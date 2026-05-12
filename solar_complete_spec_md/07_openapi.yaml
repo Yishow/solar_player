@@ -1,0 +1,652 @@
+openapi: 3.1.0
+info:
+  title: Kuozui Green Energy Display API
+  version: 1.0.0
+  description: API for solar green energy display player using Fastify, MQTT, Socket.IO, and SQLite.
+servers:
+  - url: /api
+paths:
+  /metrics/live:
+    get:
+      summary: Get current live metrics
+      operationId: getLiveMetrics
+      responses:
+        '200':
+          description: Live metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveMetrics'
+  /metrics/history:
+    get:
+      summary: Get historical metric series
+      operationId: getMetricHistory
+      parameters:
+        - in: query
+          name: metricKeys
+          schema:
+            type: string
+          description: Comma-separated metric keys
+        - in: query
+          name: range
+          schema:
+            type: string
+            enum: [day, week, month, year, custom]
+        - in: query
+          name: interval
+          schema:
+            type: string
+            enum: [1m, 5m, 30m, 1h, 1d]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Historical series
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricHistoryResponse'
+  /metrics/daily-summary:
+    get:
+      summary: Get daily energy summary
+      operationId: getDailySummary
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Daily summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyEnergySummary'
+  /metrics/cumulative:
+    get:
+      summary: Get cumulative counters
+      operationId: getCumulativeCounters
+      responses:
+        '200':
+          description: Cumulative counters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counters:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CumulativeCounter'
+  /settings/mqtt:
+    get:
+      summary: Get MQTT settings
+      operationId: getMqttSettings
+      responses:
+        '200':
+          description: MQTT settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MqttSettings'
+    put:
+      summary: Update MQTT settings
+      operationId: updateMqttSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MqttSettingsInput'
+      responses:
+        '200':
+          description: Updated MQTT settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MqttSettings'
+  /settings/mqtt/test:
+    post:
+      summary: Test MQTT connection
+      operationId: testMqttConnection
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  status: { type: string }
+                  message: { type: string }
+  /settings/mqtt/topics:
+    get:
+      summary: Get MQTT topic mappings
+      operationId: getTopicMappings
+      responses:
+        '200':
+          description: Topic mappings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topics:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TopicMapping'
+    put:
+      summary: Update MQTT topic mappings
+      operationId: updateTopicMappings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                topics:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TopicMappingInput'
+      responses:
+        '200':
+          description: Updated topic mappings
+  /circuits:
+    get:
+      summary: Get circuit configurations and live values
+      operationId: getCircuits
+      responses:
+        '200':
+          description: Circuits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  circuits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Circuit'
+    post:
+      summary: Create circuit
+      operationId: createCircuit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitInput'
+      responses:
+        '201':
+          description: Created circuit
+  /circuits/{id}:
+    put:
+      summary: Update circuit
+      operationId: updateCircuit
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CircuitInput'
+      responses:
+        '200':
+          description: Updated circuit
+    delete:
+      summary: Delete circuit
+      operationId: deleteCircuit
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted
+  /circuits/reorder:
+    put:
+      summary: Reorder circuits
+      operationId: reorderCircuits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Reordered
+  /images:
+    get:
+      summary: Get image assets
+      operationId: getImages
+      responses:
+        '200':
+          description: Image assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImageAsset'
+    post:
+      summary: Upload image
+      operationId: uploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Uploaded image
+  /images/{id}:
+    put:
+      summary: Update image metadata
+      operationId: updateImage
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageAssetInput'
+      responses:
+        '200':
+          description: Updated image
+    delete:
+      summary: Delete image
+      operationId: deleteImage
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Deleted image
+  /images/reorder:
+    put:
+      summary: Reorder images
+      operationId: reorderImages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Reordered
+  /playback/settings:
+    get:
+      summary: Get playback settings
+      operationId: getPlaybackSettings
+      responses:
+        '200':
+          description: Playback settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackSettings'
+    put:
+      summary: Update playback settings
+      operationId: updatePlaybackSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaybackSettingsInput'
+      responses:
+        '200':
+          description: Updated playback settings
+  /playback/pages:
+    get:
+      summary: Get playback pages
+      operationId: getPlaybackPages
+      responses:
+        '200':
+          description: Playback pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlaybackPage'
+    put:
+      summary: Update playback pages
+      operationId: updatePlaybackPages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlaybackPageInput'
+      responses:
+        '200':
+          description: Updated playback pages
+  /playback/current-page:
+    post:
+      summary: Set current playback page
+      operationId: setCurrentPlaybackPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pageKey]
+              properties:
+                pageKey: { type: string }
+      responses:
+        '200':
+          description: Current page changed
+  /device/status:
+    get:
+      summary: Get device status
+      operationId: getDeviceStatus
+      responses:
+        '200':
+          description: Device status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+  /device/reboot:
+    post:
+      summary: Reboot device
+      operationId: rebootDevice
+      responses:
+        '202':
+          description: Reboot scheduled
+  /device/clear-cache:
+    post:
+      summary: Clear local cache
+      operationId: clearCache
+      responses:
+        '200':
+          description: Cache cleared
+  /device/update:
+    post:
+      summary: Trigger system update
+      operationId: updateSystem
+      responses:
+        '202':
+          description: Update started
+  /device/logs:
+    get:
+      summary: Get device logs
+      operationId: getDeviceLogs
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeviceEvent'
+components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    LiveMetrics:
+      type: object
+      required: [realTimePowerKw, todayGenerationKwh, totalGenerationKwh, todayCo2ReductionT, totalCo2ReductionT, updatedAt]
+      properties:
+        realTimePowerKw: { type: number }
+        todayGenerationKwh: { type: number }
+        totalGenerationKwh: { type: number }
+        totalGenerationGwh: { type: number }
+        todayCo2ReductionT: { type: number }
+        totalCo2ReductionT: { type: number }
+        selfConsumptionKwh: { type: number }
+        consumptionKwh: { type: number }
+        selfConsumptionRatio: { type: number }
+        systemEfficiency: { type: number }
+        updatedAt: { type: string, format: date-time }
+    MetricPoint:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        value: { type: number }
+    MetricSeries:
+      type: object
+      properties:
+        metricKey: { type: string }
+        unit: { type: string }
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetricPoint'
+    MetricHistoryResponse:
+      type: object
+      properties:
+        range: { type: string }
+        interval: { type: string }
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetricSeries'
+    DailyEnergySummary:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        generationKwh: { type: number }
+        selfConsumptionKwh: { type: number }
+        consumptionKwh: { type: number }
+        co2ReductionT: { type: number }
+        peakGenerationKw: { type: number }
+        peakGenerationAt: { type: string, format: date-time }
+        peakConsumptionKw: { type: number }
+        peakConsumptionAt: { type: string, format: date-time }
+        selfConsumptionRatio: { type: number }
+        systemEfficiency: { type: number }
+    CumulativeCounter:
+      type: object
+      properties:
+        counterKey: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        lastUpdatedAt: { type: string, format: date-time }
+    MqttSettings:
+      allOf:
+        - $ref: '#/components/schemas/MqttSettingsInput'
+        - type: object
+          properties:
+            lastConnectionStatus: { type: string }
+            lastMessageAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    MqttSettingsInput:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        mode: { type: string, enum: [mqtt, mock] }
+        brokerUrl: { type: string }
+        port: { type: integer }
+        username: { type: string }
+        password: { type: string }
+        clientId: { type: string }
+        reconnectIntervalSec: { type: integer }
+        messageTimeoutSec: { type: integer }
+    TopicMapping:
+      allOf:
+        - $ref: '#/components/schemas/TopicMappingInput'
+        - type: object
+          properties:
+            id: { type: string }
+            updatedAt: { type: string, format: date-time }
+    TopicMappingInput:
+      type: object
+      properties:
+        metricKey: { type: string }
+        labelZh: { type: string }
+        labelEn: { type: string }
+        topic: { type: string }
+        unit: { type: string }
+        enabled: { type: boolean }
+    Circuit:
+      allOf:
+        - $ref: '#/components/schemas/CircuitInput'
+        - type: object
+          properties:
+            id: { type: string }
+            value: { type: number }
+            percentageOfRatedCapacity: { type: number }
+            status: { type: string, enum: [normal, attention, warning] }
+            updatedAt: { type: string, format: date-time }
+    CircuitInput:
+      type: object
+      properties:
+        displayOrder: { type: integer }
+        nameZh: { type: string }
+        nameEn: { type: string }
+        icon: { type: string }
+        unit: { type: string }
+        mqttTopic: { type: string }
+        ratedCapacity: { type: number }
+        normalMin: { type: number }
+        normalMax: { type: number }
+        attentionMin: { type: number }
+        attentionMax: { type: number }
+        warningMin: { type: number }
+        warningMax: { type: number }
+        show: { type: boolean }
+    ImageAsset:
+      allOf:
+        - $ref: '#/components/schemas/ImageAssetInput'
+        - type: object
+          properties:
+            id: { type: string }
+            filename: { type: string }
+            url: { type: string }
+            width: { type: integer }
+            height: { type: integer }
+            fileSize: { type: integer }
+            createdAt: { type: string, format: date-time }
+    ImageAssetInput:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        displayOrder: { type: integer }
+        durationSec: { type: integer }
+        includeInSlideshow: { type: boolean }
+        isCover: { type: boolean }
+        enabled: { type: boolean }
+    PlaybackSettings:
+      allOf:
+        - $ref: '#/components/schemas/PlaybackSettingsInput'
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+    PlaybackSettingsInput:
+      type: object
+      properties:
+        autoplay: { type: boolean }
+        loopMode: { type: boolean }
+        startPageKey: { type: string }
+        transitionType: { type: string, enum: [fade, slide, none] }
+        transitionSpeed: { type: string, enum: [slow, medium, fast] }
+        scheduleEnabled: { type: boolean }
+        scheduleStart: { type: string }
+        scheduleEnd: { type: string }
+        repeatDays:
+          type: array
+          items: { type: integer, minimum: 0, maximum: 6 }
+        idleMode: { type: string, enum: [static-page, black-screen, dimmed] }
+        idleMinutes: { type: integer }
+        brightness: { type: integer, minimum: 0, maximum: 100 }
+        orientation: { type: string, enum: [landscape, portrait] }
+    PlaybackPage:
+      allOf:
+        - $ref: '#/components/schemas/PlaybackPageInput'
+        - type: object
+          properties:
+            pageKey: { type: string }
+            thumbnailUrl: { type: string }
+            updatedAt: { type: string, format: date-time }
+    PlaybackPageInput:
+      type: object
+      properties:
+        pageKey: { type: string }
+        titleZh: { type: string }
+        titleEn: { type: string }
+        displayOrder: { type: integer }
+        durationSec: { type: integer }
+        enabled: { type: boolean }
+    DeviceStatus:
+      type: object
+      properties:
+        operationStatus: { type: string }
+        uptimeSec: { type: integer }
+        lastRebootAt: { type: string, format: date-time }
+        deviceName: { type: string }
+        deviceModel: { type: string }
+        serialNumber: { type: string }
+        os: { type: string }
+        systemVersion: { type: string }
+        localIp: { type: string }
+        macAddress: { type: string }
+        mqttStatus: { type: string }
+        dataSource: { type: string }
+        cpuUsage: { type: number }
+        memoryUsage: { type: number }
+        diskUsage: { type: number }
+        systemTemperatureC: { type: number }
+        networkStatus: { type: string }
+        signalStrength: { type: string }
+    DeviceEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        level: { type: string }
+        eventType: { type: string }
+        message: { type: string }
+        payload: { type: object }
+        createdAt: { type: string, format: date-time }
