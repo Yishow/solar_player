@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fastify/cors": "latest",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/swagger": "latest",
     "@fastify/swagger-ui": "latest",
     "@solar-display/shared": "workspace:*",

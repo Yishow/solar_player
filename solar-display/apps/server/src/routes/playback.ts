@@ -195,7 +195,11 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
         body.scheduleEnd === undefined ? current.schedule_end : body.scheduleEnd;
       const nextRepeatDays = body.repeatDays ?? parseRepeatDays(current.repeat_days);
       const nextIdleMode =
-        body.idleMode === "return-to-start" ? "return-to-start" : "disabled";
+        body.idleMode === undefined
+          ? current.idle_mode
+          : body.idleMode === "return-to-start"
+            ? "return-to-start"
+            : "disabled";
       const nextIdleTimeout =
         typeof body.idleTimeout === "number"
           ? Math.max(1, body.idleTimeout)
@@ -205,7 +209,11 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
           ? Math.min(100, Math.max(0, body.brightness))
           : current.brightness;
       const nextOrientation =
-        body.orientation === "portrait" ? "portrait" : "landscape";
+        body.orientation === undefined
+          ? current.orientation
+          : body.orientation === "portrait"
+            ? "portrait"
+            : "landscape";
 
       database
         .prepare(

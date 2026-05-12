@@ -328,21 +328,25 @@ export function usePlaybackController(
         return current;
       }
 
-      const nextIsPlaying =
-        !current.isIdle &&
-        !current.isPlaying &&
-        isPlaybackAllowedBySchedule(nextSettings, new Date()) &&
-        playablePages.length > 0
-          ? true
-          : current.isPlaying
-            ? false
-            : false;
+      const nowMs = Date.now();
+      const canPlay =
+        isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs)) && playablePages.length > 0;
+
+      if (current.isIdle) {
+        return createPlaybackRuntime(nextSettings, pagesRef.current, {
+          currentPageId: nextSettings.startPage,
+          isIdle: false,
+          isPlaying: canPlay,
+          lastInteractionAt: nowMs,
+          nowMs
+        });
+      }
 
       return {
         ...current,
         isIdle: false,
-        isPlaying: nextIsPlaying,
-        lastInteractionAt: Date.now()
+        isPlaying: current.isPlaying ? false : canPlay,
+        lastInteractionAt: nowMs
       };
     });
   };
