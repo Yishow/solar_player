@@ -1,0 +1,365 @@
+import {
+  createPlaybackRuntime,
+  getEnabledPlaybackPages,
+  getNextPlaybackIndex,
+  getPlaybackDurationMs,
+  getPlaybackPage,
+  isPlaybackAllowedBySchedule,
+  isPlaybackAtEdge,
+  resolvePlaybackIndexByRoute,
+  shouldEnterIdleMode,
+  type PlaybackPage,
+  type PlaybackRuntime,
+  type PlaybackSettings
+} from "@solar-display/shared";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { getPlaybackPages, getPlaybackSettings } from "../services/api";
+
+type UsePlaybackControllerOptions = {
+  currentPath?: string;
+  tickMs?: number;
+};
+
+type PlaybackControllerState = {
+  countdown: number;
+  currentPage: PlaybackPage | null;
+  errorMessage: string;
+  isIdle: boolean;
+  isLoading: boolean;
+  isPlaying: boolean;
+  pages: PlaybackPage[];
+  progress: number;
+  reload: () => Promise<void>;
+  settings: PlaybackSettings | null;
+  nextPage: () => void;
+  prevPage: () => void;
+  togglePlay: () => void;
+};
+
+function buildRuntime(
+  nextSettings: PlaybackSettings,
+  nextPages: PlaybackPage[],
+  currentRuntime: PlaybackRuntime | null,
+  currentPage: PlaybackPage | null,
+  currentPath: string | undefined,
+  nowMs: number
+) {
+  const nextRuntime = createPlaybackRuntime(nextSettings, nextPages, {
+    currentPageId: currentPage?.id ?? null,
+    isIdle: currentRuntime?.isIdle ?? false,
+    lastInteractionAt: currentRuntime?.lastInteractionAt ?? nowMs,
+    nowMs,
+    route: currentPath
+  });
+
+  if (currentRuntime === null) {
+    return nextRuntime;
+  }
+
+  const scheduleAllowsPlayback = isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs));
+  const preservePlaying =
+    !nextRuntime.isIdle && scheduleAllowsPlayback && nextSettings.autoplay ? currentRuntime.isPlaying : false;
+
+  return {
+    ...nextRuntime,
+    isPlaying: preservePlaying
+  } satisfies PlaybackRuntime;
+}
+
+export function usePlaybackController(
+  options: UsePlaybackControllerOptions = {}
+): PlaybackControllerState {
+  const [settings, setSettings] = useState<PlaybackSettings | null>(null);
+  const [pages, setPages] = useState<PlaybackPage[]>([]);
+  const [runtime, setRuntime] = useState<PlaybackRuntime | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const settingsRef = useRef<PlaybackSettings | null>(null);
+  const pagesRef = useRef<PlaybackPage[]>([]);
+  const runtimeRef = useRef<PlaybackRuntime | null>(null);
+  const tickMs = options.tickMs ?? 250;
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
+
+  useEffect(() => {
+    runtimeRef.current = runtime;
+  }, [runtime]);
+
+  const currentPage = runtime ? getPlaybackPage(runtime, pages) : null;
+  const playablePages = getEnabledPlaybackPages(pages);
+  const currentDurationMs = getPlaybackDurationMs(currentPage);
+  const countdown = runtime ? Math.max(0, Math.ceil(runtime.countdownMs / 1000)) : 0;
+  const progress =
+    runtime && currentDurationMs > 0
+      ? Math.min(100, Math.max(0, ((currentDurationMs - runtime.countdownMs) / currentDurationMs) * 100))
+      : 0;
+
+  const loadPlayback = async () => {
+    setIsLoading(true);
+
+    try {
+      const [nextSettings, nextPages] = await Promise.all([getPlaybackSettings(), getPlaybackPages()]);
+      const nowMs = Date.now();
+      const nextRuntime = buildRuntime(
+        nextSettings,
+        nextPages,
+        runtimeRef.current,
+        runtimeRef.current ? getPlaybackPage(runtimeRef.current, pagesRef.current) : null,
+        options.currentPath,
+        nowMs
+      );
+
+      startTransition(() => {
+        setSettings(nextSettings);
+        setPages(nextPages);
+        setRuntime(nextRuntime);
+        setErrorMessage("");
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPlayback();
+  }, []);
+
+  useEffect(() => {
+    const nextSettings = settingsRef.current;
+    const currentRuntime = runtimeRef.current;
+
+    if (!nextSettings || !currentRuntime || !options.currentPath) {
+      return;
+    }
+
+    const routeIndex = resolvePlaybackIndexByRoute(playablePages, options.currentPath);
+
+    if (routeIndex < 0 || routeIndex === currentRuntime.currentIndex) {
+      return;
+    }
+
+    const nextPage = playablePages[routeIndex] ?? null;
+    setRuntime({
+      ...currentRuntime,
+      countdownMs: getPlaybackDurationMs(nextPage),
+      currentIndex: routeIndex,
+      isIdle: false,
+      lastInteractionAt: Date.now()
+    });
+  }, [options.currentPath, playablePages]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      const nextSettings = settingsRef.current;
+      const currentRuntime = runtimeRef.current;
+
+      if (!nextSettings || !currentRuntime) {
+        return;
+      }
+
+      setRuntime((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const currentPages = pagesRef.current;
+        const nowMs = Date.now();
+
+        if (shouldEnterIdleMode(nextSettings, current.lastInteractionAt, nowMs)) {
+          return createPlaybackRuntime(nextSettings, currentPages, {
+            currentPageId: nextSettings.startPage,
+            isIdle: true,
+            isPlaying: false,
+            lastInteractionAt: nowMs,
+            nowMs
+          });
+        }
+
+        if (!isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs))) {
+          return {
+            ...current,
+            isPlaying: false
+          };
+        }
+
+        if (!current.isPlaying) {
+          return current;
+        }
+
+        const nextCountdownMs = current.countdownMs - tickMs;
+        if (nextCountdownMs > 0) {
+          return {
+            ...current,
+            countdownMs: nextCountdownMs
+          };
+        }
+
+        const atEdge = isPlaybackAtEdge(current, currentPages, 1);
+        const nextIndex = getNextPlaybackIndex(current.currentIndex, currentPages, nextSettings.loop, 1);
+        const nextPage = playablePages[nextIndex] ?? null;
+
+        return {
+          ...current,
+          countdownMs: getPlaybackDurationMs(nextPage),
+          currentIndex: nextIndex,
+          isPlaying: atEdge && !nextSettings.loop ? false : current.isPlaying
+        };
+      });
+    }, tickMs);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [playablePages, tickMs]);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      const nextSettings = settingsRef.current;
+
+      if (!nextSettings) {
+        return;
+      }
+
+      const nowMs = Date.now();
+
+      setRuntime((current) => {
+        if (!current) {
+          return current;
+        }
+
+        if (!current.isIdle) {
+          return {
+            ...current,
+            lastInteractionAt: nowMs
+          };
+        }
+
+        return createPlaybackRuntime(nextSettings, pagesRef.current, {
+          currentPageId: nextSettings.startPage,
+          isIdle: false,
+          isPlaying: nextSettings.autoplay,
+          lastInteractionAt: nowMs,
+          nowMs
+        });
+      });
+    };
+
+    window.addEventListener("pointerdown", handleInteraction);
+    window.addEventListener("keydown", handleInteraction);
+    window.addEventListener("touchstart", handleInteraction);
+
+    return () => {
+      window.removeEventListener("pointerdown", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+      window.removeEventListener("touchstart", handleInteraction);
+    };
+  }, []);
+
+  const nextPage = () => {
+    const nextSettings = settingsRef.current;
+
+    if (!nextSettings) {
+      return;
+    }
+
+    setRuntime((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const currentPages = pagesRef.current;
+      const nextIndex = getNextPlaybackIndex(current.currentIndex, currentPages, nextSettings.loop, 1);
+      const nextPlaybackPage = getEnabledPlaybackPages(currentPages)[nextIndex] ?? null;
+      const atEdge = isPlaybackAtEdge(current, currentPages, 1);
+
+      return {
+        ...current,
+        countdownMs: getPlaybackDurationMs(nextPlaybackPage),
+        currentIndex: nextIndex,
+        isIdle: false,
+        isPlaying: atEdge && !nextSettings.loop ? false : current.isPlaying,
+        lastInteractionAt: Date.now()
+      };
+    });
+  };
+
+  const prevPage = () => {
+    setRuntime((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const currentPages = pagesRef.current;
+      const nextIndex = getNextPlaybackIndex(
+        current.currentIndex,
+        currentPages,
+        settingsRef.current?.loop ?? true,
+        -1
+      );
+      const nextPlaybackPage = getEnabledPlaybackPages(currentPages)[nextIndex] ?? null;
+
+      return {
+        ...current,
+        countdownMs: getPlaybackDurationMs(nextPlaybackPage),
+        currentIndex: nextIndex,
+        isIdle: false,
+        lastInteractionAt: Date.now()
+      };
+    });
+  };
+
+  const togglePlay = () => {
+    const nextSettings = settingsRef.current;
+
+    if (!nextSettings) {
+      return;
+    }
+
+    setRuntime((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextIsPlaying =
+        !current.isIdle &&
+        !current.isPlaying &&
+        isPlaybackAllowedBySchedule(nextSettings, new Date()) &&
+        playablePages.length > 0
+          ? true
+          : current.isPlaying
+            ? false
+            : false;
+
+      return {
+        ...current,
+        isIdle: false,
+        isPlaying: nextIsPlaying,
+        lastInteractionAt: Date.now()
+      };
+    });
+  };
+
+  return {
+    countdown,
+    currentPage,
+    errorMessage,
+    isIdle: runtime?.isIdle ?? false,
+    isLoading,
+    isPlaying: runtime?.isPlaying ?? false,
+    nextPage,
+    pages,
+    prevPage,
+    progress,
+    reload: loadPlayback,
+    settings,
+    togglePlay
+  };
+}

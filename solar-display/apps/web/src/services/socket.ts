@@ -1,3 +1,4 @@
+import type { PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 
 export type LiveMetricReading = {
@@ -33,7 +34,7 @@ type ServerToClientEvents = {
   "images:updated": unknown;
   "liveMetrics:update": LiveMetricsSnapshot;
   "mqtt:status": MqttConnectionStatus;
-  "playback:settingsUpdated": unknown;
+  "playback:settingsUpdated": PlaybackSettingsUpdatedEvent;
   "system:error": unknown;
   "system:recovered": unknown;
 };

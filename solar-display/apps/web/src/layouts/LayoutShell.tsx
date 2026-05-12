@@ -4,11 +4,21 @@ import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { useMqttStatus } from "../hooks/useMqttStatus";
+import { usePageRotation } from "../hooks/usePageRotation";
 
 export function LayoutShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isHydrated, status } = useMqttStatus();
+  const routeMeta = routeMetaMap.get(location.pathname);
+
+  usePageRotation({
+    currentPath: location.pathname,
+    onRouteChange: (route) => {
+      navigate(route, { replace: true });
+    },
+    routeRotationEnabled: routeMeta?.group === "playback"
+  });
 
   useEffect(() => {
     if (!isHydrated) {
@@ -18,8 +28,6 @@ export function LayoutShell() {
     if (location.pathname === "/offline") {
       return;
     }
-
-    const routeMeta = routeMetaMap.get(location.pathname);
     if (routeMeta?.group !== "playback") {
       return;
     }

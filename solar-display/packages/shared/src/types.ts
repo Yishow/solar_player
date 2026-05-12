@@ -52,16 +52,38 @@ export interface PlaybackSettings {
   autoplay: boolean;
   loop: boolean;
   startPage: number;
-  transitionType: string;
+  transitionType: PlaybackTransitionType;
   transitionSpeed: number;
   scheduleEnabled: boolean;
   scheduleStart: string | null;
   scheduleEnd: string | null;
-  repeatDays: string | null;
-  idleMode: boolean;
+  repeatDays: number[];
+  idleMode: PlaybackIdleMode;
   idleTimeout: number;
   brightness: number;
-  orientation: string;
+  orientation: PlaybackOrientation;
+  updatedAt: string | null;
+}
+
+export type PlaybackTransitionType = "fade" | "slide" | "none";
+export type PlaybackIdleMode = "disabled" | "return-to-start";
+export type PlaybackOrientation = "landscape" | "portrait";
+
+export interface PlaybackPage {
+  id: number;
+  pageKey: string;
+  route: string;
+  labelZh: string;
+  labelEn: string;
+  enabled: boolean;
+  displayOrder: number;
+  durationSeconds: number;
+}
+
+export interface PlaybackSettingsUpdatedEvent {
+  source: "pages" | "settings";
+  pages?: PlaybackPage[];
+  settings?: PlaybackSettings;
 }
 
 export interface ImageAsset {

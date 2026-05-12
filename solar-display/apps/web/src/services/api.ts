@@ -1,3 +1,5 @@
+import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+
 export function buildApiUrl(path: string) {
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
@@ -28,4 +30,40 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
   }
 
   return (await response.json()) as T;
+}
+
+export async function getPlaybackSettings() {
+  const response = await requestJson<{
+    settings: PlaybackSettings;
+  }>("/api/playback/settings");
+  return response.settings;
+}
+
+export async function updatePlaybackSettings(settings: Partial<PlaybackSettings>) {
+  const response = await requestJson<{
+    settings: PlaybackSettings;
+  }>("/api/playback/settings", {
+    body: JSON.stringify(settings),
+    method: "PUT"
+  });
+  return response.settings;
+}
+
+export async function getPlaybackPages() {
+  const response = await requestJson<{
+    pages: PlaybackPage[];
+  }>("/api/playback/pages");
+  return response.pages;
+}
+
+export async function updatePlaybackPages(
+  pages: Array<Pick<PlaybackPage, "id" | "displayOrder" | "durationSeconds" | "enabled">>
+) {
+  const response = await requestJson<{
+    pages: PlaybackPage[];
+  }>("/api/playback/pages", {
+    body: JSON.stringify({ pages }),
+    method: "PUT"
+  });
+  return response.pages;
 }

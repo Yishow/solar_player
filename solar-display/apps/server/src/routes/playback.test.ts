@@ -1,0 +1,232 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { after } from "node:test";
+import {
+  createPlaybackRuntime,
+  getEnabledPlaybackPages,
+  getPlaybackPage,
+  isPlaybackAllowedBySchedule,
+  shouldEnterIdleMode,
+  type PlaybackPage,
+  type PlaybackSettings
+} from "@solar-display/shared";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-playback-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+
+const [{ buildApp }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
+  import("../app.js"),
+  import("../db/migrate.js"),
+  import("../db/seed.js")
+]);
+
+const baseSettings: PlaybackSettings = {
+  autoplay: true,
+  brightness: 100,
+  idleMode: "disabled",
+  idleTimeout: 300,
+  loop: true,
+  orientation: "landscape",
+  repeatDays: [1, 2, 3, 4, 5],
+  scheduleEnabled: false,
+  scheduleEnd: "18:00",
+  scheduleStart: "08:00",
+  startPage: 2,
+  transitionSpeed: 1000,
+  transitionType: "fade",
+  updatedAt: null
+};
+
+const basePages: PlaybackPage[] = [
+  {
+    displayOrder: 2,
+    durationSeconds: 20,
+    enabled: true,
+    id: 2,
+    labelEn: "Solar",
+    labelZh: "太陽能",
+    pageKey: "solar",
+    route: "/solar"
+  },
+  {
+    displayOrder: 1,
+    durationSeconds: 10,
+    enabled: true,
+    id: 1,
+    labelEn: "Overview",
+    labelZh: "總覽",
+    pageKey: "overview",
+    route: "/overview"
+  },
+  {
+    displayOrder: 3,
+    durationSeconds: 15,
+    enabled: false,
+    id: 3,
+    labelEn: "Images",
+    labelZh: "圖庫",
+    pageKey: "images",
+    route: "/images"
+  }
+];
+
+after(() => {
+  rmSync(tempDir, { force: true, recursive: true });
+});
+
+test("playback shared helpers sort enabled pages, honor schedule, and enter idle mode", () => {
+  const enabledPages = getEnabledPlaybackPages(basePages);
+  assert.deepEqual(
+    enabledPages.map((page) => page.id),
+    [1, 2]
+  );
+
+  const runtime = createPlaybackRuntime(baseSettings, basePages, {
+    nowMs: Date.UTC(2026, 4, 13, 1, 0, 0),
+    route: "/solar"
+  });
+
+  assert.equal(runtime.currentIndex, 1);
+  assert.equal(getPlaybackPage(runtime, basePages)?.route, "/solar");
+  assert.equal(runtime.countdownMs, 20000);
+
+  const scheduledSettings = {
+    ...baseSettings,
+    repeatDays: [3],
+    scheduleEnabled: true
+  } satisfies PlaybackSettings;
+
+  assert.equal(
+    isPlaybackAllowedBySchedule(scheduledSettings, new Date("2026-05-13T09:30:00+08:00")),
+    true
+  );
+  assert.equal(
+    isPlaybackAllowedBySchedule(scheduledSettings, new Date("2026-05-13T19:30:00+08:00")),
+    false
+  );
+
+  const idleSettings = {
+    ...baseSettings,
+    idleMode: "return-to-start",
+    idleTimeout: 30
+  } satisfies PlaybackSettings;
+
+  assert.equal(shouldEnterIdleMode(idleSettings, 10_000, 39_000), false);
+  assert.equal(shouldEnterIdleMode(idleSettings, 10_000, 40_000), true);
+});
+
+test("GET /api/playback/settings and /api/playback/pages expose seeded playback data", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const [settingsResponse, pagesResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/playback/settings"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/playback/pages"
+      })
+    ]);
+
+    assert.equal(settingsResponse.statusCode, 200);
+    assert.equal(pagesResponse.statusCode, 200);
+
+    const settingsBody = settingsResponse.json() as {
+      settings: PlaybackSettings;
+    };
+    const pagesBody = pagesResponse.json() as {
+      pages: PlaybackPage[];
+    };
+
+    assert.deepEqual(settingsBody.settings.repeatDays, [1, 2, 3, 4, 5]);
+    assert.equal(settingsBody.settings.idleMode, "disabled");
+    assert.deepEqual(
+      pagesBody.pages.map((page) => page.displayOrder),
+      [1, 2, 3, 4, 5]
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/playback/settings and /api/playback/pages persist updates and emit socket events", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  const emittedEvents: unknown[] = [];
+  const originalEmit = app.socketService.emitPlaybackSettingsUpdated.bind(app.socketService);
+
+  app.socketService.emitPlaybackSettingsUpdated = (payload: unknown) => {
+    emittedEvents.push(payload);
+    originalEmit(payload);
+  };
+
+  try {
+    const pagesResponse = await app.inject({
+      method: "GET",
+      url: "/api/playback/pages"
+    });
+    const pages = (pagesResponse.json() as { pages: PlaybackPage[] }).pages;
+
+    const settingsUpdateResponse = await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        autoplay: false,
+        brightness: 88,
+        idleMode: "return-to-start",
+        idleTimeout: 90,
+        loop: false,
+        orientation: "portrait",
+        repeatDays: [1, 3, 5],
+        scheduleEnabled: true,
+        scheduleEnd: "19:00",
+        scheduleStart: "07:30",
+        startPage: pages[1]?.id ?? pages[0]?.id ?? 0,
+        transitionSpeed: 1500,
+        transitionType: "slide"
+      } satisfies Partial<PlaybackSettings>
+    });
+
+    assert.equal(settingsUpdateResponse.statusCode, 200);
+    const updatedSettings = (settingsUpdateResponse.json() as { settings: PlaybackSettings }).settings;
+    assert.equal(updatedSettings.autoplay, false);
+    assert.equal(updatedSettings.idleMode, "return-to-start");
+    assert.deepEqual(updatedSettings.repeatDays, [1, 3, 5]);
+
+    const pagesUpdateResponse = await app.inject({
+      method: "PUT",
+      url: "/api/playback/pages",
+      payload: {
+        pages: pages
+          .slice()
+          .reverse()
+          .map((page, index) => ({
+            displayOrder: index + 1,
+            durationSeconds: 12 + index,
+            enabled: index !== 0,
+            id: page.id
+          }))
+      }
+    });
+
+    assert.equal(pagesUpdateResponse.statusCode, 200);
+    const updatedPages = (pagesUpdateResponse.json() as { pages: PlaybackPage[] }).pages;
+    assert.equal(updatedPages[0]?.displayOrder, 1);
+    assert.equal(updatedPages[0]?.durationSeconds, 12);
+    assert.equal(updatedPages[0]?.enabled, false);
+    assert.equal(emittedEvents.length, 2);
+  } finally {
+    app.socketService.emitPlaybackSettingsUpdated = originalEmit;
+    await app.close();
+  }
+});
