@@ -83,6 +83,10 @@ export class SocketService {
     this.io.emit("circuitMetrics:update", data);
   }
 
+  emitCircuitSettingsUpdated(data: unknown) {
+    this.io.emit("circuit:settingsUpdated", data);
+  }
+
   emitPlaybackSettingsUpdated(data: unknown) {
     this.io.emit("playback:settingsUpdated", data);
   }
