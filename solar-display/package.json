@@ -1,0 +1,19 @@
+{
+  "name": "solar-display",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "concurrently -k -n web,server \"pnpm --filter @solar-display/web dev\" \"pnpm --filter @solar-display/server dev\"",
+    "dev:web": "pnpm --filter @solar-display/web dev",
+    "dev:server": "pnpm --filter @solar-display/server dev",
+    "build": "pnpm run build:shared && pnpm run build:web && pnpm run build:server",
+    "build:shared": "pnpm --filter @solar-display/shared build",
+    "build:web": "pnpm --filter @solar-display/web build",
+    "build:server": "pnpm --filter @solar-display/server build",
+    "db:migrate": "pnpm --filter @solar-display/server db:migrate",
+    "db:seed": "pnpm --filter @solar-display/server db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "latest"
+  }
+}
