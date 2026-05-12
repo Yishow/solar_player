@@ -10,6 +10,12 @@ async function startServer() {
     migrateDatabase();
     seedDatabase();
 
+    try {
+      await app.mqttClientService.connect();
+    } catch (error) {
+      app.log.warn({ error }, "MQTT initial connect failed");
+    }
+
     await app.listen({
       host: config.host,
       port: config.port

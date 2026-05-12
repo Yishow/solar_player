@@ -4,12 +4,17 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError } from "fastify";
 import { config } from "./config.js";
 import { closeDatabaseConnection } from "./db/index.js";
+import { MqttClientService } from "./mqtt/MqttClientService.js";
 import healthRoute from "./routes/health.js";
+import settingsMqttRoute from "./routes/settings-mqtt.js";
 
 export async function buildApp() {
   const app = Fastify({
     logger: true
   });
+  const mqttClientService = new MqttClientService({ logger: app.log });
+
+  app.decorate("mqttClientService", mqttClientService);
 
   await app.register(cors, {
     origin: true
@@ -32,6 +37,7 @@ export async function buildApp() {
   });
 
   await app.register(healthRoute);
+  await app.register(settingsMqttRoute);
 
   app.setNotFoundHandler((request, reply) => {
     reply.status(404).send({
@@ -52,6 +58,7 @@ export async function buildApp() {
   });
 
   app.addHook("onClose", async () => {
+    await mqttClientService.disconnect();
     closeDatabaseConnection();
   });
 
