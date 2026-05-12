@@ -4,17 +4,38 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError } from "fastify";
 import { config } from "./config.js";
 import { closeDatabaseConnection } from "./db/index.js";
+import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
+import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import healthRoute from "./routes/health.js";
+import metricsRoute from "./routes/metrics.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 
 export async function buildApp() {
   const app = Fastify({
     logger: true
   });
-  const mqttClientService = new MqttClientService({ logger: app.log });
+  let mqttClientService: MqttClientService | null = null;
+  const socketService = new SocketService({
+    getLiveMetricsSnapshot: () => readLiveMetricsSnapshot(),
+    getMqttStatus: () =>
+      mqttClientService?.getStatus() ?? {
+        broker: "",
+        clientId: "",
+        connected: false,
+        reason: "offline",
+        updatedAt: new Date().toISOString()
+      } satisfies MqttStatus,
+    logger: app.log,
+    server: app.server
+  });
+  mqttClientService = new MqttClientService({
+    logger: app.log,
+    socketService
+  });
 
   app.decorate("mqttClientService", mqttClientService);
+  app.decorate("socketService", socketService);
 
   await app.register(cors, {
     origin: true
@@ -37,6 +58,7 @@ export async function buildApp() {
   });
 
   await app.register(healthRoute);
+  await app.register(metricsRoute);
   await app.register(settingsMqttRoute);
 
   app.setNotFoundHandler((request, reply) => {
@@ -58,6 +80,7 @@ export async function buildApp() {
   });
 
   app.addHook("onClose", async () => {
+    await socketService.close();
     await mqttClientService.disconnect();
     closeDatabaseConnection();
   });

@@ -15,9 +15,11 @@
     "@fastify/cors": "latest",
     "@fastify/swagger": "latest",
     "@fastify/swagger-ui": "latest",
+    "@solar-display/shared": "workspace:*",
     "better-sqlite3": "latest",
     "fastify": "latest",
-    "mqtt": "^5.15.1"
+    "mqtt": "^5.15.1",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "latest",

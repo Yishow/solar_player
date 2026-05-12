@@ -8,9 +8,11 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build"
   },
   "dependencies": {
+    "@solar-display/shared": "workspace:*",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest"
+    "react-router-dom": "latest",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/react": "latest",

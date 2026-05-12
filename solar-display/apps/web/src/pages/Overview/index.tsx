@@ -2,10 +2,74 @@ import { MetricCard } from "../../components/MetricCard";
 import { DataCardGrid } from "../../components/DataCardGrid";
 import { Sparkline } from "../../components/Sparkline";
 import { PanelCard } from "../../components/PanelCard";
+import { StatusBadge } from "../../components/StatusBadge";
+import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { PageScaffold } from "../shared/PageScaffold";
 import { liveMetrics, trendSeries } from "../../mocks/metrics";
 
+const metricBindings = [
+  {
+    fallbackIndex: 0,
+    metricKey: "realTimePower"
+  },
+  {
+    fallbackIndex: 1,
+    metricKey: "todayGeneration"
+  },
+  {
+    fallbackIndex: 2,
+    metricKey: "selfConsumptionRatio"
+  },
+  {
+    fallbackIndex: 3,
+    metricKey: "todayCo2Reduction"
+  },
+  {
+    fallbackIndex: 4,
+    metricKey: "systemEfficiency"
+  }
+] as const;
+
+function formatMetricValue(value: number, unit: string | null) {
+  const digits =
+    unit === "%" ? 1 : Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
+
+  return value.toLocaleString("zh-TW", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits === 0 ? 0 : 1
+  });
+}
+
+function formatHelperTimestamp(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleTimeString("zh-TW", {
+    hour12: false
+  });
+}
+
 export function Overview() {
+  const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
+  const metricsToRender = metricBindings.map(({ fallbackIndex, metricKey }) => {
+    const fallbackMetric = liveMetrics[fallbackIndex]!;
+    const liveMetric = snapshot.metrics[metricKey];
+
+    if (!isSocketConnected || !liveMetric) {
+      return fallbackMetric;
+    }
+
+    return {
+      ...fallbackMetric,
+      helper: `最後更新 ${formatHelperTimestamp(liveMetric.timestamp)}`,
+      unit: liveMetric.unit ?? fallbackMetric.unit,
+      value: formatMetricValue(liveMetric.value, liveMetric.unit)
+    };
+  });
+
   return (
     <PageScaffold
       path="/overview"
@@ -35,7 +99,7 @@ export function Overview() {
 
       {/* KPI Cards */}
       <DataCardGrid columns={5}>
-        {liveMetrics.map((metric, i) => (
+        {metricsToRender.map((metric) => (
           <MetricCard
             key={metric.label}
             icon={metric.icon}
@@ -49,6 +113,18 @@ export function Overview() {
 
       {/* Sparkline trend */}
       <PanelCard title="發電趨勢" subtitle="POWER TREND (12H)">
+        <div className="mb-4 flex items-center justify-end">
+          <StatusBadge
+            status={
+              connectionState === "connected"
+                ? "connected"
+                : connectionState === "connecting"
+                  ? "connecting"
+                  : "disconnected"
+            }
+            label={isSocketConnected ? "Socket 即時更新中" : "Socket 未連線，顯示 mock 資料"}
+          />
+        </div>
         <Sparkline values={trendSeries} />
       </PanelCard>
     </PageScaffold>

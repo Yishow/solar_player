@@ -5,6 +5,8 @@ import {
   type MqttClient
 } from "mqtt";
 import { getDatabase } from "../db/index.js";
+import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import type { SocketService } from "../realtime/SocketService.js";
 import { parse } from "./PayloadParser.js";
 
 type LoggerLike = {
@@ -51,12 +53,22 @@ type MqttClientServiceOptions = {
   logger: LoggerLike;
   database?: Database.Database;
   connectFn?: ConnectFunction;
+  socketService?: Pick<
+    SocketService,
+    | "emitCircuitMetrics"
+    | "emitLiveMetrics"
+    | "emitMqttStatus"
+    | "emitSystemError"
+    | "emitSystemRecovered"
+  >;
 };
 
 export type MqttStatus = {
   connected: boolean;
   broker: string;
   clientId: string;
+  reason: string | null;
+  updatedAt: string;
 };
 
 function waitForEvent(client: MqttClient, options: { timeoutMs: number }) {
@@ -141,32 +153,40 @@ export class MqttClientService {
   private readonly database: Database.Database;
   private readonly logger: LoggerLike;
   private readonly connectFn: ConnectFunction;
+  private readonly socketService: MqttClientServiceOptions["socketService"];
   private client: MqttClient | null = null;
   private desiredTopics = new Set<string>();
   private activeTopics = new Set<string>();
   private status: MqttStatus = {
     broker: "",
     clientId: "",
-    connected: false
+    connected: false,
+    reason: "offline",
+    updatedAt: new Date().toISOString()
   };
+  private hasActiveSystemError = false;
   private mockMode = false;
 
   constructor(options: MqttClientServiceOptions) {
     this.database = options.database ?? getDatabase();
     this.logger = options.logger;
     this.connectFn = options.connectFn ?? connect;
+    this.socketService = options.socketService;
   }
 
   async connect() {
     const settings = this.readSettings();
+    await this.disconnect({ broadcast: false });
+
     this.status = {
       broker: `${settings.broker_host ?? "localhost"}:${settings.broker_port ?? 1883}`,
       clientId: settings.client_id ?? "",
-      connected: false
+      connected: false,
+      reason: settings.data_mode === "mock" ? "mock" : "offline",
+      updatedAt: new Date().toISOString()
     };
     this.desiredTopics = new Set(await this.loadEnabledTopics());
-
-    await this.disconnect();
+    this.publishStatus();
 
     if (settings.data_mode === "mock") {
       this.mockMode = true;
@@ -179,11 +199,28 @@ export class MqttClientService {
     this.client = client;
     this.attachClientHandlers(client);
 
-    await waitForEvent(client, {
-      timeoutMs: Math.max((settings.message_timeout ?? 30) * 1000, 1000)
-    });
-    this.status.connected = true;
-    await this.syncSubscriptions();
+    try {
+      await waitForEvent(client, {
+        timeoutMs: Math.max((settings.message_timeout ?? 30) * 1000, 1000)
+      });
+      this.setStatus({
+        connected: true,
+        reason: "connected"
+      });
+      await this.syncSubscriptions();
+      this.notifySystemRecovered("MQTT connection restored");
+    } catch (error) {
+      this.setStatus({
+        connected: false,
+        reason: error instanceof Error ? error.message : "error"
+      });
+      this.notifySystemError("MQTT initial connect failed", {
+        broker: this.status.broker,
+        clientId: this.status.clientId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   }
 
   async testConnection(input: TestConnectionInput) {
@@ -231,17 +268,26 @@ export class MqttClientService {
     await this.syncSubscriptions();
   }
 
-  async disconnect() {
+  async disconnect(options?: { broadcast?: boolean }) {
     this.status.connected = false;
+    this.status.reason = this.mockMode ? "mock" : "offline";
+    this.status.updatedAt = new Date().toISOString();
     this.activeTopics.clear();
 
     if (!this.client) {
+      if (options?.broadcast !== false) {
+        this.publishStatus();
+      }
       return;
     }
 
     const client = this.client;
     this.client = null;
     await disconnectClient(client);
+
+    if (options?.broadcast !== false) {
+      this.publishStatus();
+    }
   }
 
   getStatus(): MqttStatus {
@@ -298,22 +344,43 @@ export class MqttClientService {
 
   private attachClientHandlers(client: MqttClient) {
     client.on("connect", () => {
-      this.status.connected = true;
+      this.setStatus({
+        connected: true,
+        reason: "connected"
+      });
+      this.notifySystemRecovered("MQTT connection restored");
       void this.syncSubscriptions();
     });
     client.on("reconnect", () => {
-      this.status.connected = false;
+      this.setStatus({
+        connected: false,
+        reason: "reconnecting"
+      });
       this.logger.info({ broker: this.status.broker }, "MQTT reconnecting");
     });
     client.on("close", () => {
-      this.status.connected = false;
+      this.setStatus({
+        connected: false,
+        reason: "offline"
+      });
     });
     client.on("offline", () => {
-      this.status.connected = false;
+      this.setStatus({
+        connected: false,
+        reason: "offline"
+      });
     });
     client.on("error", (error) => {
-      this.status.connected = false;
+      this.setStatus({
+        connected: false,
+        reason: error.message
+      });
       this.logger.error({ error }, "MQTT client error");
+      this.notifySystemError("MQTT client error", {
+        broker: this.status.broker,
+        clientId: this.status.clientId,
+        error: error.message
+      });
     });
     client.on("message", (topic, payload) => {
       void this.handleMessage(topic, payload.toString());
@@ -421,5 +488,66 @@ export class MqttClientService {
         );
       }
     }
+
+    const snapshot = readLiveMetricsSnapshot(this.database);
+    this.socketService?.emitLiveMetrics(snapshot);
+
+    const circuitMetrics = this.buildCircuitMetricsSnapshot(snapshot, mappings.map((mapping) => mapping.metric_key));
+    if (circuitMetrics !== null) {
+      this.socketService?.emitCircuitMetrics(circuitMetrics);
+    }
+  }
+
+  private buildCircuitMetricsSnapshot(
+    snapshot: LiveMetricsSnapshot,
+    metricKeys: string[]
+  ): LiveMetricsSnapshot | null {
+    const circuitEntries = metricKeys
+      .filter((metricKey) => metricKey.startsWith("factory"))
+      .map((metricKey) => [metricKey, snapshot.metrics[metricKey]] as const)
+      .filter((entry): entry is [string, LiveMetricsSnapshot["metrics"][string]] => entry[1] !== undefined);
+
+    if (circuitEntries.length === 0) {
+      return null;
+    }
+
+    return {
+      metrics: Object.fromEntries(circuitEntries),
+      timestamp: snapshot.timestamp
+    };
+  }
+
+  private setStatus(next: Pick<MqttStatus, "connected" | "reason">) {
+    this.status = {
+      ...this.status,
+      ...next,
+      updatedAt: new Date().toISOString()
+    };
+    this.publishStatus();
+  }
+
+  private publishStatus() {
+    this.socketService?.emitMqttStatus(this.getStatus());
+  }
+
+  private notifySystemError(message: string, details?: Record<string, unknown>) {
+    this.hasActiveSystemError = true;
+    this.socketService?.emitSystemError({
+      details,
+      message,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  private notifySystemRecovered(message: string) {
+    if (!this.hasActiveSystemError) {
+      return;
+    }
+
+    this.hasActiveSystemError = false;
+    this.socketService?.emitSystemRecovered({
+      message,
+      timestamp: new Date().toISOString()
+    });
   }
 }
