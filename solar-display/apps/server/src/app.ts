@@ -9,6 +9,7 @@ import { MqttClientService } from "./mqtt/MqttClientService.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
+import metricsHistoryRoute from "./routes/metrics-history.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 
 export async function buildApp() {
@@ -59,6 +60,7 @@ export async function buildApp() {
 
   await app.register(healthRoute);
   await app.register(metricsRoute);
+  await app.register(metricsHistoryRoute);
   await app.register(settingsMqttRoute);
 
   app.setNotFoundHandler((request, reply) => {

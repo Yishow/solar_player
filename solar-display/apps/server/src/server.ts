@@ -2,6 +2,9 @@ import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { migrateDatabase } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
+import { DailySummaryService } from "./services/DailySummaryService.js";
+import { MetricsAccumulatorService } from "./services/MetricsAccumulatorService.js";
+import { SnapshotWriterService } from "./services/SnapshotWriterService.js";
 
 async function startServer() {
   const app = await buildApp();
@@ -9,6 +12,26 @@ async function startServer() {
   try {
     migrateDatabase();
     seedDatabase();
+
+    const metricsAccumulatorService = new MetricsAccumulatorService();
+    metricsAccumulatorService.initialize();
+    metricsAccumulatorService.start();
+
+    const snapshotWriterService = new SnapshotWriterService({
+      metricsAccumulatorService
+    });
+    snapshotWriterService.start();
+
+    const dailySummaryService = new DailySummaryService({
+      metricsAccumulatorService
+    });
+    dailySummaryService.start();
+
+    app.addHook("onClose", async () => {
+      dailySummaryService.stop();
+      snapshotWriterService.stop();
+      metricsAccumulatorService.stop();
+    });
 
     try {
       await app.mqttClientService.connect();

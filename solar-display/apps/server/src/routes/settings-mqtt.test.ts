@@ -109,6 +109,182 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
   }
 });
 
+test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted history records", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(120.5, 90.1, 66.2, 59.5, 54.94, 97.3, "2026-05-13T09:00:00.000Z");
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total,
+          peak_generation,
+          peak_generation_time,
+          peak_consumption,
+          peak_consumption_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(
+      "2026-05-13",
+      120.5,
+      90.1,
+      66.2,
+      59.5,
+      612.4,
+      "2026-05-13T11:20:00.000Z",
+      488.9,
+      "2026-05-13T15:10:00.000Z"
+    );
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 120.5, '2026-05-13T09:00:00.000Z', 0),
+          ('consumption', 90.1, '2026-05-13T09:00:00.000Z', 0),
+          ('selfConsumption', 66.2, '2026-05-13T09:00:00.000Z', 0),
+          ('co2', 59.5, '2026-05-13T09:00:00.000Z', 0)
+      `
+    )
+    .run();
+
+  const app = await buildApp();
+
+  try {
+    const [historyResponse, dailySummaryResponse, cumulativeResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/metrics/history?range=total"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/metrics/daily-summary"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/metrics/cumulative"
+      })
+    ]);
+
+    assert.equal(historyResponse.statusCode, 200);
+    assert.equal(dailySummaryResponse.statusCode, 200);
+    assert.equal(cumulativeResponse.statusCode, 200);
+
+    const historyBody = historyResponse.json() as {
+      range: string;
+      snapshots: Array<{
+        capturedAt: string;
+        co2: number;
+        consumption: number;
+        efficiency: number;
+        generation: number;
+        ratio: number;
+        selfConsumption: number;
+      }>;
+    };
+    const dailySummaryBody = dailySummaryResponse.json() as {
+      summaries: Array<{
+        co2Total: number;
+        consumptionTotal: number;
+        date: string;
+        generationTotal: number;
+        peakConsumption: number;
+        peakConsumptionTime: string;
+        peakGeneration: number;
+        peakGenerationTime: string;
+        selfConsumptionTotal: number;
+      }>;
+    };
+    const cumulativeBody = cumulativeResponse.json() as {
+      counters: Array<{
+        lastUpdated: string;
+        metricKey: string;
+        resetCount: number;
+        totalValue: number;
+      }>;
+    };
+
+    assert.equal(historyBody.range, "total");
+    assert.deepEqual(historyBody.snapshots, [
+      {
+        capturedAt: "2026-05-13T09:00:00.000Z",
+        co2: 59.5,
+        consumption: 90.1,
+        efficiency: 97.3,
+        generation: 120.5,
+        ratio: 54.94,
+        selfConsumption: 66.2
+      }
+    ]);
+    assert.deepEqual(dailySummaryBody.summaries, [
+      {
+        co2Total: 59.5,
+        consumptionTotal: 90.1,
+        date: "2026-05-13",
+        generationTotal: 120.5,
+        peakConsumption: 488.9,
+        peakConsumptionTime: "2026-05-13T15:10:00.000Z",
+        peakGeneration: 612.4,
+        peakGenerationTime: "2026-05-13T11:20:00.000Z",
+        selfConsumptionTotal: 66.2
+      }
+    ]);
+    assert.deepEqual(cumulativeBody.counters, [
+      {
+        lastUpdated: "2026-05-13T09:00:00.000Z",
+        metricKey: "co2",
+        resetCount: 0,
+        totalValue: 59.5
+      },
+      {
+        lastUpdated: "2026-05-13T09:00:00.000Z",
+        metricKey: "consumption",
+        resetCount: 0,
+        totalValue: 90.1
+      },
+      {
+        lastUpdated: "2026-05-13T09:00:00.000Z",
+        metricKey: "generation",
+        resetCount: 0,
+        totalValue: 120.5
+      },
+      {
+        lastUpdated: "2026-05-13T09:00:00.000Z",
+        metricKey: "selfConsumption",
+        resetCount: 0,
+        totalValue: 66.2
+      }
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("SocketService emits initial snapshots and broadcasts update events", async () => {
   const emittedEvents: Array<{ event: string; payload: unknown }> = [];
   const clientEvents: Array<{ event: string; payload: unknown }> = [];
