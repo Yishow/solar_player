@@ -1,6 +1,19 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { LayoutShell } from "../layouts/LayoutShell";
-import { Index } from "../pages/Index";
+import { CircuitSettings } from "../pages/CircuitSettings";
+import { DeviceStatus } from "../pages/DeviceStatus";
+import { EnergyHistory } from "../pages/EnergyHistory";
+import { EnergyTrend } from "../pages/EnergyTrend";
+import { FactoryCircuit } from "../pages/FactoryCircuit";
+import { ImageManagement } from "../pages/ImageManagement";
+import { Images } from "../pages/Images";
+import { MqttSettings } from "../pages/MqttSettings";
+import { OfflineError } from "../pages/OfflineError";
+import { Overview } from "../pages/Overview";
+import { PlaybackSettings } from "../pages/PlaybackSettings";
+import { SlideshowPreview } from "../pages/SlideshowPreview";
+import { Solar } from "../pages/Solar";
+import { Sustainability } from "../pages/Sustainability";
 
 export const router = createBrowserRouter([
   {
@@ -13,23 +26,59 @@ export const router = createBrowserRouter([
       },
       {
         path: "overview",
-        element: <Index />
+        element: <Overview />
       },
       {
         path: "solar",
-        element: <Index />
+        element: <Solar />
       },
       {
         path: "factory-circuit",
-        element: <Index />
+        element: <FactoryCircuit />
       },
       {
         path: "images",
-        element: <Index />
+        element: <Images />
       },
       {
         path: "sustainability",
-        element: <Index />
+        element: <Sustainability />
+      },
+      {
+        path: "trends",
+        element: <EnergyTrend />
+      },
+      {
+        path: "settings/playback",
+        element: <PlaybackSettings />
+      },
+      {
+        path: "settings/images",
+        element: <ImageManagement />
+      },
+      {
+        path: "settings/mqtt",
+        element: <MqttSettings />
+      },
+      {
+        path: "settings/circuits",
+        element: <CircuitSettings />
+      },
+      {
+        path: "history",
+        element: <EnergyHistory />
+      },
+      {
+        path: "offline",
+        element: <OfflineError />
+      },
+      {
+        path: "slideshow-preview",
+        element: <SlideshowPreview />
+      },
+      {
+        path: "device-status",
+        element: <DeviceStatus />
       }
     ]
   }

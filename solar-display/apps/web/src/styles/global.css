@@ -6,6 +6,7 @@
 
 @layer base {
   html {
+    height: 100%;
     font-family: var(--font-family-zh);
     color: var(--color-neutral-900);
     background-color: var(--color-brand-green-50);
@@ -14,11 +15,16 @@
   body {
     margin: 0;
     min-width: 320px;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
     background:
       radial-gradient(circle at top left, rgba(245, 166, 35, 0.2), transparent 24%),
       radial-gradient(circle at top right, rgba(79, 122, 63, 0.18), transparent 28%),
       linear-gradient(180deg, #f5f8f1 0%, #eef4eb 54%, #eaf1e5 100%);
+  }
+
+  #root {
+    height: 100%;
   }
 
   * {
