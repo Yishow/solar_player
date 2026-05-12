@@ -1,0 +1,31 @@
+# Solar Display systemd service
+# Install: sudo cp solar-display.service /etc/systemd/system/
+# Enable: sudo systemctl enable solar-display
+# Start: sudo systemctl start solar-display
+
+[Unit]
+Description=Solar Display Kiosk System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/solar-display
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/opt/solar-display/data
+Environment=LOG_DIR=/opt/solar-display/logs
+Environment=PORT=3000
+ExecStart=/usr/bin/node apps/server/dist/app.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/solar-display/data /opt/solar-display/logs /opt/solar-display/apps/server/public/uploads
+
+[Install]
+WantedBy=multi-user.target

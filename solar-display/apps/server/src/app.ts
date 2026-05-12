@@ -13,6 +13,7 @@ import metricsHistoryRoute from "./routes/metrics-history.js";
 import playbackRoute from "./routes/playback.js";
 import imagesRoute from "./routes/images.js";
 import circuitsRoute from "./routes/circuits.js";
+import deviceRoute from "./routes/device.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 
 export async function buildApp() {
@@ -67,6 +68,7 @@ export async function buildApp() {
   await app.register(playbackRoute);
   await app.register(imagesRoute);
   await app.register(circuitsRoute);
+  await app.register(deviceRoute);
   await app.register(settingsMqttRoute);
 
   app.setNotFoundHandler((request, reply) => {
