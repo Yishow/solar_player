@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "dev": "concurrently -k -n web,server \"pnpm --filter @solar-display/web dev\" \"pnpm --filter @solar-display/server dev\"",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "pnpm --filter @solar-display/web dev",
     "dev:server": "pnpm --filter @solar-display/server dev",
     "build": "pnpm run build:shared && pnpm run build:web && pnpm run build:server",
