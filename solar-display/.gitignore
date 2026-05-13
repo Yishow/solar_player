@@ -5,6 +5,9 @@ dist/
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
+apps/server/data/*.sqlite
+apps/server/data/*.sqlite-shm
+apps/server/data/*.sqlite-wal
 uploads/images/*
 !uploads/images/.gitkeep
 !data/.gitkeep
