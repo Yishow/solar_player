@@ -45,6 +45,29 @@ test("GET /api/settings/mqtt masks password and exposes status", async () => {
   }
 });
 
+test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/api/settings/mqtt",
+      headers: {
+        origin: "http://127.0.0.1:5177",
+        "access-control-request-method": "PUT"
+      }
+    });
+
+    assert.equal(response.statusCode, 204);
+    assert.match(response.headers["access-control-allow-methods"] ?? "", /\bPUT\b/);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/metrics/live returns the latest live metrics snapshot", async () => {
   migrateDatabase();
   seedDatabase();

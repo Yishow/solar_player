@@ -77,6 +77,7 @@ export async function buildApp() {
   app.decorate("socketService", socketService);
 
   await app.register(cors, {
+    methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
     origin: true
   });
 

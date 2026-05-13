@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildApiUrl } from "./api";
+import { buildApiUrl, requestJson } from "./api";
 
 test("buildApiUrl maps any Vite dev port back to the backend port", () => {
   const originalWindow = globalThis.window;
@@ -23,5 +23,33 @@ test("buildApiUrl maps any Vite dev port back to the backend port", () => {
       configurable: true,
       value: originalWindow
     });
+  }
+});
+
+test("requestJson prefers JSON error messages over the raw serialized body", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        code: "ECONNREFUSED",
+        message: "connect ECONNREFUSED 127.0.0.1:18831",
+        statusCode: 500
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 500
+      }
+    );
+
+  try {
+    await assert.rejects(
+      () => requestJson("/api/settings/mqtt/test"),
+      /connect ECONNREFUSED 127\.0\.0\.1:18831/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });

@@ -21,6 +21,27 @@ export function buildApiUrl(path: string) {
   return `${window.location.protocol}//${window.location.hostname}:${apiPort}${path}`;
 }
 
+function extractErrorMessage(rawBody: string) {
+  try {
+    const parsed = JSON.parse(rawBody) as {
+      error?: string;
+      message?: string;
+    };
+
+    if (typeof parsed.message === "string" && parsed.message.trim().length > 0) {
+      return parsed.message;
+    }
+
+    if (typeof parsed.error === "string" && parsed.error.trim().length > 0) {
+      return parsed.error;
+    }
+  } catch {
+    // fall back to the original response body when it is not JSON
+  }
+
+  return rawBody;
+}
+
 export async function requestJson<T>(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
 
@@ -34,8 +55,8 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}`);
+    const rawBody = await response.text();
+    throw new Error(rawBody ? extractErrorMessage(rawBody) : `Request failed with status ${response.status}`);
   }
 
   return (await response.json()) as T;
