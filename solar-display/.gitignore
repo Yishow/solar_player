@@ -8,5 +8,3 @@ data/*.sqlite-wal
 uploads/images/*
 !uploads/images/.gitkeep
 !data/.gitkeep
-.spectra/
-openspec/.vector-search.db*
