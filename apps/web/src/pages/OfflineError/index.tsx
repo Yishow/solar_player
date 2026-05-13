@@ -1,50 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { KioskButton } from "../../components/KioskButton";
-import { LeafOrnament } from "../../components/LeafOrnament";
-import { PanelCard } from "../../components/PanelCard";
-import { StatusBadge } from "../../components/StatusBadge";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { getSocketClient } from "../../services/socket";
 import { PageScaffold } from "../shared/PageScaffold";
+import { buildOfflineErrorViewModel } from "./viewModel";
 
 const RETRY_SECONDS = 15;
-
-function formatTimestamp(value: string | null) {
-  if (!value) {
-    return "尚未收到";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString("zh-TW", {
-    hour12: false
-  });
-}
-
-function resolveReasonLabel(reason: string | null) {
-  if (reason === "reconnecting") {
-    return "MQTT broker 正在重連，系統暫停即時推送。";
-  }
-
-  if (reason === "mock") {
-    return "目前為 mock mode，不會連到實體 broker。";
-  }
-
-  if (reason === "offline") {
-    return "MQTT broker 離線或網路中斷。";
-  }
-
-  if (!reason || reason === "connected") {
-    return "正在等待最新的連線狀態。";
-  }
-
-  return reason;
-}
 
 export function OfflineError() {
   const navigate = useNavigate();
@@ -94,58 +57,81 @@ export function OfflineError() {
     setRetryCountdown(RETRY_SECONDS);
   };
 
+  const viewModel = buildOfflineErrorViewModel({
+    lastUpdatedAt: lastUpdatedAt ?? status.updatedAt,
+    reason: status.reason,
+    retryCountdown,
+    returnTo
+  });
+
   return (
     <PageScaffold
       path="/offline"
       description="離線錯誤頁用於 kiosk 網路中斷或資料源失聯時，顯示可理解的恢復資訊。"
     >
-      <PanelCard title="系統暫時離線" subtitle="OFFLINE RECOVERY">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-xl bg-white/95 p-6">
-            <StatusBadge status={status.connected ? "connected" : "disconnected"} label="MQTT 即時資料中斷" />
-            <p className="mt-6 text-5xl font-bold leading-tight text-brand-900">正在等待重新連線</p>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-neutral-600">
-              目前展示播放器無法取得即時發電資料，系統將持續自動重連；連線恢復後會自動返回原本的播放頁。
-            </p>
-            <dl className="mt-6 grid gap-4 rounded-2xl border border-brand-100 bg-brand-50/80 p-5 text-sm text-neutral-700">
-              <div>
-                <dt className="font-semibold text-brand-900">最後更新時間</dt>
-                <dd className="mt-1">{formatTimestamp(lastUpdatedAt ?? status.updatedAt)}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-brand-900">錯誤原因</dt>
-                <dd className="mt-1">{resolveReasonLabel(status.reason)}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-brand-900">建議處理方式</dt>
-                <dd className="mt-1">
-                  1. 確認 broker 與網路交換器供電正常。
-                  <br />
-                  2. 檢查 `settings/mqtt` 的 host、port 與帳密是否為最新設定。
-                  <br />
-                  3. 若現場仍需展示，可先切回靜態輪播頁面。
-                </dd>
-              </div>
-            </dl>
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <KioskButton onClick={handleRetry}>立即重試</KioskButton>
-              <KioskButton variant="secondary" onClick={() => navigate("/images")}>
-                切換備援輪播
-              </KioskButton>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-7 overflow-hidden rounded-[32px] border border-white/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.97),rgba(245,247,242,0.9))] p-8 shadow-panel">
+          <div className="flex items-start gap-5">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[rgba(198,103,69,0.12)] text-4xl text-[var(--color-status-error-500)]">
+              ⇅
+            </div>
+            <div>
+              <p className="text-[46px] font-bold leading-tight text-brand-900">{viewModel.headline}</p>
+              <p className="mt-2 font-en text-xl text-neutral-500">{viewModel.subtitle}</p>
             </div>
           </div>
-          <div className="flex flex-col justify-between rounded-xl bg-brand-100 p-6">
-            <LeafOrnament className="h-16 w-24" />
-            <div>
-              <p className="text-lg font-semibold text-brand-900">Retry in</p>
-              <p className="mt-3 font-en text-6xl font-bold text-brand-900">
-                00:{retryCountdown.toString().padStart(2, "0")}
-              </p>
-              <p className="mt-4 text-sm text-brand-900/80">恢復後將返回 {returnTo}</p>
-            </div>
+
+          <p className="mt-8 text-lg leading-8 text-neutral-600">
+            系統正在嘗試重新連線中。連線恢復後，會自動返回原本的播放頁面，不需要人工重新導頁。
+          </p>
+
+          <div className="mt-8 grid gap-4 rounded-[28px] border border-brand-100 bg-brand-50/75 p-5">
+            {viewModel.guidanceRows.map((row) => (
+              <div key={row.label} className="grid gap-1">
+                <p className="text-sm font-semibold tracking-[0.08em] text-brand-900">{row.label}</p>
+                <p className="text-sm leading-6 text-neutral-700">{row.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <KioskButton onClick={handleRetry}>立即重試</KioskButton>
+            <KioskButton variant="secondary" onClick={() => navigate("/images")}>
+              切換備援輪播
+            </KioskButton>
           </div>
         </div>
-      </PanelCard>
+
+        <div className="col-span-5 rounded-[32px] border border-white/70 bg-[linear-gradient(180deg,rgba(216,232,201,0.88),rgba(255,255,255,0.95))] p-8 shadow-card">
+          <p className="text-sm uppercase tracking-[0.24em] text-brand-900/70">Reconnecting...</p>
+          <p className="mt-5 text-6xl font-bold text-brand-900">00:{retryCountdown.toString().padStart(2, "0")}</p>
+          <div className="mt-6 h-2 rounded-full bg-white/70">
+            <div
+              className="h-full rounded-full bg-brand-900 transition-[width] duration-300"
+              style={{ width: `${((RETRY_SECONDS - retryCountdown) / RETRY_SECONDS) * 100}%` }}
+            />
+          </div>
+
+          <div className="mt-8 space-y-5">
+            <div>
+              <p className="text-sm font-semibold tracking-[0.08em] text-neutral-500">最後更新時間</p>
+              <p className="mt-2 text-2xl font-semibold text-neutral-900">{viewModel.lastUpdatedLabel}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-[0.08em] text-neutral-500">錯誤原因</p>
+              <p className="mt-2 text-lg leading-7 text-neutral-800">{viewModel.reasonLabel}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-[0.08em] text-neutral-500">恢復後返回</p>
+              <p className="mt-2 text-lg font-semibold text-neutral-800">{viewModel.returnToLabel}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-2xl bg-white/85 px-4 py-4 text-sm leading-6 text-neutral-600">
+            {viewModel.retryLabel}
+          </div>
+        </div>
+      </div>
     </PageScaffold>
   );
 }

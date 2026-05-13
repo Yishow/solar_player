@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KioskButton } from "../../components/KioskButton";
-import { MetricCard } from "../../components/MetricCard";
-import { PanelCard } from "../../components/PanelCard";
-import { DataCardGrid } from "../../components/DataCardGrid";
 import { requestJson } from "../../services/api";
 import { PageScaffold } from "../shared/PageScaffold";
+import {
+  buildDeviceStatusViewModel,
+  type DeviceActionFeedback
+} from "./viewModel";
 
-type DeviceStatus = {
+type DeviceRouteStatus = {
   hostname: string;
   platform: string;
   arch: string;
@@ -18,127 +19,247 @@ type DeviceStatus = {
   pid: number;
 };
 
-function formatUptime(seconds: number): string {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${days} 天 ${hours} 時`;
-  if (hours > 0) return `${hours} 時 ${minutes} 分`;
-  return `${minutes} 分`;
+type DeviceStatusResponse = {
+  success: boolean;
+  data: DeviceRouteStatus;
+  error?: string;
+};
+
+type DeviceActionResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  data?: {
+    directory?: string;
+    files?: string[];
+  };
+};
+
+async function getDeviceStatus() {
+  const response = await requestJson<DeviceStatusResponse>("/api/device/status");
+  if (!response.success) {
+    throw new Error(response.error ?? "載入裝置狀態失敗。");
+  }
+  return response.data;
+}
+
+async function runDeviceAction(path: string) {
+  return requestJson<DeviceActionResponse>(path, {
+    method: "POST"
+  });
+}
+
+async function exportLogs() {
+  return requestJson<DeviceActionResponse>("/api/device/logs/export");
+}
+
+function feedbackClassName(tone: "error" | "loading" | "ready") {
+  if (tone === "error") {
+    return "border-[rgba(230,0,18,0.18)] bg-[rgba(255,241,241,0.96)]";
+  }
+
+  if (tone === "loading") {
+    return "border-[rgba(138,148,132,0.18)] bg-[rgba(249,249,247,0.92)]";
+  }
+
+  return "border-[rgba(78,121,55,0.18)] bg-[rgba(244,248,239,0.92)]";
 }
 
 export function DeviceStatus() {
-  const [status, setStatus] = useState<DeviceStatus | null>(null);
+  const [status, setStatus] = useState<DeviceRouteStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [actionFeedback, setActionFeedback] = useState<DeviceActionFeedback>(null);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+
     const load = async () => {
       try {
-        const resp = await requestJson<{ success: boolean; data: DeviceStatus }>("/api/device/status");
-        if (active) setStatus(resp.data);
-      } catch {
-        // fallback
+        const nextStatus = await getDeviceStatus();
+        if (!active) {
+          return;
+        }
+        setStatus(nextStatus);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setActionFeedback({
+          detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
+          title: "同步失敗",
+          tone: "error"
+        });
       } finally {
-        if (active) setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
+
     void load();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleReboot = async () => {
+  const handleAction = async (
+    actionKey: string,
+    title: string,
+    action: () => Promise<DeviceActionResponse>
+  ) => {
+    setActiveAction(actionKey);
+    setActionFeedback({
+      detail: "正在執行維護操作，請稍候。",
+      title,
+      tone: "loading"
+    });
+
     try {
-      await requestJson("/api/device/reboot", { method: "POST" });
-    } catch {
-      // expected: disabled in production
+      const response = await action();
+
+      if (!response.success) {
+        throw new Error(response.error ?? "維護操作失敗。");
+      }
+
+      const detail =
+        response.message ??
+        (response.data?.files ? `可匯出 ${response.data.files.length} 份日誌。` : "維護操作已完成。");
+
+      setActionFeedback({
+        detail,
+        title: `${title}完成`,
+        tone: "ready"
+      });
+    } catch (error) {
+      setActionFeedback({
+        detail: error instanceof Error ? error.message : "維護操作失敗。",
+        title: `${title}失敗`,
+        tone: "error"
+      });
+    } finally {
+      setActiveAction(null);
     }
   };
 
-  const handleClearCache = async () => {
-    try {
-      await requestJson("/api/device/clear-cache", { method: "POST" });
-    } catch {
-      // fallback
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <PageScaffold path="/device-status" description="裝置狀態">
-        <p className="text-center text-neutral-500">載入中...</p>
-      </PageScaffold>
-    );
-  }
+  const viewModel = useMemo(
+    () =>
+      buildDeviceStatusViewModel({
+        actionFeedback,
+        isLoading,
+        status
+      }),
+    [actionFeedback, isLoading, status]
+  );
 
   return (
     <PageScaffold path="/device-status" description="裝置即時狀態、系統資源與維護操作。">
-      <PanelCard title="系統資訊" subtitle="SYSTEM INFO">
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-neutral-500">主機名稱</span>
-            <p className="font-semibold text-neutral-800">{status?.hostname ?? "-"}</p>
+      <div className="grid grid-cols-12 gap-6">
+        <aside className="col-span-3 grid gap-4">
+          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
+            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">裝置運作狀態</p>
+            <p className="mt-3 text-3xl font-bold text-brand-900">{viewModel.runtimeSummary.title}</p>
+            <p className="mt-2 text-sm text-neutral-500">{viewModel.runtimeSummary.detail}</p>
           </div>
-          <div>
-            <span className="text-neutral-500">平台</span>
-            <p className="font-semibold text-neutral-800">{status?.platform} / {status?.arch}</p>
+          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
+            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">系統運行時間</p>
+            <p className="mt-3 text-3xl font-bold text-brand-900">{viewModel.systemRows[3]?.value}</p>
           </div>
-          <div>
-            <span className="text-neutral-500">Node.js</span>
-            <p className="font-semibold text-neutral-800">{status?.nodeVersion ?? "-"}</p>
+          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
+            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">最後同步狀態</p>
+            <p className="mt-3 text-base leading-7 text-neutral-700">{viewModel.feedback.detail}</p>
           </div>
-          <div>
-            <span className="text-neutral-500">運行時間</span>
-            <p className="font-semibold text-neutral-800">{status ? formatUptime(status.uptimeSeconds) : "-"}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">CPU 核心</span>
-            <p className="font-semibold text-neutral-800">{status?.cpu.cores ?? 0}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">PID</span>
-            <p className="font-semibold text-neutral-800">{status?.pid ?? 0}</p>
-          </div>
-        </div>
-      </PanelCard>
+        </aside>
 
-      <DataCardGrid columns={3}>
-        <MetricCard
-          icon="🧠"
-          label="記憶體使用"
-          value={String(status?.memory.usePercent ?? 0)}
-          unit="%"
-          helper={`${status?.memory.usedMB ?? 0} / ${status?.memory.totalMB ?? 0} MB`}
-        />
-        <MetricCard
-          icon="💾"
-          label="磁碟使用"
-          value={String(status?.disk.usePercent ?? 0)}
-          unit="%"
-          helper={`${status?.disk.usedMB ?? 0} / ${status?.disk.totalMB ?? 0} MB`}
-        />
-        <MetricCard
-          icon="⚡"
-          label="CPU 負載"
-          value={String(status?.cpu.loadAvg[0] ?? 0)}
-          unit=""
-          helper={`1m / 5m / 15m: ${status?.cpu.loadAvg.map((v) => v.toFixed(2)).join(" / ")}`}
-        />
-      </DataCardGrid>
+        <section className="col-span-5 rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-card">
+          <h2 className="text-2xl font-semibold text-brand-900">裝置資訊</h2>
+          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">Device Information</p>
+          <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-5">
+            {viewModel.systemRows.map((row) => (
+              <div key={row.label}>
+                <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{row.label}</p>
+                <p className="mt-2 text-lg font-semibold text-neutral-900">{row.value}</p>
+              </div>
+            ))}
+            {viewModel.networkRows.map((row) => (
+              <div key={row.label}>
+                <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{row.label}</p>
+                <p className="mt-2 text-lg font-semibold text-neutral-900">{row.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <PanelCard title="維護操作" subtitle="MAINTENANCE">
-        <div className="grid grid-cols-3 gap-4">
-          <KioskButton variant="secondary" onClick={() => void handleReboot()}>
-            重新開機（已停用）
-          </KioskButton>
-          <KioskButton variant="secondary" onClick={() => void handleClearCache()}>
-            清除快取
-          </KioskButton>
-          <KioskButton variant="ghost" onClick={() => window.location.reload()}>
-            重新整理頁面
-          </KioskButton>
-        </div>
-      </PanelCard>
+        <section className="col-span-4 rounded-[28px] border border-white/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(241,246,235,0.82))] p-6 shadow-card">
+          <h2 className="text-2xl font-semibold text-brand-900">系統資源監控</h2>
+          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">System Resource Monitor</p>
+          <div className="mt-6 grid gap-4">
+            {viewModel.resourceCards.map((card) => (
+              <div key={card.label} className="rounded-2xl border border-white/70 bg-white/86 px-4 py-4 shadow-soft">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{card.label}</p>
+                  <p className="text-2xl font-bold text-brand-900">{card.valueLabel}</p>
+                </div>
+                <p className="mt-2 text-sm text-neutral-600">{card.helper}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-6 grid grid-cols-12 gap-6">
+        <section className="col-span-8 rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-card">
+          <h2 className="text-2xl font-semibold text-brand-900">維護操作</h2>
+          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">Maintenance Actions</p>
+          <div className="mt-6 grid grid-cols-4 gap-4">
+            <KioskButton
+              variant="secondary"
+              disabled={activeAction !== null}
+              onClick={() => void handleAction("reboot", "重新啟動裝置", () => runDeviceAction("/api/device/reboot"))}
+            >
+              {activeAction === "reboot" ? "執行中..." : "重新啟動裝置"}
+            </KioskButton>
+            <KioskButton
+              variant="secondary"
+              disabled={activeAction !== null}
+              onClick={() => void handleAction("clear-cache", "清除快取", () => runDeviceAction("/api/device/clear-cache"))}
+            >
+              {activeAction === "clear-cache" ? "執行中..." : "清除快取"}
+            </KioskButton>
+            <KioskButton
+              variant="secondary"
+              disabled={activeAction !== null}
+              onClick={() =>
+                void handleAction("system-update", "更新系統", async () => ({
+                  success: false,
+                  error: "目前尚未實作 system update endpoint。"
+                }))
+              }
+            >
+              {activeAction === "system-update" ? "執行中..." : "更新系統"}
+            </KioskButton>
+            <KioskButton
+              variant="ghost"
+              disabled={activeAction !== null}
+              onClick={() => void handleAction("export-logs", "匯出日誌", exportLogs)}
+            >
+              {activeAction === "export-logs" ? "執行中..." : "匯出日誌"}
+            </KioskButton>
+          </div>
+        </section>
+
+        <section
+          className={[
+            "col-span-4 rounded-[28px] border px-5 py-5 shadow-soft",
+            feedbackClassName((viewModel.feedback?.tone ?? "ready") as "error" | "loading" | "ready")
+          ].join(" ")}
+        >
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Maintenance Feedback</p>
+          <p className="mt-3 text-2xl font-semibold text-neutral-800">{viewModel.feedback.title}</p>
+          <p className="mt-3 text-sm leading-6 text-neutral-600">{viewModel.feedback.detail}</p>
+        </section>
+      </div>
     </PageScaffold>
   );
 }
