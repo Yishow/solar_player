@@ -26,7 +26,7 @@ StandardError=journal
 # Security
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/opt/solar-display/data /opt/solar-display/logs /opt/solar-display/apps/server/public/uploads
+ReadWritePaths=/opt/solar-display/data /opt/solar-display/logs /opt/solar-display/uploads/images
 
 [Install]
 WantedBy=multi-user.target

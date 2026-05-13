@@ -20,7 +20,7 @@ echo "[2/5] Creating install directory..."
 sudo mkdir -p "${INSTALL_DIR}"
 sudo mkdir -p "${INSTALL_DIR}/data"
 sudo mkdir -p "${INSTALL_DIR}/logs"
-sudo mkdir -p "${INSTALL_DIR}/apps/server/public/uploads"
+sudo mkdir -p "${INSTALL_DIR}/uploads/images"
 
 # 3. Copy files
 echo "[3/5] Copying files..."
