@@ -53,3 +53,31 @@ test("requestJson prefers JSON error messages over the raw serialized body", asy
     globalThis.fetch = originalFetch;
   }
 });
+
+test("requestJson does not force application/json when the request has no body", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenContentType: string | null = null;
+
+  globalThis.fetch = async (_input, init) => {
+    const headers = new Headers(init?.headers);
+    seenContentType = headers.get("Content-Type");
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json"
+      },
+      status: 200
+    });
+  };
+
+  try {
+    const response = await requestJson<{ success: boolean }>("/api/device/clear-cache", {
+      method: "POST"
+    });
+
+    assert.equal(response.success, true);
+    assert.equal(seenContentType, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

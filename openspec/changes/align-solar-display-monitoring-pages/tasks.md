@@ -7,4 +7,4 @@
 ## 2. Runtime-Sensitive Behavior and Readability
 
 - [x] 2.1 完成 “Preserve offline, slideshow preview, and maintenance behavior” 並對應 ### Preserve offline, preview, and maintenance behavior before visual completeness，確認 reconnect、return navigation、preview controls、progress semantics、maintenance action feedback 不回歸；驗證方式為執行 `pnpm --filter @solar-display/web test -- src/layouts/offlineRouting.test.ts src/hooks/playbackRouteNavigation.test.ts src/hooks/playbackRouteSync.test.ts`，並人工 smoke test `/offline` 與 `/slideshow-preview`。
-- [ ] 2.2 完成 “Keep monitoring and maintenance content readable at FHD scale” 並對應 ### Treat readability as a contract, not a visual nice-to-have，確認長圖表、長表格、長狀態列與維護資訊在 FHD 下可讀；驗證方式為人工檢查 `/history`、`/device-status` 等高密度頁面的可讀性摘要。
+- [x] 2.2 完成 “Keep monitoring and maintenance content readable at FHD scale” 並對應 ### Treat readability as a contract, not a visual nice-to-have，確認長圖表、長表格、長狀態列與維護資訊在 FHD 下可讀；驗證方式為人工檢查 `/history`、`/device-status` 等高密度頁面的可讀性摘要。

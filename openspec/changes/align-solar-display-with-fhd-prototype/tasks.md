@@ -66,8 +66,8 @@
 - [x] 8.4 完成 `management-page-visual-alignment` 的 `/offline` 遷移，讓 `apps/web/src/pages/OfflineError/index.tsx` 對齊 `docs/reference/kuozui-green-fhd-html-prototype/html-pages/12-offline-error-display.html` 的離線告警版面，同時保留 retry countdown、returnTo 導航與 reconnect 行為；驗證方式為執行 `pnpm --filter @solar-display/web test -- src/layouts/offlineRouting.test.ts`，並人工檢查離線與恢復時的 route 行為。
 - [x] 8.5 完成 `management-page-visual-alignment` 的 `/slideshow-preview` 遷移，讓 `apps/web/src/pages/SlideshowPreview/index.tsx` 對齊 `docs/reference/kuozui-green-fhd-html-prototype/html-pages/13-slideshow-preview.html` 的 live preview、progress、playback controls 與 page queue hierarchy，同時保留 `usePageRotation` 的既有控制流程；驗證方式為執行 `pnpm --filter @solar-display/web test -- src/hooks/playbackRouteNavigation.test.ts src/hooks/playbackRouteSync.test.ts`，並人工檢查 prev/next/play control。
 - [x] 8.6 完成 `management-page-visual-alignment` 的 `/device-status` 遷移，讓 `apps/web/src/pages/DeviceStatus/index.tsx` 對齊 `docs/reference/kuozui-green-fhd-html-prototype/html-pages/14-device-status-details.html` 的 system info、resource cards、maintenance actions 與 error/fallback states；驗證方式為執行 `pnpm --filter @solar-display/web build`，並人工檢查 reboot/clear-cache 行為在失敗時仍有合理回饋。
-- [ ] 8.7 完成 “Keep dense monitoring and maintenance content readable at FHD scale”，確認 `/trends`、`/history`、`/offline`、`/slideshow-preview`、`/device-status` 的圖表、表格、狀態文字、維護操作在 FHD 下可讀；驗證方式為人工檢查長資料與高密度區塊不擠壓關鍵控制項。
-- [ ] 8.8 完成 “Save an evidence bundle at every phase boundary” 的 Monitoring batch evidence bundle，保存 `06`、`11`、`12`、`13`、`14` 的 screenshot、命令輸出、長資料可讀性摘要與 runtime-sensitive 行為檢查；驗證方式為內容 review，確認五條 route 都有證據與未完成註記。
+- [x] 8.7 完成 “Keep dense monitoring and maintenance content readable at FHD scale”，確認 `/trends`、`/history`、`/offline`、`/slideshow-preview`、`/device-status` 的圖表、表格、狀態文字、維護操作在 FHD 下可讀；驗證方式為人工檢查長資料與高密度區塊不擠壓關鍵控制項。
+- [x] 8.8 完成 “Save an evidence bundle at every phase boundary” 的 Monitoring batch evidence bundle，保存 `06`、`11`、`12`、`13`、`14` 的 screenshot、命令輸出、長資料可讀性摘要與 runtime-sensitive 行為檢查；驗證方式為內容 review，確認五條 route 都有證據與未完成註記。
 
 ## 9. Cross-route verification and handoff
 
