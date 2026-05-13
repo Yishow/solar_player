@@ -1,4 +1,7 @@
+import type { ShellDensity } from "./shellDensity";
+
 type StatusBadgeProps = {
+  density?: ShellDensity;
   status: "connected" | "disconnected" | "connecting";
   label?: string;
 };
@@ -21,13 +24,19 @@ const badgeStyleMap = {
   }
 } as const;
 
-export function StatusBadge({ status, label }: StatusBadgeProps) {
+export function StatusBadge({
+  density = "management",
+  status,
+  label
+}: StatusBadgeProps) {
   const style = badgeStyleMap[status];
 
   return (
     <span
+      data-shell-density={density}
+      data-shell-primitive="status-pill"
       className={[
-        "inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold tracking-[0.08em]",
+        "inline-flex h-[var(--status-pill-height)] items-center gap-2 rounded-full px-4 text-sm font-semibold tracking-[0.08em]",
         style.wrapper
       ].join(" ")}
     >

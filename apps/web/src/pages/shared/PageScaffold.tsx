@@ -17,6 +17,7 @@ export function PageScaffold({ path, description, children }: PageScaffoldProps)
 
   return (
     <PageContainer
+      density={routeMeta.shellDensity}
       title={routeMeta.title}
       subtitle={routeMeta.subtitle}
       description={description}

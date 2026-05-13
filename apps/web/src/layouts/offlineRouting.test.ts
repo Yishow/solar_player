@@ -39,7 +39,8 @@ test("playback routes without offline fallback still redirect when mqtt is offli
     title: "即時頁",
     subtitle: "Live Data",
     group: "playback",
-    order: 999
+    order: 999,
+    shellDensity: "playback"
   };
 
   assert.equal(

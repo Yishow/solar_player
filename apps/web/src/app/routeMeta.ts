@@ -1,3 +1,5 @@
+import type { ShellDensity } from "../components/shellDensity";
+
 export type RouteGroup = "playback" | "management";
 
 export type RouteMeta = {
@@ -8,6 +10,7 @@ export type RouteMeta = {
   subtitle: string;
   group: RouteGroup;
   order: number;
+  shellDensity: ShellDensity;
 };
 
 export const routeMetaList: RouteMeta[] = [
@@ -18,7 +21,8 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Overview",
     allowOfflineWhenDisconnected: true,
     group: "playback",
-    order: 1
+    order: 1,
+    shellDensity: "playback"
   },
   {
     path: "/solar",
@@ -27,7 +31,8 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Solar Generation",
     allowOfflineWhenDisconnected: true,
     group: "playback",
-    order: 2
+    order: 2,
+    shellDensity: "playback"
   },
   {
     path: "/factory-circuit",
@@ -36,7 +41,8 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Factory Circuit",
     allowOfflineWhenDisconnected: true,
     group: "playback",
-    order: 3
+    order: 3,
+    shellDensity: "playback"
   },
   {
     path: "/images",
@@ -45,7 +51,8 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Images",
     allowOfflineWhenDisconnected: true,
     group: "playback",
-    order: 4
+    order: 4,
+    shellDensity: "playback"
   },
   {
     path: "/sustainability",
@@ -54,7 +61,8 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Sustainability",
     allowOfflineWhenDisconnected: true,
     group: "playback",
-    order: 5
+    order: 5,
+    shellDensity: "playback"
   },
   {
     path: "/trends",
@@ -62,7 +70,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "能源趨勢",
     subtitle: "Energy Trend",
     group: "management",
-    order: 6
+    order: 6,
+    shellDensity: "management"
   },
   {
     path: "/settings/playback",
@@ -70,7 +79,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "播放設定",
     subtitle: "Playback Settings",
     group: "management",
-    order: 7
+    order: 7,
+    shellDensity: "management"
   },
   {
     path: "/settings/images",
@@ -78,7 +88,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "圖片管理",
     subtitle: "Image Management",
     group: "management",
-    order: 8
+    order: 8,
+    shellDensity: "management"
   },
   {
     path: "/settings/mqtt",
@@ -86,7 +97,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "MQTT 設定",
     subtitle: "MQTT Settings",
     group: "management",
-    order: 9
+    order: 9,
+    shellDensity: "management"
   },
   {
     path: "/settings/circuits",
@@ -94,7 +106,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "迴路設定",
     subtitle: "Circuit Settings",
     group: "management",
-    order: 10
+    order: 10,
+    shellDensity: "management"
   },
   {
     path: "/history",
@@ -102,7 +115,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "發電歷史",
     subtitle: "Energy History",
     group: "management",
-    order: 11
+    order: 11,
+    shellDensity: "management"
   },
   {
     path: "/offline",
@@ -110,7 +124,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "離線錯誤",
     subtitle: "Offline Error",
     group: "management",
-    order: 12
+    order: 12,
+    shellDensity: "management"
   },
   {
     path: "/slideshow-preview",
@@ -118,7 +133,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "輪播預覽",
     subtitle: "Slideshow Preview",
     group: "management",
-    order: 13
+    order: 13,
+    shellDensity: "management"
   },
   {
     path: "/device-status",
@@ -126,7 +142,8 @@ export const routeMetaList: RouteMeta[] = [
     title: "裝置狀態",
     subtitle: "Device Status",
     group: "management",
-    order: 14
+    order: 14,
+    shellDensity: "device-detail"
   }
 ];
 
