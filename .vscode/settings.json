@@ -1,0 +1,15 @@
+{
+    "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+        {
+            "text": "請以繁體中文產生 Pull Request 描述。格式：第一段一句話說明這個 PR 解決什麼問題或達成什麼目標；接著條列實際變更，每條必須引用 diff 中真實出現的符號（函數名、元件名、檔案名、設定鍵）並說明其行為變化；最後若有破壞性變更或部署注意事項，單獨一節列出。禁止出現「提升可讀性」、「改善使用者體驗」、「優化相關邏輯」等無法從 diff 驗證的空話。"
+        }
+    ],
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "【強制語言規則】commit 訊息的摘要與所有條列說明必須使用繁體中文。type 和 scope 保留英文，其餘全部中文。禁止輸出英文摘要。"
+        },
+        {
+            "text": "使用 Conventional Commits 格式：第一行「type(scope): 摘要」（50 字內，不加句號）。每條條列說明必須引用 diff 中出現的實際符號（函數名、變數名、類別名、檔案名），並說明其行為變化。禁止出現「移除未使用的代碼」、「提升可讀性」、「優化邏輯」等通用描述。若 diff 簡單，只寫第一行即可。"
+        }
+    ]
+}

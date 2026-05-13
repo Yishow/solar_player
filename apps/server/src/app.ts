@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError } from "fastify";
+import { mkdirSync } from "node:fs";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
@@ -27,7 +28,12 @@ function shouldServeSpaFallback(request: { headers: { accept?: string }; method:
 
   const pathname = new URL(request.url, "http://localhost").pathname;
 
-  if (pathname.startsWith("/api/") || pathname.startsWith("/docs") || pathname.startsWith("/assets/")) {
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/docs") ||
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/uploads/")
+  ) {
     return false;
   }
 
@@ -98,6 +104,14 @@ export async function buildApp() {
   await app.register(circuitsRoute);
   await app.register(deviceRoute);
   await app.register(settingsMqttRoute);
+
+  mkdirSync(config.uploadsDir, { recursive: true });
+  await app.register(fastifyStatic, {
+    root: config.uploadsDir,
+    prefix: "/uploads/images/",
+    decorateReply: false,
+    index: false
+  });
 
   // Serve frontend static files
   const serverDir = dirname(fileURLToPath(import.meta.url));

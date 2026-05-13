@@ -5,6 +5,7 @@
 - 本 repo 根目錄就是正式產品工作目錄；直接從 root 執行 `pnpm`、讀 `package.json`、看 `apps/`、`packages/`、`deploy/`、`openspec/`。
 - 不要再把 `solar-display/`、舊 prompt package、或 `docs/` 裡的歷史資料當成主要入口。
 - 產品 monorepo 目前以 root `package.json` 為準，正式 workspace package 是 `@solar-display/server`、`@solar-display/web`、`@solar-display/shared`。
+- 做瀏覽器測試用 agent-browser skill。
 
 ## 先看哪些地方
 

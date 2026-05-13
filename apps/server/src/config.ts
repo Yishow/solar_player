@@ -20,7 +20,6 @@ function resolveDataDir() {
 export const config = {
   projectRoot,
   openapiPath: resolve(projectRoot, "docs/openapi.yaml"),
-  uploadsDir: resolve(projectRoot, "uploads/images"),
   migrationsDir: resolve(projectRoot, "apps/server/src/db/migrations"),
   get host() {
     return process.env.HOST ?? "0.0.0.0";
@@ -30,6 +29,9 @@ export const config = {
   },
   get dataDir() {
     return resolveDataDir();
+  },
+  get uploadsDir() {
+    return process.env.UPLOADS_DIR ?? resolve(projectRoot, "uploads/images");
   },
   get databasePath() {
     return process.env.DATABASE_PATH ?? resolve(resolveDataDir(), "solar-display.sqlite");

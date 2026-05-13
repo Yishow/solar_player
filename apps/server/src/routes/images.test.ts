@@ -8,6 +8,7 @@ import type { ImageAsset } from "@solar-display/shared";
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-images-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+process.env.UPLOADS_DIR = join(tempDir, "uploads", "images");
 
 const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = await Promise.all([
   import("../app.js"),
@@ -24,7 +25,7 @@ function clearImagesTable() {
     deleteStmt.run(row.id);
   }
   // Also clear upload files
-  const uploadsDir = join(tempDir, "uploads");
+  const uploadsDir = process.env.UPLOADS_DIR ?? join(tempDir, "uploads", "images");
   if (existsSync(uploadsDir)) {
     for (const file of readdirSync(uploadsDir)) {
       unlinkSync(join(uploadsDir, file));
@@ -125,6 +126,7 @@ function buildMultipartBody(filename: string, mimeType: string, content: Buffer)
 
 after(() => {
   rmSync(tempDir, { force: true, recursive: true });
+  delete process.env.UPLOADS_DIR;
 });
 
 test("GET /api/images returns empty list when no images exist", async () => {
@@ -307,6 +309,61 @@ test("PUT /api/images/:id updates image metadata", async () => {
   }
 });
 
+test("PUT /api/images/:id keeps cover image unique when a new cover is selected", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const pngBuffer = createMinimalPng();
+    const firstUpload = buildMultipartBody("cover-1.png", "image/png", pngBuffer);
+    const secondUpload = buildMultipartBody("cover-2.png", "image/png", pngBuffer);
+
+    const firstResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": firstUpload.contentType },
+      payload: firstUpload.payload
+    });
+    const secondResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": secondUpload.contentType },
+      payload: secondUpload.payload
+    });
+
+    const firstImage = (firstResponse.json() as { data: ImageAsset }).data;
+    const secondImage = (secondResponse.json() as { data: ImageAsset }).data;
+
+    const setFirstCover = await app.inject({
+      method: "PUT",
+      url: `/api/images/${firstImage.id}`,
+      payload: { isCover: true }
+    });
+    assert.equal(setFirstCover.statusCode, 200);
+
+    const setSecondCover = await app.inject({
+      method: "PUT",
+      url: `/api/images/${secondImage.id}`,
+      payload: { isCover: true }
+    });
+    assert.equal(setSecondCover.statusCode, 200);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/images"
+    });
+    const images = (listResponse.json() as { data: ImageAsset[] }).data;
+
+    assert.equal(images.find((image) => image.id === firstImage.id)?.isCover, false);
+    assert.equal(images.find((image) => image.id === secondImage.id)?.isCover, true);
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/images/:id returns 404 for non-existent image", async () => {
   migrateDatabase();
   seedDatabase();
@@ -458,6 +515,38 @@ test("GET /api/images/storage-usage returns storage information", async () => {
     assert.equal(body.success, true);
     assert.ok(typeof body.data.usedBytes === "number");
     assert.ok(typeof body.data.fileCount === "number");
+  } finally {
+    await app.close();
+  }
+});
+
+test("uploaded images are exposed through the static uploads path", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const pngBuffer = createMinimalPng();
+    const upload = buildMultipartBody("static-preview.png", "image/png", pngBuffer);
+
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": upload.contentType },
+      payload: upload.payload
+    });
+    assert.equal(uploadResponse.statusCode, 201);
+
+    const uploaded = (uploadResponse.json() as { data: ImageAsset }).data;
+    const previewResponse = await app.inject({
+      method: "GET",
+      url: `/uploads/images/${uploaded.filename}`
+    });
+
+    assert.equal(previewResponse.statusCode, 200);
+    assert.equal(previewResponse.headers["content-type"], "image/png");
   } finally {
     await app.close();
   }

@@ -1,7 +1,13 @@
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { ImageAsset, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 
 export function buildApiUrl(path: string) {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const configuredBaseUrl = (
+    import.meta as ImportMeta & {
+      env?: {
+        VITE_API_BASE_URL?: string;
+      };
+    }
+  ).env?.VITE_API_BASE_URL;
 
   if (configuredBaseUrl) {
     return `${configuredBaseUrl}${path}`;
@@ -11,16 +17,19 @@ export function buildApiUrl(path: string) {
     return `http://localhost:3000${path}`;
   }
 
-  const apiPort = window.location.port === "5173" ? "3000" : window.location.port || "3000";
+  const apiPort = /^517\d*$/.test(window.location.port) ? "3000" : window.location.port || "3000";
   return `${window.location.protocol}//${window.location.hostname}:${apiPort}${path}`;
 }
 
 export async function requestJson<T>(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+
+  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(buildApiUrl(path), {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {})
-    },
+    headers,
     ...init
   });
 
@@ -66,4 +75,64 @@ export async function updatePlaybackPages(
     method: "PUT"
   });
   return response.pages;
+}
+
+export type ImageStorageUsage = {
+  fileCount: number;
+  usedBytes: number;
+  usedMB: number;
+};
+
+export async function getImages() {
+  const response = await requestJson<{
+    data: ImageAsset[];
+    success: boolean;
+  }>("/api/images");
+  return response.data;
+}
+
+export async function getImageStorageUsage() {
+  const response = await requestJson<{
+    data: ImageStorageUsage;
+    success: boolean;
+  }>("/api/images/storage-usage");
+  return response.data;
+}
+
+export async function uploadImageAsset(file: File) {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await requestJson<{
+    data: ImageAsset;
+    success: boolean;
+  }>("/api/images", {
+    body: formData,
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function updateImageAsset(
+  id: number,
+  data: Partial<Pick<ImageAsset, "title" | "description" | "displayDuration" | "includedInSlideshow" | "isCover">>
+) {
+  const response = await requestJson<{
+    data: ImageAsset;
+    success: boolean;
+  }>(`/api/images/${id}`, {
+    body: JSON.stringify(data),
+    method: "PUT"
+  });
+  return response.data;
+}
+
+export async function deleteImageAsset(id: number) {
+  const response = await requestJson<{
+    data: { id: number };
+    success: boolean;
+  }>(`/api/images/${id}`, {
+    method: "DELETE"
+  });
+  return response.data;
 }

@@ -290,20 +290,28 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       const body = request.body ?? {};
 
       const database = getDatabase();
-      database
-        .prepare(
-          `
-            UPDATE image_assets SET
-              title = COALESCE(?, title),
-              description = COALESCE(?, description),
-              included_in_slideshow = COALESCE(?, included_in_slideshow),
-              is_cover = COALESCE(?, is_cover),
-              display_duration = COALESCE(?, display_duration),
-              updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `
-        )
-        .run(
+      const updateImage = database.prepare(
+        `
+          UPDATE image_assets SET
+            title = COALESCE(?, title),
+            description = COALESCE(?, description),
+            included_in_slideshow = COALESCE(?, included_in_slideshow),
+            is_cover = COALESCE(?, is_cover),
+            display_duration = COALESCE(?, display_duration),
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `
+      );
+      const clearOtherCovers = database.prepare(
+        "UPDATE image_assets SET is_cover = 0, updated_at = CURRENT_TIMESTAMP WHERE id != ?"
+      );
+
+      database.transaction(() => {
+        if (body.isCover === true) {
+          clearOtherCovers.run(id);
+        }
+
+        updateImage.run(
           body.title ?? null,
           body.description ?? null,
           body.includedInSlideshow === undefined
@@ -319,6 +327,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
           body.displayDuration ?? undefined,
           id
         );
+      })();
 
       const updated = getImageById(id);
 
