@@ -1,7 +1,7 @@
 export const sustainabilitySummary = {
-  accumulatedGenerationMwh: 1824,
-  accumulatedCarbonReductionTons: 907,
-  plantedTreeEquivalent: 75623,
+  accumulatedGenerationMwh: 18600,
+  accumulatedCarbonReductionTons: 9842,
+  plantedTreeEquivalent: 25600,
   annualHouseholdSupply: 508
 };
 

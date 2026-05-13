@@ -1,77 +1,129 @@
-import { MetricCard } from "../../components/MetricCard";
-import { DataCardGrid } from "../../components/DataCardGrid";
-import { PanelCard } from "../../components/PanelCard";
+import { Sparkline } from "../../components/Sparkline";
+import { MediaSlot } from "../../components/MediaSlot";
+import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
+import { trendSeries } from "../../mocks/metrics";
 import { PageScaffold } from "../shared/PageScaffold";
-import { sustainabilitySummary, sustainabilityHighlights } from "../../mocks/sustainability";
+import { buildSustainabilityViewModel } from "./viewModel";
+import sustainHeroRef from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/sustain-hero-ref.jpg";
 
 export function Sustainability() {
+  const viewModel = buildSustainabilityViewModel({
+    highlights: sustainabilityHighlights,
+    summary: sustainabilitySummary
+  });
+
   return (
     <PageScaffold
       path="/sustainability"
-      description="永續成果展示：累積發電、CO₂ 減量、ESG 貢獻。"
+      description="永續成果 storytelling、big numbers 與 ESG 行動摘要。"
     >
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-600/85 to-emerald-700/80 p-8 text-white shadow-panel">
-        <div className="absolute right-12 top-6 opacity-15">
-          <svg width="160" height="160" viewBox="0 0 100 100" fill="currentColor">
-            <path d="M50 10 C30 10 15 30 15 50 C15 70 30 90 50 90 C70 90 85 70 85 50 C85 30 70 10 50 10 Z M50 20 C60 20 70 30 75 42 C68 36 58 32 50 32 C42 32 32 36 25 42 C30 30 40 20 50 20 Z" />
-          </svg>
-        </div>
-        <h1 className="text-4xl font-bold">永續成果展示</h1>
-        <p className="mt-3 text-lg opacity-90">Sustainability Achievements — 從太陽能到 ESG 的完整成果</p>
-      </div>
+      <section className="relative grid min-h-[620px] grid-cols-12 gap-6 overflow-hidden">
+        <div className="pointer-events-none absolute left-[30%] top-[78%] h-24 w-56 rounded-full bg-brand-100/50 blur-3xl" />
 
-      {/* Big Numbers */}
-      <DataCardGrid columns={3}>
-        <div className="rounded-xl border border-white/70 bg-white/85 p-8 text-center shadow-card backdrop-blur">
-          <p className="text-5xl font-bold text-brand-900">{sustainabilitySummary.accumulatedGenerationMwh.toLocaleString()}</p>
-          <p className="mt-2 text-lg font-medium text-neutral-700">MWh</p>
-          <p className="mt-1 text-sm text-neutral-500">累積發電量</p>
+        <div className="col-span-5 flex flex-col justify-between py-3">
+          <div>
+            <p className="font-en text-sm uppercase tracking-[0.28em] text-brand-700">
+              {viewModel.hero.eyebrow}
+            </p>
+            <h2 className="mt-5 text-[64px] font-bold leading-[1.06] tracking-[0.08em] text-brand-900">
+              {viewModel.hero.title.map((line) => (
+                <span key={line} className="block">
+                  {line === "永續成果" ? <em className="not-italic text-accent-sun-600">{line}</em> : line}
+                </span>
+              ))}
+            </h2>
+            <p className="mt-4 font-en text-xl tracking-[0.16em] text-neutral-500">
+              {viewModel.hero.subtitle}
+            </p>
+            <div className="mt-8 space-y-2 text-[21px] leading-[1.6] text-neutral-700">
+              {viewModel.hero.copyZhLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+            <div className="mt-6 space-y-1 font-en text-lg leading-[1.45] text-neutral-500">
+              {viewModel.hero.copyEnLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="rounded-xl border border-white/70 bg-white/85 p-8 text-center shadow-card backdrop-blur">
-          <p className="text-5xl font-bold text-green-700">{sustainabilitySummary.accumulatedCarbonReductionTons.toLocaleString()}</p>
-          <p className="mt-2 text-lg font-medium text-neutral-700">tons CO₂e</p>
-          <p className="mt-1 text-sm text-neutral-500">累積碳減量</p>
-        </div>
-        <div className="rounded-xl border border-white/70 bg-white/85 p-8 text-center shadow-card backdrop-blur">
-          <p className="text-5xl font-bold text-emerald-700">{sustainabilitySummary.plantedTreeEquivalent.toLocaleString()}</p>
-          <p className="mt-2 text-lg font-medium text-neutral-700">株 🌳</p>
-          <p className="mt-1 text-sm text-neutral-500">等效植樹</p>
-        </div>
-      </DataCardGrid>
 
-      {/* Highlights */}
-      <PanelCard title="永續亮點" subtitle="SUSTAINABILITY HIGHLIGHTS">
-        <DataCardGrid columns={4}>
-          {sustainabilityHighlights.map((item) => (
-            <MetricCard
-              key={item.label}
-              icon={item.unit === "株" ? "🌳" : item.unit === "%" ? "📊" : item.unit === "MWh" ? "⚡" : "🌿"}
-              label={item.label}
-              value={item.value}
-              unit={item.unit}
+        <div className="col-span-7 flex flex-col gap-5">
+          <MediaSlot density="playback" className="h-[280px] rounded-[34px] p-0">
+            <img
+              alt="永續成果場域影像"
+              className="h-full w-full object-cover object-center"
+              src={sustainHeroRef}
             />
-          ))}
-        </DataCardGrid>
-      </PanelCard>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/16 via-transparent to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/28 via-white/8 to-transparent" />
+          </MediaSlot>
 
-      {/* ESG */}
-      <PanelCard title="ESG 貢獻" subtitle="ESG CONTRIBUTIONS">
-        <div className="grid grid-cols-3 gap-6 text-center">
-          <div>
-            <p className="text-3xl font-bold text-brand-800">71%</p>
-            <p className="mt-1 text-neutral-600">綠電自用率</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-brand-800">{sustainabilitySummary.annualHouseholdSupply}</p>
-            <p className="mt-1 text-neutral-600">等效家庭年用電</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-brand-800">98.6%</p>
-            <p className="mt-1 text-neutral-600">設備可用率</p>
+          <div className="grid grid-cols-3 gap-4">
+            {viewModel.bigNumbers.map((item) => (
+              <article
+                key={item.label}
+                className="rounded-[28px] border border-white/75 bg-white/92 px-6 py-5 shadow-card backdrop-blur"
+              >
+                <p className="text-sm font-semibold tracking-[0.08em] text-neutral-600">{item.label}</p>
+                <p className="mt-2 font-en text-xs uppercase tracking-[0.18em] text-brand-700">
+                  {item.helper}
+                </p>
+                <div className="mt-7 flex items-end gap-3">
+                  <p className="text-[54px] font-bold leading-none text-brand-900">{item.value}</p>
+                  <span className="pb-1 font-en text-lg font-semibold uppercase tracking-[0.14em] text-brand-700">
+                    {item.unit}
+                  </span>
+                </div>
+                <Sparkline className="mt-4 h-14" values={trendSeries} />
+              </article>
+            ))}
           </div>
         </div>
-      </PanelCard>
+      </section>
+
+      <section className="grid grid-cols-3 gap-4">
+        {viewModel.esgCards.map((card, index) => (
+          <article
+            key={card.label}
+            className="rounded-[28px] border border-white/75 bg-white/92 px-6 py-6 shadow-card backdrop-blur"
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-2xl shadow-soft">
+              {index === 0 ? "🛒" : index === 1 ? "📄" : "🌳"}
+            </div>
+            <p className="mt-5 text-[22px] font-semibold tracking-[0.08em] text-brand-900">{card.label}</p>
+            <p className="mt-1 font-en text-sm uppercase tracking-[0.18em] text-neutral-500">
+              {card.subtitle}
+            </p>
+            {"value" in card ? (
+              <p className="mt-8 text-[48px] font-bold leading-none text-brand-900">{card.value}</p>
+            ) : (
+              <ul className="mt-6 space-y-3 text-base leading-7 text-neutral-600">
+                {card.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
+          </article>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-4 gap-4">
+        {viewModel.highlights.map((item) => (
+          <article
+            key={item.label}
+            className="rounded-[24px] border border-white/70 bg-white/84 px-5 py-5 shadow-card backdrop-blur"
+          >
+            <p className="text-sm font-semibold tracking-[0.08em] text-neutral-500">{item.label}</p>
+            <div className="mt-4 flex items-end gap-2">
+              <p className="text-[42px] font-bold leading-none text-brand-900">{item.value}</p>
+              <span className="pb-1 font-en text-base uppercase tracking-[0.14em] text-brand-700">
+                {item.unit}
+              </span>
+            </div>
+          </article>
+        ))}
+      </section>
     </PageScaffold>
   );
 }
