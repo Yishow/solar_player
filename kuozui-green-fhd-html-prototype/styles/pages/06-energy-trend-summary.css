@@ -1,0 +1,279 @@
+.page-06-energy-trend-summary::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 1px solid rgba(134, 133, 122, 0.42);
+  border-radius: 24px;
+  opacity: 0.72;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.page-06-energy-trend-summary .trend-title {
+  left: 82px;
+  top: 182px;
+  width: 720px;
+}
+
+.page-06-energy-trend-summary .trend-title .eyebrow {
+  display: none;
+}
+
+.page-06-energy-trend-summary .trend-title .display-title {
+  font-size: 80px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 4px;
+  color: #373a37;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.page-06-energy-trend-summary .trend-title .display-title em {
+  color: #5d8549;
+}
+
+.page-06-energy-trend-summary .trend-title .hero-subtitle {
+  margin-top: 14px;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: 0.4px;
+  color: #5c615f;
+}
+
+.page-06-energy-trend-summary .trend-copy {
+  position: absolute;
+  left: 84px;
+  top: 360px;
+  width: 700px;
+  font-size: 19px;
+  line-height: 1.9;
+  font-weight: 500;
+  color: #565d59;
+}
+
+.page-06-energy-trend-summary .trend-leaf {
+  left: 372px;
+  top: 220px;
+  width: 548px;
+  height: 188px;
+  opacity: 0.62;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 190'%3E%3Cpath d='M12 120 C76 92 144 93 205 116 C274 142 351 143 432 111 C466 97 496 76 528 49' fill='none' stroke='%23d6c59a' stroke-width='2' stroke-linecap='round' opacity='.72'/%3E%3Cg fill='%239caf74' fill-opacity='.18'%3E%3Cpath d='M203 96 C229 39 280 18 346 21 C330 85 286 127 226 129 C210 119 203 107 203 96Z'/%3E%3Cpath d='M155 118 C173 78 210 63 258 69 C246 113 214 143 173 143 C161 136 155 127 155 118Z'/%3E%3Cpath d='M286 127 C300 95 329 81 367 85 C357 118 331 143 298 145 C290 139 286 133 286 127Z'/%3E%3Cpath d='M257 148 C270 122 293 111 323 114 C316 138 296 156 269 159 C262 155 257 151 257 148Z'/%3E%3C/g%3E%3Cg stroke='%23ffffff' stroke-opacity='.55' stroke-width='1.2' fill='none'%3E%3Cpath d='M242 121 C270 89 297 57 329 27'/%3E%3Cpath d='M186 135 C210 113 229 91 250 69'/%3E%3Cpath d='M308 139 C320 123 335 106 351 89'/%3E%3C/g%3E%3C/svg%3E")
+      center / contain no-repeat;
+}
+
+.page-06-energy-trend-summary .trend-tabs {
+  left: 1142px;
+  top: 238px;
+  width: 680px;
+  height: 68px;
+  padding: 8px 10px;
+  border-color: rgba(116, 116, 106, 0.2);
+  border-radius: 20px;
+  background: rgba(255, 252, 245, 0.82);
+  box-shadow: 0 8px 18px rgba(101, 89, 62, 0.04);
+}
+
+.page-06-energy-trend-summary .trend-tabs button {
+  min-width: 160px;
+  height: 50px;
+  padding: 0 34px;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: #50534e;
+}
+
+.page-06-energy-trend-summary .trend-tabs button.active {
+  background: linear-gradient(#6a9158, #577f46);
+  color: #fff;
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.page-06-energy-trend-summary .data-refresh {
+  position: absolute;
+  left: 1560px;
+  top: 362px;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  color: #626863;
+}
+
+.page-06-energy-trend-summary .data-refresh .icon {
+  width: 37px;
+  height: 37px;
+  margin-top: 2px;
+  color: #72945d;
+  stroke-width: 2.3;
+  flex: 0 0 auto;
+}
+
+.page-06-energy-trend-summary .data-refresh span {
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.page-06-energy-trend-summary .data-refresh small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #777b76;
+  letter-spacing: 0.2px;
+}
+
+.page-06-energy-trend-summary .trend-card {
+  top: 458px;
+  width: 304px;
+  height: 468px;
+  border-radius: 20px;
+  border: 1px solid rgba(115, 116, 108, 0.16);
+  background: rgba(255, 253, 247, 0.9);
+  box-shadow:
+    0 16px 30px rgba(95, 84, 58, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.page-06-energy-trend-summary .trend-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 34%);
+  pointer-events: none;
+}
+
+.page-06-energy-trend-summary .trend-1 {
+  left: 52px;
+}
+
+.page-06-energy-trend-summary .trend-2 {
+  left: 368px;
+}
+
+.page-06-energy-trend-summary .trend-3 {
+  left: 684px;
+}
+
+.page-06-energy-trend-summary .trend-4 {
+  left: 1000px;
+}
+
+.page-06-energy-trend-summary .trend-5 {
+  left: 1316px;
+}
+
+.page-06-energy-trend-summary .trend-card .chart-icon {
+  position: absolute;
+  left: 22px;
+  top: 22px;
+  width: 64px;
+  height: 64px;
+  padding: 11px;
+  border: 1.8px solid rgba(93, 133, 74, 0.7);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.56);
+  color: #62844e;
+  stroke-width: 2.3;
+  box-sizing: border-box;
+}
+
+.page-06-energy-trend-summary .trend-2 .chart-icon {
+  color: #f1a21a;
+  border-color: rgba(241, 162, 26, 0.76);
+}
+
+.page-06-energy-trend-summary .trend-card .chart-title {
+  left: 100px;
+  top: 34px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #424743;
+}
+
+.page-06-energy-trend-summary .trend-card .chart-title small {
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  color: #6b716c;
+}
+
+.page-06-energy-trend-summary .trend-card .mini-value {
+  position: absolute;
+  left: 40px;
+  top: 122px;
+  font-size: 58px;
+  letter-spacing: 1px;
+  color: #4f6745;
+}
+
+.page-06-energy-trend-summary .trend-card .mini-value small {
+  margin-left: 8px;
+  font-size: 20px;
+  font-weight: 400;
+  color: #525851;
+}
+
+.page-06-energy-trend-summary .trend-svg {
+  position: absolute;
+  left: 58px;
+  bottom: 66px;
+  width: 218px;
+  height: 170px;
+}
+
+.page-06-energy-trend-summary .trend-svg .grid {
+  stroke: rgba(107, 109, 98, 0.16);
+  stroke-dasharray: none;
+}
+
+.page-06-energy-trend-summary .trend-svg .line-green {
+  stroke-width: 2.4;
+}
+
+.page-06-energy-trend-summary .axis-labels {
+  position: absolute;
+  left: 20px;
+  bottom: 78px;
+  width: 42px;
+  height: 138px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font: 400 11px/1.1 var(--font-latin);
+  color: #646963;
+}
+
+.page-06-energy-trend-summary .axis-times {
+  position: absolute;
+  left: 58px;
+  right: 10px;
+  bottom: 34px;
+  display: flex;
+  justify-content: space-between;
+  font: 400 11px/1 var(--font-latin);
+  color: #646963;
+}
+
+.page-06-energy-trend-summary .trend-1 .line-green {
+  d: path("M0 145 C18 145 34 143 44 137 C56 130 62 114 68 96 C72 84 75 92 78 73 C82 86 88 56 93 67 C98 79 103 43 108 54 C114 67 120 42 126 55 C132 68 139 48 146 63 C155 81 164 90 173 101 C184 115 195 130 210 140 C226 148 242 148 260 143");
+}
+
+.page-06-energy-trend-summary .trend-2 .line-green {
+  d: path("M0 145 C22 145 40 143 54 137 C68 129 79 116 92 92 C107 65 120 49 138 32 C156 18 176 10 199 8 C222 6 242 9 260 11");
+}
+
+.page-06-energy-trend-summary .trend-3 .line-green {
+  d: path("M0 145 C20 144 39 142 55 135 C70 128 84 115 98 94 C114 69 131 49 149 34 C170 18 193 9 218 8 C236 10 249 14 260 12");
+}
+
+.page-06-energy-trend-summary .trend-4 .line-green {
+  d: path("M0 144 C16 146 31 145 44 139 C56 132 68 118 78 92 C87 66 95 47 105 42 C116 38 128 49 140 59 C153 70 168 84 184 101 C203 121 225 135 260 137");
+}
+
+.page-06-energy-trend-summary .trend-5 .line-green {
+  d: path("M0 145 C22 145 40 143 54 136 C69 127 81 112 93 92 C107 70 122 49 140 32 C158 18 177 8 199 5 C223 3 245 6 260 9");
+}

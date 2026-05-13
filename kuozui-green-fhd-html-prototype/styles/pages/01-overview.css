@@ -1,0 +1,24 @@
+
+.page-01-overview::after{content:"";position:absolute;inset:0;border:2px solid rgba(76,82,84,.34);border-radius:14px;pointer-events:none;z-index:40}
+.page-01-overview .overview-title{left:86px;top:172px;width:642px;height:392px}
+.page-01-overview .overview-title .display-title{font-size:84px;line-height:1.18;letter-spacing:6px}
+.page-01-overview .overview-title .hero-subtitle{font-size:26px;line-height:1.33;margin-top:26px}
+.page-01-overview .overview-hero{left:540px;top:140px;width:1340px;height:700px;border-radius:0;box-shadow:none}
+.page-01-overview .overview-hero img{object-position:center 48%;transform:scale(1.01)}
+.page-01-overview .header-weather{left:1438px}
+.page-01-overview .header-weather .icon-control{width:46px;height:46px;stroke-width:2.4}
+.page-01-overview .overview-leaf{left:420px;top:528px;width:296px;height:168px;opacity:.31}
+.page-01-overview .overview-gold{left:12px;top:610px;width:760px}
+.page-01-overview .kpi-card{z-index:12;background:rgba(255,253,247,.96)}
+.page-01-overview .overview-power{left:32px;top:724px;width:362px;height:228px}
+.page-01-overview .overview-today{left:411px;top:724px;width:366px;height:228px}
+.page-01-overview .overview-total{left:794px;top:724px;width:357px;height:228px}
+.page-01-overview .overview-co2-today{left:1168px;top:724px;width:332px;height:228px;border-color:rgba(233,173,45,.52);box-shadow:0 0 0 2px rgba(233,173,45,.12),var(--shadow-card)}
+.page-01-overview .overview-co2-total{left:1518px;top:724px;width:366px;height:228px}
+.page-01-overview .kpi-card__head{top:20px}
+.page-01-overview .kpi-card__head h3{font-size:19px;letter-spacing:1px}
+.page-01-overview .kpi-card__head p{font-size:14px}
+.page-01-overview .kpi-card__value{top:100px;left:62px}
+.page-01-overview .kpi-card__value span{font-size:68px}
+.page-01-overview .kpi-card__value small{font-size:22px;margin-bottom:7px}
+.page-01-overview .kpi-card .sparkline{left:52px;right:52px;width:calc(100% - 104px)}

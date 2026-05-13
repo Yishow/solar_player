@@ -1,0 +1,32 @@
+.page-02-solar::after{content:"";position:absolute;inset:0;border:2px solid rgba(76,82,84,.34);border-radius:14px;pointer-events:none;z-index:40}
+.page-02-solar .header-weather{left:1438px}
+.page-02-solar .header-weather .icon-control{width:46px;height:46px;stroke-width:2.4}
+.page-02-solar .solar-title{left:88px;top:166px;width:650px}
+.page-02-solar .solar-title .display-title{font-size:78px;line-height:1.13;letter-spacing:6px}
+.page-02-solar .solar-title .hero-subtitle{font-size:21px;line-height:1.45;margin-top:16px}
+.page-02-solar .solar-title .hero-subtitle span{display:block;font-size:22px;line-height:1.25;margin-top:6px}
+.page-02-solar .solar-leaf{left:565px;top:330px;width:190px;height:132px;opacity:.36}
+.page-02-solar .solar-gold{left:0;top:500px;width:1075px}
+.page-02-solar .solar-photo{left:0;top:540px;width:1070px;height:205px;border-radius:0;box-shadow:none}
+.page-02-solar .solar-photo img{object-position:center 52%;transform:scale(1);transform-origin:center center}
+.page-02-solar .solar-photo:after{background:linear-gradient(180deg,rgba(255,253,247,0) 48%,rgba(255,253,247,.36) 74%,rgba(255,253,247,.88) 100%)}
+.page-02-solar .flow-node{border-color:rgba(213,181,95,.44);background:rgba(255,253,247,.54);box-shadow:0 13px 30px rgba(78,66,35,.09)}
+.page-02-solar .flow-node .icon-display{position:absolute;left:50%;top:48px;width:104px;height:104px;transform:translateX(-50%);stroke-width:2.5}
+.page-02-solar .flow-node h3{position:absolute;left:0;top:248px;width:100%;margin:0;font-size:24px;letter-spacing:7px;font-weight:500}
+.page-02-solar .flow-node p{position:absolute;left:0;top:286px;width:100%;margin:0;font-size:17px}
+.page-02-solar .solar-node{left:795px;top:162px;width:230px;height:230px}
+.page-02-solar .inverter-node{left:1180px;top:162px;width:230px;height:230px}
+.page-02-solar .factory-node{left:1550px;top:162px;width:230px;height:230px}
+.page-02-solar .co2-node{left:1545px;top:494px;width:230px;height:230px}
+.page-02-solar .co2-node h3{top:132px}
+.page-02-solar .co2-node p{top:170px}
+.page-02-solar .c-solar-inverter{left:1025px;top:291px;width:155px;height:5px}
+.page-02-solar .c-inverter-factory{left:1410px;top:291px;width:140px;height:5px}
+.page-02-solar .c-inverter-co2{left:1365px;top:582px;width:180px;height:5px;transform:none}
+.page-02-solar .c-inverter-co2:before{content:"";position:absolute;left:0;bottom:0;width:5px;height:170px;background:#eaa11e;border-radius:5px}
+.page-02-solar .kpi-card{z-index:12;background:rgba(255,253,247,.96)}
+.page-02-solar .solar-generation{left:52px;top:760px;width:380px;height:220px}
+.page-02-solar .solar-self{left:448px;top:760px;width:330px;height:220px}
+.page-02-solar .solar-co2{left:794px;top:760px;width:330px;height:220px}
+.page-02-solar .solar-total-co2{left:1140px;top:760px;width:350px;height:220px}
+.page-02-solar .solar-eff{left:1506px;top:760px;width:360px;height:220px}

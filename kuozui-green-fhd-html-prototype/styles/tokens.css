@@ -1,0 +1,10 @@
+
+:root{
+  --stage-bg:#f6f2e9;--paper:#fbf9f2;--ink:#34383a;--ink-strong:#202426;--muted:#6e746f;
+  --green:#527a43;--green-2:#6f8c5c;--green-light:#e7efe0;--accent:#f2a11a;--red:#ef6363;--blue:#248bd4;
+  --line:rgba(91,99,82,.22);--card:rgba(255,253,247,.88);--card-solid:#fffdf8;
+  --shadow-card:0 14px 30px rgba(55,50,38,.13),0 2px 8px rgba(55,50,38,.08);
+  --shadow-soft:0 8px 22px rgba(55,50,38,.10);--radius-lg:18px;--radius-xl:28px;
+  --font-sans:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",Arial,sans-serif;
+  --font-latin:"Montserrat","Aptos","Segoe UI",Arial,sans-serif;
+}

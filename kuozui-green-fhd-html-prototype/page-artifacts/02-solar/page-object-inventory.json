@@ -1,0 +1,128 @@
+{
+  "pageId": "02-solar",
+  "htmlPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/html-pages/02-solar.html",
+  "objectCount": 12,
+  "objects": [
+    {
+      "id": "solar-carport-mediaslot",
+      "selector": "[data-media-purpose=\"solar-carport\"] img",
+      "role": "hero-media",
+      "assetType": "image",
+      "component": "MediaSlot",
+      "mediaPurpose": "solar-carport",
+      "currentSrc": "../assets/generated/02-solar/solar-carport-hero.png",
+      "assetStatus": "imagegen-generated",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-i-sun",
+      "selector": "svg[data-icon-id=\"i-sun\"].icon-accent",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "i-sun",
+      "currentHref": "#i-sun",
+      "iconTier": "control",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-i-wifi",
+      "selector": "svg[data-icon-id=\"i-wifi\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "i-wifi",
+      "currentHref": "#i-wifi",
+      "iconTier": "control",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-solar-panel-display",
+      "selector": "svg[data-icon-id=\"solar-panel-display\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "solar-panel-display",
+      "currentHref": null,
+      "iconTier": "display",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-inverter-display",
+      "selector": "svg[data-icon-id=\"inverter-display\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "inverter-display",
+      "currentHref": null,
+      "iconTier": "display",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-factory-consumption-display",
+      "selector": "svg[data-icon-id=\"factory-consumption-display\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "factory-consumption-display",
+      "currentHref": null,
+      "iconTier": "display",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-carbon-reduction-display",
+      "selector": "svg[data-icon-id=\"carbon-reduction-display\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "carbon-reduction-display",
+      "currentHref": null,
+      "iconTier": "display",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-metric-generation-sun",
+      "selector": "svg[data-icon-id=\"metric-generation-sun\"].icon-accent",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "metric-generation-sun",
+      "currentHref": null,
+      "iconTier": "metric",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-metric-self-consumption",
+      "selector": "svg[data-icon-id=\"metric-self-consumption\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "metric-self-consumption",
+      "currentHref": null,
+      "iconTier": "metric",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-metric-co2-today",
+      "selector": "svg[data-icon-id=\"metric-co2-today\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "metric-co2-today",
+      "currentHref": null,
+      "iconTier": "metric",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-metric-co2-total",
+      "selector": "svg[data-icon-id=\"metric-co2-total\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "metric-co2-total",
+      "currentHref": null,
+      "iconTier": "metric",
+      "replacementPolicy": "replaceable"
+    },
+    {
+      "id": "icon-metric-efficiency",
+      "selector": "svg[data-icon-id=\"metric-efficiency\"]",
+      "role": "icon",
+      "assetType": "svg-symbol",
+      "currentIconId": "metric-efficiency",
+      "currentHref": null,
+      "iconTier": "metric",
+      "replacementPolicy": "replaceable"
+    }
+  ]
+}

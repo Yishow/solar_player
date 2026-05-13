@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>永續成果頁 / Sustainability</title>
+  <link rel="stylesheet" href="../styles/tokens.css">
+  <link rel="stylesheet" href="../styles/shell.css">
+  <link rel="stylesheet" href="../styles/components.css">
+  <link rel="stylesheet" href="../styles/pages/05-sustainability.css">
+</head>
+<body>
+  <div class="viewport">
+    <main class="canvas page-05-sustainability" id="canvas" data-page="05-sustainability">
+      <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
+        <symbol id="i-sun" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="11"></circle>
+          <circle cx="32" cy="32" r="5"></circle>
+          <path d="M32 5 V15 M32 49 V59 M5 32 H15 M49 32 H59 M13 13 L20 20 M44 44 L51 51 M51 13 L44 20 M20 44 L13 51"></path>
+        </symbol>
+        <symbol id="i-wifi" viewBox="0 0 24 24">
+          <path d="M4 9 C9 5 15 5 20 9 M7 12 C10 10 14 10 17 12 M10 15 C11 14 13 14 14 15"></path>
+          <circle cx="12" cy="19" r="1"></circle>
+        </symbol>
+        <symbol id="i-bars" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M15 49 H49"></path>
+          <rect x="18" y="29" width="7" height="14" rx="1"></rect>
+          <rect x="29" y="18" width="7" height="25" rx="1"></rect>
+          <rect x="40" y="24" width="7" height="19" rx="1"></rect>
+        </symbol>
+        <symbol id="i-co2" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M18 39 C15 39 13 36 14 32 C15 29 18 27 21 27 C22 23 26 20 31 20 C36 20 40 23 41 27 C45 28 48 31 48 35 C48 39 45 42 40 42 H21"></path>
+          <text x="20" y="37" font-size="11.5" font-family="Arial, sans-serif" font-weight="700" fill="currentColor">CO₂</text>
+        </symbol>
+        <symbol id="i-leaf" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M44 18 C31 19 20 29 21 43 C32 44 43 37 44 18 Z"></path>
+          <path d="M25 40 C31 34 36 29 41 23"></path>
+        </symbol>
+        <symbol id="i-procure" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M18 23 H22 L26 42 H45"></path>
+          <path d="M25 28 H46 L42 38 H28"></path>
+          <circle cx="29" cy="45" r="2.7" fill="currentColor" stroke="none"></circle>
+          <circle cx="41" cy="45" r="2.7" fill="currentColor" stroke="none"></circle>
+          <path d="M40 18 C35 19 31 22 30 27 C35 27 39 25 40 18 Z"></path>
+        </symbol>
+        <symbol id="i-esg-doc" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M24 18 H38 L44 24 V46 H24 Z"></path>
+          <path d="M38 18 V25 H44"></path>
+          <path d="M29 31 H39 M29 36 H39 M29 41 H36"></path>
+        </symbol>
+        <symbol id="i-tree" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="21"></circle>
+          <path d="M32 19 C26 19 22 24 22 29 C22 32 23 34 25 36 C22 37 20 40 20 43 C20 48 24 52 31 52 H33 C40 52 44 48 44 43 C44 40 42 37 39 36 C41 34 42 32 42 29 C42 24 38 19 32 19 Z"></path>
+          <path d="M32 34 V49"></path>
+        </symbol>
+        <symbol id="i-trend" viewBox="0 0 24 24">
+          <path d="M4 16 L10 10 L14 14 L20 7"></path>
+          <path d="M15 7 H20 V12"></path>
+        </symbol>
+      </svg>
+
+      <header class="app-header">
+        <div class="brand">
+          <img class="brand__logo" src="../assets/provisional/logo-k-green.png" alt="Kuozui logo">
+          <div>
+            <div class="brand__zh">國瑞汽車</div>
+            <div class="brand__en">KUOZUI MOTORS</div>
+          </div>
+        </div>
+        <div class="header-divider"></div>
+        <div class="product-title">
+          <div class="product-title__zh">國瑞汽車中廠綠能展示播放器</div>
+          <div class="product-title__en">KUOZUI GREEN ENERGY DISPLAY PLAYER</div>
+        </div>
+        <div class="header-clock">09:42</div>
+        <div class="header-date">2025 / 05 / 26<br>星期一&nbsp;&nbsp; Mon.</div>
+        <div class="header-weather">
+          <svg data-inline-icon="true" data-icon-id="i-sun" data-icon-tier="control" class="icon icon-control icon-accent" aria-hidden="true" viewBox="0 0 24 24">
+            <use href="#i-sun"></use>
+          </svg>
+          <span>晴&nbsp; 31°C</span>
+        </div>
+        <div class="status-pill" data-component="StatusPill">
+          <svg data-inline-icon="true" data-icon-id="i-wifi" data-icon-tier="control" class="icon icon-control" aria-hidden="true" viewBox="0 0 24 24">
+            <use href="#i-wifi"></use>
+          </svg>
+          <span>MQTT Online</span>
+        </div>
+      </header>
+
+      <section class="title-group sustain-title">
+        <div class="eyebrow">綠 能 驅 動 ・ 永 續 未 來</div>
+        <h1 class="display-title"><em>永續</em>成果<br>持續累積</h1>
+        <div class="hero-subtitle">Sustainability in Action</div>
+      </section>
+
+      <p class="sustain-copy">
+        國瑞汽車致力推動綠色製造，落實環境管理與資源循環，<br>
+        以行動實踐企業永續承諾，與社會共創更美好的未來。<br>
+        <span>Kuozui Motors is committed to green manufacturing and<br>environmental stewardship, steadily advancing sustainable<br>practices to create a better future for our planet and society.</span>
+      </p>
+
+      <div class="leaf-watermark sustain-leaf" aria-hidden="true"></div>
+
+      <figure class="media-slot sustain-hero photo-fade-left photo-fade-bottom" data-component="MediaSlot" data-asset-status="provisional" data-replace-with="sustain-hero-ref-clean" data-media-purpose="sustainability-factory">
+        <img src="../assets/provisional/sustain-hero-ref.jpg" alt="">
+      </figure>
+
+      <article class="kpi-card compact s-total-gen" data-component="KpiCard">
+        <div class="kpi-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-bars" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-bars"></use>
+          </svg>
+          <div>
+            <h3>累積發電量</h3>
+            <p>Total Generation</p>
+          </div>
+        </div>
+        <div class="kpi-card__value"><span>18.6</span><small>GWh</small></div>
+        <svg class="sparkline" viewBox="0 0 260 34" aria-hidden="true">
+          <path d="M2 24 L18 25 L34 18 L48 22 L62 14 L78 22 L92 19 L106 23 L122 17 L138 24 L154 18 L170 26 L186 19 L202 22 L218 17 L236 24 L258 20"></path>
+        </svg>
+      </article>
+
+      <article class="kpi-card compact s-total-co2" data-component="KpiCard">
+        <div class="kpi-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-co2" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-co2"></use>
+          </svg>
+          <div>
+            <h3>累積 CO₂ 減量</h3>
+            <p>Total CO₂ Reduction</p>
+          </div>
+        </div>
+        <div class="kpi-card__value"><span>9,842</span><small>t</small></div>
+        <svg class="sparkline" viewBox="0 0 260 34" aria-hidden="true">
+          <path d="M2 25 L18 24 L34 19 L48 22 L62 15 L78 18 L92 21 L108 17 L122 20 L138 13 L154 18 L170 16 L186 20 L202 14 L218 17 L238 12 L258 16"></path>
+        </svg>
+      </article>
+
+      <article class="kpi-card compact s-energy-saving" data-component="KpiCard">
+        <div class="kpi-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-leaf" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-leaf"></use>
+          </svg>
+          <div>
+            <h3>年度節能成效</h3>
+            <p>Annual Energy Saving</p>
+          </div>
+        </div>
+        <div class="kpi-card__value"><span>12.4</span><small>%</small></div>
+        <div class="growth-note">
+          <span>較去年成長 2.1%</span>
+          <svg data-inline-icon="true" data-icon-id="i-trend" data-icon-tier="control" class="icon icon-trend" aria-hidden="true" viewBox="0 0 24 24">
+            <use href="#i-trend"></use>
+          </svg>
+        </div>
+      </article>
+
+      <article class="stat-card s-procure" data-component="StatCard">
+        <div class="stat-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-procure" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-procure"></use>
+          </svg>
+          <div>
+            <div class="stat-card__label">綠色採購金額</div>
+            <div class="stat-card__en">Green Procurement</div>
+          </div>
+        </div>
+        <div class="stat-card__value stat-card__value--procure"><span>NT$</span> 60 <small>M+</small></div>
+        <p class="stat-card__desc">累計綠色採購金額</p>
+      </article>
+
+      <article class="stat-card s-esg" data-component="StatCard">
+        <div class="stat-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-esg-doc" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-esg-doc"></use>
+          </svg>
+          <div>
+            <div class="stat-card__label">ESG 行動摘要</div>
+            <div class="stat-card__en">ESG Highlights</div>
+          </div>
+        </div>
+        <ul class="esg-list">
+          <li>推動再生能源使用</li>
+          <li>落實節能減碳行動</li>
+          <li>強化供應鏈永續管理</li>
+        </ul>
+      </article>
+
+      <article class="stat-card s-trees" data-component="StatCard">
+        <div class="stat-card__head">
+          <svg data-inline-icon="true" data-icon-id="i-tree" data-icon-tier="metric" class="icon icon-metric" aria-hidden="true" viewBox="0 0 64 64">
+            <use href="#i-tree"></use>
+          </svg>
+          <div>
+            <div class="stat-card__label">相當於種樹</div>
+            <div class="stat-card__en">Trees Planted</div>
+          </div>
+        </div>
+        <div class="stat-card__value">25,600<span class="stat-card__unit">trees</span></div>
+        <svg class="sparkline sparkline--trees" viewBox="0 0 260 34" aria-hidden="true">
+          <path d="M2 23 L18 24 L34 19 L48 22 L62 17 L78 24 L92 21 L108 17 L122 19 L138 15 L154 20 L170 18 L186 21 L202 17 L218 19 L238 15 L258 19"></path>
+        </svg>
+      </article>
+
+      <footer class="footer-nav">
+        <div class="page-number-pill">05</div>
+        <div class="footer-leaf-mini"></div>
+        <nav class="bottom-nav" data-component="BottomNav">
+          <a class="nav-item" href="01-overview.html">Overview</a>
+          <a class="nav-item" href="02-solar.html">Solar</a>
+          <a class="nav-item" href="03-factory-circuit.html">Factory Circuit</a>
+          <a class="nav-item" href="04-images.html">Images</a>
+          <a class="nav-item active" href="05-sustainability.html" aria-current="page">Sustainability</a>
+        </nav>
+        <div class="footer-slogan">永續，從現在開始 <small>/ Sustainability Starts with Us</small></div>
+        <div class="footer-branch"></div>
+      </footer>
+    </main>
+  </div>
+  <script src="../scripts/ui.js"></script>
+  <script src="../scripts/fit.js"></script>
+</body>
+</html>

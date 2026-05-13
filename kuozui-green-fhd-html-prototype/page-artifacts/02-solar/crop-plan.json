@@ -1,0 +1,246 @@
+{
+  "pageId": "02-solar",
+  "assetOutputDir": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar",
+  "operations": [
+    {
+      "assetId": "solar-carport-hero",
+      "pageObjectId": "solar-carport-mediaslot",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (1).png",
+      "sourceObjectId": "solar-carport-hero",
+      "renderMode": "png-crop",
+      "bbox": [
+        0,
+        0,
+        1672,
+        941
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 0,
+      "preserveShadow": false,
+      "sourceWidth": 1672,
+      "sourceHeight": 941,
+      "fitMode": "cover",
+      "outputFile": "solar-carport-hero.png",
+      "match": {
+        "strategy": "media-purpose",
+        "value": "solar-carport"
+      }
+    },
+    {
+      "assetId": "solar-panel-display-source",
+      "pageObjectId": "icon-solar-panel-display",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "solar-panel-display-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        145,
+        148,
+        223,
+        208
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 20,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "solar-panel-display-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "solar-panel-display"
+      }
+    },
+    {
+      "assetId": "inverter-display-source",
+      "pageObjectId": "icon-inverter-display",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "inverter-display-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        513,
+        169,
+        141,
+        190
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "inverter-display-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "inverter-display"
+      }
+    },
+    {
+      "assetId": "factory-consumption-display-source",
+      "pageObjectId": "icon-factory-consumption-display",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "factory-consumption-display-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        790,
+        167,
+        191,
+        176
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 16,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "factory-consumption-display-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "factory-consumption-display"
+      }
+    },
+    {
+      "assetId": "carbon-reduction-display-source",
+      "pageObjectId": "icon-carbon-reduction-display",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "carbon-reduction-display-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        1096,
+        176,
+        202,
+        191
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "carbon-reduction-display-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "carbon-reduction-display"
+      }
+    },
+    {
+      "assetId": "metric-generation-sun-source",
+      "pageObjectId": "icon-metric-generation-sun",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-generation-sun-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        163,
+        449,
+        188,
+        195
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 20,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "metric-generation-sun-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-generation-sun"
+      }
+    },
+    {
+      "assetId": "metric-self-consumption-source",
+      "pageObjectId": "icon-metric-self-consumption",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-self-consumption-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        485,
+        451,
+        180,
+        172
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "metric-self-consumption-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-self-consumption"
+      }
+    },
+    {
+      "assetId": "carbon-reduction-display-source",
+      "pageObjectId": "icon-metric-co2-today",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "carbon-reduction-display-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        1096,
+        176,
+        202,
+        191
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "carbon-reduction-display-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-co2-today"
+      }
+    },
+    {
+      "assetId": "metric-co2-total-source",
+      "pageObjectId": "icon-metric-co2-total",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-co2-total-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        787,
+        456,
+        183,
+        185
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "metric-co2-total-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-co2-total"
+      }
+    },
+    {
+      "assetId": "metric-efficiency-source",
+      "pageObjectId": "icon-metric-efficiency",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-efficiency-source",
+      "renderMode": "icon-raster",
+      "bbox": [
+        1087,
+        473,
+        213,
+        134
+      ],
+      "bboxSource": "metadata-content_bbox",
+      "safePadding": 18,
+      "preserveShadow": false,
+      "sourceWidth": 1448,
+      "sourceHeight": 1086,
+      "fitMode": "contain",
+      "outputFile": "metric-efficiency-source.png",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-efficiency"
+      }
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "pageId": "02-solar",
+  "assetBaseDir": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar",
+  "assets": [
+    {
+      "assetId": "solar-carport-hero",
+      "renderMode": "png-crop",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-carport-hero.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (1).png",
+      "sourceObjectId": "solar-carport-hero",
+      "pageObjectId": "solar-carport-mediaslot",
+      "fitMode": "cover"
+    },
+    {
+      "assetId": "solar-panel-display-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-panel-display-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "solar-panel-display-source",
+      "pageObjectId": "icon-solar-panel-display",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "inverter-display-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/inverter-display-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "inverter-display-source",
+      "pageObjectId": "icon-inverter-display",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "factory-consumption-display-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/factory-consumption-display-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "factory-consumption-display-source",
+      "pageObjectId": "icon-factory-consumption-display",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "carbon-reduction-display-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "carbon-reduction-display-source",
+      "pageObjectId": "icon-carbon-reduction-display",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "metric-generation-sun-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-generation-sun-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-generation-sun-source",
+      "pageObjectId": "icon-metric-generation-sun",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "metric-self-consumption-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-self-consumption-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-self-consumption-source",
+      "pageObjectId": "icon-metric-self-consumption",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "metric-co2-total-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-co2-total-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-co2-total-source",
+      "pageObjectId": "icon-metric-co2-total",
+      "fitMode": "contain"
+    },
+    {
+      "assetId": "metric-efficiency-source",
+      "renderMode": "icon-raster",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-efficiency-source.png",
+      "sourceFile": "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png",
+      "sourceObjectId": "metric-efficiency-source",
+      "pageObjectId": "icon-metric-efficiency",
+      "fitMode": "contain"
+    }
+  ],
+  "htmlBindings": [
+    {
+      "pageObjectId": "solar-carport-mediaslot",
+      "match": {
+        "strategy": "media-purpose",
+        "value": "solar-carport"
+      },
+      "assetId": "solar-carport-hero",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-carport-hero.png",
+      "renderMode": "png-crop",
+      "fitMode": "cover"
+    },
+    {
+      "pageObjectId": "icon-solar-panel-display",
+      "match": {
+        "strategy": "icon-id",
+        "value": "solar-panel-display"
+      },
+      "assetId": "solar-panel-display-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-panel-display-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-inverter-display",
+      "match": {
+        "strategy": "icon-id",
+        "value": "inverter-display"
+      },
+      "assetId": "inverter-display-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/inverter-display-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-factory-consumption-display",
+      "match": {
+        "strategy": "icon-id",
+        "value": "factory-consumption-display"
+      },
+      "assetId": "factory-consumption-display-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/factory-consumption-display-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-carbon-reduction-display",
+      "match": {
+        "strategy": "icon-id",
+        "value": "carbon-reduction-display"
+      },
+      "assetId": "carbon-reduction-display-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-metric-generation-sun",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-generation-sun"
+      },
+      "assetId": "metric-generation-sun-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-generation-sun-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-metric-self-consumption",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-self-consumption"
+      },
+      "assetId": "metric-self-consumption-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-self-consumption-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-metric-co2-today",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-co2-today"
+      },
+      "assetId": "carbon-reduction-display-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-metric-co2-total",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-co2-total"
+      },
+      "assetId": "metric-co2-total-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-co2-total-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    },
+    {
+      "pageObjectId": "icon-metric-efficiency",
+      "match": {
+        "strategy": "icon-id",
+        "value": "metric-efficiency"
+      },
+      "assetId": "metric-efficiency-source",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-efficiency-source.png",
+      "renderMode": "icon-raster",
+      "fitMode": "contain"
+    }
+  ],
+  "promptBindings": [
+    {
+      "assetId": "solar-carport-hero",
+      "purpose": "solar-carport",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-carport-hero.png"
+    },
+    {
+      "assetId": "solar-panel-display-source",
+      "purpose": "solar-panel-display",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-panel-display-source.png"
+    },
+    {
+      "assetId": "inverter-display-source",
+      "purpose": "inverter-display",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/inverter-display-source.png"
+    },
+    {
+      "assetId": "factory-consumption-display-source",
+      "purpose": "factory-consumption-display",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/factory-consumption-display-source.png"
+    },
+    {
+      "assetId": "carbon-reduction-display-source",
+      "purpose": "carbon-reduction-display",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png"
+    },
+    {
+      "assetId": "metric-generation-sun-source",
+      "purpose": "metric-generation-sun",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-generation-sun-source.png"
+    },
+    {
+      "assetId": "metric-self-consumption-source",
+      "purpose": "metric-self-consumption",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-self-consumption-source.png"
+    },
+    {
+      "assetId": "carbon-reduction-display-source",
+      "purpose": "metric-co2-today",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png"
+    },
+    {
+      "assetId": "metric-co2-total-source",
+      "purpose": "metric-co2-total",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-co2-total-source.png"
+    },
+    {
+      "assetId": "metric-efficiency-source",
+      "purpose": "metric-efficiency",
+      "projectAssetPath": "docs/ui-replica/kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-efficiency-source.png"
+    }
+  ]
+}

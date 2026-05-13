@@ -1,0 +1,156 @@
+.page-05-sustainability::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(110,117,103,.3);
+  border-radius:28px;
+  pointer-events:none;
+  z-index:40
+}
+
+.page-05-sustainability .sustain-title{left:68px;top:176px;width:470px}
+.page-05-sustainability .sustain-title .eyebrow{font-size:26px;letter-spacing:9px;margin-bottom:22px}
+.page-05-sustainability .sustain-title .display-title{font-size:88px;line-height:1.06;letter-spacing:6px}
+.page-05-sustainability .sustain-title .hero-subtitle{font-size:27px;margin-top:22px;color:#616667}
+.page-05-sustainability .sustain-copy{position:absolute;left:68px;top:458px;z-index:8;width:522px;font-size:17px;line-height:1.78;color:#4e5550}
+.page-05-sustainability .sustain-copy span{display:block;margin-top:14px;font:400 14px/1.82 var(--font-latin);color:#6f756d}
+
+.page-05-sustainability .sustain-leaf{left:520px;top:564px;width:178px;height:96px;opacity:.42;z-index:9}
+.page-05-sustainability .sustain-leaf:before{width:150px;height:74px}
+.page-05-sustainability .sustain-leaf:after{width:98px;height:50px;left:98px;top:42px}
+
+.page-05-sustainability .sustain-hero{
+  left:574px;
+  top:146px;
+  width:1346px;
+  height:560px;
+  border-radius:0;
+  box-shadow:none;
+  background:transparent
+}
+
+.page-05-sustainability .sustain-hero img{object-position:center 48%;transform:none}
+.page-05-sustainability .sustain-hero.photo-fade-left:before{
+  background:linear-gradient(90deg,rgba(255,253,247,.96) 0%,rgba(255,253,247,.72) 15%,rgba(255,253,247,.18) 36%,rgba(255,253,247,0) 56%)
+}
+.page-05-sustainability .sustain-hero.photo-fade-bottom:after{
+  background:linear-gradient(180deg,rgba(255,253,247,0) 54%,rgba(255,253,247,.58) 88%,rgba(255,253,247,.8) 100%)
+}
+
+.page-05-sustainability .s-total-gen{left:40px;top:706px;width:304px;height:232px}
+.page-05-sustainability .s-total-co2{left:362px;top:706px;width:304px;height:232px}
+.page-05-sustainability .s-energy-saving{left:684px;top:706px;width:304px;height:232px}
+.page-05-sustainability .s-procure{left:1008px;top:706px;width:304px;height:232px}
+.page-05-sustainability .s-esg{left:1330px;top:706px;width:304px;height:232px}
+.page-05-sustainability .s-trees{left:1652px;top:706px;width:236px;height:232px}
+
+.page-05-sustainability .kpi-card,
+.page-05-sustainability .stat-card{
+  background:rgba(255,253,247,.92);
+  border:1px solid rgba(155,139,92,.28);
+  box-shadow:0 12px 28px rgba(96,81,56,.11)
+}
+
+.page-05-sustainability .kpi-card__head{left:26px;top:20px;gap:16px;height:58px}
+.page-05-sustainability .kpi-card__head .icon-metric{
+  width:54px;
+  height:54px;
+  color:#6a8a50;
+  stroke-width:2.8
+}
+.page-05-sustainability .kpi-card__head h3{font-size:18px;letter-spacing:1px;margin-bottom:4px}
+.page-05-sustainability .kpi-card__head p{font-size:12px;letter-spacing:.1px}
+.page-05-sustainability .kpi-card__value{left:44px;top:108px;height:58px;gap:10px}
+.page-05-sustainability .kpi-card__value span{font-size:66px;letter-spacing:1px}
+.page-05-sustainability .kpi-card__value small{font-size:22px;margin-bottom:8px}
+.page-05-sustainability .kpi-card .sparkline{left:42px;right:42px;bottom:24px;width:calc(100% - 84px);height:28px}
+.page-05-sustainability .sparkline path{stroke:#75955e;stroke-width:2.6}
+
+.page-05-sustainability .growth-note{
+  position:absolute;
+  left:44px;
+  bottom:34px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#626862;
+  font-size:16px
+}
+.page-05-sustainability .growth-note span{color:#646b63}
+.page-05-sustainability .icon-trend{width:22px;height:22px;color:#7fa45c;stroke-width:2.5}
+
+.page-05-sustainability .stat-card{padding:0}
+.page-05-sustainability .stat-card__head{
+  position:absolute;
+  left:24px;
+  top:18px;
+  right:18px;
+  display:flex;
+  align-items:center;
+  gap:14px
+}
+.page-05-sustainability .stat-card__head .icon-metric{
+  width:50px;
+  height:50px;
+  color:#6a8a50;
+  stroke-width:2.8
+}
+.page-05-sustainability .stat-card__label{font-size:18px;letter-spacing:1px}
+.page-05-sustainability .stat-card__en{font-size:12px;margin-top:3px}
+.page-05-sustainability .stat-card__value{
+  left:28px;
+  bottom:38px;
+  font-size:66px;
+  line-height:.88;
+  letter-spacing:1px;
+  color:#57774a
+}
+.page-05-sustainability .stat-card__value--procure{
+  bottom:54px;
+  font-size:42px;
+  letter-spacing:.5px
+}
+.page-05-sustainability .stat-card__value--procure span{
+  font-size:24px;
+  font-weight:500;
+  color:#566152;
+  margin-right:6px
+}
+.page-05-sustainability .stat-card__value--procure small{
+  font-size:22px;
+  color:#566152
+}
+.page-05-sustainability .stat-card__unit{font-size:20px;margin-left:10px;margin-bottom:8px}
+.page-05-sustainability .stat-card__desc{
+  position:absolute;
+  left:28px;
+  bottom:22px;
+  margin:0;
+  font-size:17px;
+  color:#666d66
+}
+
+.page-05-sustainability .esg-list{
+  position:absolute;
+  left:30px;
+  top:94px;
+  margin:0;
+  padding-left:22px;
+  font-size:16px;
+  line-height:1.82;
+  color:#525951
+}
+
+.page-05-sustainability .sparkline--trees{
+  position:absolute;
+  left:26px;
+  right:26px;
+  bottom:24px;
+  width:calc(100% - 52px);
+  height:26px
+}
+
+.page-05-sustainability .footer-nav{height:96px}
+.page-05-sustainability .bottom-nav{left:218px}
+.page-05-sustainability .bottom-nav a{padding:22px 40px 0}
+.page-05-sustainability .footer-slogan{right:246px}

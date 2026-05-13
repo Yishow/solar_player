@@ -1,0 +1,184 @@
+{
+  "pageId": "02-solar",
+  "files": {
+    "ChatGPT Image 2026年5月11日 下午11_53_08 (1).png": {
+      "kind": "hero-photo",
+      "suggestedOutput": "png-crop",
+      "confidence": 0.96,
+      "objects": [
+        {
+          "id": "solar-carport-hero",
+          "assetId": "solar-carport-hero",
+          "bbox": [0, 0, 1672, 941],
+          "kind": "hero-photo",
+          "suggestedOutput": "png-crop",
+          "confidence": 0.96,
+          "aliases": ["solar-carport", "hero-media"]
+        }
+      ]
+    },
+    "ChatGPT Image 2026年5月11日 下午11_53_08 (2).png": {
+      "kind": "icon-sheet",
+      "suggestedOutput": "icon-raster",
+      "confidence": 0.94,
+      "objects": [
+        {
+          "id": "solar-panel-display-source",
+          "assetId": "solar-panel-display-source",
+          "bbox": [0, 0, 362, 362],
+          "kind": "energy-flow-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["solar-panel-display"]
+        },
+        {
+          "id": "inverter-display-source",
+          "assetId": "inverter-display-source",
+          "bbox": [362, 0, 362, 362],
+          "kind": "energy-flow-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["inverter-display"]
+        },
+        {
+          "id": "factory-consumption-display-source",
+          "assetId": "factory-consumption-display-source",
+          "bbox": [724, 0, 362, 362],
+          "kind": "energy-flow-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["factory-consumption-display"]
+        },
+        {
+          "id": "carbon-reduction-display-source",
+          "assetId": "carbon-reduction-display-source",
+          "bbox": [1086, 0, 362, 362],
+          "kind": "co2-badge",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["carbon-reduction-display", "metric-co2-today"]
+        },
+        {
+          "id": "metric-generation-sun-source",
+          "assetId": "metric-generation-sun-source",
+          "bbox": [0, 362, 362, 362],
+          "kind": "metric-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["metric-generation-sun"]
+        },
+        {
+          "id": "metric-self-consumption-source",
+          "assetId": "metric-self-consumption-source",
+          "bbox": [362, 362, 362, 362],
+          "kind": "metric-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["metric-self-consumption"]
+        },
+        {
+          "id": "metric-co2-total-source",
+          "assetId": "metric-co2-total-source",
+          "bbox": [724, 362, 362, 362],
+          "kind": "metric-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["metric-co2-total"]
+        },
+        {
+          "id": "metric-efficiency-source",
+          "assetId": "metric-efficiency-source",
+          "bbox": [1086, 362, 362, 362],
+          "kind": "metric-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.94,
+          "aliases": ["metric-efficiency"]
+        },
+        {
+          "id": "battery-storage-source",
+          "assetId": "battery-storage-source",
+          "bbox": [0, 724, 362, 362],
+          "kind": "status-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.9,
+          "aliases": []
+        },
+        {
+          "id": "ev-charger-source",
+          "assetId": "ev-charger-source",
+          "bbox": [362, 724, 362, 362],
+          "kind": "status-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.9,
+          "aliases": []
+        },
+        {
+          "id": "growth-chart-source",
+          "assetId": "growth-chart-source",
+          "bbox": [724, 724, 362, 362],
+          "kind": "status-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.9,
+          "aliases": []
+        },
+        {
+          "id": "sustainability-hand-source",
+          "assetId": "sustainability-hand-source",
+          "bbox": [1086, 724, 362, 362],
+          "kind": "status-icon",
+          "suggestedOutput": "icon-raster",
+          "confidence": 0.9,
+          "aliases": []
+        }
+      ]
+    },
+    "ChatGPT Image 2026年5月11日 下午11_53_08 (3).png": {
+      "kind": "leaf-ornament",
+      "suggestedOutput": "png-crop",
+      "confidence": 0.88,
+      "objects": [
+        {
+          "id": "solar-leaf-ornament",
+          "assetId": "solar-leaf-ornament",
+          "bbox": [0, 0, 1448, 1086],
+          "kind": "leaf-mark",
+          "suggestedOutput": "png-crop",
+          "confidence": 0.88,
+          "aliases": ["solar-leaf"]
+        }
+      ]
+    },
+    "ChatGPT Image 2026年5月11日 下午11_53_08 (4).png": {
+      "kind": "decorative-strip",
+      "suggestedOutput": "png-crop",
+      "confidence": 0.9,
+      "objects": [
+        {
+          "id": "solar-gold-wave",
+          "assetId": "solar-gold-wave",
+          "bbox": [0, 0, 2172, 724],
+          "kind": "decorative-strip",
+          "suggestedOutput": "png-crop",
+          "confidence": 0.9,
+          "aliases": ["solar-gold"]
+        }
+      ]
+    },
+    "ChatGPT Image 2026年5月11日 下午11_53_09 (5).png": {
+      "kind": "framed-stage",
+      "suggestedOutput": "png-crop",
+      "confidence": 0.88,
+      "objects": [
+        {
+          "id": "solar-stage-frame",
+          "assetId": "solar-stage-frame",
+          "bbox": [0, 0, 1448, 1086],
+          "kind": "background-scene",
+          "suggestedOutput": "png-crop",
+          "confidence": 0.88,
+          "aliases": []
+        }
+      ]
+    }
+  }
+}

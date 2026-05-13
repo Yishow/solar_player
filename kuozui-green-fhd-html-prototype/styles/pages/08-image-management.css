@@ -1,0 +1,79 @@
+
+.page-08-image-management .image-mgmt-title{position:absolute;left:64px;top:146px;z-index:2}
+.page-08-image-management .image-mgmt-title h1{margin:0;font-size:68px;line-height:1;letter-spacing:4px;font-weight:700;color:#393d39}
+.page-08-image-management .image-mgmt-title p{margin:12px 0 0;font:400 19px/1.05 var(--font-latin);color:#70756e}
+.page-08-image-management .image-mgmt-leaf{position:absolute;left:360px;top:176px;width:126px;height:74px;opacity:.28}
+.page-08-image-management .image-mgmt-leaf:before,.page-08-image-management .image-mgmt-leaf:after{content:"";position:absolute;border-radius:88% 0 88% 0;background:linear-gradient(135deg,rgba(117,145,79,.34),rgba(117,145,79,.04));transform:rotate(-35deg)}
+.page-08-image-management .image-mgmt-leaf:before{width:92px;height:44px;left:0;top:14px}
+.page-08-image-management .image-mgmt-leaf:after{width:64px;height:30px;left:54px;top:2px}
+.page-08-image-management .image-mgmt-gold{left:26px;top:262px;width:448px;background:linear-gradient(90deg,transparent,rgba(221,188,100,.48) 20%,rgba(221,188,100,.44) 78%,transparent)}
+.page-08-image-management .im-total{left:520px;top:114px;width:302px;height:118px;padding:16px 18px 18px 104px}
+.page-08-image-management .im-space{left:842px;top:114px;width:366px;height:118px;padding:16px 20px 18px 104px}
+.page-08-image-management .im-sync{left:1226px;top:114px;width:560px;height:118px;padding:16px 24px 18px 104px}
+.page-08-image-management .stat-card__icon{position:absolute;left:18px;top:16px;width:58px;height:58px;padding:12px;border-radius:50%;border:1px solid rgba(97,105,81,.2);background:rgba(255,255,255,.62)}
+.page-08-image-management .stat-card__label{font-size:14px;letter-spacing:.6px;color:#4b524a}
+.page-08-image-management .stat-card__en{font-size:11px;margin-top:3px}
+.page-08-image-management .stat-card__value{top:54px;bottom:auto;left:104px;font-size:42px;line-height:.94;color:#4e7143}
+.page-08-image-management .im-total .stat-card__value{font-size:58px}
+.page-08-image-management .im-space .stat-card__value{font-size:34px}
+.page-08-image-management .im-sync .small{font-size:24px;color:#59645b}
+.page-08-image-management .im-space-line{left:110px;top:86px;width:224px;height:6px}
+.page-08-image-management .im-space-line:after{width:48%}
+.page-08-image-management .source-bar{position:absolute;left:60px;top:284px;width:638px;height:124px;border:1px solid rgba(92,105,79,.16);border-radius:18px;background:rgba(255,253,247,.9);display:flex;align-items:center;padding:20px 22px;gap:16px}
+.page-08-image-management .source-bar label{font-size:15px;line-height:1.42;min-width:102px;color:#4d534e}
+.page-08-image-management .source-bar small{display:block;margin-top:3px;font:400 11px/1 var(--font-latin);color:#7d7f77}
+.page-08-image-management .source-bar input{height:52px;flex:1;border:1px solid rgba(92,105,79,.18);border-radius:10px;padding:0 18px;font-size:16px;color:#4d524e}
+.page-08-image-management .source-bar button{height:52px;width:118px;border:1px solid rgba(92,105,79,.18);background:#f5f2e8;border-radius:10px;color:#5b6058}
+.page-08-image-management .source-bar button small{font-size:10px}
+.page-08-image-management .im-upload{position:absolute;left:720px;top:292px;width:356px;height:92px;font-size:12px}
+.page-08-image-management .im-upload .icon{width:36px;height:36px;margin-right:14px}
+.page-08-image-management .slideshow-control{position:absolute;left:1098px;top:283px;width:220px;height:98px;display:flex;align-items:flex-start;gap:12px}
+.page-08-image-management .slideshow-control .toggle-switch{position:absolute;right:14px;top:8px}
+.page-08-image-management .slideshow-control span{font-size:13px;line-height:1.36;color:#535953}
+.page-08-image-management .slideshow-control small{display:block;margin-top:2px;font:400 11px/1 var(--font-latin);color:#787c75}
+.page-08-image-management .slideshow-control>div{position:absolute;left:0;top:48px;font-size:12px;line-height:1.35;color:#5a605b}
+.page-08-image-management .slideshow-control .stepper{margin:0 8px 0 12px;vertical-align:middle}
+.page-08-image-management .toggle-track{width:48px;height:26px}
+.page-08-image-management .toggle-thumb{top:3px;left:3px;width:20px;height:20px}
+.page-08-image-management .toggle-switch input:checked + .toggle-track .toggle-thumb{left:25px}
+.page-08-image-management .stepper{height:30px;grid-template-columns:30px 50px 30px;border-radius:7px}
+.page-08-image-management .stepper button{font-size:17px}
+.page-08-image-management .stepper input{font-size:15px}
+.page-08-image-management .image-grid{position:absolute;left:60px;top:440px;width:1280px;height:380px}
+.page-08-image-management .mg-card{width:288px;height:202px;border-radius:16px}
+.page-08-image-management .mg-card figure{height:118px;overflow:hidden}
+.page-08-image-management .mg-card img{object-fit:cover;object-position:center center}
+.page-08-image-management .mg-1{left:0;top:0}
+.page-08-image-management .mg-2{left:308px;top:0}
+.page-08-image-management .mg-3{left:616px;top:0}
+.page-08-image-management .mg-4{left:924px;top:0}
+.page-08-image-management .mg-5{left:0;top:220px}
+.page-08-image-management .mg-6{left:308px;top:220px}
+.page-08-image-management .mg-7{left:616px;top:220px}
+.page-08-image-management .mg-8{left:924px;top:220px}
+.page-08-image-management .image-card__badge{left:10px;top:10px;min-width:34px;height:26px;font-size:13px;line-height:26px}
+.page-08-image-management .image-card__control{right:10px;top:10px;transform:scale(.88);transform-origin:top right}
+.page-08-image-management .image-card__name{font-size:13px;margin:12px 14px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-08-image-management .image-card__meta{font-size:11px;margin:0 14px;color:#8d8f89}
+.page-08-image-management .image-card__meta small{float:right;font-size:inherit}
+.page-08-image-management .edit-panel{position:absolute;right:46px;top:260px;width:432px;height:592px;border:1px solid rgba(92,105,79,.18);border-radius:18px;background:rgba(255,253,247,.93);box-shadow:var(--shadow-card);padding:18px 22px}
+.page-08-image-management .edit-panel h2{font-size:19px;line-height:1.15;margin:0 0 12px;color:#39413b}
+.page-08-image-management .edit-panel img{width:100%;height:126px;object-fit:cover;border-radius:12px}
+.page-08-image-management .panel-field{display:block;margin-top:12px;font-size:13px;color:#666;position:relative}
+.page-08-image-management .field-heading{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:7px;font-size:12px;line-height:1.2;color:#6a6d67}
+.page-08-image-management .panel-field:nth-of-type(1) .field-heading::after{content:"8 / 50";font:400 11px/1 var(--font-latin);color:#a2a29a}
+.page-08-image-management .panel-field:nth-of-type(2) .field-heading::after{content:"10 / 100";font:400 11px/1 var(--font-latin);color:#a2a29a}
+.page-08-image-management .edit-panel input,.page-08-image-management .edit-panel textarea,.page-08-image-management .ratio-select{width:100%;border:1px solid rgba(92,105,79,.18);border-radius:10px;background:#fffdf8;padding:10px 12px;font-size:14px;color:#4b504c}
+.page-08-image-management .edit-panel textarea{height:54px;resize:none}
+.page-08-image-management .inline-action{height:38px;padding:0 16px;border:1px solid rgba(92,105,79,.2);border-radius:10px;background:#fffdf8;color:#557a44;font:600 13px/1 var(--font-sans)}
+.page-08-image-management .ratio-select{height:38px}
+.page-08-image-management .control-row{min-height:48px;padding:8px 0;font-size:13px;line-height:1.3}
+.page-08-image-management .control-row>span{max-width:150px;color:#575d58}
+.page-08-image-management .control-row .stepper{margin-left:auto}
+.page-08-image-management .control-row .ratio-select{width:162px}
+.page-08-image-management .panel-actions{position:absolute;left:22px;right:22px;bottom:16px;display:flex;gap:12px}
+.page-08-image-management .panel-actions .action-button{flex:1;height:50px;padding:0 14px;font-size:15px}
+.page-08-image-management .panel-actions .action-button small{font-size:10px;line-height:1.1}
+.page-08-image-management .set-cover{width:auto}
+.page-08-image-management .remove{width:auto;color:#e05d5d;border-color:#e7b1b1}
+.page-08-image-management .footer-nav .bottom-nav{left:252px}

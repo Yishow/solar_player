@@ -1,0 +1,85 @@
+{
+  "pageId": "02-solar",
+  "bindings": [
+    {
+      "pageObjectId": "solar-carport-mediaslot",
+      "materialObjectId": "solar-carport-hero",
+      "assetId": "solar-carport-hero",
+      "renderMode": "png-crop",
+      "confidence": 0.98,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-solar-panel-display",
+      "materialObjectId": "solar-panel-display-source",
+      "assetId": "solar-panel-display-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-inverter-display",
+      "materialObjectId": "inverter-display-source",
+      "assetId": "inverter-display-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-factory-consumption-display",
+      "materialObjectId": "factory-consumption-display-source",
+      "assetId": "factory-consumption-display-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-carbon-reduction-display",
+      "materialObjectId": "carbon-reduction-display-source",
+      "assetId": "carbon-reduction-display-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-metric-generation-sun",
+      "materialObjectId": "metric-generation-sun-source",
+      "assetId": "metric-generation-sun-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-metric-self-consumption",
+      "materialObjectId": "metric-self-consumption-source",
+      "assetId": "metric-self-consumption-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-metric-co2-today",
+      "materialObjectId": "carbon-reduction-display-source",
+      "assetId": "carbon-reduction-display-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-metric-co2-total",
+      "materialObjectId": "metric-co2-total-source",
+      "assetId": "metric-co2-total-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    },
+    {
+      "pageObjectId": "icon-metric-efficiency",
+      "materialObjectId": "metric-efficiency-source",
+      "assetId": "metric-efficiency-source",
+      "renderMode": "icon-raster",
+      "confidence": 0.97,
+      "needsReview": false
+    }
+  ]
+}
