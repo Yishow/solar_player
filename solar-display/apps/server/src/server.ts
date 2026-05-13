@@ -13,11 +13,13 @@ loadDotenv({
 });
 
 async function startServer() {
-  const app = await buildApp();
+  let app: Awaited<ReturnType<typeof buildApp>> | null = null;
 
   try {
     migrateDatabase();
     seedDatabase();
+
+    app = await buildApp();
 
     const metricsAccumulatorService = new MetricsAccumulatorService();
     metricsAccumulatorService.initialize();
@@ -50,8 +52,13 @@ async function startServer() {
       port: config.port
     });
   } catch (error) {
-    app.log.error(error);
-    await app.close();
+    if (app) {
+      app.log.error(error);
+      await app.close();
+    } else {
+      console.error(error);
+    }
+
     process.exit(1);
   }
 }
