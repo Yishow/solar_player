@@ -1,5 +1,7 @@
 import { useEffect } from "react";
+import { useRef } from "react";
 import { subscribeSocketEvent } from "../services/socket";
+import { resolvePlaybackRouteNavigation } from "./playbackRouteNavigation";
 import { usePlaybackController } from "./usePlaybackController";
 
 type UsePageRotationOptions = {
@@ -14,6 +16,7 @@ export function usePageRotation(options: UsePageRotationOptions = {}) {
     currentPath: options.currentPath,
     tickMs: options.tickMs
   });
+  const previousControllerRouteRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const unsubscribe = subscribeSocketEvent("playback:settingsUpdated", () => {
@@ -26,15 +29,20 @@ export function usePageRotation(options: UsePageRotationOptions = {}) {
   }, [controller.reload]);
 
   useEffect(() => {
-    if (!options.routeRotationEnabled) {
+    const nextRoute = resolvePlaybackRouteNavigation({
+      controllerRoute: controller.currentPage?.route,
+      currentPath: options.currentPath,
+      previousControllerRoute: previousControllerRouteRef.current,
+      routeRotationEnabled: options.routeRotationEnabled
+    });
+
+    previousControllerRouteRef.current = controller.currentPage?.route;
+
+    if (!nextRoute) {
       return;
     }
 
-    if (!controller.currentPage?.route || controller.currentPage.route === options.currentPath) {
-      return;
-    }
-
-    options.onRouteChange?.(controller.currentPage.route);
+    options.onRouteChange?.(nextRoute);
   }, [
     controller.currentPage?.route,
     options.currentPath,

@@ -14,10 +14,12 @@
   "dependencies": {
     "@fastify/cors": "latest",
     "@fastify/multipart": "^10.0.0",
+    "@fastify/static": "^9.1.3",
     "@fastify/swagger": "latest",
     "@fastify/swagger-ui": "latest",
     "@solar-display/shared": "workspace:*",
     "better-sqlite3": "latest",
+    "dotenv": "^17.4.2",
     "fastify": "latest",
     "mqtt": "^5.15.1",
     "socket.io": "^4.8.3"
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "latest",
     "@types/node": "latest",
+    "pino-pretty": "^13.1.3",
     "tsx": "latest",
     "typescript": "latest"
   }

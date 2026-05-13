@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.env
 .DS_Store
 data/*.sqlite
 data/*.sqlite-shm
@@ -7,3 +8,5 @@ data/*.sqlite-wal
 uploads/images/*
 !uploads/images/.gitkeep
 !data/.gitkeep
+.spectra/
+openspec/.vector-search.db*

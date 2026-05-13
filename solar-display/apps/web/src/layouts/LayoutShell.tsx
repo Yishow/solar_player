@@ -4,6 +4,7 @@ import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { useMqttStatus } from "../hooks/useMqttStatus";
+import { shouldRedirectToOffline } from "./offlineRouting";
 import { usePageRotation } from "../hooks/usePageRotation";
 
 export function LayoutShell() {
@@ -21,18 +22,14 @@ export function LayoutShell() {
   });
 
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-
-    if (location.pathname === "/offline") {
-      return;
-    }
-    if (routeMeta?.group !== "playback") {
-      return;
-    }
-
-    if (status.connected || status.reason === "mock") {
+    if (
+      !shouldRedirectToOffline({
+        isHydrated,
+        pathname: location.pathname,
+        routeMeta,
+        status
+      })
+    ) {
       return;
     }
 

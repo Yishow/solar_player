@@ -45,6 +45,7 @@ sudo systemctl enable solar-display
 
 echo ""
 echo "=== Deploy complete! ==="
+echo "Create env file if needed: cp ${INSTALL_DIR}/.env.example ${INSTALL_DIR}/.env"
 echo "Start the service: sudo systemctl start solar-display"
 echo "Check status:      sudo systemctl status solar-display"
 echo "View logs:         sudo journalctl -u solar-display -f"

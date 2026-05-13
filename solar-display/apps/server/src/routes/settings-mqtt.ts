@@ -1,16 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
-
-type MqttSettingsRow = {
-  broker_host: string | null;
-  broker_port: number | null;
-  username: string | null;
-  password: string | null;
-  client_id: string | null;
-  reconnect_interval: number | null;
-  message_timeout: number | null;
-  data_mode: string | null;
-};
+import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -80,18 +70,7 @@ function getSettingsRow() {
     )
     .get() as MqttSettingsRow | undefined;
 
-  return (
-    row ?? {
-      broker_host: "localhost",
-      broker_port: 1883,
-      username: "",
-      password: "",
-      client_id: "solar-display-player",
-      reconnect_interval: 5000,
-      message_timeout: 30,
-      data_mode: "mqtt"
-    }
-  );
+  return row;
 }
 
 function serializeSettings(row: MqttSettingsRow): MqttSettingsResponse {
@@ -194,13 +173,13 @@ function getEnabledTopics() {
 
 const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/settings/mqtt", async () => ({
-    settings: serializeSettings(getSettingsRow()),
+    settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
     status: app.mqttClientService.getStatus()
   }));
 
   app.put<{ Body: SettingsBody }>("/api/settings/mqtt", async (request) => {
     const database = getDatabase();
-    const current = getSettingsRow();
+    const current = getSettingsRow() ?? resolveMqttSettings({}, null);
     const next = resolveSettingsBody(request.body, current);
 
     database.transaction(() => {
@@ -246,13 +225,13 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     await app.mqttClientService.connect();
 
     return {
-      settings: serializeSettings(getSettingsRow()),
+      settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
       status: app.mqttClientService.getStatus()
     };
   });
 
   app.post<{ Body: TestConnectionBody }>("/api/settings/mqtt/test", async (request) => {
-    const resolved = resolveSettingsBody(request.body, getSettingsRow());
+    const resolved = resolveSettingsBody(request.body, getSettingsRow() ?? resolveMqttSettings({}, null));
     const result = await app.mqttClientService.testConnection(resolved);
 
     return {

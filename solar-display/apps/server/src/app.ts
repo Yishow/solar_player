@@ -1,9 +1,13 @@
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError } from "fastify";
+import { join, dirname, extname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { closeDatabaseConnection } from "./db/index.js";
+import { createLoggerOptions } from "./logger.js";
 import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
@@ -16,9 +20,33 @@ import circuitsRoute from "./routes/circuits.js";
 import deviceRoute from "./routes/device.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 
+function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+
+  const pathname = new URL(request.url, "http://localhost").pathname;
+
+  if (pathname.startsWith("/api/") || pathname.startsWith("/docs") || pathname.startsWith("/assets/")) {
+    return false;
+  }
+
+  if (extname(pathname)) {
+    return false;
+  }
+
+  const accept = request.headers.accept;
+
+  if (!accept) {
+    return true;
+  }
+
+  return accept.includes("text/html") || accept.includes("application/xhtml+xml");
+}
+
 export async function buildApp() {
   const app = Fastify({
-    logger: true
+    logger: createLoggerOptions()
   });
   let mqttClientService: MqttClientService | null = null;
   const socketService = new SocketService({
@@ -71,12 +99,26 @@ export async function buildApp() {
   await app.register(deviceRoute);
   await app.register(settingsMqttRoute);
 
+  // Serve frontend static files
+  const serverDir = dirname(fileURLToPath(import.meta.url));
+  const webDist = process.env.WEB_DIST_DIR ?? join(serverDir, "../../web/dist");
+  await app.register(fastifyStatic, {
+    root: webDist,
+    prefix: "/"
+  });
+
+  // SPA fallback: serve index.html for non-API, non-file routes
   app.setNotFoundHandler((request, reply) => {
-    reply.status(404).send({
-      success: false,
-      error: `Route ${request.method} ${request.url} not found`,
-      timestamp: new Date().toISOString()
-    });
+    if (!shouldServeSpaFallback(request)) {
+      reply.status(404).send({
+        success: false,
+        error: `Route ${request.method} ${request.url} not found`,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    reply.sendFile("index.html");
   });
 
   app.setErrorHandler((error: FastifyError, _request, reply) => {

@@ -1,5 +1,11 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  getEnvMqttSettings,
+  hasExplicitMqttEnvSettings,
+  type MqttSettingsRow,
+  shouldBootstrapStoredMqttSettings
+} from "../mqtt/settings-source.js";
 import { closeDatabaseConnection, getDatabase } from "./index.js";
 
 const topicMappings = [
@@ -159,11 +165,27 @@ export function seedDatabase() {
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
 
-    const mqttSettingsCount = database
-      .prepare("SELECT COUNT(*) AS count FROM mqtt_settings")
-      .get() as { count: number };
+    const existingMqttSettings = database
+      .prepare(
+        `
+          SELECT
+            broker_host,
+            broker_port,
+            username,
+            password,
+            client_id,
+            reconnect_interval,
+            message_timeout,
+            data_mode
+          FROM mqtt_settings
+          LIMIT 1
+        `
+      )
+      .get() as MqttSettingsRow | undefined;
 
-    if (mqttSettingsCount.count === 0) {
+    if (!existingMqttSettings || (hasExplicitMqttEnvSettings(process.env) && shouldBootstrapStoredMqttSettings(existingMqttSettings))) {
+      const mqttSettings = getEnvMqttSettings(process.env);
+      database.prepare("DELETE FROM mqtt_settings").run();
       database
         .prepare(`
           INSERT INTO mqtt_settings (
@@ -178,14 +200,14 @@ export function seedDatabase() {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .run(
-          "localhost",
-          1883,
-          "",
-          "",
-          "solar-display-player",
-          5000,
-          30,
-          "mqtt"
+          mqttSettings.broker_host,
+          mqttSettings.broker_port,
+          mqttSettings.username,
+          mqttSettings.password,
+          mqttSettings.client_id,
+          mqttSettings.reconnect_interval,
+          mqttSettings.message_timeout,
+          mqttSettings.data_mode
         );
     }
 

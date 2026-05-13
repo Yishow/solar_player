@@ -13,15 +13,25 @@ function readNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const dataDir = process.env.DATA_DIR ?? resolve(projectRoot, "data");
+function resolveDataDir() {
+  return process.env.DATA_DIR ?? resolve(projectRoot, "data");
+}
 
 export const config = {
-  host: process.env.HOST ?? "0.0.0.0",
-  port: readNumber(process.env.PORT, 3000),
   projectRoot,
-  dataDir,
-  databasePath: process.env.DATABASE_PATH ?? resolve(dataDir, "solar-display.sqlite"),
   openapiPath: resolve(projectRoot, "docs/openapi.yaml"),
   uploadsDir: resolve(projectRoot, "uploads/images"),
-  migrationsDir: resolve(projectRoot, "apps/server/src/db/migrations")
-} as const;
+  migrationsDir: resolve(projectRoot, "apps/server/src/db/migrations"),
+  get host() {
+    return process.env.HOST ?? "0.0.0.0";
+  },
+  get port() {
+    return readNumber(process.env.PORT, 3000);
+  },
+  get dataDir() {
+    return resolveDataDir();
+  },
+  get databasePath() {
+    return process.env.DATABASE_PATH ?? resolve(resolveDataDir(), "solar-display.sqlite");
+  }
+};

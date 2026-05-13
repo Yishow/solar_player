@@ -1,10 +1,16 @@
+import { config as loadDotenv } from "dotenv";
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { migrateDatabase } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
+import { resolveEnvFilePath } from "./env.js";
 import { DailySummaryService } from "./services/DailySummaryService.js";
 import { MetricsAccumulatorService } from "./services/MetricsAccumulatorService.js";
 import { SnapshotWriterService } from "./services/SnapshotWriterService.js";
+
+loadDotenv({
+  path: resolveEnvFilePath(import.meta.url)
+});
 
 async function startServer() {
   const app = await buildApp();

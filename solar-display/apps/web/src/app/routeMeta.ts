@@ -1,6 +1,7 @@
 export type RouteGroup = "playback" | "management";
 
 export type RouteMeta = {
+  allowOfflineWhenDisconnected?: boolean;
   path: string;
   navLabel: string;
   title: string;
@@ -15,6 +16,7 @@ export const routeMetaList: RouteMeta[] = [
     navLabel: "總覽",
     title: "總覽頁",
     subtitle: "Overview",
+    allowOfflineWhenDisconnected: true,
     group: "playback",
     order: 1
   },
@@ -23,6 +25,7 @@ export const routeMetaList: RouteMeta[] = [
     navLabel: "太陽能",
     title: "太陽能發電",
     subtitle: "Solar Generation",
+    allowOfflineWhenDisconnected: true,
     group: "playback",
     order: 2
   },
@@ -31,6 +34,7 @@ export const routeMetaList: RouteMeta[] = [
     navLabel: "迴路",
     title: "工廠迴路",
     subtitle: "Factory Circuit",
+    allowOfflineWhenDisconnected: true,
     group: "playback",
     order: 3
   },
@@ -39,6 +43,7 @@ export const routeMetaList: RouteMeta[] = [
     navLabel: "圖庫",
     title: "展示圖像",
     subtitle: "Images",
+    allowOfflineWhenDisconnected: true,
     group: "playback",
     order: 4
   },
@@ -47,6 +52,7 @@ export const routeMetaList: RouteMeta[] = [
     navLabel: "永續",
     title: "永續成果",
     subtitle: "Sustainability",
+    allowOfflineWhenDisconnected: true,
     group: "playback",
     order: 5
   },

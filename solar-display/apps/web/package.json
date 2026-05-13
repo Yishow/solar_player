@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.json && vite build"
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@solar-display/shared": "workspace:*",
@@ -15,6 +16,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
@@ -22,6 +24,7 @@
     "postcss": "latest",
     "tailwindcss": "^3.4.17",
     "typescript": "latest",
+    "tsx": "latest",
     "vite": "latest"
   }
 }

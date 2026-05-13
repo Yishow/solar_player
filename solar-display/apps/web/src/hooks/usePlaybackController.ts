@@ -14,6 +14,7 @@ import {
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { getPlaybackPages, getPlaybackSettings } from "../services/api";
+import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 
 type UsePlaybackControllerOptions = {
   currentPath?: string;
@@ -77,6 +78,7 @@ export function usePlaybackController(
   const settingsRef = useRef<PlaybackSettings | null>(null);
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
+  const lastSyncedPathRef = useRef<string | undefined>(undefined);
   const tickMs = options.tickMs ?? 250;
 
   useEffect(() => {
@@ -133,28 +135,21 @@ export function usePlaybackController(
   }, []);
 
   useEffect(() => {
-    const nextSettings = settingsRef.current;
-    const currentRuntime = runtimeRef.current;
-
-    if (!nextSettings || !currentRuntime || !options.currentPath) {
-      return;
-    }
-
-    const routeIndex = resolvePlaybackIndexByRoute(playablePages, options.currentPath);
-
-    if (routeIndex < 0 || routeIndex === currentRuntime.currentIndex) {
-      return;
-    }
-
-    const nextPage = playablePages[routeIndex] ?? null;
-    setRuntime({
-      ...currentRuntime,
-      countdownMs: getPlaybackDurationMs(nextPage),
-      currentIndex: routeIndex,
-      isIdle: false,
-      lastInteractionAt: Date.now()
+    const nextRuntime = resolveRouteRuntimeSync({
+      currentPath: options.currentPath,
+      lastSyncedPath: lastSyncedPathRef.current,
+      pages,
+      runtime: runtimeRef.current
     });
-  }, [options.currentPath, playablePages]);
+
+    lastSyncedPathRef.current = options.currentPath;
+
+    if (!nextRuntime) {
+      return;
+    }
+
+    setRuntime(nextRuntime);
+  }, [options.currentPath, pages]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -218,7 +213,7 @@ export function usePlaybackController(
     return () => {
       window.clearInterval(timerId);
     };
-  }, [playablePages, tickMs]);
+  }, [pages, tickMs]);
 
   useEffect(() => {
     const handleInteraction = () => {

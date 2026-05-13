@@ -8,6 +8,7 @@ import { getDatabase } from "../db/index.js";
 import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
 import { parse } from "./PayloadParser.js";
+import { type MqttSettingsRow, resolveMqttSettings } from "./settings-source.js";
 
 type LoggerLike = {
   info: (payload: unknown, message?: string) => void;
@@ -15,16 +16,7 @@ type LoggerLike = {
   error: (payload: unknown, message?: string) => void;
 };
 
-type MqttSettingsRecord = {
-  broker_host: string | null;
-  broker_port: number | null;
-  username: string | null;
-  password: string | null;
-  client_id: string | null;
-  reconnect_interval: number | null;
-  message_timeout: number | null;
-  data_mode: string | null;
-};
+type MqttSettingsRecord = MqttSettingsRow;
 
 type TopicMappingRecord = {
   metric_key: string;
@@ -315,20 +307,7 @@ export class MqttClientService {
       )
       .get() as MqttSettingsRecord | undefined;
 
-    if (!row) {
-      return {
-        broker_host: "localhost",
-        broker_port: 1883,
-        username: "",
-        password: "",
-        client_id: "solar-display-player",
-        reconnect_interval: 5000,
-        message_timeout: 30,
-        data_mode: "mqtt"
-      } satisfies MqttSettingsRecord;
-    }
-
-    return row;
+    return resolveMqttSettings(process.env, row);
   }
 
   private buildClientOptions(settings: MqttSettingsRecord): IClientOptions {
