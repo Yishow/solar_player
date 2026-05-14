@@ -74,12 +74,21 @@ export const routeMetaList: RouteMeta[] = [
     shellDensity: "management"
   },
   {
+    path: "/brand",
+    navLabel: "品牌",
+    title: "品牌資產",
+    subtitle: "Brand Assets",
+    group: "management",
+    order: 7,
+    shellDensity: "management"
+  },
+  {
     path: "/settings/playback",
     navLabel: "播放設定",
     title: "播放設定",
     subtitle: "Playback Settings",
     group: "management",
-    order: 7,
+    order: 8,
     shellDensity: "management"
   },
   {
@@ -88,7 +97,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "圖片管理",
     subtitle: "Image Management",
     group: "management",
-    order: 8,
+    order: 9,
     shellDensity: "management"
   },
   {
@@ -97,7 +106,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "MQTT 設定",
     subtitle: "MQTT Settings",
     group: "management",
-    order: 9,
+    order: 10,
     shellDensity: "management"
   },
   {
@@ -106,7 +115,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "迴路設定",
     subtitle: "Circuit Settings",
     group: "management",
-    order: 10,
+    order: 11,
     shellDensity: "management"
   },
   {
@@ -115,7 +124,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "發電歷史",
     subtitle: "Energy History",
     group: "management",
-    order: 11,
+    order: 12,
     shellDensity: "management"
   },
   {
@@ -124,7 +133,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "離線錯誤",
     subtitle: "Offline Error",
     group: "management",
-    order: 12,
+    order: 13,
     shellDensity: "management"
   },
   {
@@ -133,7 +142,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "輪播預覽",
     subtitle: "Slideshow Preview",
     group: "management",
-    order: 13,
+    order: 14,
     shellDensity: "management"
   },
   {
@@ -142,7 +151,7 @@ export const routeMetaList: RouteMeta[] = [
     title: "裝置狀態",
     subtitle: "Device Status",
     group: "management",
-    order: 14,
+    order: 15,
     shellDensity: "device-detail"
   }
 ];

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { requestJson } from "../../services/api";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { energyTrendCardKeys, energyTrendLayout } from "./layout";
@@ -99,6 +100,7 @@ function MiniTrendChart({
 }
 
 export function EnergyTrend() {
+  useBodyClass("page-hero-shell");
   const { lastUpdatedAt, snapshot } = useLiveMetrics();
   const [range, setRange] = useState<EnergyTrendRange>("day");
   const [snapshots, setSnapshots] = useState<EnergyTrendSnapshot[]>([]);
@@ -178,24 +180,6 @@ export function EnergyTrend() {
         }}
         aria-hidden
       />
-
-      {energyTrendLayout.heroSeparators.top.map((line, index) => (
-        <div
-          key={`top-${index}`}
-          className="et-hero-separator et-hero-separator-top"
-          style={{ left: line.left, top: line.top, width: line.width }}
-          aria-hidden
-        />
-      ))}
-
-      {energyTrendLayout.heroSeparators.bottom.map((line, index) => (
-        <div
-          key={`bottom-${index}`}
-          className="et-hero-separator et-hero-separator-bottom"
-          style={{ left: line.left, top: line.top, width: line.width }}
-          aria-hidden
-        />
-      ))}
 
       <div
         className="et-tabs"

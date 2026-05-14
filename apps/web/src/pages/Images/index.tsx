@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { imageMocks } from "../../mocks/images";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
@@ -34,6 +35,7 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 }
 
 export function Images() {
+  useBodyClass("page-hero-shell");
   const [activeIndex, setActiveIndex] = useState(0);
   const viewModel = buildImagesViewModel({
     activeIndex,

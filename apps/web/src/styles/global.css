@@ -56,14 +56,71 @@
   }
 
   .shell-header-bar {
-    border-bottom: 1px solid var(--shell-bar-border);
+    border-bottom: 0;
     background: var(--shell-header-bg);
     box-shadow: var(--shell-bar-shadow);
   }
 
   .shell-footer-bar {
-    border-top: 1px solid var(--shell-bar-border);
+    border-top: 0;
     background: var(--shell-footer-bg);
+  }
+
+  .shell-header-bar,
+  .shell-footer-bar {
+    position: relative;
+  }
+
+  .shell-header-bar::before,
+  .shell-header-bar::after,
+  .shell-footer-bar::before,
+  .shell-footer-bar::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .shell-header-bar::before {
+    left: 0;
+    bottom: -1px;
+    width: 640px;
+    height: 2px;
+    background: #fffdf7;
+  }
+
+  .shell-header-bar::after {
+    left: 640px;
+    bottom: -1px;
+    width: 1280px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(186, 180, 168, 0) 0%,
+      rgba(186, 180, 168, 0.92) 12%,
+      rgba(186, 180, 168, 0.92) 100%
+    );
+  }
+
+  .shell-footer-bar::before {
+    right: 0;
+    top: -1px;
+    width: 400px;
+    height: 2px;
+    background: #fffdf7;
+  }
+
+  .shell-footer-bar::after {
+    left: 0;
+    top: -1px;
+    width: 1520px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(186, 180, 168, 0.92) 0%,
+      rgba(186, 180, 168, 0.92) 88%,
+      rgba(186, 180, 168, 0) 100%
+    );
   }
 
   .shell-divider {

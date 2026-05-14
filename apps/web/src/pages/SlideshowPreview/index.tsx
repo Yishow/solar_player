@@ -1,11 +1,14 @@
 import {
   IconAutoplay,
   IconCalendar,
+  IconCaretLeft,
+  IconCaretRight,
   IconClock,
   IconNextPage,
-  IconOrder,
+  IconNodePath,
   IconPause,
   IconPlay,
+  IconStar,
   IconTransition
 } from "../../components/icons";
 import { usePageRotation } from "../../hooks/usePageRotation";
@@ -15,7 +18,7 @@ import "./preview.css";
 import { buildSlideshowPreviewViewModel } from "./viewModel";
 
 const summaryIcons = [
-  <IconOrder key="order" />,
+  <IconStar key="star" />,
   <IconClock key="clock" />,
   <IconTransition key="trans" />,
   <IconAutoplay key="play" />,
@@ -66,10 +69,12 @@ export function SlideshowPreview() {
         className="sp-title"
         style={{ left: slideshowLayout.title.left, top: slideshowLayout.title.top }}
       >
-        <h1>
-          循環<em>播放預覽頁</em>
-        </h1>
-        <p>Slideshow Preview</p>
+        <div className="sp-title-text">
+          <h1>
+            循環<em>播放預覽頁</em>
+          </h1>
+          <p>Slideshow Preview</p>
+        </div>
       </section>
 
       {/* === Left status rail === */}
@@ -81,61 +86,63 @@ export function SlideshowPreview() {
           width: slideshowLayout.status.width
         }}
       >
-        {/* Card 1: Playback status */}
+        {/* Box 1: Playback status */}
         <div className="sp-status-card sp-status-card--playback">
           <span className="sp-sc-label">
             播放狀態 <small>Playback Status</small>
           </span>
-          <div className="sp-sc-status-row">
-            <span className={`sp-sc-dot${isPlaying ? " is-playing" : ""}`} />
-            <span className={`sp-sc-status-text${isPlaying ? " is-playing" : ""}`}>
-              {viewModel.statusLabel}
-            </span>
+          <div className="sp-sc-main">
+            <div className="sp-sc-status-info">
+              <span className={`sp-sc-status-text${isPlaying ? " is-playing" : ""}`}>
+                {isPlaying ? "自動播放中" : "已暫停"}
+                <small>Auto Play</small>
+              </span>
+              <span className={`sp-sc-badge${!isPlaying ? " is-paused" : ""}`}>
+                {isPlaying ? "啟用中 Enabled" : "暫停中 Paused"}
+              </span>
+            </div>
+            <div className={`sp-sc-play-icon${!isPlaying ? " is-paused" : ""}`}>
+              <IconPlay size={28} />
+            </div>
           </div>
-          <span className={`sp-sc-badge${!isPlaying ? " is-paused" : ""}`}>
-            {isPlaying ? "Enabled" : "Paused"}
-          </span>
-          <button
-            type="button"
-            className={`sp-play-btn${!isPlaying ? " is-paused" : ""}`}
-            onClick={togglePlay}
-            aria-label={isPlaying ? "暫停" : "播放"}
-          >
-            {isPlaying ? <IconPause size={20} /> : <IconPlay size={20} />}
-          </button>
         </div>
 
-        {/* Card 2: Current page + sub-rows + progress */}
+        {/* Box 2: Current page */}
         <div className="sp-status-card sp-status-card--current">
           <span className="sp-sc-label">
-            目前播放中 <small>Currently Playing</small>
+            目前頁面 <small>Current Page</small>
           </span>
-          <div className="sp-sc-index">{viewModel.currentIndexLabel}</div>
+          <div className="sp-sc-page-count">
+            <span className="sp-sc-count-val">{viewModel.currentIndexLabel}</span>
+            <div className="sp-sc-node-icon">
+              <IconNodePath size={36} />
+            </div>
+          </div>
           <div className="sp-sc-page-name">
             <span>{viewModel.currentPageLabel}</span>
             <small>{viewModel.currentRouteLabel}</small>
           </div>
-          <div className="sp-sc-rows">
-            <div className="sp-sc-row">
-              <span className="sp-sc-row-label">
-                <IconClock size={13} />
-                每頁停留時間
-              </span>
-              <span className="sp-sc-row-value">
-                {currentPage ? currentPage.durationSeconds : "--"}
-                <small>秒</small>
-              </span>
-            </div>
-            <div className="sp-sc-row">
-              <span className="sp-sc-row-label">
-                <IconNextPage size={13} />
-                下頁切換倒數
-              </span>
-              <span className="sp-sc-row-value">
-                {countdown}
-                <small>秒</small>
-              </span>
-            </div>
+        </div>
+
+        {/* Box 3: Display duration */}
+        <div className="sp-status-card sp-status-card--compact">
+          <span className="sp-sc-label">
+            每頁停留時間 <small>Display Duration</small>
+          </span>
+          <div className="sp-sc-value-row">
+            <span className="sp-sc-value-num">{currentPage ? currentPage.durationSeconds : "--"}</span>
+            <small className="sp-sc-unit">秒 (sec.)</small>
+          </div>
+        </div>
+
+        {/* Box 4: Next page countdown */}
+        <div className="sp-status-card sp-status-card--compact">
+          <span className="sp-sc-label">
+            下一頁切換倒數 <small>Next Page In</small>
+          </span>
+          <div className="sp-sc-value-row">
+            <span className="sp-sc-value-num is-countdown">{countdown}</span>
+            <small className="sp-sc-unit">秒 (sec.)</small>
           </div>
           <div
             className="sp-progress"
@@ -173,46 +180,19 @@ export function SlideshowPreview() {
                 <h3>{card.labelZh}</h3>
                 <p>{card.labelEn}</p>
               </div>
-              {card.isCurrent && (
-                <div className="sp-card-ctrls">
-                  <button
-                    type="button"
-                    className="sp-ctrl-btn"
-                    onClick={prevPage}
-                    aria-label="上一頁"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    className="sp-ctrl-btn play"
-                    onClick={togglePlay}
-                    aria-label={isPlaying ? "暫停" : "播放"}
-                  >
-                    {isPlaying ? <IconPause size={18} /> : <IconPlay size={18} />}
-                  </button>
-                  <button
-                    type="button"
-                    className="sp-ctrl-btn"
-                    onClick={nextPage}
-                    aria-label="下一頁"
-                  >
-                    ›
-                  </button>
-                </div>
-              )}
             </article>
           );
         })}
         <button type="button" className="sp-arrow prev" onClick={prevPage} aria-label="上一張">
-          ‹
+          <IconCaretLeft size={28} />
         </button>
         <button type="button" className="sp-arrow next" onClick={nextPage} aria-label="下一張">
-          ›
+          <IconCaretRight size={28} />
         </button>
         <div className="sp-dots">
-          {visibleCards.map((card) => (
-            <i key={card.id} className={card.isCurrent ? "on" : ""} />
+          <div className="sp-dots-line" />
+          {pages.map((p, i) => (
+            <i key={p.id} className={p.id === currentPage?.id ? "on" : ""} />
           ))}
         </div>
       </section>
@@ -227,18 +207,27 @@ export function SlideshowPreview() {
           width: slideshowLayout.summary.width
         }}
       >
-        <h2>
-          播放定義摘要 <small>Playback Summary</small>
-        </h2>
-        {viewModel.summaryRows.map((row, index) => (
-          <div key={row.label} className={index === 3 && isPlaying ? "is-on" : ""}>
-            <span className="sp-summary-icon" aria-hidden>
-              {summaryIcons[index]}
-            </span>
-            <b>{row.label}</b>
-            <span>{row.value}</span>
-          </div>
-        ))}
+        <div className="sp-summary-title">
+          <h2>
+            播放設定摘要 <small>Playback Summary</small>
+          </h2>
+        </div>
+        <div className="sp-summary-grid">
+          {viewModel.summaryRows.map((row, index) => (
+            <div key={row.label} className={`sp-summary-item${index === 3 && isPlaying ? " is-on" : ""}`}>
+              <div className="sp-summary-header">
+                <span className="sp-summary-icon" aria-hidden>
+                  {summaryIcons[index]}
+                </span>
+                <div className="sp-summary-labels">
+                  <b>{row.label}</b>
+                  <small>{["Playback route", "Display Duration", "Transition Effect", "Auto Play", "Last Updated"][index]}</small>
+                </div>
+              </div>
+              <div className="sp-summary-value">{row.value}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="sp-leaf-bg" aria-hidden />

@@ -1,6 +1,7 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { LayoutShell } from "../layouts/LayoutShell";
 import { ManagementShell } from "../layouts/ManagementShell";
+import { BrandAssets } from "../pages/BrandAssets";
 import { CircuitSettings } from "../pages/CircuitSettings";
 import { DeviceStatus } from "../pages/DeviceStatus";
 import { EnergyHistory } from "../pages/EnergyHistory";
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: "trends",
         element: <EnergyTrend />
+      },
+      {
+        path: "brand",
+        element: <BrandAssets />
       },
       {
         path: "settings/playback",

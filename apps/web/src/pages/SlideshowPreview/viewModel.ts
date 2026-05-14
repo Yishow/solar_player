@@ -43,7 +43,7 @@ export function buildSlideshowPreviewViewModel({
   return {
     currentIndexLabel: `${currentIndex} / ${pages.length}`,
     currentPageLabel: currentPage?.labelZh ?? "尚無播放頁面",
-    currentRouteLabel: currentPage?.route ?? "請先在播放設定啟用頁面。",
+    currentRouteLabel: currentPage?.labelEn ?? "請先在播放設定啟用頁面。",
     progressLabel: `${Math.round(progress)}%`,
     queueCards: pages.map((page) => ({
       ...page,

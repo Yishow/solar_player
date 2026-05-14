@@ -1,4 +1,5 @@
 import { solarAssetRuntimeMap } from "./assets";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
   solarConnectorLayout,
@@ -67,6 +68,7 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 }
 
 export function Solar() {
+  useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
   const viewModel = buildSolarViewModel({
     isSocketConnected,

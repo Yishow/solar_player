@@ -1,6 +1,7 @@
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { StatusBadge } from "../../components/StatusBadge";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { overviewAssetRuntimeMap } from "./assets";
@@ -48,6 +49,7 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 }
 
 export function Overview() {
+  useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
   const viewModel = buildOverviewViewModel({
     connectionState,

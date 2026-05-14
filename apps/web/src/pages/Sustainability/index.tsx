@@ -1,5 +1,6 @@
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
 import {
@@ -80,6 +81,7 @@ function SustainabilityGlyph({
 }
 
 export function Sustainability() {
+  useBodyClass("page-hero-shell");
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
     summary: sustainabilitySummary

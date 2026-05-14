@@ -5,15 +5,6 @@
   overflow: hidden;
 }
 
-.factory-circuit-display-page::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgba(74, 82, 66, 0.18);
-  border-radius: 10px;
-  pointer-events: none;
-}
-
 .factory-circuit-title,
 .factory-circuit-copy,
 .factory-circuit-gold-line,

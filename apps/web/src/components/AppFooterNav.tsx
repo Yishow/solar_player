@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
+import { useBrandAssets } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
 import { PageNumberPill } from "./PageNumberPill";
 
@@ -56,6 +57,7 @@ export function AppFooterNav() {
   const { pathname } = useLocation();
   const currentRoute = routeMetaMap.get(pathname) ?? routeMetaList[0]!;
   const { entries, mode, isActivePath } = buildEntries(pathname);
+  const [brand] = useBrandAssets();
 
   // Settings nav has more entries; tighten typography & spacing so they fit.
   const navItemPaddingX = mode === "playback" ? 32 : 18;
@@ -126,13 +128,13 @@ export function AppFooterNav() {
               className="text-[17px] font-medium tracking-[0.42em]"
               style={{ color: "var(--shell-slogan-ink)" }}
             >
-              永續，從現在開始
+              {brand.sloganZh}
             </div>
             <div
               className="mt-[4px] font-en text-[11px] tracking-[0.04em]"
               style={{ color: "var(--shell-slogan-soft-ink)" }}
             >
-              / Sustainability Starts with Us
+              {brand.sloganEn}
             </div>
           </div>
           <FooterBranch />

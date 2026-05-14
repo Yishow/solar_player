@@ -24,4 +24,13 @@ test("header and footer bars do not rely on blur to fake the divider line", () =
 
   assert.equal(headerSection.includes("backdrop-filter"), false);
   assert.equal(footerSection.includes("backdrop-filter"), false);
+  assert.match(headerSection, /border-bottom:\s*0;/);
+  assert.match(footerSection, /border-top:\s*0;/);
+});
+
+test("hero shell supplement lines live in shared shell css", () => {
+  assert.match(globalCss, /\.shell-header-bar::before\s*\{[\s\S]*?width:\s*640px;/);
+  assert.match(globalCss, /\.shell-header-bar::after\s*\{[\s\S]*?left:\s*640px;[\s\S]*?width:\s*1280px;/);
+  assert.match(globalCss, /\.shell-footer-bar::before\s*\{[\s\S]*?width:\s*400px;/);
+  assert.match(globalCss, /\.shell-footer-bar::after\s*\{[\s\S]*?left:\s*0;[\s\S]*?width:\s*1520px;/);
 });

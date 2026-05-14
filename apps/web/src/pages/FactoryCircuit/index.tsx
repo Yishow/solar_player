@@ -2,6 +2,7 @@ import type { CircuitConfig } from "@solar-display/shared";
 import { useEffect, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
+import { useBodyClass } from "../../hooks/useBodyClass";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { requestJson } from "../../services/api";
@@ -166,6 +167,7 @@ const kpiLayoutOrder = [
 ] as const;
 
 export function FactoryCircuit() {
+  useBodyClass("page-hero-shell");
   const { connectionState, snapshot } = useLiveMetrics();
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");

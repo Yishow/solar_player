@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LeafOrnament } from "./LeafOrnament";
+import { useBrandAssets } from "../hooks/useBrandAssets";
 import { StatusBadge } from "./StatusBadge";
 
 type AppHeaderMeta = {
@@ -36,6 +36,7 @@ type AppHeaderProps = {
 
 export function AppHeader({ meta }: AppHeaderProps) {
   const [now, setNow] = useState(() => new Date());
+  const [brand] = useBrandAssets();
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -60,20 +61,25 @@ export function AppHeader({ meta }: AppHeaderProps) {
         {/* Brand cluster */}
         <div className="flex items-center gap-[15px]">
           <div className="flex h-[68px] w-[68px] items-center justify-center">
-            <LeafOrnament className="h-[52px] w-[60px]" />
+            <img
+              src={brand.logoDataUrl}
+              alt={brand.brandNameEn}
+              className="h-[60px] w-[60px] object-contain"
+              draggable={false}
+            />
           </div>
           <div className="leading-none">
             <div
               className="text-[35px] font-extrabold tracking-[0.11em]"
               style={{ color: "var(--ink-strong)" }}
             >
-              國瑞汽車
+              {brand.brandNameZh}
             </div>
             <div
               className="mt-[10px] font-en text-[15px] font-bold tracking-[0.34em]"
               style={{ color: "var(--ink-strong)" }}
             >
-              KUOZUI MOTORS
+              {brand.brandNameEn}
             </div>
           </div>
         </div>
@@ -91,13 +97,13 @@ export function AppHeader({ meta }: AppHeaderProps) {
             className="text-[22px] font-semibold tracking-[0.32em]"
             style={{ color: "var(--ink-strong)" }}
           >
-            國瑞汽車中廠綠能展示播放器
+            {brand.productTitleZh}
           </div>
           <div
             className="mt-[14px] font-en text-[15px] font-medium tracking-[0.14em]"
             style={{ color: "var(--shell-kicker-muted)" }}
           >
-            KUOZUI GREEN ENERGY DISPLAY PLAYER
+            {brand.productTitleEn}
           </div>
         </div>
 

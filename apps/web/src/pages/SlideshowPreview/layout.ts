@@ -8,11 +8,11 @@
 //   558-770  summary (h=212)
 
 export const slideshowLayout = {
-  carousel: { height: 460, left: 360, top: 78, width: 1500 },
-  status: { left: 50, top: 70, width: 282 },
-  summary: { height: 212, left: 360, top: 558, width: 1500 },
-  title: { left: 58, top: 8 }
+  carousel: { height: 460, left: 360, top: 78, width: 1510 },
+  status: { left: 50, top: 118, width: 282 },
+  summary: { height: 212, left: 360, top: 610, width: 1510 },
+  title: { left: 58, top: 40 }
 } as const;
 
-// Equal-width cards (278px) + 22px gap = 300px step → 5 cards × 300 − 22 = 1478px in 1500px carousel
-export const slideshowCardOffsets = [0, 300, 600, 900, 1200] as const;
+// Equal-width cards (278px) + 30px gap = 308px step -> 1510 width
+export const slideshowCardOffsets = [0, 308, 616, 924, 1232] as const;

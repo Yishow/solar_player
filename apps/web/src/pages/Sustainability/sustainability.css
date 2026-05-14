@@ -5,15 +5,6 @@
   overflow: hidden;
 }
 
-.sustainability-display-page::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgba(110, 117, 103, 0.3);
-  border-radius: 28px;
-  pointer-events: none;
-}
-
 .sustainability-title,
 .sustainability-copy,
 .sustainability-leaf-watermark,
