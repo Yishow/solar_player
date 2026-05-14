@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { BrandProfile } from "@solar-display/shared";
+import { brandLogoUrl, getBrandProfiles } from "../services/api";
 
-export type BrandAssets = {
-  logoDataUrl: string;
+export type BrandView = {
+  logoSrc: string;
   brandNameZh: string;
   brandNameEn: string;
   productTitleZh: string;
@@ -10,12 +12,10 @@ export type BrandAssets = {
   sloganEn: string;
 };
 
-const STORAGE_KEY = "solar-display:brand-assets";
-
 export const DEFAULT_LOGO_SRC = "/brand-logo.png";
 
-export const defaultBrandAssets: BrandAssets = {
-  logoDataUrl: DEFAULT_LOGO_SRC,
+export const defaultBrandView: BrandView = {
+  logoSrc: DEFAULT_LOGO_SRC,
   brandNameZh: "國瑞汽車",
   brandNameEn: "KUOZUI MOTORS",
   productTitleZh: "國瑞汽車中廠綠能展示播放器",
@@ -24,38 +24,46 @@ export const defaultBrandAssets: BrandAssets = {
   sloganEn: "/ Sustainability Starts with Us"
 };
 
-function readStorage(): BrandAssets {
-  if (typeof window === "undefined") return defaultBrandAssets;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultBrandAssets;
-    const parsed = JSON.parse(raw) as Partial<BrandAssets>;
-    return { ...defaultBrandAssets, ...parsed };
-  } catch {
-    return defaultBrandAssets;
-  }
+export const BRAND_CHANGED_EVENT = "solar-display:brand-changed";
+
+export function profileToView(profile: BrandProfile | null): BrandView {
+  if (!profile) return defaultBrandView;
+  return {
+    logoSrc: brandLogoUrl(profile),
+    brandNameZh: profile.brandNameZh || defaultBrandView.brandNameZh,
+    brandNameEn: profile.brandNameEn || defaultBrandView.brandNameEn,
+    productTitleZh: profile.productTitleZh || defaultBrandView.productTitleZh,
+    productTitleEn: profile.productTitleEn || defaultBrandView.productTitleEn,
+    sloganZh: profile.sloganZh || defaultBrandView.sloganZh,
+    sloganEn: profile.sloganEn || defaultBrandView.sloganEn
+  };
 }
 
-const BRAND_EVENT = "solar-display:brand-assets-changed";
+export function notifyBrandChanged() {
+  window.dispatchEvent(new Event(BRAND_CHANGED_EVENT));
+}
 
-export function useBrandAssets(): [BrandAssets, (next: BrandAssets) => void] {
-  const [assets, setAssets] = useState<BrandAssets>(() => readStorage());
+export function useBrandAssets(): BrandView {
+  const [view, setView] = useState<BrandView>(defaultBrandView);
 
-  useEffect(() => {
-    const sync = () => setAssets(readStorage());
-    window.addEventListener(BRAND_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(BRAND_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
+  const load = useCallback(async () => {
+    try {
+      const profiles = await getBrandProfiles();
+      const active = profiles.find((profile) => profile.isActive) ?? profiles[0] ?? null;
+      setView(profileToView(active));
+    } catch {
+      setView(defaultBrandView);
+    }
   }, []);
 
-  const persist = (next: BrandAssets) => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(BRAND_EVENT));
-    setAssets(next);
-  };
+  useEffect(() => {
+    void load();
+    const onChange = () => {
+      void load();
+    };
+    window.addEventListener(BRAND_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(BRAND_CHANGED_EVENT, onChange);
+  }, [load]);
 
-  return [assets, persist];
+  return view;
 }

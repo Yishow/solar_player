@@ -1,4 +1,4 @@
-import type { ImageAsset, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { BrandProfile, ImageAsset, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 
 export function buildApiUrl(path: string) {
   const configuredBaseUrl = (
@@ -50,8 +50,8 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
   }
 
   const response = await fetch(buildApiUrl(path), {
-    headers,
-    ...init
+    ...init,
+    headers
   });
 
   if (!response.ok) {
@@ -161,4 +161,94 @@ export async function deleteImageAsset(id: number) {
     method: "DELETE"
   });
   return response.data;
+}
+
+export type BrandProfileUpdate = Partial<
+  Pick<
+    BrandProfile,
+    | "name"
+    | "brandNameZh"
+    | "brandNameEn"
+    | "productTitleZh"
+    | "productTitleEn"
+    | "sloganZh"
+    | "sloganEn"
+  >
+>;
+
+export async function getBrandProfiles() {
+  const response = await requestJson<{ data: BrandProfile[]; success: boolean }>(
+    "/api/brand/profiles"
+  );
+  return response.data;
+}
+
+export async function createBrandProfile(payload: BrandProfileUpdate & { name: string }) {
+  const response = await requestJson<{ data: BrandProfile; success: boolean }>(
+    "/api/brand/profiles",
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+  return response.data;
+}
+
+export async function updateBrandProfile(id: number, payload: BrandProfileUpdate) {
+  const response = await requestJson<{ data: BrandProfile; success: boolean }>(
+    `/api/brand/profiles/${id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }
+  );
+  return response.data;
+}
+
+export async function deleteBrandProfile(id: number) {
+  await requestJson<{ data: { id: number }; success: boolean }>(
+    `/api/brand/profiles/${id}`,
+    { method: "DELETE" }
+  );
+  return { id };
+}
+
+export async function activateBrandProfile(id: number) {
+  const response = await requestJson<{ data: BrandProfile; success: boolean }>(
+    `/api/brand/profiles/${id}/activate`,
+    { method: "POST" }
+  );
+  return response.data;
+}
+
+export async function uploadBrandLogo(
+  id: number,
+  file: Blob,
+  filename: string,
+  metadata: { width?: number; height?: number } = {}
+) {
+  const formData = new FormData();
+  formData.set("file", file, filename);
+  if (metadata.width) formData.set("width", String(metadata.width));
+  if (metadata.height) formData.set("height", String(metadata.height));
+  const response = await requestJson<{ data: BrandProfile; success: boolean }>(
+    `/api/brand/profiles/${id}/logo`,
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+  return response.data;
+}
+
+export async function deleteBrandLogo(id: number) {
+  const response = await requestJson<{ data: BrandProfile; success: boolean }>(
+    `/api/brand/profiles/${id}/logo`,
+    { method: "DELETE" }
+  );
+  return response.data;
+}
+
+export function brandLogoUrl(profile: BrandProfile): string {
+  return profile.logoUrl ? buildApiUrl(profile.logoUrl) : "/brand-logo.png";
 }

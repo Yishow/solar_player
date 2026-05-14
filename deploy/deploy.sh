@@ -21,6 +21,7 @@ sudo mkdir -p "${INSTALL_DIR}"
 sudo mkdir -p "${INSTALL_DIR}/data"
 sudo mkdir -p "${INSTALL_DIR}/logs"
 sudo mkdir -p "${INSTALL_DIR}/uploads/images"
+sudo mkdir -p "${INSTALL_DIR}/uploads/brand"
 
 # 3. Copy files
 echo "[3/5] Copying files..."

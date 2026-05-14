@@ -17,6 +17,7 @@ import metricsRoute from "./routes/metrics.js";
 import metricsHistoryRoute from "./routes/metrics-history.js";
 import playbackRoute from "./routes/playback.js";
 import imagesRoute from "./routes/images.js";
+import brandRoute from "./routes/brand.js";
 import circuitsRoute from "./routes/circuits.js";
 import deviceRoute from "./routes/device.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
@@ -102,6 +103,7 @@ export async function buildApp() {
   await app.register(metricsHistoryRoute);
   await app.register(playbackRoute);
   await app.register(imagesRoute);
+  await app.register(brandRoute);
   await app.register(circuitsRoute);
   await app.register(deviceRoute);
   await app.register(settingsMqttRoute);
@@ -110,6 +112,14 @@ export async function buildApp() {
   await app.register(fastifyStatic, {
     root: config.uploadsDir,
     prefix: "/uploads/images/",
+    decorateReply: false,
+    index: false
+  });
+
+  mkdirSync(config.brandUploadsDir, { recursive: true });
+  await app.register(fastifyStatic, {
+    root: config.brandUploadsDir,
+    prefix: "/uploads/brand/",
     decorateReply: false,
     index: false
   });

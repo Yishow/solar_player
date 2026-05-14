@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +14,15 @@ function readNumber(value: string | undefined, fallback: number) {
 }
 
 function resolveDataDir() {
-  return process.env.DATA_DIR ?? resolve(projectRoot, "data");
+  return resolveEnvPath(process.env.DATA_DIR, resolve(projectRoot, "data"));
+}
+
+function resolveEnvPath(value: string | undefined, fallback: string) {
+  if (!value || value.trim().length === 0) {
+    return fallback;
+  }
+
+  return isAbsolute(value) ? value : resolve(projectRoot, value);
 }
 
 export const config = {
@@ -31,9 +39,15 @@ export const config = {
     return resolveDataDir();
   },
   get uploadsDir() {
-    return process.env.UPLOADS_DIR ?? resolve(projectRoot, "uploads/images");
+    return resolveEnvPath(process.env.UPLOADS_DIR, resolve(projectRoot, "uploads/images"));
+  },
+  get brandUploadsDir() {
+    return resolveEnvPath(process.env.BRAND_UPLOADS_DIR, resolve(projectRoot, "uploads/brand"));
   },
   get databasePath() {
-    return process.env.DATABASE_PATH ?? resolve(resolveDataDir(), "solar-display.sqlite");
+    return resolveEnvPath(
+      process.env.DATABASE_PATH,
+      resolve(resolveDataDir(), "solar-display.sqlite")
+    );
   }
 };

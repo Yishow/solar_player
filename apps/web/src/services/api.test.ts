@@ -81,3 +81,33 @@ test("requestJson does not force application/json when the request has no body",
     globalThis.fetch = originalFetch;
   }
 });
+
+test("requestJson keeps caller headers while still using the normalized Headers object", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenTraceId: string | null = null;
+
+  globalThis.fetch = async (_input, init) => {
+    const headers = new Headers(init?.headers);
+    seenTraceId = headers.get("X-Trace-Id");
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json"
+      },
+      status: 200
+    });
+  };
+
+  try {
+    const response = await requestJson<{ success: boolean }>("/api/brand/profiles", {
+      headers: {
+        "X-Trace-Id": "brand-review"
+      }
+    });
+
+    assert.equal(response.success, true);
+    assert.equal(seenTraceId, "brand-review");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

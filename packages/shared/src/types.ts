@@ -103,6 +103,26 @@ export interface ImageAsset {
   displayOrder: number | null;
 }
 
+export interface BrandProfile {
+  id: number;
+  name: string;
+  brandNameZh: string;
+  brandNameEn: string;
+  productTitleZh: string;
+  productTitleEn: string;
+  sloganZh: string;
+  sloganEn: string;
+  logoFilename: string | null;
+  logoMimeType: string | null;
+  logoWidth: number | null;
+  logoHeight: number | null;
+  logoFileSize: number | null;
+  logoUrl: string | null;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface DeviceStatus {
   mqttStatus: "connected" | "connecting" | "stale" | "offline" | "error";
   lastMessageTime: string | null;
