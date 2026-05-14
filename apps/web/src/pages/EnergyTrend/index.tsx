@@ -63,13 +63,13 @@ function MiniTrendChart({
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
   const maxValue = Math.max(...validPoints.map((point) => point.value), 1);
-  const polyline = validPoints
-    .map((point, index) => {
-      const x = padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth;
-      const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const bottom = padding + chartHeight;
+  const coords = validPoints.map((point, index) => ({
+    x: padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth,
+    y: padding + chartHeight - (point.value / maxValue) * chartHeight
+  }));
+  const linePath = coords.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
+  const areaPath = `${linePath} L ${coords[coords.length - 1]!.x},${bottom} L ${coords[0]!.x},${bottom} Z`;
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="et-chart-svg" preserveAspectRatio="none">
       {[0, 0.33, 0.66, 1].map((ratio) => (
@@ -82,7 +82,8 @@ function MiniTrendChart({
           strokeWidth="1"
         />
       ))}
-      <polyline points={polyline} />
+      <path d={areaPath} className="et-area-fill" />
+      <path d={linePath} className="et-area-line" />
     </svg>
   );
 }

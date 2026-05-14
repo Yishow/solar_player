@@ -11,6 +11,16 @@ import {
   type TopicMapping
 } from "./viewModel";
 
+const PREVIEW_ICON_GLYPHS: Record<string, string> = {
+  bars: "▤",
+  bolt: "⚡",
+  co2: "CO₂",
+  leaf: "🌱",
+  plug: "⌁",
+  refresh: "↻",
+  sun: "☀"
+};
+
 const defaultMetricOptions = [
   "realTimePower",
   "todayGeneration",
@@ -556,7 +566,9 @@ export function MqttSettings() {
                 <span
                   className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`}
                   aria-hidden
-                />
+                >
+                  {PREVIEW_ICON_GLYPHS[topic.icon] ?? "·"}
+                </span>
                 <label className="preview-row__label">
                   {topic.metricLabelZh}
                   <small>{topic.metricLabelEn}</small>

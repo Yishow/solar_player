@@ -224,6 +224,7 @@
 .playback-settings-page .ps-page-row {
   padding: 10px 14px;
   border: 1px solid rgba(92, 105, 79, 0.14);
+  border-left: 3px solid #5c854b;
   border-radius: 12px;
   background: #fffdf8;
   transition: border-color 120ms ease, background 120ms ease;
@@ -232,6 +233,7 @@
 .playback-settings-page .ps-page-row.is-disabled {
   opacity: 0.65;
   background: rgba(244, 242, 235, 0.72);
+  border-left-color: rgba(92, 105, 79, 0.28);
 }
 
 .playback-settings-page .ps-page-row__sort {
@@ -256,9 +258,18 @@
 }
 
 .playback-settings-page .ps-page-row__order {
-  font: 700 22px/1 var(--font-family-en);
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(92, 133, 75, 0.1);
+  border: 1.5px solid rgba(92, 133, 75, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 18px/1 var(--font-family-en);
   color: var(--green);
-  text-align: center;
+  flex-shrink: 0;
 }
 
 .playback-settings-page .ps-page-row__title {
