@@ -85,6 +85,14 @@ export function buildEnergyHistoryViewModel({
   summaries
 }: BuildEnergyHistoryViewModelArgs) {
   const headlineSummary = summaries[0] ?? null;
+  const lastUpdated = counters.reduce((latest: string | null, counter) => {
+    if (!counter.lastUpdated) return latest;
+    if (!latest) return counter.lastUpdated;
+    return counter.lastUpdated > latest ? counter.lastUpdated : latest;
+  }, null);
+  const lastUpdatedLabel = lastUpdated
+    ? new Date(lastUpdated).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })
+    : "--:--";
   const generationValue =
     range === "total" ? getCounterValue(counters, "generation") : headlineSummary?.generationTotal ?? sumSummaries(summaries, (summary) => summary.generationTotal);
   const selfConsumptionValue =
@@ -119,6 +127,11 @@ export function buildEnergyHistoryViewModel({
         detailLabel: "",
         label: "資料來源",
         valueLabel: "MQTT Live"
+      },
+      {
+        detailLabel: "",
+        label: "資料更新時間",
+        valueLabel: lastUpdatedLabel
       }
     ],
     chartLines: [

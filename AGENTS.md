@@ -75,3 +75,29 @@
 - 預設只修改目前 task / change 直接要求的檔案；不要順手重構無關模組。
 - 若文件、規格與現況衝突，優先回到 root scripts、`apps/server`、`apps/web`、`packages/shared` 與 `deploy/` 查實作，再決定是否更新 artifact。
 - 若要描述 repo 規則，必須能回指出目前實際檔案或行為；找不到事實支撐時，應刪掉該規則，而不是補上通用政策。
+
+
+<claude-mem-context>
+# Memory Context
+
+# [solar_player] recent context, 2026-05-14 12:21pm GMT+8
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 8 obs (2,451t read) | 51,570t work | 95% savings
+
+### May 13, 2026
+10 11:23p 🔵 All Pages Reference Alignment Audit
+11 11:36p ⚖️ **title**: Design strategy for aligning settings management surfaces with reference prototype
+### May 14, 2026
+12 12:13a 🔵 Search for icon libraries in project dependencies
+13 12:15a 🔵 Inspect Overview ViewModel testing patterns
+14 12:52a 🔄 [**title**: Refactor CircuitSettings viewModel for enhanced UI feedback]
+15 1:25a ⚖️ Initiation of Solar Page FHD Canvas Migration
+16 " ⚖️ Initiation of Solar Page FHD Canvas Migration
+17 1:50a ✅ [**title**: Complete reference migration for remaining playback pages]
+
+Access 52k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>

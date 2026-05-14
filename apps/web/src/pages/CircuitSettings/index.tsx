@@ -390,9 +390,9 @@ export function CircuitSettings() {
                   <th className="col-name">迴路名稱</th>
                   <th className="col-icon">圖示 / 單位</th>
                   <th className="col-topic">MQTT Topic</th>
-                  <th className="col-thr">Normal</th>
-                  <th className="col-thr">Attention</th>
-                  <th className="col-thr">Warning</th>
+                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--normal" />Normal</th>
+                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--attention" />Attention</th>
+                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--warning" />Warning</th>
                   <th className="col-display">顯示 / 驗證</th>
                   <th className="col-ops">操作</th>
                 </tr>
@@ -503,7 +503,7 @@ export function CircuitSettings() {
                           }
                         />
                       </div>
-                      <p className="cs-cell-caption is-success">{row.normalRangeLabel}</p>
+                      <p className="cs-thr-pill cs-thr-pill--normal">{row.normalRangeLabel}</p>
                     </td>
                     <td className="col-thr">
                       <div className="cs-thr">
@@ -533,7 +533,7 @@ export function CircuitSettings() {
                           }
                         />
                       </div>
-                      <p className="cs-cell-caption is-warning">{row.attentionRangeLabel}</p>
+                      <p className="cs-thr-pill cs-thr-pill--attention">{row.attentionRangeLabel}</p>
                     </td>
                     <td className="col-thr">
                       <div className="cs-thr">
@@ -563,7 +563,7 @@ export function CircuitSettings() {
                           }
                         />
                       </div>
-                      <p className="cs-cell-caption is-error">{row.warningRangeLabel}</p>
+                      <p className="cs-thr-pill cs-thr-pill--warning">{row.warningRangeLabel}</p>
                     </td>
                     <td className="col-display">
                       <div className="cs-display-stack">
@@ -600,6 +600,18 @@ export function CircuitSettings() {
             </table>
           </div>
         )}
+
+        <div className="cs-legend">
+          <span className="cs-legend-item cs-legend-item--normal">
+            <b>Normal</b> 正常運行
+          </span>
+          <span className="cs-legend-item cs-legend-item--attention">
+            <b>Attention</b> 需要注意
+          </span>
+          <span className="cs-legend-item cs-legend-item--warning">
+            <b>Warning</b> 超出警戒
+          </span>
+        </div>
       </section>
     </div>
   );

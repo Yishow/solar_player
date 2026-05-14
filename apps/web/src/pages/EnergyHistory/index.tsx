@@ -56,9 +56,10 @@ function TrendChart({
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
   const maxValue = Math.max(...validValues, 1);
+  const bottom = padding + chartHeight;
   const colorMap = {
     blue: "#4a86c5",
-    green: "var(--green)",
+    green: "#5c854b",
     orange: "#d89c45"
   } as const;
 
@@ -79,23 +80,26 @@ function TrendChart({
         const validPoints = line.points.filter(
           (point): point is { label: string; value: number } => point.value !== null
         );
-        const polyline = validPoints
-          .map((point, index) => {
-            const x = padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth;
-            const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
-            return `${x},${y}`;
-          })
-          .join(" ");
+        if (validPoints.length === 0) return null;
+        const coords = validPoints.map((point, index) => ({
+          x: padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth,
+          y: padding + chartHeight - (point.value / maxValue) * chartHeight
+        }));
+        const linePath = coords.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
+        const areaPath = `${linePath} L ${coords[coords.length - 1]!.x},${bottom} L ${coords[0]!.x},${bottom} Z`;
+        const color = colorMap[line.colorToken as keyof typeof colorMap];
         return (
-          <polyline
-            key={line.label}
-            fill="none"
-            points={polyline}
-            stroke={colorMap[line.colorToken as keyof typeof colorMap]}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="3"
-          />
+          <g key={line.label}>
+            <path d={areaPath} fill={color} fillOpacity={0.1} stroke="none" />
+            <path
+              d={linePath}
+              fill="none"
+              stroke={color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2.5"
+            />
+          </g>
         );
       })}
     </svg>

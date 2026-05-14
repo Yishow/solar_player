@@ -283,16 +283,16 @@ export function DeviceStatus() {
           <small>System Resource Monitor</small>
         </h2>
         <div className="ds-gauge-grid">
-          {viewModel.resourceCards.map((card, index) => (
+          {viewModel.resourceCards.map((card) => (
             <div key={card.label} className="ds-gauge">
               <div
                 className="ds-gauge-ring"
                 style={{
-                  ["--gauge-color" as string]: index === 3 ? "#ff5a24" : "var(--green)",
+                  ["--gauge-color" as string]: card.gaugeColor,
                   ["--gauge-value" as string]: String(card.gaugePercent)
                 }}
               >
-                <span>{card.gaugeValue}</span>
+                <span style={{ color: card.gaugeColor }}>{card.gaugeValue}</span>
               </div>
               <p>
                 {card.label}

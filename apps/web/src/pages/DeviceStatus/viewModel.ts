@@ -152,11 +152,16 @@ export function buildDeviceStatusViewModel({
         label: "系統溫度",
         valueLabel: status ? "--" : "--"
       }
-    ].map((card, index) => ({
-      ...card,
-      gaugeColor: index === 3 ? "#ff5a24" : "#4f7c42",
-      gaugePercent: gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel)
-    })),
+    ].map((card, index) => {
+      const gaugePercent = gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel);
+      let gaugeColor: string;
+      if (index === 3) {
+        gaugeColor = gaugePercent >= 75 ? "#c14a4a" : gaugePercent >= 55 ? "#c9881a" : "#d89c45";
+      } else {
+        gaugeColor = gaugePercent >= 90 ? "#c14a4a" : gaugePercent >= 70 ? "#c9881a" : "#4f7c42";
+      }
+      return { ...card, gaugeColor, gaugePercent };
+    }),
     systemRows: [
       {
         label: "裝置名稱",
