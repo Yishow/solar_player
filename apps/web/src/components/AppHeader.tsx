@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useBrandAssets } from "../hooks/useBrandAssets";
 import { StatusBadge } from "./StatusBadge";
 
@@ -82,14 +83,18 @@ export function AppHeader({ meta }: AppHeaderProps) {
       <div className="flex w-full items-center pl-[34px] pr-[40px]">
         {/* Brand cluster */}
         <div className="flex items-center gap-[15px]">
-          <div className="flex h-[68px] w-[68px] items-center justify-center">
+          <Link
+            to="/settings/playback"
+            title="進入設定"
+            className="flex h-[68px] w-[68px] items-center justify-center transition-transform hover:scale-105 active:scale-95"
+          >
             <img
               src={brand.logoSrc}
               alt={brand.brandNameEn}
-              className="h-[60px] w-[60px] object-contain"
+              className="h-[60px] w-[60px] object-contain drop-shadow-sm"
               draggable={false}
             />
-          </div>
+          </Link>
           <div className="leading-none">
             <div
               className="text-[35px] font-extrabold tracking-[0.11em]"
@@ -137,7 +142,7 @@ export function AppHeader({ meta }: AppHeaderProps) {
           <div className="ml-[40px]">
             <StatusBadge
               status={meta?.status ?? "connected"}
-              label={meta?.statusLabel ?? "MQTT Online"}
+              label={meta?.statusLabel ?? "Online"}
             />
           </div>
         </div>

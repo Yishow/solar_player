@@ -32,12 +32,9 @@ export function StatusBadge({
     <span
       data-shell-density={density}
       data-shell-primitive="status-pill"
-      className="inline-flex h-[54px] w-[210px] items-center justify-center gap-[12px] rounded-[16px] border font-en text-[18px] font-medium"
+      className="inline-flex h-[44px] w-auto items-center justify-center gap-[12px] font-en text-[18px] font-medium"
       style={{
-        background: "rgba(255, 255, 249, 0.78)",
-        borderColor: "rgba(89, 124, 67, 0.32)",
-        boxShadow: "0 8px 22px rgba(70, 60, 40, 0.04)",
-        color: style.accent
+        color: "var(--shell-meta-weather-ink)"
       }}
     >
       <WifiGlyph color={style.accent} />
@@ -50,13 +47,14 @@ function WifiGlyph({ color }: { color: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="20"
-      height="20"
+      width="26"
+      height="26"
       fill="none"
       stroke={color}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={{ filter: `drop-shadow(0 0 5px ${color})` }}
       aria-hidden
     >
       <path d="M4 9c5-4 11-4 16 0M7 12c3-2 7-2 10 0M10 15c1-1 3-1 4 0" />

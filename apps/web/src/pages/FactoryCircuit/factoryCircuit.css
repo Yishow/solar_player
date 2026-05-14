@@ -335,7 +335,8 @@
 .factory-circuit-kpi-value span {
   color: #53774b;
   font-size: 60px;
-  font-weight: 800;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
   line-height: 0.92;
 }
 
@@ -343,7 +344,8 @@
   margin-bottom: 6px;
   color: #60675f;
   font-family: var(--font-family-en);
-  font-size: 20px;
+  font-size: 16px;
+  font-weight: 300;
 }
 
 .factory-circuit-kpi-routing .factory-circuit-kpi-value {

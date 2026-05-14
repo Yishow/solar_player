@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
 import { useBrandAssets } from "../hooks/useBrandAssets";
@@ -12,8 +13,6 @@ type FooterEntry = {
 
 type FooterMode = "playback" | "management";
 
-const SETTINGS_ENTRY_PATH = "/settings/playback";
-
 function buildEntries(currentPath: string): {
   entries: FooterEntry[];
   mode: FooterMode;
@@ -26,12 +25,6 @@ function buildEntries(currentPath: string): {
     const playbackTabs: FooterEntry[] = routeMetaList
       .filter((route): route is RouteMeta => route.group === "playback")
       .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
-
-    playbackTabs.push({
-      key: "settings-entry",
-      label: "進入設定",
-      path: SETTINGS_ENTRY_PATH
-    });
 
     return {
       entries: playbackTabs,
@@ -64,6 +57,8 @@ export function AppFooterNav() {
   const navItemFontSize = mode === "playback" ? 16 : 14;
   const navItemTracking = mode === "playback" ? "0.04em" : "0.02em";
 
+  const activeIndex = entries.findIndex((entry) => isActivePath(entry.path));
+
   return (
     <footer
       data-shell-primitive="footer-nav"
@@ -76,55 +71,80 @@ export function AppFooterNav() {
           <LeafOrnament variant="footer-mini" />
         </div>
 
-        <nav className="ml-[20px] flex h-[64px] flex-1 items-stretch overflow-hidden">
-          {entries.map((entry) => {
-            const active = isActivePath(entry.path);
+        <nav className="ml-[20px] flex h-[64px] flex-1 items-stretch overflow-hidden group">
+          {entries.map((entry, index) => {
+            const active = index === activeIndex;
+
+            const baseClasses = "relative flex items-center font-en leading-none whitespace-nowrap transition-[color,opacity,transform,text-shadow,letter-spacing] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
+
+            const playbackClasses = active
+              ? "font-medium opacity-100"
+              : "font-medium opacity-60 group-hover:opacity-40 hover:!opacity-100 hover:-translate-y-[1px] active:scale-[0.97]";
+
+            const managementClasses = active
+              ? "font-bold opacity-100"
+              : "font-semibold opacity-70 hover:opacity-100";
 
             return (
-              <Link
-                key={entry.key}
-                to={entry.path}
-                aria-current={active ? "page" : undefined}
-                className={`relative flex items-center font-en font-medium leading-none whitespace-nowrap transition-[color,opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm ${
-                  active ? "opacity-100" : "opacity-60 hover:opacity-100 hover:-translate-y-[1px]"
-                }`}
+              <Fragment key={entry.key}>
+                {index > 0 && <NavArrow isNext={mode === "playback" && index === activeIndex + 1} />}
+                <Link
+                  to={entry.path}
+                  aria-current={active ? "page" : undefined}
+                  className={`${baseClasses} ${mode === "playback" ? playbackClasses : managementClasses}`}
+                  style={{
+                    color: active
+                      ? "var(--shell-nav-active-ink)"
+                      : "var(--shell-nav-rest-ink)",
+                    textShadow: active && mode === "playback" ? "0 0 12px rgba(63, 122, 52, 0.4)" : "none",
+                    fontSize: `${navItemFontSize}px`,
+                    letterSpacing: active && mode === "management" ? "0.06em" : navItemTracking,
+                    paddingLeft: `${navItemPaddingX}px`,
+                    paddingRight: `${navItemPaddingX}px`
+                  }}
+                >
+                  {entry.label}
+                </Link>
+              </Fragment>
+            );
+          })}
+          {mode === "playback" && (
+            <div
+              aria-hidden="true"
+              className={`flex items-center transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                activeIndex === entries.length - 1
+                  ? "opacity-100 translate-x-0"
+                  : "opacity-0 -translate-x-[10px] pointer-events-none"
+              }`}
+            >
+              <NavArrow isNext={activeIndex === entries.length - 1} />
+              <span
+                className="font-en font-medium leading-none whitespace-nowrap"
                 style={{
-                  color: active
-                    ? "var(--shell-nav-active-ink)"
-                    : "var(--shell-nav-rest-ink)",
+                  color: "var(--shell-nav-rest-ink)",
                   fontSize: `${navItemFontSize}px`,
                   letterSpacing: navItemTracking,
+                  opacity: 0.3,
                   paddingLeft: `${navItemPaddingX}px`,
                   paddingRight: `${navItemPaddingX}px`
                 }}
               >
-                {entry.label}
-                {/* Active Indicator: Subtle Glow Line */}
-                <span
-                  aria-hidden
-                  className={`absolute bottom-[14px] left-1/2 h-[2px] -translate-x-1/2 rounded-full transition-[width,opacity,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    active ? "w-[12px] opacity-100" : "w-0 opacity-0"
-                  }`}
-                  style={{
-                    background: "var(--shell-nav-underline)",
-                    boxShadow: active ? "0 0 6px 0px var(--shell-nav-underline)" : "none"
-                  }}
-                />
-              </Link>
-            );
-          })}
+                {entries[0]?.label}
+              </span>
+            </div>
+          )}
         </nav>
 
         <div className="ml-[24px] flex items-center gap-[24px]">
           <div className="text-right">
             <div
-              className="text-[17px] font-medium tracking-[0.42em]"
+              className="text-[17px] font-semibold tracking-[0.42em]"
               style={{ color: "var(--shell-slogan-ink)", marginRight: "-0.42em" }}
             >
               {brand.sloganZh}
             </div>
             <div
-              className="mt-[4px] font-en text-[11px] tracking-[0.04em]"
+              className="mt-[4px] font-en text-[11px] font-medium tracking-[0.12em]"
               style={{ color: "var(--shell-slogan-soft-ink)" }}
             >
               {brand.sloganEn}
@@ -147,7 +167,7 @@ function FooterBranch() {
       viewBox="0 0 120 44"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 opacity-90"
+      className="shrink-0 opacity-90 animate-branch"
       aria-hidden="true"
     >
       {/* Main curved branch */}
@@ -172,5 +192,49 @@ function FooterBranch() {
         strokeLinecap="round"
       />
     </svg>
+  );
+}
+
+function NavArrow({ isNext }: { isNext?: boolean }) {
+  if (isNext) {
+    return (
+      <div className="flex h-full items-center px-[4px] gap-[2px]" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <svg
+            key={i}
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="var(--shell-nav-active-ink)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="animate-arrow-wave"
+            style={{ animationDelay: `${i * 0.2}s` }}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full items-center px-[8px]" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="var(--shell-divider-strong)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ opacity: 0.4 }}
+      >
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+    </div>
   );
 }

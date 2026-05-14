@@ -21,5 +21,7 @@ apps/server/data/*.sqlite-wal
 
 uploads/images/*
 !uploads/images/.gitkeep
+uploads/brand/*
+!uploads/brand/.gitkeep
 
 .playwright-cli/

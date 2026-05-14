@@ -192,7 +192,8 @@
 .overview-kpi-value {
   color: #4f6745;
   font-size: 68px;
-  font-weight: 800;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -200,7 +201,8 @@
   margin-bottom: 8px;
   color: #525851;
   font-family: var(--font-family-en);
-  font-size: 22px;
+  font-size: 18px;
+  font-weight: 300;
 }
 
 .overview-kpi-sparkline {

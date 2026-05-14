@@ -77,7 +77,9 @@ test("playback title group is available without the management title block contr
 });
 
 test("header and footer expose shell primitives without centered max-width wrappers", () => {
-  const headerHtml = renderToStaticMarkup(React.createElement(AppHeader));
+  const headerHtml = renderToStaticMarkup(
+    React.createElement(MemoryRouter, { initialEntries: ["/overview"] }, React.createElement(AppHeader))
+  );
   const footerHtml = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -89,12 +91,13 @@ test("header and footer expose shell primitives without centered max-width wrapp
   );
 
   assert.match(headerHtml, /data-shell-primitive="app-header"/);
+  assert.match(headerHtml, /href="\/settings\/playback"/);
   assert.match(footerHtml, /data-shell-primitive="footer-nav"/);
   assert.doesNotMatch(headerHtml, /max-w-\[var\(--screen-width\)\]/);
   assert.doesNotMatch(footerHtml, /max-w-\[var\(--screen-width\)\]/);
 });
 
-test("playback footer keeps the five display routes plus a single settings entry", () => {
+test("playback footer keeps the five display routes only", () => {
   const footerHtml = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -110,7 +113,7 @@ test("playback footer keeps the five display routes plus a single settings entry
   assert.match(footerHtml, />迴路</);
   assert.match(footerHtml, />圖庫</);
   assert.match(footerHtml, />永續</);
-  assert.match(footerHtml, />進入設定</);
+  assert.doesNotMatch(footerHtml, />進入設定</);
   assert.doesNotMatch(footerHtml, />MQTT</);
   assert.doesNotMatch(footerHtml, />圖片管理</);
   assert.doesNotMatch(footerHtml, /border-left:1px solid var\(--shell-divider\)/);
@@ -180,7 +183,7 @@ test("shell primitives expose reusable section, action, media, and status wrappe
         React.createElement(MediaSlot, null, React.createElement("img", { alt: "demo", src: "/demo.png" })),
         React.createElement(StatusBadge, {
           status: "connected",
-          label: "MQTT Online"
+          label: "Online"
         })
       )
     )

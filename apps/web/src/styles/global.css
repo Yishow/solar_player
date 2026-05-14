@@ -5,6 +5,25 @@
 @tailwind utilities;
 
 @layer base {
+  @view-transition {
+    navigation: auto;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
   html {
     height: 100%;
     font-family: var(--font-family-zh);
@@ -147,4 +166,48 @@
 
 .animate-slot-machine {
   animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes branchSway {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+.animate-branch {
+  animation: branchSway 8s ease-in-out infinite;
+  transform-origin: bottom right;
+}
+
+@keyframes arrowWave {
+  0%, 100% {
+    opacity: 0.2;
+    transform: translateX(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+}
+
+.animate-arrow-wave {
+  animation: arrowWave 1.5s infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px 0px var(--shell-nav-underline);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow: 0 0 10px 2px var(--shell-nav-underline);
+    opacity: 1;
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
 }

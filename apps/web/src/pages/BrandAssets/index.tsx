@@ -320,150 +320,208 @@ export function BrandAssets() {
       description="管理多套品牌設定，並控制目前播放器顯示的品牌資訊。"
     >
       <div className="brand-page">
-        <div className="brand-layout">
-          {/* profile sidebar */}
-          <aside className="brand-profile-list">
-            <div className="brand-profile-list-header">
-              <span className="brand-profile-list-title">品牌設定</span>
-              <span className="brand-profile-list-kicker">Profiles</span>
-            </div>
+        {/* Profile chip rail */}
+        <div className="brand-profile-rail">
+          <span className="brand-profile-rail-label">Profiles</span>
+          <div className="brand-profile-chips">
             {profiles.map((profile) => (
               <button
                 key={profile.id}
                 type="button"
-                className="brand-profile-item"
+                className="brand-profile-chip"
                 data-selected={profile.id === selectedId ? "true" : "false"}
+                data-active={profile.isActive ? "true" : "false"}
                 onClick={() => handleSelect(profile)}
               >
-                <span className="brand-profile-item-name">{profile.name}</span>
-                <span className="brand-profile-item-meta">
-                  {profile.isActive ? (
-                    <span className="brand-profile-active-pill">使用中</span>
-                  ) : null}
-                  <span>{profile.brandNameZh || "—"}</span>
-                </span>
+                <span>{profile.name}</span>
+                {profile.brandNameZh ? (
+                  <span className="brand-profile-chip-meta">{profile.brandNameZh}</span>
+                ) : null}
               </button>
             ))}
-            <div className="brand-profile-list-actions">
-              <button
-                type="button"
-                className="brand-button brand-button-ghost brand-button-small"
-                onClick={() => void handleCreate()}
-              >
-                新增
-              </button>
-              <button
-                type="button"
-                className="brand-button brand-button-danger brand-button-small"
-                onClick={() => void handleDelete()}
-                disabled={!selected || selected.isActive || profiles.length <= 1}
-              >
-                刪除
-              </button>
-            </div>
-          </aside>
+          </div>
+          <div className="brand-profile-rail-actions">
+            <button
+              type="button"
+              className="brand-button brand-button-ghost brand-button-small"
+              onClick={() => void handleCreate()}
+            >
+              ＋ 新增
+            </button>
+            <button
+              type="button"
+              className="brand-button brand-button-danger brand-button-small"
+              onClick={() => void handleDelete()}
+              disabled={!selected || selected.isActive || profiles.length <= 1}
+            >
+              刪除
+            </button>
+          </div>
+        </div>
 
-          {/* detail */}
-          {selected && draft ? (
-            <div className="brand-detail">
-              {/* preview */}
-              <section className="brand-card">
-                <div className="brand-card-head">
+        {selected && draft ? (
+          <>
+            {/* Sticky stage banner — full-width hero preview */}
+            <section className="brand-stage">
+              <div className="brand-stage-frame">
+                <div className="brand-stage-header">
+                  <img
+                    className="brand-stage-logo"
+                    src={previewLogoSrc}
+                    alt={draft.brandNameEn || draft.brandNameZh}
+                  />
                   <div>
-                    <div className="brand-card-kicker">Preview</div>
-                    <div className="brand-card-title">即時預覽</div>
+                    <div className="brand-stage-brand-zh">{draft.brandNameZh || "—"}</div>
+                    <div className="brand-stage-brand-en">{draft.brandNameEn || "—"}</div>
                   </div>
-                  {dirty ? <span className="brand-dirty-badge">未儲存變更</span> : null}
-                </div>
-                <div className="brand-preview-frame">
-                  <div className="brand-preview-bar">
-                    <img className="brand-preview-logo" src={previewLogoSrc} alt={draft.brandNameEn} />
-                    <div>
-                      <div className="brand-preview-text-zh">{draft.brandNameZh || "—"}</div>
-                      <div className="brand-preview-text-en">{draft.brandNameEn || "—"}</div>
-                    </div>
-                    <div className="brand-preview-product">
-                      <div className="brand-preview-product-zh">{draft.productTitleZh || "—"}</div>
-                      <div className="brand-preview-product-en">{draft.productTitleEn || "—"}</div>
-                    </div>
-                  </div>
-                  <div className="brand-preview-slogan">
-                    <span className="brand-preview-slogan-zh">{draft.sloganZh || "—"}</span>
-                    <span className="brand-preview-slogan-en">{draft.sloganEn || "—"}</span>
+                  <span className="brand-stage-divider" aria-hidden />
+                  <div className="brand-stage-product">
+                    <div className="brand-stage-product-zh">{draft.productTitleZh || "—"}</div>
+                    <div className="brand-stage-product-en">{draft.productTitleEn || "—"}</div>
                   </div>
                 </div>
-              </section>
+                <div className="brand-stage-canvas">
+                  <div className="brand-stage-canvas-grid">
+                    <div className="brand-stage-tile">
+                      <span className="brand-stage-tile-label">Solar</span>
+                      <span className="brand-stage-tile-value">128.4 kW</span>
+                    </div>
+                    <div className="brand-stage-tile">
+                      <span className="brand-stage-tile-label">Today</span>
+                      <span className="brand-stage-tile-value">812 kWh</span>
+                    </div>
+                    <div className="brand-stage-tile">
+                      <span className="brand-stage-tile-label">CO₂↓</span>
+                      <span className="brand-stage-tile-value">405 kg</span>
+                    </div>
+                    <div className="brand-stage-tile">
+                      <span className="brand-stage-tile-label">Eff.</span>
+                      <span className="brand-stage-tile-value">94.2 %</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="brand-stage-footer">
+                  <div>
+                    <div className="brand-stage-slogan-zh">{draft.sloganZh || "—"}</div>
+                    <div className="brand-stage-slogan-en">{draft.sloganEn || "—"}</div>
+                  </div>
+                </div>
+              </div>
 
-              {/* logo */}
+              <div className="brand-stage-side">
+                <div className="brand-stage-side-head">
+                  <div className="brand-stage-side-title-group">
+                    <span className="brand-stage-side-kicker">Live Preview</span>
+                    <span className="brand-stage-side-title">{selected.name}</span>
+                  </div>
+                  {dirty ? <span className="brand-dirty-badge">未儲存</span> : null}
+                </div>
+
+                <span
+                  className="brand-stage-dot"
+                  data-state={selected.isActive ? "active" : "inactive"}
+                >
+                  {selected.isActive ? "啟用中，變更會立即反映播放器" : "未啟用，儲存後不影響當前播放"}
+                </span>
+
+                {feedback ? (
+                  <div
+                    className="brand-feedback"
+                    data-tone={feedback.tone === "error" ? "error" : "ok"}
+                  >
+                    {feedback.message}
+                  </div>
+                ) : null}
+
+                <div className="brand-stage-actions">
+                  {!selected.isActive ? (
+                    <button
+                      type="button"
+                      className="brand-button brand-button-ghost"
+                      onClick={() => void handleActivate()}
+                    >
+                      設為啟用
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="brand-button brand-button-ghost"
+                    onClick={() => setDraft(pickFields(selected))}
+                    disabled={!dirty}
+                  >
+                    全部還原
+                  </button>
+                  <button
+                    type="button"
+                    className="brand-button brand-button-primary"
+                    onClick={() => void handleSave()}
+                    disabled={!dirty || isSaving}
+                  >
+                    {isSaving ? "儲存中…" : "儲存變更"}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Edit grid: Logo (narrow) + Identity (wide) */}
+            <div className="brand-edit-grid">
               <section className="brand-card">
                 <div className="brand-card-head">
                   <div>
                     <div className="brand-card-kicker">Logo</div>
                     <div className="brand-card-title">品牌標誌</div>
                   </div>
-                  {!selected.isActive ? (
+                </div>
+                <div className="brand-logo-preview">
+                  {selected.logoFilename ? (
+                    <img src={previewLogoSrc} alt={selected.name} />
+                  ) : (
+                    <span className="brand-logo-empty">尚未上傳 Logo</span>
+                  )}
+                </div>
+                <div className="brand-logo-info">
+                  <dl className="brand-logo-meta">
+                    <dt>尺寸</dt>
+                    <dd>
+                      {selected.logoWidth && selected.logoHeight
+                        ? `${selected.logoWidth} × ${selected.logoHeight}`
+                        : "—"}
+                    </dd>
+                    <dt>比例</dt>
+                    <dd>{formatRatio(selected.logoWidth, selected.logoHeight)}</dd>
+                    <dt>檔案大小</dt>
+                    <dd>{formatBytes(selected.logoFileSize)}</dd>
+                    <dt>MIME</dt>
+                    <dd>{selected.logoMimeType ?? "—"}</dd>
+                  </dl>
+                  {warning ? <div className="brand-logo-warning">{warning}</div> : null}
+                  <div className="brand-logo-actions">
+                    <input
+                      ref={fileInputRef}
+                      className="brand-upload-input"
+                      type="file"
+                      accept={ACCEPTED_TYPES.join(",")}
+                      onChange={handleFile}
+                    />
                     <button
                       type="button"
-                      className="brand-button brand-button-primary brand-button-small"
-                      onClick={() => void handleActivate()}
+                      className="brand-button brand-button-primary"
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      設為啟用
+                      上傳新 Logo
                     </button>
-                  ) : null}
-                </div>
-                <div className="brand-logo-block">
-                  <div className="brand-logo-preview">
-                    {selected.logoFilename ? (
-                      <img src={previewLogoSrc} alt={selected.name} />
-                    ) : (
-                      <span className="brand-logo-empty">尚未上傳 Logo</span>
-                    )}
-                  </div>
-                  <div className="brand-logo-info">
-                    <dl className="brand-logo-meta">
-                      <dt>尺寸</dt>
-                      <dd>
-                        {selected.logoWidth && selected.logoHeight
-                          ? `${selected.logoWidth} × ${selected.logoHeight}`
-                          : "—"}
-                      </dd>
-                      <dt>比例</dt>
-                      <dd>{formatRatio(selected.logoWidth, selected.logoHeight)}</dd>
-                      <dt>檔案大小</dt>
-                      <dd>{formatBytes(selected.logoFileSize)}</dd>
-                      <dt>MIME</dt>
-                      <dd>{selected.logoMimeType ?? "—"}</dd>
-                    </dl>
-                    {warning ? <div className="brand-logo-warning">{warning}</div> : null}
-                    <div className="brand-logo-actions">
-                      <input
-                        ref={fileInputRef}
-                        className="brand-upload-input"
-                        type="file"
-                        accept={ACCEPTED_TYPES.join(",")}
-                        onChange={handleFile}
-                      />
-                      <button
-                        type="button"
-                        className="brand-button brand-button-primary"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        上傳新 Logo
-                      </button>
-                      <button
-                        type="button"
-                        className="brand-button brand-button-ghost"
-                        onClick={() => void handleRemoveLogo()}
-                        disabled={!selected.logoFilename}
-                      >
-                        移除 Logo
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="brand-button brand-button-ghost"
+                      onClick={() => void handleRemoveLogo()}
+                      disabled={!selected.logoFilename}
+                    >
+                      移除
+                    </button>
                   </div>
                 </div>
               </section>
 
-              {/* fields */}
               <section className="brand-card">
                 <div className="brand-card-head">
                   <div>
@@ -476,7 +534,11 @@ export function BrandAssets() {
                     const original = selected[key as keyof BrandProfile] as string;
                     const changed = draft[key] !== original;
                     return (
-                      <div key={key} className="brand-field">
+                      <div
+                        key={key}
+                        className="brand-field"
+                        data-changed={changed ? "true" : "false"}
+                      >
                         <div className="brand-field-header">
                           <label htmlFor={`field-${key}`}>{FIELD_LABELS[key]}</label>
                           {changed ? (
@@ -500,38 +562,11 @@ export function BrandAssets() {
                   })}
                 </div>
               </section>
-
-              <div className="brand-actions">
-                {feedback ? (
-                  <span
-                    className="brand-feedback"
-                    data-tone={feedback.tone === "error" ? "error" : "ok"}
-                  >
-                    {feedback.message}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className="brand-button brand-button-ghost"
-                  onClick={() => setDraft(pickFields(selected))}
-                  disabled={!dirty}
-                >
-                  全部還原
-                </button>
-                <button
-                  type="button"
-                  className="brand-button brand-button-primary"
-                  onClick={() => void handleSave()}
-                  disabled={!dirty || isSaving}
-                >
-                  {isSaving ? "儲存中…" : "儲存"}
-                </button>
-              </div>
             </div>
-          ) : (
-            <div className="brand-card">尚未載入品牌設定。</div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="brand-card">尚未載入品牌設定。</div>
+        )}
       </div>
 
       {pendingCropSrc ? (

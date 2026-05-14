@@ -111,9 +111,9 @@
   --radius-lg: 18px;
   --radius-xl: 28px;
   --radius-full: 999px;
-  --shadow-card: 0 14px 30px rgba(55, 50, 38, 0.13), 0 2px 8px rgba(55, 50, 38, 0.08);
-  --shadow-panel: 0 14px 30px rgba(55, 50, 38, 0.13), 0 2px 8px rgba(55, 50, 38, 0.08);
-  --shadow-soft: 0 8px 22px rgba(55, 50, 38, 0.1);
+  --shadow-card: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 14px 30px rgba(55, 50, 38, 0.13), 0 2px 8px rgba(55, 50, 38, 0.08);
+  --shadow-panel: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 14px 30px rgba(55, 50, 38, 0.13), 0 2px 8px rgba(55, 50, 38, 0.08);
+  --shadow-soft: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 8px 22px rgba(55, 50, 38, 0.1);
 
   --header-logo-size: 72px;
   --header-time-font-size: 48px;
