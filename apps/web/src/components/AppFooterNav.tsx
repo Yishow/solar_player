@@ -57,7 +57,7 @@ export function AppFooterNav() {
   const { pathname } = useLocation();
   const currentRoute = routeMetaMap.get(pathname) ?? routeMetaList[0]!;
   const { entries, mode, isActivePath } = buildEntries(pathname);
-  const [brand] = useBrandAssets();
+  const brand = useBrandAssets();
 
   // Settings nav has more entries; tighten typography & spacing so they fit.
   const navItemPaddingX = mode === "playback" ? 32 : 18;
@@ -77,7 +77,7 @@ export function AppFooterNav() {
         </div>
 
         <nav className="ml-[20px] flex h-[64px] flex-1 items-stretch overflow-hidden">
-          {entries.map((entry, index) => {
+          {entries.map((entry) => {
             const active = isActivePath(entry.path);
 
             return (
@@ -85,7 +85,9 @@ export function AppFooterNav() {
                 key={entry.key}
                 to={entry.path}
                 aria-current={active ? "page" : undefined}
-                className="relative flex items-center font-en font-medium leading-none transition-colors duration-150"
+                className={`relative flex items-center font-en font-medium leading-none whitespace-nowrap transition-[color,opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm ${
+                  active ? "opacity-100" : "opacity-60 hover:opacity-100 hover:-translate-y-[1px]"
+                }`}
                 style={{
                   color: active
                     ? "var(--shell-nav-active-ink)"
@@ -93,30 +95,21 @@ export function AppFooterNav() {
                   fontSize: `${navItemFontSize}px`,
                   letterSpacing: navItemTracking,
                   paddingLeft: `${navItemPaddingX}px`,
-                  paddingRight: `${navItemPaddingX}px`,
-                  whiteSpace: "nowrap"
+                  paddingRight: `${navItemPaddingX}px`
                 }}
               >
-                {index === 0 ? null : (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 top-1/2 h-[26px] w-px -translate-y-1/2"
-                    style={{ background: "var(--shell-divider)" }}
-                  />
-                )}
                 {entry.label}
-                {active ? (
-                  <span
-                    aria-hidden
-                    className="absolute h-[3px] rounded-full"
-                    style={{
-                      background: "var(--shell-nav-underline)",
-                      bottom: "10px",
-                      left: `${navItemPaddingX}px`,
-                      right: `${navItemPaddingX}px`
-                    }}
-                  />
-                ) : null}
+                {/* Active Indicator: Subtle Glow Line */}
+                <span
+                  aria-hidden
+                  className={`absolute bottom-[14px] left-1/2 h-[2px] -translate-x-1/2 rounded-full transition-[width,opacity,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    active ? "w-[12px] opacity-100" : "w-0 opacity-0"
+                  }`}
+                  style={{
+                    background: "var(--shell-nav-underline)",
+                    boxShadow: active ? "0 0 6px 0px var(--shell-nav-underline)" : "none"
+                  }}
+                />
               </Link>
             );
           })}
@@ -126,7 +119,7 @@ export function AppFooterNav() {
           <div className="text-right">
             <div
               className="text-[17px] font-medium tracking-[0.42em]"
-              style={{ color: "var(--shell-slogan-ink)" }}
+              style={{ color: "var(--shell-slogan-ink)", marginRight: "-0.42em" }}
             >
               {brand.sloganZh}
             </div>
@@ -148,42 +141,36 @@ function FooterBranch() {
   const stroke = "var(--shell-branch-stroke)";
 
   return (
-    <span
-      aria-hidden
-      className="relative inline-block shrink-0"
-      style={{
-        width: "120px",
-        height: "44px",
-        borderBottom: `2px solid ${stroke}`,
-        borderRadius: "50%",
-        transform: "skewX(-28deg)",
-        opacity: 0.9
-      }}
+    <svg
+      width="120"
+      height="44"
+      viewBox="0 0 120 44"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="shrink-0 opacity-90"
+      aria-hidden="true"
     >
-      <span
-        className="absolute"
-        style={{
-          width: "36px",
-          height: "20px",
-          right: "16px",
-          bottom: "26px",
-          border: `1.6px solid ${stroke}`,
-          borderRadius: "75% 0 75% 0",
-          transform: "rotate(-38deg)"
-        }}
+      {/* Main curved branch */}
+      <path
+        d="M 5 40 Q 60 40 115 5"
+        stroke={stroke}
+        strokeWidth="2"
+        strokeLinecap="round"
       />
-      <span
-        className="absolute"
-        style={{
-          width: "38px",
-          height: "22px",
-          right: "60px",
-          bottom: "12px",
-          border: `1.6px solid ${stroke}`,
-          borderRadius: "75% 0 75% 0",
-          transform: "rotate(-42deg)"
-        }}
+      {/* Upper leaf */}
+      <path
+        d="M 75 22 Q 90 15 100 5"
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
-    </span>
+      {/* Lower leaf */}
+      <path
+        d="M 40 33 Q 60 25 70 12"
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

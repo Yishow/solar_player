@@ -34,9 +34,8 @@ type AppHeaderProps = {
   meta?: AppHeaderMeta;
 };
 
-export function AppHeader({ meta }: AppHeaderProps) {
+function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
   const [now, setNow] = useState(() => new Date());
-  const [brand] = useBrandAssets();
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -53,6 +52,29 @@ export function AppHeader({ meta }: AppHeaderProps) {
   const weekdayLabel = meta?.weekday ?? defaultWeekday(now);
 
   return (
+    <>
+      <div
+        className="font-en text-[50px] font-bold leading-none tracking-[0.1em] tabular-nums"
+        style={{ color: "var(--ink-strong)" }}
+      >
+        {timeLabel}
+      </div>
+
+      <div
+        className="ml-[40px] font-en text-[18px] font-medium leading-[1.3]"
+        style={{ color: "var(--shell-meta-date-ink)" }}
+      >
+        <div>{dateLabel}</div>
+        <div>{weekdayLabel}</div>
+      </div>
+    </>
+  );
+}
+
+export function AppHeader({ meta }: AppHeaderProps) {
+  const brand = useBrandAssets();
+
+  return (
     <header
       data-shell-primitive="app-header"
       className="shell-header-bar relative flex h-[var(--header-height)] w-full shrink-0 items-stretch"
@@ -62,7 +84,7 @@ export function AppHeader({ meta }: AppHeaderProps) {
         <div className="flex items-center gap-[15px]">
           <div className="flex h-[68px] w-[68px] items-center justify-center">
             <img
-              src={brand.logoDataUrl}
+              src={brand.logoSrc}
               alt={brand.brandNameEn}
               className="h-[60px] w-[60px] object-contain"
               draggable={false}
@@ -84,15 +106,8 @@ export function AppHeader({ meta }: AppHeaderProps) {
           </div>
         </div>
 
-        {/* Brand → product divider */}
-        <div
-          aria-hidden
-          className="mx-[30px] h-[58px] w-px"
-          style={{ background: "var(--shell-divider-brand)" }}
-        />
-
-        {/* Product title */}
-        <div className="leading-none">
+        {/* Product title (Whitespace divider instead of solid line) */}
+        <div className="ml-[48px] leading-none">
           <div
             className="text-[22px] font-semibold tracking-[0.32em]"
             style={{ color: "var(--ink-strong)" }}
@@ -109,36 +124,17 @@ export function AppHeader({ meta }: AppHeaderProps) {
 
         {/* Right meta cluster */}
         <div className="ml-auto flex items-center">
-          <div
-            className="font-en text-[50px] font-bold leading-none tracking-[0.1em]"
-            style={{ color: "var(--ink-strong)" }}
-          >
-            {timeLabel}
-          </div>
+          <ClockArea meta={meta} />
 
           <div
-            className="ml-[26px] border-l pl-[26px] font-en text-[18px] font-medium leading-[1.55]"
-            style={{
-              borderColor: "var(--shell-divider-strong)",
-              color: "var(--shell-meta-date-ink)"
-            }}
-          >
-            <div>{dateLabel}</div>
-            <div>{weekdayLabel}</div>
-          </div>
-
-          <div
-            className="ml-[28px] flex items-center gap-[12px] border-l pl-[28px] text-[16px]"
-            style={{
-              borderColor: "var(--shell-divider-strong)",
-              color: "var(--shell-meta-weather-ink)"
-            }}
+            className="ml-[40px] flex items-center gap-[12px] text-[18px] font-medium"
+            style={{ color: "var(--shell-meta-weather-ink)" }}
           >
             <SunGlyph />
             <span>{meta?.weather ?? "晴  26°C"}</span>
           </div>
 
-          <div className="ml-[28px]">
+          <div className="ml-[40px]">
             <StatusBadge
               status={meta?.status ?? "connected"}
               label={meta?.statusLabel ?? "MQTT Online"}
@@ -154,13 +150,14 @@ function SunGlyph() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="22"
-      height="22"
+      width="26"
+      height="26"
       fill="none"
-      stroke="var(--accent)"
+      stroke="#F59E0B" /* Warm amber tone instead of default accent */
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className="drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
       aria-hidden
     >
       <circle cx="12" cy="12" r="4" />

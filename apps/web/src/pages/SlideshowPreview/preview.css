@@ -237,10 +237,25 @@
 .sp-page .sp-card.active {
   top: 0;
   height: 420px;
-  border: 2px solid var(--green);
-  box-shadow: 0 20px 50px rgba(82, 122, 67, 0.18);
+  border: 2px solid var(--active-color, var(--green));
+  box-shadow:
+    0 20px 50px var(--active-glow, rgba(82, 122, 67, 0.18)),
+    0 0 0 4px rgba(255, 255, 255, 0.8),
+    0 0 20px var(--active-glow, rgba(82, 122, 67, 0.15));
   opacity: 1;
   z-index: 2;
+  animation: card-active-breath 3s infinite ease-in-out;
+}
+
+@keyframes card-active-breath {
+  0%, 100% {
+    box-shadow: 0 20px 50px var(--active-glow, rgba(82, 122, 67, 0.18)), 0 0 10px var(--active-glow, rgba(82, 122, 67, 0.1));
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 25px 60px var(--active-glow, rgba(82, 122, 67, 0.25)), 0 0 25px var(--active-glow, rgba(82, 122, 67, 0.2));
+    transform: translateY(-5px);
+  }
 }
 
 .sp-page .sp-card img {
@@ -283,6 +298,8 @@
 
 /* Navigation arrows */
 
+/* Navigation arrows with Energy Flow Animation */
+
 .sp-page .sp-arrow {
   position: absolute;
   top: 180px;
@@ -300,18 +317,40 @@
   color: var(--ink-strong);
   cursor: pointer;
   z-index: 5;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Context-aware glow colors */
+.sp-page[data-theme="solar"] { --active-glow: rgba(242, 161, 26, 0.35); --active-color: var(--accent); }
+.sp-page[data-theme="factory-circuit"] { --active-glow: rgba(82, 122, 67, 0.35); --active-color: var(--green); }
+.sp-page[data-theme="overview"] { --active-glow: rgba(36, 139, 212, 0.35); --active-color: var(--blue); }
+.sp-page[data-theme="sustainability"] { --active-glow: rgba(111, 140, 92, 0.35); --active-color: var(--green-2); }
+
 .sp-page .sp-arrow:hover {
-  background: rgba(255, 255, 255, 0.65);
-  transform: scale(1.1);
-  color: var(--green);
-  box-shadow: 0 12px 40px rgba(82, 122, 67, 0.15);
+  background: rgba(255, 255, 255, 0.75);
+  transform: scale(1.15);
+  color: var(--active-color, var(--green));
+  box-shadow: 0 12px 40px var(--active-glow, rgba(82, 122, 67, 0.25));
 }
 
 .sp-page .sp-arrow.prev { left: -32px; }
 .sp-page .sp-arrow.next { right: -32px; }
+
+/* SVG Energy Flow Animation */
+.sp-page .sp-arrow svg path {
+  stroke-dasharray: 50;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.sp-page .sp-arrow:hover svg path:first-child {
+  animation: energy-flow 1.2s infinite linear;
+}
+
+@keyframes energy-flow {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
 
 /* Timeline dots */
 
@@ -444,7 +483,7 @@
   font-weight: 700;
 }
 
-/* ─── Decoration ─── */
+/* ─── Decoration — Context-aware Leaf ─── */
 
 .sp-page .sp-leaf-bg {
   position: absolute;
@@ -452,10 +491,12 @@
   bottom: 10px;
   width: 280px;
   height: 260px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 220'%3E%3Cg fill='none' stroke='%23688242' stroke-width='1.5'%3E%3Cpath d='M30 200 Q50 160 80 140 Q110 120 120 80'/%3E%3Cpath d='M80 140 Q60 100 90 70 Q80 140 80 140Z' fill='%23688242' opacity='.25'/%3E%3Cpath d='M80 140 Q100 120 130 110 Q80 140 80 140Z' fill='%23688242' opacity='.2'/%3E%3Cpath d='M50 170 Q30 140 55 115 Q50 170 50 170Z' fill='%23688242' opacity='.2'/%3E%3Cpath d='M50 170 Q70 155 85 135 Q50 170 50 170Z' fill='%23688242' opacity='.18'/%3E%3Cpath d='M30 200 Q15 175 30 155 Q30 200 30 200Z' fill='%23688242' opacity='.15'/%3E%3Cpath d='M120 80 Q105 50 125 30 Q120 80 120 80Z' fill='%23688242' opacity='.22'/%3E%3Cpath d='M120 80 Q140 65 155 45 Q120 80 120 80Z' fill='%23688242' opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 220'%3E%3Cg fill='none' stroke='currentColor' stroke-width='1.5'%3E%3Cpath d='M30 200 Q50 160 80 140 Q110 120 120 80'/%3E%3Cpath d='M80 140 Q60 100 90 70 Q80 140 80 140Z' fill='currentColor' opacity='.25'/%3E%3Cpath d='M80 140 Q100 120 130 110 Q80 140 80 140Z' fill='currentColor' opacity='.2'/%3E%3Cpath d='M50 170 Q30 140 55 115 Q50 170 50 170Z' fill='currentColor' opacity='.2'/%3E%3Cpath d='M50 170 Q70 155 85 135 Q50 170 50 170Z' fill='currentColor' opacity='.18'/%3E%3Cpath d='M30 200 Q15 175 30 155 Q30 200 30 200Z' fill='currentColor' opacity='.15'/%3E%3Cpath d='M120 80 Q105 50 125 30 Q120 80 120 80Z' fill='currentColor' opacity='.22'/%3E%3Cpath d='M120 80 Q140 65 155 45 Q120 80 120 80Z' fill='currentColor' opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: bottom left;
-  opacity: 0.4;
+  opacity: 0.25;
+  color: var(--active-color, var(--green));
+  transition: color 0.8s ease, opacity 0.8s ease;
   pointer-events: none;
 }

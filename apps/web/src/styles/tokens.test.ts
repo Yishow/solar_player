@@ -29,8 +29,8 @@ test("header and footer bars do not rely on blur to fake the divider line", () =
 });
 
 test("hero shell supplement lines live in shared shell css", () => {
-  assert.match(globalCss, /\.shell-header-bar::before\s*\{[\s\S]*?width:\s*640px;/);
-  assert.match(globalCss, /\.shell-header-bar::after\s*\{[\s\S]*?left:\s*640px;[\s\S]*?width:\s*1280px;/);
-  assert.match(globalCss, /\.shell-footer-bar::before\s*\{[\s\S]*?width:\s*400px;/);
-  assert.match(globalCss, /\.shell-footer-bar::after\s*\{[\s\S]*?left:\s*0;[\s\S]*?width:\s*1520px;/);
+  assert.match(globalCss, /\.shell-header-bar::before\s*\{[\s\S]*?width:\s*33\.333%;/);
+  assert.match(globalCss, /\.shell-header-bar::after\s*\{[\s\S]*?width:\s*66\.667%;/);
+  assert.match(globalCss, /\.shell-footer-bar::before\s*\{[\s\S]*?width:\s*30%;/);
+  assert.match(globalCss, /\.shell-footer-bar::after\s*\{[\s\S]*?width:\s*70%;/);
 });

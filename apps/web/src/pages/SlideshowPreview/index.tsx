@@ -64,7 +64,7 @@ export function SlideshowPreview() {
     : allCards;
 
   return (
-    <section className="sp-page">
+    <section className="sp-page" data-theme={currentPage?.pageKey}>
       <section
         className="sp-title"
         style={{ left: slideshowLayout.title.left, top: slideshowLayout.title.top }}

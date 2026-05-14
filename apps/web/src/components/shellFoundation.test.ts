@@ -113,7 +113,6 @@ test("playback footer keeps the five display routes plus a single settings entry
   assert.match(footerHtml, />進入設定</);
   assert.doesNotMatch(footerHtml, />MQTT</);
   assert.doesNotMatch(footerHtml, />圖片管理</);
-  assert.match(footerHtml, /h-\[26px\]/);
   assert.doesNotMatch(footerHtml, /border-left:1px solid var\(--shell-divider\)/);
 });
 

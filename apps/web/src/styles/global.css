@@ -84,15 +84,15 @@
   .shell-header-bar::before {
     left: 0;
     bottom: -1px;
-    width: 640px;
+    width: 33.333%;
     height: 2px;
     background: #fffdf7;
   }
 
   .shell-header-bar::after {
-    left: 640px;
+    left: 33.333%;
     bottom: -1px;
-    width: 1280px;
+    width: 66.667%;
     height: 1px;
     background: linear-gradient(
       90deg,
@@ -105,7 +105,7 @@
   .shell-footer-bar::before {
     right: 0;
     top: -1px;
-    width: 400px;
+    width: 30%;
     height: 2px;
     background: #fffdf7;
   }
@@ -113,12 +113,12 @@
   .shell-footer-bar::after {
     left: 0;
     top: -1px;
-    width: 1520px;
+    width: 70%;
     height: 1px;
     background: linear-gradient(
       90deg,
       rgba(186, 180, 168, 0.92) 0%,
-      rgba(186, 180, 168, 0.92) 88%,
+      rgba(186, 180, 168, 0.92) 80%,
       rgba(186, 180, 168, 0) 100%
     );
   }
@@ -132,4 +132,19 @@
     background: var(--shell-panel-bg);
     box-shadow: var(--shadow-soft);
   }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slot-machine {
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
