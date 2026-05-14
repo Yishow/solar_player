@@ -1,12 +1,19 @@
 import type { CircuitConfig } from "@solar-display/shared";
+import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
+import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 
 export type CircuitSettingsFeedbackTone = "error" | "loading" | "ready";
 export type CircuitRowTone = "connected" | "connecting" | "disconnected";
 
 type BuildCircuitSettingsViewModelArgs = {
   circuits: CircuitConfig[];
+  deletingId: number | null;
+  dirtyIds: number[];
   errorMessage: string;
+  isAdding: boolean;
   isLoading: boolean;
+  isReloading: boolean;
+  isSaving: boolean;
   message: string;
 };
 
@@ -39,17 +46,93 @@ function formatRange(min: number | null, max: number | null) {
   return `${formatCapacity(min)}-${formatCapacity(max)}`;
 }
 
+function resolveIconGlyph(icon: string | null): ReferenceGlyphName {
+  switch (icon) {
+    case "car":
+      return "leaf";
+    case "fan":
+      return "refresh";
+    case "light":
+      return "sun";
+    default:
+      return "bolt";
+  }
+}
+
+function resolveValidationState(circuit: CircuitConfig) {
+  if (!circuit.nameZh?.trim()) {
+    return {
+      detail: "缺少中文名稱",
+      label: "需補欄位",
+      tone: "danger" as ReferenceTone
+    };
+  }
+
+  if (!circuit.mqttTopic?.trim()) {
+    return {
+      detail: "尚未設定 MQTT topic",
+      label: "待補 topic",
+      tone: "warning" as ReferenceTone
+    };
+  }
+
+  const ranges = [
+    circuit.normalMin,
+    circuit.normalMax,
+    circuit.attentionMin,
+    circuit.attentionMax,
+    circuit.warningMin,
+    circuit.warningMax
+  ];
+
+  const hasValidRanges = ranges.every((value) => value !== null) &&
+    (circuit.normalMin ?? 0) <= (circuit.normalMax ?? 0) &&
+    (circuit.normalMax ?? 0) <= (circuit.attentionMin ?? 0) &&
+    (circuit.attentionMin ?? 0) <= (circuit.attentionMax ?? 0) &&
+    (circuit.attentionMax ?? 0) <= (circuit.warningMin ?? 0) &&
+    (circuit.warningMin ?? 0) <= (circuit.warningMax ?? 0);
+
+  if (hasValidRanges) {
+    return {
+      detail: "門檻區間已建立",
+      label: "已設定",
+      tone: "success" as ReferenceTone
+    };
+  }
+
+  return {
+    detail: "請確認 threshold 區間",
+    label: "待確認",
+    tone: "warning" as ReferenceTone
+  };
+}
+
 export function buildCircuitSettingsViewModel({
   circuits,
+  deletingId,
+  dirtyIds,
   errorMessage,
+  isAdding,
   isLoading,
+  isReloading,
+  isSaving,
   message
 }: BuildCircuitSettingsViewModelArgs) {
   const sortedCircuits = sortCircuits(circuits);
   const enabledCircuitCount = sortedCircuits.filter((circuit) => circuit.enabled).length;
   const totalCapacity = sortedCircuits.reduce((sum, circuit) => sum + (circuit.ratedCapacity ?? 0), 0);
+  const dirtySet = new Set(dirtyIds);
+  const feedbackTone = errorMessage ? "error" : isLoading ? "loading" : "ready";
 
   return {
+    actions: {
+      addDisabled: isAdding,
+      addLabel: isAdding ? "新增中..." : "新增迴路",
+      reloadDisabled: isReloading,
+      reloadLabel: isReloading ? "重新整理中..." : "重新整理",
+      saveDisabled: isSaving || dirtyIds.length === 0,
+      saveLabel: isSaving ? "儲存中..." : "儲存設定"
+    },
     emptyState:
       sortedCircuits.length === 0
         ? {
@@ -60,27 +143,78 @@ export function buildCircuitSettingsViewModel({
     feedbackBanner: {
       detail: errorMessage || message,
       title: errorMessage ? "載入失敗" : isLoading ? "正在載入迴路設定..." : "迴路設定已就緒",
-      tone: (errorMessage ? "error" : isLoading ? "loading" : "ready") as CircuitSettingsFeedbackTone
+      tone: feedbackTone
     },
-    rows: sortedCircuits.map((circuit) => ({
-      ...circuit,
-      attentionRangeLabel: formatRange(circuit.attentionMin, circuit.attentionMax),
-      iconLabel: circuit.icon ?? "未設定",
-      normalRangeLabel: formatRange(circuit.normalMin, circuit.normalMax),
-      orderLabel: circuit.displayOrder === null ? "--" : String(circuit.displayOrder),
-      statusLabel: circuit.enabled ? "已發布" : "草稿",
-      statusTone: (circuit.enabled ? "connected" : "disconnected") as CircuitRowTone,
-      topicLabel: circuit.mqttTopic ?? "未設定 topic",
-      unitLabel: circuit.unit ?? "--",
-      visibilityLabel: circuit.enabled ? "顯示中" : "已隱藏",
-      visibilityTone: (circuit.enabled ? "connected" : "disconnected") as CircuitRowTone,
-      warningRangeLabel: formatRange(circuit.warningMin, circuit.warningMax)
-    })),
+    rows: sortedCircuits.map((circuit) => {
+      const validation = resolveValidationState(circuit);
+      const isDirty = dirtySet.has(circuit.id);
+
+      return {
+        ...circuit,
+        attentionRangeLabel: formatRange(circuit.attentionMin, circuit.attentionMax),
+        deleting: deletingId === circuit.id,
+        dirtyLabel: isDirty ? "待儲存" : "已同步",
+        dirtyTone: isDirty ? ("accent" as ReferenceTone) : ("muted" as ReferenceTone),
+        iconGlyph: resolveIconGlyph(circuit.icon ?? null),
+        iconLabel: circuit.icon ?? "未設定",
+        isDirty,
+        normalRangeLabel: formatRange(circuit.normalMin, circuit.normalMax),
+        orderLabel: circuit.displayOrder === null ? "--" : String(circuit.displayOrder),
+        statusLabel: circuit.enabled ? "已發布" : "草稿",
+        statusTone: (circuit.enabled ? "connected" : "disconnected") as CircuitRowTone,
+        topicLabel: circuit.mqttTopic ?? "未設定 topic",
+        unitLabel: circuit.unit ?? "--",
+        validationDetail: validation.detail,
+        validationLabel: validation.label,
+        validationTone: validation.tone,
+        visibilityLabel: circuit.enabled ? "顯示中" : "已隱藏",
+        visibilityTone: (circuit.enabled ? "connected" : "disconnected") as CircuitRowTone,
+        warningRangeLabel: formatRange(circuit.warningMin, circuit.warningMax)
+      };
+    }),
     summary: {
       capacityLabel: `${formatCapacity(totalCapacity)} kW`,
       disabledCircuitCount: sortedCircuits.length - enabledCircuitCount,
       enabledCircuitCount,
       totalCircuitCount: sortedCircuits.length
-    }
+    },
+    summaryCards: [
+      {
+        helper: "目前 circuits route 已建立的設定筆數",
+        icon: "bars" as ReferenceGlyphName,
+        id: "total",
+        subtitle: "Total Circuits",
+        title: "迴路總數",
+        tone: "default" as ReferenceTone,
+        value: String(sortedCircuits.length)
+      },
+      {
+        helper: "會在展示頁與 live metrics 中出現的迴路數量",
+        icon: "bolt" as ReferenceGlyphName,
+        id: "enabled",
+        subtitle: "Visible Circuits",
+        title: "顯示中",
+        tone: enabledCircuitCount > 0 ? ("success" as ReferenceTone) : ("muted" as ReferenceTone),
+        value: String(enabledCircuitCount)
+      },
+      {
+        helper: "保留設定但暫時不顯示的迴路數量",
+        icon: "leaf" as ReferenceGlyphName,
+        id: "hidden",
+        subtitle: "Hidden Circuits",
+        title: "隱藏中",
+        tone: sortedCircuits.length - enabledCircuitCount > 0 ? ("accent" as ReferenceTone) : ("muted" as ReferenceTone),
+        value: String(sortedCircuits.length - enabledCircuitCount)
+      },
+      {
+        helper: "所有迴路額定容量加總，方便對照門檻設定",
+        icon: "sun" as ReferenceGlyphName,
+        id: "capacity",
+        subtitle: "Rated Capacity",
+        title: "額定容量總和",
+        tone: "default" as ReferenceTone,
+        value: `${formatCapacity(totalCapacity)} kW`
+      }
+    ]
   };
 }

@@ -29,6 +29,7 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.runtimeSummary.title, "正常運作");
   assert.equal(model.resourceCards[0]?.label, "CPU 負載");
   assert.equal(model.resourceCards[0]?.valueLabel, "0.18");
+  assert.equal(model.resourceCards[0]?.gaugePercent, 18);
   assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
   assert.match(model.feedback.title, /清除快取完成/);
   assert.equal(model.networkRows[0]?.value, "● 裝置狀態已同步");
@@ -45,6 +46,7 @@ test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", ()
   assert.equal(model.runtimeSummary.title, "同步中");
   assert.equal(model.systemRows[0]?.value, "-");
   assert.equal(model.resourceCards[3]?.valueLabel, "--");
+  assert.equal(model.resourceCards[3]?.gaugePercent, 0);
 });
 
 test("buildDeviceStatusViewModel shows failed runtime summary when status cannot be loaded", () => {

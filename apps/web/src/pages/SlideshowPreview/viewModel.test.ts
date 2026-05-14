@@ -70,6 +70,7 @@ test("buildSlideshowPreviewViewModel centralizes current slide, queue, and playb
   assert.equal(model.currentIndexLabel, "3 / 3");
   assert.equal(model.currentPageLabel, "廠區用電迴路頁");
   assert.equal(model.queueCards[2]?.isCurrent, true);
+  assert.equal(model.queueCards[2]?.previewAssetKey, "factory-circuit");
   assert.equal(model.queueCards[2]?.routeLabel, "/factory-circuit");
   assert.equal(model.summaryRows[0]?.label, "播放順序");
   assert.match(model.summaryRows[0]?.value ?? "", /Overview/);

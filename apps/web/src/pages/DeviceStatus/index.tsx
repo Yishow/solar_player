@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { KioskButton } from "../../components/KioskButton";
 import { requestJson } from "../../services/api";
-import { PageScaffold } from "../shared/PageScaffold";
+import { deviceAssetRuntimeMap } from "./assets";
+import { deviceLayout } from "./layout";
+import "./device.css";
 import {
   buildDeviceStatusViewModel,
   type DeviceActionFeedback
@@ -44,25 +45,48 @@ async function getDeviceStatus() {
 }
 
 async function runDeviceAction(path: string) {
-  return requestJson<DeviceActionResponse>(path, {
-    method: "POST"
-  });
+  return requestJson<DeviceActionResponse>(path, { method: "POST" });
 }
 
 async function exportLogs() {
   return requestJson<DeviceActionResponse>("/api/device/logs/export");
 }
 
-function feedbackClassName(tone: "error" | "loading" | "ready") {
-  if (tone === "error") {
-    return "border-[rgba(230,0,18,0.18)] bg-[rgba(255,241,241,0.96)]";
-  }
+function CheckGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
 
-  if (tone === "loading") {
-    return "border-[rgba(138,148,132,0.18)] bg-[rgba(249,249,247,0.92)]";
-  }
-
-  return "border-[rgba(78,121,55,0.18)] bg-[rgba(244,248,239,0.92)]";
+function NetworkGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 9c5-4 11-4 16 0M7 12c3-2 7-2 10 0M10 15c1-1 3-1 4 0" />
+      <circle cx="12" cy="19" r="1" fill="currentColor" />
+    </svg>
+  );
 }
 
 export function DeviceStatus() {
@@ -73,32 +97,23 @@ export function DeviceStatus() {
 
   useEffect(() => {
     let active = true;
-
     const load = async () => {
       try {
         const nextStatus = await getDeviceStatus();
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setStatus(nextStatus);
       } catch (error) {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setActionFeedback({
           detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
           title: "同步失敗",
           tone: "error"
         });
       } finally {
-        if (active) {
-          setIsLoading(false);
-        }
+        if (active) setIsLoading(false);
       }
     };
-
     void load();
-
     return () => {
       active = false;
     };
@@ -115,23 +130,15 @@ export function DeviceStatus() {
       title,
       tone: "loading"
     });
-
     try {
       const response = await action();
-
       if (!response.success) {
         throw new Error(response.error ?? "維護操作失敗。");
       }
-
       const detail =
         response.message ??
         (response.data?.files ? `可匯出 ${response.data.files.length} 份日誌。` : "維護操作已完成。");
-
-      setActionFeedback({
-        detail,
-        title: `${title}完成`,
-        tone: "ready"
-      });
+      setActionFeedback({ detail, title: `${title}完成`, tone: "ready" });
     } catch (error) {
       setActionFeedback({
         detail: error instanceof Error ? error.message : "維護操作失敗。",
@@ -144,122 +151,260 @@ export function DeviceStatus() {
   };
 
   const viewModel = useMemo(
-    () =>
-      buildDeviceStatusViewModel({
-        actionFeedback,
-        isLoading,
-        status
-      }),
+    () => buildDeviceStatusViewModel({ actionFeedback, isLoading, status }),
     [actionFeedback, isLoading, status]
   );
 
+  const runtimeOk = viewModel.runtimeSummary.title === "正常運作";
+  const runtimeError = viewModel.runtimeSummary.title === "同步失敗";
+  const runtimeIconClass = runtimeError
+    ? "is-error"
+    : runtimeOk
+      ? ""
+      : "is-warning";
+  const runtimeValueClass = runtimeError
+    ? "is-error"
+    : runtimeOk
+      ? ""
+      : "is-warning";
+
   return (
-    <PageScaffold path="/device-status" description="裝置即時狀態、系統資源與維護操作。">
-      <div className="grid grid-cols-12 gap-6">
-        <aside className="col-span-3 grid gap-4">
-          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
-            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">裝置運作狀態</p>
-            <p className="mt-3 text-3xl font-bold text-brand-900">{viewModel.runtimeSummary.title}</p>
-            <p className="mt-2 text-sm text-neutral-500">{viewModel.runtimeSummary.detail}</p>
-          </div>
-          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
-            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">系統運行時間</p>
-            <p className="mt-3 text-3xl font-bold text-brand-900">{viewModel.systemRows[3]?.value}</p>
-          </div>
-          <div className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-card">
-            <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">最後同步狀態</p>
-            <p className="mt-3 text-base leading-7 text-neutral-700">{viewModel.feedback.detail}</p>
-          </div>
-        </aside>
+    <section className="ds-page">
+      <section
+        className="ds-title"
+        style={{ left: deviceLayout.title.left, top: deviceLayout.title.top }}
+      >
+        <h1>
+          裝置<em>狀態</em>
+        </h1>
+        <p>Device Status Details</p>
+      </section>
 
-        <section className="col-span-5 rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-card">
-          <h2 className="text-2xl font-semibold text-brand-900">裝置資訊</h2>
-          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">Device Information</p>
-          <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-5">
-            {viewModel.systemRows.map((row) => (
-              <div key={row.label}>
-                <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{row.label}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-900">{row.value}</p>
+      {/* === Left aside (3 status cards) === */}
+      <aside
+        className="ds-aside"
+        style={{
+          left: deviceLayout.side.left,
+          top: deviceLayout.side.top,
+          width: deviceLayout.side.width
+        }}
+      >
+        <article className="ds-status-card">
+          <span className="ds-status-card__label">
+            裝置運作狀態
+            <small>Device Operation Status</small>
+          </span>
+          <span className={`ds-status-card__value ${runtimeValueClass}`}>
+            {viewModel.runtimeSummary.title}
+          </span>
+          <span className="ds-status-card__detail">{viewModel.runtimeSummary.detail}</span>
+          <span className={`ds-status-card__icon ${runtimeIconClass}`}>
+            <CheckGlyph />
+          </span>
+        </article>
+
+        <article className="ds-status-card">
+          <span className="ds-status-card__label">
+            系統運行時間
+            <small>Uptime</small>
+          </span>
+          <span className="ds-status-card__value is-neutral">
+            {viewModel.systemRows[3]?.value}
+          </span>
+          <span className="ds-status-card__detail">服務啟動後累積時間</span>
+        </article>
+
+        <article className="ds-status-card">
+          <span className="ds-status-card__label">
+            最後同步狀態
+            <small>Last Sync</small>
+          </span>
+          <span className="ds-status-card__value is-neutral">{viewModel.feedback.title}</span>
+          <span className="ds-status-card__detail">{viewModel.feedback.detail}</span>
+        </article>
+      </aside>
+
+      {/* === Info panel === */}
+      <section
+        className="ds-card ds-info"
+        style={{
+          height: deviceLayout.info.height,
+          left: deviceLayout.info.left,
+          top: deviceLayout.info.top,
+          width: deviceLayout.info.width
+        }}
+      >
+        <h2>
+          裝置資訊
+          <small>Device Information</small>
+        </h2>
+        <dl>
+          {viewModel.systemRows.map((row) => (
+            <div key={row.label} className="contents">
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+          {viewModel.networkRows.map((row) => (
+            <div key={row.label} className="contents">
+              <dt>{row.label}</dt>
+              <dd className={row.value.includes("●") ? "is-good" : ""}>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* === Photo === */}
+      <figure
+        className="ds-photo"
+        style={{
+          height: deviceLayout.photo.height,
+          left: deviceLayout.photo.left,
+          top: deviceLayout.photo.top,
+          width: deviceLayout.photo.width,
+          margin: 0
+        }}
+      >
+        <img alt="Device board" src={deviceAssetRuntimeMap.photo} />
+      </figure>
+
+      {/* === Resource gauges === */}
+      <section
+        className="ds-card ds-resource"
+        style={{
+          height: deviceLayout.resource.height,
+          left: deviceLayout.resource.left,
+          top: deviceLayout.resource.top,
+          width: deviceLayout.resource.width
+        }}
+      >
+        <h2>
+          系統資源監控
+          <small>System Resource Monitor</small>
+        </h2>
+        <div className="ds-gauge-grid">
+          {viewModel.resourceCards.map((card, index) => (
+            <div key={card.label} className="ds-gauge">
+              <div
+                className="ds-gauge-ring"
+                style={{
+                  ["--gauge-color" as string]: index === 3 ? "#ff5a24" : "var(--green)",
+                  ["--gauge-value" as string]: String(card.gaugePercent)
+                }}
+              >
+                <span>{card.gaugeValue}</span>
               </div>
-            ))}
-            {viewModel.networkRows.map((row) => (
-              <div key={row.label}>
-                <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{row.label}</p>
-                <p className="mt-2 text-lg font-semibold text-neutral-900">{row.value}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+              <p>
+                {card.label}
+                <small>{card.helper}</small>
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        <section className="col-span-4 rounded-[28px] border border-white/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(241,246,235,0.82))] p-6 shadow-card">
-          <h2 className="text-2xl font-semibold text-brand-900">系統資源監控</h2>
-          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">System Resource Monitor</p>
-          <div className="mt-6 grid gap-4">
-            {viewModel.resourceCards.map((card) => (
-              <div key={card.label} className="rounded-2xl border border-white/70 bg-white/86 px-4 py-4 shadow-soft">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{card.label}</p>
-                  <p className="text-2xl font-bold text-brand-900">{card.valueLabel}</p>
-                </div>
-                <p className="mt-2 text-sm text-neutral-600">{card.helper}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      {/* === Network bar === */}
+      <section
+        className="ds-network"
+        style={{
+          height: deviceLayout.network.height,
+          left: deviceLayout.network.left,
+          top: deviceLayout.network.top,
+          width: deviceLayout.network.width
+        }}
+      >
+        <span className="ds-network__icon">
+          <NetworkGlyph />
+        </span>
+        <div className="ds-network__row">
+          <b>網路狀態</b>
+          <small>Network Status</small>
+          <span>{viewModel.networkRows[0]?.value}</span>
+        </div>
+        <div className="ds-network__row">
+          <b>訊號備註</b>
+          <small>Network Note</small>
+          <span style={{ color: "#5d655d" }}>{viewModel.networkRows[1]?.value}</span>
+        </div>
+      </section>
 
-      <div className="mt-6 grid grid-cols-12 gap-6">
-        <section className="col-span-8 rounded-[28px] border border-white/70 bg-white/92 p-6 shadow-card">
-          <h2 className="text-2xl font-semibold text-brand-900">維護操作</h2>
-          <p className="mt-1 text-sm uppercase tracking-[0.18em] text-neutral-500">Maintenance Actions</p>
-          <div className="mt-6 grid grid-cols-4 gap-4">
-            <KioskButton
-              variant="secondary"
-              disabled={activeAction !== null}
-              onClick={() => void handleAction("reboot", "重新啟動裝置", () => runDeviceAction("/api/device/reboot"))}
-            >
-              {activeAction === "reboot" ? "執行中..." : "重新啟動裝置"}
-            </KioskButton>
-            <KioskButton
-              variant="secondary"
-              disabled={activeAction !== null}
-              onClick={() => void handleAction("clear-cache", "清除快取", () => runDeviceAction("/api/device/clear-cache"))}
-            >
-              {activeAction === "clear-cache" ? "執行中..." : "清除快取"}
-            </KioskButton>
-            <KioskButton
-              variant="secondary"
-              disabled={activeAction !== null}
-              onClick={() =>
-                void handleAction("system-update", "更新系統", async () => ({
-                  success: false,
-                  error: "目前尚未實作 system update endpoint。"
-                }))
-              }
-            >
-              {activeAction === "system-update" ? "執行中..." : "更新系統"}
-            </KioskButton>
-            <KioskButton
-              variant="ghost"
-              disabled={activeAction !== null}
-              onClick={() => void handleAction("export-logs", "匯出日誌", exportLogs)}
-            >
-              {activeAction === "export-logs" ? "執行中..." : "匯出日誌"}
-            </KioskButton>
-          </div>
-        </section>
-
-        <section
-          className={[
-            "col-span-4 rounded-[28px] border px-5 py-5 shadow-soft",
-            feedbackClassName((viewModel.feedback?.tone ?? "ready") as "error" | "loading" | "ready")
-          ].join(" ")}
+      {/* === Actions === */}
+      <section
+        className="ds-actions"
+        style={{
+          height: deviceLayout.actions.height,
+          left: deviceLayout.actions.left,
+          top: deviceLayout.actions.top,
+          width: deviceLayout.actions.width
+        }}
+      >
+        <button
+          type="button"
+          className="ds-action"
+          disabled={activeAction !== null}
+          onClick={() =>
+            void handleAction("reboot", "重新啟動裝置", () => runDeviceAction("/api/device/reboot"))
+          }
         >
-          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Maintenance Feedback</p>
-          <p className="mt-3 text-2xl font-semibold text-neutral-800">{viewModel.feedback.title}</p>
-          <p className="mt-3 text-sm leading-6 text-neutral-600">{viewModel.feedback.detail}</p>
-        </section>
+          {activeAction === "reboot" ? "執行中..." : "重新啟動"}
+          <small>Reboot</small>
+        </button>
+        <button
+          type="button"
+          className="ds-action"
+          disabled={activeAction !== null}
+          onClick={() =>
+            void handleAction("clear-cache", "清除快取", () => runDeviceAction("/api/device/clear-cache"))
+          }
+        >
+          {activeAction === "clear-cache" ? "執行中..." : "清除快取"}
+          <small>Clear Cache</small>
+        </button>
+        <button
+          type="button"
+          className="ds-action"
+          disabled={activeAction !== null}
+          onClick={() =>
+            void handleAction("system-update", "更新系統", async () => ({
+              success: false,
+              error: "目前尚未實作 system update endpoint。"
+            }))
+          }
+        >
+          {activeAction === "system-update" ? "執行中..." : "更新系統"}
+          <small>System Update</small>
+        </button>
+        <button
+          type="button"
+          className="ds-action"
+          disabled={activeAction !== null}
+          onClick={() => void handleAction("export-logs", "匯出日誌", exportLogs)}
+        >
+          {activeAction === "export-logs" ? "執行中..." : "匯出日誌"}
+          <small>Export Logs</small>
+        </button>
+      </section>
+
+      {/* === Feedback strip === */}
+      <div
+        className={`ds-feedback ${
+          viewModel.feedback.tone === "error"
+            ? "is-error"
+            : viewModel.feedback.tone === "loading"
+              ? "is-loading"
+              : ""
+        }`}
+        style={{
+          height: deviceLayout.feedback.height,
+          left: deviceLayout.feedback.left,
+          top: deviceLayout.feedback.top,
+          width: deviceLayout.feedback.width
+        }}
+        role="status"
+      >
+        <b>{viewModel.feedback.title}</b>
+        <span style={{ opacity: 0.85 }}>{viewModel.feedback.detail}</span>
       </div>
-    </PageScaffold>
+    </section>
   );
 }

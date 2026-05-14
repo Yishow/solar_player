@@ -1,0 +1,183 @@
+/* Management primitives — shared across all 8 management pages.
+ * Provides appearance-only rules; positioning belongs in each page's CSS.
+ */
+
+/* === Settings Card === */
+.settings-card {
+  position: absolute;
+  background: rgba(255, 253, 247, 0.92);
+  border: 1px solid rgba(98, 105, 86, 0.18);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  padding: 22px;
+  overflow: hidden;
+}
+
+.settings-card__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #344039;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.settings-card__title small {
+  font: 400 13px/1.1 var(--font-family-en);
+  letter-spacing: 0.04em;
+  color: #6f766f;
+}
+
+/* === Action Button === */
+.mgmt-action {
+  position: absolute;
+  top: 22px;
+  height: 58px;
+  border: 1px solid rgba(74, 115, 62, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 253, 247, 0.92);
+  color: var(--green);
+  font: 600 18px/1 var(--font-family-zh);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 24px;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.mgmt-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(55, 50, 38, 0.16);
+}
+
+.mgmt-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mgmt-action small {
+  font: 400 11px/1 var(--font-family-en);
+  letter-spacing: 0.18em;
+  opacity: 0.72;
+}
+
+.mgmt-action.primary {
+  background: linear-gradient(#658d56, #4c793f);
+  color: #fff;
+  border-color: #4c793f;
+  box-shadow: 0 10px 22px rgba(77, 119, 63, 0.28);
+}
+
+.mgmt-action.danger {
+  background: rgba(254, 230, 230, 0.72);
+  border-color: rgba(193, 74, 74, 0.32);
+  color: #c14a4a;
+}
+
+/* === Toggle Switch === */
+.mgmt-switch {
+  position: relative;
+  width: 50px;
+  height: 28px;
+  border-radius: 999px;
+  background: #c9cbbf;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  transition: background 150ms ease;
+}
+
+.mgmt-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: left 150ms ease;
+}
+
+.mgmt-switch.on {
+  background: linear-gradient(90deg, #6d935e, #4c7b40);
+}
+
+.mgmt-switch.on::after {
+  left: 25px;
+}
+
+.mgmt-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === Status Bar (appearance only, position via page class) === */
+.mgmt-status {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: right;
+  background: rgba(232, 240, 226, 0.7);
+  border: 1px solid rgba(92, 133, 75, 0.28);
+  color: #4c7540;
+}
+
+.mgmt-status.is-error {
+  background: rgba(254, 230, 230, 0.7);
+  border-color: rgba(193, 74, 74, 0.32);
+  color: #c14a4a;
+}
+
+.mgmt-status.is-saving,
+.mgmt-status.is-loading,
+.mgmt-status.is-uploading,
+.mgmt-status.is-deleting {
+  background: rgba(252, 240, 217, 0.75);
+  border-color: rgba(201, 136, 26, 0.32);
+  color: #c9881a;
+}
+
+/* === Chip === */
+.mgmt-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(92, 105, 79, 0.22);
+  background: #f7f6ee;
+  color: #5d655d;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mgmt-chip.is-success,
+.mgmt-chip.is-on {
+  border-color: rgba(92, 133, 75, 0.4);
+  background: rgba(92, 133, 75, 0.12);
+  color: #4c7540;
+}
+
+.mgmt-chip.is-warning,
+.mgmt-chip.is-accent,
+.mgmt-chip.is-cover {
+  border-color: rgba(232, 158, 30, 0.32);
+  background: #fff7e8;
+  color: #b27718;
+}
+
+.mgmt-chip.is-danger {
+  border-color: rgba(193, 74, 74, 0.32);
+  background: rgba(254, 230, 230, 0.7);
+  color: #c14a4a;
+}

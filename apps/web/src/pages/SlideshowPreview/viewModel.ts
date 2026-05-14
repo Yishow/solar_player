@@ -59,6 +59,7 @@ export function buildSlideshowPreviewViewModel({
       ...page,
       durationLabel: `${page.durationSeconds}s`,
       isCurrent: currentPage?.id === page.id,
+      previewAssetKey: page.pageKey,
       routeLabel: page.route,
       statusLabel: page.enabled ? "輪播已啟用" : "目前不納入輪播"
     })),

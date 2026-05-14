@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { PanelCard } from "../../components/PanelCard";
 import { requestJson } from "../../services/api";
-import { PageScaffold } from "../shared/PageScaffold";
+import { energyHistoryLayout, energyHistoryMetricCardKeys } from "./layout";
+import "./history.css";
 import {
   buildEnergyHistoryViewModel,
   type CumulativeCounter,
@@ -24,22 +24,21 @@ type CumulativeResponse = {
 };
 
 function filterSummariesByRange(range: EnergyHistoryRange, summaries: DailyEnergySummary[]) {
-  if (range === "day") {
-    return summaries.slice(0, 1);
-  }
-
-  if (range === "week") {
-    return summaries.slice(0, 7);
-  }
-
-  if (range === "month") {
-    return summaries.slice(0, 30);
-  }
-
+  if (range === "day") return summaries.slice(0, 1);
+  if (range === "week") return summaries.slice(0, 7);
+  if (range === "month") return summaries.slice(0, 30);
   return summaries;
 }
 
-function BigTrendChart({
+const METRIC_ICON_GLYPHS: Record<number, string> = {
+  0: "☀",
+  1: "↻",
+  2: "⚡",
+  3: "▤",
+  4: "🌱"
+};
+
+function TrendChart({
   lines
 }: {
   lines: Array<{
@@ -48,21 +47,23 @@ function BigTrendChart({
     points: Array<{ label: string; value: number | null }>;
   }>;
 }) {
-  const validValues = lines.flatMap((line) => line.points.map((point) => point.value).filter((value): value is number => value !== null));
-  const width = 1400;
-  const height = 350;
-  const padding = 36;
+  const validValues = lines.flatMap((line) =>
+    line.points.map((point) => point.value).filter((value): value is number => value !== null)
+  );
+  const width = 1480;
+  const height = 180;
+  const padding = 16;
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
   const maxValue = Math.max(...validValues, 1);
   const colorMap = {
     blue: "#4a86c5",
-    green: "#5f8c50",
+    green: "var(--green)",
     orange: "#d89c45"
   } as const;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+    <svg viewBox={`0 0 ${width} ${height}`} className="eh-chart-svg" preserveAspectRatio="none">
       {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
         <line
           key={ratio}
@@ -75,7 +76,9 @@ function BigTrendChart({
         />
       ))}
       {lines.map((line) => {
-        const validPoints = line.points.filter((point): point is { label: string; value: number } => point.value !== null);
+        const validPoints = line.points.filter(
+          (point): point is { label: string; value: number } => point.value !== null
+        );
         const polyline = validPoints
           .map((point, index) => {
             const x = padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth;
@@ -83,7 +86,6 @@ function BigTrendChart({
             return `${x},${y}`;
           })
           .join(" ");
-
         return (
           <polyline
             key={line.label}
@@ -91,7 +93,8 @@ function BigTrendChart({
             points={polyline}
             stroke={colorMap[line.colorToken as keyof typeof colorMap]}
             strokeLinecap="round"
-            strokeWidth="4"
+            strokeLinejoin="round"
+            strokeWidth="3"
           />
         );
       })}
@@ -109,42 +112,28 @@ export function EnergyHistory() {
 
   useEffect(() => {
     let active = true;
-
     const queryRange = range === "year" ? "total" : range;
-
     const loadHistory = async () => {
       setIsLoading(true);
-
       try {
         const [historyResponse, summaryResponse, cumulativeResponse] = await Promise.all([
           requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${queryRange}`),
           requestJson<DailySummaryResponse>("/api/metrics/daily-summary"),
           requestJson<CumulativeResponse>("/api/metrics/cumulative")
         ]);
-
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setSnapshots(historyResponse.snapshots);
         setSummaries(summaryResponse.summaries);
         setCounters(cumulativeResponse.counters);
         setErrorMessage("");
       } catch (error) {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setErrorMessage(error instanceof Error ? error.message : "載入歷史資料失敗。");
       } finally {
-        if (active) {
-          setIsLoading(false);
-        }
+        if (active) setIsLoading(false);
       }
     };
-
     void loadHistory();
-
     return () => {
       active = false;
     };
@@ -161,123 +150,179 @@ export function EnergyHistory() {
     [counters, range, snapshots, summaries]
   );
 
+  const validChartPoints = viewModel.chartLines
+    .flatMap((line) => line.points)
+    .filter((point) => point.value !== null);
+  const helperState = errorMessage ? "is-error" : isLoading ? "is-loading" : "";
+  const statusLabel = errorMessage || (isLoading ? "同步中..." : "歷史曲線已同步");
+
   return (
-    <PageScaffold path="/history" description="發電歷史紀錄：每日彙總、峰值數據、累積統計。">
-      <div className="grid grid-cols-12 gap-6">
-        <aside className="col-span-2">
-          <div className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-card">
-            <div className="space-y-2">
-              {viewModel.rangeOptions.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setRange(option.key)}
-                  className={[
-                    "flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-colors",
-                    option.active ? "bg-brand-900 text-white shadow-soft" : "bg-brand-50/50 text-neutral-700 hover:bg-white"
-                  ].join(" ")}
-                >
-                  <span className="text-lg font-semibold">{option.label}</span>
-                  <span className="text-xs uppercase tracking-[0.18em] opacity-75">{option.subtitle}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
+    <section className="eh-page">
+      <section
+        className="eh-title"
+        style={{ left: energyHistoryLayout.title.left, top: energyHistoryLayout.title.top }}
+      >
+        <h1>
+          能源<em>歷史</em>
+        </h1>
+        <p>Energy History</p>
+      </section>
 
-        <div className="col-span-10 grid gap-6">
-          <section>
-            <h1 className="text-[44px] font-bold leading-tight text-brand-900">能源資料歷史</h1>
-            <p className="mt-2 text-lg uppercase tracking-[0.18em] text-brand-700">Energy Data History</p>
-            <p className="mt-4 text-base leading-7 text-neutral-600">
-              以 monitoring batch 的 FHD 可讀性為優先，集中呈現趨勢線、累積摘要與高密度表格。
-            </p>
-          </section>
+      {/* === Side range selector === */}
+      <aside
+        className="eh-side"
+        style={{
+          height: energyHistoryLayout.side.height,
+          left: energyHistoryLayout.side.left,
+          top: energyHistoryLayout.side.top,
+          width: energyHistoryLayout.side.width
+        }}
+      >
+        <div className="eh-side-title">
+          範圍切換
+          <small>RANGE</small>
+        </div>
+        <div className="eh-side-list">
+          {viewModel.rangeOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={option.active ? "active" : ""}
+              onClick={() => setRange(option.key)}
+            >
+              <span className="eh-range-zh">{option.label}</span>
+              <span className="eh-range-en">{option.subtitle}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
 
-          {errorMessage ? (
-            <div className="rounded-[28px] border border-[rgba(230,0,18,0.18)] bg-[rgba(255,241,241,0.96)] px-6 py-5 shadow-soft">
-              <p className="text-xl font-semibold text-neutral-800">歷史資料載入失敗</p>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">{errorMessage}</p>
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-5 gap-4">
-            {viewModel.metricCards.map((card) => (
-              <article
-                key={card.label}
-                className="rounded-[28px] border border-white/75 bg-white/92 p-5 shadow-card backdrop-blur"
-              >
-                <p className="text-sm font-medium tracking-[0.08em] text-neutral-600">{card.label}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-neutral-500">{card.subtitle}</p>
-                <div className="mt-4 flex items-end gap-2">
-                  <p className="text-3xl font-bold text-brand-900">{card.valueLabel}</p>
-                  <span className="pb-1 text-sm font-semibold uppercase tracking-[0.12em] text-brand-700">
-                    {card.unitLabel}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <PanelCard title="今日趨勢" subtitle="TODAY'S TREND">
-            <div className="mb-4 flex flex-wrap gap-4 text-sm text-neutral-500">
-              {viewModel.chartLines.map((line) => (
-                <span key={line.label}>{line.label}</span>
-              ))}
-              <span>{isLoading ? "同步中..." : "歷史曲線已同步"}</span>
-            </div>
-            <BigTrendChart lines={viewModel.chartLines} />
-          </PanelCard>
-
-          <PanelCard title="高密度歷史表" subtitle="DENSE HISTORY TABLE">
-            <div className="overflow-x-auto rounded-[28px] border border-white/70 bg-white/82">
-              <table className="min-w-full text-left text-sm text-neutral-700">
-                <thead className="border-b border-neutral-200 bg-white/95 text-xs uppercase tracking-[0.18em] text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3">日期</th>
-                    <th className="px-4 py-3">發電量</th>
-                    <th className="px-4 py-3">自發自用</th>
-                    <th className="px-4 py-3">用電量</th>
-                    <th className="px-4 py-3">CO2</th>
-                    <th className="px-4 py-3">尖峰發電</th>
-                    <th className="px-4 py-3">尖峰用電</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewModel.tableRows.map((row) => (
-                    <tr key={row.dateLabel} className="border-b border-neutral-100 last:border-b-0">
-                      <td className="px-4 py-3 font-semibold text-neutral-800">{row.dateLabel}</td>
-                      <td className="px-4 py-3">{row.generationLabel}</td>
-                      <td className="px-4 py-3">{row.selfConsumptionLabel}</td>
-                      <td className="px-4 py-3">{row.consumptionLabel}</td>
-                      <td className="px-4 py-3">{row.co2Label}</td>
-                      <td className="px-4 py-3">{row.peakGenerationLabel}</td>
-                      <td className="px-4 py-3">{row.peakConsumptionLabel}</td>
-                    </tr>
-                  ))}
-                  {viewModel.tableRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-neutral-500">
-                        目前所選範圍沒有 daily summary rows。
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </PanelCard>
-
-          <div className="grid grid-cols-3 gap-4">
-            {viewModel.bottomSummary.map((item) => (
-              <div key={item.label} className="rounded-[28px] border border-white/70 bg-white/92 p-5 shadow-soft">
-                <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">{item.label}</p>
-                <p className="mt-3 text-2xl font-semibold text-brand-900">{item.valueLabel}</p>
-                {item.detailLabel ? <p className="mt-2 text-sm text-neutral-500">{item.detailLabel}</p> : null}
+      {/* === Metric cards === */}
+      {viewModel.metricCards.map((card, index) => {
+        const layoutKey = energyHistoryMetricCardKeys[index];
+        const layout = layoutKey ? energyHistoryLayout.metric[layoutKey] : null;
+        if (!layout) return null;
+        return (
+          <article
+            key={card.label}
+            className="eh-metric"
+            style={{
+              height: layout.height,
+              left: layout.left,
+              top: layout.top,
+              width: layout.width
+            }}
+          >
+            <div className="eh-metric-head">
+              <span className="eh-metric-icon">{METRIC_ICON_GLYPHS[index] ?? "·"}</span>
+              <div className="eh-metric-label">
+                <b>{card.label}</b>
+                <small>{card.subtitle}</small>
               </div>
-            ))}
+            </div>
+            <div className="eh-metric-value">
+              {card.valueLabel}
+              <small>{card.unitLabel}</small>
+            </div>
+            <div className={`eh-metric-helper ${helperState}`}>
+              {errorMessage ? "載入異常" : isLoading ? "同步中..." : "MQTT Live"}
+            </div>
+          </article>
+        );
+      })}
+
+      {/* === Chart panel === */}
+      <section
+        className="eh-chart"
+        style={{
+          height: energyHistoryLayout.chart.height,
+          left: energyHistoryLayout.chart.left,
+          top: energyHistoryLayout.chart.top,
+          width: energyHistoryLayout.chart.width
+        }}
+      >
+        <div className="eh-chart-head">
+          <div className="eh-chart-title">
+            今日趨勢
+            <small>Today's Trend</small>
+          </div>
+          <div className="eh-legend">
+            <span className="orange">發電量 (kW)</span>
+            <span className="green">自發自用 (kW)</span>
+            <span className="blue">用電量 (kW)</span>
+            <span className={`status ${helperState}`}>{statusLabel}</span>
           </div>
         </div>
-      </div>
-    </PageScaffold>
+
+        {validChartPoints.length > 0 ? (
+          <TrendChart lines={viewModel.chartLines} />
+        ) : (
+          <div className="eh-chart-empty">目前尚無歷史圖表資料</div>
+        )}
+
+        {validChartPoints.length > 0 ? (
+          <div className="eh-axis-times">
+            <span>{validChartPoints[0]?.label ?? ""}</span>
+            <span>{validChartPoints[Math.floor(validChartPoints.length / 2)]?.label ?? ""}</span>
+            <span>{validChartPoints[validChartPoints.length - 1]?.label ?? ""}</span>
+          </div>
+        ) : null}
+
+        <div className="eh-table">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>發電量</th>
+                <th>自發自用</th>
+                <th>用電量</th>
+                <th>CO₂</th>
+                <th>尖峰發電</th>
+                <th>尖峰用電</th>
+              </tr>
+            </thead>
+            <tbody>
+              {viewModel.tableRows.map((row) => (
+                <tr key={row.dateLabel}>
+                  <td>{row.dateLabel}</td>
+                  <td>{row.generationLabel}</td>
+                  <td>{row.selfConsumptionLabel}</td>
+                  <td>{row.consumptionLabel}</td>
+                  <td>{row.co2Label}</td>
+                  <td>{row.peakGenerationLabel}</td>
+                  <td>{row.peakConsumptionLabel}</td>
+                </tr>
+              ))}
+              {viewModel.tableRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", color: "#6f766f" }}>
+                    目前所選範圍沒有 daily summary rows。
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* === Bottom summary band === */}
+      <section
+        className="eh-bottom"
+        style={{
+          height: energyHistoryLayout.bottom.height,
+          left: energyHistoryLayout.bottom.left,
+          top: energyHistoryLayout.bottom.top,
+          width: energyHistoryLayout.bottom.width
+        }}
+      >
+        {viewModel.bottomSummary.map((item) => (
+          <div key={item.label}>
+            <b>{item.label}</b>
+            <span>{item.valueLabel}</span>
+            {item.detailLabel ? <small>{item.detailLabel}</small> : null}
+          </div>
+        ))}
+      </section>
+    </section>
   );
 }

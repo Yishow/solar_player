@@ -93,7 +93,54 @@ test("header and footer expose shell primitives without centered max-width wrapp
   assert.doesNotMatch(footerHtml, /max-w-\[var\(--screen-width\)\]/);
 });
 
-test("management shell preserves scrollable main content outside the fixed display canvas", () => {
+test("playback footer keeps the five display routes plus a single settings entry", () => {
+  const footerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview"]
+      },
+      React.createElement(AppFooterNav)
+    )
+  );
+
+  assert.match(footerHtml, />總覽</);
+  assert.match(footerHtml, />太陽能</);
+  assert.match(footerHtml, />迴路</);
+  assert.match(footerHtml, />圖庫</);
+  assert.match(footerHtml, />永續</);
+  assert.match(footerHtml, />進入設定</);
+  assert.doesNotMatch(footerHtml, />MQTT</);
+  assert.doesNotMatch(footerHtml, />圖片管理</);
+});
+
+test("settings footer keeps overview return plus settings-related routes only", () => {
+  const footerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/settings/mqtt"]
+      },
+      React.createElement(AppFooterNav)
+    )
+  );
+
+  assert.match(footerHtml, />回總覽</);
+  assert.match(footerHtml, />趨勢</);
+  assert.match(footerHtml, />播放設定</);
+  assert.match(footerHtml, />圖片管理</);
+  assert.match(footerHtml, />MQTT</);
+  assert.match(footerHtml, />迴路設定</);
+  assert.match(footerHtml, />歷史</);
+  assert.match(footerHtml, />預覽</);
+  assert.match(footerHtml, />裝置狀態</);
+  assert.doesNotMatch(footerHtml, />太陽能</);
+  assert.doesNotMatch(footerHtml, />永續</);
+  assert.doesNotMatch(footerHtml, />進入設定</);
+  assert.doesNotMatch(footerHtml, />離線</);
+});
+
+test("management shell shares the FHD canvas with display routes and adds an inner scroll area", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -104,10 +151,11 @@ test("management shell preserves scrollable main content outside the fixed displ
     )
   );
 
-  assert.match(html, /class="flex h-full w-full flex-col"/);
+  assert.match(html, /data-shell-primitive="display-canvas-viewport"/);
+  assert.match(html, /data-shell-primitive="display-canvas-frame"/);
+  assert.match(html, /data-shell-primitive="management-scroll"/);
   assert.match(html, /overflow-y-auto/);
   assert.match(html, /overflow-x-hidden/);
-  assert.doesNotMatch(html, /data-shell-primitive="display-canvas-viewport"/);
 });
 
 test("shell primitives expose reusable section, action, media, and status wrappers", () => {

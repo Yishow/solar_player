@@ -8,18 +8,15 @@ type StatusBadgeProps = {
 
 const badgeStyleMap = {
   connected: {
-    dot: "bg-[var(--color-status-success-500)]",
-    wrapper: "bg-[rgba(35,122,34,0.12)] text-[var(--color-status-success-500)]",
+    accent: "var(--color-status-success-500)",
     text: "Connected"
   },
   disconnected: {
-    dot: "bg-[var(--color-status-error-500)]",
-    wrapper: "bg-[rgba(230,0,18,0.12)] text-[var(--color-status-error-500)]",
+    accent: "var(--color-status-error-500)",
     text: "Disconnected"
   },
   connecting: {
-    dot: "bg-[var(--color-status-warning-500)]",
-    wrapper: "bg-[rgba(224,161,42,0.16)] text-[var(--color-status-warning-500)]",
+    accent: "var(--color-status-warning-500)",
     text: "Connecting"
   }
 } as const;
@@ -35,13 +32,35 @@ export function StatusBadge({
     <span
       data-shell-density={density}
       data-shell-primitive="status-pill"
-      className={[
-        "inline-flex h-[var(--status-pill-height)] items-center gap-2 rounded-full px-4 text-sm font-semibold tracking-[0.08em]",
-        style.wrapper
-      ].join(" ")}
+      className="inline-flex h-[54px] w-[210px] items-center justify-center gap-[12px] rounded-[16px] border font-en text-[18px] font-medium"
+      style={{
+        background: "rgba(255, 255, 249, 0.78)",
+        borderColor: "rgba(89, 124, 67, 0.32)",
+        boxShadow: "0 8px 22px rgba(70, 60, 40, 0.04)",
+        color: style.accent
+      }}
     >
-      <span className={["h-2.5 w-2.5 rounded-full", style.dot].join(" ")} />
+      <WifiGlyph color={style.accent} />
       <span>{label ?? style.text}</span>
     </span>
+  );
+}
+
+function WifiGlyph({ color }: { color: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 9c5-4 11-4 16 0M7 12c3-2 7-2 10 0M10 15c1-1 3-1 4 0" />
+      <circle cx="12" cy="19" r="1" fill={color} />
+    </svg>
   );
 }

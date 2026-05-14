@@ -62,6 +62,7 @@ export function buildOfflineErrorViewModel({
       }
     ],
     headline: "無法取得即時資料",
+    iconKey: "offline-error" as const,
     reasonLabel: resolveReasonLabel(reason),
     returnToLabel: returnTo,
     retryLabel: `將於 ${retryCountdown} 秒後重新嘗試連線`,

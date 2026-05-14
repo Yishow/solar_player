@@ -1,0 +1,335 @@
+/* Slideshow preview — reference-aligned absolute layout on FHD canvas (1920 × 838).
+ * 4 regions: title, left status rail (3 status cards) + bottom controls,
+ * main carousel + dots, bottom summary row.
+ */
+
+.sp-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 838px;
+  font-family: var(--font-family-zh);
+  color: var(--ink);
+}
+
+/* === title === */
+.sp-page .sp-title {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+}
+
+.sp-page .sp-title h1 {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-title h1 em {
+  font-style: normal;
+  color: var(--green);
+}
+
+.sp-page .sp-title p {
+  margin: 0;
+  font: 400 20px/1 var(--font-family-en);
+  letter-spacing: 0.04em;
+  color: #686e68;
+}
+
+/* === left status rail === */
+.sp-page .sp-status {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-page .sp-status-card {
+  position: relative;
+  border: 1px solid rgba(98, 105, 86, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+  min-height: 130px;
+}
+
+.sp-page .sp-status-card__label {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-status-card__label small {
+  display: block;
+  margin-top: 3px;
+  font: 400 11px/1.2 var(--font-family-en);
+  color: #6f766f;
+}
+
+.sp-page .sp-status-card__value {
+  display: block;
+  margin-top: 14px;
+  font: 700 24px/1 var(--font-family-en);
+  color: var(--green);
+}
+
+.sp-page .sp-status-card__value.is-neutral {
+  color: var(--ink-strong);
+  font-size: 28px;
+}
+
+.sp-page .sp-status-card__value.is-large {
+  color: var(--ink-strong);
+  font-size: 30px;
+}
+
+.sp-page .sp-status-card__detail {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #686e68;
+  line-height: 1.4;
+}
+
+.sp-page .sp-status-card__icon {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(92, 133, 75, 0.14);
+  color: var(--green);
+  display: grid;
+  place-items: center;
+}
+
+.sp-page .sp-progress {
+  margin-top: 12px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(92, 105, 79, 0.12);
+  overflow: hidden;
+}
+
+.sp-page .sp-progress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--progress-width, 0%);
+  background: linear-gradient(90deg, #5f884f, #47733e);
+  transition: width 200ms ease;
+}
+
+/* === bottom-left controls === */
+.sp-page .sp-controls {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+}
+
+.sp-page .sp-control {
+  flex: 1;
+  height: 50px;
+  border: 1px solid rgba(74, 115, 62, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 253, 247, 0.92);
+  color: var(--green);
+  font: 600 14px/1 var(--font-family-zh);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-page .sp-control:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(55, 50, 38, 0.12);
+}
+
+.sp-page .sp-control.primary {
+  background: linear-gradient(#658d56, #4c793f);
+  color: #fff;
+  border-color: #4c793f;
+}
+
+/* === carousel === */
+.sp-page .sp-carousel {
+  position: absolute;
+  overflow: visible;
+}
+
+.sp-page .sp-card {
+  position: absolute;
+  top: 36px;
+  width: 260px;
+  height: 380px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(125, 127, 116, 0.18);
+  background: rgba(255, 253, 247, 0.96);
+  box-shadow: 0 14px 26px rgba(73, 60, 41, 0.1);
+  text-align: center;
+  transition: transform 200ms ease;
+}
+
+.sp-page .sp-card.active {
+  top: 0;
+  width: 296px;
+  height: 416px;
+  border: 3px solid var(--green);
+  box-shadow: 0 18px 30px rgba(60, 77, 46, 0.15);
+}
+
+.sp-page .sp-card img {
+  height: 280px;
+  width: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.sp-page .sp-card.active img {
+  height: 304px;
+}
+
+.sp-page .sp-card h3 {
+  margin: 18px 14px 6px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-card p {
+  margin: 0 14px;
+  font: 400 13px/1.2 var(--font-family-en);
+  color: #686e68;
+}
+
+.sp-page .sp-card small {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #5d655d;
+  letter-spacing: 0.06em;
+}
+
+/* arrows */
+.sp-page .sp-arrow {
+  position: absolute;
+  top: 195px;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(70, 61, 41, 0.14);
+  color: #434845;
+  font-size: 42px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.sp-page .sp-arrow.prev { left: -26px; }
+.sp-page .sp-arrow.next { right: -26px; }
+
+/* dots — placed inside the carousel band so they never collide with the summary row below */
+.sp-page .sp-dots {
+  position: absolute;
+  bottom: 8px;
+  left: 240px;
+  right: 240px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sp-page .sp-dots::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 8px;
+  height: 1.5px;
+  background: rgba(166, 168, 164, 0.42);
+}
+
+.sp-page .sp-dots i {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d2d4d1;
+}
+
+.sp-page .sp-dots i.on {
+  background: var(--green);
+}
+
+/* === summary === */
+.sp-page .sp-summary {
+  position: absolute;
+  border: 1px solid rgba(128, 130, 121, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: var(--shadow-card);
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.9fr 0.96fr 1.1fr;
+}
+
+.sp-page .sp-summary h2 {
+  position: absolute;
+  left: 22px;
+  top: 14px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-summary h2 small {
+  margin-left: 10px;
+  font: 400 13px/1 var(--font-family-en);
+  color: #6f766f;
+}
+
+.sp-page .sp-summary > div {
+  position: relative;
+  border-left: 1px solid rgba(116, 120, 112, 0.16);
+  padding: 50px 24px 0;
+}
+
+.sp-page .sp-summary > div:first-child {
+  border-left: 0;
+}
+
+.sp-page .sp-summary > div b {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-summary > div span {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #44504a;
+}
+
+.sp-page .sp-summary > div.is-on span {
+  color: var(--green);
+  font-weight: 600;
+}

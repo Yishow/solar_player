@@ -6,17 +6,10 @@ import {
   solarFlowNodeLayout,
   solarHeroLayout,
   solarKpiLayout,
-  solarShellMeta,
   solarTitleLayout
 } from "./layout";
 
-test("solar layout centralizes shell metadata and main region geometry", () => {
-  assert.equal(solarShellMeta.time, "09:42");
-  assert.equal(solarShellMeta.date, "2025 / 05 / 26");
-  assert.equal(solarShellMeta.weekday, "星期一 Mon.");
-  assert.equal(solarShellMeta.weather, "晴 31°C");
-  assert.equal(solarShellMeta.statusLabel, "MQTT Online");
-
+test("solar layout centralizes main region geometry", () => {
   assert.deepEqual(solarTitleLayout, {
     left: 88,
     top: 166,

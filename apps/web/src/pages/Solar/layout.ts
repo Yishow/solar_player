@@ -1,11 +1,3 @@
-export const solarShellMeta = {
-  date: "2025 / 05 / 26",
-  statusLabel: "MQTT Online",
-  time: "09:42",
-  weather: "晴 31°C",
-  weekday: "星期一 Mon."
-} as const;
-
 export const solarTitleLayout = {
   left: 88,
   top: 166,

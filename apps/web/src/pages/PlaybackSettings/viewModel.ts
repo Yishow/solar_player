@@ -1,4 +1,6 @@
 import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
+import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 
 type BuildPlaybackSettingsViewModelArgs = {
   errorMessage: string;
@@ -98,6 +100,7 @@ export function buildPlaybackSettingsViewModel({
   const sortedPages = sortPlaybackPages(pages);
   const enabledCount = sortedPages.filter((page) => page.enabled).length;
   const totalDurationSeconds = sortedPages.reduce((sum, page) => sum + page.durationSeconds, 0);
+  const scheduleEnabled = settings?.scheduleEnabled ?? false;
 
   return {
     pageRows: sortedPages.map((page, index) => ({
@@ -105,13 +108,52 @@ export function buildPlaybackSettingsViewModel({
       canMoveDown: index < sortedPages.length - 1,
       canMoveUp: index > 0,
       orderLabel: padOrder(page.displayOrder),
-      statusLabel: page.enabled ? "啟用中" : "已停用"
+      statusLabel: page.enabled ? "啟用中" : "已停用",
+      statusTone: page.enabled ? ("success" as ReferenceTone) : ("muted" as ReferenceTone)
     })),
     saveBanner: {
       detail: errorMessage || "調整後按下儲存，展示端會透過 socket 重新載入設定。",
       title: errorMessage ? "儲存失敗" : isSaving ? "正在儲存播放設定..." : message,
       tone: errorMessage ? ("error" as const) : isSaving ? ("saving" as const) : ("ready" as const)
     },
+    summaryCards: [
+      {
+        helper: "輪播引擎目前會納入的播放頁面數量",
+        icon: "play" as ReferenceGlyphName,
+        id: "enabled",
+        subtitle: "Enabled Pages",
+        title: "啟用頁數",
+        tone: "success" as ReferenceTone,
+        value: `${enabledCount} / ${sortedPages.length}`
+      },
+      {
+        helper: "重新啟動或待機返回後的起始展示頁",
+        icon: "bars" as ReferenceGlyphName,
+        id: "start",
+        subtitle: "Start Page",
+        title: "起始頁",
+        tone: "default" as ReferenceTone,
+        value: formatStartPageLabel(settings, sortedPages)
+      },
+      {
+        helper: formatScheduleLabel(settings),
+        icon: "clock" as ReferenceGlyphName,
+        id: "schedule",
+        subtitle: "Schedule Window",
+        title: "排程視窗",
+        tone: scheduleEnabled ? ("accent" as ReferenceTone) : ("muted" as ReferenceTone),
+        value: scheduleEnabled ? "已啟用" : "全天播放"
+      },
+      {
+        helper: "單輪輪播所有頁面合計停留時間",
+        icon: "sun" as ReferenceGlyphName,
+        id: "duration",
+        subtitle: "Cycle Duration",
+        title: "總停留秒數",
+        tone: "default" as ReferenceTone,
+        value: `${totalDurationSeconds}s`
+      }
+    ],
     summary: {
       enabledCount,
       scheduleLabel: formatScheduleLabel(settings),

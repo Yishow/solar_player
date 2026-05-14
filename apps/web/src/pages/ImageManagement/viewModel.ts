@@ -1,4 +1,6 @@
 import type { ImageAsset } from "@solar-display/shared";
+import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
+import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import { buildApiUrl } from "../../services/api";
 
 type ImageStorageUsage = {
@@ -136,6 +138,10 @@ export function buildImageManagementViewModel({
       selectedAsset === null
         ? null
         : {
+            badges: [
+              ...(selectedAsset.includedInSlideshow ? ["輪播中"] : ["未加入輪播"]),
+              ...(selectedAsset.isCover ? ["封面"] : [])
+            ],
             description: selectedAsset.description ?? "尚未填寫圖片說明",
             displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
             filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
@@ -146,6 +152,44 @@ export function buildImageManagementViewModel({
             previewUrl: buildPreviewUrl(selectedAsset.filename),
             title: buildAssetTitle(selectedAsset)
           },
+    summaryCards: [
+      {
+        helper: `目前檔案數：${storageUsage.fileCount} 張`,
+        icon: "image" as ReferenceGlyphName,
+        id: "total",
+        subtitle: "Total Images",
+        title: "總圖片數",
+        tone: "default" as ReferenceTone,
+        value: String(sortedAssets.length)
+      },
+      {
+        helper: "已納入展示輪播的圖片數量",
+        icon: "bars" as ReferenceGlyphName,
+        id: "slideshow",
+        subtitle: "Slideshow Assets",
+        title: "輪播張數",
+        tone: "success" as ReferenceTone,
+        value: String(slideshowCount)
+      },
+      {
+        helper: `${formatBytes(storageUsage.usedBytes)} / 5.00 GB`,
+        icon: "refresh" as ReferenceGlyphName,
+        id: "storage",
+        subtitle: "Used Space",
+        title: "已用空間",
+        tone: usagePercent >= 80 ? ("warning" as ReferenceTone) : ("default" as ReferenceTone),
+        value: `${usagePercent}%`
+      },
+      {
+        helper: "首頁或圖片庫預設焦點素材",
+        icon: "sun" as ReferenceGlyphName,
+        id: "cover",
+        subtitle: "Cover Asset",
+        title: "封面圖片",
+        tone: coverAsset ? ("accent" as ReferenceTone) : ("muted" as ReferenceTone),
+        value: coverAsset ? buildAssetTitle(coverAsset) : "尚未指定"
+      }
+    ],
     summary: {
       coverLabel: coverAsset ? buildAssetTitle(coverAsset) : "尚未指定",
       slideshowCount,

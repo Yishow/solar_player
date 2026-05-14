@@ -1,0 +1,275 @@
+/* Energy trend summary — reference 06 absolute layout on FHD content area (1920 × 838).
+ * Hero copy + leaf watermark on top half, 5 trend chart cards across the lower half.
+ */
+
+.et-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 838px;
+  font-family: var(--font-family-zh);
+  color: var(--ink);
+}
+
+/* === hero title === */
+.et-page .et-title {
+  position: absolute;
+}
+
+.et-page .et-title h2 {
+  margin: 0;
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  line-height: 1.05;
+  color: var(--ink-strong);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.et-page .et-title h2 em {
+  font-style: normal;
+  color: var(--green);
+}
+
+.et-page .et-title p {
+  margin: 12px 0 0;
+  font: 400 20px/1 var(--font-family-en);
+  letter-spacing: 0.04em;
+  color: #5c615f;
+}
+
+.et-page .et-copy {
+  position: absolute;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.85;
+  font-weight: 500;
+  color: #565d59;
+}
+
+.et-page .et-leaf {
+  position: absolute;
+  opacity: 0.62;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 190'%3E%3Cpath d='M12 120 C76 92 144 93 205 116 C274 142 351 143 432 111 C466 97 496 76 528 49' fill='none' stroke='%23d6c59a' stroke-width='2' stroke-linecap='round' opacity='.72'/%3E%3Cg fill='%239caf74' fill-opacity='.18'%3E%3Cpath d='M203 96 C229 39 280 18 346 21 C330 85 286 127 226 129 C210 119 203 107 203 96Z'/%3E%3Cpath d='M155 118 C173 78 210 63 258 69 C246 113 214 143 173 143 C161 136 155 127 155 118Z'/%3E%3Cpath d='M286 127 C300 95 329 81 367 85 C357 118 331 143 298 145 C290 139 286 133 286 127Z'/%3E%3Cpath d='M257 148 C270 122 293 111 323 114 C316 138 296 156 269 159 C262 155 257 151 257 148Z'/%3E%3C/g%3E%3Cg stroke='%23ffffff' stroke-opacity='.55' stroke-width='1.2' fill='none'%3E%3Cpath d='M242 121 C270 89 297 57 329 27'/%3E%3Cpath d='M186 135 C210 113 229 91 250 69'/%3E%3Cpath d='M308 139 C320 123 335 106 351 89'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* === tabs === */
+.et-page .et-tabs {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(98, 105, 86, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 252, 245, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.et-page .et-tabs button {
+  flex: 1;
+  height: 50px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #50534e;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.et-page .et-tabs button.active {
+  background: linear-gradient(180deg, #6a9158, #577f46);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* === refresh marker (top-right status pill) === */
+.et-page .et-refresh {
+  position: absolute;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  border: 1px solid rgba(92, 133, 75, 0.28);
+  border-radius: 12px;
+  background: rgba(232, 240, 226, 0.7);
+  color: #4c7540;
+  box-shadow: var(--shadow-soft);
+}
+
+.et-page .et-refresh-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(92, 133, 75, 0.18);
+  color: var(--green);
+  display: grid;
+  place-items: center;
+}
+
+.et-page .et-refresh span {
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+  flex: 1;
+}
+
+.et-page .et-refresh small {
+  display: block;
+  margin-top: 2px;
+  font: 400 11px/1 var(--font-family-en);
+  opacity: 0.7;
+  letter-spacing: 0.04em;
+}
+
+.et-page .et-refresh.is-error {
+  background: rgba(254, 230, 230, 0.72);
+  border-color: rgba(193, 74, 74, 0.32);
+  color: #c14a4a;
+}
+.et-page .et-refresh.is-error .et-refresh-icon { background: rgba(193, 74, 74, 0.16); color: #c14a4a; }
+.et-page .et-refresh.is-loading {
+  background: rgba(252, 240, 217, 0.75);
+  border-color: rgba(201, 136, 26, 0.32);
+  color: #c9881a;
+}
+.et-page .et-refresh.is-loading .et-refresh-icon { background: rgba(232, 158, 30, 0.18); color: #c9881a; }
+
+/* === trend cards === */
+.et-page .et-card {
+  position: absolute;
+  border: 1px solid rgba(98, 105, 86, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow:
+    0 16px 30px rgba(95, 84, 58, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+}
+
+.et-page .et-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 34%);
+  pointer-events: none;
+}
+
+.et-page .et-card-icon {
+  position: absolute;
+  left: 22px;
+  top: 22px;
+  width: 56px;
+  height: 56px;
+  border: 1.6px solid rgba(93, 133, 74, 0.6);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--green);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+.et-page .et-card-icon.is-accent {
+  color: var(--accent);
+  border-color: rgba(241, 162, 26, 0.65);
+}
+
+.et-page .et-card-title {
+  position: absolute;
+  left: 90px;
+  top: 30px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-strong);
+}
+
+.et-page .et-card-title small {
+  display: block;
+  margin-top: 4px;
+  font: 400 12px/1.1 var(--font-family-en);
+  color: #6f766f;
+  letter-spacing: 0.04em;
+}
+
+.et-page .et-card-value {
+  position: absolute;
+  left: 30px;
+  top: 110px;
+  font: 700 52px/1 var(--font-family-en);
+  color: #4f6745;
+  letter-spacing: 1px;
+}
+
+.et-page .et-card-value small {
+  margin-left: 8px;
+  font: 400 18px/1 var(--font-family-en);
+  color: #525851;
+}
+
+.et-page .et-axis-labels {
+  position: absolute;
+  left: 18px;
+  bottom: 70px;
+  width: 36px;
+  height: 138px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font: 400 11px/1 var(--font-family-en);
+  color: #646963;
+}
+
+.et-page .et-axis-times {
+  position: absolute;
+  left: 58px;
+  right: 18px;
+  bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  font: 400 11px/1 var(--font-family-en);
+  color: #646963;
+}
+
+.et-page .et-chart-svg {
+  position: absolute;
+  left: 58px;
+  bottom: 60px;
+  width: 230px;
+  height: 170px;
+}
+
+.et-page .et-chart-svg line {
+  stroke: rgba(107, 109, 98, 0.18);
+}
+
+.et-page .et-chart-svg polyline {
+  fill: none;
+  stroke: var(--green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
+}
+
+.et-page .et-empty {
+  position: absolute;
+  left: 58px;
+  bottom: 60px;
+  display: grid;
+  place-items: center;
+  width: 230px;
+  height: 170px;
+  border: 1px dashed rgba(93, 133, 74, 0.32);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #7b8277;
+  font-size: 13px;
+}

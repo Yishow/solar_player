@@ -3,13 +3,21 @@ type PageNumberPillProps = {
   total: number;
 };
 
-export function PageNumberPill({ current, total }: PageNumberPillProps) {
+function pad(value: number) {
+  return value.toString().padStart(2, "0");
+}
+
+export function PageNumberPill({ current, total: _total }: PageNumberPillProps) {
   return (
     <div
       data-shell-primitive="page-number-pill"
-      className="inline-flex items-center rounded-full bg-brand-900 px-4 py-2 font-en text-sm font-semibold tracking-[0.24em] text-white shadow-card"
+      className="flex h-[42px] w-[90px] items-center justify-center rounded-[22px] font-en text-[21px] font-semibold text-white"
+      style={{
+        background: "var(--shell-number-pill-bg)",
+        boxShadow: "var(--shell-number-pill-shadow)"
+      }}
     >
-      {current}/{total}
+      {pad(current)}
     </div>
   );
 }

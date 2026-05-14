@@ -20,6 +20,7 @@ export function TitleBlock({
   return (
     <div
       data-shell-density={density}
+      data-shell-role="management"
       data-shell-primitive="title-block"
       className="flex items-start justify-between gap-4"
     >

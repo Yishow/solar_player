@@ -18,12 +18,13 @@ export function PageScaffold({ path, description, children }: PageScaffoldProps)
   return (
     <PageContainer
       density={routeMeta.shellDensity}
+      shellPrimitive="management-scaffold"
       title={routeMeta.title}
       subtitle={routeMeta.subtitle}
       description={description}
       aside={<PageNumberPill current={routeMeta.order} total={routeMetaList.length} />}
     >
-      <div className="grid gap-6">{children}</div>
+      {children}
     </PageContainer>
   );
 }

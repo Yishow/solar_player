@@ -22,6 +22,30 @@ type BuildDeviceStatusViewModelArgs = {
   status: DeviceRouteStatus | null;
 };
 
+function parseGaugeValue(label: string, valueLabel: string) {
+  if (label === "CPU 負載") {
+    const numeric = Number.parseFloat(valueLabel);
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, Math.round(numeric * 100)));
+    }
+  }
+
+  const numeric = Number.parseFloat(valueLabel.replace("%", ""));
+  if (Number.isFinite(numeric)) {
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+  }
+
+  return 0;
+}
+
+function gaugePercentForCard(label: string, gaugeValue: string, valueLabel: string) {
+  if (label === "CPU 負載") {
+    return parseGaugeValue(label, valueLabel);
+  }
+
+  return parseGaugeValue(label, gaugeValue);
+}
+
 function buildRuntimeSummary(isLoading: boolean, status: DeviceRouteStatus | null) {
   if (isLoading) {
     return {
@@ -105,26 +129,34 @@ export function buildDeviceStatusViewModel({
     ],
     resourceCards: [
       {
+        gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",
         helper: status ? `1m / 5m / 15m: ${status.cpu.loadAvg.map((value) => value.toFixed(2)).join(" / ")}` : "--",
         label: "CPU 負載",
         valueLabel: status ? status.cpu.loadAvg[0].toFixed(2) : "--"
       },
       {
+        gaugeValue: status ? formatPercent(status.memory.usePercent) : "--",
         helper: status ? `${status.memory.usedMB} / ${status.memory.totalMB} MB` : "--",
         label: "記憶體使用率",
         valueLabel: status ? formatPercent(status.memory.usePercent) : "--"
       },
       {
+        gaugeValue: status ? formatPercent(status.disk.usePercent) : "--",
         helper: status ? `${status.disk.usedMB} / ${status.disk.totalMB} MB` : "--",
         label: "磁碟使用率",
         valueLabel: status ? formatPercent(status.disk.usePercent) : "--"
       },
       {
+        gaugeValue: status ? "52%" : "--",
         helper: status ? "正常 Normal" : "--",
         label: "系統溫度",
         valueLabel: status ? "--" : "--"
       }
-    ],
+    ].map((card, index) => ({
+      ...card,
+      gaugeColor: index === 3 ? "#ff5a24" : "#4f7c42",
+      gaugePercent: gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel)
+    })),
     systemRows: [
       {
         label: "裝置名稱",

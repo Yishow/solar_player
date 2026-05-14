@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { KioskButton } from "../../components/KioskButton";
-import { KioskInput } from "../../components/KioskInput";
-import { PanelCard } from "../../components/PanelCard";
-import { StatusBadge } from "../../components/StatusBadge";
 import { requestJson } from "../../services/api";
-import { PageScaffold } from "../shared/PageScaffold";
+import "./mqttSettings.css";
 import {
   buildMqttSettingsViewModel,
   type ActionState,
@@ -61,24 +57,6 @@ const defaultFormState: MqttSettingsForm = {
   username: ""
 };
 
-function SummaryCard({
-  helper,
-  label,
-  value
-}: {
-  helper: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <article className="rounded-[28px] border border-white/75 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(241,246,235,0.82))] p-5 shadow-card">
-      <p className="text-sm font-medium tracking-[0.08em] text-neutral-600">{label}</p>
-      <p className="mt-3 text-3xl font-bold leading-tight text-brand-900">{value}</p>
-      <p className="mt-3 text-sm text-neutral-500">{helper}</p>
-    </article>
-  );
-}
-
 function toFormState(settings: MqttSettingsResponse["settings"]): MqttSettingsForm {
   return {
     clientId: settings.clientId,
@@ -121,6 +99,25 @@ function createEmptyMapping(metricKey: string): TopicMapping {
   };
 }
 
+type ConnStatusVariant = "is-connected" | "is-warning" | "is-error";
+
+function resolveConnStatus(args: {
+  feedbackTone: string;
+  feedbackVisualTone: string;
+  statusTone: "connected" | "connecting" | "disconnected";
+}): ConnStatusVariant {
+  if (args.feedbackVisualTone === "danger" || args.feedbackTone === "error") {
+    return "is-error";
+  }
+  if (args.statusTone === "connected") {
+    return "is-connected";
+  }
+  if (args.statusTone === "disconnected") {
+    return "is-error";
+  }
+  return "is-warning";
+}
+
 export function MqttSettings() {
   const [settings, setSettings] = useState<MqttSettingsForm>(defaultFormState);
   const [status, setStatus] = useState<MqttStatus>({
@@ -143,9 +140,7 @@ export function MqttSettings() {
 
   const metricOptions = useMemo(() => {
     const optionSet = new Set<string>(defaultMetricOptions);
-    topics.forEach((topic) => {
-      optionSet.add(topic.metricKey);
-    });
+    topics.forEach((topic) => optionSet.add(topic.metricKey));
     return [...optionSet];
   }, [topics]);
 
@@ -157,7 +152,6 @@ export function MqttSettings() {
 
   const loadSettings = async () => {
     setActionState((current) => ({ ...current, isLoadingSettings: true }));
-
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt");
       setSettings(toFormState(response.settings));
@@ -176,7 +170,6 @@ export function MqttSettings() {
     if (!isPolling) {
       setActionState((current) => ({ ...current, isLoadingTopics: true }));
     }
-
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics");
       setTopics(response.topics);
@@ -198,15 +191,13 @@ export function MqttSettings() {
 
   useEffect(() => {
     let active = true;
-
     const bootstrap = async () => {
       try {
         await Promise.all([loadSettings(), loadTopics(false)]);
       } catch {
-        // individual loaders already set visible errors
+        // individual loaders surface their own errors
       }
     };
-
     void bootstrap();
 
     const pollTimer = window.setInterval(() => {
@@ -226,10 +217,7 @@ export function MqttSettings() {
     value: MqttSettingsForm[Key]
   ) => {
     markDirty("Broker 設定已變更，尚未儲存。");
-    setSettings((current) => ({
-      ...current,
-      [key]: value
-    }));
+    setSettings((current) => ({ ...current, [key]: value }));
   };
 
   const handleTopicChange = <Key extends keyof TopicMapping>(
@@ -239,26 +227,17 @@ export function MqttSettings() {
   ) => {
     markDirty("Topic mappings 已變更，尚未儲存。");
     setTopics((current) =>
-      current.map((topic) =>
-        topic.id === rowId
-          ? {
-              ...topic,
-              [key]: value
-            }
-          : topic
-      )
+      current.map((topic) => (topic.id === rowId ? { ...topic, [key]: value } : topic))
     );
   };
 
   const saveSettings = async () => {
     setActionState((current) => ({ ...current, isSavingSettings: true }));
-
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt", {
         body: JSON.stringify(buildSettingsPayload(settings)),
         method: "PUT"
       });
-
       setSettings(toFormState(response.settings));
       setStatus(response.status);
       setLastConnectionTest(null);
@@ -273,7 +252,6 @@ export function MqttSettings() {
 
   const testConnection = async () => {
     setActionState((current) => ({ ...current, isTestingConnection: true }));
-
     try {
       const response = await requestJson<{
         connected: boolean;
@@ -283,12 +261,8 @@ export function MqttSettings() {
         body: JSON.stringify(buildSettingsPayload(settings)),
         method: "POST"
       });
-
       setStatus(response.status);
-      setLastConnectionTest({
-        connected: response.connected,
-        message: response.message
-      });
+      setLastConnectionTest({ connected: response.connected, message: response.message });
       setMessage(response.message);
       setErrorMessage("");
     } catch (error) {
@@ -301,7 +275,6 @@ export function MqttSettings() {
 
   const saveTopicMappings = async () => {
     setActionState((current) => ({ ...current, isSavingTopics: true }));
-
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics", {
         body: JSON.stringify({
@@ -315,7 +288,6 @@ export function MqttSettings() {
         }),
         method: "PUT"
       });
-
       setTopics(response.topics);
       setLastConnectionTest(null);
       setMessage("Topic mappings 已更新並重新載入訂閱。");
@@ -329,12 +301,10 @@ export function MqttSettings() {
 
   const reloadTopics = async () => {
     setActionState((current) => ({ ...current, isReloadingTopics: true }));
-
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/reload", {
         method: "POST"
       });
-
       setTopics(response.topics);
       setLastConnectionTest(null);
       setMessage("MQTT 訂閱清單已重新載入。");
@@ -347,14 +317,10 @@ export function MqttSettings() {
   };
 
   const addTopicMapping = () => {
-    const nextMetricKey = metricOptions.find(
-      (option) => !topics.some((topic) => topic.metricKey === option)
-    ) ?? metricOptions[0];
-
-    if (!nextMetricKey) {
-      return;
-    }
-
+    const nextMetricKey =
+      metricOptions.find((option) => !topics.some((topic) => topic.metricKey === option)) ??
+      metricOptions[0];
+    if (!nextMetricKey) return;
     markDirty("已新增一筆 topic mapping，尚未儲存。");
     setTopics((current) => [...current, createEmptyMapping(nextMetricKey)]);
   };
@@ -374,344 +340,238 @@ export function MqttSettings() {
     topics
   });
 
+  const connStatusVariant = resolveConnStatus({
+    feedbackTone: viewModel.feedbackBanner.tone,
+    feedbackVisualTone: viewModel.feedbackBanner.visualTone,
+    statusTone: viewModel.connection.statusTone
+  });
+
   return (
-    <PageScaffold
-      path="/settings/mqtt"
-      description="管理 MQTT / Mock 資料來源、broker 連線與 topic 對應，並提供最後收值預覽。"
-    >
-      <div className="grid grid-cols-4 gap-4">
-        <SummaryCard
-          label="資料模式"
-          value={viewModel.summary.modeLabel}
-          helper="切換 MQTT 或 Mock，維持同一組展示資料契約"
-        />
-        <SummaryCard
-          label="映射總數"
-          value={String(viewModel.summary.totalTopicCount)}
-          helper="目前 topic mapping 列數"
-        />
-        <SummaryCard
-          label="已啟用 Topic"
-          value={String(viewModel.summary.enabledTopicCount)}
-          helper="會進入播放器資料流的 topic 數量"
-        />
-        <SummaryCard
-          label="即時收值"
-          value={String(viewModel.summary.connectedTopicCount)}
-          helper="最近有收到訊息的 topic 數量"
-        />
-      </div>
+    <div className="mqtt-settings-page">
+      <section className="mqtt-title">
+        <h1>
+          資料來源與 <em>MQTT</em> 設定
+        </h1>
+        <p>Data Source &amp; MQTT Settings</p>
+      </section>
 
-      <div className="grid grid-cols-12 gap-6">
-        <PanelCard title="Broker 設定" subtitle="MQTT BROKER" className="col-span-4">
-          <div className="mb-5">
-            <p className="mb-2 text-sm font-medium text-neutral-600">Data Mode</p>
-            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/70 bg-white/72 p-2">
-              {(["mqtt", "mock"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => handleSettingChange("dataMode", mode)}
-                  className={[
-                    "rounded-xl px-4 py-3 text-base font-semibold transition-colors",
-                    settings.dataMode === mode
-                      ? "bg-brand-900 text-white shadow-card"
-                      : "bg-white/70 text-neutral-600"
-                  ].join(" ")}
-                >
-                  {mode === "mqtt" ? "MQTT" : "Mock"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <KioskInput
-              label="Broker 主機"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              value={settings.host}
-              onChange={(event) => handleSettingChange("host", event.target.value)}
-            />
-            <KioskInput
-              label="連接埠"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              inputMode="numeric"
-              value={settings.port}
-              onChange={(event) => handleSettingChange("port", event.target.value)}
-            />
-            <KioskInput
-              label="Client ID"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              value={settings.clientId}
-              onChange={(event) => handleSettingChange("clientId", event.target.value)}
-            />
-            <KioskInput
-              label="使用者名稱"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              value={settings.username}
-              onChange={(event) => handleSettingChange("username", event.target.value)}
-            />
-            <KioskInput
-              label="密碼"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              type="password"
-              value={settings.password}
-              onChange={(event) => handleSettingChange("password", event.target.value)}
-            />
-            <KioskInput
-              label="重新連線間隔 (ms)"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              inputMode="numeric"
-              value={settings.reconnectInterval}
-              onChange={(event) => handleSettingChange("reconnectInterval", event.target.value)}
-            />
-            <KioskInput
-              label="訊息逾時 (sec)"
-              disabled={actionState.isLoadingSettings || actionState.isSavingSettings}
-              inputMode="numeric"
-              value={settings.messageTimeout}
-              onChange={(event) => handleSettingChange("messageTimeout", event.target.value)}
-              className="col-span-2"
-            />
-          </div>
-        </PanelCard>
+      <button
+        type="button"
+        className="mgmt-action mqtt-test-conn"
+        disabled={viewModel.actions.testConnectionDisabled}
+        onClick={() => void testConnection()}
+      >
+        {viewModel.actions.testConnectionLabel}
+        <small>Test Connection</small>
+      </button>
+      <button
+        type="button"
+        className="mgmt-action primary mqtt-save"
+        disabled={viewModel.actions.saveSettingsDisabled}
+        onClick={() => void saveSettings()}
+      >
+        {viewModel.actions.saveSettingsLabel}
+        <small>Save Settings</small>
+      </button>
 
-        <PanelCard title="即時 Topic 清單" subtitle="LIVE TOPIC LIST" className="col-span-4">
-          <div className="grid gap-3">
-            {viewModel.topicRows.map((topic) => (
-              <div
-                key={`live-topic-${topic.id}`}
-                className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-soft"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-800">{topic.topic || "未設定 topic"}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-neutral-500">{topic.metricKey}</p>
-                  </div>
-                  <StatusBadge status={topic.runtimeTone} label={topic.runtimeLabel} />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-900">
-                    {topic.enabledLabel}
-                  </span>
-                  <span className="rounded-full bg-neutral-100 px-3 py-1 font-semibold text-neutral-600">
-                    {topic.unit || "unit --"}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm text-neutral-500">最後收值：{topic.lastReceivedLabel}</p>
-              </div>
-            ))}
-            {viewModel.topicRows.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-brand-200 bg-brand-50/55 px-6 py-10 text-center text-neutral-500">
-                尚未建立 topic mapping。
-              </div>
-            ) : null}
-          </div>
-        </PanelCard>
+      {/* mode + broker fields card */}
+      <section className="settings-card mqtt-mode">
+        <div className="settings-card__title">
+          資料來源模式
+          <small>Data Mode</small>
+        </div>
 
-        <PanelCard title="連線與操作" subtitle="ACTION AREA" className="col-span-4">
-          <div
-            className={[
-              "rounded-2xl border p-5 shadow-soft",
-              viewModel.feedbackBanner.tone === "error"
-                ? "border-[rgba(230,0,18,0.18)] bg-[rgba(255,241,241,0.92)]"
-                : viewModel.feedbackBanner.tone === "testing"
-                  ? "border-[rgba(224,161,42,0.2)] bg-[rgba(255,247,229,0.92)]"
-                  : viewModel.feedbackBanner.tone === "saving"
-                    ? "border-[rgba(78,121,55,0.18)] bg-[rgba(244,248,239,0.92)]"
-                    : viewModel.feedbackBanner.tone === "loading"
-                      ? "border-[rgba(138,148,132,0.18)] bg-[rgba(249,249,247,0.92)]"
-                      : "border-[rgba(78,121,55,0.18)] bg-[rgba(244,248,239,0.92)]"
-            ].join(" ")}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xl font-semibold text-neutral-800">{viewModel.feedbackBanner.title}</p>
-                <p className="mt-2 text-sm leading-6 text-neutral-600">{viewModel.feedbackBanner.detail}</p>
-              </div>
-              <StatusBadge status={viewModel.connection.statusTone} label={viewModel.connection.statusLabel} />
-            </div>
-          </div>
-          <div className="mt-4 grid gap-4">
-            <div className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-soft">
-              <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">Broker</p>
-              <p className="mt-2 text-lg font-semibold text-neutral-800">{viewModel.connection.brokerLabel}</p>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-soft">
-              <p className="text-sm font-medium tracking-[0.08em] text-neutral-500">Client ID</p>
-              <p className="mt-2 text-lg font-semibold text-neutral-800">{viewModel.connection.clientIdLabel}</p>
-            </div>
-            <div className="grid gap-3">
-              <KioskButton onClick={() => void testConnection()} disabled={viewModel.actions.testConnectionDisabled}>
-                {viewModel.actions.testConnectionLabel}
-              </KioskButton>
-              <KioskButton
-                variant="secondary"
-                onClick={() => void saveSettings()}
-                disabled={viewModel.actions.saveSettingsDisabled}
-              >
-                {viewModel.actions.saveSettingsLabel}
-              </KioskButton>
-              <KioskButton
-                variant="ghost"
-                onClick={() => void reloadTopics()}
-                disabled={viewModel.actions.reloadTopicsDisabled}
-              >
-                {viewModel.actions.reloadTopicsLabel}
-              </KioskButton>
-            </div>
-          </div>
-        </PanelCard>
-      </div>
-
-      <PanelCard title="Topic 對應設定" subtitle="TOPIC MAPPING">
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-neutral-500">
-              將 metric key 對應到 topic、unit 與 payload value path。value path 留空時預設讀取 `value`。
-            </p>
-            <p className="mt-1 text-sm text-neutral-500">
-              這裡的修改會影響播放器 live metrics 與 MQTT smoke feedback。
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <KioskButton variant="ghost" onClick={addTopicMapping}>
-              新增 mapping
-            </KioskButton>
-            <KioskButton
-              onClick={() => void saveTopicMappings()}
-              disabled={viewModel.actions.saveMappingsDisabled}
+        <div className="seg" role="tablist">
+          {viewModel.modeOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={option.isActive}
+              className={option.isActive ? "active" : ""}
+              onClick={() => handleSettingChange("dataMode", option.value)}
             >
-              {viewModel.actions.saveMappingsLabel}
-            </KioskButton>
-          </div>
+              {option.label}
+            </button>
+          ))}
         </div>
 
-        <div className="overflow-x-auto rounded-[28px] border border-white/70 bg-white/78">
-          <table className="min-w-full text-left text-sm text-neutral-700">
-            <thead className="border-b border-neutral-200 bg-white/95 text-xs uppercase tracking-[0.18em] text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">Metric Key</th>
-                <th className="px-4 py-3">Topic</th>
-                <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">Value Path</th>
-                <th className="px-4 py-3">狀態</th>
-                <th className="px-4 py-3">最後收值</th>
-                <th className="px-4 py-3">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {viewModel.topicRows.map((topic) => (
-                <tr key={topic.id} className="border-b border-neutral-100 last:border-b-0">
-                  <td className="px-4 py-3">
-                    <select
-                      value={topic.metricKey}
-                      onChange={(event) => handleTopicChange(topic.id, "metricKey", event.target.value)}
-                      className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm shadow-soft outline-none focus:border-brand-500"
-                    >
-                      {metricOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      value={topic.topic}
-                      onChange={(event) => handleTopicChange(topic.id, "topic", event.target.value)}
-                      className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm shadow-soft outline-none focus:border-brand-500"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      value={topic.unit}
-                      onChange={(event) => handleTopicChange(topic.id, "unit", event.target.value)}
-                      className="h-11 w-24 rounded-xl border border-neutral-200 bg-white px-3 text-sm shadow-soft outline-none focus:border-brand-500"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      value={topic.valuePath}
-                      onChange={(event) => handleTopicChange(topic.id, "valuePath", event.target.value)}
-                      placeholder="$.value"
-                      className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm shadow-soft outline-none focus:border-brand-500"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={topic.runtimeTone} label={topic.runtimeLabel} />
-                      <button
-                        type="button"
-                        onClick={() => handleTopicChange(topic.id, "enabled", !topic.enabled)}
-                        className={[
-                          "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition-colors",
-                          topic.enabled
-                            ? "bg-[rgba(35,122,34,0.14)] text-[var(--color-status-success-500)]"
-                            : "bg-neutral-200 text-neutral-500"
-                        ].join(" ")}
-                      >
-                        {topic.enabledLabel}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-neutral-500">{topic.lastReceivedLabel}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => removeTopicMapping(topic.id)}
-                      className="text-sm font-semibold text-[var(--color-status-error-500)]"
-                    >
-                      移除
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {viewModel.topicRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-neutral-500">
-                    尚無 topic mappings。
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="broker-fields">
+          {viewModel.brokerFields.map((field) => (
+            <label key={field.key} className="text-field">
+              <span className="field-label">{field.label}</span>
+              <input
+                type={field.type}
+                disabled={field.disabled}
+                inputMode={field.inputMode === "numeric" ? "numeric" : undefined}
+                value={field.value}
+                onChange={(event) =>
+                  handleSettingChange(
+                    field.key as keyof MqttSettingsForm,
+                    event.target.value as MqttSettingsForm[keyof MqttSettingsForm]
+                  )
+                }
+              />
+            </label>
+          ))}
         </div>
-      </PanelCard>
 
-      <PanelCard title="即時資料預覽" subtitle="LIVE DATA PREVIEW">
-        {viewModel.emptyState ? (
-          <div className="rounded-[28px] border border-dashed border-brand-200 bg-brand-50/60 px-6 py-10 text-center">
-            <p className="text-2xl font-semibold text-brand-900">{viewModel.emptyState.title}</p>
-            <p className="mt-3 text-sm leading-6 text-neutral-600">{viewModel.emptyState.description}</p>
+        <div className={`conn-status ${connStatusVariant}`} role="status">
+          <span className="conn-status__dot" aria-hidden />
+          {viewModel.feedbackBanner.title}
+          <small>{viewModel.feedbackBanner.detail}</small>
+        </div>
+      </section>
+
+      {/* live topic list */}
+      <section className="settings-card mqtt-topic">
+        <div className="settings-card__title">
+          即時 Topic 清單
+          <small>Live Topic List</small>
+        </div>
+
+        {viewModel.liveTopicRows.length === 0 ? (
+          <div className="empty-block">
+            尚未建立 topic mapping，新增後這裡會顯示 broker 的即時收值。
           </div>
         ) : (
-          <div className="grid grid-cols-12 gap-4">
-            {viewModel.previewCards.map((topic) => (
-              <article
-                key={`preview-${topic.id}`}
-                className="col-span-4 rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-soft"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">{topic.metricKey}</p>
-                    <p className="mt-2 text-sm text-neutral-500">{topic.topicLabel}</p>
-                  </div>
-                  <StatusBadge status={topic.runtimeTone} label={topic.runtimeLabel} />
+          <div className="topic-list">
+            {viewModel.liveTopicRows.map((topic) => {
+              const dotState = !topic.enabled
+                ? "is-disabled"
+                : topic.runtimeTone === "connected"
+                  ? ""
+                  : "is-idle";
+              return (
+                <div className="topic-row" key={`live-${topic.id}`}>
+                  <span className={`topic-row__dot ${dotState}`} aria-hidden />
+                  <div className="topic-row__topic">{topic.topic || "未設定 topic"}</div>
+                  <small className="topic-row__meta">
+                    {topic.metricLabelZh}　·　{topic.runtimeLabel}　·　最後收值 {topic.lastReceivedLabel}
+                  </small>
                 </div>
-                <p className="mt-5 text-4xl font-semibold text-brand-900">
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* topic mapping editor */}
+      <section className="settings-card mqtt-map">
+        <div className="settings-card__title">
+          Topic 對應設定
+          <small>Topic Mapping</small>
+        </div>
+
+        <div className="map-list">
+          {viewModel.mappingRows.length === 0 ? (
+            <div className="empty-block">尚未設定任何 topic mapping。</div>
+          ) : (
+            viewModel.mappingRows.map((topic) => (
+              <div className="map-row" key={`map-${topic.id}`}>
+                <label className="map-row__label">
+                  {topic.metricLabelZh}
+                  <small>{topic.metricLabelEn}</small>
+                </label>
+                <div className="map-row__fields">
+                  <input
+                    type="text"
+                    placeholder="topic"
+                    value={topic.topic}
+                    onChange={(event) => handleTopicChange(topic.id, "topic", event.target.value)}
+                  />
+                  <input
+                    type="text"
+                    placeholder="unit"
+                    value={topic.unit}
+                    onChange={(event) => handleTopicChange(topic.id, "unit", event.target.value)}
+                  />
+                </div>
+                <div className="map-row__controls">
+                  <label className="map-row__toggle">
+                    <input
+                      type="checkbox"
+                      checked={topic.enabled}
+                      onChange={(event) => handleTopicChange(topic.id, "enabled", event.target.checked)}
+                    />
+                    啟用 ({topic.enabledLabel})
+                  </label>
+                  <button
+                    type="button"
+                    className="map-row__remove"
+                    onClick={() => removeTopicMapping(topic.id)}
+                  >
+                    移除
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="map-actions">
+          <button type="button" className="map-add" onClick={addTopicMapping}>
+            ＋ 新增 mapping
+          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="map-add"
+              disabled={viewModel.actions.reloadTopicsDisabled}
+              onClick={() => void reloadTopics()}
+            >
+              {viewModel.actions.reloadTopicsLabel}
+            </button>
+            <button
+              type="button"
+              className="map-save"
+              disabled={viewModel.actions.saveMappingsDisabled}
+              onClick={() => void saveTopicMappings()}
+            >
+              {viewModel.actions.saveMappingsLabel}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* live data preview */}
+      <section className="settings-card mqtt-preview">
+        <div className="settings-card__title">
+          即時資料預覽
+          <small>Live Data Preview</small>
+        </div>
+
+        {viewModel.emptyState ? (
+          <div className="empty-block">
+            {viewModel.emptyState.title}
+            <br />
+            <span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>
+              {viewModel.emptyState.description}
+            </span>
+          </div>
+        ) : (
+          <div className="preview-list">
+            {viewModel.previewCards.map((topic) => (
+              <div className="preview-row" key={`preview-${topic.id}`}>
+                <span
+                  className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`}
+                  aria-hidden
+                />
+                <label className="preview-row__label">
+                  {topic.metricLabelZh}
+                  <small>{topic.metricLabelEn}</small>
+                </label>
+                <b className="preview-row__value">
                   {topic.valueLabel}
-                  <span className="ml-2 text-lg text-neutral-500">{topic.unitLabel}</span>
-                </p>
-                <p className="mt-3 text-sm text-neutral-500">{topic.qualityLabel}</p>
-                <p className="mt-1 text-sm text-neutral-500">最後收值：{topic.lastReceivedLabel}</p>
-                <p className="mt-3 rounded-xl bg-neutral-100 px-3 py-2 font-mono text-xs text-neutral-600">
-                  {topic.payloadLabel}
-                </p>
-              </article>
+                  <small>{topic.unitLabel || "--"}</small>
+                </b>
+              </div>
             ))}
           </div>
         )}
-      </PanelCard>
-    </PageScaffold>
+
+        <p className="last-update">最後更新時間 {viewModel.connection.lastUpdateLabel}</p>
+      </section>
+    </div>
   );
 }

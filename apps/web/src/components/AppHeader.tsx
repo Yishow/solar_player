@@ -16,11 +16,18 @@ function pad(value: number) {
 }
 
 function formatTime(now: Date) {
-  return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
 function formatDate(now: Date) {
-  return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}`;
+  return `${now.getFullYear()} / ${pad(now.getMonth() + 1)} / ${pad(now.getDate())}`;
+}
+
+const WEEKDAY_ZH = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+const WEEKDAY_EN = ["Sun.", "Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat."];
+
+function defaultWeekday(now: Date) {
+  return `${WEEKDAY_ZH[now.getDay()]}  ${WEEKDAY_EN[now.getDay()]}`;
 }
 
 type AppHeaderProps = {
@@ -40,52 +47,118 @@ export function AppHeader({ meta }: AppHeaderProps) {
     };
   }, []);
 
+  const timeLabel = meta?.time ?? formatTime(now);
+  const dateLabel = meta?.date ?? formatDate(now);
+  const weekdayLabel = meta?.weekday ?? defaultWeekday(now);
+
   return (
     <header
       data-shell-primitive="app-header"
-      className="relative shrink-0 overflow-hidden border-b border-white/70 bg-white/68 backdrop-blur"
+      className="shell-header-bar relative flex h-[var(--header-height)] w-full shrink-0 items-stretch"
     >
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent-sun-500/60 to-transparent" />
-      <div className="flex h-[var(--header-height)] w-full items-center justify-between px-page-x">
-        <div className="flex items-center gap-5">
-          <div className="flex h-[var(--header-logo-size)] w-[var(--header-logo-size)] items-center justify-center rounded-full bg-brand-900 shadow-card">
-            <LeafOrnament className="h-9 w-12" />
+      <div className="flex w-full items-center pl-[34px] pr-[40px]">
+        {/* Brand cluster */}
+        <div className="flex items-center gap-[15px]">
+          <div className="flex h-[68px] w-[68px] items-center justify-center">
+            <LeafOrnament className="h-[52px] w-[60px]" />
           </div>
-          <div>
-            <h1 className="text-[30px] font-bold tracking-[0.04em] text-brand-900">
-              國瑞汽車中廠綠能展示播放器
-            </h1>
-            <p className="mt-2 font-en text-sm uppercase tracking-[0.24em] text-brand-700">
-              Kuozui Green Energy Display Player
-            </p>
+          <div className="leading-none">
+            <div
+              className="text-[35px] font-extrabold tracking-[0.11em]"
+              style={{ color: "var(--ink-strong)" }}
+            >
+              國瑞汽車
+            </div>
+            <div
+              className="mt-[10px] font-en text-[15px] font-bold tracking-[0.34em]"
+              style={{ color: "var(--ink-strong)" }}
+            >
+              KUOZUI MOTORS
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="rounded-xl border border-white/70 bg-white/86 px-5 py-4 shadow-soft">
-            <p className="font-en text-[var(--header-time-font-size)] font-semibold leading-none text-brand-900">
-              {meta?.time ?? formatTime(now)}
-            </p>
-            <p className="mt-2 text-right text-lg font-medium text-neutral-700">
-              {meta?.date ?? formatDate(now)}
-            </p>
-            {meta?.weekday ? (
-              <p className="mt-1 text-right font-en text-sm tracking-[0.16em] text-neutral-500">
-                {meta.weekday}
-              </p>
-            ) : null}
+
+        {/* Brand → product divider */}
+        <div
+          aria-hidden
+          className="mx-[30px] h-[58px] w-px"
+          style={{ background: "var(--shell-divider-brand)" }}
+        />
+
+        {/* Product title */}
+        <div className="leading-none">
+          <div
+            className="text-[22px] font-semibold tracking-[0.32em]"
+            style={{ color: "var(--ink-strong)" }}
+          >
+            國瑞汽車中廠綠能展示播放器
           </div>
-          <div className="min-w-[220px] rounded-xl border border-white/70 bg-white/86 px-5 py-4 shadow-soft">
-            <p className="font-en text-xs uppercase tracking-[0.24em] text-neutral-500">Environment</p>
-            <div className="mt-3 flex items-center justify-between gap-4">
-              <p className="text-2xl font-semibold text-brand-900">{meta?.weather ?? "26°C ☀️"}</p>
-              <StatusBadge
-                status={meta?.status ?? "connected"}
-                label={meta?.statusLabel ?? "MQTT Online"}
-              />
-            </div>
+          <div
+            className="mt-[14px] font-en text-[15px] font-medium tracking-[0.14em]"
+            style={{ color: "var(--shell-kicker-muted)" }}
+          >
+            KUOZUI GREEN ENERGY DISPLAY PLAYER
+          </div>
+        </div>
+
+        {/* Right meta cluster */}
+        <div className="ml-auto flex items-center">
+          <div
+            className="font-en text-[50px] font-bold leading-none tracking-[0.1em]"
+            style={{ color: "var(--ink-strong)" }}
+          >
+            {timeLabel}
+          </div>
+
+          <div
+            className="ml-[26px] border-l pl-[26px] font-en text-[18px] font-medium leading-[1.55]"
+            style={{
+              borderColor: "var(--shell-divider-strong)",
+              color: "var(--shell-meta-date-ink)"
+            }}
+          >
+            <div>{dateLabel}</div>
+            <div>{weekdayLabel}</div>
+          </div>
+
+          <div
+            className="ml-[28px] flex items-center gap-[12px] border-l pl-[28px] text-[16px]"
+            style={{
+              borderColor: "var(--shell-divider-strong)",
+              color: "var(--shell-meta-weather-ink)"
+            }}
+          >
+            <SunGlyph />
+            <span>{meta?.weather ?? "晴  26°C"}</span>
+          </div>
+
+          <div className="ml-[28px]">
+            <StatusBadge
+              status={meta?.status ?? "connected"}
+              label={meta?.statusLabel ?? "MQTT Online"}
+            />
           </div>
         </div>
       </div>
     </header>
+  );
+}
+
+function SunGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="var(--accent)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
+    </svg>
   );
 }

@@ -1,81 +1,182 @@
 import { Link, useLocation } from "react-router-dom";
-import { routeMetaList, routeMetaMap } from "../app/routeMeta";
+import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
 import { LeafOrnament } from "./LeafOrnament";
 import { PageNumberPill } from "./PageNumberPill";
+
+type FooterEntry = {
+  key: string;
+  label: string;
+  path: string;
+};
+
+type FooterMode = "playback" | "management";
+
+const SETTINGS_ENTRY_PATH = "/settings/playback";
+
+function buildEntries(currentPath: string): {
+  entries: FooterEntry[];
+  mode: FooterMode;
+  isActivePath: (path: string) => boolean;
+} {
+  const currentRoute = routeMetaMap.get(currentPath);
+  const isPlayback = !currentRoute || currentRoute.group === "playback";
+
+  if (isPlayback) {
+    const playbackTabs: FooterEntry[] = routeMetaList
+      .filter((route): route is RouteMeta => route.group === "playback")
+      .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
+
+    playbackTabs.push({
+      key: "settings-entry",
+      label: "進入設定",
+      path: SETTINGS_ENTRY_PATH
+    });
+
+    return {
+      entries: playbackTabs,
+      mode: "playback",
+      isActivePath: (path) => path === currentPath
+    };
+  }
+
+  const managementTabs: FooterEntry[] = routeMetaList
+    .filter((route): route is RouteMeta => route.group === "management" && route.path !== "/offline")
+    .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
+
+  const overviewEntry: FooterEntry = { key: "overview-return", label: "回總覽", path: "/overview" };
+
+  return {
+    entries: [overviewEntry, ...managementTabs],
+    mode: "management",
+    isActivePath: (path) => path === currentPath
+  };
+}
 
 export function AppFooterNav() {
   const { pathname } = useLocation();
   const currentRoute = routeMetaMap.get(pathname) ?? routeMetaList[0]!;
-  const playbackTabs = routeMetaList.filter((route) => route.group === "playback");
-  const managementTabs = routeMetaList.filter((route) => route.group === "management");
+  const { entries, mode, isActivePath } = buildEntries(pathname);
+
+  // Settings nav has more entries; tighten typography & spacing so they fit.
+  const navItemPaddingX = mode === "playback" ? 32 : 18;
+  const navItemFontSize = mode === "playback" ? 16 : 14;
+  const navItemTracking = mode === "playback" ? "0.04em" : "0.02em";
 
   return (
     <footer
       data-shell-primitive="footer-nav"
-      className="relative shrink-0 overflow-hidden border-t border-white/70 bg-white/80 backdrop-blur"
+      className="shell-footer-bar relative flex h-[var(--footer-height)] w-full shrink-0 items-stretch"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-700/40 to-transparent" />
-      <div className="flex h-[var(--footer-height)] w-full items-center justify-between gap-6 px-page-x">
-        <div className="flex items-center gap-4">
-          <PageNumberPill current={currentRoute.order} total={routeMetaList.length} />
-          <div>
-            <p className="font-en text-xs uppercase tracking-[0.24em] text-neutral-500">Kiosk Navigation</p>
-            <p className="text-sm text-neutral-600">
-              第 {currentRoute.order} 頁，共 {routeMetaList.length} 頁
-            </p>
-          </div>
+      <div className="flex w-full items-center pl-[32px] pr-[32px]">
+        <PageNumberPill current={currentRoute.order} total={routeMetaList.length} />
+
+        <div className="ml-[32px]">
+          <LeafOrnament variant="footer-mini" />
         </div>
-        <nav className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-          <div className="flex items-center gap-2 overflow-hidden">
-            {playbackTabs.map((tab) => {
-              const active = tab.path === pathname;
 
-              return (
-                <Link
-                  key={tab.path}
-                  to={tab.path}
-                  className={[
-                    "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-                    active
-                      ? "bg-brand-900 text-white shadow-card"
-                      : "bg-white/90 text-neutral-700 hover:bg-brand-100 hover:text-brand-900"
-                  ].join(" ")}
-                >
-                  {tab.navLabel}
-                </Link>
-              );
-            })}
-          </div>
-          <div className="h-8 w-px bg-neutral-200" />
-          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-            <span className="rounded-full bg-brand-100 px-3 py-2 text-xs font-semibold tracking-[0.18em] text-brand-800">
-              設定
-            </span>
-            {managementTabs.map((tab) => {
-              const active = tab.path === pathname;
+        <nav className="ml-[20px] flex h-[64px] flex-1 items-stretch overflow-hidden">
+          {entries.map((entry, index) => {
+            const active = isActivePath(entry.path);
 
-              return (
-                <Link
-                  key={tab.path}
-                  to={tab.path}
-                  className={[
-                    "rounded-full px-3 py-2 text-sm transition-colors",
-                    active
-                      ? "bg-brand-900 text-white shadow-card"
-                      : "bg-neutral-100 text-neutral-700 hover:bg-white"
-                  ].join(" ")}
-                >
-                  {tab.navLabel}
-                </Link>
-              );
-            })}
-          </div>
+            return (
+              <Link
+                key={entry.key}
+                to={entry.path}
+                aria-current={active ? "page" : undefined}
+                className="relative flex items-center font-en font-medium leading-none transition-colors duration-150"
+                style={{
+                  borderLeft:
+                    index === 0 ? "0" : "1px solid var(--shell-divider)",
+                  color: active
+                    ? "var(--shell-nav-active-ink)"
+                    : "var(--shell-nav-rest-ink)",
+                  fontSize: `${navItemFontSize}px`,
+                  letterSpacing: navItemTracking,
+                  paddingLeft: `${navItemPaddingX}px`,
+                  paddingRight: `${navItemPaddingX}px`,
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {entry.label}
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute h-[3px] rounded-full"
+                    style={{
+                      background: "var(--shell-nav-underline)",
+                      bottom: "10px",
+                      left: `${navItemPaddingX}px`,
+                      right: `${navItemPaddingX}px`
+                    }}
+                  />
+                ) : null}
+              </Link>
+            );
+          })}
         </nav>
-        <div className="flex items-center gap-3">
-          <LeafOrnament />
-          <p className="text-right text-lg font-semibold tracking-[0.08em] text-brand-900">綠能永續．智慧展示</p>
+
+        <div className="ml-[24px] flex items-center gap-[24px]">
+          <div className="text-right">
+            <div
+              className="text-[17px] font-medium tracking-[0.42em]"
+              style={{ color: "var(--shell-slogan-ink)" }}
+            >
+              永續，從現在開始
+            </div>
+            <div
+              className="mt-[4px] font-en text-[11px] tracking-[0.04em]"
+              style={{ color: "var(--shell-slogan-soft-ink)" }}
+            >
+              / Sustainability Starts with Us
+            </div>
+          </div>
+          <FooterBranch />
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterBranch() {
+  const stroke = "var(--shell-branch-stroke)";
+
+  return (
+    <span
+      aria-hidden
+      className="relative inline-block shrink-0"
+      style={{
+        width: "120px",
+        height: "44px",
+        borderBottom: `2px solid ${stroke}`,
+        borderRadius: "50%",
+        transform: "skewX(-28deg)",
+        opacity: 0.9
+      }}
+    >
+      <span
+        className="absolute"
+        style={{
+          width: "36px",
+          height: "20px",
+          right: "16px",
+          bottom: "26px",
+          border: `1.6px solid ${stroke}`,
+          borderRadius: "75% 0 75% 0",
+          transform: "rotate(-38deg)"
+        }}
+      />
+      <span
+        className="absolute"
+        style={{
+          width: "38px",
+          height: "22px",
+          right: "60px",
+          bottom: "12px",
+          border: `1.6px solid ${stroke}`,
+          borderRadius: "75% 0 75% 0",
+          transform: "rotate(-42deg)"
+        }}
+      />
+    </span>
   );
 }

@@ -40,8 +40,13 @@ test("buildCircuitSettingsViewModel maps prototype table fields and summary coun
         warningMin: 90
       }
     ],
+    deletingId: null,
+    dirtyIds: [12],
     errorMessage: "",
+    isAdding: false,
     isLoading: false,
+    isReloading: false,
+    isSaving: false,
     message: "迴路設定已同步。"
   });
 
@@ -50,11 +55,14 @@ test("buildCircuitSettingsViewModel maps prototype table fields and summary coun
   assert.equal(model.summary.disabledCircuitCount, 1);
   assert.equal(model.summary.capacityLabel, "500 kW");
   assert.equal(model.feedbackBanner.tone, "ready");
+  assert.equal(model.actions.saveDisabled, false);
   assert.equal(model.rows[0]?.orderLabel, "2");
   assert.equal(model.rows[0]?.normalRangeLabel, "0-70");
   assert.equal(model.rows[0]?.attentionRangeLabel, "70-90");
   assert.equal(model.rows[0]?.warningRangeLabel, "90-100");
   assert.equal(model.rows[0]?.visibilityLabel, "顯示中");
+  assert.equal(model.rows[0]?.dirtyLabel, "待儲存");
+  assert.equal(model.rows[0]?.validationLabel, "已設定");
   assert.equal(model.rows[1]?.visibilityTone, "disconnected");
   assert.equal(model.rows[1]?.statusLabel, "草稿");
 });
@@ -62,8 +70,13 @@ test("buildCircuitSettingsViewModel maps prototype table fields and summary coun
 test("buildCircuitSettingsViewModel surfaces load failure and empty state clearly", () => {
   const model = buildCircuitSettingsViewModel({
     circuits: [],
+    deletingId: null,
+    dirtyIds: [],
     errorMessage: "載入失敗",
+    isAdding: false,
     isLoading: false,
+    isReloading: false,
+    isSaving: false,
     message: "正在載入迴路設定..."
   });
 

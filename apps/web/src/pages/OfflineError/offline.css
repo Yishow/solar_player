@@ -1,0 +1,184 @@
+.offline-display-page {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.offline-background,
+.offline-panel {
+  position: absolute;
+}
+
+.offline-background {
+  overflow: hidden;
+}
+
+.offline-background img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.offline-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 253, 247, 0.95) 0%, rgba(255, 253, 247, 0.46) 24%, rgba(255, 253, 247, 0) 56%);
+}
+
+.offline-panel {
+  z-index: 12;
+  text-align: center;
+}
+
+.offline-icon-shell {
+  position: relative;
+  display: inline-block;
+  color: #207d24;
+}
+
+.offline-icon-main {
+  width: 152px;
+  height: 152px;
+}
+
+.offline-icon-badge {
+  position: absolute;
+  right: -2px;
+  top: 52px;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d3412d;
+  color: white;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.offline-panel h1 {
+  margin: 26px 0 10px;
+  color: #2f3530;
+  font-size: 41px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.offline-panel h2 {
+  margin: 0 0 24px;
+  color: #49504b;
+  font-family: var(--font-family-en);
+  font-size: 31px;
+  font-weight: 500;
+}
+
+.offline-panel p {
+  margin: 0;
+  color: #4f5650;
+  font-size: 25px;
+  line-height: 1.35;
+}
+
+.offline-panel p span {
+  color: #6b716b;
+  font-family: var(--font-family-en);
+  font-size: 22px;
+}
+
+.offline-detail-card {
+  margin: 34px auto 0;
+  width: 652px;
+  height: 282px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.94);
+  box-shadow: 0 10px 24px rgba(66, 73, 57, 0.1);
+  padding: 18px 26px;
+  text-align: left;
+}
+
+.offline-detail-card div {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+  align-items: center;
+  height: 82px;
+  border-bottom: 1px solid rgba(92, 105, 79, 0.16);
+}
+
+.offline-detail-card div:last-child {
+  border-bottom: 0;
+}
+
+.offline-detail-card b {
+  color: #384039;
+  font-size: 20px;
+}
+
+.offline-detail-card span {
+  color: #34383a;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.offline-retry-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 652px;
+  height: 66px;
+  margin: 20px auto 0;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.94);
+  box-shadow: 0 10px 24px rgba(66, 73, 57, 0.1);
+  color: #303632;
+  font-size: 20px;
+}
+
+.offline-retry-bar i {
+  width: 34px;
+  height: 34px;
+  border: 5px dotted #333;
+  border-radius: 50%;
+}
+
+.offline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 652px;
+  margin: 18px auto 0;
+}
+
+.offline-action {
+  border: 1px solid rgba(95, 140, 80, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 253, 247, 0.86);
+  color: #356239;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 10px 18px;
+}
+
+.offline-action.ghost {
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.offline-return-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #586159;
+  font-size: 15px;
+}
+
+.offline-return-chip svg {
+  width: 18px;
+  height: 18px;
+}
