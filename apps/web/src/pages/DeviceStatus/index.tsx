@@ -322,8 +322,8 @@ export function DeviceStatus() {
           <span>{viewModel.networkRows[0]?.value}</span>
         </div>
         <div className="ds-network__row">
-          <b>訊號備註</b>
-          <small>Network Note</small>
+          <b>訊號強度</b>
+          <small>Signal Strength</small>
           <span style={{ color: "#5d655d" }}>{viewModel.networkRows[1]?.value}</span>
         </div>
       </section>

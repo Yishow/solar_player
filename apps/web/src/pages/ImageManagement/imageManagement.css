@@ -339,8 +339,16 @@
 }
 
 .image-mgmt-page .im-form-row label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-size: 13px;
   color: #5d655d;
+}
+
+.image-mgmt-page .im-char-count {
+  font: 400 11px/1 var(--font-family-en);
+  color: #aab0a9;
 }
 
 .image-mgmt-page .im-form-row label small {
@@ -451,4 +459,99 @@
   color: #c14a4a;
   border-color: rgba(231, 177, 177, 1);
   background: rgba(255, 248, 248, 0.85);
+}
+
+/* duration stepper */
+.image-mgmt-page .im-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.image-mgmt-page .im-stepper__btn {
+  width: 40px;
+  height: 38px;
+  border: none;
+  background: rgba(92, 133, 75, 0.08);
+  color: var(--green);
+  font: 600 20px/1 var(--font-family-en);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 100ms ease;
+}
+
+.image-mgmt-page .im-stepper__btn:hover:not(:disabled) {
+  background: rgba(92, 133, 75, 0.18);
+}
+
+.image-mgmt-page .im-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-mgmt-page .im-stepper__value {
+  flex: 1;
+  text-align: center;
+  font: 600 16px/1 var(--font-family-en);
+  color: #344039;
+}
+
+.image-mgmt-page .im-stepper__unit {
+  font-size: 12px;
+  color: #888d86;
+  padding-right: 12px;
+}
+
+/* aspect ratio select */
+.image-mgmt-page .im-select {
+  width: 100%;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 8px 12px;
+  font: 400 14px/1.4 var(--font-family-en);
+  color: #4b504c;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.image-mgmt-page .im-select:focus {
+  border-color: rgba(93, 119, 69, 0.55);
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+}
+
+.image-mgmt-page .im-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* crop/focus button */
+.image-mgmt-page .im-crop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  border: 1px dashed rgba(93, 119, 69, 0.38);
+  border-radius: 8px;
+  background: rgba(247, 251, 240, 0.55);
+  color: var(--green);
+  font: 600 13px/1 var(--font-family-zh);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.image-mgmt-page .im-crop-btn:hover:not(:disabled) {
+  background: rgba(232, 244, 220, 0.65);
+  border-color: rgba(93, 119, 69, 0.6);
+}
+
+.image-mgmt-page .im-crop-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

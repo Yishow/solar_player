@@ -23,6 +23,16 @@ test("energy trend layout centralizes title, tabs, refresh, and chart card geome
     top: 18,
     width: 418
   });
+  assert.deepEqual(energyTrendLayout.heroSeparators.top[0], {
+    left: 0,
+    top: 92,
+    width: 488
+  });
+  assert.deepEqual(energyTrendLayout.heroSeparators.bottom[2], {
+    left: 1352,
+    top: 236,
+    width: 568
+  });
   assert.deepEqual(energyTrendLayout.cards.card5, {
     height: 468,
     left: 1316,
@@ -41,6 +51,10 @@ test("energy trend regions stack within content height 838 and avoid hard collis
   const tabsBottom = energyTrendLayout.tabs.top + energyTrendLayout.tabs.height;
   assert.ok(energyTrendLayout.cards.card1.top > tabsBottom, "cards clear tabs row");
   assert.ok(energyTrendLayout.cards.card1.top > energyTrendLayout.copy.top + 32, "cards clear copy line");
+  assert.ok(
+    energyTrendLayout.heroSeparators.bottom[0].top < energyTrendLayout.cards.card1.top,
+    "bottom separator stays above cards row"
+  );
 
   // total fits 838
   const cardsBottom = energyTrendLayout.cards.card1.top + energyTrendLayout.cards.card1.height;

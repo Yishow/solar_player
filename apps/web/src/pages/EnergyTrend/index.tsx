@@ -74,11 +74,21 @@ function MiniTrendChart({
     <svg viewBox={`0 0 ${width} ${height}`} className="et-chart-svg" preserveAspectRatio="none">
       {[0, 0.33, 0.66, 1].map((ratio) => (
         <line
-          key={ratio}
+          key={`h${ratio}`}
           x1={padding}
           y1={padding + chartHeight * ratio}
           x2={padding + chartWidth}
           y2={padding + chartHeight * ratio}
+          strokeWidth="1"
+        />
+      ))}
+      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+        <line
+          key={`v${ratio}`}
+          x1={padding + ratio * chartWidth}
+          y1={padding}
+          x2={padding + ratio * chartWidth}
+          y2={bottom}
           strokeWidth="1"
         />
       ))}
@@ -169,6 +179,24 @@ export function EnergyTrend() {
         aria-hidden
       />
 
+      {energyTrendLayout.heroSeparators.top.map((line, index) => (
+        <div
+          key={`top-${index}`}
+          className="et-hero-separator et-hero-separator-top"
+          style={{ left: line.left, top: line.top, width: line.width }}
+          aria-hidden
+        />
+      ))}
+
+      {energyTrendLayout.heroSeparators.bottom.map((line, index) => (
+        <div
+          key={`bottom-${index}`}
+          className="et-hero-separator et-hero-separator-bottom"
+          style={{ left: line.left, top: line.top, width: line.width }}
+          aria-hidden
+        />
+      ))}
+
       <div
         className="et-tabs"
         style={{
@@ -256,13 +284,10 @@ export function EnergyTrend() {
               <div className="et-empty">尚無趨勢資料</div>
             )}
             <div className="et-axis-times">
-              <span>{formatTickLabel(validPoints[0]?.label ?? "")}</span>
-              <span>
-                {formatTickLabel(validPoints[Math.floor(validPoints.length / 2)]?.label ?? "")}
-              </span>
-              <span>
-                {formatTickLabel(validPoints[validPoints.length - 1]?.label ?? "")}
-              </span>
+              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                const idx = Math.round(ratio * (validPoints.length - 1));
+                return <span key={ratio}>{formatTickLabel(validPoints[idx]?.label ?? "")}</span>;
+              })}
             </div>
           </article>
         );

@@ -291,6 +291,7 @@ test("PUT /api/images/:id updates image metadata", async () => {
       payload: {
         title: "Updated Title",
         description: "Updated description",
+        aspectRatio: 4 / 3,
         includedInSlideshow: true,
         isCover: true,
         displayDuration: 20
@@ -301,6 +302,7 @@ test("PUT /api/images/:id updates image metadata", async () => {
     const updated = (updateResponse.json() as { data: ImageAsset }).data;
     assert.equal(updated.title, "Updated Title");
     assert.equal(updated.description, "Updated description");
+    assert.equal(updated.aspectRatio, 4 / 3);
     assert.equal(updated.includedInSlideshow, true);
     assert.equal(updated.isCover, true);
     assert.equal(updated.displayDuration, 20);

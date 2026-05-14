@@ -21,11 +21,11 @@
     radial-gradient(circle at 20% 88%, rgba(108, 132, 82, 0.11), transparent 17%);
   --shell-header-bg: rgba(255, 255, 250, 0.93);
   --shell-footer-bg: rgba(255, 253, 247, 0.88);
-  --shell-bar-border: rgba(90, 90, 78, 0.16);
-  --shell-bar-shadow: 0 3px 20px rgba(70, 60, 40, 0.04);
-  --shell-divider: rgba(80, 82, 70, 0.18);
-  --shell-divider-strong: rgba(70, 70, 60, 0.22);
-  --shell-divider-brand: rgba(61, 70, 54, 0.26);
+  --shell-bar-border: rgba(171, 166, 154, 0.48);
+  --shell-bar-shadow: none;
+  --shell-divider: rgba(198, 192, 179, 0.56);
+  --shell-divider-strong: rgba(186, 180, 168, 0.7);
+  --shell-divider-brand: rgba(186, 180, 168, 0.7);
   --shell-panel-bg: rgba(255, 255, 249, 0.82);
   --shell-panel-border: rgba(89, 124, 67, 0.16);
   --shell-number-pill-bg: linear-gradient(#638c53, #4d773f);
@@ -94,9 +94,9 @@
 
   --screen-width: 1920px;
   --screen-height: 1080px;
-  --header-height: 146px;
-  --footer-height: 96px;
-  --content-height: 842px;
+  --header-height: 110px;
+  --footer-height: 72px;
+  --content-height: 898px;
   --page-padding-x: 34px;
   --page-padding-y: 28px;
   --grid-gap-xs: 8px;

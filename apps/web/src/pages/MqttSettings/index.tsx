@@ -563,16 +563,18 @@ export function MqttSettings() {
           <div className="preview-list">
             {viewModel.previewCards.map((topic) => (
               <div className="preview-row" key={`preview-${topic.id}`}>
-                <span
-                  className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`}
-                  aria-hidden
-                >
-                  {PREVIEW_ICON_GLYPHS[topic.icon] ?? "·"}
-                </span>
-                <label className="preview-row__label">
-                  {topic.metricLabelZh}
-                  <small>{topic.metricLabelEn}</small>
-                </label>
+                <div className="preview-row__header">
+                  <span
+                    className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`}
+                    aria-hidden
+                  >
+                    {PREVIEW_ICON_GLYPHS[topic.icon] ?? "·"}
+                  </span>
+                  <label className="preview-row__label">
+                    {topic.metricLabelZh}
+                    <small>{topic.metricLabelEn}</small>
+                  </label>
+                </div>
                 <b className="preview-row__value">
                   {topic.valueLabel}
                   <small>{topic.unitLabel || "--"}</small>

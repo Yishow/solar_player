@@ -11,6 +11,18 @@
 //   270-738   5 trend cards (h=468)
 
 export const energyTrendLayout = {
+  heroSeparators: {
+    bottom: [
+      { left: 58, top: 236, width: 706 },
+      { left: 824, top: 236, width: 472 },
+      { left: 1352, top: 236, width: 568 }
+    ],
+    top: [
+      { left: 0, top: 92, width: 488 },
+      { left: 532, top: 92, width: 514 },
+      { left: 1100, top: 92, width: 770 }
+    ]
+  },
   cards: {
     card1: { height: 468, left: 52, top: 270, width: 304 },
     card2: { height: 468, left: 368, top: 270, width: 304 },

@@ -32,7 +32,7 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.resourceCards[0]?.gaugePercent, 18);
   assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
   assert.match(model.feedback.title, /清除快取完成/);
-  assert.equal(model.networkRows[0]?.value, "● 裝置狀態已同步");
+  assert.equal(model.networkRows[0]?.value, "● 已連線 Connected");
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {
@@ -61,6 +61,6 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
   });
 
   assert.equal(model.runtimeSummary.title, "同步失敗");
-  assert.equal(model.networkRows[0]?.value, "未取得狀態");
+  assert.equal(model.networkRows[0]?.value, "● 未連線");
   assert.equal(model.networkRows[1]?.value, "需待裝置狀態恢復後確認");
 });

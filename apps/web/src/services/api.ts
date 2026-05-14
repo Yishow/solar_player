@@ -136,7 +136,12 @@ export async function uploadImageAsset(file: File) {
 
 export async function updateImageAsset(
   id: number,
-  data: Partial<Pick<ImageAsset, "title" | "description" | "displayDuration" | "includedInSlideshow" | "isCover">>
+  data: Partial<
+    Pick<
+      ImageAsset,
+      "title" | "description" | "displayDuration" | "includedInSlideshow" | "isCover" | "aspectRatio"
+    >
+  >
 ) {
   const response = await requestJson<{
     data: ImageAsset;

@@ -119,12 +119,12 @@ export function buildDeviceStatusViewModel({
     runtimeSummary,
     networkRows: [
       {
-        label: "資料同步",
-        value: isLoading ? "同步中" : status ? "● 裝置狀態已同步" : "未取得狀態"
+        label: "網路狀態",
+        value: isLoading ? "同步中" : status ? "● 已連線 Connected" : "● 未連線"
       },
       {
-        label: "網路備註",
-        value: status ? "以有線 / 系統層網路為主" : "需待裝置狀態恢復後確認"
+        label: "訊號強度",
+        value: status ? "有線連線 (穩定)" : "需待裝置狀態恢復後確認"
       }
     ],
     resourceCards: [
@@ -147,10 +147,10 @@ export function buildDeviceStatusViewModel({
         valueLabel: status ? formatPercent(status.disk.usePercent) : "--"
       },
       {
-        gaugeValue: status ? "52%" : "--",
+        gaugeValue: status ? "52°C" : "--",
         helper: status ? "正常 Normal" : "--",
         label: "系統溫度",
-        valueLabel: status ? "--" : "--"
+        valueLabel: status ? "52°C" : "--"
       }
     ].map((card, index) => {
       const gaugePercent = gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel);

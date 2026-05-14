@@ -12,16 +12,6 @@ type BuildSlideshowPreviewViewModelArgs = {
   settings: PlaybackSettings | null;
 };
 
-function formatRepeatDays(days: number[]) {
-  const labels = ["日", "一", "二", "三", "四", "五", "六"];
-
-  if (days.length === 0) {
-    return "每天";
-  }
-
-  return days.map((day) => labels[day] ?? "?").join(" / ");
-}
-
 function buildPlaybackOrderLabel(pages: PlaybackPage[]) {
   if (pages.length === 0) {
     return "尚未設定";
@@ -83,8 +73,10 @@ export function buildSlideshowPreviewViewModel({
         value: settings?.autoplay ? "啟用中 Enabled" : "停用中 Disabled"
       },
       {
-        label: "重複星期",
-        value: formatRepeatDays(settings?.repeatDays ?? [])
+        label: "最後更新",
+        value: settings?.updatedAt
+          ? settings.updatedAt.substring(0, 16).replace("T", " ")
+          : "尚無紀錄"
       }
     ]
   };

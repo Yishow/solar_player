@@ -10,6 +10,11 @@ import {
   uploadImageAsset
 } from "../../services/api";
 import { Switch } from "../../components/management";
+import {
+  formatAspectRatioChoice,
+  formatAspectRatioLabel,
+  parseAspectRatioChoice
+} from "./aspectRatio";
 import "./imageManagement.css";
 import { buildImageManagementViewModel } from "./viewModel";
 
@@ -89,6 +94,7 @@ export function ImageManagement() {
   const updateAssetField = (
     id: number,
     updates: Partial<{
+      aspectRatio: number | null;
       title: string | null;
       description: string | null;
       displayDuration: number;
@@ -129,6 +135,7 @@ export function ImageManagement() {
     setErrorMessage("");
     try {
       await updateImageAsset(selectedAsset.id, {
+        aspectRatio: selectedAsset.aspectRatio,
         description: selectedAsset.description,
         displayDuration: selectedAsset.displayDuration,
         includedInSlideshow: selectedAsset.includedInSlideshow,
@@ -210,6 +217,7 @@ export function ImageManagement() {
             : "";
 
   const selectedAsset = assets.find((asset) => asset.id === viewModel.selection?.id);
+  const aspectRatioChoice = selectedAsset ? formatAspectRatioChoice(selectedAsset.aspectRatio) : "auto";
 
   return (
     <div className="image-mgmt-page">
@@ -403,10 +411,12 @@ export function ImageManagement() {
               <div className="im-form-row">
                 <label>
                   標題 <small>Title</small>
+                  <span className="im-char-count">{(selectedAsset.title ?? "").length}/50</span>
                 </label>
                 <input
                   className="im-input"
                   disabled={isLoading || isDeleting}
+                  maxLength={50}
                   value={selectedAsset.title ?? ""}
                   onChange={(event) =>
                     updateAssetField(viewModel.selection!.id, { title: event.target.value })
@@ -417,10 +427,12 @@ export function ImageManagement() {
               <div className="im-form-row">
                 <label>
                   描述 <small>Description</small>
+                  <span className="im-char-count">{(selectedAsset.description ?? "").length}/100</span>
                 </label>
                 <textarea
                   className="im-textarea"
                   disabled={isLoading || isDeleting}
+                  maxLength={100}
                   value={selectedAsset.description ?? ""}
                   onChange={(event) =>
                     updateAssetField(viewModel.selection!.id, { description: event.target.value })
@@ -430,20 +442,69 @@ export function ImageManagement() {
 
               <div className="im-form-row">
                 <label>
-                  顯示時間 <small>Duration (秒)</small>
+                  顯示時間 <small>Duration</small>
                 </label>
-                <input
-                  className="im-input"
-                  type="number"
-                  min="1"
+                <div className="im-stepper">
+                  <button
+                    type="button"
+                    className="im-stepper__btn"
+                    disabled={isLoading || isDeleting || selectedAsset.displayDuration <= 1}
+                    onClick={() =>
+                      updateAssetField(viewModel.selection!.id, {
+                        displayDuration: Math.max(1, selectedAsset.displayDuration - 1)
+                      })
+                    }
+                  >
+                    −
+                  </button>
+                  <span className="im-stepper__value">{selectedAsset.displayDuration}</span>
+                  <span className="im-stepper__unit">秒</span>
+                  <button
+                    type="button"
+                    className="im-stepper__btn"
+                    disabled={isLoading || isDeleting}
+                    onClick={() =>
+                      updateAssetField(viewModel.selection!.id, {
+                        displayDuration: selectedAsset.displayDuration + 1
+                      })
+                    }
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="im-form-row">
+                <label>
+                  裁切/焦點 <small>Crop / Focus</small>
+                </label>
+                <button type="button" className="im-crop-btn" disabled>
+                  ✂ 調整焦點 Adjust Focus
+                </button>
+              </div>
+
+              <div className="im-form-row">
+                <label>
+                  長寬比 <small>Aspect Ratio</small>
+                </label>
+                <select
+                  className="im-select"
+                  value={aspectRatioChoice}
                   disabled={isLoading || isDeleting}
-                  value={String(selectedAsset.displayDuration)}
                   onChange={(event) =>
                     updateAssetField(viewModel.selection!.id, {
-                      displayDuration: Number.parseInt(event.target.value, 10) || 1
+                      aspectRatio: parseAspectRatioChoice(event.target.value, selectedAsset.aspectRatio)
                     })
                   }
-                />
+                >
+                  <option value="auto">原始比例 Auto</option>
+                  <option value="16:9">16:9 (建議)</option>
+                  <option value="4:3">4:3</option>
+                  <option value="1:1">1:1</option>
+                  {aspectRatioChoice === "custom" ? (
+                    <option value="custom">自訂比例 {formatAspectRatioLabel(selectedAsset.aspectRatio)}</option>
+                  ) : null}
+                </select>
               </div>
 
               <div className="im-toggle">

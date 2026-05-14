@@ -266,47 +266,12 @@ export function EnergyHistory() {
 
         {validChartPoints.length > 0 ? (
           <div className="eh-axis-times">
-            <span>{validChartPoints[0]?.label ?? ""}</span>
-            <span>{validChartPoints[Math.floor(validChartPoints.length / 2)]?.label ?? ""}</span>
-            <span>{validChartPoints[validChartPoints.length - 1]?.label ?? ""}</span>
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const idx = Math.round(ratio * (validChartPoints.length - 1));
+              return <span key={ratio}>{validChartPoints[idx]?.label ?? ""}</span>;
+            })}
           </div>
         ) : null}
-
-        <div className="eh-table">
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>發電量</th>
-                <th>自發自用</th>
-                <th>用電量</th>
-                <th>CO₂</th>
-                <th>尖峰發電</th>
-                <th>尖峰用電</th>
-              </tr>
-            </thead>
-            <tbody>
-              {viewModel.tableRows.map((row) => (
-                <tr key={row.dateLabel}>
-                  <td>{row.dateLabel}</td>
-                  <td>{row.generationLabel}</td>
-                  <td>{row.selfConsumptionLabel}</td>
-                  <td>{row.consumptionLabel}</td>
-                  <td>{row.co2Label}</td>
-                  <td>{row.peakGenerationLabel}</td>
-                  <td>{row.peakConsumptionLabel}</td>
-                </tr>
-              ))}
-              {viewModel.tableRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "#6f766f" }}>
-                    目前所選範圍沒有 daily summary rows。
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
       </section>
 
       {/* === Bottom summary band === */}

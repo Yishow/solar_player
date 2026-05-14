@@ -37,6 +37,7 @@ type ImageAssetRow = {
 type ImageUpdateBody = {
   title?: string;
   description?: string;
+  aspectRatio?: number;
   includedInSlideshow?: boolean;
   isCover?: boolean;
   displayDuration?: number;
@@ -295,6 +296,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
           UPDATE image_assets SET
             title = COALESCE(?, title),
             description = COALESCE(?, description),
+            aspect_ratio = COALESCE(?, aspect_ratio),
             included_in_slideshow = COALESCE(?, included_in_slideshow),
             is_cover = COALESCE(?, is_cover),
             display_duration = COALESCE(?, display_duration),
@@ -314,6 +316,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         updateImage.run(
           body.title ?? null,
           body.description ?? null,
+          body.aspectRatio ?? undefined,
           body.includedInSlideshow === undefined
             ? undefined
             : body.includedInSlideshow

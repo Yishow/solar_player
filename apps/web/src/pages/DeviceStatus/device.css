@@ -243,8 +243,8 @@
 .ds-page .ds-gauge-ring {
   position: relative;
   margin: 0 auto;
-  width: 108px;
-  height: 108px;
+  width: 130px;
+  height: 130px;
   border-radius: 50%;
   background:
     conic-gradient(var(--gauge-color, var(--green)) calc(var(--gauge-value, 0) * 1%), rgba(92, 105, 79, 0.12) 0);
@@ -253,7 +253,7 @@
 .ds-page .ds-gauge-ring::after {
   content: "";
   position: absolute;
-  inset: 14px;
+  inset: 17px;
   border-radius: 50%;
   background: rgba(255, 253, 247, 0.96);
 }
@@ -265,7 +265,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 22px/1 var(--font-family-en);
+  font: 700 26px/1 var(--font-family-en);
   color: var(--ink-strong);
 }
 

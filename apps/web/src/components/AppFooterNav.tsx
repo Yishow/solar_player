@@ -85,8 +85,6 @@ export function AppFooterNav() {
                 aria-current={active ? "page" : undefined}
                 className="relative flex items-center font-en font-medium leading-none transition-colors duration-150"
                 style={{
-                  borderLeft:
-                    index === 0 ? "0" : "1px solid var(--shell-divider)",
                   color: active
                     ? "var(--shell-nav-active-ink)"
                     : "var(--shell-nav-rest-ink)",
@@ -97,6 +95,13 @@ export function AppFooterNav() {
                   whiteSpace: "nowrap"
                 }}
               >
+                {index === 0 ? null : (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 h-[26px] w-px -translate-y-1/2"
+                    style={{ background: "var(--shell-divider)" }}
+                  />
+                )}
                 {entry.label}
                 {active ? (
                   <span

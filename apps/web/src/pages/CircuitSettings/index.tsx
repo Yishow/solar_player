@@ -382,6 +382,12 @@ export function CircuitSettings() {
             <span style={{ fontSize: 13 }}>{viewModel.emptyState.description}</span>
           </div>
         ) : (
+          <>
+            <div className="cs-legend">
+              <span className="cs-legend-item cs-legend-item--normal">Normal</span>
+              <span className="cs-legend-item cs-legend-item--attention">Attention</span>
+              <span className="cs-legend-item cs-legend-item--warning">Warning</span>
+            </div>
           <div className="cs-table-wrap">
             <table className="cs-table">
               <thead>
@@ -599,19 +605,8 @@ export function CircuitSettings() {
               </tbody>
             </table>
           </div>
+          </>
         )}
-
-        <div className="cs-legend">
-          <span className="cs-legend-item cs-legend-item--normal">
-            <b>Normal</b> 正常運行
-          </span>
-          <span className="cs-legend-item cs-legend-item--attention">
-            <b>Attention</b> 需要注意
-          </span>
-          <span className="cs-legend-item cs-legend-item--warning">
-            <b>Warning</b> 超出警戒
-          </span>
-        </div>
       </section>
     </div>
   );

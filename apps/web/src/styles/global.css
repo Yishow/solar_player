@@ -59,13 +59,11 @@
     border-bottom: 1px solid var(--shell-bar-border);
     background: var(--shell-header-bg);
     box-shadow: var(--shell-bar-shadow);
-    backdrop-filter: blur(12px);
   }
 
   .shell-footer-bar {
     border-top: 1px solid var(--shell-bar-border);
     background: var(--shell-footer-bg);
-    backdrop-filter: blur(12px);
   }
 
   .shell-divider {

@@ -1,10 +1,10 @@
-/* Slideshow preview — reference-aligned absolute layout on FHD canvas (1920 × 838).
- * 4 regions: title, left status rail (3 status cards) + bottom controls,
- * main carousel + dots, bottom summary row.
+/* Slideshow Preview — FHD canvas (1920 × 838).
+ * Regions: title · left status rail · carousel (controls embedded on active card) · bottom summary.
  */
 
 .sp-page {
   position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-height: 838px;
@@ -12,7 +12,8 @@
   color: var(--ink);
 }
 
-/* === title === */
+/* ─── Title ─── */
+
 .sp-page .sp-title {
   position: absolute;
   display: flex;
@@ -26,6 +27,7 @@
   font-weight: 700;
   letter-spacing: 4px;
   color: var(--ink-strong);
+  line-height: 1;
 }
 
 .sp-page .sp-title h1 em {
@@ -37,10 +39,11 @@
   margin: 0;
   font: 400 20px/1 var(--font-family-en);
   letter-spacing: 0.04em;
-  color: #686e68;
+  color: var(--muted);
 }
 
-/* === left status rail === */
+/* ─── Left status rail ─── */
+
 .sp-page .sp-status {
   position: absolute;
   display: flex;
@@ -50,69 +53,249 @@
 
 .sp-page .sp-status-card {
   position: relative;
-  border: 1px solid rgba(98, 105, 86, 0.18);
-  border-radius: 14px;
-  background: rgba(255, 253, 247, 0.92);
+  border: 1px solid rgba(97, 105, 81, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.93);
   box-shadow: var(--shadow-card);
-  padding: 18px 20px;
-  min-height: 130px;
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  padding: 22px 24px;
 }
 
-.sp-page .sp-status-card__label {
-  display: block;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink-strong);
-}
-
-.sp-page .sp-status-card__label small {
-  display: block;
-  margin-top: 3px;
-  font: 400 11px/1.2 var(--font-family-en);
-  color: #6f766f;
-}
-
-.sp-page .sp-status-card__value {
-  display: block;
-  margin-top: 14px;
-  font: 700 24px/1 var(--font-family-en);
-  color: var(--green);
-}
-
-.sp-page .sp-status-card__value.is-neutral {
-  color: var(--ink-strong);
-  font-size: 28px;
-}
-
-.sp-page .sp-status-card__value.is-large {
-  color: var(--ink-strong);
-  font-size: 30px;
-}
-
-.sp-page .sp-status-card__detail {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
-  color: #686e68;
-  line-height: 1.4;
-}
-
-.sp-page .sp-status-card__icon {
+/* Green accent bar on left edge */
+.sp-page .sp-status-card::after {
+  content: "";
   position: absolute;
-  right: 18px;
-  top: 18px;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: rgba(92, 133, 75, 0.14);
+  left: 0;
+  top: 20px;
+  bottom: 20px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #6d9a58, #47733e);
+}
+
+.sp-page .sp-status-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.14));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Card label — z-index 1 to sit above ::before shimmer */
+
+.sp-page .sp-sc-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-strong);
+  line-height: 1;
+}
+
+.sp-page .sp-sc-label small {
+  display: block;
+  margin-top: 4px;
+  font: 400 11px/1 var(--font-family-en);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Card 1 — Playback status */
+
+.sp-page .sp-status-card--playback {
+  min-height: 148px;
+  padding-right: 82px;
+}
+
+.sp-page .sp-sc-status-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sp-page .sp-sc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.sp-page .sp-sc-dot.is-playing {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82, 122, 67, 0.22);
+}
+
+.sp-page .sp-sc-status-text {
+  font: 700 21px/1 var(--font-family-zh);
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-sc-status-text.is-playing {
   color: var(--green);
+}
+
+.sp-page .sp-sc-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  height: 24px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 122, 67, 0.3);
+  background: rgba(82, 122, 67, 0.1);
+  font: 600 11px/1 var(--font-family-en);
+  color: var(--green);
+  letter-spacing: 0.05em;
+}
+
+.sp-page .sp-sc-badge.is-paused {
+  border-color: rgba(242, 161, 26, 0.35);
+  background: rgba(242, 161, 26, 0.12);
+  color: var(--accent);
+}
+
+/* Play/Pause circular button on card 1 */
+
+.sp-page .sp-play-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #658d56, #4c793f);
+  color: #fff;
   display: grid;
   place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(72, 115, 58, 0.45);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  z-index: 1;
 }
 
-.sp-page .sp-progress {
+.sp-page .sp-play-btn:hover {
+  transform: translateY(-50%) scale(1.07);
+  box-shadow: 0 6px 20px rgba(72, 115, 58, 0.55);
+}
+
+.sp-page .sp-play-btn.is-paused {
+  background: linear-gradient(135deg, #c98e1a, #a8700f);
+  box-shadow: 0 4px 16px rgba(180, 120, 20, 0.45);
+}
+
+/* Card 2 — Current page */
+
+.sp-page .sp-status-card--current {
+  min-height: 210px;
+}
+
+.sp-page .sp-sc-index {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  font: 700 44px/1 var(--font-family-en);
+  color: var(--ink-strong);
+  letter-spacing: -1px;
+}
+
+.sp-page .sp-sc-page-name {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+}
+
+.sp-page .sp-sc-page-name span {
+  display: block;
+  font: 700 15px/1.2 var(--font-family-zh);
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-sc-page-name small {
+  display: block;
+  margin-top: 4px;
+  font: 400 11px/1 var(--font-family-en);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.sp-page .sp-sc-countdown {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 16px;
+}
+
+.sp-page .sp-sc-sec {
+  font: 700 32px/1 var(--font-family-en);
+  color: var(--green);
+}
+
+.sp-page .sp-sc-countdown small {
+  font: 400 12px/1 var(--font-family-en);
+  color: var(--muted);
+}
+
+/* Sub-rows inside status card 2 */
+
+.sp-page .sp-sc-rows {
+  position: relative;
+  z-index: 1;
   margin-top: 12px;
-  height: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sp-page .sp-sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-top: 1px solid rgba(98, 105, 86, 0.1);
+  gap: 8px;
+}
+
+.sp-page .sp-sc-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.sp-page .sp-sc-row-value {
+  font: 700 15px/1 var(--font-family-en);
+  color: var(--ink-strong);
+  white-space: nowrap;
+}
+
+.sp-page .sp-sc-row-value small {
+  font: 400 11px/1 var(--font-family-zh);
+  color: var(--muted);
+  margin-left: 3px;
+}
+
+/* Progress bar (shared) */
+
+.sp-page .sp-progress {
+  position: relative;
+  margin-top: 12px;
+  height: 5px;
   border-radius: 999px;
   background: rgba(92, 105, 79, 0.12);
   overflow: hidden;
@@ -124,123 +307,192 @@
   height: 100%;
   width: var(--progress-width, 0%);
   background: linear-gradient(90deg, #5f884f, #47733e);
+  border-radius: 999px;
   transition: width 200ms ease;
 }
 
-/* === bottom-left controls === */
-.sp-page .sp-controls {
-  position: absolute;
-  display: flex;
-  gap: 8px;
-}
+/* ─── Carousel ─── */
 
-.sp-page .sp-control {
-  flex: 1;
-  height: 50px;
-  border: 1px solid rgba(74, 115, 62, 0.35);
-  border-radius: 10px;
-  background: rgba(255, 253, 247, 0.92);
-  color: var(--green);
-  font: 600 14px/1 var(--font-family-zh);
-  cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sp-page .sp-control:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(55, 50, 38, 0.12);
-}
-
-.sp-page .sp-control.primary {
-  background: linear-gradient(#658d56, #4c793f);
-  color: #fff;
-  border-color: #4c793f;
-}
-
-/* === carousel === */
 .sp-page .sp-carousel {
   position: absolute;
   overflow: visible;
 }
 
+/* All cards share the same 278px width — equal distribution, no overlap */
 .sp-page .sp-card {
   position: absolute;
-  top: 36px;
-  width: 260px;
-  height: 380px;
+  top: 44px;
+  width: 278px;
+  height: 366px;
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid rgba(125, 127, 116, 0.18);
-  background: rgba(255, 253, 247, 0.96);
-  box-shadow: 0 14px 26px rgba(73, 60, 41, 0.1);
-  text-align: center;
-  transition: transform 200ms ease;
+  border-radius: 18px;
+  border: 1px solid rgba(125, 127, 116, 0.15);
+  background: rgba(255, 253, 247, 0.88);
+  box-shadow:
+    0 8px 20px rgba(73, 60, 41, 0.08),
+    0 2px 4px rgba(73, 60, 41, 0.04);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  filter: brightness(0.97) saturate(0.9);
 }
 
 .sp-page .sp-card.active {
   top: 0;
-  width: 296px;
-  height: 416px;
-  border: 3px solid var(--green);
-  box-shadow: 0 18px 30px rgba(60, 77, 46, 0.15);
+  height: 410px;  /* same width, taller only */
+  border: 3px solid #527a43;
+  box-shadow:
+    0 0 0 5px rgba(82, 122, 67, 0.14),
+    0 0 0 8px rgba(82, 122, 67, 0.05),
+    0 24px 52px rgba(55, 77, 42, 0.22),
+    0 4px 14px rgba(55, 77, 42, 0.12);
+  z-index: 2;
+  filter: none;
+  background: rgba(255, 253, 247, 0.99);
 }
 
 .sp-page .sp-card img {
-  height: 280px;
   width: 100%;
+  height: 252px;
   object-fit: cover;
   object-position: top center;
+  display: block;
 }
 
 .sp-page .sp-card.active img {
-  height: 304px;
+  height: 288px;
+}
+
+/* Number badge */
+
+.sp-page .sp-card-num {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #658d56, #4c793f);
+  color: #fff;
+  font: 700 12px/28px var(--font-family-en);
+  text-align: center;
+  z-index: 3;
+  letter-spacing: 0.04em;
+  box-shadow: 0 3px 10px rgba(72, 115, 58, 0.45);
+}
+
+/* Card footer — same bottom: 14px for ALL cards.
+ * Non-active (top:44, h:366): text at abs-Y 396. Active (top:0, h:410): text at abs-Y 396. Identical. */
+.sp-page .sp-card-footer {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  padding: 0 16px;
+  z-index: 4;
 }
 
 .sp-page .sp-card h3 {
-  margin: 18px 14px 6px;
-  font-size: 17px;
+  margin: 0 0 4px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--ink-strong);
+  line-height: 1.2;
+  letter-spacing: 0.5px;
 }
 
 .sp-page .sp-card p {
-  margin: 0 14px;
-  font: 400 13px/1.2 var(--font-family-en);
-  color: #686e68;
+  margin: 0;
+  font: 400 12px/1.2 var(--font-family-en);
+  color: var(--muted);
+  letter-spacing: 0.03em;
 }
 
-.sp-page .sp-card small {
-  display: block;
-  margin-top: 10px;
-  font-size: 12px;
-  color: #5d655d;
-  letter-spacing: 0.06em;
+/* Controls overlay — rendered within the IMAGE area of the active card (top:218 = 288px image − 70px controls height).
+ * Keeps text area (below image) fully clear; gradient fades into bottom of image. */
+
+.sp-page .sp-card-ctrls {
+  position: absolute;
+  top: 218px;
+  left: 0;
+  right: 0;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(16, 26, 12, 0) 0%,
+    rgba(16, 26, 12, 0.65) 100%
+  );
+  z-index: 3;
 }
 
-/* arrows */
+.sp-page .sp-ctrl-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  transition: background 120ms ease, transform 100ms ease;
+}
+
+.sp-page .sp-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(1.08);
+}
+
+.sp-page .sp-ctrl-btn.play {
+  width: 44px;
+  height: 44px;
+  background: rgba(82, 122, 67, 0.88);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 12px rgba(55, 95, 38, 0.4);
+}
+
+.sp-page .sp-ctrl-btn.play:hover {
+  background: rgba(82, 122, 67, 1);
+  transform: scale(1.1);
+}
+
+/* ─── Carousel navigation arrows ─── */
+
 .sp-page .sp-arrow {
   position: absolute;
-  top: 195px;
+  top: 200px;
   width: 52px;
   height: 52px;
-  border: 0;
+  border: 1px solid rgba(97, 105, 81, 0.14);
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 10px 20px rgba(70, 61, 41, 0.14);
+  background: rgba(255, 253, 247, 0.94);
+  box-shadow: 0 10px 24px rgba(70, 61, 41, 0.16);
   color: #434845;
-  font-size: 42px;
+  font-size: 34px;
   line-height: 1;
   cursor: pointer;
-  z-index: 2;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  transition: box-shadow 120ms ease, background 120ms ease;
+}
+
+.sp-page .sp-arrow:hover {
+  background: #fffdf8;
+  box-shadow: 0 14px 30px rgba(70, 61, 41, 0.22);
 }
 
 .sp-page .sp-arrow.prev { left: -26px; }
 .sp-page .sp-arrow.next { right: -26px; }
 
-/* dots — placed inside the carousel band so they never collide with the summary row below */
+/* ─── Progress dots ─── */
+
 .sp-page .sp-dots {
   position: absolute;
   bottom: 8px;
@@ -259,77 +511,120 @@
   right: 18px;
   top: 8px;
   height: 1.5px;
-  background: rgba(166, 168, 164, 0.42);
+  background: rgba(166, 168, 164, 0.38);
 }
 
 .sp-page .sp-dots i {
   position: relative;
   z-index: 1;
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #d2d4d1;
+  background: rgba(166, 168, 160, 0.6);
+  transition: background 200ms ease;
 }
 
 .sp-page .sp-dots i.on {
   background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82, 122, 67, 0.2);
 }
 
-/* === summary === */
+/* ─── Bottom summary ─── */
+
 .sp-page .sp-summary {
   position: absolute;
   border: 1px solid rgba(128, 130, 121, 0.18);
-  border-radius: 16px;
+  border-radius: 18px;
   background: rgba(255, 253, 247, 0.92);
   box-shadow: var(--shadow-card);
-  padding: 18px 22px;
+  backdrop-filter: blur(8px);
+  padding: 22px 28px;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 1.4fr 1fr 0.9fr 0.96fr 1.1fr;
 }
 
+.sp-page .sp-summary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.12));
+  pointer-events: none;
+}
+
 .sp-page .sp-summary h2 {
   position: absolute;
-  left: 22px;
-  top: 14px;
+  left: 28px;
+  top: 16px;
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--ink-strong);
+  letter-spacing: 1px;
+  z-index: 1;
 }
 
 .sp-page .sp-summary h2 small {
   margin-left: 10px;
-  font: 400 13px/1 var(--font-family-en);
-  color: #6f766f;
+  font: 400 12px/1 var(--font-family-en);
+  color: var(--muted);
+  letter-spacing: 0.04em;
 }
 
 .sp-page .sp-summary > div {
   position: relative;
-  border-left: 1px solid rgba(116, 120, 112, 0.16);
-  padding: 50px 24px 0;
+  border-left: 1px solid rgba(116, 120, 112, 0.14);
+  padding: 52px 24px 16px;
+  z-index: 1;
 }
 
 .sp-page .sp-summary > div:first-child {
   border-left: 0;
 }
 
-.sp-page .sp-summary > div b {
-  display: block;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink-strong);
+.sp-page .sp-summary-icon {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  color: var(--green);
+  opacity: 0.8;
 }
 
-.sp-page .sp-summary > div span {
+.sp-page .sp-summary > div b {
   display: block;
-  margin-top: 6px;
-  font-size: 14px;
-  line-height: 1.5;
+  font: 700 14px/1 var(--font-family-zh);
+  color: var(--ink-strong);
+  letter-spacing: 0.5px;
+}
+
+.sp-page .sp-summary > div span:not(.sp-summary-icon) {
+  display: block;
+  margin-top: 7px;
+  font: 400 14px/1.5 var(--font-family-zh);
   color: #44504a;
 }
 
-.sp-page .sp-summary > div.is-on span {
+.sp-page .sp-summary > div.is-on span:not(.sp-summary-icon) {
   color: var(--green);
   font-weight: 600;
+}
+
+/* ─── Leaf watermark ─── */
+
+.sp-page .sp-leaf-bg {
+  position: absolute;
+  left: 0;
+  bottom: 10px;
+  width: 240px;
+  height: 220px;
+  pointer-events: none;
+  opacity: 0.45;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 220'%3E%3Cg fill='none' stroke='%23688242' stroke-width='1.5'%3E%3Cpath d='M30 200 Q50 160 80 140 Q110 120 120 80'/%3E%3Cpath d='M80 140 Q60 100 90 70 Q80 140 80 140Z' fill='%23688242' opacity='.25'/%3E%3Cpath d='M80 140 Q100 120 130 110 Q80 140 80 140Z' fill='%23688242' opacity='.2'/%3E%3Cpath d='M50 170 Q30 140 55 115 Q50 170 50 170Z' fill='%23688242' opacity='.2'/%3E%3Cpath d='M50 170 Q70 155 85 135 Q50 170 50 170Z' fill='%23688242' opacity='.18'/%3E%3Cpath d='M30 200 Q15 175 30 155 Q30 200 30 200Z' fill='%23688242' opacity='.15'/%3E%3Cpath d='M120 80 Q105 50 125 30 Q120 80 120 80Z' fill='%23688242' opacity='.22'/%3E%3Cpath d='M120 80 Q140 65 155 45 Q120 80 120 80Z' fill='%23688242' opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
 }

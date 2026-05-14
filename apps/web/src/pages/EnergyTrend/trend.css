@@ -11,6 +11,28 @@
   color: var(--ink);
 }
 
+.et-page .et-hero-separator {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(214, 206, 190, 0),
+    rgba(214, 206, 190, 0.9) 12%,
+    rgba(203, 195, 180, 0.95) 88%,
+    rgba(214, 206, 190, 0)
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.et-page .et-hero-separator-top {
+  opacity: 0.78;
+}
+
+.et-page .et-hero-separator-bottom {
+  opacity: 0.7;
+}
+
 /* === hero title === */
 .et-page .et-title {
   position: absolute;
@@ -61,10 +83,10 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid rgba(98, 105, 86, 0.22);
+  border: 0;
   border-radius: 18px;
   background: rgba(255, 252, 245, 0.9);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 
 .et-page .et-tabs button {
@@ -95,11 +117,11 @@
   gap: 12px;
   align-items: center;
   padding: 8px 16px;
-  border: 1px solid rgba(92, 133, 75, 0.28);
+  border: 0;
   border-radius: 12px;
-  background: rgba(232, 240, 226, 0.7);
+  background: transparent;
   color: #4c7540;
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 
 .et-page .et-refresh-icon {
@@ -129,14 +151,12 @@
 }
 
 .et-page .et-refresh.is-error {
-  background: rgba(254, 230, 230, 0.72);
-  border-color: rgba(193, 74, 74, 0.32);
+  background: transparent;
   color: #c14a4a;
 }
 .et-page .et-refresh.is-error .et-refresh-icon { background: rgba(193, 74, 74, 0.16); color: #c14a4a; }
 .et-page .et-refresh.is-loading {
-  background: rgba(252, 240, 217, 0.75);
-  border-color: rgba(201, 136, 26, 0.32);
+  background: transparent;
   color: #c9881a;
 }
 .et-page .et-refresh.is-loading .et-refresh-icon { background: rgba(232, 158, 30, 0.18); color: #c9881a; }
