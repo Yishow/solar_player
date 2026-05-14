@@ -13,11 +13,24 @@ type SolarMetricBinding = {
   fallbackIndex: number;
   fallbackValue?: string;
   fallbackHelper?: string;
-  icon: string;
+  iconKey: SolarKpiIconKey;
   key: SolarMetricKey;
   label: string;
   unit: string;
 };
+
+type SolarFlowAssetKey =
+  | "solar-panel-display"
+  | "inverter-display"
+  | "factory-consumption-display"
+  | "carbon-reduction-display";
+
+type SolarKpiIconKey =
+  | "metric-generation-sun"
+  | "metric-self-consumption"
+  | "metric-co2-today"
+  | "metric-co2-total"
+  | "metric-efficiency";
 
 type BuildSolarViewModelArgs = {
   isSocketConnected: boolean;
@@ -25,19 +38,43 @@ type BuildSolarViewModelArgs = {
 };
 
 const kpiBindings: SolarMetricBinding[] = [
-  { fallbackIndex: 1, icon: "☀️", key: "todayGeneration", label: "今日發電量", unit: "kWh" },
-  { fallbackIndex: 2, icon: "🏭", key: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
-  { fallbackIndex: 3, icon: "🌿", key: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
+  {
+    fallbackIndex: 1,
+    iconKey: "metric-generation-sun",
+    key: "todayGeneration",
+    label: "今日發電量",
+    unit: "kWh"
+  },
+  {
+    fallbackIndex: 2,
+    iconKey: "metric-self-consumption",
+    key: "selfConsumptionRatio",
+    label: "自發自用比例",
+    unit: "%"
+  },
+  {
+    fallbackIndex: 3,
+    iconKey: "metric-co2-today",
+    key: "todayCo2Reduction",
+    label: "今日減碳量",
+    unit: "t"
+  },
   {
     fallbackHelper: "累積成果",
     fallbackIndex: 3,
     fallbackValue: "9,842",
-    icon: "🍃",
+    iconKey: "metric-co2-total",
     key: "totalCo2Reduction",
     label: "累積減碳量",
     unit: "t"
   },
-  { fallbackIndex: 4, icon: "🛰️", key: "systemEfficiency", label: "系統效率", unit: "%" }
+  {
+    fallbackIndex: 4,
+    iconKey: "metric-efficiency",
+    key: "systemEfficiency",
+    label: "系統效率",
+    unit: "%"
+  }
 ];
 
 function formatMetricValue(value: number, unit: string | null) {
@@ -78,22 +115,46 @@ export function buildSolarViewModel({
   snapshot
 }: BuildSolarViewModelArgs) {
   const power = resolveMetricValue(
-    { fallbackIndex: 0, icon: "⚡", key: "realTimePower", label: "即時功率", unit: "kW" },
+    {
+      fallbackIndex: 0,
+      iconKey: "metric-generation-sun",
+      key: "realTimePower",
+      label: "即時功率",
+      unit: "kW"
+    },
     isSocketConnected,
     snapshot
   );
   const efficiency = resolveMetricValue(
-    { fallbackIndex: 4, icon: "🛰️", key: "systemEfficiency", label: "系統效率", unit: "%" },
+    {
+      fallbackIndex: 4,
+      iconKey: "metric-efficiency",
+      key: "systemEfficiency",
+      label: "系統效率",
+      unit: "%"
+    },
     isSocketConnected,
     snapshot
   );
   const selfConsumption = resolveMetricValue(
-    { fallbackIndex: 2, icon: "🏭", key: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
+    {
+      fallbackIndex: 2,
+      iconKey: "metric-self-consumption",
+      key: "selfConsumptionRatio",
+      label: "自發自用比例",
+      unit: "%"
+    },
     isSocketConnected,
     snapshot
   );
   const co2Today = resolveMetricValue(
-    { fallbackIndex: 3, icon: "🌿", key: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
+    {
+      fallbackIndex: 3,
+      iconKey: "metric-co2-today",
+      key: "todayCo2Reduction",
+      label: "今日減碳量",
+      unit: "t"
+    },
     isSocketConnected,
     snapshot
   );
@@ -101,26 +162,26 @@ export function buildSolarViewModel({
   return {
     flowNodes: [
       {
+        assetKey: "solar-panel-display" as SolarFlowAssetKey,
         footnote: "Solar Panels",
-        icon: "☀️",
         label: "太陽能板",
         value: `${power.value} ${power.unit}`
       },
       {
+        assetKey: "inverter-display" as SolarFlowAssetKey,
         footnote: "Inverter",
-        icon: "🔄",
         label: "變流器",
         value: `${efficiency.value}${efficiency.unit}`
       },
       {
+        assetKey: "factory-consumption-display" as SolarFlowAssetKey,
         footnote: "Factory Consumption",
-        icon: "🏭",
         label: "工廠用電",
         value: `${selfConsumption.value}${selfConsumption.unit}`
       },
       {
+        assetKey: "carbon-reduction-display" as SolarFlowAssetKey,
         footnote: "Carbon Reduction",
-        icon: "🌿",
         label: "減碳效益",
         value: `${co2Today.value} ${co2Today.unit}`
       }
@@ -135,7 +196,7 @@ export function buildSolarViewModel({
 
       return {
         helper: resolved.helper,
-        icon: binding.icon,
+        iconKey: binding.iconKey,
         label: binding.label,
         unit: resolved.unit,
         value: resolved.value

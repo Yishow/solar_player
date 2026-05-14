@@ -23,6 +23,7 @@ export function buildSustainabilityViewModel({
     bigNumbers: [
       {
         helper: "Total Generation",
+        iconKey: "bars" as const,
         label: "累積發電量",
         unit: "GWh",
         value:
@@ -32,6 +33,7 @@ export function buildSustainabilityViewModel({
       },
       {
         helper: "Total CO₂ Reduction",
+        iconKey: "co2" as const,
         label: "累積 CO₂ 減量",
         unit: "t",
         value: (summary?.accumulatedCarbonReductionTons ?? fallbackSummary.accumulatedCarbonReductionTons).toLocaleString(
@@ -40,6 +42,7 @@ export function buildSustainabilityViewModel({
       },
       {
         helper: "Annual Energy Saving",
+        iconKey: "leaf" as const,
         label: "年度節能成效",
         unit: "%",
         value: fallbackSummary.annualEnergySavingPercent.toFixed(1)
@@ -47,11 +50,13 @@ export function buildSustainabilityViewModel({
     ],
     esgCards: [
       {
+        iconKey: "procure" as const,
         label: "綠色採購金額",
         subtitle: "Green Procurement",
         value: "NT$ 60 M+"
       },
       {
+        iconKey: "esg-doc" as const,
         items: [
           "推動再生能源使用",
           "落實節能減碳行動",
@@ -61,6 +66,7 @@ export function buildSustainabilityViewModel({
         subtitle: "ESG Highlights"
       },
       {
+        iconKey: "tree" as const,
         label: "相當於種樹",
         subtitle: "Trees Planted",
         value: (summary?.plantedTreeEquivalent ?? fallbackSummary.plantedTreeEquivalent).toLocaleString("zh-TW")

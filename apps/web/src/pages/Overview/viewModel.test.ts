@@ -31,6 +31,7 @@ test("buildOverviewViewModel prefers live metrics when socket data is available"
   assert.equal(model.metrics.length, 5);
   assert.equal(model.metrics[0]?.value, "612");
   assert.equal(model.metrics[0]?.unit, "kW");
+  assert.equal(model.metrics[0]?.iconKey, "bolt");
   assert.match(model.metrics[0]?.helper ?? "", /最後更新/);
   assert.equal(model.metrics[1]?.value, "3,842");
 });
@@ -47,5 +48,6 @@ test("buildOverviewViewModel falls back to mock presentation when live metrics a
 
   assert.equal(model.metrics[0]?.label, "即時功率");
   assert.equal(model.metrics[0]?.value, "586");
+  assert.equal(model.metrics[4]?.iconKey, "leaf");
   assert.equal(model.summary.statusLabel, "Socket 未連線，顯示 mock 資料");
 });

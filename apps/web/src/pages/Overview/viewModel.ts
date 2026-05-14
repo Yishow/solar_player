@@ -10,7 +10,7 @@ type OverviewMetricKey =
 
 type OverviewMetricCard = {
   fallbackIndex: number;
-  icon: string;
+  iconKey: OverviewMetricIconKey;
   key: OverviewMetricKey;
   label: string;
   unit: string;
@@ -26,12 +26,14 @@ type OverviewStatus = "connected" | "connecting" | "disconnected";
 
 export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
 
+type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
+
 const metricCards: OverviewMetricCard[] = [
-  { fallbackIndex: 0, icon: "⚡", key: "realTimePower", label: "即時功率", unit: "kW" },
-  { fallbackIndex: 1, icon: "☀️", key: "todayGeneration", label: "今日發電量", unit: "kWh" },
-  { fallbackIndex: 2, icon: "🏭", key: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
-  { fallbackIndex: 3, icon: "🌿", key: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
-  { fallbackIndex: 4, icon: "🛰️", key: "systemEfficiency", label: "系統效率", unit: "%" }
+  { fallbackIndex: 0, iconKey: "bolt", key: "realTimePower", label: "即時功率", unit: "kW" },
+  { fallbackIndex: 1, iconKey: "sun", key: "todayGeneration", label: "今日發電量", unit: "kWh" },
+  { fallbackIndex: 2, iconKey: "bars", key: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
+  { fallbackIndex: 3, iconKey: "co2", key: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
+  { fallbackIndex: 4, iconKey: "leaf", key: "systemEfficiency", label: "系統效率", unit: "%" }
 ];
 
 function formatMetricValue(value: number, unit: string | null) {
@@ -78,14 +80,14 @@ export function buildOverviewViewModel({
       subtitle: "Driving a Better Future with Green Manufacturing",
       titleLines: ["以綠色製造", "驅動美好生活"]
     },
-    metrics: metricCards.map(({ fallbackIndex, icon, key, label, unit }) => {
+    metrics: metricCards.map(({ fallbackIndex, iconKey, key, label, unit }) => {
       const fallbackMetric = liveMetrics[fallbackIndex]!;
       const liveMetric = snapshot.metrics[key];
 
       if (!isSocketConnected || !liveMetric) {
         return {
           helper: fallbackMetric.helper,
-          icon,
+          iconKey,
           label,
           unit,
           value: fallbackMetric.value
@@ -94,7 +96,7 @@ export function buildOverviewViewModel({
 
       return {
         helper: `最後更新 ${formatHelperTimestamp(liveMetric.timestamp)}`,
-        icon,
+        iconKey,
         label,
         unit: liveMetric.unit ?? unit,
         value: formatMetricValue(liveMetric.value, liveMetric.unit ?? unit)

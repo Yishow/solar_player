@@ -1,5 +1,6 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { LayoutShell } from "../layouts/LayoutShell";
+import { ManagementShell } from "../layouts/ManagementShell";
 import { CircuitSettings } from "../pages/CircuitSettings";
 import { DeviceStatus } from "../pages/DeviceStatus";
 import { EnergyHistory } from "../pages/EnergyHistory";
@@ -17,13 +18,13 @@ import { Sustainability } from "../pages/Sustainability";
 
 export const router = createBrowserRouter([
   {
+    index: true,
     path: "/",
+    element: <Navigate to="/overview" replace />
+  },
+  {
     element: <LayoutShell />,
     children: [
-      {
-        index: true,
-        element: <Navigate to="/overview" replace />
-      },
       {
         path: "overview",
         element: <Overview />
@@ -43,7 +44,12 @@ export const router = createBrowserRouter([
       {
         path: "sustainability",
         element: <Sustainability />
-      },
+      }
+    ]
+  },
+  {
+    element: <ManagementShell />,
+    children: [
       {
         path: "trends",
         element: <EnergyTrend />

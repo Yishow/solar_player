@@ -1,16 +1,70 @@
-import { MediaSlot } from "../../components/MediaSlot";
-import { Sparkline } from "../../components/Sparkline";
+import { solarAssetRuntimeMap } from "./assets";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
-import { trendSeries } from "../../mocks/metrics";
-import { PageScaffold } from "../shared/PageScaffold";
+import {
+  solarConnectorLayout,
+  solarFlowNodeLayout,
+  solarHeroLayout,
+  solarKpiLayout,
+  solarTitleLayout
+} from "./layout";
+import "./solar.css";
 import { buildSolarViewModel } from "./viewModel";
-import solarHeroImage from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-carport-hero.png";
-import solarPanelImage from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/solar-panel-display-source.png";
-import inverterImage from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/inverter-display-source.png";
-import factoryImage from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/factory-consumption-display-source.png";
-import carbonImage from "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png";
 
-const flowImages = [solarPanelImage, inverterImage, factoryImage, carbonImage];
+const CONTENT_TOP_OFFSET = 146;
+
+const flowNodeOrder = [
+  {
+    assetKey: "solar-panel-display",
+    key: "solar"
+  },
+  {
+    assetKey: "inverter-display",
+    key: "inverter"
+  },
+  {
+    assetKey: "factory-consumption-display",
+    key: "factory"
+  },
+  {
+    assetKey: "carbon-reduction-display",
+    key: "co2"
+  }
+] as const;
+
+const kpiCardOrder = [
+  {
+    englishLabel: "Today's Generation",
+    iconKey: "metric-generation-sun",
+    key: "generation"
+  },
+  {
+    englishLabel: "Self-consumption Ratio",
+    iconKey: "metric-self-consumption",
+    key: "selfConsumption"
+  },
+  {
+    englishLabel: "Today's CO2 Reduction",
+    iconKey: "metric-co2-today",
+    key: "co2"
+  },
+  {
+    englishLabel: "Total CO2 Reduction",
+    iconKey: "metric-co2-total",
+    key: "totalCo2"
+  },
+  {
+    englishLabel: "System Efficiency",
+    iconKey: "metric-efficiency",
+    key: "efficiency"
+  }
+] as const;
+
+function withContentOffset<T extends { top: number }>(layout: T) {
+  return {
+    ...layout,
+    top: layout.top - CONTENT_TOP_OFFSET
+  };
+}
 
 export function Solar() {
   const { isSocketConnected, snapshot } = useLiveMetrics();
@@ -19,103 +73,164 @@ export function Solar() {
     snapshot
   });
 
+  const titleLayout = withContentOffset(solarTitleLayout);
+  const heroLayout = withContentOffset(solarHeroLayout);
+  const goldLineLayout = withContentOffset({
+    left: 0,
+    top: 500,
+    width: 1075
+  });
+  const leafLayout = withContentOffset({
+    height: 132,
+    left: 565,
+    top: 330,
+    width: 190
+  });
+
   return (
-    <PageScaffold
-      path="/solar"
-      description="太陽能發電流程：面板 → 變流器 → 配電 → 效益。"
-    >
-      <section className="relative grid min-h-[560px] grid-cols-12 gap-6 overflow-hidden">
-        <div className="pointer-events-none absolute left-0 top-[58%] h-px w-[58%] bg-gradient-to-r from-accent-sun-500/0 via-accent-sun-500/70 to-accent-sun-500/0" />
-        <div className="pointer-events-none absolute left-[30%] top-[34%] h-24 w-56 rounded-full bg-brand-100/60 blur-3xl" />
+    <section className="solar-display-page">
+      <div
+        className="solar-leaf-watermark"
+        style={{
+          height: `${leafLayout.height}px`,
+          left: `${leafLayout.left}px`,
+          top: `${leafLayout.top}px`,
+          width: `${leafLayout.width}px`
+        }}
+      />
 
-        <div className="col-span-7 flex min-h-[560px] flex-col justify-between">
-          <div className="pt-2">
-            <p className="font-en text-sm uppercase tracking-[0.28em] text-brand-700">
-              {viewModel.hero.eyebrow}
-            </p>
-            <h2 className="mt-5 text-[64px] font-bold leading-[1.05] tracking-[0.08em] text-brand-900">
-              {viewModel.hero.titleLines[0]}
-              <br />
-              {viewModel.hero.titleLines[1]}
-            </h2>
-            <p className="mt-5 max-w-2xl text-2xl leading-[1.45] text-neutral-600">
-              {viewModel.hero.subtitleLines[0]}
-            </p>
-            <p className="mt-2 max-w-xl font-en text-xl leading-[1.35] text-brand-700">
-              {viewModel.hero.subtitleLines[1]}
-            </p>
-          </div>
+      <div
+        className="solar-gold-line"
+        style={{
+          left: `${goldLineLayout.left}px`,
+          top: `${goldLineLayout.top}px`,
+          width: `${goldLineLayout.width}px`
+        }}
+      />
 
-          <MediaSlot density="playback" className="h-[220px] rounded-[30px] p-0">
-            <img
-              alt="太陽能車棚與綠能展示場域"
-              className="h-full w-full object-cover object-center"
-              src={solarHeroImage}
-            />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/28 via-white/6 to-transparent" />
-          </MediaSlot>
-        </div>
-
-        <div className="col-span-5 rounded-[32px] border border-white/70 bg-white/62 p-5 shadow-panel backdrop-blur">
-          <div className="grid grid-cols-2 gap-4">
-            {viewModel.flowNodes.map((node, index) => (
-              <article
-                key={node.label}
-                className={[
-                  "rounded-[28px] border border-[#d5b55f]/50 bg-white/82 p-5 shadow-card",
-                  index === viewModel.flowNodes.length - 1 ? "col-span-2" : ""
-                ].join(" ")}
-              >
-                <div className="flex h-full flex-col items-center text-center">
-                  <img
-                    alt={node.label}
-                    className="h-24 w-24 object-contain"
-                    src={flowImages[index]}
-                  />
-                  <h3 className="mt-5 text-2xl font-semibold tracking-[0.14em] text-brand-900">
-                    {node.label}
-                  </h3>
-                  <p className="mt-2 font-en text-sm uppercase tracking-[0.24em] text-neutral-500">
-                    {node.footnote}
-                  </p>
-                  <p className="mt-6 text-4xl font-bold text-brand-900">{node.value}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
+      <section
+        className="solar-title-group"
+        style={{
+          left: `${titleLayout.left}px`,
+          top: `${titleLayout.top}px`,
+          width: `${titleLayout.width}px`
+        }}
+      >
+        <p className="solar-eyebrow">{viewModel.hero.eyebrow}</p>
+        <h2 className="solar-display-title">
+          {viewModel.hero.titleLines[0]}
+          <br />
+          製造<em>新能源</em>
+        </h2>
+        <p className="solar-subtitle">
+          {viewModel.hero.subtitleLines[0]}
+          <span>{viewModel.hero.subtitleLines[1]}</span>
+        </p>
       </section>
 
-      <section className="grid grid-cols-5 gap-4">
-        {viewModel.kpis.map((metric) => (
+      <figure
+        className="solar-hero-banner"
+        style={{
+          height: `${heroLayout.height}px`,
+          left: `${heroLayout.left}px`,
+          top: `${heroLayout.top}px`,
+          width: `${heroLayout.width}px`
+        }}
+      >
+        <img
+          alt="太陽能車棚與綠能展示場域"
+          className="solar-hero-image"
+          src={solarAssetRuntimeMap.hero}
+        />
+        <div className="solar-hero-fade" />
+      </figure>
+
+      {flowNodeOrder.map((flowItem, index) => {
+        const node = viewModel.flowNodes[index]!;
+        const layout = withContentOffset(solarFlowNodeLayout[flowItem.key]);
+        const assetSrc = solarAssetRuntimeMap.flow[node.assetKey];
+
+        return (
+          <article
+            key={node.label}
+            className={[
+              "solar-flow-node",
+              flowItem.key === "co2" ? "solar-flow-node-co2" : ""
+            ].join(" ")}
+            style={{
+              height: `${layout.height}px`,
+              left: `${layout.left}px`,
+              top: `${layout.top}px`,
+              width: `${layout.width}px`
+            }}
+          >
+            <img alt={node.label} className="solar-flow-icon" src={assetSrc} />
+            <h3>{node.label}</h3>
+            <p>{node.footnote}</p>
+            <div className="solar-flow-value">{node.value}</div>
+          </article>
+        );
+      })}
+
+      <div
+        className="solar-connector"
+        style={{
+          height: `${solarConnectorLayout.solarToInverter.height}px`,
+          left: `${solarConnectorLayout.solarToInverter.left}px`,
+          top: `${solarConnectorLayout.solarToInverter.top - CONTENT_TOP_OFFSET}px`,
+          width: `${solarConnectorLayout.solarToInverter.width}px`
+        }}
+      />
+      <div
+        className="solar-connector"
+        style={{
+          height: `${solarConnectorLayout.inverterToFactory.height}px`,
+          left: `${solarConnectorLayout.inverterToFactory.left}px`,
+          top: `${solarConnectorLayout.inverterToFactory.top - CONTENT_TOP_OFFSET}px`,
+          width: `${solarConnectorLayout.inverterToFactory.width}px`
+        }}
+      />
+      <div
+        className="solar-connector solar-connector-orange solar-connector-l"
+        style={{
+          height: `${solarConnectorLayout.inverterToCo2.height}px`,
+          left: `${solarConnectorLayout.inverterToCo2.left}px`,
+          top: `${solarConnectorLayout.inverterToCo2.top - CONTENT_TOP_OFFSET}px`,
+          width: `${solarConnectorLayout.inverterToCo2.width}px`
+        }}
+      />
+
+      {kpiCardOrder.map((cardItem, index) => {
+        const metric = viewModel.kpis[index]!;
+        const layout = withContentOffset(solarKpiLayout[cardItem.key]);
+        const assetSrc = solarAssetRuntimeMap.kpi[metric.iconKey];
+
+        return (
           <article
             key={metric.label}
-            className="rounded-[28px] border border-white/75 bg-white/92 px-6 py-5 shadow-card backdrop-blur"
+            className="solar-kpi-card"
+            style={{
+              height: `${layout.height}px`,
+              left: `${layout.left}px`,
+              top: `${layout.top}px`,
+              width: `${layout.width}px`
+            }}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="solar-kpi-head">
+              <img alt={metric.label} className="solar-kpi-icon" src={assetSrc} />
               <div>
-                <p className="text-sm font-semibold tracking-[0.08em] text-neutral-600">
-                  {metric.label}
-                </p>
-                <p className="mt-1 font-en text-xs uppercase tracking-[0.18em] text-brand-700">
-                  Solar KPI
-                </p>
-              </div>
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-2xl shadow-soft">
-                {metric.icon}
+                <h3>{metric.label}</h3>
+                <p>{cardItem.englishLabel}</p>
               </div>
             </div>
-            <div className="mt-8 flex items-end gap-3">
-              <p className="text-[50px] font-bold leading-none text-brand-900">{metric.value}</p>
-              <span className="pb-1 font-en text-lg font-semibold uppercase tracking-[0.14em] text-brand-700">
-                {metric.unit}
-              </span>
+            <div className="solar-kpi-value-row">
+              <span className="solar-kpi-value">{metric.value}</span>
+              <span className="solar-kpi-unit">{metric.unit}</span>
             </div>
-            <Sparkline className="mt-4 h-14" values={trendSeries} />
-            <p className="mt-3 text-sm leading-6 text-neutral-600">{metric.helper}</p>
+            <p className="solar-kpi-helper">{metric.helper}</p>
           </article>
-        ))}
-      </section>
-    </PageScaffold>
+        );
+      })}
+    </section>
   );
 }

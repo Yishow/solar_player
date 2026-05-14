@@ -1,0 +1,256 @@
+.sustainability-display-page {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sustainability-display-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(110, 117, 103, 0.3);
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.sustainability-title,
+.sustainability-copy,
+.sustainability-leaf-watermark,
+.sustainability-hero,
+.sustainability-highlight-rail,
+.sustainability-kpi-card,
+.sustainability-stat-card {
+  position: absolute;
+}
+
+.sustainability-title {
+  z-index: 8;
+}
+
+.sustainability-eyebrow {
+  margin: 0 0 22px;
+  color: #4f7d3d;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 9px;
+}
+
+.sustainability-display-title {
+  margin: 0;
+  color: #313538;
+  font-size: 88px;
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: 6px;
+}
+
+.sustainability-display-title em {
+  color: #5b8046;
+  font-style: normal;
+}
+
+.sustainability-subtitle {
+  margin: 22px 0 0;
+  color: #616667;
+  font-family: var(--font-family-en);
+  font-size: 27px;
+}
+
+.sustainability-copy {
+  z-index: 8;
+  color: #4e5550;
+  font-size: 17px;
+  line-height: 1.78;
+}
+
+.sustainability-copy-line {
+  margin: 0;
+}
+
+.sustainability-copy-en {
+  display: block;
+  margin-top: 14px;
+  color: #6f756d;
+  font-family: var(--font-family-en);
+  font-size: 14px;
+  line-height: 1.82;
+}
+
+.sustainability-leaf-watermark {
+  opacity: 0.42;
+}
+
+.sustainability-leaf-watermark::before,
+.sustainability-leaf-watermark::after {
+  content: "";
+  position: absolute;
+  border-radius: 90% 0 90% 0;
+  background: linear-gradient(135deg, rgba(129, 149, 103, 0.24), rgba(129, 149, 103, 0.08));
+  transform: rotate(-28deg);
+}
+
+.sustainability-leaf-watermark::before {
+  width: 150px;
+  height: 74px;
+}
+
+.sustainability-leaf-watermark::after {
+  left: 98px;
+  top: 42px;
+  width: 98px;
+  height: 50px;
+}
+
+.sustainability-hero {
+  overflow: hidden;
+}
+
+.sustainability-hero img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+}
+
+.sustainability-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 253, 247, 0.96) 0%, rgba(255, 253, 247, 0.72) 15%, rgba(255, 253, 247, 0.18) 36%, rgba(255, 253, 247, 0) 56%);
+}
+
+.sustainability-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 253, 247, 0) 54%, rgba(255, 253, 247, 0.58) 88%, rgba(255, 253, 247, 0.8) 100%);
+}
+
+.sustainability-kpi-card,
+.sustainability-stat-card {
+  z-index: 12;
+  border: 1px solid rgba(155, 139, 92, 0.28);
+  border-radius: 24px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: 0 12px 28px rgba(96, 81, 56, 0.11);
+}
+
+.sustainability-card-head {
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sustainability-card-icon {
+  width: 50px;
+  height: 50px;
+  color: #6a8a50;
+}
+
+.sustainability-card-head h3 {
+  margin: 0 0 4px;
+  color: #384039;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.sustainability-card-head p {
+  margin: 0;
+  color: #70766f;
+  font-family: var(--font-family-en);
+  font-size: 12px;
+}
+
+.sustainability-card-value {
+  position: absolute;
+  left: 44px;
+  top: 108px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.sustainability-card-value span {
+  color: #57774a;
+  font-size: 66px;
+  font-weight: 800;
+  line-height: 0.88;
+}
+
+.sustainability-card-value small {
+  margin-bottom: 8px;
+  color: #566152;
+  font-size: 22px;
+}
+
+.sustainability-sparkline,
+.sustainability-trees-sparkline {
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  bottom: 22px;
+  height: 28px;
+}
+
+.sustainability-growth-note {
+  position: absolute;
+  left: 44px;
+  bottom: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #626862;
+  font-size: 16px;
+}
+
+.sustainability-growth-note svg {
+  width: 22px;
+  height: 22px;
+  color: #7fa45c;
+}
+
+.sustainability-stat-value {
+  position: absolute;
+  left: 28px;
+  bottom: 54px;
+  color: #57774a;
+  font-size: 66px;
+  font-weight: 800;
+  line-height: 0.88;
+}
+
+.sustainability-stat-procure {
+  position: absolute;
+  left: 28px;
+  bottom: 54px;
+  color: #57774a;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sustainability-stat-desc {
+  position: absolute;
+  left: 28px;
+  bottom: 22px;
+  margin: 0;
+  color: #666d66;
+  font-size: 17px;
+}
+
+.sustainability-esg-list {
+  position: absolute;
+  left: 30px;
+  top: 94px;
+  margin: 0;
+  padding-left: 20px;
+  color: #525951;
+  font-size: 16px;
+  line-height: 1.82;
+}

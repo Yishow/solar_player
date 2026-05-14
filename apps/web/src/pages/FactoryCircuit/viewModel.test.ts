@@ -107,10 +107,13 @@ test("buildFactoryCircuitViewModel centralizes threshold mapping by power and ke
   assert.equal(model.loadRows.length, 6);
   assert.equal(model.loadRows[0]?.statusLabel, "警告");
   assert.equal(model.loadRows[0]?.statusTone, "danger");
+  assert.equal(model.loadRows[0]?.iconKey, "production-line");
   assert.equal(model.loadRows[1]?.statusLabel, "注意");
   assert.equal(model.loadRows[1]?.statusTone, "warning");
+  assert.equal(model.flowNodes[2]?.iconKey, "switchboard");
   assert.equal(model.loadRows[2]?.isEmpty, true);
   assert.equal(model.kpis[0]?.value, "1,230");
+  assert.equal(model.kpis[0]?.iconKey, "bolt");
   assert.equal(model.kpis[1]?.value, "33");
   assert.equal(model.kpis[4]?.value, "供應中");
 });

@@ -11,7 +11,9 @@ test("buildSustainabilityViewModel falls back to readable storytelling cards whe
 
   assert.equal(model.bigNumbers[0]?.value, "18.6");
   assert.equal(model.bigNumbers[0]?.unit, "GWh");
+  assert.equal(model.bigNumbers[0]?.iconKey, "bars");
   assert.equal(model.bigNumbers[1]?.value, "9,842");
+  assert.equal(model.esgCards[0]?.iconKey, "procure");
   assert.equal(model.esgCards.length, 3);
   assert.match(model.hero.copyZhLines[0] ?? "", /國瑞汽車致力推動綠色製造/);
 });
@@ -24,5 +26,6 @@ test("buildSustainabilityViewModel keeps the sustainability witness numbers alig
 
   assert.equal(model.bigNumbers[0]?.value, "18.6");
   assert.equal(model.bigNumbers[1]?.value, "9,842");
+  assert.equal(model.esgCards[2]?.iconKey, "tree");
   assert.equal(model.esgCards[2] && "value" in model.esgCards[2] ? model.esgCards[2].value : null, "25,600");
 });

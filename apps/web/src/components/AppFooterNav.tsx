@@ -10,8 +10,12 @@ export function AppFooterNav() {
   const managementTabs = routeMetaList.filter((route) => route.group === "management");
 
   return (
-    <footer className="shrink-0 border-t border-white/70 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex h-[var(--footer-height)] max-w-[var(--screen-width)] items-center justify-between gap-6 px-page-x">
+    <footer
+      data-shell-primitive="footer-nav"
+      className="relative shrink-0 overflow-hidden border-t border-white/70 bg-white/80 backdrop-blur"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-700/40 to-transparent" />
+      <div className="flex h-[var(--footer-height)] w-full items-center justify-between gap-6 px-page-x">
         <div className="flex items-center gap-4">
           <PageNumberPill current={currentRoute.order} total={routeMetaList.length} />
           <div>

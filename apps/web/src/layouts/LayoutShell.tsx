@@ -3,7 +3,9 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
+import { DisplayCanvas } from "../components/DisplayCanvas";
 import { useMqttStatus } from "../hooks/useMqttStatus";
+import { solarShellMeta } from "../pages/Solar/layout";
 import { shouldRedirectToOffline } from "./offlineRouting";
 import { usePageRotation } from "../hooks/usePageRotation";
 
@@ -12,6 +14,7 @@ export function LayoutShell() {
   const navigate = useNavigate();
   const { isHydrated, status } = useMqttStatus();
   const routeMeta = routeMetaMap.get(location.pathname);
+  const headerMeta = location.pathname === "/solar" ? solarShellMeta : undefined;
 
   usePageRotation({
     currentPath: location.pathname,
@@ -42,14 +45,8 @@ export function LayoutShell() {
   }, [isHydrated, location.pathname, navigate, status.connected, status.reason]);
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(245,248,241,0.98)_38%,_rgba(234,241,229,1)_100%)] text-neutral-900">
-      <div className="mx-auto flex h-full max-w-[var(--screen-width)] flex-col">
-        <AppHeader />
-        <main className="min-h-0 flex-1 overflow-auto">
-          <Outlet />
-        </main>
-        <AppFooterNav />
-      </div>
-    </div>
+    <DisplayCanvas header={<AppHeader meta={headerMeta} />} footer={<AppFooterNav />}>
+      <Outlet />
+    </DisplayCanvas>
   );
 }

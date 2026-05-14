@@ -14,6 +14,21 @@ type CircuitSlotKey =
   | "ev"
   | "infrastructure";
 
+export type FactoryCircuitIconKey =
+  | "bolt"
+  | "bars"
+  | "leaf"
+  | "production-line"
+  | "hvac"
+  | "lighting"
+  | "office"
+  | "ev"
+  | "infrastructure"
+  | "solar"
+  | "inverter"
+  | "switchboard"
+  | "sun";
+
 type BuildFactoryCircuitViewModelArgs = {
   circuits: FactoryCircuitRuntime[];
   connectionState: SocketConnectionState["status"];
@@ -24,7 +39,7 @@ type BuildFactoryCircuitViewModelArgs = {
 type CircuitSlotDefinition = {
   defaultEn: string;
   defaultZh: string;
-  icon: string;
+  iconKey: FactoryCircuitIconKey;
   key: CircuitSlotKey;
   sharePercent: number;
 };
@@ -37,42 +52,42 @@ const slotDefinitions: CircuitSlotDefinition[] = [
   {
     defaultEn: "Production Line",
     defaultZh: "生產線用電",
-    icon: "🏭",
+    iconKey: "production-line",
     key: "production",
     sharePercent: 45
   },
   {
     defaultEn: "HVAC & Environment",
     defaultZh: "空調與環境設備",
-    icon: "❄️",
+    iconKey: "hvac",
     key: "hvac",
     sharePercent: 20
   },
   {
     defaultEn: "Lighting",
     defaultZh: "照明系統",
-    icon: "💡",
+    iconKey: "lighting",
     key: "lighting",
     sharePercent: 10
   },
   {
     defaultEn: "Office & Common Area",
     defaultZh: "辦公與公共區域",
-    icon: "👥",
+    iconKey: "office",
     key: "office",
     sharePercent: 10
   },
   {
     defaultEn: "EV / Green Facility",
     defaultZh: "充電設備 / 綠能設施",
-    icon: "🔋",
+    iconKey: "ev",
     key: "ev",
     sharePercent: 10
   },
   {
     defaultEn: "Infrastructure",
     defaultZh: "其他基礎設施",
-    icon: "🏢",
+    iconKey: "infrastructure",
     key: "infrastructure",
     sharePercent: 5
   }
@@ -212,7 +227,8 @@ export function buildFactoryCircuitViewModel({
 
     if (!circuit) {
       return {
-        icon: slot.icon,
+        fallbackSharePercent: slot.sharePercent,
+        iconKey: slot.iconKey,
         isEmpty: true,
         labelEn: slot.defaultEn,
         labelZh: slot.defaultZh,
@@ -235,7 +251,8 @@ export function buildFactoryCircuitViewModel({
     const status = resolveStatus(circuit);
 
     return {
-      icon: slot.icon,
+      fallbackSharePercent: slot.sharePercent,
+      iconKey: slot.iconKey,
       isEmpty: false,
       labelEn: circuit.nameEn ?? slot.defaultEn,
       labelZh: circuit.nameZh ?? slot.defaultZh,
@@ -258,9 +275,9 @@ export function buildFactoryCircuitViewModel({
             title: "目前沒有可播放的迴路資料"
           },
     flowNodes: [
-      { icon: "☀️", label: "太陽能板", subtitle: "PV Modules" },
-      { icon: "🔄", label: "逆變器", subtitle: "Inverter" },
-      { icon: "🔌", label: "配電盤", subtitle: "Switchboard" }
+      { iconKey: "solar", key: "solar" as const, label: "太陽能板", subtitle: "PV Modules" },
+      { iconKey: "inverter", key: "inverter" as const, label: "逆變器", subtitle: "Inverter" },
+      { iconKey: "switchboard", key: "board" as const, label: "配電盤", subtitle: "Switchboard" }
     ],
     hero: {
       copyEnLines: [
@@ -281,35 +298,35 @@ export function buildFactoryCircuitViewModel({
     kpis: [
       {
         helper: `${loadRows.filter((row) => !row.isEmpty).length || slotDefinitions.length} 個迴路面板`,
-        icon: "⚡",
+        iconKey: "bolt",
         label: "目前廠區總用電",
         unit: "kW",
         value: formatNumber(totalPowerForDisplay)
       },
       {
         helper: "Solar Supply Share",
-        icon: "🟡",
+        iconKey: "sun",
         label: "太陽能供應占比",
         unit: "%",
         value: formatNumber(Math.round((solarSourceKw / totalPowerForDisplay) * 100))
       },
       {
         helper: "Today's Self-consumption",
-        icon: "☀️",
+        iconKey: "sun",
         label: "今日自發自用電量",
         unit: "kWh",
         value: formatNumber(selfConsumptionKwh)
       },
       {
         helper: "Estimated Peak Load",
-        icon: "📊",
+        iconKey: "bars",
         label: "尖峰負載",
         unit: "kW",
         value: formatNumber(hasCircuitData ? Math.round(totalPowerKw * 1.45) : 1860)
       },
       {
         helper: loadState === "error" ? "Circuit API Fallback" : "Green Energy Routing",
-        icon: "🌿",
+        iconKey: "leaf",
         label: "目前綠電流向",
         unit: loadState === "error" ? "Fallback" : "Normal",
         value: flowState
