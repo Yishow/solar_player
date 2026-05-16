@@ -17,10 +17,9 @@
     radial-gradient(circle at 78% 12%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 34%),
     linear-gradient(120deg, #fffdf7 0%, #f8f4e9 74%, #f2efe5 100%);
   --shell-stage-overlay:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0) 20%),
     radial-gradient(circle at 20% 88%, rgba(108, 132, 82, 0.11), transparent 17%);
-  --shell-header-bg: rgba(255, 255, 250, 0.93);
-  --shell-footer-bg: rgba(255, 253, 247, 0.88);
+  --shell-header-bg: transparent;
+  --shell-footer-bg: transparent;
   --shell-bar-border: rgba(171, 166, 154, 0.48);
   --shell-bar-shadow: none;
   --shell-divider: rgba(198, 192, 179, 0.56);

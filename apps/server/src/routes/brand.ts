@@ -70,6 +70,42 @@ function serializeRow(row: BrandProfileRow): BrandProfile {
   };
 }
 
+function clearLogoMetadata(id: number) {
+  getDatabase()
+    .prepare(
+      `UPDATE brand_profiles
+          SET logo_filename = NULL,
+              logo_mime_type = NULL,
+              logo_width = NULL,
+              logo_height = NULL,
+              logo_file_size = NULL,
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`
+    )
+    .run(id);
+}
+
+function repairMissingLogoMetadata(row: BrandProfileRow): BrandProfileRow {
+  if (!row.logo_filename) {
+    return row;
+  }
+
+  const filePath = resolve(config.brandUploadsDir, row.logo_filename);
+  if (existsSync(filePath)) {
+    return row;
+  }
+
+  clearLogoMetadata(row.id);
+  return {
+    ...row,
+    logo_filename: null,
+    logo_mime_type: null,
+    logo_width: null,
+    logo_height: null,
+    logo_file_size: null
+  };
+}
+
 function getAllProfiles(): BrandProfileRow[] {
   return getDatabase()
     .prepare(
@@ -79,11 +115,12 @@ function getAllProfiles(): BrandProfileRow[] {
          FROM brand_profiles
          ORDER BY is_active DESC, id ASC`
     )
-    .all() as BrandProfileRow[];
+    .all()
+    .map((row) => repairMissingLogoMetadata(row as BrandProfileRow)) as BrandProfileRow[];
 }
 
 function getProfileById(id: number): BrandProfileRow | undefined {
-  return getDatabase()
+  const row = getDatabase()
     .prepare(
       `SELECT id, name, brand_name_zh, brand_name_en, product_title_zh, product_title_en,
               slogan_zh, slogan_en, logo_filename, logo_mime_type, logo_width, logo_height,
@@ -91,6 +128,8 @@ function getProfileById(id: number): BrandProfileRow | undefined {
          FROM brand_profiles WHERE id = ?`
     )
     .get(id) as BrandProfileRow | undefined;
+
+  return row ? repairMissingLogoMetadata(row) : undefined;
 }
 
 function ensureBrandDir() {
@@ -152,9 +191,10 @@ const brandRoute: FastifyPluginAsync = async (app) => {
       )
       .get() as BrandProfileRow | undefined;
     if (!row) return notFound(reply);
+
     return {
       success: true,
-      data: serializeRow(row),
+      data: serializeRow(repairMissingLogoMetadata(row)),
       timestamp: new Date().toISOString()
     };
   });

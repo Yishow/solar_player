@@ -137,6 +137,61 @@ test("GET /api/brand/profiles returns the seeded active brand profile", async ()
   }
 });
 
+test("GET /api/brand/profiles clears stale logo metadata when the uploaded file is missing", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearBrandProfiles();
+
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE brand_profiles
+        SET logo_filename = ?,
+            logo_mime_type = ?,
+            logo_width = ?,
+            logo_height = ?,
+            logo_file_size = ?
+      WHERE is_active = 1`
+  ).run("missing-logo.png", "image/png", 330, 330, 3553);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/brand/profiles"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { success: boolean; data: BrandProfile[] };
+    assert.equal(body.success, true);
+    assert.equal(body.data[0]?.logoFilename, null);
+    assert.equal(body.data[0]?.logoUrl, null);
+    assert.equal(body.data[0]?.logoWidth, null);
+    assert.equal(body.data[0]?.logoHeight, null);
+    assert.equal(body.data[0]?.logoFileSize, null);
+
+    const repaired = db
+      .prepare(
+        "SELECT logo_filename, logo_mime_type, logo_width, logo_height, logo_file_size FROM brand_profiles WHERE is_active = 1"
+      )
+      .get() as {
+      logo_filename: string | null;
+      logo_mime_type: string | null;
+      logo_width: number | null;
+      logo_height: number | null;
+      logo_file_size: number | null;
+    };
+
+    assert.equal(repaired.logo_filename, null);
+    assert.equal(repaired.logo_mime_type, null);
+    assert.equal(repaired.logo_width, null);
+    assert.equal(repaired.logo_height, null);
+    assert.equal(repaired.logo_file_size, null);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/brand/profiles creates a non-active brand profile", async () => {
   migrateDatabase();
   seedDatabase();

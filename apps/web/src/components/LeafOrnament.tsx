@@ -6,17 +6,21 @@ type LeafOrnamentProps = {
 export function LeafOrnament({ className, variant = "logo" }: LeafOrnamentProps) {
   if (variant === "footer-mini") {
     return (
-      <span
-        aria-hidden
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 30 26"
+        fill="none"
+        stroke="#789467"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         className={["inline-block", className ?? ""].join(" ")}
-        style={{
-          width: "22px",
-          height: "28px",
-          border: "1.5px solid rgba(83, 123, 68, 0.45)",
-          borderRadius: "60% 0 60% 0",
-          transform: "rotate(-20deg)"
-        }}
-      />
+        style={{ width: "26px", height: "22px", transform: "translateY(-2px)" }}
+        aria-hidden="true"
+      >
+        <path d="M24 3C13 4 5 11 5 22C16 22 23 13 24 3Z" />
+        <path d="M7 21C12 14 17 9 23 4" />
+      </svg>
     );
   }
 

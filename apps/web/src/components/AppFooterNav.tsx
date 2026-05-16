@@ -158,39 +158,26 @@ export function AppFooterNav() {
 }
 
 function FooterBranch() {
-  const stroke = "var(--shell-branch-stroke)";
-
   return (
     <svg
-      width="120"
-      height="44"
-      viewBox="0 0 120 44"
+      width="176"
+      height="72"
+      viewBox="0 0 176 72"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 opacity-90 animate-branch"
+      className="shrink-0 opacity-90 relative z-10 animate-branch"
+      style={{ transform: "translateY(-4px)" }}
+      stroke="var(--shell-branch-stroke, #9aa05e)"
+      strokeWidth="1.45"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* Main curved branch */}
-      <path
-        d="M 5 40 Q 60 40 115 5"
-        stroke={stroke}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* Upper leaf */}
-      <path
-        d="M 75 22 Q 90 15 100 5"
-        stroke={stroke}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      {/* Lower leaf */}
-      <path
-        d="M 40 33 Q 60 25 70 12"
-        stroke={stroke}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M3 61C55 76 119 49 166 7" />
+      <path d="M55 54C49 33 60 17 80 7C84 31 76 47 55 54Z" fill="#fffdf7" fillOpacity=".26" />
+      <path d="M106 37C101 18 112 4 133 1C134 22 125 34 106 37Z" fill="#fffdf7" fillOpacity=".22" />
+      <path d="M135 25C138 9 152 2 172 1C167 18 154 26 135 25Z" fill="#fffdf7" fillOpacity=".2" />
+      <path d="M70 45C84 39 98 31 111 21 M119 34C132 28 144 20 154 10" />
     </svg>
   );
 }
