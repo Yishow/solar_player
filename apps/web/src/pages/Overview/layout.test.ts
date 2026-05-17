@@ -9,8 +9,6 @@ import {
   overviewSummaryLayout,
   overviewTitleLayout
 } from "./layout";
-import { solarKpiLayout } from "../Solar/layout";
-
 test("overview layout centralizes reference hero and KPI geometry", () => {
   assert.deepEqual(overviewTitleLayout, {
     left: 86,
@@ -19,9 +17,9 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
   });
   assert.deepEqual(overviewHeroLayout, {
     height: 820,
-    left: 540,
+    left: 430,
     top: 140,
-    width: 1340
+    width: 1490
   });
   assert.deepEqual(overviewLeafLayout, {
     height: 168,
@@ -39,11 +37,52 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
     top: 602,
     width: 376
   });
-  assert.deepEqual(overviewKpiLayout.power, solarKpiLayout.generation);
-  assert.deepEqual(overviewKpiLayout.today, solarKpiLayout.selfConsumption);
-  assert.deepEqual(overviewKpiLayout.total, solarKpiLayout.co2);
-  assert.deepEqual(overviewKpiLayout.co2Today, solarKpiLayout.totalCo2);
-  assert.deepEqual(overviewKpiLayout.co2Total, solarKpiLayout.efficiency);
+  assert.deepEqual(overviewKpiLayout.power, {
+    height: 250,
+    left: 40,
+    top: 760,
+    width: 352
+  });
+  assert.deepEqual(overviewKpiLayout.today, {
+    height: 250,
+    left: 412,
+    top: 760,
+    width: 352
+  });
+  assert.deepEqual(overviewKpiLayout.total, {
+    height: 250,
+    left: 784,
+    top: 760,
+    width: 352
+  });
+  assert.deepEqual(overviewKpiLayout.co2Today, {
+    height: 250,
+    left: 1156,
+    top: 760,
+    width: 352
+  });
+  assert.deepEqual(overviewKpiLayout.co2Total, {
+    height: 250,
+    left: 1528,
+    top: 760,
+    width: 352
+  });
+
+  const orderedCards = [
+    overviewKpiLayout.power,
+    overviewKpiLayout.today,
+    overviewKpiLayout.total,
+    overviewKpiLayout.co2Today,
+    overviewKpiLayout.co2Total
+  ];
+  const expectedGap = 20;
+
+  for (let index = 0; index < orderedCards.length - 1; index += 1) {
+    const current = orderedCards[index]!;
+    const next = orderedCards[index + 1]!;
+
+    assert.equal(next.left - (current.left + current.width), expectedGap);
+  }
 });
 
 test("overview asset map keeps hero image page-local", () => {
