@@ -46,7 +46,7 @@ test("buildOverviewViewModel falls back to mock presentation when live metrics a
     }
   });
 
-  assert.equal(model.metrics[0]?.label, "即時功率");
+  assert.equal(model.metrics[0]?.label, "即時發電功率");
   assert.equal(model.metrics[0]?.value, "586");
   assert.equal(model.metrics[4]?.iconKey, "leaf");
   assert.equal(model.summary.statusLabel, "Socket 未連線，顯示 mock 資料");

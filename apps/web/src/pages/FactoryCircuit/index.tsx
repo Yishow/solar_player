@@ -227,7 +227,7 @@ export function FactoryCircuit() {
       >
         <p className="factory-circuit-eyebrow">{viewModel.hero.eyebrow}</p>
         <h2 className="factory-circuit-display-title">
-          廠區用電迴<em>路</em>
+          廠區用電迴路
         </h2>
         <p className="factory-circuit-subtitle">{viewModel.hero.subtitle}</p>
       </section>

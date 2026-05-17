@@ -1,3 +1,5 @@
+import { solarKpiLayout } from "../Solar/layout";
+
 export const overviewTitleLayout = {
   left: 86,
   top: 172,
@@ -5,7 +7,7 @@ export const overviewTitleLayout = {
 } as const;
 
 export const overviewHeroLayout = {
-  height: 700,
+  height: 820,
   left: 540,
   top: 140,
   width: 1340
@@ -31,36 +33,11 @@ export const overviewSummaryLayout = {
 } as const;
 
 export const overviewKpiLayout = {
-  co2Today: {
-    height: 228,
-    left: 1168,
-    top: 724,
-    width: 332
-  },
-  co2Total: {
-    height: 228,
-    left: 1518,
-    top: 724,
-    width: 366
-  },
-  power: {
-    height: 228,
-    left: 32,
-    top: 724,
-    width: 362
-  },
-  today: {
-    height: 228,
-    left: 411,
-    top: 724,
-    width: 366
-  },
-  total: {
-    height: 228,
-    left: 794,
-    top: 724,
-    width: 357
-  }
+  co2Today: solarKpiLayout.totalCo2,
+  co2Total: solarKpiLayout.efficiency,
+  power: solarKpiLayout.generation,
+  today: solarKpiLayout.selfConsumption,
+  total: solarKpiLayout.co2
 } as const;
 
 export const overviewAssetMap = {

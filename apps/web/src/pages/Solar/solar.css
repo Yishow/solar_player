@@ -20,9 +20,9 @@
 }
 
 .solar-eyebrow {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   color: #4f7d3d;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: 9px;
 }
@@ -30,9 +30,9 @@
 .solar-display-title {
   margin: 0;
   color: #313538;
-  font-size: 78px;
+  font-size: 80px;
   font-weight: 800;
-  line-height: 1.13;
+  line-height: 1.15;
   letter-spacing: 6px;
 }
 
@@ -42,9 +42,9 @@
 }
 
 .solar-subtitle {
-  margin: 16px 0 0;
+  margin: 20px 0 0;
   color: #646968;
-  font-size: 21px;
+  font-size: 22px;
   line-height: 1.45;
 }
 

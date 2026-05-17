@@ -12,8 +12,8 @@ import {
 
 test("images layout centralizes title, media stage, and thumbnail geometry", () => {
   assert.deepEqual(imagesTitleLayout, {
-    left: 78,
-    top: 192,
+    left: 88,
+    top: 166,
     width: 560
   });
   assert.deepEqual(imagesCounterLayout, {

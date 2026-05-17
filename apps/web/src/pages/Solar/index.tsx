@@ -122,7 +122,7 @@ export function Solar() {
         <h2 className="solar-display-title">
           {viewModel.hero.titleLines[0]}
           <br />
-          製造<em>新能源</em>
+          製造<em>新能量</em>
         </h2>
         <p className="solar-subtitle">
           {viewModel.hero.subtitleLines[0]}

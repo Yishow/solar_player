@@ -3,8 +3,8 @@ import { sustainabilityAssetMap } from "./assets";
 export { sustainabilityAssetMap };
 
 export const sustainabilityTitleLayout = {
-  left: 68,
-  top: 176,
+  left: 88,
+  top: 166,
   width: 470
 } as const;
 
@@ -30,42 +30,42 @@ export const sustainabilityHeroLayout = {
 
 export const sustainabilityKpiLayout = {
   annualSaving: {
-    height: 232,
+    height: 220,
     left: 684,
-    top: 706,
+    top: 760,
     width: 304
   },
   totalCo2: {
-    height: 232,
+    height: 220,
     left: 362,
-    top: 706,
+    top: 760,
     width: 304
   },
   totalGeneration: {
-    height: 232,
+    height: 220,
     left: 40,
-    top: 706,
+    top: 760,
     width: 304
   }
 } as const;
 
 export const sustainabilityStatLayout = {
   esg: {
-    height: 232,
+    height: 220,
     left: 1330,
-    top: 706,
+    top: 760,
     width: 304
   },
   procure: {
-    height: 232,
+    height: 220,
     left: 1008,
-    top: 706,
+    top: 760,
     width: 304
   },
   trees: {
-    height: 232,
+    height: 220,
     left: 1652,
-    top: 706,
+    top: 760,
     width: 236
   }
 } as const;

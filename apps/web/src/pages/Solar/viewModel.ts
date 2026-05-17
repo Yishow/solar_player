@@ -189,7 +189,7 @@ export function buildSolarViewModel({
     hero: {
       eyebrow: "綠能驅動・永續未來",
       subtitleLines: ["乾淨的太陽能，為工廠注入綠色動能", "Clean solar energy powers our factory"],
-      titleLines: ["太陽能驅動", "製造新能源"]
+      titleLines: ["太陽能驅動", "製造新能量"]
     },
     kpis: kpiBindings.map((binding) => {
       const resolved = resolveMetricValue(binding, isSocketConnected, snapshot);

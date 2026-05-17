@@ -1,6 +1,5 @@
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
-import { StatusBadge } from "../../components/StatusBadge";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
@@ -98,7 +97,11 @@ export function Overview() {
           <br />
           驅動美好生活
         </h2>
-        <p className="overview-hero-subtitle">{viewModel.hero.subtitle}</p>
+        <p className="overview-hero-subtitle">
+          {viewModel.hero.subtitleLines[0]}
+          <br />
+          {viewModel.hero.subtitleLines[1]}
+        </p>
       </section>
 
       <figure
@@ -113,18 +116,6 @@ export function Overview() {
         <img alt="國瑞汽車中廠綠能展示場域" src={overviewAssetRuntimeMap.hero} />
       </figure>
 
-      <section
-        className="overview-summary"
-        style={{
-          left: `${summaryLayout.left}px`,
-          top: `${summaryLayout.top}px`,
-          width: `${summaryLayout.width}px`
-        }}
-      >
-        <StatusBadge density="playback" status={viewModel.summary.status} label={viewModel.summary.statusLabel} />
-        <p>聚焦即時功率、日發電量、自發自用與減碳成果，作為播放首頁的第一層敘事。</p>
-      </section>
-
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;
         const layout = withContentOffset(overviewKpiLayout[cardItem.key]);
@@ -132,10 +123,7 @@ export function Overview() {
         return (
           <article
             key={metric.label}
-            className={[
-              "overview-kpi-card",
-              cardItem.key === "co2Today" ? "overview-kpi-card-highlight" : ""
-            ].join(" ")}
+            className="overview-kpi-card"
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -147,7 +135,7 @@ export function Overview() {
               <div
                 className={[
                   "overview-kpi-icon-shell",
-                  metric.iconKey === "sun" ? "overview-kpi-icon-accent" : ""
+                  metric.accentColor ? "overview-kpi-icon-accent" : ""
                 ].join(" ")}
               >
                 <ReferenceGlyph className="overview-kpi-icon" name={metric.iconKey} />
@@ -162,7 +150,6 @@ export function Overview() {
               <span className="overview-kpi-unit">{metric.unit}</span>
             </div>
             <Sparkline className="overview-kpi-sparkline" values={trendSeries} />
-            <p className="overview-kpi-helper">{metric.helper}</p>
           </article>
         );
       })}

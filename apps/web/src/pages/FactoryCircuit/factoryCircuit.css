@@ -32,9 +32,9 @@
 .factory-circuit-display-title {
   margin: 0;
   color: #313538;
-  font-size: 72px;
+  font-size: 80px;
   font-weight: 800;
-  line-height: 1.08;
+  line-height: 1.15;
   letter-spacing: 6px;
 }
 
@@ -44,10 +44,11 @@
 }
 
 .factory-circuit-subtitle {
-  margin: 16px 0 0;
+  margin: 20px 0 0;
   color: #5f6561;
   font-family: var(--font-family-en);
   font-size: 26px;
+  line-height: 1.4;
 }
 
 .factory-circuit-copy {

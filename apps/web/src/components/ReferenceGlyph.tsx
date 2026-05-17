@@ -24,92 +24,57 @@ export function ReferenceGlyph({ className, name }: ReferenceGlyphProps) {
   switch (name) {
     case "bolt":
       return (
-        <svg
-          aria-hidden="true"
-          className={iconClassName(className)}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.4"
-          viewBox="0 0 64 64"
-        >
-          <path d="M36 4 L14 36 H31 L26 60 L50 24 H33 Z" />
-          <path d="M31 8 L22 31 H36" />
-          <circle cx="39" cy="46" r="4" />
-          <path d="M14 54 H38" />
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <path d="M36 4L14 36H32L26 60L50 28H34L38 4Z" fill="currentColor" fillOpacity="0.15" />
+          <path d="M34 6L16 34H32L28 58L48 26H34L36 6Z" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="44" cy="16" r="3" fill="currentColor" opacity="0.4" />
+          <circle cx="20" cy="48" r="1.5" fill="currentColor" opacity="0.4" />
         </svg>
       );
     case "sun":
       return (
-        <svg
-          aria-hidden="true"
-          className={iconClassName(className)}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.4"
-          viewBox="0 0 64 64"
-        >
-          <circle cx="32" cy="32" r="11" />
-          <circle cx="32" cy="32" r="5" />
-          <path d="M32 5 V15 M32 49 V59 M5 32 H15 M49 32 H59 M13 13 L20 20 M44 44 L51 51 M51 13 L44 20 M20 44 L13 51" />
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="12" fill="currentColor" fillOpacity="0.15" />
+          <circle cx="32" cy="32" r="10" stroke="currentColor" strokeWidth="2.4" />
+          <path d="M32 4V12 M32 52V60 M4 32H12 M52 32H60 M12.2 12.2L17.8 17.8 M46.2 46.2L51.8 51.8 M12.2 51.8L17.8 46.2 M46.2 12.2L51.8 17.8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="22" stroke="currentColor" strokeWidth="1" strokeDasharray="2 6" opacity="0.4" />
         </svg>
       );
     case "bars":
       return (
-        <svg
-          aria-hidden="true"
-          className={iconClassName(className)}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.4"
-          viewBox="0 0 64 64"
-        >
-          <path d="M10 53 H54" />
-          <rect x="14" y="31" width="7" height="16" rx="1" />
-          <rect x="29" y="14" width="7" height="33" rx="1" />
-          <rect x="44" y="24" width="7" height="23" rx="1" />
-          <path d="M17 25 H21 M32 8 H36 M47 18 H51" />
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <rect x="14" y="36" width="8" height="20" rx="2" fill="currentColor" fillOpacity="0.15" />
+          <rect x="28" y="24" width="8" height="32" rx="2" fill="currentColor" fillOpacity="0.2" />
+          <rect x="42" y="12" width="8" height="44" rx="2" fill="currentColor" fillOpacity="0.3" />
+          <rect x="14" y="36" width="8" height="20" rx="2" stroke="currentColor" strokeWidth="2.4" />
+          <rect x="28" y="24" width="8" height="32" rx="2" stroke="currentColor" strokeWidth="2.4" />
+          <rect x="42" y="12" width="8" height="44" rx="2" stroke="currentColor" strokeWidth="2.4" />
+          <path d="M6 56H58" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M18 26 L26 18 L34 22 L46 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="46" cy="6" r="3" fill="currentColor" />
         </svg>
       );
     case "co2":
       return (
-        <svg
-          aria-hidden="true"
-          className={iconClassName(className)}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.2"
-          viewBox="0 0 64 64"
-        >
-          <path d="M16 47 C9 47 5 42 6 36 C7 31 11 28 16 28 C18 18 27 12 38 15 C46 17 51 23 52 31 C58 32 61 37 60 43 C59 48 55 52 48 52 H18" />
-          <circle cx="24" cy="38" r="7" />
-          <path d="M34 32 H44 C49 32 51 35 51 39 C51 43 48 45 44 45 H35 L50 52 H34 Z" />
-          <circle cx="54" cy="51" r="3" />
-          <path d="M20 38 C20 34 23 31 27 32 M39 37 H47" />
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <path d="M18 22 A 8 8 0 0 1 34 22 A 10 10 0 0 1 54 26 A 8 8 0 0 1 48 40 H 20 A 10 10 0 0 1 18 22 Z" fill="currentColor" fillOpacity="0.15" />
+          <path d="M20 24 A 8 8 0 0 1 36 24 A 10 10 0 0 1 56 28 A 8 8 0 0 1 50 42 H 22 A 10 10 0 0 1 20 24 Z" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M38 46 L38 58 M32 52 L38 58 L44 52" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M26 30 C 24.5 28.5 21 28.5 19.5 30 C 17.5 32 17.5 36 19.5 38 C 21 39.5 24.5 39.5 26 38" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <rect x="28" y="29" width="6" height="10" rx="3" stroke="currentColor" strokeWidth="2.4" />
+          <path d="M37 36 C 37 34 40 34 40 36 C 40 38 36 40 36 42 H 41" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "leaf":
       return (
-        <svg
-          aria-hidden="true"
-          className={iconClassName(className)}
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.2"
-          viewBox="0 0 64 64"
-        >
-          <path d="M52 10 C31 12 13 27 13 48 C31 49 48 36 52 10 Z" />
-          <path d="M17 47 C27 36 36 27 49 15" />
-          <path d="M28 36 C25 33 24 28 25 24 M37 28 C34 25 33 21 34 17 M22 43 C19 42 17 40 15 37" />
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <path d="M34 8C34 8 58 10 58 34C58 48 44 58 32 58C18 58 6 44 6 32C6 14 34 8 34 8Z" fill="currentColor" fillOpacity="0.15" />
+          <path d="M32 6C32 6 60 8 60 36C60 52 44 62 30 62C14 62 2 48 2 34C2 12 32 6 32 6Z" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M30 62C30 62 30 40 44 24" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M34 46L46 40" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M40 34L52 28" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M26 38C26 38 18 30 18 22C18 14 28 10 28 10C28 10 38 14 38 22C38 30 26 38 26 38Z" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="rgba(255, 253, 247, 0.9)" />
+          <path d="M26 38V10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
       );
     case "plug":

@@ -9,6 +9,7 @@ import {
   overviewSummaryLayout,
   overviewTitleLayout
 } from "./layout";
+import { solarKpiLayout } from "../Solar/layout";
 
 test("overview layout centralizes reference hero and KPI geometry", () => {
   assert.deepEqual(overviewTitleLayout, {
@@ -17,7 +18,7 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
     width: 642
   });
   assert.deepEqual(overviewHeroLayout, {
-    height: 700,
+    height: 820,
     left: 540,
     top: 140,
     width: 1340
@@ -38,12 +39,11 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
     top: 602,
     width: 376
   });
-  assert.deepEqual(overviewKpiLayout.co2Today, {
-    height: 228,
-    left: 1168,
-    top: 724,
-    width: 332
-  });
+  assert.deepEqual(overviewKpiLayout.power, solarKpiLayout.generation);
+  assert.deepEqual(overviewKpiLayout.today, solarKpiLayout.selfConsumption);
+  assert.deepEqual(overviewKpiLayout.total, solarKpiLayout.co2);
+  assert.deepEqual(overviewKpiLayout.co2Today, solarKpiLayout.totalCo2);
+  assert.deepEqual(overviewKpiLayout.co2Total, solarKpiLayout.efficiency);
 });
 
 test("overview asset map keeps hero image page-local", () => {

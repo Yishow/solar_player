@@ -82,7 +82,7 @@ export function buildSustainabilityViewModel({
         "國瑞汽車致力推動綠色製造，落實環境管理與資源循環，",
         "以行動實踐企業永續承諾，與社會共創更美好的未來。"
       ],
-      eyebrow: "綠 能 驅 動 ・ 永 續 未 來",
+      eyebrow: "綠能驅動・永續未來",
       subtitle: "Sustainability in Action",
       title: ["永續成果", "持續累積"]
     },

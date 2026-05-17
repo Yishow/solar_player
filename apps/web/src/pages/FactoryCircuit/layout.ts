@@ -1,10 +1,12 @@
+import { solarKpiLayout } from "../Solar/layout";
+
 export const factoryCircuitLayoutMeta = {
   pageNumber: "03"
 } as const;
 
 export const factoryCircuitTitleLayout = {
-  left: 78,
-  top: 190,
+  left: 88,
+  top: 166,
   width: 590
 } as const;
 
@@ -114,40 +116,10 @@ export const factoryCircuitLoadRowLayout = [
 ] as const;
 
 export const factoryCircuitKpiLayout = {
-  flow: {
-    height: 210,
-    left: 1546,
-    top: 748,
-    width: 340
-  },
-  peak: {
-    height: 210,
-    left: 1168,
-    top: 748,
-    width: 360
-  },
-  routing: {
-    height: 196,
-    left: 1556,
-    top: 760,
-    width: 308
-  },
-  selfConsumption: {
-    height: 210,
-    left: 790,
-    top: 748,
-    width: 360
-  },
-  solarShare: {
-    height: 210,
-    left: 412,
-    top: 748,
-    width: 360
-  },
-  totalPower: {
-    height: 210,
-    left: 34,
-    top: 748,
-    width: 360
-  }
+  flow: solarKpiLayout.efficiency,
+  peak: solarKpiLayout.totalCo2,
+  routing: solarKpiLayout.efficiency,
+  selfConsumption: solarKpiLayout.co2,
+  solarShare: solarKpiLayout.selfConsumption,
+  totalPower: solarKpiLayout.generation
 } as const;

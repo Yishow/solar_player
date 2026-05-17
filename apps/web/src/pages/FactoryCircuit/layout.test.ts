@@ -8,11 +8,12 @@ import {
   factoryCircuitNodeLayout,
   factoryCircuitTitleLayout
 } from "./layout";
+import { solarKpiLayout } from "../Solar/layout";
 
 test("factory circuit layout centralizes the reference geometry for the playback body", () => {
   assert.deepEqual(factoryCircuitTitleLayout, {
-    left: 78,
-    top: 190,
+    left: 88,
+    top: 166,
     width: 590
   });
   assert.deepEqual(factoryCircuitNodeLayout.board, {
@@ -32,11 +33,10 @@ test("factory circuit layout centralizes the reference geometry for the playback
     top: 146,
     width: 470
   });
-  assert.deepEqual(factoryCircuitKpiLayout.routing, {
-    height: 196,
-    left: 1556,
-    top: 760,
-    width: 308
-  });
+  assert.deepEqual(factoryCircuitKpiLayout.totalPower, solarKpiLayout.generation);
+  assert.deepEqual(factoryCircuitKpiLayout.solarShare, solarKpiLayout.selfConsumption);
+  assert.deepEqual(factoryCircuitKpiLayout.selfConsumption, solarKpiLayout.co2);
+  assert.deepEqual(factoryCircuitKpiLayout.peak, solarKpiLayout.totalCo2);
+  assert.deepEqual(factoryCircuitKpiLayout.flow, solarKpiLayout.efficiency);
   assert.equal(factoryCircuitLayoutMeta.pageNumber, "03");
 });

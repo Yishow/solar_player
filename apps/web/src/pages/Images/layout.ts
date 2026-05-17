@@ -1,6 +1,6 @@
 export const imagesTitleLayout = {
-  left: 78,
-  top: 192,
+  left: 88,
+  top: 166,
   width: 560
 } as const;
 

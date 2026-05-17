@@ -4,11 +4,12 @@ import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/
 type OverviewMetricKey =
   | "realTimePower"
   | "todayGeneration"
-  | "selfConsumptionRatio"
+  | "totalGeneration"
   | "todayCo2Reduction"
-  | "systemEfficiency";
+  | "totalCo2Reduction";
 
 type OverviewMetricCard = {
+  accentColor: boolean;
   fallbackIndex: number;
   iconKey: OverviewMetricIconKey;
   key: OverviewMetricKey;
@@ -29,11 +30,11 @@ export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
 type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
 
 const metricCards: OverviewMetricCard[] = [
-  { fallbackIndex: 0, iconKey: "bolt", key: "realTimePower", label: "即時功率", unit: "kW" },
-  { fallbackIndex: 1, iconKey: "sun", key: "todayGeneration", label: "今日發電量", unit: "kWh" },
-  { fallbackIndex: 2, iconKey: "bars", key: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
-  { fallbackIndex: 3, iconKey: "co2", key: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
-  { fallbackIndex: 4, iconKey: "leaf", key: "systemEfficiency", label: "系統效率", unit: "%" }
+  { accentColor: false, fallbackIndex: 0, iconKey: "bolt", key: "realTimePower",     label: "即時發電功率",   unit: "kW"  },
+  { accentColor: true,  fallbackIndex: 1, iconKey: "sun",  key: "todayGeneration",   label: "今日發電量",     unit: "kWh" },
+  { accentColor: false, fallbackIndex: 2, iconKey: "bars", key: "totalGeneration",   label: "累積發電量",     unit: "GWh" },
+  { accentColor: false, fallbackIndex: 3, iconKey: "co2",  key: "todayCo2Reduction", label: "今日 CO₂ 減量",  unit: "t"   },
+  { accentColor: false, fallbackIndex: 4, iconKey: "leaf", key: "totalCo2Reduction", label: "累積 CO₂ 減量",  unit: "t"   }
 ];
 
 function formatMetricValue(value: number, unit: string | null) {
@@ -77,15 +78,16 @@ export function buildOverviewViewModel({
   return {
     hero: {
       eyebrow: "綠能驅動・永續未來",
-      subtitle: "Driving a Better Future with Green Manufacturing",
+      subtitleLines: ["Driving a Better Future with", "Green Manufacturing"],
       titleLines: ["以綠色製造", "驅動美好生活"]
     },
-    metrics: metricCards.map(({ fallbackIndex, iconKey, key, label, unit }) => {
+    metrics: metricCards.map(({ accentColor, fallbackIndex, iconKey, key, label, unit }) => {
       const fallbackMetric = liveMetrics[fallbackIndex]!;
       const liveMetric = snapshot.metrics[key];
 
       if (!isSocketConnected || !liveMetric) {
         return {
+          accentColor: accentColor,
           helper: fallbackMetric.helper,
           iconKey,
           label,
@@ -95,6 +97,7 @@ export function buildOverviewViewModel({
       }
 
       return {
+        accentColor: accentColor,
         helper: `最後更新 ${formatHelperTimestamp(liveMetric.timestamp)}`,
         iconKey,
         label,
