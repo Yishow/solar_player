@@ -77,6 +77,27 @@ test("clampCanvasRect keeps geometry inside the FHD editor bounds", () => {
   );
 });
 
+test("clampCanvasRect falls back to minimum dimensions when incoming geometry is incomplete", () => {
+  const rect = clampCanvasRect(
+    {
+      height: undefined as unknown as number,
+      left: 24,
+      top: 18,
+      width: 220
+    },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    }
+  );
+
+  assert.equal(rect.height, 80);
+  assert.equal(rect.width, 220);
+  assert.equal(rect.top, 18);
+});
+
 test("resolveViewportAfterZoom keeps the focus point stable while zooming", () => {
   const next = resolveViewportAfterZoom(
     { offsetX: 0, offsetY: 0, zoom: 1 },

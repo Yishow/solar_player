@@ -38,11 +38,21 @@ export type CanvasViewport = {
   zoom: number;
 };
 
+function normalizeCanvasCoordinate(value: number) {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function normalizeCanvasDimension(value: number, fallback: number) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 export function clampCanvasRect(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasRect {
-  const width = Math.max(constraint.minWidth, Math.min(rect.width, constraint.canvasWidth));
-  const height = Math.max(constraint.minHeight, Math.min(rect.height, constraint.canvasHeight));
-  const left = Math.max(0, Math.min(rect.left, constraint.canvasWidth - width));
-  const top = Math.max(0, Math.min(rect.top, constraint.canvasHeight - height));
+  const normalizedWidth = normalizeCanvasDimension(rect.width, constraint.minWidth);
+  const normalizedHeight = normalizeCanvasDimension(rect.height, constraint.minHeight);
+  const width = Math.max(constraint.minWidth, Math.min(normalizedWidth, constraint.canvasWidth));
+  const height = Math.max(constraint.minHeight, Math.min(normalizedHeight, constraint.canvasHeight));
+  const left = Math.max(0, Math.min(normalizeCanvasCoordinate(rect.left), constraint.canvasWidth - width));
+  const top = Math.max(0, Math.min(normalizeCanvasCoordinate(rect.top), constraint.canvasHeight - height));
 
   return {
     height,
