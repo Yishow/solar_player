@@ -12,13 +12,6 @@ import {
 
 type PlaybackSettingsUpdateBody = Partial<PlaybackSettings>;
 
-type PlaybackPageUpdateInput = {
-  id: number;
-  enabled?: boolean;
-  displayOrder?: number;
-  durationSeconds?: number;
-};
-
 type PlaybackPagesUpdateBody = {
   pages: PlaybackPageUpdateInput[];
 };
