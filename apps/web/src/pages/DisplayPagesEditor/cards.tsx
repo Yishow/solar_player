@@ -1,5 +1,5 @@
-import React from "react";
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DisplayEditorCanvasOverlay, DisplayEditorInspectorFields, type ResolvedDisplayEditorRegion } from "./inspectorFields";
 
 export function DisplayEditorCanvasCard({
@@ -27,8 +27,21 @@ export function DisplayEditorCanvasCard({
   viewportHeight: number;
   viewportWidth: number;
 }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setScale(entry.contentRect.width / viewportWidth);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [viewportWidth]);
+
   return (
-    <article className="rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(252,251,246,0.96)] p-5 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+    <article className="self-start rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(252,251,246,0.96)] p-5 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-[var(--shell-subtitle-ink)]">
@@ -50,11 +63,17 @@ export function DisplayEditorCanvasCard({
         </div>
       </div>
       {controls}
-      <div className="mt-5 overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7]">
+      <div
+        ref={wrapperRef}
+        className="mt-5 w-full overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7]"
+        style={{ aspectRatio: `${viewportWidth} / ${viewportHeight}` }}
+      >
         <div
           className="relative overflow-hidden"
           style={{
             height: `${viewportHeight}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
             width: `${viewportWidth}px`
           }}
         >
