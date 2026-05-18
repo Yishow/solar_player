@@ -1,7 +1,7 @@
 import type { DisplayPageKey } from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DisplayPageEditorAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
@@ -38,6 +38,14 @@ export type DisplayEditorPageDefinition = {
   renderPreview?: (config: Record<string, unknown>) => ReactElement;
 };
 
+function renderDisplayEditorFallback(label: string) {
+  return (
+    <div className="flex h-full items-center justify-center bg-[#e8eddf] text-[40px] font-semibold text-[var(--shell-title-ink)]">
+      {label}
+    </div>
+  );
+}
+
 export function DisplayPagesEditor({
   initialEditorState,
   initialPublishingStateByPage,
@@ -53,13 +61,21 @@ export function DisplayPagesEditor({
   pageDefinitions?: DisplayEditorPageDefinition[];
   renderPreview?: boolean;
 }) {
-  const pageIdSet = useMemo(() => new Set(pageDefinitions.map((page) => page.id)), [pageDefinitions]);
+  const resolvedPageDefinitions = useMemo(
+    () => (pageDefinitions.length > 0 ? pageDefinitions : fallbackPageDefinitions),
+    [pageDefinitions]
+  );
+  const defaultPageId = resolvedPageDefinitions[0]?.id ?? "overview";
+  const pageIdSet = useMemo(
+    () => new Set(resolvedPageDefinitions.map((page) => page.id)),
+    [resolvedPageDefinitions]
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
   const selectedPageId =
     requestedPageId && pageIdSet.has(requestedPageId as DisplayPageKey)
       ? (requestedPageId as DisplayPageKey)
-      : "overview";
+      : defaultPageId;
   const [editMode, setEditMode] = useState(initialEditorState?.editMode ?? false);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
   const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
@@ -70,7 +86,10 @@ export function DisplayPagesEditor({
         : {}
   );
 
-  const selectedPage = useMemo(() => pageDefinitions.find((page) => page.id === selectedPageId) ?? pageDefinitions[0]!, [selectedPageId]);
+  const selectedPage = useMemo(
+    () => resolvedPageDefinitions.find((page) => page.id === selectedPageId) ?? resolvedPageDefinitions[0]!,
+    [resolvedPageDefinitions, selectedPageId]
+  );
   const seedConfig = useMemo(() => selectedPage.createSeedConfig(), [selectedPage]);
   const {
     applyConfigUpdate,
@@ -96,7 +115,10 @@ export function DisplayPagesEditor({
     setConfig((current) => setValueAtPath(current, path, value));
   };
   const editableRegions = useMemo(() => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.id), seedConfig), [config, seedConfig, selectedPage.id]);
-  const selectedRegion = editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null;
+  const selectedRegion = useMemo(
+    () => editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null,
+    [editableRegions, selectedRegionId]
+  );
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
   const regionPresetOptions = useMemo(() => resolveRegionPresetOptions(selectedRegion, editableRegions), [editableRegions, selectedRegion]);
@@ -134,9 +156,11 @@ export function DisplayPagesEditor({
     }
   }, [editMode, editableRegions, selectedRegionId]);
 
-  useDisplayEditorKeybinding(() => {
+  const toggleEditMode = useCallback(() => {
     setEditMode((current) => !current);
-  });
+  }, []);
+
+  useDisplayEditorKeybinding(toggleEditMode);
 
   const handleReload = async () => {
     await reload();
@@ -164,6 +188,16 @@ export function DisplayPagesEditor({
     selectedRegion,
     undo
   });
+  const previewContent = useMemo(() => {
+    if (!renderPreview || !selectedPage.renderPreview) {
+      return renderDisplayEditorFallback(selectedPage.label);
+    }
+
+    return React.createElement(
+      selectedPage.renderPreview as unknown as React.ComponentType<Record<string, unknown>>,
+      config
+    );
+  }, [config, renderPreview, selectedPage]);
 
   return (
     <PageScaffold
@@ -203,7 +237,7 @@ export function DisplayPagesEditor({
               [selectedPage.id]: toggleRegionLock(current[selectedPage.id] ?? [], regionId)
             }));
           }}
-          pageDefinitions={pageDefinitions}
+          pageDefinitions={resolvedPageDefinitions}
           publishingPanels={
             <DisplayPagePublishingPanels
               blockingCount={blockingCount}
@@ -245,24 +279,14 @@ export function DisplayPagesEditor({
                 className="absolute left-0 top-0 origin-top-left"
                 style={{
                   height: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
+                  minHeight: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
+                  minWidth: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`,
                   transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${0.5 * viewport.zoom})`,
                   transformOrigin: "top left",
                   width: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`
                 }}
               >
-                {renderPreview ? (
-                  selectedPage.renderPreview ? (
-                    selectedPage.renderPreview(config)
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-[#e8eddf] text-[40px] font-semibold text-[var(--shell-title-ink)]">
-                      {selectedPage.label}
-                    </div>
-                  )
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-[#e8eddf] text-[40px] font-semibold text-[var(--shell-title-ink)]">
-                    {selectedPage.label}
-                  </div>
-                )}
+                {previewContent}
               </div>
             }
             regions={editableRegions}

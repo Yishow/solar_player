@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { DisplayPagesEditor } from "./index";
+import { DisplayPagesEditor, type DisplayEditorPageDefinition } from "./index";
 
 test("display page editor shell exposes the full rollout page switcher and idle inspector guidance", () => {
   const html = renderToStaticMarkup(
@@ -122,4 +122,48 @@ test("locked regions remain selectable but do not expose resize interaction hand
   assert.match(html, /data-locked="true"/);
   assert.doesNotMatch(html, /Overview Hero Media resize handle/);
   assert.match(html, /Locked regions 無法直接改動/);
+});
+
+test("display page editor falls back to built-in page definitions when a caller passes an empty set", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        pageDefinitions: [],
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, />Overview</);
+  assert.match(html, />Factory Circuit</);
+  assert.match(html, /Canvas Preview/);
+});
+
+test("display page editor preview surface keeps positive minimum dimensions for preview widgets", () => {
+  const pageDefinitions: DisplayEditorPageDefinition[] = [
+    {
+      createSeedConfig: () => ({}),
+      id: "overview",
+      label: "Overview"
+    }
+  ];
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        pageDefinitions,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /min-height:934px/);
+  assert.match(html, /min-width:1920px/);
 });
