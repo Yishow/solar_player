@@ -6,7 +6,7 @@ import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
-import { requestJson } from "../../services/api";
+import { requestJson, fetchDisplayStory, type DisplayStoryPayload } from "../../services/api";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
@@ -183,6 +183,27 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
   });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
+  const [factoryStoryData, setFactoryStoryData] = useState<DisplayStoryPayload["factoryCircuit"] | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchDisplayStory()
+      .then((story) => {
+        if (isActive) {
+          setFactoryStoryData(story.factoryCircuit);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setFactoryStoryData(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -218,7 +239,8 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
     circuits,
     connectionState,
     loadState,
-    snapshot
+    snapshot,
+    factoryCircuitStory: factoryStoryData ?? undefined
   });
   const resolvedConfig = config ?? runtimeConfig.config;
 

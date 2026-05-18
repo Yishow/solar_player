@@ -183,3 +183,50 @@ test("buildFactoryCircuitViewModel exposes deterministic alert reasons and missi
   assert.equal(model.loadRows[1]?.alertReason, "missing-live-power");
   assert.equal(model.loadRows[1]?.statusLabel, "離線");
 });
+
+test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available", () => {
+  const model = buildFactoryCircuitViewModel({
+    circuits: [],
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot,
+    factoryCircuitStory: {
+      slots: [
+        { slotKey: "production", label: "故事版生產線", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 },
+        { slotKey: "hvac", label: "故事版空調", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "warning", livePowerKw: 310, circuitId: 2 },
+        { slotKey: "lighting", label: "故事版照明", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
+        { slotKey: "office", label: "故事版辦公區", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 90, circuitId: 4 },
+        { slotKey: "ev", label: "故事版充電站", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 45, circuitId: 5 },
+        { slotKey: "infrastructure", label: "故事版基礎設施", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 35, circuitId: 6 }
+      ],
+      summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
+    }
+  });
+
+  assert.equal(model.loadRows.length, 6);
+  assert.equal(model.loadRows[0]?.labelZh, "故事版生產線");
+  assert.equal(model.loadRows[0]?.livePowerKw, 520);
+  assert.equal(model.loadRows[0]?.statusLabel, "正常");
+  assert.equal(model.loadRows[2]?.isEmpty, true);
+  assert.equal(model.loadRows[2]?.statusLabel, "未綁定");
+  assert.equal(model.summary.statusLabel, "迴路資料已同步");
+});
+
+test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitStory has too few slots", () => {
+  const runtimes = buildFactoryCircuitRuntimes(circuitConfigs);
+  const model = buildFactoryCircuitViewModel({
+    circuits: runtimes,
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot,
+    factoryCircuitStory: {
+      slots: [
+        { slotKey: "production", label: "單一", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 }
+      ],
+      summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
+    }
+  });
+
+  assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
+  assert.equal(model.summary.statusLabel, "迴路資料已同步");
+});

@@ -196,7 +196,24 @@ export async function getDisplayReadiness() {
 }
 
 export type DisplayStoryPayload = {
-  factoryCircuit: unknown;
+  factoryCircuit: {
+    slots: Array<{
+      slotKey: string;
+      label: string;
+      bindingState: string;
+      fallbackReason: string | null;
+      freshnessState: string;
+      alertTone: string;
+      livePowerKw: number | null;
+      circuitId: number | null;
+    }>;
+    summary: {
+      alertTone: string;
+      bindingState: string;
+      fallbackReason: string | null;
+      freshnessState: string;
+    };
+  };
   generatedAt: string;
   overview: {
     metrics: Array<MonitoringMetricBinding<string>>;

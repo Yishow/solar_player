@@ -35,6 +35,24 @@ type BuildFactoryCircuitViewModelArgs = {
   connectionState: SocketConnectionState["status"];
   loadState: FactoryCircuitLoadState;
   snapshot: LiveMetricsSnapshot;
+  factoryCircuitStory?: {
+    slots: Array<{
+      slotKey: string;
+      label: string;
+      bindingState: string;
+      fallbackReason: string | null;
+      freshnessState: string;
+      alertTone: string;
+      livePowerKw: number | null;
+      circuitId: number | null;
+    }>;
+    summary: {
+      alertTone: string;
+      bindingState: string;
+      fallbackReason: string | null;
+      freshnessState: string;
+    };
+  };
 };
 
 const prototypeTotalLoadKw = 1280;
@@ -126,8 +144,109 @@ export function buildFactoryCircuitViewModel({
   circuits,
   connectionState,
   loadState,
-  snapshot
+  snapshot,
+  factoryCircuitStory
 }: BuildFactoryCircuitViewModelArgs) {
+  const shouldUseStory = factoryCircuitStory !== undefined && factoryCircuitStory.slots.length >= 2;
+
+  if (shouldUseStory) {
+    const storySlotByKey = new Map(factoryCircuitStory.slots.map((slot) => [slot.slotKey, slot]));
+    const toneMap: Record<string, { progressClass: string; textClass: string; tone: string; statusLabel: string }> = {
+      normal: { progressClass: "bg-[#5f8c50]", textClass: "text-[#557a43]", tone: "success", statusLabel: "正常" },
+      warning: { progressClass: "bg-[#d6a73f]", textClass: "text-[#9b7121]", tone: "warning", statusLabel: "注意" },
+      danger: { progressClass: "bg-[#c96745]", textClass: "text-[#9f4324]", tone: "danger", statusLabel: "警告" }
+    };
+
+    const loadRows = slotDefinitions.map((slot) => {
+      const storySlot = storySlotByKey.get(slot.key);
+      const binding = resolveMonitoringSlotBinding({
+        circuitId: storySlot?.circuitId ?? null,
+        slotKey: slot.key
+      });
+
+      if (!storySlot || storySlot.bindingState === "missing" || storySlot.bindingState === "conflict") {
+        return {
+          alertReason: storySlot ? storySlot.fallbackReason : null,
+          bindingState: binding.bindingState,
+          fallbackReason: binding.fallbackReason,
+          fallbackSharePercent: slot.sharePercent,
+          iconKey: slot.iconKey,
+          isEmpty: true,
+          labelEn: storySlot?.label ?? slot.defaultEn,
+          labelZh: storySlot?.label ?? slot.defaultZh,
+          livePowerKw: storySlot?.livePowerKw ?? 0,
+          progressClass: "bg-neutral-300",
+          sharePercent: 0,
+          statusLabel: storySlot ? (storySlot.bindingState === "conflict" ? "衝突" : "未綁定") : "待接入",
+          statusTone: "neutral" as const,
+          textClass: "text-neutral-500",
+          utilizationPercent: 0
+        };
+      }
+
+      const tone = toneMap[storySlot.alertTone] ?? toneMap.normal!;
+      const livePower = storySlot.livePowerKw ?? 0;
+      return {
+        alertReason: storySlot.fallbackReason,
+        bindingState: binding.bindingState,
+        fallbackReason: binding.fallbackReason,
+        fallbackSharePercent: slot.sharePercent,
+        iconKey: slot.iconKey,
+        isEmpty: false,
+        labelEn: storySlot.label,
+        labelZh: storySlot.label,
+        livePowerKw: livePower,
+        progressClass: tone.progressClass,
+        sharePercent: slot.sharePercent,
+        statusLabel: tone.statusLabel,
+        statusTone: tone.tone as "success" | "warning" | "danger" | "neutral",
+        textClass: tone.textClass,
+        utilizationPercent: 0
+      };
+    });
+
+    const totalPowerKw = factoryCircuitStory.slots.reduce((sum, slot) => sum + (slot.livePowerKw ?? 0), 0);
+    const solarSourceKw = readMetricValue(snapshot, "realTimePower") ?? prototypeSolarShareSourceKw;
+    const selfConsumptionKwh = readMetricValue(snapshot, "selfConsumptionEnergy") ?? prototypeSelfConsumptionKwh;
+    const summary = factoryCircuitStory.summary;
+
+    return {
+      emptyState: null,
+      flowNodes: [
+        { iconKey: "solar", key: "solar" as const, label: "太陽能板", subtitle: "PV Modules" },
+        { iconKey: "inverter", key: "inverter" as const, label: "逆變器", subtitle: "Inverter" },
+        { iconKey: "switchboard", key: "board" as const, label: "配電盤", subtitle: "Switchboard" }
+      ],
+      hero: {
+        copyEnLines: [
+          "Solar energy is converted into clean power and",
+          "distributed through the switchboard to support",
+          "factory operations, driving green manufacturing",
+          "every day."
+        ],
+        copyZhLines: [
+          "太陽能發電轉換為潔淨電力，",
+          "經由配電系統分配至廠區各項用電設備，",
+          "驅動製造運作，落實綠色生產。"
+        ],
+        eyebrow: "綠能驅動・永續未來",
+        subtitle: "Factory Energy Circuit",
+        title: "廠區用電迴路"
+      },
+      kpis: [
+        { helper: `${loadRows.filter((row) => !row.isEmpty).length || slotDefinitions.length} 個迴路面板`, iconKey: "bolt", label: "目前廠區總用電", unit: "kW", value: formatNumber(totalPowerKw || prototypeTotalLoadKw) },
+        { helper: "Solar Supply Share", iconKey: "sun", label: "太陽能供應占比", unit: "%", value: formatNumber(Math.round((solarSourceKw / (totalPowerKw || prototypeTotalLoadKw)) * 100)) },
+        { helper: "Today's Self-consumption", iconKey: "sun", label: "今日自發自用電量", unit: "kWh", value: formatNumber(selfConsumptionKwh) },
+        { helper: "Estimated Peak Load", iconKey: "bars", label: "尖峰負載", unit: "kW", value: formatNumber(Math.round((totalPowerKw || prototypeTotalLoadKw) * 1.45)) },
+        { helper: "Green Energy Routing", iconKey: "leaf", label: "目前綠電流向", unit: summary.freshnessState === "fresh" ? "Normal" : "Fallback", value: summary.freshnessState === "fresh" ? "供應中" : "待命" }
+      ],
+      loadRows,
+      summary: {
+        statusLabel: summary.freshnessState === "fresh" ? "迴路資料已同步" : summary.fallbackReason ? `資料異常：${summary.fallbackReason}` : "迴路資料待確認"
+      }
+    };
+  }
+
   const totalPowerKw = circuits.reduce((sum, circuit) => sum + circuit.livePowerKw, 0);
   const hasCircuitData = circuits.length > 0;
   const totalPowerForDisplay = hasCircuitData ? totalPowerKw : prototypeTotalLoadKw;
