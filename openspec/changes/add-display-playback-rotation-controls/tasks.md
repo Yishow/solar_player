@@ -10,5 +10,5 @@
 
 ## 3. Skip reason reporting and safe fallback
 
-- [ ] 3.1 Deliver `Record skip reason reporting for skipped display pages` by returning machine-readable skip reasons from rotation diagnostics and preview responses, verified by targeted server route tests.
+- [x] 3.1 Deliver `Record skip reason reporting for skipped display pages` by returning machine-readable skip reasons from rotation diagnostics and preview responses, verified by targeted server route tests.
 - [ ] 3.2 Deliver `Preserve a safe fallback when no display pages are playable` and reference `Expose rotation preview through management surfaces` by keeping existing safe playback or offline behavior when all pages are skipped, verified by `pnpm --filter @solar-display/web test` around playback controller and offline routing behavior.
