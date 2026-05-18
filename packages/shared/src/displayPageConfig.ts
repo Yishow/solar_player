@@ -41,6 +41,17 @@ export type DisplayPageMediaBinding = {
   src?: string;
 };
 
+export type DisplayPageAssetFindingReason = "missing-asset" | "missing-file";
+
+export type DisplayPageAssetFinding = {
+  assetId: DisplayPageManagedAssetId | null;
+  bindingId: string;
+  message: string;
+  pageId: DisplayPageKey;
+  reason: DisplayPageAssetFindingReason;
+  status: "unhealthy";
+};
+
 export type FallbackPolicyMode = "hide" | "show-placeholder" | "show-seed";
 
 export type FallbackPolicy = {
@@ -75,6 +86,7 @@ export type PublishHistoryEntry = {
 };
 
 export type DisplayPageConfigEnvelope<TRegions extends Record<string, unknown> = Record<string, unknown>> = {
+  assetFindings?: DisplayPageAssetFinding[];
   pageId: DisplayPageKey;
   regions: TRegions;
   updatedAt: string | null;

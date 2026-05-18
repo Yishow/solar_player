@@ -14,6 +14,7 @@ import {
   readFallbackStatus
 } from "../services/displayPagePublishingService.js";
 import {
+  collectDisplayPageAssetFindings,
   normalizeDisplayPageRegionsForStorage,
   resolveDisplayPageRegions
 } from "../services/displayPageAssetService.js";
@@ -65,6 +66,7 @@ function resolveEnvelope<TRegions extends Record<string, unknown>>(
 ) {
   return {
     ...envelope,
+    assetFindings: collectDisplayPageAssetFindings(envelope.pageId, envelope.regions),
     regions: resolveDisplayPageRegions(envelope.regions)
   };
 }
@@ -167,6 +169,17 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     const validation = validateConfigDraft(draft.regions);
     const imageWarnings = checkImageReferences(draft.regions);
     if (imageWarnings.length > 0) validation.findings.push(...imageWarnings);
+    const assetFindings = collectDisplayPageAssetFindings(pageId, draft.regions);
+    if (assetFindings.length > 0) {
+      validation.findings.push(
+        ...assetFindings.map((finding) => ({
+          code: "ASSET_REFERENCE_MISSING",
+          message: finding.message,
+          regionId: finding.bindingId,
+          severity: "warning" as const
+        }))
+      );
+    }
 
     return { validation };
   });

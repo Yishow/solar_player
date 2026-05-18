@@ -1,4 +1,12 @@
+import type {
+  DisplayPageAssetFinding,
+  DisplayPageAssetFindingReason,
+  DisplayPageKey
+} from "@solar-display/shared";
 import { isDisplayPageMediaBinding } from "@solar-display/shared";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
 
 type ImageAssetReferenceRow = {
@@ -6,6 +14,10 @@ type ImageAssetReferenceRow = {
 };
 
 type UnknownRecord = Record<string, unknown>;
+type ManagedAssetResolution = {
+  filename: string | null;
+  reason: DisplayPageAssetFindingReason | null;
+};
 
 function cloneValue<T>(value: T): T {
   return structuredClone(value);
@@ -15,11 +27,30 @@ function isPlainObject(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readManagedAssetFilename(assetId: number | string) {
+function readManagedAssetResolution(assetId: number | string): ManagedAssetResolution {
   const row = getDatabase()
     .prepare("SELECT filename FROM image_assets WHERE id = ?")
     .get(assetId) as ImageAssetReferenceRow | undefined;
-  return row?.filename ?? null;
+  const filename = row?.filename ?? null;
+
+  if (!filename) {
+    return {
+      filename: null,
+      reason: "missing-asset"
+    };
+  }
+
+  if (!existsSync(resolve(config.uploadsDir, filename))) {
+    return {
+      filename: null,
+      reason: "missing-file"
+    };
+  }
+
+  return {
+    filename,
+    reason: null
+  };
 }
 
 function normalizeMediaBindingForStorage(binding: UnknownRecord) {
@@ -35,7 +66,7 @@ function resolveMediaBinding(binding: UnknownRecord) {
   const assetId = resolved.assetId;
 
   if (typeof assetId === "number" || typeof assetId === "string") {
-    const filename = readManagedAssetFilename(assetId);
+    const { filename } = readManagedAssetResolution(assetId);
     if (filename) {
       resolved.src = `/uploads/images/${filename}`;
     } else {
@@ -75,4 +106,49 @@ export function normalizeDisplayPageRegionsForStorage<T extends Record<string, u
 
 export function resolveDisplayPageRegions<T extends Record<string, unknown>>(regions: T) {
   return mapDisplayPageRegions(regions, resolveMediaBinding) as T;
+}
+
+export function collectDisplayPageAssetFindings(
+  pageId: DisplayPageKey,
+  regions: Record<string, unknown>
+) {
+  const findings: DisplayPageAssetFinding[] = [];
+
+  function scan(value: unknown, path: string) {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => scan(item, `${path}[${index}]`));
+      return;
+    }
+
+    if (!isPlainObject(value)) {
+      return;
+    }
+
+    if (isDisplayPageMediaBinding(value)) {
+      const assetId = value.assetId;
+      if (typeof assetId === "number" || typeof assetId === "string") {
+        const { reason } = readManagedAssetResolution(assetId);
+        if (reason) {
+          findings.push({
+            assetId,
+            bindingId: path,
+            message:
+              reason === "missing-file"
+                ? `素材檔案遺失，無法解析 binding ${path}`
+                : `素材引用不存在，無法解析 binding ${path}`,
+            pageId,
+            reason,
+            status: "unhealthy"
+          });
+        }
+      }
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      scan(child, path ? `${path}.${key}` : key);
+    }
+  }
+
+  scan(regions, "");
+  return findings;
 }

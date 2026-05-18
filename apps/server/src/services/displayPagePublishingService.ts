@@ -14,7 +14,10 @@ import { getDatabase } from "../db/index.js";
 import { config } from "../config.js";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { normalizeDisplayPageRegionsForStorage } from "./displayPageAssetService.js";
+import {
+  collectDisplayPageAssetFindings,
+  normalizeDisplayPageRegionsForStorage
+} from "./displayPageAssetService.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -180,6 +183,15 @@ function publishDraft(
   if (imageWarnings.length > 0) {
     validation.findings.push(...imageWarnings);
   }
+  const assetWarnings = collectDisplayPageAssetFindings(pageId, draft.regions).map((finding) => ({
+    code: "ASSET_REFERENCE_MISSING",
+    message: finding.message,
+    regionId: finding.bindingId,
+    severity: "warning" as const
+  }));
+  if (assetWarnings.length > 0) {
+    validation.findings.push(...assetWarnings);
+  }
 
   const newVersion = readNextLiveVersion(pageId);
   const now = new Date().toISOString();
@@ -281,13 +293,14 @@ function readFallbackStatus(pageId: DisplayPageKey): DisplayPageFallbackStatus {
   const live = readStageConfig(pageId, "live");
   const policy = live.fallbackPolicy ?? defaultFallbackPolicy;
   const imageWarnings = checkImageReferences(live.regions);
+  const assetFindings = collectDisplayPageAssetFindings(pageId, live.regions);
   const items: FallbackStatusItem[] = [
     { key: "staleData", mode: policy.staleData, active: false },
     {
       key: "missingAsset",
       mode: policy.missingAsset,
-      active: imageWarnings.length > 0,
-      message: imageWarnings[0]?.message
+      active: imageWarnings.length > 0 || assetFindings.length > 0,
+      message: assetFindings[0]?.message ?? imageWarnings[0]?.message
     },
     {
       key: "emptyContent",
