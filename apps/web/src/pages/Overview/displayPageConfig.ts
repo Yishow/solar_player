@@ -1,3 +1,4 @@
+import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
 export type OverviewDisplayRect = {
@@ -21,10 +22,7 @@ export type OverviewDisplayPageConfig = {
     titleLines: [string, string];
   };
   heroCopyLayout: OverviewDisplayTextRect;
-  heroMedia: {
-    alt: string;
-    src: string;
-  };
+  heroMedia: DisplayPageMediaBinding;
   kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewDisplayRect>;
 };
 
@@ -47,7 +45,12 @@ export function createOverviewDisplayPageSeedConfig(
       width: 642
     },
     heroMedia: {
+      alignX: 1,
+      alignY: 0,
       alt: heroAlt,
+      fitMode: "contain",
+      focusX: 1,
+      focusY: 0,
       src: heroSrc
     },
     kpiCards: {

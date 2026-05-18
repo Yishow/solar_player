@@ -5,6 +5,7 @@ import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
+import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import {
   createSustainabilityDisplayPageSeedConfig,
   type SustainabilityDisplayPageConfig
@@ -178,7 +179,11 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
           width: `${heroLayout.width}px`
         }}
       >
-        <img alt={resolvedConfig.heroMedia.alt} src={resolvedConfig.heroMedia.src} />
+        <img
+          alt={resolvedConfig.heroMedia.alt}
+          src={resolvedConfig.heroMedia.src}
+          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
+        />
       </figure>
 
       <section

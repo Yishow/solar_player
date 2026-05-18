@@ -1,3 +1,4 @@
+import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import {
   solarConnectorLayout,
   solarFlowNodeLayout,
@@ -21,10 +22,7 @@ export type SolarDisplayPageConfig = {
     subtitleLines: [string, string];
     titleLines: [string, string];
   };
-  heroMedia: {
-    alt: string;
-    src: string;
-  };
+  heroMedia: DisplayPageMediaBinding;
   kpiCards: Record<"co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2", SolarDisplayRect>;
 };
 
@@ -53,7 +51,12 @@ export function createSolarDisplayPageSeedConfig(
       titleLines: ["太陽能驅動", "製造新能量"]
     },
     heroMedia: {
+      alignX: 0.5,
+      alignY: 0.52,
       alt: heroAlt,
+      fitMode: "cover",
+      focusX: 0.5,
+      focusY: 0.52,
       src: heroSrc
     },
     kpiCards: {

@@ -1,3 +1,4 @@
+import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import {
   imagesArrowLayout,
   imagesCopyLayout,
@@ -23,10 +24,7 @@ export type ImagesDisplayPageConfig = {
     title: string;
   };
   infoPanel: ImagesDisplayRect;
-  mainStage: ImagesDisplayRect & {
-    alt: string;
-    src: string;
-  };
+  mainStage: ImagesDisplayRect & DisplayPageMediaBinding;
   thumbnailSlots: Record<"thumb1" | "thumb2" | "thumb3" | "thumb4", ImagesDisplayRect>;
   textBlocks: {
     copy: {
@@ -69,7 +67,12 @@ export function createImagesDisplayPageSeedConfig(
     infoPanel: { ...imagesInfoLayout },
     mainStage: {
       ...imagesMainLayout,
+      alignX: 0.5,
+      alignY: 0.52,
       alt: mainStageAlt,
+      fitMode: "cover",
+      focusX: 0.5,
+      focusY: 0.52,
       src: mainStageSrc
     },
     textBlocks: {

@@ -5,6 +5,7 @@ import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
+import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
@@ -123,7 +124,11 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
           width: `${heroLayout.width}px`
         }}
       >
-        <img alt={resolvedConfig.heroMedia.alt} src={resolvedConfig.heroMedia.src} />
+        <img
+          alt={resolvedConfig.heroMedia.alt}
+          src={resolvedConfig.heroMedia.src}
+          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
+        />
       </figure>
 
       {overviewCardOrder.map((cardItem, index) => {

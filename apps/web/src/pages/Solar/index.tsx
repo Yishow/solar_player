@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
@@ -184,6 +185,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
           alt={resolvedConfig.heroMedia.alt}
           className="solar-hero-image"
           src={resolvedConfig.heroMedia.src}
+          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
         <div className="solar-hero-fade" />
       </figure>

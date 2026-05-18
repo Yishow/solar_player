@@ -1,3 +1,4 @@
+import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import {
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
@@ -20,10 +21,7 @@ export type SustainabilityDisplayPageConfig = {
     subtitle: string;
     title: [string, string];
   };
-  heroMedia: SustainabilityDisplayRect & {
-    alt: string;
-    src: string;
-  };
+  heroMedia: SustainabilityDisplayRect & DisplayPageMediaBinding;
   highlightRail: {
     container: SustainabilityDisplayRect;
     items: Array<{
@@ -57,7 +55,12 @@ export function createSustainabilityDisplayPageSeedConfig(
     },
     heroMedia: {
       ...sustainabilityHeroLayout,
+      alignX: 0.5,
+      alignY: 0.48,
       alt: heroAlt,
+      fitMode: "cover",
+      focusX: 0.5,
+      focusY: 0.48,
       src: heroSrc
     },
     highlightRail: {

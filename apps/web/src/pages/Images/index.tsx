@@ -3,6 +3,7 @@ import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { imageMocks } from "../../mocks/images";
+import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
   createImagesDisplayPageSeedConfig,
@@ -155,6 +156,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
             src={viewModel.active.assetSource ?? resolvedConfig.mainStage.src ?? undefined}
+            style={buildDisplayPageMediaStyle(resolvedConfig.mainStage)}
           />
         ) : (
           <div className="images-main-placeholder">
