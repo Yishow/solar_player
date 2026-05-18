@@ -207,7 +207,23 @@ export type DisplayStoryPayload = {
       freshnessState: MonitoringFreshnessState;
     };
   };
-  solar: unknown;
+  solar: {
+    kpis: Array<MonitoringMetricBinding<string> & {
+      comparison: {
+        state: "unavailable" | "below-target" | "above-target" | "at-target";
+        delta: number | null;
+        fallbackReason: string | null;
+        label: string;
+      };
+    }>;
+    story: {
+      flowState: {
+        state: "healthy" | "degraded" | "offline";
+        reason: string | null;
+        label: string;
+      };
+    };
+  };
 };
 
 export async function fetchDisplayStory() {

@@ -36,6 +36,32 @@ type BuildSolarViewModelArgs = {
   comparisonTargets?: Partial<Record<SolarMetricKey, SolarComparisonTarget>>;
   isSocketConnected: boolean;
   snapshot: LiveMetricsSnapshot;
+  solarStory?: {
+    kpis: Array<{
+      metricKey: string;
+      label: string;
+      unit: string;
+      value?: string;
+      comparison: {
+        state: string;
+        delta: number | null;
+        fallbackReason: string | null;
+        label: string;
+      };
+      helper?: string;
+      fallbackReason?: string | null;
+      freshnessState?: string;
+      bindingState?: string;
+      alertTone?: string;
+    }>;
+    story: {
+      flowState: {
+        state: string;
+        reason: string | null;
+        label: string;
+      };
+    };
+  };
 };
 
 const kpiBindings: SolarMetricBinding[] = [
@@ -66,8 +92,61 @@ function resolveMetricValue(
 export function buildSolarViewModel({
   comparisonTargets,
   isSocketConnected,
-  snapshot
+  snapshot,
+  solarStory
 }: BuildSolarViewModelArgs) {
+  const shouldUseStory = solarStory !== undefined && solarStory.kpis.length >= 3;
+
+  if (shouldUseStory) {
+    const storyKpiByKey = new Map(solarStory.kpis.map((kpi) => [kpi.metricKey, kpi]));
+    const kpis = kpiBindings.map((binding) => {
+      const storyKpi = storyKpiByKey.get(binding.metricKey);
+      const value = storyKpi?.value ?? resolveMetricValue(binding, isSocketConnected, snapshot).value;
+      const resolved = storyKpi
+        ? { helper: storyKpi.helper ?? "", ...storyKpi }
+        : resolveMetricValue(binding, isSocketConnected, snapshot);
+      return {
+        comparison: storyKpi?.comparison ?? resolveSolarComparison({
+          actualUnit: resolved.unit,
+          actualValue: isSocketConnected ? snapshot.metrics[binding.metricKey]?.value ?? null : null,
+          target: comparisonTargets?.[binding.metricKey]
+        }),
+        helper: resolved.helper,
+        iconKey: binding.iconKey,
+        label: storyKpi?.label ?? binding.label,
+        unit: storyKpi?.unit ?? resolved.unit,
+        value
+      };
+    });
+
+    const powerValue = storyKpiByKey.get("realTimePower")?.value ?? "--";
+    const powerUnit = storyKpiByKey.get("realTimePower")?.unit ?? "kW";
+    const efficiencyValue = storyKpiByKey.get("systemEfficiency")?.value ?? "--";
+    const efficiencyUnit = storyKpiByKey.get("systemEfficiency")?.unit ?? "%";
+    const selfConsumptionValue = storyKpiByKey.get("selfConsumptionRatio")?.value ?? "--";
+    const selfConsumptionUnit = storyKpiByKey.get("selfConsumptionRatio")?.unit ?? "%";
+    const co2TodayValue = storyKpiByKey.get("todayCo2Reduction")?.value ?? "--";
+    const co2TodayUnit = storyKpiByKey.get("todayCo2Reduction")?.unit ?? "t";
+
+    return {
+      flowNodes: [
+        { assetKey: "solar-panel-display" as SolarFlowAssetKey, footnote: "Solar Panels", label: "太陽能板", value: `${powerValue} ${powerUnit}` },
+        { assetKey: "inverter-display" as SolarFlowAssetKey, footnote: "Inverter", label: "變流器", value: `${efficiencyValue}${efficiencyUnit}` },
+        { assetKey: "factory-consumption-display" as SolarFlowAssetKey, footnote: "Factory Consumption", label: "工廠用電", value: `${selfConsumptionValue}${selfConsumptionUnit}` },
+        { assetKey: "carbon-reduction-display" as SolarFlowAssetKey, footnote: "Carbon Reduction", label: "減碳效益", value: `${co2TodayValue} ${co2TodayUnit}` }
+      ],
+      hero: {
+        eyebrow: "綠能驅動・永續未來",
+        subtitleLines: ["乾淨的太陽能，為工廠注入綠色動能", "Clean solar energy powers our factory"],
+        titleLines: ["太陽能驅動", "製造新能量"]
+      },
+      kpis,
+      story: {
+        flowState: solarStory.story.flowState
+      }
+    };
+  }
+
   const power = resolveMetricValue(
     { fallbackIndex: 0, iconKey: "metric-generation-sun", metricKey: "realTimePower", label: "即時功率", unit: "kW" },
     isSocketConnected,

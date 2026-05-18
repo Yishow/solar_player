@@ -1,9 +1,13 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import {
+  fetchDisplayStory,
+  type DisplayStoryPayload
+} from "../../services/api";
 import {
   createSolarDisplayPageSeedConfig,
   type SolarDisplayPageConfig
@@ -104,14 +108,37 @@ function splitSolarTitleLine(titleLine: string) {
 export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
+  const [solarStoryData, setSolarStoryData] = useState<DisplayStoryPayload["solar"] | null>(null);
   const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
   const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
     enabled: config === undefined,
     stage: "live"
   });
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchDisplayStory()
+      .then((story) => {
+        if (isActive) {
+          setSolarStoryData(story.solar);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setSolarStoryData(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const viewModel = buildSolarViewModel({
     isSocketConnected,
-    snapshot
+    snapshot,
+    solarStory: solarStoryData ?? undefined
   });
   const resolvedConfig = config ?? runtimeConfig.config;
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
