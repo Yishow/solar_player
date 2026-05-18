@@ -6,7 +6,7 @@
 ## 2. Conditional playback
 
 - [x] 2.1 Deliver `Evaluate conditional playback for display pages at runtime` and reference `Evaluate conditional playback at runtime with explicit skip reasons` by applying readiness, schedule, and health checks before page selection, verified by shared playback resolver tests and targeted server tests.
-- [ ] 2.2 Deliver `Reuse conditional playback result in management preview` by exposing the same evaluation output to management preview APIs, verified by tests comparing runtime and preview results for the same inputs.
+- [x] 2.2 Deliver `Reuse conditional playback result in management preview` by exposing the same evaluation output to management preview APIs, verified by tests comparing runtime and preview results for the same inputs.
 
 ## 3. Skip reason reporting and safe fallback
 
