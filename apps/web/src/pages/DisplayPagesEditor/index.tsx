@@ -11,6 +11,7 @@ import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard, DisplayEditorInspectorCard } from "./cards";
+import { DisplayEditorCanvasOverlay } from "./inspectorFields";
 import { applyGeometryClipboard, createGeometryClipboard, resolveGeometryClipboardCompatibility, type DisplayEditorGeometryClipboard } from "./displayEditorGeometry";
 import { applyRegionPreset } from "./displayEditorPresets";
 import { isRegionLocked, resolveRegionPresetOptions, toggleRegionLock } from "./displayEditorRegionState";
@@ -77,6 +78,7 @@ export function DisplayPagesEditor({
       ? (requestedPageId as DisplayPageKey)
       : defaultPageId;
   const [editMode, setEditMode] = useState(initialEditorState?.editMode ?? false);
+  const [canvasContainerScale, setCanvasContainerScale] = useState(1);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
   const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
   const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Partial<Record<DisplayPageKey, string[]>>>(
@@ -176,10 +178,11 @@ export function DisplayPagesEditor({
   const geometryClipboardCompatibility = selectedRegion
     ? resolveGeometryClipboardCompatibility(selectedRegion, geometryClipboard)
     : { compatible: false, reason: "幾何剪貼簿只可貼到相容的 region。" };
-  const { onStartInteraction, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
+  const { onStartInteraction, onZoomDelta, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
     applyConfigUpdate,
     canRedo,
     canUndo,
+    canvasContainerScale,
     config,
     editMode,
     lockedRegionIds,
@@ -204,7 +207,7 @@ export function DisplayPagesEditor({
       path="/display-pages/editor"
       description="切換五個展示頁畫布，後續分 phase 接上 overlay、inspector 與 persisted page config。"
     >
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <DisplayEditorSidebar
           assetHealthPanel={
             <DisplayPageEditorAssetHealthPanel
@@ -270,9 +273,9 @@ export function DisplayPagesEditor({
               </div>
             }
             editMode={editMode}
-            lockedRegionIds={lockedRegionIds}
-            onSelectRegion={setSelectedRegionId}
-            onStartInteraction={onStartInteraction}
+            onScaleChange={setCanvasContainerScale}
+            onToggleEditMode={toggleEditMode}
+            onZoomDelta={onZoomDelta}
             pageLabel={selectedPage.label}
             preview={
               <div
@@ -287,10 +290,16 @@ export function DisplayPagesEditor({
                 }}
               >
                 {previewContent}
+                <DisplayEditorCanvasOverlay
+                  isInteractive={editMode}
+                  lockedRegionIds={lockedRegionIds}
+                  regions={editableRegions}
+                  selectedRegionId={selectedRegion?.id ?? null}
+                  onSelect={setSelectedRegionId}
+                  onStartInteraction={onStartInteraction}
+                />
               </div>
             }
-            regions={editableRegions}
-            selectedRegionId={selectedRegion?.id ?? null}
             viewportHeight={EDITOR_PREVIEW_VIEWPORT_HEIGHT}
             viewportWidth={EDITOR_PREVIEW_VIEWPORT_WIDTH}
           />

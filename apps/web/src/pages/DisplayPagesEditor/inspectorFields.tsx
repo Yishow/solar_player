@@ -87,7 +87,8 @@ export function DisplayEditorCanvasOverlay({
               height: `${region.geometry.height}px`,
               left: `${region.geometry.left}px`,
               top: `${region.geometry.top}px`,
-              width: `${region.geometry.width}px`
+              width: `${region.geometry.width}px`,
+              zIndex: 50
             }}
           >
             <button

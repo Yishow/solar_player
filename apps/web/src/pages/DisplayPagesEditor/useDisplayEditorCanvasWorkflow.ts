@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isDisplayEditorHistoryKey } from "../../hooks/useDisplayEditor";
 import {
   applyCanvasDrag,
@@ -35,6 +35,7 @@ export function useDisplayEditorCanvasWorkflow({
   applyConfigUpdate,
   canRedo,
   canUndo,
+  canvasContainerScale = 1,
   config,
   editMode,
   lockedRegionIds,
@@ -49,6 +50,7 @@ export function useDisplayEditorCanvasWorkflow({
   ) => void;
   canRedo: boolean;
   canUndo: boolean;
+  canvasContainerScale?: number;
   config: Record<string, unknown>;
   editMode: boolean;
   lockedRegionIds: string[];
@@ -59,6 +61,10 @@ export function useDisplayEditorCanvasWorkflow({
 }) {
   const [viewport, setViewport] = useState({ offsetX: 0, offsetY: 0, zoom: 1 });
   const [canvasInteraction, setCanvasInteraction] = useState<CanvasInteractionState | null>(null);
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const containerScaleRef = useRef(canvasContainerScale);
+  containerScaleRef.current = canvasContainerScale;
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
 
   useEffect(() => {
@@ -154,9 +160,10 @@ export function useDisplayEditorCanvasWorkflow({
         return;
       }
 
+      const effectiveScale = EDITOR_PREVIEW_SCALE * viewportRef.current.zoom * containerScaleRef.current;
       const delta = {
-        x: Math.round((event.clientX - activeInteraction.origin.x) / EDITOR_PREVIEW_SCALE),
-        y: Math.round((event.clientY - activeInteraction.origin.y) / EDITOR_PREVIEW_SCALE)
+        x: Math.round((event.clientX - activeInteraction.origin.x) / effectiveScale),
+        y: Math.round((event.clientY - activeInteraction.origin.y) / effectiveScale)
       };
       const constraint = {
         canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
@@ -220,6 +227,13 @@ export function useDisplayEditorCanvasWorkflow({
     [canRedo, canUndo, redo, undo]
   );
 
+  const onZoomDelta = useCallback(
+    (delta: number, focusPoint: { x: number; y: number }) => {
+      setViewport((current) => resolveViewportAfterZoom(current, current.zoom + delta, focusPoint));
+    },
+    []
+  );
+
   return {
     onStartInteraction: (
       event: ReactPointerEvent<HTMLButtonElement>,
@@ -239,6 +253,7 @@ export function useDisplayEditorCanvasWorkflow({
         type
       });
     },
+    onZoomDelta,
     viewport,
     viewportControls
   };
