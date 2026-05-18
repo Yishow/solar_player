@@ -24,6 +24,23 @@ export type ValidationResult = {
   canPublish: boolean;
 };
 
+export const displayPageMediaFitModes = ["contain", "cover"] as const;
+
+export type DisplayPageMediaFitMode = (typeof displayPageMediaFitModes)[number];
+
+export type DisplayPageManagedAssetId = number | string;
+
+export type DisplayPageMediaBinding = {
+  alt?: string;
+  alignX?: number;
+  alignY?: number;
+  assetId?: DisplayPageManagedAssetId | null;
+  fitMode?: DisplayPageMediaFitMode;
+  focusX?: number;
+  focusY?: number;
+  src?: string;
+};
+
 export type FallbackPolicyMode = "hide" | "show-placeholder" | "show-seed";
 
 export type FallbackPolicy = {
@@ -82,6 +99,16 @@ export function createEmptyDisplayPageConfig(
     updatedAt: null,
     version: 1
   };
+}
+
+export function isDisplayPageMediaBinding(value: unknown): value is DisplayPageMediaBinding {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  return ["alignX", "alignY", "assetId", "fitMode", "focusX", "focusY", "src"].some(
+    (key) => key in value
+  );
 }
 
 export const defaultFallbackPolicy: FallbackPolicy = {

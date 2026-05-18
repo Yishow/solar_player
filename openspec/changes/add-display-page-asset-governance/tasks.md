@@ -1,6 +1,6 @@
 ## 1. Managed asset references
 
-- [ ] 1.1 Deliver `Bind display page media fields to managed asset library references` and reference `Use managed asset references instead of raw src strings` by extending shared config and server resolution to save managed asset identifiers for display-page media, verified by `pnpm --filter @solar-display/server test` coverage for reference resolution.
+- [x] 1.1 Deliver `Bind display page media fields to managed asset library references` and reference `Use managed asset references instead of raw src strings` by extending shared config and server resolution to save managed asset identifiers for display-page media, verified by `pnpm --filter @solar-display/server test` coverage for reference resolution.
 - [ ] 1.2 Deliver `Protect managed asset references from silent breakage` by surfacing missing or unresolved asset findings from management APIs, verified by targeted server tests that remove or invalidate a referenced asset and inspect the response.
 
 ## 2. Media placement controls

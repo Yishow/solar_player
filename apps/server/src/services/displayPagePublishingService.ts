@@ -14,6 +14,7 @@ import { getDatabase } from "../db/index.js";
 import { config } from "../config.js";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { normalizeDisplayPageRegionsForStorage } from "./displayPageAssetService.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -77,13 +78,14 @@ function readStageConfig(pageId: DisplayPageKey, stage: ConfigStage): DisplayPag
 
 function writeStageConfig(pageId: DisplayPageKey, stage: ConfigStage, regions: Record<string, unknown>): DisplayPageConfigEnvelope {
   const db = getDatabase();
+  const normalizedRegions = normalizeDisplayPageRegionsForStorage(regions);
   db.prepare(
     `INSERT INTO display_page_stage_configs (page_key, stage, config_json, updated_at)
      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(page_key, stage) DO UPDATE SET
        config_json = excluded.config_json,
        updated_at = CURRENT_TIMESTAMP`
-  ).run(pageId, stage, JSON.stringify(regions));
+  ).run(pageId, stage, JSON.stringify(normalizedRegions));
   return readStageConfig(pageId, stage);
 }
 

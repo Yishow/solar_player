@@ -13,6 +13,10 @@ import {
   getPublishHistory,
   readFallbackStatus
 } from "../services/displayPagePublishingService.js";
+import {
+  normalizeDisplayPageRegionsForStorage,
+  resolveDisplayPageRegions
+} from "../services/displayPageAssetService.js";
 
 type DisplayPageRouteParams = { pageId: string };
 type DisplayPageConfigBody = { regions?: Record<string, unknown> };
@@ -45,7 +49,7 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
-function readDisplayPageConfig(pageId: DisplayPageKey): DisplayPageConfigEnvelope {
+function readStoredDisplayPageConfig(pageId: DisplayPageKey): DisplayPageConfigEnvelope {
   const database = getDatabase();
   const row = database
     .prepare(`SELECT config_json, updated_at FROM display_page_configs WHERE page_key = ?`)
@@ -56,12 +60,21 @@ function readDisplayPageConfig(pageId: DisplayPageKey): DisplayPageConfigEnvelop
   return { pageId, regions: parseRegions(row.config_json), updatedAt: row.updated_at, version: 1 };
 }
 
+function resolveEnvelope<TRegions extends Record<string, unknown>>(
+  envelope: DisplayPageConfigEnvelope<TRegions>
+) {
+  return {
+    ...envelope,
+    regions: resolveDisplayPageRegions(envelope.regions)
+  };
+}
+
 const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Legacy routes (backward compatible) ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/config", async (request) => {
     const pageId = assertDisplayPageKey(request.params.pageId);
-    return { config: readDisplayPageConfig(pageId) };
+    return { config: resolveEnvelope(readStoredDisplayPageConfig(pageId)) };
   });
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
@@ -78,6 +91,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
       }
 
       const database = getDatabase();
+      const normalizedRegions = normalizeDisplayPageRegionsForStorage(regions);
       database
         .prepare(
           `INSERT INTO display_page_configs (page_key, config_json, updated_at)
@@ -86,9 +100,9 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
              config_json = excluded.config_json,
              updated_at = CURRENT_TIMESTAMP`
         )
-        .run(pageId, JSON.stringify(regions));
+        .run(pageId, JSON.stringify(normalizedRegions));
 
-      return { config: readDisplayPageConfig(pageId) };
+      return { config: resolveEnvelope(readStoredDisplayPageConfig(pageId)) };
     }
   );
 
@@ -96,7 +110,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/draft", async (request) => {
     const pageId = assertDisplayPageKey(request.params.pageId);
-    return { config: readStageConfig(pageId, "draft") };
+    return { config: resolveEnvelope(readStageConfig(pageId, "draft")) };
   });
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
@@ -112,7 +126,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         throw error;
       }
 
-      return { config: writeStageConfig(pageId, "draft", regions) };
+      return { config: resolveEnvelope(writeStageConfig(pageId, "draft", regions)) };
     }
   );
 
@@ -120,7 +134,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/live", async (request) => {
     const pageId = assertDisplayPageKey(request.params.pageId);
-    return { config: readStageConfig(pageId, "live") };
+    return { config: resolveEnvelope(readStageConfig(pageId, "live")) };
   });
 
   // --- Publish draft to live ---
@@ -140,7 +154,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      return { config: live, validation };
+      return { config: resolveEnvelope(live), validation };
     }
   );
 
@@ -174,7 +188,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
       try {
         const config = rollbackToVersion(pageId, targetVersion, publishedBy);
-        return { config };
+        return { config: resolveEnvelope(config) };
       } catch (err) {
         if (err instanceof Error && "statusCode" in err && err.statusCode === 404) {
           return reply.status(404).send({
