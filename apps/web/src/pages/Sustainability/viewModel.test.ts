@@ -125,6 +125,8 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   assert.equal(model.bigNumbers[0]?.value, "4.8");
   assert.equal(model.highlights[0]?.label, "本季減碳");
   assert.equal(model.highlights[0]?.value, "312");
+  assert.equal(model.provenance.label, "季報");
+  assert.equal(model.provenance.updatedAt, "2026-05-01T00:00:00.000Z");
   assert.equal(model.provenance.syncState, "warning");
 });
 
@@ -135,8 +137,10 @@ test("buildSustainabilityViewModel preserves provenance and module fallbacks whe
     summary: sustainabilitySummary
   });
 
+  assert.equal(model.provenance.label, "年報");
   assert.equal(model.provenance.source, "yearly-rollup");
   assert.equal(model.provenance.syncState, "stale");
+  assert.equal(model.provenance.updatedAt, "2026-04-30T23:00:00.000Z");
   assert.equal(model.storyModules[0]?.title, "年度里程碑");
   assert.deepEqual(model.storyModules[1]?.bullets, ["推動再生能源使用", "強化供應鏈永續管理"]);
   assert.match(model.storyModules[0]?.description ?? "", /內容整理中/);

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { defaultFallbackPolicy } from "@solar-display/shared";
+import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainability/displayPageConfig";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
   mergeDisplayPageConfig,
+  shouldHydrateDisplayPageSession,
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage
@@ -42,6 +44,21 @@ test("mergeDisplayPageConfig falls back to seed array entries when persisted con
   assert.deepEqual(merged.heroCopy.subtitleLines, seedConfig.heroCopy.subtitleLines);
 });
 
+test("mergeDisplayPageConfig keeps the seed-backed hero media src when a live managed asset binding no longer resolves", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    heroMedia: {
+      alt: "Managed sustainability hero",
+      assetId: 42
+    }
+  });
+
+  assert.equal(merged.heroMedia.assetId, 42);
+  assert.equal(merged.heroMedia.alt, "Managed sustainability hero");
+  assert.equal(merged.heroMedia.src, "/sustainability-seed.jpg");
+  assert.equal(merged.heroMedia.fitMode, seedConfig.heroMedia.fitMode);
+});
+
 test("resolveDisplayPageConfigForPage falls back to seed config while the next page is still loading", () => {
   const overviewSeed = {
     heroContainer: {
@@ -68,6 +85,13 @@ test("resolveDisplayPageConfigForPage falls back to seed config while the next p
   );
 
   assert.deepEqual(resolved, overviewSeed);
+});
+
+test("display page runtime previews skip draft-session hydration when persistence is disabled", () => {
+  assert.equal(shouldHydrateDisplayPageSession(false, false), false);
+  assert.equal(shouldHydrateDisplayPageSession(false, true), false);
+  assert.equal(shouldHydrateDisplayPageSession(true, true), false);
+  assert.equal(shouldHydrateDisplayPageSession(true, false), true);
 });
 
 test("resolveDisplayPageConfigStagePath targets the live publishing channel for runtime reads", () => {
