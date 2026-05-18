@@ -131,26 +131,28 @@ export function collectDisplayPageAssetFindings(
   pageId: DisplayPageKey,
   regions: Record<string, unknown>
 ) {
-  return collectDisplayPageAssetReferences(pageId, regions)
-    .map((reference) => {
-      const { reason } = readManagedAssetResolution(reference.assetId);
-      if (!reason) {
-        return null;
-      }
+  const findings: DisplayPageAssetFinding[] = [];
 
-      return {
-        assetId: reference.assetId,
-        bindingId: reference.bindingId,
-        message:
-          reason === "missing-file"
-            ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
-            : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
-        pageId: reference.pageId,
-        reason,
-        status: "unhealthy" as const
-      };
-    })
-    .filter((finding): finding is DisplayPageAssetFinding => finding !== null);
+  for (const reference of collectDisplayPageAssetReferences(pageId, regions)) {
+    const { reason } = readManagedAssetResolution(reference.assetId);
+    if (!reason) {
+      continue;
+    }
+
+    findings.push({
+      assetId: reference.assetId,
+      bindingId: reference.bindingId,
+      message:
+        reason === "missing-file"
+          ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
+          : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
+      pageId: reference.pageId,
+      reason,
+      status: "unhealthy"
+    });
+  }
+
+  return findings;
 }
 
 export function collectDisplayPageMediaPlacementIssues(regions: Record<string, unknown>) {

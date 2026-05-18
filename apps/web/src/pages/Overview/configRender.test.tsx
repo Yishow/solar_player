@@ -21,5 +21,5 @@ test("overview display page seed config captures the current default hero contra
   assert.deepEqual(config.heroCopy.titleLines, ["以綠色製造", "驅動美好生活"]);
   assert.deepEqual(config.heroCopyLayout, { left: 86, top: 172, width: 642 });
   assert.equal(config.heroMedia.alt, "國瑞汽車中廠綠能展示場域");
-  assert.ok(config.heroMedia.src.length > 0);
+  assert.ok((config.heroMedia.src ?? "").length > 0);
 });

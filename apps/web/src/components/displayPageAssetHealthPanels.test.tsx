@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DisplayPageAssetHealthReport } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -7,7 +8,7 @@ import {
   ImageManagementAssetHealthPanel
 } from "./displayPageAssetHealthPanels";
 
-const healthyReport = {
+const healthyReport: DisplayPageAssetHealthReport = {
   assets: [
     {
       affectedPages: ["overview"],
@@ -23,9 +24,9 @@ const healthyReport = {
   findings: [],
   generatedAt: "2026-05-18T08:00:00.000Z",
   status: "healthy"
-} as const;
+};
 
-const unhealthyReport = {
+const unhealthyReport: DisplayPageAssetHealthReport = {
   assets: [
     {
       affectedPages: ["images"],
@@ -59,7 +60,7 @@ const unhealthyReport = {
   ],
   generatedAt: "2026-05-18T08:00:00.000Z",
   status: "unhealthy"
-} as const;
+};
 
 test("display page editor asset health panel renders healthy and unhealthy states", () => {
   const healthyHtml = renderToStaticMarkup(

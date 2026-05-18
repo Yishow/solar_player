@@ -56,7 +56,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   const resolvedConfig = config ?? runtimeConfig.config;
   const assetSources = useMemo(
     () => [
-      resolvedConfig.mainStage.src,
+      resolvedConfig.mainStage.src ?? null,
       imagesAssetRuntimeMap.thumbs[0],
       imagesAssetRuntimeMap.thumbs[1],
       imagesAssetRuntimeMap.thumbs[2],
