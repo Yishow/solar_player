@@ -252,6 +252,7 @@ export async function fetchImagePlaylist(activeIndex = 0) {
     playlist: {
       entries: Array<{
         entryId: string;
+        assetId: number | null;
         displayOrder: number;
         durationSeconds: number;
         enabled: boolean;
@@ -282,6 +283,24 @@ export async function fetchImagePlaylist(activeIndex = 0) {
       } | null;
     };
   }>(`/api/image-playlist?activeIndex=${activeIndex}`);
+}
+
+export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
+  area: string | null;
+  assetId: number | null;
+  capturedAt: string | null;
+  description: string | null;
+  displayOrder: number;
+  durationSeconds: number;
+  enabled: boolean;
+  fallbackMode: "display-placeholder" | "skip" | "use-cover";
+  tags: string[];
+  title: string | null;
+}>) {
+  return requestJson<{ playlist: unknown }>(
+    `/api/image-playlist/${entryId}`,
+    { body: JSON.stringify(data), method: "PUT" }
+  );
 }
 
 export async function getDeviceDisplayOpsSummary() {

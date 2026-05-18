@@ -6,10 +6,12 @@ import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth
 import { useImageAssetReferences } from "../../hooks/useImageAssetReferences";
 import {
   deleteImageAsset,
+  fetchImagePlaylist,
   getImages,
   getImageStorageUsage,
   type ImageStorageUsage,
   updateImageAsset,
+  updateImagePlaylistEntry,
   uploadImageAsset
 } from "../../services/api";
 import { ImageManagementContent } from "./ImageManagementContent";
@@ -30,6 +32,21 @@ export function ImageManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState("正在同步圖片庫...");
   const [errorMessage, setErrorMessage] = useState("");
+  const [playlistEntries, setPlaylistEntries] = useState<Array<{
+    entryId: string;
+    displayOrder: number;
+    durationSeconds: number;
+    enabled: boolean;
+    fallbackMode: "display-placeholder" | "skip" | "use-cover";
+    title: string;
+    description: string;
+    area: string;
+    capturedAt: string;
+    tags: string[];
+    assetSource: string | null;
+    hasAsset: boolean;
+    assetId: number | null;
+  }>>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
@@ -45,9 +62,14 @@ export function ImageManagement() {
   } = useImageAssetReferences(selectedImageId);
 
   const syncImages = async (preferredImageId: number | null = selectedImageId) => {
-    const [nextAssets, nextStorageUsage] = await Promise.all([getImages(), getImageStorageUsage()]);
+    const [nextAssets, nextStorageUsage, playlistRes] = await Promise.all([
+      getImages(),
+      getImageStorageUsage(),
+      fetchImagePlaylist()
+    ]);
     setAssets(nextAssets);
     setStorageUsage(nextStorageUsage);
+    setPlaylistEntries(playlistRes.playlist.entries);
     setSelectedImageId((currentSelected) => {
       const candidateId = preferredImageId ?? currentSelected;
       if (candidateId !== null && nextAssets.some((asset) => asset.id === candidateId)) {
@@ -62,10 +84,15 @@ export function ImageManagement() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [nextAssets, nextStorageUsage] = await Promise.all([getImages(), getImageStorageUsage()]);
+        const [nextAssets, nextStorageUsage, playlistRes] = await Promise.all([
+          getImages(),
+          getImageStorageUsage(),
+          fetchImagePlaylist()
+        ]);
         if (!active) return;
         setAssets(nextAssets);
         setStorageUsage(nextStorageUsage);
+        setPlaylistEntries(playlistRes.playlist.entries);
         setSelectedImageId(nextAssets[0]?.id ?? null);
         setMessage("圖片庫已同步。");
         setErrorMessage("");
@@ -221,6 +248,7 @@ export function ImageManagement() {
       isSaving={isSaving}
       isUploading={isUploading}
       message={message}
+      playlistEntries={playlistEntries}
       resyncLibrary={resyncLibrary}
       selectedImageId={selectedImageId}
       setSelectedImageId={setSelectedImageId}

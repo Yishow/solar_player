@@ -46,6 +46,19 @@ type ImageManagementContentProps = {
   isSaving: boolean;
   isUploading: boolean;
   message: string;
+  playlistEntries: Array<{
+    entryId: string;
+    assetId: number | null;
+    displayOrder: number;
+    durationSeconds: number;
+    enabled: boolean;
+    fallbackMode: "display-placeholder" | "skip" | "use-cover";
+    title: string;
+    description: string;
+    area: string;
+    capturedAt: string;
+    tags: string[];
+  }>;
   resyncLibrary: () => Promise<void>;
   selectedImageId: number | null;
   setSelectedImageId: (value: number) => void;
@@ -82,6 +95,7 @@ export function ImageManagementContent({
   isSaving,
   isUploading,
   message,
+  playlistEntries,
   resyncLibrary,
   selectedImageId,
   setSelectedImageId,
@@ -96,7 +110,8 @@ export function ImageManagementContent({
     isUploading,
     message,
     selectedImageId,
-    storageUsage
+    storageUsage,
+    playlistEntries
   });
   const statusVariant =
     viewModel.actionBanner.tone === "error"

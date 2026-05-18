@@ -18,6 +18,20 @@ type BuildImageManagementViewModelArgs = {
   message: string;
   selectedImageId: number | null;
   storageUsage: ImageStorageUsage;
+  playlistEntries?: Array<{
+    entryId: string;
+    assetId: number | null;
+    displayOrder: number;
+    durationSeconds: number;
+    enabled: boolean;
+    fallbackMode: "display-placeholder" | "skip" | "use-cover";
+    title: string;
+    description: string;
+    area: string;
+    capturedAt: string;
+    tags: string[];
+  }>;
+  liveDisplayReferences?: Array<{ pageKey: string; stage: string; label: string }>;
 };
 
 const totalStorageBytes = 5 * 1024 * 1024 * 1024;
@@ -70,16 +84,19 @@ function buildPreviewUrl(filename: string | null) {
   return buildApiUrl(`/uploads/images/${filename}`);
 }
 
-export function buildImageManagementViewModel({
-  assets,
-  errorMessage,
-  isDeleting,
-  isSaving,
-  isUploading,
-  message,
-  selectedImageId,
-  storageUsage
-}: BuildImageManagementViewModelArgs) {
+export function buildImageManagementViewModel(args: BuildImageManagementViewModelArgs) {
+  const {
+    assets,
+    errorMessage,
+    isDeleting,
+    isSaving,
+    isUploading,
+    message,
+    selectedImageId,
+    storageUsage,
+    playlistEntries,
+    liveDisplayReferences
+  } = args;
   const sortedAssets = sortAssets(assets);
   const selectedAsset =
     sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
@@ -137,21 +154,34 @@ export function buildImageManagementViewModel({
     selection:
       selectedAsset === null
         ? null
-        : {
-            badges: [
-              ...(selectedAsset.includedInSlideshow ? ["輪播中"] : ["未加入輪播"]),
-              ...(selectedAsset.isCover ? ["封面"] : [])
-            ],
-            description: selectedAsset.description ?? "尚未填寫圖片說明",
-            displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
-            filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
-            id: selectedAsset.id,
-            includedInSlideshow: selectedAsset.includedInSlideshow,
-            isCover: selectedAsset.isCover,
-            meta: `${selectedAsset.width ?? "--"} × ${selectedAsset.height ?? "--"} • ${formatMimeType(selectedAsset.mimeType)} • ${formatBytes(selectedAsset.fileSize ?? 0)}`,
-            previewUrl: buildPreviewUrl(selectedAsset.filename),
-            title: buildAssetTitle(selectedAsset)
-          },
+        : (() => {
+            const playlistEntry = args.playlistEntries?.find((entry) => entry.assetId === selectedAsset.id);
+            return {
+              badges: [
+                ...(selectedAsset.includedInSlideshow ? ["輪播中"] : ["未加入輪播"]),
+                ...(selectedAsset.isCover ? ["封面"] : [])
+              ],
+              description: selectedAsset.description ?? "尚未填寫圖片說明",
+              displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
+              filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
+              id: selectedAsset.id,
+              includedInSlideshow: selectedAsset.includedInSlideshow,
+              isCover: selectedAsset.isCover,
+              meta: `${selectedAsset.width ?? "--"} × ${selectedAsset.height ?? "--"} • ${formatMimeType(selectedAsset.mimeType)} • ${formatBytes(selectedAsset.fileSize ?? 0)}`,
+              previewUrl: buildPreviewUrl(selectedAsset.filename),
+              title: buildAssetTitle(selectedAsset),
+              // Playlist-level fields
+              playlistEntryId: playlistEntry?.entryId ?? null,
+              playlistDisplayOrder: playlistEntry?.displayOrder ?? null,
+              playlistFallbackMode: playlistEntry?.fallbackMode ?? null,
+              playlistEnabled: playlistEntry?.enabled ?? null,
+              playlistTitle: playlistEntry?.title ?? null,
+              playlistDescription: playlistEntry?.description ?? null,
+              playlistArea: playlistEntry?.area ?? null,
+              playlistTags: playlistEntry?.tags ?? null,
+              playlistCapturedAt: playlistEntry?.capturedAt ?? null
+            };
+          })(),
     summaryCards: [
       {
         helper: `目前檔案數：${storageUsage.fileCount} 張`,
