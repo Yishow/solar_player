@@ -46,7 +46,7 @@ export function DisplayEditorLeftPanel({
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
         <div className="grid gap-2">
           {regions.map((region) => {
             const isSelected = selectedRegionId === region.id;

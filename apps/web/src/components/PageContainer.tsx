@@ -41,7 +41,7 @@ export function PageContainer({
           title={title}
         />
       ) : null}
-      <div className="flex-1">{children}</div>
+      <div className={["flex-1", usesFixedHeight ? "min-h-0 overflow-hidden" : ""].join(" ")}>{children}</div>
     </section>
   );
 }

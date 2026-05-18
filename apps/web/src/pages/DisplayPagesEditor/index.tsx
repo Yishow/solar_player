@@ -213,6 +213,8 @@ export function DisplayPagesEditor({
     );
   }, [config, renderPreview, selectedPage]);
 
+  const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
+
   const pageTabs = (
     <div className="flex self-end items-end gap-2">
       {resolvedPageDefinitions.map((page) => {
@@ -245,7 +247,7 @@ export function DisplayPagesEditor({
       description="切換五個展示頁畫布，後續分 phase 接上 overlay、inspector 與 persisted page config。"
       aside={pageTabs}
     >
-      <div className="grid h-full min-h-0 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+      <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
         <DisplayEditorLeftPanel
           dirty={dirty}
           editMode={editMode}
@@ -321,55 +323,79 @@ export function DisplayPagesEditor({
         </div>
 
         <div className="flex flex-col overflow-hidden border-l border-[var(--shell-divider)]">
-          <div className="flex-1 overflow-y-auto p-4">
-            <DisplayEditorInspectorCard
-              actions={
-                selectedRegion ? (
-                  <DisplayEditorInspectorTools
-                    geometryClipboard={geometryClipboard}
-                    geometryClipboardCompatibility={geometryClipboardCompatibility}
-                    presetOptions={regionPresetOptions}
-                    selectedRegion={selectedRegion}
-                    selectedRegionLocked={selectedRegionLocked}
-                    onApplyPreset={(option) =>
-                      applyConfigUpdate((current) =>
-                        applyRegionPreset(current, selectedRegion, option.preset)
-                      )
-                    }
-                    onCopyGeometry={() => setGeometryClipboard(createGeometryClipboard(selectedRegion))}
-                    onPasteGeometry={() =>
-                      applyConfigUpdate((current) =>
-                        applyGeometryClipboard(current, selectedRegion, geometryClipboard)
-                      )
-                    }
-                    onResetRegion={() => resetPaths(selectedRegion.fields.map((field) => field.path))}
-                  />
-                ) : null
-              }
-              editMode={editMode}
-              emptyMessage={
-                editableRegions.length > 0
-                  ? "請先在畫布上選取一個 editable region。"
-                  : "這個頁面的 page-specific editor 尚未在本 phase 展開，先保留 preview 與 route coverage。"
-              }
-              onChange={updatePath}
-              onResetField={(path) => resetPaths([path])}
-              selectedRegion={selectedRegion}
-            />
+          <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
+            {(["inspector", "health", "publish"] as const).map((tab) => {
+              const labels = { inspector: "Inspector", health: "Asset Health", publish: "Publishing" };
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  className={[
+                    "flex-1 px-2 py-2.5 text-[11px] font-semibold transition-colors",
+                    rightTab === tab
+                      ? "border-b-2 border-[var(--shell-accent)] text-[var(--shell-title-ink)]"
+                      : "text-[var(--shell-muted-ink)] hover:text-[var(--shell-copy-ink)]"
+                  ].join(" ")}
+                  onClick={() => setRightTab(tab)}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
           </div>
-          <div className="shrink-0 space-y-3 border-t border-[var(--shell-divider)] p-4">
-            <DisplayPageEditorAssetHealthPanel
-              errorMessage={assetHealthErrorMessage}
-              isLoading={isAssetHealthLoading}
-              pageId={selectedPage.id}
-              report={assetHealthReport}
-            />
-            <DisplayPagePublishingPanels
-              blockingCount={blockingCount}
-              fallbackPolicy={fallbackPolicy}
-              publishingError={publishingError}
-              publishingState={publishingState}
-            />
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {rightTab === "inspector" && (
+              <DisplayEditorInspectorCard
+                actions={
+                  selectedRegion ? (
+                    <DisplayEditorInspectorTools
+                      geometryClipboard={geometryClipboard}
+                      geometryClipboardCompatibility={geometryClipboardCompatibility}
+                      presetOptions={regionPresetOptions}
+                      selectedRegion={selectedRegion}
+                      selectedRegionLocked={selectedRegionLocked}
+                      onApplyPreset={(option) =>
+                        applyConfigUpdate((current) =>
+                          applyRegionPreset(current, selectedRegion, option.preset)
+                        )
+                      }
+                      onCopyGeometry={() => setGeometryClipboard(createGeometryClipboard(selectedRegion))}
+                      onPasteGeometry={() =>
+                        applyConfigUpdate((current) =>
+                          applyGeometryClipboard(current, selectedRegion, geometryClipboard)
+                        )
+                      }
+                      onResetRegion={() => resetPaths(selectedRegion.fields.map((field) => field.path))}
+                    />
+                  ) : null
+                }
+                editMode={editMode}
+                emptyMessage={
+                  editableRegions.length > 0
+                    ? "請先在畫布上選取一個 editable region。"
+                    : "這個頁面的 page-specific editor 尚未在本 phase 展開，先保留 preview 與 route coverage。"
+                }
+                onChange={updatePath}
+                onResetField={(path) => resetPaths([path])}
+                selectedRegion={selectedRegion}
+              />
+            )}
+            {rightTab === "health" && (
+              <DisplayPageEditorAssetHealthPanel
+                errorMessage={assetHealthErrorMessage}
+                isLoading={isAssetHealthLoading}
+                pageId={selectedPage.id}
+                report={assetHealthReport}
+              />
+            )}
+            {rightTab === "publish" && (
+              <DisplayPagePublishingPanels
+                blockingCount={blockingCount}
+                fallbackPolicy={fallbackPolicy}
+                publishingError={publishingError}
+                publishingState={publishingState}
+              />
+            )}
           </div>
         </div>
       </div>
