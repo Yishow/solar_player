@@ -104,7 +104,8 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     []
   );
   const runtimeConfig = useDisplayPageConfig("sustainability", seedConfig, {
-    enabled: config === undefined
+    enabled: config === undefined,
+    stage: "live"
   });
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,

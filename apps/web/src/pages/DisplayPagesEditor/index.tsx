@@ -5,6 +5,8 @@ import { useSearchParams } from "react-router-dom";
 import { PageScaffold } from "../shared/PageScaffold";
 import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
+import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
+import { DisplayPagePublishingPanels } from "./publishingStatus";
 
 type DisplayEditorField = {
   id: string;
@@ -79,9 +81,11 @@ const EDITOR_PREVIEW_VIEWPORT_HEIGHT = Math.round(
 );
 
 export function DisplayPagesEditor({
+  initialPublishingStateByPage,
   pageDefinitions = fallbackPageDefinitions,
   renderPreview = true
 }: {
+  initialPublishingStateByPage?: DisplayPagePublishingStateMap;
   pageDefinitions?: DisplayEditorPageDefinition[];
   renderPreview?: boolean;
 }) {
@@ -104,13 +108,15 @@ export function DisplayPagesEditor({
     config,
     dirty,
     errorMessage,
+    fallbackPolicy,
     isLoading,
     isSaving,
+    lastLoadedEnvelope,
     message,
     reload,
     save,
     setConfig
-  } = useDisplayPageConfig(selectedPage.id, seedConfig);
+  } = useDisplayPageConfig(selectedPage.id, seedConfig, { stage: "draft" });
 
   const updatePath = (path: Array<number | string>, value: unknown) => {
     setConfig((current) => setValueAtPath(current, path, value));
@@ -121,6 +127,20 @@ export function DisplayPagesEditor({
   );
   const selectedRegion =
     editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null;
+  const {
+    blockingCount,
+    isPublishBlocked,
+    isPublishing,
+    publish,
+    publishingError,
+    publishingState,
+    refresh
+  } = useDisplayPagePublishingState(
+    selectedPage.id,
+    lastLoadedEnvelope?.updatedAt,
+    initialPublishingStateByPage,
+    reload
+  );
 
   useEffect(() => {
     setSelectedRegionId(null);
@@ -141,6 +161,16 @@ export function DisplayPagesEditor({
     setEditMode((current) => !current);
   });
 
+  const handleReload = async () => {
+    await reload();
+    await refresh();
+  };
+
+  const handleSave = async () => {
+    await save();
+    await refresh();
+  };
+
   return (
     <PageScaffold
       path="/display-pages/editor"
@@ -156,7 +186,7 @@ export function DisplayPagesEditor({
               type="button"
               className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-55"
               disabled={isLoading}
-              onClick={() => void reload()}
+              onClick={() => void handleReload()}
             >
               重新同步
             </button>
@@ -164,9 +194,17 @@ export function DisplayPagesEditor({
               type="button"
               className="rounded-full bg-[var(--shell-accent)] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-55"
               disabled={isLoading || isSaving || !dirty}
-              onClick={() => void save()}
+              onClick={() => void handleSave()}
             >
               {isSaving ? "儲存中..." : "儲存設定"}
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-[var(--shell-title-ink)] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-55"
+              disabled={isLoading || isSaving || isPublishing || isPublishBlocked}
+              onClick={() => void publish()}
+            >
+              {isPublishing ? "發布中..." : "發布草稿"}
             </button>
           </div>
           <div
@@ -182,6 +220,12 @@ export function DisplayPagesEditor({
           >
             {errorMessage || message}
           </div>
+          <DisplayPagePublishingPanels
+            blockingCount={blockingCount}
+            fallbackPolicy={fallbackPolicy}
+            publishingError={publishingError}
+            publishingState={publishingState}
+          />
           <div className="mt-4 grid gap-3">
             {pageDefinitions.map((page) => {
               const active = page.id === selectedPage.id;

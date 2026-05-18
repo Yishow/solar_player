@@ -1,10 +1,13 @@
 import type {
   BrandProfile,
+  ConfigStage,
+  DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
   DisplayPageKey,
   ImageAsset,
   PlaybackPage,
-  PlaybackSettings
+  PlaybackSettings,
+  ValidationResult
 } from "@solar-display/shared";
 
 export function buildApiUrl(path: string) {
@@ -93,24 +96,56 @@ export async function getPlaybackPages() {
   return response.pages;
 }
 
-export async function getDisplayPageConfig(pageId: DisplayPageKey) {
+export function resolveDisplayPageConfigApiPath(pageId: DisplayPageKey, stage: ConfigStage | "config" = "config") {
+  return `/api/display-pages/${pageId}/${stage}`;
+}
+
+export async function getDisplayPageConfig(pageId: DisplayPageKey, stage: ConfigStage | "config" = "config") {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
-  }>(`/api/display-pages/${pageId}/config`);
+  }>(resolveDisplayPageConfigApiPath(pageId, stage));
   return response.config;
 }
 
 export async function updateDisplayPageConfig(
   pageId: DisplayPageKey,
-  regions: Record<string, unknown>
+  regions: Record<string, unknown>,
+  stage: ConfigStage | "config" = "config"
 ) {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
-  }>(`/api/display-pages/${pageId}/config`, {
+  }>(resolveDisplayPageConfigApiPath(pageId, stage), {
     body: JSON.stringify({ regions }),
     method: "PUT"
   });
   return response.config;
+}
+
+export async function validateDisplayPageDraft(pageId: DisplayPageKey) {
+  const response = await requestJson<{
+    validation: ValidationResult;
+  }>(`/api/display-pages/${pageId}/validate`, {
+    method: "POST"
+  });
+  return response.validation;
+}
+
+export async function publishDisplayPageDraft(pageId: DisplayPageKey, publishedBy?: string) {
+  const response = await requestJson<{
+    config: DisplayPageConfigEnvelope;
+    validation: ValidationResult;
+  }>(`/api/display-pages/${pageId}/publish`, {
+    body: JSON.stringify({ publishedBy }),
+    method: "POST"
+  });
+  return response;
+}
+
+export async function getDisplayPageFallbackStatus(pageId: DisplayPageKey) {
+  const response = await requestJson<{
+    fallback: DisplayPageFallbackStatus;
+  }>(`/api/display-pages/${pageId}/fallback`);
+  return response.fallback;
 }
 
 export async function updatePlaybackPages(

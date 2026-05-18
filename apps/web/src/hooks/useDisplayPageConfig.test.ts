@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { defaultFallbackPolicy } from "@solar-display/shared";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
   mergeDisplayPageConfig,
+  resolveDisplayPageConfigStagePath,
+  resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage
 } from "./useDisplayPageConfig";
 
@@ -65,4 +68,27 @@ test("resolveDisplayPageConfigForPage falls back to seed config while the next p
   );
 
   assert.deepEqual(resolved, overviewSeed);
+});
+
+test("resolveDisplayPageConfigStagePath targets the live publishing channel for runtime reads", () => {
+  assert.equal(resolveDisplayPageConfigStagePath("overview", "live"), "/api/display-pages/overview/live");
+  assert.equal(resolveDisplayPageConfigStagePath("overview", "draft"), "/api/display-pages/overview/draft");
+});
+
+test("resolveDisplayPageFallbackPolicy prefers the envelope fallback policy and falls back to defaults", () => {
+  assert.deepEqual(
+    resolveDisplayPageFallbackPolicy({
+      fallbackPolicy: {
+        emptyContent: "show-placeholder",
+        missingAsset: "hide",
+        staleData: "show-seed"
+      }
+    }),
+    {
+      emptyContent: "show-placeholder",
+      missingAsset: "hide",
+      staleData: "show-seed"
+    }
+  );
+  assert.deepEqual(resolveDisplayPageFallbackPolicy(null), defaultFallbackPolicy);
 });

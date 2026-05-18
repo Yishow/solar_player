@@ -48,7 +48,8 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     []
   );
   const runtimeConfig = useDisplayPageConfig("images", seedConfig, {
-    enabled: config === undefined
+    enabled: config === undefined,
+    stage: "live"
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const resolvedConfig = config ?? runtimeConfig.config;

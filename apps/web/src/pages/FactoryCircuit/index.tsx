@@ -178,7 +178,8 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
   const { connectionState, snapshot } = useLiveMetrics();
   const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
   const runtimeConfig = useDisplayPageConfig("factory-circuit", seedConfig, {
-    enabled: config === undefined
+    enabled: config === undefined,
+    stage: "live"
   });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");

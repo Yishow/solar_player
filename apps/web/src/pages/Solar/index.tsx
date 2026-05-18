@@ -105,7 +105,8 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   const { isSocketConnected, snapshot } = useLiveMetrics();
   const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
   const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
-    enabled: config === undefined
+    enabled: config === undefined,
+    stage: "live"
   });
   const viewModel = buildSolarViewModel({
     isSocketConnected,

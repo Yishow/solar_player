@@ -57,7 +57,8 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     []
   );
   const runtimeConfig = useDisplayPageConfig("overview", seedConfig, {
-    enabled: config === undefined
+    enabled: config === undefined,
+    stage: "live"
   });
   const viewModel = buildOverviewViewModel({
     connectionState,
