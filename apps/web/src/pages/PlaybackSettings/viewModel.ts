@@ -1,6 +1,7 @@
 import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
+import { buildRotationPreviewRows } from "../DisplayPagesEditor/rotationPreview";
 
 type BuildPlaybackSettingsViewModelArgs = {
   errorMessage: string;
@@ -150,10 +151,11 @@ export function buildPlaybackSettingsViewModel({
         id: "duration",
         subtitle: "Cycle Duration",
         title: "總停留秒數",
-        tone: "default" as ReferenceTone,
-        value: `${totalDurationSeconds}s`
+      tone: "default" as ReferenceTone,
+      value: `${totalDurationSeconds}s`
       }
     ],
+    rotationPreviewRows: buildRotationPreviewRows(sortedPages),
     summary: {
       enabledCount,
       scheduleLabel: formatScheduleLabel(settings),

@@ -88,4 +88,25 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
   assert.equal(model.pageRows[0]?.canMoveUp, false);
   assert.equal(model.pageRows[1]?.orderLabel, "02");
   assert.equal(model.pageRows[2]?.statusLabel, "已停用");
+  assert.deepEqual(
+    model.rotationPreviewRows,
+    [
+      {
+        durationLabel: "15 秒",
+        id: 1,
+        labelEn: "Overview",
+        labelZh: "總覽",
+        orderLabel: "01",
+        route: "/overview"
+      },
+      {
+        durationLabel: "20 秒",
+        id: 2,
+        labelEn: "Solar",
+        labelZh: "太陽能",
+        orderLabel: "02",
+        route: "/solar"
+      }
+    ]
+  );
 });

@@ -183,12 +183,13 @@ export function PlaybackSettings() {
           播放流程預覽 <small>/ Rotation Route Preview</small>
         </div>
         <div className="ps-preview__list">
-          {viewModel.pageRows.filter(p => p.enabled).map((page, index, arr) => (
+          {viewModel.rotationPreviewRows.map((page, index, arr) => (
             <div key={page.id} style={{ display: "flex", alignItems: "center", gap: "16px" }}>
               <div className="ps-preview__item">
                 <img src={PAGE_THUMBNAILS[page.route]} alt={page.labelZh} className="ps-preview__item-thumb" />
                 <div className="ps-preview__label">
                   <span className="ps-badge-number">{index + 1}</span> {page.labelEn}
+                  <small style={{ display: "block", opacity: 0.72 }}>{page.durationLabel}</small>
                 </div>
               </div>
               {index < arr.length - 1 && <div className="ps-preview__arrow">&gt;</div>}
