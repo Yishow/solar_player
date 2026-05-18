@@ -11,4 +11,4 @@
 ## 3. Asset health reporting
 
 - [x] 3.1 Deliver `Report asset health for display page references` and reference `Compute asset health reporting from references and repository state` by adding server-side health computation that returns affected pages and reasons, verified by targeted server tests.
-- [ ] 3.2 Deliver `Show asset health reporting where operators edit or manage media` by exposing those findings in `apps/web/src/pages/DisplayPagesEditor` and `apps/web/src/pages/ImageManagement`, verified by manual inspection plus targeted web tests for rendered status states.
+- [x] 3.2 Deliver `Show asset health reporting where operators edit or manage media` by exposing those findings in `apps/web/src/pages/DisplayPagesEditor` and `apps/web/src/pages/ImageManagement`, verified by manual inspection plus targeted web tests for rendered status states.

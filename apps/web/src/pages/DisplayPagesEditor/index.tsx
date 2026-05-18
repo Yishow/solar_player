@@ -2,11 +2,14 @@ import type { DisplayPageKey } from "@solar-display/shared";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { DisplayPageEditorAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
+import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { PageScaffold } from "../shared/PageScaffold";
 import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
+import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 
 type DisplayEditorField = {
   id: string;
@@ -44,34 +47,6 @@ export type DisplayEditorPageDefinition = {
   label: string;
   renderPreview?: (config: Record<string, unknown>) => ReactElement;
 };
-
-const fallbackPageDefinitions: DisplayEditorPageDefinition[] = [
-  {
-    id: "overview",
-    label: "Overview",
-    createSeedConfig: () => ({})
-  },
-  {
-    id: "solar",
-    label: "Solar",
-    createSeedConfig: () => ({})
-  },
-  {
-    id: "factory-circuit",
-    label: "Factory Circuit",
-    createSeedConfig: () => ({})
-  },
-  {
-    id: "images",
-    label: "Images",
-    createSeedConfig: () => ({})
-  },
-  {
-    id: "sustainability",
-    label: "Sustainability",
-    createSeedConfig: () => ({})
-  }
-];
 
 const EDITOR_PREVIEW_SCALE = 0.5;
 const EDITOR_PREVIEW_SURFACE_HEIGHT = 934;
@@ -141,6 +116,12 @@ export function DisplayPagesEditor({
     initialPublishingStateByPage,
     reload
   );
+  const {
+    errorMessage: assetHealthErrorMessage,
+    isLoading: isAssetHealthLoading,
+    reload: reloadAssetHealth,
+    report: assetHealthReport
+  } = useDisplayPageAssetHealth();
 
   useEffect(() => {
     setSelectedRegionId(null);
@@ -164,11 +145,13 @@ export function DisplayPagesEditor({
   const handleReload = async () => {
     await reload();
     await refresh();
+    await reloadAssetHealth();
   };
 
   const handleSave = async () => {
     await save();
     await refresh();
+    await reloadAssetHealth();
   };
 
   return (
@@ -225,6 +208,12 @@ export function DisplayPagesEditor({
             fallbackPolicy={fallbackPolicy}
             publishingError={publishingError}
             publishingState={publishingState}
+          />
+          <DisplayPageEditorAssetHealthPanel
+            errorMessage={assetHealthErrorMessage}
+            isLoading={isAssetHealthLoading}
+            pageId={selectedPage.id}
+            report={assetHealthReport}
           />
           <div className="mt-4 grid gap-3">
             {pageDefinitions.map((page) => {

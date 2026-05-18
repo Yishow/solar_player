@@ -1,6 +1,7 @@
 import type {
   BrandProfile,
   ConfigStage,
+  DisplayPageAssetHealthReport,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
   DisplayPageKey,
@@ -146,6 +147,13 @@ export async function getDisplayPageFallbackStatus(pageId: DisplayPageKey) {
     fallback: DisplayPageFallbackStatus;
   }>(`/api/display-pages/${pageId}/fallback`);
   return response.fallback;
+}
+
+export async function getDisplayPageAssetHealth() {
+  const response = await requestJson<{
+    health: DisplayPageAssetHealthReport;
+  }>("/api/display-pages/asset-health");
+  return response.health;
 }
 
 export async function updatePlaybackPages(
