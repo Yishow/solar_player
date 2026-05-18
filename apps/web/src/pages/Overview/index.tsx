@@ -1,10 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
+import {
+  fetchDisplayStory,
+  type DisplayStoryPayload
+} from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { overviewAssetRuntimeMap } from "./assets";
 import {
@@ -53,6 +57,7 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
+  const [storyData, setStoryData] = useState<DisplayStoryPayload["overview"] | null>(null);
   const seedConfig = useMemo(
     () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
     []
@@ -61,10 +66,32 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     enabled: config === undefined,
     stage: "live"
   });
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchDisplayStory()
+      .then((story) => {
+        if (isActive) {
+          setStoryData(story.overview);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setStoryData(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const viewModel = buildOverviewViewModel({
     connectionState,
     isSocketConnected,
-    snapshot
+    snapshot,
+    storyOverview: storyData ?? undefined
   });
   const resolvedConfig = config ?? runtimeConfig.config;
 

@@ -1,4 +1,10 @@
-import type { MonitoringMetricBinding } from "@solar-display/shared";
+import type {
+  MonitoringAlertTone,
+  MonitoringBindingState,
+  MonitoringFallbackReason,
+  MonitoringFreshnessState,
+  MonitoringMetricBinding
+} from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
   resolveMonitoringSummaryState
@@ -27,6 +33,15 @@ type BuildOverviewViewModelArgs = {
   metricBindings?: OverviewMetricCard[];
   now?: string;
   snapshot: LiveMetricsSnapshot;
+  storyOverview?: {
+    metrics: Array<MonitoringMetricBinding<string>>;
+    summary: {
+      alertTone: MonitoringAlertTone;
+      bindingState: MonitoringBindingState;
+      fallbackReason: MonitoringFallbackReason | null;
+      freshnessState: MonitoringFreshnessState;
+    };
+  };
   summaryMetricKeys?: OverviewMetricKey[];
 };
 
@@ -52,15 +67,66 @@ function resolveSummaryStatus(connectionState: SocketConnectionState["status"]):
   return "disconnected";
 }
 
+function resolveSummaryLabel(args: {
+  isSocketConnected: boolean;
+  summaryState: {
+    bindingState: MonitoringBindingState;
+    fallbackReason: MonitoringFallbackReason | null;
+    freshnessState: MonitoringFreshnessState;
+  };
+}) {
+  if (!args.isSocketConnected) {
+    return "Socket 未連線，顯示 mock 資料";
+  }
+
+  if (args.summaryState.fallbackReason === "stale-data" || args.summaryState.freshnessState === "stale") {
+    return "資料延遲，摘要使用最近一次有效讀值";
+  }
+
+  if (args.summaryState.bindingState === "missing" || args.summaryState.freshnessState === "fallback") {
+    return "部分 KPI 缺資料，使用 fallback 顯示";
+  }
+
+  return "Socket 即時更新中";
+}
+
+function resolveStoryMetricCards(storyMetrics: Array<MonitoringMetricBinding<string>>) {
+  const storyMetricByKey = new Map(storyMetrics.map((metric) => [metric.metricKey, metric]));
+
+  return metricCards.map((metricCard) => {
+    const storyMetric = storyMetricByKey.get(metricCard.metricKey);
+
+    if (!storyMetric) {
+      return metricCard;
+    }
+
+    return {
+      ...storyMetric,
+      accentColor: metricCard.accentColor,
+      iconKey: metricCard.iconKey,
+      metricKey: metricCard.metricKey
+    };
+  });
+}
+
 export function buildOverviewViewModel({
   connectionState,
   isSocketConnected,
   metricBindings = metricCards,
   now,
   snapshot,
+  storyOverview,
   summaryMetricKeys
 }: BuildOverviewViewModelArgs) {
-  const metrics = metricBindings.map(({ accentColor = false, iconKey, ...binding }) => {
+  const shouldUseStoryOverview =
+    storyOverview !== undefined &&
+    storyOverview.metrics.length >= 3 &&
+    storyOverview.summary.freshnessState !== "fallback";
+  const resolvedMetricBindings = shouldUseStoryOverview
+    ? resolveStoryMetricCards(storyOverview.metrics)
+    : metricBindings;
+
+  const metrics = resolvedMetricBindings.map(({ accentColor = false, iconKey, ...binding }) => {
     const fallbackMetric = liveMetrics[binding.fallbackIndex]!;
     const resolved = resolveMonitoringMetricBinding({
       binding: {
@@ -87,13 +153,15 @@ export function buildOverviewViewModel({
       value: resolved.value
     };
   });
-  const summaryState = resolveMonitoringSummaryState(
-    metrics.filter((metric) =>
-      (summaryMetricKeys ?? metricBindings.map((binding) => binding.metricKey)).includes(
-        metric.metricKey
-      )
-    )
-  );
+  const summaryState = shouldUseStoryOverview
+    ? storyOverview.summary
+    : resolveMonitoringSummaryState(
+        metrics.filter((metric) =>
+          (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
+            metric.metricKey as OverviewMetricKey
+          )
+        )
+      );
 
   return {
     hero: {
@@ -106,13 +174,10 @@ export function buildOverviewViewModel({
       alertTone: summaryState.alertTone,
       fallbackReason: summaryState.fallbackReason,
       status: resolveSummaryStatus(connectionState),
-      statusLabel: !isSocketConnected
-        ? "Socket 未連線，顯示 mock 資料"
-        : summaryState.fallbackReason === "stale-data"
-          ? "資料延遲，摘要使用最近一次有效讀值"
-          : summaryState.bindingState === "missing"
-            ? "部分 KPI 缺資料，使用 fallback 顯示"
-            : "Socket 即時更新中"
+      statusLabel: resolveSummaryLabel({
+        isSocketConnected,
+        summaryState
+      })
     }
   };
 }

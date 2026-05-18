@@ -12,6 +12,11 @@ import type {
   DisplayPageKey,
   DisplayReadinessReport,
   ImageAsset,
+  MonitoringAlertTone,
+  MonitoringBindingState,
+  MonitoringFallbackReason,
+  MonitoringFreshnessState,
+  MonitoringMetricBinding,
   PlaybackPage,
   PlaybackSettings,
   ValidationResult
@@ -188,6 +193,25 @@ export async function getDisplayReadiness() {
     readiness: DisplayReadinessReport;
   }>("/api/display-readiness");
   return response.readiness;
+}
+
+export type DisplayStoryPayload = {
+  factoryCircuit: unknown;
+  generatedAt: string;
+  overview: {
+    metrics: Array<MonitoringMetricBinding<string>>;
+    summary: {
+      alertTone: MonitoringAlertTone;
+      bindingState: MonitoringBindingState;
+      fallbackReason: MonitoringFallbackReason | null;
+      freshnessState: MonitoringFreshnessState;
+    };
+  };
+  solar: unknown;
+};
+
+export async function fetchDisplayStory() {
+  return requestJson<DisplayStoryPayload>("/api/display-story");
 }
 
 export async function getDeviceDisplayOpsSummary() {
