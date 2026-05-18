@@ -45,6 +45,7 @@ export interface CircuitConfig {
   warningMin: number | null;
   warningMax: number | null;
   displayOrder: number | null;
+  displaySlot?: string | null;
   enabled: boolean;
 }
 

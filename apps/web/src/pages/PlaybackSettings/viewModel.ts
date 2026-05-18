@@ -1,4 +1,9 @@
-import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type {
+  DisplayOpsSummary,
+  DisplayRotationPreview,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import {
@@ -12,6 +17,7 @@ type BuildPlaybackSettingsViewModelArgs = {
   isSaving: boolean;
   message: string;
   pages: PlaybackPage[];
+  displayOpsSummary?: DisplayOpsSummary | null;
   rotationPreview?: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
 };
@@ -101,6 +107,7 @@ export function buildPlaybackSettingsViewModel({
   isSaving,
   message,
   pages,
+  displayOpsSummary,
   rotationPreview,
   settings
 }: BuildPlaybackSettingsViewModelArgs) {
@@ -123,6 +130,29 @@ export function buildPlaybackSettingsViewModel({
       title: errorMessage ? "儲存失敗" : isSaving ? "正在儲存播放設定..." : message,
       tone: errorMessage ? ("error" as const) : isSaving ? ("saving" as const) : ("ready" as const)
     },
+    displayOpsBanner: {
+      detail:
+        displayOpsSummary?.blockingIssues[0]?.message ??
+        "rotation publish、skip 與 draft pending 狀態會在這裡同步。",
+      title:
+        displayOpsSummary?.draftPending
+          ? `有 ${displayOpsSummary.draftCount} 頁尚未發布`
+          : "Display operations 已同步",
+      tone:
+        displayOpsSummary?.blockingIssues.some((issue) => issue.severity === "blocking")
+          ? ("error" as const)
+          : displayOpsSummary?.draftPending
+            ? ("warning" as const)
+            : ("ready" as const)
+    },
+    pendingDraftRows:
+      displayOpsSummary?.pages
+        .filter((page) => page.draftPending)
+        .map((page) => ({
+          labelEn: page.labelEn,
+          labelZh: page.labelZh,
+          publishState: page.publishState
+        })) ?? [],
     summaryCards: [
       {
         helper: "輪播引擎目前會納入的播放頁面數量",

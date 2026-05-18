@@ -1,4 +1,4 @@
-import type { PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
+import type { DisplaySyncEvent, PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 
 export type LiveMetricReading = {
@@ -31,6 +31,7 @@ export type SocketConnectionState = {
 type ServerToClientEvents = {
   "circuitMetrics:update": LiveMetricsSnapshot;
   "deviceStatus:update": unknown;
+  "display:sync": DisplaySyncEvent;
   "images:updated": unknown;
   "liveMetrics:update": LiveMetricsSnapshot;
   "mqtt:status": MqttConnectionStatus;

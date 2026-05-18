@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketIoServer } from "socket.io";
+import type { DisplaySyncEvent } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
 export type MqttStatus = {
@@ -97,6 +98,10 @@ export class SocketService {
 
   emitDeviceStatusUpdate(data: unknown) {
     this.io.emit("deviceStatus:update", data);
+  }
+
+  emitDisplaySync(data: DisplaySyncEvent) {
+    this.io.emit("display:sync", data);
   }
 
   emitSystemError(data: SystemNotification) {

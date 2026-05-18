@@ -1,4 +1,8 @@
-import type { DisplayPageAssetHealthReport, ImageAsset } from "@solar-display/shared";
+import type {
+  DisplayOpsAssetReferenceSummary,
+  DisplayPageAssetHealthReport,
+  ImageAsset
+} from "@solar-display/shared";
 import type { ChangeEvent, RefObject } from "react";
 import { Switch } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
@@ -25,7 +29,10 @@ function badgeClass(badge: string) {
 type ImageManagementContentProps = {
   assetHealthErrorMessage: string;
   assetHealthReport: DisplayPageAssetHealthReport | null;
+  assetReferences: DisplayOpsAssetReferenceSummary | null;
+  assetReferencesErrorMessage: string;
   assets: ImageAsset[];
+  deleteBlocked: boolean;
   errorMessage: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
   handleDelete: () => Promise<void>;
@@ -33,6 +40,7 @@ type ImageManagementContentProps = {
   handleSetCover: () => Promise<void>;
   handleUpload: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   isAssetHealthLoading: boolean;
+  isAssetReferencesLoading: boolean;
   isDeleting: boolean;
   isLoading: boolean;
   isSaving: boolean;
@@ -57,7 +65,10 @@ type ImageManagementContentProps = {
 export function ImageManagementContent({
   assetHealthErrorMessage,
   assetHealthReport,
+  assetReferences,
+  assetReferencesErrorMessage,
   assets,
+  deleteBlocked,
   errorMessage,
   fileInputRef,
   handleDelete,
@@ -65,6 +76,7 @@ export function ImageManagementContent({
   handleSetCover,
   handleUpload,
   isAssetHealthLoading,
+  isAssetReferencesLoading,
   isDeleting,
   isLoading,
   isSaving,
@@ -276,12 +288,38 @@ export function ImageManagementContent({
                 </div>
                 <Switch ariaLabel="納入輪播" on={viewModel.selection.includedInSlideshow} disabled={isLoading || isDeleting} onChange={(next) => updateAssetField(viewModel.selection!.id, { includedInSlideshow: next })} />
               </div>
+
+              <div className="im-form-row">
+                <label>展示引用 <small>Display References</small></label>
+                {isAssetReferencesLoading ? (
+                  <div className="mgmt-status">正在載入素材引用...</div>
+                ) : assetReferencesErrorMessage ? (
+                  <div className="mgmt-status is-error">{assetReferencesErrorMessage}</div>
+                ) : assetReferences && assetReferences.references.length > 0 ? (
+                  <div className="mgmt-status">
+                    {assetReferences.references.map((reference) => (
+                      <div key={`${reference.kind}-${reference.targetLabel}-${reference.stage}`} style={{ marginTop: 6 }}>
+                        {reference.kind} · {reference.stage} · {reference.targetLabel}
+                        <small style={{ display: "block", opacity: 0.72 }}>{reference.message}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mgmt-status">目前沒有 display-page 或 slideshow 引用。</div>
+                )}
+              </div>
+
+              {deleteBlocked ? (
+                <div className="mgmt-status is-error">
+                  這張圖片仍被 live display surface 引用，請先解除引用後再移除。
+                </div>
+              ) : null}
             </div>
 
             <div className="im-editor-actions">
               <button type="button" className="im-btn primary" disabled={isLoading || isSaving || isDeleting} onClick={() => void handleSave()}>{isSaving ? "儲存中..." : "儲存"}</button>
               <button type="button" className="im-btn" disabled={isLoading || isSaving || isDeleting || viewModel.selection.isCover} onClick={() => void handleSetCover()}>{viewModel.selection.isCover ? "目前封面" : "設為封面"}</button>
-              <button type="button" className="im-btn danger" disabled={isLoading || isSaving || isDeleting} onClick={() => void handleDelete()}>{isDeleting ? "移除中..." : "移除"}</button>
+              <button type="button" className="im-btn danger" disabled={isLoading || isSaving || isDeleting || deleteBlocked} onClick={() => void handleDelete()}>{deleteBlocked ? "先解除引用" : isDeleting ? "移除中..." : "移除"}</button>
             </div>
           </>
         ) : (

@@ -9,6 +9,37 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       tone: "ready",
       title: "清除快取完成"
     },
+    displayOpsSummary: {
+      alerts: [
+        {
+          code: "asset-unhealthy",
+          message: "overview live asset missing",
+          pageId: "overview",
+          severity: "blocking"
+        }
+      ],
+      assetHealthSummary: {
+        affectedPages: ["overview"],
+        unhealthyCount: 1
+      },
+      degraded: true,
+      diagnosticActions: [
+        { action: "refresh-readiness", label: "Refresh readiness" },
+        { action: "export-summary", label: "Export summary" }
+      ],
+      draftCount: 2,
+      generatedAt: "2026-05-18T09:30:00.000Z",
+      lastPublishAt: "2026-05-18T08:45:00.000Z",
+      liveVersion: 14,
+      readinessSummary: {
+        blockingCount: 3,
+        warningCount: 0
+      },
+      skipSummary: {
+        count: 1,
+        pages: ["overview"]
+      }
+    },
     isLoading: false,
     status: {
       arch: "arm64",
@@ -33,6 +64,12 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
   assert.match(model.feedback.title, /清除快取完成/);
   assert.equal(model.networkRows[0]?.value, "● 已連線 Connected");
+  assert.equal(model.displayOpsSummary.statusTitle, "展示退化");
+  assert.equal(model.displayOpsSummary.liveVersion, "v14");
+  assert.equal(model.displayOpsSummary.lastPublishLabel, "2026-05-18 08:45");
+  assert.equal(model.displayOpsSummary.assetHealthLabel, "1 unhealthy");
+  assert.equal(model.displayOpsSummary.alerts[0]?.message, "overview live asset missing");
+  assert.equal(model.displayOpsSummary.diagnostics[0]?.action, "refresh-readiness");
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {

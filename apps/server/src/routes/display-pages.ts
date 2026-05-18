@@ -126,6 +126,11 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
              updated_at = CURRENT_TIMESTAMP`
         )
         .run(pageId, JSON.stringify(normalizedRegions));
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "display-page-config-updated",
+        scope: "display-pages"
+      });
 
       return { config: resolveEnvelope(readStoredDisplayPageConfig(pageId)) };
     }
@@ -159,7 +164,13 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         );
       }
 
-      return { config: resolveEnvelope(writeStageConfig(pageId, "draft", regions)) };
+      const config = resolveEnvelope(writeStageConfig(pageId, "draft", regions));
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "display-page-draft-updated",
+        scope: "display-pages"
+      });
+      return { config };
     }
   );
 
@@ -186,6 +197,11 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
           timestamp: new Date().toISOString()
         });
       }
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "display-page-published",
+        scope: "display-pages"
+      });
 
       return { config: resolveEnvelope(live), validation };
     }
@@ -232,6 +248,11 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
       try {
         const config = rollbackToVersion(pageId, targetVersion, publishedBy);
+        app.socketService.emitDisplaySync({
+          generatedAt: new Date().toISOString(),
+          reason: "display-page-rolled-back",
+          scope: "display-pages"
+        });
         return { config: resolveEnvelope(config) };
       } catch (err) {
         if (err instanceof Error && "statusCode" in err && err.statusCode === 404) {

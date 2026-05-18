@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { CircuitConfig } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
 
 type CircuitRow = {
   id: number;
@@ -17,6 +18,7 @@ type CircuitRow = {
   warning_min: number | null;
   warning_max: number | null;
   display_order: number | null;
+  display_slot: string | null;
   enabled: number;
 };
 
@@ -40,6 +42,7 @@ function serializeCircuit(row: CircuitRow): CircuitConfig {
     warningMin: row.warning_min,
     warningMax: row.warning_max,
     displayOrder: row.display_order,
+    displaySlot: row.display_slot,
     enabled: toBoolean(row.enabled)
   };
 }
@@ -68,6 +71,7 @@ type CircuitCreateBody = {
   warningMin?: number;
   warningMax?: number;
   displayOrder?: number;
+  displaySlot?: string | null;
   enabled?: boolean;
 };
 
@@ -80,7 +84,8 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
   // GET /api/circuits
   app.get("/api/circuits", async () => ({
     success: true,
-    data: getAllCircuits()
+    data: getAllCircuits(),
+    readiness: readDisplayReadinessReport()
   }));
 
   // POST /api/circuits
@@ -92,10 +97,10 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     const result = db
       .prepare(
         `INSERT INTO circuit_configs (
-          name_zh, name_en, icon, unit, mqtt_topic, rated_capacity,
+          name_zh, name_en, icon, unit, mqtt_topic, display_slot, rated_capacity,
           normal_min, normal_max, attention_min, attention_max, warning_min, warning_max,
           display_order, enabled
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         body.nameZh ?? null,
@@ -103,6 +108,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         body.icon ?? null,
         body.unit ?? "kW",
         body.mqttTopic ?? null,
+        body.displaySlot ?? null,
         rc,
         body.normalMin ?? 0,
         body.normalMax ?? rc * 0.7,
@@ -122,10 +128,16 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       action: "created",
       circuit: inserted ? serializeCircuit(inserted) : null
     });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "circuit-created",
+      scope: "circuits"
+    });
 
     return {
       success: true,
-      data: inserted ? serializeCircuit(inserted) : null
+      data: inserted ? serializeCircuit(inserted) : null,
+      readiness: readDisplayReadinessReport()
     };
   });
 
@@ -153,6 +165,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
           icon = COALESCE(?, icon),
           unit = COALESCE(?, unit),
           mqtt_topic = COALESCE(?, mqtt_topic),
+          display_slot = ?,
           rated_capacity = ?,
           normal_min = COALESCE(?, normal_min),
           normal_max = COALESCE(?, normal_max),
@@ -170,6 +183,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         body.icon ?? null,
         body.unit ?? null,
         body.mqttTopic ?? null,
+        body.displaySlot === undefined ? existing.display_slot : body.displaySlot,
         rc,
         body.normalMin,
         body.normalMax,
@@ -190,10 +204,16 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         action: "updated",
         circuit: updated ? serializeCircuit(updated) : null
       });
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "circuit-updated",
+        scope: "circuits"
+      });
 
       return {
         success: true,
-        data: updated ? serializeCircuit(updated) : null
+        data: updated ? serializeCircuit(updated) : null,
+        readiness: readDisplayReadinessReport()
       };
     }
   );
@@ -218,8 +238,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       action: "deleted",
       circuitId: id
     });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "circuit-deleted",
+      scope: "circuits"
+    });
 
-    return { success: true, data: { id } };
+    return { success: true, data: { id }, readiness: readDisplayReadinessReport() };
   });
 
   // PUT /api/circuits/reorder
@@ -240,8 +265,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     transaction(body.circuits ?? []);
 
     app.socketService.emitCircuitSettingsUpdated({ action: "reordered" });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "circuit-reordered",
+      scope: "circuits"
+    });
 
-    return { success: true, data: getAllCircuits() };
+    return { success: true, data: getAllCircuits(), readiness: readDisplayReadinessReport() };
   });
 };
 

@@ -127,6 +127,7 @@ export function seedDatabase() {
       icon,
       unit,
       mqtt_topic,
+      display_slot,
       rated_capacity,
       normal_min,
       normal_max,
@@ -139,7 +140,7 @@ export function seedDatabase() {
       created_at,
       updated_at
     )
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     WHERE NOT EXISTS (
       SELECT 1 FROM circuit_configs WHERE mqtt_topic = ?
     )
@@ -232,6 +233,7 @@ export function seedDatabase() {
         circuitConfig.icon,
         "kW",
         circuitConfig.mqttTopic,
+        ["production", "hvac", "lighting", "office", "ev", "infrastructure"][index],
         circuitConfig.ratedCapacity,
         0,
         circuitConfig.ratedCapacity * 0.7,

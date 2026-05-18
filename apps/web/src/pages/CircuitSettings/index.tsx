@@ -1,8 +1,10 @@
 import type { CircuitConfig } from "@solar-display/shared";
 import { useEffect, useMemo, useState } from "react";
+import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { requestJson } from "../../services/api";
-import { Switch } from "../../components/management";
 import "./circuitSettings.css";
+import { CircuitSettingsContent } from "./CircuitSettingsContent";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 
 type CircuitListResponse = {
@@ -75,6 +77,7 @@ function buildNewCircuitDraft(circuits: CircuitConfig[]): Partial<CircuitConfig>
     attentionMax: 90,
     attentionMin: 70,
     displayOrder: nextOrder,
+    displaySlot: null,
     enabled: true,
     icon: "bolt",
     mqttTopic: "",
@@ -94,26 +97,6 @@ function parseNumberInput(value: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const ICON_GLYPH_MAP: Record<string, string> = {
-  bolt: "⚡",
-  car: "🚗",
-  fan: "❄",
-  light: "☀"
-};
-
-function iconGlyph(icon: string | null | undefined) {
-  if (!icon) return "·";
-  return ICON_GLYPH_MAP[icon] ?? "·";
-}
-
-function chipClass(tone: string) {
-  if (tone === "success") return "mgmt-chip is-success";
-  if (tone === "warning") return "mgmt-chip is-warning";
-  if (tone === "danger") return "mgmt-chip is-danger";
-  if (tone === "accent") return "mgmt-chip is-accent";
-  return "mgmt-chip";
-}
-
 export function CircuitSettings() {
   const [circuits, setCircuits] = useState<CircuitConfig[]>([]);
   const [dirtyIds, setDirtyIds] = useState<number[]>([]);
@@ -124,6 +107,12 @@ export function CircuitSettings() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [message, setMessage] = useState("正在載入迴路設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const {
+    errorMessage: readinessErrorMessage,
+    isLoading: readinessLoading,
+    readiness,
+    reload: reloadReadiness
+  } = useDisplayReadiness();
 
   const loadCircuits = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (silent) {
@@ -149,27 +138,13 @@ export function CircuitSettings() {
   };
 
   useEffect(() => {
-    let active = true;
-    const bootstrap = async () => {
-      try {
-        const nextCircuits = await getCircuits();
-        if (!active) return;
-        setCircuits(nextCircuits);
-        setDirtyIds([]);
-        setMessage("迴路設定已同步。");
-        setErrorMessage("");
-      } catch (error) {
-        if (!active) return;
-        setErrorMessage(error instanceof Error ? error.message : "載入迴路設定失敗。");
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    void bootstrap();
-    return () => {
-      active = false;
-    };
+    void loadCircuits();
   }, []);
+
+  useDisplaySyncRefresh(() => {
+    void loadCircuits({ silent: true });
+    void reloadReadiness();
+  });
 
   const markDirty = (id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
     setDirtyIds((current) => (current.includes(id) ? current : [...current, id]));
@@ -195,6 +170,7 @@ export function CircuitSettings() {
       const created = await createCircuit(buildNewCircuitDraft(circuits));
       setCircuits((current) => [...current, created]);
       setMessage("已新增迴路，請補齊欄位後按下儲存設定。");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "新增迴路失敗。");
     } finally {
@@ -228,6 +204,7 @@ export function CircuitSettings() {
       );
       setDirtyIds([]);
       setMessage("迴路設定已儲存。");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存迴路設定失敗。");
     } finally {
@@ -243,6 +220,7 @@ export function CircuitSettings() {
       setCircuits((current) => current.filter((circuit) => circuit.id !== id));
       setDirtyIds((current) => current.filter((currentId) => currentId !== id));
       setMessage("已刪除迴路。");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "刪除迴路失敗。");
     } finally {
@@ -266,348 +244,20 @@ export function CircuitSettings() {
     [circuits, deletingId, dirtyIds, errorMessage, isAdding, isLoading, isReloading, isSaving, message]
   );
 
-  const statusVariant =
-    viewModel.feedbackBanner.tone === "error"
-      ? "is-error"
-      : viewModel.feedbackBanner.tone === "loading"
-        ? "is-loading"
-        : "";
-
   return (
-    <div className="cs-page">
-      <section className="cs-title">
-        <h1>
-          迴路<em>設定</em>
-        </h1>
-        <p>Circuit Settings</p>
-      </section>
-
-      <button
-        type="button"
-        className="mgmt-action cs-resync"
-        disabled={viewModel.actions.reloadDisabled}
-        onClick={() => void loadCircuits({ silent: true })}
-      >
-        {viewModel.actions.reloadLabel}
-        <small>Resync</small>
-      </button>
-      <button
-        type="button"
-        className="mgmt-action cs-add"
-        disabled={viewModel.actions.addDisabled}
-        onClick={() => void handleAdd()}
-      >
-        {viewModel.actions.addLabel}
-        <small>Add Circuit</small>
-      </button>
-      <button
-        type="button"
-        className="mgmt-action primary cs-save"
-        disabled={viewModel.actions.saveDisabled}
-        onClick={() => void handleSaveAll()}
-      >
-        {viewModel.actions.saveLabel}
-        <small>Save Settings</small>
-      </button>
-
-      <div className={`mgmt-status cs-status ${statusVariant}`} role="status">
-        {viewModel.feedbackBanner.title}
-        {viewModel.feedbackBanner.detail ? (
-          <>
-            　·
-            <span style={{ opacity: 0.78 }}>{viewModel.feedbackBanner.detail}</span>
-          </>
-        ) : null}
-      </div>
-
-      <section className="settings-card cs-card">
-        <div className="settings-card__title">
-          廠區用電迴路
-          <small>Factory Circuits · 共 {viewModel.summary.totalCircuitCount} 筆</small>
-        </div>
-
-        <div className="cs-stats">
-          <div className="cs-stat">
-            <span className="cs-stat__label">
-              迴路總數
-              <small>Total</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.totalCircuitCount}</span>
-          </div>
-          <div className="cs-stat">
-            <span className="cs-stat__label">
-              顯示中
-              <small>Visible</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.enabledCircuitCount}</span>
-          </div>
-          <div className="cs-stat">
-            <span className="cs-stat__label">
-              隱藏中
-              <small>Hidden</small>
-            </span>
-            <span className="cs-stat__value" style={{ color: "#888d86" }}>
-              {viewModel.summary.disabledCircuitCount}
-            </span>
-          </div>
-          <div className="cs-stat">
-            <span className="cs-stat__label">
-              額定容量總和
-              <small>Capacity</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.capacityLabel}</span>
-          </div>
-          <div className="cs-stat">
-            <span className="cs-stat__label">
-              待儲存
-              <small>Dirty</small>
-            </span>
-            <span
-              className="cs-stat__value"
-              style={{ color: dirtyIds.length > 0 ? "#c9881a" : "#888d86" }}
-            >
-              {dirtyIds.length}
-            </span>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="cs-empty">
-            <strong>正在載入迴路設定</strong>
-            <span style={{ fontSize: 13 }}>同步 circuits route 中，請稍候。</span>
-          </div>
-        ) : viewModel.emptyState ? (
-          <div className="cs-empty">
-            <strong>{viewModel.emptyState.title}</strong>
-            <span style={{ fontSize: 13 }}>{viewModel.emptyState.description}</span>
-          </div>
-        ) : (
-          <>
-            <div className="cs-legend">
-              <span className="cs-legend-item cs-legend-item--normal">Normal</span>
-              <span className="cs-legend-item cs-legend-item--attention">Attention</span>
-              <span className="cs-legend-item cs-legend-item--warning">Warning</span>
-            </div>
-          <div className="cs-table-wrap">
-            <table className="cs-table">
-              <thead>
-                <tr>
-                  <th className="col-order">順序</th>
-                  <th className="col-name">迴路名稱</th>
-                  <th className="col-icon">圖示 / 單位</th>
-                  <th className="col-topic">MQTT Topic</th>
-                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--normal" />Normal</th>
-                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--attention" />Attention</th>
-                  <th className="col-thr"><span className="cs-th-dot cs-th-dot--warning" />Warning</th>
-                  <th className="col-display">顯示 / 驗證</th>
-                  <th className="col-ops">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {viewModel.rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={`${row.isDirty ? "is-dirty" : ""} ${row.enabled ? "" : "is-disabled"}`}
-                  >
-                    <td className="col-order">
-                      <input
-                        className="cs-input cs-input--order"
-                        type="number"
-                        min={1}
-                        value={row.displayOrder ?? 0}
-                        onChange={(event) =>
-                          handleFieldChange(
-                            row.id,
-                            "displayOrder",
-                            parseNumberInput(event.target.value, 1)
-                          )
-                        }
-                      />
-                    </td>
-                    <td className="col-name">
-                      <div className="cs-name-stack">
-                        <input
-                          className="cs-input cs-input--zh"
-                          placeholder="中文名稱"
-                          value={row.nameZh ?? ""}
-                          onChange={(event) =>
-                            handleFieldChange(row.id, "nameZh", event.target.value)
-                          }
-                        />
-                        <input
-                          className="cs-input"
-                          placeholder="English"
-                          value={row.nameEn ?? ""}
-                          onChange={(event) =>
-                            handleFieldChange(row.id, "nameEn", event.target.value)
-                          }
-                        />
-                        <p className="cs-cell-caption">
-                          額定 {row.ratedCapacity ?? 0} {row.unitLabel}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="col-icon">
-                      <div className="cs-icon-stack">
-                        <div className="cs-icon-row">
-                          <span className="cs-icon-glyph">{iconGlyph(row.icon)}</span>
-                          <input
-                            className="cs-input"
-                            placeholder="bolt"
-                            value={row.icon ?? ""}
-                            onChange={(event) =>
-                              handleFieldChange(row.id, "icon", event.target.value)
-                            }
-                          />
-                        </div>
-                        <input
-                          className="cs-input"
-                          placeholder="kW"
-                          value={row.unit ?? ""}
-                          onChange={(event) =>
-                            handleFieldChange(row.id, "unit", event.target.value)
-                          }
-                        />
-                      </div>
-                    </td>
-                    <td className="col-topic">
-                      <input
-                        className="cs-input"
-                        placeholder="factory/power/..."
-                        value={row.mqttTopic ?? ""}
-                        onChange={(event) =>
-                          handleFieldChange(row.id, "mqttTopic", event.target.value)
-                        }
-                      />
-                      <p className="cs-cell-caption">{row.topicLabel}</p>
-                    </td>
-                    <td className="col-thr">
-                      <div className="cs-thr">
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.normalMin ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "normalMin",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                        <small>—</small>
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.normalMax ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "normalMax",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                      <p className="cs-thr-pill cs-thr-pill--normal">{row.normalRangeLabel}</p>
-                    </td>
-                    <td className="col-thr">
-                      <div className="cs-thr">
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.attentionMin ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "attentionMin",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                        <small>—</small>
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.attentionMax ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "attentionMax",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                      <p className="cs-thr-pill cs-thr-pill--attention">{row.attentionRangeLabel}</p>
-                    </td>
-                    <td className="col-thr">
-                      <div className="cs-thr">
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.warningMin ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "warningMin",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                        <small>—</small>
-                        <input
-                          className="cs-input is-narrow"
-                          type="number"
-                          value={row.warningMax ?? 0}
-                          onChange={(event) =>
-                            handleFieldChange(
-                              row.id,
-                              "warningMax",
-                              parseNumberInput(event.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                      <p className="cs-thr-pill cs-thr-pill--warning">{row.warningRangeLabel}</p>
-                    </td>
-                    <td className="col-display">
-                      <div className="cs-display-stack">
-                        <div className="cs-toggle">
-                          <Switch
-                            ariaLabel={`${row.nameZh ?? "迴路"} 顯示`}
-                            on={row.enabled}
-                            onChange={(next) => handleFieldChange(row.id, "enabled", next)}
-                          />
-                          <span className="cs-toggle-label">{row.visibilityLabel}</span>
-                        </div>
-                        <span className={chipClass(row.validationTone)}>
-                          {row.validationLabel}
-                        </span>
-                        <p className="cs-cell-caption">{row.validationDetail}</p>
-                      </div>
-                    </td>
-                    <td className="col-ops">
-                      <div className="cs-ops">
-                        <span className={chipClass(row.dirtyTone)}>{row.dirtyLabel}</span>
-                        <button
-                          type="button"
-                          className="cs-delete"
-                          disabled={row.deleting}
-                          onClick={() => void handleDelete(row.id)}
-                        >
-                          {row.deleting ? "刪除中..." : "刪除"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </>
-        )}
-      </section>
-    </div>
+    <CircuitSettingsContent
+      dirtyCount={dirtyIds.length}
+      handleAdd={handleAdd}
+      handleDelete={handleDelete}
+      handleFieldChange={handleFieldChange}
+      isLoading={isLoading}
+      loadCircuits={loadCircuits}
+      parseNumberInput={parseNumberInput}
+      readiness={readiness}
+      readinessErrorMessage={readinessErrorMessage}
+      readinessLoading={readinessLoading}
+      saveAll={handleSaveAll}
+      viewModel={viewModel}
+    />
   );
 }

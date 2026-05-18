@@ -1,11 +1,16 @@
 import type {
   BrandProfile,
   ConfigStage,
+  DeviceDisplayDiagnosticResult,
+  DeviceDisplayOpsSummary,
+  DisplayOpsAssetReferenceSummary,
+  DisplayOpsSummary,
   DisplayRotationPreview,
   DisplayPageAssetHealthReport,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
   DisplayPageKey,
+  DisplayReadinessReport,
   ImageAsset,
   PlaybackPage,
   PlaybackSettings,
@@ -162,6 +167,68 @@ export async function getDisplayPageAssetHealth() {
     health: DisplayPageAssetHealthReport;
   }>("/api/display-pages/asset-health");
   return response.health;
+}
+
+export async function getDisplayOpsSummary() {
+  const response = await requestJson<{
+    summary: DisplayOpsSummary;
+  }>("/api/display-ops");
+  return response.summary;
+}
+
+export async function getImageAssetReferences(id: number) {
+  const response = await requestJson<{
+    references: DisplayOpsAssetReferenceSummary;
+  }>(`/api/display-ops/assets/${id}/references`);
+  return response.references;
+}
+
+export async function getDisplayReadiness() {
+  const response = await requestJson<{
+    readiness: DisplayReadinessReport;
+  }>("/api/display-readiness");
+  return response.readiness;
+}
+
+export async function getDeviceDisplayOpsSummary() {
+  const response = await requestJson<{
+    summary: DeviceDisplayOpsSummary;
+  }>("/api/device-display-ops");
+  return response.summary;
+}
+
+export type DeviceStatusResponseData = {
+  hostname: string;
+  platform: string;
+  arch: string;
+  nodeVersion: string;
+  uptimeSeconds: number;
+  cpu: { cores: number; loadAvg: [number, number, number] };
+  memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
+  disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  pid: number;
+};
+
+export async function getDeviceStatus() {
+  const response = await requestJson<{
+    data: DeviceStatusResponseData;
+    success: boolean;
+  }>("/api/device/status");
+  if (!response.success) {
+    throw new Error("載入裝置狀態失敗。");
+  }
+  return response.data;
+}
+
+export async function runDeviceDisplayDiagnostic(action: "export-summary" | "refresh-readiness") {
+  const response = await requestJson<{
+    data: DeviceDisplayDiagnosticResult;
+    success: boolean;
+  }>("/api/device-display-ops/diagnostics", {
+    body: JSON.stringify({ action }),
+    method: "POST"
+  });
+  return response.data;
 }
 
 export async function updatePlaybackPages(

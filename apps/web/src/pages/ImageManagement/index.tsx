@@ -1,7 +1,9 @@
 import type { ImageAsset } from "@solar-display/shared";
 import type { ChangeEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
+import { useImageAssetReferences } from "../../hooks/useImageAssetReferences";
 import {
   deleteImageAsset,
   getImages,
@@ -35,6 +37,12 @@ export function ImageManagement() {
     reload: reloadAssetHealth,
     report: assetHealthReport
   } = useDisplayPageAssetHealth();
+  const {
+    errorMessage: assetReferencesErrorMessage,
+    isLoading: isAssetReferencesLoading,
+    references: assetReferences,
+    reload: reloadAssetReferences
+  } = useImageAssetReferences(selectedImageId);
 
   const syncImages = async (preferredImageId: number | null = selectedImageId) => {
     const [nextAssets, nextStorageUsage] = await Promise.all([getImages(), getImageStorageUsage()]);
@@ -74,6 +82,12 @@ export function ImageManagement() {
     };
   }, []);
 
+  useDisplaySyncRefresh(() => {
+    void syncImages();
+    void reloadAssetHealth();
+    void reloadAssetReferences();
+  });
+
   const markDirty = () => {
     setMessage("圖片設定已變更，尚未儲存。");
     setErrorMessage("");
@@ -103,6 +117,7 @@ export function ImageManagement() {
       }
       await syncImages(lastUploadedId);
       await reloadAssetHealth();
+      await reloadAssetReferences();
       setMessage(files.length === 1 ? "圖片已上傳。" : `已完成 ${files.length} 張圖片上傳。`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "上傳圖片失敗。");
@@ -127,6 +142,7 @@ export function ImageManagement() {
       });
       await syncImages(selectedAsset.id);
       await reloadAssetHealth();
+      await reloadAssetReferences();
       setMessage("圖片設定已儲存。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存圖片設定失敗。");
@@ -142,6 +158,7 @@ export function ImageManagement() {
     try {
       await updateImageAsset(selectedImageId, { isCover: true });
       await syncImages(selectedImageId);
+      await reloadAssetReferences();
       setMessage("已更新封面圖片。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "設定封面圖片失敗。");
@@ -158,6 +175,7 @@ export function ImageManagement() {
       await deleteImageAsset(selectedImageId);
       await syncImages(null);
       await reloadAssetHealth();
+      await reloadAssetReferences();
       setMessage("已移除圖片。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "移除圖片失敗。");
@@ -173,6 +191,7 @@ export function ImageManagement() {
     try {
       await syncImages();
       await reloadAssetHealth();
+      await reloadAssetReferences();
       setMessage("圖片庫已同步。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "同步圖片庫失敗。");
@@ -185,7 +204,10 @@ export function ImageManagement() {
     <ImageManagementContent
       assetHealthErrorMessage={assetHealthErrorMessage}
       assetHealthReport={assetHealthReport}
+      assetReferences={assetReferences}
+      assetReferencesErrorMessage={assetReferencesErrorMessage}
       assets={assets}
+      deleteBlocked={(assetReferences?.liveCount ?? 0) > 0}
       errorMessage={errorMessage}
       fileInputRef={fileInputRef}
       handleDelete={handleDelete}
@@ -193,6 +215,7 @@ export function ImageManagement() {
       handleSetCover={handleSetCover}
       handleUpload={handleUpload}
       isAssetHealthLoading={isAssetHealthLoading}
+      isAssetReferencesLoading={isAssetReferencesLoading}
       isDeleting={isDeleting}
       isLoading={isLoading}
       isSaving={isSaving}

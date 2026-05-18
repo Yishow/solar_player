@@ -1,3 +1,5 @@
+import type { DeviceDisplayOpsSummary } from "@solar-display/shared";
+
 type DeviceRouteStatus = {
   hostname: string;
   platform: string;
@@ -18,6 +20,7 @@ export type DeviceActionFeedback = {
 
 type BuildDeviceStatusViewModelArgs = {
   actionFeedback: DeviceActionFeedback;
+  displayOpsSummary?: DeviceDisplayOpsSummary | null;
   isLoading: boolean;
   status: DeviceRouteStatus | null;
 };
@@ -95,8 +98,27 @@ function formatPercent(value: number | null) {
   return `${Math.round(value)}%`;
 }
 
+function formatTimestamp(value: string | null | undefined) {
+  if (!value) {
+    return "--";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 export function buildDeviceStatusViewModel({
   actionFeedback,
+  displayOpsSummary,
   isLoading,
   status
 }: BuildDeviceStatusViewModelArgs) {
@@ -127,6 +149,31 @@ export function buildDeviceStatusViewModel({
         value: status ? "有線連線 (穩定)" : "需待裝置狀態恢復後確認"
       }
     ],
+    displayOpsSummary: {
+      alertCount: displayOpsSummary?.alerts.length ?? 0,
+      alerts:
+        displayOpsSummary?.alerts.map((alert) => ({
+          ...alert,
+          pageLabel: alert.pageId ? `${alert.pageId}` : "global"
+        })) ?? [],
+      assetHealthLabel: `${displayOpsSummary?.assetHealthSummary.unhealthyCount ?? 0} unhealthy`,
+      degraded: displayOpsSummary?.degraded ?? false,
+      diagnosticsLabel:
+        displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") ?? "--",
+      diagnostics: displayOpsSummary?.diagnosticActions ?? [],
+      draftCount: displayOpsSummary?.draftCount ?? 0,
+      helper:
+        displayOpsSummary?.alerts[0]?.message ??
+        "可在此查看 live publish、skip 與 readiness 摘要。",
+      lastPublishLabel: formatTimestamp(displayOpsSummary?.lastPublishAt),
+      liveVersion:
+        displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined
+          ? "--"
+          : `v${displayOpsSummary.liveVersion}`,
+      readinessLabel: `${displayOpsSummary?.readinessSummary.blockingCount ?? 0} blocking`,
+      skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
+      statusTitle: displayOpsSummary?.degraded ? "展示退化" : "展示正常"
+    },
     resourceCards: [
       {
         gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",

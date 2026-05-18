@@ -1,25 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { requestJson } from "../../services/api";
 import "./mqttSettings.css";
-import {
-  buildMqttSettingsViewModel,
-  type ActionState,
-  type ConnectionTestFeedback,
-  type DataMode,
-  type MqttSettingsForm,
-  type MqttStatus,
-  type TopicMapping
-} from "./viewModel";
-
-const PREVIEW_ICON_GLYPHS: Record<string, string> = {
-  bars: "▤",
-  bolt: "⚡",
-  co2: "CO₂",
-  leaf: "🌱",
-  plug: "⌁",
-  refresh: "↻",
-  sun: "☀"
-};
+import { MqttSettingsContent } from "./MqttSettingsContent";
+import { type ActionState, type ConnectionTestFeedback, type DataMode, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
 
 const defaultMetricOptions = [
   "realTimePower",
@@ -109,25 +94,6 @@ function createEmptyMapping(metricKey: string): TopicMapping {
   };
 }
 
-type ConnStatusVariant = "is-connected" | "is-warning" | "is-error";
-
-function resolveConnStatus(args: {
-  feedbackTone: string;
-  feedbackVisualTone: string;
-  statusTone: "connected" | "connecting" | "disconnected";
-}): ConnStatusVariant {
-  if (args.feedbackVisualTone === "danger" || args.feedbackTone === "error") {
-    return "is-error";
-  }
-  if (args.statusTone === "connected") {
-    return "is-connected";
-  }
-  if (args.statusTone === "disconnected") {
-    return "is-error";
-  }
-  return "is-warning";
-}
-
 export function MqttSettings() {
   const [settings, setSettings] = useState<MqttSettingsForm>(defaultFormState);
   const [status, setStatus] = useState<MqttStatus>({
@@ -147,6 +113,11 @@ export function MqttSettings() {
     isSavingTopics: false,
     isTestingConnection: false
   });
+  const {
+    errorMessage: readinessErrorMessage,
+    readiness,
+    reload: reloadReadiness
+  } = useDisplayReadiness();
 
   const metricOptions = useMemo(() => {
     const optionSet = new Set<string>(defaultMetricOptions);
@@ -222,6 +193,12 @@ export function MqttSettings() {
     };
   }, []);
 
+  useDisplaySyncRefresh(() => {
+    void loadSettings();
+    void loadTopics(true);
+    void reloadReadiness();
+  });
+
   const handleSettingChange = <Key extends keyof MqttSettingsForm>(
     key: Key,
     value: MqttSettingsForm[Key]
@@ -253,6 +230,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("MQTT broker 設定已儲存並重新連線。");
       setErrorMessage("");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存 MQTT 設定失敗。");
     } finally {
@@ -302,6 +280,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("Topic mappings 已更新並重新載入訂閱。");
       setErrorMessage("");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存 topic mappings 失敗。");
     } finally {
@@ -319,6 +298,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("MQTT 訂閱清單已重新載入。");
       setErrorMessage("");
+      await reloadReadiness();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "重新載入 topic mappings 失敗。");
     } finally {
@@ -340,252 +320,25 @@ export function MqttSettings() {
     setTopics((current) => current.filter((topic) => topic.id !== rowId));
   };
 
-  const viewModel = buildMqttSettingsViewModel({
-    actionState,
-    errorMessage,
-    lastConnectionTest,
-    message,
-    settings,
-    status,
-    topics
-  });
-
-  const connStatusVariant = resolveConnStatus({
-    feedbackTone: viewModel.feedbackBanner.tone,
-    feedbackVisualTone: viewModel.feedbackBanner.visualTone,
-    statusTone: viewModel.connection.statusTone
-  });
-
   return (
-    <div className="mqtt-settings-page">
-      <section className="mqtt-title">
-        <h1>
-          資料來源與 <em>MQTT</em> 設定
-        </h1>
-        <p>Data Source &amp; MQTT Settings</p>
-      </section>
-
-      <button
-        type="button"
-        className="mgmt-action mqtt-test-conn"
-        disabled={viewModel.actions.testConnectionDisabled}
-        onClick={() => void testConnection()}
-      >
-        {viewModel.actions.testConnectionLabel}
-        <small>Test Connection</small>
-      </button>
-      <button
-        type="button"
-        className="mgmt-action primary mqtt-save"
-        disabled={viewModel.actions.saveSettingsDisabled}
-        onClick={() => void saveSettings()}
-      >
-        {viewModel.actions.saveSettingsLabel}
-        <small>Save Settings</small>
-      </button>
-
-      {/* mode + broker fields card */}
-      <section className="settings-card mqtt-mode">
-        <div className="settings-card__title">
-          資料來源模式
-          <small>Data Mode</small>
-        </div>
-
-        <div className="seg" role="tablist">
-          {viewModel.modeOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={option.isActive}
-              className={option.isActive ? "active" : ""}
-              onClick={() => handleSettingChange("dataMode", option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="broker-fields">
-          {viewModel.brokerFields.map((field) => (
-            <label key={field.key} className="text-field">
-              <span className="field-label">{field.label}</span>
-              <input
-                type={field.type}
-                disabled={field.disabled}
-                inputMode={field.inputMode === "numeric" ? "numeric" : undefined}
-                value={field.value}
-                onChange={(event) =>
-                  handleSettingChange(
-                    field.key as keyof MqttSettingsForm,
-                    event.target.value as MqttSettingsForm[keyof MqttSettingsForm]
-                  )
-                }
-              />
-            </label>
-          ))}
-        </div>
-
-        <div className={`conn-status ${connStatusVariant}`} role="status">
-          <span className="conn-status__dot" aria-hidden />
-          {viewModel.feedbackBanner.title}
-          <small>{viewModel.feedbackBanner.detail}</small>
-        </div>
-      </section>
-
-      {/* live topic list */}
-      <section className="settings-card mqtt-topic">
-        <div className="settings-card__title">
-          即時 Topic 清單
-          <small>Live Topic List</small>
-        </div>
-
-        {viewModel.liveTopicRows.length === 0 ? (
-          <div className="empty-block">
-            尚未建立 topic mapping，新增後這裡會顯示 broker 的即時收值。
-          </div>
-        ) : (
-          <div className="topic-list">
-            {viewModel.liveTopicRows.map((topic) => {
-              const dotState = !topic.enabled
-                ? "is-disabled"
-                : topic.runtimeTone === "connected"
-                  ? ""
-                  : "is-idle";
-              return (
-                <div className="topic-row" key={`live-${topic.id}`}>
-                  <span className={`topic-row__dot ${dotState}`} aria-hidden />
-                  <div className="topic-row__topic">{topic.topic || "未設定 topic"}</div>
-                  <small className="topic-row__meta">
-                    {topic.metricLabelZh}　·　{topic.runtimeLabel}　·　最後收值 {topic.lastReceivedLabel}
-                  </small>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* topic mapping editor */}
-      <section className="settings-card mqtt-map">
-        <div className="settings-card__title">
-          Topic 對應設定
-          <small>Topic Mapping</small>
-        </div>
-
-        <div className="map-list">
-          {viewModel.mappingRows.length === 0 ? (
-            <div className="empty-block">尚未設定任何 topic mapping。</div>
-          ) : (
-            viewModel.mappingRows.map((topic) => (
-              <div className="map-row" key={`map-${topic.id}`}>
-                <label className="map-row__label">
-                  {topic.metricLabelZh}
-                  <small>{topic.metricLabelEn}</small>
-                </label>
-                <div className="map-row__fields">
-                  <input
-                    type="text"
-                    placeholder="topic"
-                    value={topic.topic}
-                    onChange={(event) => handleTopicChange(topic.id, "topic", event.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="unit"
-                    value={topic.unit}
-                    onChange={(event) => handleTopicChange(topic.id, "unit", event.target.value)}
-                  />
-                </div>
-                <div className="map-row__controls">
-                  <label className="map-row__toggle">
-                    <input
-                      type="checkbox"
-                      checked={topic.enabled}
-                      onChange={(event) => handleTopicChange(topic.id, "enabled", event.target.checked)}
-                    />
-                    啟用 ({topic.enabledLabel})
-                  </label>
-                  <button
-                    type="button"
-                    className="map-row__remove"
-                    onClick={() => removeTopicMapping(topic.id)}
-                  >
-                    移除
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="map-actions">
-          <button type="button" className="map-add" onClick={addTopicMapping}>
-            ＋ 新增 mapping
-          </button>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              className="map-add"
-              disabled={viewModel.actions.reloadTopicsDisabled}
-              onClick={() => void reloadTopics()}
-            >
-              {viewModel.actions.reloadTopicsLabel}
-            </button>
-            <button
-              type="button"
-              className="map-save"
-              disabled={viewModel.actions.saveMappingsDisabled}
-              onClick={() => void saveTopicMappings()}
-            >
-              {viewModel.actions.saveMappingsLabel}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* live data preview */}
-      <section className="settings-card mqtt-preview">
-        <div className="settings-card__title">
-          即時資料預覽
-          <small>Live Data Preview</small>
-        </div>
-
-        {viewModel.emptyState ? (
-          <div className="empty-block">
-            {viewModel.emptyState.title}
-            <br />
-            <span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>
-              {viewModel.emptyState.description}
-            </span>
-          </div>
-        ) : (
-          <div className="preview-list">
-            {viewModel.previewCards.map((topic) => (
-              <div className="preview-row" key={`preview-${topic.id}`}>
-                <div className="preview-row__header">
-                  <span
-                    className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`}
-                    aria-hidden
-                  >
-                    {PREVIEW_ICON_GLYPHS[topic.icon] ?? "·"}
-                  </span>
-                  <label className="preview-row__label">
-                    {topic.metricLabelZh}
-                    <small>{topic.metricLabelEn}</small>
-                  </label>
-                </div>
-                <b className="preview-row__value">
-                  {topic.valueLabel}
-                  <small>{topic.unitLabel || "--"}</small>
-                </b>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <p className="last-update">最後更新時間 {viewModel.connection.lastUpdateLabel}</p>
-      </section>
-    </div>
+    <MqttSettingsContent
+      actionState={actionState}
+      addTopicMapping={addTopicMapping}
+      errorMessage={errorMessage}
+      handleSettingChange={handleSettingChange}
+      handleTopicChange={handleTopicChange}
+      lastConnectionTest={lastConnectionTest}
+      message={message}
+      readiness={readiness}
+      readinessErrorMessage={readinessErrorMessage}
+      reloadTopics={reloadTopics}
+      removeTopicMapping={removeTopicMapping}
+      saveSettings={saveSettings}
+      saveTopicMappings={saveTopicMappings}
+      settings={settings}
+      status={status}
+      testConnection={testConnection}
+      topics={topics}
+    />
   );
 }

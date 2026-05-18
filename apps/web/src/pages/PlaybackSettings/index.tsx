@@ -1,5 +1,7 @@
 import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import { useEffect, useState } from "react";
+import { useDisplayOpsSummary } from "../../hooks/useDisplayOpsSummary";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
   getDisplayRotationPreview,
   getPlaybackPages,
@@ -10,6 +12,7 @@ import {
 import { Switch } from "../../components/management";
 import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
+import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
 
 import slideOverview from "../../assets/playback/slide-overview.jpg";
 import slideSolar from "../../assets/playback/slide-solar.jpg";
@@ -33,6 +36,11 @@ export function PlaybackSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const {
+    errorMessage: displayOpsErrorMessage,
+    reload: reloadDisplayOpsSummary,
+    summary: displayOpsSummary
+  } = useDisplayOpsSummary();
 
   useEffect(() => {
     let active = true;
@@ -63,6 +71,11 @@ export function PlaybackSettings() {
     };
   }, []);
 
+  useDisplaySyncRefresh(() => {
+    void resyncPlaybackConfig();
+    void reloadDisplayOpsSummary();
+  });
+
   const markDirty = () => {
     setMessage("設定已變更，尚未儲存。");
     setErrorMessage("");
@@ -92,6 +105,7 @@ export function PlaybackSettings() {
         )
       ]);
       const nextRotationPreview = await getDisplayRotationPreview();
+      await reloadDisplayOpsSummary();
       setSettings(savedSettings);
       setPages(savedPages);
       setRotationPreview(nextRotationPreview);
@@ -115,6 +129,7 @@ export function PlaybackSettings() {
         getPlaybackPages(),
         getDisplayRotationPreview()
       ]);
+      await reloadDisplayOpsSummary();
       setSettings(nextSettings);
       setPages(nextPages);
       setRotationPreview(nextRotationPreview);
@@ -131,6 +146,7 @@ export function PlaybackSettings() {
     isSaving,
     message,
     pages,
+    displayOpsSummary,
     rotationPreview,
     settings
   });
@@ -175,6 +191,14 @@ export function PlaybackSettings() {
           {isSaving ? "儲存中..." : "儲存設定"}
           <small>Save Settings</small>
         </button>
+        <button
+          type="button"
+          className="ps-add-btn"
+          disabled
+          title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"
+        >
+          + 新增頁面 Add Page
+        </button>
       </div>
 
       <div className={`mgmt-status ps-status ${statusVariant}`} role="status">
@@ -185,6 +209,13 @@ export function PlaybackSettings() {
             <span style={{ opacity: 0.75 }}>{viewModel.saveBanner.detail}</span>
           </>
         ) : null}
+      </div>
+
+      <div className={`mgmt-status ${viewModel.displayOpsBanner.tone === "error" ? "is-error" : ""}`} role="status">
+        {displayOpsErrorMessage || viewModel.displayOpsBanner.title}
+        <small style={{ display: "block", opacity: 0.75 }}>
+          {displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
+        </small>
       </div>
 
       <section className="ps-preview">
@@ -239,299 +270,26 @@ export function PlaybackSettings() {
             ))}
           </div>
         ) : null}
+        {viewModel.pendingDraftRows.length > 0 ? (
+          <div className="mgmt-status" style={{ marginTop: "16px" }}>
+            {viewModel.pendingDraftRows.map((page) => (
+              <div key={`${page.labelEn}-${page.publishState}`} style={{ marginTop: "6px" }}>
+                {page.labelEn} / {page.labelZh}：目前仍有 {page.publishState} 變更待發布
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
-
-      <div className="ps-bottom-cards">
-        {/* Card 1: 輪播順序 Rotation Order */}
-        <section className="settings-card ps-card-order">
-          <div className="settings-card__title">
-            <span className="ps-badge-number">1</span>
-            <div className="ps-title-text">
-              輪播順序
-              <small>Rotation Order</small>
-            </div>
-            <div className="ps-info-icon">i</div>
-          </div>
-          <div className="ps-card-content">
-            {viewModel.pageRows.map((page, index) => (
-              <div key={page.id} className="ps-list-item" style={{ opacity: page.enabled ? 1 : 0.5 }}>
-                <span className="ps-drag-handle" title="拖曳以排序"
-                  onClick={() => {
-                    if (page.canMoveUp) {
-                      markDirty();
-                      setPages((current) => reorderPlaybackPages(current, page.id, -1));
-                    }
-                  }}
-                >::::</span>
-                <span className="ps-badge-number">{index + 1}</span>
-                <img src={PAGE_THUMBNAILS[page.route]} alt={page.labelZh} className="ps-list-thumb" />
-                <select
-                  className="ps-select"
-                  disabled={formDisabled}
-                  value={String(page.enabled ? "enabled" : "disabled")}
-                  onChange={(event) => {
-                    const next = event.target.value === "enabled";
-                    markDirty();
-                    setPages((current) =>
-                      current.map((currentPage) =>
-                        currentPage.id === page.id ? { ...currentPage, enabled: next } : currentPage
-                      )
-                    );
-                  }}
-                >
-                  <option value="enabled">{page.labelEn}</option>
-                  <option value="disabled">{page.labelEn} (停用)</option>
-                </select>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="ps-add-btn"
-              disabled
-              title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"
-            >
-              + 新增頁面 Add Page
-            </button>
-          </div>
-        </section>
-
-        {/* Card 2: 每頁停留秒數 Per-page Duration */}
-        <section className="settings-card ps-card-duration">
-          <div className="settings-card__title">
-            <span className="ps-badge-number">2</span>
-            <div className="ps-title-text">
-              每頁停留秒數
-              <small>Per-page Duration</small>
-            </div>
-            <div className="ps-info-icon">i</div>
-          </div>
-          <div className="ps-card-content">
-            {viewModel.pageRows.map((page) => (
-              <div key={page.id} className="ps-list-item" style={{ opacity: page.enabled ? 1 : 0.5 }}>
-                <span className="ps-label">{page.labelEn}</span>
-                <div className="ps-stepper">
-                  <button type="button" className="ps-stepper-btn" onClick={() => {
-                    const next = Math.max(1, page.durationSeconds - 1);
-                    markDirty();
-                    setPages((current) => current.map((c) => c.id === page.id ? { ...c, durationSeconds: next } : c));
-                  }}>-</button>
-                  <input
-                    className="ps-stepper-input"
-                    type="number"
-                    min="1"
-                    value={String(page.durationSeconds)}
-                    onChange={(event) => {
-                      const next = Number.parseInt(event.target.value, 10) || 1;
-                      markDirty();
-                      setPages((current) =>
-                        current.map((current) => current.id === page.id ? { ...current, durationSeconds: next } : current)
-                      );
-                    }}
-                  />
-                  <button type="button" className="ps-stepper-btn" onClick={() => {
-                    const next = page.durationSeconds + 1;
-                    markDirty();
-                    setPages((current) => current.map((c) => c.id === page.id ? { ...c, durationSeconds: next } : c));
-                  }}>+</button>
-                </div>
-              </div>
-            ))}
-            <div className="ps-unit">單位：秒 (sec.)</div>
-          </div>
-        </section>
-
-        {/* Card 3: 播放控制 Playback Control */}
-        <section className="settings-card ps-card-control">
-          <div className="settings-card__title">
-            <span className="ps-badge-number">3</span>
-            <div className="ps-title-text">
-              播放控制
-              <small>Playback Control</small>
-            </div>
-            <div className="ps-info-icon">i</div>
-          </div>
-          <div className="ps-card-content">
-            <div className="ps-row-flex">
-              <div className="ps-row-label">自動播放 <small>Autoplay</small></div>
-              <Switch ariaLabel="自動播放" on={settings?.autoplay ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("autoplay", next)} />
-            </div>
-            <div className="ps-row-flex">
-              <div className="ps-row-label">循環播放 <small>Loop Mode</small></div>
-              <Switch ariaLabel="循環播放" on={settings?.loop ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("loop", next)} />
-            </div>
-            
-            <div className="ps-row-flex">
-              <div className="ps-row-label">起始頁面 <small>Start Page</small></div>
-              <select className="ps-select ps-row-select-small" disabled={formDisabled} value={String(settings?.startPage ?? "")} onChange={(event) => updateSettingsField("startPage", Number.parseInt(event.target.value, 10) || settings?.startPage || 0)}>
-                {viewModel.pageRows.map((page) => <option key={page.id} value={String(page.id)}>{page.labelEn}</option>)}
-              </select>
-            </div>
-
-            <div className="ps-row-flex">
-              <div className="ps-row-label">轉場類型 <small>Transition Type</small></div>
-              <select className="ps-select ps-row-select" disabled={formDisabled} value={settings?.transitionType ?? "fade"} onChange={(event) => updateSettingsField("transitionType", event.target.value as PlaybackSettings["transitionType"])}>
-                <option value="fade">淡入淡出 Fade</option>
-                <option value="slide">滑動 Slide</option>
-                <option value="none">無 None</option>
-              </select>
-            </div>
-
-            <div className="ps-row-flex">
-              <div className="ps-row-label">轉場速度 <small>Transition Speed</small></div>
-              <select className="ps-select ps-row-select" disabled={formDisabled} value={String(settings?.transitionSpeed ?? 1000)} onChange={(event) => updateSettingsField("transitionSpeed", Number.parseInt(event.target.value, 10) || 1000)}>
-                <option value="500">快 Fast</option>
-                <option value="1000">中等 Medium</option>
-                <option value="2000">慢 Slow</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        {/* Card 4: 排程設定 Daily Schedule */}
-        <section className="settings-card ps-card-schedule">
-          <div className="settings-card__title">
-            <span className="ps-badge-number">4</span>
-            <div className="ps-title-text">
-              排程設定
-              <small>Daily Schedule</small>
-            </div>
-            <div className="ps-info-icon">i</div>
-          </div>
-          <div className="ps-card-content">
-            <div className="ps-row-flex">
-              <div className="ps-row-label">啟用排程 <small>Enable Schedule</small></div>
-              <Switch ariaLabel="啟用排程" on={settings?.scheduleEnabled ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("scheduleEnabled", next)} />
-            </div>
-            
-            <div className="ps-row-flex">
-              <div className="ps-row-label">開始時間 <small>Start Time</small></div>
-              <select className="ps-select ps-row-select-small" disabled={!settings?.scheduleEnabled || formDisabled} value={settings?.scheduleStart ?? "08:00"} onChange={(event) => updateSettingsField("scheduleStart", event.target.value)}>
-                <option value="08:00">08 : 00</option>
-                <option value="09:00">09 : 00</option>
-              </select>
-            </div>
-
-            <div className="ps-row-flex">
-              <div className="ps-row-label">結束時間 <small>End Time</small></div>
-              <select className="ps-select ps-row-select-small" disabled={!settings?.scheduleEnabled || formDisabled} value={settings?.scheduleEnd ?? "18:00"} onChange={(event) => updateSettingsField("scheduleEnd", event.target.value)}>
-                <option value="17:00">17 : 00</option>
-                <option value="18:00">18 : 00</option>
-              </select>
-            </div>
-
-            <div style={{ marginTop: "32px" }}>
-              <div className="ps-row-label">重複設定 <small>Repeat</small></div>
-              <div className="ps-weekdays">
-                {[
-                  { label: "週一", en: "Mon.", value: 1 },
-                  { label: "週二", en: "Tue.", value: 2 },
-                  { label: "週三", en: "Wed.", value: 3 },
-                  { label: "週四", en: "Thu.", value: 4 },
-                  { label: "週五", en: "Fri.", value: 5 }
-                ].map((day) => {
-                  const active = settings?.repeatDays.includes(day.value) ?? false;
-                  return (
-                    <button
-                      key={day.value}
-                      type="button"
-                      disabled={!settings?.scheduleEnabled || formDisabled}
-                      className={`ps-weekday ${active ? "on" : ""}`}
-                      onClick={() => {
-                        if (!settings) return;
-                        const nextDays = active ? settings.repeatDays.filter((current) => current !== day.value) : [...settings.repeatDays, day.value];
-                        updateSettingsField("repeatDays", [...new Set(nextDays)].sort((left, right) => left - right));
-                      }}
-                    >
-                      <span>{day.label}</span>
-                      <span>{day.en}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="ps-weekdays-bottom">
-                {[
-                  { label: "週六", en: "Sat.", value: 6 },
-                  { label: "週日", en: "Sun.", value: 0 }
-                ].map((day) => {
-                  const active = settings?.repeatDays.includes(day.value) ?? false;
-                  return (
-                    <button
-                      key={day.value}
-                      type="button"
-                      disabled={!settings?.scheduleEnabled || formDisabled}
-                      className={`ps-weekday ${active ? "on" : ""}`}
-                      onClick={() => {
-                        if (!settings) return;
-                        const nextDays = active ? settings.repeatDays.filter((current) => current !== day.value) : [...settings.repeatDays, day.value];
-                        updateSettingsField("repeatDays", [...new Set(nextDays)].sort((left, right) => left - right));
-                      }}
-                    >
-                      <span>{day.label}</span>
-                      <span>{day.en}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Card 5: 裝置與顯示設定 Display & Device Settings */}
-        <section className="settings-card ps-card-display">
-          <div className="settings-card__title">
-            <span className="ps-badge-number">5</span>
-            <div className="ps-title-text">
-              裝置與顯示設定
-              <small>Display & Device Settings</small>
-            </div>
-            <div className="ps-info-icon">i</div>
-          </div>
-          <div className="ps-card-content">
-            <div className="ps-stack">
-              <div className="ps-row-label">閒置模式 <small>Idle Mode</small></div>
-              <select className="ps-select" disabled={formDisabled} value={settings?.idleMode ?? "disabled"} onChange={(event) => updateSettingsField("idleMode", event.target.value as PlaybackSettings["idleMode"])}>
-                <option value="disabled">停用 Disabled</option>
-                <option value="return-to-start">切換至固定頁面 Switch to Static Page</option>
-              </select>
-            </div>
-
-            <div className="ps-stack">
-              <div className="ps-row-label">閒置時間 <small>Idle Time</small></div>
-              <select className="ps-select" disabled={formDisabled} value={String(settings?.idleTimeout ?? 300)} onChange={(event) => updateSettingsField("idleTimeout", Number.parseInt(event.target.value, 10) || 300)}>
-                <option value="60">1 分鐘 1 Minute</option>
-                <option value="300">5 分鐘 5 Minutes</option>
-                <option value="600">10 分鐘 10 Minutes</option>
-              </select>
-            </div>
-
-            <div className="ps-stack" style={{ marginTop: "32px" }}>
-              <div className="ps-row-label">亮度 <small>Brightness</small></div>
-              <div className="ps-brightness">
-                <button type="button" className="ps-stepper-btn" style={{border: "none", fontSize: "20px"}} onClick={() => updateSettingsField("brightness", Math.max(0, (settings?.brightness ?? 100) - 10))}>-</button>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  disabled={formDisabled}
-                  value={String(settings?.brightness ?? 100)}
-                  onChange={(event) => updateSettingsField("brightness", Number.parseInt(event.target.value, 10) || 0)}
-                />
-                <span className="ps-brightness__value">{settings?.brightness ?? 100}%</span>
-                <button type="button" className="ps-stepper-btn" style={{border: "none", fontSize: "20px"}} onClick={() => updateSettingsField("brightness", Math.min(100, (settings?.brightness ?? 100) + 10))}>+</button>
-              </div>
-            </div>
-
-            <div className="ps-stack" style={{ marginTop: "32px" }}>
-              <div className="ps-row-label">顯示方向 <small>Orientation</small></div>
-              <select className="ps-select" disabled={formDisabled} value={settings?.orientation ?? "landscape"} onChange={(event) => updateSettingsField("orientation", event.target.value as PlaybackSettings["orientation"])}>
-                <option value="landscape">橫向 Landscape (16:9)</option>
-                <option value="portrait">直向 Portrait (9:16)</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-      </div>
+      <PlaybackSettingsFormSections
+        formDisabled={formDisabled}
+        markDirty={markDirty}
+        pages={pages}
+        reorderPlaybackPages={reorderPlaybackPages}
+        setPages={setPages}
+        settings={settings}
+        updateSettingsField={updateSettingsField}
+        viewModel={viewModel}
+      />
     </div>
   );
 }

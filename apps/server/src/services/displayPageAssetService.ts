@@ -232,7 +232,7 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
-function collectDisplayPageAssetReferences(
+export function collectDisplayPageAssetReferences(
   pageId: DisplayPageKey,
   regions: Record<string, unknown>
 ) {

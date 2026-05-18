@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
 import { join } from "node:path";
+import { readDeviceDisplayOpsSummary } from "../services/deviceDisplayOpsService.js";
 
 function getUptimeSeconds(): number {
   if (platform() === "linux") {
@@ -87,6 +88,9 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     const disk = getDiskUsage(process.env.DATA_DIR ?? "/tmp");
     const memory = getMemoryUsage();
     const cpu = getCpuUsage();
+    const displayOps = readDeviceDisplayOpsSummary({
+      mqttStatus: app.mqttClientService.getStatus()
+    });
 
     return {
       success: true,
@@ -99,6 +103,7 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         cpu,
         memory,
         disk,
+        displayOps,
         pid: process.pid
       }
     };

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
+import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -174,7 +175,8 @@ function getEnabledTopics() {
 const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/settings/mqtt", async () => ({
     settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
-    status: app.mqttClientService.getStatus()
+    status: app.mqttClientService.getStatus(),
+    readiness: readDisplayReadinessReport()
   }));
 
   app.put<{ Body: SettingsBody }>("/api/settings/mqtt", async (request) => {
@@ -223,10 +225,16 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     })();
 
     await app.mqttClientService.connect();
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "mqtt-settings-updated",
+      scope: "mqtt"
+    });
 
     return {
       settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
-      status: app.mqttClientService.getStatus()
+      status: app.mqttClientService.getStatus(),
+      readiness: readDisplayReadinessReport()
     };
   });
 
@@ -241,7 +249,8 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/api/settings/mqtt/topics", async () => ({
-    topics: serializeTopicMappings()
+    topics: serializeTopicMappings(),
+    readiness: readDisplayReadinessReport()
   }));
 
   app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request) => {
@@ -300,17 +309,29 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     })();
 
     await app.mqttClientService.subscribe(getEnabledTopics());
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "mqtt-topics-updated",
+      scope: "mqtt"
+    });
 
     return {
-      topics: serializeTopicMappings()
+      topics: serializeTopicMappings(),
+      readiness: readDisplayReadinessReport()
     };
   });
 
   app.post("/api/settings/mqtt/reload", async () => {
     await app.mqttClientService.subscribe(getEnabledTopics());
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "mqtt-topics-reloaded",
+      scope: "mqtt"
+    });
 
     return {
-      topics: serializeTopicMappings()
+      topics: serializeTopicMappings(),
+      readiness: readDisplayReadinessReport()
     };
   });
 };

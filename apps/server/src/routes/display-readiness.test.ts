@@ -1,0 +1,147 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  buildApp,
+  getDatabase
+} from "./display-pages-asset-governance.test-support.js";
+
+test("GET /api/display-readiness reports blocking findings for missing MQTT mappings and slot bindings", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("realTimePower");
+  database
+    .prepare("UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?")
+    .run("factory/power/production");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+        summary: {
+          blockingCount: number;
+        };
+      };
+    };
+
+    assert.ok(body.readiness.summary.blockingCount >= 2);
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "overview" &&
+          finding.requirementKey === "realTimePower" &&
+          finding.sourceType === "mqtt-metric" &&
+          finding.status === "blocking" &&
+          finding.blocking
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "factory-circuit" &&
+          finding.requirementKey === "production" &&
+          finding.sourceType === "circuit-slot" &&
+          finding.status === "blocking" &&
+          finding.blocking
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-readiness reports conflicting slot assignments", async () => {
+  const database = getDatabase();
+  database
+    .prepare("UPDATE circuit_configs SET display_slot = ? WHERE mqtt_topic IN (?, ?)")
+    .run("production", "factory/power/production", "factory/power/hvac");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          reason: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "factory-circuit" &&
+          finding.requirementKey === "production" &&
+          finding.sourceType === "circuit-slot" &&
+          finding.status === "blocking" &&
+          finding.blocking &&
+          /conflict/i.test(finding.reason)
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/circuits/:id persists explicit display slot assignments", async () => {
+  const app = await buildApp();
+
+  try {
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits"
+    });
+    const firstCircuit = (listResponse.json() as {
+      data: Array<{ displaySlot?: string | null; id: number }>;
+    }).data[0];
+
+    assert.ok(firstCircuit);
+
+    const updateResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        displaySlot: "production"
+      },
+      url: `/api/circuits/${firstCircuit.id}`
+    });
+
+    assert.equal(updateResponse.statusCode, 200);
+    const body = updateResponse.json() as {
+      data: {
+        displaySlot: string | null;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, true);
+    assert.equal(body.data.displaySlot, "production");
+  } finally {
+    await app.close();
+  }
+});
