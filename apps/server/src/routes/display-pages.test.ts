@@ -367,3 +367,80 @@ test("POST /api/display-pages/:pageId/validate returns validation without publis
     await app.close();
   }
 });
+
+test("overlapping live draft regions are reported with both region ids and blocked from publish", async () => {
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/solar/draft",
+      payload: {
+        regions: {
+          generation: { left: 120, top: 80, width: 320, height: 180 },
+          efficiency: { left: 220, top: 140, width: 320, height: 180 }
+        }
+      }
+    });
+
+    const validateRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/solar/validate"
+    });
+
+    assert.equal(validateRes.statusCode, 200);
+    const validateBody = validateRes.json() as {
+      validation: {
+        canPublish: boolean;
+        findings: Array<{ code: string; regionId?: string }>;
+      };
+    };
+    assert.equal(validateBody.validation.canPublish, false);
+    assert.equal(
+      validateBody.validation.findings.some(
+        (finding) => finding.code === "GEOMETRY_OVERLAP" && finding.regionId === "generation"
+      ),
+      true
+    );
+    assert.equal(
+      validateBody.validation.findings.some(
+        (finding) => finding.code === "GEOMETRY_OVERLAP" && finding.regionId === "efficiency"
+      ),
+      true
+    );
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/solar/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 422);
+    const publishBody = publishRes.json() as {
+      success: boolean;
+      validation: {
+        canPublish: boolean;
+        findings: Array<{ code: string; regionId?: string }>;
+      };
+    };
+    assert.equal(publishBody.success, false);
+    assert.equal(publishBody.validation.canPublish, false);
+    assert.equal(
+      publishBody.validation.findings.some(
+        (finding) => finding.code === "GEOMETRY_OVERLAP" && finding.regionId === "generation"
+      ),
+      true
+    );
+    assert.equal(
+      publishBody.validation.findings.some(
+        (finding) => finding.code === "GEOMETRY_OVERLAP" && finding.regionId === "efficiency"
+      ),
+      true
+    );
+
+    const liveRes = await app.inject({ method: "GET", url: "/api/display-pages/solar/live" });
+    const liveBody = liveRes.json() as { config: { regions: Record<string, unknown> } };
+    assert.deepEqual(liveBody.config.regions, {});
+  } finally {
+    await app.close();
+  }
+});

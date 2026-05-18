@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statfsSync } from "node:fs";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
 import { join } from "node:path";
 import { readDeviceDisplayOpsSummary } from "../services/deviceDisplayOpsService.js";
@@ -19,12 +18,14 @@ function getUptimeSeconds(): number {
 
 function getDiskUsage(path: string): { totalMB: number; usedMB: number; availableMB: number; usePercent: number } {
   try {
-    const output = execSync(`df -BM "${path}" | tail -1`, { encoding: "utf-8" });
-    const parts = output.trim().split(/\s+/);
-    const totalMB = Number.parseInt(parts[1]?.replace("M", "") ?? "0", 10);
-    const usedMB = Number.parseInt(parts[2]?.replace("M", "") ?? "0", 10);
-    const availableMB = Number.parseInt(parts[3]?.replace("M", "") ?? "0", 10);
-    const usePercent = Number.parseInt(parts[4]?.replace("%", "") ?? "0", 10);
+    const stats = statfsSync(path);
+    const totalBytes = stats.blocks * stats.bsize;
+    const usedBytes = Math.max(0, (stats.blocks - stats.bfree) * stats.bsize);
+    const availableBytes = Math.max(0, stats.bavail * stats.bsize);
+    const totalMB = Math.round(totalBytes / 1024 / 1024);
+    const usedMB = Math.round(usedBytes / 1024 / 1024);
+    const availableMB = Math.round(availableBytes / 1024 / 1024);
+    const usePercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
     return { totalMB, usedMB, availableMB, usePercent };
   } catch {
     return { totalMB: 0, usedMB: 0, availableMB: 0, usePercent: 0 };

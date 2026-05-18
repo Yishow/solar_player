@@ -185,6 +185,12 @@ test("GET /api/device/status keeps host health while adding a degraded display s
     const body = response.json() as {
       data: {
         cpu: { cores: number };
+        disk: {
+          availableMB: number;
+          totalMB: number;
+          usedMB: number;
+          usePercent: number;
+        };
         displayOps: {
           degraded: boolean;
           diagnosticActions: Array<{ action: string }>;
@@ -197,6 +203,10 @@ test("GET /api/device/status keeps host health while adding a degraded display s
     assert.equal(body.success, true);
     assert.equal(typeof body.data.hostname, "string");
     assert.ok(body.data.cpu.cores >= 1);
+    assert.ok(body.data.disk.totalMB > 0);
+    assert.ok(body.data.disk.availableMB >= 0);
+    assert.ok(body.data.disk.usedMB >= 0);
+    assert.ok(body.data.disk.usePercent >= 0);
     assert.equal(typeof body.data.displayOps.degraded, "boolean");
     assert.deepEqual(
       body.data.displayOps.diagnosticActions.map((action) => action.action),

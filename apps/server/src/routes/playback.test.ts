@@ -190,6 +190,35 @@ test("display rotation evaluator preserves unknown skip reason strings for diagn
   );
 });
 
+test("display rotation evaluator reports unpublished and asset-unhealthy pages with machine-readable skip reasons", () => {
+  const preview = evaluateDisplayRotation({
+    now: new Date("2026-05-13T09:30:00+08:00"),
+    pageConditions: {
+      1: { isPublished: false },
+      2: { isHealthy: false }
+    },
+    pages: basePages,
+    settings: baseSettings
+  });
+
+  assert.deepEqual(
+    preview.playablePages.map((page) => page.id),
+    []
+  );
+  assert.equal(
+    preview.skippedPages.find((page) => page.id === 1)?.skipReason,
+    "unpublished"
+  );
+  assert.equal(
+    preview.skippedPages.find((page) => page.id === 2)?.skipReason,
+    "asset-unhealthy"
+  );
+  assert.equal(
+    preview.skippedPages.find((page) => page.id === 3)?.skipReason,
+    "disabled"
+  );
+});
+
 test("GET /api/playback/settings and /api/playback/pages expose seeded playback data", async () => {
   migrateDatabase();
   seedDatabase();

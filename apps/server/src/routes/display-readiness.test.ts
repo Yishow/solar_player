@@ -109,6 +109,87 @@ test("GET /api/display-readiness reports conflicting slot assignments", async ()
   }
 });
 
+test("MQTT and circuit settings surfaces expose the same blocking readiness findings", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("realTimePower");
+  database
+    .prepare("UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?")
+    .run("factory/power/production");
+
+  const app = await buildApp();
+
+  try {
+    const [mqttResponse, circuitsResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/settings/mqtt"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/circuits"
+      })
+    ]);
+
+    assert.equal(mqttResponse.statusCode, 200);
+    assert.equal(circuitsResponse.statusCode, 200);
+
+    const mqttBody = mqttResponse.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+        summary: {
+          blockingCount: number;
+        };
+      };
+    };
+    const circuitsBody = circuitsResponse.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+        summary: {
+          blockingCount: number;
+        };
+      };
+    };
+
+    assert.equal(
+      mqttBody.readiness.summary.blockingCount,
+      circuitsBody.readiness.summary.blockingCount
+    );
+
+    const summarize = (
+      findings: Array<{
+        blocking: boolean;
+        pageId: string;
+        requirementKey: string;
+        sourceType: string;
+        status: string;
+      }>
+    ) =>
+      findings
+        .filter((finding) => finding.blocking)
+        .map((finding) => `${finding.pageId}:${finding.requirementKey}:${finding.sourceType}:${finding.status}`)
+        .sort();
+
+    assert.deepEqual(
+      summarize(mqttBody.readiness.findings),
+      summarize(circuitsBody.readiness.findings)
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/circuits/:id persists explicit display slot assignments", async () => {
   const app = await buildApp();
 

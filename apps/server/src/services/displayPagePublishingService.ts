@@ -100,6 +100,15 @@ function readNextLiveVersion(pageId: DisplayPageKey) {
 function validateConfigDraft(regions: Record<string, unknown>): ValidationResult {
   const findings: ValidationFinding[] = [];
   const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
+  const layoutRects: Array<{
+    bottom: number;
+    height: number;
+    left: number;
+    regionId: string;
+    right: number;
+    top: number;
+    width: number;
+  }> = [];
 
   if (placementIssues.length > 0) {
     findings.push(
@@ -152,6 +161,54 @@ function validateConfigDraft(regions: Record<string, unknown>): ValidationResult
       if (nHeight !== null && nHeight <= 0) {
         findings.push({ severity: "blocking", code: "GEOMETRY_INVALID_VALUE", message: `${regionId}.height 必須大於 0`, regionId });
       }
+
+      if (
+        nLeft !== null &&
+        nTop !== null &&
+        nWidth !== null &&
+        nHeight !== null &&
+        nWidth > 0 &&
+        nHeight > 0
+      ) {
+        layoutRects.push({
+          bottom: nTop + nHeight,
+          height: nHeight,
+          left: nLeft,
+          regionId,
+          right: nLeft + nWidth,
+          top: nTop,
+          width: nWidth
+        });
+      }
+    }
+  }
+
+  for (let index = 0; index < layoutRects.length; index += 1) {
+    const current = layoutRects[index]!;
+    for (let compareIndex = index + 1; compareIndex < layoutRects.length; compareIndex += 1) {
+      const candidate = layoutRects[compareIndex]!;
+      const overlaps =
+        current.left < candidate.right &&
+        current.right > candidate.left &&
+        current.top < candidate.bottom &&
+        current.bottom > candidate.top;
+
+      if (!overlaps) {
+        continue;
+      }
+
+      findings.push({
+        severity: "blocking",
+        code: "GEOMETRY_OVERLAP",
+        message: `${current.regionId} 與 ${candidate.regionId} 發生重疊`,
+        regionId: current.regionId
+      });
+      findings.push({
+        severity: "blocking",
+        code: "GEOMETRY_OVERLAP",
+        message: `${candidate.regionId} 與 ${current.regionId} 發生重疊`,
+        regionId: candidate.regionId
+      });
     }
   }
 
