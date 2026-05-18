@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
-import { imageMocks } from "../../mocks/images";
+import { fetchImagePlaylist } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
@@ -53,41 +53,92 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     stage: "live"
   });
   const [activeIndex, setActiveIndex] = useState(0);
+  const [playlistData, setPlaylistData] = useState<{
+    entries: Array<{
+      entryId: string;
+      displayOrder: number;
+      durationSeconds: number;
+      enabled: boolean;
+      fallbackMode: "display-placeholder" | "skip" | "use-cover";
+      fallbackReason?: string | null;
+      title: string;
+      description: string;
+      area: string;
+      capturedAt: string;
+      resolution: string;
+      tags: string[];
+      assetSource: string | null;
+      hasAsset: boolean;
+    }>;
+    activeEntry: {
+      entryId: string;
+      durationSeconds: number;
+      fallbackMode: "display-placeholder" | "skip" | "use-cover";
+      fallbackReason: string | null;
+      title: string;
+      description: string;
+      area: string;
+      capturedAt: string;
+      resolution: string;
+      tags: string[];
+      assetSource: string | null;
+      hasAsset: boolean;
+    } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchImagePlaylist(activeIndex)
+      .then((res) => {
+        if (isActive && res.playlist) {
+          setPlaylistData(res.playlist);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setPlaylistData(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeIndex]);
+
   const resolvedConfig = config ?? runtimeConfig.config;
-  const playlistAssets = useMemo(
-    () =>
-      [
-        resolvedConfig.mainStage.src ?? null,
-        imagesAssetRuntimeMap.thumbs[0] ?? null,
-        imagesAssetRuntimeMap.thumbs[1] ?? null,
-        imagesAssetRuntimeMap.thumbs[2] ?? null,
-        null
-      ].map((source, index) => ({
-        assetId: `asset-${index + 1}`,
-        height: source ? 1080 : null,
-        source,
-        status: source ? ("ready" as const) : ("pending" as const),
-        width: source ? 1920 : null
-      })),
-    [resolvedConfig.mainStage.src]
-  );
   const playlistEntries = useMemo(
     () =>
-      imageMocks.map((image, index) => ({
-        area: image.area,
-        assetId: `asset-${index + 1}`,
-        capturedAt: image.updatedAt,
-        description: `${image.area} 的播放素材，保持資訊面板與縮圖播放同步。`,
-        displayOrder: index + 1,
-        durationSeconds: image.durationSec,
-        enabled: true,
-        entryId: image.id,
-        fallbackMode: index === 4 ? "display-placeholder" as const : "use-cover" as const,
-        resolution: image.resolution,
-        tags: index === 0 ? ["封面", "太陽能"] : index === 3 ? ["Fallback"] : [],
-        title: image.title
-      })),
-    []
+      playlistData === null
+        ? []
+        : playlistData.entries.map((entry) => ({
+            area: entry.area,
+            assetId: entry.entryId,
+            capturedAt: entry.capturedAt,
+            description: entry.description,
+            displayOrder: entry.displayOrder,
+            durationSeconds: entry.durationSeconds,
+            enabled: entry.enabled,
+            entryId: entry.entryId,
+            fallbackMode: entry.fallbackMode,
+            resolution: entry.resolution,
+            tags: entry.tags,
+            title: entry.title
+          })),
+    [playlistData]
+  );
+  const playlistAssets = useMemo(
+    () =>
+      playlistData === null
+        ? []
+        : playlistData.entries.map((entry, index) => ({
+            assetId: entry.entryId,
+            height: entry.hasAsset ? 1080 : null,
+            source: entry.assetSource,
+            status: entry.hasAsset ? ("ready" as const) : ("pending" as const),
+            width: entry.hasAsset ? 1920 : null
+          })),
+    [playlistData]
   );
   const viewModel = buildImagesViewModel({
     activeIndex,

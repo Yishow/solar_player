@@ -247,6 +247,43 @@ export async function fetchDisplayStory() {
   return requestJson<DisplayStoryPayload>("/api/display-story");
 }
 
+export async function fetchImagePlaylist(activeIndex = 0) {
+  return requestJson<{
+    playlist: {
+      entries: Array<{
+        entryId: string;
+        displayOrder: number;
+        durationSeconds: number;
+        enabled: boolean;
+        fallbackMode: "display-placeholder" | "skip" | "use-cover";
+        fallbackReason?: string | null;
+        title: string;
+        description: string;
+        area: string;
+        capturedAt: string;
+        resolution: string;
+        tags: string[];
+        assetSource: string | null;
+        hasAsset: boolean;
+      }>;
+      activeEntry: {
+        entryId: string;
+        durationSeconds: number;
+        fallbackMode: "display-placeholder" | "skip" | "use-cover";
+        fallbackReason: string | null;
+        title: string;
+        description: string;
+        area: string;
+        capturedAt: string;
+        resolution: string;
+        tags: string[];
+        assetSource: string | null;
+        hasAsset: boolean;
+      } | null;
+    };
+  }>(`/api/image-playlist?activeIndex=${activeIndex}`);
+}
+
 export async function getDeviceDisplayOpsSummary() {
   const response = await requestJson<{
     summary: DeviceDisplayOpsSummary;
