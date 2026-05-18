@@ -161,7 +161,7 @@ export function DisplayEditorInspectorFields({
   onResetField?: (path: DisplayEditorPath) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-3">
       {fields.map((field) => renderField(field, onChange, onResetField))}
     </div>
   );
@@ -200,7 +200,7 @@ function renderField(
     return (
       <div
         key={displayEditorPathKey(field.path)}
-        className="grid gap-3 rounded-[16px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.03)] p-3 md:col-span-2"
+        className="grid gap-3 rounded-[16px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.03)] p-3"
       >
         {label}
         {items.map((item, index) => (
@@ -208,7 +208,7 @@ function renderField(
             <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--shell-subtitle-ink)]">
               {arraySchema.itemLabel} {index + 1}
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3">
               {arraySchema.itemFields.map((itemField) =>
                 renderField(
                   {

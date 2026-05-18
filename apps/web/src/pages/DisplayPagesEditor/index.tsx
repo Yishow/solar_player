@@ -346,6 +346,7 @@ export function DisplayPagesEditor({
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {rightTab === "inspector" && (
               <DisplayEditorInspectorCard
+                flat
                 actions={
                   selectedRegion ? (
                     <DisplayEditorInspectorTools
