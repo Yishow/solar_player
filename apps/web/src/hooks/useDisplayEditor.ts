@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type DisplayEditorToggleEvent = {
   altKey?: boolean;
@@ -54,6 +54,12 @@ export function isDisplayEditorHistoryKey(
 }
 
 export function useDisplayEditorKeybinding(onToggle: () => void) {
+  const onToggleRef = useRef(onToggle);
+
+  useEffect(() => {
+    onToggleRef.current = onToggle;
+  }, [onToggle]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null;
@@ -71,12 +77,12 @@ export function useDisplayEditorKeybinding(onToggle: () => void) {
       }
 
       event.preventDefault();
-      onToggle();
+      onToggleRef.current();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onToggle]);
+  }, []);
 }
