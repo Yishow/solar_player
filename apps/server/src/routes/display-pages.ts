@@ -20,6 +20,7 @@ import {
   normalizeDisplayPageRegionsForStorage,
   resolveDisplayPageRegions
 } from "../services/displayPageAssetService.js";
+import { readDisplayRotationPreview } from "../services/displayRotationService.js";
 
 type DisplayPageRouteParams = { pageId: string };
 type DisplayPageConfigBody = { regions?: Record<string, unknown> };
@@ -260,6 +261,12 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/display-pages/asset-health", async () => {
     return { health: computeDisplayPageAssetHealthReport() };
   });
+
+  app.get("/api/display-pages/rotation-preview", async () => ({
+    preview: readDisplayRotationPreview({
+      mqttStatus: app.mqttClientService.getStatus()
+    })
+  }));
 };
 
 export default displayPagesRoute;

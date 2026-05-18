@@ -5,10 +5,12 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import {
   createPlaybackRuntime,
+  evaluateDisplayRotation,
   getEnabledPlaybackPages,
   getPlaybackPage,
   isPlaybackAllowedBySchedule,
   shouldEnterIdleMode,
+  type DisplayRotationSkipReason,
   type PlaybackPage,
   type PlaybackSettings
 } from "@solar-display/shared";
@@ -125,6 +127,51 @@ test("playback shared helpers sort enabled pages, honor schedule, and enter idle
 
   assert.equal(shouldEnterIdleMode(idleSettings, 10_000, 39_000), false);
   assert.equal(shouldEnterIdleMode(idleSettings, 10_000, 40_000), true);
+});
+
+test("display rotation evaluator skips disabled and not-ready pages while preserving playable order", () => {
+  const preview = evaluateDisplayRotation({
+    fallbackRoute: "/offline",
+    now: new Date("2026-05-13T09:30:00+08:00"),
+    pageConditions: {
+      1: { isPublished: true, isHealthy: true, isReady: true },
+      2: { isPublished: true, isHealthy: true, isReady: false },
+      3: { isPublished: true, isHealthy: true, isReady: true }
+    },
+    pages: basePages,
+    settings: baseSettings
+  });
+
+  assert.deepEqual(
+    preview.playablePages.map((page) => page.id),
+    [1]
+  );
+  assert.deepEqual(
+    preview.skippedPages.map((page) => [page.id, page.skipReason] satisfies [number, DisplayRotationSkipReason]),
+    [
+      [2, "data-not-ready"],
+      [3, "disabled"]
+    ]
+  );
+  assert.equal(preview.fallbackRoute, null);
+});
+
+test("display rotation evaluator falls back when schedule blocks every enabled page", () => {
+  const preview = evaluateDisplayRotation({
+    fallbackRoute: "/offline",
+    now: new Date("2026-05-13T19:30:00+08:00"),
+    pages: basePages,
+    settings: {
+      ...baseSettings,
+      scheduleEnabled: true
+    }
+  });
+
+  assert.equal(preview.playablePages.length, 0);
+  assert.equal(preview.fallbackRoute, "/offline");
+  assert.equal(preview.skippedPages[0]?.skipReason, "out-of-schedule");
+  assert.equal(preview.skippedPages[1]?.skipReason, "out-of-schedule");
+  assert.equal(preview.skippedPages[2]?.skipReason, "disabled");
 });
 
 test("GET /api/playback/settings and /api/playback/pages expose seeded playback data", async () => {
@@ -328,6 +375,42 @@ test("PUT /api/playback/rotation-plan persists page order, enabled state, and du
         { pageKey: "overview", enabled: false, durationSeconds: 22 }
       ]
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview exposes runtime playable pages and skip reasons", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        fallbackRoute: string | null;
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.deepEqual(
+      body.preview.playablePages.map((page) => page.pageKey),
+      ["images"]
+    );
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "overview")?.skipReason,
+      "data-not-ready"
+    );
+    assert.equal(body.preview.fallbackRoute, null);
   } finally {
     await app.close();
   }

@@ -1,6 +1,7 @@
 import type {
   BrandProfile,
   ConfigStage,
+  DisplayRotationPreview,
   DisplayPageAssetHealthReport,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
@@ -95,6 +96,13 @@ export async function getPlaybackPages() {
     pages: PlaybackPage[];
   }>("/api/playback/pages");
   return response.pages;
+}
+
+export async function getDisplayRotationPreview() {
+  const response = await requestJson<{
+    preview: DisplayRotationPreview;
+  }>("/api/display-pages/rotation-preview");
+  return response.preview;
 }
 
 export function resolveDisplayPageConfigApiPath(pageId: DisplayPageKey, stage: ConfigStage | "config" = "config") {

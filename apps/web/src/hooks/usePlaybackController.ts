@@ -13,7 +13,7 @@ import {
   type PlaybackSettings
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
-import { getPlaybackPages, getPlaybackSettings } from "../services/api";
+import { getDisplayRotationPreview, getPlaybackSettings } from "../services/api";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 
 type UsePlaybackControllerOptions = {
@@ -25,6 +25,7 @@ type PlaybackControllerState = {
   countdown: number;
   currentPage: PlaybackPage | null;
   errorMessage: string;
+  fallbackRoute: string | null;
   isIdle: boolean;
   isLoading: boolean;
   isPlaying: boolean;
@@ -75,6 +76,7 @@ export function usePlaybackController(
   const [runtime, setRuntime] = useState<PlaybackRuntime | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [fallbackRoute, setFallbackRoute] = useState<string | null>(null);
   const settingsRef = useRef<PlaybackSettings | null>(null);
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
@@ -106,11 +108,15 @@ export function usePlaybackController(
     setIsLoading(true);
 
     try {
-      const [nextSettings, nextPages] = await Promise.all([getPlaybackSettings(), getPlaybackPages()]);
+      const [nextSettings, rotationPreview] = await Promise.all([
+        getPlaybackSettings(),
+        getDisplayRotationPreview()
+      ]);
+      const runtimePages = rotationPreview.playablePages;
       const nowMs = Date.now();
       const nextRuntime = buildRuntime(
         nextSettings,
-        nextPages,
+        runtimePages,
         runtimeRef.current,
         runtimeRef.current ? getPlaybackPage(runtimeRef.current, pagesRef.current) : null,
         options.currentPath,
@@ -119,7 +125,8 @@ export function usePlaybackController(
 
       startTransition(() => {
         setSettings(nextSettings);
-        setPages(nextPages);
+        setPages(runtimePages);
+        setFallbackRoute(rotationPreview.fallbackRoute);
         setRuntime(nextRuntime);
         setErrorMessage("");
       });
@@ -350,6 +357,7 @@ export function usePlaybackController(
     countdown,
     currentPage,
     errorMessage,
+    fallbackRoute,
     isIdle: runtime?.isIdle ?? false,
     isLoading,
     isPlaying: runtime?.isPlaying ?? false,

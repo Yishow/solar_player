@@ -1,6 +1,15 @@
-import type { DisplayRotationPlan, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
-import { buildDisplayRotationPlan } from "@solar-display/shared";
+import type {
+  DisplayPageKey,
+  DisplayRotationPageCondition,
+  DisplayRotationPlan,
+  DisplayRotationPreview,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
+import { buildDisplayRotationPlan, evaluateDisplayRotation } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 
 type PlaybackSettingsRow = {
   autoplay: number;
@@ -29,6 +38,28 @@ type PlaybackPageRow = {
   page_key: string;
   route: string;
 };
+
+type MqttSettingsRow = {
+  message_timeout: number | null;
+};
+
+type StageConfigRow = {
+  config_json: string;
+  page_key: DisplayPageKey;
+  published_at: string | null;
+};
+
+type MqttStatusLike = {
+  connected: boolean;
+  reason: string | null;
+};
+
+const liveDataPageKeys = new Set<DisplayPageKey>([
+  "overview",
+  "solar",
+  "factory-circuit",
+  "sustainability"
+]);
 
 export type PlaybackPageUpdateInput = {
   id: number;
@@ -86,6 +117,23 @@ function serializePageRow(row: PlaybackPageRow): PlaybackPage {
     pageKey: row.page_key,
     route: row.route
   };
+}
+
+function parseRegions(raw: string | null | undefined) {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // ignore malformed config rows in diagnostics
+  }
+
+  return {};
 }
 
 function readPlaybackSettingsRow(): PlaybackSettingsRow {
@@ -226,6 +274,78 @@ export function readPlaybackPages() {
   ).map(serializePageRow);
 }
 
+function readMessageTimeoutSeconds() {
+  const row = getDatabase()
+    .prepare(
+      `
+        SELECT message_timeout
+        FROM mqtt_settings
+        LIMIT 1
+      `
+    )
+    .get() as MqttSettingsRow | undefined;
+
+  return Math.max(1, row?.message_timeout ?? 30);
+}
+
+function readLiveStageRows() {
+  return getDatabase()
+    .prepare(
+      `
+        SELECT
+          page_key,
+          config_json,
+          published_at
+        FROM display_page_stage_configs
+        WHERE stage = 'live'
+      `
+    )
+    .all() as StageConfigRow[];
+}
+
+function buildPageConditions(
+  pages: PlaybackPage[],
+  mqttStatus: MqttStatusLike,
+  now: Date
+) {
+  const liveStageByPage = new Map(
+    readLiveStageRows().map((row) => [row.page_key, row] satisfies [DisplayPageKey, StageConfigRow])
+  );
+  const liveMetrics = readLiveMetricsSnapshot();
+  const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
+  const metricsFresh =
+    liveMetrics.timestamp !== null &&
+    now.getTime() - new Date(liveMetrics.timestamp).getTime() <= freshMetricsDeadlineMs;
+  const pageConditions: Record<number, DisplayRotationPageCondition> = {};
+
+  for (const page of pages) {
+    const pageKey = page.pageKey as DisplayPageKey;
+    const liveStage = liveStageByPage.get(pageKey);
+    const assetFindings = liveStage
+      ? collectDisplayPageAssetFindings(pageKey, parseRegions(liveStage.config_json))
+      : [];
+    const pageRequiresLiveData = liveDataPageKeys.has(pageKey);
+    const dataReady = !pageRequiresLiveData || mqttStatus.reason === "mock" || metricsFresh;
+
+    pageConditions[page.id] = {
+      detail:
+        !dataReady && pageRequiresLiveData
+          ? liveMetrics.timestamp
+            ? `最後資料時間 ${liveMetrics.timestamp} 已超過 freshness window`
+            : "尚未收到可用的即時資料"
+          : assetFindings[0]?.message ?? null,
+      isHealthy: assetFindings.length === 0,
+      isPublished:
+        liveStage === undefined ||
+        liveStage.published_at !== null ||
+        Object.keys(parseRegions(liveStage.config_json)).length === 0,
+      isReady: dataReady
+    };
+  }
+
+  return pageConditions;
+}
+
 export function updatePlaybackPages(pages: PlaybackPageUpdateInput[]) {
   const database = getDatabase();
   const updatePage = database.prepare(
@@ -260,4 +380,21 @@ export function readDisplayRotationPlan(): DisplayRotationPlan {
 export function updateDisplayRotationPlan(pages: PlaybackPageUpdateInput[]) {
   updatePlaybackPages(pages);
   return readDisplayRotationPlan();
+}
+
+export function readDisplayRotationPreview(options: {
+  mqttStatus: MqttStatusLike;
+  now?: Date;
+}): DisplayRotationPreview {
+  const now = options.now ?? new Date();
+  const settings = readPlaybackSettings();
+  const pages = readPlaybackPages();
+
+  return evaluateDisplayRotation({
+    fallbackRoute: "/offline",
+    now,
+    pageConditions: buildPageConditions(pages, options.mqttStatus, now),
+    pages,
+    settings
+  });
 }
