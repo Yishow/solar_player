@@ -49,12 +49,12 @@ function buildOverviewRegions(
     {
       id: "overview-hero-copy",
       label: "Overview Hero Copy",
-      description: "調整三段 slogan 與 title/subtitle copy。",
+      description: "調整三段 slogan 與 title/subtitle copy，並可微調標題區塊位置。",
       rect: {
-        height: typedConfig.heroContainer.height,
-        left: 86,
-        top: toContentTop(172),
-        width: 642
+        height: 244,
+        left: typedConfig.heroCopyLayout.left,
+        top: toContentTop(typedConfig.heroCopyLayout.top),
+        width: typedConfig.heroCopyLayout.width
       },
       fields: [
         {
@@ -91,6 +91,30 @@ function buildOverviewRegions(
           onChange: (value) => updatePath(["heroCopy", "subtitleLines", 1], value),
           type: "text",
           value: typedConfig.heroCopy.subtitleLines[1]
+        },
+        {
+          id: "hero-copy-left",
+          label: "Left",
+          onChange: (value) => updatePath(["heroCopyLayout", "left"], Number(value)),
+          step: 1,
+          type: "number",
+          value: typedConfig.heroCopyLayout.left
+        },
+        {
+          id: "hero-copy-top",
+          label: "Top",
+          onChange: (value) => updatePath(["heroCopyLayout", "top"], Number(value)),
+          step: 1,
+          type: "number",
+          value: typedConfig.heroCopyLayout.top
+        },
+        {
+          id: "hero-copy-width",
+          label: "Width",
+          onChange: (value) => updatePath(["heroCopyLayout", "width"], Number(value)),
+          step: 1,
+          type: "number",
+          value: typedConfig.heroCopyLayout.width
         }
       ]
     },

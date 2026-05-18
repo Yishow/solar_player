@@ -11,6 +11,15 @@ function deepClone<T>(value: T): T {
   return structuredClone(value);
 }
 
+export function resolveDisplayPageConfigForPage<T>(
+  pageId: DisplayPageKey,
+  configPageId: DisplayPageKey,
+  seedConfig: T,
+  config: T
+) {
+  return configPageId === pageId ? config : deepClone(seedConfig);
+}
+
 export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown): T {
   if (overrideConfig === undefined) {
     return deepClone(seedConfig);
@@ -102,6 +111,7 @@ export function useDisplayPageConfig<T>(
 ): UseDisplayPageConfigResult<T> {
   const enabled = options.enabled ?? true;
   const [config, setConfig] = useState<T>(() => deepClone(seedConfig));
+  const [configPageId, setConfigPageId] = useState<DisplayPageKey>(pageId);
   const [lastLoadedConfig, setLastLoadedConfig] = useState<T>(() => deepClone(seedConfig));
   const [lastLoadedEnvelope, setLastLoadedEnvelope] = useState<DisplayPageConfigEnvelope | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
@@ -118,6 +128,7 @@ export function useDisplayPageConfig<T>(
     if (!enabled) {
       const clonedSeed = deepClone(seedConfig);
       setConfig(clonedSeed);
+      setConfigPageId(pageId);
       setLastLoadedConfig(clonedSeed);
       setLastLoadedEnvelope(null);
       setIsLoading(false);
@@ -142,6 +153,7 @@ export function useDisplayPageConfig<T>(
 
         const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
         setConfig(mergedConfig);
+        setConfigPageId(pageId);
         setLastLoadedConfig(mergedConfig);
         setLastLoadedEnvelope(envelope);
         setMessage(envelope.updatedAt ? "展示頁設定已同步。" : "目前使用 seed fallback，可直接開始編輯。");
@@ -152,6 +164,7 @@ export function useDisplayPageConfig<T>(
 
         const clonedSeed = deepClone(seedConfig);
         setConfig(clonedSeed);
+        setConfigPageId(pageId);
         setLastLoadedConfig(clonedSeed);
         setLastLoadedEnvelope(null);
         setErrorMessage(error instanceof Error ? error.message : "載入展示頁設定失敗。");
@@ -183,6 +196,7 @@ export function useDisplayPageConfig<T>(
       const envelope = await getDisplayPageConfig(pageId);
       const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
       setConfig(mergedConfig);
+      setConfigPageId(pageId);
       setLastLoadedConfig(mergedConfig);
       setLastLoadedEnvelope(envelope);
       setMessage(envelope.updatedAt ? "展示頁設定已同步。" : "目前使用 seed fallback，可直接開始編輯。");
@@ -207,6 +221,7 @@ export function useDisplayPageConfig<T>(
       const envelope = await updateDisplayPageConfig(pageId, config as Record<string, unknown>);
       const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
       setConfig(mergedConfig);
+      setConfigPageId(pageId);
       setLastLoadedConfig(mergedConfig);
       setLastLoadedEnvelope(envelope);
       setMessage("展示頁設定已儲存。");
@@ -218,11 +233,14 @@ export function useDisplayPageConfig<T>(
     }
   };
 
+  const effectiveConfig = resolveDisplayPageConfigForPage(pageId, configPageId, seedConfig, config);
+  const isAwaitingPageSync = configPageId !== pageId;
+
   return {
-    config,
-    dirty,
+    config: effectiveConfig,
+    dirty: isAwaitingPageSync ? false : dirty,
     errorMessage,
-    isLoading,
+    isLoading: isLoading || isAwaitingPageSync,
     isSaving,
     lastLoadedEnvelope,
     message,

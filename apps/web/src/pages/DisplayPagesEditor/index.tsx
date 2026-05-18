@@ -71,6 +71,13 @@ const fallbackPageDefinitions: DisplayEditorPageDefinition[] = [
   }
 ];
 
+const EDITOR_PREVIEW_SCALE = 0.5;
+const EDITOR_PREVIEW_SURFACE_HEIGHT = 934;
+const EDITOR_PREVIEW_SURFACE_WIDTH = 1920;
+const EDITOR_PREVIEW_VIEWPORT_HEIGHT = Math.round(
+  EDITOR_PREVIEW_SURFACE_HEIGHT * EDITOR_PREVIEW_SCALE
+);
+
 export function DisplayPagesEditor({
   pageDefinitions = fallbackPageDefinitions,
   renderPreview = true
@@ -228,8 +235,22 @@ export function DisplayPagesEditor({
             </div>
 
             <div className="mt-5 overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7]">
-              <div className="relative h-[520px] origin-top-left scale-[0.27]">
-                <div className="relative" style={{ height: "934px", width: "1920px" }}>
+              <div
+                className="relative overflow-hidden"
+                style={{
+                  height: `${EDITOR_PREVIEW_VIEWPORT_HEIGHT}px`,
+                  width: `${Math.round(EDITOR_PREVIEW_SURFACE_WIDTH * EDITOR_PREVIEW_SCALE)}px`
+                }}
+              >
+                <div
+                  className="absolute left-0 top-0 origin-top-left"
+                  style={{
+                    height: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
+                    transform: `scale(${EDITOR_PREVIEW_SCALE})`,
+                    transformOrigin: "top left",
+                    width: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`
+                  }}
+                >
                   {renderPreview ? (
                     selectedPage.renderPreview ? (
                       selectedPage.renderPreview(config)

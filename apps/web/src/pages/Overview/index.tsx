@@ -12,8 +12,7 @@ import {
 } from "./displayPageConfig";
 import {
   overviewGoldLineLayout,
-  overviewLeafLayout,
-  overviewTitleLayout
+  overviewLeafLayout
 } from "./layout";
 import "./overview.css";
 import { buildOverviewViewModel } from "./viewModel";
@@ -67,7 +66,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   });
   const resolvedConfig = config ?? runtimeConfig.config;
 
-  const titleLayout = withContentOffset(overviewTitleLayout);
+  const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);

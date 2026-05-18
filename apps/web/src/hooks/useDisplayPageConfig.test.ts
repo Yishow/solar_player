@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
-import { mergeDisplayPageConfig } from "./useDisplayPageConfig";
+import {
+  mergeDisplayPageConfig,
+  resolveDisplayPageConfigForPage
+} from "./useDisplayPageConfig";
 
 test("mergeDisplayPageConfig preserves solar seed-backed regions outside partial overrides", () => {
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
@@ -34,4 +37,32 @@ test("mergeDisplayPageConfig falls back to seed array entries when persisted con
     seedConfig.heroCopy.titleLines[1]
   ]);
   assert.deepEqual(merged.heroCopy.subtitleLines, seedConfig.heroCopy.subtitleLines);
+});
+
+test("resolveDisplayPageConfigForPage falls back to seed config while the next page is still loading", () => {
+  const overviewSeed = {
+    heroContainer: {
+      height: 820,
+      left: 430,
+      top: 140,
+      width: 1490
+    }
+  };
+  const staleSustainabilityConfig = {
+    heroMedia: {
+      height: 560,
+      left: 574,
+      top: 146,
+      width: 1346
+    }
+  };
+
+  const resolved = resolveDisplayPageConfigForPage(
+    "overview",
+    "sustainability",
+    overviewSeed,
+    staleSustainabilityConfig as unknown as typeof overviewSeed
+  );
+
+  assert.deepEqual(resolved, overviewSeed);
 });
