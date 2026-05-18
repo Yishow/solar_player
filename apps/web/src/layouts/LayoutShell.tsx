@@ -13,8 +13,7 @@ export function LayoutShell() {
   const navigate = useNavigate();
   const { isHydrated, status } = useMqttStatus();
   const routeMeta = routeMetaMap.get(location.pathname);
-
-  usePageRotation({
+  const controller = usePageRotation({
     currentPath: location.pathname,
     onRouteChange: (route) => {
       navigate(route, { replace: true });
@@ -27,6 +26,10 @@ export function LayoutShell() {
       !shouldRedirectToOffline({
         isHydrated,
         pathname: location.pathname,
+        rotation: {
+          fallbackRoute: controller.fallbackRoute,
+          hasPlayablePages: controller.pages.length > 0
+        },
         routeMeta,
         status
       })
@@ -40,7 +43,16 @@ export function LayoutShell() {
         returnTo: location.pathname
       }
     });
-  }, [isHydrated, location.pathname, navigate, status.connected, status.reason]);
+  }, [
+    controller.fallbackRoute,
+    controller.pages.length,
+    isHydrated,
+    location.pathname,
+    navigate,
+    routeMeta,
+    status.connected,
+    status.reason
+  ]);
 
   return (
     <DisplayCanvas header={<AppHeader />} footer={<AppFooterNav />}>

@@ -8,6 +8,10 @@ type MqttStatusLike = {
 type ShouldRedirectToOfflineInput = {
   isHydrated: boolean;
   pathname: string;
+  rotation?: {
+    fallbackRoute: string | null;
+    hasPlayablePages: boolean;
+  };
   routeMeta: RouteMeta | undefined;
   status: MqttStatusLike;
 };
@@ -15,6 +19,7 @@ type ShouldRedirectToOfflineInput = {
 export function shouldRedirectToOffline({
   isHydrated,
   pathname,
+  rotation,
   routeMeta,
   status
 }: ShouldRedirectToOfflineInput) {
@@ -28,6 +33,10 @@ export function shouldRedirectToOffline({
 
   if (routeMeta?.group !== "playback") {
     return false;
+  }
+
+  if (rotation?.fallbackRoute === "/offline" && !rotation.hasPlayablePages) {
+    return true;
   }
 
   if (routeMeta.allowOfflineWhenDisconnected) {

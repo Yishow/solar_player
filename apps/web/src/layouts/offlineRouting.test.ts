@@ -53,3 +53,25 @@ test("playback routes without offline fallback still redirect when mqtt is offli
     true
   );
 });
+
+test("playback routes redirect to offline when rotation preview reports no playable pages", () => {
+  const routeMeta = routeMetaMap.get("/overview");
+  assert.ok(routeMeta);
+
+  assert.equal(
+    shouldRedirectToOffline({
+      isHydrated: true,
+      pathname: "/overview",
+      rotation: {
+        fallbackRoute: "/offline",
+        hasPlayablePages: false
+      },
+      routeMeta,
+      status: {
+        connected: true,
+        reason: "connected"
+      }
+    }),
+    true
+  );
+});

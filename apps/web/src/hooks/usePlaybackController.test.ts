@@ -9,5 +9,6 @@ const controllerSource = fs.readFileSync(path.join(hookDir, "usePlaybackControll
 test("usePlaybackController reuses the server rotation preview for runtime page selection", () => {
   assert.match(controllerSource, /getDisplayRotationPreview\(\)/);
   assert.match(controllerSource, /const runtimePages = rotationPreview\.playablePages;/);
+  assert.match(controllerSource, /setFallbackRoute\(rotationPreview\.fallbackRoute\)/);
   assert.match(controllerSource, /setPages\(runtimePages\)/);
 });
