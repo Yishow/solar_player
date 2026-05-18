@@ -72,6 +72,9 @@ export function DisplayEditorCanvasOverlay({
 
         const isSelected = selectedRegionId === region.id;
         const isLocked = lockedRegionIds.includes(region.id);
+        if (!isSelected) {
+          return null;
+        }
         return (
           <div
             key={region.id}

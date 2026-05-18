@@ -12,6 +12,7 @@
     "@solar-display/shared": "workspace:*",
     "react": "latest",
     "react-dom": "latest",
+    "react-grab": "^0.1.37",
     "react-router-dom": "latest",
     "socket.io-client": "^4.8.3"
   },
@@ -23,8 +24,8 @@
     "autoprefixer": "latest",
     "postcss": "latest",
     "tailwindcss": "^3.4.17",
-    "typescript": "latest",
     "tsx": "latest",
+    "typescript": "latest",
     "vite": "latest"
   }
 }

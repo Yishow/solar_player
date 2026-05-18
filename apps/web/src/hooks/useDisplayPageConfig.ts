@@ -72,6 +72,10 @@ export function resolveDisplayPageFallbackPolicy(
   return envelope?.fallbackPolicy ?? defaultFallbackPolicy;
 }
 
+export function shouldHydrateDisplayPageSession(enabled: boolean, hasSession: boolean) {
+  return enabled && !hasSession;
+}
+
 function resolveLoadMessage(stage: ConfigStage, envelope: DisplayPageConfigEnvelope) {
   if (envelope.updatedAt) {
     return stage === "live" ? "正式展示頁設定已同步。" : "展示頁設定已同步。";
@@ -133,11 +137,6 @@ export function useDisplayPageConfig<T>(
 
   useEffect(() => {
     if (!enabled) {
-      const clonedSeed = deepClone(seedConfig);
-      setSessions((current) => ({
-        ...current,
-        [pageId]: createDraftSession(clonedSeed, null, defaultFallbackPolicy)
-      }));
       setIsLoading(false);
       setIsSaving(false);
       setMessage("使用頁面預設設定。");
@@ -146,7 +145,7 @@ export function useDisplayPageConfig<T>(
     }
 
     let active = true;
-    if (sessions[pageId]) {
+    if (!shouldHydrateDisplayPageSession(enabled, Boolean(sessions[pageId]))) {
       setIsLoading(false);
       setMessage(dirty ? "保留未儲存草稿。" : "展示頁設定已同步。");
       setErrorMessage("");
