@@ -1,4 +1,4 @@
-import { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
+import React, { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;

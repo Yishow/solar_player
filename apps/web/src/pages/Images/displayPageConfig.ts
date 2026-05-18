@@ -1,4 +1,5 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
   imagesArrowLayout,
   imagesCopyLayout,
@@ -86,3 +87,155 @@ export function createImagesDisplayPageSeedConfig(
     }
   };
 }
+
+export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
+  {
+    id: "images-hero-copy",
+    label: "Images Hero Copy",
+    description: "調整 title、subtitle 與三行 copy。",
+    geometry: {
+      fallbackHeight: 180,
+      leftPath: ["textBlocks", "copy", "left"],
+      minWidth: 180,
+      resizeMode: "horizontal",
+      topOffset: 146,
+      topPath: ["textBlocks", "copy", "top"],
+      widthPath: ["textBlocks", "copy", "width"]
+    },
+    fields: [
+      { fieldType: "text", id: "images-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
+      { fieldType: "text", id: "images-title", label: "Title", path: ["hero", "title"] },
+      { fieldType: "text", id: "images-subtitle", label: "Subtitle", path: ["hero", "subtitle"] },
+      { fieldType: "text", id: "images-copy-1", label: "Copy Line 1", path: ["hero", "copyLines", 0] },
+      { fieldType: "text", id: "images-copy-2", label: "Copy Line 2", path: ["hero", "copyLines", 1] },
+      { fieldType: "text", id: "images-copy-3", label: "Copy Line 3", path: ["hero", "copyLines", 2] }
+    ],
+    presetKey: "images-hero-copy"
+  },
+  {
+    id: "images-copy-layout",
+    label: "Images Copy Layout",
+    description: "調整 copy block 幾何。",
+    geometry: {
+      compatibilityKey: "images-copy-layout",
+      fallbackHeight: 148,
+      leftPath: ["textBlocks", "copy", "left"],
+      minWidth: 120,
+      resizeMode: "horizontal",
+      topOffset: 146,
+      topPath: ["textBlocks", "copy", "top"],
+      widthPath: ["textBlocks", "copy", "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: "images-copy-left", label: "Left", path: ["textBlocks", "copy", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "images-copy-top", label: "Top", path: ["textBlocks", "copy", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-copy-width", label: "Width", path: ["textBlocks", "copy", "width"] }
+    ],
+    presetKey: "images-copy-layout"
+  },
+  {
+    id: "images-main-stage",
+    label: "Images Main Stage",
+    description: "調整主舞台 geometry、備援素材與 placement controls。",
+    geometry: {
+      compatibilityKey: "images-main-stage-geometry",
+      heightPath: ["mainStage", "height"],
+      leftPath: ["mainStage", "left"],
+      minHeight: 120,
+      minWidth: 120,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["mainStage", "top"],
+      widthPath: ["mainStage", "width"]
+    },
+    fields: [
+      { fieldType: "asset", id: "images-stage-src", label: "Fallback Src", path: ["mainStage", "src"] },
+      { fieldType: "text", id: "images-stage-alt", label: "Image Alt", path: ["mainStage", "alt"] },
+      {
+        fieldType: "select",
+        id: "images-stage-fit-mode",
+        label: "Fit Mode",
+        options: [
+          { label: "Contain", value: "contain" },
+          { label: "Cover", value: "cover" }
+        ],
+        path: ["mainStage", "fitMode"]
+      },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-focus-x", label: "Focus X", path: ["mainStage", "focusX"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-focus-y", label: "Focus Y", path: ["mainStage", "focusY"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-align-x", label: "Align X", path: ["mainStage", "alignX"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-align-y", label: "Align Y", path: ["mainStage", "alignY"], step: 0.05 },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-stage-left", label: "Left", path: ["mainStage", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "images-stage-top", label: "Top", path: ["mainStage", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-stage-width", label: "Width", path: ["mainStage", "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-stage-height", label: "Height", path: ["mainStage", "height"] }
+    ],
+    presetKey: "images-main-stage"
+  },
+  {
+    id: "images-info-panel",
+    label: "Images Info Panel",
+    description: "調整資訊欄 geometry。",
+    geometry: {
+      compatibilityKey: "images-info-panel-geometry",
+      heightPath: ["infoPanel", "height"],
+      leftPath: ["infoPanel", "left"],
+      minHeight: 120,
+      minWidth: 120,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["infoPanel", "top"],
+      widthPath: ["infoPanel", "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: "images-info-left", label: "Left", path: ["infoPanel", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "images-info-top", label: "Top", path: ["infoPanel", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-info-width", label: "Width", path: ["infoPanel", "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "images-info-height", label: "Height", path: ["infoPanel", "height"] }
+    ],
+    presetKey: "images-info-panel"
+  },
+  ...Object.keys(createImagesDisplayPageSeedConfig().arrows).map<DisplayEditorRegionSchema>((key) => ({
+    id: `images-arrow-${key}`,
+    label: `Images Arrow ${key}`,
+    description: "調整左右箭頭位置。",
+    geometry: {
+      compatibilityKey: "images-arrow-geometry",
+      fallbackHeight: 64,
+      leftPath: ["arrows", key, "left"],
+      minWidth: 32,
+      resizeMode: "none",
+      topOffset: 146,
+      topPath: ["arrows", key, "top"],
+      widthPath: ["arrows", key, "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["arrows", key, "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["arrows", key, "top"] }
+    ],
+    presetKey: "images-arrow"
+  })),
+  ...Object.keys(createImagesDisplayPageSeedConfig().thumbnailSlots).map<DisplayEditorRegionSchema>((key) => ({
+    id: `images-thumb-${key}`,
+    label: `Images Thumb ${key}`,
+    description: "調整 thumb slot 幾何位置。",
+    geometry: {
+      compatibilityKey: "images-thumb-geometry",
+      heightPath: ["thumbnailSlots", key, "height"],
+      leftPath: ["thumbnailSlots", key, "left"],
+      minHeight: 80,
+      minWidth: 80,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["thumbnailSlots", key, "top"],
+      widthPath: ["thumbnailSlots", key, "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["thumbnailSlots", key, "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["thumbnailSlots", key, "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["thumbnailSlots", key, "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["thumbnailSlots", key, "height"] }
+    ],
+    presetKey: "images-thumb"
+  }))
+];

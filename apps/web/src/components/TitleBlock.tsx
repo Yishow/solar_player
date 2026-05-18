@@ -1,3 +1,4 @@
+import React from "react";
 import type { ReactNode } from "react";
 import { SectionTitle } from "./SectionTitle";
 import { shellDensityClassMap, type ShellDensity } from "./shellDensity";

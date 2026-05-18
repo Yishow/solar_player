@@ -1,3 +1,4 @@
+import React from "react";
 import type { FallbackPolicy } from "@solar-display/shared";
 import { formatFallbackKey, formatFallbackMode, type DisplayPagePublishingState } from "./publishing";
 

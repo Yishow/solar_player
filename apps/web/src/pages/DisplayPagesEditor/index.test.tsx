@@ -71,3 +71,55 @@ test("display page editor shows blocking validation and fallback publishing stat
   assert.match(html, /發布草稿/);
   assert.match(html, /disabled=""/);
 });
+
+test("display page editor keeps the region tree selection and inspector in sync", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-hero-media"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /Region Tree/);
+  assert.match(html, /Overview Hero Media/);
+  assert.match(html, /Image Source/);
+  assert.match(html, /Fit Mode/);
+  assert.match(html, /Reset Region/);
+  assert.match(html, /Copy Geometry/);
+  assert.match(html, /Undo/);
+  assert.match(html, /Redo/);
+  assert.match(html, /Region Presets/);
+});
+
+test("locked regions remain selectable but do not expose resize interaction handles", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          lockedRegionIds: ["overview-hero-media"],
+          selectedRegionId: "overview-hero-media"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /已鎖定/);
+  assert.match(html, /data-locked="true"/);
+  assert.doesNotMatch(html, /Overview Hero Media resize handle/);
+  assert.match(html, /Locked regions 無法直接改動/);
+});

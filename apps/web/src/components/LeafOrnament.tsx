@@ -1,3 +1,5 @@
+import React from "react";
+
 type LeafOrnamentProps = {
   className?: string;
   variant?: "logo" | "footer-mini";

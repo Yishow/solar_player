@@ -1,3 +1,5 @@
+import React from "react";
+
 type SectionTitleProps = {
   title: string;
   subtitle: string;

@@ -1,3 +1,4 @@
+import React from "react";
 import type { ShellDensity } from "./shellDensity";
 
 type StatusBadgeProps = {

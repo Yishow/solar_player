@@ -1,3 +1,4 @@
+import React from "react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { TitleBlock } from "./TitleBlock";
 import type { ShellDensity } from "./shellDensity";

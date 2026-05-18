@@ -5,6 +5,7 @@ type DisplayEditorToggleEvent = {
   ctrlKey?: boolean;
   key: string;
   metaKey?: boolean;
+  shiftKey?: boolean;
   targetTagName?: string;
 };
 
@@ -20,6 +21,36 @@ export function isDisplayEditorToggleKey(event: DisplayEditorToggleEvent) {
   }
 
   return event.key.toLowerCase() === "e";
+}
+
+export function isDisplayEditorNudgeKey(event: DisplayEditorToggleEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey) {
+    return false;
+  }
+
+  if (ignoredTargetTags.has(event.targetTagName?.toUpperCase() ?? "")) {
+    return false;
+  }
+
+  return ["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key);
+}
+
+export function isDisplayEditorHistoryKey(
+  event: DisplayEditorToggleEvent
+): "redo" | "undo" | null {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+    return null;
+  }
+
+  if (ignoredTargetTags.has(event.targetTagName?.toUpperCase() ?? "")) {
+    return null;
+  }
+
+  if (event.key.toLowerCase() !== "z") {
+    return null;
+  }
+
+  return event.shiftKey ? "redo" : "undo";
 }
 
 export function useDisplayEditorKeybinding(onToggle: () => void) {

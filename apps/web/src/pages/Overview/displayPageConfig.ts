@@ -1,4 +1,5 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
 export type OverviewDisplayRect = {
@@ -62,3 +63,112 @@ export function createOverviewDisplayPageSeedConfig(
     }
   };
 }
+
+export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
+  {
+    id: "overview-hero-copy",
+    label: "Overview Hero Copy",
+    description: "調整三段 slogan 與 title/subtitle copy，並可微調標題區塊位置。",
+    geometry: {
+      fallbackHeight: 244,
+      leftPath: ["heroCopyLayout", "left"],
+      minWidth: 200,
+      resizeMode: "horizontal",
+      topOffset: 146,
+      topPath: ["heroCopyLayout", "top"],
+      widthPath: ["heroCopyLayout", "width"]
+    },
+    fields: [
+      { fieldType: "text", id: "eyebrow", label: "Eyebrow", path: ["heroCopy", "eyebrow"] },
+      { fieldType: "text", id: "title-line-1", label: "Title Line 1", path: ["heroCopy", "titleLines", 0] },
+      { fieldType: "text", id: "title-line-2", label: "Title Line 2", path: ["heroCopy", "titleLines", 1] },
+      { fieldType: "text", id: "subtitle-line-1", label: "Subtitle Line 1", path: ["heroCopy", "subtitleLines", 0] },
+      { fieldType: "text", id: "subtitle-line-2", label: "Subtitle Line 2", path: ["heroCopy", "subtitleLines", 1] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-copy-left", label: "Left", path: ["heroCopyLayout", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "hero-copy-top", label: "Top", path: ["heroCopyLayout", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-copy-width", label: "Width", path: ["heroCopyLayout", "width"] }
+    ],
+    presetKey: "hero-copy"
+  },
+  {
+    id: "overview-hero-media",
+    label: "Overview Hero Media",
+    description: "切換 hero image、alt 文案與 placement controls。",
+    geometry: {
+      compatibilityKey: "hero-media-geometry",
+      heightPath: ["heroContainer", "height"],
+      leftPath: ["heroContainer", "left"],
+      minHeight: 120,
+      minWidth: 120,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["heroContainer", "top"],
+      widthPath: ["heroContainer", "width"]
+    },
+    fields: [
+      { fieldType: "asset", id: "hero-src", label: "Image Source", path: ["heroMedia", "src"] },
+      { fieldType: "text", id: "hero-alt", label: "Image Alt", path: ["heroMedia", "alt"] },
+      {
+        fieldType: "select",
+        id: "hero-fit-mode",
+        label: "Fit Mode",
+        options: [
+          { label: "Contain", value: "contain" },
+          { label: "Cover", value: "cover" }
+        ],
+        path: ["heroMedia", "fitMode"]
+      },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-x", label: "Focus X", path: ["heroMedia", "focusX"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-y", label: "Focus Y", path: ["heroMedia", "focusY"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-x", label: "Align X", path: ["heroMedia", "alignX"], step: 0.05 },
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 }
+    ],
+    presetKey: "hero-media"
+  },
+  {
+    id: "overview-hero-container",
+    label: "Overview Hero Container",
+    description: "調整 hero 畫布容器幾何。",
+    geometry: {
+      compatibilityKey: "hero-container-geometry",
+      heightPath: ["heroContainer", "height"],
+      leftPath: ["heroContainer", "left"],
+      minHeight: 120,
+      minWidth: 120,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["heroContainer", "top"],
+      widthPath: ["heroContainer", "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-left", label: "Left", path: ["heroContainer", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "hero-top", label: "Top", path: ["heroContainer", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-width", label: "Width", path: ["heroContainer", "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-height", label: "Height", path: ["heroContainer", "height"] }
+    ],
+    presetKey: "hero-container"
+  },
+  ...Object.keys(createOverviewDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
+    id: `overview-kpi-${key}`,
+    label: `Overview KPI ${key}`,
+    description: "調整 KPI card geometry。",
+    geometry: {
+      compatibilityKey: "overview-kpi-geometry",
+      heightPath: ["kpiCards", key, "height"],
+      leftPath: ["kpiCards", key, "left"],
+      minHeight: 80,
+      minWidth: 80,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["kpiCards", key, "top"],
+      widthPath: ["kpiCards", key, "width"]
+    },
+    fields: [
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["kpiCards", key, "height"] }
+    ],
+    presetKey: "overview-kpi"
+  }))
+];

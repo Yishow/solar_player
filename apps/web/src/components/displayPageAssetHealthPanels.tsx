@@ -1,3 +1,4 @@
+import React from "react";
 import type { DisplayPageAssetHealthEntry, DisplayPageAssetHealthReport, DisplayPageKey } from "@solar-display/shared";
 
 const displayPageLabels: Record<DisplayPageKey, string> = {
