@@ -132,3 +132,28 @@ test("display editor inspector surfaces range, required, and select compatibilit
     ["Fit Mode 的值與可用選項不相容。"]
   );
 });
+
+test("display editor inspector renders validation feedback inline for invalid fields", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorInspectorFields, {
+      fields: [
+        createField(
+          {
+            constraints: { min: 0 },
+            fieldType: "number",
+            id: "width",
+            label: "Width",
+            path: ["width"]
+          },
+          -24,
+          true
+        )
+      ],
+      onChange: () => {}
+    })
+  );
+
+  assert.match(html, /Width 必須大於或等於 0。/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /dirty/);
+});
