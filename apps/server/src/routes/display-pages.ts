@@ -16,6 +16,7 @@ import {
 import {
   collectDisplayPageAssetFindings,
   collectDisplayPageMediaPlacementIssues,
+  computeDisplayPageAssetHealthReport,
   normalizeDisplayPageRegionsForStorage,
   resolveDisplayPageRegions
 } from "../services/displayPageAssetService.js";
@@ -254,6 +255,10 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/fallback", async (request) => {
     const pageId = assertDisplayPageKey(request.params.pageId);
     return { fallback: readFallbackStatus(pageId) };
+  });
+
+  app.get("/api/display-pages/asset-health", async () => {
+    return { health: computeDisplayPageAssetHealthReport() };
   });
 };
 

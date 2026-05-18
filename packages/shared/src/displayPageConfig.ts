@@ -52,6 +52,24 @@ export type DisplayPageAssetFinding = {
   status: "unhealthy";
 };
 
+export type DisplayPageAssetHealthEntry = {
+  assetId: DisplayPageManagedAssetId | null;
+  affectedPages: DisplayPageKey[];
+  bindings: Array<Pick<DisplayPageAssetFinding, "bindingId" | "pageId">>;
+  filename: string | null;
+  findings: DisplayPageAssetFinding[];
+  reasons: DisplayPageAssetFindingReason[];
+  status: "healthy" | "unhealthy";
+  title: string | null;
+};
+
+export type DisplayPageAssetHealthReport = {
+  assets: DisplayPageAssetHealthEntry[];
+  findings: DisplayPageAssetFinding[];
+  generatedAt: string;
+  status: "healthy" | "unhealthy";
+};
+
 export type FallbackPolicyMode = "hide" | "show-placeholder" | "show-seed";
 
 export type FallbackPolicy = {

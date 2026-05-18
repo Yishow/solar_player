@@ -398,3 +398,99 @@ test("draft validation reports invalid alignment placement values as blocking fi
     await app.close();
   }
 });
+
+test("asset health API reports healthy and unhealthy display page asset references with affected pages", async () => {
+  const app = await buildApp();
+  const healthyAsset = seedManagedImageAsset();
+  const missingAsset = seedManagedImageAsset();
+
+  try {
+    await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/overview/config",
+      payload: {
+        regions: {
+          heroMedia: {
+            alt: "Overview hero",
+            assetId: healthyAsset.assetId
+          }
+        }
+      }
+    });
+
+    await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/solar/draft",
+      payload: {
+        regions: {
+          heroMedia: {
+            alt: "Solar hero",
+            assetId: missingAsset.assetId
+          }
+        }
+      }
+    });
+
+    getDatabase().prepare("DELETE FROM image_assets WHERE id = ?").run(missingAsset.assetId);
+
+    const healthResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/asset-health"
+    });
+
+    assert.equal(healthResponse.statusCode, 200);
+    const healthBody = healthResponse.json() as {
+      health: {
+        assets: Array<{
+          assetId: number;
+          affectedPages: string[];
+          reasons: string[];
+          status: string;
+        }>;
+        findings: Array<{
+          assetId: number;
+          bindingId: string;
+          pageId: string;
+          reason: string;
+          status: string;
+        }>;
+        status: string;
+      };
+    };
+
+    assert.equal(healthBody.health.status, "unhealthy");
+    assert.equal(
+      healthBody.health.assets.some(
+        (asset) =>
+          asset.assetId === healthyAsset.assetId &&
+          asset.status === "healthy" &&
+          asset.affectedPages.includes("overview") &&
+          asset.reasons.length === 0
+      ),
+      true
+    );
+    assert.equal(
+      healthBody.health.assets.some(
+        (asset) =>
+          asset.assetId === missingAsset.assetId &&
+          asset.status === "unhealthy" &&
+          asset.affectedPages.includes("solar") &&
+          asset.reasons.includes("missing-asset")
+      ),
+      true
+    );
+    assert.equal(
+      healthBody.health.findings.some(
+        (finding) =>
+          finding.assetId === missingAsset.assetId &&
+          finding.bindingId === "heroMedia" &&
+          finding.pageId === "solar" &&
+          finding.reason === "missing-asset" &&
+          finding.status === "unhealthy"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});

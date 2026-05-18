@@ -1,5 +1,7 @@
 import type {
   DisplayPageAssetFinding,
+  DisplayPageAssetHealthEntry,
+  DisplayPageAssetHealthReport,
   DisplayPageAssetFindingReason,
   DisplayPageKey
 } from "@solar-display/shared";
@@ -11,12 +13,14 @@ import { getDatabase } from "../db/index.js";
 
 type ImageAssetReferenceRow = {
   filename: string | null;
+  title: string | null;
 };
 
 type UnknownRecord = Record<string, unknown>;
 type ManagedAssetResolution = {
   filename: string | null;
   reason: DisplayPageAssetFindingReason | null;
+  title: string | null;
 };
 
 export type DisplayPageMediaPlacementIssue = {
@@ -34,27 +38,31 @@ function isPlainObject(value: unknown): value is UnknownRecord {
 
 function readManagedAssetResolution(assetId: number | string): ManagedAssetResolution {
   const row = getDatabase()
-    .prepare("SELECT filename FROM image_assets WHERE id = ?")
+    .prepare("SELECT filename, title FROM image_assets WHERE id = ?")
     .get(assetId) as ImageAssetReferenceRow | undefined;
   const filename = row?.filename ?? null;
+  const title = row?.title ?? null;
 
   if (!filename) {
     return {
       filename: null,
-      reason: "missing-asset"
+      reason: "missing-asset",
+      title
     };
   }
 
   if (!existsSync(resolve(config.uploadsDir, filename))) {
     return {
       filename: null,
-      reason: "missing-file"
+      reason: "missing-file",
+      title
     };
   }
 
   return {
     filename,
-    reason: null
+    reason: null,
+    title
   };
 }
 
@@ -81,6 +89,12 @@ function resolveMediaBinding(binding: UnknownRecord) {
 
   return resolved;
 }
+
+type DisplayPageAssetReference = {
+  assetId: string | number;
+  bindingId: string;
+  pageId: DisplayPageKey;
+};
 
 function mapDisplayPageRegions(
   value: unknown,
@@ -117,45 +131,26 @@ export function collectDisplayPageAssetFindings(
   pageId: DisplayPageKey,
   regions: Record<string, unknown>
 ) {
-  const findings: DisplayPageAssetFinding[] = [];
-
-  function scan(value: unknown, path: string) {
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => scan(item, `${path}[${index}]`));
-      return;
-    }
-
-    if (!isPlainObject(value)) {
-      return;
-    }
-
-    if (isDisplayPageMediaBinding(value)) {
-      const assetId = value.assetId;
-      if (typeof assetId === "number" || typeof assetId === "string") {
-        const { reason } = readManagedAssetResolution(assetId);
-        if (reason) {
-          findings.push({
-            assetId,
-            bindingId: path,
-            message:
-              reason === "missing-file"
-                ? `素材檔案遺失，無法解析 binding ${path}`
-                : `素材引用不存在，無法解析 binding ${path}`,
-            pageId,
-            reason,
-            status: "unhealthy"
-          });
-        }
+  return collectDisplayPageAssetReferences(pageId, regions)
+    .map((reference) => {
+      const { reason } = readManagedAssetResolution(reference.assetId);
+      if (!reason) {
+        return null;
       }
-    }
 
-    for (const [key, child] of Object.entries(value)) {
-      scan(child, path ? `${path}.${key}` : key);
-    }
-  }
-
-  scan(regions, "");
-  return findings;
+      return {
+        assetId: reference.assetId,
+        bindingId: reference.bindingId,
+        message:
+          reason === "missing-file"
+            ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
+            : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
+        pageId: reference.pageId,
+        reason,
+        status: "unhealthy" as const
+      };
+    })
+    .filter((finding): finding is DisplayPageAssetFinding => finding !== null);
 }
 
 export function collectDisplayPageMediaPlacementIssues(regions: Record<string, unknown>) {
@@ -216,4 +211,159 @@ export function collectDisplayPageMediaPlacementIssues(regions: Record<string, u
 
   scan(regions, "");
   return issues;
+}
+
+function parseRegions(raw: string | null | undefined) {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // ignore malformed config rows
+  }
+
+  return {};
+}
+
+function collectDisplayPageAssetReferences(
+  pageId: DisplayPageKey,
+  regions: Record<string, unknown>
+) {
+  const references: DisplayPageAssetReference[] = [];
+
+  function scan(value: unknown, path: string) {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => scan(item, `${path}[${index}]`));
+      return;
+    }
+
+    if (!isPlainObject(value)) {
+      return;
+    }
+
+    if (isDisplayPageMediaBinding(value)) {
+      const assetId = value.assetId;
+      if (typeof assetId === "number" || typeof assetId === "string") {
+        references.push({
+          assetId,
+          bindingId: path,
+          pageId
+        });
+      }
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      scan(child, path ? `${path}.${key}` : key);
+    }
+  }
+
+  scan(regions, "");
+  return references;
+}
+
+function assetReferenceKey(assetId: string | number) {
+  return `${typeof assetId}:${assetId}`;
+}
+
+export function computeDisplayPageAssetHealthReport(): DisplayPageAssetHealthReport {
+  const database = getDatabase();
+  const rows = [
+    ...(database
+      .prepare("SELECT page_key, config_json FROM display_page_configs")
+      .all() as Array<{ config_json: string | null; page_key: DisplayPageKey }>),
+    ...(database
+      .prepare("SELECT page_key, config_json FROM display_page_stage_configs")
+      .all() as Array<{ config_json: string | null; page_key: DisplayPageKey }>)
+  ];
+  const assetEntries = new Map<string, DisplayPageAssetHealthEntry>();
+  const findings: DisplayPageAssetFinding[] = [];
+
+  for (const row of rows) {
+    const references = collectDisplayPageAssetReferences(row.page_key, parseRegions(row.config_json));
+
+    for (const reference of references) {
+      const key = assetReferenceKey(reference.assetId);
+      const resolution = readManagedAssetResolution(reference.assetId);
+      const finding =
+        resolution.reason === null
+          ? null
+          : {
+              assetId: reference.assetId,
+              bindingId: reference.bindingId,
+              message:
+                resolution.reason === "missing-file"
+                  ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
+                  : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
+              pageId: reference.pageId,
+              reason: resolution.reason,
+              status: "unhealthy" as const
+            };
+
+      const existingEntry = assetEntries.get(key) ?? {
+        assetId: reference.assetId,
+        affectedPages: [],
+        bindings: [],
+        filename: resolution.filename,
+        findings: [],
+        reasons: [],
+        status: "healthy" as const,
+        title: resolution.title
+      };
+
+      if (!existingEntry.affectedPages.includes(reference.pageId)) {
+        existingEntry.affectedPages.push(reference.pageId);
+      }
+
+      if (
+        !existingEntry.bindings.some(
+          (binding) => binding.pageId === reference.pageId && binding.bindingId === reference.bindingId
+        )
+      ) {
+        existingEntry.bindings.push({
+          bindingId: reference.bindingId,
+          pageId: reference.pageId
+        });
+      }
+
+      if (finding) {
+        existingEntry.status = "unhealthy";
+        if (!existingEntry.reasons.includes(finding.reason)) {
+          existingEntry.reasons.push(finding.reason);
+        }
+        if (
+          !existingEntry.findings.some(
+            (entryFinding) =>
+              entryFinding.pageId === finding.pageId &&
+              entryFinding.bindingId === finding.bindingId &&
+              entryFinding.reason === finding.reason
+          )
+        ) {
+          existingEntry.findings.push(finding);
+          findings.push(finding);
+        }
+      }
+
+      assetEntries.set(key, existingEntry);
+    }
+  }
+
+  const assets = Array.from(assetEntries.values()).sort((left, right) => {
+    if (left.status !== right.status) {
+      return left.status === "unhealthy" ? -1 : 1;
+    }
+
+    return String(left.assetId).localeCompare(String(right.assetId));
+  });
+
+  return {
+    assets,
+    findings,
+    generatedAt: new Date().toISOString(),
+    status: findings.length > 0 ? "unhealthy" : "healthy"
+  };
 }
