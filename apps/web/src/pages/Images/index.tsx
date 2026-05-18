@@ -54,20 +54,46 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const resolvedConfig = config ?? runtimeConfig.config;
-  const assetSources = useMemo(
-    () => [
-      resolvedConfig.mainStage.src ?? null,
-      imagesAssetRuntimeMap.thumbs[0],
-      imagesAssetRuntimeMap.thumbs[1],
-      imagesAssetRuntimeMap.thumbs[2],
-      null
-    ],
+  const playlistAssets = useMemo(
+    () =>
+      [
+        resolvedConfig.mainStage.src ?? null,
+        imagesAssetRuntimeMap.thumbs[0] ?? null,
+        imagesAssetRuntimeMap.thumbs[1] ?? null,
+        imagesAssetRuntimeMap.thumbs[2] ?? null,
+        null
+      ].map((source, index) => ({
+        assetId: `asset-${index + 1}`,
+        height: source ? 1080 : null,
+        source,
+        status: source ? ("ready" as const) : ("pending" as const),
+        width: source ? 1920 : null
+      })),
     [resolvedConfig.mainStage.src]
+  );
+  const playlistEntries = useMemo(
+    () =>
+      imageMocks.map((image, index) => ({
+        area: image.area,
+        assetId: `asset-${index + 1}`,
+        capturedAt: image.updatedAt,
+        description: `${image.area} 的播放素材，保持資訊面板與縮圖播放同步。`,
+        displayOrder: index + 1,
+        durationSeconds: image.durationSec,
+        enabled: true,
+        entryId: image.id,
+        fallbackMode: index === 4 ? "display-placeholder" as const : "use-cover" as const,
+        resolution: image.resolution,
+        tags: index === 0 ? ["封面", "太陽能"] : index === 3 ? ["Fallback"] : [],
+        title: image.title
+      })),
+    []
   );
   const viewModel = buildImagesViewModel({
     activeIndex,
-    assetSources,
-    slides: imageMocks
+    assets: playlistAssets,
+    coverAssetSource: resolvedConfig.mainStage.src ?? null,
+    entries: playlistEntries
   });
   const visibleStart = Math.min(Math.max(activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
@@ -134,7 +160,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
       >
         <b>{viewModel.counter.current}</b>
         <span>/ {viewModel.counter.total}</span>
-        <p>自動輪播中，每 15 秒切換一張</p>
+        <p>自動輪播中，目前素材停留 {viewModel.active.durationSeconds} 秒</p>
         <div
           className="images-progress-line"
           style={{
@@ -181,10 +207,16 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         <div className="images-info-icon">
           <ReferenceGlyph name="image" />
         </div>
-        <h3>{viewModel.active.title}</h3>
-        <p>廠區播放素材會優先使用已同步資產；若素材缺漏，仍保留完整圖片版型與資訊欄位。</p>
+        <h3>{viewModel.active.infoPanel.title}</h3>
+        <p>
+          {viewModel.active.infoPanel.description}
+          {viewModel.active.fallbackReason
+            ? ` 目前 fallback：${viewModel.active.fallbackMode} / ${viewModel.active.fallbackReason}。`
+            : ""}
+        </p>
         <small>
-          {viewModel.active.id} · {viewModel.active.area} · {viewModel.active.resolution} · {viewModel.active.durationSec} 秒 · {viewModel.active.updatedAt}
+          {viewModel.active.entryId} · {viewModel.active.infoPanel.area} · {viewModel.active.resolution} · {viewModel.active.durationSeconds} 秒 · {viewModel.active.infoPanel.capturedAt}
+          {viewModel.active.infoPanel.tags.length > 0 ? ` · ${viewModel.active.infoPanel.tags.join(" / ")}` : ""}
         </small>
       </article>
 
@@ -217,7 +249,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
 
         return (
           <button
-            key={thumbnail.id}
+            key={thumbnail.entryId}
             className={[
               "images-thumb",
               thumbnail.isActive ? "images-thumb-active" : ""
@@ -231,7 +263,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
             onClick={() => setActiveIndex(visibleStart + thumbIndex)}
           >
             {thumbnail.hasAsset ? (
-              <img alt={thumbnail.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />
+              <img alt={thumbnail.infoPanel.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />
             ) : (
               <div className="images-thumb-placeholder">
                 <ReferenceGlyph name="image" />

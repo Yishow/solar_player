@@ -1,3 +1,8 @@
+import type { MonitoringMetricBinding } from "@solar-display/shared";
+import {
+  resolveMonitoringMetricBinding,
+  resolveMonitoringSummaryState
+} from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 
@@ -8,55 +13,32 @@ type OverviewMetricKey =
   | "todayCo2Reduction"
   | "totalCo2Reduction";
 
+type OverviewStatus = "connected" | "connecting" | "disconnected";
+type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
+
 type OverviewMetricCard = {
-  accentColor: boolean;
-  fallbackIndex: number;
+  accentColor?: boolean;
   iconKey: OverviewMetricIconKey;
-  key: OverviewMetricKey;
-  label: string;
-  unit: string;
-};
+} & MonitoringMetricBinding<OverviewMetricKey>;
 
 type BuildOverviewViewModelArgs = {
   connectionState: SocketConnectionState["status"];
   isSocketConnected: boolean;
+  metricBindings?: OverviewMetricCard[];
+  now?: string;
   snapshot: LiveMetricsSnapshot;
+  summaryMetricKeys?: OverviewMetricKey[];
 };
-
-type OverviewStatus = "connected" | "connecting" | "disconnected";
 
 export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
 
-type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
-
 const metricCards: OverviewMetricCard[] = [
-  { accentColor: false, fallbackIndex: 0, iconKey: "bolt", key: "realTimePower",     label: "即時發電功率",   unit: "kW"  },
-  { accentColor: true,  fallbackIndex: 1, iconKey: "sun",  key: "todayGeneration",   label: "今日發電量",     unit: "kWh" },
-  { accentColor: false, fallbackIndex: 2, iconKey: "bars", key: "totalGeneration",   label: "累積發電量",     unit: "GWh" },
-  { accentColor: false, fallbackIndex: 3, iconKey: "co2",  key: "todayCo2Reduction", label: "今日 CO₂ 減量",  unit: "t"   },
-  { accentColor: false, fallbackIndex: 4, iconKey: "leaf", key: "totalCo2Reduction", label: "累積 CO₂ 減量",  unit: "t"   }
+  { accentColor: false, fallbackIndex: 0, iconKey: "bolt", metricKey: "realTimePower", label: "即時發電功率", unit: "kW" },
+  { accentColor: true, fallbackIndex: 1, iconKey: "sun", metricKey: "todayGeneration", label: "今日發電量", unit: "kWh" },
+  { accentColor: false, fallbackIndex: 2, iconKey: "bars", metricKey: "totalGeneration", label: "累積發電量", unit: "GWh" },
+  { accentColor: false, fallbackIndex: 3, iconKey: "co2", metricKey: "todayCo2Reduction", label: "今日 CO₂ 減量", unit: "t" },
+  { accentColor: false, fallbackIndex: 4, iconKey: "leaf", metricKey: "totalCo2Reduction", label: "累積 CO₂ 減量", unit: "t" }
 ];
-
-function formatMetricValue(value: number, unit: string | null) {
-  const digits = unit === "%" ? 1 : Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
-
-  return value.toLocaleString("zh-TW", {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits === 0 ? 0 : 1
-  });
-}
-
-function formatHelperTimestamp(value: string) {
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleTimeString("zh-TW", {
-    hour12: false
-  });
-}
 
 function resolveSummaryStatus(connectionState: SocketConnectionState["status"]): OverviewStatus {
   if (connectionState === "connected") {
@@ -73,42 +55,64 @@ function resolveSummaryStatus(connectionState: SocketConnectionState["status"]):
 export function buildOverviewViewModel({
   connectionState,
   isSocketConnected,
-  snapshot
+  metricBindings = metricCards,
+  now,
+  snapshot,
+  summaryMetricKeys
 }: BuildOverviewViewModelArgs) {
+  const metrics = metricBindings.map(({ accentColor = false, iconKey, ...binding }) => {
+    const fallbackMetric = liveMetrics[binding.fallbackIndex]!;
+    const resolved = resolveMonitoringMetricBinding({
+      binding: {
+        ...binding,
+        fallbackHelper: fallbackMetric.helper,
+        fallbackValue: fallbackMetric.value
+      },
+      isConnected: isSocketConnected,
+      now,
+      reading: snapshot.metrics[binding.metricKey] ?? null
+    });
+
+    return {
+      accentColor,
+      alertTone: resolved.alertTone,
+      bindingState: resolved.bindingState,
+      fallbackReason: resolved.fallbackReason,
+      freshnessState: resolved.freshnessState,
+      helper: resolved.helper,
+      iconKey,
+      label: resolved.label,
+      metricKey: resolved.metricKey,
+      unit: resolved.unit,
+      value: resolved.value
+    };
+  });
+  const summaryState = resolveMonitoringSummaryState(
+    metrics.filter((metric) =>
+      (summaryMetricKeys ?? metricBindings.map((binding) => binding.metricKey)).includes(
+        metric.metricKey
+      )
+    )
+  );
+
   return {
     hero: {
       eyebrow: "綠能驅動・永續未來",
       subtitleLines: ["Driving a Better Future with", "Green Manufacturing"],
       titleLines: ["以綠色製造", "驅動美好生活"]
     },
-    metrics: metricCards.map(({ accentColor, fallbackIndex, iconKey, key, label, unit }) => {
-      const fallbackMetric = liveMetrics[fallbackIndex]!;
-      const liveMetric = snapshot.metrics[key];
-
-      if (!isSocketConnected || !liveMetric) {
-        return {
-          accentColor: accentColor,
-          helper: fallbackMetric.helper,
-          iconKey,
-          label,
-          unit,
-          value: fallbackMetric.value
-        };
-      }
-
-      return {
-        accentColor: accentColor,
-        helper: `最後更新 ${formatHelperTimestamp(liveMetric.timestamp)}`,
-        iconKey,
-        label,
-        unit: liveMetric.unit ?? unit,
-        value: formatMetricValue(liveMetric.value, liveMetric.unit ?? unit)
-      };
-    }),
+    metrics,
     summary: {
+      alertTone: summaryState.alertTone,
+      fallbackReason: summaryState.fallbackReason,
       status: resolveSummaryStatus(connectionState),
-      statusLabel:
-        isSocketConnected ? "Socket 即時更新中" : "Socket 未連線，顯示 mock 資料"
+      statusLabel: !isSocketConnected
+        ? "Socket 未連線，顯示 mock 資料"
+        : summaryState.fallbackReason === "stale-data"
+          ? "資料延遲，摘要使用最近一次有效讀值"
+          : summaryState.bindingState === "missing"
+            ? "部分 KPI 缺資料，使用 fallback 顯示"
+            : "Socket 即時更新中"
     }
   };
 }

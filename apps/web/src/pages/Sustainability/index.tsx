@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -32,6 +32,19 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 
 function iconClassName(className?: string) {
   return ["h-full w-full", className ?? ""].join(" ").trim();
+}
+
+function periodLabel(period: "lifetime" | "month" | "quarter" | "year") {
+  switch (period) {
+    case "month":
+      return "月";
+    case "quarter":
+      return "季";
+    case "year":
+      return "年";
+    default:
+      return "累積";
+  }
 }
 
 const sustainabilityKpiOrder = [
@@ -108,8 +121,10 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     enabled: config === undefined,
     stage: "live"
   });
+  const [selectedPeriod, setSelectedPeriod] = useState<"lifetime" | "month" | "quarter" | "year">("lifetime");
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
+    selectedPeriod,
     summary: sustainabilitySummary
   });
   const resolvedConfig = config ?? runtimeConfig.config;
@@ -136,6 +151,43 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
           {resolvedConfig.hero.title[1]}
         </h2>
         <p className="sustainability-subtitle">{resolvedConfig.hero.subtitle}</p>
+      </section>
+
+      <section
+        style={{
+          position: "absolute",
+          right: "88px",
+          top: `${titleLayout.top}px`,
+          zIndex: 14,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: "14px"
+        }}
+      >
+        <div style={{ display: "flex", gap: "10px" }}>
+          {viewModel.periodOptions.map((period) => (
+            <button
+              key={period}
+              onClick={() => setSelectedPeriod(period)}
+              style={{
+                border: "1px solid rgba(91, 128, 70, 0.24)",
+                borderRadius: "999px",
+                background: viewModel.selectedPeriod === period ? "#5b8046" : "rgba(255, 253, 247, 0.92)",
+                color: viewModel.selectedPeriod === period ? "#fffdf8" : "#57774a",
+                fontSize: "17px",
+                fontWeight: 700,
+                padding: "10px 16px"
+              }}
+            >
+              {periodLabel(period)}
+            </button>
+          ))}
+        </div>
+        <div style={{ textAlign: "right", color: "#5f675f", fontSize: "15px", lineHeight: 1.55 }}>
+          <div>資料來源：{viewModel.provenance.label} / {viewModel.provenance.source}</div>
+          <div>同步狀態：{viewModel.provenance.syncState}{viewModel.provenance.updatedAt ? ` · ${viewModel.provenance.updatedAt}` : " · 尚未提供更新時間"}</div>
+        </div>
       </section>
 
       <div
@@ -195,13 +247,17 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
           width: `${resolvedConfig.highlightRail.container.width}px`
         }}
       >
-        {resolvedConfig.highlightRail.items.map((item) => (
-          <article key={`${item.label}-${item.unit}`} className="sustainability-highlight-item">
-            <strong>{item.value}</strong>
-            <span>{item.unit}</span>
-            <small>{item.label}</small>
-          </article>
-        ))}
+        {resolvedConfig.highlightRail.items.slice(0, viewModel.highlights.length).map((seedItem, index) => {
+          const item = viewModel.highlights[index] ?? seedItem;
+
+          return (
+            <article key={`${item.label}-${item.unit}`} className="sustainability-highlight-item">
+              <strong>{item.value}</strong>
+              <span>{item.unit}</span>
+              <small>{item.label}</small>
+            </article>
+          );
+        })}
       </section>
 
       {viewModel.bigNumbers.map((item, index) => {
@@ -245,6 +301,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
 
       {viewModel.esgCards.map((card, index) => {
         const layout = withContentOffset(resolvedConfig.statCards[sustainabilityStatOrder[index]!]);
+        const storyModule = viewModel.storyModules[index] ?? null;
 
         return (
           <article
@@ -262,11 +319,26 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
                 <SustainabilityGlyph name={card.iconKey} />
               </div>
               <div>
-                <h3>{card.label}</h3>
-                <p>{card.subtitle}</p>
+                <h3>{storyModule?.title ?? card.label}</h3>
+                <p>{storyModule ? `${periodLabel(viewModel.selectedPeriod)}期故事模組` : card.subtitle}</p>
               </div>
             </div>
-            {"value" in card ? (
+            {storyModule ? (
+              "items" in card || storyModule.bullets.length > 0 ? (
+                <ul className="sustainability-esg-list">
+                  {(storyModule.bullets.length > 0 ? storyModule.bullets : [storyModule.description]).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <>
+                  <div className={index === 0 ? "sustainability-stat-procure" : "sustainability-stat-value"}>
+                    {storyModule.description}
+                  </div>
+                  <p className="sustainability-stat-desc">內容會跟隨 {periodLabel(viewModel.selectedPeriod)}期視角切換</p>
+                </>
+              )
+            ) : "value" in card ? (
               <>
                 <div className={index === 0 ? "sustainability-stat-procure" : "sustainability-stat-value"}>
                   {card.value}

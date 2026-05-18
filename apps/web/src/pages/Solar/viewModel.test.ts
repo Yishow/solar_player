@@ -77,3 +77,55 @@ test("buildSolarViewModel keeps fallback values when snapshot fields are missing
   assert.equal(model.flowNodes[3]?.assetKey, "carbon-reduction-display");
   assert.equal(model.kpis[3]?.value, "9,842");
 });
+
+test("buildSolarViewModel resolves degraded flow storytelling and comparison targets", () => {
+  const model = buildSolarViewModel({
+    comparisonTargets: {
+      systemEfficiency: {
+        label: "效率基準",
+        unit: "%",
+        value: 95
+      },
+      todayGeneration: {
+        label: "今日目標",
+        unit: "kWh",
+        value: 4000
+      }
+    },
+    isSocketConnected: true,
+    snapshot: {
+      metrics: {
+        ...snapshot.metrics,
+        realTimePower: {
+          quality: "good",
+          timestamp: "2026-05-13T10:00:00.000Z",
+          unit: "kW",
+          value: 84
+        },
+        systemEfficiency: {
+          quality: "good",
+          timestamp: "2026-05-13T10:00:00.000Z",
+          unit: "%",
+          value: 88.1
+        }
+      },
+      timestamp: "2026-05-13T10:00:00.000Z"
+    }
+  });
+
+  assert.equal(model.story.flowState.state, "degraded");
+  assert.equal(model.story.flowState.reason, "reduced-efficiency");
+  assert.equal(model.kpis[0]?.comparison?.state, "below-target");
+  assert.match(model.kpis[0]?.comparison?.label ?? "", /今日目標/);
+  assert.equal(model.kpis[4]?.comparison?.state, "below-target");
+});
+
+test("buildSolarViewModel preserves missing comparison target diagnostics", () => {
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot
+  });
+
+  assert.equal(model.kpis[0]?.comparison?.state, "unavailable");
+  assert.equal(model.kpis[0]?.comparison?.fallbackReason, "comparison-target-missing");
+});

@@ -1,0 +1,63 @@
+import type { FastifyPluginAsync } from "fastify";
+import {
+  readImagePlaylist,
+  reorderImagePlaylist,
+  updateImagePlaylistEntry
+} from "../services/imagePlaylistService.js";
+
+type PlaylistEntryBody = Partial<{
+  area: string | null;
+  assetId: number | null;
+  capturedAt: string | null;
+  description: string | null;
+  displayOrder: number;
+  durationSeconds: number;
+  enabled: boolean;
+  fallbackMode: "display-placeholder" | "skip" | "use-cover";
+  tags: string[];
+  title: string | null;
+}>;
+
+type ReorderBody = {
+  entries?: Array<{
+    displayOrder: number;
+    durationSeconds?: number;
+    enabled?: boolean;
+    entryId: string;
+  }>;
+};
+
+const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
+  app.get<{ Querystring: { activeIndex?: string } }>("/api/image-playlist", async (request) => ({
+    playlist: readImagePlaylist(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0)
+  }));
+
+  app.put<{ Params: { entryId: string }; Body: PlaylistEntryBody }>(
+    "/api/image-playlist/:entryId",
+    async (request) => {
+      updateImagePlaylistEntry(request.params.entryId, request.body ?? {});
+      const playlist = readImagePlaylist();
+      app.socketService.emitImagesUpdated({ action: "playlist-updated", playlist });
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "image-playlist-updated",
+        scope: "images"
+      });
+      return { playlist };
+    }
+  );
+
+  app.put<{ Body: ReorderBody }>("/api/image-playlist/reorder", async (request) => {
+    reorderImagePlaylist(request.body?.entries ?? []);
+    const playlist = readImagePlaylist();
+    app.socketService.emitImagesUpdated({ action: "playlist-reordered", playlist });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "image-playlist-reordered",
+      scope: "images"
+    });
+    return { playlist };
+  });
+};
+
+export default imagePlaylistRoute;

@@ -24,7 +24,10 @@ import deviceDisplayOpsRoute from "./routes/device-display-ops.js";
 import displayOpsRoute from "./routes/display-ops.js";
 import displayPagesRoute from "./routes/display-pages.js";
 import displayReadinessRoute from "./routes/display-readiness.js";
+import displayStoryRoute from "./routes/display-story.js";
+import imagePlaylistRoute from "./routes/image-playlist.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
+import sustainabilityStoryRoute from "./routes/sustainability-story.js";
 
 function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -114,7 +117,10 @@ export async function buildApp() {
   await app.register(displayOpsRoute);
   await app.register(displayPagesRoute);
   await app.register(displayReadinessRoute);
+  await app.register(displayStoryRoute);
+  await app.register(imagePlaylistRoute);
   await app.register(settingsMqttRoute);
+  await app.register(sustainabilityStoryRoute);
 
   mkdirSync(config.uploadsDir, { recursive: true });
   await app.register(fastifyStatic, {

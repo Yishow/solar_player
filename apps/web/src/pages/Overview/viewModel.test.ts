@@ -51,3 +51,54 @@ test("buildOverviewViewModel falls back to mock presentation when live metrics a
   assert.equal(model.metrics[4]?.iconKey, "leaf");
   assert.equal(model.summary.statusLabel, "Socket 未連線，顯示 mock 資料");
 });
+
+test("buildOverviewViewModel supports declarative KPI bindings and summary diagnostics", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    now: "2026-05-13T10:30:00.000Z",
+    snapshot: {
+      metrics: {
+        totalGeneration: {
+          quality: "good",
+          timestamp: "2026-05-13T09:10:00.000Z",
+          unit: "kWh",
+          value: 18642
+        },
+        todayGeneration: {
+          quality: "good",
+          timestamp: "2026-05-13T10:28:00.000Z",
+          unit: "kWh",
+          value: 3842
+        }
+      },
+      timestamp: "2026-05-13T10:28:00.000Z"
+    },
+    metricBindings: [
+      {
+        fallbackIndex: 2,
+        iconKey: "bars",
+        label: "累積發電量",
+        metricKey: "totalGeneration",
+        unit: "kWh"
+      },
+      {
+        fallbackIndex: 1,
+        iconKey: "sun",
+        label: "今日發電量",
+        metricKey: "todayGeneration",
+        unit: "kWh"
+      }
+    ],
+    summaryMetricKeys: ["totalGeneration", "todayGeneration"]
+  });
+
+  assert.equal(model.metrics.length, 2);
+  assert.equal(model.metrics[0]?.label, "累積發電量");
+  assert.equal(model.metrics[0]?.bindingState, "bound");
+  assert.equal(model.metrics[0]?.freshnessState, "stale");
+  assert.equal(model.metrics[0]?.fallbackReason, "stale-data");
+  assert.equal(model.summary.alertTone, "warning");
+  assert.equal(model.summary.fallbackReason, "stale-data");
+  assert.equal(model.summary.statusLabel, "資料延遲，摘要使用最近一次有效讀值");
+});

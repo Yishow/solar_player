@@ -14,7 +14,13 @@ export type MetricKey =
   | "selfConsumptionEnergy"
   | "consumptionEnergy"
   | "selfConsumptionRatio"
-  | "systemEfficiency";
+  | "systemEfficiency"
+  | "factoryProductionPower"
+  | "factoryHvacPower"
+  | "factoryLightingPower"
+  | "factoryOfficePower"
+  | "factoryEvGreenPower"
+  | "factoryInfrastructurePower";
 
 export interface MqttTopicMapping {
   id: number;

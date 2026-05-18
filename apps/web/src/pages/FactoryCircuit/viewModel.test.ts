@@ -139,3 +139,47 @@ test("buildFactoryCircuitViewModel keeps the full prototype structure for empty 
   assert.equal(model.kpis[0]?.value, "1,280");
   assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
 });
+
+test("buildFactoryCircuitRuntimes no longer guesses slot bindings from icon heuristics", () => {
+  const runtimes = buildFactoryCircuitRuntimes([
+    {
+      ...circuitConfigs[0]!,
+      displaySlot: null,
+      icon: "factory"
+    }
+  ]);
+
+  const model = buildFactoryCircuitViewModel({
+    circuits: runtimes,
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot
+  });
+
+  assert.equal(runtimes[0]?.displaySlot, null);
+  assert.equal(model.loadRows[0]?.isEmpty, true);
+  assert.equal(model.loadRows[0]?.bindingState, "missing");
+  assert.equal(model.loadRows[0]?.fallbackReason, "missing-slot-binding");
+});
+
+test("buildFactoryCircuitViewModel exposes deterministic alert reasons and missing-data states", () => {
+  const model = buildFactoryCircuitViewModel({
+    circuits: [
+      {
+        ...circuitConfigs[1]!,
+        livePowerKw: 790
+      },
+      {
+        ...circuitConfigs[0]!,
+        livePowerKw: 0
+      }
+    ],
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot
+  });
+
+  assert.equal(model.loadRows[0]?.alertReason, "warning-threshold-exceeded");
+  assert.equal(model.loadRows[1]?.alertReason, "missing-live-power");
+  assert.equal(model.loadRows[1]?.statusLabel, "離線");
+});

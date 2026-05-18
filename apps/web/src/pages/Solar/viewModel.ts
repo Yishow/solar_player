@@ -1,3 +1,9 @@
+import type { MonitoringMetricBinding, SolarComparisonTarget } from "@solar-display/shared";
+import {
+  resolveMonitoringMetricBinding,
+  resolveSolarComparison,
+  resolveSolarFlowState
+} from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
 import type { LiveMetricsSnapshot } from "../../services/socket";
 
@@ -8,16 +14,6 @@ type SolarMetricKey =
   | "todayCo2Reduction"
   | "totalCo2Reduction"
   | "systemEfficiency";
-
-type SolarMetricBinding = {
-  fallbackIndex: number;
-  fallbackValue?: string;
-  fallbackHelper?: string;
-  iconKey: SolarKpiIconKey;
-  key: SolarMetricKey;
-  label: string;
-  unit: string;
-};
 
 type SolarFlowAssetKey =
   | "solar-panel-display"
@@ -32,159 +28,78 @@ type SolarKpiIconKey =
   | "metric-co2-total"
   | "metric-efficiency";
 
+type SolarMetricBinding = {
+  iconKey: SolarKpiIconKey;
+} & MonitoringMetricBinding<SolarMetricKey>;
+
 type BuildSolarViewModelArgs = {
+  comparisonTargets?: Partial<Record<SolarMetricKey, SolarComparisonTarget>>;
   isSocketConnected: boolean;
   snapshot: LiveMetricsSnapshot;
 };
 
 const kpiBindings: SolarMetricBinding[] = [
-  {
-    fallbackIndex: 1,
-    iconKey: "metric-generation-sun",
-    key: "todayGeneration",
-    label: "今日發電量",
-    unit: "kWh"
-  },
-  {
-    fallbackIndex: 2,
-    iconKey: "metric-self-consumption",
-    key: "selfConsumptionRatio",
-    label: "自發自用比例",
-    unit: "%"
-  },
-  {
-    fallbackIndex: 3,
-    iconKey: "metric-co2-today",
-    key: "todayCo2Reduction",
-    label: "今日減碳量",
-    unit: "t"
-  },
-  {
-    fallbackHelper: "累積成果",
-    fallbackIndex: 3,
-    fallbackValue: "9,842",
-    iconKey: "metric-co2-total",
-    key: "totalCo2Reduction",
-    label: "累積減碳量",
-    unit: "t"
-  },
-  {
-    fallbackIndex: 4,
-    iconKey: "metric-efficiency",
-    key: "systemEfficiency",
-    label: "系統效率",
-    unit: "%"
-  }
+  { fallbackIndex: 1, iconKey: "metric-generation-sun", metricKey: "todayGeneration", label: "今日發電量", unit: "kWh" },
+  { fallbackIndex: 2, iconKey: "metric-self-consumption", metricKey: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
+  { fallbackIndex: 3, iconKey: "metric-co2-today", metricKey: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
+  { fallbackHelper: "累積成果", fallbackIndex: 3, fallbackValue: "9,842", iconKey: "metric-co2-total", metricKey: "totalCo2Reduction", label: "累積減碳量", unit: "t" },
+  { fallbackIndex: 4, iconKey: "metric-efficiency", metricKey: "systemEfficiency", label: "系統效率", unit: "%" }
 ];
-
-function formatMetricValue(value: number, unit: string | null) {
-  const digits = unit === "%" ? 1 : Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
-
-  return value.toLocaleString("zh-TW", {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits === 0 ? 0 : 1
-  });
-}
 
 function resolveMetricValue(
   binding: SolarMetricBinding,
   isSocketConnected: boolean,
   snapshot: LiveMetricsSnapshot
 ) {
-  const { fallbackHelper, fallbackIndex, fallbackValue, key, unit } = binding;
-  const fallbackMetric = liveMetrics[fallbackIndex]!;
-  const liveMetric = snapshot.metrics[key];
-
-  if (!isSocketConnected || !liveMetric) {
-    return {
-      helper: fallbackHelper ?? fallbackMetric.helper,
-      unit,
-      value: fallbackValue ?? fallbackMetric.value
-    };
-  }
-
-  return {
-    helper: fallbackMetric.helper,
-    unit: liveMetric.unit ?? unit,
-    value: formatMetricValue(liveMetric.value, liveMetric.unit ?? unit)
-  };
+  const fallbackMetric = liveMetrics[binding.fallbackIndex]!;
+  return resolveMonitoringMetricBinding({
+    binding: {
+      ...binding,
+      fallbackHelper: binding.fallbackHelper ?? fallbackMetric.helper,
+      fallbackValue: binding.fallbackValue ?? fallbackMetric.value
+    },
+    isConnected: isSocketConnected,
+    reading: snapshot.metrics[binding.metricKey] ?? null
+  });
 }
 
 export function buildSolarViewModel({
+  comparisonTargets,
   isSocketConnected,
   snapshot
 }: BuildSolarViewModelArgs) {
   const power = resolveMetricValue(
-    {
-      fallbackIndex: 0,
-      iconKey: "metric-generation-sun",
-      key: "realTimePower",
-      label: "即時功率",
-      unit: "kW"
-    },
+    { fallbackIndex: 0, iconKey: "metric-generation-sun", metricKey: "realTimePower", label: "即時功率", unit: "kW" },
     isSocketConnected,
     snapshot
   );
   const efficiency = resolveMetricValue(
-    {
-      fallbackIndex: 4,
-      iconKey: "metric-efficiency",
-      key: "systemEfficiency",
-      label: "系統效率",
-      unit: "%"
-    },
+    { fallbackIndex: 4, iconKey: "metric-efficiency", metricKey: "systemEfficiency", label: "系統效率", unit: "%" },
     isSocketConnected,
     snapshot
   );
   const selfConsumption = resolveMetricValue(
-    {
-      fallbackIndex: 2,
-      iconKey: "metric-self-consumption",
-      key: "selfConsumptionRatio",
-      label: "自發自用比例",
-      unit: "%"
-    },
+    { fallbackIndex: 2, iconKey: "metric-self-consumption", metricKey: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
     isSocketConnected,
     snapshot
   );
   const co2Today = resolveMetricValue(
-    {
-      fallbackIndex: 3,
-      iconKey: "metric-co2-today",
-      key: "todayCo2Reduction",
-      label: "今日減碳量",
-      unit: "t"
-    },
+    { fallbackIndex: 3, iconKey: "metric-co2-today", metricKey: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
     isSocketConnected,
     snapshot
   );
+  const flowState = resolveSolarFlowState({
+    efficiencyPercent: isSocketConnected ? snapshot.metrics.systemEfficiency?.value ?? null : null,
+    isConnected: isSocketConnected,
+    powerKw: isSocketConnected ? snapshot.metrics.realTimePower?.value ?? null : null
+  });
 
   return {
     flowNodes: [
-      {
-        assetKey: "solar-panel-display" as SolarFlowAssetKey,
-        footnote: "Solar Panels",
-        label: "太陽能板",
-        value: `${power.value} ${power.unit}`
-      },
-      {
-        assetKey: "inverter-display" as SolarFlowAssetKey,
-        footnote: "Inverter",
-        label: "變流器",
-        value: `${efficiency.value}${efficiency.unit}`
-      },
-      {
-        assetKey: "factory-consumption-display" as SolarFlowAssetKey,
-        footnote: "Factory Consumption",
-        label: "工廠用電",
-        value: `${selfConsumption.value}${selfConsumption.unit}`
-      },
-      {
-        assetKey: "carbon-reduction-display" as SolarFlowAssetKey,
-        footnote: "Carbon Reduction",
-        label: "減碳效益",
-        value: `${co2Today.value} ${co2Today.unit}`
-      }
+      { assetKey: "solar-panel-display" as SolarFlowAssetKey, footnote: "Solar Panels", label: "太陽能板", value: `${power.value} ${power.unit}` },
+      { assetKey: "inverter-display" as SolarFlowAssetKey, footnote: "Inverter", label: "變流器", value: `${efficiency.value}${efficiency.unit}` },
+      { assetKey: "factory-consumption-display" as SolarFlowAssetKey, footnote: "Factory Consumption", label: "工廠用電", value: `${selfConsumption.value}${selfConsumption.unit}` },
+      { assetKey: "carbon-reduction-display" as SolarFlowAssetKey, footnote: "Carbon Reduction", label: "減碳效益", value: `${co2Today.value} ${co2Today.unit}` }
     ],
     hero: {
       eyebrow: "綠能驅動・永續未來",
@@ -193,14 +108,21 @@ export function buildSolarViewModel({
     },
     kpis: kpiBindings.map((binding) => {
       const resolved = resolveMetricValue(binding, isSocketConnected, snapshot);
-
       return {
+        comparison: resolveSolarComparison({
+          actualUnit: resolved.unit,
+          actualValue: isSocketConnected ? snapshot.metrics[binding.metricKey]?.value ?? null : null,
+          target: comparisonTargets?.[binding.metricKey]
+        }),
         helper: resolved.helper,
         iconKey: binding.iconKey,
         label: binding.label,
         unit: resolved.unit,
         value: resolved.value
       };
-    })
+    }),
+    story: {
+      flowState
+    }
   };
 }
