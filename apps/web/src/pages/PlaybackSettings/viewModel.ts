@@ -1,13 +1,18 @@
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
-import { buildRotationPreviewRows } from "../DisplayPagesEditor/rotationPreview";
+import {
+  buildEffectiveRotationRows,
+  buildRotationPreviewRows,
+  buildSkippedRotationRows
+} from "../DisplayPagesEditor/rotationPreview";
 
 type BuildPlaybackSettingsViewModelArgs = {
   errorMessage: string;
   isSaving: boolean;
   message: string;
   pages: PlaybackPage[];
+  rotationPreview?: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
 };
 
@@ -96,6 +101,7 @@ export function buildPlaybackSettingsViewModel({
   isSaving,
   message,
   pages,
+  rotationPreview,
   settings
 }: BuildPlaybackSettingsViewModelArgs) {
   const sortedPages = sortPlaybackPages(pages);
@@ -155,7 +161,9 @@ export function buildPlaybackSettingsViewModel({
       value: `${totalDurationSeconds}s`
       }
     ],
+    effectiveRotationRows: buildEffectiveRotationRows(rotationPreview ?? null),
     rotationPreviewRows: buildRotationPreviewRows(sortedPages),
+    skippedRotationRows: buildSkippedRotationRows(rotationPreview ?? null),
     summary: {
       enabledCount,
       scheduleLabel: formatScheduleLabel(settings),

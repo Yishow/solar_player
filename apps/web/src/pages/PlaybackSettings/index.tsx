@@ -1,6 +1,7 @@
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import { useEffect, useState } from "react";
 import {
+  getDisplayRotationPreview,
   getPlaybackPages,
   getPlaybackSettings,
   updatePlaybackPages,
@@ -27,6 +28,7 @@ const PAGE_THUMBNAILS: Record<string, string> = {
 export function PlaybackSettings() {
   const [settings, setSettings] = useState<PlaybackSettings | null>(null);
   const [pages, setPages] = useState<PlaybackPage[]>([]);
+  const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
@@ -37,13 +39,15 @@ export function PlaybackSettings() {
     const loadPlaybackConfig = async () => {
       setIsLoading(true);
       try {
-        const [nextSettings, nextPages] = await Promise.all([
+        const [nextSettings, nextPages, nextRotationPreview] = await Promise.all([
           getPlaybackSettings(),
-          getPlaybackPages()
+          getPlaybackPages(),
+          getDisplayRotationPreview()
         ]);
         if (!active) return;
         setSettings(nextSettings);
         setPages(nextPages);
+        setRotationPreview(nextRotationPreview);
         setMessage("播放設定已同步。");
         setErrorMessage("");
       } catch (error) {
@@ -87,8 +91,10 @@ export function PlaybackSettings() {
           }))
         )
       ]);
+      const nextRotationPreview = await getDisplayRotationPreview();
       setSettings(savedSettings);
       setPages(savedPages);
+      setRotationPreview(nextRotationPreview);
       setMessage("播放設定已儲存。");
       setErrorMessage("");
     } catch (error) {
@@ -104,12 +110,14 @@ export function PlaybackSettings() {
     setIsSaving(false);
     setIsLoading(true);
     try {
-      const [nextSettings, nextPages] = await Promise.all([
+      const [nextSettings, nextPages, nextRotationPreview] = await Promise.all([
         getPlaybackSettings(),
-        getPlaybackPages()
+        getPlaybackPages(),
+        getDisplayRotationPreview()
       ]);
       setSettings(nextSettings);
       setPages(nextPages);
+      setRotationPreview(nextRotationPreview);
       setMessage("播放設定已同步。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "重新同步播放設定失敗。");
@@ -123,6 +131,7 @@ export function PlaybackSettings() {
     isSaving,
     message,
     pages,
+    rotationPreview,
     settings
   });
 
@@ -180,7 +189,7 @@ export function PlaybackSettings() {
 
       <section className="ps-preview">
         <div className="ps-preview__title">
-          播放流程預覽 <small>/ Rotation Route Preview</small>
+          目前配置輪播鏈 <small>/ Configured Rotation Preview</small>
         </div>
         <div className="ps-preview__list">
           {viewModel.rotationPreviewRows.map((page, index, arr) => (
@@ -196,6 +205,40 @@ export function PlaybackSettings() {
             </div>
           ))}
         </div>
+        <div className="ps-preview__title" style={{ marginTop: "20px" }}>
+          正式生效輪播鏈 <small>/ Effective Runtime Rotation</small>
+        </div>
+        <div className="ps-preview__list">
+          {viewModel.effectiveRotationRows.length > 0 ? viewModel.effectiveRotationRows.map((page, index, arr) => (
+            <div key={`effective-${page.id}`} style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div className="ps-preview__item">
+                <img src={PAGE_THUMBNAILS[page.route]} alt={page.labelZh} className="ps-preview__item-thumb" />
+                <div className="ps-preview__label">
+                  <span className="ps-badge-number">{index + 1}</span> {page.labelEn}
+                  <small style={{ display: "block", opacity: 0.72 }}>{page.durationLabel}</small>
+                </div>
+              </div>
+              {index < arr.length - 1 && <div className="ps-preview__arrow">&gt;</div>}
+            </div>
+          )) : (
+            <div className="mgmt-status">
+              目前沒有可播放頁面。
+              {rotationPreview?.fallbackRoute ? (
+                <small style={{ display: "block", opacity: 0.72 }}>Fallback: {rotationPreview.fallbackRoute}</small>
+              ) : null}
+            </div>
+          )}
+        </div>
+        {viewModel.skippedRotationRows.length > 0 ? (
+          <div className="mgmt-status" style={{ marginTop: "16px" }}>
+            {viewModel.skippedRotationRows.map((page) => (
+              <div key={`${page.labelEn}-${page.skipReasonText}`} style={{ marginTop: "6px" }}>
+                {page.labelEn} / {page.labelZh}：{page.skipReasonLabel}
+                {page.detail ? <small style={{ display: "block", opacity: 0.72 }}>{page.detail}</small> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <div className="ps-bottom-cards">

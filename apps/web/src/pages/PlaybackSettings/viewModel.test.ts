@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
 
 const settings: PlaybackSettings = {
@@ -53,6 +53,49 @@ const pages: PlaybackPage[] = [
   }
 ];
 
+const effectiveRotationPreview: DisplayRotationPreview = {
+  evaluatedAt: "2026-05-18T09:30:00.000Z",
+  fallbackRoute: null,
+  playablePages: [
+    {
+      displayOrder: 1,
+      durationSeconds: 15,
+      enabled: true,
+      id: 1,
+      labelEn: "Overview",
+      labelZh: "總覽",
+      pageKey: "overview",
+      route: "/overview"
+    }
+  ],
+  skippedPages: [
+    {
+      detail: "尚未收到可用的即時資料",
+      displayOrder: 2,
+      durationSeconds: 20,
+      enabled: true,
+      id: 2,
+      labelEn: "Solar",
+      labelZh: "太陽能",
+      pageKey: "solar",
+      route: "/solar",
+      skipReason: "data-not-ready"
+    },
+    {
+      detail: null,
+      displayOrder: 3,
+      durationSeconds: 12,
+      enabled: false,
+      id: 3,
+      labelEn: "Images",
+      labelZh: "圖庫",
+      pageKey: "images",
+      route: "/images",
+      skipReason: "disabled"
+    }
+  ]
+};
+
 test("reorderPlaybackPages rewrites display order after moving a page upward", () => {
   const reordered = reorderPlaybackPages(pages, 3, -1);
 
@@ -75,6 +118,7 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
     isSaving: false,
     message: "播放設定已同步。",
     pages,
+    rotationPreview: effectiveRotationPreview,
     settings
   });
 
@@ -106,6 +150,38 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelZh: "太陽能",
         orderLabel: "02",
         route: "/solar"
+      }
+    ]
+  );
+  assert.deepEqual(
+    model.effectiveRotationRows,
+    [
+      {
+        durationLabel: "15 秒",
+        id: 1,
+        labelEn: "Overview",
+        labelZh: "總覽",
+        orderLabel: "01",
+        route: "/overview"
+      }
+    ]
+  );
+  assert.deepEqual(
+    model.skippedRotationRows,
+    [
+      {
+        detail: "尚未收到可用的即時資料",
+        labelEn: "Solar",
+        labelZh: "太陽能",
+        skipReasonLabel: "資料尚未就緒",
+        skipReasonText: "data-not-ready"
+      },
+      {
+        detail: null,
+        labelEn: "Images",
+        labelZh: "圖庫",
+        skipReasonLabel: "頁面已停用",
+        skipReasonText: "disabled"
       }
     ]
   );

@@ -10,11 +10,13 @@ test("playback settings keeps save and resync actions wired to the playback APIs
   assert.match(playbackSettingsSource, /const handleSave = async \(\) => \{/);
   assert.match(playbackSettingsSource, /updatePlaybackSettings\(settings\)/);
   assert.match(playbackSettingsSource, /updatePlaybackPages\(/);
+  assert.match(playbackSettingsSource, /getDisplayRotationPreview\(\)/);
   assert.match(playbackSettingsSource, /const resyncPlaybackConfig = async \(\) => \{/);
   assert.match(playbackSettingsSource, /className="mgmt-action ps-resync"/);
   assert.match(playbackSettingsSource, /className="mgmt-action primary ps-save"/);
   assert.match(playbackSettingsSource, /role="status"/);
   assert.match(playbackSettingsSource, /viewModel\.saveBanner\.title/);
+  assert.match(playbackSettingsSource, /正式生效輪播鏈/);
 });
 
 test("playback settings does not expose an enabled add-page button without backend support", () => {
