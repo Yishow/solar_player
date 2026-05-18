@@ -6,7 +6,7 @@
 ## 2. Media placement controls
 
 - [x] 2.1 Deliver `Provide per-binding media placement controls for display pages` and reference `Store media placement controls beside each media binding` by adding editor fields and runtime support for focal point, fit behavior, and alignment, verified by `pnpm --filter @solar-display/web test` or manual preview checks on at least one hero and one stage image.
-- [ ] 2.2 Deliver `Keep media placement controls within safe bounds` by validating placement values on save or publish, verified by targeted API tests that submit invalid placement control payloads.
+- [x] 2.2 Deliver `Keep media placement controls within safe bounds` by validating placement values on save or publish, verified by targeted API tests that submit invalid placement control payloads.
 
 ## 3. Asset health reporting
 

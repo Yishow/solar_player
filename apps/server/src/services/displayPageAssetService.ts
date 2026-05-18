@@ -3,7 +3,7 @@ import type {
   DisplayPageAssetFindingReason,
   DisplayPageKey
 } from "@solar-display/shared";
-import { isDisplayPageMediaBinding } from "@solar-display/shared";
+import { displayPageMediaFitModes, isDisplayPageMediaBinding } from "@solar-display/shared";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "../config.js";
@@ -17,6 +17,11 @@ type UnknownRecord = Record<string, unknown>;
 type ManagedAssetResolution = {
   filename: string | null;
   reason: DisplayPageAssetFindingReason | null;
+};
+
+export type DisplayPageMediaPlacementIssue = {
+  bindingId: string;
+  message: string;
 };
 
 function cloneValue<T>(value: T): T {
@@ -151,4 +156,64 @@ export function collectDisplayPageAssetFindings(
 
   scan(regions, "");
   return findings;
+}
+
+export function collectDisplayPageMediaPlacementIssues(regions: Record<string, unknown>) {
+  const issues: DisplayPageMediaPlacementIssue[] = [];
+
+  function pushIssue(bindingId: string, message: string) {
+    issues.push({ bindingId, message });
+  }
+
+  function scan(value: unknown, path: string) {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => scan(item, `${path}[${index}]`));
+      return;
+    }
+
+    if (!isPlainObject(value)) {
+      return;
+    }
+
+    if (isDisplayPageMediaBinding(value)) {
+      if ("fitMode" in value && !displayPageMediaFitModes.includes(value.fitMode as never)) {
+        pushIssue(`${path}.fitMode`, `${path}.fitMode 僅支援 contain 或 cover`);
+      }
+
+      if ("focusX" in value) {
+        const focusX = value.focusX;
+        if (typeof focusX !== "number" || !Number.isFinite(focusX) || focusX < 0 || focusX > 1) {
+          pushIssue(`${path}.focusX`, `${path}.focusX 必須介於 0 和 1 之間`);
+        }
+      }
+
+      if ("focusY" in value) {
+        const focusY = value.focusY;
+        if (typeof focusY !== "number" || !Number.isFinite(focusY) || focusY < 0 || focusY > 1) {
+          pushIssue(`${path}.focusY`, `${path}.focusY 必須介於 0 和 1 之間`);
+        }
+      }
+
+      if ("alignX" in value) {
+        const alignX = value.alignX;
+        if (typeof alignX !== "number" || !Number.isFinite(alignX)) {
+          pushIssue(`${path}.alignX`, `${path}.alignX 必須為有效數字`);
+        }
+      }
+
+      if ("alignY" in value) {
+        const alignY = value.alignY;
+        if (typeof alignY !== "number" || !Number.isFinite(alignY)) {
+          pushIssue(`${path}.alignY`, `${path}.alignY 必須為有效數字`);
+        }
+      }
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      scan(child, path ? `${path}.${key}` : key);
+    }
+  }
+
+  scan(regions, "");
+  return issues;
 }

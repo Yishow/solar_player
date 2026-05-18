@@ -16,6 +16,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   collectDisplayPageAssetFindings,
+  collectDisplayPageMediaPlacementIssues,
   normalizeDisplayPageRegionsForStorage
 } from "./displayPageAssetService.js";
 
@@ -98,6 +99,18 @@ function readNextLiveVersion(pageId: DisplayPageKey) {
 
 function validateConfigDraft(regions: Record<string, unknown>): ValidationResult {
   const findings: ValidationFinding[] = [];
+  const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
+
+  if (placementIssues.length > 0) {
+    findings.push(
+      ...placementIssues.map((issue) => ({
+        severity: "blocking" as const,
+        code: "MEDIA_PLACEMENT_INVALID",
+        message: issue.message,
+        regionId: issue.bindingId
+      }))
+    );
+  }
 
   for (const [regionId, value] of Object.entries(regions)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {

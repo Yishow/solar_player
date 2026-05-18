@@ -15,6 +15,7 @@ import {
 } from "../services/displayPagePublishingService.js";
 import {
   collectDisplayPageAssetFindings,
+  collectDisplayPageMediaPlacementIssues,
   normalizeDisplayPageRegionsForStorage,
   resolveDisplayPageRegions
 } from "../services/displayPageAssetService.js";
@@ -50,6 +51,18 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
+function sendPlacementValidationError(
+  reply: { status: (code: number) => { send: (payload: Record<string, unknown>) => unknown } },
+  details: string[]
+) {
+  return reply.status(400).send({
+    success: false,
+    error: "Display page media placement is invalid",
+    details,
+    timestamp: new Date().toISOString()
+  });
+}
+
 function readStoredDisplayPageConfig(pageId: DisplayPageKey): DisplayPageConfigEnvelope {
   const database = getDatabase();
   const row = database
@@ -81,7 +94,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
     "/api/display-pages/:pageId/config",
-    async (request) => {
+    async (request, reply) => {
       const pageId = assertDisplayPageKey(request.params.pageId);
       const regions = request.body?.regions;
 
@@ -90,6 +103,14 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         // @ts-expect-error fastify reads statusCode
         error.statusCode = 400;
         throw error;
+      }
+
+      const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
+      if (placementIssues.length > 0) {
+        return sendPlacementValidationError(
+          reply,
+          placementIssues.map((issue) => issue.message)
+        );
       }
 
       const database = getDatabase();
@@ -117,7 +138,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
     "/api/display-pages/:pageId/draft",
-    async (request) => {
+    async (request, reply) => {
       const pageId = assertDisplayPageKey(request.params.pageId);
       const regions = request.body?.regions;
 
@@ -126,6 +147,14 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         // @ts-expect-error fastify reads statusCode
         error.statusCode = 400;
         throw error;
+      }
+
+      const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
+      if (placementIssues.length > 0) {
+        return sendPlacementValidationError(
+          reply,
+          placementIssues.map((issue) => issue.message)
+        );
       }
 
       return { config: resolveEnvelope(writeStageConfig(pageId, "draft", regions)) };
