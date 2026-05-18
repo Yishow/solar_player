@@ -174,6 +174,22 @@ test("display rotation evaluator falls back when schedule blocks every enabled p
   assert.equal(preview.skippedPages[2]?.skipReason, "disabled");
 });
 
+test("display rotation evaluator preserves unknown skip reason strings for diagnostics", () => {
+  const preview = evaluateDisplayRotation({
+    now: new Date("2026-05-13T09:30:00+08:00"),
+    pageConditions: {
+      1: { skipReason: "maintenance-window" }
+    },
+    pages: basePages,
+    settings: baseSettings
+  });
+
+  assert.equal(
+    preview.skippedPages.find((page) => page.id === 1)?.skipReason,
+    "maintenance-window"
+  );
+});
+
 test("GET /api/playback/settings and /api/playback/pages expose seeded playback data", async () => {
   migrateDatabase();
   seedDatabase();
@@ -411,6 +427,50 @@ test("GET /api/display-pages/rotation-preview exposes runtime playable pages and
       "data-not-ready"
     );
     assert.equal(body.preview.fallbackRoute, null);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview reports out-of-schedule pages with a machine-readable reason", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        repeatDays: [3],
+        scheduleEnabled: true,
+        scheduleEnd: "18:00",
+        scheduleStart: "08:00"
+      } satisfies Partial<PlaybackSettings>
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        skippedPages: Array<PlaybackPage & { skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "overview")?.skipReason,
+      "out-of-schedule"
+    );
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "images")?.skipReason,
+      "out-of-schedule"
+    );
   } finally {
     await app.close();
   }
