@@ -1,6 +1,6 @@
 ## 1. Rotation plan model
 
-- [ ] 1.1 Deliver `Maintain a first-class rotation plan for display pages` and reference `Keep rotation plan as a first-class playback model` by extending playback persistence and shared types for page order, enabled state, and duration, verified by `pnpm --filter @solar-display/server test` coverage for rotation plan reads and writes.
+- [x] 1.1 Deliver `Maintain a first-class rotation plan for display pages` and reference `Keep rotation plan as a first-class playback model` by extending playback persistence and shared types for page order, enabled state, and duration, verified by `pnpm --filter @solar-display/server test` coverage for rotation plan reads and writes.
 - [ ] 1.2 Deliver `Show rotation plan preview in management workflow` by updating playback-related management UI to render the effective configured sequence and durations, verified by targeted web tests or manual preview inspection.
 
 ## 2. Conditional playback
