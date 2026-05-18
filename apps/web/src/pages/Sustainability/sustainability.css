@@ -119,6 +119,45 @@
   background: linear-gradient(180deg, rgba(255, 253, 247, 0) 54%, rgba(255, 253, 247, 0.58) 88%, rgba(255, 253, 247, 0.8) 100%);
 }
 
+.sustainability-highlight-rail {
+  z-index: 11;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sustainability-highlight-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid rgba(155, 139, 92, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.88);
+  box-shadow: 0 12px 24px rgba(96, 81, 56, 0.08);
+  padding: 14px 16px;
+}
+
+.sustainability-highlight-item strong {
+  color: #57774a;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sustainability-highlight-item span {
+  margin-top: 4px;
+  color: #596455;
+  font-family: var(--font-family-en);
+  font-size: 14px;
+}
+
+.sustainability-highlight-item small {
+  margin-top: 8px;
+  color: #677062;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
 .sustainability-kpi-card,
 .sustainability-stat-card {
   z-index: 12;

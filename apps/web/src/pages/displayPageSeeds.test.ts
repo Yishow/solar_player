@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createFactoryCircuitDisplayPageSeedConfig } from "./FactoryCircuit/displayPageConfig";
+import { createImagesDisplayPageSeedConfig } from "./Images/displayPageConfig";
+import { createOverviewDisplayPageSeedConfig } from "./Overview/displayPageConfig";
+import { createSolarDisplayPageSeedConfig } from "./Solar/displayPageConfig";
+import { createSustainabilityDisplayPageSeedConfig } from "./Sustainability/displayPageConfig";
+
+test("all five display pages expose non-empty seed-backed editor config", () => {
+  const overview = createOverviewDisplayPageSeedConfig("/overview-hero.png");
+  const solar = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const factoryCircuit = createFactoryCircuitDisplayPageSeedConfig();
+  const images = createImagesDisplayPageSeedConfig("/images-main.jpg");
+  const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
+
+  assert.ok(Object.keys(overview.kpiCards).length > 0);
+  assert.ok(Object.keys(solar.flowNodes).length > 0);
+  assert.ok(Object.keys(factoryCircuit.loadRows).length > 0);
+  assert.ok(Object.keys(images.thumbnailSlots).length > 0);
+  assert.ok(Object.keys(sustainability.highlightRail).length > 0);
+
+  assert.equal(factoryCircuit.hero.copyZhLines.length, 3);
+  assert.equal(images.hero.copyLines.length, 3);
+  assert.equal(sustainability.hero.copyEnLines.length, 3);
+});

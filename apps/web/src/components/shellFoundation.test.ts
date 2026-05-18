@@ -18,6 +18,7 @@ import { StatusBadge } from "./StatusBadge";
 test("shell witness routes declare the shared density contract", () => {
   assert.equal(routeMetaMap.get("/overview")?.shellDensity, "playback");
   assert.equal(routeMetaMap.get("/brand")?.shellDensity, "management");
+  assert.equal(routeMetaMap.get("/display-pages/editor")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/settings/playback")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/device-status")?.shellDensity, "device-detail");
 });
@@ -133,6 +134,7 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.match(footerHtml, />回總覽</);
   assert.match(footerHtml, />趨勢</);
   assert.match(footerHtml, />品牌</);
+  assert.match(footerHtml, />展示編輯</);
   assert.match(footerHtml, />播放設定</);
   assert.match(footerHtml, />圖片管理</);
   assert.match(footerHtml, />MQTT</);

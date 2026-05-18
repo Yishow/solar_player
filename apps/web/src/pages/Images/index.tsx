@@ -1,17 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { useBodyClass } from "../../hooks/useBodyClass";
+import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { imageMocks } from "../../mocks/images";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
-  imagesArrowLayout,
-  imagesCopyLayout,
+  createImagesDisplayPageSeedConfig,
+  type ImagesDisplayPageConfig
+} from "./displayPageConfig";
+import {
   imagesCounterLayout,
   imagesGoldLayout,
-  imagesInfoLayout,
-  imagesMainLayout,
-  imagesThumbLayout,
-  imagesThumbSize,
   imagesTitleLayout
 } from "./layout";
 import "./images.css";
@@ -19,13 +18,7 @@ import { buildImagesViewModel } from "./viewModel";
 
 const CONTENT_TOP_OFFSET = 146;
 
-const assetSources = [
-  imagesAssetRuntimeMap.main,
-  imagesAssetRuntimeMap.thumbs[0],
-  imagesAssetRuntimeMap.thumbs[1],
-  imagesAssetRuntimeMap.thumbs[2],
-  null
-];
+const thumbSlotOrder = ["thumb1", "thumb2", "thumb3", "thumb4"] as const;
 
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
@@ -34,9 +27,41 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
-export function Images() {
+function splitImagesTitle(title: string) {
+  if (title.length <= 2) {
+    return {
+      emphasis: title,
+      suffix: ""
+    };
+  }
+
+  return {
+    emphasis: title.slice(0, 2),
+    suffix: title.slice(2)
+  };
+}
+
+export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
+  const seedConfig = useMemo(
+    () => createImagesDisplayPageSeedConfig(imagesAssetRuntimeMap.main),
+    []
+  );
+  const runtimeConfig = useDisplayPageConfig("images", seedConfig, {
+    enabled: config === undefined
+  });
   const [activeIndex, setActiveIndex] = useState(0);
+  const resolvedConfig = config ?? runtimeConfig.config;
+  const assetSources = useMemo(
+    () => [
+      resolvedConfig.mainStage.src,
+      imagesAssetRuntimeMap.thumbs[0],
+      imagesAssetRuntimeMap.thumbs[1],
+      imagesAssetRuntimeMap.thumbs[2],
+      null
+    ],
+    [resolvedConfig.mainStage.src]
+  );
   const viewModel = buildImagesViewModel({
     activeIndex,
     assetSources,
@@ -46,11 +71,12 @@ export function Images() {
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
 
   const titleLayout = withContentOffset(imagesTitleLayout);
-  const copyLayout = withContentOffset(imagesCopyLayout);
+  const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(imagesGoldLayout);
   const counterLayout = withContentOffset(imagesCounterLayout);
-  const mainLayout = withContentOffset(imagesMainLayout);
-  const infoLayout = withContentOffset(imagesInfoLayout);
+  const mainLayout = withContentOffset(resolvedConfig.mainStage);
+  const infoLayout = withContentOffset(resolvedConfig.infoPanel);
+  const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
 
   return (
     <section className="images-display-page">
@@ -62,11 +88,12 @@ export function Images() {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="images-eyebrow">{viewModel.hero.eyebrow}</p>
+        <p className="images-eyebrow">{resolvedConfig.hero.eyebrow}</p>
         <h2 className="images-display-title">
-          <em>綠能</em>現場影像
+          <em>{titleTokens.emphasis}</em>
+          {titleTokens.suffix}
         </h2>
-        <p className="images-hero-subtitle">{viewModel.hero.subtitle}</p>
+        <p className="images-hero-subtitle">{resolvedConfig.hero.subtitle}</p>
       </section>
 
       <p
@@ -77,7 +104,7 @@ export function Images() {
           width: `${copyLayout.width}px`
         }}
       >
-        {viewModel.hero.copyLines.map((line) => (
+        {resolvedConfig.hero.copyLines.map((line) => (
           <span key={line} className="block">
             {line}
           </span>
@@ -124,7 +151,10 @@ export function Images() {
         }}
       >
         {viewModel.active.hasAsset ? (
-          <img alt={viewModel.active.title} src={viewModel.active.assetSource ?? undefined} />
+          <img
+            alt={resolvedConfig.mainStage.alt || viewModel.active.title}
+            src={viewModel.active.assetSource ?? resolvedConfig.mainStage.src ?? undefined}
+          />
         ) : (
           <div className="images-main-placeholder">
             <div className="glyph-shell">
@@ -158,8 +188,8 @@ export function Images() {
       <button
         className="images-gallery-arrow"
         style={{
-          left: `${imagesArrowLayout.left.left}px`,
-          top: `${imagesArrowLayout.left.top - CONTENT_TOP_OFFSET}px`
+          left: `${resolvedConfig.arrows.left.left}px`,
+          top: `${resolvedConfig.arrows.left.top - CONTENT_TOP_OFFSET}px`
         }}
         onClick={() =>
           setActiveIndex((index) => (index > 0 ? index - 1 : viewModel.thumbnails.length - 1))
@@ -170,8 +200,8 @@ export function Images() {
       <button
         className="images-gallery-arrow"
         style={{
-          left: `${imagesArrowLayout.right.left}px`,
-          top: `${imagesArrowLayout.right.top - CONTENT_TOP_OFFSET}px`
+          left: `${resolvedConfig.arrows.right.left}px`,
+          top: `${resolvedConfig.arrows.right.top - CONTENT_TOP_OFFSET}px`
         }}
         onClick={() => setActiveIndex((index) => (index < viewModel.thumbnails.length - 1 ? index + 1 : 0))}
       >
@@ -179,7 +209,7 @@ export function Images() {
       </button>
 
       {visibleThumbnails.map((thumbnail, thumbIndex) => {
-        const layout = imagesThumbLayout[thumbIndex]!;
+        const layout = resolvedConfig.thumbnailSlots[thumbSlotOrder[thumbIndex]!];
         const runtimeThumb = imagesAssetRuntimeMap.thumbs[(visibleStart + thumbIndex) % imagesAssetRuntimeMap.thumbs.length];
 
         return (
@@ -190,10 +220,10 @@ export function Images() {
               thumbnail.isActive ? "images-thumb-active" : ""
             ].join(" ")}
             style={{
-              height: `${imagesThumbSize.height}px`,
+              height: `${layout.height}px`,
               left: `${layout.left}px`,
               top: `${layout.top - CONTENT_TOP_OFFSET}px`,
-              width: `${imagesThumbSize.width}px`
+              width: `${layout.width}px`
             }}
             onClick={() => setActiveIndex(visibleStart + thumbIndex)}
           >

@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { createFactoryCircuitDisplayPageSeedConfig } from "./displayPageConfig";
+
+const factoryCircuitSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+
+test("factory circuit runtime reads resolved display config for copy, status, nodes, connectors, load rows, and KPI cards", () => {
+  assert.match(factoryCircuitSource, /resolvedConfig\.hero\.eyebrow/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.hero\.title/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.statusBlock/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.loadPanel/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
+});
+
+test("factory circuit display page seed config captures the current default layout and hero contract", () => {
+  const config = createFactoryCircuitDisplayPageSeedConfig();
+
+  assert.equal(config.hero.eyebrow, "綠能驅動・永續未來");
+  assert.equal(config.hero.title, "廠區用電迴路");
+  assert.equal(config.textBlocks.copy.left, 78);
+  assert.equal(config.statusBlock.top, 620);
+  assert.equal(config.nodes.board.width, 182);
+  assert.equal(config.connectors.inverterToBoard.width, 74);
+  assert.equal(config.loadRows.production.height, 84);
+  assert.equal(config.kpiCards.totalPower.width, 380);
+});

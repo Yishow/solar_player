@@ -1,4 +1,11 @@
-import type { BrandProfile, ImageAsset, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type {
+  BrandProfile,
+  DisplayPageConfigEnvelope,
+  DisplayPageKey,
+  ImageAsset,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
 
 export function buildApiUrl(path: string) {
   const configuredBaseUrl = (
@@ -84,6 +91,26 @@ export async function getPlaybackPages() {
     pages: PlaybackPage[];
   }>("/api/playback/pages");
   return response.pages;
+}
+
+export async function getDisplayPageConfig(pageId: DisplayPageKey) {
+  const response = await requestJson<{
+    config: DisplayPageConfigEnvelope;
+  }>(`/api/display-pages/${pageId}/config`);
+  return response.config;
+}
+
+export async function updateDisplayPageConfig(
+  pageId: DisplayPageKey,
+  regions: Record<string, unknown>
+) {
+  const response = await requestJson<{
+    config: DisplayPageConfigEnvelope;
+  }>(`/api/display-pages/${pageId}/config`, {
+    body: JSON.stringify({ regions }),
+    method: "PUT"
+  });
+  return response.config;
 }
 
 export async function updatePlaybackPages(

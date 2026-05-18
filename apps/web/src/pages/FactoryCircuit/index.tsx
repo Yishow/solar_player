@@ -1,21 +1,19 @@
 import type { CircuitConfig } from "@solar-display/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
+import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { requestJson } from "../../services/api";
 import {
-  factoryCircuitConnectorLayout,
-  factoryCircuitCopyLayout,
+  createFactoryCircuitDisplayPageSeedConfig,
+  type FactoryCircuitDisplayPageConfig
+} from "./displayPageConfig";
+import {
   factoryCircuitGoldLayout,
-  factoryCircuitKpiLayout,
   factoryCircuitLeafLayout,
-  factoryCircuitLoadPanelLayout,
-  factoryCircuitLoadRowLayout,
-  factoryCircuitNodeLayout,
-  factoryCircuitStatusLayout,
   factoryCircuitTitleLayout
 } from "./layout";
 import "./factoryCircuit.css";
@@ -166,9 +164,22 @@ const kpiLayoutOrder = [
   "flow"
 ] as const;
 
-export function FactoryCircuit() {
+const loadRowOrder = [
+  "production",
+  "hvac",
+  "lighting",
+  "office",
+  "ev",
+  "infrastructure"
+] as const;
+
+export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, snapshot } = useLiveMetrics();
+  const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
+  const runtimeConfig = useDisplayPageConfig("factory-circuit", seedConfig, {
+    enabled: config === undefined
+  });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
 
@@ -208,12 +219,13 @@ export function FactoryCircuit() {
     loadState,
     snapshot
   });
+  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
-  const copyLayout = withContentOffset(factoryCircuitCopyLayout);
+  const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
   const leafLayout = withContentOffset(factoryCircuitLeafLayout);
-  const statusLayout = withContentOffset(factoryCircuitStatusLayout);
+  const statusLayout = withContentOffset(resolvedConfig.statusBlock);
 
   return (
     <section className="factory-circuit-display-page">
@@ -225,11 +237,11 @@ export function FactoryCircuit() {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="factory-circuit-eyebrow">{viewModel.hero.eyebrow}</p>
+        <p className="factory-circuit-eyebrow">{resolvedConfig.hero.eyebrow}</p>
         <h2 className="factory-circuit-display-title">
-          廠區用電迴路
+          {resolvedConfig.hero.title}
         </h2>
-        <p className="factory-circuit-subtitle">{viewModel.hero.subtitle}</p>
+        <p className="factory-circuit-subtitle">{resolvedConfig.hero.subtitle}</p>
       </section>
 
       <p
@@ -240,13 +252,13 @@ export function FactoryCircuit() {
           width: `${copyLayout.width}px`
         }}
       >
-        {viewModel.hero.copyZhLines.map((line) => (
+        {resolvedConfig.hero.copyZhLines.map((line) => (
           <span key={line} className="block">
             {line}
           </span>
         ))}
         <span className="factory-circuit-copy-en">
-          {viewModel.hero.copyEnLines.map((line) => (
+          {resolvedConfig.hero.copyEnLines.map((line) => (
             <span key={line} className="block">
               {line}
             </span>
@@ -286,7 +298,7 @@ export function FactoryCircuit() {
       </section>
 
       {viewModel.flowNodes.map((node) => {
-        const layout = withContentOffset(factoryCircuitNodeLayout[node.key]);
+        const layout = withContentOffset(resolvedConfig.nodes[node.key]);
         return (
           <article
             key={node.label}
@@ -307,11 +319,13 @@ export function FactoryCircuit() {
         );
       })}
 
-      {Object.entries(factoryCircuitConnectorLayout).map(([key, layout]) => {
-        const nextLayout = withContentOffset(layout);
+      {Object.keys(resolvedConfig.connectors).map((connectorKey) => {
+        const nextLayout = withContentOffset(
+          resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
+        );
         return (
           <div
-            key={key}
+            key={connectorKey}
             className="factory-circuit-connector"
             style={{
               left: `${nextLayout.left}px`,
@@ -340,22 +354,22 @@ export function FactoryCircuit() {
       <section
         className="factory-circuit-load-panel"
         style={{
-          height: `${factoryCircuitLoadPanelLayout.height}px`,
-          left: `${factoryCircuitLoadPanelLayout.left}px`,
-          top: `${factoryCircuitLoadPanelLayout.top - CONTENT_TOP_OFFSET}px`,
-          width: `${factoryCircuitLoadPanelLayout.width}px`
+          height: `${resolvedConfig.loadPanel.height}px`,
+          left: `${resolvedConfig.loadPanel.left}px`,
+          top: `${resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET}px`,
+          width: `${resolvedConfig.loadPanel.width}px`
         }}
       >
         {viewModel.loadRows.map((row, index) => {
-          const layout = withContentOffset(factoryCircuitLoadRowLayout[index]!);
+          const layout = withContentOffset(resolvedConfig.loadRows[loadRowOrder[index]!]);
           return (
             <article
               key={`${row.labelZh}-${index}`}
               className="factory-circuit-load-row"
               style={{
                 height: `${layout.height}px`,
-                left: `${layout.left - factoryCircuitLoadPanelLayout.left}px`,
-                top: `${layout.top - (factoryCircuitLoadPanelLayout.top - CONTENT_TOP_OFFSET)}px`,
+                left: `${layout.left - resolvedConfig.loadPanel.left}px`,
+                top: `${layout.top - (resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET)}px`,
                 width: `${layout.width}px`
               }}
             >
@@ -374,7 +388,7 @@ export function FactoryCircuit() {
       </section>
 
       {viewModel.kpis.map((metric, index) => {
-        const layout = withContentOffset(factoryCircuitKpiLayout[kpiLayoutOrder[index]!]);
+        const layout = withContentOffset(resolvedConfig.kpiCards[kpiLayoutOrder[index]!]);
         const className =
           kpiLayoutOrder[index] === "flow" ? "factory-circuit-kpi-card factory-circuit-kpi-routing" : "factory-circuit-kpi-card";
 

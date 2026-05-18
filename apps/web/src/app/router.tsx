@@ -4,6 +4,7 @@ import { ManagementShell } from "../layouts/ManagementShell";
 import { BrandAssets } from "../pages/BrandAssets";
 import { CircuitSettings } from "../pages/CircuitSettings";
 import { DeviceStatus } from "../pages/DeviceStatus";
+import { DisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
 import { EnergyHistory } from "../pages/EnergyHistory";
 import { EnergyTrend } from "../pages/EnergyTrend";
 import { FactoryCircuit } from "../pages/FactoryCircuit";
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
       {
         path: "brand",
         element: <BrandAssets />
+      },
+      {
+        path: "display-pages/editor",
+        element: <DisplayPagesEditorRoute />
       },
       {
         path: "settings/playback",

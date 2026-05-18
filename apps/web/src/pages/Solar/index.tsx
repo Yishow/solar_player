@@ -1,11 +1,13 @@
+import { useMemo } from "react";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
+import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
-  solarConnectorLayout,
-  solarFlowNodeLayout,
-  solarHeroLayout,
-  solarKpiLayout,
+  createSolarDisplayPageSeedConfig,
+  type SolarDisplayPageConfig
+} from "./displayPageConfig";
+import {
   solarTitleLayout
 } from "./layout";
 import "./solar.css";
@@ -60,6 +62,21 @@ const kpiCardOrder = [
   }
 ] as const;
 
+const connectorOrder = [
+  {
+    className: "solar-connector",
+    key: "solarToInverter"
+  },
+  {
+    className: "solar-connector",
+    key: "inverterToFactory"
+  },
+  {
+    className: "solar-connector solar-connector-orange solar-connector-l",
+    key: "inverterToCo2"
+  }
+] as const;
+
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
@@ -67,16 +84,38 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
-export function Solar() {
+function splitSolarTitleLine(titleLine: string) {
+  const emphasis = "新能量";
+
+  if (!titleLine.endsWith(emphasis)) {
+    return {
+      emphasis: "",
+      prefix: titleLine
+    };
+  }
+
+  return {
+    emphasis,
+    prefix: titleLine.slice(0, -emphasis.length)
+  };
+}
+
+export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
+  const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
+  const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
+    enabled: config === undefined
+  });
   const viewModel = buildSolarViewModel({
     isSocketConnected,
     snapshot
   });
+  const resolvedConfig = config ?? runtimeConfig.config;
+  const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
 
   const titleLayout = withContentOffset(solarTitleLayout);
-  const heroLayout = withContentOffset(solarHeroLayout);
+  const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const goldLineLayout = withContentOffset({
     left: 0,
     top: 500,
@@ -118,15 +157,16 @@ export function Solar() {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="solar-eyebrow">{viewModel.hero.eyebrow}</p>
+        <p className="solar-eyebrow">{resolvedConfig.heroCopy.eyebrow}</p>
         <h2 className="solar-display-title">
-          {viewModel.hero.titleLines[0]}
+          {resolvedConfig.heroCopy.titleLines[0]}
           <br />
-          製造<em>新能量</em>
+          {solarTitleLine2.prefix}
+          {solarTitleLine2.emphasis ? <em>{solarTitleLine2.emphasis}</em> : null}
         </h2>
         <p className="solar-subtitle">
-          {viewModel.hero.subtitleLines[0]}
-          <span>{viewModel.hero.subtitleLines[1]}</span>
+          {resolvedConfig.heroCopy.subtitleLines[0]}
+          <span>{resolvedConfig.heroCopy.subtitleLines[1]}</span>
         </p>
       </section>
 
@@ -140,16 +180,16 @@ export function Solar() {
         }}
       >
         <img
-          alt="太陽能車棚與綠能展示場域"
+          alt={resolvedConfig.heroMedia.alt}
           className="solar-hero-image"
-          src={solarAssetRuntimeMap.hero}
+          src={resolvedConfig.heroMedia.src}
         />
         <div className="solar-hero-fade" />
       </figure>
 
       {flowNodeOrder.map((flowItem, index) => {
         const node = viewModel.flowNodes[index]!;
-        const layout = withContentOffset(solarFlowNodeLayout[flowItem.key]);
+        const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
         const assetSrc = solarAssetRuntimeMap.flow[node.assetKey];
 
         return (
@@ -174,37 +214,26 @@ export function Solar() {
         );
       })}
 
-      <div
-        className="solar-connector"
-        style={{
-          height: `${solarConnectorLayout.solarToInverter.height}px`,
-          left: `${solarConnectorLayout.solarToInverter.left}px`,
-          top: `${solarConnectorLayout.solarToInverter.top - CONTENT_TOP_OFFSET}px`,
-          width: `${solarConnectorLayout.solarToInverter.width}px`
-        }}
-      />
-      <div
-        className="solar-connector"
-        style={{
-          height: `${solarConnectorLayout.inverterToFactory.height}px`,
-          left: `${solarConnectorLayout.inverterToFactory.left}px`,
-          top: `${solarConnectorLayout.inverterToFactory.top - CONTENT_TOP_OFFSET}px`,
-          width: `${solarConnectorLayout.inverterToFactory.width}px`
-        }}
-      />
-      <div
-        className="solar-connector solar-connector-orange solar-connector-l"
-        style={{
-          height: `${solarConnectorLayout.inverterToCo2.height}px`,
-          left: `${solarConnectorLayout.inverterToCo2.left}px`,
-          top: `${solarConnectorLayout.inverterToCo2.top - CONTENT_TOP_OFFSET}px`,
-          width: `${solarConnectorLayout.inverterToCo2.width}px`
-        }}
-      />
+      {connectorOrder.map((connector) => {
+        const layout = withContentOffset(resolvedConfig.connectors[connector.key]);
+
+        return (
+          <div
+            key={connector.key}
+            className={connector.className}
+            style={{
+              height: `${layout.height}px`,
+              left: `${layout.left}px`,
+              top: `${layout.top}px`,
+              width: `${layout.width}px`
+            }}
+          />
+        );
+      })}
 
       {kpiCardOrder.map((cardItem, index) => {
         const metric = viewModel.kpis[index]!;
-        const layout = withContentOffset(solarKpiLayout[cardItem.key]);
+        const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
         const assetSrc = solarAssetRuntimeMap.kpi[metric.iconKey];
 
         return (

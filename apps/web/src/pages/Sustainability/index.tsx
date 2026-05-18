@@ -1,12 +1,17 @@
+import { useMemo } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
+import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
 import {
+  createSustainabilityDisplayPageSeedConfig,
+  type SustainabilityDisplayPageConfig
+} from "./displayPageConfig";
+import {
   sustainabilityAssetMap,
   sustainabilityCopyLayout,
-  sustainabilityHeroLayout,
   sustainabilityKpiLayout,
   sustainabilityLeafLayout,
   sustainabilityStatLayout,
@@ -27,6 +32,18 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 function iconClassName(className?: string) {
   return ["h-full w-full", className ?? ""].join(" ").trim();
 }
+
+const sustainabilityKpiOrder = [
+  "totalGeneration",
+  "totalCo2",
+  "annualSaving"
+] as const;
+
+const sustainabilityStatOrder = [
+  "procure",
+  "esg",
+  "trees"
+] as const;
 
 function SustainabilityGlyph({
   className,
@@ -80,17 +97,25 @@ function SustainabilityGlyph({
   }
 }
 
-export function Sustainability() {
+export function Sustainability({ config }: { config?: SustainabilityDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
+  const seedConfig = useMemo(
+    () => createSustainabilityDisplayPageSeedConfig(sustainabilityAssetMap.hero.src),
+    []
+  );
+  const runtimeConfig = useDisplayPageConfig("sustainability", seedConfig, {
+    enabled: config === undefined
+  });
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
     summary: sustainabilitySummary
   });
+  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
   const leafLayout = withContentOffset(sustainabilityLeafLayout);
-  const heroLayout = withContentOffset(sustainabilityHeroLayout);
+  const heroLayout = withContentOffset(resolvedConfig.heroMedia);
 
   return (
     <section className="sustainability-display-page">
@@ -102,13 +127,13 @@ export function Sustainability() {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="sustainability-eyebrow">{viewModel.hero.eyebrow}</p>
+        <p className="sustainability-eyebrow">{resolvedConfig.hero.eyebrow}</p>
         <h2 className="sustainability-display-title">
-          <em>{viewModel.hero.title[0]}</em>
+          <em>{resolvedConfig.hero.title[0]}</em>
           <br />
-          {viewModel.hero.title[1]}
+          {resolvedConfig.hero.title[1]}
         </h2>
-        <p className="sustainability-subtitle">{viewModel.hero.subtitle}</p>
+        <p className="sustainability-subtitle">{resolvedConfig.hero.subtitle}</p>
       </section>
 
       <div
@@ -119,13 +144,13 @@ export function Sustainability() {
           width: `${copyLayout.width}px`
         }}
       >
-        {viewModel.hero.copyZhLines.map((line) => (
+        {resolvedConfig.hero.copyZhLines.map((line) => (
           <p key={line} className="sustainability-copy-line">
             {line}
           </p>
         ))}
         <div className="sustainability-copy-en">
-          {viewModel.hero.copyEnLines.map((line) => (
+          {resolvedConfig.hero.copyEnLines.map((line) => (
             <p key={line} className="sustainability-copy-line">
               {line}
             </p>
@@ -152,16 +177,29 @@ export function Sustainability() {
           width: `${heroLayout.width}px`
         }}
       >
-        <img alt="國瑞汽車永續成果場域" src={sustainabilityAssetMap.hero.src} />
+        <img alt={resolvedConfig.heroMedia.alt} src={resolvedConfig.heroMedia.src} />
       </figure>
 
+      <section
+        className="sustainability-highlight-rail"
+        style={{
+          height: `${resolvedConfig.highlightRail.container.height}px`,
+          left: `${resolvedConfig.highlightRail.container.left}px`,
+          top: `${resolvedConfig.highlightRail.container.top - CONTENT_TOP_OFFSET}px`,
+          width: `${resolvedConfig.highlightRail.container.width}px`
+        }}
+      >
+        {resolvedConfig.highlightRail.items.map((item) => (
+          <article key={`${item.label}-${item.unit}`} className="sustainability-highlight-item">
+            <strong>{item.value}</strong>
+            <span>{item.unit}</span>
+            <small>{item.label}</small>
+          </article>
+        ))}
+      </section>
+
       {viewModel.bigNumbers.map((item, index) => {
-        const layout =
-          index === 0
-            ? withContentOffset(sustainabilityKpiLayout.totalGeneration)
-            : index === 1
-              ? withContentOffset(sustainabilityKpiLayout.totalCo2)
-              : withContentOffset(sustainabilityKpiLayout.annualSaving);
+        const layout = withContentOffset(resolvedConfig.kpiCards[sustainabilityKpiOrder[index]!]);
 
         return (
           <article
@@ -200,12 +238,7 @@ export function Sustainability() {
       })}
 
       {viewModel.esgCards.map((card, index) => {
-        const layout =
-          index === 0
-            ? withContentOffset(sustainabilityStatLayout.procure)
-            : index === 1
-              ? withContentOffset(sustainabilityStatLayout.esg)
-              : withContentOffset(sustainabilityStatLayout.trees);
+        const layout = withContentOffset(resolvedConfig.statCards[sustainabilityStatOrder[index]!]);
 
         return (
           <article

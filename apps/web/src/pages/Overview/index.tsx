@@ -1,15 +1,18 @@
+import { useMemo } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
+import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { overviewAssetRuntimeMap } from "./assets";
 import {
+  createOverviewDisplayPageSeedConfig,
+  type OverviewDisplayPageConfig
+} from "./displayPageConfig";
+import {
   overviewGoldLineLayout,
-  overviewHeroLayout,
-  overviewKpiLayout,
   overviewLeafLayout,
-  overviewSummaryLayout,
   overviewTitleLayout
 } from "./layout";
 import "./overview.css";
@@ -47,20 +50,27 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
-export function Overview() {
+export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
+  const seedConfig = useMemo(
+    () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
+    []
+  );
+  const runtimeConfig = useDisplayPageConfig("overview", seedConfig, {
+    enabled: config === undefined
+  });
   const viewModel = buildOverviewViewModel({
     connectionState,
     isSocketConnected,
     snapshot
   });
+  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(overviewTitleLayout);
-  const heroLayout = withContentOffset(overviewHeroLayout);
+  const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
-  const summaryLayout = withContentOffset(overviewSummaryLayout);
 
   return (
     <section className="overview-display-page">
@@ -91,16 +101,16 @@ export function Overview() {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="overview-eyebrow">{viewModel.hero.eyebrow}</p>
+        <p className="overview-eyebrow">{resolvedConfig.heroCopy.eyebrow}</p>
         <h2 className="overview-display-title">
-          以<em>綠色</em>製造
+          {resolvedConfig.heroCopy.titleLines[0]}
           <br />
-          驅動美好生活
+          {resolvedConfig.heroCopy.titleLines[1]}
         </h2>
         <p className="overview-hero-subtitle">
-          {viewModel.hero.subtitleLines[0]}
+          {resolvedConfig.heroCopy.subtitleLines[0]}
           <br />
-          {viewModel.hero.subtitleLines[1]}
+          {resolvedConfig.heroCopy.subtitleLines[1]}
         </p>
       </section>
 
@@ -113,12 +123,12 @@ export function Overview() {
           width: `${heroLayout.width}px`
         }}
       >
-        <img alt="國瑞汽車中廠綠能展示場域" src={overviewAssetRuntimeMap.hero} />
+        <img alt={resolvedConfig.heroMedia.alt} src={resolvedConfig.heroMedia.src} />
       </figure>
 
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;
-        const layout = withContentOffset(overviewKpiLayout[cardItem.key]);
+        const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
 
         return (
           <article

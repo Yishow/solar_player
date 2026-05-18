@@ -20,6 +20,7 @@ import imagesRoute from "./routes/images.js";
 import brandRoute from "./routes/brand.js";
 import circuitsRoute from "./routes/circuits.js";
 import deviceRoute from "./routes/device.js";
+import displayPagesRoute from "./routes/display-pages.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 
 function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
@@ -106,6 +107,7 @@ export async function buildApp() {
   await app.register(brandRoute);
   await app.register(circuitsRoute);
   await app.register(deviceRoute);
+  await app.register(displayPagesRoute);
   await app.register(settingsMqttRoute);
 
   mkdirSync(config.uploadsDir, { recursive: true });
