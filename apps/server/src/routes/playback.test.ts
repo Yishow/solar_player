@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test, { after } from "node:test";
+import test, { after, beforeEach } from "node:test";
 import {
   createPlaybackRuntime,
   getEnabledPlaybackPages,
@@ -17,11 +17,19 @@ const tempDir = mkdtempSync(join(tmpdir(), "solar-display-playback-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ buildApp }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
+const [{ buildApp }, { closeDatabaseConnection }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
   import("../app.js"),
+  import("../db/index.js"),
   import("../db/migrate.js"),
   import("../db/seed.js")
 ]);
+
+beforeEach(() => {
+  closeDatabaseConnection();
+  rmSync(process.env.DATABASE_PATH!, { force: true });
+  rmSync(`${process.env.DATABASE_PATH!}-shm`, { force: true });
+  rmSync(`${process.env.DATABASE_PATH!}-wal`, { force: true });
+});
 
 const baseSettings: PlaybackSettings = {
   autoplay: true,
@@ -74,6 +82,7 @@ const basePages: PlaybackPage[] = [
 ];
 
 after(() => {
+  closeDatabaseConnection();
   rmSync(tempDir, { force: true, recursive: true });
 });
 
@@ -157,6 +166,39 @@ test("GET /api/playback/settings and /api/playback/pages expose seeded playback 
   }
 });
 
+test("GET /api/playback/rotation-plan exposes the persisted display rotation plan", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/playback/rotation-plan"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      rotationPlan: {
+        pages: PlaybackPage[];
+      };
+    };
+
+    assert.deepEqual(
+      body.rotationPlan.pages.map((page) => page.pageKey),
+      ["overview", "solar", "factory-circuit", "images", "sustainability"]
+    );
+    assert.deepEqual(
+      body.rotationPlan.pages.map((page) => page.durationSeconds),
+      [15, 15, 15, 15, 15]
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/playback/settings and /api/playback/pages persist updates and emit socket events", async () => {
   migrateDatabase();
   seedDatabase();
@@ -227,6 +269,66 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
     assert.equal(emittedEvents.length, 2);
   } finally {
     app.socketService.emitPlaybackSettingsUpdated = originalEmit;
+    await app.close();
+  }
+});
+
+test("PUT /api/playback/rotation-plan persists page order, enabled state, and duration", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const initialResponse = await app.inject({
+      method: "GET",
+      url: "/api/playback/rotation-plan"
+    });
+    const initialPlan = (initialResponse.json() as {
+      rotationPlan: {
+        pages: PlaybackPage[];
+      };
+    }).rotationPlan;
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/playback/rotation-plan",
+      payload: {
+        pages: initialPlan.pages
+          .slice()
+          .reverse()
+          .map((page, index) => ({
+            id: page.id,
+            enabled: index < 3,
+            displayOrder: index + 1,
+            durationSeconds: 18 + index
+          }))
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      rotationPlan: {
+        pages: PlaybackPage[];
+      };
+    };
+
+    assert.deepEqual(
+      body.rotationPlan.pages.map((page) => ({
+        durationSeconds: page.durationSeconds,
+        enabled: page.enabled,
+        pageKey: page.pageKey
+      })),
+      [
+        { pageKey: "sustainability", enabled: true, durationSeconds: 18 },
+        { pageKey: "images", enabled: true, durationSeconds: 19 },
+        { pageKey: "factory-circuit", enabled: true, durationSeconds: 20 },
+        { pageKey: "solar", enabled: false, durationSeconds: 21 },
+        { pageKey: "overview", enabled: false, durationSeconds: 22 }
+      ]
+    );
+  } finally {
     await app.close();
   }
 });
