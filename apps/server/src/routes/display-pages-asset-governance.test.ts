@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
@@ -243,6 +243,60 @@ test("draft validation reports missing managed asset references as warnings", as
       ),
       true
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("management config read surfaces an unhealthy finding when the managed asset file is missing", async () => {
+  const app = await buildApp();
+  const managedAsset = seedManagedImageAsset();
+
+  try {
+    await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/overview/config",
+      payload: {
+        regions: {
+          heroMedia: {
+            alt: "Overview hero",
+            assetId: managedAsset.assetId
+          }
+        }
+      }
+    });
+
+    unlinkSync(join(uploadsDir, managedAsset.filename));
+
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/config"
+    });
+
+    assert.equal(readResponse.statusCode, 200);
+    const readBody = readResponse.json() as {
+      config: {
+        assetFindings?: Array<{
+          assetId: number;
+          bindingId: string;
+          message: string;
+          pageId: string;
+          reason: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.deepEqual(readBody.config.assetFindings, [
+      {
+        assetId: managedAsset.assetId,
+        bindingId: "heroMedia",
+        message: "素材檔案遺失，無法解析 binding heroMedia",
+        pageId: "overview",
+        reason: "missing-file",
+        status: "unhealthy"
+      }
+    ]);
   } finally {
     await app.close();
   }
