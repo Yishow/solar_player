@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import {
@@ -12,14 +12,14 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
-import {
-  fetchDisplayStory,
-  type DisplayStoryPayload
-} from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
-import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
+import {
+  resolveRuntimeFallbackBannerState,
+  RuntimeConfigFallbackBanner
+} from "../runtimeConfigHydration";
 import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
@@ -68,7 +68,6 @@ function withContentOffset<T extends { top: number }>(layout: T) {
 export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
-  const [storyData, setStoryData] = useState<DisplayStoryPayload["overview"] | null>(null);
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(
@@ -79,26 +78,9 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchDisplayStory()
-      .then((story) => {
-        if (isActive) {
-          setStoryData(story.overview);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setStoryData(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  const storyRuntime = useDisplayStoryRuntime("overview", {
+    enabled: runtimeHydrationEnabled
+  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -116,7 +98,12 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     connectionState,
     isSocketConnected,
     snapshot,
-    storyOverview: storyData ?? undefined
+    storyOverview: storyRuntime.payload ?? undefined
+  });
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
+    usesRuntimeFallback: storyRuntime.usesFallback
   });
 
   const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
@@ -131,7 +118,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
 
   return (
     <section className="overview-display-page">
-      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <div
         className="overview-leaf-watermark"
         style={{

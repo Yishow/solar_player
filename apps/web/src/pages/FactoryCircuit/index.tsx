@@ -7,10 +7,14 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
-import { requestJson, fetchDisplayStory, type DisplayStoryPayload } from "../../services/api";
-import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
+import { requestJson } from "../../services/api";
+import {
+  resolveRuntimeFallbackBannerState,
+  RuntimeConfigFallbackBanner
+} from "../runtimeConfigHydration";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
@@ -189,27 +193,6 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
   });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
-  const [factoryStoryData, setFactoryStoryData] = useState<DisplayStoryPayload["factoryCircuit"] | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchDisplayStory()
-      .then((story) => {
-        if (isActive) {
-          setFactoryStoryData(story.factoryCircuit);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setFactoryStoryData(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -240,6 +223,17 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
       active = false;
     };
   }, []);
+  const circuitDependencyKey = useMemo(
+    () =>
+      circuits
+        .map((circuit) => `${circuit.id}:${circuit.displaySlot ?? "na"}:${circuit.enabled ? "on" : "off"}`)
+        .join("|"),
+    [circuits]
+  );
+  const factoryStoryRuntime = useDisplayStoryRuntime("factory-circuit", {
+    dependencyKey: circuitDependencyKey,
+    enabled: runtimeHydrationEnabled
+  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -258,7 +252,12 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
     connectionState,
     loadState,
     snapshot,
-    factoryCircuitStory: factoryStoryData ?? undefined
+    factoryCircuitStory: factoryStoryRuntime.payload ?? undefined
+  });
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? factoryStoryRuntime.errorMessage : "",
+    usesRuntimeFallback: factoryStoryRuntime.usesFallback
   });
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
@@ -269,7 +268,7 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
 
   return (
     <section className="factory-circuit-display-page">
-      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="factory-circuit-title"
         style={{

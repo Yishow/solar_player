@@ -1,8 +1,5 @@
-import type {
-  SustainabilityPeriodKey,
-  SustainabilityStoryInput
-} from "@solar-display/shared";
-import { useEffect, useMemo, useState } from "react";
+import type { SustainabilityPeriodKey } from "@solar-display/shared";
+import { useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import {
@@ -16,11 +13,14 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStoryRuntime";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
-import { fetchSustainabilityStory } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
-import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
+import {
+  resolveRuntimeFallbackBannerState,
+  RuntimeConfigFallbackBanner
+} from "../runtimeConfigHydration";
 import {
   createSustainabilityDisplayPageSeedConfig,
   type SustainabilityDisplayPageConfig
@@ -140,27 +140,9 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     stage: runtimeStage
   });
   const [selectedPeriod, setSelectedPeriod] = useState<SustainabilityPeriodKey>("lifetime");
-  const [storyData, setStoryData] = useState<SustainabilityStoryInput | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchSustainabilityStory(selectedPeriod)
-      .then((res) => {
-        if (isActive) {
-          setStoryData(res.story);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setStoryData(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [selectedPeriod]);
+  const storyRuntime = useSustainabilityStoryRuntime(selectedPeriod, {
+    enabled: runtimeHydrationEnabled
+  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -177,8 +159,13 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
     selectedPeriod,
-    story: storyData ?? undefined,
+    story: storyRuntime.payload ?? undefined,
     summary: sustainabilitySummary
+  });
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
+    usesRuntimeFallback: storyRuntime.usesFallback
   });
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
@@ -188,7 +175,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
 
   return (
     <section className="sustainability-display-page">
-      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="sustainability-title"
         style={{

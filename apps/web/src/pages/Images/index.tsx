@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import {
   DisplayCardFooter,
@@ -10,9 +10,12 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
-import { fetchImagePlaylist } from "../../services/api";
+import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
-import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
+import {
+  resolveRuntimeFallbackBannerState,
+  RuntimeConfigFallbackBanner
+} from "../runtimeConfigHydration";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
   createImagesDisplayPageSeedConfig,
@@ -65,30 +68,9 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     stage: runtimeStage
   });
   const [activeIndex, setActiveIndex] = useState(0);
-  const [playlistData, setPlaylistData] = useState<{
-    entries: Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"]["entries"];
-    activeEntry: Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"]["activeEntry"];
-  } | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchImagePlaylist(activeIndex, { bootstrap: true })
-      .then((res) => {
-        if (isActive) {
-          setPlaylistData(res.playlist);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setPlaylistData(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [activeIndex]);
+  const playlistRuntime = useImagePlaylistRuntime(activeIndex, {
+    enabled: runtimeHydrationEnabled
+  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -103,11 +85,16 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
 
   const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildImagesViewModel({
-    activeEntry: playlistData?.activeEntry ?? null,
+    activeEntry: playlistRuntime.payload?.activeEntry ?? null,
     activeIndex,
     assets: [],
     coverAssetSource: resolvedConfig.mainStage.src ?? null,
-    entries: playlistData?.entries ?? []
+    entries: playlistRuntime.payload?.entries ?? []
+  });
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? playlistRuntime.errorMessage : "",
+    usesRuntimeFallback: playlistRuntime.usesFallback
   });
   const visibleStart = Math.min(Math.max(viewModel.activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
@@ -122,7 +109,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
 
   return (
     <section className="images-display-page">
-      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="images-title-group"
         style={{

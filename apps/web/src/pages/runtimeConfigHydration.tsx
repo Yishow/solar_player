@@ -1,4 +1,35 @@
-export function RuntimeConfigFallbackBanner({ errorMessage }: { errorMessage: string }) {
+export function resolveRuntimeFallbackBannerState(input: {
+  configErrorMessage: string;
+  runtimeErrorMessage: string;
+  usesRuntimeFallback: boolean;
+}) {
+  if (input.configErrorMessage) {
+    return {
+      errorMessage: input.configErrorMessage,
+      headline: "展示頁設定載入失敗，暫時使用 seed fallback。"
+    };
+  }
+
+  if (input.runtimeErrorMessage && input.usesRuntimeFallback) {
+    return {
+      errorMessage: input.runtimeErrorMessage,
+      headline: "展示資料同步失敗，暫時保留上一份 fallback-safe 內容。"
+    };
+  }
+
+  return {
+    errorMessage: "",
+    headline: ""
+  };
+}
+
+export function RuntimeConfigFallbackBanner({
+  errorMessage,
+  headline
+}: {
+  errorMessage: string;
+  headline?: string;
+}) {
   if (!errorMessage) {
     return null;
   }
@@ -23,7 +54,7 @@ export function RuntimeConfigFallbackBanner({ errorMessage }: { errorMessage: st
       }}
     >
       <strong style={{ display: "block", fontSize: "14px", marginBottom: "4px" }}>
-        展示頁設定載入失敗，暫時使用 seed fallback。
+        {headline || "展示頁設定載入失敗，暫時使用 seed fallback。"}
       </strong>
       <span>{errorMessage}</span>
     </div>

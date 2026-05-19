@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   DisplayCardFooter,
   DisplayCardFrame,
@@ -12,16 +12,16 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
-import {
-  fetchDisplayStory,
-  type DisplayStoryPayload
-} from "../../services/api";
 import {
   createSolarDisplayPageSeedConfig,
   type SolarDisplayPageConfig
 } from "./displayPageConfig";
-import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
+import {
+  resolveRuntimeFallbackBannerState,
+  RuntimeConfigFallbackBanner
+} from "../runtimeConfigHydration";
 import {
   solarTitleLayout
 } from "./layout";
@@ -119,7 +119,6 @@ function splitSolarTitleLine(titleLine: string) {
 export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
-  const [solarStoryData, setSolarStoryData] = useState<DisplayStoryPayload["solar"] | null>(null);
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
@@ -127,26 +126,9 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
-
-  useEffect(() => {
-    let isActive = true;
-
-    void fetchDisplayStory()
-      .then((story) => {
-        if (isActive) {
-          setSolarStoryData(story.solar);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setSolarStoryData(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  const solarStoryRuntime = useDisplayStoryRuntime("solar", {
+    enabled: runtimeHydrationEnabled
+  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -163,7 +145,12 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   const viewModel = buildSolarViewModel({
     isSocketConnected,
     snapshot,
-    solarStory: solarStoryData ?? undefined
+    solarStory: solarStoryRuntime.payload ?? undefined
+  });
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
+    usesRuntimeFallback: solarStoryRuntime.usesFallback
   });
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
 
@@ -183,7 +170,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
 
   return (
     <section className="solar-display-page">
-      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <div
         className="solar-leaf-watermark"
         style={{
