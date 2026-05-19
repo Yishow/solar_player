@@ -53,7 +53,8 @@ export function AppFooterNav() {
   const brand = useBrandAssets();
 
   // Settings nav has more entries; tighten typography & spacing so they fit.
-  const navItemPaddingX = mode === "playback" ? 32 : 18;
+  // 縮小間距以讓項目更近
+  const navItemPaddingX = mode === "playback" ? 24 : 14;
   const navItemFontSize = mode === "playback" ? 16 : 14;
   const navItemTracking = mode === "playback" ? "0.04em" : "0.02em";
 
@@ -65,17 +66,18 @@ export function AppFooterNav() {
       className="shell-footer-bar relative flex h-[var(--footer-height)] w-full shrink-0 items-stretch"
     >
       <div className="flex w-full items-center pl-[32px] pr-[32px]">
-        <PageNumberPill current={currentRoute.order} total={routeMetaList.length} />
+        {/* 已移除 PageNumberPill */}
 
-        <div className="ml-[32px]">
+        <div>
           <LeafOrnament variant="footer-mini" />
         </div>
 
-        <nav className="ml-[20px] flex h-[64px] flex-1 items-stretch overflow-hidden group">
+        <nav className="ml-[12px] flex h-[64px] flex-1 items-stretch overflow-hidden group">
           {entries.map((entry, index) => {
             const active = index === activeIndex;
 
-            const baseClasses = "relative flex items-center font-en leading-none whitespace-nowrap transition-[color,opacity,transform,text-shadow,letter-spacing] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
+            // 加入了 group/item 與 active 的背景光暈 (Radial Gradient)
+            const baseClasses = "group/item relative flex items-center font-en leading-none whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
 
             const playbackClasses = active
               ? "font-medium opacity-100"
@@ -103,6 +105,10 @@ export function AppFooterNav() {
                     paddingRight: `${navItemPaddingX}px`
                   }}
                 >
+                  {/* 環境光暈 - 實作第 5 點 */}
+                  {active && mode === "playback" && (
+                     <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(63,122,52,0.12)_0%,transparent_70%)] pointer-events-none" />
+                  )}
                   {entry.label}
                 </Link>
               </Fragment>
@@ -139,7 +145,12 @@ export function AppFooterNav() {
           <div className="text-right">
             <div
               className="text-[17px] font-semibold tracking-[0.42em]"
-              style={{ color: "var(--shell-slogan-ink)", marginRight: "-0.42em" }}
+              // 實作第 3 點：字體的活版印刷感 (Engraved Typography)
+              style={{ 
+                color: "var(--shell-slogan-ink)", 
+                marginRight: "-0.42em",
+                textShadow: "0 1px 1px rgba(255, 255, 255, 0.8), 0 -1px 1px rgba(0, 0, 0, 0.05)"
+              }}
             >
               {brand.sloganZh}
             </div>
@@ -166,7 +177,8 @@ function FooterBranch() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="shrink-0 opacity-90 relative z-10 animate-branch"
-      style={{ transform: "translateY(-4px)" }}
+      // 實作第 4 點：為圖示增加物理維度與浮雕感
+      style={{ transform: "translateY(-4px)", filter: "drop-shadow(0 2px 4px rgba(104, 130, 66, 0.2)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.5))" }}
       stroke="var(--shell-branch-stroke, #9aa05e)"
       strokeWidth="1.45"
       strokeLinecap="round"
@@ -185,7 +197,7 @@ function FooterBranch() {
 function NavArrow({ isNext }: { isNext?: boolean }) {
   if (isNext) {
     return (
-      <div className="flex h-full items-center px-[4px] gap-[2px]" aria-hidden="true">
+      <div className="flex h-full items-center px-[2px] gap-[1px]" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <svg
             key={i}
@@ -194,7 +206,8 @@ function NavArrow({ isNext }: { isNext?: boolean }) {
             height="18"
             fill="none"
             stroke="var(--shell-nav-active-ink)"
-            strokeWidth="2.5"
+            // 稍微加粗一點讓動畫箭頭更明顯
+            strokeWidth="2.8"
             strokeLinecap="round"
             strokeLinejoin="round"
             className="animate-arrow-wave"
@@ -208,17 +221,18 @@ function NavArrow({ isNext }: { isNext?: boolean }) {
   }
 
   return (
-    <div className="flex h-full items-center px-[8px]" aria-hidden="true">
+    // 縮小左右 padding 讓項目更靠近，並調深顏色透明度讓分隔標更明顯
+    <div className="flex h-full items-center px-[4px]" aria-hidden="true">
       <svg
         viewBox="0 0 24 24"
         width="16"
         height="16"
         fill="none"
         stroke="var(--shell-divider-strong)"
-        strokeWidth="1.5"
+        strokeWidth="2.0"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ opacity: 0.4 }}
+        style={{ opacity: 0.7 }}
       >
         <path d="M9 18l6-6-6-6" />
       </svg>
