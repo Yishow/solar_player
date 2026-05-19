@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useRef } from "react";
 import { subscribeSocketEvent } from "../services/socket";
+import { createDisplaySyncPlaybackReloadCoordinator } from "./displaySyncPlaybackReload";
 import { resolvePlaybackRouteNavigation } from "./playbackRouteNavigation";
 import { usePlaybackController } from "./usePlaybackController";
 
@@ -19,12 +20,20 @@ export function usePageRotation(options: UsePageRotationOptions = {}) {
   const previousControllerRouteRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    const unsubscribe = subscribeSocketEvent("playback:settingsUpdated", () => {
+    const coordinator = createDisplaySyncPlaybackReloadCoordinator({
+      reloadPlayback: controller.reload
+    });
+    const unsubscribePlayback = subscribeSocketEvent("playback:settingsUpdated", () => {
       void controller.reload();
+    });
+    const unsubscribeDisplaySync = subscribeSocketEvent("display:sync", (event) => {
+      coordinator.notify(event);
     });
 
     return () => {
-      unsubscribe();
+      coordinator.dispose();
+      unsubscribePlayback();
+      unsubscribeDisplaySync();
     };
   }, [controller.reload]);
 

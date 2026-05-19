@@ -20,3 +20,9 @@ test("usePageRotation initializes the previous controller route before evaluatin
   assert.notEqual(resolveIndex, -1);
   assert.ok(initialGuardIndex < resolveIndex, "expected guard to run before playback route resolution");
 });
+
+test("usePageRotation reloads playback runtime from relevant display sync scopes through the shared coordinator", () => {
+  assert.match(usePageRotationSource, /subscribeSocketEvent\("display:sync"/);
+  assert.match(usePageRotationSource, /createDisplaySyncPlaybackReloadCoordinator\(/);
+  assert.match(usePageRotationSource, /coordinator\.notify\(event\)/);
+});

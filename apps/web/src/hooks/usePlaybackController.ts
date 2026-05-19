@@ -15,6 +15,7 @@ import {
 import { startTransition, useEffect, useRef, useState } from "react";
 import { getDisplayRotationPreview, getPlaybackSettings } from "../services/api";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
+import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
 
 type UsePlaybackControllerOptions = {
   currentPath?: string;
@@ -37,36 +38,6 @@ type PlaybackControllerState = {
   prevPage: () => void;
   togglePlay: () => void;
 };
-
-function buildRuntime(
-  nextSettings: PlaybackSettings,
-  nextPages: PlaybackPage[],
-  currentRuntime: PlaybackRuntime | null,
-  currentPage: PlaybackPage | null,
-  currentPath: string | undefined,
-  nowMs: number
-) {
-  const nextRuntime = createPlaybackRuntime(nextSettings, nextPages, {
-    currentPageId: currentPage?.id ?? null,
-    isIdle: currentRuntime?.isIdle ?? false,
-    lastInteractionAt: currentRuntime?.lastInteractionAt ?? nowMs,
-    nowMs,
-    route: currentPath
-  });
-
-  if (currentRuntime === null) {
-    return nextRuntime;
-  }
-
-  const scheduleAllowsPlayback = isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs));
-  const preservePlaying =
-    !nextRuntime.isIdle && scheduleAllowsPlayback && nextSettings.autoplay ? currentRuntime.isPlaying : false;
-
-  return {
-    ...nextRuntime,
-    isPlaying: preservePlaying
-  } satisfies PlaybackRuntime;
-}
 
 export function usePlaybackController(
   options: UsePlaybackControllerOptions = {}
@@ -114,14 +85,14 @@ export function usePlaybackController(
       ]);
       const runtimePages = rotationPreview.playablePages;
       const nowMs = Date.now();
-      const nextRuntime = buildRuntime(
-        nextSettings,
-        runtimePages,
-        runtimeRef.current,
-        runtimeRef.current ? getPlaybackPage(runtimeRef.current, pagesRef.current) : null,
-        options.currentPath,
-        nowMs
-      );
+      const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
+        currentPath: options.currentPath,
+        currentRuntime: runtimeRef.current,
+        nextPages: runtimePages,
+        nowMs,
+        previousPages: pagesRef.current,
+        settings: nextSettings
+      });
 
       startTransition(() => {
         setSettings(nextSettings);
