@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayCardStyleFields,
+  createDisplayCardStyleConfig,
+  type DisplayCardStyleConfig
+} from "../shared/displayCardStyleConfig";
+import {
   buildDisplayPageIconSourceFields,
   createPageIconKeySource,
   type DisplayPageIconSource
@@ -20,6 +25,10 @@ export type SustainabilityDisplayRect = {
 };
 
 export type SustainabilityDisplayPageConfig = {
+  cardStyles: Record<
+    "annualSaving" | "esg" | "procure" | "totalCo2" | "totalGeneration" | "trees",
+    DisplayCardStyleConfig
+  >;
   hero: {
     copyEnLines: [string, string, string];
     copyZhLines: [string, string];
@@ -49,6 +58,50 @@ export function createSustainabilityDisplayPageSeedConfig(
   heroAlt = "國瑞汽車永續成果場域"
 ): SustainabilityDisplayPageConfig {
   return {
+    cardStyles: {
+      annualSaving: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      }),
+      esg: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      }),
+      procure: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      }),
+      totalCo2: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      }),
+      totalGeneration: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      }),
+      trees: createDisplayCardStyleConfig({
+        cornerRadius: 24,
+        unitFontSize: 22,
+        unitPaddingBottom: 8,
+        valueFontSize: 66,
+        valueRowAlign: "center"
+      })
+    },
     hero: {
       copyEnLines: [
         "Kuozui Motors is committed to green manufacturing and",
@@ -255,6 +308,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: key,
+        path: ["cardStyles", key]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]
@@ -282,6 +339,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["statCards", key, "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: key,
+        path: ["cardStyles", key]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", "statCards", key]

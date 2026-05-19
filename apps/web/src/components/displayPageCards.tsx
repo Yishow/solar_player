@@ -1,4 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
+import {
+  buildDisplayCardStyleVars,
+  type DisplayCardStyleConfig
+} from "../pages/shared/displayCardStyleConfig";
 
 type DisplayCardSurface = "info" | "metric";
 type DisplayCardValueAlign = "center" | "start";
@@ -8,11 +12,13 @@ function classNames(...values: Array<string | false | null | undefined>) {
 }
 
 export function DisplayCardFrame({
+  cardStyle,
   children,
   className,
   style,
   surface
 }: {
+  cardStyle?: DisplayCardStyleConfig;
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -21,7 +27,7 @@ export function DisplayCardFrame({
   return (
     <article
       className={classNames("display-card-frame", `display-card-surface-${surface}`, className)}
-      style={style}
+      style={cardStyle ? { ...buildDisplayCardStyleVars(cardStyle), ...style } : style}
     >
       {children}
     </article>

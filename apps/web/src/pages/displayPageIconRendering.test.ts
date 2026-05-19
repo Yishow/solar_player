@@ -43,6 +43,6 @@ test("images runtime routes placeholder icons through the shared icon resolver",
 test("sustainability runtime routes KPI and stat icons through the shared icon resolver", () => {
   const source = readPageSource("Sustainability");
 
-  assert.match(source, /resolvedConfig\.iconSources\.kpiCards\[sustainabilityKpiOrder\[index\]!\]/);
-  assert.match(source, /resolvedConfig\.iconSources\.statCards\[sustainabilityStatOrder\[index\]!\]/);
+  assert.match(source, /resolvedConfig\.iconSources\.kpiCards\[cardKey\]/);
+  assert.match(source, /resolvedConfig\.iconSources\.statCards\[cardKey\]/);
 });

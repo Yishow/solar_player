@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { defaultFallbackPolicy } from "@solar-display/shared";
+import { createImagesDisplayPageSeedConfig } from "../pages/Images/displayPageConfig";
 import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainability/displayPageConfig";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
@@ -75,6 +76,22 @@ test("mergeDisplayPageConfig preserves the seed src while honoring explicit seed
   assert.equal(merged.heroMedia.alt, "Solar seed fallback");
   assert.equal(merged.heroMedia.src, "/solar-seed.jpg");
   assert.equal(merged.heroMedia.fitMode, seedConfig.heroMedia.fitMode);
+});
+
+test("mergeDisplayPageConfig keeps geometry and source bindings untouched during style-only card overrides", () => {
+  const seedConfig = createImagesDisplayPageSeedConfig("/images-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    cardStyles: {
+      infoPanel: {
+        titleFontSize: 32
+      }
+    }
+  });
+
+  assert.equal(merged.cardStyles.infoPanel.titleFontSize, 32);
+  assert.deepEqual(merged.infoPanel, seedConfig.infoPanel);
+  assert.deepEqual(merged.iconSources.infoPanel, seedConfig.iconSources.infoPanel);
+  assert.deepEqual(merged.mainStage, seedConfig.mainStage);
 });
 
 test("resolveDisplayPageConfigForPage falls back to seed config while the next page is still loading", () => {

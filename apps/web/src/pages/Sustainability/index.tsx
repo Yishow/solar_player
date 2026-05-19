@@ -18,6 +18,7 @@ import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStor
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -244,10 +245,13 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
       </section>
 
       {viewModel.bigNumbers.map((item, index) => {
-        const layout = withContentOffset(resolvedConfig.kpiCards[sustainabilityKpiOrder[index]!]);
+        const cardKey = sustainabilityKpiOrder[index]!;
+        const layout = withContentOffset(resolvedConfig.kpiCards[cardKey]);
+        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardKey]);
 
         return (
           <DisplayCardFrame
+            cardStyle={cardStyle}
             key={item.label}
             className="sustainability-kpi-card"
             surface="metric"
@@ -262,14 +266,14 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
               icon={renderDisplayPageIcon({
                 alt: item.label,
                 className: "h-full w-full",
-                seedSource: seedConfig.iconSources.kpiCards[sustainabilityKpiOrder[index]!],
-                source: resolvedConfig.iconSources.kpiCards[sustainabilityKpiOrder[index]!]
+                seedSource: seedConfig.iconSources.kpiCards[cardKey],
+                source: resolvedConfig.iconSources.kpiCards[cardKey]
               })}
               iconContainerClassName="sustainability-card-icon"
               subtitle={item.helper}
               title={item.label}
             />
-            <DisplayCardValueRow align="center" unit={item.unit} value={item.value} />
+            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={item.unit} value={item.value} />
             {index === 2 ? (
               <DisplayCardFooter className="sustainability-card-footer">
                 <div className="sustainability-growth-note">
@@ -287,11 +291,14 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
       })}
 
       {viewModel.esgCards.map((card, index) => {
-        const layout = withContentOffset(resolvedConfig.statCards[sustainabilityStatOrder[index]!]);
+        const cardKey = sustainabilityStatOrder[index]!;
+        const layout = withContentOffset(resolvedConfig.statCards[cardKey]);
+        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardKey]);
         const storyModule = viewModel.storyModules[index] ?? null;
 
         return (
           <DisplayCardFrame
+            cardStyle={cardStyle}
             key={card.label}
             className="sustainability-stat-card"
             surface="metric"
@@ -306,8 +313,8 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
               icon={renderDisplayPageIcon({
                 alt: storyModule?.title ?? card.label,
                 className: "h-full w-full",
-                seedSource: seedConfig.iconSources.statCards[sustainabilityStatOrder[index]!],
-                source: resolvedConfig.iconSources.statCards[sustainabilityStatOrder[index]!]
+                seedSource: seedConfig.iconSources.statCards[cardKey],
+                source: resolvedConfig.iconSources.statCards[cardKey]
               })}
               iconContainerClassName="sustainability-card-icon"
               subtitle={storyModule ? `${periodLabel(viewModel.selectedPeriod)}期故事模組` : card.subtitle}
@@ -339,7 +346,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
                   </DisplayCardFooter>
                 ) : (
                   <>
-                    <DisplayCardValueRow align="center" value={card.value} />
+                    <DisplayCardValueRow align={cardStyle.valueRowAlign} value={card.value} />
                     <DisplayCardFooter className="sustainability-card-footer">
                       <Sparkline className="sustainability-trees-sparkline" values={trendSeries.map((value) => value - 2)} />
                     </DisplayCardFooter>

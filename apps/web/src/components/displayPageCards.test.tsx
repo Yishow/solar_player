@@ -10,6 +10,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "./displayPageCards";
+import { createDisplayCardStyleConfig } from "../pages/shared/displayCardStyleConfig";
 
 test("display page metric-card primitives render shared frame, header, centered value row, and footer slots", () => {
   const markup = renderToStaticMarkup(
@@ -54,6 +55,40 @@ test("display page info-card primitives preserve icon, body, and metadata slots"
   assert.match(markup, /images-info-card-body/);
   assert.match(markup, /Metadata/);
   assert.match(markup, /IMG-03/);
+});
+
+test("display page card primitives serialize persisted style overrides into shared CSS variables", () => {
+  const markup = renderToStaticMarkup(
+    <DisplayCardFrame
+      cardStyle={createDisplayCardStyleConfig({
+        cornerRadius: 18,
+        footerPaddingTop: 12,
+        headerGap: 10,
+        iconBoxSize: 44,
+        paddingBottom: 16,
+        paddingLeft: 20,
+        paddingRight: 24,
+        paddingTop: 14,
+        subtitleFontSize: 12,
+        titleFontSize: 13,
+        unitFontSize: 18,
+        unitPaddingBottom: 4,
+        valueFontSize: 72,
+        valueMarginTop: 22
+      })}
+      className="overview-summary"
+      style={{ left: "88px" }}
+      surface="info"
+    >
+      <DisplayCardHeader title="Shared Story Summary" />
+      <p className="overview-summary-body">故事摘要狀態</p>
+    </DisplayCardFrame>
+  );
+
+  assert.match(markup, /--display-card-title-size:13px/);
+  assert.match(markup, /--display-card-padding:14px 24px 16px 20px/);
+  assert.match(markup, /--display-card-radius:18px/);
+  assert.match(markup, /--display-card-footer-padding-top:12px/);
 });
 
 test("shared display-card CSS owns the header rhythm contract and aligned pages stop redefining it", () => {

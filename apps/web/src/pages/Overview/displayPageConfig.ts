@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayCardStyleFields,
+  createDisplayCardStyleConfig,
+  type DisplayCardStyleConfig
+} from "../shared/displayCardStyleConfig";
+import {
   buildDisplayPageIconSourceFields,
   createReferenceGlyphIconSource,
   type DisplayPageIconSource
@@ -21,6 +26,10 @@ export type OverviewDisplayTextRect = {
 };
 
 export type OverviewDisplayPageConfig = {
+  cardStyles: Record<
+    "co2Today" | "co2Total" | "power" | "summary" | "today" | "total",
+    DisplayCardStyleConfig
+  >;
   heroContainer: OverviewDisplayRect;
   heroCopy: {
     eyebrow: string;
@@ -34,6 +43,7 @@ export type OverviewDisplayPageConfig = {
     DisplayPageIconSource
   >;
   kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewDisplayRect>;
+  summaryCard: OverviewDisplayTextRect;
 };
 
 export function createOverviewDisplayPageSeedConfig(
@@ -41,6 +51,61 @@ export function createOverviewDisplayPageSeedConfig(
   heroAlt = "國瑞汽車中廠綠能展示場域"
 ): OverviewDisplayPageConfig {
   return {
+    cardStyles: {
+      co2Today: createDisplayCardStyleConfig({
+        paddingBottom: 18,
+        paddingLeft: 22,
+        paddingRight: 22,
+        paddingTop: 20,
+        unitFontSize: 18,
+        valueFontSize: 72,
+        valueRowAlign: "center"
+      }),
+      co2Total: createDisplayCardStyleConfig({
+        paddingBottom: 18,
+        paddingLeft: 22,
+        paddingRight: 22,
+        paddingTop: 20,
+        unitFontSize: 18,
+        valueFontSize: 72,
+        valueRowAlign: "center"
+      }),
+      power: createDisplayCardStyleConfig({
+        paddingBottom: 18,
+        paddingLeft: 22,
+        paddingRight: 22,
+        paddingTop: 20,
+        unitFontSize: 18,
+        valueFontSize: 72,
+        valueRowAlign: "center"
+      }),
+      summary: createDisplayCardStyleConfig({
+        cornerRadius: 18,
+        paddingBottom: 14,
+        paddingLeft: 18,
+        paddingRight: 18,
+        paddingTop: 14,
+        titleFontSize: 13
+      }),
+      today: createDisplayCardStyleConfig({
+        paddingBottom: 18,
+        paddingLeft: 22,
+        paddingRight: 22,
+        paddingTop: 20,
+        unitFontSize: 18,
+        valueFontSize: 72,
+        valueRowAlign: "center"
+      }),
+      total: createDisplayCardStyleConfig({
+        paddingBottom: 18,
+        paddingLeft: 22,
+        paddingRight: 22,
+        paddingTop: 20,
+        unitFontSize: 18,
+        valueFontSize: 72,
+        valueRowAlign: "center"
+      })
+    },
     heroContainer: {
       ...overviewHeroLayout
     },
@@ -77,6 +142,11 @@ export function createOverviewDisplayPageSeedConfig(
       power: { ...overviewKpiLayout.power },
       today: { ...overviewKpiLayout.today },
       total: { ...overviewKpiLayout.total }
+    },
+    summaryCard: {
+      left: 88,
+      top: 430,
+      width: 520
     }
   };
 }
@@ -176,6 +246,30 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     presetKey: "hero-media"
   },
   {
+    id: "overview-summary",
+    label: "Overview Summary",
+    description: "調整摘要卡片位置與 card appearance。",
+    geometry: {
+      fallbackHeight: 140,
+      leftPath: ["summaryCard", "left"],
+      minWidth: 180,
+      resizeMode: "horizontal",
+      topOffset: 146,
+      topPath: ["summaryCard", "top"],
+      widthPath: ["summaryCard", "width"]
+    },
+    fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: "overview-summary",
+        path: ["cardStyles", "summary"]
+      }),
+      { constraints: { min: 0 }, fieldType: "number", id: "summary-left", label: "Left", path: ["summaryCard", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "summary-top", label: "Top", path: ["summaryCard", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "summary-width", label: "Width", path: ["summaryCard", "width"] }
+    ],
+    presetKey: "overview-summary"
+  },
+  {
     id: "overview-hero-container",
     label: "Overview Hero Container",
     description: "調整 hero 畫布容器幾何。",
@@ -214,6 +308,10 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: key,
+        path: ["cardStyles", key]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", key]

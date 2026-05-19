@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayCardStyleFields,
+  createDisplayCardStyleConfig,
+  type DisplayCardStyleConfig
+} from "../shared/displayCardStyleConfig";
+import {
   buildDisplayPageIconSourceFields,
   createAssetImageIconSource,
   type DisplayPageIconSource
@@ -20,6 +25,10 @@ export type SolarDisplayRect = {
 };
 
 export type SolarDisplayPageConfig = {
+  cardStyles: Record<
+    "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2",
+    DisplayCardStyleConfig
+  >;
   connectors: Record<"inverterToCo2" | "inverterToFactory" | "solarToInverter", SolarDisplayRect>;
   flowNodes: Record<"co2" | "factory" | "inverter" | "solar", SolarDisplayRect>;
   heroContainer: SolarDisplayRect;
@@ -66,6 +75,13 @@ export function createSolarDisplayPageSeedConfig(
   iconAssetSources: SolarIconAssetSources = defaultSolarIconAssetSources
 ): SolarDisplayPageConfig {
   return {
+    cardStyles: {
+      co2: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
+      efficiency: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
+      generation: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
+      selfConsumption: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
+      totalCo2: createDisplayCardStyleConfig({ valueRowAlign: "center" })
+    },
     connectors: {
       inverterToCo2: { ...solarConnectorLayout.inverterToCo2 },
       inverterToFactory: { ...solarConnectorLayout.inverterToFactory },
@@ -280,6 +296,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: key,
+        path: ["cardStyles", key]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]

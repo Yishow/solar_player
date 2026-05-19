@@ -85,24 +85,14 @@
 
 .overview-summary {
   z-index: 11;
-  display: flex;
-  flex-direction: column;
   gap: 6px;
-  padding: 14px 18px;
-  border-radius: 18px;
   border: 1px solid rgba(90, 121, 72, 0.14);
   background: rgba(255, 253, 247, 0.9);
   box-shadow: 0 10px 22px rgba(66, 73, 57, 0.08);
-}
-
-.overview-summary .display-card-title {
-  color: #5e675f;
-  font-family: var(--font-family-en);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
+  --display-card-title-color: #5e675f;
+  --display-card-title-font-family: var(--font-family-en);
+  --display-card-title-letter-spacing: 0.08em;
+  --display-card-title-transform: uppercase;
 }
 
 .overview-summary-body {
@@ -128,14 +118,10 @@
   --display-card-title-color: #2f3530;
   --display-card-subtitle-color: #687068;
   --display-card-value-color: #4f6745;
-  --display-card-value-size: 72px;
   --display-card-unit-color: #525851;
-  --display-card-unit-size: 18px;
   border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 26px;
   background: rgba(255, 253, 247, 0.96);
   box-shadow: 0 10px 24px rgba(66, 73, 57, 0.1);
-  padding: 20px 22px 18px;
   overflow: hidden;
 }
 

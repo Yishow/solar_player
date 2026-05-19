@@ -7,6 +7,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
+import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -308,9 +309,11 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
       {kpiCardOrder.map((cardItem, index) => {
         const metric = viewModel.kpis[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
+        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
 
         return (
           <DisplayCardFrame
+            cardStyle={cardStyle}
             key={metric.label}
             className="solar-kpi-card"
             surface="metric"
@@ -331,7 +334,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
               subtitle={cardItem.englishLabel}
               title={metric.label}
             />
-            <DisplayCardValueRow align="center" unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
             <DisplayCardFooter>
               <p className="solar-kpi-helper">{metric.helper}</p>
             </DisplayCardFooter>

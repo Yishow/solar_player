@@ -15,6 +15,7 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.mainStage/);
   assert.match(imagesSource, /resolveDisplayPageMediaSource\(\s*resolvedConfig\.mainStage,\s*seedConfig\.mainStage\.src\s*\)/);
   assert.match(imagesSource, /resolvedConfig\.infoPanel/);
+  assert.match(imagesSource, /resolvedConfig\.cardStyles\.infoPanel/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.left/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.right/);
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);

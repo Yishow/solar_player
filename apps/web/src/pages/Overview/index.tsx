@@ -17,6 +17,7 @@ import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -112,11 +113,8 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
-  const summaryLayout = withContentOffset({
-    left: 88,
-    top: 430,
-    width: 520
-  });
+  const summaryLayout = withContentOffset(resolvedConfig.summaryCard);
+  const summaryCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.summary);
 
   return (
     <section className="overview-display-page">
@@ -178,6 +176,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
       </figure>
 
       <DisplayCardFrame
+        cardStyle={summaryCardStyle}
         className={[
           "overview-summary",
           `overview-summary-${viewModel.summary.alertTone}`
@@ -196,9 +195,11 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
+        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
 
         return (
           <DisplayCardFrame
+            cardStyle={cardStyle}
             key={metric.label}
             className="overview-kpi-card"
             surface="metric"
@@ -223,7 +224,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
               subtitle={cardItem.englishLabel}
               title={metric.label}
             />
-            <DisplayCardValueRow align="center" unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
             <DisplayCardFooter>
               <Sparkline className="overview-kpi-sparkline" values={trendSeries} />
             </DisplayCardFooter>

@@ -15,6 +15,7 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
   assert.match(sustainabilitySource, /resolvedConfig\.kpiCards\[/);
   assert.match(sustainabilitySource, /resolvedConfig\.statCards\[/);
+  assert.match(sustainabilitySource, /resolvedConfig\.cardStyles\[/);
   assert.match(sustainabilitySource, /DisplayCardFrame/);
   assert.match(sustainabilitySource, /DisplayCardValueRow/);
 });

@@ -4,6 +4,14 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DisplayEditorFieldSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  createOverviewDisplayPageSeedConfig,
+  overviewDisplayPageEditorRegions
+} from "../Overview/displayPageConfig";
+import {
+  createSolarDisplayPageSeedConfig,
+  solarDisplayPageEditorRegions
+} from "../Solar/displayPageConfig";
+import {
   DisplayEditorInspectorFields,
   resolveDisplayEditorRegions,
   resolveDisplayEditorFieldIssues,
@@ -337,4 +345,46 @@ test("display editor inspector surfaces validation issues for invalid icon sourc
   assert.deepEqual(resolveDisplayEditorFieldIssues(invalidField), [
     "Sustainability Icon 的值與可用選項不相容。"
   ]);
+});
+
+test("display editor inspector resolves persisted card-style controls for eligible shared-card regions", () => {
+  const overviewConfig = createOverviewDisplayPageSeedConfig("/overview-hero.png");
+  const solarConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const [overviewSummary] = resolveDisplayEditorRegions(
+    overviewConfig as unknown as Record<string, unknown>,
+    overviewDisplayPageEditorRegions.filter((region) => region.id === "overview-summary"),
+    overviewConfig as unknown as Record<string, unknown>
+  );
+  const [solarGeneration] = resolveDisplayEditorRegions(
+    solarConfig as unknown as Record<string, unknown>,
+    solarDisplayPageEditorRegions.filter((region) => region.id === "solar-kpi-generation"),
+    solarConfig as unknown as Record<string, unknown>
+  );
+
+  assert.deepEqual(
+    overviewSummary?.fields
+      .filter((field) => field.schema.id.startsWith("overview-summary-card-"))
+      .map((field) => field.schema.label),
+    [
+      "Title Font Size",
+      "Subtitle Font Size",
+      "Value Font Size",
+      "Unit Font Size",
+      "Padding Top",
+      "Padding Right",
+      "Padding Bottom",
+      "Padding Left",
+      "Corner Radius",
+      "Header Gap",
+      "Icon Box Size",
+      "Footer Padding Top",
+      "Value Margin Top",
+      "Unit Padding Bottom",
+      "Value Row Align"
+    ]
+  );
+  assert.equal(
+    solarGeneration?.fields.some((field) => field.path.join(".") === "cardStyles.generation.valueRowAlign"),
+    true
+  );
 });

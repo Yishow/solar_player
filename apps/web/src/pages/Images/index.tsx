@@ -13,6 +13,7 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -110,6 +111,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   const counterLayout = withContentOffset(imagesCounterLayout);
   const mainLayout = withContentOffset(resolvedConfig.mainStage);
   const infoLayout = withContentOffset(resolvedConfig.infoPanel);
+  const infoCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.infoPanel);
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
 
   return (
@@ -208,6 +210,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
       </figure>
 
       <DisplayCardFrame
+        cardStyle={infoCardStyle}
         className="images-info-card"
         surface="info"
         style={{

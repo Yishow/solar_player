@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayCardStyleFields,
+  createDisplayCardStyleConfig,
+  type DisplayCardStyleConfig
+} from "../shared/displayCardStyleConfig";
+import {
   buildDisplayPageIconSourceFields,
   createReferenceGlyphIconSource,
   type DisplayPageIconSource
@@ -23,6 +28,7 @@ export type ImagesDisplayRect = {
 
 export type ImagesDisplayPageConfig = {
   arrows: Record<"left" | "right", ImagesDisplayRect>;
+  cardStyles: Record<"infoPanel", DisplayCardStyleConfig>;
   hero: {
     copyLines: [string, string, string];
     eyebrow: string;
@@ -64,6 +70,17 @@ export function createImagesDisplayPageSeedConfig(
         top: imagesArrowLayout.right.top,
         width: 64
       }
+    },
+    cardStyles: {
+      infoPanel: createDisplayCardStyleConfig({
+        cornerRadius: 22,
+        footerPaddingTop: 16,
+        paddingBottom: 30,
+        paddingLeft: 30,
+        paddingRight: 30,
+        paddingTop: 34,
+        titleFontSize: 28
+      })
     },
     hero: {
       copyLines: [
@@ -246,6 +263,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["infoPanel", "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: "info-panel",
+        path: ["cardStyles", "infoPanel"]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: "info-panel",
         path: ["iconSources", "infoPanel"]
