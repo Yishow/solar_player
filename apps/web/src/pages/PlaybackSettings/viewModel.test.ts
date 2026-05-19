@@ -141,6 +141,7 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
+        pageKey: "overview",
         route: "/overview"
       },
       {
@@ -149,6 +150,7 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Solar",
         labelZh: "太陽能",
         orderLabel: "02",
+        pageKey: "solar",
         route: "/solar"
       }
     ]
@@ -162,6 +164,7 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
+        pageKey: "overview",
         route: "/overview"
       }
     ]

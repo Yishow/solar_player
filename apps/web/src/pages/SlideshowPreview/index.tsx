@@ -12,10 +12,11 @@ import {
   IconTransition
 } from "../../components/icons";
 import { usePageRotation } from "../../hooks/usePageRotation";
-import { slideshowPreviewAssetRuntimeMap } from "./assets";
-import { slideshowCardOffsets, slideshowLayout } from "./layout";
+import { slideshowLayout } from "./layout";
 import "./preview.css";
 import { buildSlideshowPreviewViewModel } from "./viewModel";
+import { LiveSlideshowPreviewCards } from "./LiveSlideshowPreviewCards";
+import { useLiveDisplayPagePreviewCatalog } from "../shared/useLiveDisplayPagePreviewCatalog";
 
 const summaryIcons = [
   <IconStar key="star" />,
@@ -26,6 +27,7 @@ const summaryIcons = [
 ];
 
 export function SlideshowPreview() {
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog();
   const {
     countdown,
     currentPage,
@@ -161,28 +163,20 @@ export function SlideshowPreview() {
           width: slideshowLayout.carousel.width
         }}
       >
-        {visibleCards.map((card, index) => {
-          const asset =
-            slideshowPreviewAssetRuntimeMap[
-              card.previewAssetKey as keyof typeof slideshowPreviewAssetRuntimeMap
-            ] ?? slideshowPreviewAssetRuntimeMap.fallback;
-          return (
-            <article
-              key={card.id}
-              className={`sp-card${card.isCurrent ? " active" : ""}`}
-              style={{ left: slideshowCardOffsets[index] ?? 0 }}
-            >
-              <span className="sp-card-num">
-                {String(card.displayOrder).padStart(2, "0")}
-              </span>
-              <img alt={card.labelZh} src={asset} />
-              <div className="sp-card-footer">
-                <h3>{card.labelZh}</h3>
-                <p>{card.labelEn}</p>
-              </div>
-            </article>
-          );
-        })}
+        <LiveSlideshowPreviewCards
+          cards={visibleCards.map((card) => ({
+            displayOrder: card.displayOrder,
+            id: card.id,
+            isCurrent: card.isCurrent,
+            labelEn: card.labelEn,
+            labelZh: card.labelZh,
+            pageKey: card.pageKey,
+            routeLabel: card.routeLabel,
+            statusLabel: card.statusLabel
+          }))}
+          definitions={livePreviewCatalog.definitions}
+          states={livePreviewCatalog.states}
+        />
         <button type="button" className="sp-arrow prev" onClick={prevPage} aria-label="上一張">
           <IconCaretLeft size={28} />
         </button>

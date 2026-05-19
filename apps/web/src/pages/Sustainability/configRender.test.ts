@@ -32,9 +32,9 @@ test("sustainability display page seed config captures the current hero and high
 });
 
 test("sustainability runtime resolves the shared story adapter and clears back to fallback data on request failure", () => {
-  assert.match(sustainabilitySource, /fetchSustainabilityStory\(selectedPeriod\)/);
-  assert.match(sustainabilitySource, /setStoryData\(res\.story\)/);
-  assert.match(sustainabilitySource, /story:\s*storyData \?\? undefined/);
-  assert.match(sustainabilitySource, /catch\(\(\) => \{/);
-  assert.match(sustainabilitySource, /setStoryData\(null\)/);
+  assert.match(sustainabilitySource, /useSustainabilityStoryRuntime\(selectedPeriod/);
+  assert.match(sustainabilitySource, /enabled: runtimeHydrationEnabled/);
+  assert.match(sustainabilitySource, /story:\s*storyRuntime\.payload \?\? undefined/);
+  assert.match(sustainabilitySource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
+  assert.match(sustainabilitySource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
 });

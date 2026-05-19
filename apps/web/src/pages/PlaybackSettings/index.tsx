@@ -18,22 +18,11 @@ import { Switch } from "../../components/management";
 import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
-
-import slideOverview from "../../assets/playback/slide-overview.jpg";
-import slideSolar from "../../assets/playback/slide-solar.jpg";
-import slideCircuit from "../../assets/playback/slide-circuit.jpg";
-import slideImages from "../../assets/playback/slide-images.jpg";
-import slideSustainability from "../../assets/playback/slide-sustainability.jpg";
-
-const PAGE_THUMBNAILS: Record<string, string> = {
-  "/overview": slideOverview,
-  "/solar": slideSolar,
-  "/factory-circuit": slideCircuit,
-  "/images": slideImages,
-  "/sustainability": slideSustainability
-};
+import { LiveRotationPreviewList } from "./LiveRotationPreviewList";
+import { useLiveDisplayPagePreviewCatalog } from "../shared/useLiveDisplayPagePreviewCatalog";
 
 export function PlaybackSettings() {
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog();
   const [settings, setSettings] = useState<PlaybackSettings | null>(null);
   const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(null);
   const [pages, setPages] = useState<PlaybackPage[]>([]);
@@ -255,35 +244,23 @@ export function PlaybackSettings() {
           目前配置輪播鏈 <small>/ Configured Rotation Preview</small>
         </div>
         <div className="ps-preview__list">
-          {viewModel.rotationPreviewRows.map((page, index, arr) => (
-            <div key={page.id} style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div className="ps-preview__item">
-                <img src={PAGE_THUMBNAILS[page.route]} alt={page.labelZh} className="ps-preview__item-thumb" />
-                <div className="ps-preview__label">
-                  <span className="ps-badge-number">{index + 1}</span> {page.labelEn}
-                  <small style={{ display: "block", opacity: 0.72 }}>{page.durationLabel}</small>
-                </div>
-              </div>
-              {index < arr.length - 1 && <div className="ps-preview__arrow">&gt;</div>}
-            </div>
-          ))}
+          <LiveRotationPreviewList
+            definitions={livePreviewCatalog.definitions}
+            rows={viewModel.rotationPreviewRows}
+            states={livePreviewCatalog.states}
+          />
         </div>
         <div className="ps-preview__title" style={{ marginTop: "20px" }}>
           正式生效輪播鏈 <small>/ Effective Runtime Rotation</small>
         </div>
         <div className="ps-preview__list">
-          {viewModel.effectiveRotationRows.length > 0 ? viewModel.effectiveRotationRows.map((page, index, arr) => (
-            <div key={`effective-${page.id}`} style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div className="ps-preview__item">
-                <img src={PAGE_THUMBNAILS[page.route]} alt={page.labelZh} className="ps-preview__item-thumb" />
-                <div className="ps-preview__label">
-                  <span className="ps-badge-number">{index + 1}</span> {page.labelEn}
-                  <small style={{ display: "block", opacity: 0.72 }}>{page.durationLabel}</small>
-                </div>
-              </div>
-              {index < arr.length - 1 && <div className="ps-preview__arrow">&gt;</div>}
-            </div>
-          )) : (
+          {viewModel.effectiveRotationRows.length > 0 ? (
+            <LiveRotationPreviewList
+              definitions={livePreviewCatalog.definitions}
+              rows={viewModel.effectiveRotationRows}
+              states={livePreviewCatalog.states}
+            />
+          ) : (
             <div className="mgmt-status">
               目前沒有可播放頁面。
               {rotationPreview?.fallbackRoute ? (

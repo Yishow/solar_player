@@ -19,6 +19,13 @@ test("playback settings keeps save and resync actions wired to the playback APIs
   assert.match(playbackSettingsSource, /正式生效輪播鏈/);
 });
 
+test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
+  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\)/);
+  assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
+  assert.doesNotMatch(playbackSettingsSource, /slideOverview/);
+  assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
+});
+
 test("playback settings does not expose an enabled add-page button without backend support", () => {
   assert.match(playbackSettingsSource, /className="ps-add-btn"/);
   assert.match(playbackSettingsSource, /disabled/);

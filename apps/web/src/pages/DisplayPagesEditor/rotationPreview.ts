@@ -1,8 +1,10 @@
 import type {
+  DisplayPageKey,
   DisplayRotationPreview,
   DisplayRotationSkipReason,
   PlaybackPage
 } from "@solar-display/shared";
+import { isDisplayPageKey } from "@solar-display/shared";
 
 export type RotationPreviewRow = {
   durationLabel: string;
@@ -10,6 +12,7 @@ export type RotationPreviewRow = {
   labelEn: string;
   labelZh: string;
   orderLabel: string;
+  pageKey: DisplayPageKey | null;
   route: string;
 };
 
@@ -25,6 +28,15 @@ function padOrder(value: number) {
   return value.toString().padStart(2, "0");
 }
 
+function resolvePreviewPageKey(page: PlaybackPage): DisplayPageKey | null {
+  if (isDisplayPageKey(page.pageKey)) {
+    return page.pageKey;
+  }
+
+  const routeKey = page.route.replace(/^\//, "");
+  return isDisplayPageKey(routeKey) ? routeKey : null;
+}
+
 export function buildRotationPreviewRows(pages: PlaybackPage[]): RotationPreviewRow[] {
   return pages
     .slice()
@@ -36,6 +48,7 @@ export function buildRotationPreviewRows(pages: PlaybackPage[]): RotationPreview
       labelEn: page.labelEn,
       labelZh: page.labelZh,
       orderLabel: padOrder(page.displayOrder),
+      pageKey: resolvePreviewPageKey(page),
       route: page.route
     }));
 }
