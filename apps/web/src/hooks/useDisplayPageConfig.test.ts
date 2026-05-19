@@ -6,6 +6,7 @@ import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConf
 import {
   mergeDisplayPageConfig,
   shouldHydrateDisplayPageSession,
+  shouldDeferDisplayPageRuntimeRender,
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage
@@ -92,6 +93,54 @@ test("display page runtime previews skip draft-session hydration when persistenc
   assert.equal(shouldHydrateDisplayPageSession(false, true), false);
   assert.equal(shouldHydrateDisplayPageSession(true, true), false);
   assert.equal(shouldHydrateDisplayPageSession(true, false), true);
+});
+
+test("live runtime pages defer first render until persisted config hydration completes", () => {
+  assert.equal(
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled: true,
+      isLoading: true,
+      lastLoadedEnvelope: null,
+      stage: "live"
+    }),
+    true
+  );
+  assert.equal(
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled: true,
+      isLoading: false,
+      lastLoadedEnvelope: null,
+      stage: "live"
+    }),
+    false
+  );
+  assert.equal(
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled: true,
+      isLoading: true,
+      lastLoadedEnvelope: {
+        fallbackPolicy: defaultFallbackPolicy,
+        pageId: "overview",
+        publishedAt: null,
+        publishedBy: null,
+        regions: {},
+        stage: "live",
+        updatedAt: "2026-05-19T08:00:00.000Z",
+        version: 3
+      },
+      stage: "live"
+    }),
+    false
+  );
+  assert.equal(
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled: true,
+      isLoading: true,
+      lastLoadedEnvelope: null,
+      stage: "draft"
+    }),
+    false
+  );
 });
 
 test("resolveDisplayPageConfigStagePath targets the live publishing channel for runtime reads", () => {

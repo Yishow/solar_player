@@ -3,10 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
-import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import {
+  shouldDeferDisplayPageRuntimeRender,
+  useDisplayPageConfig
+} from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import { requestJson, fetchDisplayStory, type DisplayStoryPayload } from "../../services/api";
+import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
@@ -176,10 +180,12 @@ const loadRowOrder = [
 export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, snapshot } = useLiveMetrics();
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
   const runtimeConfig = useDisplayPageConfig("factory-circuit", seedConfig, {
-    enabled: config === undefined,
-    stage: "live"
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
   });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
@@ -235,6 +241,18 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
     };
   }, []);
 
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return null;
+  }
+
+  const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildFactoryCircuitViewModel({
     circuits,
     connectionState,
@@ -242,7 +260,6 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
     snapshot,
     factoryCircuitStory: factoryStoryData ?? undefined
   });
-  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
@@ -252,6 +269,7 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
 
   return (
     <section className="factory-circuit-display-page">
+      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
       <section
         className="factory-circuit-title"
         style={{

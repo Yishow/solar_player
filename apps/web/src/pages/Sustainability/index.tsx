@@ -6,11 +6,15 @@ import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
-import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import {
+  shouldDeferDisplayPageRuntimeRender,
+  useDisplayPageConfig
+} from "../../hooks/useDisplayPageConfig";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
 import { fetchSustainabilityStory } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import {
   createSustainabilityDisplayPageSeedConfig,
   type SustainabilityDisplayPageConfig
@@ -118,13 +122,15 @@ function SustainabilityGlyph({
 
 export function Sustainability({ config }: { config?: SustainabilityDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
   const seedConfig = useMemo(
     () => createSustainabilityDisplayPageSeedConfig(sustainabilityAssetMap.hero.src),
     []
   );
   const runtimeConfig = useDisplayPageConfig("sustainability", seedConfig, {
-    enabled: config === undefined,
-    stage: "live"
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
   });
   const [selectedPeriod, setSelectedPeriod] = useState<SustainabilityPeriodKey>("lifetime");
   const [storyData, setStoryData] = useState<SustainabilityStoryInput | null>(null);
@@ -149,13 +155,24 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     };
   }, [selectedPeriod]);
 
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return null;
+  }
+
+  const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
     selectedPeriod,
     story: storyData ?? undefined,
     summary: sustainabilitySummary
   });
-  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
@@ -164,6 +181,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
 
   return (
     <section className="sustainability-display-page">
+      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
       <section
         className="sustainability-title"
         style={{

@@ -76,6 +76,15 @@ export function shouldHydrateDisplayPageSession(enabled: boolean, hasSession: bo
   return enabled && !hasSession;
 }
 
+export function shouldDeferDisplayPageRuntimeRender(args: {
+  runtimeHydrationEnabled: boolean;
+  isLoading: boolean;
+  lastLoadedEnvelope: DisplayPageConfigEnvelope | null;
+  stage: ConfigStage;
+}) {
+  return args.runtimeHydrationEnabled && args.stage === "live" && args.isLoading && args.lastLoadedEnvelope === null;
+}
+
 function resolveLoadMessage(stage: ConfigStage, envelope: DisplayPageConfigEnvelope) {
   if (envelope.updatedAt) {
     return stage === "live" ? "正式展示頁設定已同步。" : "展示頁設定已同步。";

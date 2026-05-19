@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
-import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import {
+  shouldDeferDisplayPageRuntimeRender,
+  useDisplayPageConfig
+} from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
 import {
@@ -10,6 +13,7 @@ import {
   type DisplayStoryPayload
 } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
@@ -58,13 +62,15 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
   const [storyData, setStoryData] = useState<DisplayStoryPayload["overview"] | null>(null);
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
   const seedConfig = useMemo(
     () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
     []
   );
   const runtimeConfig = useDisplayPageConfig("overview", seedConfig, {
-    enabled: config === undefined,
-    stage: "live"
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
   });
 
   useEffect(() => {
@@ -87,13 +93,24 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     };
   }, []);
 
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return null;
+  }
+
+  const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildOverviewViewModel({
     connectionState,
     isSocketConnected,
     snapshot,
     storyOverview: storyData ?? undefined
   });
-  const resolvedConfig = config ?? runtimeConfig.config;
 
   const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -107,6 +124,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
 
   return (
     <section className="overview-display-page">
+      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
       <div
         className="overview-leaf-watermark"
         style={{

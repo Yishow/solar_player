@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
-import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import {
+  shouldDeferDisplayPageRuntimeRender,
+  useDisplayPageConfig
+} from "../../hooks/useDisplayPageConfig";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
   fetchDisplayStory,
@@ -12,6 +15,7 @@ import {
   createSolarDisplayPageSeedConfig,
   type SolarDisplayPageConfig
 } from "./displayPageConfig";
+import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import {
   solarTitleLayout
 } from "./layout";
@@ -109,10 +113,12 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
   const [solarStoryData, setSolarStoryData] = useState<DisplayStoryPayload["solar"] | null>(null);
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
   const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
-    enabled: config === undefined,
-    stage: "live"
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
   });
 
   useEffect(() => {
@@ -135,12 +141,23 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
     };
   }, []);
 
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return null;
+  }
+
+  const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildSolarViewModel({
     isSocketConnected,
     snapshot,
     solarStory: solarStoryData ?? undefined
   });
-  const resolvedConfig = config ?? runtimeConfig.config;
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
 
   const titleLayout = withContentOffset(solarTitleLayout);
@@ -159,6 +176,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
 
   return (
     <section className="solar-display-page">
+      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
       <div
         className="solar-leaf-watermark"
         style={{

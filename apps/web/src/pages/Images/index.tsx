@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { useBodyClass } from "../../hooks/useBodyClass";
-import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import {
+  shouldDeferDisplayPageRuntimeRender,
+  useDisplayPageConfig
+} from "../../hooks/useDisplayPageConfig";
 import { fetchImagePlaylist } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import { imagesAssetRuntimeMap } from "./assets";
 import {
   createImagesDisplayPageSeedConfig,
@@ -44,13 +48,15 @@ function splitImagesTitle(title: string) {
 
 export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   useBodyClass("page-hero-shell");
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
   const seedConfig = useMemo(
     () => createImagesDisplayPageSeedConfig(imagesAssetRuntimeMap.main),
     []
   );
   const runtimeConfig = useDisplayPageConfig("images", seedConfig, {
-    enabled: config === undefined,
-    stage: "live"
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const [playlistData, setPlaylistData] = useState<{
@@ -78,6 +84,17 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     };
   }, [activeIndex]);
 
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return null;
+  }
+
   const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildImagesViewModel({
     activeEntry: playlistData?.activeEntry ?? null,
@@ -99,6 +116,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
 
   return (
     <section className="images-display-page">
+      <RuntimeConfigFallbackBanner errorMessage={runtimeHydrationEnabled ? runtimeConfig.errorMessage : ""} />
       <section
         className="images-title-group"
         style={{
