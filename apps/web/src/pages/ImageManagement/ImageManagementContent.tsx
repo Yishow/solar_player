@@ -3,7 +3,7 @@ import type {
   DisplayPageAssetHealthReport,
   ImageAsset
 } from "@solar-display/shared";
-import type { ChangeEvent, RefObject } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
 import { Switch } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import {
@@ -62,6 +62,7 @@ type ImageManagementContentProps = {
     capturedAt: string;
     tags: string[];
   }>;
+  remoteSyncBanner: ReactNode;
   resyncLibrary: () => Promise<void>;
   selectedImageId: number | null;
   setSelectedImageId: (value: number) => void;
@@ -116,6 +117,7 @@ export function ImageManagementContent({
   isUploading,
   message,
   playlistEntries,
+  remoteSyncBanner,
   resyncLibrary,
   selectedImageId,
   setSelectedImageId,
@@ -184,6 +186,8 @@ export function ImageManagementContent({
           </>
         ) : null}
       </div>
+
+      {remoteSyncBanner}
 
       <section className="settings-card im-card-library">
         <div className="settings-card__title">

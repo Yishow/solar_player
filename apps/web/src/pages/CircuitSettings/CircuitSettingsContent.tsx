@@ -1,4 +1,5 @@
 import { displayCircuitSlotKeys, type CircuitConfig, type DisplayReadinessReport } from "@solar-display/shared";
+import type { ReactNode } from "react";
 import { Switch } from "../../components/management";
 import { DisplayReadinessPanel } from "../../components/DisplayReadinessPanel";
 import { buildCircuitSettingsViewModel } from "./viewModel";
@@ -18,6 +19,7 @@ type CircuitSettingsContentProps = {
   readiness: DisplayReadinessReport | null;
   readinessErrorMessage: string;
   readinessLoading: boolean;
+  remoteSyncBanner: ReactNode;
   saveAll: () => Promise<void>;
   viewModel: ReturnType<typeof buildCircuitSettingsViewModel>;
 };
@@ -62,6 +64,7 @@ export function CircuitSettingsContent({
   readiness,
   readinessErrorMessage,
   readinessLoading,
+  remoteSyncBanner,
   saveAll,
   viewModel
 }: CircuitSettingsContentProps) {
@@ -118,6 +121,8 @@ export function CircuitSettingsContent({
           </>
         ) : null}
       </div>
+
+      {remoteSyncBanner}
 
       <section className="settings-card cs-card">
         <div className="settings-card__title">

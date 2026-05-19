@@ -1,4 +1,5 @@
 import type { DisplayReadinessReport } from "@solar-display/shared";
+import type { ReactNode } from "react";
 import { DisplayReadinessPanel } from "../../components/DisplayReadinessPanel";
 import type {
   ActionState,
@@ -38,6 +39,7 @@ type MqttSettingsContentProps = {
   readinessErrorMessage: string;
   removeTopicMapping: (rowId: number) => void;
   reloadTopics: () => Promise<void>;
+  remoteSyncBanner: ReactNode;
   saveSettings: () => Promise<void>;
   saveTopicMappings: () => Promise<void>;
   settings: MqttSettingsForm;
@@ -79,6 +81,8 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
         {viewModel.actions.saveSettingsLabel}
         <small>Save Settings</small>
       </button>
+
+      {props.remoteSyncBanner}
 
       <section className="settings-card mqtt-mode">
         <div className="settings-card__title">資料來源模式<small>Data Mode</small></div>

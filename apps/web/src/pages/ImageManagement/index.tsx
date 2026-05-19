@@ -1,6 +1,11 @@
 import type { ImageAsset } from "@solar-display/shared";
 import type { ChangeEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
+import {
+  hasDisplaySyncDraftChanges,
+  useDisplaySyncDraftGuard
+} from "../../hooks/displaySyncDraftGuard";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { useImageAssetReferences } from "../../hooks/useImageAssetReferences";
@@ -53,6 +58,7 @@ function normalizeManagementPlaylistEntry(entry: Awaited<ReturnType<typeof fetch
 
 export function ImageManagement() {
   const [assets, setAssets] = useState<ImageAsset[]>([]);
+  const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>([]);
   const [storageUsage, setStorageUsage] = useState<ImageStorageUsage>(initialStorageUsage);
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +69,7 @@ export function ImageManagement() {
   const [message, setMessage] = useState("正在同步圖片庫...");
   const [errorMessage, setErrorMessage] = useState("");
   const [playlistEntries, setPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
+  const [lastSyncedPlaylistEntries, setLastSyncedPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
@@ -83,9 +90,12 @@ export function ImageManagement() {
       getImageStorageUsage(),
       fetchImagePlaylistGovernance()
     ]);
+    const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
     setAssets(nextAssets);
+    setLastSyncedAssets(nextAssets);
     setStorageUsage(nextStorageUsage);
-    setPlaylistEntries(playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry));
+    setPlaylistEntries(nextPlaylistEntries);
+    setLastSyncedPlaylistEntries(nextPlaylistEntries);
     setSelectedImageId((currentSelected) => {
       const candidateId = preferredImageId ?? currentSelected;
       if (candidateId !== null && nextAssets.some((asset) => asset.id === candidateId)) {
@@ -106,9 +116,12 @@ export function ImageManagement() {
           fetchImagePlaylistGovernance()
         ]);
         if (!active) return;
+        const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
         setAssets(nextAssets);
+        setLastSyncedAssets(nextAssets);
         setStorageUsage(nextStorageUsage);
-        setPlaylistEntries(playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry));
+        setPlaylistEntries(nextPlaylistEntries);
+        setLastSyncedPlaylistEntries(nextPlaylistEntries);
         setSelectedImageId(nextAssets[0]?.id ?? null);
         setMessage("圖片庫已同步。");
         setErrorMessage("");
@@ -124,14 +137,6 @@ export function ImageManagement() {
       active = false;
     };
   }, []);
-
-  useDisplaySyncRefresh(() => {
-    void syncImages().catch((error) => {
-      setErrorMessage(error instanceof Error ? error.message : "同步圖片庫失敗。");
-    });
-    void reloadAssetHealth();
-    void reloadAssetReferences();
-  });
 
   const markDirty = () => {
     setMessage("圖片設定已變更，尚未儲存。");
@@ -292,21 +297,39 @@ export function ImageManagement() {
     }
   };
 
+  const reloadImageManagement = async () => {
+    await syncImages();
+    await reloadAssetHealth();
+    await reloadAssetReferences();
+    setMessage("圖片庫已同步。");
+    setErrorMessage("");
+  };
+
   const resyncLibrary = async () => {
     setIsLoading(true);
     setMessage("正在同步圖片庫...");
     setErrorMessage("");
     try {
-      await syncImages();
-      await reloadAssetHealth();
-      await reloadAssetReferences();
-      setMessage("圖片庫已同步。");
+      await reloadImageManagement();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "同步圖片庫失敗。");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const isDirty = useMemo(
+    () =>
+      hasDisplaySyncDraftChanges(assets, lastSyncedAssets)
+      || hasDisplaySyncDraftChanges(playlistEntries, lastSyncedPlaylistEntries),
+    [assets, lastSyncedAssets, lastSyncedPlaylistEntries, playlistEntries]
+  );
+  const syncDraftGuard = useDisplaySyncDraftGuard({
+    isDirty: isDirty,
+    reloadNow: reloadImageManagement
+  });
+
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
 
   return (
     <ImageManagementContent
@@ -333,6 +356,14 @@ export function ImageManagement() {
       isUploading={isUploading}
       message={message}
       playlistEntries={playlistEntries}
+      remoteSyncBanner={
+        syncDraftGuard.hasPendingRemoteChange ? (
+          <RemoteSyncBanner
+            onKeepEditing={syncDraftGuard.keepEditing}
+            onReloadNow={() => syncDraftGuard.discardAndReload().catch(() => {})}
+          />
+        ) : null
+      }
       resyncLibrary={resyncLibrary}
       selectedImageId={selectedImageId}
       setSelectedImageId={setSelectedImageId}

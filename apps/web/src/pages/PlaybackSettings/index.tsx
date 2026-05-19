@@ -1,5 +1,10 @@
 import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
+import {
+  hasDisplaySyncDraftChanges,
+  useDisplaySyncDraftGuard
+} from "../../hooks/displaySyncDraftGuard";
 import { useDisplayOpsSummary } from "../../hooks/useDisplayOpsSummary";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
@@ -30,7 +35,9 @@ const PAGE_THUMBNAILS: Record<string, string> = {
 
 export function PlaybackSettings() {
   const [settings, setSettings] = useState<PlaybackSettings | null>(null);
+  const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(null);
   const [pages, setPages] = useState<PlaybackPage[]>([]);
+  const [lastSyncedPages, setLastSyncedPages] = useState<PlaybackPage[]>([]);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +61,9 @@ export function PlaybackSettings() {
         ]);
         if (!active) return;
         setSettings(nextSettings);
+        setLastSyncedSettings(nextSettings);
         setPages(nextPages);
+        setLastSyncedPages(nextPages);
         setRotationPreview(nextRotationPreview);
         setMessage("播放設定已同步。");
         setErrorMessage("");
@@ -70,11 +79,6 @@ export function PlaybackSettings() {
       active = false;
     };
   }, []);
-
-  useDisplaySyncRefresh(() => {
-    void resyncPlaybackConfig();
-    void reloadDisplayOpsSummary();
-  });
 
   const markDirty = () => {
     setMessage("設定已變更，尚未儲存。");
@@ -107,7 +111,9 @@ export function PlaybackSettings() {
       const nextRotationPreview = await getDisplayRotationPreview();
       await reloadDisplayOpsSummary();
       setSettings(savedSettings);
+      setLastSyncedSettings(savedSettings);
       setPages(savedPages);
+      setLastSyncedPages(savedPages);
       setRotationPreview(nextRotationPreview);
       setMessage("播放設定已儲存。");
       setErrorMessage("");
@@ -131,15 +137,32 @@ export function PlaybackSettings() {
       ]);
       await reloadDisplayOpsSummary();
       setSettings(nextSettings);
+      setLastSyncedSettings(nextSettings);
       setPages(nextPages);
+      setLastSyncedPages(nextPages);
       setRotationPreview(nextRotationPreview);
       setMessage("播放設定已同步。");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "重新同步播放設定失敗。");
+      const nextError = error instanceof Error ? error : new Error("重新同步播放設定失敗。");
+      setErrorMessage(nextError.message);
+      throw nextError;
     } finally {
       setIsLoading(false);
     }
   };
+
+  const isDirty = useMemo(
+    () =>
+      hasDisplaySyncDraftChanges(settings, lastSyncedSettings)
+      || hasDisplaySyncDraftChanges(pages, lastSyncedPages),
+    [lastSyncedPages, lastSyncedSettings, pages, settings]
+  );
+  const syncDraftGuard = useDisplaySyncDraftGuard({
+    isDirty: isDirty,
+    reloadNow: resyncPlaybackConfig
+  });
+
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
 
   const viewModel = buildPlaybackSettingsViewModel({
     errorMessage,
@@ -177,7 +200,9 @@ export function PlaybackSettings() {
           type="button"
           className="mgmt-action ps-resync"
           disabled={isLoading}
-          onClick={() => void resyncPlaybackConfig()}
+          onClick={() => {
+            void resyncPlaybackConfig().catch(() => {});
+          }}
         >
           重新同步
           <small>Resync</small>
@@ -210,6 +235,13 @@ export function PlaybackSettings() {
           </>
         ) : null}
       </div>
+
+      {syncDraftGuard.hasPendingRemoteChange ? (
+        <RemoteSyncBanner
+          onKeepEditing={syncDraftGuard.keepEditing}
+          onReloadNow={() => syncDraftGuard.discardAndReload().catch(() => {})}
+        />
+      ) : null}
 
       <div className={`mgmt-status ${viewModel.displayOpsBanner.tone === "error" ? "is-error" : ""}`} role="status">
         {displayOpsErrorMessage || viewModel.displayOpsBanner.title}

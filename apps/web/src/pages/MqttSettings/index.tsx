@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
+import {
+  hasDisplaySyncDraftChanges,
+  useDisplaySyncDraftGuard
+} from "../../hooks/displaySyncDraftGuard";
 import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { requestJson } from "../../services/api";
@@ -96,12 +101,14 @@ function createEmptyMapping(metricKey: string): TopicMapping {
 
 export function MqttSettings() {
   const [settings, setSettings] = useState<MqttSettingsForm>(defaultFormState);
+  const [lastSyncedSettings, setLastSyncedSettings] = useState<MqttSettingsForm>(defaultFormState);
   const [status, setStatus] = useState<MqttStatus>({
     broker: "",
     clientId: "",
     connected: false
   });
   const [topics, setTopics] = useState<TopicMapping[]>([]);
+  const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>([]);
   const [lastConnectionTest, setLastConnectionTest] = useState<ConnectionTestFeedback>(null);
   const [message, setMessage] = useState("正在載入 MQTT 設定...");
   const [errorMessage, setErrorMessage] = useState("");
@@ -131,37 +138,54 @@ export function MqttSettings() {
     setErrorMessage("");
   };
 
-  const loadSettings = async () => {
+  const loadSettings = async ({ propagateError = false }: { propagateError?: boolean } = {}) => {
     setActionState((current) => ({ ...current, isLoadingSettings: true }));
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt");
-      setSettings(toFormState(response.settings));
+      const nextSettings = toFormState(response.settings);
+      setSettings(nextSettings);
+      setLastSyncedSettings(nextSettings);
       setStatus(response.status);
       setLastConnectionTest(null);
       setMessage("MQTT 設定已同步。");
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "載入 MQTT 設定失敗。");
+      const nextError = error instanceof Error ? error : new Error("載入 MQTT 設定失敗。");
+      setErrorMessage(nextError.message);
+      if (propagateError) {
+        throw nextError;
+      }
     } finally {
       setActionState((current) => ({ ...current, isLoadingSettings: false }));
     }
   };
 
-  const loadTopics = async (isPolling: boolean) => {
+  const loadTopics = async ({
+    isPolling,
+    propagateError = false
+  }: {
+    isPolling: boolean;
+    propagateError?: boolean;
+  }) => {
     if (!isPolling) {
       setActionState((current) => ({ ...current, isLoadingTopics: true }));
     }
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics");
       setTopics(response.topics);
+      setLastSyncedTopics(response.topics);
       if (!isPolling) {
         setLastConnectionTest(null);
         setMessage("Topic mappings 已同步。");
         setErrorMessage("");
       }
     } catch (error) {
+      const nextError = error instanceof Error ? error : new Error("載入 topic mappings 失敗。");
       if (!isPolling) {
-        setErrorMessage(error instanceof Error ? error.message : "載入 topic mappings 失敗。");
+        setErrorMessage(nextError.message);
+      }
+      if (propagateError) {
+        throw nextError;
       }
     } finally {
       if (!isPolling) {
@@ -174,7 +198,7 @@ export function MqttSettings() {
     let active = true;
     const bootstrap = async () => {
       try {
-        await Promise.all([loadSettings(), loadTopics(false)]);
+        await Promise.all([loadSettings(), loadTopics({ isPolling: false })]);
       } catch {
         // individual loaders surface their own errors
       }
@@ -183,7 +207,7 @@ export function MqttSettings() {
 
     const pollTimer = window.setInterval(() => {
       if (active) {
-        void loadTopics(true);
+        void loadTopics({ isPolling: true });
       }
     }, 5000);
 
@@ -192,12 +216,6 @@ export function MqttSettings() {
       window.clearInterval(pollTimer);
     };
   }, []);
-
-  useDisplaySyncRefresh(() => {
-    void loadSettings();
-    void loadTopics(true);
-    void reloadReadiness();
-  });
 
   const handleSettingChange = <Key extends keyof MqttSettingsForm>(
     key: Key,
@@ -225,7 +243,9 @@ export function MqttSettings() {
         body: JSON.stringify(buildSettingsPayload(settings)),
         method: "PUT"
       });
-      setSettings(toFormState(response.settings));
+      const nextSettings = toFormState(response.settings);
+      setSettings(nextSettings);
+      setLastSyncedSettings(nextSettings);
       setStatus(response.status);
       setLastConnectionTest(null);
       setMessage("MQTT broker 設定已儲存並重新連線。");
@@ -277,6 +297,7 @@ export function MqttSettings() {
         method: "PUT"
       });
       setTopics(response.topics);
+      setLastSyncedTopics(response.topics);
       setLastConnectionTest(null);
       setMessage("Topic mappings 已更新並重新載入訂閱。");
       setErrorMessage("");
@@ -295,6 +316,7 @@ export function MqttSettings() {
         method: "POST"
       });
       setTopics(response.topics);
+      setLastSyncedTopics(response.topics);
       setLastConnectionTest(null);
       setMessage("MQTT 訂閱清單已重新載入。");
       setErrorMessage("");
@@ -320,6 +342,25 @@ export function MqttSettings() {
     setTopics((current) => current.filter((topic) => topic.id !== rowId));
   };
 
+  const isDirty = useMemo(
+    () =>
+      hasDisplaySyncDraftChanges(settings, lastSyncedSettings)
+      || hasDisplaySyncDraftChanges(topics, lastSyncedTopics),
+    [lastSyncedSettings, lastSyncedTopics, settings, topics]
+  );
+  const syncDraftGuard = useDisplaySyncDraftGuard({
+    isDirty: isDirty,
+    reloadNow: async () => {
+      await Promise.all([
+        loadSettings({ propagateError: true }),
+        loadTopics({ isPolling: true, propagateError: true }),
+        reloadReadiness()
+      ]);
+    }
+  });
+
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+
   return (
     <MqttSettingsContent
       actionState={actionState}
@@ -332,6 +373,14 @@ export function MqttSettings() {
       readiness={readiness}
       readinessErrorMessage={readinessErrorMessage}
       reloadTopics={reloadTopics}
+      remoteSyncBanner={
+        syncDraftGuard.hasPendingRemoteChange ? (
+          <RemoteSyncBanner
+            onKeepEditing={syncDraftGuard.keepEditing}
+            onReloadNow={() => syncDraftGuard.discardAndReload().catch(() => {})}
+          />
+        ) : null
+      }
       removeTopicMapping={removeTopicMapping}
       saveSettings={saveSettings}
       saveTopicMappings={saveTopicMappings}

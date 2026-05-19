@@ -1,5 +1,7 @@
 import type { CircuitConfig } from "@solar-display/shared";
 import { useEffect, useMemo, useState } from "react";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
+import { useDisplaySyncDraftGuard } from "../../hooks/displaySyncDraftGuard";
 import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { requestJson } from "../../services/api";
@@ -114,7 +116,13 @@ export function CircuitSettings() {
     reload: reloadReadiness
   } = useDisplayReadiness();
 
-  const loadCircuits = async ({ silent = false }: { silent?: boolean } = {}) => {
+  const loadCircuits = async ({
+    silent = false,
+    propagateError = false
+  }: {
+    silent?: boolean;
+    propagateError?: boolean;
+  } = {}) => {
     if (silent) {
       setIsReloading(true);
     } else {
@@ -127,7 +135,11 @@ export function CircuitSettings() {
       setMessage("迴路設定已同步。");
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "載入迴路設定失敗。");
+      const nextError = error instanceof Error ? error : new Error("載入迴路設定失敗。");
+      setErrorMessage(nextError.message);
+      if (propagateError) {
+        throw nextError;
+      }
     } finally {
       if (silent) {
         setIsReloading(false);
@@ -140,11 +152,6 @@ export function CircuitSettings() {
   useEffect(() => {
     void loadCircuits();
   }, []);
-
-  useDisplaySyncRefresh(() => {
-    void loadCircuits({ silent: true });
-    void reloadReadiness();
-  });
 
   const markDirty = (id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
     setDirtyIds((current) => (current.includes(id) ? current : [...current, id]));
@@ -228,6 +235,15 @@ export function CircuitSettings() {
     }
   };
 
+  const syncDraftGuard = useDisplaySyncDraftGuard({
+    isDirty: dirtyIds.length > 0,
+    reloadNow: async () => {
+      await Promise.all([loadCircuits({ propagateError: true, silent: true }), reloadReadiness()]);
+    }
+  });
+
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+
   const viewModel = useMemo(
     () =>
       buildCircuitSettingsViewModel({
@@ -256,6 +272,14 @@ export function CircuitSettings() {
       readiness={readiness}
       readinessErrorMessage={readinessErrorMessage}
       readinessLoading={readinessLoading}
+      remoteSyncBanner={
+        syncDraftGuard.hasPendingRemoteChange ? (
+          <RemoteSyncBanner
+            onKeepEditing={syncDraftGuard.keepEditing}
+            onReloadNow={() => syncDraftGuard.discardAndReload().catch(() => {})}
+          />
+        ) : null
+      }
       saveAll={handleSaveAll}
       viewModel={viewModel}
     />
