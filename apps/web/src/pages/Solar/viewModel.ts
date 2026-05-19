@@ -99,6 +99,11 @@ export function buildSolarViewModel({
 
   if (shouldUseStory) {
     const storyKpiByKey = new Map(solarStory.kpis.map((kpi) => [kpi.metricKey, kpi]));
+    const power = resolveMetricValue(
+      { fallbackIndex: 0, iconKey: "metric-generation-sun", metricKey: "realTimePower", label: "即時功率", unit: "kW" },
+      isSocketConnected,
+      snapshot
+    );
     const kpis = kpiBindings.map((binding) => {
       const storyKpi = storyKpiByKey.get(binding.metricKey);
       const value = storyKpi?.value ?? resolveMetricValue(binding, isSocketConnected, snapshot).value;
@@ -119,8 +124,8 @@ export function buildSolarViewModel({
       };
     });
 
-    const powerValue = storyKpiByKey.get("realTimePower")?.value ?? "--";
-    const powerUnit = storyKpiByKey.get("realTimePower")?.unit ?? "kW";
+    const powerValue = storyKpiByKey.get("realTimePower")?.value ?? power.value;
+    const powerUnit = storyKpiByKey.get("realTimePower")?.unit ?? power.unit;
     const efficiencyValue = storyKpiByKey.get("systemEfficiency")?.value ?? "--";
     const efficiencyUnit = storyKpiByKey.get("systemEfficiency")?.unit ?? "%";
     const selfConsumptionValue = storyKpiByKey.get("selfConsumptionRatio")?.value ?? "--";

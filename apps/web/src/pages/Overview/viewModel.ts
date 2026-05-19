@@ -3,7 +3,8 @@ import type {
   MonitoringBindingState,
   MonitoringFallbackReason,
   MonitoringFreshnessState,
-  MonitoringMetricBinding
+  MonitoringMetricBinding,
+  ResolvedMonitoringMetricBinding
 } from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
@@ -34,7 +35,7 @@ type BuildOverviewViewModelArgs = {
   now?: string;
   snapshot: LiveMetricsSnapshot;
   storyOverview?: {
-    metrics: Array<MonitoringMetricBinding<string>>;
+    metrics: Array<ResolvedMonitoringMetricBinding<string>>;
     summary: {
       alertTone: MonitoringAlertTone;
       bindingState: MonitoringBindingState;
@@ -69,12 +70,25 @@ function resolveSummaryStatus(connectionState: SocketConnectionState["status"]):
 
 function resolveSummaryLabel(args: {
   isSocketConnected: boolean;
+  usesSharedStory: boolean;
   summaryState: {
     bindingState: MonitoringBindingState;
     fallbackReason: MonitoringFallbackReason | null;
     freshnessState: MonitoringFreshnessState;
   };
 }) {
+  if (args.usesSharedStory) {
+    if (args.summaryState.fallbackReason === "stale-data" || args.summaryState.freshnessState === "stale") {
+      return "共享故事資料延遲，摘要使用最近一次有效讀值";
+    }
+
+    if (args.summaryState.bindingState === "missing" || args.summaryState.freshnessState === "fallback") {
+      return "共享故事部分缺值，缺少 KPI 會回退顯示";
+    }
+
+    return "共享故事資料同步中";
+  }
+
   if (!args.isSocketConnected) {
     return "Socket 未連線，顯示 mock 資料";
   }
@@ -90,10 +104,13 @@ function resolveSummaryLabel(args: {
   return "Socket 即時更新中";
 }
 
-function resolveStoryMetricCards(storyMetrics: Array<MonitoringMetricBinding<string>>) {
+function resolveStoryMetricCards(
+  metricBindings: OverviewMetricCard[],
+  storyMetrics: Array<ResolvedMonitoringMetricBinding<string>>
+) {
   const storyMetricByKey = new Map(storyMetrics.map((metric) => [metric.metricKey, metric]));
 
-  return metricCards.map((metricCard) => {
+  return metricBindings.map((metricCard) => {
     const storyMetric = storyMetricByKey.get(metricCard.metricKey);
 
     if (!storyMetric) {
@@ -101,10 +118,17 @@ function resolveStoryMetricCards(storyMetrics: Array<MonitoringMetricBinding<str
     }
 
     return {
-      ...storyMetric,
       accentColor: metricCard.accentColor,
+      alertTone: storyMetric.alertTone,
+      bindingState: storyMetric.bindingState,
+      fallbackReason: storyMetric.fallbackReason,
+      freshnessState: storyMetric.freshnessState,
+      helper: storyMetric.helper,
       iconKey: metricCard.iconKey,
-      metricKey: metricCard.metricKey
+      label: storyMetric.label,
+      metricKey: metricCard.metricKey,
+      unit: storyMetric.unit,
+      value: storyMetric.value
     };
   });
 }
@@ -118,15 +142,31 @@ export function buildOverviewViewModel({
   storyOverview,
   summaryMetricKeys
 }: BuildOverviewViewModelArgs) {
-  const shouldUseStoryOverview =
-    storyOverview !== undefined &&
-    storyOverview.metrics.length >= 3 &&
-    storyOverview.summary.freshnessState !== "fallback";
-  const resolvedMetricBindings = shouldUseStoryOverview
-    ? resolveStoryMetricCards(storyOverview.metrics)
+  const hasStoryOverview = storyOverview !== undefined;
+  const resolvedMetricBindings = hasStoryOverview
+    ? resolveStoryMetricCards(metricBindings, storyOverview.metrics)
     : metricBindings;
 
-  const metrics = resolvedMetricBindings.map(({ accentColor = false, iconKey, ...binding }) => {
+  const metrics = resolvedMetricBindings.map((metricCard) => {
+    const { accentColor = false, iconKey } = metricCard;
+
+    if ("helper" in metricCard) {
+      return {
+        accentColor,
+        alertTone: metricCard.alertTone,
+        bindingState: metricCard.bindingState,
+        fallbackReason: metricCard.fallbackReason,
+        freshnessState: metricCard.freshnessState,
+        helper: metricCard.helper,
+        iconKey,
+        label: metricCard.label,
+        metricKey: metricCard.metricKey,
+        unit: metricCard.unit,
+        value: metricCard.value
+      };
+    }
+
+    const binding = metricCard;
     const fallbackMetric = liveMetrics[binding.fallbackIndex]!;
     const resolved = resolveMonitoringMetricBinding({
       binding: {
@@ -153,7 +193,7 @@ export function buildOverviewViewModel({
       value: resolved.value
     };
   });
-  const summaryState = shouldUseStoryOverview
+  const summaryState = hasStoryOverview
     ? storyOverview.summary
     : resolveMonitoringSummaryState(
         metrics.filter((metric) =>
@@ -176,6 +216,7 @@ export function buildOverviewViewModel({
       status: resolveSummaryStatus(connectionState),
       statusLabel: resolveSummaryLabel({
         isSocketConnected,
+        usesSharedStory: hasStoryOverview,
         summaryState
       })
     }

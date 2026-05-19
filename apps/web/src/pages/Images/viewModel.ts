@@ -1,6 +1,7 @@
 import type {
   ImagePlaylistAssetInput,
-  ImagePlaylistEntryInput
+  ImagePlaylistEntryInput,
+  ResolvedImagePlaylistEntry
 } from "@solar-display/shared";
 import {
   resolveActiveImagePlaylistEntry,
@@ -8,32 +9,46 @@ import {
 } from "@solar-display/shared";
 
 type BuildImagesViewModelArgs = {
+  activeEntry?: ResolvedImagePlaylistEntry | null;
   activeIndex: number;
   assets: ImagePlaylistAssetInput[];
   coverAssetSource?: string | null;
-  entries: ImagePlaylistEntryInput[];
+  entries: Array<ImagePlaylistEntryInput | ResolvedImagePlaylistEntry>;
 };
 
 function padCounter(value: number) {
   return value.toString().padStart(2, "0");
 }
 
+function isResolvedImagePlaylistEntry(
+  entry: ImagePlaylistEntryInput | ResolvedImagePlaylistEntry
+): entry is ResolvedImagePlaylistEntry {
+  return "infoPanel" in entry && "isPlayable" in entry;
+}
+
 export function buildImagesViewModel({
+  activeEntry,
   activeIndex,
   assets,
   coverAssetSource,
   entries
 }: BuildImagesViewModelArgs) {
-  const thumbnails = resolveImagePlaylistEntries({
-    assets,
-    coverAssetSource,
-    entries
-  });
-  const active = resolveActiveImagePlaylistEntry(thumbnails, activeIndex);
+  const thumbnails = entries.every(isResolvedImagePlaylistEntry)
+    ? entries
+        .filter((entry) => entry.enabled)
+        .sort((left, right) => left.displayOrder - right.displayOrder || left.entryId.localeCompare(right.entryId))
+    : resolveImagePlaylistEntries({
+        assets,
+        coverAssetSource,
+        entries
+      });
+  const active = activeEntry ?? resolveActiveImagePlaylistEntry(thumbnails, activeIndex);
   const activeIndexResolved =
     active === null ? 0 : thumbnails.findIndex((entry) => entry.entryId === active.entryId);
+  const safeActiveIndex = Math.max(activeIndexResolved, 0);
 
   return {
+    activeIndex: safeActiveIndex,
     active: active === null
       ? {
           assetSource: null,
@@ -65,7 +80,7 @@ export function buildImagesViewModel({
           title: active.infoPanel.title
         },
     counter: {
-      current: padCounter(activeIndexResolved + 1),
+      current: padCounter(safeActiveIndex + 1),
       total: padCounter(Math.max(thumbnails.length, 1))
     },
     hero: {

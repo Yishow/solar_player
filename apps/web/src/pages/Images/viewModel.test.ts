@@ -106,3 +106,70 @@ test("buildImagesViewModel keeps placeholder and metadata fallbacks predictable"
   assert.equal(model.active.infoPanel.capturedAt, "未提供拍攝日期");
   assert.equal(model.active.infoPanel.description, "尚未提供圖片說明");
 });
+
+test("buildImagesViewModel honors the server-resolved active entry and keeps use-cover playback visible", () => {
+  const resolvedEntries = [
+    {
+      assetId: "asset-2",
+      assetSource: null,
+      capturedAt: "2026/05/10 09:18",
+      description: "",
+      displayOrder: 2,
+      durationSeconds: 10,
+      enabled: true,
+      entryId: "IMG-02",
+      fallbackActive: true,
+      fallbackMode: "skip" as const,
+      fallbackReason: "asset-missing" as const,
+      hasAsset: false,
+      infoPanel: {
+        area: "迴路頁",
+        capturedAt: "2026/05/10 09:18",
+        description: "尚未提供圖片說明",
+        tags: [],
+        title: "工廠迴路導覽"
+      },
+      isPlayable: false,
+      resolution: "1920x1080",
+      tags: [],
+      title: "工廠迴路導覽"
+    },
+    {
+      assetId: "asset-3",
+      assetSource: "cover.jpg",
+      capturedAt: "2026/05/10 14:32",
+      description: "首頁封面展示最新太陽能陣列成果。",
+      displayOrder: 3,
+      durationSeconds: 25,
+      enabled: true,
+      entryId: "IMG-03",
+      fallbackActive: true,
+      fallbackMode: "use-cover" as const,
+      fallbackReason: "asset-missing" as const,
+      hasAsset: false,
+      infoPanel: {
+        area: "首頁 Hero",
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      },
+      isPlayable: true,
+      resolution: "3840x2160",
+      tags: ["封面", "太陽能"],
+      title: "太陽能板鳥瞰"
+    }
+  ];
+  const model = buildImagesViewModel({
+    activeEntry: resolvedEntries[1],
+    activeIndex: 0,
+    assets: [],
+    entries: resolvedEntries
+  });
+
+  assert.equal(model.activeIndex, 1);
+  assert.equal(model.counter.current, "02");
+  assert.equal(model.active.entryId, "IMG-03");
+  assert.equal(model.active.assetSource, "cover.jpg");
+  assert.equal(model.active.fallbackMode, "use-cover");
+});

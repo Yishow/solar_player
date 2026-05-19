@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { readDisplayOpsAssetReferences } from "../services/displayOpsService.js";
+import { deleteImagePlaylistEntriesForAsset } from "../services/imagePlaylistService.js";
 import {
   ALLOWED_EXTENSIONS,
   deleteImageFile,
@@ -182,11 +183,12 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     const references = readDisplayOpsAssetReferences(id);
     if (references.blockingIssues.length > 0) {
       return reply.status(409).send({
-        ...errorResponse("Image is still referenced by a live display surface."),
+        ...errorResponse("Image is still referenced by a live display surface or playlist runtime."),
         references
       });
     }
 
+    deleteImagePlaylistEntriesForAsset(id);
     getDatabase().prepare("DELETE FROM image_assets WHERE id = ?").run(id);
     if (existing.filename) {
       deleteImageFile(existing.filename);

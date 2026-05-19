@@ -9,6 +9,32 @@ type ImageStorageUsage = {
   usedMB: number;
 };
 
+export type ImageManagementPlaylistEntry = {
+  entryId: string;
+  assetId: number | null;
+  displayOrder: number;
+  durationSeconds: number;
+  enabled: boolean;
+  fallbackMode: "display-placeholder" | "skip" | "use-cover";
+  title: string;
+  description: string;
+  area: string;
+  capturedAt: string;
+  tags: string[];
+};
+
+export function normalizeManagementPlaylistAssetId(assetId: string | null, entryId: string) {
+  if (assetId === null) {
+    return null;
+  }
+
+  if (!/^\d+$/.test(assetId)) {
+    throw new Error(`圖片輪播項目 ${entryId} 的素材識別碼無效：${assetId}`);
+  }
+
+  return Number(assetId);
+}
+
 type BuildImageManagementViewModelArgs = {
   assets: ImageAsset[];
   errorMessage: string;
@@ -18,19 +44,7 @@ type BuildImageManagementViewModelArgs = {
   message: string;
   selectedImageId: number | null;
   storageUsage: ImageStorageUsage;
-  playlistEntries?: Array<{
-    entryId: string;
-    assetId: number | null;
-    displayOrder: number;
-    durationSeconds: number;
-    enabled: boolean;
-    fallbackMode: "display-placeholder" | "skip" | "use-cover";
-    title: string;
-    description: string;
-    area: string;
-    capturedAt: string;
-    tags: string[];
-  }>;
+  playlistEntries?: ImageManagementPlaylistEntry[];
   liveDisplayReferences?: Array<{ pageKey: string; stage: string; label: string }>;
 };
 
@@ -84,6 +98,42 @@ function buildPreviewUrl(filename: string | null) {
   return buildApiUrl(`/uploads/images/${filename}`);
 }
 
+function comparePlaylistEntries(left: ImageManagementPlaylistEntry, right: ImageManagementPlaylistEntry) {
+  return left.displayOrder - right.displayOrder || left.entryId.localeCompare(right.entryId);
+}
+
+export function resolvePlaylistEntriesForAsset(
+  playlistEntries: ImageManagementPlaylistEntry[] | undefined,
+  assetId: number
+) {
+  return (playlistEntries ?? [])
+    .filter((entry) => entry.assetId === assetId)
+    .sort(comparePlaylistEntries);
+}
+
+export function resolvePrimaryPlaylistEntry(
+  playlistEntries: ImageManagementPlaylistEntry[] | undefined,
+  assetId: number
+) {
+  return resolvePlaylistEntriesForAsset(playlistEntries, assetId)[0] ?? null;
+}
+
+export function resolvePlaylistRuntimeInclusion(
+  playlistEntries: ImageManagementPlaylistEntry[] | undefined,
+  assetId: number
+) {
+  if (playlistEntries === undefined) {
+    return null;
+  }
+
+  const matches = resolvePlaylistEntriesForAsset(playlistEntries, assetId);
+  if (matches.length === 0) {
+    return null;
+  }
+
+  return matches.some((entry) => entry.enabled);
+}
+
 export function buildImageManagementViewModel(args: BuildImageManagementViewModelArgs) {
   const {
     assets,
@@ -100,7 +150,17 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
   const sortedAssets = sortAssets(assets);
   const selectedAsset =
     sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
-  const slideshowCount = sortedAssets.filter((asset) => asset.includedInSlideshow).length;
+  const resolveEffectiveInPlaylist = (asset: ImageAsset) => {
+    const runtimeInclusion = resolvePlaylistRuntimeInclusion(playlistEntries, asset.id);
+    if (runtimeInclusion !== null) {
+      return runtimeInclusion;
+    }
+
+    return asset.includedInSlideshow;
+  };
+  const slideshowCount = sortedAssets.filter(
+    (asset) => resolveEffectiveInPlaylist(asset)
+  ).length;
   const usagePercent = Math.min(
     100,
     Math.round((storageUsage.usedBytes / totalStorageBytes) * 100)
@@ -139,10 +199,13 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
           }
         : null,
     library: sortedAssets.map((asset, index) => ({
-      badges: [
-        ...(asset.includedInSlideshow ? ["輪播中"] : ["未加入輪播"]),
-        ...(asset.isCover ? ["封面"] : [])
-      ],
+      badges: (() => {
+        const inPlaylist = resolveEffectiveInPlaylist(asset);
+        return [
+          ...(inPlaylist ? ["輪播中"] : ["未加入輪播"]),
+          ...(asset.isCover ? ["封面"] : [])
+        ];
+      })(),
       filename: asset.originalName ?? asset.filename ?? `image-${asset.id}`,
       id: asset.id,
       isSelected: asset.id === selectedAsset?.id,
@@ -155,24 +218,29 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
       selectedAsset === null
         ? null
         : (() => {
-            const playlistEntry = args.playlistEntries?.find((entry) => entry.assetId === selectedAsset.id);
+            const playlistEntry = resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id);
+            const playlistAssetEntries = resolvePlaylistEntriesForAsset(args.playlistEntries, selectedAsset.id);
+            const playlistEntryCount = playlistAssetEntries.length;
+            const inPlaylist = resolveEffectiveInPlaylist(selectedAsset);
             return {
               badges: [
-                ...(selectedAsset.includedInSlideshow ? ["輪播中"] : ["未加入輪播"]),
+                ...(inPlaylist ? ["輪播中"] : ["未加入輪播"]),
                 ...(selectedAsset.isCover ? ["封面"] : [])
               ],
               description: selectedAsset.description ?? "尚未填寫圖片說明",
               displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
               filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
               id: selectedAsset.id,
-              includedInSlideshow: selectedAsset.includedInSlideshow,
+              includedInSlideshow: inPlaylist,
               isCover: selectedAsset.isCover,
               meta: `${selectedAsset.width ?? "--"} × ${selectedAsset.height ?? "--"} • ${formatMimeType(selectedAsset.mimeType)} • ${formatBytes(selectedAsset.fileSize ?? 0)}`,
               previewUrl: buildPreviewUrl(selectedAsset.filename),
               title: buildAssetTitle(selectedAsset),
               // Playlist-level fields
               playlistEntryId: playlistEntry?.entryId ?? null,
+              playlistEntryCount,
               playlistDisplayOrder: playlistEntry?.displayOrder ?? null,
+              playlistDurationSeconds: playlistEntry?.durationSeconds ?? null,
               playlistFallbackMode: playlistEntry?.fallbackMode ?? null,
               playlistEnabled: playlistEntry?.enabled ?? null,
               playlistTitle: playlistEntry?.title ?? null,

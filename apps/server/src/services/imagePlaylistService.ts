@@ -17,6 +17,7 @@ type ImageAssetRow = {
   filename: string | null;
   height: number | null;
   id: number;
+  included_in_slideshow: number;
   is_cover: number;
   title: string | null;
   width: number | null;
@@ -56,6 +57,10 @@ type ReorderInput = Array<{
   entryId: string;
 }>;
 
+type ReadImagePlaylistOptions = {
+  bootstrapEntries?: boolean;
+};
+
 function ensurePlaylistTable() {
   getDatabase().exec(`
     CREATE TABLE IF NOT EXISTS image_playlist_entries (
@@ -77,6 +82,20 @@ function ensurePlaylistTable() {
   `);
 }
 
+function hasPlaylistTable() {
+  return Boolean(
+    getDatabase()
+      .prepare(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table' AND name = 'image_playlist_entries'
+        `
+      )
+      .get()
+  );
+}
+
 function formatEntryId(index: number) {
   return `IMG-${String(index).padStart(2, "0")}`;
 }
@@ -94,6 +113,7 @@ function readAssets() {
           height,
           display_duration,
           display_order,
+          included_in_slideshow,
           is_cover
         FROM image_assets
         ORDER BY display_order ASC, id ASC
@@ -102,7 +122,11 @@ function readAssets() {
     .all() as ImageAssetRow[];
 }
 
-function readPlaylistRows() {
+function readPlaylistRows(options?: { ensureTable?: boolean }) {
+  if (options?.ensureTable === false && !hasPlaylistTable()) {
+    return [];
+  }
+
   ensurePlaylistTable();
   return getDatabase()
     .prepare(
@@ -151,12 +175,15 @@ function ensureBootstrappedEntries() {
   ensurePlaylistTable();
   const database = getDatabase();
   const assets = readAssets();
-  const existing = new Set(
-    (database.prepare("SELECT asset_id FROM image_playlist_entries WHERE asset_id IS NOT NULL").all() as Array<{ asset_id: number }>).map((row) => row.asset_id)
-  );
-  const currentCount = Number(
-    (database.prepare("SELECT COUNT(*) AS count FROM image_playlist_entries").get() as { count: number }).count
-  );
+  const existingEntries = database.prepare(
+    `
+      SELECT asset_id, entry_id
+      FROM image_playlist_entries
+      WHERE asset_id IS NOT NULL
+      ORDER BY entry_id ASC
+    `
+  ).all() as Array<{ asset_id: number; entry_id: string }>;
+  const existing = new Set(existingEntries.map((row) => row.asset_id));
   const insert = database.prepare(
     `
       INSERT INTO image_playlist_entries (
@@ -170,11 +197,19 @@ function ensureBootstrappedEntries() {
         fallback_mode,
         tags_json,
         updated_at
-      ) VALUES (?, ?, 1, ?, ?, ?, ?, 'display-placeholder', '[]', CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'display-placeholder', '[]', CURRENT_TIMESTAMP)
     `
   );
 
-  let nextIndex = currentCount + 1;
+  let nextIndex = existingEntries.reduce((max, row) => {
+    const match = /^IMG-(\d+)$/.exec(row.entry_id);
+    const sequence = match?.[1];
+    if (!sequence) {
+      return max;
+    }
+
+    return Math.max(max, Number.parseInt(sequence, 10));
+  }, 0) + 1;
   for (const asset of assets) {
     if (existing.has(asset.id)) {
       continue;
@@ -182,12 +217,44 @@ function ensureBootstrappedEntries() {
     insert.run(
       formatEntryId(nextIndex),
       asset.id,
+      asset.included_in_slideshow,
       asset.display_order ?? nextIndex,
       asset.display_duration ?? 10,
       asset.title,
       asset.description
     );
     nextIndex += 1;
+  }
+}
+
+function syncImageAssetSlideshowState(assetIds: Iterable<number | null>) {
+  const ids = [...new Set(
+    Array.from(assetIds).filter((assetId): assetId is number => typeof assetId === "number")
+  )];
+
+  if (ids.length === 0 || !hasPlaylistTable()) {
+    return;
+  }
+
+  const selectEnabledCount = getDatabase().prepare(
+    `
+      SELECT COUNT(*) AS count
+      FROM image_playlist_entries
+      WHERE asset_id = ? AND enabled = 1
+    `
+  );
+  const updateAsset = getDatabase().prepare(
+    `
+      UPDATE image_assets
+      SET included_in_slideshow = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+  );
+
+  for (const assetId of ids) {
+    const enabledCount = Number((selectEnabledCount.get(assetId) as { count: number }).count);
+    updateAsset.run(enabledCount > 0 ? 1 : 0, assetId);
   }
 }
 
@@ -201,8 +268,25 @@ function resolveAssets() {
   } satisfies ImagePlaylistAssetInput));
 }
 
-function resolveEntries() {
-  ensureBootstrappedEntries();
+function resolveEntries(options?: ReadImagePlaylistOptions) {
+  if (options?.bootstrapEntries === false) {
+    return readPlaylistRows({ ensureTable: false }).map((row) => ({
+      area: row.area,
+      assetId: row.asset_id === null ? null : String(row.asset_id),
+      capturedAt: row.captured_at,
+      description: row.description,
+      displayOrder: row.display_order,
+      durationSeconds: row.duration_seconds,
+      enabled: row.enabled === 1,
+      entryId: row.entry_id,
+      fallbackMode: row.fallback_mode,
+      tags: parseTags(row.tags_json),
+      title: row.title
+    } satisfies ImagePlaylistEntryInput));
+  } else {
+    ensureBootstrappedEntries();
+  }
+
   return readPlaylistRows().map((row) => ({
     area: row.area,
     assetId: row.asset_id === null ? null : String(row.asset_id),
@@ -223,53 +307,134 @@ function coverAssetSource() {
   return row ? fileSource(row.filename) : null;
 }
 
-export function readImagePlaylist(activeIndex = 0) {
+function buildResolvedImagePlaylist(
+  activeIndex = 0,
+  options?: ReadImagePlaylistOptions
+) {
+  const playlistRows = resolveEntries(options);
   const entries = resolveImagePlaylistEntries({
     assets: resolveAssets(),
     coverAssetSource: coverAssetSource(),
-    entries: resolveEntries()
+    entries: playlistRows
   });
 
   return {
     activeEntry: resolveActiveImagePlaylistEntry(entries, activeIndex),
     entries,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
+    hasPlaylistRows: playlistRows.length > 0
   };
+}
+
+export function readImagePlaylist(activeIndex = 0) {
+  return buildResolvedImagePlaylist(activeIndex);
+}
+
+export function readImagePlaylistSnapshot(activeIndex = 0, options?: ReadImagePlaylistOptions) {
+  return buildResolvedImagePlaylist(activeIndex, options);
+}
+
+export function readImagePlaylistGovernanceSnapshot(options?: ReadImagePlaylistOptions) {
+  const entries = resolveEntries(options);
+
+  return {
+    entries,
+    generatedAt: new Date().toISOString(),
+    hasPlaylistRows: entries.length > 0
+  };
+}
+
+export function deleteImagePlaylistEntriesForAsset(assetId: number) {
+  if (!hasPlaylistTable()) {
+    return;
+  }
+
+  getDatabase()
+    .prepare(
+      `
+        DELETE FROM image_playlist_entries
+        WHERE asset_id = ?
+      `
+    )
+    .run(assetId);
+}
+
+export function bootstrapImagePlaylistGovernance() {
+  ensureBootstrappedEntries();
+  syncImageAssetSlideshowState(
+    readAssets().map((asset) => asset.id)
+  );
+  return readImagePlaylistGovernanceSnapshot({
+    bootstrapEntries: false
+  });
 }
 
 export function updateImagePlaylistEntry(entryId: string, input: PlaylistUpdateInput) {
   ensureBootstrappedEntries();
+  const previousRow = getDatabase()
+    .prepare(
+      `
+        SELECT
+          asset_id,
+          enabled,
+          display_order,
+          duration_seconds,
+          title,
+          area,
+          captured_at,
+          tags_json,
+          description,
+          fallback_mode
+        FROM image_playlist_entries
+        WHERE entry_id = ?
+      `
+    )
+    .get(entryId) as PlaylistRow | undefined;
+  if (!previousRow) {
+    return;
+  }
   getDatabase()
     .prepare(
       `
         UPDATE image_playlist_entries SET
-          asset_id = COALESCE(?, asset_id),
-          enabled = COALESCE(?, enabled),
-          display_order = COALESCE(?, display_order),
-          duration_seconds = COALESCE(?, duration_seconds),
-          title = COALESCE(?, title),
-          area = COALESCE(?, area),
-          captured_at = COALESCE(?, captured_at),
-          tags_json = COALESCE(?, tags_json),
-          description = COALESCE(?, description),
-          fallback_mode = COALESCE(?, fallback_mode),
+          asset_id = ?,
+          enabled = ?,
+          display_order = ?,
+          duration_seconds = ?,
+          title = ?,
+          area = ?,
+          captured_at = ?,
+          tags_json = ?,
+          description = ?,
+          fallback_mode = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE entry_id = ?
       `
     )
     .run(
-      input.assetId ?? undefined,
-      input.enabled === undefined ? undefined : input.enabled ? 1 : 0,
-      input.displayOrder ?? undefined,
-      input.durationSeconds ?? undefined,
-      input.title ?? undefined,
-      input.area ?? undefined,
-      input.capturedAt ?? undefined,
-      input.tags === undefined ? undefined : JSON.stringify(input.tags),
-      input.description ?? undefined,
-      input.fallbackMode ?? undefined,
+      input.assetId === undefined ? previousRow.asset_id : input.assetId,
+      input.enabled === undefined ? previousRow.enabled : input.enabled ? 1 : 0,
+      input.displayOrder ?? previousRow.display_order,
+      input.durationSeconds ?? previousRow.duration_seconds,
+      input.title === undefined ? previousRow.title : input.title,
+      input.area === undefined ? previousRow.area : input.area,
+      input.capturedAt === undefined ? previousRow.captured_at : input.capturedAt,
+      input.tags === undefined ? previousRow.tags_json : JSON.stringify(input.tags),
+      input.description === undefined ? previousRow.description : input.description,
+      input.fallbackMode ?? previousRow.fallback_mode,
       entryId
     );
+
+  const nextRow = getDatabase()
+    .prepare(
+    `
+      SELECT asset_id
+      FROM image_playlist_entries
+      WHERE entry_id = ?
+    `
+    )
+    .get(entryId) as { asset_id: number | null } | undefined;
+  syncImageAssetSlideshowState([previousRow.asset_id, nextRow?.asset_id ?? null]);
 }
 
 export function reorderImagePlaylist(entries: ReorderInput) {
@@ -294,4 +459,15 @@ export function reorderImagePlaylist(entries: ReorderInput) {
       );
     }
   })(entries);
+  syncImageAssetSlideshowState(
+    (getDatabase()
+      .prepare(
+        `
+          SELECT DISTINCT asset_id
+          FROM image_playlist_entries
+          WHERE asset_id IS NOT NULL
+        `
+      )
+      .all() as Array<{ asset_id: number }>).map((row) => row.asset_id)
+  );
 }

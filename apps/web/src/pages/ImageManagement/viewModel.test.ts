@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ImageAsset } from "@solar-display/shared";
-import { buildImageManagementViewModel } from "./viewModel";
+import {
+  buildImageManagementViewModel,
+  normalizeManagementPlaylistAssetId,
+  resolvePlaylistRuntimeInclusion
+} from "./viewModel";
 
 const assets: ImageAsset[] = [
   {
@@ -85,4 +89,159 @@ test("buildImageManagementViewModel keeps an empty-state contract when no assets
   assert.equal(model.selection, null);
   assert.equal(model.library.length, 0);
   assert.match(model.emptyState?.title ?? "", /尚未上傳圖片/);
+});
+
+test("buildImageManagementViewModel preserves legacy slideshow state when no playlist row exists yet", () => {
+  const model = buildImageManagementViewModel({
+    assets,
+    errorMessage: "",
+    isDeleting: false,
+    isSaving: false,
+    isUploading: false,
+    message: "圖片庫已同步。",
+    playlistEntries: [],
+    selectedImageId: 3,
+    storageUsage: {
+      fileCount: 2,
+      usedBytes: 2.5 * 1024 * 1024 * 1024,
+      usedMB: 2560
+    }
+  });
+
+  assert.deepEqual(model.library[0]?.badges, ["輪播中", "封面"]);
+  assert.deepEqual(model.selection?.badges, ["輪播中", "封面"]);
+  assert.equal(model.selection?.includedInSlideshow, true);
+  assert.equal(model.summary.slideshowCount, 1);
+  assert.equal(resolvePlaylistRuntimeInclusion([], 3), null);
+});
+
+test("buildImageManagementViewModel matches playlist runtime fields by string asset id", () => {
+  const model = buildImageManagementViewModel({
+    assets,
+    errorMessage: "",
+    isDeleting: false,
+    isSaving: false,
+    isUploading: false,
+    message: "圖片庫已同步。",
+    playlistEntries: [
+      {
+        area: "首頁 Hero",
+        assetId: 3,
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        displayOrder: 1,
+        durationSeconds: 25,
+        enabled: true,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      }
+    ],
+    selectedImageId: 3,
+    storageUsage: {
+      fileCount: 2,
+      usedBytes: 2.5 * 1024 * 1024 * 1024,
+      usedMB: 2560
+    }
+  });
+
+  assert.deepEqual(model.library[0]?.badges, ["輪播中", "封面"]);
+  assert.equal(model.selection?.playlistEntryId, "IMG-01");
+  assert.equal(model.selection?.playlistDisplayOrder, 1);
+  assert.equal(model.selection?.playlistDurationSeconds, 25);
+  assert.equal(model.selection?.playlistFallbackMode, "use-cover");
+  assert.equal(model.selection?.playlistArea, "首頁 Hero");
+  assert.deepEqual(model.selection?.playlistTags, ["封面", "太陽能"]);
+});
+
+test("buildImageManagementViewModel edits the first ordered playlist row when one asset appears multiple times", () => {
+  const model = buildImageManagementViewModel({
+    assets,
+    errorMessage: "",
+    isDeleting: false,
+    isSaving: false,
+    isUploading: false,
+    message: "圖片庫已同步。",
+    playlistEntries: [
+      {
+        area: "備援輪播",
+        assetId: 3,
+        capturedAt: "",
+        description: "",
+        displayOrder: 2,
+        durationSeconds: 12,
+        enabled: true,
+        entryId: "IMG-02",
+        fallbackMode: "skip",
+        tags: [],
+        title: ""
+      },
+      {
+        area: "首頁 Hero",
+        assetId: 3,
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        displayOrder: 1,
+        durationSeconds: 25,
+        enabled: false,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      }
+    ],
+    selectedImageId: 3,
+    storageUsage: {
+      fileCount: 2,
+      usedBytes: 2.5 * 1024 * 1024 * 1024,
+      usedMB: 2560
+    }
+  });
+
+  assert.equal(model.selection?.playlistEntryCount, 2);
+  assert.equal(model.selection?.playlistEntryId, "IMG-01");
+  assert.equal(model.selection?.playlistDisplayOrder, 1);
+  assert.deepEqual(model.library[0]?.badges, ["輪播中", "封面"]);
+  assert.deepEqual(model.selection?.badges, ["輪播中", "封面"]);
+  assert.equal(model.selection?.includedInSlideshow, true);
+  assert.equal(model.summary.slideshowCount, 1);
+  assert.equal(model.selection?.playlistEnabled, false);
+  assert.equal(resolvePlaylistRuntimeInclusion(model.selection ? [
+    {
+      area: "備援輪播",
+      assetId: 3,
+      capturedAt: "",
+      description: "",
+      displayOrder: 2,
+      durationSeconds: 12,
+      enabled: true,
+      entryId: "IMG-02",
+      fallbackMode: "skip",
+      tags: [],
+      title: ""
+    },
+    {
+      area: "首頁 Hero",
+      assetId: 3,
+      capturedAt: "2026/05/10 14:32",
+      description: "首頁封面展示最新太陽能陣列成果。",
+      displayOrder: 1,
+      durationSeconds: 25,
+      enabled: false,
+      entryId: "IMG-01",
+      fallbackMode: "use-cover",
+      tags: ["封面", "太陽能"],
+      title: "太陽能板鳥瞰"
+    }
+  ] : undefined, 3), true);
+});
+
+test("normalizeManagementPlaylistAssetId accepts only fully numeric shared asset ids", () => {
+  assert.equal(normalizeManagementPlaylistAssetId("3", "IMG-01"), 3);
+  assert.equal(normalizeManagementPlaylistAssetId(null, "IMG-02"), null);
+  assert.throws(
+    () => normalizeManagementPlaylistAssetId("12abc", "IMG-03"),
+    /IMG-03/
+  );
 });

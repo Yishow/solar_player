@@ -17,6 +17,9 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.arrows\.left/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.right/);
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
+  assert.match(imagesSource, /activeEntry: playlistData\?\.activeEntry \?\? null/);
+  assert.match(imagesSource, /entries: playlistData\?\.entries \?\? \[\]/);
+  assert.match(imagesSource, /viewModel\.active\.assetSource \?/);
 });
 
 test("images display page seed config captures the current default gallery layout and hero contract", () => {

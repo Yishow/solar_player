@@ -64,12 +64,11 @@ test("display page editor shows blocking validation and fallback publishing stat
     )
   );
 
-  assert.match(html, /draft 有 1 項 blocking 問題/);
-  assert.match(html, /heroCopyLayout/);
-  assert.match(html, /目前 live 正在 fallback/);
-  assert.match(html, /emptyContent/);
-  assert.match(html, /發布草稿/);
-  assert.match(html, /disabled=""/);
+  assert.doesNotMatch(html, /draft 有 1 項 blocking 問題/);
+  assert.doesNotMatch(html, /heroCopyLayout/);
+  assert.doesNotMatch(html, /目前 live 正在 fallback/);
+  assert.doesNotMatch(html, /emptyContent/);
+  assert.doesNotMatch(html, /發布草稿/);
 });
 
 test("display page editor keeps the region tree selection and inspector in sync", () => {

@@ -17,8 +17,13 @@ import type {
   MonitoringFallbackReason,
   MonitoringFreshnessState,
   MonitoringMetricBinding,
+  ResolvedMonitoringMetricBinding,
   PlaybackPage,
   PlaybackSettings,
+  ImagePlaylistEntryInput,
+  ResolvedImagePlaylistEntry,
+  SustainabilityPeriodKey,
+  SustainabilityStoryInput,
   ValidationResult
 } from "@solar-display/shared";
 
@@ -216,7 +221,7 @@ export type DisplayStoryPayload = {
   };
   generatedAt: string;
   overview: {
-    metrics: Array<MonitoringMetricBinding<string>>;
+    metrics: Array<ResolvedMonitoringMetricBinding<string>>;
     summary: {
       alertTone: MonitoringAlertTone;
       bindingState: MonitoringBindingState;
@@ -247,42 +252,52 @@ export async function fetchDisplayStory() {
   return requestJson<DisplayStoryPayload>("/api/display-story");
 }
 
-export async function fetchImagePlaylist(activeIndex = 0) {
+export async function fetchImagePlaylist(
+  activeIndex = 0,
+  options?: {
+    bootstrap?: boolean;
+  }
+) {
+  const query = new URLSearchParams({
+    activeIndex: String(activeIndex)
+  });
+
+  if (options?.bootstrap === true) {
+    query.set("bootstrap", "true");
+  } else if (options?.bootstrap === false) {
+    query.set("bootstrap", "false");
+  }
+
   return requestJson<{
     playlist: {
-      entries: Array<{
-        entryId: string;
-        assetId: number | null;
-        displayOrder: number;
-        durationSeconds: number;
-        enabled: boolean;
-        fallbackMode: "display-placeholder" | "skip" | "use-cover";
-        fallbackReason?: string | null;
-        title: string;
-        description: string;
-        area: string;
-        capturedAt: string;
-        resolution: string;
-        tags: string[];
-        assetSource: string | null;
-        hasAsset: boolean;
-      }>;
-      activeEntry: {
-        entryId: string;
-        durationSeconds: number;
-        fallbackMode: "display-placeholder" | "skip" | "use-cover";
-        fallbackReason: string | null;
-        title: string;
-        description: string;
-        area: string;
-        capturedAt: string;
-        resolution: string;
-        tags: string[];
-        assetSource: string | null;
-        hasAsset: boolean;
-      } | null;
+      activeEntry: ResolvedImagePlaylistEntry | null;
+      entries: ResolvedImagePlaylistEntry[];
+      generatedAt: string;
+      hasPlaylistRows: boolean;
     };
-  }>(`/api/image-playlist?activeIndex=${activeIndex}`);
+  }>(`/api/image-playlist?${query.toString()}`);
+}
+
+export async function fetchImagePlaylistGovernance() {
+  return requestJson<{
+    playlist: {
+      entries: ImagePlaylistEntryInput[];
+      generatedAt: string;
+      hasPlaylistRows: boolean;
+    };
+  }>("/api/image-playlist/governance");
+}
+
+export async function bootstrapImagePlaylistGovernance() {
+  return requestJson<{
+    playlist: {
+      entries: ImagePlaylistEntryInput[];
+      generatedAt: string;
+      hasPlaylistRows: boolean;
+    };
+  }>("/api/image-playlist/governance/bootstrap", {
+    method: "POST"
+  });
 }
 
 export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
@@ -300,6 +315,17 @@ export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
   return requestJson<{ playlist: unknown }>(
     `/api/image-playlist/${entryId}`,
     { body: JSON.stringify(data), method: "PUT" }
+  );
+}
+
+export async function fetchSustainabilityStory(period?: SustainabilityPeriodKey) {
+  const query = period
+    ? `?${new URLSearchParams({
+        period
+      }).toString()}`
+    : "";
+  return requestJson<{ story: SustainabilityStoryInput }>(
+    `/api/sustainability-story${query}`
   );
 }
 

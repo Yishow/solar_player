@@ -28,3 +28,11 @@ test("sustainability display page seed config captures the current hero and high
   assert.equal(config.kpiCards.totalGeneration.width, 304);
   assert.equal(config.statCards.procure.left, 1008);
 });
+
+test("sustainability runtime resolves the shared story adapter and clears back to fallback data on request failure", () => {
+  assert.match(sustainabilitySource, /fetchSustainabilityStory\(selectedPeriod\)/);
+  assert.match(sustainabilitySource, /setStoryData\(res\.story\)/);
+  assert.match(sustainabilitySource, /story:\s*storyData \?\? undefined/);
+  assert.match(sustainabilitySource, /catch\(\(\) => \{/);
+  assert.match(sustainabilitySource, /setStoryData\(null\)/);
+});

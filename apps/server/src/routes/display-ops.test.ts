@@ -259,6 +259,284 @@ test("DELETE /api/images/:id blocks removal when the asset is still referenced b
   }
 });
 
+test("DELETE /api/images/:id allows removal when the asset is only referenced by a draft display page", async () => {
+  const asset = seedManagedImageAsset("draft-only-reference.png");
+  upsertStageConfig({
+    config: {
+      heroMedia: {
+        assetId: asset.assetId
+      }
+    },
+    pageKey: "overview",
+    stage: "draft",
+    updatedAt: "2026-05-18T09:00:00.000Z",
+    version: 3
+  });
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/images/${asset.assetId}`
+    });
+
+    assert.equal(response.statusCode, 200);
+  } finally {
+    await app.close();
+  }
+});
+
+test("DELETE /api/images/:id blocks removal when the asset is still referenced by a bootstrapped playlist runtime row", async () => {
+  const asset = seedManagedImageAsset("playlist-blocker.png");
+  getDatabase()
+    .prepare(
+      `
+        UPDATE image_assets
+        SET included_in_slideshow = 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+    )
+    .run(asset.assetId);
+
+  const app = await buildApp();
+
+  try {
+    const bootstrapResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist?bootstrap=true"
+    });
+    assert.equal(bootstrapResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/images/${asset.assetId}`
+    });
+
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as {
+      error: string;
+      references?: {
+        blockingIssues: Array<{ code: string; message: string }>;
+        references: Array<{ kind: string; stage: string }>;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, false);
+    assert.match(body.error, /playlist runtime/i);
+    assert.equal(
+      body.references?.blockingIssues.some((issue) => /playlist/i.test(issue.message)),
+      true
+    );
+    assert.equal(
+      body.references?.references.some(
+        (reference) => reference.kind === "slideshow" && reference.stage === "live"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("DELETE /api/images/:id ignores legacy slideshow fallback when no playlist runtime rows exist yet", async () => {
+  const asset = seedManagedImageAsset("playlist-legacy-delete.png");
+  getDatabase()
+    .prepare(
+      `
+        UPDATE image_assets
+        SET included_in_slideshow = 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+    )
+    .run(asset.assetId);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/images/${asset.assetId}`
+    });
+
+    assert.equal(response.statusCode, 200);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-ops/assets/:id/references keeps legacy slideshow as a diagnostic reference without a blocking issue", async () => {
+  const asset = seedManagedImageAsset("playlist-legacy-reference.png");
+  getDatabase()
+    .prepare(
+      `
+        UPDATE image_assets
+        SET included_in_slideshow = 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+    )
+    .run(asset.assetId);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/display-ops/assets/${asset.assetId}/references`
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      references: {
+        blockingIssues: Array<{ code: string; message: string }>;
+        liveCount: number;
+        references: Array<{ bindingId: string | null; kind: string; stage: string; targetLabel: string | null }>;
+      };
+    };
+
+    assert.equal(body.references.liveCount, 1);
+    assert.equal(
+      body.references.references.some(
+        (reference) =>
+          reference.kind === "slideshow" &&
+          reference.stage === "live" &&
+          reference.bindingId === null &&
+          reference.targetLabel === "slideshow"
+      ),
+      true
+    );
+    assert.equal(body.references.blockingIssues.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-ops/assets/:id/references ignores legacy slideshow fallback when playlist rows already exist but are disabled", async () => {
+  const asset = seedManagedImageAsset("playlist-disabled-fallback.png");
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "GET",
+      url: "/api/image-playlist?bootstrap=true"
+    });
+
+    getDatabase()
+      .prepare(
+        `
+          UPDATE image_assets
+          SET included_in_slideshow = 1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `
+      )
+      .run(asset.assetId);
+
+    getDatabase()
+      .prepare(
+        `
+          UPDATE image_playlist_entries
+          SET enabled = 0,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE asset_id = ?
+        `
+      )
+      .run(asset.assetId);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/display-ops/assets/${asset.assetId}/references`
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      references: {
+        blockingIssues: Array<{ code: string }>;
+        liveCount: number;
+        references: Array<{ kind: string; stage: string }>;
+      };
+    };
+
+    assert.equal(body.references.liveCount, 0);
+    assert.equal(
+      body.references.references.some(
+        (reference) => reference.kind === "slideshow" && reference.stage === "live"
+      ),
+      false
+    );
+    assert.equal(body.references.blockingIssues.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-ops/assets/:id/references clears the legacy slideshow flag when a playlist row is disabled", async () => {
+  const first = seedManagedImageAsset("playlist-disable-first.png");
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "GET",
+      url: "/api/image-playlist?bootstrap=true"
+    });
+
+    getDatabase()
+      .prepare(
+        `
+          UPDATE image_assets
+          SET included_in_slideshow = 1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `
+      )
+      .run(first.assetId);
+
+    const updateResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        enabled: false
+      },
+      url: "/api/image-playlist/IMG-01"
+    });
+
+    assert.equal(updateResponse.statusCode, 200);
+
+    const firstAsset = getDatabase()
+      .prepare("SELECT included_in_slideshow FROM image_assets WHERE id = ?")
+      .get(first.assetId) as { included_in_slideshow: number };
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/display-ops/assets/${first.assetId}/references`
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      references: {
+        blockingIssues: Array<{ code: string }>;
+        liveCount: number;
+        references: Array<{ kind: string; stage: string }>;
+      };
+    };
+
+    assert.equal(firstAsset.included_in_slideshow, 0);
+    assert.equal(body.references.liveCount, 0);
+    assert.equal(
+      body.references.references.some(
+        (reference) => reference.kind === "slideshow" && reference.stage === "live"
+      ),
+      false
+    );
+    assert.equal(body.references.blockingIssues.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-ops includes asset-health blockers when a live display asset file is missing", async () => {
   const asset = seedManagedImageAsset("missing-health.png");
   upsertStageConfig({

@@ -32,15 +32,18 @@ type ImageManagementContentProps = {
   assetReferences: DisplayOpsAssetReferenceSummary | null;
   assetReferencesErrorMessage: string;
   assets: ImageAsset[];
+  deleteBlockMessage: string | null;
   deleteBlocked: boolean;
   errorMessage: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
   handleDelete: () => Promise<void>;
+  handleBootstrapPlaylistGovernance: () => Promise<void>;
   handleSave: () => Promise<void>;
   handleSetCover: () => Promise<void>;
   handleUpload: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   isAssetHealthLoading: boolean;
   isAssetReferencesLoading: boolean;
+  isBootstrappingPlaylist: boolean;
   isDeleting: boolean;
   isLoading: boolean;
   isSaving: boolean;
@@ -73,6 +76,20 @@ type ImageManagementContentProps = {
       title: string | null;
     }>
   ) => void;
+  updatePlaylistEntryField: (
+    entryId: string,
+    updates: Partial<{
+      area: string;
+      capturedAt: string;
+      description: string;
+      displayOrder: number;
+      durationSeconds: number;
+      enabled: boolean;
+      fallbackMode: "display-placeholder" | "skip" | "use-cover";
+      tags: string[];
+      title: string;
+    }>
+  ) => void;
 };
 
 export function ImageManagementContent({
@@ -81,15 +98,18 @@ export function ImageManagementContent({
   assetReferences,
   assetReferencesErrorMessage,
   assets,
+  deleteBlockMessage,
   deleteBlocked,
   errorMessage,
   fileInputRef,
   handleDelete,
+  handleBootstrapPlaylistGovernance,
   handleSave,
   handleSetCover,
   handleUpload,
   isAssetHealthLoading,
   isAssetReferencesLoading,
+  isBootstrappingPlaylist,
   isDeleting,
   isLoading,
   isSaving,
@@ -100,7 +120,8 @@ export function ImageManagementContent({
   selectedImageId,
   setSelectedImageId,
   storageUsage,
-  updateAssetField
+  updateAssetField,
+  updatePlaylistEntryField
 }: ImageManagementContentProps) {
   const viewModel = buildImageManagementViewModel({
     assets,
@@ -125,6 +146,7 @@ export function ImageManagementContent({
             : "";
   const selectedAsset = assets.find((asset) => asset.id === viewModel.selection?.id);
   const aspectRatioChoice = selectedAsset ? formatAspectRatioChoice(selectedAsset.aspectRatio) : "auto";
+  const playlistTagsValue = viewModel.selection?.playlistTags?.join(" / ") ?? "";
 
   return (
     <div className="image-mgmt-page">
@@ -270,15 +292,103 @@ export function ImageManagementContent({
                 <textarea className="im-textarea" disabled={isLoading || isDeleting} maxLength={100} value={selectedAsset.description ?? ""} onChange={(event) => updateAssetField(viewModel.selection!.id, { description: event.target.value })} />
               </div>
 
-              <div className="im-form-row">
-                <label>顯示時間 <small>Duration</small></label>
-                <div className="im-stepper">
-                  <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting || selectedAsset.displayDuration <= 1} onClick={() => updateAssetField(viewModel.selection!.id, { displayDuration: Math.max(1, selectedAsset.displayDuration - 1) })}>−</button>
-                  <span className="im-stepper__value">{selectedAsset.displayDuration}</span>
-                  <span className="im-stepper__unit">秒</span>
-                  <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updateAssetField(viewModel.selection!.id, { displayDuration: selectedAsset.displayDuration + 1 })}>+</button>
-                </div>
+              <div className="im-section-label">
+                播放設定
+                <small>Playlist Runtime</small>
               </div>
+
+              {viewModel.selection.playlistEntryCount > 1 ? (
+                <div className="mgmt-status">
+                  此素材目前對應多個 playlist rows，以下正在編輯排序最前的 {viewModel.selection.playlistEntryId}。
+                </div>
+              ) : null}
+
+              {viewModel.selection.playlistEntryId ? (
+                <>
+                  <div className="im-form-row">
+                    <label>播放標題 <small>Playlist Title</small></label>
+                    <input className="im-input" disabled={isLoading || isDeleting} maxLength={50} value={viewModel.selection.playlistTitle ?? ""} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { title: event.target.value })} />
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>播放描述 <small>Playlist Description</small></label>
+                    <textarea className="im-textarea" disabled={isLoading || isDeleting} maxLength={100} value={viewModel.selection.playlistDescription ?? ""} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { description: event.target.value })} />
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>顯示區域 <small>Area</small></label>
+                    <input className="im-input" disabled={isLoading || isDeleting} maxLength={40} value={viewModel.selection.playlistArea ?? ""} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { area: event.target.value })} />
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>拍攝時間 <small>Captured At</small></label>
+                    <input className="im-input" disabled={isLoading || isDeleting} maxLength={40} value={viewModel.selection.playlistCapturedAt ?? ""} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { capturedAt: event.target.value })} />
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>標籤 <small>Tags</small></label>
+                    <input className="im-input" disabled={isLoading || isDeleting} maxLength={80} value={playlistTagsValue} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, {
+                      tags: event.target.value
+                        .split("/")
+                        .map((tag) => tag.trim())
+                        .filter((tag) => tag.length > 0)
+                    })} />
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>播放順序 <small>Display Order</small></label>
+                    <div className="im-stepper">
+                      <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDisplayOrder ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: Math.max(1, (viewModel.selection!.playlistDisplayOrder ?? 1) - 1) })}>−</button>
+                      <span className="im-stepper__value">{viewModel.selection.playlistDisplayOrder ?? 1}</span>
+                      <span className="im-stepper__unit">位</span>
+                      <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: (viewModel.selection!.playlistDisplayOrder ?? 1) + 1 })}>+</button>
+                    </div>
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>播放時間 <small>Duration</small></label>
+                    <div className="im-stepper">
+                      <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDurationSeconds ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: Math.max(1, (viewModel.selection!.playlistDurationSeconds ?? 1) - 1) })}>−</button>
+                      <span className="im-stepper__value">{viewModel.selection.playlistDurationSeconds ?? 10}</span>
+                      <span className="im-stepper__unit">秒</span>
+                      <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: (viewModel.selection!.playlistDurationSeconds ?? 10) + 1 })}>+</button>
+                    </div>
+                  </div>
+
+                  <div className="im-form-row">
+                    <label>Fallback 模式 <small>Fallback Mode</small></label>
+                    <select className="im-select" value={viewModel.selection.playlistFallbackMode ?? "display-placeholder"} disabled={isLoading || isDeleting} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, {
+                      fallbackMode: event.target.value as "display-placeholder" | "skip" | "use-cover"
+                    })}>
+                      <option value="display-placeholder">display-placeholder</option>
+                      <option value="skip">skip</option>
+                      <option value="use-cover">use-cover</option>
+                    </select>
+                  </div>
+
+                  <div className="im-toggle">
+                    <div className="im-toggle__label">
+                      啟用播放
+                      <small>{viewModel.selection.playlistEnabled ? "目前正在 playlist runtime 中啟用" : "目前未在 playlist runtime 中啟用"}</small>
+                    </div>
+                    <Switch ariaLabel="啟用播放" on={viewModel.selection.playlistEnabled ?? false} disabled={isLoading || isDeleting} onChange={(next) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { enabled: next })} />
+                  </div>
+                </>
+              ) : (
+                <div className="mgmt-status">
+                  此素材目前沒有對應的 playlist entry，暫時只能調整素材庫欄位。
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="im-btn"
+                      disabled={isLoading || isDeleting || isSaving || isBootstrappingPlaylist}
+                      onClick={() => void handleBootstrapPlaylistGovernance()}
+                    >
+                      {isBootstrappingPlaylist ? "建立中..." : "建立 Playlist Governance Rows"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="im-form-row">
                 <label>裁切/焦點 <small>Crop / Focus</small></label>
@@ -294,14 +404,6 @@ export function ImageManagementContent({
                   <option value="1:1">1:1</option>
                   {aspectRatioChoice === "custom" ? <option value="custom">自訂比例 {formatAspectRatioLabel(selectedAsset.aspectRatio)}</option> : null}
                 </select>
-              </div>
-
-              <div className="im-toggle">
-                <div className="im-toggle__label">
-                  納入輪播
-                  <small>{viewModel.selection.includedInSlideshow ? "目前已加入展示輪播" : "目前未在輪播清單"}</small>
-                </div>
-                <Switch ariaLabel="納入輪播" on={viewModel.selection.includedInSlideshow} disabled={isLoading || isDeleting} onChange={(next) => updateAssetField(viewModel.selection!.id, { includedInSlideshow: next })} />
               </div>
 
               <div className="im-form-row">
@@ -326,7 +428,7 @@ export function ImageManagementContent({
 
               {deleteBlocked ? (
                 <div className="mgmt-status is-error">
-                  這張圖片仍被 live display surface 引用，請先解除引用後再移除。
+                  {deleteBlockMessage ?? "這張圖片仍被 live display surface 或 playlist runtime 引用，請先解除引用後再移除。"}
                 </div>
               ) : null}
             </div>

@@ -338,6 +338,23 @@
   gap: 6px;
 }
 
+.image-mgmt-page .im-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(92, 105, 79, 0.12);
+  color: #314233;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.image-mgmt-page .im-section-label small {
+  font: 400 11px/1.1 var(--font-family-en);
+  color: #879084;
+}
+
 .image-mgmt-page .im-form-row label {
   display: flex;
   justify-content: space-between;

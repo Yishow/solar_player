@@ -1,10 +1,15 @@
-import { useMemo, useState } from "react";
+import type {
+  SustainabilityPeriodKey,
+  SustainabilityStoryInput
+} from "@solar-display/shared";
+import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
+import { fetchSustainabilityStory } from "../../services/api";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import {
   createSustainabilityDisplayPageSeedConfig,
@@ -34,7 +39,7 @@ function iconClassName(className?: string) {
   return ["h-full w-full", className ?? ""].join(" ").trim();
 }
 
-function periodLabel(period: "lifetime" | "month" | "quarter" | "year") {
+function periodLabel(period: SustainabilityPeriodKey) {
   switch (period) {
     case "month":
       return "月";
@@ -121,10 +126,33 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     enabled: config === undefined,
     stage: "live"
   });
-  const [selectedPeriod, setSelectedPeriod] = useState<"lifetime" | "month" | "quarter" | "year">("lifetime");
+  const [selectedPeriod, setSelectedPeriod] = useState<SustainabilityPeriodKey>("lifetime");
+  const [storyData, setStoryData] = useState<SustainabilityStoryInput | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void fetchSustainabilityStory(selectedPeriod)
+      .then((res) => {
+        if (isActive) {
+          setStoryData(res.story);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setStoryData(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedPeriod]);
+
   const viewModel = buildSustainabilityViewModel({
     highlights: sustainabilityHighlights,
     selectedPeriod,
+    story: storyData ?? undefined,
     summary: sustainabilitySummary
   });
   const resolvedConfig = config ?? runtimeConfig.config;

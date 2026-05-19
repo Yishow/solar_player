@@ -99,6 +99,11 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
+  const summaryLayout = withContentOffset({
+    left: 88,
+    top: 430,
+    width: 520
+  });
 
   return (
     <section className="overview-display-page">
@@ -157,6 +162,21 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
       </figure>
+
+      <section
+        className={[
+          "overview-summary",
+          `overview-summary-${viewModel.summary.alertTone}`
+        ].join(" ")}
+        style={{
+          left: `${summaryLayout.left}px`,
+          top: `${summaryLayout.top}px`,
+          width: `${summaryLayout.width}px`
+        }}
+      >
+        <strong>Shared Story Summary</strong>
+        <p>{viewModel.summary.statusLabel}</p>
+      </section>
 
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;

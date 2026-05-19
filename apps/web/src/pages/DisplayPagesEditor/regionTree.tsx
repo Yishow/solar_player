@@ -37,6 +37,8 @@ export function DisplayEditorLeftPanel({
   lockedRegionIds: string[];
 }) {
   const [tab, setTab] = useState<"regions" | "actions">("regions");
+  const saveDisabled = isLoading || isSaving || !dirty;
+  const publishDisabled = isLoading || isSaving || isPublishing || isPublishBlocked;
 
   return (
     <section className="flex h-full flex-col border-r border-[var(--shell-divider)] bg-white/70 backdrop-blur-sm">
@@ -142,17 +144,37 @@ export function DisplayEditorLeftPanel({
           </button>
           <button
             type="button"
-            className="w-full rounded-full bg-[var(--shell-accent)] px-3 py-2.5 text-[13px] font-semibold text-white disabled:opacity-55"
-            disabled={isLoading || isSaving || !dirty}
+            className="w-full rounded-full px-3 py-2.5 text-[13px] font-semibold"
+            disabled={saveDisabled}
             onClick={onSave}
+            style={saveDisabled
+              ? {
+                  backgroundColor: "rgba(95, 140, 80, 0.14)",
+                  border: "1px solid rgba(95, 140, 80, 0.22)",
+                  color: "var(--shell-muted-ink)"
+                }
+              : {
+                  backgroundColor: "#5f8c50",
+                  color: "#ffffff"
+                }}
           >
             {isSaving ? "儲存中..." : "儲存設定"}
           </button>
           <button
             type="button"
-            className="w-full rounded-full bg-[var(--shell-title-ink)] px-3 py-2.5 text-[13px] font-semibold text-white disabled:opacity-55"
-            disabled={isLoading || isSaving || isPublishing || isPublishBlocked}
+            className="w-full rounded-full px-3 py-2.5 text-[13px] font-semibold"
+            disabled={publishDisabled}
             onClick={onPublish}
+            style={publishDisabled
+              ? {
+                  backgroundColor: "rgba(52, 56, 58, 0.14)",
+                  border: "1px solid rgba(52, 56, 58, 0.18)",
+                  color: "var(--shell-muted-ink)"
+                }
+              : {
+                  backgroundColor: "#34383a",
+                  color: "#ffffff"
+                }}
           >
             {isPublishing ? "發布中..." : "發布草稿"}
           </button>

@@ -130,7 +130,7 @@ test("buildSolarViewModel preserves missing comparison target diagnostics", () =
   assert.equal(model.kpis[0]?.comparison?.fallbackReason, "comparison-target-missing");
 });
 
-test("buildSolarViewModel uses solar story KPIs and flowState when available", () => {
+test("buildSolarViewModel uses solar story KPIs and keeps live power fallback when the shared story omits it", () => {
   const model = buildSolarViewModel({
     isSocketConnected: true,
     snapshot,
@@ -153,7 +153,7 @@ test("buildSolarViewModel uses solar story KPIs and flowState when available", (
   assert.equal(model.kpis[0]?.value, "4,200");
   assert.equal(model.kpis[0]?.comparison?.state, "above-target");
   assert.equal(model.story.flowState.state, "healthy");
-  assert.equal(model.flowNodes[0]?.value, "-- kW");
+  assert.equal(model.flowNodes[0]?.value, "586 kW");
 });
 
 test("buildSolarViewModel falls back to socket when solarStory has too few KPIs", () => {

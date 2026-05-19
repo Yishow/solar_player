@@ -54,44 +54,16 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const [playlistData, setPlaylistData] = useState<{
-    entries: Array<{
-      entryId: string;
-      displayOrder: number;
-      durationSeconds: number;
-      enabled: boolean;
-      fallbackMode: "display-placeholder" | "skip" | "use-cover";
-      fallbackReason?: string | null;
-      title: string;
-      description: string;
-      area: string;
-      capturedAt: string;
-      resolution: string;
-      tags: string[];
-      assetSource: string | null;
-      hasAsset: boolean;
-    }>;
-    activeEntry: {
-      entryId: string;
-      durationSeconds: number;
-      fallbackMode: "display-placeholder" | "skip" | "use-cover";
-      fallbackReason: string | null;
-      title: string;
-      description: string;
-      area: string;
-      capturedAt: string;
-      resolution: string;
-      tags: string[];
-      assetSource: string | null;
-      hasAsset: boolean;
-    } | null;
+    entries: Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"]["entries"];
+    activeEntry: Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"]["activeEntry"];
   } | null>(null);
 
   useEffect(() => {
     let isActive = true;
 
-    void fetchImagePlaylist(activeIndex)
+    void fetchImagePlaylist(activeIndex, { bootstrap: true })
       .then((res) => {
-        if (isActive && res.playlist) {
+        if (isActive) {
           setPlaylistData(res.playlist);
         }
       })
@@ -107,46 +79,14 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   }, [activeIndex]);
 
   const resolvedConfig = config ?? runtimeConfig.config;
-  const playlistEntries = useMemo(
-    () =>
-      playlistData === null
-        ? []
-        : playlistData.entries.map((entry) => ({
-            area: entry.area,
-            assetId: entry.entryId,
-            capturedAt: entry.capturedAt,
-            description: entry.description,
-            displayOrder: entry.displayOrder,
-            durationSeconds: entry.durationSeconds,
-            enabled: entry.enabled,
-            entryId: entry.entryId,
-            fallbackMode: entry.fallbackMode,
-            resolution: entry.resolution,
-            tags: entry.tags,
-            title: entry.title
-          })),
-    [playlistData]
-  );
-  const playlistAssets = useMemo(
-    () =>
-      playlistData === null
-        ? []
-        : playlistData.entries.map((entry, index) => ({
-            assetId: entry.entryId,
-            height: entry.hasAsset ? 1080 : null,
-            source: entry.assetSource,
-            status: entry.hasAsset ? ("ready" as const) : ("pending" as const),
-            width: entry.hasAsset ? 1920 : null
-          })),
-    [playlistData]
-  );
   const viewModel = buildImagesViewModel({
+    activeEntry: playlistData?.activeEntry ?? null,
     activeIndex,
-    assets: playlistAssets,
+    assets: [],
     coverAssetSource: resolvedConfig.mainStage.src ?? null,
-    entries: playlistEntries
+    entries: playlistData?.entries ?? []
   });
-  const visibleStart = Math.min(Math.max(activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
+  const visibleStart = Math.min(Math.max(viewModel.activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
 
   const titleLayout = withContentOffset(imagesTitleLayout);
@@ -215,7 +155,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         <div
           className="images-progress-line"
           style={{
-            ["--progress-width" as string]: `${((activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
+            ["--progress-width" as string]: `${((viewModel.activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
           }}
         />
       </section>
@@ -229,7 +169,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           width: `${mainLayout.width}px`
         }}
       >
-        {viewModel.active.hasAsset ? (
+        {viewModel.active.assetSource ? (
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
             src={viewModel.active.assetSource ?? resolvedConfig.mainStage.src ?? undefined}
@@ -278,7 +218,13 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           top: `${resolvedConfig.arrows.left.top - CONTENT_TOP_OFFSET}px`
         }}
         onClick={() =>
-          setActiveIndex((index) => (index > 0 ? index - 1 : viewModel.thumbnails.length - 1))
+          setActiveIndex(() =>
+            viewModel.thumbnails.length === 0
+              ? 0
+              : viewModel.activeIndex > 0
+                ? viewModel.activeIndex - 1
+                : viewModel.thumbnails.length - 1
+          )
         }
       >
         ‹
@@ -289,7 +235,15 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           left: `${resolvedConfig.arrows.right.left}px`,
           top: `${resolvedConfig.arrows.right.top - CONTENT_TOP_OFFSET}px`
         }}
-        onClick={() => setActiveIndex((index) => (index < viewModel.thumbnails.length - 1 ? index + 1 : 0))}
+        onClick={() =>
+          setActiveIndex(() =>
+            viewModel.thumbnails.length === 0
+              ? 0
+              : viewModel.activeIndex < viewModel.thumbnails.length - 1
+                ? viewModel.activeIndex + 1
+                : 0
+          )
+        }
       >
         ›
       </button>
@@ -313,7 +267,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
             }}
             onClick={() => setActiveIndex(visibleStart + thumbIndex)}
           >
-            {thumbnail.hasAsset ? (
+            {thumbnail.assetSource ? (
               <img alt={thumbnail.infoPanel.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />
             ) : (
               <div className="images-thumb-placeholder">

@@ -21,6 +21,30 @@ const snapshot: LiveMetricsSnapshot = {
   timestamp: "2026-05-13T10:00:00.000Z"
 };
 
+function createResolvedStoryMetric(args: {
+  alertTone?: "danger" | "normal" | "warning";
+  bindingState?: "bound" | "conflict" | "missing";
+  fallbackReason?: "metric-unavailable" | "stale-data" | null;
+  freshnessState?: "fallback" | "fresh" | "stale";
+  helper?: string;
+  label: string;
+  metricKey: string;
+  unit: string;
+  value?: string;
+}) {
+  return {
+    alertTone: args.alertTone ?? "normal",
+    bindingState: args.bindingState ?? "bound",
+    fallbackReason: args.fallbackReason ?? null,
+    freshnessState: args.freshnessState ?? "fresh",
+    helper: args.helper ?? `共享故事 ${args.label}`,
+    label: args.label,
+    metricKey: args.metricKey,
+    unit: args.unit,
+    value: args.value ?? "--"
+  };
+}
+
 test("buildOverviewViewModel prefers live metrics when socket data is available", () => {
   const model = buildOverviewViewModel({
     connectionState: "connected",
@@ -132,9 +156,9 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
     },
     storyOverview: {
       metrics: [
-        { fallbackIndex: 2, label: "故事版累積發電量", metricKey: "totalGeneration", unit: "MWh" },
-        { fallbackIndex: 0, label: "故事版即時功率", metricKey: "realTimePower", unit: "kW" },
-        { fallbackIndex: 1, label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh" }
+        createResolvedStoryMetric({ label: "故事版累積發電量", metricKey: "totalGeneration", unit: "MWh", value: "18.6" }),
+        createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "612" }),
+        createResolvedStoryMetric({ label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh", value: "3,842" })
       ],
       summary: {
         alertTone: "normal",
@@ -153,7 +177,7 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
   assert.equal(model.metrics[2]?.unit, "MWh");
   assert.equal(model.metrics[3]?.label, "今日 CO₂ 減量");
   assert.equal(model.summary.alertTone, "normal");
-  assert.equal(model.summary.statusLabel, "Socket 即時更新中");
+  assert.equal(model.summary.statusLabel, "共享故事資料同步中");
 });
 
 test("buildOverviewViewModel keeps display-story overview bindings when story summary is stale", () => {
@@ -163,9 +187,17 @@ test("buildOverviewViewModel keeps display-story overview bindings when story su
     snapshot,
     storyOverview: {
       metrics: [
-        { fallbackIndex: 0, label: "故事版即時功率", metricKey: "realTimePower", unit: "kW" },
-        { fallbackIndex: 1, label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh" },
-        { fallbackIndex: 2, label: "故事版累積發電量", metricKey: "totalGeneration", unit: "GWh" }
+        createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "612" }),
+        createResolvedStoryMetric({ label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh", value: "3,842" }),
+        createResolvedStoryMetric({
+          alertTone: "warning",
+          fallbackReason: "stale-data",
+          freshnessState: "stale",
+          label: "故事版累積發電量",
+          metricKey: "totalGeneration",
+          unit: "GWh",
+          value: "--"
+        })
       ],
       summary: {
         alertTone: "warning",
@@ -180,7 +212,90 @@ test("buildOverviewViewModel keeps display-story overview bindings when story su
   assert.equal(model.metrics[2]?.label, "故事版累積發電量");
   assert.equal(model.summary.alertTone, "warning");
   assert.equal(model.summary.fallbackReason, "stale-data");
-  assert.equal(model.summary.statusLabel, "資料延遲，摘要使用最近一次有效讀值");
+  assert.equal(model.summary.statusLabel, "共享故事資料延遲，摘要使用最近一次有效讀值");
+});
+
+test("buildOverviewViewModel keeps shared story metrics when the summary is in fallback state", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "612" }),
+        createResolvedStoryMetric({
+          alertTone: "warning",
+          bindingState: "missing",
+          fallbackReason: "metric-unavailable",
+          freshnessState: "fallback",
+          helper: "共享故事缺少今日發電量",
+          label: "故事版今日發電量",
+          metricKey: "todayGeneration",
+          unit: "kWh",
+          value: "--"
+        })
+      ],
+      summary: {
+        alertTone: "warning",
+        bindingState: "missing",
+        fallbackReason: "metric-unavailable",
+        freshnessState: "fallback"
+      }
+    }
+  });
+
+  assert.equal(model.metrics[0]?.label, "故事版即時功率");
+  assert.equal(model.metrics[1]?.label, "故事版今日發電量");
+  assert.equal(model.metrics[2]?.label, "累積發電量");
+  assert.equal(model.summary.fallbackReason, "metric-unavailable");
+  assert.equal(model.summary.statusLabel, "共享故事部分缺值，缺少 KPI 會回退顯示");
+});
+
+test("buildOverviewViewModel accepts resolved display-story overview metrics without fallback bindings", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        {
+          alertTone: "normal",
+          bindingState: "bound",
+          fallbackReason: null,
+          freshnessState: "fresh",
+          helper: "共享故事即時功率",
+          label: "故事版即時功率",
+          metricKey: "realTimePower",
+          unit: "kW",
+          value: "601"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "missing",
+          fallbackReason: "metric-unavailable",
+          freshnessState: "fallback",
+          helper: "共享故事缺少今日發電量",
+          label: "故事版今日發電量",
+          metricKey: "todayGeneration",
+          unit: "kWh",
+          value: "--"
+        }
+      ],
+      summary: {
+        alertTone: "warning",
+        bindingState: "missing",
+        fallbackReason: "metric-unavailable",
+        freshnessState: "fallback"
+      }
+    }
+  });
+
+  assert.equal(model.metrics[0]?.label, "故事版即時功率");
+  assert.equal(model.metrics[0]?.value, "601");
+  assert.equal(model.metrics[0]?.helper, "共享故事即時功率");
+  assert.equal(model.metrics[1]?.bindingState, "missing");
+  assert.equal(model.metrics[1]?.helper, "共享故事缺少今日發電量");
+  assert.equal(model.metrics[2]?.label, "累積發電量");
 });
 
 test("buildOverviewViewModel keeps socket bindings when display-story request failed", () => {

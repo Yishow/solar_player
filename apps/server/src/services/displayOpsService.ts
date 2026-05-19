@@ -186,8 +186,46 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
   const assetRow = getDatabase()
     .prepare("SELECT id, included_in_slideshow, is_cover FROM image_assets WHERE id = ?")
     .get(assetId) as ImageAssetRow | undefined;
+  const playlistTableExists = Boolean(
+    getDatabase()
+      .prepare(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table' AND name = 'image_playlist_entries'
+        `
+      )
+      .get()
+  );
+  const enabledPlaylistEntries = playlistTableExists
+    ? (getDatabase()
+        .prepare(
+          `
+            SELECT entry_id, enabled
+            FROM image_playlist_entries
+            WHERE asset_id = ?
+            ORDER BY display_order ASC, entry_id ASC
+          `
+        )
+        .all(assetId) as Array<{
+        enabled: number;
+        entry_id: string;
+      }>)
+    : [];
 
-  if (assetRow?.included_in_slideshow === 1) {
+  const activePlaylistEntries = enabledPlaylistEntries.filter((entry) => entry.enabled === 1);
+  if (activePlaylistEntries.length > 0) {
+    activePlaylistEntries.forEach((entry) => {
+      stageReferences.push({
+        bindingId: entry.entry_id,
+        kind: "slideshow",
+        message: "此素材目前仍在啟用中的 playlist runtime 內",
+        pageId: null,
+        stage: "live",
+        targetLabel: entry.entry_id
+      });
+    });
+  } else if (enabledPlaylistEntries.length === 0 && assetRow?.included_in_slideshow === 1) {
     stageReferences.push({
       bindingId: null,
       kind: "slideshow",
@@ -211,11 +249,20 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
 
   const liveCount = stageReferences.filter((reference) => reference.stage === "live").length;
   const draftCount = stageReferences.filter((reference) => reference.stage === "draft").length;
-  const hasBlockingLiveReference = stageReferences.some(
+  const hasBlockingLiveDisplayReference = stageReferences.some(
     (reference) => reference.kind === "display-page" && reference.stage === "live"
   );
-  const blockingIssues =
-    hasBlockingLiveReference
+  const hasBlockingPlaylistReference = stageReferences.some(
+    (reference) =>
+      reference.stage === "live" &&
+     reference.kind === "slideshow" &&
+     !(reference.bindingId === null && reference.targetLabel === "slideshow")
+  );
+  const hasBlockingCoverReference = stageReferences.some(
+   (reference) => reference.stage === "live" && reference.kind === "cover"
+  );
+  const blockingIssues = [
+    ...(hasBlockingLiveDisplayReference
       ? [
           buildIssue({
             assetId,
@@ -224,7 +271,28 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
             severity: "blocking"
           })
         ]
-      : [];
+      : []),
+    ...(hasBlockingPlaylistReference
+      ? [
+          buildIssue({
+            assetId,
+            code: "live-reference",
+            message: "Asset is still referenced by live playlist usage",
+            severity: "blocking"
+          })
+        ]
+      : []),
+    ...(hasBlockingCoverReference
+      ? [
+          buildIssue({
+            assetId,
+            code: "live-reference",
+            message: "Asset is still referenced by the live cover image",
+            severity: "blocking"
+          })
+        ]
+      : [])
+  ];
 
   return {
     assetId,
