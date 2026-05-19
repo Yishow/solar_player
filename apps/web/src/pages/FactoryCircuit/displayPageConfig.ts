@@ -1,5 +1,19 @@
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildGoldLineFields,
+  buildHeroTypographyFields,
+  buildLeafOrnamentFields,
+  buildStatusBlockChromeFields,
+  createGoldLineChromeConfig,
+  createHeroTypographyConfig,
+  createLeafOrnamentChromeConfig,
+  createStatusBlockChromeConfig,
+  type GoldLineChromeConfig,
+  type HeroTypographyConfig,
+  type LeafOrnamentChromeConfig,
+  type StatusBlockChromeConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildDisplayPageIconSourceFields,
   createPageIconKeySource,
   type DisplayPageIconSource
@@ -22,6 +36,16 @@ export type FactoryCircuitDisplayRect = {
 };
 
 export type FactoryCircuitDisplayPageConfig = {
+  chrome: {
+    heroTypography: HeroTypographyConfig;
+    modules: {
+      statusBlock: StatusBlockChromeConfig;
+    };
+    ornaments: {
+      goldLine: GoldLineChromeConfig;
+      leaf: LeafOrnamentChromeConfig;
+    };
+  };
   connectors: Record<"inverterToBoard" | "solarToInverter", FactoryCircuitDisplayRect>;
   hero: {
     copyEnLines: [string, string, string, string];
@@ -53,6 +77,23 @@ export type FactoryCircuitDisplayPageConfig = {
 
 export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDisplayPageConfig {
   return {
+    chrome: {
+      heroTypography: createHeroTypographyConfig({
+        subtitleMarginTop: 20
+      }),
+      modules: {
+        statusBlock: createStatusBlockChromeConfig()
+      },
+      ornaments: {
+        goldLine: createGoldLineChromeConfig({
+          thickness: 2,
+          opacity: 1
+        }),
+        leaf: createLeafOrnamentChromeConfig({
+          opacity: 0.38
+        })
+      }
+    },
     connectors: {
       inverterToBoard: { ...factoryCircuitConnectorLayout.inverterToBoard, height: 16 },
       solarToInverter: { ...factoryCircuitConnectorLayout.solarToInverter, height: 16 }
@@ -138,6 +179,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["textBlocks", "copy", "width"]
     },
     fields: [
+      ...buildHeroTypographyFields({
+        idPrefix: "factory",
+        path: ["chrome", "heroTypography"]
+      }),
       { fieldType: "text", id: "factory-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "factory-title", label: "Title", path: ["hero", "title"] },
       { fieldType: "text", id: "factory-subtitle", label: "Subtitle", path: ["hero", "subtitle"] },
@@ -170,6 +215,36 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       { constraints: { min: 0 }, fieldType: "number", id: "factory-status-width", label: "Status Width", path: ["statusBlock", "width"] }
     ],
     presetKey: "factory-copy-layout"
+  },
+  {
+    id: "factory-status-block",
+    label: "Factory Status Block",
+    description: "調整 status block chrome appearance。",
+    fields: buildStatusBlockChromeFields({
+      idPrefix: "factory",
+      path: ["chrome", "modules", "statusBlock"]
+    }),
+    presetKey: "factory-status-block"
+  },
+  {
+    id: "factory-ornament-gold-line",
+    label: "Factory Gold Line",
+    description: "調整 gold line chrome appearance。",
+    fields: buildGoldLineFields({
+      idPrefix: "factory",
+      path: ["chrome", "ornaments", "goldLine"]
+    }),
+    presetKey: "factory-gold-line"
+  },
+  {
+    id: "factory-ornament-leaf",
+    label: "Factory Leaf Ornament",
+    description: "調整 leaf ornament chrome appearance。",
+    fields: buildLeafOrnamentFields({
+      idPrefix: "factory",
+      path: ["chrome", "ornaments", "leaf"]
+    }),
+    presetKey: "factory-leaf"
   },
   ...Object.keys(createFactoryCircuitDisplayPageSeedConfig().nodes).map<DisplayEditorRegionSchema>((key) => ({
     id: `factory-node-${key}`,

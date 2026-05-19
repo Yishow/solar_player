@@ -136,6 +136,8 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
     runtimeErrorMessage: runtimeHydrationEnabled ? factoryStoryRuntime.errorMessage : "",
     usesRuntimeFallback: factoryStoryRuntime.usesFallback
   });
+  const heroTypography = resolvedConfig.chrome.heroTypography;
+  const statusChrome = resolvedConfig.chrome.modules.statusBlock;
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
@@ -154,11 +156,37 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="factory-circuit-eyebrow">{resolvedConfig.hero.eyebrow}</p>
-        <h2 className="factory-circuit-display-title">
+        <p
+          className="factory-circuit-eyebrow"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
+            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
+          }}
+        >
+          {resolvedConfig.hero.eyebrow}
+        </p>
+        <h2
+          className="factory-circuit-display-title"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
+            fontWeight: heroTypography.titleEmphasisWeight,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
+          }}
+        >
           {resolvedConfig.hero.title}
         </h2>
-        <p className="factory-circuit-subtitle">{resolvedConfig.hero.subtitle}</p>
+        <p
+          className="factory-circuit-subtitle"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
+            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
+          }}
+        >
+          {resolvedConfig.hero.subtitle}
+        </p>
       </section>
 
       <p
@@ -186,8 +214,10 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
       <div
         className="factory-circuit-gold-line"
         style={{
+          height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLayout.left}px`,
-          top: `${goldLayout.top}px`,
+          opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+          top: `${goldLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
           width: `${goldLayout.width}px`
         }}
       />
@@ -196,8 +226,10 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
         className="factory-circuit-leaf-watermark"
         style={{
           height: `${leafLayout.height}px`,
-          left: `${leafLayout.left}px`,
-          top: `${leafLayout.top}px`,
+          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
         }}
       />
@@ -205,13 +237,26 @@ export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageC
       <section
         className="factory-circuit-status-note"
         style={{
+          borderRadius: `${statusChrome.radius}px`,
+          gap: `${resolvedConfig.chrome.modules.statusBlock.gap}px`,
           left: `${statusLayout.left}px`,
+          padding: `${resolvedConfig.chrome.modules.statusBlock.paddingTop}px ${resolvedConfig.chrome.modules.statusBlock.paddingRight}px ${resolvedConfig.chrome.modules.statusBlock.paddingBottom}px ${resolvedConfig.chrome.modules.statusBlock.paddingLeft}px`,
           top: `${statusLayout.top}px`,
           width: `${statusLayout.width}px`
         }}
       >
-        <b>{viewModel.summary.statusLabel}</b>
-        {viewModel.emptyState ? <p>{viewModel.emptyState.description}</p> : <p>保留六個迴路面板與五個 KPI witness，持續對齊 reference routing board。</p>}
+        <b style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.titleFontSize}px` }}>
+          {viewModel.summary.statusLabel}
+        </b>
+        {viewModel.emptyState ? (
+          <p style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.bodyFontSize}px` }}>
+            {viewModel.emptyState.description}
+          </p>
+        ) : (
+          <p style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.bodyFontSize}px` }}>
+            保留六個迴路面板與五個 KPI witness，持續對齊 reference routing board。
+          </p>
+        )}
       </section>
 
       {viewModel.flowNodes.map((node) => {

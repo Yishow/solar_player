@@ -6,6 +6,20 @@ import {
   type DisplayCardStyleConfig
 } from "../shared/displayCardStyleConfig";
 import {
+  buildArrowChromeFields,
+  buildCounterChromeFields,
+  buildGoldLineFields,
+  buildHeroTypographyFields,
+  createArrowChromeConfig,
+  createCounterChromeConfig,
+  createGoldLineChromeConfig,
+  createHeroTypographyConfig,
+  type ArrowChromeConfig,
+  type CounterChromeConfig,
+  type GoldLineChromeConfig,
+  type HeroTypographyConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildDisplayPageIconSourceFields,
   createReferenceGlyphIconSource,
   type DisplayPageIconSource
@@ -29,6 +43,16 @@ export type ImagesDisplayRect = {
 export type ImagesDisplayPageConfig = {
   arrows: Record<"left" | "right", ImagesDisplayRect>;
   cardStyles: Record<"infoPanel", DisplayCardStyleConfig>;
+  chrome: {
+    heroTypography: HeroTypographyConfig;
+    modules: {
+      arrows: ArrowChromeConfig;
+      counter: CounterChromeConfig;
+    };
+    ornaments: {
+      goldLine: GoldLineChromeConfig;
+    };
+  };
   hero: {
     copyLines: [string, string, string];
     eyebrow: string;
@@ -81,6 +105,20 @@ export function createImagesDisplayPageSeedConfig(
         paddingTop: 34,
         titleFontSize: 28
       })
+    },
+    chrome: {
+      heroTypography: createHeroTypographyConfig({
+        subtitleMarginTop: 20
+      }),
+      modules: {
+        arrows: createArrowChromeConfig(),
+        counter: createCounterChromeConfig()
+      },
+      ornaments: {
+        goldLine: createGoldLineChromeConfig({
+          opacity: 0.88
+        })
+      }
     },
     hero: {
       copyLines: [
@@ -141,6 +179,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["textBlocks", "copy", "width"]
     },
     fields: [
+      ...buildHeroTypographyFields({
+        idPrefix: "images",
+        path: ["chrome", "heroTypography"]
+      }),
       { fieldType: "text", id: "images-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "images-title", label: "Title", path: ["hero", "title"] },
       { fieldType: "text", id: "images-subtitle", label: "Subtitle", path: ["hero", "subtitle"] },
@@ -170,6 +212,36 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "images-copy-width", label: "Width", path: ["textBlocks", "copy", "width"] }
     ],
     presetKey: "images-copy-layout"
+  },
+  {
+    id: "images-ornament-gold-line",
+    label: "Images Gold Ornament",
+    description: "調整 gold ornament chrome appearance。",
+    fields: buildGoldLineFields({
+      idPrefix: "images",
+      path: ["chrome", "ornaments", "goldLine"]
+    }),
+    presetKey: "images-gold-ornament"
+  },
+  {
+    id: "images-counter",
+    label: "Images Counter",
+    description: "調整 slide counter chrome appearance。",
+    fields: buildCounterChromeFields({
+      idPrefix: "images",
+      path: ["chrome", "modules", "counter"]
+    }),
+    presetKey: "images-counter"
+  },
+  {
+    id: "images-arrows-style",
+    label: "Images Arrows",
+    description: "調整 gallery arrow chrome appearance。",
+    fields: buildArrowChromeFields({
+      idPrefix: "images",
+      path: ["chrome", "modules", "arrows"]
+    }),
+    presetKey: "images-arrows"
   },
   {
     id: "images-main-stage",

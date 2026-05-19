@@ -108,6 +108,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     usesRuntimeFallback: storyRuntime.usesFallback
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const heroTypography = resolvedConfig.chrome.heroTypography;
 
   const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -123,8 +124,10 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
         className="overview-leaf-watermark"
         style={{
           height: `${leafLayout.height}px`,
-          left: `${leafLayout.left}px`,
-          top: `${leafLayout.top}px`,
+          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          transform: `rotate(-15deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
         }}
       />
@@ -132,8 +135,10 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
       <div
         className="overview-gold-line"
         style={{
+          height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLineLayout.left}px`,
-          top: `${goldLineLayout.top}px`,
+          opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+          top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
           width: `${goldLineLayout.width}px`
         }}
       />
@@ -146,13 +151,37 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="overview-eyebrow">{resolvedConfig.heroCopy.eyebrow}</p>
-        <h2 className="overview-display-title">
+        <p
+          className="overview-eyebrow"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
+            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
+          }}
+        >
+          {resolvedConfig.heroCopy.eyebrow}
+        </p>
+        <h2
+          className="overview-display-title"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
+            fontWeight: heroTypography.titleEmphasisWeight,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
+          }}
+        >
           {resolvedConfig.heroCopy.titleLines[0]}
           <br />
           {resolvedConfig.heroCopy.titleLines[1]}
         </h2>
-        <p className="overview-hero-subtitle">
+        <p
+          className="overview-hero-subtitle"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
+            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
+          }}
+        >
           {resolvedConfig.heroCopy.subtitleLines[0]}
           <br />
           {resolvedConfig.heroCopy.subtitleLines[1]}

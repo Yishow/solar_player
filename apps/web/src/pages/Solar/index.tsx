@@ -182,6 +182,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   });
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const heroTypography = resolvedConfig.chrome.heroTypography;
 
   const titleLayout = withContentOffset(solarTitleLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -204,8 +205,10 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
         className="solar-leaf-watermark"
         style={{
           height: `${leafLayout.height}px`,
-          left: `${leafLayout.left}px`,
-          top: `${leafLayout.top}px`,
+          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
         }}
       />
@@ -213,8 +216,10 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
       <div
         className="solar-gold-line"
         style={{
+          height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLineLayout.left}px`,
-          top: `${goldLineLayout.top}px`,
+          opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+          top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
           width: `${goldLineLayout.width}px`
         }}
       />
@@ -227,14 +232,39 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="solar-eyebrow">{resolvedConfig.heroCopy.eyebrow}</p>
-        <h2 className="solar-display-title">
+        <p
+          className="solar-eyebrow"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
+            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
+          }}
+        >
+          {resolvedConfig.heroCopy.eyebrow}
+        </p>
+        <h2
+          className="solar-display-title"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
+          }}
+        >
           {resolvedConfig.heroCopy.titleLines[0]}
           <br />
           {solarTitleLine2.prefix}
-          {solarTitleLine2.emphasis ? <em>{solarTitleLine2.emphasis}</em> : null}
+          {solarTitleLine2.emphasis ? (
+            <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{solarTitleLine2.emphasis}</em>
+          ) : null}
         </h2>
-        <p className="solar-subtitle">
+        <p
+          className="solar-subtitle"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
+            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
+          }}
+        >
           {resolvedConfig.heroCopy.subtitleLines[0]}
           <span>{resolvedConfig.heroCopy.subtitleLines[1]}</span>
         </p>

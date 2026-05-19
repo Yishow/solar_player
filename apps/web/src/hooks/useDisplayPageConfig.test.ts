@@ -94,6 +94,39 @@ test("mergeDisplayPageConfig keeps geometry and source bindings untouched during
   assert.deepEqual(merged.mainStage, seedConfig.mainStage);
 });
 
+test("mergeDisplayPageConfig keeps hero content and geometry untouched during page chrome appearance overrides", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    chrome: {
+      heroTypography: {
+        titleFontSize: 92
+      },
+      modules: {
+        periodChips: {
+          chipGap: 18
+        },
+        provenance: {
+          fontSize: 17
+        }
+      },
+      ornaments: {
+        leaf: {
+          opacity: 0.58
+        }
+      }
+    }
+  });
+
+  assert.equal(merged.chrome.heroTypography.titleFontSize, 92);
+  assert.equal(merged.chrome.modules.periodChips.chipGap, 18);
+  assert.equal(merged.chrome.modules.provenance.fontSize, 17);
+  assert.equal(merged.chrome.ornaments.leaf.opacity, 0.58);
+  assert.deepEqual(merged.hero, seedConfig.hero);
+  assert.deepEqual(merged.heroMedia, seedConfig.heroMedia);
+  assert.deepEqual(merged.highlightRail, seedConfig.highlightRail);
+  assert.deepEqual(merged.statCards.procure, seedConfig.statCards.procure);
+});
+
 test("resolveDisplayPageConfigForPage falls back to seed config while the next page is still loading", () => {
   const overviewSeed = {
     heroContainer: {

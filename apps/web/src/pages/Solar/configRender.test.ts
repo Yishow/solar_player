@@ -8,6 +8,13 @@ const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "u
 
 test("solar runtime reads resolved display config for hero, flow nodes, connectors, and KPI cards", () => {
   assert.match(solarSource, /resolvedConfig\.heroCopy\.eyebrow/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.heroTypography\.subtitleMarginTop/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.offsetX/);
   assert.match(solarSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(solarSource, /resolvedConfig\.flowNodes\[flowItem\.key\]/);
   assert.match(solarSource, /resolvedConfig\.connectors\[connector\.key\]/);

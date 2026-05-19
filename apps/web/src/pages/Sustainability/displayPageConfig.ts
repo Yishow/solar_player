@@ -6,6 +6,20 @@ import {
   type DisplayCardStyleConfig
 } from "../shared/displayCardStyleConfig";
 import {
+  buildHeroTypographyFields,
+  buildLeafOrnamentFields,
+  buildPeriodChipsChromeFields,
+  buildProvenanceChromeFields,
+  createHeroTypographyConfig,
+  createLeafOrnamentChromeConfig,
+  createPeriodChipsChromeConfig,
+  createProvenanceChromeConfig,
+  type HeroTypographyConfig,
+  type LeafOrnamentChromeConfig,
+  type PeriodChipsChromeConfig,
+  type ProvenanceChromeConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildDisplayPageIconSourceFields,
   createPageIconKeySource,
   type DisplayPageIconSource
@@ -29,6 +43,16 @@ export type SustainabilityDisplayPageConfig = {
     "annualSaving" | "esg" | "procure" | "totalCo2" | "totalGeneration" | "trees",
     DisplayCardStyleConfig
   >;
+  chrome: {
+    heroTypography: HeroTypographyConfig;
+    modules: {
+      periodChips: PeriodChipsChromeConfig;
+      provenance: ProvenanceChromeConfig;
+    };
+    ornaments: {
+      leaf: LeafOrnamentChromeConfig;
+    };
+  };
   hero: {
     copyEnLines: [string, string, string];
     copyZhLines: [string, string];
@@ -101,6 +125,20 @@ export function createSustainabilityDisplayPageSeedConfig(
         valueFontSize: 66,
         valueRowAlign: "center"
       })
+    },
+    chrome: {
+      heroTypography: createHeroTypographyConfig({
+        subtitleMarginTop: 20
+      }),
+      modules: {
+        periodChips: createPeriodChipsChromeConfig(),
+        provenance: createProvenanceChromeConfig()
+      },
+      ornaments: {
+        leaf: createLeafOrnamentChromeConfig({
+          opacity: 0.42
+        })
+      }
     },
     hero: {
       copyEnLines: [
@@ -176,6 +214,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["heroMedia", "width"]
     },
     fields: [
+      ...buildHeroTypographyFields({
+        idPrefix: "sustainability",
+        path: ["chrome", "heroTypography"]
+      }),
       { fieldType: "text", id: "sustainability-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "sustainability-title-1", label: "Title Line 1", path: ["hero", "title", 0] },
       { fieldType: "text", id: "sustainability-title-2", label: "Title Line 2", path: ["hero", "title", 1] },
@@ -291,6 +333,36 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       }
     ],
     presetKey: "sustainability-highlight"
+  },
+  {
+    id: "sustainability-ornament-leaf",
+    label: "Sustainability Leaf Ornament",
+    description: "調整 leaf ornament chrome appearance。",
+    fields: buildLeafOrnamentFields({
+      idPrefix: "sustainability",
+      path: ["chrome", "ornaments", "leaf"]
+    }),
+    presetKey: "sustainability-leaf"
+  },
+  {
+    id: "sustainability-period-chips",
+    label: "Sustainability Period Chips",
+    description: "調整 period chips chrome appearance。",
+    fields: buildPeriodChipsChromeFields({
+      idPrefix: "sustainability",
+      path: ["chrome", "modules", "periodChips"]
+    }),
+    presetKey: "sustainability-period-chips"
+  },
+  {
+    id: "sustainability-provenance",
+    label: "Sustainability Provenance",
+    description: "調整 provenance block chrome appearance。",
+    fields: buildProvenanceChromeFields({
+      idPrefix: "sustainability",
+      path: ["chrome", "modules", "provenance"]
+    }),
+    presetKey: "sustainability-provenance"
   },
   ...Object.keys(createSustainabilityDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
     id: `sustainability-kpi-${key}`,

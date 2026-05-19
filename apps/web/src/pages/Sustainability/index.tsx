@@ -111,6 +111,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     usesRuntimeFallback: storyRuntime.usesFallback
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const heroTypography = resolvedConfig.chrome.heroTypography;
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
@@ -128,13 +129,38 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="sustainability-eyebrow">{resolvedConfig.hero.eyebrow}</p>
-        <h2 className="sustainability-display-title">
-          <em>{resolvedConfig.hero.title[0]}</em>
+        <p
+          className="sustainability-eyebrow"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
+            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
+          }}
+        >
+          {resolvedConfig.hero.eyebrow}
+        </p>
+        <h2
+          className="sustainability-display-title"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
+          }}
+        >
+          <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{resolvedConfig.hero.title[0]}</em>
           <br />
           {resolvedConfig.hero.title[1]}
         </h2>
-        <p className="sustainability-subtitle">{resolvedConfig.hero.subtitle}</p>
+        <p
+          className="sustainability-subtitle"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
+            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
+          }}
+        >
+          {resolvedConfig.hero.subtitle}
+        </p>
       </section>
 
       <section
@@ -149,26 +175,33 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
           gap: "14px"
         }}
       >
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: `${resolvedConfig.chrome.modules.periodChips.chipGap}px` }}>
           {viewModel.periodOptions.map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
               style={{
                 border: "1px solid rgba(91, 128, 70, 0.24)",
-                borderRadius: "999px",
+                borderRadius: `${resolvedConfig.chrome.modules.periodChips.radius}px`,
                 background: viewModel.selectedPeriod === period ? "#5b8046" : "rgba(255, 253, 247, 0.92)",
                 color: viewModel.selectedPeriod === period ? "#fffdf8" : "#57774a",
-                fontSize: "17px",
+                fontSize: `${resolvedConfig.chrome.modules.periodChips.fontSize}px`,
                 fontWeight: 700,
-                padding: "10px 16px"
+                padding: `${resolvedConfig.chrome.modules.periodChips.chipPaddingY}px ${resolvedConfig.chrome.modules.periodChips.chipPaddingX}px`
               }}
             >
               {periodLabel(period)}
             </button>
           ))}
         </div>
-        <div style={{ textAlign: "right", color: "#5f675f", fontSize: "15px", lineHeight: 1.55 }}>
+        <div
+          style={{
+            color: "#5f675f",
+            fontSize: `${resolvedConfig.chrome.modules.provenance.fontSize}px`,
+            lineHeight: resolvedConfig.chrome.modules.provenance.lineHeight,
+            textAlign: "right"
+          }}
+        >
           <div>資料來源：{viewModel.provenance.label} / {viewModel.provenance.source}</div>
           <div>同步狀態：{viewModel.provenance.syncState}{viewModel.provenance.updatedAt ? ` · ${viewModel.provenance.updatedAt}` : " · 尚未提供更新時間"}</div>
         </div>
@@ -200,8 +233,10 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
         className="sustainability-leaf-watermark"
         style={{
           height: `${leafLayout.height}px`,
-          left: `${leafLayout.left}px`,
-          top: `${leafLayout.top}px`,
+          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
         }}
       />

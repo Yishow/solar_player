@@ -6,6 +6,17 @@ import {
   type DisplayCardStyleConfig
 } from "../shared/displayCardStyleConfig";
 import {
+  buildGoldLineFields,
+  buildHeroTypographyFields,
+  buildLeafOrnamentFields,
+  createGoldLineChromeConfig,
+  createHeroTypographyConfig,
+  createLeafOrnamentChromeConfig,
+  type GoldLineChromeConfig,
+  type HeroTypographyConfig,
+  type LeafOrnamentChromeConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildDisplayPageIconSourceFields,
   createAssetImageIconSource,
   type DisplayPageIconSource
@@ -29,6 +40,13 @@ export type SolarDisplayPageConfig = {
     "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2",
     DisplayCardStyleConfig
   >;
+  chrome: {
+    heroTypography: HeroTypographyConfig;
+    ornaments: {
+      goldLine: GoldLineChromeConfig;
+      leaf: LeafOrnamentChromeConfig;
+    };
+  };
   connectors: Record<"inverterToCo2" | "inverterToFactory" | "solarToInverter", SolarDisplayRect>;
   flowNodes: Record<"co2" | "factory" | "inverter" | "solar", SolarDisplayRect>;
   heroContainer: SolarDisplayRect;
@@ -81,6 +99,19 @@ export function createSolarDisplayPageSeedConfig(
       generation: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
       selfConsumption: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
       totalCo2: createDisplayCardStyleConfig({ valueRowAlign: "center" })
+    },
+    chrome: {
+      heroTypography: createHeroTypographyConfig({
+        subtitleFontSize: 22
+      }),
+      ornaments: {
+        goldLine: createGoldLineChromeConfig({
+          opacity: 0.8
+        }),
+        leaf: createLeafOrnamentChromeConfig({
+          opacity: 0.36
+        })
+      }
     },
     connectors: {
       inverterToCo2: { ...solarConnectorLayout.inverterToCo2 },
@@ -151,6 +182,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["heroContainer", "width"]
     },
     fields: [
+      ...buildHeroTypographyFields({
+        idPrefix: "solar",
+        path: ["chrome", "heroTypography"]
+      }),
       { fieldType: "text", id: "solar-eyebrow", label: "Eyebrow", path: ["heroCopy", "eyebrow"] },
       { fieldType: "text", id: "solar-title-line-1", label: "Title Line 1", path: ["heroCopy", "titleLines", 0] },
       { fieldType: "text", id: "solar-title-line-2", label: "Title Line 2", path: ["heroCopy", "titleLines", 1] },
@@ -230,6 +265,26 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "solar-hero-height", label: "Height", path: ["heroContainer", "height"] }
     ],
     presetKey: "hero-media"
+  },
+  {
+    id: "solar-ornament-gold-line",
+    label: "Solar Gold Line",
+    description: "調整 gold line chrome appearance。",
+    fields: buildGoldLineFields({
+      idPrefix: "solar",
+      path: ["chrome", "ornaments", "goldLine"]
+    }),
+    presetKey: "solar-gold-line"
+  },
+  {
+    id: "solar-ornament-leaf",
+    label: "Solar Leaf Ornament",
+    description: "調整 leaf ornament chrome appearance。",
+    fields: buildLeafOrnamentFields({
+      idPrefix: "solar",
+      path: ["chrome", "ornaments", "leaf"]
+    }),
+    presetKey: "solar-leaf"
   },
   ...Object.keys(createSolarDisplayPageSeedConfig().flowNodes).map<DisplayEditorRegionSchema>((key) => ({
     id: `solar-flow-${key}`,

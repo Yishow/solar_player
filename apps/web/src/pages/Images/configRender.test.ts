@@ -10,6 +10,14 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(imagesSource, /resolvedConfig\.hero\.title/);
   assert.match(imagesSource, /resolvedConfig\.hero\.subtitle/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.counter\.currentFontSize/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.counter\.progressThickness/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.arrows\.buttonSize/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.arrows\.borderRadius/);
   assert.match(imagesSource, /resolvedConfig\.hero\.copyLines/);
   assert.match(imagesSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(imagesSource, /resolvedConfig\.mainStage/);

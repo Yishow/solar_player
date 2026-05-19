@@ -6,6 +6,17 @@ import {
   type DisplayCardStyleConfig
 } from "../shared/displayCardStyleConfig";
 import {
+  buildGoldLineFields,
+  buildHeroTypographyFields,
+  buildLeafOrnamentFields,
+  createGoldLineChromeConfig,
+  createHeroTypographyConfig,
+  createLeafOrnamentChromeConfig,
+  type GoldLineChromeConfig,
+  type HeroTypographyConfig,
+  type LeafOrnamentChromeConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildDisplayPageIconSourceFields,
   createReferenceGlyphIconSource,
   type DisplayPageIconSource
@@ -30,6 +41,13 @@ export type OverviewDisplayPageConfig = {
     "co2Today" | "co2Total" | "power" | "summary" | "today" | "total",
     DisplayCardStyleConfig
   >;
+  chrome: {
+    heroTypography: HeroTypographyConfig;
+    ornaments: {
+      goldLine: GoldLineChromeConfig;
+      leaf: LeafOrnamentChromeConfig;
+    };
+  };
   heroContainer: OverviewDisplayRect;
   heroCopy: {
     eyebrow: string;
@@ -106,6 +124,28 @@ export function createOverviewDisplayPageSeedConfig(
         valueRowAlign: "center"
       })
     },
+    chrome: {
+      heroTypography: createHeroTypographyConfig({
+        eyebrowFontSize: 26,
+        eyebrowLetterSpacing: 5,
+        eyebrowMarginBottom: 20,
+        subtitleFontSize: 26,
+        subtitleLineHeight: 1.35,
+        subtitleMarginTop: 30,
+        titleEmphasisWeight: 900,
+        titleFontSize: 84,
+        titleLetterSpacing: 4
+      }),
+      ornaments: {
+        goldLine: createGoldLineChromeConfig({
+          opacity: 0.78
+        }),
+        leaf: createLeafOrnamentChromeConfig({
+          opacity: 0.44,
+          scale: 1.5
+        })
+      }
+    },
     heroContainer: {
       ...overviewHeroLayout
     },
@@ -166,6 +206,10 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["heroCopyLayout", "width"]
     },
     fields: [
+      ...buildHeroTypographyFields({
+        idPrefix: "overview",
+        path: ["chrome", "heroTypography"]
+      }),
       { fieldType: "text", id: "eyebrow", label: "Eyebrow", path: ["heroCopy", "eyebrow"] },
       { fieldType: "text", id: "title-line-1", label: "Title Line 1", path: ["heroCopy", "titleLines", 0] },
       { fieldType: "text", id: "title-line-2", label: "Title Line 2", path: ["heroCopy", "titleLines", 1] },
@@ -291,6 +335,26 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "hero-height", label: "Height", path: ["heroContainer", "height"] }
     ],
     presetKey: "hero-container"
+  },
+  {
+    id: "overview-ornament-gold-line",
+    label: "Overview Gold Line",
+    description: "調整 hero gold line chrome appearance。",
+    fields: buildGoldLineFields({
+      idPrefix: "overview",
+      path: ["chrome", "ornaments", "goldLine"]
+    }),
+    presetKey: "overview-gold-line"
+  },
+  {
+    id: "overview-ornament-leaf",
+    label: "Overview Leaf Ornament",
+    description: "調整 leaf ornament chrome appearance。",
+    fields: buildLeafOrnamentFields({
+      idPrefix: "overview",
+      path: ["chrome", "ornaments", "leaf"]
+    }),
+    presetKey: "overview-leaf"
   },
   ...Object.keys(createOverviewDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
     id: `overview-kpi-${key}`,

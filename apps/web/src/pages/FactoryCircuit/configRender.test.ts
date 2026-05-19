@@ -9,6 +9,14 @@ const factoryCircuitSource = readFileSync(path.join(import.meta.dirname, "index.
 test("factory circuit runtime reads resolved display config for copy, status, nodes, connectors, load rows, and KPI cards", () => {
   assert.match(factoryCircuitSource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(factoryCircuitSource, /resolvedConfig\.hero\.title/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.paddingTop/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.titleFontSize/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.bodyFontSize/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(factoryCircuitSource, /resolvedConfig\.statusBlock/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);

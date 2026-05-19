@@ -102,6 +102,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     runtimeErrorMessage: runtimeHydrationEnabled ? playlistRuntime.errorMessage : "",
     usesRuntimeFallback: playlistRuntime.usesFallback
   });
+  const heroTypography = resolvedConfig.chrome.heroTypography;
   const visibleStart = Math.min(Math.max(viewModel.activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
 
@@ -125,12 +126,37 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           width: `${titleLayout.width}px`
         }}
       >
-        <p className="images-eyebrow">{resolvedConfig.hero.eyebrow}</p>
-        <h2 className="images-display-title">
-          <em>{titleTokens.emphasis}</em>
+        <p
+          className="images-eyebrow"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
+            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
+          }}
+        >
+          {resolvedConfig.hero.eyebrow}
+        </p>
+        <h2
+          className="images-display-title"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
+            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
+          }}
+        >
+          <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{titleTokens.emphasis}</em>
           {titleTokens.suffix}
         </h2>
-        <p className="images-hero-subtitle">{resolvedConfig.hero.subtitle}</p>
+        <p
+          className="images-hero-subtitle"
+          style={{
+            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
+            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
+            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
+          }}
+        >
+          {resolvedConfig.hero.subtitle}
+        </p>
       </section>
 
       <p
@@ -153,7 +179,10 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         style={{
           height: `${goldLayout.height}px`,
           left: `${goldLayout.left}px`,
-          top: `${goldLayout.top}px`,
+          opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+          top: `${goldLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
+          transform: `scaleY(${resolvedConfig.chrome.ornaments.goldLine.thickness})`,
+          transformOrigin: "top left",
           width: `${goldLayout.width}px`
         }}
       />
@@ -167,12 +196,23 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           width: `${counterLayout.width}px`
         }}
       >
-        <b>{viewModel.counter.current}</b>
-        <span>/ {viewModel.counter.total}</span>
-        <p>自動輪播中，目前素材停留 {viewModel.active.durationSeconds} 秒</p>
+        <b style={{ fontSize: `${resolvedConfig.chrome.modules.counter.currentFontSize}px` }}>
+          {viewModel.counter.current}
+        </b>
+        <span style={{ fontSize: `${resolvedConfig.chrome.modules.counter.totalFontSize}px` }}>/ {viewModel.counter.total}</span>
+        <p
+          style={{
+            fontSize: `${resolvedConfig.chrome.modules.counter.bodyFontSize}px`,
+            marginTop: `${resolvedConfig.chrome.modules.counter.bodyMarginTop}px`
+          }}
+        >
+          自動輪播中，目前素材停留 {viewModel.active.durationSeconds} 秒
+        </p>
         <div
           className="images-progress-line"
           style={{
+            height: `${resolvedConfig.chrome.modules.counter.progressThickness}px`,
+            top: `${resolvedConfig.chrome.modules.counter.progressTopOffset}px`,
             ["--progress-width" as string]: `${((viewModel.activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
           }}
         />
@@ -247,8 +287,12 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
       <button
         className="images-gallery-arrow"
         style={{
+          borderRadius: `${resolvedConfig.chrome.modules.arrows.borderRadius}px`,
+          fontSize: `${resolvedConfig.chrome.modules.arrows.fontSize}px`,
+          height: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`,
           left: `${resolvedConfig.arrows.left.left}px`,
-          top: `${resolvedConfig.arrows.left.top - CONTENT_TOP_OFFSET}px`
+          top: `${resolvedConfig.arrows.left.top - CONTENT_TOP_OFFSET}px`,
+          width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
         onClick={() =>
           setActiveIndex(() =>
@@ -265,8 +309,12 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
       <button
         className="images-gallery-arrow"
         style={{
+          borderRadius: `${resolvedConfig.chrome.modules.arrows.borderRadius}px`,
+          fontSize: `${resolvedConfig.chrome.modules.arrows.fontSize}px`,
+          height: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`,
           left: `${resolvedConfig.arrows.right.left}px`,
-          top: `${resolvedConfig.arrows.right.top - CONTENT_TOP_OFFSET}px`
+          top: `${resolvedConfig.arrows.right.top - CONTENT_TOP_OFFSET}px`,
+          width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
         onClick={() =>
           setActiveIndex(() =>

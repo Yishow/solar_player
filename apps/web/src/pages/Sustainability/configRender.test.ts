@@ -10,6 +10,14 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.title\[0\]/);
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.copyZhLines/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.fontSize/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.provenance\.fontSize/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.provenance\.lineHeight/);
   assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.items/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);

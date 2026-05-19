@@ -10,6 +10,13 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /resolvedConfig\.heroCopy\.eyebrow/);
   assert.match(overviewSource, /resolvedConfig\.heroCopy\.titleLines\[0\]/);
   assert.match(overviewSource, /resolvedConfig\.heroCopyLayout/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.subtitleMarginTop/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
   assert.match(overviewSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(overviewSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
   assert.match(overviewSource, /viewModel\.summary\.statusLabel/);
