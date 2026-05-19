@@ -52,6 +52,7 @@ export function createOverviewDisplayPageSeedConfig(
       fitMode: "contain",
       focusX: 1,
       focusY: 0,
+      sourceMode: "seed-default",
       src: heroSrc
     },
     kpiCards: {
@@ -106,7 +107,40 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["heroContainer", "width"]
     },
     fields: [
-      { fieldType: "asset", id: "hero-src", label: "Image Source", path: ["heroMedia", "src"] },
+      {
+        fieldType: "select",
+        id: "hero-source-mode",
+        label: "Source Mode",
+        options: [
+          { label: "Managed Asset", value: "managed-asset" },
+          { label: "Direct Src", value: "direct-src" },
+          { label: "Seed Default", value: "seed-default" }
+        ],
+        path: ["heroMedia", "sourceMode"]
+      },
+      {
+        constraints: { required: true },
+        fieldType: "asset",
+        id: "hero-managed-asset",
+        label: "Managed Asset Ref",
+        path: ["heroMedia", "assetId"],
+        placeholder: "image_assets.id",
+        visibleWhen: {
+          equals: "managed-asset",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
+      {
+        constraints: { required: true },
+        fieldType: "text",
+        id: "hero-src",
+        label: "Image Source",
+        path: ["heroMedia", "src"],
+        visibleWhen: {
+          equals: "direct-src",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
       { fieldType: "text", id: "hero-alt", label: "Image Alt", path: ["heroMedia", "alt"] },
       {
         fieldType: "select",

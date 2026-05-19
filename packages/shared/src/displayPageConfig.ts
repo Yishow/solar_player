@@ -29,6 +29,13 @@ export const displayPageMediaFitModes = ["contain", "cover"] as const;
 export type DisplayPageMediaFitMode = (typeof displayPageMediaFitModes)[number];
 
 export type DisplayPageManagedAssetId = number | string;
+export const displayPageMediaSourceModes = [
+  "managed-asset",
+  "direct-src",
+  "seed-default"
+] as const;
+
+export type DisplayPageMediaSourceMode = (typeof displayPageMediaSourceModes)[number];
 
 export type DisplayPageMediaBinding = {
   alt?: string;
@@ -38,6 +45,7 @@ export type DisplayPageMediaBinding = {
   fitMode?: DisplayPageMediaFitMode;
   focusX?: number;
   focusY?: number;
+  sourceMode?: DisplayPageMediaSourceMode;
   src?: string;
 };
 
@@ -120,6 +128,10 @@ export function isDisplayPageKey(value: string): value is DisplayPageKey {
   return displayPageKeys.includes(value as DisplayPageKey);
 }
 
+export function isDisplayPageMediaSourceMode(value: unknown): value is DisplayPageMediaSourceMode {
+  return typeof value === "string" && displayPageMediaSourceModes.includes(value as DisplayPageMediaSourceMode);
+}
+
 export function createEmptyDisplayPageConfig(
   pageId: DisplayPageKey
 ): DisplayPageConfigEnvelope<Record<string, never>> {
@@ -136,9 +148,71 @@ export function isDisplayPageMediaBinding(value: unknown): value is DisplayPageM
     return false;
   }
 
-  return ["alignX", "alignY", "assetId", "fitMode", "focusX", "focusY", "src"].some(
+  return ["alignX", "alignY", "assetId", "fitMode", "focusX", "focusY", "sourceMode", "src"].some(
     (key) => key in value
   );
+}
+
+export function resolveDisplayPageMediaSourceMode(binding: DisplayPageMediaBinding): DisplayPageMediaSourceMode {
+  if (isDisplayPageMediaSourceMode(binding.sourceMode)) {
+    return binding.sourceMode;
+  }
+
+  if (binding.assetId !== undefined && binding.assetId !== null) {
+    return "managed-asset";
+  }
+
+  if (typeof binding.src === "string" && binding.src.trim().length > 0) {
+    return "direct-src";
+  }
+
+  return "seed-default";
+}
+
+export function normalizeDisplayPageMediaBindingBySourceMode(
+  binding: DisplayPageMediaBinding
+): DisplayPageMediaBinding {
+  const sourceMode = resolveDisplayPageMediaSourceMode(binding);
+  const normalized: DisplayPageMediaBinding = {
+    ...binding,
+    sourceMode
+  };
+
+  if (sourceMode === "managed-asset") {
+    delete normalized.src;
+    return normalized;
+  }
+
+  if (sourceMode === "direct-src") {
+    delete normalized.assetId;
+    return normalized;
+  }
+
+  delete normalized.assetId;
+  delete normalized.src;
+  return normalized;
+}
+
+function resolveNonEmptyMediaSource(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+export function resolveDisplayPageMediaSource(
+  binding: DisplayPageMediaBinding,
+  fallbackSource?: string | null
+) {
+  const bindingSource = resolveNonEmptyMediaSource(binding.src);
+  const fallback = resolveNonEmptyMediaSource(fallbackSource);
+
+  switch (resolveDisplayPageMediaSourceMode(binding)) {
+    case "managed-asset":
+      return bindingSource ?? fallback;
+    case "direct-src":
+      return bindingSource ?? fallback;
+    case "seed-default":
+    default:
+      return bindingSource ?? fallback;
+  }
 }
 
 export const defaultFallbackPolicy: FallbackPolicy = {

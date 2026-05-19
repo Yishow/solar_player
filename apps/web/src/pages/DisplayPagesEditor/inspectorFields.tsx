@@ -140,12 +140,20 @@ export function resolveDisplayEditorRegions(
 ): ResolvedDisplayEditorRegion[] {
   return regionSchemas.map((schema) => ({
     description: schema.description,
-    fields: schema.fields.map((field) => ({
-      dirty: JSON.stringify(getValueAtPath(config, field.path)) !== JSON.stringify(getValueAtPath(seedConfig, field.path)),
-      path: field.path,
-      schema: field,
-      value: getValueAtPath(config, field.path)
-    })),
+    fields: schema.fields
+      .filter((field) => {
+        if (!field.visibleWhen) {
+          return true;
+        }
+
+        return getValueAtPath(config, field.visibleWhen.path) === field.visibleWhen.equals;
+      })
+      .map((field) => ({
+        dirty: JSON.stringify(getValueAtPath(config, field.path)) !== JSON.stringify(getValueAtPath(seedConfig, field.path)),
+        path: field.path,
+        schema: field,
+        value: getValueAtPath(config, field.path)
+      })),
     geometry: resolveRegionGeometry(config, schema),
     id: schema.id,
     label: schema.label,
@@ -295,8 +303,13 @@ function renderFieldInput(
     return (
       <input
         className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none focus:border-[var(--shell-divider-strong)]"
+        placeholder={"placeholder" in field.schema ? field.schema.placeholder : undefined}
         type="text"
-        value={typeof field.value === "string" ? field.value : ""}
+        value={
+          typeof field.value === "number" || typeof field.value === "string"
+            ? String(field.value)
+            : ""
+        }
         onChange={(event) => onChange(field.path, event.target.value)}
       />
     );

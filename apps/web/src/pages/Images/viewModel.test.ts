@@ -68,6 +68,7 @@ test("buildImagesViewModel uses playlist ordering, per-entry duration, and metad
   const model = buildImagesViewModel({
     activeIndex: 0,
     assets,
+    coverAssetSource: "/brand-logo.png",
     entries: playlistEntries
   });
 
@@ -77,6 +78,7 @@ test("buildImagesViewModel uses playlist ordering, per-entry duration, and metad
   assert.equal(model.active.infoPanel.title, "太陽能板鳥瞰");
   assert.equal(model.active.infoPanel.area, "首頁 Hero");
   assert.deepEqual(model.active.infoPanel.tags, ["封面", "太陽能"]);
+  assert.equal(model.active.assetSource, "hero.jpg");
 });
 
 test("buildImagesViewModel skips degraded entries configured with skip and preserves diagnostics", () => {

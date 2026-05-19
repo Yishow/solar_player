@@ -17,6 +17,10 @@ type DisplayEditorFieldBase = {
   label: string;
   path: DisplayEditorPath;
   resettable?: boolean;
+  visibleWhen?: {
+    equals: DisplayEditorOptionValue;
+    path: DisplayEditorPath;
+  };
 };
 
 export type DisplayEditorTextFieldSchema = DisplayEditorFieldBase & {
@@ -47,7 +51,9 @@ export type DisplayEditorSelectFieldSchema = DisplayEditorFieldBase & {
 };
 
 export type DisplayEditorAssetFieldSchema = DisplayEditorFieldBase & {
+  constraints?: DisplayEditorFieldConstraint;
   fieldType: "asset";
+  placeholder?: string;
 };
 
 export type DisplayEditorArrayItemFieldSchema =

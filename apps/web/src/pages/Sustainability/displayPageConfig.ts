@@ -62,6 +62,7 @@ export function createSustainabilityDisplayPageSeedConfig(
       fitMode: "cover",
       focusX: 0.5,
       focusY: 0.48,
+      sourceMode: "seed-default",
       src: heroSrc
     },
     highlightRail: {
@@ -126,7 +127,40 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["heroMedia", "width"]
     },
     fields: [
-      { fieldType: "asset", id: "sustainability-hero-src", label: "Image Source", path: ["heroMedia", "src"] },
+      {
+        fieldType: "select",
+        id: "sustainability-hero-source-mode",
+        label: "Source Mode",
+        options: [
+          { label: "Managed Asset", value: "managed-asset" },
+          { label: "Direct Src", value: "direct-src" },
+          { label: "Seed Default", value: "seed-default" }
+        ],
+        path: ["heroMedia", "sourceMode"]
+      },
+      {
+        constraints: { required: true },
+        fieldType: "asset",
+        id: "sustainability-hero-asset-id",
+        label: "Managed Asset Ref",
+        path: ["heroMedia", "assetId"],
+        placeholder: "image_assets.id",
+        visibleWhen: {
+          equals: "managed-asset",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
+      {
+        constraints: { required: true },
+        fieldType: "text",
+        id: "sustainability-hero-src",
+        label: "Image Source",
+        path: ["heroMedia", "src"],
+        visibleWhen: {
+          equals: "direct-src",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
       { fieldType: "text", id: "sustainability-hero-alt", label: "Image Alt", path: ["heroMedia", "alt"] },
       {
         fieldType: "select",

@@ -20,6 +20,10 @@ test("all five display pages expose non-empty seed-backed editor config", () => 
   assert.ok(Object.keys(sustainability.highlightRail).length > 0);
 
   assert.equal(factoryCircuit.hero.copyZhLines.length, 3);
+  assert.equal(overview.heroMedia.sourceMode, "seed-default");
+  assert.equal(solar.heroMedia.sourceMode, "seed-default");
   assert.equal(images.hero.copyLines.length, 3);
+  assert.equal(images.mainStage.sourceMode, "seed-default");
   assert.equal(sustainability.hero.copyEnLines.length, 3);
+  assert.equal(sustainability.heroMedia.sourceMode, "seed-default");
 });

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import {
   DisplayCardFooter,
@@ -84,11 +85,15 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
   }
 
   const resolvedConfig = config ?? runtimeConfig.config;
+  const mainStageSource = resolveDisplayPageMediaSource(
+    resolvedConfig.mainStage,
+    seedConfig.mainStage.src
+  );
   const viewModel = buildImagesViewModel({
     activeEntry: playlistRuntime.payload?.activeEntry ?? null,
     activeIndex,
     assets: [],
-    coverAssetSource: resolvedConfig.mainStage.src ?? null,
+    coverAssetSource: mainStageSource,
     entries: playlistRuntime.payload?.entries ?? []
   });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
@@ -183,7 +188,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         {viewModel.active.assetSource ? (
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
-            src={viewModel.active.assetSource ?? resolvedConfig.mainStage.src ?? undefined}
+            src={viewModel.active.assetSource ?? mainStageSource ?? undefined}
             style={buildDisplayPageMediaStyle(resolvedConfig.mainStage)}
           />
         ) : (

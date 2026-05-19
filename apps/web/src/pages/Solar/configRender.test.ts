@@ -8,7 +8,7 @@ const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "u
 
 test("solar runtime reads resolved display config for hero, flow nodes, connectors, and KPI cards", () => {
   assert.match(solarSource, /resolvedConfig\.heroCopy\.eyebrow/);
-  assert.match(solarSource, /resolvedConfig\.heroMedia\.src/);
+  assert.match(solarSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(solarSource, /resolvedConfig\.flowNodes\[flowItem\.key\]/);
   assert.match(solarSource, /resolvedConfig\.connectors\[connector\.key\]/);
   assert.match(solarSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);

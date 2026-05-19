@@ -1,4 +1,5 @@
 import type { SustainabilityPeriodKey } from "@solar-display/shared";
+import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
@@ -167,6 +168,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
     usesRuntimeFallback: storyRuntime.usesFallback
   });
+  const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
@@ -273,7 +275,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
       >
         <img
           alt={resolvedConfig.heroMedia.alt}
-          src={resolvedConfig.heroMedia.src}
+          src={heroMediaSource ?? undefined}
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
       </figure>

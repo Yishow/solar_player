@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { DisplayEditorFieldSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
   DisplayEditorInspectorFields,
+  resolveDisplayEditorRegions,
   resolveDisplayEditorFieldIssues,
   type ResolvedDisplayEditorField
 } from "./inspectorFields";
@@ -131,6 +132,22 @@ test("display editor inspector surfaces range, required, and select compatibilit
     ),
     ["Fit Mode 的值與可用選項不相容。"]
   );
+
+  assert.deepEqual(
+    resolveDisplayEditorFieldIssues(
+      createField(
+        {
+          constraints: { required: true },
+          fieldType: "asset",
+          id: "hero-managed-asset",
+          label: "Managed Asset Ref",
+          path: ["heroMedia", "assetId"]
+        },
+        42
+      )
+    ),
+    []
+  );
 });
 
 test("display editor inspector renders validation feedback inline for invalid fields", () => {
@@ -156,4 +173,69 @@ test("display editor inspector renders validation feedback inline for invalid fi
   assert.match(html, /Width 必須大於或等於 0。/);
   assert.match(html, /role="alert"/);
   assert.match(html, /dirty/);
+});
+
+test("display editor inspector resolves only the payload fields owned by the selected media source mode", () => {
+  const [region] = resolveDisplayEditorRegions(
+    {
+      heroMedia: {
+        alt: "Overview hero",
+        assetId: 42,
+        sourceMode: "direct-src",
+        src: "/uploads/images/overview-direct.png"
+      }
+    },
+    [
+      {
+        fields: [
+          {
+            fieldType: "select",
+            id: "hero-source-mode",
+            label: "Source Mode",
+            options: [
+              { label: "Managed Asset", value: "managed-asset" },
+              { label: "Direct Src", value: "direct-src" },
+              { label: "Seed Default", value: "seed-default" }
+            ],
+            path: ["heroMedia", "sourceMode"]
+          },
+          {
+            fieldType: "asset",
+            id: "hero-managed-asset",
+            label: "Managed Asset Ref",
+            path: ["heroMedia", "assetId"],
+            visibleWhen: {
+              equals: "managed-asset",
+              path: ["heroMedia", "sourceMode"]
+            }
+          },
+          {
+            fieldType: "text",
+            id: "hero-direct-src",
+            label: "Direct Src",
+            path: ["heroMedia", "src"],
+            visibleWhen: {
+              equals: "direct-src",
+              path: ["heroMedia", "sourceMode"]
+            }
+          },
+          { fieldType: "text", id: "hero-alt", label: "Image Alt", path: ["heroMedia", "alt"] }
+        ],
+        id: "overview-hero-media",
+        label: "Overview Hero Media"
+      }
+    ],
+    {
+      heroMedia: {
+        alt: "Seed hero",
+        sourceMode: "seed-default",
+        src: "/brand-logo.png"
+      }
+    }
+  );
+
+  assert.deepEqual(
+    region?.fields.map((field) => field.schema.id),
+    ["hero-source-mode", "hero-direct-src", "hero-alt"]
+  );
 });

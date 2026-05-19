@@ -63,6 +63,125 @@ test("draft config stores managed asset references and resolves runtime src on r
   }
 });
 
+test("draft config stores direct-src bindings without stale managed asset baggage", async () => {
+  const app = await buildApp();
+
+  try {
+    const saveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/overview/draft",
+      payload: {
+        regions: {
+          heroMedia: {
+            alt: "Direct overview hero",
+            assetId: 42,
+            sourceMode: "direct-src",
+            src: "/uploads/images/overview-direct.png"
+          }
+        }
+      }
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+
+    const storedRow = getDatabase()
+      .prepare("SELECT config_json FROM display_page_stage_configs WHERE page_key = ? AND stage = ?")
+      .get("overview", "draft") as { config_json: string };
+    const storedConfig = JSON.parse(storedRow.config_json) as {
+      heroMedia: { alt: string; assetId?: number; sourceMode: string; src?: string };
+    };
+
+    assert.equal(storedConfig.heroMedia.sourceMode, "direct-src");
+    assert.equal(storedConfig.heroMedia.alt, "Direct overview hero");
+    assert.equal(storedConfig.heroMedia.src, "/uploads/images/overview-direct.png");
+    assert.equal("assetId" in storedConfig.heroMedia, false);
+
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/draft"
+    });
+
+    assert.equal(readResponse.statusCode, 200);
+    const readBody = readResponse.json() as {
+      config: {
+        assetFindings?: Array<unknown>;
+        regions: {
+          heroMedia: { alt: string; assetId?: number; sourceMode: string; src?: string };
+        };
+      };
+    };
+
+    assert.equal(readBody.config.regions.heroMedia.sourceMode, "direct-src");
+    assert.equal(readBody.config.regions.heroMedia.alt, "Direct overview hero");
+    assert.equal(readBody.config.regions.heroMedia.src, "/uploads/images/overview-direct.png");
+    assert.equal("assetId" in readBody.config.regions.heroMedia, false);
+    assert.deepEqual(readBody.config.assetFindings ?? [], []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("seed-default bindings do not surface managed asset findings after legacy payload cleanup", async () => {
+  const app = await buildApp();
+  const managedAsset = seedManagedImageAsset();
+
+  try {
+    const saveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/sustainability/draft",
+      payload: {
+        regions: {
+          heroMedia: {
+            alt: "Seed sustainability hero",
+            assetId: managedAsset.assetId,
+            sourceMode: "seed-default",
+            src: "/should-drop.png"
+          }
+        }
+      }
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+
+    const storedRow = getDatabase()
+      .prepare("SELECT config_json FROM display_page_stage_configs WHERE page_key = ? AND stage = ?")
+      .get("sustainability", "draft") as { config_json: string };
+    const storedConfig = JSON.parse(storedRow.config_json) as {
+      heroMedia: { alt: string; assetId?: number; sourceMode: string; src?: string };
+    };
+
+    assert.equal(storedConfig.heroMedia.sourceMode, "seed-default");
+    assert.equal(storedConfig.heroMedia.alt, "Seed sustainability hero");
+    assert.equal("assetId" in storedConfig.heroMedia, false);
+    assert.equal("src" in storedConfig.heroMedia, false);
+
+    getDatabase().prepare("DELETE FROM image_assets WHERE id = ?").run(managedAsset.assetId);
+
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/sustainability/draft"
+    });
+
+    assert.equal(readResponse.statusCode, 200);
+    const readBody = readResponse.json() as {
+      config: {
+        assetFindings?: Array<unknown>;
+        regions: {
+          heroMedia: { alt: string; assetId?: number; sourceMode: string; src?: string };
+        };
+      };
+    };
+
+    assert.equal(readBody.config.regions.heroMedia.sourceMode, "seed-default");
+    assert.equal(readBody.config.regions.heroMedia.alt, "Seed sustainability hero");
+    assert.equal("assetId" in readBody.config.regions.heroMedia, false);
+    assert.equal("src" in readBody.config.regions.heroMedia, false);
+    assert.deepEqual(readBody.config.assetFindings ?? [], []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("draft config surfaces a missing managed asset finding when the reference no longer resolves", async () => {
   const app = await buildApp();
   const managedAsset = seedManagedImageAsset();

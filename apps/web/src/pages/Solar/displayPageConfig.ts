@@ -58,6 +58,7 @@ export function createSolarDisplayPageSeedConfig(
       fitMode: "cover",
       focusX: 0.5,
       focusY: 0.52,
+      sourceMode: "seed-default",
       src: heroSrc
     },
     kpiCards: {
@@ -109,7 +110,40 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["heroContainer", "width"]
     },
     fields: [
-      { fieldType: "asset", id: "solar-hero-src", label: "Image Source", path: ["heroMedia", "src"] },
+      {
+        fieldType: "select",
+        id: "solar-hero-source-mode",
+        label: "Source Mode",
+        options: [
+          { label: "Managed Asset", value: "managed-asset" },
+          { label: "Direct Src", value: "direct-src" },
+          { label: "Seed Default", value: "seed-default" }
+        ],
+        path: ["heroMedia", "sourceMode"]
+      },
+      {
+        constraints: { required: true },
+        fieldType: "asset",
+        id: "solar-hero-asset-id",
+        label: "Managed Asset Ref",
+        path: ["heroMedia", "assetId"],
+        placeholder: "image_assets.id",
+        visibleWhen: {
+          equals: "managed-asset",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
+      {
+        constraints: { required: true },
+        fieldType: "text",
+        id: "solar-hero-src",
+        label: "Image Source",
+        path: ["heroMedia", "src"],
+        visibleWhen: {
+          equals: "direct-src",
+          path: ["heroMedia", "sourceMode"]
+        }
+      },
       { fieldType: "text", id: "solar-hero-alt", label: "Image Alt", path: ["heroMedia", "alt"] },
       {
         fieldType: "select",

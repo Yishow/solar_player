@@ -50,13 +50,30 @@ test("mergeDisplayPageConfig keeps the seed-backed hero media src when a live ma
   const merged = mergeDisplayPageConfig(seedConfig, {
     heroMedia: {
       alt: "Managed sustainability hero",
-      assetId: 42
+      assetId: 42,
+      sourceMode: "managed-asset"
     }
   });
 
   assert.equal(merged.heroMedia.assetId, 42);
   assert.equal(merged.heroMedia.alt, "Managed sustainability hero");
   assert.equal(merged.heroMedia.src, "/sustainability-seed.jpg");
+  assert.equal(merged.heroMedia.fitMode, seedConfig.heroMedia.fitMode);
+  assert.equal(merged.heroMedia.sourceMode, "managed-asset");
+});
+
+test("mergeDisplayPageConfig preserves the seed src while honoring explicit seed-default source mode", () => {
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    heroMedia: {
+      alt: "Solar seed fallback",
+      sourceMode: "seed-default"
+    }
+  });
+
+  assert.equal(merged.heroMedia.sourceMode, "seed-default");
+  assert.equal(merged.heroMedia.alt, "Solar seed fallback");
+  assert.equal(merged.heroMedia.src, "/solar-seed.jpg");
   assert.equal(merged.heroMedia.fitMode, seedConfig.heroMedia.fitMode);
 });
 

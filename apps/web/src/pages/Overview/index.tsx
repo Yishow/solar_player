@@ -15,6 +15,7 @@ import {
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
+import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import {
   resolveRuntimeFallbackBannerState,
@@ -105,6 +106,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
     usesRuntimeFallback: storyRuntime.usesFallback
   });
+  const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
 
   const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -170,7 +172,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
       >
         <img
           alt={resolvedConfig.heroMedia.alt}
-          src={resolvedConfig.heroMedia.src}
+          src={heroMediaSource ?? undefined}
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
       </figure>

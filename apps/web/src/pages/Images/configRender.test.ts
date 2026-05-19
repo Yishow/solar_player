@@ -13,13 +13,14 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.hero\.copyLines/);
   assert.match(imagesSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(imagesSource, /resolvedConfig\.mainStage/);
+  assert.match(imagesSource, /resolveDisplayPageMediaSource\(\s*resolvedConfig\.mainStage,\s*seedConfig\.mainStage\.src\s*\)/);
   assert.match(imagesSource, /resolvedConfig\.infoPanel/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.left/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.right/);
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
   assert.match(imagesSource, /activeEntry: playlistRuntime\.payload\?\.activeEntry \?\? null/);
   assert.match(imagesSource, /entries: playlistRuntime\.payload\?\.entries \?\? \[\]/);
-  assert.match(imagesSource, /viewModel\.active\.assetSource \?/);
+  assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
   assert.match(imagesSource, /DisplayCardFrame/);
   assert.match(imagesSource, /DisplayCardFooter/);
 });

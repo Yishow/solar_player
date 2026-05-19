@@ -74,6 +74,7 @@ export function createImagesDisplayPageSeedConfig(
       fitMode: "cover",
       focusX: 0.5,
       focusY: 0.52,
+      sourceMode: "seed-default",
       src: mainStageSrc
     },
     textBlocks: {
@@ -149,7 +150,40 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["mainStage", "width"]
     },
     fields: [
-      { fieldType: "asset", id: "images-stage-src", label: "Fallback Src", path: ["mainStage", "src"] },
+      {
+        fieldType: "select",
+        id: "images-stage-source-mode",
+        label: "Fallback Source Mode",
+        options: [
+          { label: "Managed Asset", value: "managed-asset" },
+          { label: "Direct Src", value: "direct-src" },
+          { label: "Seed Default", value: "seed-default" }
+        ],
+        path: ["mainStage", "sourceMode"]
+      },
+      {
+        constraints: { required: true },
+        fieldType: "asset",
+        id: "images-stage-asset-id",
+        label: "Fallback Asset Ref",
+        path: ["mainStage", "assetId"],
+        placeholder: "image_assets.id",
+        visibleWhen: {
+          equals: "managed-asset",
+          path: ["mainStage", "sourceMode"]
+        }
+      },
+      {
+        constraints: { required: true },
+        fieldType: "text",
+        id: "images-stage-src",
+        label: "Fallback Src",
+        path: ["mainStage", "src"],
+        visibleWhen: {
+          equals: "direct-src",
+          path: ["mainStage", "sourceMode"]
+        }
+      },
       { fieldType: "text", id: "images-stage-alt", label: "Image Alt", path: ["mainStage", "alt"] },
       {
         fieldType: "select",

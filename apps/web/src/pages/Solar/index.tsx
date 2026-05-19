@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import {
   DisplayCardFooter,
   DisplayCardFrame,
@@ -153,6 +154,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
     usesRuntimeFallback: solarStoryRuntime.usesFallback
   });
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
+  const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
 
   const titleLayout = withContentOffset(solarTitleLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -223,7 +225,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
         <img
           alt={resolvedConfig.heroMedia.alt}
           className="solar-hero-image"
-          src={resolvedConfig.heroMedia.src}
+          src={heroMediaSource ?? undefined}
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
         <div className="solar-hero-fade" />

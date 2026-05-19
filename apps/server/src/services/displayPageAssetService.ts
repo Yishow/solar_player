@@ -5,7 +5,12 @@ import type {
   DisplayPageAssetFindingReason,
   DisplayPageKey
 } from "@solar-display/shared";
-import { displayPageMediaFitModes, isDisplayPageMediaBinding } from "@solar-display/shared";
+import {
+  displayPageMediaFitModes,
+  isDisplayPageMediaBinding,
+  normalizeDisplayPageMediaBindingBySourceMode,
+  resolveDisplayPageMediaSourceMode
+} from "@solar-display/shared";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "../config.js";
@@ -67,24 +72,25 @@ function readManagedAssetResolution(assetId: number | string): ManagedAssetResol
 }
 
 function normalizeMediaBindingForStorage(binding: UnknownRecord) {
-  const normalized = cloneValue(binding);
-  if ("assetId" in normalized && normalized.assetId !== undefined && normalized.assetId !== null) {
-    delete normalized.src;
-  }
-  return normalized;
+  return normalizeDisplayPageMediaBindingBySourceMode(cloneValue(binding));
 }
 
 function resolveMediaBinding(binding: UnknownRecord) {
-  const resolved = cloneValue(binding);
+  const resolved = normalizeDisplayPageMediaBindingBySourceMode(cloneValue(binding));
+  const sourceMode = resolveDisplayPageMediaSourceMode(resolved);
   const assetId = resolved.assetId;
 
-  if (typeof assetId === "number" || typeof assetId === "string") {
+  if (sourceMode === "managed-asset" && (typeof assetId === "number" || typeof assetId === "string")) {
     const { filename } = readManagedAssetResolution(assetId);
     if (filename) {
       resolved.src = `/uploads/images/${filename}`;
     } else {
       delete resolved.src;
     }
+  }
+
+  if (sourceMode === "seed-default") {
+    delete resolved.src;
   }
 
   return resolved;
@@ -249,6 +255,10 @@ export function collectDisplayPageAssetReferences(
     }
 
     if (isDisplayPageMediaBinding(value)) {
+      if (resolveDisplayPageMediaSourceMode(value) !== "managed-asset") {
+        return;
+      }
+
       const assetId = value.assetId;
       if (typeof assetId === "number" || typeof assetId === "string") {
         references.push({

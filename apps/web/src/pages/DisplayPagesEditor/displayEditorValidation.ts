@@ -48,6 +48,33 @@ function validateNumberField(
   return issues;
 }
 
+function validateAssetField(
+  label: string,
+  value: unknown,
+  constraints?: DisplayEditorFieldConstraint
+) {
+  const issues: string[] = [];
+
+  const normalizedValue =
+    typeof value === "number"
+      ? String(value)
+      : typeof value === "string"
+        ? value
+        : "";
+
+  if (constraints?.required && normalizedValue.trim().length === 0) {
+    issues.push(`${label} 為必填欄位。`);
+  }
+  if (constraints?.minLength !== undefined && normalizedValue.length < constraints.minLength) {
+    issues.push(`${label} 至少需要 ${constraints.minLength} 個字元。`);
+  }
+  if (constraints?.maxLength !== undefined && normalizedValue.length > constraints.maxLength) {
+    issues.push(`${label} 不可超過 ${constraints.maxLength} 個字元。`);
+  }
+
+  return issues;
+}
+
 function validateSelectField(
   schema: DisplayEditorSelectFieldSchema,
   value: unknown
@@ -90,8 +117,15 @@ export function resolveDisplayEditorFieldValidationIssues(
       "constraints" in schema ? schema.constraints : undefined
     );
   }
-  if (schema.fieldType === "text" || schema.fieldType === "asset") {
+  if (schema.fieldType === "text") {
     return validateStringField(
+      schema.label,
+      value,
+      "constraints" in schema ? schema.constraints : undefined
+    );
+  }
+  if (schema.fieldType === "asset") {
+    return validateAssetField(
       schema.label,
       value,
       "constraints" in schema ? schema.constraints : undefined

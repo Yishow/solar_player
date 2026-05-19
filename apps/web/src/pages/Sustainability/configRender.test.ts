@@ -10,7 +10,7 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.title\[0\]/);
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.copyZhLines/);
-  assert.match(sustainabilitySource, /resolvedConfig\.heroMedia\.src/);
+  assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.items/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
   assert.match(sustainabilitySource, /resolvedConfig\.kpiCards\[/);
