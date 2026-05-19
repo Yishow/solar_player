@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayPageIconSourceFields,
+  createAssetImageIconSource,
+  type DisplayPageIconSource
+} from "../shared/displayIconSourceConfig";
+import {
   solarConnectorLayout,
   solarFlowNodeLayout,
   solarHeroLayout,
@@ -24,12 +29,41 @@ export type SolarDisplayPageConfig = {
     titleLines: [string, string];
   };
   heroMedia: DisplayPageMediaBinding;
+  iconSources: {
+    flowNodes: Record<"co2" | "factory" | "inverter" | "solar", DisplayPageIconSource>;
+    kpiCards: Record<
+      "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2",
+      DisplayPageIconSource
+    >;
+  };
   kpiCards: Record<"co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2", SolarDisplayRect>;
+};
+
+export type SolarIconAssetSources = {
+  flowNodes: Record<"co2" | "factory" | "inverter" | "solar", string>;
+  kpiCards: Record<"co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2", string>;
+};
+
+const defaultSolarIconAssetSources: SolarIconAssetSources = {
+  flowNodes: {
+    co2: "/display-assets/solar/carbon-reduction-display-source.png",
+    factory: "/display-assets/solar/factory-consumption-display-source.png",
+    inverter: "/display-assets/solar/inverter-display-source.png",
+    solar: "/display-assets/solar/solar-panel-display-source.png"
+  },
+  kpiCards: {
+    co2: "/display-assets/solar/metric-co2-today-source.png",
+    efficiency: "/display-assets/solar/metric-efficiency-source.png",
+    generation: "/display-assets/solar/metric-generation-sun-source.png",
+    selfConsumption: "/display-assets/solar/metric-self-consumption-source.png",
+    totalCo2: "/display-assets/solar/metric-co2-total-source.png"
+  }
 };
 
 export function createSolarDisplayPageSeedConfig(
   heroSrc = "/brand-logo.png",
-  heroAlt = "太陽能車棚與綠能展示場域"
+  heroAlt = "太陽能車棚與綠能展示場域",
+  iconAssetSources: SolarIconAssetSources = defaultSolarIconAssetSources
 ): SolarDisplayPageConfig {
   return {
     connectors: {
@@ -60,6 +94,21 @@ export function createSolarDisplayPageSeedConfig(
       focusY: 0.52,
       sourceMode: "seed-default",
       src: heroSrc
+    },
+    iconSources: {
+      flowNodes: {
+        co2: createAssetImageIconSource(iconAssetSources.flowNodes.co2, "減碳效益"),
+        factory: createAssetImageIconSource(iconAssetSources.flowNodes.factory, "工廠用電"),
+        inverter: createAssetImageIconSource(iconAssetSources.flowNodes.inverter, "變流器"),
+        solar: createAssetImageIconSource(iconAssetSources.flowNodes.solar, "太陽能板")
+      },
+      kpiCards: {
+        co2: createAssetImageIconSource(iconAssetSources.kpiCards.co2, "今日減碳量"),
+        efficiency: createAssetImageIconSource(iconAssetSources.kpiCards.efficiency, "系統效率"),
+        generation: createAssetImageIconSource(iconAssetSources.kpiCards.generation, "今日發電量"),
+        selfConsumption: createAssetImageIconSource(iconAssetSources.kpiCards.selfConsumption, "自發自用比例"),
+        totalCo2: createAssetImageIconSource(iconAssetSources.kpiCards.totalCo2, "累積減碳量")
+      }
     },
     kpiCards: {
       co2: { ...solarKpiLayout.co2 },
@@ -182,6 +231,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["flowNodes", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "flowNodes", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["flowNodes", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["flowNodes", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["flowNodes", key, "width"] },
@@ -227,6 +280,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "kpiCards", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

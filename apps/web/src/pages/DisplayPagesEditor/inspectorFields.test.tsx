@@ -239,3 +239,102 @@ test("display editor inspector resolves only the payload fields owned by the sel
     ["hero-source-mode", "hero-direct-src", "hero-alt"]
   );
 });
+
+test("display editor inspector surfaces validation issues for invalid icon source payload options", () => {
+  const [region] = resolveDisplayEditorRegions(
+    {
+      iconSources: {
+        solar: {
+          iconKey: "solar",
+          mode: "page-icon-key",
+          registry: "sustainability"
+        }
+      },
+      nodes: {
+        solar: {
+          height: 120,
+          left: 800,
+          top: 240,
+          width: 120
+        }
+      }
+    },
+    [
+      {
+        fields: [
+          {
+            fieldType: "select",
+            id: "solar-icon-source-mode",
+            label: "Icon Source Mode",
+            options: [
+              { label: "Asset Image", value: "asset-image" },
+              { label: "Reference Glyph", value: "reference-glyph" },
+              { label: "Page Icon Key", value: "page-icon-key" }
+            ],
+            path: ["iconSources", "solar", "mode"]
+          },
+          {
+            fieldType: "select",
+            id: "solar-icon-registry",
+            label: "Icon Registry",
+            options: [
+              { label: "Factory Circuit", value: "factory-circuit" },
+              { label: "Sustainability", value: "sustainability" }
+            ],
+            path: ["iconSources", "solar", "registry"],
+            visibleWhen: {
+              equals: "page-icon-key",
+              path: ["iconSources", "solar", "mode"]
+            }
+          },
+          {
+            fieldType: "select",
+            id: "solar-icon-key-sustainability",
+            label: "Sustainability Icon",
+            options: [
+              { label: "bars", value: "bars" },
+              { label: "co2", value: "co2" },
+              { label: "esg-doc", value: "esg-doc" }
+            ],
+            path: ["iconSources", "solar", "iconKey"],
+            visibleWhen: {
+              equals: "sustainability",
+              path: ["iconSources", "solar", "registry"]
+            }
+          }
+        ],
+        geometry: {
+          heightPath: ["nodes", "solar", "height"],
+          leftPath: ["nodes", "solar", "left"],
+          topPath: ["nodes", "solar", "top"],
+          widthPath: ["nodes", "solar", "width"]
+        },
+        id: "factory-node-solar",
+        label: "Factory Node Solar"
+      }
+    ],
+    {
+      iconSources: {
+        solar: {
+          iconKey: "esg-doc",
+          mode: "page-icon-key",
+          registry: "sustainability"
+        }
+      },
+      nodes: {
+        solar: {
+          height: 120,
+          left: 800,
+          top: 240,
+          width: 120
+        }
+      }
+    }
+  );
+
+  const invalidField = region?.fields.find((field) => field.schema.id === "solar-icon-key-sustainability");
+  assert.ok(invalidField);
+  assert.deepEqual(resolveDisplayEditorFieldIssues(invalidField), [
+    "Sustainability Icon 的值與可用選項不相容。"
+  ]);
+});

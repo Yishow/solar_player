@@ -1,19 +1,22 @@
-export type ReferenceGlyphName =
-  | "bars"
-  | "bolt"
-  | "check"
-  | "clock"
-  | "co2"
-  | "efficiency"
-  | "esg-doc"
-  | "image"
-  | "leaf"
-  | "play"
-  | "plug"
-  | "procure"
-  | "refresh"
-  | "self-consumption"
-  | "sun";
+export const referenceGlyphNames = [
+  "bars",
+  "bolt",
+  "check",
+  "clock",
+  "co2",
+  "efficiency",
+  "esg-doc",
+  "image",
+  "leaf",
+  "play",
+  "plug",
+  "procure",
+  "refresh",
+  "self-consumption",
+  "sun"
+] as const;
+
+export type ReferenceGlyphName = (typeof referenceGlyphNames)[number];
 
 type ReferenceGlyphProps = {
   className?: string;

@@ -10,7 +10,8 @@ test("solar KPI cards use the shared display card family", () => {
   assert.match(solarSource, /DisplayCardHeader/);
   assert.match(solarSource, /DisplayCardValueRow/);
   assert.match(solarSource, /DisplayCardFooter/);
-  assert.match(solarSource, /solarAssetRuntimeMap\.kpi\[metric\.iconKey\]/);
-  assert.match(solarSource, /<img alt=\{metric\.label\} className=\"solar-kpi-icon\" src=\{assetSrc\} \/>/);
+  assert.match(solarSource, /renderDisplayPageIcon\(\{/);
+  assert.match(solarSource, /seedSource: seedConfig\.iconSources\.kpiCards\[cardItem\.key\]/);
+  assert.match(solarSource, /source: resolvedConfig\.iconSources\.kpiCards\[cardItem\.key\]/);
   assert.match(solarSource, /DisplayCardValueRow align=\"center\" unit=\{metric\.unit\} value=\{metric\.value\} \/>/);
 });

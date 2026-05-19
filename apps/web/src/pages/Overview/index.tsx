@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ReferenceGlyph } from "../../components/ReferenceGlyph";
+import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
 import {
   DisplayCardFooter,
@@ -210,7 +210,12 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
             }}
           >
             <DisplayCardHeader
-              icon={<ReferenceGlyph className="overview-kpi-icon" name={metric.iconKey} />}
+              icon={renderDisplayPageIcon({
+                alt: metric.label,
+                className: "overview-kpi-icon",
+                seedSource: seedConfig.iconSources[cardItem.key],
+                source: resolvedConfig.iconSources[cardItem.key]
+              })}
               iconContainerClassName={[
                 "overview-kpi-icon-shell",
                 metric.accentColor ? "overview-kpi-icon-accent" : ""

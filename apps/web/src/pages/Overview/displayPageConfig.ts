@@ -1,5 +1,10 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import {
+  buildDisplayPageIconSourceFields,
+  createReferenceGlyphIconSource,
+  type DisplayPageIconSource
+} from "../shared/displayIconSourceConfig";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
 export type OverviewDisplayRect = {
@@ -24,6 +29,10 @@ export type OverviewDisplayPageConfig = {
   };
   heroCopyLayout: OverviewDisplayTextRect;
   heroMedia: DisplayPageMediaBinding;
+  iconSources: Record<
+    "co2Today" | "co2Total" | "power" | "today" | "total",
+    DisplayPageIconSource
+  >;
   kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewDisplayRect>;
 };
 
@@ -54,6 +63,13 @@ export function createOverviewDisplayPageSeedConfig(
       focusY: 0,
       sourceMode: "seed-default",
       src: heroSrc
+    },
+    iconSources: {
+      co2Today: createReferenceGlyphIconSource("co2"),
+      co2Total: createReferenceGlyphIconSource("leaf"),
+      power: createReferenceGlyphIconSource("bolt"),
+      today: createReferenceGlyphIconSource("sun"),
+      total: createReferenceGlyphIconSource("bars")
     },
     kpiCards: {
       co2Today: { ...overviewKpiLayout.co2Today },
@@ -198,6 +214,10 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

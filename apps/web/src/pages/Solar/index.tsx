@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
   DisplayCardFooter,
   DisplayCardFrame,
@@ -17,7 +18,8 @@ import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
   createSolarDisplayPageSeedConfig,
-  type SolarDisplayPageConfig
+  type SolarDisplayPageConfig,
+  type SolarIconAssetSources
 } from "./displayPageConfig";
 import {
   resolveRuntimeFallbackBannerState,
@@ -94,6 +96,22 @@ const connectorOrder = [
   }
 ] as const;
 
+const solarSeedIconAssetSources: SolarIconAssetSources = {
+  flowNodes: {
+    co2: solarAssetRuntimeMap.flow["carbon-reduction-display"],
+    factory: solarAssetRuntimeMap.flow["factory-consumption-display"],
+    inverter: solarAssetRuntimeMap.flow["inverter-display"],
+    solar: solarAssetRuntimeMap.flow["solar-panel-display"]
+  },
+  kpiCards: {
+    co2: solarAssetRuntimeMap.kpi["metric-co2-today"],
+    efficiency: solarAssetRuntimeMap.kpi["metric-efficiency"],
+    generation: solarAssetRuntimeMap.kpi["metric-generation-sun"],
+    selfConsumption: solarAssetRuntimeMap.kpi["metric-self-consumption"],
+    totalCo2: solarAssetRuntimeMap.kpi["metric-co2-total"]
+  }
+};
+
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
@@ -122,7 +140,15 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
   const { isSocketConnected, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
-  const seedConfig = useMemo(() => createSolarDisplayPageSeedConfig(solarAssetRuntimeMap.hero), []);
+  const seedConfig = useMemo(
+    () =>
+      createSolarDisplayPageSeedConfig(
+        solarAssetRuntimeMap.hero,
+        "太陽能車棚與綠能展示場域",
+        solarSeedIconAssetSources
+      ),
+    []
+  );
   const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
@@ -234,7 +260,6 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
       {flowNodeOrder.map((flowItem, index) => {
         const node = viewModel.flowNodes[index]!;
         const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
-        const assetSrc = solarAssetRuntimeMap.flow[node.assetKey];
 
         return (
           <article
@@ -250,7 +275,12 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
               width: `${layout.width}px`
             }}
           >
-            <img alt={node.label} className="solar-flow-icon" src={assetSrc} />
+            {renderDisplayPageIcon({
+              alt: node.label,
+              className: "solar-flow-icon",
+              seedSource: seedConfig.iconSources.flowNodes[flowItem.key],
+              source: resolvedConfig.iconSources.flowNodes[flowItem.key]
+            })}
             <h3>{node.label}</h3>
             <p>{node.footnote}</p>
             <div className="solar-flow-value">{node.value}</div>
@@ -278,7 +308,6 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
       {kpiCardOrder.map((cardItem, index) => {
         const metric = viewModel.kpis[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
-        const assetSrc = solarAssetRuntimeMap.kpi[metric.iconKey];
 
         return (
           <DisplayCardFrame
@@ -293,7 +322,12 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
             }}
           >
             <DisplayCardHeader
-              icon={<img alt={metric.label} className="solar-kpi-icon" src={assetSrc} />}
+              icon={renderDisplayPageIcon({
+                alt: metric.label,
+                className: "solar-kpi-icon",
+                seedSource: seedConfig.iconSources.kpiCards[cardItem.key],
+                source: resolvedConfig.iconSources.kpiCards[cardItem.key]
+              })}
               subtitle={cardItem.englishLabel}
               title={metric.label}
             />

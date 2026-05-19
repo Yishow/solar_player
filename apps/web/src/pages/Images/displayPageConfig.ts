@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayPageIconSourceFields,
+  createReferenceGlyphIconSource,
+  type DisplayPageIconSource
+} from "../shared/displayIconSourceConfig";
+import {
   imagesArrowLayout,
   imagesCopyLayout,
   imagesInfoLayout,
@@ -23,6 +28,11 @@ export type ImagesDisplayPageConfig = {
     eyebrow: string;
     subtitle: string;
     title: string;
+  };
+  iconSources: {
+    infoPanel: DisplayPageIconSource;
+    mainStagePlaceholder: DisplayPageIconSource;
+    thumbnailSlots: Record<"thumb1" | "thumb2" | "thumb3" | "thumb4", DisplayPageIconSource>;
   };
   infoPanel: ImagesDisplayRect;
   mainStage: ImagesDisplayRect & DisplayPageMediaBinding;
@@ -64,6 +74,16 @@ export function createImagesDisplayPageSeedConfig(
       eyebrow: "綠能驅動・永續未來",
       subtitle: "Green Energy in Action",
       title: "綠能現場影像"
+    },
+    iconSources: {
+      infoPanel: createReferenceGlyphIconSource("image"),
+      mainStagePlaceholder: createReferenceGlyphIconSource("image"),
+      thumbnailSlots: {
+        thumb1: createReferenceGlyphIconSource("image"),
+        thumb2: createReferenceGlyphIconSource("image"),
+        thumb3: createReferenceGlyphIconSource("image"),
+        thumb4: createReferenceGlyphIconSource("image")
+      }
     },
     infoPanel: { ...imagesInfoLayout },
     mainStage: {
@@ -150,6 +170,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["mainStage", "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: "main-stage",
+        path: ["iconSources", "mainStagePlaceholder"]
+      }),
       {
         fieldType: "select",
         id: "images-stage-source-mode",
@@ -222,6 +246,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["infoPanel", "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: "info-panel",
+        path: ["iconSources", "infoPanel"]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: "images-info-left", label: "Left", path: ["infoPanel", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "images-info-top", label: "Top", path: ["infoPanel", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "images-info-width", label: "Width", path: ["infoPanel", "width"] },
@@ -265,6 +293,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["thumbnailSlots", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "thumbnailSlots", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["thumbnailSlots", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["thumbnailSlots", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["thumbnailSlots", key, "width"] },

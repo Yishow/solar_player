@@ -1,6 +1,11 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayPageIconSourceFields,
+  createPageIconKeySource,
+  type DisplayPageIconSource
+} from "../shared/displayIconSourceConfig";
+import {
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityKpiLayout,
@@ -30,6 +35,10 @@ export type SustainabilityDisplayPageConfig = {
       unit: string;
       value: string;
     }>;
+  };
+  iconSources: {
+    kpiCards: Record<"annualSaving" | "totalCo2" | "totalGeneration", DisplayPageIconSource>;
+    statCards: Record<"esg" | "procure" | "trees", DisplayPageIconSource>;
   };
   kpiCards: Record<"annualSaving" | "totalCo2" | "totalGeneration", SustainabilityDisplayRect>;
   statCards: Record<"esg" | "procure" | "trees", SustainabilityDisplayRect>;
@@ -73,6 +82,18 @@ export function createSustainabilityDisplayPageSeedConfig(
         { label: "綠電自用", unit: "%", value: "71" },
         { label: "等效植樹", unit: "株", value: "25,600" }
       ]
+    },
+    iconSources: {
+      kpiCards: {
+        annualSaving: createPageIconKeySource("sustainability", "leaf"),
+        totalCo2: createPageIconKeySource("sustainability", "co2"),
+        totalGeneration: createPageIconKeySource("sustainability", "bars")
+      },
+      statCards: {
+        esg: createPageIconKeySource("sustainability", "esg-doc"),
+        procure: createPageIconKeySource("sustainability", "procure"),
+        trees: createPageIconKeySource("sustainability", "tree")
+      }
     },
     kpiCards: {
       annualSaving: { ...sustainabilityKpiLayout.annualSaving },
@@ -234,6 +255,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "kpiCards", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },
@@ -257,6 +282,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["statCards", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "statCards", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["statCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["statCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["statCards", key, "width"] },

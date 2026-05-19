@@ -1,5 +1,10 @@
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayPageIconSourceFields,
+  createPageIconKeySource,
+  type DisplayPageIconSource
+} from "../shared/displayIconSourceConfig";
+import {
   factoryCircuitConnectorLayout,
   factoryCircuitCopyLayout,
   factoryCircuitKpiLayout,
@@ -24,6 +29,14 @@ export type FactoryCircuitDisplayPageConfig = {
     eyebrow: string;
     subtitle: string;
     title: string;
+  };
+  iconSources: {
+    kpiCards: Record<"flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower", DisplayPageIconSource>;
+    loadRows: Record<
+      "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
+      DisplayPageIconSource
+    >;
+    nodes: Record<"board" | "inverter" | "solar", DisplayPageIconSource>;
   };
   kpiCards: Record<"flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower", FactoryCircuitDisplayRect>;
   loadPanel: FactoryCircuitDisplayRect;
@@ -59,6 +72,28 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       eyebrow: "綠能驅動・永續未來",
       subtitle: "Factory Energy Circuit",
       title: "廠區用電迴路"
+    },
+    iconSources: {
+      kpiCards: {
+        flow: createPageIconKeySource("factory-circuit", "leaf"),
+        peak: createPageIconKeySource("factory-circuit", "bars"),
+        selfConsumption: createPageIconKeySource("factory-circuit", "sun"),
+        solarShare: createPageIconKeySource("factory-circuit", "sun"),
+        totalPower: createPageIconKeySource("factory-circuit", "bolt")
+      },
+      loadRows: {
+        ev: createPageIconKeySource("factory-circuit", "ev"),
+        hvac: createPageIconKeySource("factory-circuit", "hvac"),
+        infrastructure: createPageIconKeySource("factory-circuit", "infrastructure"),
+        lighting: createPageIconKeySource("factory-circuit", "lighting"),
+        office: createPageIconKeySource("factory-circuit", "office"),
+        production: createPageIconKeySource("factory-circuit", "production-line")
+      },
+      nodes: {
+        board: createPageIconKeySource("factory-circuit", "switchboard"),
+        inverter: createPageIconKeySource("factory-circuit", "inverter"),
+        solar: createPageIconKeySource("factory-circuit", "solar")
+      }
     },
     kpiCards: {
       flow: { ...factoryCircuitKpiLayout.flow },
@@ -152,6 +187,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["nodes", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "nodes", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["nodes", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["nodes", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["nodes", key, "width"] },
@@ -219,11 +258,42 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["loadRows", key, "width"]
     },
     fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "loadRows", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["loadRows", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["loadRows", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["loadRows", key, "width"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["loadRows", key, "height"] }
     ],
     presetKey: "factory-load-row"
+  })),
+  ...Object.keys(createFactoryCircuitDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
+    id: `factory-kpi-${key}`,
+    label: `Factory KPI ${key}`,
+    description: "調整 KPI 幾何位置。",
+    geometry: {
+      compatibilityKey: "factory-kpi-geometry",
+      heightPath: ["kpiCards", key, "height"],
+      leftPath: ["kpiCards", key, "left"],
+      minHeight: 80,
+      minWidth: 80,
+      resizeMode: "both",
+      topOffset: 146,
+      topPath: ["kpiCards", key, "top"],
+      widthPath: ["kpiCards", key, "width"]
+    },
+    fields: [
+      ...buildDisplayPageIconSourceFields({
+        idPrefix: key,
+        path: ["iconSources", "kpiCards", key]
+      }),
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["kpiCards", key, "height"] }
+    ],
+    presetKey: "factory-kpi"
   }))
 ];

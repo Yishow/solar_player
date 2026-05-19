@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
-import { ReferenceGlyph } from "../../components/ReferenceGlyph";
+import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
   DisplayCardFooter,
   DisplayCardFrame,
@@ -194,7 +194,12 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         ) : (
           <div className="images-main-placeholder">
             <div className="glyph-shell">
-              <ReferenceGlyph name="image" />
+              {renderDisplayPageIcon({
+                alt: resolvedConfig.mainStage.alt || viewModel.active.title,
+                className: "h-full w-full",
+                seedSource: seedConfig.iconSources.mainStagePlaceholder,
+                source: resolvedConfig.iconSources.mainStagePlaceholder
+              })}
             </div>
             <h3>{viewModel.active.title}</h3>
             <p>{viewModel.active.placeholderLabel}</p>
@@ -213,7 +218,12 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         }}
       >
         <DisplayCardHeader
-          icon={<ReferenceGlyph name="image" />}
+          icon={renderDisplayPageIcon({
+            alt: "Images Info Icon",
+            className: "h-full w-full",
+            seedSource: seedConfig.iconSources.infoPanel,
+            source: resolvedConfig.iconSources.infoPanel
+          })}
           iconContainerClassName="images-info-icon"
           title={viewModel.active.infoPanel.title}
         />
@@ -291,7 +301,12 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
               <img alt={thumbnail.infoPanel.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />
             ) : (
               <div className="images-thumb-placeholder">
-                <ReferenceGlyph name="image" />
+                {renderDisplayPageIcon({
+                  alt: thumbnail.infoPanel.title,
+                  className: "h-full w-full",
+                  seedSource: seedConfig.iconSources.thumbnailSlots[thumbSlotOrder[thumbIndex]!],
+                  source: resolvedConfig.iconSources.thumbnailSlots[thumbSlotOrder[thumbIndex]!]
+                })}
               </div>
             )}
           </button>
