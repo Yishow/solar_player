@@ -5,6 +5,12 @@ import type {
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
+import {
+  DisplayCardFooter,
+  DisplayCardFrame,
+  DisplayCardHeader,
+  DisplayCardValueRow
+} from "../../components/displayPageCards";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -27,6 +33,7 @@ import {
   sustainabilityStatLayout,
   sustainabilityTitleLayout
 } from "./layout";
+import "../../components/displayPageCards.css";
 import "./sustainability.css";
 import { buildSustainabilityViewModel } from "./viewModel";
 
@@ -310,9 +317,10 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
         const layout = withContentOffset(resolvedConfig.kpiCards[sustainabilityKpiOrder[index]!]);
 
         return (
-          <article
+          <DisplayCardFrame
             key={item.label}
             className="sustainability-kpi-card"
+            surface="metric"
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -320,28 +328,26 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
               width: `${layout.width}px`
             }}
           >
-            <div className="sustainability-card-head">
-              <div className="sustainability-card-icon">
-                <SustainabilityGlyph name={item.iconKey} />
-              </div>
-              <div>
-                <h3>{item.label}</h3>
-                <p>{item.helper}</p>
-              </div>
-            </div>
-            <div className="sustainability-card-value">
-              <span>{item.value}</span>
-              <small>{item.unit}</small>
-            </div>
+            <DisplayCardHeader
+              icon={<SustainabilityGlyph name={item.iconKey} />}
+              iconContainerClassName="sustainability-card-icon"
+              subtitle={item.helper}
+              title={item.label}
+            />
+            <DisplayCardValueRow align="center" unit={item.unit} value={item.value} />
             {index === 2 ? (
-              <div className="sustainability-growth-note">
-                <span>較去年成長 2.1%</span>
-                <SustainabilityGlyph name="trend" />
-              </div>
+              <DisplayCardFooter className="sustainability-card-footer">
+                <div className="sustainability-growth-note">
+                  <span>較去年成長 2.1%</span>
+                  <SustainabilityGlyph name="trend" />
+                </div>
+              </DisplayCardFooter>
             ) : (
-              <Sparkline className="sustainability-sparkline" values={trendSeries.map((value) => value - index * 1.8)} />
+              <DisplayCardFooter className="sustainability-card-footer">
+                <Sparkline className="sustainability-sparkline" values={trendSeries.map((value) => value - index * 1.8)} />
+              </DisplayCardFooter>
             )}
-          </article>
+          </DisplayCardFrame>
         );
       })}
 
@@ -350,9 +356,10 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
         const storyModule = viewModel.storyModules[index] ?? null;
 
         return (
-          <article
+          <DisplayCardFrame
             key={card.label}
             className="sustainability-stat-card"
+            surface="metric"
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -360,49 +367,55 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
               width: `${layout.width}px`
             }}
           >
-            <div className="sustainability-card-head">
-              <div className="sustainability-card-icon">
-                <SustainabilityGlyph name={card.iconKey} />
-              </div>
-              <div>
-                <h3>{storyModule?.title ?? card.label}</h3>
-                <p>{storyModule ? `${periodLabel(viewModel.selectedPeriod)}期故事模組` : card.subtitle}</p>
-              </div>
-            </div>
+            <DisplayCardHeader
+              icon={<SustainabilityGlyph name={card.iconKey} />}
+              iconContainerClassName="sustainability-card-icon"
+              subtitle={storyModule ? `${periodLabel(viewModel.selectedPeriod)}期故事模組` : card.subtitle}
+              title={storyModule?.title ?? card.label}
+            />
             {storyModule ? (
               "items" in card || storyModule.bullets.length > 0 ? (
-                <ul className="sustainability-esg-list">
-                  {(storyModule.bullets.length > 0 ? storyModule.bullets : [storyModule.description]).map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+                <DisplayCardFooter className="sustainability-card-footer">
+                  <ul className="sustainability-esg-list">
+                    {(storyModule.bullets.length > 0 ? storyModule.bullets : [storyModule.description]).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </DisplayCardFooter>
               ) : (
-                <>
+                <DisplayCardFooter className="sustainability-card-footer">
                   <div className={index === 0 ? "sustainability-stat-procure" : "sustainability-stat-value"}>
                     {storyModule.description}
                   </div>
                   <p className="sustainability-stat-desc">內容會跟隨 {periodLabel(viewModel.selectedPeriod)}期視角切換</p>
-                </>
+                </DisplayCardFooter>
               )
             ) : "value" in card ? (
               <>
-                <div className={index === 0 ? "sustainability-stat-procure" : "sustainability-stat-value"}>
-                  {card.value}
-                </div>
                 {index === 0 ? (
-                  <p className="sustainability-stat-desc">累計綠色採購金額</p>
+                  <DisplayCardFooter className="sustainability-card-footer">
+                    <div className="sustainability-stat-procure">{card.value}</div>
+                    <p className="sustainability-stat-desc">累計綠色採購金額</p>
+                  </DisplayCardFooter>
                 ) : (
-                  <Sparkline className="sustainability-trees-sparkline" values={trendSeries.map((value) => value - 2)} />
+                  <>
+                    <DisplayCardValueRow align="center" value={card.value} />
+                    <DisplayCardFooter className="sustainability-card-footer">
+                      <Sparkline className="sustainability-trees-sparkline" values={trendSeries.map((value) => value - 2)} />
+                    </DisplayCardFooter>
+                  </>
                 )}
               </>
             ) : (
-              <ul className="sustainability-esg-list">
-                {card.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
+              <DisplayCardFooter className="sustainability-card-footer">
+                <ul className="sustainability-esg-list">
+                  {card.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </DisplayCardFooter>
             )}
-          </article>
+          </DisplayCardFrame>
         );
       })}
     </section>

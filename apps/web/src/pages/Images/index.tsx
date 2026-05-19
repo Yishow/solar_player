@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
+import {
+  DisplayCardFooter,
+  DisplayCardFrame,
+  DisplayCardHeader
+} from "../../components/displayPageCards";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -18,6 +23,7 @@ import {
   imagesGoldLayout,
   imagesTitleLayout
 } from "./layout";
+import "../../components/displayPageCards.css";
 import "./images.css";
 import { buildImagesViewModel } from "./viewModel";
 
@@ -204,8 +210,9 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
         )}
       </figure>
 
-      <article
+      <DisplayCardFrame
         className="images-info-card"
+        surface="info"
         style={{
           height: `${infoLayout.height}px`,
           left: `${infoLayout.left}px`,
@@ -213,21 +220,24 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
           width: `${infoLayout.width}px`
         }}
       >
-        <div className="images-info-icon">
-          <ReferenceGlyph name="image" />
-        </div>
-        <h3>{viewModel.active.infoPanel.title}</h3>
-        <p>
+        <DisplayCardHeader
+          icon={<ReferenceGlyph name="image" />}
+          iconContainerClassName="images-info-icon"
+          title={viewModel.active.infoPanel.title}
+        />
+        <p className="images-info-card-body">
           {viewModel.active.infoPanel.description}
           {viewModel.active.fallbackReason
             ? ` 目前 fallback：${viewModel.active.fallbackMode} / ${viewModel.active.fallbackReason}。`
             : ""}
         </p>
-        <small>
+        <DisplayCardFooter>
+          <small className="images-info-card-meta">
           {viewModel.active.entryId} · {viewModel.active.infoPanel.area} · {viewModel.active.resolution} · {viewModel.active.durationSeconds} 秒 · {viewModel.active.infoPanel.capturedAt}
           {viewModel.active.infoPanel.tags.length > 0 ? ` · ${viewModel.active.infoPanel.tags.join(" / ")}` : ""}
-        </small>
-      </article>
+          </small>
+        </DisplayCardFooter>
+      </DisplayCardFrame>
 
       <button
         className="images-gallery-arrow"

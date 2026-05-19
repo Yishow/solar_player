@@ -1,0 +1,14 @@
+## 1. 建立共用視覺基線
+
+- [x] 1.1 落實 `Use Solar card header as the single visual baseline`，使 `Solar SHALL remain the icon-treatment baseline for shared KPI cards` 在 shared card family 下持續成立，交付結果為 `Solar` KPI card 仍使用既有 asset-backed icon treatment 並作為 header rhythm 真相來源；驗證方式為 `pnpm --filter @solar-display/web exec tsx --test src/pages/Solar/cardFamily.test.ts src/pages/Solar/configRender.test.ts` 與 browser/DOM 檢查第一張 `.solar-kpi-card` 的 icon element 為 `IMG`。
+- [x] 1.2 落實 `Shared display cards SHALL keep a single header visual contract across aligned pages` 的 primitives contract，讓 `apps/web/src/components/displayPageCards.tsx` 與 `apps/web/src/components/displayPageCards.css` 對 header alignment、icon box、title/subtitle rhythm、value row、footer spacing 提供單一 baseline；驗證方式為 `pnpm --filter @solar-display/web exec tsx --test src/components/displayPageCards.test.tsx` 與 artifact/content review，確認頁面不再需要以 page-local header rhythm 才能成立。
+
+## 2. 對齊頁面視覺語言且保留內容槽位
+
+- [x] 2.1 落實 `Keep page geometry fixed and constrain changes to internal card rhythm`，讓 `Shared card typography and value-row alignment SHALL not drift by page` 在 `Solar`、`Overview`、`Sustainability` KPI/stat cards 上成立，交付結果為 title/subtitle/unit 與 value row 對齊統一、卡片外部 FHD 幾何不變；驗證方式為 targeted web tests、browser computed-style 檢查，以及內容 review 確認 `left/top/width/height` 未改動。
+- [x] 2.2 落實 `Preserve page-specific content slots while removing page-local header drift`，使 `Shared display cards SHALL keep a single header visual contract across aligned pages` 在 `Overview` summary/KPI、`Sustainability` KPI/stat、`Images` info card 上成立，同時保留 sparkline、growth note、ESG list、metadata strip 等內容槽位；驗證方式為 `pnpm --filter @solar-display/web exec tsx --test src/pages/Overview/configRender.test.tsx src/pages/Sustainability/configRender.test.ts src/pages/Images/configRender.test.ts` 與人工檢查內容區塊仍存在。
+
+## 3. 鎖住回歸與驗證完成度
+
+- [x] 3.1 落實 `Lock the visual contract with source-level regressions and targeted browser checks`，使 `Shared card typography and value-row alignment SHALL not drift by page` 與 `Solar SHALL remain the icon-treatment baseline for shared KPI cards` 都有可重複驗證的 regression coverage；驗證方式為補足 source-level tests 後執行 `pnpm --filter @solar-display/web exec tsx --test src/components/displayPageCards.test.tsx src/pages/Solar/cardFamily.test.ts src/pages/Overview/configRender.test.tsx src/pages/Sustainability/configRender.test.ts src/pages/Images/configRender.test.ts`。
+- [x] 3.2 驗證 `Shared display cards SHALL keep a single header visual contract across aligned pages` 的交付完整，交付結果為 `pnpm --filter @solar-display/web exec tsc --noEmit -p tsconfig.json`、`pnpm --filter @solar-display/web build`、`spectra validate --strict --changes align-display-page-card-visual-language` 通過，且 browser manual check 確認四頁 card header 不再分裂；驗證方式為上述命令與單一 `agent-browser` session 的 sequential computed-style 檢查。

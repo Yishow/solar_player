@@ -20,6 +20,8 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /activeEntry: playlistData\?\.activeEntry \?\? null/);
   assert.match(imagesSource, /entries: playlistData\?\.entries \?\? \[\]/);
   assert.match(imagesSource, /viewModel\.active\.assetSource \?/);
+  assert.match(imagesSource, /DisplayCardFrame/);
+  assert.match(imagesSource, /DisplayCardFooter/);
 });
 
 test("images display page seed config captures the current default gallery layout and hero contract", () => {

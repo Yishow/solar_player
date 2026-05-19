@@ -194,6 +194,9 @@
 
 .images-info-card {
   z-index: 7;
+  --display-card-title-color: #2e3430;
+  --display-card-title-size: 28px;
+  --display-card-title-letter-spacing: 1px;
   border: 1px solid rgba(92, 105, 79, 0.18);
   border-radius: 22px;
   background: rgba(255, 253, 247, 0.94);
@@ -203,8 +206,6 @@
 
 .images-info-card .images-info-icon {
   display: flex;
-  height: 72px;
-  width: 72px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -217,25 +218,16 @@
   width: 34px;
 }
 
-.images-info-card h3 {
-  margin: 10px 0 18px;
-  font-size: 28px;
-  letter-spacing: 1px;
-  color: #2e3430;
-}
-
-.images-info-card p {
-  margin: 0;
+.images-info-card .images-info-card-body {
+  margin: 18px 0 0;
   color: #5b625c;
   font-size: 19px;
   line-height: 1.74;
 }
 
-.images-info-card small {
-  position: absolute;
-  left: 30px;
-  bottom: 26px;
-  width: calc(100% - 60px);
+.images-info-card .images-info-card-meta {
+  display: block;
+  width: 100%;
   padding-top: 16px;
   border-top: 1px solid rgba(92, 105, 79, 0.16);
   color: #5b774d;

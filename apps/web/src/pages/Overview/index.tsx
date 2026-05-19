@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
 import { Sparkline } from "../../components/Sparkline";
+import {
+  DisplayCardFooter,
+  DisplayCardFrame,
+  DisplayCardHeader,
+  DisplayCardValueRow
+} from "../../components/displayPageCards";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -23,6 +29,7 @@ import {
   overviewGoldLineLayout,
   overviewLeafLayout
 } from "./layout";
+import "../../components/displayPageCards.css";
 import "./overview.css";
 import { buildOverviewViewModel } from "./viewModel";
 
@@ -181,29 +188,31 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
         />
       </figure>
 
-      <section
+      <DisplayCardFrame
         className={[
           "overview-summary",
           `overview-summary-${viewModel.summary.alertTone}`
         ].join(" ")}
+        surface="info"
         style={{
           left: `${summaryLayout.left}px`,
           top: `${summaryLayout.top}px`,
           width: `${summaryLayout.width}px`
         }}
       >
-        <strong>Shared Story Summary</strong>
-        <p>{viewModel.summary.statusLabel}</p>
-      </section>
+        <DisplayCardHeader title="Shared Story Summary" />
+        <p className="overview-summary-body">{viewModel.summary.statusLabel}</p>
+      </DisplayCardFrame>
 
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
 
         return (
-          <article
+          <DisplayCardFrame
             key={metric.label}
             className="overview-kpi-card"
+            surface="metric"
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -211,26 +220,20 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
               width: `${layout.width}px`
             }}
           >
-            <div className="overview-kpi-head">
-              <div
-                className={[
-                  "overview-kpi-icon-shell",
-                  metric.accentColor ? "overview-kpi-icon-accent" : ""
-                ].join(" ")}
-              >
-                <ReferenceGlyph className="overview-kpi-icon" name={metric.iconKey} />
-              </div>
-              <div>
-                <h3>{metric.label}</h3>
-                <p>{cardItem.englishLabel}</p>
-              </div>
-            </div>
-            <div className="overview-kpi-value-row">
-              <span className="overview-kpi-value">{metric.value}</span>
-              <span className="overview-kpi-unit">{metric.unit}</span>
-            </div>
-            <Sparkline className="overview-kpi-sparkline" values={trendSeries} />
-          </article>
+            <DisplayCardHeader
+              icon={<ReferenceGlyph className="overview-kpi-icon" name={metric.iconKey} />}
+              iconContainerClassName={[
+                "overview-kpi-icon-shell",
+                metric.accentColor ? "overview-kpi-icon-accent" : ""
+              ].join(" ")}
+              subtitle={cardItem.englishLabel}
+              title={metric.label}
+            />
+            <DisplayCardValueRow align="center" unit={metric.unit} value={metric.value} />
+            <DisplayCardFooter>
+              <Sparkline className="overview-kpi-sparkline" values={trendSeries} />
+            </DisplayCardFooter>
+          </DisplayCardFrame>
         );
       })}
     </section>

@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  DisplayCardFooter,
+  DisplayCardFrame,
+  DisplayCardHeader,
+  DisplayCardValueRow
+} from "../../components/displayPageCards";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -19,6 +25,7 @@ import { RuntimeConfigFallbackBanner } from "../runtimeConfigHydration";
 import {
   solarTitleLayout
 } from "./layout";
+import "../../components/displayPageCards.css";
 import "./solar.css";
 import { buildSolarViewModel } from "./viewModel";
 
@@ -285,9 +292,10 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
         const assetSrc = solarAssetRuntimeMap.kpi[metric.iconKey];
 
         return (
-          <article
+          <DisplayCardFrame
             key={metric.label}
             className="solar-kpi-card"
+            surface="metric"
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -295,19 +303,16 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
               width: `${layout.width}px`
             }}
           >
-            <div className="solar-kpi-head">
-              <img alt={metric.label} className="solar-kpi-icon" src={assetSrc} />
-              <div>
-                <h3>{metric.label}</h3>
-                <p>{cardItem.englishLabel}</p>
-              </div>
-            </div>
-            <div className="solar-kpi-value-row">
-              <span className="solar-kpi-value">{metric.value}</span>
-              <span className="solar-kpi-unit">{metric.unit}</span>
-            </div>
-            <p className="solar-kpi-helper">{metric.helper}</p>
-          </article>
+            <DisplayCardHeader
+              icon={<img alt={metric.label} className="solar-kpi-icon" src={assetSrc} />}
+              subtitle={cardItem.englishLabel}
+              title={metric.label}
+            />
+            <DisplayCardValueRow align="center" unit={metric.unit} value={metric.value} />
+            <DisplayCardFooter>
+              <p className="solar-kpi-helper">{metric.helper}</p>
+            </DisplayCardFooter>
+          </DisplayCardFrame>
         );
       })}
     </section>

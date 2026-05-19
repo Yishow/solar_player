@@ -4,11 +4,15 @@ export type ReferenceGlyphName =
   | "check"
   | "clock"
   | "co2"
+  | "efficiency"
+  | "esg-doc"
   | "image"
   | "leaf"
   | "play"
   | "plug"
+  | "procure"
   | "refresh"
+  | "self-consumption"
   | "sun";
 
 type ReferenceGlyphProps = {
@@ -125,6 +129,46 @@ export function ReferenceGlyph({ className, name }: ReferenceGlyphProps) {
           <rect x="4" y="5" width="16" height="14" rx="2" />
           <path d="M7 16 L11 12 L14 15 L16 13 L19 16" />
           <circle cx="9" cy="9" r="1" />
+        </svg>
+      );
+    case "self-consumption":
+      return (
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="22" stroke="currentColor" strokeWidth="2.4" opacity="0.18" />
+          <path d="M32 10 A22 22 0 0 1 54 32 H32 Z" fill="currentColor" fillOpacity="0.14" />
+          <path d="M32 32 L46 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="6" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="2.4" />
+          <path d="M18 42 C22 48 29 52 37 52 C45 52 51 48 55 42" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      );
+    case "efficiency":
+      return (
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none">
+          <path d="M14 40 C14 26 22 14 32 14 C42 14 50 26 50 40" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M32 40 L44 24" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="32" cy="40" r="5" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="2.4" />
+          <path d="M22 50 H42" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M24 20 L20 16 M40 20 L44 16" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      );
+    case "procure":
+      return (
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="32" cy="32" r="21" />
+          <path d="M18 23 H22 L26 42 H45" />
+          <path d="M25 28 H46 L42 38 H28" />
+          <circle cx="29" cy="45" r="2.7" fill="currentColor" stroke="none" />
+          <circle cx="41" cy="45" r="2.7" fill="currentColor" stroke="none" />
+          <path d="M40 18 C35 19 31 22 30 27 C35 27 39 25 40 18 Z" />
+        </svg>
+      );
+    case "esg-doc":
+      return (
+        <svg aria-hidden="true" className={iconClassName(className)} viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="32" cy="32" r="21" />
+          <path d="M24 18 H38 L44 24 V46 H24 Z" />
+          <path d="M38 18 V25 H44" />
+          <path d="M29 31 H39 M29 36 H39 M29 41 H36" />
         </svg>
       );
     case "play":

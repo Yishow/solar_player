@@ -161,80 +161,35 @@
 .sustainability-kpi-card,
 .sustainability-stat-card {
   z-index: 12;
+  --display-card-title-color: #384039;
+  --display-card-subtitle-color: #70766f;
+  --display-card-icon-color: #6a8a50;
+  --display-card-value-color: #57774a;
+  --display-card-value-size: 66px;
+  --display-card-value-weight: 800;
+  --display-card-value-line-height: 0.88;
+  --display-card-unit-color: #566152;
+  --display-card-unit-size: 22px;
+  --display-card-unit-padding-bottom: 8px;
   border: 1px solid rgba(155, 139, 92, 0.28);
   border-radius: 24px;
   background: rgba(255, 253, 247, 0.92);
   box-shadow: 0 12px 28px rgba(96, 81, 56, 0.11);
 }
 
-.sustainability-card-head {
-  position: absolute;
-  left: 24px;
-  top: 18px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 .sustainability-card-icon {
-  width: 50px;
-  height: 50px;
   color: #6a8a50;
-}
-
-.sustainability-card-head h3 {
-  margin: 0 0 4px;
-  color: #384039;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.sustainability-card-head p {
-  margin: 0;
-  color: #70766f;
-  font-family: var(--font-family-en);
-  font-size: 12px;
-}
-
-.sustainability-card-value {
-  position: absolute;
-  left: 44px;
-  top: 108px;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.sustainability-card-value span {
-  color: #57774a;
-  font-size: 66px;
-  font-weight: 800;
-  line-height: 0.88;
-}
-
-.sustainability-card-value small {
-  margin-bottom: 8px;
-  color: #566152;
-  font-size: 22px;
 }
 
 .sustainability-sparkline,
 .sustainability-trees-sparkline {
-  position: absolute;
-  left: 30px;
-  right: 30px;
-  bottom: 22px;
   height: 28px;
 }
 
 .sustainability-growth-note {
-  position: absolute;
-  left: 44px;
-  bottom: 34px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   color: #626862;
   font-size: 16px;
@@ -247,9 +202,7 @@
 }
 
 .sustainability-stat-value {
-  position: absolute;
-  left: 28px;
-  bottom: 54px;
+  text-align: center;
   color: #57774a;
   font-size: 66px;
   font-weight: 800;
@@ -257,9 +210,7 @@
 }
 
 .sustainability-stat-procure {
-  position: absolute;
-  left: 28px;
-  bottom: 54px;
+  text-align: center;
   color: #57774a;
   font-size: 42px;
   font-weight: 700;
@@ -267,18 +218,13 @@
 }
 
 .sustainability-stat-desc {
-  position: absolute;
-  left: 28px;
-  bottom: 22px;
-  margin: 0;
+  margin: 14px 0 0;
   color: #666d66;
   font-size: 17px;
+  text-align: center;
 }
 
 .sustainability-esg-list {
-  position: absolute;
-  left: 30px;
-  top: 94px;
   margin: 0;
   padding-left: 20px;
   color: #525951;
