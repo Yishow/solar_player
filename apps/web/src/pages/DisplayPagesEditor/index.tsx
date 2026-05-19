@@ -9,12 +9,7 @@ import { routeMetaMap } from "../../app/routeMeta";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
-import {
-  formatFallbackKey,
-  formatFallbackMode,
-  type DisplayPagePublishingStateMap,
-  useDisplayPagePublishingState
-} from "./publishing";
+import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard } from "./canvasCard";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
@@ -153,35 +148,6 @@ export function DisplayPagesEditor({
     reload: reloadAssetHealth,
     report: assetHealthReport
   } = useDisplayPageAssetHealth();
-  const editorControlSummaryLines = useMemo(() => {
-    if (!publishingState) {
-      return [];
-    }
-
-    const lines = [
-      blockingCount > 0 ? `draft 有 ${blockingCount} 項 blocking 問題` : "draft 已通過 blocking 檢查",
-      publishingState.fallback.isFallbackActive ? "目前 live 正在 fallback" : "目前 live 未啟用 fallback"
-    ];
-
-    publishingState.validation.findings.forEach((finding) => {
-      lines.push(finding.regionId ? `${finding.regionId}: ${finding.message}` : finding.message);
-    });
-
-    publishingState.fallback.items
-      .filter((item) => item.active)
-      .forEach((item) => {
-        lines.push(`${formatFallbackKey(item.key)}: ${formatFallbackMode(item.mode)}`);
-      });
-
-    return lines;
-  }, [blockingCount, publishingState]);
-  const saveDisabled = isLoading || isSaving || !dirty;
-  const publishDisabled = isLoading || isSaving || isPublishing || isPublishBlocked;
-  const controlStatusToneClassName = errorMessage
-    ? "border-[rgba(180,82,52,0.25)] bg-[rgba(180,82,52,0.08)] text-[#8f452d]"
-    : dirty
-      ? "border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] text-[#8e6410]"
-      : "border-[var(--shell-divider)] bg-white/80 text-[var(--shell-copy-ink)]";
 
   useEffect(() => { setSelectedRegionId(null); }, [selectedPage.id]);
 
@@ -281,77 +247,7 @@ export function DisplayPagesEditor({
       description="切換五個展示頁畫布，後續分 phase 接上 overlay、inspector 與 persisted page config。"
       aside={pageTabs}
     >
-      <div className="flex h-full min-h-0 flex-col gap-4">
-        <section className="shrink-0 rounded-[18px] border border-[var(--shell-divider)] bg-white/65 px-4 py-3 shadow-[0_12px_30px_rgba(80,94,54,0.06)] backdrop-blur-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div
-                className={[
-                  "rounded-[16px] border px-3 py-2 text-[12px] leading-5",
-                  controlStatusToneClassName
-                ].join(" ")}
-                role="status"
-              >
-                {errorMessage || message}
-              </div>
-              {editorControlSummaryLines.length > 0 ? (
-                <div className="rounded-[16px] border border-[var(--shell-divider)] bg-white/85 px-3 py-2 text-[12px] leading-5 text-[var(--shell-copy-ink)]">
-                  {editorControlSummaryLines.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-55"
-                disabled={isLoading}
-                onClick={() => void handleReload()}
-              >
-                重新同步
-              </button>
-              <button
-                type="button"
-                className="rounded-full px-4 py-2 text-[13px] font-semibold"
-                disabled={saveDisabled}
-                onClick={() => void handleSave()}
-                style={saveDisabled
-                  ? {
-                      backgroundColor: "rgba(95, 140, 80, 0.14)",
-                      border: "1px solid rgba(95, 140, 80, 0.22)",
-                      color: "var(--shell-muted-ink)"
-                    }
-                  : {
-                      backgroundColor: "#5f8c50",
-                      color: "#ffffff"
-                    }}
-              >
-                {isSaving ? "儲存中..." : "儲存設定"}
-              </button>
-              <button
-                type="button"
-                className="rounded-full px-4 py-2 text-[13px] font-semibold"
-                disabled={publishDisabled}
-                onClick={() => void publish()}
-                style={publishDisabled
-                  ? {
-                      backgroundColor: "rgba(52, 56, 58, 0.14)",
-                      border: "1px solid rgba(52, 56, 58, 0.18)",
-                      color: "var(--shell-muted-ink)"
-                    }
-                  : {
-                      backgroundColor: "#34383a",
-                      color: "#ffffff"
-                    }}
-              >
-                {isPublishing ? "發布中..." : "發布草稿"}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+      <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
         <DisplayEditorLeftPanel
           dirty={dirty}
           editMode={editMode}
@@ -504,7 +400,6 @@ export function DisplayPagesEditor({
           </div>
           </div>
         </div>
-      </div>
     </PageContainer>
   );
 }

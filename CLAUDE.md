@@ -41,6 +41,7 @@
 - `apps/web/src/` 目前使用 extensionless relative imports；不要把 server 的 import 風格直接搬到 web。
 - `packages/shared/src/index.ts` 是共用出口；server 與 web 目前都透過 `@solar-display/shared` 取用型別與 playback 邏輯。
 - 測試命名目前以 `*.test.ts` 為準，位置就在各自 `src/` 目錄下，例如 `apps/server/src/routes/images.test.ts`、`apps/web/src/hooks/playbackRouteNavigation.test.ts`。
+- 若需要做瀏覽器測試，使用 `agent-browser` skill。
 
 ### Server 行為與 error handling
 
@@ -48,6 +49,7 @@
 - `apps/server/src/app.ts` 對未命中路由與未捕捉錯誤有統一回應。常見 API 錯誤形狀是 `{ success: false, error, timestamp }`；500 錯誤會回 `Internal Server Error`，不直接暴露內部例外內容。
 - 成功回應的形狀並不完全一致；有些 route 回 `{ success: true, data, timestamp }`，也有些 route 直接回 `{ settings, status }` 或 `{ topics }`。修改 API 時先跟隨既有 route 形狀，不要硬套新的 envelope。
 - logger 模式由 `apps/server/src/logger.ts` 決定：production 用 Fastify 預設 logger，非 production 用 `pino-pretty`。
+- server 程式中優先使用 `app.log` 而非 `console.error`；`console.error` 目前只出現在 app 建立前的啟動失敗路徑。
 
 ### 安全與設定邊界
 

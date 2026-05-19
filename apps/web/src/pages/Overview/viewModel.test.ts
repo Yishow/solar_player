@@ -298,6 +298,70 @@ test("buildOverviewViewModel accepts resolved display-story overview metrics wit
   assert.equal(model.metrics[2]?.label, "累積發電量");
 });
 
+test("buildOverviewViewModel tolerates incomplete shared story payloads and falls back to derived summary", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "601" }),
+        undefined
+      ] as unknown as Array<{
+        alertTone: "danger" | "normal" | "warning";
+        bindingState: "bound" | "conflict" | "missing";
+        fallbackReason: "metric-unavailable" | "stale-data" | null;
+        freshnessState: "fallback" | "fresh" | "stale";
+        helper: string;
+        label: string;
+        metricKey: string;
+        unit: string;
+        value: string;
+      }>,
+      summary: undefined as never
+    }
+  });
+
+  assert.equal(model.metrics[0]?.label, "故事版即時功率");
+  assert.equal(model.metrics[1]?.label, "今日發電量");
+  assert.equal(model.summary.alertTone, "warning");
+  assert.equal(model.summary.statusLabel, "共享故事部分缺值，缺少 KPI 會回退顯示");
+});
+
+test("buildOverviewViewModel rejects invalid shared story state enums and falls back to socket bindings", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [{
+        ...createResolvedStoryMetric({ label: "不合法故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "601" }),
+        alertTone: "invalid-tone"
+      }] as unknown as Array<{
+        alertTone: "danger" | "normal" | "warning";
+        bindingState: "bound" | "conflict" | "missing";
+        fallbackReason: "metric-unavailable" | "stale-data" | null;
+        freshnessState: "fallback" | "fresh" | "stale";
+        helper: string;
+        label: string;
+        metricKey: string;
+        unit: string;
+        value: string;
+      }>,
+      summary: {
+        alertTone: "invalid-tone",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      } as never
+    }
+  });
+
+  assert.equal(model.metrics[0]?.label, "即時發電功率");
+  assert.equal(model.summary.alertTone, "warning");
+  assert.equal(model.summary.statusLabel, "共享故事部分缺值，缺少 KPI 會回退顯示");
+});
+
 test("buildOverviewViewModel keeps socket bindings when display-story request failed", () => {
   const model = buildOverviewViewModel({
     connectionState: "connected",

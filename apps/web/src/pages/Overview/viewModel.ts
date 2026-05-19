@@ -28,6 +28,13 @@ type OverviewMetricCard = {
   iconKey: OverviewMetricIconKey;
 } & MonitoringMetricBinding<OverviewMetricKey>;
 
+type OverviewStorySummary = {
+  alertTone: MonitoringAlertTone;
+  bindingState: MonitoringBindingState;
+  fallbackReason: MonitoringFallbackReason | null;
+  freshnessState: MonitoringFreshnessState;
+};
+
 type BuildOverviewViewModelArgs = {
   connectionState: SocketConnectionState["status"];
   isSocketConnected: boolean;
@@ -55,6 +62,22 @@ const metricCards: OverviewMetricCard[] = [
   { accentColor: false, fallbackIndex: 3, iconKey: "co2", metricKey: "todayCo2Reduction", label: "今日 CO₂ 減量", unit: "t" },
   { accentColor: false, fallbackIndex: 4, iconKey: "leaf", metricKey: "totalCo2Reduction", label: "累積 CO₂ 減量", unit: "t" }
 ];
+
+const validMonitoringAlertTones = new Set<MonitoringAlertTone>(["danger", "normal", "warning"]);
+const validMonitoringBindingStates = new Set<MonitoringBindingState>(["bound", "conflict", "missing"]);
+const validMonitoringFreshnessStates = new Set<MonitoringFreshnessState>(["fresh", "fallback", "stale"]);
+const validMonitoringFallbackReasons = new Set<MonitoringFallbackReason>([
+  "attention-threshold-exceeded",
+  "comparison-target-missing",
+  "low-output",
+  "metric-unavailable",
+  "missing-live-power",
+  "missing-slot-binding",
+  "reduced-efficiency",
+  "socket-disconnected",
+  "stale-data",
+  "warning-threshold-exceeded"
+]);
 
 function resolveSummaryStatus(connectionState: SocketConnectionState["status"]): OverviewStatus {
   if (connectionState === "connected") {
@@ -133,6 +156,51 @@ function resolveStoryMetricCards(
   });
 }
 
+function isResolvedStoryMetric(value: unknown): value is ResolvedMonitoringMetricBinding<string> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ResolvedMonitoringMetricBinding<string>>;
+  return (
+    typeof candidate.alertTone === "string" &&
+    validMonitoringAlertTones.has(candidate.alertTone as MonitoringAlertTone) &&
+    typeof candidate.bindingState === "string" &&
+    validMonitoringBindingStates.has(candidate.bindingState as MonitoringBindingState) &&
+    (candidate.fallbackReason === null || (
+      typeof candidate.fallbackReason === "string" &&
+      validMonitoringFallbackReasons.has(candidate.fallbackReason as MonitoringFallbackReason)
+    )) &&
+    typeof candidate.freshnessState === "string" &&
+    validMonitoringFreshnessStates.has(candidate.freshnessState as MonitoringFreshnessState) &&
+    typeof candidate.metricKey === "string" &&
+    typeof candidate.label === "string" &&
+    typeof candidate.unit === "string" &&
+    typeof candidate.value === "string" &&
+    typeof candidate.helper === "string"
+  );
+}
+
+function isOverviewStorySummary(value: unknown): value is OverviewStorySummary {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<OverviewStorySummary>;
+  return (
+    typeof candidate.alertTone === "string" &&
+    validMonitoringAlertTones.has(candidate.alertTone as MonitoringAlertTone) &&
+    typeof candidate.bindingState === "string" &&
+    validMonitoringBindingStates.has(candidate.bindingState as MonitoringBindingState) &&
+    (candidate.fallbackReason === null || (
+      typeof candidate.fallbackReason === "string" &&
+      validMonitoringFallbackReasons.has(candidate.fallbackReason as MonitoringFallbackReason)
+    )) &&
+    typeof candidate.freshnessState === "string" &&
+    validMonitoringFreshnessStates.has(candidate.freshnessState as MonitoringFreshnessState)
+  );
+}
+
 export function buildOverviewViewModel({
   connectionState,
   isSocketConnected,
@@ -143,8 +211,9 @@ export function buildOverviewViewModel({
   summaryMetricKeys
 }: BuildOverviewViewModelArgs) {
   const hasStoryOverview = storyOverview !== undefined;
+  const storyMetrics = hasStoryOverview ? storyOverview.metrics.filter(isResolvedStoryMetric) : [];
   const resolvedMetricBindings = hasStoryOverview
-    ? resolveStoryMetricCards(metricBindings, storyOverview.metrics)
+    ? resolveStoryMetricCards(metricBindings, storyMetrics)
     : metricBindings;
 
   const metrics = resolvedMetricBindings.map((metricCard) => {
@@ -194,7 +263,15 @@ export function buildOverviewViewModel({
     };
   });
   const summaryState = hasStoryOverview
-    ? storyOverview.summary
+    ? isOverviewStorySummary(storyOverview.summary)
+      ? storyOverview.summary
+      : resolveMonitoringSummaryState(
+          metrics.filter((metric) =>
+            (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
+              metric.metricKey as OverviewMetricKey
+            )
+          )
+        )
     : resolveMonitoringSummaryState(
         metrics.filter((metric) =>
           (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
