@@ -148,7 +148,7 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.doesNotMatch(footerHtml, />離線</);
 });
 
-test("management shell shares the FHD canvas with display routes and adds an inner scroll area", () => {
+test("management shell uses dedicated full-viewport primitives instead of the playback canvas", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -159,11 +159,16 @@ test("management shell shares the FHD canvas with display routes and adds an inn
     )
   );
 
-  assert.match(html, /data-shell-primitive="display-canvas-viewport"/);
-  assert.match(html, /data-shell-primitive="display-canvas-frame"/);
+  assert.match(html, /data-shell-primitive="management-shell-viewport"/);
+  assert.match(html, /data-shell-primitive="management-shell-surface"/);
+  assert.match(html, /data-shell-primitive="management-shell-content"/);
   assert.match(html, /data-shell-primitive="management-scroll"/);
   assert.match(html, /overflow-y-auto/);
   assert.match(html, /overflow-x-hidden/);
+  assert.doesNotMatch(html, /data-shell-primitive="display-canvas-viewport"/);
+  assert.doesNotMatch(html, /data-shell-primitive="display-canvas-frame"/);
+  assert.doesNotMatch(html, /width:1920px/);
+  assert.doesNotMatch(html, /height:1080px/);
 });
 
 test("shell primitives expose reusable section, action, media, and status wrappers", () => {
