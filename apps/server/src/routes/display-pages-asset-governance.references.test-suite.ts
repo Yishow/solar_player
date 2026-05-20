@@ -9,22 +9,37 @@ import {
   uploadsDir
 } from "./display-pages-asset-governance.test-support.js";
 
+async function saveDraftConfig(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  pageId: string,
+  regions: Record<string, unknown>
+) {
+  const draftResponse = await app.inject({
+    method: "GET",
+    url: `/api/display-pages/${pageId}/draft`
+  });
+  const draftBody = draftResponse.json() as { config: { version: number } };
+
+  return app.inject({
+    method: "PUT",
+    url: `/api/display-pages/${pageId}/draft`,
+    payload: {
+      baseVersion: draftBody.config.version,
+      regions
+    }
+  });
+}
+
 test("draft config stores managed asset references and resolves runtime src on read", async () => {
   const app = await buildApp();
   const managedAsset = seedManagedImageAsset();
 
   try {
-    const saveResponse = await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/overview/draft",
-      payload: {
-        regions: {
-          heroMedia: {
-            alt: "Managed overview hero",
-            assetId: managedAsset.assetId,
-            src: "/should-not-persist.png"
-          }
-        }
+    const saveResponse = await saveDraftConfig(app, "overview", {
+      heroMedia: {
+        alt: "Managed overview hero",
+        assetId: managedAsset.assetId,
+        src: "/should-not-persist.png"
       }
     });
 
@@ -67,18 +82,12 @@ test("draft config stores direct-src bindings without stale managed asset baggag
   const app = await buildApp();
 
   try {
-    const saveResponse = await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/overview/draft",
-      payload: {
-        regions: {
-          heroMedia: {
-            alt: "Direct overview hero",
-            assetId: 42,
-            sourceMode: "direct-src",
-            src: "/uploads/images/overview-direct.png"
-          }
-        }
+    const saveResponse = await saveDraftConfig(app, "overview", {
+      heroMedia: {
+        alt: "Direct overview hero",
+        assetId: 42,
+        sourceMode: "direct-src",
+        src: "/uploads/images/overview-direct.png"
       }
     });
 
@@ -126,18 +135,12 @@ test("seed-default bindings do not surface managed asset findings after legacy p
   const managedAsset = seedManagedImageAsset();
 
   try {
-    const saveResponse = await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/sustainability/draft",
-      payload: {
-        regions: {
-          heroMedia: {
-            alt: "Seed sustainability hero",
-            assetId: managedAsset.assetId,
-            sourceMode: "seed-default",
-            src: "/should-drop.png"
-          }
-        }
+    const saveResponse = await saveDraftConfig(app, "sustainability", {
+      heroMedia: {
+        alt: "Seed sustainability hero",
+        assetId: managedAsset.assetId,
+        sourceMode: "seed-default",
+        src: "/should-drop.png"
       }
     });
 
@@ -187,16 +190,10 @@ test("draft config surfaces a missing managed asset finding when the reference n
   const managedAsset = seedManagedImageAsset();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/solar/draft",
-      payload: {
-        regions: {
-          heroMedia: {
-            alt: "Solar hero",
-            assetId: managedAsset.assetId
-          }
-        }
+    await saveDraftConfig(app, "solar", {
+      heroMedia: {
+        alt: "Solar hero",
+        assetId: managedAsset.assetId
       }
     });
 
@@ -240,16 +237,10 @@ test("draft validation reports missing managed asset references as warnings", as
   const managedAsset = seedManagedImageAsset();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/images/draft",
-      payload: {
-        regions: {
-          mainStage: {
-            alt: "Images stage",
-            assetId: managedAsset.assetId
-          }
-        }
+    await saveDraftConfig(app, "images", {
+      mainStage: {
+        alt: "Images stage",
+        assetId: managedAsset.assetId
       }
     });
 

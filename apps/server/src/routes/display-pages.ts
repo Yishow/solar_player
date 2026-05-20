@@ -1,4 +1,8 @@
-import type { DisplayPageConfigEnvelope, DisplayPageId } from "@solar-display/shared";
+import type {
+  DisplayPageConfigEnvelope,
+  DisplayPageDraftSaveConflictResponse,
+  DisplayPageId
+} from "@solar-display/shared";
 import {
   createEmptyDisplayPageConfig
 } from "@solar-display/shared";
@@ -6,6 +10,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { readDisplayPageInstance } from "../services/displayPageRegistryService.js";
 import {
+  ManagementDraftSaveConflictError,
   readStageConfig,
   writeStageConfig,
   publishDraft,
@@ -23,7 +28,7 @@ import {
 import { readDisplayRotationPreview } from "../services/displayRotationService.js";
 
 type DisplayPageRouteParams = { pageId: string };
-type DisplayPageConfigBody = { regions?: Record<string, unknown> };
+type DisplayPageConfigBody = { baseVersion?: number; regions?: Record<string, unknown> };
 type PublishRequestBody = { publishedBy?: string };
 type RollbackRequestBody = { targetVersion: number; publishedBy?: string };
 
@@ -164,13 +169,35 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
         );
       }
 
-      const config = resolveEnvelope(writeStageConfig(pageId, "draft", regions));
-      app.socketService.emitDisplaySync({
-        generatedAt: new Date().toISOString(),
-        reason: "display-page-draft-updated",
-        scope: "display-pages"
-      });
-      return { config };
+      try {
+        const config = resolveEnvelope(
+          writeStageConfig(pageId, "draft", regions, {
+            baseVersion: request.body?.baseVersion
+          })
+        );
+        app.socketService.emitDisplaySync({
+          generatedAt: new Date().toISOString(),
+          reason: "display-page-draft-updated",
+          scope: "display-pages"
+        });
+        return { config };
+      } catch (error) {
+        if (error instanceof ManagementDraftSaveConflictError) {
+          const conflictResponse: DisplayPageDraftSaveConflictResponse = {
+            code: error.code,
+            conflict: {
+              ...error.conflict,
+              latestEnvelope: resolveEnvelope(error.conflict.latestEnvelope)
+            },
+            error: error.message,
+            success: false,
+            timestamp: new Date().toISOString()
+          };
+          return reply.status(409).send(conflictResponse);
+        }
+
+        throw error;
+      }
     }
   );
 

@@ -30,6 +30,27 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
+async function saveDraftConfig(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  pageId: string,
+  regions: Record<string, unknown>
+) {
+  const draftResponse = await app.inject({
+    method: "GET",
+    url: `/api/display-pages/${pageId}/draft`
+  });
+  const draftBody = draftResponse.json() as { config: { version: number } };
+
+  return app.inject({
+    method: "PUT",
+    url: `/api/display-pages/${pageId}/draft`,
+    payload: {
+      baseVersion: draftBody.config.version,
+      regions
+    }
+  });
+}
+
 test("GET /api/display-pages/:pageId/config returns an empty persisted config envelope by default", async () => {
   const app = await buildApp();
 
@@ -166,13 +187,16 @@ test("PUT /api/display-pages/:pageId/draft saves draft without affecting live", 
     const draftRes = await app.inject({
       method: "PUT",
       url: "/api/display-pages/overview/draft",
-      payload: { regions: { heroCopyLayout: { left: 120 } } }
+      payload: { baseVersion: 1, regions: { heroCopyLayout: { left: 120 } } }
     });
 
     assert.equal(draftRes.statusCode, 200);
-    const draftBody = draftRes.json() as { config: { stage: string; regions: { heroCopyLayout: { left: number } } } };
+    const draftBody = draftRes.json() as {
+      config: { stage: string; regions: { heroCopyLayout: { left: number } }; version: number };
+    };
     assert.equal(draftBody.config.stage, "draft");
     assert.equal(draftBody.config.regions.heroCopyLayout.left, 120);
+    assert.equal(draftBody.config.version, 2);
 
     const liveRes = await app.inject({
       method: "GET",
@@ -183,6 +207,68 @@ test("PUT /api/display-pages/:pageId/draft saves draft without affecting live", 
     const liveBody = liveRes.json() as { config: { stage: string; regions: Record<string, unknown> } };
     assert.equal(liveBody.config.stage, "live");
     assert.deepEqual(liveBody.config.regions, {});
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/display-pages/:pageId/draft rejects stale baseVersion and returns the latest draft baseline", async () => {
+  const app = await buildApp();
+
+  try {
+    const firstSaveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/overview/draft",
+      payload: { baseVersion: 1, regions: { heroCopyLayout: { left: 120 } } }
+    });
+
+    assert.equal(firstSaveResponse.statusCode, 200);
+
+    const staleSaveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/display-pages/overview/draft",
+      payload: { baseVersion: 1, regions: { heroCopyLayout: { left: 188 } } }
+    });
+
+    assert.equal(staleSaveResponse.statusCode, 409);
+    const staleBody = staleSaveResponse.json() as {
+      code: string;
+      conflict: {
+        baseVersion: number;
+        currentVersion: number;
+        latestEnvelope: {
+          regions: {
+            heroCopyLayout: {
+              left: number;
+            };
+          };
+          version: number;
+        };
+      };
+    };
+    assert.equal(staleBody.code, "management_draft_conflict");
+    assert.equal(staleBody.conflict.baseVersion, 1);
+    assert.equal(staleBody.conflict.currentVersion, 2);
+    assert.equal(staleBody.conflict.latestEnvelope.version, 2);
+    assert.equal(staleBody.conflict.latestEnvelope.regions.heroCopyLayout.left, 120);
+
+    const draftReadResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/draft"
+    });
+    const draftReadBody = draftReadResponse.json() as {
+      config: {
+        regions: {
+          heroCopyLayout: {
+            left: number;
+          };
+        };
+        version: number;
+      };
+    };
+
+    assert.equal(draftReadBody.config.version, 2);
+    assert.equal(draftReadBody.config.regions.heroCopyLayout.left, 120);
   } finally {
     await app.close();
   }
@@ -261,11 +347,7 @@ test("POST /api/display-pages/:pageId/publish promotes draft to live", async () 
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/overview/draft",
-      payload: { regions: { heroCopyLayout: { left: 120 } } }
-    });
+    await saveDraftConfig(app, "overview", { heroCopyLayout: { left: 120 } });
 
     const publishRes = await app.inject({
       method: "POST",
@@ -294,22 +376,14 @@ test("POST /api/display-pages/:pageId/rollback restores previous version", async
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/solar/draft",
-      payload: { regions: { heroCopyLayout: { left: 100 } } }
-    });
+    await saveDraftConfig(app, "solar", { heroCopyLayout: { left: 100 } });
     const pub1 = await app.inject({
       method: "POST",
       url: "/api/display-pages/solar/publish"
     });
     assert.equal(pub1.statusCode, 200);
 
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/solar/draft",
-      payload: { regions: { heroCopyLayout: { left: 200 } } }
-    });
+    await saveDraftConfig(app, "solar", { heroCopyLayout: { left: 200 } });
     const pub2 = await app.inject({
       method: "POST",
       url: "/api/display-pages/solar/publish"
@@ -340,10 +414,10 @@ test("GET /api/display-pages/:pageId/history returns publish history", async () 
   const app = await buildApp();
 
   try {
-    await app.inject({ method: "PUT", url: "/api/display-pages/images/draft", payload: { regions: { gallery: { cols: 3 } } } });
+    await saveDraftConfig(app, "images", { gallery: { cols: 3 } });
     await app.inject({ method: "POST", url: "/api/display-pages/images/publish", payload: { publishedBy: "op1" } });
 
-    await app.inject({ method: "PUT", url: "/api/display-pages/images/draft", payload: { regions: { gallery: { cols: 4 } } } });
+    await saveDraftConfig(app, "images", { gallery: { cols: 4 } });
     await app.inject({ method: "POST", url: "/api/display-pages/images/publish", payload: { publishedBy: "op2" } });
 
     const historyRes = await app.inject({ method: "GET", url: "/api/display-pages/images/history" });
@@ -378,10 +452,8 @@ test("POST publish with out-of-bounds geometry is rejected", async () => {
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/overview/draft",
-      payload: { regions: { heroRegion: { left: 1800, top: 0, width: 200, height: 100 } } }
+    await saveDraftConfig(app, "overview", {
+      heroRegion: { left: 1800, top: 0, width: 200, height: 100 }
     });
 
     const publishRes = await app.inject({
@@ -403,10 +475,8 @@ test("POST publish with negative dimensions is rejected", async () => {
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/solar/draft",
-      payload: { regions: { kpiCard: { left: 0, top: 0, width: -10, height: 50 } } }
+    await saveDraftConfig(app, "solar", {
+      kpiCard: { left: 0, top: 0, width: -10, height: 50 }
     });
 
     const publishRes = await app.inject({
@@ -427,10 +497,8 @@ test("POST publish with valid config succeeds", async () => {
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/sustainability/draft",
-      payload: { regions: { heroBanner: { left: 0, top: 0, width: 1920, height: 400 } } }
+    await saveDraftConfig(app, "sustainability", {
+      heroBanner: { left: 0, top: 0, width: 1920, height: 400 }
     });
 
     const publishRes = await app.inject({
@@ -451,10 +519,8 @@ test("POST /api/display-pages/:pageId/validate returns validation without publis
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/overview/draft",
-      payload: { regions: { badRegion: { left: -10, top: 0, width: 100, height: 100 } } }
+    await saveDraftConfig(app, "overview", {
+      badRegion: { left: -10, top: 0, width: 100, height: 100 }
     });
 
     const validateRes = await app.inject({
@@ -479,15 +545,9 @@ test("overlapping live draft regions are reported with both region ids and block
   const app = await buildApp();
 
   try {
-    await app.inject({
-      method: "PUT",
-      url: "/api/display-pages/solar/draft",
-      payload: {
-        regions: {
-          generation: { left: 120, top: 80, width: 320, height: 180 },
-          efficiency: { left: 220, top: 140, width: 320, height: 180 }
-        }
-      }
+    await saveDraftConfig(app, "solar", {
+      generation: { left: 120, top: 80, width: 320, height: 180 },
+      efficiency: { left: 220, top: 140, width: 320, height: 180 }
     });
 
     const validateRes = await app.inject({

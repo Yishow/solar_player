@@ -2,12 +2,17 @@ import type {
   ConfigStage,
   DisplayPageConfigEnvelope,
   DisplayPageId,
-  FallbackPolicy
+  FallbackPolicy,
+  ManagementDraftSaveConflict
 } from "@solar-display/shared";
 import { defaultFallbackPolicy } from "@solar-display/shared";
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { getDisplayPageConfig, updateDisplayPageConfig } from "../services/api";
+import {
+  getDisplayPageConfig,
+  isManagementDraftConflictError,
+  updateDisplayPageConfig
+} from "../services/api";
 import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
 import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 export { getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
@@ -70,6 +75,26 @@ export function resolveDisplayPageFallbackPolicy(
   envelope: Pick<DisplayPageConfigEnvelope, "fallbackPolicy"> | null
 ): FallbackPolicy {
   return envelope?.fallbackPolicy ?? defaultFallbackPolicy;
+}
+
+export function applyDisplayPageSaveConflict<T>(
+  session: DisplayPageDraftSession<T>,
+  latestConfig: T,
+  latestEnvelope: DisplayPageConfigEnvelope,
+  fallbackPolicy: FallbackPolicy
+): DisplayPageDraftSession<T> {
+  return {
+    ...session,
+    fallbackPolicy,
+    lastLoadedConfig: deepClone(latestConfig),
+    lastLoadedEnvelope: latestEnvelope
+  };
+}
+
+export function resolveDisplayPageSaveConflictMessage(
+  conflict: ManagementDraftSaveConflict<DisplayPageConfigEnvelope>
+) {
+  return `儲存衝突：伺服器草稿已更新到 v${conflict.currentVersion}，已保留本地未儲存變更，請先重新同步後再決定是否重套。`;
 }
 
 export function shouldHydrateDisplayPageSession(enabled: boolean, hasSession: boolean) {
@@ -225,18 +250,53 @@ export function useDisplayPageConfig<T>(
       return;
     }
 
+    if (!lastLoadedEnvelope) {
+      setErrorMessage("缺少最新伺服器基線，請先重新同步後再儲存。");
+      setMessage("儲存失敗，請先重新同步。");
+      return;
+    }
+
     setIsSaving(true);
     setMessage("正在儲存展示頁設定...");
     setErrorMessage("");
 
     try {
-      const envelope = await updateDisplayPageConfig(pageId, config as Record<string, unknown>, stage);
+      const envelope = await updateDisplayPageConfig(
+        pageId,
+        config as Record<string, unknown>,
+        stage,
+        { baseVersion: lastLoadedEnvelope.version }
+      );
       const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
       setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
       setMessage("展示頁設定已儲存。");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "儲存展示頁設定失敗。");
-      setMessage("儲存失敗，保留未儲存變更。");
+      if (isManagementDraftConflictError(error)) {
+        const latestEnvelope = error.conflict.latestEnvelope as DisplayPageConfigEnvelope;
+        const latestConfig = mergeDisplayPageConfig(seedConfig, latestEnvelope.regions);
+        setSessions((current) => {
+          const session = current[pageId] ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy);
+
+          return {
+            ...current,
+            [pageId]: applyDisplayPageSaveConflict(
+              session,
+              latestConfig,
+              latestEnvelope,
+              resolveDisplayPageFallbackPolicy(latestEnvelope)
+            )
+          };
+        });
+        setErrorMessage(
+          resolveDisplayPageSaveConflictMessage(
+            error.conflict as ManagementDraftSaveConflict<DisplayPageConfigEnvelope>
+          )
+        );
+        setMessage("儲存衝突，已保留本地未儲存變更。");
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : "儲存展示頁設定失敗。");
+        setMessage("儲存失敗，保留未儲存變更。");
+      }
     } finally {
       setIsSaving(false);
     }

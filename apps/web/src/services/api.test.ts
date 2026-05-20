@@ -3,9 +3,14 @@ import test from "node:test";
 import {
   bootstrapImagePlaylistGovernance,
   buildApiUrl,
+  isManagementAccessDeniedError,
+  isManagementDraftConflictError,
   fetchImagePlaylist,
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
+  getRuntimeBrandProfile,
+  getRuntimeMqttStatus,
+  updateDisplayPageConfig,
   requestJson
 } from "./api";
 
@@ -85,6 +90,94 @@ test("requestJson prefers JSON error messages over the raw serialized body", asy
   }
 });
 
+test("requestJson surfaces explicit management denied envelopes as typed access-denied errors", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        access: "denied",
+        code: "management_access_denied",
+        error: "Management access denied",
+        requiredRole: "management-trusted",
+        success: false,
+        timestamp: "2026-05-20T12:00:00.000Z"
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 403
+      }
+    );
+
+  try {
+    await assert.rejects(async () => {
+      try {
+        await requestJson("/api/device/status");
+      } catch (error) {
+        assert.equal(isManagementAccessDeniedError(error), true);
+        throw error;
+      }
+    }, /Management access denied/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("requestJson surfaces explicit management draft conflicts as typed optimistic-concurrency errors", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        code: "management_draft_conflict",
+        conflict: {
+          baseVersion: 4,
+          currentVersion: 5,
+          latestEnvelope: {
+            pageId: "overview",
+            regions: {
+              heroCopyLayout: {
+                left: 120
+              }
+            },
+            stage: "draft",
+            updatedAt: "2026-05-20T10:00:00.000Z",
+            version: 5
+          },
+          resourceId: "overview",
+          resourceType: "display-page-draft"
+        },
+        error: "Draft save conflict",
+        success: false,
+        timestamp: "2026-05-20T12:00:00.000Z"
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 409
+      }
+    );
+
+  try {
+    await assert.rejects(async () => {
+      try {
+        await requestJson("/api/display-pages/overview/draft", {
+          body: JSON.stringify({ baseVersion: 4, regions: {} }),
+          method: "PUT"
+        });
+      } catch (error) {
+        assert.equal(isManagementDraftConflictError(error), true);
+        throw error;
+      }
+    }, /Draft save conflict/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("requestJson does not force application/json when the request has no body", async () => {
   const originalFetch = globalThis.fetch;
   let seenContentType: string | null = null;
@@ -143,6 +236,54 @@ test("requestJson keeps caller headers while still using the normalized Headers 
   }
 });
 
+test("updateDisplayPageConfig forwards the draft baseVersion precondition to the draft save endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenBody = "";
+  let seenUrl = "";
+
+  globalThis.fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenBody = String(init?.body ?? "");
+
+    return new Response(
+      JSON.stringify({
+        config: {
+          pageId: "overview",
+          regions: {
+            heroCopyLayout: {
+              left: 120
+            }
+          },
+          stage: "draft",
+          updatedAt: "2026-05-20T10:00:00.000Z",
+          version: 5
+        }
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const response = await updateDisplayPageConfig(
+      "overview",
+      { heroCopyLayout: { left: 120 } },
+      "draft",
+      { baseVersion: 4 }
+    );
+
+    assert.equal(response.version, 5);
+    assert.match(seenUrl, /\/api\/display-pages\/overview\/draft$/);
+    assert.match(seenBody, /"baseVersion":4/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("fetchSustainabilityStory forwards the selected period to the shared story endpoint", async () => {
   const originalFetch = globalThis.fetch;
   let seenUrl = "";
@@ -194,7 +335,7 @@ test("fetchSustainabilityStory forwards the selected period to the shared story 
   }
 });
 
-test("fetchImagePlaylist can request a read-only snapshot without bootstrap side effects", async () => {
+test("fetchImagePlaylist targets the pure runtime read playlist contract", async () => {
   const originalFetch = globalThis.fetch;
   let seenUrl = "";
 
@@ -219,10 +360,10 @@ test("fetchImagePlaylist can request a read-only snapshot without bootstrap side
     );
   };
   try {
-    const response = await fetchImagePlaylist(0, { bootstrap: false });
+    const response = await fetchImagePlaylist(0);
     assert.equal(response.playlist.activeEntry, null);
     assert.equal(response.playlist.hasPlaylistRows, false);
-    assert.match(seenUrl, /\/api\/image-playlist\?activeIndex=0&bootstrap=false$/);
+    assert.match(seenUrl, /\/api\/image-playlist\?activeIndex=0$/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -258,6 +399,79 @@ test("fetchImagePlaylistGovernance targets the raw governance snapshot endpoint"
     assert.equal(response.playlist.entries.length, 0);
     assert.equal(response.playlist.hasPlaylistRows, false);
     assert.match(seenUrl, /\/api\/image-playlist\/governance$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getRuntimeBrandProfile targets the public active-brand bootstrap endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenUrl = "";
+
+  globalThis.fetch = async (input) => {
+    seenUrl = String(input);
+
+    return new Response(
+      JSON.stringify({
+        data: {
+          brandNameZh: "國瑞汽車",
+          brandNameEn: "KUOZUI MOTORS",
+          logoUrl: "/uploads/brand/default.png",
+          productTitleZh: "國瑞汽車中廠綠能展示播放器",
+          productTitleEn: "KUOZUI GREEN ENERGY DISPLAY PLAYER",
+          sloganZh: "永續，從現在開始",
+          sloganEn: "/ Sustainability Starts with Us"
+        },
+        success: true
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const brand = await getRuntimeBrandProfile();
+    assert.equal(brand.brandNameZh, "國瑞汽車");
+    assert.match(seenUrl, /\/api\/brand\/profiles\/active$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getRuntimeMqttStatus targets the public-safe runtime mqtt bootstrap endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenUrl = "";
+
+  globalThis.fetch = async (input) => {
+    seenUrl = String(input);
+
+    return new Response(
+      JSON.stringify({
+        status: {
+          broker: "mqtt.example:1883",
+          clientId: "display-player",
+          connected: true,
+          reason: null,
+          updatedAt: "2026-05-20T12:00:00.000Z"
+        }
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const status = await getRuntimeMqttStatus();
+    assert.equal(status.connected, true);
+    assert.match(seenUrl, /\/api\/runtime\/mqtt-status$/);
   } finally {
     globalThis.fetch = originalFetch;
   }

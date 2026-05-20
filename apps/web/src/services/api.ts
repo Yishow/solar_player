@@ -16,6 +16,8 @@ import type {
   ImageAsset,
   MonitoringAlertTone,
   MonitoringBindingState,
+  ManagementDraftSaveConflict,
+  ManagementDraftSavePrecondition,
   MonitoringFallbackReason,
   MonitoringFreshnessState,
   MonitoringMetricBinding,
@@ -30,6 +32,8 @@ import type {
   SustainabilityPeriodStory,
   SustainabilityStory,
   SustainabilityStoryInput,
+  RuntimeBrandProfile,
+  RuntimeMqttStatus,
   ValidationResult
 } from "@solar-display/shared";
 
@@ -94,6 +98,72 @@ function extractErrorMessage(rawBody: string) {
   return rawBody;
 }
 
+type ParsedErrorBody = {
+  access?: string;
+  code?: string;
+  conflict?: ManagementDraftSaveConflict<Record<string, unknown>>;
+  error?: string;
+  message?: string;
+  requiredRole?: string;
+  success?: boolean;
+  timestamp?: string;
+};
+
+export class ApiRequestError extends Error {
+  readonly body: ParsedErrorBody | null;
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number, body: ParsedErrorBody | null) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.body = body;
+    this.statusCode = statusCode;
+  }
+}
+
+export class ManagementAccessDeniedError extends ApiRequestError {
+  constructor(message: string, statusCode: number, body: ParsedErrorBody | null) {
+    super(message, statusCode, body);
+    this.name = "ManagementAccessDeniedError";
+  }
+}
+
+export function isManagementAccessDeniedError(error: unknown): error is ManagementAccessDeniedError {
+  return error instanceof ManagementAccessDeniedError;
+}
+
+export class ManagementDraftConflictError<
+  TEnvelope = Record<string, unknown>
+> extends ApiRequestError {
+  readonly conflict: ManagementDraftSaveConflict<TEnvelope>;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    body: ParsedErrorBody | null,
+    conflict: ManagementDraftSaveConflict<TEnvelope>
+  ) {
+    super(message, statusCode, body);
+    this.name = "ManagementDraftConflictError";
+    this.conflict = conflict;
+  }
+}
+
+export function isManagementDraftConflictError(
+  error: unknown
+): error is ManagementDraftConflictError {
+  return error instanceof ManagementDraftConflictError;
+}
+
+function parseErrorBody(rawBody: string): ParsedErrorBody | null {
+  try {
+    const parsed = JSON.parse(rawBody) as ParsedErrorBody;
+    return typeof parsed === "object" && parsed !== null ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestJson<T>(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
 
@@ -108,7 +178,31 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     const rawBody = await response.text();
-    throw new Error(rawBody ? extractErrorMessage(rawBody) : `Request failed with status ${response.status}`);
+    const parsedBody = rawBody ? parseErrorBody(rawBody) : null;
+    const message = rawBody ? extractErrorMessage(rawBody) : `Request failed with status ${response.status}`;
+
+    if (
+      response.status === 403
+      && parsedBody?.access === "denied"
+      && parsedBody.code === "management_access_denied"
+    ) {
+      throw new ManagementAccessDeniedError(message, response.status, parsedBody);
+    }
+
+    if (
+      response.status === 409
+      && parsedBody?.code === "management_draft_conflict"
+      && parsedBody.conflict
+    ) {
+      throw new ManagementDraftConflictError(
+        message,
+        response.status,
+        parsedBody,
+        parsedBody.conflict
+      );
+    }
+
+    throw new ApiRequestError(message, response.status, parsedBody);
   }
 
   return (await response.json()) as T;
@@ -188,12 +282,16 @@ export async function getDisplayPageConfig(pageId: DisplayPageId, stage: ConfigS
 export async function updateDisplayPageConfig(
   pageId: DisplayPageId,
   regions: Record<string, unknown>,
-  stage: ConfigStage | "config" = "config"
+  stage: ConfigStage | "config" = "config",
+  precondition?: ManagementDraftSavePrecondition
 ) {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
   }>(resolveDisplayPageConfigApiPath(pageId, stage), {
-    body: JSON.stringify({ regions }),
+    body: JSON.stringify({
+      ...(precondition ?? {}),
+      regions
+    }),
     method: "PUT"
   });
   return response.config;
@@ -280,21 +378,10 @@ export async function fetchDisplayStory() {
   return requestJson<DisplayStoryPayload>("/api/display-story");
 }
 
-export async function fetchImagePlaylist(
-  activeIndex = 0,
-  options?: {
-    bootstrap?: boolean;
-  }
-) {
+export async function fetchImagePlaylist(activeIndex = 0) {
   const query = new URLSearchParams({
     activeIndex: String(activeIndex)
   });
-
-  if (options?.bootstrap === true) {
-    query.set("bootstrap", "true");
-  } else if (options?.bootstrap === false) {
-    query.set("bootstrap", "false");
-  }
 
   return requestJson<{
     playlist: {
@@ -566,6 +653,20 @@ export async function getBrandProfiles() {
     "/api/brand/profiles"
   );
   return response.data;
+}
+
+export async function getRuntimeBrandProfile() {
+  const response = await requestJson<{ data: RuntimeBrandProfile; success: boolean }>(
+    "/api/brand/profiles/active"
+  );
+  return response.data;
+}
+
+export async function getRuntimeMqttStatus() {
+  const response = await requestJson<{ status: RuntimeMqttStatus }>(
+    "/api/runtime/mqtt-status"
+  );
+  return response.status;
 }
 
 export async function createBrandProfile(payload: BrandProfileUpdate & { name: string }) {

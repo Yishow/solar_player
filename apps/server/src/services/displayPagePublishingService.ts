@@ -3,6 +3,7 @@ import type {
   DisplayPageId,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
+  ManagementDraftSaveConflict,
   FallbackPolicy,
   FallbackStatusItem,
   PublishHistoryEntry,
@@ -42,6 +43,22 @@ type PublishHistoryRow = {
   source_version: number | null;
   published_at: string;
 };
+
+type WriteStageConfigOptions = {
+  baseVersion?: number;
+};
+
+export class ManagementDraftSaveConflictError extends Error {
+  readonly code = "management_draft_conflict";
+  readonly conflict: ManagementDraftSaveConflict<DisplayPageConfigEnvelope>;
+  readonly statusCode = 409;
+
+  constructor(conflict: ManagementDraftSaveConflict<DisplayPageConfigEnvelope>) {
+    super("Draft save conflict");
+    this.name = "ManagementDraftSaveConflictError";
+    this.conflict = conflict;
+  }
+}
 
 function parseRegions(raw: string | null | undefined): Record<string, unknown> {
   if (!raw) return {};
@@ -90,16 +107,45 @@ function readStageConfig(pageId: DisplayPageId, stage: ConfigStage): DisplayPage
   return toEnvelope(pageId, stage, row);
 }
 
-function writeStageConfig(pageId: DisplayPageId, stage: ConfigStage, regions: Record<string, unknown>): DisplayPageConfigEnvelope {
+function writeStageConfig(
+  pageId: DisplayPageId,
+  stage: ConfigStage,
+  regions: Record<string, unknown>,
+  options: WriteStageConfigOptions = {}
+): DisplayPageConfigEnvelope {
   const db = getDatabase();
+  const current = readStageConfig(pageId, stage);
+
+  if (stage === "draft") {
+    if (typeof options.baseVersion !== "number" || !Number.isInteger(options.baseVersion) || options.baseVersion < 1) {
+      const error = new Error("baseVersion must be a positive integer");
+      // @ts-expect-error fastify reads statusCode
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (current.version !== options.baseVersion) {
+      throw new ManagementDraftSaveConflictError({
+        baseVersion: options.baseVersion,
+        currentVersion: current.version,
+        latestEnvelope: current,
+        resourceId: pageId,
+        resourceType: "display-page-draft"
+      });
+    }
+  }
+
   const normalizedRegions = normalizeDisplayPageRegionsForStorage(regions);
+  const nextVersion = current.version + 1;
+  const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO display_page_stage_configs (page_key, stage, config_json, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(page_key, stage) DO UPDATE SET
        config_json = excluded.config_json,
-       updated_at = CURRENT_TIMESTAMP`
-  ).run(pageId, stage, JSON.stringify(normalizedRegions));
+       version = excluded.version,
+       updated_at = excluded.updated_at`
+  ).run(pageId, stage, JSON.stringify(normalizedRegions), nextVersion, now);
   return readStageConfig(pageId, stage);
 }
 

@@ -5,13 +5,16 @@ import { createImagesDisplayPageSeedConfig } from "../pages/Images/displayPageCo
 import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainability/displayPageConfig";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
+  applyDisplayPageSaveConflict,
   mergeDisplayPageConfig,
-  shouldHydrateDisplayPageSession,
-  shouldDeferDisplayPageRuntimeRender,
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
-  resolveDisplayPageConfigForPage
+  resolveDisplayPageConfigForPage,
+  resolveDisplayPageSaveConflictMessage,
+  shouldDeferDisplayPageRuntimeRender,
+  shouldHydrateDisplayPageSession
 } from "./useDisplayPageConfig";
+import { createDraftSession } from "./displayPageDraftSession";
 
 test("mergeDisplayPageConfig preserves solar seed-backed regions outside partial overrides", () => {
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
@@ -231,4 +234,62 @@ test("resolveDisplayPageFallbackPolicy prefers the envelope fallback policy and 
     }
   );
   assert.deepEqual(resolveDisplayPageFallbackPolicy(null), defaultFallbackPolicy);
+});
+
+test("applyDisplayPageSaveConflict preserves local draft edits while rebasing onto the latest server baseline", () => {
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const localConfig = mergeDisplayPageConfig(seedConfig, {
+    heroCopy: {
+      titleLines: ["本地草稿標題", seedConfig.heroCopy.titleLines[1]]
+    }
+  });
+  const latestEnvelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar" as const,
+    publishedAt: null,
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["伺服器新版標題"]
+      }
+    },
+    stage: "draft" as const,
+    updatedAt: "2026-05-20T10:00:00.000Z",
+    version: 5
+  };
+  const session = createDraftSession(localConfig, {
+    ...latestEnvelope,
+    updatedAt: "2026-05-20T09:00:00.000Z",
+    version: 4
+  }, defaultFallbackPolicy);
+
+  const nextSession = applyDisplayPageSaveConflict(
+    session,
+    mergeDisplayPageConfig(seedConfig, latestEnvelope.regions),
+    latestEnvelope,
+    defaultFallbackPolicy
+  );
+
+  assert.equal(nextSession.config.heroCopy.titleLines[0], "本地草稿標題");
+  assert.equal(nextSession.lastLoadedConfig.heroCopy.titleLines[0], "伺服器新版標題");
+  assert.equal(nextSession.lastLoadedEnvelope?.version, 5);
+});
+
+test("resolveDisplayPageSaveConflictMessage gives the operator a reload-first conflict hint", () => {
+  const message = resolveDisplayPageSaveConflictMessage({
+    baseVersion: 4,
+    currentVersion: 5,
+    latestEnvelope: {
+      pageId: "overview",
+      regions: {},
+      stage: "draft",
+      updatedAt: "2026-05-20T10:00:00.000Z",
+      version: 5
+    },
+    resourceId: "overview",
+    resourceType: "display-page-draft"
+  });
+
+  assert.match(message, /v5/);
+  assert.match(message, /重新同步/);
 });

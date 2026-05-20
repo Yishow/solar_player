@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./brandRuntime.js";
 export * from "./playback.js";
 export * from "./displayRotation.js";
 export * from "./displayPageConfig.js";
@@ -7,4 +8,6 @@ export * from "./displayReadiness.js";
 export * from "./deviceDisplayOps.js";
 export * from "./displayStory.js";
 export * from "./imagePlaylist.js";
+export * from "./managementAccess.js";
+export * from "./managementDraftSave.js";
 export * from "./sustainabilityStory.js";
