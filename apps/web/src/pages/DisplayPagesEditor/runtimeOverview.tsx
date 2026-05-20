@@ -93,7 +93,6 @@ export const overviewRuntimePageDefinition: DisplayEditorPageDefinition = {
   label: "Overview",
   renderPage: (pageId) => <Overview pageId={pageId} />,
   templateKey: "overview",
-  buildEditableRegions: (config, helpers) => buildOverviewRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero) as Record<string, unknown>,
   renderPreview: (config) => <Overview config={config as OverviewDisplayPageConfig} />

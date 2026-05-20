@@ -125,7 +125,6 @@ export const solarRuntimePageDefinition: DisplayEditorPageDefinition = {
   label: "Solar",
   renderPage: (pageId) => <Solar pageId={pageId} />,
   templateKey: "solar",
-  buildEditableRegions: (config, helpers) => buildSolarRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createSolarDisplayPageSeedConfig(
       solarAssetRuntimeMap.hero,

@@ -111,7 +111,6 @@ export const sustainabilityRuntimePageDefinition: DisplayEditorPageDefinition = 
   label: "Sustainability",
   renderPage: (pageId) => <Sustainability pageId={pageId} />,
   templateKey: "sustainability",
-  buildEditableRegions: (config, helpers) => buildSustainabilityRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createSustainabilityDisplayPageSeedConfig(sustainabilityAssetMap.hero.src) as Record<string, unknown>,
   renderPreview: (config) => <Sustainability config={config as SustainabilityDisplayPageConfig} />

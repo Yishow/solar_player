@@ -1,4 +1,5 @@
 import type { DisplayEditorPageDefinition } from "./index";
+import { hasPageRegionSchemaCoverage } from "./pageRegionSchemas";
 import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
 import { factoryCircuitRuntimePageDefinition } from "./runtimeFactoryCircuit";
 import { imagesRuntimePageDefinition } from "./runtimeImages";
@@ -7,13 +8,17 @@ import { solarRuntimePageDefinition } from "./runtimeSolar";
 import { sustainabilityRuntimePageDefinition } from "./runtimeSustainability";
 import type { DisplayPageInstance, DisplayPageTemplateKey } from "@solar-display/shared";
 
-export const runtimePageDefinitions: DisplayEditorPageDefinition[] = [
+const authoredRuntimePageDefinitions: DisplayEditorPageDefinition[] = [
   overviewRuntimePageDefinition,
   solarRuntimePageDefinition,
   factoryCircuitRuntimePageDefinition,
   imagesRuntimePageDefinition,
   sustainabilityRuntimePageDefinition
 ];
+
+export const runtimePageDefinitions: DisplayEditorPageDefinition[] = authoredRuntimePageDefinitions.filter(
+  (definition) => hasPageRegionSchemaCoverage(definition.templateKey)
+);
 
 const runtimePageDefinitionTemplates = new Map<
   DisplayPageTemplateKey,

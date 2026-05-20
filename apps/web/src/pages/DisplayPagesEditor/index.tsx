@@ -34,7 +34,6 @@ type DisplayEditorField = { id: string; label: string; onChange: (value: string)
 type DisplayEditorRect = { height?: number; left: number; top: number; width: number };
 export type DisplayEditorRegion = { description?: string; fields: DisplayEditorField[]; id: string; label: string; rect?: DisplayEditorRect };
 export type DisplayEditorPageDefinition = {
-  buildEditableRegions?: (config: Record<string, unknown>, helpers: { updatePath: (path: Array<number | string>, value: unknown) => void }) => DisplayEditorRegion[];
   createSeedConfig: () => Record<string, unknown>;
   id: string;
   label: string;

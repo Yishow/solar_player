@@ -2,11 +2,21 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import type { DisplayPageInstance, DisplayPageTemplateKey } from "@solar-display/shared";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
+import { displayPageTemplateKeys, type DisplayPageInstance, type DisplayPageTemplateKey } from "@solar-display/shared";
+import { DisplayPagesEditor } from "./index";
 import { mediaPlacementFields } from "./runtimeFieldBuilders";
+import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
 
 const editorRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
+const runtimeDefinitionsSource = readFileSync(
+  path.join(import.meta.dirname, "runtimePageDefinitions.tsx"),
+  "utf8"
+);
+const displayEditorIndexSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
 test("media placement field builder exposes fit, focus, and align controls for editor regions", () => {
   const fields = mediaPlacementFields(
@@ -180,4 +190,70 @@ test("runtime page definitions rebuild from a refreshed registry snapshot after 
     buildRegistryPageDefinitions(refreshedPages, definitionTemplates).map((definition) => definition.id),
     ["overview", "sustainability-2"]
   );
+});
+
+test("runtime page definitions keep supported pages on the shared schema-aware inspector contract", () => {
+  assert.match(runtimeDefinitionsSource, /overviewRuntimePageDefinition/);
+  assert.match(runtimeDefinitionsSource, /solarRuntimePageDefinition/);
+  assert.match(runtimeDefinitionsSource, /factoryCircuitRuntimePageDefinition/);
+  assert.match(runtimeDefinitionsSource, /imagesRuntimePageDefinition/);
+  assert.match(runtimeDefinitionsSource, /sustainabilityRuntimePageDefinition/);
+
+  for (const templateKey of displayPageTemplateKeys) {
+    assert.equal(resolvePageRegionSchemas(templateKey).length > 0, true);
+  }
+
+  assert.doesNotMatch(displayEditorIndexSource, /buildEditableRegions\?:/);
+
+  for (const runtimeFile of [
+    "runtimeOverview.tsx",
+    "runtimeSolar.tsx",
+    "runtimeFactoryCircuit.tsx",
+    "runtimeImages.tsx",
+    "runtimeSustainability.tsx"
+  ]) {
+    const runtimeSource = readFileSync(path.join(import.meta.dirname, runtimeFile), "utf8");
+    assert.doesNotMatch(runtimeSource, /buildEditableRegions:/);
+  }
+});
+
+test("display page editor no longer falls back to the phase-only inspector message for supported runtime pages", () => {
+  const pageLabels: Record<DisplayPageTemplateKey, string> = {
+    "factory-circuit": "Factory Circuit",
+    images: "Images",
+    overview: "Overview",
+    solar: "Solar",
+    sustainability: "Sustainability"
+  };
+  const pageDefinitions = displayPageTemplateKeys.map((templateKey) => ({
+    createSeedConfig: () => ({}),
+    id: templateKey,
+    label: pageLabels[templateKey],
+    templateKey
+  }));
+
+  for (const templateKey of displayPageTemplateKeys) {
+    const firstRegion = resolvePageRegionSchemas(templateKey)[0];
+    assert.ok(firstRegion);
+
+    const html = renderToStaticMarkup(
+      React.createElement(
+        MemoryRouter,
+        {
+          initialEntries: [`/display-pages/editor?page=${templateKey}`]
+        },
+        React.createElement(DisplayPagesEditor, {
+          initialEditorState: {
+            editMode: true,
+            selectedRegionId: firstRegion.id
+          },
+          pageDefinitions,
+          renderPreview: false
+        })
+      )
+    );
+
+    assert.doesNotMatch(html, /page-specific editor 尚未在本 phase 展開/);
+    assert.match(html, new RegExp(firstRegion.label));
+  }
 });

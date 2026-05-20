@@ -122,7 +122,6 @@ export const imagesRuntimePageDefinition: DisplayEditorPageDefinition = {
   label: "Images",
   renderPage: (pageId) => <Images pageId={pageId} />,
   templateKey: "images",
-  buildEditableRegions: (config, helpers) => buildImagesRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createImagesDisplayPageSeedConfig(imagesAssetRuntimeMap.main) as Record<string, unknown>,
   renderPreview: (config) => <Images config={config as ImagesDisplayPageConfig} />

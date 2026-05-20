@@ -3,6 +3,8 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DisplayEditorFieldSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { setValueAtPath } from "../../hooks/displayPageConfigPaths";
+import { applyDraftConfigUpdate, createDraftSession, resetDraftPaths } from "../../hooks/displayPageDraftSession";
 import {
   createOverviewDisplayPageSeedConfig,
   overviewDisplayPageEditorRegions
@@ -11,6 +13,10 @@ import {
   createSolarDisplayPageSeedConfig,
   solarDisplayPageEditorRegions
 } from "../Solar/displayPageConfig";
+import {
+  createSustainabilityDisplayPageSeedConfig,
+  sustainabilityDisplayPageEditorRegions
+} from "../Sustainability/displayPageConfig";
 import {
   DisplayEditorInspectorFields,
   resolveDisplayEditorRegions,
@@ -387,4 +393,43 @@ test("display editor inspector resolves persisted card-style controls for eligib
     solarGeneration?.fields.some((field) => field.path.join(".") === "cardStyles.generation.valueRowAlign"),
     true
   );
+});
+
+test("display editor inspector keeps sustainability page-specific fields bound to the active draft session", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.png");
+  const heroCopySchema = sustainabilityDisplayPageEditorRegions.filter(
+    (region) => region.id === "sustainability-hero-copy"
+  );
+  const fallbackPolicy = {
+    emptyContent: "show-placeholder",
+    missingAsset: "show-seed",
+    staleData: "show-placeholder"
+  } as const;
+
+  const initialSession = createDraftSession(seedConfig, null, fallbackPolicy);
+  const titlePath = ["hero", "title", 0] as const;
+  const draftSession = applyDraftConfigUpdate(initialSession, (current) =>
+    setValueAtPath(current, [...titlePath], "草稿中的永續成果")
+  );
+
+  const [draftRegion] = resolveDisplayEditorRegions(
+    draftSession.config as unknown as Record<string, unknown>,
+    heroCopySchema,
+    seedConfig as unknown as Record<string, unknown>
+  );
+  const titleField = draftRegion?.fields.find((field) => field.schema.id === "sustainability-title-1");
+  assert.ok(titleField);
+  assert.equal(titleField.value, "草稿中的永續成果");
+  assert.equal(titleField.dirty, true);
+
+  const resetSession = resetDraftPaths(draftSession, seedConfig, [[...titlePath]]);
+  const [resetRegion] = resolveDisplayEditorRegions(
+    resetSession.config as unknown as Record<string, unknown>,
+    heroCopySchema,
+    seedConfig as unknown as Record<string, unknown>
+  );
+  const resetField = resetRegion?.fields.find((field) => field.schema.id === "sustainability-title-1");
+  assert.ok(resetField);
+  assert.equal(resetField.value, seedConfig.hero.title[0]);
+  assert.equal(resetField.dirty, false);
 });

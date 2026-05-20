@@ -116,7 +116,6 @@ export const factoryCircuitRuntimePageDefinition: DisplayEditorPageDefinition = 
   label: "Factory Circuit",
   renderPage: (pageId) => <FactoryCircuit pageId={pageId} />,
   templateKey: "factory-circuit",
-  buildEditableRegions: (config, helpers) => buildFactoryCircuitRegions(config, helpers.updatePath),
   createSeedConfig: () => createFactoryCircuitDisplayPageSeedConfig() as Record<string, unknown>,
   renderPreview: (config) => <FactoryCircuit config={config as FactoryCircuitDisplayPageConfig} />
 };
