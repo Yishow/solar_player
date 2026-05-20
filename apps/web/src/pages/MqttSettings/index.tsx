@@ -10,6 +10,7 @@ import { requestJson } from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
 import { type ActionState, type ConnectionTestFeedback, type DataMode, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
+import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
 const defaultMetricOptions = [
   "realTimePower",
@@ -350,6 +351,7 @@ export function MqttSettings() {
   );
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
+    relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
       await Promise.all([
         loadSettings({ propagateError: true }),
@@ -359,7 +361,7 @@ export function MqttSettings() {
     }
   });
 
-  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, MQTT_SETTINGS_DISPLAY_SYNC_SCOPES);
 
   return (
     <MqttSettingsContent

@@ -27,6 +27,7 @@ import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
 import { LiveRotationPreviewList } from "./LiveRotationPreviewList";
+import { PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import { useLiveDisplayPagePreviewCatalog } from "../shared/useLiveDisplayPagePreviewCatalog";
 
 export function PlaybackSettings() {
@@ -191,10 +192,11 @@ export function PlaybackSettings() {
     : "顯示頁面管理";
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
+    relevantScopes: PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: resyncPlaybackConfig
   });
 
-  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES);
 
   const viewModel = buildPlaybackSettingsViewModel({
     errorMessage,

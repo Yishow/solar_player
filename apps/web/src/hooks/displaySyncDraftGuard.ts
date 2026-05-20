@@ -1,21 +1,32 @@
+import type { DisplaySyncEvent, DisplaySyncEventScope } from "@solar-display/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { shouldHandleDisplaySyncScope } from "./useDisplaySyncRefresh";
 
 export type DisplaySyncDraftGuardState = {
   hasPendingRemoteChange: boolean;
 };
 
-export type DisplaySyncDraftGuardOutcome = "deferred" | "reloaded";
+export type DisplaySyncDraftGuardOutcome = "deferred" | "ignored" | "reloaded";
 
 export async function applyDisplaySyncDraftGuard(
   state: DisplaySyncDraftGuardState,
   options: {
+    event: DisplaySyncEvent;
     isDirty: boolean;
+    relevantScopes: readonly DisplaySyncEventScope[];
     reloadNow: () => Promise<void>;
   }
 ): Promise<{
   nextState: DisplaySyncDraftGuardState;
   outcome: DisplaySyncDraftGuardOutcome;
 }> {
+  if (!shouldHandleDisplaySyncScope(options.event, options.relevantScopes)) {
+    return {
+      nextState: state,
+      outcome: "ignored"
+    };
+  }
+
   if (options.isDirty) {
     return {
       nextState: {
@@ -68,17 +79,20 @@ export function hasDisplaySyncDraftChanges<T>(current: T, synced: T): boolean {
 
 type UseDisplaySyncDraftGuardOptions = {
   isDirty: boolean;
+  relevantScopes: readonly DisplaySyncEventScope[];
   reloadNow: () => Promise<void>;
 };
 
 export function useDisplaySyncDraftGuard({
   isDirty,
+  relevantScopes,
   reloadNow
 }: UseDisplaySyncDraftGuardOptions) {
   const [state, setState] = useState<DisplaySyncDraftGuardState>({
     hasPendingRemoteChange: false
   });
   const dirtyRef = useRef(isDirty);
+  const relevantScopesRef = useRef(relevantScopes);
   const reloadNowRef = useRef(reloadNow);
   const stateRef = useRef(state);
 
@@ -94,6 +108,10 @@ export function useDisplaySyncDraftGuard({
   }, [isDirty]);
 
   useEffect(() => {
+    relevantScopesRef.current = relevantScopes;
+  }, [relevantScopes]);
+
+  useEffect(() => {
     reloadNowRef.current = reloadNow;
   }, [reloadNow]);
 
@@ -101,11 +119,18 @@ export function useDisplaySyncDraftGuard({
     stateRef.current = state;
   }, [state]);
 
-  const handleDisplaySync = useCallback(async () => {
+  const handleDisplaySync = useCallback(async (event: DisplaySyncEvent) => {
     const result = await applyDisplaySyncDraftGuard(stateRef.current, {
+      event,
       isDirty: dirtyRef.current,
+      relevantScopes: relevantScopesRef.current,
       reloadNow: () => reloadNowRef.current()
     });
+
+    if (result.outcome === "ignored") {
+      return;
+    }
+
     stateRef.current = result.nextState;
     setState(result.nextState);
   }, []);

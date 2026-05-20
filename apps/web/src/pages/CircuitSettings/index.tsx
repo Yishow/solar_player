@@ -8,6 +8,7 @@ import { requestJson } from "../../services/api";
 import "./circuitSettings.css";
 import { CircuitSettingsContent } from "./CircuitSettingsContent";
 import { buildCircuitSettingsViewModel } from "./viewModel";
+import { CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
 type CircuitListResponse = {
   success: boolean;
@@ -237,12 +238,13 @@ export function CircuitSettings() {
 
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: dirtyIds.length > 0,
+    relevantScopes: CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
       await Promise.all([loadCircuits({ propagateError: true, silent: true }), reloadReadiness()]);
     }
   });
 
-  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES);
 
   const viewModel = useMemo(
     () =>

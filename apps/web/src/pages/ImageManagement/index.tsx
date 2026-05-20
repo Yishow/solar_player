@@ -29,6 +29,7 @@ import {
   hasSelectedImageManagementDraftChanges,
   normalizeManagementPlaylistAssetId
 } from "./viewModel";
+import { IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
 const initialStorageUsage: ImageStorageUsage = {
   fileCount: 0,
@@ -335,10 +336,11 @@ export function ImageManagement() {
   const isDirty = hasSelectedDraftChanges;
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
+    relevantScopes: IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES,
     reloadNow: reloadImageManagement
   });
 
-  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES);
 
   return (
     <ImageManagementContent

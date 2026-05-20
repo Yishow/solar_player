@@ -19,6 +19,7 @@ import {
 } from "../../services/api";
 import { notifyBrandChanged } from "../../hooks/useBrandAssets";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
+import { BRAND_ASSETS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import { CropDialog } from "./CropDialog";
 import "./brandAssets.css";
 
@@ -194,10 +195,11 @@ export function BrandAssets() {
 
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: dirty,
+    relevantScopes: BRAND_ASSETS_DISPLAY_SYNC_SCOPES,
     reloadNow: () => resyncBrandProfiles(selectedId ?? undefined)
   });
 
-  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, BRAND_ASSETS_DISPLAY_SYNC_SCOPES);
 
   const cancelPendingAction = useCallback(() => {
     if (isConfirmingAction) {

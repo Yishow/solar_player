@@ -14,6 +14,7 @@ import {
   type DeviceActionFeedback
 } from "./viewModel";
 import { DeviceStatusContent } from "./DeviceStatusContent";
+import { DEVICE_STATUS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
 export function DeviceStatus() {
   const [status, setStatus] = useState<DeviceStatusResponseData | null>(null);
@@ -80,7 +81,7 @@ export function DeviceStatus() {
   useDisplaySyncRefresh(() => {
     void loadStatus();
     void reloadDisplayOpsSummary();
-  });
+  }, DEVICE_STATUS_DISPLAY_SYNC_SCOPES);
 
   const handleDiagnostic = async (action: "export-summary" | "refresh-readiness", label: string) => {
     setActiveAction(action);
