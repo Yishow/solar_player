@@ -72,6 +72,7 @@ const historySnapshots = [
 test("buildEnergyTrendViewModel maps five prototype chart cards from live and history metrics", () => {
   const model = buildEnergyTrendViewModel({
     liveSnapshot,
+    now: "2026-05-13T10:02:00.000Z",
     range: "day",
     snapshots: historySnapshots
   });
@@ -90,6 +91,9 @@ test("buildEnergyTrendViewModel maps five prototype chart cards from live and hi
   assert.equal(model.cards[4]?.unitLabel, "t");
   assert.equal(model.cards[0]?.chartPoints.length, 3);
   assert.equal(model.refreshLabel, "資料每 30 秒更新一次");
+  assert.equal(model.monitoringState.category, "fresh");
+  assert.equal(model.monitoringState.freshnessLabel, "即時資料");
+  assert.equal(model.monitoringState.sourceRoleLabel, "MQTT Live + History Snapshot");
 });
 
 test("buildEnergyTrendViewModel keeps fallback copy when snapshots are empty", () => {
@@ -98,6 +102,7 @@ test("buildEnergyTrendViewModel keeps fallback copy when snapshots are empty", (
       metrics: {},
       timestamp: null
     },
+    now: "2026-05-13T10:02:00.000Z",
     range: "total",
     snapshots: []
   });
@@ -107,4 +112,35 @@ test("buildEnergyTrendViewModel keeps fallback copy when snapshots are empty", (
   assert.equal(model.cards[0]?.chartPoints.length, 0);
   assert.match(model.leadDescription, /掌握綠電發電/);
   assert.equal(model.tabs[3]?.active, true);
+  assert.equal(model.monitoringState.category, "empty");
+  assert.equal(model.monitoringState.emptyStateLabel, "目前沒有可用的趨勢資料來源");
+});
+
+test("buildEnergyTrendViewModel labels stale cumulative fallback telemetry explicitly", () => {
+  const model = buildEnergyTrendViewModel({
+    liveSnapshot,
+    now: "2026-05-13T10:20:00.000Z",
+    range: "day",
+    snapshots: historySnapshots
+  });
+
+  assert.equal(model.monitoringState.category, "stale");
+  assert.equal(model.monitoringState.freshnessLabel, "逾時資料");
+  assert.equal(model.monitoringState.sourceRoleLabel, "Cumulative Telemetry Fallback");
+});
+
+test("buildEnergyTrendViewModel marks history-only fallback data as degraded", () => {
+  const model = buildEnergyTrendViewModel({
+    liveSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    now: "2026-05-13T10:02:00.000Z",
+    range: "week",
+    snapshots: historySnapshots
+  });
+
+  assert.equal(model.monitoringState.category, "degraded");
+  assert.equal(model.monitoringState.freshnessLabel, "降級資料");
+  assert.equal(model.monitoringState.sourceRoleLabel, "History Snapshot Fallback");
 });

@@ -142,6 +142,16 @@ export function EnergyTrend() {
   );
 
   const refreshState = errorMessage ? "is-error" : isLoading ? "is-loading" : "";
+  const refreshSummary = errorMessage
+    ? errorMessage
+    : isLoading
+      ? "同步中..."
+      : viewModel.monitoringState.statusLabel;
+  const refreshDetail = errorMessage
+    ? "History sync failed"
+    : isLoading
+      ? "Loading metrics history"
+      : `${viewModel.monitoringState.sourceRoleLabel} · ${viewModel.monitoringState.freshnessLabel} · ${viewModel.monitoringState.detailLabel}`;
 
   return (
     <section className="et-page">
@@ -215,15 +225,8 @@ export function EnergyTrend() {
           <RefreshGlyph />
         </span>
         <span>
-          {errorMessage ||
-            `${viewModel.refreshLabel}，最新時間 ${lastUpdatedAt ?? "尚未收到"}。`}
-          <small>
-            {isLoading
-              ? "Loading metrics history"
-              : errorMessage
-                ? "History sync failed"
-                : "MQTT Live"}
-          </small>
+          {refreshSummary}
+          <small>{refreshDetail}</small>
         </span>
       </div>
 
@@ -265,7 +268,7 @@ export function EnergyTrend() {
             {validPoints.length > 0 ? (
               <MiniTrendChart points={card.chartPoints} />
             ) : (
-              <div className="et-empty">尚無趨勢資料</div>
+              <div className="et-empty">{viewModel.monitoringState.emptyStateLabel}</div>
             )}
             <div className="et-axis-times">
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {

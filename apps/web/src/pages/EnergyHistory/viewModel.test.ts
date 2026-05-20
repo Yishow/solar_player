@@ -73,6 +73,7 @@ const cumulativeCounters = [
 test("buildEnergyHistoryViewModel maps side navigation, summary cards, and dense rows", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
     range: "day",
     snapshots,
     summaries: dailySummaries
@@ -96,11 +97,15 @@ test("buildEnergyHistoryViewModel maps side navigation, summary cards, and dense
   assert.equal(model.tableRows.length, 1);
   assert.equal(model.tableRows[0]?.dateLabel, "2026-05-13");
   assert.equal(model.tableRows[0]?.consumptionLabel, "12,680");
+  assert.equal(model.monitoringState.category, "fresh");
+  assert.equal(model.monitoringState.freshnessLabel, "歷史資料");
+  assert.equal(model.monitoringState.sourceRoleLabel, "History Summary + Trend Snapshot");
 });
 
 test("buildEnergyHistoryViewModel falls back to cumulative counters for total range", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
     range: "total",
     snapshots: [],
     summaries: []
@@ -114,11 +119,14 @@ test("buildEnergyHistoryViewModel falls back to cumulative counters for total ra
   assert.equal(model.tableRows.length, 0);
   assert.equal(model.bottomSummary[2]?.label, "資料來源");
   assert.equal(model.bottomSummary[2]?.valueLabel, "Cumulative Counter");
+  assert.equal(model.monitoringState.category, "fresh");
+  assert.equal(model.monitoringState.freshnessLabel, "累積資料");
 });
 
 test("buildEnergyHistoryViewModel keeps year distinct from total-only counters and labels", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
     range: "year",
     snapshots,
     summaries: [
@@ -159,4 +167,45 @@ test("buildEnergyHistoryViewModel keeps year distinct from total-only counters a
   assert.equal(model.bottomSummary[2]?.valueLabel, "History Summary");
   assert.equal(model.chartTitle, "今年趨勢");
   assert.equal(model.chartSubtitle, "This Year");
+  assert.equal(model.monitoringState.category, "fresh");
+});
+
+test("buildEnergyHistoryViewModel keeps partial history inputs in the shared degraded category", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
+    range: "month",
+    snapshots: [],
+    summaries: dailySummaries
+  });
+
+  assert.equal(model.monitoringState.category, "degraded");
+  assert.equal(model.monitoringState.freshnessLabel, "降級資料");
+  assert.equal(model.monitoringState.sourceRoleLabel, "History Summary");
+});
+
+test("buildEnergyHistoryViewModel marks stale history sources explicitly", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    now: "2026-05-15T10:02:00.000Z",
+    range: "day",
+    snapshots,
+    summaries: dailySummaries
+  });
+
+  assert.equal(model.monitoringState.category, "stale");
+  assert.equal(model.monitoringState.freshnessLabel, "逾時資料");
+});
+
+test("buildEnergyHistoryViewModel keeps missing annual data in the shared empty category", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
+    range: "year",
+    snapshots: [],
+    summaries: []
+  });
+
+  assert.equal(model.monitoringState.category, "empty");
+  assert.equal(model.monitoringState.emptyStateLabel, "目前沒有可用的歷史資料來源");
 });

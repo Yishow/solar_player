@@ -150,7 +150,12 @@ export function EnergyHistory() {
     .flatMap((line) => line.points)
     .filter((point) => point.value !== null);
   const helperState = errorMessage ? "is-error" : isLoading ? "is-loading" : "";
-  const statusLabel = errorMessage || (isLoading ? "同步中..." : "歷史曲線已同步");
+  const statusLabel = errorMessage || (isLoading ? "同步中..." : viewModel.monitoringState.statusLabel);
+  const monitoringDetail = errorMessage
+    ? "載入異常"
+    : isLoading
+      ? "同步中..."
+      : `${viewModel.monitoringState.sourceRoleLabel} · ${viewModel.monitoringState.freshnessLabel}`;
 
   return (
     <section className="eh-page">
@@ -221,7 +226,7 @@ export function EnergyHistory() {
               <small>{card.unitLabel}</small>
             </div>
             <div className={`eh-metric-helper ${helperState}`}>
-              {errorMessage ? "載入異常" : isLoading ? "同步中..." : viewModel.sourceLabel}
+              {monitoringDetail}
             </div>
           </article>
         );
@@ -253,7 +258,7 @@ export function EnergyHistory() {
         {validChartPoints.length > 0 ? (
           <TrendChart lines={viewModel.chartLines} />
         ) : (
-          <div className="eh-chart-empty">目前尚無歷史圖表資料</div>
+          <div className="eh-chart-empty">{viewModel.monitoringState.emptyStateLabel}</div>
         )}
 
         {validChartPoints.length > 0 ? (

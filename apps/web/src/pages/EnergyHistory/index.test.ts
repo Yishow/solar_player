@@ -16,3 +16,10 @@ test("energy history renders range-aware chart headings from the view model cont
   assert.match(energyHistorySource, /viewModel\.chartSubtitle/);
   assert.match(energyHistorySource, /viewModel\.bottomSummary/);
 });
+
+test("energy history renders explicit operator-facing monitoring state semantics", () => {
+  assert.match(energyHistorySource, /viewModel\.monitoringState\.statusLabel/);
+  assert.match(energyHistorySource, /viewModel\.monitoringState\.sourceRoleLabel/);
+  assert.match(energyHistorySource, /viewModel\.monitoringState\.freshnessLabel/);
+  assert.match(energyHistorySource, /viewModel\.monitoringState\.emptyStateLabel/);
+});

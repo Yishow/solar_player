@@ -1,3 +1,8 @@
+import {
+  buildMonitoringSurfaceState,
+  isMonitoringSourceStale
+} from "../energyMonitoringState";
+
 export type EnergyHistoryRange = "day" | "week" | "month" | "year" | "total";
 
 export type EnergyHistorySnapshot = {
@@ -31,6 +36,7 @@ export type CumulativeCounter = {
 
 type BuildEnergyHistoryViewModelArgs = {
   counters: CumulativeCounter[];
+  now?: Date | string;
   range: EnergyHistoryRange;
   snapshots: EnergyHistorySnapshot[];
   summaries: DailyEnergySummary[];
@@ -139,8 +145,40 @@ function resolvePeakSummary(
   }, null);
 }
 
+function hasHistorySnapshotData(snapshots: EnergyHistorySnapshot[]) {
+  return snapshots.some(
+    (snapshot) =>
+      snapshot.co2 !== null ||
+      snapshot.consumption !== null ||
+      snapshot.efficiency !== null ||
+      snapshot.generation !== null ||
+      snapshot.ratio !== null ||
+      snapshot.selfConsumption !== null
+  );
+}
+
+function hasSummaryData(summaries: DailyEnergySummary[]) {
+  return summaries.some(
+    (summary) =>
+      summary.co2Total !== null ||
+      summary.consumptionTotal !== null ||
+      summary.generationTotal !== null ||
+      summary.selfConsumptionTotal !== null ||
+      summary.peakConsumption !== null ||
+      summary.peakGeneration !== null
+  );
+}
+
+function hasRequiredCounterData(counters: CumulativeCounter[]) {
+  const requiredKeys = ["generation", "selfConsumption", "consumption", "ratio", "co2"];
+  return requiredKeys.every((metricKey) =>
+    counters.some((counter) => counter.metricKey === metricKey && counter.totalValue !== null)
+  );
+}
+
 export function buildEnergyHistoryViewModel({
   counters,
+  now,
   range,
   snapshots,
   summaries
@@ -185,6 +223,77 @@ export function buildEnergyHistoryViewModel({
     range === "total"
       ? getCounterValue(counters, "co2")
       : getSummariesValue(range, summaries, (summary) => summary.co2Total);
+  const hasUsableSummaries = hasSummaryData(summaries);
+  const hasUsableSnapshots = hasHistorySnapshotData(snapshots);
+  const hasUsableCounters = hasRequiredCounterData(counters);
+  const historySourceStale = isMonitoringSourceStale(lastUpdated, {
+    now,
+    staleAfterMs: 24 * 60 * 60 * 1000
+  });
+  const monitoringState = range === "total"
+    ? !hasUsableCounters
+      ? buildMonitoringSurfaceState({
+          category: "empty",
+          detailLabel: "累積計數器目前沒有可用資料",
+          emptyStateLabel: "目前沒有可用的歷史資料來源",
+          freshnessLabel: "無資料",
+          lastUpdatedAt: null,
+          sourceRoleLabel: "Cumulative Counter"
+        })
+      : historySourceStale
+        ? buildMonitoringSurfaceState({
+            category: "stale",
+            detailLabel: "累積計數器已超過操作監看時效，請確認上游同步",
+            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            freshnessLabel: "逾時資料",
+            lastUpdatedAt: lastUpdated,
+            sourceRoleLabel: "Cumulative Counter"
+          })
+        : buildMonitoringSurfaceState({
+            category: "fresh",
+            detailLabel: "累積計數器已同步，可用於長期監看",
+            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            freshnessLabel: "累積資料",
+            lastUpdatedAt: lastUpdated,
+            sourceRoleLabel: "Cumulative Counter"
+          })
+    : !hasUsableSummaries && !hasUsableSnapshots
+      ? buildMonitoringSurfaceState({
+          category: "empty",
+          detailLabel: "所選 range 尚未產生可用的 history rows",
+          emptyStateLabel: "目前沒有可用的歷史資料來源",
+          freshnessLabel: "無資料",
+          lastUpdatedAt: null,
+          sourceRoleLabel: "History Summary"
+        })
+      : historySourceStale
+        ? buildMonitoringSurfaceState({
+            category: "stale",
+            detailLabel: "歷史來源已超過操作監看時效，請留意目前數據可能過舊",
+            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            freshnessLabel: "逾時資料",
+            lastUpdatedAt: lastUpdated,
+            sourceRoleLabel: hasUsableSummaries ? "History Summary + Trend Snapshot" : "Trend Snapshot Fallback"
+          })
+        : !hasUsableSummaries || !hasUsableSnapshots
+          ? buildMonitoringSurfaceState({
+              category: "degraded",
+              detailLabel: hasUsableSummaries
+                ? "缺少 trend snapshot，僅能用 history summary 呈現監看結果"
+                : "缺少 history summary，僅能用 trend snapshot 維持趨勢判讀",
+              emptyStateLabel: "目前沒有可用的歷史資料來源",
+              freshnessLabel: "降級資料",
+              lastUpdatedAt: lastUpdated,
+              sourceRoleLabel: hasUsableSummaries ? "History Summary" : "Trend Snapshot Fallback"
+            })
+          : buildMonitoringSurfaceState({
+              category: "fresh",
+              detailLabel: "history summary 與 trend snapshot 皆可用",
+              emptyStateLabel: "目前沒有可用的歷史資料來源",
+              freshnessLabel: "歷史資料",
+              lastUpdatedAt: lastUpdated,
+              sourceRoleLabel: "History Summary + Trend Snapshot"
+            });
 
   return {
     bottomSummary: [
@@ -280,6 +389,7 @@ export function buildEnergyHistoryViewModel({
       ...option,
       active: option.key === range
     })),
+    monitoringState,
     sourceLabel: rangeHeading.sourceLabel,
     tableRows: summaries.map((summary) => ({
       co2Label: formatCo2Tonnes(summary.co2Total),
