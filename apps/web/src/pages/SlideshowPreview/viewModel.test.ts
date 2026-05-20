@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
 import { buildSlideshowPreviewViewModel } from "./viewModel";
 
 const pages: PlaybackPage[] = [
@@ -53,6 +53,19 @@ const settings: PlaybackSettings = {
   updatedAt: "2026-05-13T10:00:00.000Z"
 };
 
+const degradedRotationPreview: DisplayRotationPreview = {
+  evaluatedAt: "2026-05-20T02:45:00.000Z",
+  fallbackRoute: null,
+  playablePages: [pages[0]!, pages[2]!],
+  skippedPages: [
+    {
+      ...pages[1]!,
+      detail: "overview 缺少必要的 MQTT mapping",
+      skipReason: "mqtt-mapping-missing"
+    }
+  ]
+};
+
 test("buildSlideshowPreviewViewModel centralizes current slide, queue, and playback summary", () => {
   const model = buildSlideshowPreviewViewModel({
     countdown: 12,
@@ -63,6 +76,7 @@ test("buildSlideshowPreviewViewModel centralizes current slide, queue, and playb
     isPlaying: true,
     pages,
     progress: 62,
+    rotationPreview: degradedRotationPreview,
     settings
   });
 
@@ -76,6 +90,10 @@ test("buildSlideshowPreviewViewModel centralizes current slide, queue, and playb
   assert.match(model.summaryRows[0]?.value ?? "", /Overview/);
   assert.equal(model.summaryRows[1]?.value, "20 秒");
   assert.equal(model.progressLabel, "62%");
+  assert.equal(model.debugStatus.title, "輪播狀態已降級");
+  assert.equal(model.effectiveSequenceRows.length, 2);
+  assert.equal(model.effectiveSequenceRows[1]?.pageId, "factory-circuit");
+  assert.equal(model.skippedDebugRows[0]?.skipReasonText, "mqtt-mapping-missing");
 });
 
 test("buildSlideshowPreviewViewModel keeps fallback state when no pages are enabled", () => {
@@ -88,6 +106,12 @@ test("buildSlideshowPreviewViewModel keeps fallback state when no pages are enab
     isPlaying: false,
     pages: [],
     progress: 0,
+    rotationPreview: {
+      evaluatedAt: "2026-05-20T02:45:00.000Z",
+      fallbackRoute: "/offline",
+      playablePages: [],
+      skippedPages: []
+    },
     settings: null
   });
 
@@ -95,4 +119,7 @@ test("buildSlideshowPreviewViewModel keeps fallback state when no pages are enab
   assert.equal(model.statusDetail, "載入播放設定失敗。");
   assert.equal(model.queueCards.length, 0);
   assert.equal(model.summaryRows[0]?.value, "尚未設定");
+  assert.equal(model.debugStatus.title, "Fallback routing 中");
+  assert.equal(model.fallbackRouteLabel, "/offline");
+  assert.match(model.debugRows[2]?.value ?? "", /\/offline/);
 });

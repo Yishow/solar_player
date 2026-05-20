@@ -39,6 +39,7 @@ export function SlideshowPreview() {
     pages,
     prevPage,
     progress,
+    rotationPreview,
     settings,
     togglePlay
   } = usePageRotation();
@@ -52,6 +53,7 @@ export function SlideshowPreview() {
     isPlaying,
     pages,
     progress,
+    rotationPreview,
     settings
   });
 
@@ -203,7 +205,7 @@ export function SlideshowPreview() {
       >
         <div className="sp-summary-title">
           <h2>
-            播放設定摘要 <small>Playback Summary</small>
+            播放與偵錯摘要 <small>Playback + Rotation Debug</small>
           </h2>
         </div>
         <div className="sp-summary-grid">
@@ -222,6 +224,28 @@ export function SlideshowPreview() {
             </div>
           ))}
         </div>
+        <div className={`sp-debug-status is-${viewModel.debugStatus.tone}`}>
+          <b>{viewModel.debugStatus.title}</b>
+          <small>{viewModel.debugStatus.detail}</small>
+        </div>
+        <div className="sp-debug-grid">
+          {viewModel.debugRows.map((row) => (
+            <div key={row.label} className="sp-debug-item">
+              <b>{row.label}</b>
+              <span>{row.value}</span>
+            </div>
+          ))}
+        </div>
+        {viewModel.skippedDebugRows.length > 0 ? (
+          <div className="sp-debug-list">
+            {viewModel.skippedDebugRows.map((row) => (
+              <div key={`${row.labelEn}-${row.skipReasonText}`} className="sp-debug-list__row">
+                {row.labelEn} / {row.labelZh}：{row.skipReasonLabel}
+                {row.detail ? <small>{row.detail}</small> : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <div className="sp-leaf-bg" aria-hidden />

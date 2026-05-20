@@ -412,13 +412,13 @@
   background: var(--paper);
   border: 1px solid var(--shell-panel-border);
   box-shadow: var(--shadow-panel);
-  padding: 28px 32px;
+  padding: 20px 32px;
   display: flex;
   flex-direction: column;
 }
 
 .sp-page .sp-summary-title {
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .sp-page .sp-summary h2 {
@@ -497,6 +497,85 @@
 .sp-page .sp-summary-item.is-on .sp-summary-value {
   color: var(--green);
   font-weight: 700;
+}
+
+.sp-page .sp-debug-status {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(93, 101, 93, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sp-page .sp-debug-status.is-ready {
+  background: rgba(82, 122, 67, 0.12);
+}
+
+.sp-page .sp-debug-status.is-warning {
+  background: rgba(210, 142, 34, 0.12);
+}
+
+.sp-page .sp-debug-status.is-error {
+  background: rgba(193, 74, 74, 0.12);
+}
+
+.sp-page .sp-debug-status b {
+  font-size: 14px;
+  color: var(--ink-strong);
+}
+
+.sp-page .sp-debug-status small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sp-page .sp-debug-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sp-page .sp-debug-item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 105, 79, 0.12);
+}
+
+.sp-page .sp-debug-item b {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sp-page .sp-debug-item span {
+  font-size: 13px;
+  color: var(--ink-strong);
+  line-height: 1.35;
+}
+
+.sp-page .sp-debug-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.sp-page .sp-debug-list__row {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.sp-page .sp-debug-list__row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
 }
 
 /* ─── Decoration — Context-aware Leaf ─── */

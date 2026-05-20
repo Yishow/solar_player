@@ -1,5 +1,6 @@
 import {
   createPlaybackRuntime,
+  type DisplayRotationPreview,
   getEnabledPlaybackPages,
   getNextPlaybackIndex,
   getPlaybackDurationMs,
@@ -33,6 +34,7 @@ type PlaybackControllerState = {
   pages: PlaybackPage[];
   progress: number;
   reload: () => Promise<void>;
+  rotationPreview: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
   nextPage: () => void;
   prevPage: () => void;
@@ -48,6 +50,7 @@ export function usePlaybackController(
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [fallbackRoute, setFallbackRoute] = useState<string | null>(null);
+  const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
   const settingsRef = useRef<PlaybackSettings | null>(null);
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
@@ -98,10 +101,12 @@ export function usePlaybackController(
         setSettings(nextSettings);
         setPages(runtimePages);
         setFallbackRoute(rotationPreview.fallbackRoute);
+        setRotationPreview(rotationPreview);
         setRuntime(nextRuntime);
         setErrorMessage("");
       });
     } catch (error) {
+      setRotationPreview(null);
       setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
     } finally {
       setIsLoading(false);
@@ -337,6 +342,7 @@ export function usePlaybackController(
     prevPage,
     progress,
     reload: loadPlayback,
+    rotationPreview,
     settings,
     togglePlay
   };
