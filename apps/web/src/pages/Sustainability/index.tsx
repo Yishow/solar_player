@@ -15,7 +15,6 @@ import {
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
 import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStoryRuntime";
-import { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
 import { trendSeries } from "../../mocks/metrics";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
@@ -106,10 +105,8 @@ export function Sustainability({
 
   const resolvedConfig = config ?? runtimeConfig.config;
   const viewModel = buildSustainabilityViewModel({
-    highlights: sustainabilityHighlights,
     selectedPeriod,
-    story: storyRuntime.payload ?? undefined,
-    summary: sustainabilitySummary
+    story: storyRuntime.payload ?? undefined
   });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
@@ -318,8 +315,10 @@ export function Sustainability({
             {index === 2 ? (
               <DisplayCardFooter className="sustainability-card-footer">
                 <div className="sustainability-growth-note">
-                  <span>較去年成長 2.1%</span>
-                  <SustainabilityGlyph name="trend" />
+                  <span>{viewModel.comparison.label}</span>
+                  {viewModel.comparison.state === "available" ? (
+                    <SustainabilityGlyph name="trend" />
+                  ) : null}
                 </div>
               </DisplayCardFooter>
             ) : (
@@ -335,7 +334,6 @@ export function Sustainability({
         const cardKey = sustainabilityStatOrder[index]!;
         const layout = withContentOffset(resolvedConfig.statCards[cardKey]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardKey]);
-        const storyModule = viewModel.storyModules[index] ?? null;
 
         return (
           <DisplayCardFrame
@@ -352,38 +350,25 @@ export function Sustainability({
           >
             <DisplayCardHeader
               icon={renderDisplayPageIcon({
-                alt: storyModule?.title ?? card.label,
+                alt: card.label,
                 className: "h-full w-full",
                 seedSource: seedConfig.iconSources.statCards[cardKey],
                 source: resolvedConfig.iconSources.statCards[cardKey]
               })}
               iconContainerClassName="sustainability-card-icon"
-              subtitle={storyModule ? `${periodLabel(viewModel.selectedPeriod)}期故事模組` : card.subtitle}
-              title={storyModule?.title ?? card.label}
+              subtitle={`${card.subtitle} · ${card.provenance.sourceClass}`}
+              title={card.label}
             />
-            {storyModule ? (
-              "items" in card || storyModule.bullets.length > 0 ? (
-                <DisplayCardFooter className="sustainability-card-footer">
-                  <ul className="sustainability-esg-list">
-                    {(storyModule.bullets.length > 0 ? storyModule.bullets : [storyModule.description]).map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </DisplayCardFooter>
-              ) : (
-                <DisplayCardFooter className="sustainability-card-footer">
-                  <div className={index === 0 ? "sustainability-stat-procure" : "sustainability-stat-value"}>
-                    {storyModule.description}
-                  </div>
-                  <p className="sustainability-stat-desc">內容會跟隨 {periodLabel(viewModel.selectedPeriod)}期視角切換</p>
-                </DisplayCardFooter>
-              )
-            ) : "value" in card ? (
+            {"value" in card ? (
               <>
                 {index === 0 ? (
                   <DisplayCardFooter className="sustainability-card-footer">
                     <div className="sustainability-stat-procure">{card.value}</div>
-                    <p className="sustainability-stat-desc">累計綠色採購金額</p>
+                    <p className="sustainability-stat-desc">
+                      {card.provenance.syncState === "missing"
+                        ? "缺少上游資料"
+                        : `資料來源：${card.provenance.source}`}
+                    </p>
                   </DisplayCardFooter>
                 ) : (
                   <>

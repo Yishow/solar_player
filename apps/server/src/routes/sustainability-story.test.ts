@@ -1,22 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildApp
+  buildApp,
+  getDatabase
 } from "./display-pages-asset-governance.test-support.js";
 
-test("GET /api/sustainability-story returns periodized story with provenance", async () => {
+function seedSustainabilityCounters() {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 18600000, '2026-05-13T10:00:00.000Z', 0),
+          ('co2', 9842, '2026-05-13T10:00:00.000Z', 0),
+          ('consumption', 6000, '2026-05-13T10:00:00.000Z', 0),
+          ('selfConsumption', 4200, '2026-05-13T10:00:00.000Z', 0)
+      `
+    )
+    .run();
+}
+
+test("GET /api/sustainability-story derives periodized aggregates and exposes unavailable comparison provenance", async () => {
+  seedSustainabilityCounters();
   const app = await buildApp();
 
   try {
     const response = await app.inject({
       method: "GET",
-      url: "/api/sustainability-story?period=quarter"
+      url: "/api/sustainability-story?period=year"
     });
 
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       story: {
         period: {
+          bigNumberProvenance: {
+            accumulatedGenerationGwh: {
+              sourceClass: string;
+            };
+          };
+          bigNumbers: {
+            accumulatedGenerationGwh: number;
+          };
+          comparison: {
+            fallbackReason: string | null;
+            label: string;
+            state: string;
+          };
           provenance: {
             source: string;
             syncState: string;
@@ -26,15 +58,21 @@ test("GET /api/sustainability-story returns periodized story with provenance", a
       };
     };
 
-    assert.equal(body.story.selectedPeriod, "quarter");
-    assert.equal(body.story.period.provenance.source, "quarterly-rollup");
-    assert.equal(body.story.period.provenance.syncState, "warning");
+    assert.equal(body.story.selectedPeriod, "year");
+    assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
+    assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.sourceClass, "runtime-aggregate");
+    assert.equal(body.story.period.comparison.state, "unavailable");
+    assert.equal(body.story.period.comparison.fallbackReason, "comparison-baseline-missing");
+    assert.match(body.story.period.comparison.label, /未提供|無法/);
+    assert.equal(body.story.period.provenance.source, "cumulative-counters");
+    assert.equal(body.story.period.provenance.syncState, "fresh");
   } finally {
     await app.close();
   }
 });
 
-test("PUT /api/sustainability-story persists story modules and readable fallbacks", async () => {
+test("PUT /api/sustainability-story persists editorial modules without overriding runtime aggregates", async () => {
+  seedSustainabilityCounters();
   const app = await buildApp();
 
   try {
@@ -44,23 +82,30 @@ test("PUT /api/sustainability-story persists story modules and readable fallback
         availablePeriods: ["month", "quarter", "year", "lifetime"],
         modules: [
           {
+            description: "2026 年綠色採購聚焦低碳供應鏈",
+            id: "procurement-1",
+            title: "綠色採購敘事",
+            type: "project-outcome"
+          },
+          {
+            bullets: ["導入再生能源", "", "供應鏈碳管理"],
+            id: "esg-1",
+            type: "esg-summary"
+          },
+          {
+            description: "年度減碳盤點完成並對外揭露",
             id: "milestone-1",
             title: "年度里程碑",
             type: "milestone"
-          },
-          {
-            bullets: ["推動再生能源使用", "", "強化供應鏈永續管理"],
-            id: "esg-1",
-            type: "esg-summary"
           }
         ],
         periods: {
           lifetime: {
             bigNumbers: {
-              annualEnergySavingPercent: 12.4,
-              accumulatedCarbonReductionTons: 9842,
-              accumulatedGenerationGwh: 18.6,
-              plantedTreeEquivalent: 25600
+              annualEnergySavingPercent: 999.9,
+              accumulatedCarbonReductionTons: 888888,
+              accumulatedGenerationGwh: 777.7,
+              plantedTreeEquivalent: 666666
             },
             highlights: [],
             provenance: {
@@ -104,11 +149,16 @@ test("PUT /api/sustainability-story persists story modules and readable fallback
         modules: Array<{
           bullets: string[];
           description: string;
+          provenance: {
+            sourceClass: string;
+          };
+          type: string;
           title: string;
         }>;
         period: {
-          provenance: {
-            syncState: string;
+          bigNumbers: {
+            accumulatedCarbonReductionTons: number;
+            accumulatedGenerationGwh: number;
           };
         };
         selectedPeriod: string;
@@ -116,10 +166,48 @@ test("PUT /api/sustainability-story persists story modules and readable fallback
     };
 
     assert.equal(body.story.selectedPeriod, "year");
-    assert.equal(body.story.period.provenance.syncState, "stale");
-    assert.equal(body.story.modules[0]?.title, "年度里程碑");
-    assert.match(body.story.modules[0]?.description ?? "", /內容整理中/);
-    assert.deepEqual(body.story.modules[1]?.bullets, ["推動再生能源使用", "強化供應鏈永續管理"]);
+    assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
+    assert.equal(body.story.period.bigNumbers.accumulatedCarbonReductionTons, 9842);
+    assert.equal(body.story.modules[0]?.type, "project-outcome");
+    assert.match(body.story.modules[0]?.description ?? "", /綠色採購/);
+    assert.equal(body.story.modules[0]?.provenance.sourceClass, "manual-module");
+    assert.deepEqual(body.story.modules[1]?.bullets, ["導入再生能源", "供應鏈碳管理"]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/sustainability-story marks missing aggregate dependencies explicitly instead of returning silent fallback numbers", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/sustainability-story?period=lifetime"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      story: {
+        period: {
+          bigNumberProvenance: {
+            accumulatedGenerationGwh: {
+              sourceClass: string;
+              syncState: string;
+            };
+          };
+          bigNumbers: {
+            accumulatedGenerationGwh: number | null;
+          };
+        };
+      };
+    };
+
+    assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, null);
+    assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.sourceClass, "missing");
+    assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.syncState, "missing");
   } finally {
     await app.close();
   }

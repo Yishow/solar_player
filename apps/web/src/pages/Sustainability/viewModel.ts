@@ -1,131 +1,179 @@
-import type { SustainabilityStoryInput } from "@solar-display/shared";
+import type {
+  SustainabilityPeriodKey,
+  SustainabilityProvenance,
+  SustainabilityStoryInput
+} from "@solar-display/shared";
 import {
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
-import type { sustainabilityHighlights, sustainabilitySummary } from "../../mocks/sustainability";
-
-type SustainabilitySummary = typeof sustainabilitySummary;
-type SustainabilityHighlight = (typeof sustainabilityHighlights)[number];
 
 type BuildSustainabilityViewModelArgs = {
-  highlights?: SustainabilityHighlight[];
-  selectedPeriod?: "lifetime" | "month" | "quarter" | "year";
+  selectedPeriod?: SustainabilityPeriodKey;
   story?: SustainabilityStoryInput;
-  summary: SustainabilitySummary | null;
 };
 
-const fallbackSummary = {
-  accumulatedCarbonReductionTons: 9842,
-  accumulatedGenerationGwh: 18.6,
-  annualEnergySavingPercent: 12.4,
-  plantedTreeEquivalent: 25600
-};
-
-function buildDefaultStory(
-  highlights: SustainabilityHighlight[],
-  summary: SustainabilitySummary | null
-): SustainabilityStoryInput {
-  const lifetime = {
-    annualEnergySavingPercent: fallbackSummary.annualEnergySavingPercent,
-    accumulatedCarbonReductionTons:
-      summary?.accumulatedCarbonReductionTons ?? fallbackSummary.accumulatedCarbonReductionTons,
-    accumulatedGenerationGwh:
-      summary === null
-        ? fallbackSummary.accumulatedGenerationGwh
-        : Number((summary.accumulatedGenerationMwh / 1000).toFixed(1)),
-    plantedTreeEquivalent:
-      summary?.plantedTreeEquivalent ?? fallbackSummary.plantedTreeEquivalent
-  };
-
+function buildMissingProvenance(label: string) {
   return {
-    availablePeriods: ["month", "quarter", "year", "lifetime"],
-    modules: [
-      { description: "內容整理中", id: "milestone-default", title: "年度里程碑", type: "milestone" },
-      { bullets: ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"], id: "esg-default", title: "ESG 行動摘要", type: "esg-summary" }
-    ],
+    label,
+    source: "aggregate-missing",
+    sourceClass: "missing",
+    syncState: "missing",
+    updatedAt: null
+  } satisfies SustainabilityProvenance;
+}
+
+function buildDefaultStory(): SustainabilityStoryInput {
+  return {
+    availablePeriods: ["lifetime"],
+    modules: [],
     periods: {
       lifetime: {
-        bigNumbers: lifetime,
-        highlights: highlights.length > 0
-          ? highlights
-          : [
-              { label: "本月減碳", unit: "tCO₂e", value: "38.4" },
-              { label: "年度節電", unit: "MWh", value: "214" },
-              { label: "綠電自用", unit: "%", value: "71" },
-              { label: "等效植樹", unit: "株", value: "25,600" }
-            ],
-        provenance: {
-          label: "累積資料",
-          source: "fallback-story",
-          syncState: summary === null ? "missing" : "fresh",
-          updatedAt: null
-        }
-      },
-      month: {
         bigNumbers: {
-          annualEnergySavingPercent: 2.4,
-          accumulatedCarbonReductionTons: 38.4,
-          accumulatedGenerationGwh: 0.6,
-          plantedTreeEquivalent: 180
+          annualEnergySavingPercent: null,
+          accumulatedCarbonReductionTons: null,
+          accumulatedGenerationGwh: null,
+          plantedTreeEquivalent: null
         },
-        highlights,
-        provenance: {
-          label: "月報",
-          source: "fallback-month",
-          syncState: "warning",
-          updatedAt: null
-        }
-      },
-      quarter: {
-        bigNumbers: {
-          annualEnergySavingPercent: 7.2,
-          accumulatedCarbonReductionTons: 312,
-          accumulatedGenerationGwh: 4.8,
-          plantedTreeEquivalent: 980
+        comparison: {
+          delta: null,
+          fallbackReason: "comparison-baseline-missing",
+          label: "缺少比較基準",
+          state: "unavailable"
         },
-        highlights: highlights.slice(0, 2),
-        provenance: {
-          label: "季報",
-          source: "fallback-quarter",
-          syncState: "warning",
-          updatedAt: null
-        }
-      },
-      year: {
-        bigNumbers: lifetime,
-        highlights,
-        provenance: {
-          label: "年報",
-          source: "fallback-year",
-          syncState: summary === null ? "stale" : "fresh",
-          updatedAt: null
-        }
+        highlights: [],
+        provenance: buildMissingProvenance("累積資料")
       }
     },
     selectedPeriod: "lifetime"
   };
 }
 
+function formatFixed(value: number | null, digits: number) {
+  return value === null ? "--" : value.toFixed(digits);
+}
+
+function formatInteger(value: number | null) {
+  return value === null ? "--" : value.toLocaleString("zh-TW");
+}
+
+function buildDerivedHighlights(
+  period: ReturnType<typeof resolveSustainabilityStoryPeriod>["period"]
+) {
+  return [
+    {
+      label: "累積發電",
+      provenance: period.bigNumberProvenance.accumulatedGenerationGwh,
+      unit: "GWh",
+      value: formatFixed(period.bigNumbers.accumulatedGenerationGwh, 1)
+    },
+    {
+      label: "累積減碳",
+      provenance: period.bigNumberProvenance.accumulatedCarbonReductionTons,
+      unit: "tCO₂e",
+      value: formatInteger(period.bigNumbers.accumulatedCarbonReductionTons)
+    },
+    {
+      label: "節能成效",
+      provenance: period.bigNumberProvenance.annualEnergySavingPercent,
+      unit: "%",
+      value: formatFixed(period.bigNumbers.annualEnergySavingPercent, 1)
+    },
+    {
+      label: "植樹等效",
+      provenance: period.bigNumberProvenance.plantedTreeEquivalent,
+      unit: "株",
+      value: formatInteger(period.bigNumbers.plantedTreeEquivalent)
+    }
+  ];
+}
+
+function buildModuleCard(
+  module:
+    | ReturnType<typeof normalizeSustainabilityStory>["modules"][number]
+    | undefined,
+  args: {
+    iconKey: "esg-doc" | "procure";
+    label: string;
+    subtitle: string;
+  }
+) {
+  if (!module) {
+    return {
+      iconKey: args.iconKey,
+      items: ["模組未提供"],
+      label: args.label,
+      provenance: buildMissingProvenance(args.label),
+      subtitle: args.subtitle
+    };
+  }
+
+  return {
+    iconKey: args.iconKey,
+    items: module.bullets.length > 0 ? module.bullets : [module.description],
+    label: module.title,
+    provenance: module.provenance,
+    subtitle: args.subtitle
+  };
+}
+
 export function buildSustainabilityViewModel({
-  highlights = [],
   selectedPeriod,
-  story,
-  summary
+  story
 }: BuildSustainabilityViewModelArgs) {
-  const normalized = normalizeSustainabilityStory(story ?? buildDefaultStory(highlights, summary));
+  const normalized = normalizeSustainabilityStory(story ?? buildDefaultStory());
   const resolved = resolveSustainabilityStoryPeriod(normalized, selectedPeriod);
+  const procurementModule = normalized.modules.find(
+    (module) => module.type === "project-outcome"
+  );
+  const esgModule = normalized.modules.find((module) => module.type === "esg-summary");
 
   return {
     bigNumbers: [
-      { helper: "Total Generation", iconKey: "bars" as const, label: "累積發電量", unit: "GWh", value: resolved.period.bigNumbers.accumulatedGenerationGwh.toFixed(1) },
-      { helper: "Total CO₂ Reduction", iconKey: "co2" as const, label: "累積 CO₂ 減量", unit: "t", value: resolved.period.bigNumbers.accumulatedCarbonReductionTons.toLocaleString("zh-TW") },
-      { helper: "Annual Energy Saving", iconKey: "leaf" as const, label: "年度節能成效", unit: "%", value: resolved.period.bigNumbers.annualEnergySavingPercent.toFixed(1) }
+      {
+        helper: "Total Generation",
+        iconKey: "bars" as const,
+        label: "累積發電量",
+        provenance: resolved.period.bigNumberProvenance.accumulatedGenerationGwh,
+        unit: "GWh",
+        value: formatFixed(resolved.period.bigNumbers.accumulatedGenerationGwh, 1)
+      },
+      {
+        helper: "Total CO₂ Reduction",
+        iconKey: "co2" as const,
+        label: "累積 CO₂ 減量",
+        provenance: resolved.period.bigNumberProvenance.accumulatedCarbonReductionTons,
+        unit: "t",
+        value: formatInteger(resolved.period.bigNumbers.accumulatedCarbonReductionTons)
+      },
+      {
+        helper: "Annual Energy Saving",
+        iconKey: "leaf" as const,
+        label: "年度節能成效",
+        provenance: resolved.period.bigNumberProvenance.annualEnergySavingPercent,
+        unit: "%",
+        value: formatFixed(resolved.period.bigNumbers.annualEnergySavingPercent, 1)
+      }
     ],
+    comparison: resolved.period.comparison,
     esgCards: [
-      { iconKey: "procure" as const, label: "綠色採購金額", subtitle: "Green Procurement", value: "NT$ 60 M+" },
-      { iconKey: "esg-doc" as const, items: ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"], label: "ESG 行動摘要", subtitle: "ESG Highlights" },
-      { iconKey: "tree" as const, label: "相當於種樹", subtitle: "Trees Planted", value: resolved.period.bigNumbers.plantedTreeEquivalent.toLocaleString("zh-TW") }
+      buildModuleCard(procurementModule, {
+        iconKey: "procure",
+        label: "綠色採購敘事",
+        subtitle: "Procurement Narrative"
+      }),
+      buildModuleCard(esgModule, {
+        iconKey: "esg-doc",
+        label: "ESG 行動摘要",
+        subtitle: "ESG Highlights"
+      }),
+      {
+        iconKey: "tree" as const,
+        label: "相當於種樹",
+        provenance: resolved.period.bigNumberProvenance.plantedTreeEquivalent,
+        subtitle: "Trees Planted",
+        value: formatInteger(resolved.period.bigNumbers.plantedTreeEquivalent)
+      }
     ],
     hero: {
       copyEnLines: [
@@ -141,14 +189,10 @@ export function buildSustainabilityViewModel({
       subtitle: "Sustainability in Action",
       title: ["永續成果", "持續累積"]
     },
-    highlights: resolved.period.highlights.length > 0
-      ? resolved.period.highlights
-      : [
-          { label: "本月減碳", unit: "tCO₂e", value: "38.4" },
-          { label: "年度節電", unit: "MWh", value: "214" },
-          { label: "綠電自用", unit: "%", value: "71" },
-          { label: "等效植樹", unit: "株", value: "25,600" }
-        ],
+    highlights:
+      resolved.period.highlights.length > 0
+        ? resolved.period.highlights
+        : buildDerivedHighlights(resolved.period),
     periodOptions: normalized.availablePeriods,
     provenance: resolved.period.provenance,
     selectedPeriod: resolved.selectedPeriod,

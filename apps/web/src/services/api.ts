@@ -27,6 +27,8 @@ import type {
   SolarComparisonState,
   SolarFlowStoryState,
   SustainabilityPeriodKey,
+  SustainabilityPeriodStory,
+  SustainabilityStory,
   SustainabilityStoryInput,
   ValidationResult
 } from "@solar-display/shared";
@@ -331,7 +333,7 @@ export async function fetchSustainabilityStory(period?: SustainabilityPeriodKey)
         period
       }).toString()}`
     : "";
-  return requestJson<{ story: SustainabilityStoryInput }>(
+  return requestJson<{ story: SustainabilityStory & { generatedAt: string; period: SustainabilityPeriodStory } }>(
     `/api/sustainability-story${query}`
   );
 }

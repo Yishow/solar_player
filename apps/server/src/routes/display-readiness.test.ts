@@ -145,6 +145,69 @@ test("GET /api/display-readiness keeps solar self-consumption ready through deri
   }
 });
 
+test("GET /api/display-readiness tracks rendered sustainability indicators instead of legacy placeholder dependencies", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("totalGeneration");
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("totalCo2Reduction");
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("selfConsumptionEnergy");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          reason: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "sustainability" &&
+          finding.requirementKey === "accumulatedGenerationGwh" &&
+          finding.sourceType === "derived-metric" &&
+          finding.status === "blocking" &&
+          /totalGeneration/i.test(finding.reason)
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "sustainability" &&
+          finding.requirementKey === "annualEnergySavingPercent" &&
+          finding.sourceType === "derived-metric" &&
+          finding.status === "blocking" &&
+          /selfConsumptionEnergy/i.test(finding.reason)
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "sustainability" &&
+          finding.requirementKey === "consumptionEnergy"
+      ),
+      false
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-readiness reports factory metric mapping gaps alongside slot bindings", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryProductionPower");
