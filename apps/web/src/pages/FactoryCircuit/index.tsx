@@ -58,13 +58,19 @@ const loadRowOrder = [
   "infrastructure"
 ] as const;
 
-export function FactoryCircuit({ config }: { config?: FactoryCircuitDisplayPageConfig }) {
+export function FactoryCircuit({
+  config,
+  pageId = "factory-circuit"
+}: {
+  config?: FactoryCircuitDisplayPageConfig;
+  pageId?: string;
+}) {
   useBodyClass("page-hero-shell");
   const { connectionState, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
-  const runtimeConfig = useDisplayPageConfig("factory-circuit", seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });

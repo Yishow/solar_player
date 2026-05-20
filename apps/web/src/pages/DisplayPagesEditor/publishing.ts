@@ -1,6 +1,6 @@
 import type {
+  DisplayPageId,
   DisplayPageFallbackStatus,
-  DisplayPageKey,
   FallbackPolicyKey,
   FallbackPolicyMode,
   ValidationResult
@@ -13,7 +13,7 @@ export type DisplayPagePublishingState = {
   validation: ValidationResult;
 };
 
-export type DisplayPagePublishingStateMap = Partial<Record<DisplayPageKey, DisplayPagePublishingState>>;
+export type DisplayPagePublishingStateMap = Record<string, DisplayPagePublishingState | undefined>;
 
 export function countBlockingFindings(validation?: ValidationResult | null) {
   return validation?.findings.filter((finding) => finding.severity === "blocking").length ?? 0;
@@ -36,7 +36,7 @@ export function formatFallbackKey(key: FallbackPolicyKey) {
 }
 
 export function useDisplayPagePublishingState(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   draftUpdatedAt: string | null | undefined,
   initialPublishingStateByPage: DisplayPagePublishingStateMap | undefined,
   reloadDraft: () => Promise<void>

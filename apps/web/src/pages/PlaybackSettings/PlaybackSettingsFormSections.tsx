@@ -1,11 +1,30 @@
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type {
+  DisplayPageInstance,
+  DisplayPageTemplateKey,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
+import { displayPageTemplateKeys } from "@solar-display/shared";
+import { useMemo, useState } from "react";
 import { Switch } from "../../components/management";
 
 type PlaybackSettingsFormSectionsProps = {
   formDisabled: boolean;
+  isRegistrySaving: boolean;
   markDirty: () => void;
+  onArchivePage: (page: DisplayPageInstance) => void;
+  onCreatePage: (input: {
+    displayNameEn: string;
+    displayNameZh: string;
+    routeSlug: string;
+    templateKey: DisplayPageTemplateKey;
+  }) => void;
   pages: PlaybackPage[];
+  registryActionDisabled: boolean;
+  registryPages: DisplayPageInstance[];
+  registrySectionLabel: string;
   setPages: React.Dispatch<React.SetStateAction<PlaybackPage[]>>;
+  showAddPageForm: boolean;
   updateSettingsField: <Key extends keyof PlaybackSettings>(
     key: Key,
     value: PlaybackSettings[Key]
@@ -25,16 +44,57 @@ type PlaybackSettingsFormSectionsProps = {
   };
 };
 
+const templateLabelMap: Record<DisplayPageTemplateKey, { en: string; zh: string }> = {
+  "factory-circuit": { en: "Factory Circuit", zh: "工廠迴路" },
+  images: { en: "Images", zh: "綠能影像" },
+  overview: { en: "Overview", zh: "總覽" },
+  solar: { en: "Solar", zh: "太陽能" },
+  sustainability: { en: "Sustainability", zh: "永續資訊" }
+};
+
 export function PlaybackSettingsFormSections({
   formDisabled,
+  isRegistrySaving,
   markDirty,
+  onArchivePage,
+  onCreatePage,
   pages,
+  registryActionDisabled,
+  registryPages,
+  registrySectionLabel,
   setPages,
+  showAddPageForm,
   updateSettingsField,
   reorderPlaybackPages,
   settings,
   viewModel
 }: PlaybackSettingsFormSectionsProps) {
+  const [draftTemplateKey, setDraftTemplateKey] = useState<DisplayPageTemplateKey>("images");
+  const [draftDisplayNameEn, setDraftDisplayNameEn] = useState("");
+  const [draftDisplayNameZh, setDraftDisplayNameZh] = useState("");
+  const [draftRouteSlug, setDraftRouteSlug] = useState("");
+  const templateInstanceCounts = useMemo(() => {
+    const counts = new Map<DisplayPageTemplateKey, number>();
+
+    for (const page of registryPages) {
+      counts.set(page.templateKey, (counts.get(page.templateKey) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [registryPages]);
+  const canSubmitNewPage =
+    !registryActionDisabled
+    && draftDisplayNameEn.trim().length > 0
+    && draftDisplayNameZh.trim().length > 0
+    && draftRouteSlug.trim().length > 0;
+
+  const resetDraftForm = () => {
+    setDraftTemplateKey("images");
+    setDraftDisplayNameEn("");
+    setDraftDisplayNameZh("");
+    setDraftRouteSlug("");
+  };
+
   return (
     <div className="ps-bottom-cards">
       <section className="settings-card ps-card-order">
@@ -44,6 +104,82 @@ export function PlaybackSettingsFormSections({
           <div className="ps-info-icon">i</div>
         </div>
         <div className="ps-card-content">
+          <div className="ps-registry-block">
+            <div className="ps-registry-block__title">
+              {registrySectionLabel}
+              <small>Display Page Registry</small>
+            </div>
+            <p className="ps-registry-block__helper">
+              這裡可新增同模板副本，或封存不再需要的展示頁實例。
+            </p>
+            {showAddPageForm ? (
+              <div className="ps-registry-form">
+                <label className="ps-stack">
+                  <span className="ps-row-label">模板種類 <small>Template</small></span>
+                  <select
+                    className="ps-select"
+                    disabled={registryActionDisabled}
+                    value={draftTemplateKey}
+                    onChange={(event) => setDraftTemplateKey(event.target.value as DisplayPageTemplateKey)}
+                  >
+                    {displayPageTemplateKeys.map((templateKey) => (
+                      <option key={templateKey} value={templateKey}>
+                        {templateLabelMap[templateKey].zh} / {templateLabelMap[templateKey].en}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ps-stack">
+                  <span className="ps-row-label">中文顯示名稱 <small>ZH Label</small></span>
+                  <input
+                    className="ps-select"
+                    disabled={registryActionDisabled}
+                    placeholder={`${templateLabelMap[draftTemplateKey].zh} 副本`}
+                    value={draftDisplayNameZh}
+                    onChange={(event) => setDraftDisplayNameZh(event.target.value)}
+                  />
+                </label>
+                <label className="ps-stack">
+                  <span className="ps-row-label">英文顯示名稱 <small>EN Label</small></span>
+                  <input
+                    className="ps-select"
+                    disabled={registryActionDisabled}
+                    placeholder={`${templateLabelMap[draftTemplateKey].en} Secondary`}
+                    value={draftDisplayNameEn}
+                    onChange={(event) => setDraftDisplayNameEn(event.target.value)}
+                  />
+                </label>
+                <label className="ps-stack">
+                  <span className="ps-row-label">路由代號 <small>Route Slug</small></span>
+                  <input
+                    className="ps-select"
+                    disabled={registryActionDisabled}
+                    placeholder={`${draftTemplateKey}-secondary`}
+                    value={draftRouteSlug}
+                    onChange={(event) => setDraftRouteSlug(event.target.value)}
+                  />
+                </label>
+                <div className="ps-registry-form__actions">
+                  <button
+                    type="button"
+                    className="mgmt-action primary"
+                    disabled={!canSubmitNewPage}
+                    onClick={() => {
+                      onCreatePage({
+                        displayNameEn: draftDisplayNameEn.trim(),
+                        displayNameZh: draftDisplayNameZh.trim(),
+                        routeSlug: draftRouteSlug.trim(),
+                        templateKey: draftTemplateKey
+                      });
+                      resetDraftForm();
+                    }}
+                  >
+                    {isRegistrySaving ? "新增中..." : "建立頁面"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
           {viewModel.pageRows.map((page, index) => (
             <div key={page.id} className="ps-list-item" style={{ opacity: page.enabled ? 1 : 0.5 }}>
               <span
@@ -76,6 +212,29 @@ export function PlaybackSettingsFormSections({
                 <option value="enabled">{page.labelEn}</option>
                 <option value="disabled">{page.labelEn} (停用)</option>
               </select>
+              {(() => {
+                const registryPage = registryPages.find((currentPage) => currentPage.id === page.id);
+                const isLastTemplateInstance =
+                  registryPage
+                    ? (templateInstanceCounts.get(registryPage.templateKey) ?? 0) <= 1
+                    : true;
+
+                return (
+                  <button
+                    type="button"
+                    className="ps-archive-btn"
+                    disabled={registryActionDisabled || !registryPage || isLastTemplateInstance}
+                    title={isLastTemplateInstance ? "每個模板至少需保留一個啟用中的頁面。" : "封存這個顯示頁面"}
+                    onClick={() => {
+                      if (registryPage) {
+                        onArchivePage(registryPage);
+                      }
+                    }}
+                  >
+                    封存
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>

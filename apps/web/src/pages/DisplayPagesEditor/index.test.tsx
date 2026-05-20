@@ -147,7 +147,8 @@ test("display page editor preview surface keeps positive minimum dimensions for 
     {
       createSeedConfig: () => ({}),
       id: "overview",
-      label: "Overview"
+      label: "Overview",
+      templateKey: "overview"
     }
   ];
   const html = renderToStaticMarkup(

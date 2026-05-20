@@ -67,7 +67,7 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
-export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
+export function Overview({ config, pageId = "overview" }: { config?: OverviewDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
@@ -76,7 +76,7 @@ export function Overview({ config }: { config?: OverviewDisplayPageConfig }) {
     () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
     []
   );
-  const runtimeConfig = useDisplayPageConfig("overview", seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });

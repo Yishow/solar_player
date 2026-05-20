@@ -22,6 +22,7 @@ import circuitsRoute from "./routes/circuits.js";
 import deviceRoute from "./routes/device.js";
 import deviceDisplayOpsRoute from "./routes/device-display-ops.js";
 import displayOpsRoute from "./routes/display-ops.js";
+import displayPageRegistryRoute from "./routes/display-page-registry.js";
 import displayPagesRoute from "./routes/display-pages.js";
 import displayReadinessRoute from "./routes/display-readiness.js";
 import displayStoryRoute from "./routes/display-story.js";
@@ -115,6 +116,7 @@ export async function buildApp() {
   await app.register(deviceRoute);
   await app.register(deviceDisplayOpsRoute);
   await app.register(displayOpsRoute);
+  await app.register(displayPageRegistryRoute);
   await app.register(displayPagesRoute);
   await app.register(displayReadinessRoute);
   await app.register(displayStoryRoute);

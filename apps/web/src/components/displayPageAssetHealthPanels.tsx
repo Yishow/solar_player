@@ -1,20 +1,20 @@
 import React from "react";
-import type { DisplayPageAssetHealthEntry, DisplayPageAssetHealthReport, DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageAssetHealthEntry, DisplayPageAssetHealthReport } from "@solar-display/shared";
 
-const displayPageLabels: Record<DisplayPageKey, string> = {
+const displayPageLabels = {
   "factory-circuit": "Factory Circuit",
   images: "Images",
   overview: "Overview",
   solar: "Solar",
   sustainability: "Sustainability"
-};
+} as const;
 
 function formatReason(reason: string) {
   return reason === "missing-file" ? "檔案遺失" : "素材不存在";
 }
 
-function formatPageLabel(pageId: DisplayPageKey) {
-  return displayPageLabels[pageId];
+function formatPageLabel(pageId: string) {
+  return displayPageLabels[pageId as keyof typeof displayPageLabels] ?? pageId;
 }
 
 function renderStateBanner({
@@ -54,7 +54,7 @@ export function DisplayPageEditorAssetHealthPanel({
 }: {
   errorMessage: string;
   isLoading: boolean;
-  pageId: DisplayPageKey;
+  pageId: string;
   report: DisplayPageAssetHealthReport | null;
 }) {
   const pageEntries =

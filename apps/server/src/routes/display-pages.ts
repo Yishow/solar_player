@@ -1,10 +1,10 @@
-import type { DisplayPageConfigEnvelope, DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageConfigEnvelope, DisplayPageId } from "@solar-display/shared";
 import {
-  createEmptyDisplayPageConfig,
-  isDisplayPageKey
+  createEmptyDisplayPageConfig
 } from "@solar-display/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
+import { readDisplayPageInstance } from "../services/displayPageRegistryService.js";
 import {
   readStageConfig,
   writeStageConfig,
@@ -32,8 +32,8 @@ type DisplayPageConfigRow = {
   updated_at: string | null;
 };
 
-function assertDisplayPageKey(pageId: string): DisplayPageKey {
-  if (!isDisplayPageKey(pageId)) {
+function assertDisplayPageId(pageId: string): DisplayPageId {
+  if (!readDisplayPageInstance(pageId)) {
     const error = new Error(`Unknown display page: ${pageId}`);
     // @ts-expect-error fastify reads statusCode
     error.statusCode = 404;
@@ -65,7 +65,7 @@ function sendPlacementValidationError(
   });
 }
 
-function readStoredDisplayPageConfig(pageId: DisplayPageKey): DisplayPageConfigEnvelope {
+function readStoredDisplayPageConfig(pageId: DisplayPageId): DisplayPageConfigEnvelope {
   const database = getDatabase();
   const row = database
     .prepare(`SELECT config_json, updated_at FROM display_page_configs WHERE page_key = ?`)
@@ -90,14 +90,14 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Legacy routes (backward compatible) ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/config", async (request) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     return { config: resolveEnvelope(readStoredDisplayPageConfig(pageId)) };
   });
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
     "/api/display-pages/:pageId/config",
     async (request, reply) => {
-      const pageId = assertDisplayPageKey(request.params.pageId);
+      const pageId = assertDisplayPageId(request.params.pageId);
       const regions = request.body?.regions;
 
       if (regions === undefined || regions === null || Array.isArray(regions) || typeof regions !== "object") {
@@ -139,14 +139,14 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Stage-aware draft routes ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/draft", async (request) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     return { config: resolveEnvelope(readStageConfig(pageId, "draft")) };
   });
 
   app.put<{ Body: DisplayPageConfigBody; Params: DisplayPageRouteParams }>(
     "/api/display-pages/:pageId/draft",
     async (request, reply) => {
-      const pageId = assertDisplayPageKey(request.params.pageId);
+      const pageId = assertDisplayPageId(request.params.pageId);
       const regions = request.body?.regions;
 
       if (regions === undefined || regions === null || Array.isArray(regions) || typeof regions !== "object") {
@@ -177,7 +177,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Live config read ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/live", async (request) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     return { config: resolveEnvelope(readStageConfig(pageId, "live")) };
   });
 
@@ -186,7 +186,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: DisplayPageRouteParams; Body: PublishRequestBody }>(
     "/api/display-pages/:pageId/publish",
     async (request, reply) => {
-      const pageId = assertDisplayPageKey(request.params.pageId);
+      const pageId = assertDisplayPageId(request.params.pageId);
       const { live, validation } = publishDraft(pageId, request.body?.publishedBy);
 
       if (!validation.canPublish) {
@@ -210,7 +210,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Validate draft without publishing ---
 
   app.post<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/validate", async (request, reply) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     const draft = readStageConfig(pageId, "draft");
     const { validateConfigDraft, checkImageReferences } = await import("../services/displayPagePublishingService.js");
     const validation = validateConfigDraft(draft.regions);
@@ -236,7 +236,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: DisplayPageRouteParams; Body: RollbackRequestBody }>(
     "/api/display-pages/:pageId/rollback",
     async (request, reply) => {
-      const pageId = assertDisplayPageKey(request.params.pageId);
+      const pageId = assertDisplayPageId(request.params.pageId);
       const { targetVersion, publishedBy } = request.body ?? {};
 
       if (typeof targetVersion !== "number" || targetVersion < 1) {
@@ -270,12 +270,12 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
   // --- Publish history ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/history", async (request) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     return { history: getPublishHistory(pageId) };
   });
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/fallback", async (request) => {
-    const pageId = assertDisplayPageKey(request.params.pageId);
+    const pageId = assertDisplayPageId(request.params.pageId);
     return { fallback: readFallbackStatus(pageId) };
   });
 

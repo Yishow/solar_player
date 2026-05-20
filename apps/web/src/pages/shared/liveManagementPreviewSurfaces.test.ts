@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import { LiveRotationPreviewList } from "../PlaybackSettings/LiveRotationPreviewList";
 import { LiveSlideshowPreviewCards } from "../SlideshowPreview/LiveSlideshowPreviewCards";
 import type { LiveDisplayPagePreviewDefinition, LiveDisplayPagePreviewState } from "./liveDisplayPagePreview";
@@ -24,7 +24,7 @@ const definitions: LiveDisplayPagePreviewDefinition[] = [
   }
 ];
 
-const previewStates: Partial<Record<DisplayPageKey, LiveDisplayPagePreviewState>> = {
+const previewStates: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>> = {
   overview: {
     config: {
       headline: "Overview live hero v2",
@@ -45,8 +45,9 @@ test("playback settings and slideshow preview surfaces render the same live prev
           labelEn: "Overview",
           labelZh: "總覽頁",
           orderLabel: "01",
-          pageKey: "overview",
-          route: "/overview"
+          pageId: "overview",
+          route: "/overview",
+          templateKey: "overview"
         }
       ],
       states: previewStates
@@ -64,7 +65,8 @@ test("playback settings and slideshow preview surfaces render the same live prev
           labelZh: "總覽頁",
           pageKey: "overview",
           routeLabel: "/overview",
-          statusLabel: "輪播已啟用"
+          statusLabel: "輪播已啟用",
+          templateKey: "overview"
         }
       ],
       definitions,

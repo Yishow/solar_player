@@ -1,5 +1,4 @@
-import type { DisplayPageKey } from "@solar-display/shared";
-import { isDisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewDefinition,
@@ -7,27 +6,18 @@ import {
 } from "../shared/liveDisplayPagePreview";
 import type { RotationPreviewRow } from "../DisplayPagesEditor/rotationPreview";
 
-function resolvePageKey(row: RotationPreviewRow): DisplayPageKey | null {
-  if (row.pageKey && isDisplayPageKey(row.pageKey)) {
-    return row.pageKey;
-  }
-
-  const routeKey = row.route.replace(/^\//, "");
-  return isDisplayPageKey(routeKey) ? routeKey : null;
-}
-
 function resolvePreviewState(
-  pageKey: DisplayPageKey | null,
-  states: Partial<Record<DisplayPageKey, LiveDisplayPagePreviewState>>
+  templateKey: DisplayPageTemplateKey | null,
+  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>
 ) {
-  if (!pageKey) {
+  if (!templateKey) {
     return {
-      detail: "目前無法從輪播頁面資料解析對應的展示頁 key。",
+      detail: "目前無法從輪播頁面資料解析對應的展示頁 template。",
       status: "renderer-unavailable"
     } satisfies LiveDisplayPagePreviewState;
   }
 
-  return states[pageKey] ?? {
+  return states[templateKey] ?? {
     detail: "正在同步正式預覽...",
     status: "loading"
   };
@@ -40,22 +30,20 @@ export function LiveRotationPreviewList({
 }: {
   definitions: LiveDisplayPagePreviewDefinition[];
   rows: RotationPreviewRow[];
-  states: Partial<Record<DisplayPageKey, LiveDisplayPagePreviewState>>;
+  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>;
 }) {
   return (
     <>
       {rows.map((page, index, arr) => {
-        const pageKey = resolvePageKey(page);
-
         return (
           <div key={page.id} style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <div className="ps-preview__item">
               <div className="ps-preview__item-surface">
                 <LiveDisplayPagePreview
                   definitions={definitions}
-                  pageKey={pageKey ?? "overview"}
+                  templateKey={page.templateKey ?? "overview"}
                   pageLabel={page.labelZh}
-                  state={resolvePreviewState(pageKey, states)}
+                  state={resolvePreviewState(page.templateKey, states)}
                 />
               </div>
               <div className="ps-preview__label">

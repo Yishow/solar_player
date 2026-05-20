@@ -1,4 +1,4 @@
-import type { DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -36,9 +36,11 @@ export type DisplayEditorRegion = { description?: string; fields: DisplayEditorF
 export type DisplayEditorPageDefinition = {
   buildEditableRegions?: (config: Record<string, unknown>, helpers: { updatePath: (path: Array<number | string>, value: unknown) => void }) => DisplayEditorRegion[];
   createSeedConfig: () => Record<string, unknown>;
-  id: DisplayPageKey;
+  id: string;
   label: string;
+  renderPage?: (pageId: string) => ReactElement;
   renderPreview?: (config: Record<string, unknown>) => ReactElement;
+  templateKey: DisplayPageTemplateKey;
 };
 
 function renderDisplayEditorFallback(label: string) {
@@ -78,14 +80,14 @@ export function DisplayPagesEditor({
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
   const selectedPageId =
-    requestedPageId && pageIdSet.has(requestedPageId as DisplayPageKey)
-      ? (requestedPageId as DisplayPageKey)
+    requestedPageId && pageIdSet.has(requestedPageId)
+      ? requestedPageId
       : defaultPageId;
   const [editMode, setEditMode] = useState(initialEditorState?.editMode ?? false);
   const [canvasContainerScale, setCanvasContainerScale] = useState(1);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
   const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
-  const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Partial<Record<DisplayPageKey, string[]>>>(
+  const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Record<string, string[]>>(
     () =>
       initialEditorState?.lockedRegionIds?.length
         ? { [selectedPageId]: initialEditorState.lockedRegionIds }
@@ -120,7 +122,10 @@ export function DisplayPagesEditor({
   const updatePath = (path: Array<number | string>, value: unknown) => {
     setConfig((current) => setValueAtPath(current, path, value));
   };
-  const editableRegions = useMemo(() => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.id), seedConfig), [config, seedConfig, selectedPage.id]);
+  const editableRegions = useMemo(
+    () => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.templateKey), seedConfig),
+    [config, seedConfig, selectedPage.templateKey]
+  );
   const selectedRegion = useMemo(
     () => editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null,
     [editableRegions, selectedRegionId]
@@ -180,7 +185,7 @@ export function DisplayPagesEditor({
     await reloadAssetHealth();
   };
 
-  const handleSelectPage = (pageId: DisplayPageKey) => {
+  const handleSelectPage = (pageId: string) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("page", pageId);
     setSearchParams(nextParams, { replace: true });

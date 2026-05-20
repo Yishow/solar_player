@@ -1,4 +1,4 @@
-export const displayPageKeys = [
+export const displayPageTemplateKeys = [
   "overview",
   "solar",
   "factory-circuit",
@@ -6,7 +6,31 @@ export const displayPageKeys = [
   "sustainability"
 ] as const;
 
-export type DisplayPageKey = (typeof displayPageKeys)[number];
+export const displayPageKeys = displayPageTemplateKeys;
+
+export type DisplayPageTemplateKey = (typeof displayPageTemplateKeys)[number];
+export type DisplayPageKey = DisplayPageTemplateKey;
+export type DisplayPageId = string;
+
+export type DisplayPageInstance = {
+  id: number;
+  archivedAt: string | null;
+  createdAt: string | null;
+  displayNameEn: string;
+  displayNameZh: string;
+  displayOrder: number;
+  draftVersion: number | null;
+  durationSeconds: number;
+  enabled: boolean;
+  hasDraftChanges: boolean;
+  lastPublishedAt: string | null;
+  liveVersion: number | null;
+  pageKey: string;
+  route: string;
+  routeSlug: string;
+  templateKey: DisplayPageTemplateKey;
+  updatedAt: string | null;
+};
 
 export type ConfigStage = "draft" | "live";
 
@@ -55,14 +79,14 @@ export type DisplayPageAssetFinding = {
   assetId: DisplayPageManagedAssetId | null;
   bindingId: string;
   message: string;
-  pageId: DisplayPageKey;
+  pageId: DisplayPageId;
   reason: DisplayPageAssetFindingReason;
   status: "unhealthy";
 };
 
 export type DisplayPageAssetHealthEntry = {
   assetId: DisplayPageManagedAssetId | null;
-  affectedPages: DisplayPageKey[];
+  affectedPages: DisplayPageId[];
   bindings: Array<Pick<DisplayPageAssetFinding, "bindingId" | "pageId">>;
   filename: string | null;
   findings: DisplayPageAssetFinding[];
@@ -96,7 +120,7 @@ export type FallbackStatusItem = {
 };
 
 export type DisplayPageFallbackStatus = {
-  pageId: DisplayPageKey;
+  pageId: DisplayPageId;
   stage: "live";
   isFallbackActive: boolean;
   items: FallbackStatusItem[];
@@ -113,7 +137,7 @@ export type PublishHistoryEntry = {
 
 export type DisplayPageConfigEnvelope<TRegions extends Record<string, unknown> = Record<string, unknown>> = {
   assetFindings?: DisplayPageAssetFinding[];
-  pageId: DisplayPageKey;
+  pageId: DisplayPageId;
   regions: TRegions;
   updatedAt: string | null;
   version: number;
@@ -128,12 +152,16 @@ export function isDisplayPageKey(value: string): value is DisplayPageKey {
   return displayPageKeys.includes(value as DisplayPageKey);
 }
 
+export function isDisplayPageTemplateKey(value: string): value is DisplayPageTemplateKey {
+  return displayPageTemplateKeys.includes(value as DisplayPageTemplateKey);
+}
+
 export function isDisplayPageMediaSourceMode(value: unknown): value is DisplayPageMediaSourceMode {
   return typeof value === "string" && displayPageMediaSourceModes.includes(value as DisplayPageMediaSourceMode);
 }
 
 export function createEmptyDisplayPageConfig(
-  pageId: DisplayPageKey
+  pageId: DisplayPageId
 ): DisplayPageConfigEnvelope<Record<string, never>> {
   return {
     pageId,

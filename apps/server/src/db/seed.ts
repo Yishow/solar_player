@@ -162,6 +162,26 @@ export function seedDatabase() {
     )
   `);
 
+  const insertDisplayPageRegistryInstance = database.prepare(`
+    INSERT INTO display_page_registry (
+      page_key,
+      template_key,
+      route_slug,
+      label_zh,
+      label_en,
+      enabled,
+      archived_at,
+      display_order,
+      duration_seconds,
+      created_at,
+      updated_at
+    )
+    SELECT ?, ?, ?, ?, ?, 1, NULL, ?, 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    WHERE NOT EXISTS (
+      SELECT 1 FROM display_page_registry WHERE page_key = ?
+    )
+  `);
+
   database.transaction(() => {
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
@@ -251,6 +271,16 @@ export function seedDatabase() {
       insertPlaybackPage.run(
         page.pageKey,
         page.route,
+        page.labelZh,
+        page.labelEn,
+        page.displayOrder,
+        page.pageKey
+      );
+
+      insertDisplayPageRegistryInstance.run(
+        page.pageKey,
+        page.pageKey,
+        page.route.replace(/^\//, ""),
         page.labelZh,
         page.labelEn,
         page.displayOrder,

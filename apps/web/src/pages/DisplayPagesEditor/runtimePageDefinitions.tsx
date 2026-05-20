@@ -1,9 +1,11 @@
 import type { DisplayEditorPageDefinition } from "./index";
+import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
 import { factoryCircuitRuntimePageDefinition } from "./runtimeFactoryCircuit";
 import { imagesRuntimePageDefinition } from "./runtimeImages";
 import { overviewRuntimePageDefinition } from "./runtimeOverview";
 import { solarRuntimePageDefinition } from "./runtimeSolar";
 import { sustainabilityRuntimePageDefinition } from "./runtimeSustainability";
+import type { DisplayPageInstance, DisplayPageTemplateKey } from "@solar-display/shared";
 
 export const runtimePageDefinitions: DisplayEditorPageDefinition[] = [
   overviewRuntimePageDefinition,
@@ -12,3 +14,15 @@ export const runtimePageDefinitions: DisplayEditorPageDefinition[] = [
   imagesRuntimePageDefinition,
   sustainabilityRuntimePageDefinition
 ];
+
+const runtimePageDefinitionTemplates = new Map<
+  DisplayPageTemplateKey,
+  Omit<DisplayEditorPageDefinition, "id" | "label">
+    & Pick<DisplayEditorPageDefinition, "label" | "templateKey">
+>(
+  runtimePageDefinitions.map((definition) => [definition.templateKey, definition])
+);
+
+export function buildRuntimePageDefinitions(pages: DisplayPageInstance[]): DisplayEditorPageDefinition[] {
+  return buildRegistryPageDefinitions(pages, runtimePageDefinitionTemplates);
+}

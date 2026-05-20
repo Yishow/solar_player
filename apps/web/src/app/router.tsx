@@ -7,16 +7,12 @@ import { DeviceStatus } from "../pages/DeviceStatus";
 import { DisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
 import { EnergyHistory } from "../pages/EnergyHistory";
 import { EnergyTrend } from "../pages/EnergyTrend";
-import { FactoryCircuit } from "../pages/FactoryCircuit";
 import { ImageManagement } from "../pages/ImageManagement";
-import { Images } from "../pages/Images";
 import { MqttSettings } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
-import { Overview } from "../pages/Overview";
 import { PlaybackSettings } from "../pages/PlaybackSettings";
 import { SlideshowPreview } from "../pages/SlideshowPreview";
-import { Solar } from "../pages/Solar";
-import { Sustainability } from "../pages/Sustainability";
+import { DisplayPageRouteHost } from "../pages/shared/displayPageRouteHost";
 
 export const router = createBrowserRouter([
   {
@@ -28,24 +24,8 @@ export const router = createBrowserRouter([
     element: <LayoutShell />,
     children: [
       {
-        path: "overview",
-        element: <Overview />
-      },
-      {
-        path: "solar",
-        element: <Solar />
-      },
-      {
-        path: "factory-circuit",
-        element: <FactoryCircuit />
-      },
-      {
-        path: "images",
-        element: <Images />
-      },
-      {
-        path: "sustainability",
-        element: <Sustainability />
+        path: ":displayPageSlug",
+        element: <DisplayPageRouteHost />
       }
     ]
   },

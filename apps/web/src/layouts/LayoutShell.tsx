@@ -12,7 +12,7 @@ export function LayoutShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isHydrated, status } = useMqttStatus();
-  const routeMeta = routeMetaMap.get(location.pathname);
+  const routeMeta = routeMetaMap.get(location.pathname) ?? routeMetaMap.get("/overview");
   const controller = usePageRotation({
     currentPath: location.pathname,
     onRouteChange: (route) => {

@@ -4,26 +4,31 @@ export const fallbackPageDefinitions: DisplayEditorPageDefinition[] = [
   {
     id: "overview",
     label: "Overview",
-    createSeedConfig: () => ({})
+    createSeedConfig: () => ({}),
+    templateKey: "overview"
   },
   {
     id: "solar",
     label: "Solar",
-    createSeedConfig: () => ({})
+    createSeedConfig: () => ({}),
+    templateKey: "solar"
   },
   {
     id: "factory-circuit",
     label: "Factory Circuit",
-    createSeedConfig: () => ({})
+    createSeedConfig: () => ({}),
+    templateKey: "factory-circuit"
   },
   {
     id: "images",
     label: "Images",
-    createSeedConfig: () => ({})
+    createSeedConfig: () => ({}),
+    templateKey: "images"
   },
   {
     id: "sustainability",
     label: "Sustainability",
-    createSeedConfig: () => ({})
+    createSeedConfig: () => ({}),
+    templateKey: "sustainability"
   }
 ];

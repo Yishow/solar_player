@@ -1,35 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DisplayPageInstance } from "@solar-display/shared";
-import { mediaPlacementFields } from "./runtimeFieldBuilders";
-import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
+import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
 
-test("media placement field builder exposes fit, focus, and align controls for editor regions", () => {
-  const fields = mediaPlacementFields(
-    "images-stage",
-    ["mainStage"],
-    {
-      alt: "Stage image",
-      src: "/images-stage.jpg"
-    },
-    () => {}
-  );
-
-  assert.deepEqual(
-    fields.map((field) => field.id),
-    [
-      "images-stage-fit-mode",
-      "images-stage-focus-x",
-      "images-stage-focus-y",
-      "images-stage-align-x",
-      "images-stage-align-y"
-    ]
-  );
-  assert.equal(fields[0]?.value, "cover");
-  assert.equal(fields[1]?.value, 0.5);
-});
-
-test("runtime page definitions expand registry-backed duplicate instances into independent editor tabs", () => {
+test("display page route host resolves duplicate route slugs to the correct registry instance", () => {
   const registryPages: DisplayPageInstance[] = [
     {
       archivedAt: null,
@@ -57,13 +31,13 @@ test("runtime page definitions expand registry-backed duplicate instances into i
       displayOrder: 2,
       displayNameEn: "Images Secondary",
       displayNameZh: "綠能影像副本",
-      draftVersion: 1,
+      draftVersion: 2,
       durationSeconds: 22,
       enabled: true,
-      hasDraftChanges: true,
+      hasDraftChanges: false,
       id: 6,
-      lastPublishedAt: null,
-      liveVersion: null,
+      lastPublishedAt: "2026-05-20T00:00:00.000Z",
+      liveVersion: 2,
       pageKey: "images-2",
       route: "/images-secondary",
       routeSlug: "images-secondary",
@@ -92,23 +66,10 @@ test("runtime page definitions expand registry-backed duplicate instances into i
     }
   ];
 
-  const definitions = buildRegistryPageDefinitions(
-    registryPages,
-    new Map([
-      ["overview", { createSeedConfig: () => ({}), label: "Overview", templateKey: "overview" }],
-      ["images", { createSeedConfig: () => ({}), label: "Images", templateKey: "images" }]
-    ])
-  );
+  const resolved = resolveDisplayPageRouteInstance(registryPages, "/images-secondary");
 
-  assert.deepEqual(
-    definitions.map((definition) => ({
-      id: definition.id,
-      label: definition.label,
-      templateKey: definition.templateKey
-    })),
-    [
-      { id: "overview", label: "Overview", templateKey: "overview" },
-      { id: "images-2", label: "Images Secondary", templateKey: "images" }
-    ]
-  );
+  assert.equal(resolved?.pageKey, "images-2");
+  assert.equal(resolved?.templateKey, "images");
+  assert.equal(resolveDisplayPageRouteInstance(registryPages, "/images-archived"), null);
+  assert.equal(resolveDisplayPageRouteInstance(registryPages, "/missing-page"), null);
 });

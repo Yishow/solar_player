@@ -1,9 +1,10 @@
 import type {
+  DisplayPageKey,
+  DisplayPageId,
   DisplayPageAssetFinding,
   DisplayPageAssetHealthEntry,
   DisplayPageAssetHealthReport,
   DisplayPageAssetFindingReason,
-  DisplayPageKey
 } from "@solar-display/shared";
 import {
   displayPageMediaFitModes,
@@ -99,7 +100,7 @@ function resolveMediaBinding(binding: UnknownRecord) {
 type DisplayPageAssetReference = {
   assetId: string | number;
   bindingId: string;
-  pageId: DisplayPageKey;
+  pageId: DisplayPageId;
 };
 
 function mapDisplayPageRegions(
@@ -134,7 +135,7 @@ export function resolveDisplayPageRegions<T extends Record<string, unknown>>(reg
 }
 
 export function collectDisplayPageAssetFindings(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   regions: Record<string, unknown>
 ) {
   const findings: DisplayPageAssetFinding[] = [];
@@ -239,7 +240,7 @@ function parseRegions(raw: string | null | undefined) {
 }
 
 export function collectDisplayPageAssetReferences(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   regions: Record<string, unknown>
 ) {
   const references: DisplayPageAssetReference[] = [];

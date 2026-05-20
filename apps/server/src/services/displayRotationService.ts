@@ -1,5 +1,5 @@
 import type {
-  DisplayPageKey,
+  DisplayPageTemplateKey,
   DisplayRotationPageCondition,
   DisplayRotationPlan,
   DisplayRotationPreview,
@@ -29,6 +29,7 @@ type PlaybackSettingsRow = {
 };
 
 type PlaybackPageRow = {
+  archived_at: string | null;
   display_order: number;
   duration_seconds: number;
   enabled: number;
@@ -36,7 +37,8 @@ type PlaybackPageRow = {
   label_en: string;
   label_zh: string;
   page_key: string;
-  route: string;
+  route_slug: string;
+  template_key: DisplayPageTemplateKey;
 };
 
 type MqttSettingsRow = {
@@ -45,7 +47,7 @@ type MqttSettingsRow = {
 
 type StageConfigRow = {
   config_json: string;
-  page_key: DisplayPageKey;
+  page_key: string;
   published_at: string | null;
 };
 
@@ -54,7 +56,7 @@ type MqttStatusLike = {
   reason: string | null;
 };
 
-const liveDataPageKeys = new Set<DisplayPageKey>([
+const liveDataPageKeys = new Set<DisplayPageTemplateKey>([
   "overview",
   "solar",
   "factory-circuit",
@@ -115,7 +117,8 @@ function serializePageRow(row: PlaybackPageRow): PlaybackPage {
     labelEn: row.label_en,
     labelZh: row.label_zh,
     pageKey: row.page_key,
-    route: row.route
+    route: `/${row.route_slug}`,
+    templateKey: row.template_key
   };
 }
 
@@ -260,13 +263,16 @@ export function readPlaybackPages() {
           SELECT
             id,
             page_key,
-            route,
+            template_key,
+            route_slug,
             label_zh,
             label_en,
             enabled,
+            archived_at,
             display_order,
             duration_seconds
-          FROM playback_pages
+          FROM display_page_registry
+          WHERE archived_at IS NULL
           ORDER BY display_order ASC, id ASC
         `
       )
@@ -309,7 +315,7 @@ function buildPageConditions(
   now: Date
 ) {
   const liveStageByPage = new Map(
-    readLiveStageRows().map((row) => [row.page_key, row] satisfies [DisplayPageKey, StageConfigRow])
+    readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
   const liveMetrics = readLiveMetricsSnapshot();
   const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
@@ -319,12 +325,12 @@ function buildPageConditions(
   const pageConditions: Record<number, DisplayRotationPageCondition> = {};
 
   for (const page of pages) {
-    const pageKey = page.pageKey as DisplayPageKey;
-    const liveStage = liveStageByPage.get(pageKey);
+    const liveStage = liveStageByPage.get(page.pageKey);
     const assetFindings = liveStage
-      ? collectDisplayPageAssetFindings(pageKey, parseRegions(liveStage.config_json))
+      ? collectDisplayPageAssetFindings(page.pageKey, parseRegions(liveStage.config_json))
       : [];
-    const pageRequiresLiveData = liveDataPageKeys.has(pageKey);
+    const pageRequiresLiveData =
+      page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
     const dataReady = !pageRequiresLiveData || mqttStatus.reason === "mock" || metricsFresh;
 
     pageConditions[page.id] = {
@@ -350,11 +356,12 @@ export function updatePlaybackPages(pages: PlaybackPageUpdateInput[]) {
   const database = getDatabase();
   const updatePage = database.prepare(
     `
-      UPDATE playback_pages
+      UPDATE display_page_registry
       SET
         display_order = ?,
         duration_seconds = ?,
-        enabled = ?
+        enabled = ?,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `
   );

@@ -3,13 +3,14 @@ import type {
   ConfigStage,
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
+  DisplayPageInstance,
   DisplayOpsAssetReferenceSummary,
   DisplayOpsSummary,
   DisplayRotationPreview,
   DisplayPageAssetHealthReport,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
-  DisplayPageKey,
+  DisplayPageId,
   DisplayReadinessReport,
   ImageAsset,
   MonitoringAlertTone,
@@ -113,6 +114,35 @@ export async function getPlaybackPages() {
   return response.pages;
 }
 
+export async function getDisplayPageRegistry() {
+  const response = await requestJson<{
+    pages: DisplayPageInstance[];
+  }>("/api/display-page-registry");
+  return response.pages;
+}
+
+export async function createDisplayPageRegistryPage(
+  page: Pick<DisplayPageInstance, "displayNameEn" | "displayNameZh" | "routeSlug" | "templateKey">
+    & Partial<Pick<DisplayPageInstance, "displayOrder" | "durationSeconds" | "enabled">>
+) {
+  const response = await requestJson<{
+    page: DisplayPageInstance;
+  }>("/api/display-page-registry", {
+    body: JSON.stringify(page),
+    method: "POST"
+  });
+  return response.page;
+}
+
+export async function archiveDisplayPageRegistryPage(pageKey: string) {
+  const response = await requestJson<{
+    page: DisplayPageInstance;
+  }>(`/api/display-page-registry/${pageKey}/archive`, {
+    method: "POST"
+  });
+  return response.page;
+}
+
 export async function getDisplayRotationPreview() {
   const response = await requestJson<{
     preview: DisplayRotationPreview;
@@ -120,11 +150,11 @@ export async function getDisplayRotationPreview() {
   return response.preview;
 }
 
-export function resolveDisplayPageConfigApiPath(pageId: DisplayPageKey, stage: ConfigStage | "config" = "config") {
+export function resolveDisplayPageConfigApiPath(pageId: DisplayPageId, stage: ConfigStage | "config" = "config") {
   return `/api/display-pages/${pageId}/${stage}`;
 }
 
-export async function getDisplayPageConfig(pageId: DisplayPageKey, stage: ConfigStage | "config" = "config") {
+export async function getDisplayPageConfig(pageId: DisplayPageId, stage: ConfigStage | "config" = "config") {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
   }>(resolveDisplayPageConfigApiPath(pageId, stage));
@@ -132,7 +162,7 @@ export async function getDisplayPageConfig(pageId: DisplayPageKey, stage: Config
 }
 
 export async function updateDisplayPageConfig(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   regions: Record<string, unknown>,
   stage: ConfigStage | "config" = "config"
 ) {
@@ -145,7 +175,7 @@ export async function updateDisplayPageConfig(
   return response.config;
 }
 
-export async function validateDisplayPageDraft(pageId: DisplayPageKey) {
+export async function validateDisplayPageDraft(pageId: DisplayPageId) {
   const response = await requestJson<{
     validation: ValidationResult;
   }>(`/api/display-pages/${pageId}/validate`, {
@@ -154,7 +184,7 @@ export async function validateDisplayPageDraft(pageId: DisplayPageKey) {
   return response.validation;
 }
 
-export async function publishDisplayPageDraft(pageId: DisplayPageKey, publishedBy?: string) {
+export async function publishDisplayPageDraft(pageId: DisplayPageId, publishedBy?: string) {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
     validation: ValidationResult;
@@ -165,7 +195,7 @@ export async function publishDisplayPageDraft(pageId: DisplayPageKey, publishedB
   return response;
 }
 
-export async function getDisplayPageFallbackStatus(pageId: DisplayPageKey) {
+export async function getDisplayPageFallbackStatus(pageId: DisplayPageId) {
   const response = await requestJson<{
     fallback: DisplayPageFallbackStatus;
   }>(`/api/display-pages/${pageId}/fallback`);

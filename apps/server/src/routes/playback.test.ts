@@ -19,7 +19,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "solar-display-playback-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ buildApp }, { closeDatabaseConnection }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
+const [{ buildApp }, { closeDatabaseConnection, getDatabase }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
   import("../app.js"),
   import("../db/index.js"),
   import("../db/migrate.js"),
@@ -258,6 +258,62 @@ test("GET /api/playback/settings and /api/playback/pages expose seeded playback 
   }
 });
 
+test("GET /api/playback/pages resolves duplicate display pages from the registry instead of the legacy static playback table", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare(
+      `
+        INSERT INTO display_page_registry (
+          page_key,
+          template_key,
+          route_slug,
+          label_zh,
+          label_en,
+          enabled,
+          archived_at,
+          display_order,
+          duration_seconds,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `
+    )
+    .run("images-2", "images", "images-secondary", "綠能影像副本", "Images Secondary", 1, 6, 22);
+
+  const app = await buildApp();
+
+  try {
+    const pagesResponse = await app.inject({
+      method: "GET",
+      url: "/api/playback/pages"
+    });
+
+    assert.equal(pagesResponse.statusCode, 200);
+
+    const pages = (pagesResponse.json() as { pages: PlaybackPage[] }).pages;
+    assert.deepEqual(
+      pages.map((page) => ({
+        pageKey: page.pageKey,
+        route: page.route,
+        templateKey: page.templateKey
+      })),
+      [
+        { pageKey: "overview", route: "/overview", templateKey: "overview" },
+        { pageKey: "solar", route: "/solar", templateKey: "solar" },
+        { pageKey: "factory-circuit", route: "/factory-circuit", templateKey: "factory-circuit" },
+        { pageKey: "images", route: "/images", templateKey: "images" },
+        { pageKey: "sustainability", route: "/sustainability", templateKey: "sustainability" },
+        { pageKey: "images-2", route: "/images-secondary", templateKey: "images" }
+      ]
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/playback/rotation-plan exposes the persisted display rotation plan", async () => {
   migrateDatabase();
   seedDatabase();
@@ -464,6 +520,8 @@ test("GET /api/display-pages/rotation-preview exposes runtime playable pages and
 test("GET /api/display-pages/rotation-preview reports out-of-schedule pages with a machine-readable reason", async () => {
   migrateDatabase();
   seedDatabase();
+  const today = new Date().getDay();
+  const offScheduleDay = (today + 1) % 7;
 
   const app = await buildApp();
 
@@ -472,7 +530,7 @@ test("GET /api/display-pages/rotation-preview reports out-of-schedule pages with
       method: "PUT",
       url: "/api/playback/settings",
       payload: {
-        repeatDays: [3],
+        repeatDays: [offScheduleDay],
         scheduleEnabled: true,
         scheduleEnd: "18:00",
         scheduleStart: "08:00"

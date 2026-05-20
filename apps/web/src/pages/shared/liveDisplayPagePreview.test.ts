@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewState
@@ -14,7 +14,7 @@ type PreviewConfig = {
 };
 
 type PreviewDefinition = {
-  id: DisplayPageKey;
+  id: DisplayPageTemplateKey;
   label: string;
   renderPreview: (config: Record<string, unknown>) => React.ReactElement;
 };
@@ -42,9 +42,9 @@ function renderPreview(state: LiveDisplayPagePreviewState) {
   return renderToStaticMarkup(
     React.createElement(LiveDisplayPagePreview, {
       definitions: previewDefinitions,
-      pageKey: "overview",
       pageLabel: "總覽頁",
-      state
+      state,
+      templateKey: "overview"
     })
   );
 }

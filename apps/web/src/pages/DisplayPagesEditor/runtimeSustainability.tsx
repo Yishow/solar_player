@@ -109,6 +109,8 @@ function buildSustainabilityRegions(
 export const sustainabilityRuntimePageDefinition: DisplayEditorPageDefinition = {
   id: "sustainability",
   label: "Sustainability",
+  renderPage: (pageId) => <Sustainability pageId={pageId} />,
+  templateKey: "sustainability",
   buildEditableRegions: (config, helpers) => buildSustainabilityRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createSustainabilityDisplayPageSeedConfig(sustainabilityAssetMap.hero.src) as Record<string, unknown>,

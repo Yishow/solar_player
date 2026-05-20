@@ -1,15 +1,15 @@
 import type {
   ConfigStage,
+  DisplayPageId,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
-  DisplayPageKey,
   FallbackPolicy,
   FallbackStatusItem,
   PublishHistoryEntry,
   ValidationFinding,
   ValidationResult
 } from "@solar-display/shared";
-import { defaultFallbackPolicy, isDisplayPageKey } from "@solar-display/shared";
+import { defaultFallbackPolicy } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { config } from "../config.js";
 import { existsSync, readdirSync } from "node:fs";
@@ -52,7 +52,7 @@ function parseRegions(raw: string | null | undefined): Record<string, unknown> {
 }
 
 function toEnvelope(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   stage: ConfigStage,
   row: StageConfigRow | undefined
 ): DisplayPageConfigEnvelope {
@@ -71,7 +71,7 @@ function toEnvelope(
   };
 }
 
-function readStageConfig(pageId: DisplayPageKey, stage: ConfigStage): DisplayPageConfigEnvelope {
+function readStageConfig(pageId: DisplayPageId, stage: ConfigStage): DisplayPageConfigEnvelope {
   const db = getDatabase();
   const row = db.prepare(
     `SELECT config_json, version, updated_at, published_at, published_by
@@ -80,7 +80,7 @@ function readStageConfig(pageId: DisplayPageKey, stage: ConfigStage): DisplayPag
   return toEnvelope(pageId, stage, row);
 }
 
-function writeStageConfig(pageId: DisplayPageKey, stage: ConfigStage, regions: Record<string, unknown>): DisplayPageConfigEnvelope {
+function writeStageConfig(pageId: DisplayPageId, stage: ConfigStage, regions: Record<string, unknown>): DisplayPageConfigEnvelope {
   const db = getDatabase();
   const normalizedRegions = normalizeDisplayPageRegionsForStorage(regions);
   db.prepare(
@@ -93,7 +93,7 @@ function writeStageConfig(pageId: DisplayPageKey, stage: ConfigStage, regions: R
   return readStageConfig(pageId, stage);
 }
 
-function readNextLiveVersion(pageId: DisplayPageKey) {
+function readNextLiveVersion(pageId: DisplayPageId) {
   return readStageConfig(pageId, "live").version + 1;
 }
 
@@ -239,7 +239,7 @@ function checkImageReferences(regions: Record<string, unknown>): ValidationFindi
 }
 
 function publishDraft(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   publishedBy?: string
 ): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
   const draft = readStageConfig(pageId, "draft");
@@ -292,7 +292,7 @@ function publishDraft(
 }
 
 function rollbackToVersion(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   targetVersion: number,
   publishedBy?: string
 ): DisplayPageConfigEnvelope {
@@ -337,7 +337,7 @@ function rollbackToVersion(
   return readStageConfig(pageId, "live");
 }
 
-function getPublishHistory(pageId: DisplayPageKey): PublishHistoryEntry[] {
+function getPublishHistory(pageId: DisplayPageId): PublishHistoryEntry[] {
   const db = getDatabase();
   const rows = db.prepare(
     `SELECT id, page_key, version, stage, action, config_json, published_by, source_version, published_at
@@ -354,12 +354,12 @@ function getPublishHistory(pageId: DisplayPageKey): PublishHistoryEntry[] {
   }));
 }
 
-function readFallbackPolicy(pageId: DisplayPageKey): FallbackPolicy {
+function readFallbackPolicy(pageId: DisplayPageId): FallbackPolicy {
   const live = readStageConfig(pageId, "live");
   return live.fallbackPolicy ?? defaultFallbackPolicy;
 }
 
-function readFallbackStatus(pageId: DisplayPageKey): DisplayPageFallbackStatus {
+function readFallbackStatus(pageId: DisplayPageId): DisplayPageFallbackStatus {
   const live = readStageConfig(pageId, "live");
   const policy = live.fallbackPolicy ?? defaultFallbackPolicy;
   const imageWarnings = checkImageReferences(live.regions);

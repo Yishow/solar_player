@@ -1,7 +1,7 @@
 import type {
   ConfigStage,
   DisplayPageConfigEnvelope,
-  DisplayPageKey,
+  DisplayPageId,
   FallbackPolicy
 } from "@solar-display/shared";
 import { defaultFallbackPolicy } from "@solar-display/shared";
@@ -17,8 +17,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 export function resolveDisplayPageConfigForPage<T>(
-  pageId: DisplayPageKey,
-  configPageId: DisplayPageKey,
+  pageId: DisplayPageId,
+  configPageId: DisplayPageId,
   seedConfig: T,
   config: T
 ) {
@@ -62,7 +62,7 @@ export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown
   return deepClone(overrideConfig as T);
 }
 
-export function resolveDisplayPageConfigStagePath(pageId: DisplayPageKey, stage: ConfigStage) {
+export function resolveDisplayPageConfigStagePath(pageId: DisplayPageId, stage: ConfigStage) {
   return `/api/display-pages/${pageId}/${stage}`;
 }
 
@@ -122,13 +122,13 @@ type UseDisplayPageConfigResult<T> = {
 };
 
 export function useDisplayPageConfig<T>(
-  pageId: DisplayPageKey,
+  pageId: DisplayPageId,
   seedConfig: T,
   options: UseDisplayPageConfigOptions = {}
 ): UseDisplayPageConfigResult<T> {
   const enabled = options.enabled ?? true;
   const stage = options.stage ?? "live";
-  const [sessions, setSessions] = useState<Partial<Record<DisplayPageKey, DisplayPageDraftSession<T>>>>({});
+  const [sessions, setSessions] = useState<Record<string, DisplayPageDraftSession<T>>>({});
   const [isLoading, setIsLoading] = useState(enabled);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState(enabled ? "正在同步展示頁設定..." : "使用頁面預設設定。");

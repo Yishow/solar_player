@@ -136,7 +136,7 @@ function splitSolarTitleLine(titleLine: string) {
   };
 }
 
-export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
+export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const { isSocketConnected, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
@@ -150,7 +150,7 @@ export function Solar({ config }: { config?: SolarDisplayPageConfig }) {
       ),
     []
   );
-  const runtimeConfig = useDisplayPageConfig("solar", seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });

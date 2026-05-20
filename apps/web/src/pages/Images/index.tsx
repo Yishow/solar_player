@@ -57,7 +57,7 @@ function splitImagesTitle(title: string) {
   };
 }
 
-export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
+export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
@@ -65,7 +65,7 @@ export function Images({ config }: { config?: ImagesDisplayPageConfig }) {
     () => createImagesDisplayPageSeedConfig(imagesAssetRuntimeMap.main),
     []
   );
-  const runtimeConfig = useDisplayPageConfig("images", seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });

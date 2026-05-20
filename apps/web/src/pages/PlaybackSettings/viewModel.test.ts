@@ -141,8 +141,9 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
-        pageKey: "overview",
-        route: "/overview"
+        pageId: "overview",
+        route: "/overview",
+        templateKey: "overview"
       },
       {
         durationLabel: "20 秒",
@@ -150,8 +151,9 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Solar",
         labelZh: "太陽能",
         orderLabel: "02",
-        pageKey: "solar",
-        route: "/solar"
+        pageId: "solar",
+        route: "/solar",
+        templateKey: "solar"
       }
     ]
   );
@@ -164,8 +166,9 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
-        pageKey: "overview",
-        route: "/overview"
+        pageId: "overview",
+        route: "/overview",
+        templateKey: "overview"
       }
     ]
   );

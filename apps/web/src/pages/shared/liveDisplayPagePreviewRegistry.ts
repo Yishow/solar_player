@@ -1,9 +1,9 @@
-import type { DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import { runtimePageDefinitions } from "../DisplayPagesEditor/runtimePageDefinitions";
 
 export type LiveDisplayPagePreviewRegistryEntry = {
   createSeedConfig: () => Record<string, unknown>;
-  id: DisplayPageKey;
+  id: DisplayPageTemplateKey;
   label: string;
   renderPreview?: (config: Record<string, unknown>) => ReturnType<NonNullable<(typeof runtimePageDefinitions)[number]["renderPreview"]>>;
 };
@@ -11,7 +11,7 @@ export type LiveDisplayPagePreviewRegistryEntry = {
 export const liveDisplayPagePreviewRegistry: LiveDisplayPagePreviewRegistryEntry[] =
   runtimePageDefinitions.map((definition) => ({
     createSeedConfig: definition.createSeedConfig,
-    id: definition.id,
+    id: definition.templateKey,
     label: definition.label,
     renderPreview: definition.renderPreview
   }));

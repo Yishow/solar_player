@@ -1,5 +1,5 @@
-import type { DisplayPageKey, PlaybackPage } from "@solar-display/shared";
-import { isDisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey, PlaybackPage } from "@solar-display/shared";
+import { isDisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewDefinition,
@@ -9,34 +9,34 @@ import { slideshowCardOffsets } from "./layout";
 
 type SlideshowPreviewCard = Pick<
   PlaybackPage,
-  "displayOrder" | "id" | "labelEn" | "labelZh" | "pageKey"
+  "displayOrder" | "id" | "labelEn" | "labelZh" | "pageKey" | "templateKey"
 > & {
   isCurrent: boolean;
   routeLabel: string;
   statusLabel: string;
 };
 
-function resolveCardPageKey(card: SlideshowPreviewCard): DisplayPageKey | null {
-  if (isDisplayPageKey(card.pageKey)) {
-    return card.pageKey;
+function resolveCardTemplateKey(card: SlideshowPreviewCard): DisplayPageTemplateKey | null {
+  if (card.templateKey && isDisplayPageTemplateKey(card.templateKey)) {
+    return card.templateKey;
   }
 
   const routeKey = card.routeLabel.replace(/^\//, "");
-  return isDisplayPageKey(routeKey) ? routeKey : null;
+  return isDisplayPageTemplateKey(routeKey) ? routeKey : null;
 }
 
 function resolvePreviewState(
-  pageKey: DisplayPageKey | null,
-  states: Partial<Record<DisplayPageKey, LiveDisplayPagePreviewState>>
+  templateKey: DisplayPageTemplateKey | null,
+  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>
 ) {
-  if (!pageKey) {
+  if (!templateKey) {
     return {
       detail: "目前無法解析此輪播卡片對應的展示頁。",
       status: "renderer-unavailable"
     } satisfies LiveDisplayPagePreviewState;
   }
 
-  return states[pageKey] ?? {
+  return states[templateKey] ?? {
     detail: "正在同步正式預覽...",
     status: "loading"
   };
@@ -49,12 +49,12 @@ export function LiveSlideshowPreviewCards({
 }: {
   cards: SlideshowPreviewCard[];
   definitions: LiveDisplayPagePreviewDefinition[];
-  states: Partial<Record<DisplayPageKey, LiveDisplayPagePreviewState>>;
+  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>;
 }) {
   return (
     <>
       {cards.map((card, index) => {
-        const pageKey = resolveCardPageKey(card);
+        const templateKey = resolveCardTemplateKey(card);
 
         return (
           <article
@@ -68,9 +68,9 @@ export function LiveSlideshowPreviewCards({
             <div className="sp-card-preview">
               <LiveDisplayPagePreview
                 definitions={definitions}
-                pageKey={pageKey ?? "overview"}
                 pageLabel={card.labelZh}
-                state={resolvePreviewState(pageKey, states)}
+                state={resolvePreviewState(templateKey, states)}
+                templateKey={templateKey ?? "overview"}
               />
             </div>
             <div className="sp-card-footer">

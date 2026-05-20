@@ -123,6 +123,8 @@ const solarSeedIconAssetSources: SolarIconAssetSources = {
 export const solarRuntimePageDefinition: DisplayEditorPageDefinition = {
   id: "solar",
   label: "Solar",
+  renderPage: (pageId) => <Solar pageId={pageId} />,
+  templateKey: "solar",
   buildEditableRegions: (config, helpers) => buildSolarRegions(config, helpers.updatePath),
   createSeedConfig: () =>
     createSolarDisplayPageSeedConfig(

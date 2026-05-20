@@ -9,7 +9,7 @@ process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 const databasePath = process.env.DATABASE_PATH;
 
-const [{ buildApp }, { closeDatabaseConnection }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
+const [{ buildApp }, { closeDatabaseConnection, getDatabase }, { migrateDatabase }, { seedDatabase }] = await Promise.all([
   import("../app.js"),
   import("../db/index.js"),
   import("../db/migrate.js"),
@@ -99,6 +99,61 @@ test("GET /api/display-pages/:pageId/draft returns draft stage config", async ()
     assert.equal(body.config.pageId, "overview");
     assert.equal(body.config.stage, "draft");
     assert.deepEqual(body.config.regions, {});
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/:pageId/draft accepts registry-backed duplicate page instances", async () => {
+  const database = getDatabase();
+  database
+    .prepare(
+      `
+        INSERT INTO display_page_registry (
+          page_key,
+          template_key,
+          route_slug,
+          label_zh,
+          label_en,
+          enabled,
+          archived_at,
+          display_order,
+          duration_seconds,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `
+    )
+    .run("images-2", "images", "images-secondary", "綠能影像副本", "Images Secondary", 1, 6, 22);
+  database
+    .prepare(
+      `
+        INSERT INTO display_page_stage_configs (
+          page_key,
+          stage,
+          config_json,
+          version,
+          updated_at,
+          published_at,
+          published_by
+        ) VALUES (?, 'draft', ?, 3, CURRENT_TIMESTAMP, NULL, NULL)
+      `
+    )
+    .run("images-2", JSON.stringify({ hero: { title: "Secondary Images" } }));
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/images-2/draft"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { config: { pageId: string; stage: string; version: number } };
+    assert.equal(body.config.pageId, "images-2");
+    assert.equal(body.config.stage, "draft");
+    assert.equal(body.config.version, 3);
   } finally {
     await app.close();
   }

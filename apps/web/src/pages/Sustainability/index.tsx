@@ -70,7 +70,13 @@ const sustainabilityKpiOrder = [
 
 const sustainabilityStatOrder = ["procure", "esg", "trees"] as const;
 
-export function Sustainability({ config }: { config?: SustainabilityDisplayPageConfig }) {
+export function Sustainability({
+  config,
+  pageId = "sustainability"
+}: {
+  config?: SustainabilityDisplayPageConfig;
+  pageId?: string;
+}) {
   useBodyClass("page-hero-shell");
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
@@ -78,7 +84,7 @@ export function Sustainability({ config }: { config?: SustainabilityDisplayPageC
     () => createSustainabilityDisplayPageSeedConfig(sustainabilityAssetMap.hero.src),
     []
   );
-  const runtimeConfig = useDisplayPageConfig("sustainability", seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });

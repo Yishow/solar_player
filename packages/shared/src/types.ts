@@ -1,3 +1,5 @@
+import type { DisplayPageTemplateKey } from "./displayPageConfig.js";
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -79,6 +81,7 @@ export type PlaybackOrientation = "landscape" | "portrait";
 export interface PlaybackPage {
   id: number;
   pageKey: string;
+  templateKey?: DisplayPageTemplateKey;
   route: string;
   labelZh: string;
   labelEn: string;

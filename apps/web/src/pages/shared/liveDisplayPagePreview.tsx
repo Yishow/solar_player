@@ -1,9 +1,9 @@
-import type { DisplayPageKey } from "@solar-display/shared";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
 
 export type LiveDisplayPagePreviewDefinition = {
-  id: DisplayPageKey;
+  id: DisplayPageTemplateKey;
   label: string;
   renderPreview?: (config: Record<string, unknown>) => ReactElement;
 };
@@ -45,16 +45,16 @@ function resolveFallbackHeadline(status: LiveDisplayPagePreviewState["status"]) 
 
 export function LiveDisplayPagePreview({
   definitions,
-  pageKey,
+  templateKey,
   pageLabel,
   state
 }: {
   definitions: LiveDisplayPagePreviewDefinition[];
-  pageKey: DisplayPageKey;
+  templateKey: DisplayPageTemplateKey;
   pageLabel: string;
   state: LiveDisplayPagePreviewState;
 }) {
-  const definition = definitions.find((entry) => entry.id === pageKey);
+  const definition = definitions.find((entry) => entry.id === templateKey);
 
   if (state.status !== "ready" || !definition?.renderPreview) {
     const status = state.status !== "ready" ? state.status : "renderer-unavailable";

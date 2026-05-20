@@ -26,8 +26,12 @@ test("playback settings renders rotation tiles from the shared live preview cata
   assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
 });
 
-test("playback settings does not expose an enabled add-page button without backend support", () => {
+test("playback settings wires add-page management through display page registry APIs", () => {
+  assert.match(playbackSettingsSource, /getDisplayPageRegistry\(\)/);
+  assert.match(playbackSettingsSource, /createDisplayPageRegistryPage\(/);
+  assert.match(playbackSettingsSource, /archiveDisplayPageRegistryPage\(/);
   assert.match(playbackSettingsSource, /className="ps-add-btn"/);
-  assert.match(playbackSettingsSource, /disabled/);
-  assert.match(playbackSettingsSource, /title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"/);
+  assert.match(playbackSettingsSource, /disabled=\{registryActionDisabled\}/);
+  assert.match(playbackSettingsSource, /顯示頁面管理/);
+  assert.doesNotMatch(playbackSettingsSource, /title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"/);
 });

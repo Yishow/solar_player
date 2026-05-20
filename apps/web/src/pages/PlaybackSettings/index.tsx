@@ -1,4 +1,9 @@
-import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type {
+  DisplayPageInstance,
+  DisplayRotationPreview,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
 import { useEffect, useMemo, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
@@ -8,6 +13,9 @@ import {
 import { useDisplayOpsSummary } from "../../hooks/useDisplayOpsSummary";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
+  archiveDisplayPageRegistryPage,
+  createDisplayPageRegistryPage,
+  getDisplayPageRegistry,
   getDisplayRotationPreview,
   getPlaybackPages,
   getPlaybackSettings,
@@ -27,33 +35,63 @@ export function PlaybackSettings() {
   const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(null);
   const [pages, setPages] = useState<PlaybackPage[]>([]);
   const [lastSyncedPages, setLastSyncedPages] = useState<PlaybackPage[]>([]);
+  const [registryPages, setRegistryPages] = useState<DisplayPageInstance[]>([]);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRegistrySaving, setIsRegistrySaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showAddPageForm, setShowAddPageForm] = useState(false);
   const {
     errorMessage: displayOpsErrorMessage,
     reload: reloadDisplayOpsSummary,
     summary: displayOpsSummary
   } = useDisplayOpsSummary();
 
+  const applyLoadedPlaybackConfig = (
+    nextSettings: PlaybackSettings,
+    nextPages: PlaybackPage[],
+    nextRotationPreview: DisplayRotationPreview,
+    nextRegistryPages: DisplayPageInstance[]
+  ) => {
+    setSettings(nextSettings);
+    setLastSyncedSettings(nextSettings);
+    setPages(nextPages);
+    setLastSyncedPages(nextPages);
+    setRotationPreview(nextRotationPreview);
+    setRegistryPages(nextRegistryPages);
+  };
+
+  const loadPlaybackConfig = async () => {
+    const [nextSettings, nextPages, nextRotationPreview, nextRegistryPages] = await Promise.all([
+      getPlaybackSettings(),
+      getPlaybackPages(),
+      getDisplayRotationPreview(),
+      getDisplayPageRegistry()
+    ]);
+
+    return {
+      nextPages,
+      nextRegistryPages,
+      nextRotationPreview,
+      nextSettings
+    };
+  };
+
   useEffect(() => {
     let active = true;
-    const loadPlaybackConfig = async () => {
+    const bootstrap = async () => {
       setIsLoading(true);
       try {
-        const [nextSettings, nextPages, nextRotationPreview] = await Promise.all([
-          getPlaybackSettings(),
-          getPlaybackPages(),
-          getDisplayRotationPreview()
-        ]);
+        const {
+          nextPages,
+          nextRegistryPages,
+          nextRotationPreview,
+          nextSettings
+        } = await loadPlaybackConfig();
         if (!active) return;
-        setSettings(nextSettings);
-        setLastSyncedSettings(nextSettings);
-        setPages(nextPages);
-        setLastSyncedPages(nextPages);
-        setRotationPreview(nextRotationPreview);
+        applyLoadedPlaybackConfig(nextSettings, nextPages, nextRotationPreview, nextRegistryPages);
         setMessage("播放設定已同步。");
         setErrorMessage("");
       } catch (error) {
@@ -63,7 +101,7 @@ export function PlaybackSettings() {
         if (active) setIsLoading(false);
       }
     };
-    void loadPlaybackConfig();
+    void bootstrap();
     return () => {
       active = false;
     };
@@ -119,17 +157,14 @@ export function PlaybackSettings() {
     setIsSaving(false);
     setIsLoading(true);
     try {
-      const [nextSettings, nextPages, nextRotationPreview] = await Promise.all([
-        getPlaybackSettings(),
-        getPlaybackPages(),
-        getDisplayRotationPreview()
-      ]);
+      const {
+        nextPages,
+        nextRegistryPages,
+        nextRotationPreview,
+        nextSettings
+      } = await loadPlaybackConfig();
       await reloadDisplayOpsSummary();
-      setSettings(nextSettings);
-      setLastSyncedSettings(nextSettings);
-      setPages(nextPages);
-      setLastSyncedPages(nextPages);
-      setRotationPreview(nextRotationPreview);
+      applyLoadedPlaybackConfig(nextSettings, nextPages, nextRotationPreview, nextRegistryPages);
       setMessage("播放設定已同步。");
     } catch (error) {
       const nextError = error instanceof Error ? error : new Error("重新同步播放設定失敗。");
@@ -146,6 +181,14 @@ export function PlaybackSettings() {
       || hasDisplaySyncDraftChanges(pages, lastSyncedPages),
     [lastSyncedPages, lastSyncedSettings, pages, settings]
   );
+  const activeRegistryPages = useMemo(
+    () => registryPages.filter((page) => page.enabled && page.archivedAt === null),
+    [registryPages]
+  );
+  const registryActionDisabled = isLoading || isSaving || isRegistrySaving || isDirty;
+  const registryActionTitle = isDirty
+    ? "請先儲存或重新同步目前的播放設定，再管理顯示頁面。"
+    : "顯示頁面管理";
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
     reloadNow: resyncPlaybackConfig
@@ -171,6 +214,42 @@ export function PlaybackSettings() {
         : "";
 
   const formDisabled = isLoading || !settings;
+
+  const handleCreatePage = async (input: {
+    displayNameEn: string;
+    displayNameZh: string;
+    routeSlug: string;
+    templateKey: DisplayPageInstance["templateKey"];
+  }) => {
+    setIsRegistrySaving(true);
+    setErrorMessage("");
+
+    try {
+      await createDisplayPageRegistryPage(input);
+      await resyncPlaybackConfig();
+      setShowAddPageForm(false);
+      setMessage(`已新增顯示頁面：${input.displayNameEn}。`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "新增顯示頁面失敗。");
+    } finally {
+      setIsRegistrySaving(false);
+    }
+  };
+
+  const handleArchivePage = async (page: DisplayPageInstance) => {
+    setIsRegistrySaving(true);
+    setErrorMessage("");
+
+    try {
+      await archiveDisplayPageRegistryPage(page.pageKey);
+      await resyncPlaybackConfig();
+      setMessage(`已封存顯示頁面：${page.displayNameEn}。`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "封存顯示頁面失敗。");
+    } finally {
+      setIsRegistrySaving(false);
+    }
+  };
 
   return (
     <div className="playback-settings-page">
@@ -208,10 +287,12 @@ export function PlaybackSettings() {
         <button
           type="button"
           className="ps-add-btn"
-          disabled
-          title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"
+          disabled={registryActionDisabled}
+          title={registryActionTitle}
+          aria-label="顯示頁面管理"
+          onClick={() => setShowAddPageForm((current) => !current)}
         >
-          + 新增頁面 Add Page
+          {showAddPageForm ? "收起頁面管理" : "+ 新增頁面 Add Page"}
         </button>
       </div>
 
@@ -291,8 +372,15 @@ export function PlaybackSettings() {
       </section>
       <PlaybackSettingsFormSections
         formDisabled={formDisabled}
+        isRegistrySaving={isRegistrySaving}
         markDirty={markDirty}
         pages={pages}
+        registryActionDisabled={registryActionDisabled}
+        registryPages={activeRegistryPages}
+        registrySectionLabel="顯示頁面管理"
+        onArchivePage={(page) => void handleArchivePage(page)}
+        onCreatePage={(input) => void handleCreatePage(input)}
+        showAddPageForm={showAddPageForm}
         reorderPlaybackPages={reorderPlaybackPages}
         setPages={setPages}
         settings={settings}
