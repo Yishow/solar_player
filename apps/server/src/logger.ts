@@ -1,7 +1,12 @@
 import type { FastifyServerOptions } from "fastify";
 
 function isNodeTestRuntime() {
-  return process.execArgv.includes("--test");
+  return (
+    process.execArgv.includes("--test")
+    || process.argv.includes("--test")
+    || typeof process.env.NODE_TEST_CONTEXT === "string"
+    || typeof process.env.NODE_TEST_WORKER_ID === "string"
+  );
 }
 
 export function createLoggerOptions(

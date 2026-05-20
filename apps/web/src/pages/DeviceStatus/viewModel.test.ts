@@ -41,6 +41,11 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       }
     },
     isLoading: false,
+    logExport: {
+      directory: "/var/log/solar-display",
+      files: ["server.log", "worker.log"]
+    },
+    logExportError: "",
     status: {
       arch: "arm64",
       cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
@@ -62,20 +67,28 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.resourceCards[0]?.valueLabel, "0.18");
   assert.equal(model.resourceCards[0]?.gaugePercent, 18);
   assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
+  assert.equal(model.resourceCards[3]?.valueLabel, "Unavailable");
+  assert.equal(model.resourceCards[3]?.helper, "目前無可信溫度量測來源");
   assert.match(model.feedback.title, /清除快取完成/);
-  assert.equal(model.networkRows[0]?.value, "● 已連線 Connected");
+  assert.equal(model.networkRows[0]?.value, "● 管理通道可達");
+  assert.equal(model.networkRows[1]?.value, "目前無可信訊號強度量測");
   assert.equal(model.displayOpsSummary.statusTitle, "展示退化");
   assert.equal(model.displayOpsSummary.liveVersion, "v14");
   assert.equal(model.displayOpsSummary.lastPublishLabel, "2026-05-18 08:45");
   assert.equal(model.displayOpsSummary.assetHealthLabel, "1 unhealthy");
   assert.equal(model.displayOpsSummary.alerts[0]?.message, "overview live asset missing");
   assert.equal(model.displayOpsSummary.diagnostics[0]?.action, "refresh-readiness");
+  assert.equal(model.logsSummary.statusTitle, "最近日誌");
+  assert.equal(model.logsSummary.fileCountLabel, "2 files");
+  assert.match(model.logsSummary.detail, /server\.log/);
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,
     isLoading: true,
+    logExport: null,
+    logExportError: "",
     status: null
   });
 
@@ -94,10 +107,14 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
       tone: "error"
     },
     isLoading: false,
+    logExport: null,
+    logExportError: "No logs directory",
     status: null
   });
 
   assert.equal(model.runtimeSummary.title, "同步失敗");
   assert.equal(model.networkRows[0]?.value, "● 未連線");
   assert.equal(model.networkRows[1]?.value, "需待裝置狀態恢復後確認");
+  assert.equal(model.logsSummary.statusTitle, "日誌不可用");
+  assert.equal(model.logsSummary.fileCountLabel, "Unavailable");
 });

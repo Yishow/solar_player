@@ -71,11 +71,17 @@ export function runDeviceDisplayDiagnostic(input: {
   action: DeviceDisplayDiagnosticAction;
   mqttStatus: MqttStatusLike;
 }): DeviceDisplayDiagnosticResult {
+  const summary = readDeviceDisplayOpsSummary({
+    mqttStatus: input.mqttStatus
+  });
+
   return {
     action: input.action,
-    generatedAt: new Date().toISOString(),
-    summary: readDeviceDisplayOpsSummary({
-      mqttStatus: input.mqttStatus
-    })
+    generatedAt: summary.generatedAt,
+    message:
+      input.action === "refresh-readiness"
+        ? "Refreshed the bounded display readiness summary."
+        : "Exported the bounded display operations summary snapshot.",
+    summary
   };
 }

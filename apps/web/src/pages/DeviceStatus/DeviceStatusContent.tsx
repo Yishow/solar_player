@@ -204,6 +204,26 @@ export function DeviceStatusContent({
               <div className="mgmt-status">目前沒有 display readiness、skip 或 asset 警示。</div>
             ) : null}
           </div>
+
+          <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
+            <h2 style={{ marginBottom: 12 }}>
+              系統日誌
+              <small>Recent Logs</small>
+            </h2>
+            <div
+              className={`mgmt-status ${
+                viewModel.logsSummary.statusTitle === "日誌不可用" ? "is-error" : ""
+              }`}
+            >
+              {viewModel.logsSummary.statusTitle}
+              <small style={{ display: "block", opacity: 0.72 }}>
+                {viewModel.logsSummary.fileCountLabel} · {viewModel.logsSummary.directoryLabel}
+              </small>
+            </div>
+            <div className="mgmt-status" style={{ marginTop: 12 }}>
+              {viewModel.logsSummary.detail}
+            </div>
+          </div>
         </div>
       </section>
 

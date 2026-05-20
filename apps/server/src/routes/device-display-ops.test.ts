@@ -119,7 +119,7 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
   }
 });
 
-test("POST /api/device-display-ops/diagnostics reuses the current summary findings", async () => {
+test("POST /api/device-display-ops/diagnostics returns a truthful safe result for the named action", async () => {
   const app = await buildApp();
 
   try {
@@ -131,7 +131,7 @@ test("POST /api/device-display-ops/diagnostics reuses the current summary findin
       app.inject({
         method: "POST",
         payload: {
-          action: "export-summary"
+          action: "refresh-readiness"
         },
         url: "/api/device-display-ops/diagnostics"
       })
@@ -150,15 +150,21 @@ test("POST /api/device-display-ops/diagnostics reuses the current summary findin
       success: boolean;
       data: {
         action: string;
+        generatedAt: string;
+        message: string;
         summary: {
           draftCount: number;
+          generatedAt: string;
+          readinessSummary: { blockingCount: number };
           skipSummary: { count: number };
         };
       };
     };
 
     assert.equal(diagnosticBody.success, true);
-    assert.equal(diagnosticBody.data.action, "export-summary");
+    assert.equal(diagnosticBody.data.action, "refresh-readiness");
+    assert.match(diagnosticBody.data.message, /Refreshed the bounded display readiness summary\./);
+    assert.equal(typeof diagnosticBody.data.generatedAt, "string");
     assert.equal(
       diagnosticBody.data.summary.draftCount,
       summaryBody.summary.draftCount
@@ -167,6 +173,11 @@ test("POST /api/device-display-ops/diagnostics reuses the current summary findin
       diagnosticBody.data.summary.skipSummary.count,
       summaryBody.summary.skipSummary.count
     );
+    assert.equal(
+      diagnosticBody.data.summary.readinessSummary.blockingCount >= 0,
+      true
+    );
+    assert.equal(diagnosticBody.data.generatedAt, diagnosticBody.data.summary.generatedAt);
   } finally {
     await app.close();
   }

@@ -38,5 +38,6 @@ export type DeviceDisplayOpsSummary = {
 export type DeviceDisplayDiagnosticResult = {
   action: DeviceDisplayDiagnosticAction;
   generatedAt: string;
+  message: string;
   summary: DeviceDisplayOpsSummary;
 };

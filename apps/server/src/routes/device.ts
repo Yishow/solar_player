@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { existsSync, readFileSync, readdirSync, statfsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, statfsSync } from "node:fs";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
 import { join } from "node:path";
 import { readDeviceDisplayOpsSummary } from "../services/deviceDisplayOpsService.js";
@@ -71,7 +71,7 @@ function getRecentLogs(logDir: string, limit: number): Array<{ file: string; siz
   const files = readdirSync(logDir)
     .filter((f) => f.endsWith(".log"))
     .map((f) => {
-      const stat = require("node:fs").statSync(join(logDir, f));
+      const stat = statSync(join(logDir, f));
       return {
         file: f,
         size: stat.size,
@@ -126,9 +126,17 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
   });
 
   // GET /api/device/logs
-  app.get<{ Querystring: { limit?: string } }>("/api/device/logs", async (request) => {
+  app.get<{ Querystring: { limit?: string } }>("/api/device/logs", async (request, reply) => {
     const limit = Number.parseInt(request.query.limit ?? "20", 10) || 20;
     const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
+    if (!existsSync(logDir)) {
+      reply.code(404);
+      return {
+        success: false,
+        error: "No logs directory",
+        timestamp: new Date().toISOString()
+      };
+    }
     return {
       success: true,
       data: getRecentLogs(logDir, limit)
@@ -140,7 +148,11 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
     if (!existsSync(logDir)) {
       reply.code(404);
-      return { success: false, error: "No logs directory" };
+      return {
+        success: false,
+        error: "No logs directory",
+        timestamp: new Date().toISOString()
+      };
     }
     // Return list of log files for download
     const files = readdirSync(logDir).filter((f) => f.endsWith(".log"));

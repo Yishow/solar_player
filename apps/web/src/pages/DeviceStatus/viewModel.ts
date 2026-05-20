@@ -1,4 +1,5 @@
 import type { DeviceDisplayOpsSummary } from "@solar-display/shared";
+import type { DeviceLogExportMetadata } from "../../services/api";
 
 type DeviceRouteStatus = {
   hostname: string;
@@ -22,6 +23,8 @@ type BuildDeviceStatusViewModelArgs = {
   actionFeedback: DeviceActionFeedback;
   displayOpsSummary?: DeviceDisplayOpsSummary | null;
   isLoading: boolean;
+  logExport: DeviceLogExportMetadata | null;
+  logExportError: string;
   status: DeviceRouteStatus | null;
 };
 
@@ -120,6 +123,8 @@ export function buildDeviceStatusViewModel({
   actionFeedback,
   displayOpsSummary,
   isLoading,
+  logExport,
+  logExportError,
   status
 }: BuildDeviceStatusViewModelArgs) {
   const runtimeSummary = buildRuntimeSummary(isLoading, status);
@@ -142,11 +147,11 @@ export function buildDeviceStatusViewModel({
     networkRows: [
       {
         label: "網路狀態",
-        value: isLoading ? "同步中" : status ? "● 已連線 Connected" : "● 未連線"
+        value: isLoading ? "同步中" : status ? "● 管理通道可達" : "● 未連線"
       },
       {
         label: "訊號強度",
-        value: status ? "有線連線 (穩定)" : "需待裝置狀態恢復後確認"
+        value: status ? "目前無可信訊號強度量測" : "需待裝置狀態恢復後確認"
       }
     ],
     displayOpsSummary: {
@@ -174,6 +179,24 @@ export function buildDeviceStatusViewModel({
       skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
       statusTitle: displayOpsSummary?.degraded ? "展示退化" : "展示正常"
     },
+    logsSummary: logExportError
+      ? {
+          detail: logExportError,
+          directoryLabel: "--",
+          fileCountLabel: "Unavailable",
+          statusTitle: "日誌不可用"
+        }
+      : {
+          detail:
+            logExport === null
+              ? "尚未載入裝置日誌 metadata。"
+              : logExport.files.length > 0
+                ? logExport.files.slice(0, 3).join(" / ")
+                : "目前沒有可供匯出的 .log 檔案。",
+          directoryLabel: logExport?.directory ?? "--",
+          fileCountLabel: logExport === null ? "--" : `${logExport.files.length} files`,
+          statusTitle: logExport === null ? "尚未載入" : "最近日誌"
+        },
     resourceCards: [
       {
         gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",
@@ -194,15 +217,17 @@ export function buildDeviceStatusViewModel({
         valueLabel: status ? formatPercent(status.disk.usePercent) : "--"
       },
       {
-        gaugeValue: status ? "52°C" : "--",
-        helper: status ? "正常 Normal" : "--",
+        gaugeValue: "--",
+        helper: status ? "目前無可信溫度量測來源" : "--",
         label: "系統溫度",
-        valueLabel: status ? "52°C" : "--"
+        valueLabel: status ? "Unavailable" : "--"
       }
     ].map((card, index) => {
       const gaugePercent = gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel);
       let gaugeColor: string;
-      if (index === 3) {
+      if (card.valueLabel === "Unavailable") {
+        gaugeColor = "#7c847c";
+      } else if (index === 3) {
         gaugeColor = gaugePercent >= 75 ? "#c14a4a" : gaugePercent >= 55 ? "#c9881a" : "#d89c45";
       } else {
         gaugeColor = gaugePercent >= 90 ? "#c14a4a" : gaugePercent >= 70 ? "#c9881a" : "#4f7c42";

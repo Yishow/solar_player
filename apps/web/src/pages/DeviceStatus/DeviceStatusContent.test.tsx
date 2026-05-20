@@ -11,4 +11,6 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.alerts\)\.map/);
   assert.match(deviceStatusContentSource, /handleDiagnostic\(action\.action, action\.label\)/);
   assert.match(deviceStatusContentSource, /displayOpsSummary\.helper/);
+  assert.match(deviceStatusContentSource, /viewModel\.logsSummary\.statusTitle/);
+  assert.match(deviceStatusContentSource, /Recent Logs/);
 });

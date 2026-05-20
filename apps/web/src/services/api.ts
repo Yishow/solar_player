@@ -414,6 +414,11 @@ export type DeviceStatusResponseData = {
   pid: number;
 };
 
+export type DeviceLogExportMetadata = {
+  directory: string;
+  files: string[];
+};
+
 export async function getDeviceStatus() {
   const response = await requestJson<{
     data: DeviceStatusResponseData;
@@ -421,6 +426,17 @@ export async function getDeviceStatus() {
   }>("/api/device/status");
   if (!response.success) {
     throw new Error("載入裝置狀態失敗。");
+  }
+  return response.data;
+}
+
+export async function getDeviceLogExportMetadata() {
+  const response = await requestJson<{
+    data: DeviceLogExportMetadata;
+    success: boolean;
+  }>("/api/device/logs/export");
+  if (!response.success) {
+    throw new Error("載入裝置日誌失敗。");
   }
   return response.data;
 }
