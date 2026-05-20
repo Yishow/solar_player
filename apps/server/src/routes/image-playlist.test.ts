@@ -19,7 +19,7 @@ function enableImageInSlideshow(assetId: number) {
     .run(assetId);
 }
 
-test("GET /api/image-playlist bootstraps ordered playlist entries from image assets by default", async () => {
+test("GET /api/image-playlist resolves a playable runtime playlist without creating governance rows", async () => {
   const first = seedManagedImageAsset("playlist-cover.png");
   const second = seedManagedImageAsset("playlist-gallery.png");
   enableImageInSlideshow(first.assetId);
@@ -35,6 +35,9 @@ test("GET /api/image-playlist bootstraps ordered playlist entries from image ass
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       playlist: {
+        activeEntry: {
+          entryId: string;
+        } | null;
         entries: Array<{
           displayOrder: number;
           durationSeconds: number;
@@ -44,27 +47,42 @@ test("GET /api/image-playlist bootstraps ordered playlist entries from image ass
         hasPlaylistRows: boolean;
       };
     };
+    const playlistTableExists = Boolean(
+      getDatabase()
+        .prepare(
+          `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'image_playlist_entries'
+          `
+        )
+        .get()
+    );
 
+    assert.equal(body.playlist.activeEntry?.entryId, "IMG-01");
     assert.equal(body.playlist.entries.length, 2);
-    assert.equal(body.playlist.hasPlaylistRows, true);
+    assert.equal(body.playlist.hasPlaylistRows, false);
     assert.equal(body.playlist.entries[0]?.entryId, "IMG-01");
     assert.equal(body.playlist.entries[0]?.displayOrder, 1);
     assert.equal(body.playlist.entries[0]?.enabled, true);
     assert.equal(body.playlist.entries[0]?.durationSeconds, 10);
+    assert.equal(playlistTableExists, false);
   } finally {
     await app.close();
   }
 });
 
-test("GET /api/image-playlist?bootstrap=false does not create playlist rows on read", async () => {
-  seedManagedImageAsset("playlist-cover.png");
-  seedManagedImageAsset("playlist-gallery.png");
+test("GET /api/image-playlist keeps runtime reads side-effect free even when no governance rows exist", async () => {
+  const first = seedManagedImageAsset("playlist-cover.png");
+  const second = seedManagedImageAsset("playlist-gallery.png");
+  enableImageInSlideshow(first.assetId);
+  enableImageInSlideshow(second.assetId);
   const app = await buildApp();
 
   try {
     const response = await app.inject({
       method: "GET",
-      url: "/api/image-playlist?bootstrap=false"
+      url: "/api/image-playlist"
     });
 
     assert.equal(response.statusCode, 200);
@@ -88,8 +106,8 @@ test("GET /api/image-playlist?bootstrap=false does not create playlist rows on r
         .get()
     );
 
-    assert.equal(body.playlist.activeEntry, null);
-    assert.equal(body.playlist.entries.length, 0);
+    assert.notEqual(body.playlist.activeEntry, null);
+    assert.equal(body.playlist.entries.length, 2);
     assert.equal(body.playlist.hasPlaylistRows, false);
     assert.equal(playlistTableExists, false);
   } finally {
@@ -106,8 +124,8 @@ test("GET /api/image-playlist/governance keeps disabled rows visible for managem
 
   try {
     await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     const disableResponse = await app.inject({
@@ -292,8 +310,8 @@ test("playlist routes persist reordering, metadata, durations, and diagnosable f
 
   try {
     await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     const updateResponse = await app.inject({
@@ -340,7 +358,7 @@ test("playlist routes persist reordering, metadata, durations, and diagnosable f
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/image-playlist?activeIndex=0&bootstrap=true"
+      url: "/api/image-playlist?activeIndex=0"
     });
 
     assert.equal(response.statusCode, 200);
@@ -391,8 +409,8 @@ test("DELETE /api/images/:id removes disabled governance rows for the deleted as
 
   try {
     await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     const disableResponse = await app.inject({
@@ -436,7 +454,7 @@ test("DELETE /api/images/:id removes disabled governance rows for the deleted as
   }
 });
 
-test("GET /api/image-playlist?bootstrap=true assigns a fresh entry id after an older row was removed", async () => {
+test("POST /api/image-playlist/governance/bootstrap assigns a fresh entry id after an older row was removed", async () => {
   const first = seedManagedImageAsset("playlist-gap-first.png");
   const second = seedManagedImageAsset("playlist-gap-second.png");
   enableImageInSlideshow(first.assetId);
@@ -445,8 +463,8 @@ test("GET /api/image-playlist?bootstrap=true assigns a fresh entry id after an o
 
   try {
     const bootstrapResponse = await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
     assert.equal(bootstrapResponse.statusCode, 200);
 
@@ -456,8 +474,8 @@ test("GET /api/image-playlist?bootstrap=true assigns a fresh entry id after an o
     enableImageInSlideshow(third.assetId);
 
     const response = await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     assert.equal(response.statusCode, 200);

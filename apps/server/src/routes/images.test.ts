@@ -604,6 +604,13 @@ test("Full lifecycle: upload, update, list, reorder, delete", async () => {
     const updated = (updateResponse.json() as { data: ImageAsset }).data;
     assert.equal(updated.title, "Lifecycle Test Image");
 
+    const disableSlideshowResponse = await app.inject({
+      method: "PUT",
+      url: `/api/images/${images[0]?.id}`,
+      payload: { includedInSlideshow: false }
+    });
+    assert.equal(disableSlideshowResponse.statusCode, 200);
+
     // Reorder
     const reorderResponse = await app.inject({
       method: "PUT",

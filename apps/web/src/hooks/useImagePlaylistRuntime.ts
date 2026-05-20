@@ -15,9 +15,7 @@ export function useImagePlaylistRuntime(
   return useRuntimeRefreshLifecycle<Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"]>({
     enabled: options?.enabled ?? true,
     load: async () => {
-      const response = await fetchImagePlaylist(activeIndex, {
-        bootstrap: true
-      });
+      const response = await fetchImagePlaylist(activeIndex);
       return response.playlist;
     },
     refreshKey: spec.refreshKey,

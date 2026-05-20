@@ -57,10 +57,6 @@ type ReorderInput = Array<{
   entryId: string;
 }>;
 
-type ReadImagePlaylistOptions = {
-  bootstrapEntries?: boolean;
-};
-
 function ensurePlaylistTable() {
   getDatabase().exec(`
     CREATE TABLE IF NOT EXISTS image_playlist_entries (
@@ -237,26 +233,8 @@ function resolveAssets() {
   } satisfies ImagePlaylistAssetInput));
 }
 
-function resolveEntries(options?: ReadImagePlaylistOptions) {
-  if (options?.bootstrapEntries === false) {
-    return readPlaylistRows({ ensureTable: false }).map((row) => ({
-      area: row.area,
-      assetId: row.asset_id === null ? null : String(row.asset_id),
-      capturedAt: row.captured_at,
-      description: row.description,
-      displayOrder: row.display_order,
-      durationSeconds: row.duration_seconds,
-      enabled: row.enabled === 1,
-      entryId: row.entry_id,
-      fallbackMode: row.fallback_mode,
-      tags: parseTags(row.tags_json),
-      title: row.title
-    } satisfies ImagePlaylistEntryInput));
-  } else {
-    ensureBootstrappedEntries();
-  }
-
-  return readPlaylistRows().map((row) => ({
+function toEntryInput(row: PlaylistRow) {
+  return {
     area: row.area,
     assetId: row.asset_id === null ? null : String(row.asset_id),
     capturedAt: row.captured_at,
@@ -268,7 +246,65 @@ function resolveEntries(options?: ReadImagePlaylistOptions) {
     fallbackMode: row.fallback_mode,
     tags: parseTags(row.tags_json),
     title: row.title
-  } satisfies ImagePlaylistEntryInput));
+  } satisfies ImagePlaylistEntryInput;
+}
+
+function readPersistedPlaylistEntries() {
+  return readPlaylistRows({ ensureTable: false }).map(toEntryInput);
+}
+
+function createEphemeralEntryIdFactory(entries: ImagePlaylistEntryInput[]) {
+  const usedEntryIds = new Set(entries.map((entry) => entry.entryId));
+  let nextIndex = entries.reduce((max, entry) => {
+    const match = /^IMG-(\d+)$/.exec(entry.entryId);
+    const sequence = match?.[1];
+    if (!sequence) {
+      return max;
+    }
+
+    return Math.max(max, Number.parseInt(sequence, 10));
+  }, 0) + 1;
+
+  return () => {
+    let entryId = formatEntryId(nextIndex);
+    while (usedEntryIds.has(entryId)) {
+      nextIndex += 1;
+      entryId = formatEntryId(nextIndex);
+    }
+
+    usedEntryIds.add(entryId);
+    nextIndex += 1;
+    return entryId;
+  };
+}
+
+function resolveRuntimeEntries() {
+  const assets = readAssets();
+  const persistedEntries = readPersistedPlaylistEntries();
+  const representedAssetIds = new Set(
+    persistedEntries.flatMap((entry) => (entry.assetId === null ? [] : [entry.assetId]))
+  );
+  const nextEphemeralEntryId = createEphemeralEntryIdFactory(persistedEntries);
+  const fallbackEntries = assets
+    .filter((asset) => !representedAssetIds.has(String(asset.id)))
+    .map((asset, index) => ({
+      assetId: String(asset.id),
+      area: null,
+      capturedAt: null,
+      description: asset.description,
+      displayOrder: asset.display_order ?? index + 1,
+      durationSeconds: asset.display_duration ?? 10,
+      enabled: asset.included_in_slideshow === 1,
+      entryId: nextEphemeralEntryId(),
+      fallbackMode: "display-placeholder",
+      tags: [],
+      title: asset.title
+    } satisfies ImagePlaylistEntryInput));
+
+  return {
+    entries: [...persistedEntries, ...fallbackEntries],
+    hasPlaylistRows: persistedEntries.length > 0
+  };
 }
 
 function coverAssetSource() {
@@ -276,22 +312,19 @@ function coverAssetSource() {
   return row ? fileSource(row.filename) : null;
 }
 
-function buildResolvedImagePlaylist(
-  activeIndex = 0,
-  options?: ReadImagePlaylistOptions
-) {
-  const playlistRows = resolveEntries(options);
+function buildResolvedImagePlaylist(activeIndex = 0) {
+  const runtimeEntries = resolveRuntimeEntries();
   const entries = resolveImagePlaylistEntries({
     assets: resolveAssets(),
     coverAssetSource: coverAssetSource(),
-    entries: playlistRows
+    entries: runtimeEntries.entries
   });
 
   return {
     activeEntry: resolveActiveImagePlaylistEntry(entries, activeIndex),
     entries,
     generatedAt: new Date().toISOString(),
-    hasPlaylistRows: playlistRows.length > 0
+    hasPlaylistRows: runtimeEntries.hasPlaylistRows
   };
 }
 
@@ -299,12 +332,8 @@ export function readImagePlaylist(activeIndex = 0) {
   return buildResolvedImagePlaylist(activeIndex);
 }
 
-export function readImagePlaylistSnapshot(activeIndex = 0, options?: ReadImagePlaylistOptions) {
-  return buildResolvedImagePlaylist(activeIndex, options);
-}
-
-export function readImagePlaylistGovernanceSnapshot(options?: ReadImagePlaylistOptions) {
-  const entries = resolveEntries(options);
+export function readImagePlaylistGovernanceSnapshot() {
+  const entries = readPersistedPlaylistEntries();
   const resolvedEntries = resolveImagePlaylistEntries({
     assets: resolveAssets(),
     coverAssetSource: coverAssetSource(),
@@ -337,9 +366,7 @@ export function deleteImagePlaylistEntriesForAsset(assetId: number) {
 
 export function bootstrapImagePlaylistGovernance() {
   ensureBootstrappedEntries();
-  return readImagePlaylistGovernanceSnapshot({
-    bootstrapEntries: false
-  });
+  return readImagePlaylistGovernanceSnapshot();
 }
 
 export function updateImagePlaylistEntry(entryId: string, input: PlaylistUpdateInput) {

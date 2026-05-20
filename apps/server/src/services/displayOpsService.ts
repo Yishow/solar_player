@@ -241,12 +241,12 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
     });
   } else if (enabledPlaylistEntries.length === 0 && assetRow?.included_in_slideshow === 1) {
     stageReferences.push({
-      bindingId: null,
+      bindingId: `runtime-asset-${assetId}`,
       kind: "slideshow",
-      message: "此素材目前已納入 slideshow",
+      message: "此素材目前仍在 runtime playlist 內",
       pageId: null,
       stage: "live",
-      targetLabel: "slideshow"
+      targetLabel: "playlist-runtime"
     });
   }
 

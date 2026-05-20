@@ -3,7 +3,6 @@ import {
   bootstrapImagePlaylistGovernance,
   readImagePlaylist,
   readImagePlaylistGovernanceSnapshot,
-  readImagePlaylistSnapshot,
   reorderImagePlaylist,
   updateImagePlaylistEntry
 } from "../services/imagePlaylistService.js";
@@ -31,18 +30,12 @@ type ReorderBody = {
 };
 
 const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
-  app.get<{ Querystring: { activeIndex?: string; bootstrap?: string } }>("/api/image-playlist", async (request) => ({
-    playlist: request.query.bootstrap === "false"
-      ? readImagePlaylistSnapshot(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0, {
-          bootstrapEntries: false
-        })
-      : readImagePlaylist(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0)
+  app.get<{ Querystring: { activeIndex?: string } }>("/api/image-playlist", async (request) => ({
+    playlist: readImagePlaylist(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0)
   }));
 
   app.get("/api/image-playlist/governance", async () => ({
-    playlist: readImagePlaylistGovernanceSnapshot({
-      bootstrapEntries: false
-    })
+    playlist: readImagePlaylistGovernanceSnapshot()
   }));
 
   app.post("/api/image-playlist/governance/bootstrap", async () => {
