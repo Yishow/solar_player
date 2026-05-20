@@ -1,9 +1,15 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
+import { ManagementFixedLayoutFrame } from "../components/ManagementFixedLayoutFrame";
 
 export function ManagementShell() {
+  const location = useLocation();
+  const routeMeta = routeMetaMap.get(location.pathname);
+  const usesFixedLayoutFrame = routeMeta?.managementFrame === "fixed-fhd";
+
   return (
     <div
       data-shell-primitive="management-shell-viewport"
@@ -23,7 +29,13 @@ export function ManagementShell() {
             data-shell-primitive="management-scroll"
             className="h-full w-full overflow-y-auto overflow-x-hidden"
           >
-            <Outlet />
+            {usesFixedLayoutFrame ? (
+              <ManagementFixedLayoutFrame>
+                <Outlet />
+              </ManagementFixedLayoutFrame>
+            ) : (
+              <Outlet />
+            )}
           </div>
         </main>
         <AppFooterNav />

@@ -2,11 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "./AppFooterNav";
 import { AppHeader } from "./AppHeader";
 import { DisplayCanvas } from "./DisplayCanvas";
+import {
+  computeManagementFixedLayoutScale,
+  MANAGEMENT_FIXED_LAYOUT_HEIGHT,
+  MANAGEMENT_FIXED_LAYOUT_WIDTH
+} from "./ManagementFixedLayoutFrame";
 import { ManagementShell } from "../layouts/ManagementShell";
 import { PageScaffold } from "../pages/shared/PageScaffold";
 import { ActionCluster } from "./ActionCluster";
@@ -21,6 +26,16 @@ test("shell witness routes declare the shared density contract", () => {
   assert.equal(routeMetaMap.get("/display-pages/editor")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/settings/playback")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/device-status")?.shellDensity, "device-detail");
+  assert.equal(routeMetaMap.get("/trends")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/settings/playback")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/settings/images")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/settings/mqtt")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/settings/circuits")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/history")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/slideshow-preview")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/device-status")?.managementFrame, "fixed-fhd");
+  assert.equal(routeMetaMap.get("/brand")?.managementFrame, undefined);
+  assert.equal(routeMetaMap.get("/display-pages/editor")?.managementFrame, undefined);
 });
 
 test("display canvas host renders a fixed FHD surface with explicit shell primitives", () => {
@@ -148,7 +163,7 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.doesNotMatch(footerHtml, />離線</);
 });
 
-test("management shell uses dedicated full-viewport primitives instead of the playback canvas", () => {
+test("management shell keeps its own primitives while fixed-layout routes avoid the playback canvas contract", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -165,10 +180,91 @@ test("management shell uses dedicated full-viewport primitives instead of the pl
   assert.match(html, /data-shell-primitive="management-scroll"/);
   assert.match(html, /overflow-y-auto/);
   assert.match(html, /overflow-x-hidden/);
+  assert.match(html, /data-shell-primitive="management-fixed-layout-frame"/);
+  assert.match(html, /width:1920px/);
+  assert.match(html, /height:838px/);
   assert.doesNotMatch(html, /data-shell-primitive="display-canvas-viewport"/);
   assert.doesNotMatch(html, /data-shell-primitive="display-canvas-frame"/);
-  assert.doesNotMatch(html, /width:1920px/);
   assert.doesNotMatch(html, /height:1080px/);
+});
+
+test("management shell wraps fixed-layout management routes in a dedicated scaled frame", () => {
+  const fixedLayoutHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/settings/playback"]
+      },
+      React.createElement(
+        Routes,
+        null,
+        React.createElement(
+          Route,
+          {
+            element: React.createElement(ManagementShell),
+            path: "/"
+          },
+          React.createElement(Route, {
+            element: React.createElement("div", null, "fixed-layout-body"),
+            path: "settings/playback"
+          })
+        )
+      )
+    )
+  );
+
+  const fluidLayoutHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/brand"]
+      },
+      React.createElement(
+        Routes,
+        null,
+        React.createElement(
+          Route,
+          {
+            element: React.createElement(ManagementShell),
+            path: "/"
+          },
+          React.createElement(Route, {
+            element: React.createElement("div", null, "fluid-layout-body"),
+            path: "brand"
+          })
+        )
+      )
+    )
+  );
+
+  assert.match(fixedLayoutHtml, /data-shell-primitive="management-fixed-layout-frame"/);
+  assert.match(fixedLayoutHtml, /fixed-layout-body/);
+  assert.doesNotMatch(fluidLayoutHtml, /data-shell-primitive="management-fixed-layout-frame"/);
+  assert.match(fluidLayoutHtml, /fluid-layout-body/);
+});
+
+test("management fixed layout scale clamps to the available viewport without enlarging", () => {
+  assert.equal(
+    computeManagementFixedLayoutScale({
+      height: MANAGEMENT_FIXED_LAYOUT_HEIGHT,
+      width: MANAGEMENT_FIXED_LAYOUT_WIDTH
+    }),
+    1
+  );
+  assert.equal(
+    computeManagementFixedLayoutScale({
+      height: 600,
+      width: 1280
+    }),
+    Math.min(1280 / MANAGEMENT_FIXED_LAYOUT_WIDTH, 600 / MANAGEMENT_FIXED_LAYOUT_HEIGHT)
+  );
+  assert.equal(
+    computeManagementFixedLayoutScale({
+      height: 2000,
+      width: 4000
+    }),
+    1
+  );
 });
 
 test("shell primitives expose reusable section, action, media, and status wrappers", () => {

@@ -50,8 +50,27 @@ export function buildApiUrl(path: string) {
     return `http://localhost:3000${path}`;
   }
 
-  const apiPort = /^517\d*$/.test(window.location.port) ? "3000" : window.location.port || "3000";
-  return `${window.location.protocol}//${window.location.hostname}:${apiPort}${path}`;
+  return `${resolveBrowserApiOrigin(window.location)}${path}`;
+}
+
+function isLoopbackHostname(hostname: string) {
+  const normalizedHostname = hostname.toLowerCase();
+  return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1" || normalizedHostname === "::1";
+}
+
+export function resolveBrowserApiOrigin(locationLike: {
+  hostname: string;
+  port: string;
+  protocol: string;
+}) {
+  const isViteDevPort = /^517\d*$/.test(locationLike.port);
+
+  if (isViteDevPort && !isLoopbackHostname(locationLike.hostname)) {
+    return `${locationLike.protocol}//${locationLike.hostname}:${locationLike.port}`;
+  }
+
+  const apiPort = isViteDevPort ? "3000" : locationLike.port || "3000";
+  return `${locationLike.protocol}//${locationLike.hostname}:${apiPort}`;
 }
 
 function extractErrorMessage(rawBody: string) {

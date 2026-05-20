@@ -1,5 +1,6 @@
 import type { DisplaySyncEvent, PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
+import { resolveBrowserApiOrigin } from "./api";
 
 export type LiveMetricReading = {
   quality: string | null;
@@ -81,19 +82,28 @@ function setConnectionState(next: Partial<SocketConnectionState>) {
   notifyConnectionState();
 }
 
-function resolveSocketOrigin() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+export function resolveSocketOrigin(locationLike?: {
+  hostname: string;
+  port: string;
+  protocol: string;
+}) {
+  const configuredBaseUrl = (
+    import.meta as ImportMeta & {
+      env?: {
+        VITE_API_BASE_URL?: string;
+      };
+    }
+  ).env?.VITE_API_BASE_URL;
 
   if (configuredBaseUrl) {
     return new URL(configuredBaseUrl).origin;
   }
 
-  if (typeof window === "undefined") {
+  if (!locationLike && typeof window === "undefined") {
     return "http://localhost:3000";
   }
 
-  const apiPort = window.location.port === "5173" ? "3000" : window.location.port || "3000";
-  return `${window.location.protocol}//${window.location.hostname}:${apiPort}`;
+  return resolveBrowserApiOrigin(locationLike ?? window.location);
 }
 
 function attachHeartbeat(client: Socket<ServerToClientEvents, ClientToServerEvents>) {

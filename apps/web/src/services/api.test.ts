@@ -9,7 +9,7 @@ import {
   requestJson
 } from "./api";
 
-test("buildApiUrl maps any Vite dev port back to the backend port", () => {
+test("buildApiUrl maps loopback Vite dev ports back to the backend port", () => {
   const originalWindow = globalThis.window;
 
   Object.defineProperty(globalThis, "window", {
@@ -25,6 +25,30 @@ test("buildApiUrl maps any Vite dev port back to the backend port", () => {
 
   try {
     assert.equal(buildApiUrl("/api/images"), "http://localhost:3000/api/images");
+  } finally {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow
+    });
+  }
+});
+
+test("buildApiUrl keeps non-loopback Vite dev hosts on the current origin so proxy rules can forward API traffic", () => {
+  const originalWindow = globalThis.window;
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      location: {
+        hostname: "100.76.76.75",
+        port: "5173",
+        protocol: "http:"
+      }
+    }
+  });
+
+  try {
+    assert.equal(buildApiUrl("/api/images"), "http://100.76.76.75:5173/api/images");
   } finally {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
