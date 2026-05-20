@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import type { FastifyPluginAsync } from "fastify";
-import type { BrandProfile, DisplaySyncEvent } from "@solar-display/shared";
+import type { BrandProfile, DisplaySyncEvent, RuntimeBrandProfile } from "@solar-display/shared";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
 
@@ -67,6 +67,18 @@ function serializeRow(row: BrandProfileRow): BrandProfile {
     isActive: row.is_active === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function serializeRuntimeBrandProfile(row: BrandProfileRow): RuntimeBrandProfile {
+  return {
+    brandNameZh: row.brand_name_zh,
+    brandNameEn: row.brand_name_en,
+    productTitleZh: row.product_title_zh,
+    productTitleEn: row.product_title_en,
+    sloganZh: row.slogan_zh,
+    sloganEn: row.slogan_en,
+    logoUrl: row.logo_filename ? `/uploads/brand/${row.logo_filename}` : null
   };
 }
 
@@ -186,11 +198,17 @@ const brandRoute: FastifyPluginAsync = async (app) => {
   });
 
   // ---------- GET /api/brand/profiles ----------
-  app.get("/api/brand/profiles", async () => ({
-    success: true,
-    data: getAllProfiles().map(serializeRow),
-    timestamp: new Date().toISOString()
-  }));
+  app.get("/api/brand/profiles", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return {
+      success: true,
+      data: getAllProfiles().map(serializeRow),
+      timestamp: new Date().toISOString()
+    };
+  });
 
   // ---------- GET /api/brand/profiles/active ----------
   app.get("/api/brand/profiles/active", async (_request, reply) => {
@@ -206,7 +224,7 @@ const brandRoute: FastifyPluginAsync = async (app) => {
 
     return {
       success: true,
-      data: serializeRow(repairMissingLogoMetadata(row)),
+      data: serializeRuntimeBrandProfile(repairMissingLogoMetadata(row)),
       timestamp: new Date().toISOString()
     };
   });

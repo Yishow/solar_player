@@ -137,6 +137,82 @@ test("GET /api/brand/profiles returns the seeded active brand profile", async ()
   }
 });
 
+test("GET /api/brand/profiles denies untrusted remote readers while keeping the active runtime brand readable", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearBrandProfiles();
+
+  const app = await buildApp();
+
+  try {
+    const [profilesResponse, activeResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/brand/profiles",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/brand/profiles/active",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      })
+    ]);
+
+    assert.equal(profilesResponse.statusCode, 403);
+    assert.deepEqual(profilesResponse.json(), {
+      access: "denied",
+      code: "management_access_denied",
+      error: "Management access denied",
+      requiredRole: "management-trusted",
+      success: false,
+      timestamp: profilesResponse.json<{ timestamp: string }>().timestamp
+    });
+
+    assert.equal(activeResponse.statusCode, 200);
+    const activeBody = activeResponse.json() as { data: BrandProfile; success: boolean };
+    assert.equal(activeBody.success, true);
+    assert.equal(activeBody.data.brandNameZh, "國瑞汽車");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/brand/profiles/active returns only the playback runtime brand payload", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearBrandProfiles();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/brand/profiles/active"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { data: Record<string, unknown>; success: boolean };
+    assert.equal(body.success, true);
+    assert.deepEqual(Object.keys(body.data).sort(), [
+      "brandNameEn",
+      "brandNameZh",
+      "logoUrl",
+      "productTitleEn",
+      "productTitleZh",
+      "sloganEn",
+      "sloganZh"
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/brand/profiles clears stale logo metadata when the uploaded file is missing", async () => {
   migrateDatabase();
   seedDatabase();
@@ -258,6 +334,66 @@ test("POST /api/brand/profiles/:id/activate switches the active profile", async 
     const active = listBody.data.find((profile) => profile.isActive);
     assert.equal(active?.id, Number(created.lastInsertRowid));
   } finally {
+    await app.close();
+  }
+});
+
+test("active brand mutations emit brand-scoped display sync invalidations", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearBrandProfiles();
+
+  const db = getDatabase();
+  const activeId = (db.prepare("SELECT id FROM brand_profiles WHERE is_active = 1").get() as { id: number }).id;
+  const app = await buildApp();
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  const emitted: Array<{ generatedAt: string; reason: string; scope: string }> = [];
+
+  app.socketService.emitDisplaySync = (payload) => {
+    emitted.push(payload as { generatedAt: string; reason: string; scope: string });
+    originalEmitDisplaySync(payload);
+  };
+
+  try {
+    const pngBuffer = createMinimalPng();
+    const { payload, contentType } = buildMultipartBody("brand.png", "image/png", pngBuffer, {
+      width: "512",
+      height: "512"
+    });
+
+    const updateResponse = await app.inject({
+      method: "PUT",
+      url: `/api/brand/profiles/${activeId}`,
+      payload: {
+        sloganZh: "新的標語"
+      }
+    });
+
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: `/api/brand/profiles/${activeId}/logo`,
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/brand/profiles/${activeId}/logo`
+    });
+
+    assert.equal(updateResponse.statusCode, 200);
+    assert.equal(uploadResponse.statusCode, 200);
+    assert.equal(deleteResponse.statusCode, 200);
+    assert.deepEqual(
+      emitted.map((event) => ({ reason: event.reason, scope: event.scope })),
+      [
+        { reason: "brand-profile-updated", scope: "brand" },
+        { reason: "brand-logo-updated", scope: "brand" },
+        { reason: "brand-logo-removed", scope: "brand" }
+      ]
+    );
+  } finally {
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
     await app.close();
   }
 });
