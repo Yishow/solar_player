@@ -80,6 +80,38 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       `
     )
     .run("factoryProductionPower", 790, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":790}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("factoryLightingPower", 120, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":120}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("factoryOfficePower", 90, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":90}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("factoryEvGreenPower", 45, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":45}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("factoryInfrastructurePower", 35, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":35}');
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("selfConsumptionRatio");
   database
     .prepare(
@@ -98,6 +130,15 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       factoryCircuit: {
+        kpis: Array<{
+          bindingState: string;
+          dependencyKeys: string[];
+          fallbackReason: string | null;
+          metricKey: string;
+          provenance: string;
+          sourceClass: string;
+          value: string;
+        }>;
         slots: Array<{
           bindingState: string;
           fallbackReason: string | null;
@@ -168,6 +209,26 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       ),
       true
     );
+    const totalPowerKpi = body.factoryCircuit.kpis.find(
+      (metric) => metric.metricKey === "totalPower"
+    );
+    assert.ok(totalPowerKpi);
+    assert.equal(totalPowerKpi.bindingState, "missing");
+    assert.equal(totalPowerKpi.fallbackReason, "missing-slot-binding");
+    assert.equal(totalPowerKpi.provenance, "fallback");
+    assert.equal(totalPowerKpi.sourceClass, "slot-aggregate");
+    assert.equal(totalPowerKpi.value, "--");
+    assert.equal(totalPowerKpi.dependencyKeys.includes("hvac"), true);
+
+    const selfConsumptionKpi = body.factoryCircuit.kpis.find(
+      (metric) => metric.metricKey === "selfConsumption"
+    );
+    assert.ok(selfConsumptionKpi);
+    assert.equal(selfConsumptionKpi.bindingState, "bound");
+    assert.equal(selfConsumptionKpi.fallbackReason, null);
+    assert.equal(selfConsumptionKpi.provenance, "live");
+    assert.equal(selfConsumptionKpi.sourceClass, "mqtt-live");
+    assert.equal(selfConsumptionKpi.value, "30.0");
   } finally {
     await app.close();
   }

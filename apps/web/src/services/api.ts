@@ -12,6 +12,7 @@ import type {
   DisplayPageConfigEnvelope,
   DisplayPageId,
   DisplayReadinessReport,
+  FactoryCircuitStoryPayload,
   ImageAsset,
   MonitoringAlertTone,
   MonitoringBindingState,
@@ -23,6 +24,8 @@ import type {
   PlaybackSettings,
   ImagePlaylistEntryInput,
   ResolvedImagePlaylistEntry,
+  SolarComparisonState,
+  SolarFlowStoryState,
   SustainabilityPeriodKey,
   SustainabilityStoryInput,
   ValidationResult
@@ -231,24 +234,7 @@ export async function getDisplayReadiness() {
 }
 
 export type DisplayStoryPayload = {
-  factoryCircuit: {
-    slots: Array<{
-      slotKey: string;
-      label: string;
-      bindingState: string;
-      fallbackReason: string | null;
-      freshnessState: string;
-      alertTone: string;
-      livePowerKw: number | null;
-      circuitId: number | null;
-    }>;
-    summary: {
-      alertTone: string;
-      bindingState: string;
-      fallbackReason: string | null;
-      freshnessState: string;
-    };
-  };
+  factoryCircuit: FactoryCircuitStoryPayload;
   generatedAt: string;
   overview: {
     metrics: Array<ResolvedMonitoringMetricBinding<string>>;
@@ -261,19 +247,10 @@ export type DisplayStoryPayload = {
   };
   solar: {
     kpis: Array<ResolvedMonitoringMetricBinding<string> & {
-      comparison: {
-        state: "unavailable" | "below-target" | "above-target" | "at-target";
-        delta: string | null;
-        fallbackReason: string | null;
-        label: string;
-      };
+      comparison: SolarComparisonState;
     }>;
     story: {
-      flowState: {
-        state: "healthy" | "degraded" | "offline";
-        reason: string | null;
-        label: string;
-      };
+      flowState: SolarFlowStoryState;
     };
   };
 };

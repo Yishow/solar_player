@@ -65,9 +65,9 @@ type BuildSolarViewModelArgs = {
     }>;
     story: {
       flowState: {
+        label?: string;
         state: string;
         reason: string | null;
-        label: string;
       };
     };
   };

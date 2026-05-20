@@ -1,10 +1,13 @@
 import type {
   DisplayCircuitSlotKey,
+  FactoryCircuitKpiKey,
+  FactoryCircuitStoryPayload,
   MonitoringMetricBinding,
   MonitoringStoryState,
   SolarComparisonTarget
 } from "@solar-display/shared";
 import {
+  formatMonitoringValue,
   resolveMonitoringMetricBinding,
   resolveMonitoringSlotBinding,
   resolveMonitoringSummaryState,
@@ -182,34 +185,37 @@ function readCircuits() {
 
 function resolveCircuitState(args: {
   attentionMin: number | null;
-  hasReading: boolean;
   value: number | null;
   warningMin: number | null;
 }) {
-  if (!args.hasReading || args.value === null || args.value <= 0) {
+  if (args.value === null || args.value <= 0) {
     return {
       alertTone: "warning" as const,
-      fallbackReason: "missing-live-power" as const
+      fallbackReason: "missing-live-power" as const,
+      freshnessState: "fallback" as const
     };
   }
 
   if (args.warningMin !== null && args.value >= args.warningMin) {
     return {
       alertTone: "danger" as const,
-      fallbackReason: "warning-threshold-exceeded" as const
+      fallbackReason: "warning-threshold-exceeded" as const,
+      freshnessState: "fresh" as const
     };
   }
 
   if (args.attentionMin !== null && args.value >= args.attentionMin) {
     return {
       alertTone: "warning" as const,
-      fallbackReason: "attention-threshold-exceeded" as const
+      fallbackReason: "attention-threshold-exceeded" as const,
+      freshnessState: "fresh" as const
     };
   }
 
   return {
     alertTone: "normal" as const,
-    fallbackReason: null
+    fallbackReason: null,
+    freshnessState: "fresh" as const
   };
 }
 
@@ -277,6 +283,286 @@ function resolveSolarKpiBinding(args: {
   });
 }
 
+function resolveFactoryMetricBinding(args: {
+  dependencyKeys: string[];
+  isConnected: boolean;
+  label: string;
+  metricKey: string;
+  now?: string;
+  reading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null;
+  unit: string;
+}) {
+  return resolveMonitoringMetricBinding({
+    binding: {
+      dependencyKeys: args.dependencyKeys,
+      fallbackIndex: 0,
+      fallbackValue: "--",
+      label: args.label,
+      metricKey: args.metricKey,
+      unit: args.unit
+    },
+    isConnected: args.isConnected,
+    now: args.now,
+    reading: args.reading
+  });
+}
+
+function buildFactoryFallbackKpi(args: {
+  bindingState: MonitoringStoryState["bindingState"];
+  dependencyKeys: string[];
+  fallbackReason: MonitoringStoryState["fallbackReason"];
+  fallbackStrategy: "derive-from-dependencies" | "placeholder";
+  freshnessState: MonitoringStoryState["freshnessState"];
+  helper: string;
+  label: string;
+  metricKey: FactoryCircuitKpiKey;
+  sourceClass: "derived-metric" | "mqtt-live" | "slot-aggregate";
+  unit: string;
+  value?: string;
+}) {
+  return {
+    alertTone: "warning" as const,
+    bindingState: args.bindingState,
+    dependencyKeys: args.dependencyKeys,
+    fallbackReason: args.fallbackReason,
+    fallbackStrategy: args.fallbackStrategy,
+    freshnessState: args.freshnessState,
+    helper: args.helper,
+    label: args.label,
+    metricKey: args.metricKey,
+    provenance: "fallback" as const,
+    sourceClass: args.sourceClass,
+    unit: args.unit,
+    value: args.value ?? "--"
+  };
+}
+
+function buildFactoryResolvedKpi(args: {
+  dependencyKeys: string[];
+  fallbackStrategy: "derive-from-dependencies" | "placeholder";
+  helper: string;
+  label: string;
+  metricKey: FactoryCircuitKpiKey;
+  provenance: "aggregate" | "derived" | "live";
+  sourceClass: "derived-metric" | "mqtt-live" | "slot-aggregate";
+  unit: string;
+  value: number | string;
+}) {
+  return {
+    alertTone: "normal" as const,
+    bindingState: "bound" as const,
+    dependencyKeys: args.dependencyKeys,
+    fallbackReason: null,
+    fallbackStrategy: args.fallbackStrategy,
+    freshnessState: "fresh" as const,
+    helper: args.helper,
+    label: args.label,
+    metricKey: args.metricKey,
+    provenance: args.provenance,
+    sourceClass: args.sourceClass,
+    unit: args.unit,
+    value: typeof args.value === "number" ? formatMonitoringValue(args.value, args.unit) : args.value
+  };
+}
+
+function resolveFactoryDegradedHelper(slot: FactoryCircuitStoryPayload["slots"][number] | undefined) {
+  if (!slot) {
+    return "等待完整迴路聚合";
+  }
+
+  if (slot.bindingState !== "bound") {
+    return `缺少 ${slot.label} 迴路綁定`;
+  }
+
+  if (slot.fallbackReason === "stale-data") {
+    return `${slot.label} 即時功率已延遲`;
+  }
+
+  if (slot.fallbackReason === "socket-disconnected") {
+    return "Socket 未連線，等待迴路資料恢復";
+  }
+
+  return `${slot.label} 尚未回報即時功率`;
+}
+
+function resolveFactoryCircuitKpis(args: {
+  isConnected: boolean;
+  slots: FactoryCircuitStoryPayload["slots"];
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
+  summary: FactoryCircuitStoryPayload["summary"];
+}) {
+  const aggregateDependencyKeys = [...slotOrder];
+  const aggregateFailure = args.slots.find(
+    (slot) =>
+      slot.bindingState !== "bound" ||
+      slot.freshnessState !== "fresh" ||
+      slot.livePowerKw === null
+  );
+  const totalPowerValue = aggregateFailure
+    ? null
+    : args.slots.reduce((sum, slot) => sum + (slot.livePowerKw ?? 0), 0);
+  const aggregateHelper = resolveFactoryDegradedHelper(aggregateFailure);
+
+  const totalPower = totalPowerValue === null
+    ? buildFactoryFallbackKpi({
+        bindingState: aggregateFailure?.bindingState ?? args.summary.bindingState,
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackReason: aggregateFailure?.fallbackReason ?? args.summary.fallbackReason,
+        fallbackStrategy: "placeholder",
+        freshnessState: aggregateFailure?.freshnessState ?? args.summary.freshnessState,
+        helper: aggregateHelper,
+        label: "目前廠區總用電",
+        metricKey: "totalPower",
+        sourceClass: "slot-aggregate",
+        unit: "kW"
+      })
+    : buildFactoryResolvedKpi({
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackStrategy: "placeholder",
+        helper: `${args.slots.length} 個迴路來源`,
+        label: "目前廠區總用電",
+        metricKey: "totalPower",
+        provenance: "aggregate",
+        sourceClass: "slot-aggregate",
+        unit: "kW",
+        value: totalPowerValue
+      });
+
+  const solarPower = resolveFactoryMetricBinding({
+    dependencyKeys: ["realTimePower"],
+    isConnected: args.isConnected,
+    label: "太陽能供應占比",
+    metricKey: "realTimePower",
+    now: args.snapshot.timestamp ?? undefined,
+    reading: args.snapshot.metrics.realTimePower ?? null,
+    unit: "kW"
+  });
+  const solarShare = totalPowerValue === null
+    ? buildFactoryFallbackKpi({
+        bindingState: totalPower.bindingState,
+        dependencyKeys: ["realTimePower", ...aggregateDependencyKeys],
+        fallbackReason: totalPower.fallbackReason,
+        fallbackStrategy: "derive-from-dependencies",
+        freshnessState: totalPower.freshnessState,
+        helper: aggregateHelper,
+        label: "太陽能供應占比",
+        metricKey: "solarShare",
+        sourceClass: "derived-metric",
+        unit: "%"
+      })
+    : solarPower.bindingState !== "bound" || solarPower.freshnessState !== "fresh"
+      ? buildFactoryFallbackKpi({
+          bindingState: solarPower.bindingState,
+          dependencyKeys: ["realTimePower", ...aggregateDependencyKeys],
+          fallbackReason: solarPower.fallbackReason,
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: solarPower.freshnessState,
+          helper: solarPower.helper,
+          label: "太陽能供應占比",
+          metricKey: "solarShare",
+          sourceClass: "derived-metric",
+          unit: "%"
+        })
+      : buildFactoryResolvedKpi({
+          dependencyKeys: ["realTimePower", ...aggregateDependencyKeys],
+          fallbackStrategy: "derive-from-dependencies",
+          helper: "Solar Supply Share",
+          label: "太陽能供應占比",
+          metricKey: "solarShare",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          unit: "%",
+          value: (args.snapshot.metrics.realTimePower!.value / totalPowerValue) * 100
+        });
+
+  const selfConsumption = resolveFactoryMetricBinding({
+    dependencyKeys: ["selfConsumptionEnergy"],
+    isConnected: args.isConnected,
+    label: "今日自發自用電量",
+    metricKey: "selfConsumptionEnergy",
+    now: args.snapshot.timestamp ?? undefined,
+    reading: args.snapshot.metrics.selfConsumptionEnergy ?? null,
+    unit: "kWh"
+  });
+  const selfConsumptionKpi = selfConsumption.bindingState !== "bound" || selfConsumption.freshnessState !== "fresh"
+    ? buildFactoryFallbackKpi({
+        bindingState: selfConsumption.bindingState,
+        dependencyKeys: ["selfConsumptionEnergy"],
+        fallbackReason: selfConsumption.fallbackReason,
+        fallbackStrategy: "placeholder",
+        freshnessState: selfConsumption.freshnessState,
+        helper: selfConsumption.helper,
+        label: "今日自發自用電量",
+        metricKey: "selfConsumption",
+        sourceClass: "mqtt-live",
+        unit: "kWh"
+      })
+    : buildFactoryResolvedKpi({
+        dependencyKeys: ["selfConsumptionEnergy"],
+        fallbackStrategy: "placeholder",
+        helper: selfConsumption.helper,
+        label: "今日自發自用電量",
+        metricKey: "selfConsumption",
+        provenance: "live",
+        sourceClass: "mqtt-live",
+        unit: selfConsumption.unit,
+        value: selfConsumption.value
+      });
+
+  const peak = totalPowerValue === null
+    ? buildFactoryFallbackKpi({
+        bindingState: totalPower.bindingState,
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackReason: totalPower.fallbackReason,
+        fallbackStrategy: "derive-from-dependencies",
+        freshnessState: totalPower.freshnessState,
+        helper: aggregateHelper,
+        label: "尖峰負載",
+        metricKey: "peak",
+        sourceClass: "derived-metric",
+        unit: "kW"
+      })
+    : buildFactoryResolvedKpi({
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackStrategy: "derive-from-dependencies",
+        helper: "依目前總負載推估",
+        label: "尖峰負載",
+        metricKey: "peak",
+        provenance: "derived",
+        sourceClass: "derived-metric",
+        unit: "kW",
+        value: totalPowerValue * 1.45
+      });
+
+  const flow = totalPowerValue === null
+    ? buildFactoryFallbackKpi({
+        bindingState: totalPower.bindingState,
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackReason: totalPower.fallbackReason,
+        fallbackStrategy: "placeholder",
+        freshnessState: totalPower.freshnessState,
+        helper: aggregateHelper,
+        label: "目前綠電流向",
+        metricKey: "flow",
+        sourceClass: "derived-metric",
+        unit: "Fallback",
+        value: "待命"
+      })
+    : buildFactoryResolvedKpi({
+        dependencyKeys: aggregateDependencyKeys,
+        fallbackStrategy: "placeholder",
+        helper: "Green Energy Routing",
+        label: "目前綠電流向",
+        metricKey: "flow",
+        provenance: "derived",
+        sourceClass: "derived-metric",
+        unit: "Normal",
+        value: "供應中"
+      });
+
+  return [totalPower, solarShare, selfConsumptionKpi, peak, flow];
+}
+
 export function readDisplayStory() {
   const snapshot = readLiveMetricsSnapshot();
   const isConnected = snapshot.timestamp !== null;
@@ -308,12 +594,6 @@ export function readDisplayStory() {
     const circuit = matches.length === 1 ? matches[0]! : null;
     const metricKey = slotMetricMap[slotKey];
     const reading = metricKey ? snapshot.metrics[metricKey] ?? null : null;
-    const circuitState = resolveCircuitState({
-      attentionMin: circuit?.attention_min ?? null,
-      hasReading: isConnected,
-      value: reading?.value ?? null,
-      warningMin: circuit?.warning_min ?? null
-    });
     const state =
       binding.bindingState !== "bound"
         ? ({
@@ -322,12 +602,38 @@ export function readDisplayStory() {
             fallbackReason: binding.fallbackReason as MonitoringStoryState["fallbackReason"],
             freshnessState: binding.freshnessState as MonitoringStoryState["freshnessState"]
           } satisfies MonitoringStoryState)
-        : ({
-            alertTone: circuitState.alertTone,
-            bindingState: "bound",
-            fallbackReason: circuitState.fallbackReason,
-            freshnessState: "fresh"
-          } satisfies MonitoringStoryState);
+        : (() => {
+            const readingState = resolveFactoryMetricBinding({
+              dependencyKeys: [metricKey],
+              isConnected,
+              label: circuit?.name_zh ?? circuit?.name_en ?? slotKey,
+              metricKey,
+              now: snapshot.timestamp ?? undefined,
+              reading,
+              unit: "kW"
+            });
+
+            if (readingState.bindingState !== "bound" || readingState.freshnessState !== "fresh") {
+              return {
+                alertTone: readingState.alertTone,
+                bindingState: "bound",
+                fallbackReason: readingState.fallbackReason,
+                freshnessState: readingState.freshnessState
+              } satisfies MonitoringStoryState;
+            }
+
+            const circuitState = resolveCircuitState({
+              attentionMin: circuit?.attention_min ?? null,
+              value: reading?.value ?? null,
+              warningMin: circuit?.warning_min ?? null
+            });
+            return {
+              alertTone: circuitState.alertTone,
+              bindingState: "bound",
+              fallbackReason: circuitState.fallbackReason,
+              freshnessState: circuitState.freshnessState
+            } satisfies MonitoringStoryState;
+          })();
 
     slotStates.push(state);
 
@@ -335,15 +641,27 @@ export function readDisplayStory() {
       ...state,
       circuitId: circuit?.id ?? null,
       label: circuit?.name_zh ?? circuit?.name_en ?? slotKey,
-      livePowerKw: reading?.value ?? null,
+      livePowerKw:
+        state.bindingState === "bound" &&
+        state.freshnessState === "fresh" &&
+        state.fallbackReason !== "missing-live-power"
+          ? reading?.value ?? null
+          : null,
       slotKey
     };
   });
+  const factorySummary = resolveMonitoringSummaryState(slotStates);
 
   return {
     factoryCircuit: {
+      kpis: resolveFactoryCircuitKpis({
+        isConnected,
+        slots: factorySlots,
+        snapshot,
+        summary: factorySummary
+      }),
       slots: factorySlots,
-      summary: resolveMonitoringSummaryState(slotStates)
+      summary: factorySummary
     },
     generatedAt: new Date().toISOString(),
     overview: {

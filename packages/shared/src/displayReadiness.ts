@@ -74,6 +74,12 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "systemEfficiency", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryProductionPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryHvacPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryLightingPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryOfficePower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryEvGreenPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryInfrastructurePower", sourceType: "mqtt-metric" },
   { pageId: "sustainability", requirementKey: "consumptionEnergy", sourceType: "mqtt-metric" },
   {
     pageId: "sustainability",

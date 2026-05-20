@@ -88,8 +88,8 @@ test("buildFactoryCircuitRuntimes orders enabled circuits into prototype slot or
   assert.equal(runtimes.length, 2);
   assert.equal(runtimes[0]?.nameZh, "生產線用電");
   assert.equal(runtimes[1]?.nameZh, "空調與環境設備");
-  assert.equal(runtimes[0]?.livePowerKw, 576);
-  assert.equal(runtimes[1]?.livePowerKw, 256);
+  assert.equal(runtimes[0]?.livePowerKw, null);
+  assert.equal(runtimes[1]?.livePowerKw, null);
 });
 
 test("buildFactoryCircuitViewModel centralizes threshold mapping by power and keeps six load rows", () => {
@@ -115,10 +115,11 @@ test("buildFactoryCircuitViewModel centralizes threshold mapping by power and ke
   assert.equal(model.loadRows[1]?.statusTone, "warning");
   assert.equal(model.flowNodes[2]?.iconKey, "switchboard");
   assert.equal(model.loadRows[2]?.isEmpty, true);
-  assert.equal(model.kpis[0]?.value, "1,230");
+  assert.equal(model.kpis[0]?.value, "--");
+  assert.equal(model.kpis[0]?.provenance, "fallback");
   assert.equal(model.kpis[0]?.iconKey, "bolt");
-  assert.equal(model.kpis[1]?.value, "33");
-  assert.equal(model.kpis[4]?.value, "供應中");
+  assert.equal(model.kpis[1]?.value, "--");
+  assert.equal(model.kpis[4]?.value, "待命");
 });
 
 test("buildFactoryCircuitViewModel keeps the full prototype structure for empty data", () => {
@@ -136,7 +137,8 @@ test("buildFactoryCircuitViewModel keeps the full prototype structure for empty 
   assert.equal(model.loadRows.length, 6);
   assert.equal(model.loadRows.every((row) => row.isEmpty), true);
   assert.equal(model.loadRows[0]?.statusLabel, "未接入");
-  assert.equal(model.kpis[0]?.value, "1,280");
+  assert.equal(model.kpis[0]?.value, "--");
+  assert.equal(model.kpis[0]?.provenance, "fallback");
   assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
 });
 
@@ -181,7 +183,7 @@ test("buildFactoryCircuitViewModel exposes deterministic alert reasons and missi
 
   assert.equal(model.loadRows[0]?.alertReason, "warning-threshold-exceeded");
   assert.equal(model.loadRows[1]?.alertReason, "missing-live-power");
-  assert.equal(model.loadRows[1]?.statusLabel, "離線");
+  assert.equal(model.loadRows[1]?.statusLabel, "待資料");
 });
 
 test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available", () => {
@@ -191,6 +193,83 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
     loadState: "ready",
     snapshot,
     factoryCircuitStory: {
+      kpis: [
+        {
+          alertTone: "warning",
+          bindingState: "missing",
+          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          fallbackReason: "missing-slot-binding",
+          fallbackStrategy: "placeholder",
+          freshnessState: "fallback",
+          helper: "缺少空調迴路綁定",
+          label: "目前廠區總用電",
+          metricKey: "totalPower",
+          provenance: "fallback",
+          sourceClass: "slot-aggregate",
+          unit: "kW",
+          value: "--"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "missing",
+          dependencyKeys: ["realTimePower", "production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          fallbackReason: "missing-slot-binding",
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: "fallback",
+          helper: "等待完整迴路聚合",
+          label: "太陽能供應占比",
+          metricKey: "solarShare",
+          provenance: "fallback",
+          sourceClass: "derived-metric",
+          unit: "%",
+          value: "--"
+        },
+        {
+          alertTone: "normal",
+          bindingState: "bound",
+          dependencyKeys: ["selfConsumptionEnergy"],
+          fallbackReason: null,
+          fallbackStrategy: "placeholder",
+          freshnessState: "fresh",
+          helper: "最後更新 2026-05-13T10:00:00.000Z",
+          label: "今日自發自用電量",
+          metricKey: "selfConsumption",
+          provenance: "live",
+          sourceClass: "mqtt-live",
+          unit: "kWh",
+          value: "2,430"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "missing",
+          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          fallbackReason: "missing-slot-binding",
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: "fallback",
+          helper: "等待完整迴路聚合",
+          label: "尖峰負載",
+          metricKey: "peak",
+          provenance: "fallback",
+          sourceClass: "derived-metric",
+          unit: "kW",
+          value: "--"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "missing",
+          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          fallbackReason: "missing-slot-binding",
+          fallbackStrategy: "placeholder",
+          freshnessState: "fallback",
+          helper: "等待完整迴路聚合",
+          label: "目前綠電流向",
+          metricKey: "flow",
+          provenance: "fallback",
+          sourceClass: "derived-metric",
+          unit: "Fallback",
+          value: "待命"
+        }
+      ],
       slots: [
         { slotKey: "production", label: "故事版生產線", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 },
         { slotKey: "hvac", label: "故事版空調", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "warning", livePowerKw: 310, circuitId: 2 },
@@ -209,6 +288,12 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
   assert.equal(model.loadRows[0]?.statusLabel, "正常");
   assert.equal(model.loadRows[2]?.isEmpty, true);
   assert.equal(model.loadRows[2]?.statusLabel, "未綁定");
+  assert.equal(model.loadRows[2]?.livePowerKw, null);
+  assert.equal(model.kpis[0]?.value, "--");
+  assert.equal(model.kpis[0]?.provenance, "fallback");
+  assert.equal(model.kpis[0]?.sourceClass, "slot-aggregate");
+  assert.equal(model.kpis[2]?.value, "2,430");
+  assert.equal(model.kpis[2]?.provenance, "live");
   assert.equal(model.summary.statusLabel, "迴路資料已同步");
 });
 
@@ -220,6 +305,7 @@ test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitSto
     loadState: "ready",
     snapshot,
     factoryCircuitStory: {
+      kpis: [],
       slots: [
         { slotKey: "production", label: "單一", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 }
       ],
@@ -228,5 +314,5 @@ test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitSto
   });
 
   assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
-  assert.equal(model.summary.statusLabel, "迴路資料已同步");
+  assert.equal(model.summary.statusLabel, "部分迴路尚未回報即時功率");
 });

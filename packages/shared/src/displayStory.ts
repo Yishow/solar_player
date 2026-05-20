@@ -20,6 +20,7 @@ export type MonitoringFallbackReason =
   | "stale-data"
   | "warning-threshold-exceeded";
 export type MonitoringMetricProvenance =
+  | "aggregate"
   | "cumulative"
   | "derived"
   | "fallback"
@@ -27,7 +28,8 @@ export type MonitoringMetricProvenance =
 export type MonitoringMetricSourceClass =
   | "cumulative-counter"
   | "derived-metric"
-  | "mqtt-live";
+  | "mqtt-live"
+  | "slot-aggregate";
 
 export type MonitoringStoryState = {
   alertTone: MonitoringAlertTone;
@@ -70,6 +72,26 @@ export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> 
   };
 
 export type MonitoringSummaryState = MonitoringStoryState;
+
+export type FactoryCircuitKpiKey =
+  | "flow"
+  | "peak"
+  | "selfConsumption"
+  | "solarShare"
+  | "totalPower";
+
+export type FactoryCircuitStorySlot = MonitoringStoryState & {
+  circuitId: number | null;
+  label: string;
+  livePowerKw: number | null;
+  slotKey: DisplayCircuitSlotKey;
+};
+
+export type FactoryCircuitStoryPayload = {
+  kpis: Array<ResolvedMonitoringMetricBinding<FactoryCircuitKpiKey>>;
+  slots: FactoryCircuitStorySlot[];
+  summary: MonitoringSummaryState;
+};
 
 export type SolarComparisonTarget = {
   label: string;
@@ -200,7 +222,12 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
     helper: `最後更新 ${args.reading.timestamp}`,
     label: args.binding.label,
     metricKey: args.binding.metricKey,
-    provenance: sourceClass === "cumulative-counter" ? "cumulative" : "live",
+    provenance:
+      sourceClass === "cumulative-counter"
+        ? "cumulative"
+        : sourceClass === "slot-aggregate"
+          ? "aggregate"
+          : "live",
     sourceClass,
     unit: args.reading.unit ?? args.binding.unit,
     value: formatMonitoringValue(args.reading.value, args.reading.unit ?? args.binding.unit)

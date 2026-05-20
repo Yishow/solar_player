@@ -79,6 +79,15 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
+          finding.requirementKey === "factoryProductionPower" &&
+          finding.sourceType === "mqtt-metric"
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "factory-circuit" &&
           finding.requirementKey === "production" &&
           finding.sourceType === "circuit-slot" &&
           finding.status === "blocking" &&
@@ -128,6 +137,49 @@ test("GET /api/display-readiness keeps solar self-consumption ready through deri
           /derived from/i.test(finding.reason) &&
           /self_consumption/i.test(finding.reason) &&
           /consumption/i.test(finding.reason)
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-readiness reports factory metric mapping gaps alongside slot bindings", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryProductionPower");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          reason: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "factory-circuit" &&
+          finding.requirementKey === "factoryProductionPower" &&
+          finding.sourceType === "mqtt-metric" &&
+          finding.status === "blocking" &&
+          finding.blocking &&
+          /missing mqtt mapping/i.test(finding.reason)
       ),
       true
     );
