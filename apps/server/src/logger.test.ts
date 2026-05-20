@@ -25,3 +25,7 @@ test("createLoggerOptions uses pino-pretty outside production", () => {
 test("createLoggerOptions keeps JSON logger in production", () => {
   assert.equal(createLoggerOptions("production"), true);
 });
+
+test("createLoggerOptions disables threaded pretty logging in tests", () => {
+  assert.equal(createLoggerOptions("test"), false);
+});

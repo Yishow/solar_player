@@ -11,7 +11,7 @@ import {
 } from "./viewModel";
 
 type MetricsHistoryResponse = {
-  range: "day" | "week" | "month" | "total";
+  range: "day" | "week" | "month" | "year" | "total";
   snapshots: EnergyHistorySnapshot[];
 };
 
@@ -22,13 +22,6 @@ type DailySummaryResponse = {
 type CumulativeResponse = {
   counters: CumulativeCounter[];
 };
-
-function filterSummariesByRange(range: EnergyHistoryRange, summaries: DailyEnergySummary[]) {
-  if (range === "day") return summaries.slice(0, 1);
-  if (range === "week") return summaries.slice(0, 7);
-  if (range === "month") return summaries.slice(0, 30);
-  return summaries;
-}
 
 const METRIC_ICON_GLYPHS: Record<number, string> = {
   0: "☀",
@@ -116,13 +109,12 @@ export function EnergyHistory() {
 
   useEffect(() => {
     let active = true;
-    const queryRange = range === "year" ? "total" : range;
     const loadHistory = async () => {
       setIsLoading(true);
       try {
         const [historyResponse, summaryResponse, cumulativeResponse] = await Promise.all([
-          requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${queryRange}`),
-          requestJson<DailySummaryResponse>("/api/metrics/daily-summary"),
+          requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
+          requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
           requestJson<CumulativeResponse>("/api/metrics/cumulative")
         ]);
         if (!active) return;
@@ -149,7 +141,7 @@ export function EnergyHistory() {
         counters,
         range,
         snapshots,
-        summaries: filterSummariesByRange(range, summaries)
+        summaries
       }),
     [counters, range, snapshots, summaries]
   );
@@ -229,7 +221,7 @@ export function EnergyHistory() {
               <small>{card.unitLabel}</small>
             </div>
             <div className={`eh-metric-helper ${helperState}`}>
-              {errorMessage ? "載入異常" : isLoading ? "同步中..." : "MQTT Live"}
+              {errorMessage ? "載入異常" : isLoading ? "同步中..." : viewModel.sourceLabel}
             </div>
           </article>
         );
@@ -247,8 +239,8 @@ export function EnergyHistory() {
       >
         <div className="eh-chart-head">
           <div className="eh-chart-title">
-            今日趨勢
-            <small>Today's Trend</small>
+            {viewModel.chartTitle}
+            <small>{viewModel.chartSubtitle}</small>
           </div>
           <div className="eh-legend">
             <span className="orange">發電量 (kW)</span>

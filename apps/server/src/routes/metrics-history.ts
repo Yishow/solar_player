@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 
-type HistoryRange = "day" | "week" | "month" | "total";
+type HistoryRange = "day" | "week" | "month" | "year" | "total";
 
 type MetricSnapshotRow = {
   captured_at: string;
@@ -32,15 +32,25 @@ type CumulativeCounterRow = {
   total_value: number | null;
 };
 
-const rangeToClause: Record<Exclude<HistoryRange, "total">, string> = {
-  day: "captured_at >= datetime('now', '-1 day')",
-  month: "captured_at >= datetime('now', '-1 month')",
-  week: "captured_at >= datetime('now', '-7 day')"
+const snapshotRangeToClause: Record<Exclude<HistoryRange, "total">, string> = {
+  day: "captured_at >= datetime('now', 'start of day')",
+  month: "captured_at >= datetime('now', '-29 day')",
+  week: "captured_at >= datetime('now', '-6 day')",
+  year: "captured_at >= datetime('now', 'start of year')"
 };
 
 function isHistoryRange(value: string): value is HistoryRange {
-  return value === "day" || value === "week" || value === "month" || value === "total";
+  return value === "day" || value === "week" || value === "month" || value === "year" || value === "total";
 }
+
+const dailySummaryRangeToClause: Record<Exclude<HistoryRange, "total">, string> = {
+  day: "date >= date('now')",
+  month: "date >= date('now', '-29 day')",
+  week: "date >= date('now', '-6 day')",
+  year: "date >= date('now', 'start of year')"
+};
+
+const historyRangeError = "Invalid range. Expected day, week, month, year, or total.";
 
 const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/metrics/history", async (request, reply) => {
@@ -48,7 +58,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
 
     if (!isHistoryRange(rangeParam)) {
       reply.status(400).send({
-        error: "Invalid range. Expected day, week, month, or total.",
+        error: historyRangeError,
         success: false,
         timestamp: new Date().toISOString()
       });
@@ -56,7 +66,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     }
 
     const database = getDatabase();
-    const filterClause = rangeParam === "total" ? "" : `WHERE ${rangeToClause[rangeParam]}`;
+    const filterClause = rangeParam === "total" ? "" : `WHERE ${snapshotRangeToClause[rangeParam]}`;
     const rows = database
       .prepare(
         `
@@ -89,8 +99,19 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/api/metrics/daily-summary", async () => {
+  app.get("/api/metrics/daily-summary", async (request, reply) => {
+    const rangeParam = (request.query as { range?: string }).range ?? "total";
+    if (!isHistoryRange(rangeParam)) {
+      reply.status(400).send({
+        error: historyRangeError,
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     const database = getDatabase();
+    const filterClause = rangeParam === "total" ? "" : `WHERE ${dailySummaryRangeToClause[rangeParam]}`;
     const rows = database
       .prepare(
         `
@@ -105,6 +126,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
             peak_consumption,
             peak_consumption_time
           FROM daily_energy_summaries
+          ${filterClause}
           ORDER BY date DESC
         `
       )

@@ -44,6 +44,34 @@ const rangeOptions = [
   { key: "total", label: "累積", subtitle: "Cumulative" }
 ] as const;
 
+const rangeHeadings: Record<EnergyHistoryRange, { sourceLabel: string; title: string; subtitle: string }> = {
+  day: {
+    sourceLabel: "History Summary",
+    subtitle: "Today's Trend",
+    title: "今日趨勢"
+  },
+  month: {
+    sourceLabel: "History Summary",
+    subtitle: "This Month",
+    title: "本月趨勢"
+  },
+  total: {
+    sourceLabel: "Cumulative Counter",
+    subtitle: "Cumulative Trend",
+    title: "累積趨勢"
+  },
+  week: {
+    sourceLabel: "History Summary",
+    subtitle: "This Week",
+    title: "本週趨勢"
+  },
+  year: {
+    sourceLabel: "History Summary",
+    subtitle: "This Year",
+    title: "今年趨勢"
+  }
+};
+
 function formatInteger(value: number | null) {
   if (value === null) {
     return "--";
@@ -78,55 +106,106 @@ function sumSummaries(
   return summaries.reduce((sum, summary) => sum + (picker(summary) ?? 0), 0);
 }
 
+function getSummariesValue(
+  range: EnergyHistoryRange,
+  summaries: DailyEnergySummary[],
+  picker: (summary: DailyEnergySummary) => number | null
+) {
+  if (summaries.length === 0) {
+    return null;
+  }
+
+  if (range === "day") {
+    return picker(summaries[0]!);
+  }
+
+  return sumSummaries(summaries, picker);
+}
+
+function resolvePeakSummary(
+  summaries: DailyEnergySummary[],
+  picker: (summary: DailyEnergySummary) => number | null
+) {
+  return summaries.reduce<DailyEnergySummary | null>((currentPeak, summary) => {
+    const currentValue = currentPeak === null ? null : picker(currentPeak);
+    const nextValue = picker(summary);
+    if (nextValue === null) {
+      return currentPeak;
+    }
+    if (currentValue === null || nextValue >= currentValue) {
+      return summary;
+    }
+    return currentPeak;
+  }, null);
+}
+
 export function buildEnergyHistoryViewModel({
   counters,
   range,
   snapshots,
   summaries
 }: BuildEnergyHistoryViewModelArgs) {
-  const headlineSummary = summaries[0] ?? null;
-  const lastUpdated = counters.reduce((latest: string | null, counter) => {
-    if (!counter.lastUpdated) return latest;
-    if (!latest) return counter.lastUpdated;
-    return counter.lastUpdated > latest ? counter.lastUpdated : latest;
-  }, null);
+  const rangeHeading = rangeHeadings[range];
+  const peakGenerationSummary = resolvePeakSummary(summaries, (summary) => summary.peakGeneration);
+  const peakConsumptionSummary = resolvePeakSummary(summaries, (summary) => summary.peakConsumption);
+  const lastUpdated =
+    range === "total"
+      ? counters.reduce((latest: string | null, counter) => {
+          if (!counter.lastUpdated) return latest;
+          if (!latest) return counter.lastUpdated;
+          return counter.lastUpdated > latest ? counter.lastUpdated : latest;
+        }, null)
+      : snapshots.reduce<string | null>((latest, snapshot) => {
+          if (!snapshot.capturedAt) return latest;
+          if (!latest) return snapshot.capturedAt;
+          return snapshot.capturedAt > latest ? snapshot.capturedAt : latest;
+        }, null);
   const lastUpdatedLabel = lastUpdated
     ? new Date(lastUpdated).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })
     : "--:--";
   const generationValue =
-    range === "total" ? getCounterValue(counters, "generation") : headlineSummary?.generationTotal ?? sumSummaries(summaries, (summary) => summary.generationTotal);
+    range === "total"
+      ? getCounterValue(counters, "generation")
+      : getSummariesValue(range, summaries, (summary) => summary.generationTotal);
   const selfConsumptionValue =
     range === "total"
       ? getCounterValue(counters, "selfConsumption")
-      : headlineSummary?.selfConsumptionTotal ?? sumSummaries(summaries, (summary) => summary.selfConsumptionTotal);
+      : getSummariesValue(range, summaries, (summary) => summary.selfConsumptionTotal);
   const consumptionValue =
     range === "total"
       ? getCounterValue(counters, "consumption")
-      : headlineSummary?.consumptionTotal ?? sumSummaries(summaries, (summary) => summary.consumptionTotal);
-  const ratioValue = getCounterValue(counters, "ratio");
+      : getSummariesValue(range, summaries, (summary) => summary.consumptionTotal);
+  const ratioValue =
+    range === "total"
+      ? getCounterValue(counters, "ratio")
+      : generationValue !== null && generationValue > 0 && selfConsumptionValue !== null
+        ? (selfConsumptionValue / generationValue) * 100
+        : null;
   const co2Value =
-    range === "total" ? getCounterValue(counters, "co2") : headlineSummary?.co2Total ?? sumSummaries(summaries, (summary) => summary.co2Total);
+    range === "total"
+      ? getCounterValue(counters, "co2")
+      : getSummariesValue(range, summaries, (summary) => summary.co2Total);
 
   return {
     bottomSummary: [
       {
-        detailLabel: headlineSummary?.peakGenerationTime ?? "--:--",
+        detailLabel: peakGenerationSummary?.peakGenerationTime ?? "--:--",
         label: "尖峰發電",
-        valueLabel: headlineSummary?.peakGeneration !== null && headlineSummary?.peakGeneration !== undefined
-          ? `${formatInteger(headlineSummary.peakGeneration)} kW`
+        valueLabel: peakGenerationSummary?.peakGeneration !== null && peakGenerationSummary?.peakGeneration !== undefined
+          ? `${formatInteger(peakGenerationSummary.peakGeneration)} kW`
           : "--"
       },
       {
-        detailLabel: headlineSummary?.peakConsumptionTime ?? "--:--",
+        detailLabel: peakConsumptionSummary?.peakConsumptionTime ?? "--:--",
         label: "尖峰用電",
-        valueLabel: headlineSummary?.peakConsumption !== null && headlineSummary?.peakConsumption !== undefined
-          ? `${formatInteger(headlineSummary.peakConsumption)} kW`
+        valueLabel: peakConsumptionSummary?.peakConsumption !== null && peakConsumptionSummary?.peakConsumption !== undefined
+          ? `${formatInteger(peakConsumptionSummary.peakConsumption)} kW`
           : "--"
       },
       {
         detailLabel: "",
         label: "資料來源",
-        valueLabel: "MQTT Live"
+        valueLabel: rangeHeading.sourceLabel
       },
       {
         detailLabel: "",
@@ -163,6 +242,8 @@ export function buildEnergyHistoryViewModel({
         }))
       }
     ],
+    chartSubtitle: rangeHeading.subtitle,
+    chartTitle: rangeHeading.title,
     metricCards: [
       {
         label: "發電量",
@@ -199,6 +280,7 @@ export function buildEnergyHistoryViewModel({
       ...option,
       active: option.key === range
     })),
+    sourceLabel: rangeHeading.sourceLabel,
     tableRows: summaries.map((summary) => ({
       co2Label: formatCo2Tonnes(summary.co2Total),
       consumptionLabel: formatInteger(summary.consumptionTotal),
