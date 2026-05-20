@@ -3,7 +3,6 @@ import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
-  hasDisplaySyncDraftChanges,
   useDisplaySyncDraftGuard
 } from "../../hooks/displaySyncDraftGuard";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
@@ -16,8 +15,8 @@ import {
   getImages,
   getImageStorageUsage,
   type ImageStorageUsage,
+  persistImageManagementDraftTarget,
   updateImageAsset,
-  updateImagePlaylistEntry,
   uploadImageAsset
 } from "../../services/api";
 import { ImageManagementContent } from "./ImageManagementContent";
@@ -26,8 +25,9 @@ import type {
   ImageManagementResolvedPlaylistEntry
 } from "./viewModel";
 import {
-  normalizeManagementPlaylistAssetId,
-  resolvePlaylistEntriesForAsset
+  buildImageManagementDraftSaveTarget,
+  hasSelectedImageManagementDraftChanges,
+  normalizeManagementPlaylistAssetId
 } from "./viewModel";
 
 const initialStorageUsage: ImageStorageUsage = {
@@ -35,11 +35,6 @@ const initialStorageUsage: ImageStorageUsage = {
   usedBytes: 0,
   usedMB: 0
 };
-
-function normalizeNullablePlaylistText(value: string) {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 function normalizeManagementPlaylistEntry(entry: Awaited<ReturnType<typeof fetchImagePlaylistGovernance>>["playlist"]["entries"][number]): ImageManagementPlaylistEntry {
   return {
@@ -189,6 +184,33 @@ export function ImageManagement() {
     );
   };
 
+  const hasSelectedDraftChanges = useMemo(
+    () =>
+      hasSelectedImageManagementDraftChanges({
+        assets,
+        lastSyncedAssets,
+        lastSyncedPlaylistEntries,
+        playlistEntries,
+        selectedImageId
+      }),
+    [assets, lastSyncedAssets, lastSyncedPlaylistEntries, playlistEntries, selectedImageId]
+  );
+
+  const handleSelectImage = (nextImageId: number) => {
+    if (nextImageId === selectedImageId) {
+      return;
+    }
+
+    if (hasSelectedDraftChanges) {
+      setMessage("請先儲存或重新同步目前圖片的未儲存變更，再切換其他素材。");
+      setErrorMessage("");
+      return;
+    }
+
+    setSelectedImageId(nextImageId);
+    setErrorMessage("");
+  };
+
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
@@ -213,40 +235,27 @@ export function ImageManagement() {
   };
 
   const handleSave = async () => {
-    const selectedAsset = assets.find((asset) => asset.id === selectedImageId);
-    if (!selectedAsset) return;
-    const assetPlaylistEntries = resolvePlaylistEntriesForAsset(playlistEntries, selectedAsset.id);
-    const selectedPlaylistEntry = assetPlaylistEntries[0] ?? null;
+    const saveTarget = buildImageManagementDraftSaveTarget({
+      assets,
+      playlistEntries,
+      selectedImageId
+    });
+    if (saveTarget === null) return;
     setIsSaving(true);
     setErrorMessage("");
     try {
-      await Promise.all([
-        updateImageAsset(selectedAsset.id, {
-          aspectRatio: selectedAsset.aspectRatio,
-          description: selectedAsset.description,
-          title: selectedAsset.title
-        }),
-        ...(selectedPlaylistEntry === null
-          ? []
-          : [
-              updateImagePlaylistEntry(selectedPlaylistEntry.entryId, {
-                area: normalizeNullablePlaylistText(selectedPlaylistEntry.area),
-                assetId: selectedPlaylistEntry.assetId,
-                capturedAt: normalizeNullablePlaylistText(selectedPlaylistEntry.capturedAt),
-                description: normalizeNullablePlaylistText(selectedPlaylistEntry.description),
-                displayOrder: selectedPlaylistEntry.displayOrder,
-                durationSeconds: selectedPlaylistEntry.durationSeconds,
-                enabled: selectedPlaylistEntry.enabled,
-                fallbackMode: selectedPlaylistEntry.fallbackMode,
-                tags: selectedPlaylistEntry.tags,
-                title: normalizeNullablePlaylistText(selectedPlaylistEntry.title)
-              })
-            ])
+      await persistImageManagementDraftTarget(saveTarget);
+      await syncImages(saveTarget.asset.id);
+      const refreshResults = await Promise.allSettled([
+        reloadAssetHealth(),
+        reloadAssetReferences()
       ]);
-      await syncImages(selectedAsset.id);
-      await reloadAssetHealth();
-      await reloadAssetReferences();
-      setMessage("圖片設定已儲存。");
+      const hasRefreshFailure = refreshResults.some((result) => result.status === "rejected");
+      setMessage(
+        hasRefreshFailure
+          ? "圖片設定已儲存，診斷資料將在下次同步時更新。"
+          : "圖片設定已儲存。"
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存圖片設定失敗。");
     } finally {
@@ -323,12 +332,7 @@ export function ImageManagement() {
     }
   };
 
-  const isDirty = useMemo(
-    () =>
-      hasDisplaySyncDraftChanges(assets, lastSyncedAssets)
-      || hasDisplaySyncDraftChanges(playlistEntries, lastSyncedPlaylistEntries),
-    [assets, lastSyncedAssets, lastSyncedPlaylistEntries, playlistEntries]
-  );
+  const isDirty = hasSelectedDraftChanges;
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
     reloadNow: reloadImageManagement
@@ -372,7 +376,7 @@ export function ImageManagement() {
       }
       resyncLibrary={resyncLibrary}
       selectedImageId={selectedImageId}
-      setSelectedImageId={setSelectedImageId}
+      handleSelectImage={handleSelectImage}
       storageUsage={storageUsage}
       updateAssetField={updateAssetField}
       updatePlaylistEntryField={updatePlaylistEntryField}

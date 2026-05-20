@@ -67,7 +67,7 @@ type ImageManagementContentProps = {
   remoteSyncBanner: ReactNode;
   resyncLibrary: () => Promise<void>;
   selectedImageId: number | null;
-  setSelectedImageId: (value: number) => void;
+  handleSelectImage: (value: number) => void;
   storageUsage: ImageStorageUsage;
   updateAssetField: (
     id: number,
@@ -121,7 +121,7 @@ export function ImageManagementContent({
   remoteSyncBanner,
   resyncLibrary,
   selectedImageId,
-  setSelectedImageId,
+  handleSelectImage,
   storageUsage,
   updateAssetField,
   updatePlaylistEntryField
@@ -249,7 +249,7 @@ export function ImageManagementContent({
           ) : (
             <div className="im-grid">
               {viewModel.library.map((asset) => (
-                <button key={asset.id} type="button" onClick={() => setSelectedImageId(asset.id)} className={`im-thumb ${asset.isSelected ? "is-selected" : ""}`}>
+                <button key={asset.id} type="button" onClick={() => handleSelectImage(asset.id)} className={`im-thumb ${asset.isSelected ? "is-selected" : ""}`}>
                   <div className="im-thumb__media">
                     {asset.previewUrl ? <img src={asset.previewUrl} alt={asset.title} /> : <div className="im-thumb__placeholder">無預覽</div>}
                     <span className="im-thumb__order">{asset.orderLabel}</span>

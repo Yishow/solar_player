@@ -30,6 +30,27 @@ export type ImageManagementResolvedPlaylistEntry = {
   isPlayable: boolean;
 };
 
+type ImageManagementDraftSessionArgs = {
+  assets: ImageAsset[];
+  playlistEntries?: ImageManagementPlaylistEntry[];
+  selectedImageId: number | null;
+};
+
+type ImageManagementDraftChangeArgs = ImageManagementDraftSessionArgs & {
+  lastSyncedAssets: ImageAsset[];
+  lastSyncedPlaylistEntries: ImageManagementPlaylistEntry[];
+};
+
+export type ImageManagementDraftSession = {
+  assetId: number;
+  playlistEntryId: string | null;
+};
+
+export type ImageManagementDraftSaveTarget = {
+  asset: Pick<ImageAsset, "aspectRatio" | "description" | "id" | "title">;
+  playlistEntry: ImageManagementPlaylistEntry | null;
+};
+
 export function normalizeManagementPlaylistAssetId(assetId: string | null, entryId: string) {
   if (assetId === null) {
     return null;
@@ -64,6 +85,14 @@ function sortAssets(assets: ImageAsset[]) {
     const rightOrder = right.displayOrder ?? Number.MAX_SAFE_INTEGER;
     return leftOrder - rightOrder || left.id - right.id;
   });
+}
+
+export function resolveSelectedImageManagementAsset(
+  assets: ImageAsset[],
+  selectedImageId: number | null
+) {
+  const sortedAssets = sortAssets(assets);
+  return sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
 }
 
 function padCounter(value: number) {
@@ -124,6 +153,65 @@ export function resolvePrimaryPlaylistEntry(
   assetId: number
 ) {
   return resolvePlaylistEntriesForAsset(playlistEntries, assetId)[0] ?? null;
+}
+
+export function resolveImageManagementDraftSession(
+  args: ImageManagementDraftSessionArgs
+): ImageManagementDraftSession | null {
+  const selectedAsset = resolveSelectedImageManagementAsset(args.assets, args.selectedImageId);
+  if (selectedAsset === null) {
+    return null;
+  }
+
+  return {
+    assetId: selectedAsset.id,
+    playlistEntryId: resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id)?.entryId ?? null
+  };
+}
+
+export function hasSelectedImageManagementDraftChanges(
+  args: ImageManagementDraftChangeArgs
+) {
+  const session = resolveImageManagementDraftSession(args);
+  if (session === null) {
+    return false;
+  }
+
+  const selectedAsset = args.assets.find((asset) => asset.id === session.assetId) ?? null;
+  const syncedAsset = args.lastSyncedAssets.find((asset) => asset.id === session.assetId) ?? null;
+  if (JSON.stringify(selectedAsset) !== JSON.stringify(syncedAsset)) {
+    return true;
+  }
+
+  if (session.playlistEntryId === null) {
+    return false;
+  }
+
+  const selectedPlaylistEntry =
+    args.playlistEntries?.find((entry) => entry.entryId === session.playlistEntryId) ?? null;
+  const syncedPlaylistEntry =
+    args.lastSyncedPlaylistEntries.find((entry) => entry.entryId === session.playlistEntryId) ?? null;
+
+  return JSON.stringify(selectedPlaylistEntry) !== JSON.stringify(syncedPlaylistEntry);
+}
+
+export function buildImageManagementDraftSaveTarget(
+  args: ImageManagementDraftSessionArgs
+): ImageManagementDraftSaveTarget | null {
+  const selectedAsset = resolveSelectedImageManagementAsset(args.assets, args.selectedImageId);
+  if (selectedAsset === null) {
+    return null;
+  }
+
+  return {
+    asset: {
+      aspectRatio: selectedAsset.aspectRatio,
+      description: selectedAsset.description,
+      id: selectedAsset.id,
+      title: selectedAsset.title
+    },
+    playlistEntry: resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id)
+  };
 }
 
 export function resolvePlaylistRuntimeInclusion(
@@ -196,8 +284,7 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
     liveDisplayReferences
   } = args;
   const sortedAssets = sortAssets(assets);
-  const selectedAsset =
-    sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
+  const selectedAsset = resolveSelectedImageManagementAsset(assets, selectedImageId);
   const resolvedEntryMap = new Map(
     (resolvedPlaylistEntries ?? []).map((entry) => [entry.entryId, entry])
   );

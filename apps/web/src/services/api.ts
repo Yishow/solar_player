@@ -311,6 +311,33 @@ export async function bootstrapImagePlaylistGovernance() {
   });
 }
 
+export type ImageManagementDraftSaveTarget = {
+  asset: {
+    aspectRatio: number | null;
+    description: string | null;
+    id: number;
+    title: string | null;
+  };
+  playlistEntry: null | {
+    area: string;
+    assetId: number | null;
+    capturedAt: string;
+    description: string;
+    displayOrder: number;
+    durationSeconds: number;
+    enabled: boolean;
+    entryId: string;
+    fallbackMode: "display-placeholder" | "skip" | "use-cover";
+    tags: string[];
+    title: string;
+  };
+};
+
+function normalizeNullableImageManagementText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
   area: string | null;
   assetId: number | null;
@@ -327,6 +354,34 @@ export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
     `/api/image-playlist/${entryId}`,
     { body: JSON.stringify(data), method: "PUT" }
   );
+}
+
+export async function persistImageManagementDraftTarget(
+  target: ImageManagementDraftSaveTarget
+) {
+  await Promise.all([
+    updateImageAsset(target.asset.id, {
+      aspectRatio: target.asset.aspectRatio,
+      description: target.asset.description,
+      title: target.asset.title
+    }),
+    ...(target.playlistEntry === null
+      ? []
+      : [
+          updateImagePlaylistEntry(target.playlistEntry.entryId, {
+            area: normalizeNullableImageManagementText(target.playlistEntry.area),
+            assetId: target.playlistEntry.assetId,
+            capturedAt: normalizeNullableImageManagementText(target.playlistEntry.capturedAt),
+            description: normalizeNullableImageManagementText(target.playlistEntry.description),
+            displayOrder: target.playlistEntry.displayOrder,
+            durationSeconds: target.playlistEntry.durationSeconds,
+            enabled: target.playlistEntry.enabled,
+            fallbackMode: target.playlistEntry.fallbackMode,
+            tags: target.playlistEntry.tags,
+            title: normalizeNullableImageManagementText(target.playlistEntry.title)
+          })
+        ])
+  ]);
 }
 
 export async function fetchSustainabilityStory(period?: SustainabilityPeriodKey) {

@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ImageAsset } from "@solar-display/shared";
 import {
+  buildImageManagementDraftSaveTarget,
   buildImageManagementViewModel,
+  hasSelectedImageManagementDraftChanges,
   normalizeManagementPlaylistAssetId,
+  resolveImageManagementDraftSession,
   resolvePlaylistRuntimeInclusion
 } from "./viewModel";
 
@@ -238,6 +241,162 @@ test("buildImageManagementViewModel edits the first ordered playlist row when on
       title: "太陽能板鳥瞰"
     }
   ] : undefined, 3), true);
+});
+
+test("resolveImageManagementDraftSession keeps one selected asset and playlist row authoritative", () => {
+  const session = resolveImageManagementDraftSession({
+    assets,
+    playlistEntries: [
+      {
+        area: "備援輪播",
+        assetId: 3,
+        capturedAt: "",
+        description: "",
+        displayOrder: 2,
+        durationSeconds: 12,
+        enabled: true,
+        entryId: "IMG-02",
+        fallbackMode: "skip",
+        tags: [],
+        title: ""
+      },
+      {
+        area: "首頁 Hero",
+        assetId: 3,
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        displayOrder: 1,
+        durationSeconds: 25,
+        enabled: false,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      }
+    ],
+    selectedImageId: 3
+  });
+
+  assert.deepEqual(session, {
+    assetId: 3,
+    playlistEntryId: "IMG-01"
+  });
+});
+
+test("hasSelectedImageManagementDraftChanges stays scoped to the current selected session", () => {
+  const changedAssets = assets.map((asset) =>
+    asset.id === 7 ? { ...asset, title: "綠色校園 2" } : asset
+  );
+  const changedPlaylistEntries = [
+    {
+      area: "首頁 Hero",
+      assetId: 3,
+      capturedAt: "2026/05/10 14:32",
+      description: "首頁封面展示最新太陽能陣列成果。",
+      displayOrder: 1,
+      durationSeconds: 25,
+      enabled: true,
+      entryId: "IMG-01",
+      fallbackMode: "use-cover" as const,
+      tags: ["封面", "太陽能"],
+      title: "太陽能板鳥瞰"
+    },
+    {
+      area: "校園入口",
+      assetId: 7,
+      capturedAt: "",
+      description: "",
+      displayOrder: 2,
+      durationSeconds: 30,
+      enabled: true,
+      entryId: "IMG-07",
+      fallbackMode: "skip" as const,
+      tags: [],
+      title: ""
+    }
+  ];
+  const syncedPlaylistEntries = changedPlaylistEntries.map((entry) =>
+    entry.entryId === "IMG-07" ? { ...entry, durationSeconds: 18 } : entry
+  );
+
+  assert.equal(
+    hasSelectedImageManagementDraftChanges({
+      assets: changedAssets,
+      lastSyncedAssets: assets,
+      lastSyncedPlaylistEntries: syncedPlaylistEntries,
+      playlistEntries: changedPlaylistEntries,
+      selectedImageId: 3
+    }),
+    false
+  );
+
+  assert.equal(
+    hasSelectedImageManagementDraftChanges({
+      assets: changedAssets,
+      lastSyncedAssets: assets,
+      lastSyncedPlaylistEntries: syncedPlaylistEntries,
+      playlistEntries: changedPlaylistEntries,
+      selectedImageId: 7
+    }),
+    true
+  );
+});
+
+test("buildImageManagementDraftSaveTarget saves the authoritative selected asset session only", () => {
+  const target = buildImageManagementDraftSaveTarget({
+    assets,
+    playlistEntries: [
+      {
+        area: "備援輪播",
+        assetId: 3,
+        capturedAt: "",
+        description: "",
+        displayOrder: 2,
+        durationSeconds: 12,
+        enabled: true,
+        entryId: "IMG-02",
+        fallbackMode: "skip",
+        tags: [],
+        title: ""
+      },
+      {
+        area: "首頁 Hero",
+        assetId: 3,
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        displayOrder: 1,
+        durationSeconds: 25,
+        enabled: false,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      }
+    ],
+    selectedImageId: 3
+  });
+
+  assert.deepEqual(target, {
+    asset: {
+      aspectRatio: 16 / 9,
+      description: "工廠太陽能板與綠能設施",
+      id: 3,
+      title: "綠色工廠"
+    },
+    playlistEntry: {
+      area: "首頁 Hero",
+      assetId: 3,
+      capturedAt: "2026/05/10 14:32",
+      description: "首頁封面展示最新太陽能陣列成果。",
+      displayOrder: 1,
+      durationSeconds: 25,
+      enabled: false,
+      entryId: "IMG-01",
+      fallbackMode: "use-cover",
+      tags: ["封面", "太陽能"],
+      title: "太陽能板鳥瞰"
+    }
+  });
 });
 
 test("normalizeManagementPlaylistAssetId accepts only fully numeric shared asset ids", () => {

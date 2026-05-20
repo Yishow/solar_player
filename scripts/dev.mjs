@@ -58,6 +58,7 @@ function freePort(port) {
 
 function buildCommands(serverPort) {
   return [
+    "pnpm --filter @solar-display/shared dev",
     "pnpm --filter @solar-display/web dev",
     `PORT=${serverPort} pnpm --filter @solar-display/server dev`
   ];
@@ -76,7 +77,7 @@ const commands = buildCommands(serverPort);
 
 const child = spawn(
   "pnpm",
-  ["exec", "concurrently", "-k", "-n", "web,server", ...commands],
+  ["exec", "concurrently", "-k", "-n", "shared,web,server", ...commands],
   {
     cwd: projectRoot,
     stdio: "inherit",
