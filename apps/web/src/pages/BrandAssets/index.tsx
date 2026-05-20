@@ -2,6 +2,10 @@ import type { BrandProfile } from "@solar-display/shared";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useBlocker } from "react-router-dom";
 import { PageContainer } from "../../components/PageContainer";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
+import {
+  useDisplaySyncDraftGuard
+} from "../../hooks/displaySyncDraftGuard";
 import {
   brandLogoUrl,
   activateBrandProfile,
@@ -14,6 +18,7 @@ import {
   type BrandProfileUpdate
 } from "../../services/api";
 import { notifyBrandChanged } from "../../hooks/useBrandAssets";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { CropDialog } from "./CropDialog";
 import "./brandAssets.css";
 
@@ -32,6 +37,15 @@ type DraftFields = {
   sloganZh: string;
   sloganEn: string;
 };
+
+type PendingAction =
+  | {
+      confirmLabel: string;
+      description: string;
+      kind: "delete-profile" | "remove-logo";
+      title: string;
+    }
+  | null;
 
 const FIELD_LABELS: Record<keyof DraftFields, string> = {
   name: "品牌設定名稱",
@@ -86,7 +100,9 @@ export function BrandAssets() {
   const [draft, setDraft] = useState<DraftFields | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isConfirmingAction, setIsConfirmingAction] = useState(false);
   const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
@@ -119,33 +135,77 @@ export function BrandAssets() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  const loadProfiles = useCallback(async (preferredId?: number) => {
-    try {
-      const list = await getBrandProfiles();
-      setProfiles(list);
-      const chosen =
-        list.find((profile) => profile.id === preferredId) ??
-        list.find((profile) => profile.isActive) ??
-        list[0] ??
-        null;
-      setSelectedId(chosen?.id ?? null);
-      setDraft(chosen ? pickFields(chosen) : null);
-    } catch (error) {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "載入品牌設定失敗"
-      });
-    }
+  const syncProfiles = useCallback(async (preferredId?: number) => {
+    const list = await getBrandProfiles();
+    setProfiles(list);
+    const chosen =
+      list.find((profile) => profile.id === preferredId) ??
+      list.find((profile) => profile.isActive) ??
+      list[0] ??
+      null;
+    setSelectedId(chosen?.id ?? null);
+    setDraft(chosen ? pickFields(chosen) : null);
+    return chosen;
   }, []);
 
+  const resyncBrandProfiles = useCallback(async (preferredId?: number) => {
+    try {
+      await syncProfiles(preferredId);
+      setFeedback({ tone: "ok", message: "品牌設定已同步。" });
+    } catch (error) {
+      const nextError = error instanceof Error ? error : new Error("重新同步品牌設定失敗");
+      setFeedback({
+        tone: "error",
+        message: nextError.message
+      });
+      throw nextError;
+    }
+  }, [syncProfiles]);
+
   useEffect(() => {
-    void loadProfiles();
-  }, [loadProfiles]);
+    let active = true;
+
+    const bootstrap = async () => {
+      try {
+        await syncProfiles();
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setFeedback({
+          tone: "error",
+          message: error instanceof Error ? error.message : "載入品牌設定失敗"
+        });
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, [syncProfiles]);
 
   const confirmDiscardDirty = useCallback(() => {
     if (!dirty) return true;
     return window.confirm("尚有未儲存的變更，繼續會丟棄目前修改，確定要繼續嗎？");
   }, [dirty]);
+
+  const syncDraftGuard = useDisplaySyncDraftGuard({
+    isDirty: dirty,
+    reloadNow: () => resyncBrandProfiles(selectedId ?? undefined)
+  });
+
+  useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync);
+
+  const cancelPendingAction = useCallback(() => {
+    if (isConfirmingAction) {
+      return;
+    }
+
+    setPendingAction(null);
+  }, [isConfirmingAction]);
 
   const handleSelect = (profile: BrandProfile) => {
     if (dirty) {
@@ -155,6 +215,7 @@ export function BrandAssets() {
     setSelectedId(profile.id);
     setDraft(pickFields(profile));
     setFeedback(null);
+    setPendingAction(null);
   };
 
   const updateField = <K extends keyof DraftFields>(key: K, value: DraftFields[K]) => {
@@ -182,6 +243,7 @@ export function BrandAssets() {
       setProfiles((current) => current.map((profile) => (profile.id === updated.id ? updated : profile)));
       setDraft(pickFields(updated));
       setFeedback({ tone: "ok", message: "已儲存。" });
+      syncDraftGuard.clearPendingRemoteChange();
       if (updated.isActive) notifyBrandChanged();
     } catch (error) {
       setFeedback({
@@ -199,8 +261,9 @@ export function BrandAssets() {
     try {
       await activateBrandProfile(selected.id);
       notifyBrandChanged();
-      await loadProfiles(selected.id);
+      await resyncBrandProfiles(selected.id);
       setFeedback({ tone: "ok", message: `已切換到「${selected.name}」` });
+      syncDraftGuard.clearPendingRemoteChange();
     } catch (error) {
       setFeedback({
         tone: "error",
@@ -215,7 +278,7 @@ export function BrandAssets() {
     if (!name || name.trim().length === 0) return;
     try {
       const created = await createBrandProfile({ name: name.trim() });
-      await loadProfiles(created.id);
+      await resyncBrandProfiles(created.id);
       setFeedback({ tone: "ok", message: "已建立新設定。" });
     } catch (error) {
       setFeedback({
@@ -225,25 +288,19 @@ export function BrandAssets() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selected) return;
     if (selected.isActive) {
       setFeedback({ tone: "error", message: "啟用中的設定無法刪除，請先切換到其他設定。" });
       return;
     }
     if (!confirmDiscardDirty()) return;
-    const ok = window.confirm(`確定刪除「${selected.name}」？`);
-    if (!ok) return;
-    try {
-      await deleteBrandProfile(selected.id);
-      await loadProfiles();
-      setFeedback({ tone: "ok", message: "已刪除。" });
-    } catch (error) {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "刪除失敗"
-      });
-    }
+    setPendingAction({
+      confirmLabel: "確認刪除",
+      description: `刪除後會移除「${selected.name}」以及其上傳 Logo，且無法復原。`,
+      kind: "delete-profile",
+      title: `確定刪除「${selected.name}」？`
+    });
   };
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -282,6 +339,7 @@ export function BrandAssets() {
         current.map((profile) => (profile.id === updated.id ? updated : profile))
       );
       setFeedback({ tone: "ok", message: "Logo 已更新。" });
+      syncDraftGuard.clearPendingRemoteChange();
       if (updated.isActive) notifyBrandChanged();
     } catch (error) {
       setFeedback({
@@ -291,24 +349,52 @@ export function BrandAssets() {
     }
   };
 
-  const handleRemoveLogo = async () => {
+  const handleRemoveLogo = () => {
     if (!selected || !selected.logoFilename) return;
-    const ok = window.confirm("移除目前 Logo？");
-    if (!ok) return;
+    setPendingAction({
+      confirmLabel: "確認移除 Logo",
+      description: "移除後 Header 會退回預設品牌圖示，直到再次上傳新的 Logo。",
+      kind: "remove-logo",
+      title: "確定移除目前 Logo？"
+    });
+  };
+
+  const confirmPendingAction = useCallback(async () => {
+    if (!selected || !pendingAction) {
+      return;
+    }
+
+    setIsConfirmingAction(true);
+
     try {
-      const updated = await deleteBrandLogo(selected.id);
-      setProfiles((current) =>
-        current.map((profile) => (profile.id === updated.id ? updated : profile))
-      );
-      if (updated.isActive) notifyBrandChanged();
-      setFeedback({ tone: "ok", message: "Logo 已移除。" });
+      if (pendingAction.kind === "delete-profile") {
+        const deletedName = selected.name;
+        await deleteBrandProfile(selected.id);
+        await resyncBrandProfiles();
+        setFeedback({ tone: "ok", message: `已刪除「${deletedName}」。` });
+      }
+
+      if (pendingAction.kind === "remove-logo") {
+        const updated = await deleteBrandLogo(selected.id);
+        setProfiles((current) =>
+          current.map((profile) => (profile.id === updated.id ? updated : profile))
+        );
+        if (updated.isActive) notifyBrandChanged();
+        setFeedback({ tone: "ok", message: "Logo 已移除。" });
+      }
+
+      syncDraftGuard.clearPendingRemoteChange();
+      setPendingAction(null);
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: error instanceof Error ? error.message : "移除失敗"
+        message: error instanceof Error ? error.message : "操作失敗"
       });
+      throw error;
+    } finally {
+      setIsConfirmingAction(false);
     }
-  };
+  }, [pendingAction, resyncBrandProfiles, selected, syncDraftGuard]);
 
   const previewLogoSrc = selected ? brandLogoUrl(selected) : "/brand-logo.png";
   const warning = selected ? aspectWarning(selected.logoWidth, selected.logoHeight) : null;
@@ -320,6 +406,13 @@ export function BrandAssets() {
       description="管理多套品牌設定，並控制目前播放器顯示的品牌資訊。"
     >
       <div className="brand-page">
+        {syncDraftGuard.hasPendingRemoteChange ? (
+          <RemoteSyncBanner
+            onKeepEditing={syncDraftGuard.keepEditing}
+            onReloadNow={() => syncDraftGuard.discardAndReload().catch(() => {})}
+          />
+        ) : null}
+
         {/* Profile chip rail */}
         <div className="brand-profile-rail">
           <span className="brand-profile-rail-label">Profiles</span>
@@ -430,6 +523,31 @@ export function BrandAssets() {
                     data-tone={feedback.tone === "error" ? "error" : "ok"}
                   >
                     {feedback.message}
+                  </div>
+                ) : null}
+
+                {pendingAction ? (
+                  <div className="brand-confirm-panel">
+                    <strong>{pendingAction.title}</strong>
+                    <p>{pendingAction.description}</p>
+                    <div className="brand-confirm-panel-actions">
+                      <button
+                        type="button"
+                        className="brand-button brand-button-ghost"
+                        onClick={cancelPendingAction}
+                        disabled={isConfirmingAction}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        className="brand-button brand-button-danger"
+                        onClick={() => void confirmPendingAction()}
+                        disabled={isConfirmingAction}
+                      >
+                        {isConfirmingAction ? "處理中…" : pendingAction.confirmLabel}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 

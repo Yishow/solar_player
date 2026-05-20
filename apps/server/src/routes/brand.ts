@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import type { FastifyPluginAsync } from "fastify";
-import type { BrandProfile } from "@solar-display/shared";
+import type { BrandProfile, DisplaySyncEvent } from "@solar-display/shared";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
 
@@ -168,6 +168,18 @@ function notFound(reply: { status: (code: number) => { send: (body: unknown) => 
   });
 }
 
+function emitBrandDisplaySync(app: {
+  socketService: {
+    emitDisplaySync: (payload: DisplaySyncEvent) => void;
+  };
+}, reason: string) {
+  app.socketService.emitDisplaySync({
+    generatedAt: new Date().toISOString(),
+    reason,
+    scope: "brand"
+  });
+}
+
 const brandRoute: FastifyPluginAsync = async (app) => {
   await app.register(import("@fastify/multipart"), {
     limits: { fileSize: MAX_FILE_SIZE, files: 1 }
@@ -224,6 +236,7 @@ const brandRoute: FastifyPluginAsync = async (app) => {
       );
     const created = getProfileById(result.lastInsertRowid as number);
     if (!created) return badRequest(reply, "Failed to create profile");
+    emitBrandDisplaySync(app, "brand-profile-created");
     return reply.status(201).send({
       success: true,
       data: serializeRow(created),
@@ -264,6 +277,7 @@ const brandRoute: FastifyPluginAsync = async (app) => {
           id
         );
       const updated = getProfileById(id);
+      emitBrandDisplaySync(app, "brand-profile-updated");
       return {
         success: true,
         data: serializeRow(updated!),
@@ -290,6 +304,8 @@ const brandRoute: FastifyPluginAsync = async (app) => {
       }
       db.prepare("DELETE FROM brand_profiles WHERE id = ?").run(id);
       if (existing.logo_filename) deleteLogoFile(existing.logo_filename);
+      app.log.info({ profileId: id }, "Deleted brand profile");
+      emitBrandDisplaySync(app, "brand-profile-deleted");
       return {
         success: true,
         data: { id },
@@ -311,6 +327,8 @@ const brandRoute: FastifyPluginAsync = async (app) => {
         db.prepare("UPDATE brand_profiles SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE is_active = 1").run();
         db.prepare("UPDATE brand_profiles SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
       })();
+      app.log.info({ profileId: id }, "Activated brand profile");
+      emitBrandDisplaySync(app, "brand-profile-activated");
       return {
         success: true,
         data: serializeRow(getProfileById(id)!),
@@ -373,6 +391,8 @@ const brandRoute: FastifyPluginAsync = async (app) => {
         );
 
       if (oldLogo && oldLogo !== filename) deleteLogoFile(oldLogo);
+      app.log.info({ profileId: id }, "Updated brand logo");
+      emitBrandDisplaySync(app, "brand-logo-updated");
 
       return {
         success: true,
@@ -400,6 +420,8 @@ const brandRoute: FastifyPluginAsync = async (app) => {
             WHERE id = ?`
         )
         .run(id);
+      app.log.info({ profileId: id }, "Removed brand logo");
+      emitBrandDisplaySync(app, "brand-logo-removed");
       return {
         success: true,
         data: serializeRow(getProfileById(id)!),

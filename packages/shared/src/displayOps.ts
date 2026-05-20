@@ -77,6 +77,7 @@ export type DisplayOpsSummary = {
 };
 
 export type DisplaySyncEventScope =
+  | "brand"
   | "circuits"
   | "device"
   | "display-ops"

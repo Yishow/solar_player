@@ -17,6 +17,8 @@ const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = a
 
 after(() => {
   rmSync(tempDir, { force: true, recursive: true });
+  delete process.env.MANAGEMENT_TRUSTED_ORIGINS;
+  delete process.env.MANAGEMENT_ACCESS_TOKEN;
 });
 
 test("GET /api/settings/mqtt masks password and exposes status", async () => {
@@ -48,6 +50,7 @@ test("GET /api/settings/mqtt masks password and exposes status", async () => {
 test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves", async () => {
   migrateDatabase();
   seedDatabase();
+  process.env.MANAGEMENT_TRUSTED_ORIGINS = "http://127.0.0.1:5177";
 
   const app = await buildApp();
 
@@ -63,6 +66,102 @@ test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves
 
     assert.equal(response.statusCode, 204);
     assert.match(response.headers["access-control-allow-methods"] ?? "", /\bPUT\b/);
+    assert.equal(response.headers["access-control-allow-origin"], "http://127.0.0.1:5177");
+  } finally {
+    await app.close();
+  }
+});
+
+test("OPTIONS /api/settings/mqtt preflight rejects unknown origins by default", async () => {
+  migrateDatabase();
+  seedDatabase();
+  delete process.env.MANAGEMENT_TRUSTED_ORIGINS;
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/api/settings/mqtt",
+      headers: {
+        origin: "https://evil.example",
+        "access-control-request-method": "PUT"
+      }
+    });
+
+    assert.equal(response.statusCode, 404);
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt rejects untrusted origins and leaves persisted settings unchanged", async () => {
+  migrateDatabase();
+  seedDatabase();
+  delete process.env.MANAGEMENT_TRUSTED_ORIGINS;
+
+  const app = await buildApp();
+
+  try {
+    const before = getDatabase()
+      .prepare("SELECT broker_host, broker_port FROM mqtt_settings LIMIT 1")
+      .get() as { broker_host: string; broker_port: number };
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt",
+      headers: {
+        origin: "https://evil.example"
+      },
+      payload: {
+        host: "evil-broker",
+        port: 2883
+      }
+    });
+
+    assert.equal(response.statusCode, 403);
+
+    const afterRow = getDatabase()
+      .prepare("SELECT broker_host, broker_port FROM mqtt_settings LIMIT 1")
+      .get() as { broker_host: string; broker_port: number };
+
+    assert.deepEqual(afterRow, before);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt allows trusted local operator origins", async () => {
+  migrateDatabase();
+  seedDatabase();
+  process.env.MANAGEMENT_TRUSTED_ORIGINS = "http://127.0.0.1:5177";
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.connect = async () => undefined;
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt",
+      headers: {
+        origin: "http://127.0.0.1:5177"
+      },
+      payload: {
+        host: "trusted-broker",
+        port: 2883
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const row = getDatabase()
+      .prepare("SELECT broker_host, broker_port FROM mqtt_settings LIMIT 1")
+      .get() as { broker_host: string; broker_port: number };
+
+    assert.equal(row.broker_host, "trusted-broker");
+    assert.equal(row.broker_port, 2883);
   } finally {
     await app.close();
   }

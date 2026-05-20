@@ -49,5 +49,12 @@ export const config = {
       process.env.DATABASE_PATH,
       resolve(resolveDataDir(), "solar-display.sqlite")
     );
+  },
+  get managementTrustedOrigins() {
+    return process.env.MANAGEMENT_TRUSTED_ORIGINS;
+  },
+  get managementAccessToken() {
+    const value = process.env.MANAGEMENT_ACCESS_TOKEN?.trim();
+    return value && value.length > 0 ? value : null;
   }
 };

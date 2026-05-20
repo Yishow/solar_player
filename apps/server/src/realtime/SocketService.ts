@@ -36,6 +36,7 @@ export type SystemNotification = {
 };
 
 type SocketServiceOptions = {
+  corsOrigin?: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => void;
   getLiveMetricsSnapshot: () => LiveMetricsSnapshot;
   getMqttStatus: () => MqttStatus;
   io?: SocketServerLike;
@@ -57,7 +58,7 @@ export class SocketService {
       options.io ??
       new SocketIoServer(options.server, {
         cors: {
-          origin: true
+          origin: options.corsOrigin ?? ((_origin, callback) => callback(null, false))
         },
         pingInterval: 25000,
         pingTimeout: 20000

@@ -360,6 +360,34 @@
   border-left-color: var(--color-status-error-500);
 }
 
+.brand-confirm-panel {
+  border: 1px solid rgba(193, 74, 74, 0.22);
+  background: rgba(254, 244, 242, 0.92);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  color: var(--ink-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.brand-confirm-panel strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.brand-confirm-panel p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.brand-confirm-panel-actions {
+  display: flex;
+  gap: var(--grid-gap-xs);
+  margin-top: 14px;
+}
+
 .brand-stage-actions {
   margin-top: auto;
   display: grid;

@@ -7,7 +7,8 @@ const pageSources = [
   "PlaybackSettings/index.tsx",
   "MqttSettings/index.tsx",
   "CircuitSettings/index.tsx",
-  "ImageManagement/index.tsx"
+  "ImageManagement/index.tsx",
+  "BrandAssets/index.tsx"
 ].map((relativePath) => ({
   path: relativePath,
   source: fs.readFileSync(path.join(import.meta.dirname, relativePath), "utf8")
@@ -33,10 +34,21 @@ test("management surfaces keep clean summary reloads inside their display-sync a
   const mqttSettingsSource = pageSources.find((page) => page.path === "MqttSettings/index.tsx")?.source ?? "";
   const circuitSettingsSource = pageSources.find((page) => page.path === "CircuitSettings/index.tsx")?.source ?? "";
   const imageManagementSource = pageSources.find((page) => page.path === "ImageManagement/index.tsx")?.source ?? "";
+  const brandAssetsSource = pageSources.find((page) => page.path === "BrandAssets/index.tsx")?.source ?? "";
 
   assert.match(playbackSettingsSource, /reloadDisplayOpsSummary\(\)/);
   assert.match(mqttSettingsSource, /reloadReadiness\(\)/);
   assert.match(circuitSettingsSource, /reloadReadiness\(\)/);
   assert.match(imageManagementSource, /reloadAssetHealth\(\)/);
   assert.match(imageManagementSource, /reloadAssetReferences\(\)/);
+  assert.match(brandAssetsSource, /resyncBrandProfiles/);
+});
+
+test("BrandAssets exposes operator-facing destructive confirmations instead of confirm-only flows", () => {
+  const brandAssetsSource = pageSources.find((page) => page.path === "BrandAssets/index.tsx")?.source ?? "";
+
+  assert.match(brandAssetsSource, /pendingAction/);
+  assert.match(brandAssetsSource, /brand-confirm-panel/);
+  assert.match(brandAssetsSource, /confirmPendingAction/);
+  assert.match(brandAssetsSource, /cancelPendingAction/);
 });

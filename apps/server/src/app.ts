@@ -11,6 +11,10 @@ import { closeDatabaseConnection } from "./db/index.js";
 import { createLoggerOptions } from "./logger.js";
 import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
+import managementAuthPlugin, {
+  createManagementCorsOriginDelegate,
+  parseManagementTrustedOrigins
+} from "./plugins/managementAuth.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
@@ -63,8 +67,11 @@ export async function buildApp() {
   const app = Fastify({
     logger: createLoggerOptions()
   });
+  const trustedManagementOrigins = parseManagementTrustedOrigins(config.managementTrustedOrigins);
+  const managementCorsOrigin = createManagementCorsOriginDelegate(trustedManagementOrigins);
   let mqttClientService: MqttClientService | null = null;
   const socketService = new SocketService({
+    corsOrigin: managementCorsOrigin,
     getLiveMetricsSnapshot: () => readLiveMetricsSnapshot(),
     getMqttStatus: () =>
       mqttClientService?.getStatus() ?? {
@@ -87,7 +94,12 @@ export async function buildApp() {
 
   await app.register(cors, {
     methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
-    origin: true
+    origin: managementCorsOrigin
+  });
+
+  await managementAuthPlugin(app, {
+    managementAccessToken: config.managementAccessToken,
+    trustedOrigins: trustedManagementOrigins
   });
 
   await app.register(swagger, {
