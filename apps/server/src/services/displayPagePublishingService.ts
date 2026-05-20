@@ -9,7 +9,10 @@ import type {
   ValidationFinding,
   ValidationResult
 } from "@solar-display/shared";
-import { defaultFallbackPolicy } from "@solar-display/shared";
+import {
+  defaultFallbackPolicy,
+  resolveDisplayPageFallbackPolicyByPageId
+} from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { config } from "../config.js";
 import { existsSync, readdirSync } from "node:fs";
@@ -57,7 +60,14 @@ function toEnvelope(
   row: StageConfigRow | undefined
 ): DisplayPageConfigEnvelope {
   if (!row) {
-    return { pageId, regions: {}, updatedAt: null, version: 1, stage, fallbackPolicy: defaultFallbackPolicy };
+    return {
+      pageId,
+      regions: {},
+      updatedAt: null,
+      version: 1,
+      stage,
+      fallbackPolicy: resolveDisplayPageFallbackPolicyByPageId(pageId)
+    };
   }
   return {
     pageId,
@@ -67,7 +77,7 @@ function toEnvelope(
     stage,
     publishedAt: row.published_at,
     publishedBy: row.published_by,
-    fallbackPolicy: defaultFallbackPolicy
+    fallbackPolicy: resolveDisplayPageFallbackPolicyByPageId(pageId)
   };
 }
 

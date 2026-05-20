@@ -67,6 +67,16 @@ export function formatRotationSkipReason(skipReason: DisplayRotationSkipReason) 
       return "素材狀態異常";
     case "data-not-ready":
       return "資料尚未就緒";
+    case "stale-runtime":
+      return "即時資料逾時";
+    case "mqtt-mapping-missing":
+      return "MQTT 指標映射缺失";
+    case "derived-metric-missing":
+      return "衍生指標依賴缺失";
+    case "slot-binding-missing":
+      return "迴路槽位尚未綁定";
+    case "slot-binding-conflict":
+      return "迴路槽位綁定衝突";
     default:
       return skipReason;
   }

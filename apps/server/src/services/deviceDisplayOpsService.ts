@@ -24,7 +24,14 @@ export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLik
     ...new Set(assetAlerts.flatMap((issue) => issue.pageId ? [issue.pageId] : []))
   ];
   const runtimeReadinessAlerts = displayOps.blockingIssues.filter(
-    (issue) => issue.code === "data-not-ready" || issue.code === "unpublished"
+    (issue) =>
+      issue.code === "data-not-ready" ||
+      issue.code === "derived-metric-missing" ||
+      issue.code === "mqtt-mapping-missing" ||
+      issue.code === "slot-binding-conflict" ||
+      issue.code === "slot-binding-missing" ||
+      issue.code === "stale-runtime" ||
+      issue.code === "unpublished"
   );
   const readinessAlerts = readiness.findings
     .filter((finding) => finding.blocking)

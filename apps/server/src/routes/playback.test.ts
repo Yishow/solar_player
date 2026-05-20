@@ -88,6 +88,23 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
+function seedFreshMetricReading(metricKey = "realTimePower") {
+  getDatabase()
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_key) DO UPDATE SET
+          value = excluded.value,
+          unit = excluded.unit,
+          timestamp = excluded.timestamp,
+          quality = excluded.quality,
+          raw_payload = excluded.raw_payload
+      `
+    )
+    .run(metricKey, 586.2, "kW", new Date().toISOString(), "good", '{"value":586.2}');
+}
+
 test("playback shared helpers sort enabled pages, honor schedule, and enter idle mode", () => {
   const enabledPages = getEnabledPlaybackPages(basePages);
   assert.deepEqual(
@@ -509,9 +526,124 @@ test("GET /api/display-pages/rotation-preview exposes runtime playable pages and
     );
     assert.equal(
       body.preview.skippedPages.find((page) => page.pageKey === "overview")?.skipReason,
-      "data-not-ready"
+      "stale-runtime"
     );
     assert.equal(body.preview.fallbackRoute, null);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview uses readiness findings as the dominant skip reason when MQTT mappings are missing", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare("DELETE FROM topic_mappings WHERE metric_key = ?")
+    .run("systemEfficiency");
+  seedFreshMetricReading();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "solar"),
+      false
+    );
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "solar")?.skipReason,
+      "mqtt-mapping-missing"
+    );
+    assert.match(
+      body.preview.skippedPages.find((page) => page.pageKey === "solar")?.detail ?? "",
+      /systemEfficiency/i
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview keeps slot conflicts blocking even in mock mode", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare(
+      `
+        UPDATE circuit_configs
+        SET display_slot = 'production'
+        WHERE id IN (
+          SELECT id
+          FROM circuit_configs
+          WHERE enabled = 1
+          ORDER BY id ASC
+          LIMIT 2
+        )
+      `
+    )
+    .run();
+
+  const app = await buildApp();
+
+  try {
+    const mqttResponse = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt",
+      payload: {
+        clientId: "solar-display-player",
+        dataMode: "mock",
+        host: "localhost",
+        messageTimeout: 30,
+        password: "",
+        port: 1883,
+        reconnectInterval: 5000,
+        username: ""
+      }
+    });
+    assert.equal(mqttResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "factory-circuit"),
+      false
+    );
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "factory-circuit")?.skipReason,
+      "slot-binding-conflict"
+    );
+    assert.match(
+      body.preview.skippedPages.find((page) => page.pageKey === "factory-circuit")?.detail ?? "",
+      /slot conflict/i
+    );
   } finally {
     await app.close();
   }

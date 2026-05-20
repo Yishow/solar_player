@@ -1,15 +1,22 @@
 import type {
+  DisplayReadinessFinding,
   DisplayPageTemplateKey,
   DisplayRotationPageCondition,
   DisplayRotationPlan,
   DisplayRotationPreview,
+  FallbackPolicy,
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
-import { buildDisplayRotationPlan, evaluateDisplayRotation } from "@solar-display/shared";
+import {
+  buildDisplayRotationPlan,
+  evaluateDisplayRotation,
+  resolveDisplayPageFallbackPolicyByPageId
+} from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
+import { readDisplayReadinessReport } from "./displayReadinessService.js";
 
 type PlaybackSettingsRow = {
   autoplay: number;
@@ -62,6 +69,134 @@ const liveDataPageKeys = new Set<DisplayPageTemplateKey>([
   "factory-circuit",
   "sustainability"
 ]);
+
+function buildReadinessFindingsByTemplateKey() {
+  const byTemplateKey = new Map<DisplayPageTemplateKey, DisplayReadinessFinding[]>();
+
+  for (const finding of readDisplayReadinessReport().findings) {
+    if (!finding.blocking || !liveDataPageKeys.has(finding.pageId)) {
+      continue;
+    }
+
+    const findings = byTemplateKey.get(finding.pageId) ?? [];
+    findings.push(finding);
+    byTemplateKey.set(finding.pageId, findings);
+  }
+
+  return byTemplateKey;
+}
+
+function resolveReadinessFindingPriority(finding: DisplayReadinessFinding) {
+  if (finding.sourceType === "circuit-slot" && finding.reason.startsWith("slot conflict")) {
+    return 0;
+  }
+
+  if (finding.sourceType === "circuit-slot") {
+    return 1;
+  }
+
+  if (finding.sourceType === "mqtt-metric") {
+    return 2;
+  }
+
+  if (finding.sourceType === "derived-metric") {
+    return 3;
+  }
+
+  return 4;
+}
+
+function resolveReadinessSkipReason(findings: DisplayReadinessFinding[]) {
+  const dominantFinding = [...findings].sort((left, right) => {
+    const priorityDelta =
+      resolveReadinessFindingPriority(left) - resolveReadinessFindingPriority(right);
+
+    if (priorityDelta !== 0) {
+      return priorityDelta;
+    }
+
+    return left.requirementKey.localeCompare(right.requirementKey);
+  })[0];
+
+  if (!dominantFinding) {
+    return null;
+  }
+
+  if (dominantFinding.sourceType === "circuit-slot") {
+    return dominantFinding.reason.startsWith("slot conflict")
+      ? {
+          detail: dominantFinding.reason,
+          skipReason: "slot-binding-conflict"
+        }
+      : {
+          detail: dominantFinding.reason,
+          skipReason: "slot-binding-missing"
+        };
+  }
+
+  if (dominantFinding.sourceType === "derived-metric") {
+    return {
+      detail: dominantFinding.reason,
+      skipReason: "derived-metric-missing"
+    };
+  }
+
+  return {
+    detail: dominantFinding.reason,
+    skipReason: "mqtt-mapping-missing"
+  };
+}
+
+function resolveRuntimeDataCondition(args: {
+  fallbackPolicy: FallbackPolicy;
+  liveMetricsTimestamp: string | null;
+  metricsFresh: boolean;
+  mqttStatus: MqttStatusLike;
+  pageRequiresLiveData: boolean;
+}) {
+  if (!args.pageRequiresLiveData) {
+    return null;
+  }
+
+  if (args.mqttStatus.reason === "mock") {
+    return args.fallbackPolicy.staleData === "hide"
+      ? {
+          detail: "目前為 mock mode，但此頁 fallback policy 不允許以 degraded runtime 播放。",
+          skipReason: "stale-runtime"
+        }
+      : null;
+  }
+
+  if (args.metricsFresh) {
+    return null;
+  }
+
+  return args.fallbackPolicy.staleData === "hide"
+    ? {
+        detail: args.liveMetricsTimestamp
+          ? `最後資料時間 ${args.liveMetricsTimestamp} 已超過 freshness window`
+          : "尚未收到可用的即時資料",
+        skipReason: "stale-runtime"
+      }
+    : null;
+}
+
+function resolveAssetCondition(args: {
+  assetMessage: string | null;
+  fallbackPolicy: FallbackPolicy;
+  hasAssetFindings: boolean;
+}) {
+  if (!args.hasAssetFindings) {
+    return null;
+  }
+
+  return args.fallbackPolicy.missingAsset === "hide"
+    ? {
+        detail: args.assetMessage,
+        isHealthy: false
+      }
+    : null;
+}
 
 export type PlaybackPageUpdateInput = {
   id: number;
@@ -318,6 +453,7 @@ function buildPageConditions(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
   const liveMetrics = readLiveMetricsSnapshot();
+  const readinessFindingsByTemplateKey = buildReadinessFindingsByTemplateKey();
   const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
   const metricsFresh =
     liveMetrics.timestamp !== null &&
@@ -329,23 +465,50 @@ function buildPageConditions(
     const assetFindings = liveStage
       ? collectDisplayPageAssetFindings(page.pageKey, parseRegions(liveStage.config_json))
       : [];
+    const fallbackPolicy = resolveDisplayPageFallbackPolicyByPageId(
+      page.pageKey,
+      page.templateKey ?? null
+    );
     const pageRequiresLiveData =
       page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
-    const dataReady = !pageRequiresLiveData || mqttStatus.reason === "mock" || metricsFresh;
+    const readinessCondition =
+      page.templateKey === undefined
+        ? null
+        : resolveReadinessSkipReason(
+            readinessFindingsByTemplateKey.get(page.templateKey) ?? []
+          );
+    const runtimeDataCondition = resolveRuntimeDataCondition({
+      fallbackPolicy,
+      liveMetricsTimestamp: liveMetrics.timestamp,
+      metricsFresh,
+      mqttStatus,
+      pageRequiresLiveData
+    });
+    const assetCondition = resolveAssetCondition({
+      assetMessage: assetFindings[0]?.message ?? null,
+      fallbackPolicy,
+      hasAssetFindings: assetFindings.length > 0
+    });
+    const dominantSkipReason =
+      readinessCondition?.skipReason ?? runtimeDataCondition?.skipReason ?? null;
+    const dominantDetail =
+      readinessCondition?.detail ?? runtimeDataCondition?.detail ?? assetCondition?.detail ?? null;
+    const isReady =
+      readinessCondition === null &&
+      (!pageRequiresLiveData ||
+        metricsFresh ||
+        mqttStatus.reason === "mock" ||
+        fallbackPolicy.staleData !== "hide");
 
     pageConditions[page.id] = {
-      detail:
-        !dataReady && pageRequiresLiveData
-          ? liveMetrics.timestamp
-            ? `最後資料時間 ${liveMetrics.timestamp} 已超過 freshness window`
-            : "尚未收到可用的即時資料"
-          : assetFindings[0]?.message ?? null,
-      isHealthy: assetFindings.length === 0,
+      detail: dominantDetail,
+      isHealthy: assetCondition?.isHealthy ?? assetFindings.length === 0,
       isPublished:
         liveStage === undefined ||
         liveStage.published_at !== null ||
         Object.keys(parseRegions(liveStage.config_json)).length === 0,
-      isReady: dataReady
+      isReady,
+      skipReason: dominantSkipReason
     };
   }
 

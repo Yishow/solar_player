@@ -35,8 +35,8 @@ export function shouldRedirectToOffline({
     return false;
   }
 
-  if (rotation?.fallbackRoute === "/offline" && !rotation.hasPlayablePages) {
-    return true;
+  if (rotation) {
+    return rotation.fallbackRoute === "/offline";
   }
 
   if (routeMeta.allowOfflineWhenDisconnected) {

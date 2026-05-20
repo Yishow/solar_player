@@ -106,7 +106,7 @@ test("GET /api/display-ops summarizes pending drafts, skip reasons, and live pub
     assert.ok(overview);
     assert.equal(overview.publishState, "draft-pending");
     assert.equal(overview.draftPending, true);
-    assert.equal(overview.skipReason, "data-not-ready");
+    assert.equal(overview.skipReason, "stale-runtime");
     assert.equal(
       body.summary.blockingIssues.some(
         (issue) => issue.code === "draft-pending" && issue.pageId === "overview"

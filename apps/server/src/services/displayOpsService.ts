@@ -119,16 +119,27 @@ function buildPageSummaries(
     }
 
     if (skipped?.skipReason) {
+      const mappedIssueCode =
+        skipped.skipReason === "asset-unhealthy"
+          ? "asset-unhealthy"
+          : skipped.skipReason === "data-not-ready"
+            ? "data-not-ready"
+            : skipped.skipReason === "derived-metric-missing"
+              ? "derived-metric-missing"
+              : skipped.skipReason === "mqtt-mapping-missing"
+                ? "mqtt-mapping-missing"
+                : skipped.skipReason === "slot-binding-conflict"
+                  ? "slot-binding-conflict"
+                  : skipped.skipReason === "slot-binding-missing"
+                    ? "slot-binding-missing"
+                    : skipped.skipReason === "stale-runtime"
+                      ? "stale-runtime"
+                      : skipped.skipReason === "unpublished"
+                        ? "unpublished"
+                        : "skip-active";
       blockingIssues.push(
         buildIssue({
-          code:
-            skipped.skipReason === "asset-unhealthy"
-              ? "asset-unhealthy"
-              : skipped.skipReason === "data-not-ready"
-                ? "data-not-ready"
-                : skipped.skipReason === "unpublished"
-                  ? "unpublished"
-                  : "skip-active",
+          code: mappedIssueCode,
           message: skipped.detail ?? `${page.labelZh} 目前不會進入正式輪播`,
           pageId,
           severity: skipped.skipReason === "disabled" ? "warning" : "blocking"

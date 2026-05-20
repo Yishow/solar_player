@@ -4,9 +4,14 @@ import type { DisplayRotationSkipReason } from "./displayRotation.js";
 export type DisplayOpsIssueCode =
   | "asset-unhealthy"
   | "data-not-ready"
+  | "derived-metric-missing"
   | "draft-pending"
   | "live-reference"
+  | "mqtt-mapping-missing"
   | "skip-active"
+  | "slot-binding-conflict"
+  | "slot-binding-missing"
+  | "stale-runtime"
   | "unpublished";
 
 export type DisplayOpsIssueSeverity = "blocking" | "warning";

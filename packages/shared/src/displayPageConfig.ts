@@ -248,3 +248,56 @@ export const defaultFallbackPolicy: FallbackPolicy = {
   missingAsset: "show-seed",
   emptyContent: "hide"
 };
+
+export const displayPageFallbackPolicyByTemplateKey: Record<DisplayPageTemplateKey, FallbackPolicy> = {
+  overview: {
+    emptyContent: "hide",
+    missingAsset: "show-seed",
+    staleData: "hide"
+  },
+  solar: {
+    emptyContent: "hide",
+    missingAsset: "show-seed",
+    staleData: "hide"
+  },
+  "factory-circuit": {
+    emptyContent: "hide",
+    missingAsset: "show-placeholder",
+    staleData: "hide"
+  },
+  images: {
+    emptyContent: "hide",
+    missingAsset: "show-seed",
+    staleData: "show-placeholder"
+  },
+  sustainability: {
+    emptyContent: "hide",
+    missingAsset: "show-seed",
+    staleData: "hide"
+  }
+};
+
+export function resolveDisplayPageTemplateKeyFromPageId(pageId: string): DisplayPageTemplateKey | null {
+  if (isDisplayPageTemplateKey(pageId)) {
+    return pageId;
+  }
+
+  const matchedTemplateKey = displayPageTemplateKeys.find(
+    (templateKey) => pageId === templateKey || pageId.startsWith(`${templateKey}-`)
+  );
+
+  return matchedTemplateKey ?? null;
+}
+
+export function resolveDisplayPageFallbackPolicyByPageId(
+  pageId: string,
+  templateKey?: DisplayPageTemplateKey | null
+): FallbackPolicy {
+  const resolvedTemplateKey = templateKey ?? resolveDisplayPageTemplateKeyFromPageId(pageId);
+
+  if (!resolvedTemplateKey) {
+    return defaultFallbackPolicy;
+  }
+
+  return displayPageFallbackPolicyByTemplateKey[resolvedTemplateKey] ?? defaultFallbackPolicy;
+}

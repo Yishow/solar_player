@@ -79,7 +79,7 @@ const effectiveRotationPreview: DisplayRotationPreview = {
       labelZh: "太陽能",
       pageKey: "solar",
       route: "/solar",
-      skipReason: "data-not-ready"
+      skipReason: "stale-runtime"
     },
     {
       detail: null,
@@ -179,8 +179,8 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         detail: "尚未收到可用的即時資料",
         labelEn: "Solar",
         labelZh: "太陽能",
-        skipReasonLabel: "資料尚未就緒",
-        skipReasonText: "data-not-ready"
+        skipReasonLabel: "即時資料逾時",
+        skipReasonText: "stale-runtime"
       },
       {
         detail: null,

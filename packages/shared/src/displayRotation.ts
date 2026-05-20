@@ -12,7 +12,12 @@ export const displayRotationSkipReasons = [
   "out-of-schedule",
   "unpublished",
   "asset-unhealthy",
-  "data-not-ready"
+  "data-not-ready",
+  "stale-runtime",
+  "mqtt-mapping-missing",
+  "derived-metric-missing",
+  "slot-binding-missing",
+  "slot-binding-conflict"
 ] as const;
 
 export type DisplayRotationSkipReason =

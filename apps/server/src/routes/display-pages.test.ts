@@ -205,6 +205,58 @@ test("GET /api/display-pages/:pageId/live returns live stage config", async () =
   }
 });
 
+test("GET /api/display-pages/:pageId/live exposes the shared fallback policy metadata for live-dependent pages", async () => {
+  const app = await buildApp();
+
+  try {
+    const [overviewResponse, factoryResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/display-pages/overview/live"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/display-pages/factory-circuit/live"
+      })
+    ]);
+
+    assert.equal(overviewResponse.statusCode, 200);
+    assert.equal(factoryResponse.statusCode, 200);
+
+    const overviewBody = overviewResponse.json() as {
+      config: {
+        fallbackPolicy: {
+          emptyContent: string;
+          missingAsset: string;
+          staleData: string;
+        };
+      };
+    };
+    const factoryBody = factoryResponse.json() as {
+      config: {
+        fallbackPolicy: {
+          emptyContent: string;
+          missingAsset: string;
+          staleData: string;
+        };
+      };
+    };
+
+    assert.deepEqual(overviewBody.config.fallbackPolicy, {
+      emptyContent: "hide",
+      missingAsset: "show-seed",
+      staleData: "hide"
+    });
+    assert.deepEqual(factoryBody.config.fallbackPolicy, {
+      emptyContent: "hide",
+      missingAsset: "show-placeholder",
+      staleData: "hide"
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/display-pages/:pageId/publish promotes draft to live", async () => {
   const app = await buildApp();
 

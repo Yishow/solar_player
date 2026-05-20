@@ -75,3 +75,29 @@ test("playback routes redirect to offline when rotation preview reports no playa
     true
   );
 });
+
+test("rotation eligibility takes precedence over raw mqtt disconnect state once preview is available", () => {
+  const routeMeta: RouteMeta = {
+    path: "/requires-live-data",
+    navLabel: "即時頁",
+    title: "即時頁",
+    subtitle: "Live Data",
+    group: "playback",
+    order: 999,
+    shellDensity: "playback"
+  };
+
+  assert.equal(
+    shouldRedirectToOffline({
+      isHydrated: true,
+      pathname: routeMeta.path,
+      rotation: {
+        fallbackRoute: null,
+        hasPlayablePages: true
+      },
+      routeMeta,
+      status: disconnectedStatus
+    }),
+    false
+  );
+});
