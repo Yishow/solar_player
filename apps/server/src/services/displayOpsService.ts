@@ -1,3 +1,6 @@
+import {
+  resolveDisplayFaultTriageSummaryFromDisplayOps
+} from "@solar-display/shared";
 import type {
   DisplayOpsAssetReference,
   DisplayOpsAssetReferenceSummary,
@@ -317,9 +320,10 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
 export function readDisplayOpsSummary(options: { mqttStatus: MqttStatusLike }): DisplayOpsSummary {
   const pages = buildPageSummaries(readPlaybackPages(), options.mqttStatus);
   const livePages = pages.filter((page) => page.liveVersion !== null);
+  const blockingIssues = pages.flatMap((page) => page.blockingIssues);
 
   return {
-    blockingIssues: pages.flatMap((page) => page.blockingIssues),
+    blockingIssues,
     draftCount: pages.filter((page) => page.draftPending).length,
     draftPending: pages.some((page) => page.draftPending),
     generatedAt: new Date().toISOString(),
@@ -332,7 +336,10 @@ export function readDisplayOpsSummary(options: { mqttStatus: MqttStatusLike }): 
       0
     ) || null,
     pages,
-    skipCount: pages.filter((page) => page.skipState === "skipped").length
+    skipCount: pages.filter((page) => page.skipState === "skipped").length,
+    triageSummary: resolveDisplayFaultTriageSummaryFromDisplayOps({
+      blockingIssues
+    })
   };
 }
 

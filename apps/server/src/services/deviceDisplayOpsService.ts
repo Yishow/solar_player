@@ -43,7 +43,7 @@ export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLik
     }));
 
   return {
-    alerts: [...assetAlerts, ...readinessAlerts],
+    alerts: [...assetAlerts, ...runtimeReadinessAlerts, ...readinessAlerts],
     assetHealthSummary: {
       affectedPages: affectedAssetPages,
       unhealthyCount: affectedAssetPages.length
@@ -63,7 +63,8 @@ export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLik
       pages: displayOps.pages
         .filter((page) => page.skipState === "skipped")
         .map((page) => page.pageId)
-    }
+    },
+    triageSummary: displayOps.triageSummary ?? null
   };
 }
 

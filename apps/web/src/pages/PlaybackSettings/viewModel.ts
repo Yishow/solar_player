@@ -1,9 +1,11 @@
 import type {
+  DisplayFaultTriageSummary,
   DisplayOpsSummary,
   DisplayRotationPreview,
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
+import { resolveDisplayFaultTriageSummaryFromDisplayOps } from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import {
@@ -74,6 +76,18 @@ function formatStartPageLabel(settings: PlaybackSettings | null, pages: Playback
   return `${padOrder(matchedPage.displayOrder)}. ${matchedPage.labelZh}`;
 }
 
+function formatTriagePages(summary: DisplayFaultTriageSummary) {
+  return summary.affectedPages.length > 0 ? summary.affectedPages.join("、") : "global";
+}
+
+function formatTriageDetail(summary: DisplayFaultTriageSummary) {
+  const nextStep = summary.repairDestinationLabel
+    ? `下一步：${summary.repairDestinationLabel}`
+    : "請改由管理頁面檢查整體 display readiness。";
+
+  return `受影響頁面：${formatTriagePages(summary)} · 主因：${summary.dominantReason} · ${nextStep}`;
+}
+
 export function reorderPlaybackPages(
   pages: PlaybackPage[],
   id: number,
@@ -115,6 +129,9 @@ export function buildPlaybackSettingsViewModel({
   const enabledCount = sortedPages.filter((page) => page.enabled).length;
   const totalDurationSeconds = sortedPages.reduce((sum, page) => sum + page.durationSeconds, 0);
   const scheduleEnabled = settings?.scheduleEnabled ?? false;
+  const triageSummary =
+    displayOpsSummary?.triageSummary
+    ?? resolveDisplayFaultTriageSummaryFromDisplayOps(displayOpsSummary ?? null);
 
   return {
     pageRows: sortedPages.map((page, index) => ({
@@ -132,10 +149,14 @@ export function buildPlaybackSettingsViewModel({
     },
     displayOpsBanner: {
       detail:
-        displayOpsSummary?.blockingIssues[0]?.message ??
-        "rotation publish、skip 與 draft pending 狀態會在這裡同步。",
+        triageSummary
+          ? formatTriageDetail(triageSummary)
+          : displayOpsSummary?.blockingIssues[0]?.message
+            ?? "rotation publish、skip 與 draft pending 狀態會在這裡同步。",
       title:
-        displayOpsSummary?.draftPending
+        triageSummary
+          ? `受影響頁面：${formatTriagePages(triageSummary)}`
+          : displayOpsSummary?.draftPending
           ? `有 ${displayOpsSummary.draftCount} 頁尚未發布`
           : "Display operations 已同步",
       tone:
@@ -145,6 +166,7 @@ export function buildPlaybackSettingsViewModel({
             ? ("warning" as const)
             : ("ready" as const)
     },
+    triageSummary,
     pendingDraftRows:
       displayOpsSummary?.pages
         .filter((page) => page.draftPending)

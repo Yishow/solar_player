@@ -1,5 +1,6 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
 import type { DisplayRotationSkipReason } from "./displayRotation.js";
+import type { DisplayFaultTriageSummary } from "./deviceDisplayOps.js";
 
 export type DisplayOpsIssueCode =
   | "asset-unhealthy"
@@ -74,6 +75,7 @@ export type DisplayOpsSummary = {
   liveVersion: number | null;
   pages: DisplayOpsPageSummary[];
   skipCount: number;
+  triageSummary?: DisplayFaultTriageSummary | null;
 };
 
 export type DisplaySyncEventScope =

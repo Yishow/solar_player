@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ReferenceGlyph } from "../../components/ReferenceGlyph";
+import { useDisplayOpsSummary } from "../../hooks/useDisplayOpsSummary";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { getSocketClient } from "../../services/socket";
@@ -33,6 +34,7 @@ export function OfflineError() {
   const navigate = useNavigate();
   const location = useLocation();
   const { lastUpdatedAt } = useLiveMetrics();
+  const { summary: displayOpsSummary } = useDisplayOpsSummary();
   const { status } = useMqttStatus();
   const [retryCountdown, setRetryCountdown] = useState(RETRY_SECONDS);
 
@@ -81,7 +83,8 @@ export function OfflineError() {
     lastUpdatedAt: lastUpdatedAt ?? status.updatedAt,
     reason: status.reason,
     retryCountdown,
-    returnTo
+    returnTo,
+    triageSummary: displayOpsSummary?.triageSummary ?? null
   });
 
   const backgroundLayout = withContentOffset(offlineBackgroundLayout);

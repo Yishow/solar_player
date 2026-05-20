@@ -1,8 +1,11 @@
+import type { DisplayFaultTriageSummary } from "@solar-display/shared";
+
 type BuildOfflineErrorViewModelArgs = {
   lastUpdatedAt: string | null;
   reason: string | null;
   retryCountdown: number;
   returnTo: string;
+  triageSummary?: DisplayFaultTriageSummary | null;
 };
 
 function formatTimestamp(value: string | null) {
@@ -40,33 +43,63 @@ function resolveReasonLabel(reason: string | null) {
   return reason;
 }
 
-export function buildOfflineErrorViewModel({
-  lastUpdatedAt,
-  reason,
-  retryCountdown,
-  returnTo
-}: BuildOfflineErrorViewModelArgs) {
-  return {
-    guidanceRows: [
-      {
-        label: "最後更新時間",
-        value: formatTimestamp(lastUpdatedAt)
-      },
-      {
-        label: "錯誤原因",
-        value: resolveReasonLabel(reason)
-      },
+function buildGuidanceRows(lastUpdatedAt: string | null, reason: string | null, triageSummary?: DisplayFaultTriageSummary | null) {
+  const baselineRows = [
+    {
+      label: "最後更新時間",
+      value: formatTimestamp(lastUpdatedAt)
+    },
+    {
+      label: "錯誤原因",
+      value: resolveReasonLabel(reason)
+    }
+  ];
+
+  if (!triageSummary) {
+    return [
+      ...baselineRows,
       {
         label: "建議處理方式",
         value: "請檢查網路、broker 狀態與 `settings/mqtt` 設定，必要時先切回備援輪播。"
       }
-    ],
+    ];
+  }
+
+  return [
+    ...baselineRows,
+    {
+      label: "受影響頁面",
+      value: triageSummary.affectedPages.length > 0 ? triageSummary.affectedPages.join("、") : "global"
+    },
+    {
+      label: "主導原因",
+      value: triageSummary.dominantReason
+    },
+    {
+      label: "下一步",
+      value: triageSummary.repairDestinationLabel
+        ? `前往 ${triageSummary.repairDestinationLabel}`
+        : "請改由管理頁面檢查整體 display readiness。"
+    }
+  ];
+}
+
+export function buildOfflineErrorViewModel({
+  lastUpdatedAt,
+  reason,
+  retryCountdown,
+  returnTo,
+  triageSummary
+}: BuildOfflineErrorViewModelArgs) {
+  return {
+    guidanceRows: buildGuidanceRows(lastUpdatedAt, reason, triageSummary),
     headline: "無法取得即時資料",
     iconKey: "offline-error" as const,
     reasonLabel: resolveReasonLabel(reason),
     returnToLabel: returnTo,
     retryLabel: `將於 ${retryCountdown} 秒後重新嘗試連線`,
     subtitle: "Unable to retrieve live data.",
-    lastUpdatedLabel: formatTimestamp(lastUpdatedAt)
+    lastUpdatedLabel: formatTimestamp(lastUpdatedAt),
+    triageSummary: triageSummary ?? null
   };
 }

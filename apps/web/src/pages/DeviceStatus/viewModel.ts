@@ -1,4 +1,8 @@
-import type { DeviceDisplayOpsSummary } from "@solar-display/shared";
+import {
+  resolveDisplayFaultTriageSummaryFromAlerts,
+  type DeviceDisplayOpsSummary,
+  type DisplayFaultTriageSummary
+} from "@solar-display/shared";
 import type { DeviceLogExportMetadata } from "../../services/api";
 
 type DeviceRouteStatus = {
@@ -119,6 +123,18 @@ function formatTimestamp(value: string | null | undefined) {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
+function formatTriagePages(summary: DisplayFaultTriageSummary) {
+  return summary.affectedPages.length > 0 ? summary.affectedPages.join("、") : "global";
+}
+
+function formatTriageHelper(summary: DisplayFaultTriageSummary) {
+  const nextStep = summary.repairDestinationLabel
+    ? `下一步：${summary.repairDestinationLabel}`
+    : "請改由管理頁面檢查整體 display readiness。";
+
+  return `受影響頁面：${formatTriagePages(summary)} · 主因：${summary.dominantReason} · ${nextStep}`;
+}
+
 export function buildDeviceStatusViewModel({
   actionFeedback,
   displayOpsSummary,
@@ -128,6 +144,9 @@ export function buildDeviceStatusViewModel({
   status
 }: BuildDeviceStatusViewModelArgs) {
   const runtimeSummary = buildRuntimeSummary(isLoading, status);
+  const triageSummary =
+    displayOpsSummary?.triageSummary
+    ?? resolveDisplayFaultTriageSummaryFromAlerts(displayOpsSummary?.alerts ?? null);
 
   return {
     feedback:
@@ -168,8 +187,10 @@ export function buildDeviceStatusViewModel({
       diagnostics: displayOpsSummary?.diagnosticActions ?? [],
       draftCount: displayOpsSummary?.draftCount ?? 0,
       helper:
-        displayOpsSummary?.alerts[0]?.message ??
-        "可在此查看 live publish、skip 與 readiness 摘要。",
+        triageSummary
+          ? formatTriageHelper(triageSummary)
+          : displayOpsSummary?.alerts[0]?.message
+            ?? "可在此查看 live publish、skip 與 readiness 摘要。",
       lastPublishLabel: formatTimestamp(displayOpsSummary?.lastPublishAt),
       liveVersion:
         displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined
@@ -179,6 +200,7 @@ export function buildDeviceStatusViewModel({
       skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
       statusTitle: displayOpsSummary?.degraded ? "展示退化" : "展示正常"
     },
+    triageSummary,
     logsSummary: logExportError
       ? {
           detail: logExportError,

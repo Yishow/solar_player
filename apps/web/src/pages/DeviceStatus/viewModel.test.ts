@@ -118,3 +118,54 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
   assert.equal(model.logsSummary.statusTitle, "日誌不可用");
   assert.equal(model.logsSummary.fileCountLabel, "Unavailable");
 });
+
+test("buildDeviceStatusViewModel preserves unpublished triage semantics across the device surface", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    displayOpsSummary: {
+      alerts: [
+        {
+          code: "unpublished",
+          message: "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播",
+          pageId: "factory-circuit",
+          severity: "blocking"
+        }
+      ],
+      assetHealthSummary: {
+        affectedPages: [],
+        unhealthyCount: 0
+      },
+      degraded: true,
+      diagnosticActions: [],
+      draftCount: 1,
+      generatedAt: "2026-05-20T02:45:00.000Z",
+      lastPublishAt: "2026-05-20T01:30:00.000Z",
+      liveVersion: 6,
+      readinessSummary: {
+        blockingCount: 1,
+        warningCount: 0
+      },
+      skipSummary: {
+        count: 1,
+        pages: ["factory-circuit"]
+      },
+      triageSummary: {
+        affectedPages: ["factory-circuit"],
+        dominantReason: "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播",
+        faultKind: "publish-state",
+        repairDestinationKey: "display-pages-editor",
+        repairDestinationLabel: "Display Pages Editor",
+        sourceIssueCode: "unpublished"
+      }
+    } as never,
+    isLoading: false,
+    logExport: null,
+    logExportError: "",
+    status: null
+  });
+
+  assert.equal(model.triageSummary?.dominantReason, "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播");
+  assert.deepEqual(model.triageSummary?.affectedPages, ["factory-circuit"]);
+  assert.equal(model.triageSummary?.repairDestinationLabel, "Display Pages Editor");
+  assert.match(model.displayOpsSummary.helper, /Display Pages Editor/);
+});

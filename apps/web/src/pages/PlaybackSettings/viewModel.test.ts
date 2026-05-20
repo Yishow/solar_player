@@ -192,3 +192,98 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
     ]
   );
 });
+
+test("buildPlaybackSettingsViewModel maps dominant display faults into repair destinations", () => {
+  const cases = [
+    {
+      code: "mqtt-mapping-missing" as const,
+      expectedDestination: "MQTT Settings",
+      expectedKind: "mqtt-mapping",
+      message: "overview 缺少必要的 MQTT mapping",
+      pageId: "overview" as const
+    },
+    {
+      code: "slot-binding-missing" as const,
+      expectedDestination: "Circuit Settings",
+      expectedKind: "slot-binding",
+      message: "solar 缺少必要的 circuit slot 綁定",
+      pageId: "solar" as const
+    },
+    {
+      code: "stale-runtime" as const,
+      expectedDestination: "Playback Settings",
+      expectedKind: "runtime-readiness",
+      message: "images runtime 已逾時，暫時跳過輪播",
+      pageId: "images" as const
+    },
+    {
+      code: "unpublished" as const,
+      expectedDestination: "Display Pages Editor",
+      expectedKind: "publish-state",
+      message: "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播",
+      pageId: "factory-circuit" as const
+    }
+  ];
+
+  for (const testCase of cases) {
+    const model = buildPlaybackSettingsViewModel({
+      errorMessage: "",
+      isSaving: false,
+      message: "播放設定已同步。",
+      pages,
+      displayOpsSummary: {
+        blockingIssues: [
+          {
+            code: testCase.code,
+            message: testCase.message,
+            pageId: testCase.pageId,
+            severity: "blocking"
+          }
+        ],
+        draftCount: 0,
+        draftPending: false,
+        generatedAt: "2026-05-20T02:45:00.000Z",
+        lastPublishAt: "2026-05-20T01:30:00.000Z",
+        liveVersion: 6,
+        pages: [
+          {
+            blockingIssues: [
+              {
+                code: testCase.code,
+                message: testCase.message,
+                pageId: testCase.pageId,
+                severity: "blocking"
+              }
+            ],
+            draftPending: false,
+            draftVersion: null,
+            labelEn: testCase.pageId,
+            labelZh: testCase.pageId,
+            liveVersion: 6,
+            pageId: testCase.pageId,
+            publishState: testCase.code === "unpublished" ? "draft-only" : "live",
+            route: `/${testCase.pageId}`,
+            skipDetail: testCase.message,
+            skipReason:
+              testCase.code === "mqtt-mapping-missing"
+                ? "mqtt-mapping-missing"
+                : testCase.code === "slot-binding-missing"
+                  ? "slot-binding-missing"
+                  : testCase.code === "stale-runtime"
+                    ? "stale-runtime"
+                    : "unpublished",
+            skipState: "skipped"
+          }
+        ],
+        skipCount: 1
+      },
+      rotationPreview: effectiveRotationPreview,
+      settings
+    });
+
+    assert.equal(model.triageSummary?.repairDestinationLabel, testCase.expectedDestination);
+    assert.equal(model.triageSummary?.faultKind, testCase.expectedKind);
+    assert.deepEqual(model.triageSummary?.affectedPages, [testCase.pageId]);
+    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.expectedDestination));
+  }
+});
