@@ -1,6 +1,5 @@
 import type { DisplayReadinessReport } from "@solar-display/shared";
 import type { ReactNode } from "react";
-import { DisplayReadinessPanel } from "../../components/DisplayReadinessPanel";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import type {
   ActionState,
@@ -55,6 +54,13 @@ function resolveConnStatus(statusTone: "connected" | "connecting" | "disconnecte
   if (statusTone === "connected") return "is-connected";
   if (statusTone === "disconnected") return "is-error";
   return "is-warning";
+}
+
+function resolveCoverageChipClass(stateLabel: string) {
+  if (stateLabel === "Ready") return "mgmt-chip is-success";
+  if (stateLabel === "Mapping Gap") return "mgmt-chip is-danger";
+  if (stateLabel === "Idle Runtime") return "mgmt-chip is-warning";
+  return "mgmt-chip";
 }
 
 export function MqttSettingsContent(props: MqttSettingsContentProps) {
@@ -114,35 +120,6 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
         </div>
       </section>
 
-      <DisplayReadinessPanel
-        errorMessage={props.readinessErrorMessage}
-        findings={props.readiness?.findings ?? []}
-        isLoading={props.actionState.isLoadingSettings && props.readiness === null}
-        sourceType="mqtt-metric"
-        title="展示資料覆蓋率"
-      />
-
-      <section className="settings-card">
-        <div className="settings-card__title">Runtime Readiness<small>Live Coverage Feedback</small></div>
-        <div className={`conn-status ${resolveConnStatus(viewModel.runtimePreview.statusTone)}`} role="status">
-          <span className="conn-status__dot" aria-hidden />
-          {viewModel.runtimePreview.statusLabel}
-          <small>{viewModel.runtimePreview.statusDetail}</small>
-        </div>
-        {viewModel.coverageRows.length === 0 ? (
-          <div className="mgmt-status">目前沒有 MQTT runtime coverage finding。</div>
-        ) : (
-          <div className="mgmt-status">
-            {viewModel.coverageRows.map((row) => (
-              <div key={`${row.pageId}-${row.requirementKey}`} style={{ marginTop: 6 }}>
-                [{row.stateLabel}] {row.pageId} · {row.metricLabelZh}
-                <small style={{ display: "block", opacity: 0.72 }}>{row.detail}</small>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       <section className="settings-card mqtt-topic">
         <div className="settings-card__title">即時 Topic 清單<small>Live Topic List</small></div>
         {viewModel.liveTopicRows.length === 0 ? (
@@ -195,6 +172,31 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
 
       <section className="settings-card mqtt-preview">
         <div className="settings-card__title">即時資料預覽<small>Live Data Preview</small></div>
+        <div className="mqtt-runtime-summary">
+          <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.runtimePreview.statusTone)}`} role="status">
+            <span className="conn-status__dot" aria-hidden />
+            {viewModel.runtimePreview.statusLabel}
+            <small>{viewModel.runtimePreview.statusDetail}</small>
+          </div>
+          {props.readinessErrorMessage ? (
+            <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
+          ) : viewModel.coverageRows.length > 0 ? (
+            <div className="mqtt-runtime-feedback">
+              {viewModel.coverageRows.slice(0, 3).map((row) => (
+                <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
+                  <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
+                  <div className="mqtt-runtime-feedback__copy">
+                    <strong>{row.metricLabelZh}</strong>
+                    <small>{row.detail}</small>
+                  </div>
+                </div>
+              ))}
+              {viewModel.coverageRows.length > 3 ? (
+                <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         {viewModel.emptyState ? (
           <div className="empty-block">{viewModel.emptyState.title}<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>{viewModel.emptyState.description}</span></div>
         ) : (

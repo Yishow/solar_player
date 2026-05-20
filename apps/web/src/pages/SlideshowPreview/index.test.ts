@@ -10,8 +10,8 @@ test("slideshow preview renders cards from the shared live preview catalog inste
   assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(slideshowPreviewSource, /<LiveSlideshowPreviewCards/);
   assert.match(slideshowPreviewSource, /viewModel\.debugStatus/);
-  assert.match(slideshowPreviewSource, /viewModel\.debugRows/);
-  assert.match(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
+  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.debugRows/);
+  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
   assert.doesNotMatch(slideshowPreviewSource, /slideshowPreviewAssetRuntimeMap/);
   assert.doesNotMatch(slideshowPreviewSource, /<img alt=\{card\.labelZh\} src=\{asset\}/);
 });

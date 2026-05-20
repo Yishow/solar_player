@@ -121,4 +121,6 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
   assert.match(html, /Mapping Gap/);
   assert.match(html, /Idle Runtime/);
   assert.match(html, /等待 topic 首次收值/);
+  assert.doesNotMatch(html, /Runtime Readiness/);
+  assert.doesNotMatch(html, /Display Readiness/);
 });

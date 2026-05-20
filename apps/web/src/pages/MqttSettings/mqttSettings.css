@@ -45,7 +45,67 @@
 .mqtt-settings-page .mqtt-mode { left: 50px; top: 162px; width: 435px; height: 604px; }
 .mqtt-settings-page .mqtt-topic { left: 504px; top: 162px; width: 370px; height: 604px; }
 .mqtt-settings-page .mqtt-map { left: 890px; top: 162px; width: 520px; height: 604px; }
-.mqtt-settings-page .mqtt-preview { left: 1428px; top: 162px; width: 435px; height: 604px; }
+.mqtt-settings-page .mqtt-preview {
+  left: 1428px;
+  top: 162px;
+  width: 435px;
+  height: 604px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mqtt-settings-page .mqtt-runtime-summary {
+  margin-bottom: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.mqtt-settings-page .mqtt-runtime-status {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback {
+  display: grid;
+  gap: 8px;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  background: #fffdf8;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback__copy strong {
+  font-size: 13px;
+  color: #344039;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback__copy small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6f766f;
+}
+
+.mqtt-settings-page .mqtt-runtime-feedback__more {
+  margin: 0;
+  font-size: 12px;
+  color: #6f766f;
+}
 
 /* title stacked vertically (overrides global baseline alignment) */
 .mqtt-settings-page .settings-card__title {
@@ -335,7 +395,8 @@
 /* preview rows */
 .mqtt-settings-page .preview-list {
   margin-top: 4px;
-  max-height: 484px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -401,11 +462,9 @@
 }
 
 .mqtt-settings-page .last-update {
-  position: absolute;
-  bottom: 18px;
-  left: 22px;
-  right: 22px;
+  position: static;
   margin: 0;
+  margin-top: 12px;
   font-size: 13px;
   color: #777;
   border-top: 1px solid rgba(92, 105, 79, 0.14);

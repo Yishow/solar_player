@@ -104,6 +104,45 @@
   margin-left: auto;
 }
 
+.cs-page .cs-readiness {
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.cs-page .cs-readiness-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cs-page .cs-readiness-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  background: #fffdf8;
+}
+
+.cs-page .cs-readiness-item__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.cs-page .cs-readiness-item__copy strong {
+  font-size: 13px;
+  color: #344039;
+}
+
+.cs-page .cs-readiness-item__copy small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6f766f;
+}
+
 /* table */
 .cs-page .cs-table-wrap {
   flex: 1;

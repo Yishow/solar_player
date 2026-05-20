@@ -1,7 +1,6 @@
 import { displayCircuitSlotKeys, type CircuitConfig, type DisplayReadinessReport } from "@solar-display/shared";
 import type { ReactNode } from "react";
 import { Switch } from "../../components/management";
-import { DisplayReadinessPanel } from "../../components/DisplayReadinessPanel";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 
 type CircuitSettingsContentProps = {
@@ -74,6 +73,26 @@ export function CircuitSettingsContent({
       : viewModel.feedbackBanner.tone === "loading"
         ? "is-loading"
         : "";
+  const readinessFindings =
+    readiness?.findings.filter((finding) => finding.sourceType === "circuit-slot") ?? [];
+  const blockingReadinessCount = readinessFindings.filter((finding) => finding.status === "blocking").length;
+  const warningReadinessCount = readinessFindings.filter((finding) => finding.status === "warning").length;
+  const readinessVariant = readinessErrorMessage
+    ? "is-error"
+    : readinessLoading
+      ? "is-loading"
+      : blockingReadinessCount > 0
+        ? "is-error"
+        : warningReadinessCount > 0
+          ? "is-warning"
+          : "";
+  const readinessSummary = readinessErrorMessage
+    ? readinessErrorMessage
+    : readinessLoading
+      ? "正在計算 display slot 綁定 readiness..."
+      : readinessFindings.length === 0
+        ? "所有 display slot 綁定正常，未發現 readiness finding。"
+        : `目前有 ${blockingReadinessCount} 項 blocking、${warningReadinessCount} 項 warning 的 display slot readiness finding。`;
 
   return (
     <div className="cs-page">
@@ -172,13 +191,24 @@ export function CircuitSettingsContent({
           </div>
         </div>
 
-        <DisplayReadinessPanel
-          errorMessage={readinessErrorMessage}
-          findings={readiness?.findings ?? []}
-          isLoading={readinessLoading}
-          sourceType="circuit-slot"
-          title="展示 slot 綁定檢查"
-        />
+        <div className={`mgmt-status cs-readiness ${readinessVariant}`.trim()} role="status">
+          {readinessSummary}
+        </div>
+        {readinessFindings.length > 0 && !readinessErrorMessage && !readinessLoading ? (
+          <div className="cs-readiness-list">
+            {readinessFindings.slice(0, 3).map((finding) => (
+              <div key={`${finding.pageId}-${finding.requirementKey}`} className="cs-readiness-item">
+                <span className={chipClass(finding.status === "blocking" ? "danger" : "warning")}>
+                  {finding.status === "blocking" ? "Blocking" : "Warning"}
+                </span>
+                <div className="cs-readiness-item__copy">
+                  <strong>{finding.requirementKey}</strong>
+                  <small>{finding.reason}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="cs-empty">
