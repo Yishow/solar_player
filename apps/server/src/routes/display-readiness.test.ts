@@ -100,6 +100,26 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
   }
 });
 
+test("GET /api/display-readiness denies untrusted remote readers", async () => {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness",
+      headers: {
+        host: "player.example",
+        origin: "https://evil.example"
+      }
+    });
+
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.json<{ access: string }>().access, "denied");
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-readiness keeps solar self-consumption ready through derived dependencies", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("selfConsumptionRatio");

@@ -47,6 +47,47 @@ test("GET /api/settings/mqtt masks password and exposes status", async () => {
   }
 });
 
+test("GET /api/settings/mqtt denies untrusted readers while runtime mqtt bootstrap remains public-safe", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const [settingsResponse, runtimeResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/settings/mqtt",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/runtime/mqtt-status",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      })
+    ]);
+
+    assert.equal(settingsResponse.statusCode, 403);
+    assert.equal(settingsResponse.json<{ access: string }>().access, "denied");
+
+    assert.equal(runtimeResponse.statusCode, 200);
+    const runtimeBody = runtimeResponse.json() as {
+      status: {
+        connected: boolean;
+      };
+    };
+    assert.equal(typeof runtimeBody.status.connected, "boolean");
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/settings/mqtt/topics exposes broker status alongside topic and readiness snapshots", async () => {
   migrateDatabase();
   seedDatabase();
@@ -435,11 +476,21 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
   }
 });
 
-test("SocketService emits initial snapshots and broadcasts update events", async () => {
+test("SocketService emits playback-safe snapshots to all sessions and keeps diagnostic events management-only", async () => {
   const emittedEvents: Array<{ event: string; payload: unknown }> = [];
-  const clientEvents: Array<{ event: string; payload: unknown }> = [];
+  const clientEvents = new Map<string, Array<{ event: string; payload: unknown }>>();
+  const socketsByRoom = new Map<string, Set<string>>();
   const connectionHandlers: Array<
-    (socket: { emit: (event: string, payload: unknown) => void }) => void
+    (socket: {
+      emit: (event: string, payload: unknown) => void;
+      handshake?: {
+        address?: string;
+        auth?: Record<string, unknown>;
+        headers: Record<string, string>;
+      };
+      id?: string;
+      join?: (room: string) => void;
+    }) => void
   > = [];
 
   const fakeIo = {
@@ -448,21 +499,46 @@ test("SocketService emits initial snapshots and broadcasts update events", async
     },
     emit(event: string, payload: unknown) {
       emittedEvents.push({ event, payload });
+      for (const events of clientEvents.values()) {
+        events.push({ event, payload });
+      }
       return true;
     },
     on(
       event: "connection",
-      listener: (socket: { emit: (event: string, payload: unknown) => void }) => void
+      listener: (socket: {
+        emit: (event: string, payload: unknown) => void;
+        handshake?: {
+          address?: string;
+          auth?: Record<string, unknown>;
+          headers: Record<string, string>;
+        };
+        id?: string;
+        join?: (room: string) => void;
+      }) => void
     ) {
       if (event === "connection") {
         connectionHandlers.push(listener);
       }
+    },
+    to(room: string) {
+      return {
+        emit(event: string, payload: unknown) {
+          emittedEvents.push({ event: `${room}:${event}`, payload });
+          for (const socketId of socketsByRoom.get(room) ?? []) {
+            clientEvents.get(socketId)?.push({ event, payload });
+          }
+          return true;
+        }
+      };
     }
   };
 
   const { SocketService } = await import("../realtime/SocketService.js");
 
   const service = new SocketService({
+    classifySession: (handshake) =>
+      handshake.auth?.sessionClass === "management-trusted" ? "management-trusted" : "playback-safe",
     getLiveMetricsSnapshot: () => ({
       metrics: {
         realTimePower: {
@@ -489,15 +565,49 @@ test("SocketService emits initial snapshots and broadcasts update events", async
     }
   });
 
-  const connectionHandler = connectionHandlers[0];
-  if (!connectionHandler) {
-    assert.fail("expected SocketService to register a connection handler");
-  }
-
-  connectionHandler({
-    emit: (event: string, payload: unknown) => {
-      clientEvents.push({ event, payload });
+  const connectSocket = (socketId: string, sessionClass: "management-trusted" | "playback-safe") => {
+    const connectionHandler = connectionHandlers[0];
+    if (!connectionHandler) {
+      assert.fail("expected SocketService to register a connection handler");
     }
+
+    const events: Array<{ event: string; payload: unknown }> = [];
+    clientEvents.set(socketId, events);
+
+    connectionHandler({
+      emit: (event: string, payload: unknown) => {
+        events.push({ event, payload });
+      },
+      handshake: {
+        address: "127.0.0.1",
+        auth: {
+          sessionClass
+        },
+        headers: {
+          origin: "http://127.0.0.1:5177"
+        }
+      },
+      id: socketId,
+      join: (room: string) => {
+        const roomSockets = socketsByRoom.get(room) ?? new Set<string>();
+        roomSockets.add(socketId);
+        socketsByRoom.set(room, roomSockets);
+      }
+    });
+
+    return events;
+  };
+
+  const playbackEvents = connectSocket("playback-1", "playback-safe");
+  const managementEvents = connectSocket("management-1", "management-trusted");
+
+  service.emitSystemError({
+    message: "Broker offline",
+    timestamp: "2026-05-13T09:06:00.000Z"
+  });
+  service.emitSystemRecovered({
+    message: "Broker recovered",
+    timestamp: "2026-05-13T09:07:00.000Z"
   });
 
   service.emitMqttStatus({
@@ -521,11 +631,27 @@ test("SocketService emits initial snapshots and broadcasts update events", async
   });
 
   assert.deepEqual(
-    clientEvents.map(({ event }) => event),
-    ["mqtt:status", "liveMetrics:update"]
+    playbackEvents.map(({ event }) => event),
+    ["mqtt:status", "liveMetrics:update", "mqtt:status", "liveMetrics:update"]
+  );
+  assert.deepEqual(
+    managementEvents.map(({ event }) => event),
+    [
+      "mqtt:status",
+      "liveMetrics:update",
+      "system:error",
+      "system:recovered",
+      "mqtt:status",
+      "liveMetrics:update"
+    ]
   );
   assert.deepEqual(
     emittedEvents.map(({ event }) => event),
-    ["mqtt:status", "liveMetrics:update"]
+    [
+      "management-trusted:system:error",
+      "management-trusted:system:recovered",
+      "mqtt:status",
+      "liveMetrics:update"
+    ]
   );
 });

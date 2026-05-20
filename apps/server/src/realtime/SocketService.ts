@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketIoServer } from "socket.io";
+import type { ManagementSocketSessionClass } from "@solar-display/shared";
 import type { DisplaySyncEvent } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
@@ -19,12 +20,21 @@ type LoggerLike = {
 
 type SocketClientLike = {
   emit: (event: string, payload: unknown) => void;
+  handshake?: {
+    address?: string;
+    auth?: Record<string, unknown>;
+    headers: Record<string, string | string[] | undefined>;
+  };
   id?: string;
+  join?: (room: string) => void;
 };
 
 type SocketServerLike = {
   emit: (event: string, payload: unknown) => boolean;
   on: (event: "connection", listener: (socket: SocketClientLike) => void) => unknown;
+  to?: (room: string) => {
+    emit: (event: string, payload: unknown) => boolean;
+  };
   close: (callback?: (error?: Error) => void) => void;
 };
 
@@ -36,6 +46,7 @@ export type SystemNotification = {
 };
 
 type SocketServiceOptions = {
+  classifySession?: (handshake: NonNullable<SocketClientLike["handshake"]>) => ManagementSocketSessionClass;
   corsOrigin?: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => void;
   getLiveMetricsSnapshot: () => LiveMetricsSnapshot;
   getMqttStatus: () => MqttStatus;
@@ -46,11 +57,13 @@ type SocketServiceOptions = {
 
 export class SocketService {
   private readonly io: SocketServerLike;
+  private readonly classifySession;
   private readonly logger: LoggerLike;
   private liveMetricsSnapshot: LiveMetricsSnapshot;
   private mqttStatus: MqttStatus;
 
   constructor(options: SocketServiceOptions) {
+    this.classifySession = options.classifySession;
     this.logger = options.logger;
     this.liveMetricsSnapshot = options.getLiveMetricsSnapshot();
     this.mqttStatus = options.getMqttStatus();
@@ -65,10 +78,28 @@ export class SocketService {
       });
 
     this.io.on("connection", (socket) => {
-      this.logger.info({ socketId: socket.id }, "Socket.IO client connected");
+      const sessionClass = socket.handshake
+        ? this.classifySession?.(socket.handshake) ?? "playback-safe"
+        : "playback-safe";
+
+      socket.join?.("playback-safe");
+      if (sessionClass === "management-trusted") {
+        socket.join?.("management-trusted");
+      }
+
+      this.logger.info({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
       socket.emit("mqtt:status", this.mqttStatus);
       socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
     });
+  }
+
+  private emitManagementOnly(event: string, payload: unknown) {
+    if (this.io.to) {
+      this.io.to("management-trusted").emit(event, payload);
+      return;
+    }
+
+    this.io.emit(event, payload);
   }
 
   emitLiveMetrics(data: LiveMetricsSnapshot) {
@@ -98,7 +129,7 @@ export class SocketService {
   }
 
   emitDeviceStatusUpdate(data: unknown) {
-    this.io.emit("deviceStatus:update", data);
+    this.emitManagementOnly("deviceStatus:update", data);
   }
 
   emitDisplaySync(data: DisplaySyncEvent) {
@@ -106,11 +137,11 @@ export class SocketService {
   }
 
   emitSystemError(data: SystemNotification) {
-    this.io.emit("system:error", data);
+    this.emitManagementOnly("system:error", data);
   }
 
   emitSystemRecovered(data: SystemNotification) {
-    this.io.emit("system:recovered", data);
+    this.emitManagementOnly("system:recovered", data);
   }
 
   async close() {

@@ -6,11 +6,17 @@ import {
 } from "../services/deviceDisplayOpsService.js";
 
 const deviceDisplayOpsRoute: FastifyPluginAsync = async (app) => {
-  app.get("/api/device-display-ops", async () => ({
-    summary: readDeviceDisplayOpsSummary({
-      mqttStatus: app.mqttClientService.getStatus()
-    })
-  }));
+  app.get("/api/device-display-ops", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return {
+      summary: readDeviceDisplayOpsSummary({
+        mqttStatus: app.mqttClientService.getStatus()
+      })
+    };
+  });
 
   app.post<{ Body: { action?: DeviceDisplayDiagnosticAction } }>(
     "/api/device-display-ops/diagnostics",

@@ -1,8 +1,43 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { IncomingHttpHeaders } from "node:http";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import {
+  MANAGEMENT_ACCESS_DENIED_CODE,
+  MANAGEMENT_ACCESS_DENIED_MESSAGE,
+  type ManagementAccessDeniedEnvelope,
+  type ManagementSocketSessionClass
+} from "@solar-display/shared";
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-const MANAGEMENT_ACCESS_TOKEN_HEADER = "x-solar-management-token";
+export const MANAGEMENT_ACCESS_TOKEN_HEADER = "x-solar-management-token";
+
+type RequestLike = {
+  headers: IncomingHttpHeaders;
+  ip?: string;
+  method?: string;
+  url?: string;
+};
+
+type SocketHandshakeLike = {
+  address?: string;
+  auth?: Record<string, unknown>;
+  headers: IncomingHttpHeaders;
+};
+
+type ManagementAccessDecision = {
+  normalizedOrigin: string | null;
+  reason: "access-token" | "loopback-origin" | "loopback-remote" | "same-host-origin" | "trusted-origin" | "untrusted";
+  trusted: boolean;
+};
+
+export type ManagementAccessControl = {
+  classifySocketSession: (handshake: SocketHandshakeLike) => ManagementSocketSessionClass;
+  createDeniedEnvelope: () => ManagementAccessDeniedEnvelope;
+  deny: (reply: FastifyReply) => unknown;
+  isTrustedManagementMutationRequest: (request: FastifyRequest) => boolean;
+  isTrustedManagementReadRequest: (request: FastifyRequest) => boolean;
+  isTrustedManagementRequestLike: (request: RequestLike) => boolean;
+};
 
 function readHeaderValue(value: string | string[] | undefined): string | null {
   if (typeof value === "string") {
@@ -67,15 +102,27 @@ function isSameHostOrigin(origin: string, requestHost: string | null): boolean {
   }
 }
 
-function matchesAccessToken(
-  request: FastifyRequest,
+function matchesHeaderAccessToken(
+  headers: IncomingHttpHeaders,
   managementAccessToken: string | null
 ): boolean {
   if (!managementAccessToken) {
     return false;
   }
 
-  return readHeaderValue(request.headers[MANAGEMENT_ACCESS_TOKEN_HEADER]) === managementAccessToken;
+  return readHeaderValue(headers[MANAGEMENT_ACCESS_TOKEN_HEADER]) === managementAccessToken;
+}
+
+function matchesSocketAuthAccessToken(
+  auth: Record<string, unknown> | undefined,
+  managementAccessToken: string | null
+) {
+  if (!managementAccessToken) {
+    return false;
+  }
+
+  const token = typeof auth?.managementAccessToken === "string" ? auth.managementAccessToken.trim() : "";
+  return token.length > 0 && token === managementAccessToken;
 }
 
 function isManagementMutationRequest(request: FastifyRequest): boolean {
@@ -118,31 +165,144 @@ export function isTrustedManagementCorsOrigin(
   return isLoopbackOrigin(normalizedOrigin) || matchesConfiguredOrigin(normalizedOrigin, trustedOrigins);
 }
 
-function isTrustedManagementMutationRequest(
-  request: FastifyRequest,
+function classifyManagementRequest(
+  request: RequestLike,
   trustedOrigins: string[],
   managementAccessToken: string | null
-): boolean {
-  if (matchesAccessToken(request, managementAccessToken)) {
-    return true;
+) : ManagementAccessDecision {
+  if (matchesHeaderAccessToken(request.headers, managementAccessToken)) {
+    return {
+      normalizedOrigin: null,
+      reason: "access-token",
+      trusted: true
+    };
   }
 
   const origin = readHeaderValue(request.headers.origin);
 
   if (!origin) {
-    return isLoopbackRemoteAddress(request.ip);
+    const trusted = isLoopbackRemoteAddress(request.ip);
+    return {
+      normalizedOrigin: null,
+      reason: trusted ? "loopback-remote" : "untrusted",
+      trusted
+    };
   }
 
   const normalizedOrigin = normalizeOrigin(origin);
   if (!normalizedOrigin) {
-    return false;
+    return {
+      normalizedOrigin: null,
+      reason: "untrusted",
+      trusted: false
+    };
   }
 
-  return (
-    isLoopbackOrigin(normalizedOrigin)
-    || matchesConfiguredOrigin(normalizedOrigin, trustedOrigins)
-    || isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))
-  );
+  if (isLoopbackOrigin(normalizedOrigin)) {
+    return {
+      normalizedOrigin,
+      reason: "loopback-origin",
+      trusted: true
+    };
+  }
+
+  if (matchesConfiguredOrigin(normalizedOrigin, trustedOrigins)) {
+    return {
+      normalizedOrigin,
+      reason: "trusted-origin",
+      trusted: true
+    };
+  }
+
+  if (isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))) {
+    return {
+      normalizedOrigin,
+      reason: "same-host-origin",
+      trusted: true
+    };
+  }
+
+  return {
+    normalizedOrigin,
+    reason: "untrusted",
+    trusted: false
+  };
+}
+
+function resolveRequestedSocketSessionClass(
+  auth: Record<string, unknown> | undefined
+): ManagementSocketSessionClass {
+  return auth?.sessionClass === "management-trusted" ? "management-trusted" : "playback-safe";
+}
+
+export function createManagementAccessDeniedEnvelope(): ManagementAccessDeniedEnvelope {
+  return {
+    access: "denied",
+    code: MANAGEMENT_ACCESS_DENIED_CODE,
+    error: MANAGEMENT_ACCESS_DENIED_MESSAGE,
+    requiredRole: "management-trusted",
+    success: false,
+    timestamp: new Date().toISOString()
+  };
+}
+
+export function createManagementAccessControl(options: {
+  managementAccessToken: string | null;
+  trustedOrigins: string[];
+}): ManagementAccessControl {
+  return {
+    classifySocketSession(handshake) {
+      const requestedClass = resolveRequestedSocketSessionClass(handshake.auth);
+      if (requestedClass !== "management-trusted") {
+        return "playback-safe";
+      }
+
+      if (
+        matchesHeaderAccessToken(handshake.headers, options.managementAccessToken)
+        || matchesSocketAuthAccessToken(handshake.auth, options.managementAccessToken)
+      ) {
+        return "management-trusted";
+      }
+
+      return classifyManagementRequest(
+        {
+          headers: handshake.headers,
+          ip: handshake.address
+        },
+        options.trustedOrigins,
+        options.managementAccessToken
+      ).trusted
+        ? "management-trusted"
+        : "playback-safe";
+    },
+    createDeniedEnvelope() {
+      return createManagementAccessDeniedEnvelope();
+    },
+    deny(reply) {
+      return reply.status(403).send(createManagementAccessDeniedEnvelope());
+    },
+    isTrustedManagementMutationRequest(request) {
+      return classifyManagementRequest(
+        request,
+        options.trustedOrigins,
+        options.managementAccessToken
+      ).trusted;
+    },
+    isTrustedManagementReadRequest(request) {
+      return classifyManagementRequest(
+        request,
+        options.trustedOrigins,
+        options.managementAccessToken
+      ).trusted;
+    },
+    isTrustedManagementRequestLike(request) {
+      return classifyManagementRequest(
+        request,
+        options.trustedOrigins,
+        options.managementAccessToken
+      ).trusted;
+    }
+  };
 }
 
 export function createManagementCorsOriginDelegate(trustedOrigins: string[]) {
@@ -152,6 +312,7 @@ export function createManagementCorsOriginDelegate(trustedOrigins: string[]) {
 }
 
 type ManagementAuthPluginOptions = {
+  accessControl?: ManagementAccessControl;
   managementAccessToken: string | null;
   trustedOrigins: string[];
 };
@@ -160,18 +321,19 @@ const managementAuthPlugin: FastifyPluginAsync<ManagementAuthPluginOptions> = as
   app,
   options
 ) => {
+  const accessControl =
+    options.accessControl
+    ?? createManagementAccessControl({
+      managementAccessToken: options.managementAccessToken,
+      trustedOrigins: options.trustedOrigins
+    });
+
   app.addHook("onRequest", async (request, reply) => {
     if (!isManagementMutationRequest(request)) {
       return;
     }
 
-    if (
-      isTrustedManagementMutationRequest(
-        request,
-        options.trustedOrigins,
-        options.managementAccessToken
-      )
-    ) {
+    if (accessControl.isTrustedManagementMutationRequest(request)) {
       return;
     }
 
@@ -185,11 +347,7 @@ const managementAuthPlugin: FastifyPluginAsync<ManagementAuthPluginOptions> = as
       "Denied management mutation request"
     );
 
-    reply.status(403).send({
-      success: false,
-      error: "Management access denied",
-      timestamp: new Date().toISOString()
-    });
+    accessControl.deny(reply);
   });
 };
 

@@ -118,6 +118,26 @@ test("GET /api/display-ops summarizes pending drafts, skip reasons, and live pub
   }
 });
 
+test("GET /api/display-ops denies untrusted remote readers", async () => {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-ops",
+      headers: {
+        host: "player.example",
+        origin: "https://evil.example"
+      }
+    });
+
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.json<{ access: string }>().access, "denied");
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-ops/assets/:id/references returns display-page and slideshow references", async () => {
   const asset = seedManagedImageAsset("reference-asset.png");
   getDatabase()
@@ -304,8 +324,8 @@ test("DELETE /api/images/:id blocks removal when the asset is still referenced b
 
   try {
     const bootstrapResponse = await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
     assert.equal(bootstrapResponse.statusCode, 200);
 
@@ -341,7 +361,7 @@ test("DELETE /api/images/:id blocks removal when the asset is still referenced b
   }
 });
 
-test("DELETE /api/images/:id ignores legacy slideshow fallback when no playlist runtime rows exist yet", async () => {
+test("DELETE /api/images/:id blocks removal when slideshow runtime is resolved from assets without governance rows", async () => {
   const asset = seedManagedImageAsset("playlist-legacy-delete.png");
   getDatabase()
     .prepare(
@@ -362,13 +382,13 @@ test("DELETE /api/images/:id ignores legacy slideshow fallback when no playlist 
       url: `/api/images/${asset.assetId}`
     });
 
-    assert.equal(response.statusCode, 200);
+    assert.equal(response.statusCode, 409);
   } finally {
     await app.close();
   }
 });
 
-test("GET /api/display-ops/assets/:id/references keeps legacy slideshow as a diagnostic reference without a blocking issue", async () => {
+test("GET /api/display-ops/assets/:id/references treats asset-backed runtime slideshow usage as a blocking live reference", async () => {
   const asset = seedManagedImageAsset("playlist-legacy-reference.png");
   getDatabase()
     .prepare(
@@ -404,12 +424,12 @@ test("GET /api/display-ops/assets/:id/references keeps legacy slideshow as a dia
         (reference) =>
           reference.kind === "slideshow" &&
           reference.stage === "live" &&
-          reference.bindingId === null &&
-          reference.targetLabel === "slideshow"
+          reference.bindingId === `runtime-asset-${asset.assetId}` &&
+          reference.targetLabel === "playlist-runtime"
       ),
       true
     );
-    assert.equal(body.references.blockingIssues.length, 0);
+    assert.equal(body.references.blockingIssues.length, 1);
   } finally {
     await app.close();
   }
@@ -421,8 +441,8 @@ test("GET /api/display-ops/assets/:id/references ignores legacy slideshow fallba
 
   try {
     await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     getDatabase()
@@ -480,8 +500,8 @@ test("GET /api/display-ops/assets/:id/references ignores the legacy slideshow fl
 
   try {
     await app.inject({
-      method: "GET",
-      url: "/api/image-playlist?bootstrap=true"
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
     });
 
     getDatabase()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { requestJson } from "../services/api";
+import { getRuntimeMqttStatus } from "../services/api";
 import {
   getCachedMqttStatus,
   getSocketClient,
@@ -7,9 +7,11 @@ import {
   type MqttConnectionStatus
 } from "../services/socket";
 
-type MqttSettingsBootstrapResponse = {
-  status: MqttConnectionStatus;
-};
+export async function loadRuntimeMqttStatus(
+  loadStatus: () => Promise<MqttConnectionStatus> = getRuntimeMqttStatus
+) {
+  return loadStatus();
+}
 
 export function useMqttStatus() {
   const [status, setStatus] = useState<MqttConnectionStatus>(getCachedMqttStatus());
@@ -20,12 +22,12 @@ export function useMqttStatus() {
 
     const bootstrapStatus = async () => {
       try {
-        const response = await requestJson<MqttSettingsBootstrapResponse>("/api/settings/mqtt");
+        const response = await loadRuntimeMqttStatus();
         if (!active) {
           return;
         }
 
-        setStatus(response.status);
+        setStatus(response);
         setIsHydrated(true);
       } catch {
         // Socket.IO will keep trying; bootstrap failure should not block route rendering.

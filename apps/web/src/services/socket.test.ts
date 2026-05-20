@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveSocketOrigin } from "./socket";
+import { resolveSocketOrigin, resolveSocketSessionClass } from "./socket";
 
 test("resolveSocketOrigin maps loopback Vite dev ports back to the backend port", () => {
   assert.equal(
@@ -22,4 +22,11 @@ test("resolveSocketOrigin keeps non-loopback Vite dev hosts on the current origi
     }),
     "http://100.76.76.75:5173"
   );
+});
+
+test("resolveSocketSessionClass keeps playback routes public-safe and upgrades management routes explicitly", () => {
+  assert.equal(resolveSocketSessionClass("/overview"), "playback-safe");
+  assert.equal(resolveSocketSessionClass("/solar"), "playback-safe");
+  assert.equal(resolveSocketSessionClass("/device-status"), "management-trusted");
+  assert.equal(resolveSocketSessionClass("/settings/mqtt"), "management-trusted");
 });

@@ -12,6 +12,7 @@ import { createLoggerOptions } from "./logger.js";
 import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
 import managementAuthPlugin, {
+  createManagementAccessControl,
   createManagementCorsOriginDelegate,
   parseManagementTrustedOrigins
 } from "./plugins/managementAuth.js";
@@ -69,8 +70,13 @@ export async function buildApp() {
   });
   const trustedManagementOrigins = parseManagementTrustedOrigins(config.managementTrustedOrigins);
   const managementCorsOrigin = createManagementCorsOriginDelegate(trustedManagementOrigins);
+  const managementAccess = createManagementAccessControl({
+    managementAccessToken: config.managementAccessToken,
+    trustedOrigins: trustedManagementOrigins
+  });
   let mqttClientService: MqttClientService | null = null;
   const socketService = new SocketService({
+    classifySession: managementAccess.classifySocketSession,
     corsOrigin: managementCorsOrigin,
     getLiveMetricsSnapshot: () => readLiveMetricsSnapshot(),
     getMqttStatus: () =>
@@ -89,6 +95,7 @@ export async function buildApp() {
     socketService
   });
 
+  app.decorate("managementAccess", managementAccess);
   app.decorate("mqttClientService", mqttClientService);
   app.decorate("socketService", socketService);
 
@@ -98,6 +105,7 @@ export async function buildApp() {
   });
 
   await managementAuthPlugin(app, {
+    accessControl: managementAccess,
     managementAccessToken: config.managementAccessToken,
     trustedOrigins: trustedManagementOrigins
   });

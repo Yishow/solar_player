@@ -1,5 +1,7 @@
 import type { DisplaySyncEvent, PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
+import type { ManagementSocketSessionClass } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
+import { routeMetaMap } from "../app/routeMeta";
 import { resolveBrowserApiOrigin } from "./api";
 
 export type LiveMetricReading = {
@@ -48,6 +50,7 @@ type ClientToServerEvents = {
 };
 
 let socketClient: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+let socketSessionClass: ManagementSocketSessionClass | null = null;
 let cachedLiveMetrics: LiveMetricsSnapshot = {
   metrics: {},
   timestamp: null
@@ -106,6 +109,18 @@ export function resolveSocketOrigin(locationLike?: {
   return resolveBrowserApiOrigin(locationLike ?? window.location);
 }
 
+export function resolveSocketSessionClass(pathname: string): ManagementSocketSessionClass {
+  return routeMetaMap.get(pathname)?.group === "management" ? "management-trusted" : "playback-safe";
+}
+
+function resolveCurrentSocketSessionClass() {
+  if (typeof window === "undefined") {
+    return "playback-safe" as const;
+  }
+
+  return resolveSocketSessionClass(window.location.pathname);
+}
+
 function attachHeartbeat(client: Socket<ServerToClientEvents, ClientToServerEvents>) {
   const syncHeartbeat = () => {
     setConnectionState({
@@ -125,8 +140,11 @@ function attachHeartbeat(client: Socket<ServerToClientEvents, ClientToServerEven
   });
 }
 
-function createSocketClient() {
+function createSocketClient(sessionClass: ManagementSocketSessionClass) {
   const client = io(resolveSocketOrigin(), {
+    auth: {
+      sessionClass
+    },
     path: "/socket.io",
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -186,8 +204,12 @@ function createSocketClient() {
 }
 
 function ensureSocketClient() {
-  if (socketClient === null) {
-    socketClient = createSocketClient();
+  const nextSessionClass = resolveCurrentSocketSessionClass();
+
+  if (socketClient === null || socketSessionClass !== nextSessionClass) {
+    socketClient?.disconnect();
+    socketClient = createSocketClient(nextSessionClass);
+    socketSessionClass = nextSessionClass;
   }
 
   return socketClient;

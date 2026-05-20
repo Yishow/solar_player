@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import type { RuntimeMqttStatus } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
@@ -173,11 +174,21 @@ function getEnabledTopics() {
 }
 
 const settingsMqttRoute: FastifyPluginAsync = async (app) => {
-  app.get("/api/settings/mqtt", async () => ({
-    settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
-    status: app.mqttClientService.getStatus(),
-    readiness: readDisplayReadinessReport()
+  app.get("/api/runtime/mqtt-status", async () => ({
+    status: app.mqttClientService.getStatus() satisfies RuntimeMqttStatus
   }));
+
+  app.get("/api/settings/mqtt", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return {
+      settings: serializeSettings(resolveMqttSettings(process.env, getSettingsRow())),
+      status: app.mqttClientService.getStatus(),
+      readiness: readDisplayReadinessReport()
+    };
+  });
 
   app.put<{ Body: SettingsBody }>("/api/settings/mqtt", async (request) => {
     const database = getDatabase();
@@ -248,11 +259,17 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/api/settings/mqtt/topics", async () => ({
-    status: app.mqttClientService.getStatus(),
-    topics: serializeTopicMappings(),
-    readiness: readDisplayReadinessReport()
-  }));
+  app.get("/api/settings/mqtt/topics", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return {
+      status: app.mqttClientService.getStatus(),
+      topics: serializeTopicMappings(),
+      readiness: readDisplayReadinessReport()
+    };
+  });
 
   app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request) => {
     const database = getDatabase();
