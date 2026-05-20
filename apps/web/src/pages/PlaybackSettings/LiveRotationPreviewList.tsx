@@ -23,6 +23,8 @@ function resolvePreviewState(
   };
 }
 
+const PLAYBACK_ROTATION_PREVIEW_SCALE = 101 / 1080;
+
 export function LiveRotationPreviewList({
   definitions,
   rows,
@@ -43,6 +45,7 @@ export function LiveRotationPreviewList({
                   definitions={definitions}
                   templateKey={page.templateKey ?? "overview"}
                   pageLabel={page.labelZh}
+                  previewScale={PLAYBACK_ROTATION_PREVIEW_SCALE}
                   state={resolvePreviewState(page.templateKey, states)}
                 />
               </div>

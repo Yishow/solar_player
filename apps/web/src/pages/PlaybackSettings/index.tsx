@@ -214,6 +214,7 @@ export function PlaybackSettings() {
       : viewModel.saveBanner.tone === "saving"
         ? "is-saving"
         : "";
+  const showSaveBanner = statusVariant !== "";
 
   const formDisabled = isLoading || !settings;
 
@@ -298,15 +299,17 @@ export function PlaybackSettings() {
         </button>
       </div>
 
-      <div className={`mgmt-status ps-status ${statusVariant}`} role="status">
-        {viewModel.saveBanner.title}
-        {viewModel.saveBanner.detail ? (
-          <>
-            <br />
-            <span style={{ opacity: 0.75 }}>{viewModel.saveBanner.detail}</span>
-          </>
-        ) : null}
-      </div>
+      {showSaveBanner ? (
+        <div className={`mgmt-status ps-status ${statusVariant}`} role="status">
+          {viewModel.saveBanner.title}
+          {viewModel.saveBanner.detail ? (
+            <>
+              <br />
+              <span style={{ opacity: 0.75 }}>{viewModel.saveBanner.detail}</span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {syncDraftGuard.hasPendingRemoteChange ? (
         <RemoteSyncBanner
@@ -333,44 +336,6 @@ export function PlaybackSettings() {
             states={livePreviewCatalog.states}
           />
         </div>
-        <div className="ps-preview__title" style={{ marginTop: "20px" }}>
-          正式生效輪播鏈 <small>/ Effective Runtime Rotation</small>
-        </div>
-        <div className="ps-preview__list">
-          {viewModel.effectiveRotationRows.length > 0 ? (
-            <LiveRotationPreviewList
-              definitions={livePreviewCatalog.definitions}
-              rows={viewModel.effectiveRotationRows}
-              states={livePreviewCatalog.states}
-            />
-          ) : (
-            <div className="mgmt-status">
-              目前沒有可播放頁面。
-              {rotationPreview?.fallbackRoute ? (
-                <small style={{ display: "block", opacity: 0.72 }}>Fallback: {rotationPreview.fallbackRoute}</small>
-              ) : null}
-            </div>
-          )}
-        </div>
-        {viewModel.skippedRotationRows.length > 0 ? (
-          <div className="mgmt-status" style={{ marginTop: "16px" }}>
-            {viewModel.skippedRotationRows.map((page) => (
-              <div key={`${page.labelEn}-${page.skipReasonText}`} style={{ marginTop: "6px" }}>
-                {page.labelEn} / {page.labelZh}：{page.skipReasonLabel}
-                {page.detail ? <small style={{ display: "block", opacity: 0.72 }}>{page.detail}</small> : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {viewModel.pendingDraftRows.length > 0 ? (
-          <div className="mgmt-status" style={{ marginTop: "16px" }}>
-            {viewModel.pendingDraftRows.map((page) => (
-              <div key={`${page.labelEn}-${page.publishState}`} style={{ marginTop: "6px" }}>
-                {page.labelEn} / {page.labelZh}：目前仍有 {page.publishState} 變更待發布
-              </div>
-            ))}
-          </div>
-        ) : null}
       </section>
       <PlaybackSettingsFormSections
         formDisabled={formDisabled}

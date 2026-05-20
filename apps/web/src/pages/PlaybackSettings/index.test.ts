@@ -15,8 +15,8 @@ test("playback settings keeps save and resync actions wired to the playback APIs
   assert.match(playbackSettingsSource, /className="mgmt-action ps-resync"/);
   assert.match(playbackSettingsSource, /className="mgmt-action primary ps-save"/);
   assert.match(playbackSettingsSource, /role="status"/);
-  assert.match(playbackSettingsSource, /viewModel\.saveBanner\.title/);
-  assert.match(playbackSettingsSource, /正式生效輪播鏈/);
+  assert.match(playbackSettingsSource, /showSaveBanner/);
+  assert.doesNotMatch(playbackSettingsSource, /正式生效輪播鏈/);
 });
 
 test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
@@ -24,6 +24,8 @@ test("playback settings renders rotation tiles from the shared live preview cata
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
   assert.doesNotMatch(playbackSettingsSource, /slideOverview/);
   assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
+  assert.doesNotMatch(playbackSettingsSource, /viewModel\.skippedRotationRows\.length > 0/);
+  assert.doesNotMatch(playbackSettingsSource, /viewModel\.pendingDraftRows\.length > 0/);
 });
 
 test("playback settings wires add-page management through display page registry APIs", () => {

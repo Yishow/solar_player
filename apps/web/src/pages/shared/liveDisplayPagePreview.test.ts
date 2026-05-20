@@ -62,6 +62,8 @@ test("live display page preview renders the latest published config through the 
   assert.match(html, /\/media\/overview-hero-v2\.png/);
   assert.match(html, /data-live-preview-status="ready"/);
   assert.match(html, /唯讀預覽/);
+  assert.match(html, /data-live-preview-scaled-content="true"/);
+  assert.match(html, /transform:scale\(/);
 });
 
 test("live display page preview exposes explicit fallback state when the published preview cannot resolve", () => {

@@ -2,6 +2,9 @@ import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
 
+const LIVE_PREVIEW_CANVAS_WIDTH = 1920;
+const LIVE_PREVIEW_CANVAS_HEIGHT = 1080;
+
 export type LiveDisplayPagePreviewDefinition = {
   id: DisplayPageTemplateKey;
   label: string;
@@ -47,11 +50,13 @@ export function LiveDisplayPagePreview({
   definitions,
   templateKey,
   pageLabel,
-  state
+  state,
+  previewScale = 1
 }: {
   definitions: LiveDisplayPagePreviewDefinition[];
   templateKey: DisplayPageTemplateKey;
   pageLabel: string;
+  previewScale?: number;
   state: LiveDisplayPagePreviewState;
 }) {
   const definition = definitions.find((entry) => entry.id === templateKey);
@@ -128,10 +133,33 @@ export function LiveDisplayPagePreview({
         style={{
           height: "100%",
           pointerEvents: "none",
+          position: "relative",
           width: "100%"
         }}
       >
-        {definition.renderPreview(state.config)}
+        <div
+          style={{
+            height: `${LIVE_PREVIEW_CANVAS_HEIGHT * previewScale}px`,
+            left: "50%",
+            overflow: "hidden",
+            position: "absolute",
+            top: 0,
+            transform: "translateX(-50%)",
+            width: `${LIVE_PREVIEW_CANVAS_WIDTH * previewScale}px`
+          }}
+        >
+          <div
+            data-live-preview-scaled-content="true"
+            style={{
+              height: `${LIVE_PREVIEW_CANVAS_HEIGHT}px`,
+              transform: `scale(${previewScale})`,
+              transformOrigin: "top left",
+              width: `${LIVE_PREVIEW_CANVAS_WIDTH}px`
+            }}
+          >
+            {definition.renderPreview(state.config)}
+          </div>
+        </div>
       </div>
     </section>
   );
