@@ -172,10 +172,7 @@ export function Sustainability({
           right: "88px",
           top: `${titleLayout.top}px`,
           zIndex: 14,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: "14px"
+          display: "flex"
         }}
       >
         <div style={{ display: "flex", gap: `${resolvedConfig.chrome.modules.periodChips.chipGap}px` }}>
@@ -196,17 +193,6 @@ export function Sustainability({
               {periodLabel(period)}
             </button>
           ))}
-        </div>
-        <div
-          style={{
-            color: "#5f675f",
-            fontSize: `${resolvedConfig.chrome.modules.provenance.fontSize}px`,
-            lineHeight: resolvedConfig.chrome.modules.provenance.lineHeight,
-            textAlign: "right"
-          }}
-        >
-          <div>資料來源：{viewModel.provenance.label} / {viewModel.provenance.source}</div>
-          <div>同步狀態：{viewModel.provenance.syncState}{viewModel.provenance.updatedAt ? ` · ${viewModel.provenance.updatedAt}` : " · 尚未提供更新時間"}</div>
         </div>
       </section>
 
@@ -356,7 +342,7 @@ export function Sustainability({
                 source: resolvedConfig.iconSources.statCards[cardKey]
               })}
               iconContainerClassName="sustainability-card-icon"
-              subtitle={`${card.subtitle} · ${card.provenance.sourceClass}`}
+              subtitle={card.subtitle}
               title={card.label}
             />
             {"value" in card ? (
@@ -364,11 +350,7 @@ export function Sustainability({
                 {index === 0 ? (
                   <DisplayCardFooter className="sustainability-card-footer">
                     <div className="sustainability-stat-procure">{card.value}</div>
-                    <p className="sustainability-stat-desc">
-                      {card.provenance.syncState === "missing"
-                        ? "缺少上游資料"
-                        : `資料來源：${card.provenance.source}`}
-                    </p>
+                    <p className="sustainability-stat-desc">持續累積年度永續影響</p>
                   </DisplayCardFooter>
                 ) : (
                   <>

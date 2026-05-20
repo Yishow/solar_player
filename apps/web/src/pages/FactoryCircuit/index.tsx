@@ -143,13 +143,11 @@ export function FactoryCircuit({
     usesRuntimeFallback: factoryStoryRuntime.usesFallback
   });
   const heroTypography = resolvedConfig.chrome.heroTypography;
-  const statusChrome = resolvedConfig.chrome.modules.statusBlock;
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
   const leafLayout = withContentOffset(factoryCircuitLeafLayout);
-  const statusLayout = withContentOffset(resolvedConfig.statusBlock);
 
   return (
     <section className="factory-circuit-display-page">
@@ -239,31 +237,6 @@ export function FactoryCircuit({
           width: `${leafLayout.width}px`
         }}
       />
-
-      <section
-        className="factory-circuit-status-note"
-        style={{
-          borderRadius: `${statusChrome.radius}px`,
-          gap: `${resolvedConfig.chrome.modules.statusBlock.gap}px`,
-          left: `${statusLayout.left}px`,
-          padding: `${resolvedConfig.chrome.modules.statusBlock.paddingTop}px ${resolvedConfig.chrome.modules.statusBlock.paddingRight}px ${resolvedConfig.chrome.modules.statusBlock.paddingBottom}px ${resolvedConfig.chrome.modules.statusBlock.paddingLeft}px`,
-          top: `${statusLayout.top}px`,
-          width: `${statusLayout.width}px`
-        }}
-      >
-        <b style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.titleFontSize}px` }}>
-          {viewModel.summary.statusLabel}
-        </b>
-        {viewModel.emptyState ? (
-          <p style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.bodyFontSize}px` }}>
-            {viewModel.emptyState.description}
-          </p>
-        ) : (
-          <p style={{ fontSize: `${resolvedConfig.chrome.modules.statusBlock.bodyFontSize}px` }}>
-            保留六個迴路面板與五個 KPI witness，持續對齊 reference routing board。
-          </p>
-        )}
-      </section>
 
       {viewModel.flowNodes.map((node) => {
         const layout = withContentOffset(resolvedConfig.nodes[node.key]);

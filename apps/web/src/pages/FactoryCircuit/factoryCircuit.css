@@ -9,7 +9,6 @@
 .factory-circuit-copy,
 .factory-circuit-gold-line,
 .factory-circuit-leaf-watermark,
-.factory-circuit-status-note,
 .factory-circuit-node,
 .factory-circuit-connector,
 .factory-circuit-load-panel,
@@ -75,30 +74,6 @@
 .factory-circuit-leaf-watermark {
   opacity: 0.38;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 255 148' fill='none' stroke='%23829a68' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 113 C62 66 111 51 179 57 C126 99 67 118 9 113 Z' fill='%23829a68' fill-opacity='.12'/%3E%3Cpath d='M12 112 C63 81 113 68 176 58'/%3E%3Cpath d='M83 88 C80 71 84 55 98 42 C109 61 105 76 83 88 Z' fill='%23829a68' fill-opacity='.16'/%3E%3Cpath d='M133 72 C137 48 153 33 180 25 C179 55 162 70 133 72 Z' fill='%23829a68' fill-opacity='.13'/%3E%3Cpath d='M52 104 C49 91 53 80 65 70 C72 86 67 97 52 104 Z' fill='%23829a68' fill-opacity='.13'/%3E%3Cpath d='M179 58 C203 59 223 68 241 83 C213 91 191 82 179 58 Z' fill='%23829a68' fill-opacity='.1'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.factory-circuit-status-note {
-  z-index: 8;
-  display: grid;
-  gap: 8px;
-  border: 1px solid rgba(154, 160, 103, 0.22);
-  border-radius: 18px;
-  background: rgba(255, 253, 247, 0.9);
-  box-shadow: 0 10px 24px rgba(60, 67, 50, 0.08);
-  padding: 16px 18px;
-}
-
-.factory-circuit-status-note b {
-  color: #355437;
-  font-size: 18px;
-  letter-spacing: 0.04em;
-}
-
-.factory-circuit-status-note p {
-  margin: 0;
-  color: #697067;
-  font-size: 14px;
-  line-height: 1.7;
 }
 
 .factory-circuit-node {

@@ -19,13 +19,10 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
   assert.match(overviewSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(overviewSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
-  assert.match(overviewSource, /viewModel\.summary\.statusLabel/);
-  assert.match(overviewSource, /overview-summary/);
   assert.match(overviewSource, /DisplayCardFrame/);
   assert.match(overviewSource, /DisplayCardValueRow/);
-  assert.match(overviewSource, /resolvedConfig\.summaryCard/);
-  assert.match(overviewSource, /resolvedConfig\.cardStyles\.summary/);
   assert.match(overviewSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
+  assert.doesNotMatch(overviewSource, /Shared Story Summary/);
 });
 
 test("overview display page seed config captures the current default hero contract", () => {

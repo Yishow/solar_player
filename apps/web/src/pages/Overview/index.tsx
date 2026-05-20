@@ -114,9 +114,6 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
-  const summaryLayout = withContentOffset(resolvedConfig.summaryCard);
-  const summaryCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.summary);
-
   return (
     <section className="overview-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
@@ -203,23 +200,6 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
       </figure>
-
-      <DisplayCardFrame
-        cardStyle={summaryCardStyle}
-        className={[
-          "overview-summary",
-          `overview-summary-${viewModel.summary.alertTone}`
-        ].join(" ")}
-        surface="info"
-        style={{
-          left: `${summaryLayout.left}px`,
-          top: `${summaryLayout.top}px`,
-          width: `${summaryLayout.width}px`
-        }}
-      >
-        <DisplayCardHeader title="Shared Story Summary" />
-        <p className="overview-summary-body">{viewModel.summary.statusLabel}</p>
-      </DisplayCardFrame>
 
       {overviewCardOrder.map((cardItem, index) => {
         const metric = viewModel.metrics[index]!;

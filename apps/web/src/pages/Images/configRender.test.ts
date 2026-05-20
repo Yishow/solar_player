@@ -32,6 +32,10 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
   assert.match(imagesSource, /DisplayCardFrame/);
   assert.match(imagesSource, /DisplayCardFooter/);
+  assert.doesNotMatch(imagesSource, /目前 fallback：/);
+  assert.doesNotMatch(imagesSource, /viewModel\.active\.resolution/);
+  assert.doesNotMatch(imagesSource, /viewModel\.active\.infoPanel\.tags/);
+  assert.doesNotMatch(imagesSource, /viewModel\.active\.entryId/);
 });
 
 test("images display page seed config captures the current default gallery layout and hero contract", () => {

@@ -16,8 +16,6 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.fontSize/);
-  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.provenance\.fontSize/);
-  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.provenance\.lineHeight/);
   assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.items/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
@@ -26,6 +24,9 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.cardStyles\[/);
   assert.match(sustainabilitySource, /DisplayCardFrame/);
   assert.match(sustainabilitySource, /DisplayCardValueRow/);
+  assert.doesNotMatch(sustainabilitySource, /資料來源：/);
+  assert.doesNotMatch(sustainabilitySource, /同步狀態：/);
+  assert.doesNotMatch(sustainabilitySource, /sourceClass/);
 });
 
 test("sustainability display page seed config captures the current hero and highlight rail contract", () => {

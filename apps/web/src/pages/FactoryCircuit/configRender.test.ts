@@ -12,18 +12,15 @@ test("factory circuit runtime reads resolved display config for copy, status, no
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.paddingTop/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.titleFontSize/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.modules\.statusBlock\.bodyFontSize/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.statusBlock/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.loadPanel/);
   assert.match(factoryCircuitSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
+  assert.doesNotMatch(factoryCircuitSource, /factory-circuit-status-note/);
 });
 
 test("factory circuit display page seed config captures the current default layout and hero contract", () => {

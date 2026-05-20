@@ -9,7 +9,6 @@
 .overview-hero-banner,
 .overview-leaf-watermark,
 .overview-gold-line,
-.overview-summary,
 .overview-kpi-card {
   position: absolute;
 }
@@ -81,36 +80,6 @@
   transform: rotate(-3deg);
   opacity: 0.78;
   background: linear-gradient(90deg, transparent, rgba(216, 175, 77, 0.92), transparent);
-}
-
-.overview-summary {
-  z-index: 11;
-  gap: 6px;
-  border: 1px solid rgba(90, 121, 72, 0.14);
-  background: rgba(255, 253, 247, 0.9);
-  box-shadow: 0 10px 22px rgba(66, 73, 57, 0.08);
-  --display-card-title-color: #5e675f;
-  --display-card-title-font-family: var(--font-family-en);
-  --display-card-title-letter-spacing: 0.08em;
-  --display-card-title-transform: uppercase;
-}
-
-.overview-summary-body {
-  margin: 0;
-  color: #313538;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.overview-summary-warning {
-  border-color: rgba(208, 157, 42, 0.28);
-  background: rgba(255, 249, 233, 0.94);
-}
-
-.overview-summary-danger {
-  border-color: rgba(180, 99, 72, 0.24);
-  background: rgba(255, 245, 240, 0.94);
 }
 
 .overview-kpi-card {

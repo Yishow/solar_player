@@ -272,14 +272,13 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         />
         <p className="images-info-card-body">
           {viewModel.active.infoPanel.description}
-          {viewModel.active.fallbackReason
-            ? ` 目前 fallback：${viewModel.active.fallbackMode} / ${viewModel.active.fallbackReason}。`
-            : ""}
         </p>
         <DisplayCardFooter>
           <small className="images-info-card-meta">
-          {viewModel.active.entryId} · {viewModel.active.infoPanel.area} · {viewModel.active.resolution} · {viewModel.active.durationSeconds} 秒 · {viewModel.active.infoPanel.capturedAt}
-          {viewModel.active.infoPanel.tags.length > 0 ? ` · ${viewModel.active.infoPanel.tags.join(" / ")}` : ""}
+            {viewModel.active.infoPanel.area} · {viewModel.active.durationSeconds} 秒
+            {viewModel.active.infoPanel.capturedAt !== "尚未同步"
+              ? ` · ${viewModel.active.infoPanel.capturedAt}`
+              : ""}
           </small>
         </DisplayCardFooter>
       </DisplayCardFrame>
