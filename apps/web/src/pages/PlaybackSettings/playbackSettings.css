@@ -56,6 +56,10 @@
   display: flex;
   gap: 16px;
 }
+.playback-settings-page .ps-actions .mgmt-action {
+  position: static;
+  top: auto;
+}
 .playback-settings-page .ps-resync { width: 140px; }
 .playback-settings-page .ps-save { width: 140px; }
 .playback-settings-page .ps-status { position: absolute; left: 68px; top: 310px; width: 422px; }

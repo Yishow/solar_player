@@ -5,6 +5,7 @@ import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
 const playbackSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
+const playbackSettingsCss = fs.readFileSync(path.join(pageDir, "playbackSettings.css"), "utf8");
 
 test("playback settings keeps save and resync actions wired to the playback APIs", () => {
   assert.match(playbackSettingsSource, /const handleSave = async \(\) => \{/);
@@ -38,4 +39,10 @@ test("playback settings wires add-page management through display page registry 
   assert.match(playbackSettingsSource, /disabled=\{registryActionDisabled\}/);
   assert.match(playbackSettingsSource, /顯示頁面管理/);
   assert.doesNotMatch(playbackSettingsSource, /title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"/);
+});
+
+test("playback settings action row opts out of the absolute-position management button primitive", () => {
+  assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-actions \.mgmt-action/);
+  assert.match(playbackSettingsCss, /position:\s*static/);
+  assert.match(playbackSettingsCss, /top:\s*auto/);
 });
