@@ -1,6 +1,7 @@
 import type { DisplayReadinessReport } from "@solar-display/shared";
 import type { ReactNode } from "react";
 import { DisplayReadinessPanel } from "../../components/DisplayReadinessPanel";
+import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import type {
   ActionState,
   ConnectionTestFeedback,
@@ -34,6 +35,8 @@ type MqttSettingsContentProps = {
     value: TopicMapping[Key]
   ) => void;
   lastConnectionTest: ConnectionTestFeedback;
+  liveMetricsConnectionState: SocketConnectionState["status"];
+  liveMetricsSnapshot: LiveMetricsSnapshot | null;
   message: string;
   readiness: DisplayReadinessReport | null;
   readinessErrorMessage: string;
@@ -59,7 +62,10 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
     actionState: props.actionState,
     errorMessage: props.errorMessage,
     lastConnectionTest: props.lastConnectionTest,
+    liveMetricsConnectionState: props.liveMetricsConnectionState,
+    liveMetricsSnapshot: props.liveMetricsSnapshot,
     message: props.message,
+    readiness: props.readiness,
     settings: props.settings,
     status: props.status,
     topics: props.topics
@@ -115,6 +121,27 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
         sourceType="mqtt-metric"
         title="展示資料覆蓋率"
       />
+
+      <section className="settings-card">
+        <div className="settings-card__title">Runtime Readiness<small>Live Coverage Feedback</small></div>
+        <div className={`conn-status ${resolveConnStatus(viewModel.runtimePreview.statusTone)}`} role="status">
+          <span className="conn-status__dot" aria-hidden />
+          {viewModel.runtimePreview.statusLabel}
+          <small>{viewModel.runtimePreview.statusDetail}</small>
+        </div>
+        {viewModel.coverageRows.length === 0 ? (
+          <div className="mgmt-status">目前沒有 MQTT runtime coverage finding。</div>
+        ) : (
+          <div className="mgmt-status">
+            {viewModel.coverageRows.map((row) => (
+              <div key={`${row.pageId}-${row.requirementKey}`} style={{ marginTop: 6 }}>
+                [{row.stateLabel}] {row.pageId} · {row.metricLabelZh}
+                <small style={{ display: "block", opacity: 0.72 }}>{row.detail}</small>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="settings-card mqtt-topic">
         <div className="settings-card__title">即時 Topic 清單<small>Live Topic List</small></div>

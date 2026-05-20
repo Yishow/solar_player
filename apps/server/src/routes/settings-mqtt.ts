@@ -249,6 +249,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/api/settings/mqtt/topics", async () => ({
+    status: app.mqttClientService.getStatus(),
     topics: serializeTopicMappings(),
     readiness: readDisplayReadinessReport()
   }));
@@ -316,6 +317,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     });
 
     return {
+      status: app.mqttClientService.getStatus(),
       topics: serializeTopicMappings(),
       readiness: readDisplayReadinessReport()
     };
@@ -330,6 +332,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     });
 
     return {
+      status: app.mqttClientService.getStatus(),
       topics: serializeTopicMappings(),
       readiness: readDisplayReadinessReport()
     };

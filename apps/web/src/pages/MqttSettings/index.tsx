@@ -6,6 +6,8 @@ import {
 } from "../../hooks/displaySyncDraftGuard";
 import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
+import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { requestJson } from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
@@ -44,6 +46,7 @@ type MqttSettingsResponse = {
 };
 
 type TopicMappingsResponse = {
+  status: MqttStatus;
   topics: TopicMapping[];
 };
 
@@ -106,7 +109,9 @@ export function MqttSettings() {
   const [status, setStatus] = useState<MqttStatus>({
     broker: "",
     clientId: "",
-    connected: false
+    connected: false,
+    reason: null,
+    updatedAt: null
   });
   const [topics, setTopics] = useState<TopicMapping[]>([]);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>([]);
@@ -126,6 +131,16 @@ export function MqttSettings() {
     readiness,
     reload: reloadReadiness
   } = useDisplayReadiness();
+  const { connectionState: liveMetricsConnectionState, snapshot: liveMetricsSnapshot } = useLiveMetrics();
+  const mqttStatusStream = useMqttStatus();
+
+  useEffect(() => {
+    if (!mqttStatusStream.isHydrated) {
+      return;
+    }
+
+    setStatus(mqttStatusStream.status);
+  }, [mqttStatusStream.isHydrated, mqttStatusStream.status]);
 
   const metricOptions = useMemo(() => {
     const optionSet = new Set<string>(defaultMetricOptions);
@@ -173,6 +188,7 @@ export function MqttSettings() {
     }
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics");
+      setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
       if (!isPolling) {
@@ -297,6 +313,7 @@ export function MqttSettings() {
         }),
         method: "PUT"
       });
+      setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
       setLastConnectionTest(null);
@@ -316,6 +333,7 @@ export function MqttSettings() {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/reload", {
         method: "POST"
       });
+      setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
       setLastConnectionTest(null);
@@ -371,6 +389,8 @@ export function MqttSettings() {
       handleSettingChange={handleSettingChange}
       handleTopicChange={handleTopicChange}
       lastConnectionTest={lastConnectionTest}
+      liveMetricsConnectionState={liveMetricsConnectionState}
+      liveMetricsSnapshot={liveMetricsSnapshot}
       message={message}
       readiness={readiness}
       readinessErrorMessage={readinessErrorMessage}

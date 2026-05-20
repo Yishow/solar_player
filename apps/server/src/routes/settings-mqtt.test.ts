@@ -47,6 +47,34 @@ test("GET /api/settings/mqtt masks password and exposes status", async () => {
   }
 });
 
+test("GET /api/settings/mqtt/topics exposes broker status alongside topic and readiness snapshots", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/mqtt/topics"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      readiness: { generatedAt: string };
+      status: { connected: boolean };
+      topics: unknown[];
+    };
+
+    assert.equal(Array.isArray(body.topics), true);
+    assert.equal(typeof body.status.connected, "boolean");
+    assert.equal(typeof body.readiness.generatedAt, "string");
+  } finally {
+    await app.close();
+  }
+});
+
 test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves", async () => {
   migrateDatabase();
   seedDatabase();

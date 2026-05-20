@@ -1,5 +1,7 @@
+import type { DisplayReadinessReport } from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
+import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 
 export type DataMode = "mqtt" | "mock";
 
@@ -18,6 +20,8 @@ export type MqttStatus = {
   connected: boolean;
   broker: string;
   clientId: string;
+  reason: string | null;
+  updatedAt: string | null;
 };
 
 export type TopicMapping = {
@@ -52,7 +56,10 @@ type BuildMqttSettingsViewModelArgs = {
   actionState: ActionState;
   errorMessage: string;
   lastConnectionTest: ConnectionTestFeedback;
+  liveMetricsConnectionState: SocketConnectionState["status"];
+  liveMetricsSnapshot: LiveMetricsSnapshot | null;
   message: string;
+  readiness: DisplayReadinessReport | null;
   settings: MqttSettingsForm;
   status: MqttStatus;
   topics: TopicMapping[];
@@ -134,6 +141,74 @@ function buildLastUpdateLabel(topics: TopicMapping[]) {
     : "尚未收到更新";
 }
 
+function resolveTopicRuntime(
+  topic: TopicMapping,
+  status: MqttStatus,
+  liveMetricsSnapshot: LiveMetricsSnapshot | null,
+  liveMetricsConnectionState: SocketConnectionState["status"]
+) {
+  const liveReading = liveMetricsSnapshot?.metrics[topic.metricKey];
+  const shouldPreferLiveReading =
+    liveReading !== undefined &&
+    (topic.lastReceivedAt === null || liveReading.timestamp >= topic.lastReceivedAt);
+  const lastReceivedAt = shouldPreferLiveReading ? liveReading.timestamp : topic.lastReceivedAt;
+  const lastValue = shouldPreferLiveReading ? liveReading.value : topic.lastValue;
+  const quality = shouldPreferLiveReading ? liveReading.quality : topic.quality;
+  const unit = shouldPreferLiveReading ? (liveReading.unit ?? topic.unit) : topic.unit;
+
+  let runtimeLabel = "Disconnected";
+  let runtimeTone: "connected" | "connecting" | "disconnected" = "disconnected";
+
+  if (!topic.enabled) {
+    runtimeLabel = "Disabled";
+  } else if (shouldPreferLiveReading || lastReceivedAt !== null) {
+    runtimeLabel = shouldPreferLiveReading || liveMetricsConnectionState === "connected" ? "Live" : "Fallback";
+    runtimeTone =
+      shouldPreferLiveReading || liveMetricsConnectionState === "connected" ? "connected" : "connecting";
+  } else if (status.connected) {
+    runtimeLabel = "Idle";
+    runtimeTone = "connecting";
+  }
+
+  return {
+    ...topic,
+    lastReceivedAt,
+    lastValue,
+    quality,
+    runtimeLabel,
+    runtimeTone,
+    unit
+  };
+}
+
+function resolveRuntimePreviewStatus(
+  status: MqttStatus,
+  liveMetricsConnectionState: SocketConnectionState["status"],
+  hasLiveTopicActivity: boolean
+) {
+  if (liveMetricsConnectionState === "connected") {
+    return {
+      statusDetail: "Socket live updates 會優先覆蓋舊的 poll snapshot，topic 活動會近即時反映在畫面上。",
+      statusLabel: "即時串流中",
+      statusTone: "connected" as const
+    };
+  }
+
+  if (hasLiveTopicActivity || status.connected) {
+    return {
+      statusDetail: "目前改用 bootstrap / poll fallback 顯示最近一次 topic 狀態，等待 socket 即時串流恢復。",
+      statusLabel: "Polling fallback",
+      statusTone: "connecting" as const
+    };
+  }
+
+  return {
+    statusDetail: "Socket 與 broker 都尚未提供可用的即時 preview，請先檢查串流與連線狀態。",
+    statusLabel: "串流不可用",
+    statusTone: "disconnected" as const
+  };
+}
+
 function resolveConnectionState(settings: MqttSettingsForm, status: MqttStatus) {
   if (settings.dataMode === "mock") {
     return {
@@ -162,15 +237,41 @@ export function buildMqttSettingsViewModel({
   actionState,
   errorMessage,
   lastConnectionTest,
+  liveMetricsConnectionState,
+  liveMetricsSnapshot,
   message,
+  readiness,
   settings,
   status,
   topics
 }: BuildMqttSettingsViewModelArgs) {
   const connection = resolveConnectionState(settings, status);
-  const enabledTopics = topics.filter((topic) => topic.enabled);
+  const mappedTopics = topics.map((topic) => {
+    const metric = describeMetric(topic.metricKey);
+    const runtimeTopic = resolveTopicRuntime(
+      topic,
+      status,
+      liveMetricsSnapshot,
+      liveMetricsConnectionState
+    );
+
+    return {
+      ...runtimeTopic,
+      enabledLabel: topic.enabled ? "ON" : "OFF",
+      lastReceivedLabel: formatTimestamp(runtimeTopic.lastReceivedAt),
+      metricIcon: metric.icon,
+      metricLabelEn: metric.en,
+      metricLabelZh: metric.zh
+    };
+  });
+  const enabledTopics = mappedTopics.filter((topic) => topic.enabled);
   const connectedTopics = enabledTopics.filter((topic) => topic.lastReceivedAt !== null);
-  const lastUpdateLabel = buildLastUpdateLabel(topics);
+  const lastUpdateLabel = buildLastUpdateLabel(mappedTopics);
+  const runtimePreview = resolveRuntimePreviewStatus(
+    status,
+    liveMetricsConnectionState,
+    connectedTopics.length > 0
+  );
   const feedbackTone = errorMessage
     ? "error"
     : actionState.isTestingConnection
@@ -193,24 +294,43 @@ export function buildMqttSettingsViewModel({
     testing: "warning"
   };
 
-  const mappedTopics = topics.map((topic) => {
-    const metric = describeMetric(topic.metricKey);
+  const coverageRows = (readiness?.findings ?? [])
+    .filter((finding) => finding.sourceType === "mqtt-metric")
+    .map((finding) => {
+      const topic = mappedTopics.find((candidate) => candidate.metricKey === finding.requirementKey);
+      const metric = describeMetric(finding.requirementKey);
 
-    return {
-      ...topic,
-      enabledLabel: topic.enabled ? "ON" : "OFF",
-      lastReceivedLabel: formatTimestamp(topic.lastReceivedAt),
-      metricIcon: metric.icon,
-      metricLabelEn: metric.en,
-      metricLabelZh: metric.zh,
-      runtimeLabel: topic.lastReceivedAt ? "Live" : topic.enabled ? "Idle" : "Disabled",
-      runtimeTone: topic.lastReceivedAt
-        ? ("connected" as const)
-        : topic.enabled
-          ? ("connecting" as const)
-          : ("disconnected" as const)
-    };
-  });
+      if (!topic || !topic.enabled || topic.topic.trim() === "") {
+        return {
+          detail: finding.reason,
+          metricLabelZh: metric.zh,
+          pageId: finding.pageId,
+          requirementKey: finding.requirementKey,
+          stateLabel: "Mapping Gap",
+          stateTone: "disconnected" as const
+        };
+      }
+
+      if (topic.lastReceivedAt === null) {
+        return {
+          detail: status.connected ? finding.reason : "Broker 目前未連線，topic runtime 無法提供即時收值。",
+          metricLabelZh: metric.zh,
+          pageId: finding.pageId,
+          requirementKey: finding.requirementKey,
+          stateLabel: status.connected ? "Idle Runtime" : "Broker Disconnected",
+          stateTone: status.connected ? ("connecting" as const) : ("disconnected" as const)
+        };
+      }
+
+      return {
+        detail: `最近收值 ${formatTimestamp(topic.lastReceivedAt)}`,
+        metricLabelZh: metric.zh,
+        pageId: finding.pageId,
+        requirementKey: finding.requirementKey,
+        stateLabel: "Ready",
+        stateTone: "connected" as const
+      };
+    });
 
   return {
     actions: {
@@ -320,6 +440,7 @@ export function buildMqttSettingsViewModel({
       tone: feedbackTone,
       visualTone: feedbackToneMap[feedbackTone]
     },
+    coverageRows,
     liveTopicRows: mappedTopics,
     mappingRows: mappedTopics,
     modeOptions: [
@@ -335,24 +456,23 @@ export function buildMqttSettingsViewModel({
       }
     ],
     previewCards: enabledTopics.map((topic) => {
-      const metric = describeMetric(topic.metricKey);
-
       return {
-        icon: metric.icon,
+        icon: topic.metricIcon,
         id: topic.id,
         lastReceivedLabel: formatTimestamp(topic.lastReceivedAt),
         metricKey: topic.metricKey,
-        metricLabelEn: metric.en,
-        metricLabelZh: metric.zh,
+        metricLabelEn: topic.metricLabelEn,
+        metricLabelZh: topic.metricLabelZh,
         payloadLabel: topic.rawPayload ?? "尚未收到 payload",
         qualityLabel: topic.quality ? `Quality: ${topic.quality}` : "Quality: --",
-        runtimeTone: topic.lastReceivedAt ? ("connected" as const) : ("disconnected" as const),
-        runtimeLabel: topic.lastReceivedAt ? "Live" : "Idle",
+        runtimeTone: topic.runtimeTone,
+        runtimeLabel: topic.runtimeLabel,
         topicLabel: topic.topic || "未設定 topic",
         unitLabel: topic.unit,
         valueLabel: formatValue(topic.lastValue)
       };
     }),
+    runtimePreview,
     summary: {
       connectedTopicCount: connectedTopics.length,
       enabledTopicCount: enabledTopics.length,
