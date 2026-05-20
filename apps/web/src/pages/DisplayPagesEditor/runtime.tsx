@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useDisplayPageRegistry } from "../../hooks/useDisplayPageRegistry";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { buildRuntimePageDefinitions } from "./runtimePageDefinitions";
@@ -7,8 +7,10 @@ import { DisplayPagesEditor } from "./index";
 
 export function DisplayPagesEditorRoute() {
   const registry = useDisplayPageRegistry();
-  const pageDefinitions =
-    registry.pages.length > 0 ? buildRuntimePageDefinitions(registry.pages) : runtimePageDefinitions;
+  const pageDefinitions = useMemo(
+    () => (registry.pages.length > 0 ? buildRuntimePageDefinitions(registry.pages) : runtimePageDefinitions),
+    [registry.pages]
+  );
 
   return (
     <DisplayPagesEditor

@@ -1,13 +1,14 @@
 import type { DisplayPageInstance } from "@solar-display/shared";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getDisplayPageRegistry } from "../services/api";
+import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
 
 export function useDisplayPageRegistry() {
   const [pages, setPages] = useState<DisplayPageInstance[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setIsLoading(true);
     try {
       const nextPages = await getDisplayPageRegistry();
@@ -18,11 +19,13 @@ export function useDisplayPageRegistry() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
+
+  useDisplaySyncRefresh(load, ["display-pages"]);
 
   return {
     errorMessage,

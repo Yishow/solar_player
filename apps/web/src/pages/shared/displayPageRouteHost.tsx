@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useDisplayPageRegistry } from "../../hooks/useDisplayPageRegistry";
 import { runtimePageDefinitions } from "../DisplayPagesEditor/runtimePageDefinitions";
@@ -11,8 +11,14 @@ const runtimePageDefinitionMap = new Map(
 export function DisplayPageRouteHost() {
   const location = useLocation();
   const registry = useDisplayPageRegistry();
-  const page = resolveDisplayPageRouteInstance(registry.pages, location.pathname);
-  const definition = page?.templateKey ? runtimePageDefinitionMap.get(page.templateKey) : null;
+  const page = useMemo(
+    () => resolveDisplayPageRouteInstance(registry.pages, location.pathname),
+    [location.pathname, registry.pages]
+  );
+  const definition = useMemo(
+    () => (page?.templateKey ? runtimePageDefinitionMap.get(page.templateKey) : null),
+    [page?.templateKey]
+  );
 
   if (definition?.renderPage && page) {
     return definition.renderPage(page.pageKey);

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
-import type { DisplayPageInstance } from "@solar-display/shared";
+import type { DisplayPageInstance, DisplayPageTemplateKey } from "@solar-display/shared";
 import { mediaPlacementFields } from "./runtimeFieldBuilders";
 import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
+
+const editorRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
 
 test("media placement field builder exposes fit, focus, and align controls for editor regions", () => {
   const fields = mediaPlacementFields(
@@ -110,5 +114,70 @@ test("runtime page definitions expand registry-backed duplicate instances into i
       { id: "overview", label: "Overview", templateKey: "overview" },
       { id: "images-2", label: "Images Secondary", templateKey: "images" }
     ]
+  );
+});
+
+test("runtime page definitions rebuild from a refreshed registry snapshot after a create mutation", () => {
+  const initialPages: DisplayPageInstance[] = [
+    {
+      archivedAt: null,
+      createdAt: "2026-05-20T00:00:00.000Z",
+      displayOrder: 1,
+      displayNameEn: "Overview",
+      displayNameZh: "總覽",
+      draftVersion: 1,
+      durationSeconds: 15,
+      enabled: true,
+      hasDraftChanges: false,
+      id: 1,
+      lastPublishedAt: "2026-05-20T00:00:00.000Z",
+      liveVersion: 1,
+      pageKey: "overview",
+      route: "/overview",
+      routeSlug: "overview",
+      templateKey: "overview",
+      updatedAt: "2026-05-20T00:00:00.000Z"
+    }
+  ];
+  const refreshedPages: DisplayPageInstance[] = [
+    ...initialPages,
+    {
+      archivedAt: null,
+      createdAt: "2026-05-20T00:30:00.000Z",
+      displayOrder: 2,
+      displayNameEn: "Sustainability",
+      displayNameZh: "永續營運",
+      draftVersion: 1,
+      durationSeconds: 18,
+      enabled: true,
+      hasDraftChanges: false,
+      id: 8,
+      lastPublishedAt: "2026-05-20T00:30:00.000Z",
+      liveVersion: 1,
+      pageKey: "sustainability-2",
+      route: "/sustainability-2",
+      routeSlug: "sustainability-2",
+      templateKey: "sustainability",
+      updatedAt: "2026-05-20T00:30:00.000Z"
+    }
+  ];
+
+  const definitionTemplates = new Map<DisplayPageTemplateKey, {
+    createSeedConfig: () => {};
+    label: string;
+    templateKey: DisplayPageTemplateKey;
+  }>([
+    ["overview", { createSeedConfig: () => ({}), label: "Overview", templateKey: "overview" }],
+    ["sustainability", { createSeedConfig: () => ({}), label: "Sustainability", templateKey: "sustainability" }]
+  ]);
+
+  assert.match(editorRuntimeSource, /buildRuntimePageDefinitions\(registry\.pages\)/);
+  assert.deepEqual(
+    buildRegistryPageDefinitions(initialPages, definitionTemplates).map((definition) => definition.id),
+    ["overview"]
+  );
+  assert.deepEqual(
+    buildRegistryPageDefinitions(refreshedPages, definitionTemplates).map((definition) => definition.id),
+    ["overview", "sustainability-2"]
   );
 });

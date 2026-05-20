@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import type { DisplayPageInstance } from "@solar-display/shared";
 import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
+
+const routeHostSource = readFileSync(path.join(import.meta.dirname, "displayPageRouteHost.tsx"), "utf8");
+const registryHookSource = readFileSync(
+  path.join(import.meta.dirname, "../../hooks/useDisplayPageRegistry.ts"),
+  "utf8"
+);
 
 test("display page route host resolves duplicate route slugs to the correct registry instance", () => {
   const registryPages: DisplayPageInstance[] = [
@@ -72,4 +80,46 @@ test("display page route host resolves duplicate route slugs to the correct regi
   assert.equal(resolved?.templateKey, "images");
   assert.equal(resolveDisplayPageRouteInstance(registryPages, "/images-archived"), null);
   assert.equal(resolveDisplayPageRouteInstance(registryPages, "/missing-page"), null);
+});
+
+test("display page route host consumes refreshed registry snapshots after display-pages mutations", () => {
+  assert.match(registryHookSource, /useDisplaySyncRefresh\(load,\s*\["display-pages"\]\)/);
+  assert.match(routeHostSource, /resolveDisplayPageRouteInstance\(registry\.pages, location\.pathname\)/);
+});
+
+test("display page route host drops archived routes once the registry snapshot refreshes", () => {
+  const activeSnapshot: DisplayPageInstance[] = [
+    {
+      archivedAt: null,
+      createdAt: "2026-05-20T00:00:00.000Z",
+      displayOrder: 1,
+      displayNameEn: "Images Secondary",
+      displayNameZh: "綠能影像副本",
+      draftVersion: 2,
+      durationSeconds: 22,
+      enabled: true,
+      hasDraftChanges: false,
+      id: 6,
+      lastPublishedAt: "2026-05-20T00:00:00.000Z",
+      liveVersion: 2,
+      pageKey: "images-2",
+      route: "/images-secondary",
+      routeSlug: "images-secondary",
+      templateKey: "images",
+      updatedAt: "2026-05-20T00:00:00.000Z"
+    }
+  ];
+  const refreshedSnapshot: DisplayPageInstance[] = [
+    {
+      ...activeSnapshot[0]!,
+      archivedAt: "2026-05-20T01:00:00.000Z",
+      enabled: false,
+      lastPublishedAt: null,
+      liveVersion: null,
+      updatedAt: "2026-05-20T01:00:00.000Z"
+    }
+  ];
+
+  assert.equal(resolveDisplayPageRouteInstance(activeSnapshot, "/images-secondary")?.pageKey, "images-2");
+  assert.equal(resolveDisplayPageRouteInstance(refreshedSnapshot, "/images-secondary"), null);
 });
