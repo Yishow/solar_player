@@ -23,3 +23,9 @@ test("energy history renders explicit operator-facing monitoring state semantics
   assert.match(energyHistorySource, /viewModel\.monitoringState\.freshnessLabel/);
   assert.match(energyHistorySource, /viewModel\.monitoringState\.emptyStateLabel/);
 });
+
+test("energy history reloads all persisted history datasets through the monitoring-history runtime refresh contract", () => {
+  assert.match(energyHistorySource, /useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range\)/);
+  assert.match(energyHistorySource, /refreshKey:\s*historyRefresh\.refreshKey/);
+});

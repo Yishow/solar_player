@@ -1,5 +1,6 @@
 import { setInterval, clearInterval } from "node:timers";
 import type Database from "better-sqlite3";
+import type { DisplaySyncEvent } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
@@ -28,6 +29,7 @@ type CumulativeCounterRow = {
 
 type MetricsAccumulatorServiceOptions = {
   database?: Database.Database;
+  emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   flushIntervalMs?: number;
   maxIntegrationGapSeconds?: number;
   pollIntervalMs?: number;
@@ -78,6 +80,7 @@ function sumConsumptionPower(snapshot: LiveMetricsSnapshot) {
 
 export class MetricsAccumulatorService {
   private readonly database: Database.Database;
+  private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly flushIntervalMs: number;
   private readonly maxIntegrationGapSeconds: number;
   private readonly pollIntervalMs: number;
@@ -103,6 +106,7 @@ export class MetricsAccumulatorService {
 
   constructor(options: MetricsAccumulatorServiceOptions = {}) {
     this.database = options.database ?? getDatabase();
+    this.emitDisplaySync = options.emitDisplaySync;
     this.flushIntervalMs = options.flushIntervalMs ?? 30_000;
     this.maxIntegrationGapSeconds = options.maxIntegrationGapSeconds ?? 300;
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
@@ -236,6 +240,8 @@ export class MetricsAccumulatorService {
       return;
     }
 
+    const wroteNewCounters = this.dirty;
+
     const nowIso = new Date().toISOString();
     const upsert = this.database.prepare(
       `
@@ -261,6 +267,14 @@ export class MetricsAccumulatorService {
     })();
 
     this.dirty = false;
+
+    if (wroteNewCounters) {
+      this.emitDisplaySync?.({
+        generatedAt: nowIso,
+        reason: "metrics-counters-flushed",
+        scope: "monitoring-history"
+      });
+    }
   }
 
   getCounters(): CumulativeCounters {

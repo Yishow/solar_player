@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { requestJson } from "../../services/api";
+import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
 import { energyTrendCardKeys, energyTrendLayout } from "./layout";
 import "./trend.css";
 import {
@@ -101,35 +103,21 @@ function MiniTrendChart({
 
 export function EnergyTrend() {
   useBodyClass("page-hero-shell");
-  const { lastUpdatedAt, snapshot } = useLiveMetrics();
+  const { snapshot } = useLiveMetrics();
   const [range, setRange] = useState<EnergyTrendRange>("day");
-  const [snapshots, setSnapshots] = useState<EnergyTrendSnapshot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    const loadHistory = async () => {
-      setIsLoading(true);
-      try {
-        const response = await requestJson<MetricsHistoryResponse>(
-          `/api/metrics/history?range=${range}`
-        );
-        if (!active) return;
-        setSnapshots(response.snapshots);
-        setErrorMessage("");
-      } catch (error) {
-        if (!active) return;
-        setErrorMessage(error instanceof Error ? error.message : "載入趨勢資料失敗。");
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    void loadHistory();
-    return () => {
-      active = false;
-    };
-  }, [range]);
+  const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
+  const historyRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
+    enabled: true,
+    load: () =>
+      requestJson<MetricsHistoryResponse>(
+        `/api/metrics/history?range=${range}`
+      ),
+    refreshKey: historyRefresh.refreshKey,
+    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
+  });
+  const snapshots = historyRuntime.payload?.snapshots ?? [];
+  const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
+  const errorMessage = historyRuntime.errorMessage;
 
   const viewModel = useMemo(
     () =>

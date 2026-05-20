@@ -11,3 +11,9 @@ test("energy trend renders explicit operator-facing monitoring state semantics",
   assert.match(energyTrendSource, /viewModel\.monitoringState\.freshnessLabel/);
   assert.match(energyTrendSource, /viewModel\.monitoringState\.emptyStateLabel/);
 });
+
+test("energy trend reloads history data through the monitoring-history runtime refresh contract", () => {
+  assert.match(energyTrendSource, /useRuntimeRefreshLifecycle/);
+  assert.match(energyTrendSource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range\)/);
+  assert.match(energyTrendSource, /refreshKey:\s*historyRefresh\.refreshKey/);
+});

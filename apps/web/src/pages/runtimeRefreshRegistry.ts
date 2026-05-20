@@ -7,7 +7,10 @@ import type {
 export type DisplayPageRuntimeSourceKind =
   | "display-story"
   | "image-playlist"
+  | "monitoring-history"
   | "sustainability-story";
+
+export type MonitoringHistoryRuntimeRangeKey = "day" | "month" | "total" | "week" | "year";
 
 type RuntimeRefreshRegistryContext = {
   activeIndex?: number;
@@ -45,7 +48,7 @@ const runtimeRefreshRegistry: Record<DisplayPageKey, RuntimeRefreshRegistryEntry
   },
   sustainability: {
     refreshKey: (context) => `sustainability:${context.selectedPeriod ?? "lifetime"}`,
-    refreshScopes: ["display-pages"],
+    refreshScopes: ["sustainability"],
     sourceKind: "sustainability-story"
   }
 };
@@ -61,5 +64,13 @@ export function resolveDisplayPageRuntimeRefreshSpec(
     refreshKey: entry.refreshKey(context),
     refreshScopes: entry.refreshScopes,
     sourceKind: entry.sourceKind
+  };
+}
+
+export function resolveMonitoringHistoryRuntimeRefreshSpec(range: MonitoringHistoryRuntimeRangeKey) {
+  return {
+    refreshKey: `monitoring-history:${range}`,
+    refreshScopes: ["monitoring-history"] as DisplaySyncEventScope[],
+    sourceKind: "monitoring-history" as const
   };
 }

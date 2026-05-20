@@ -1,22 +1,26 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
+import type { DisplaySyncEvent } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import type { MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
 type SnapshotWriterServiceOptions = {
   database?: Database.Database;
+  emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   intervalMs?: number;
   metricsAccumulatorService: MetricsAccumulatorService;
 };
 
 export class SnapshotWriterService {
   private readonly database: Database.Database;
+  private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly intervalMs: number;
   private readonly metricsAccumulatorService: MetricsAccumulatorService;
   private timer: NodeJS.Timeout | null = null;
 
   constructor(options: SnapshotWriterServiceOptions) {
     this.database = options.database ?? getDatabase();
+    this.emitDisplaySync = options.emitDisplaySync;
     this.intervalMs = options.intervalMs ?? 60_000;
     this.metricsAccumulatorService = options.metricsAccumulatorService;
   }
@@ -68,5 +72,11 @@ export class SnapshotWriterService {
         snapshot.efficiency,
         capturedAt.toISOString()
       );
+
+    this.emitDisplaySync?.({
+      generatedAt: capturedAt.toISOString(),
+      reason: "metric-snapshot-written",
+      scope: "monitoring-history"
+    });
   }
 }

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { requestJson } from "../../services/api";
+import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
 import { energyHistoryLayout, energyHistoryMetricCardKeys } from "./layout";
 import "./history.css";
 import {
@@ -21,6 +23,12 @@ type DailySummaryResponse = {
 
 type CumulativeResponse = {
   counters: CumulativeCounter[];
+};
+
+type HistoryRuntimePayload = {
+  counters: CumulativeCounter[];
+  snapshots: EnergyHistorySnapshot[];
+  summaries: DailyEnergySummary[];
 };
 
 const METRIC_ICON_GLYPHS: Record<number, string> = {
@@ -101,39 +109,30 @@ function TrendChart({
 
 export function EnergyHistory() {
   const [range, setRange] = useState<EnergyHistoryRange>("day");
-  const [snapshots, setSnapshots] = useState<EnergyHistorySnapshot[]>([]);
-  const [summaries, setSummaries] = useState<DailyEnergySummary[]>([]);
-  const [counters, setCounters] = useState<CumulativeCounter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
+  const historyRuntime = useRuntimeRefreshLifecycle<HistoryRuntimePayload>({
+    enabled: true,
+    load: async () => {
+      const [historyResponse, summaryResponse, cumulativeResponse] = await Promise.all([
+        requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
+        requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
+        requestJson<CumulativeResponse>("/api/metrics/cumulative")
+      ]);
 
-  useEffect(() => {
-    let active = true;
-    const loadHistory = async () => {
-      setIsLoading(true);
-      try {
-        const [historyResponse, summaryResponse, cumulativeResponse] = await Promise.all([
-          requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
-          requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
-          requestJson<CumulativeResponse>("/api/metrics/cumulative")
-        ]);
-        if (!active) return;
-        setSnapshots(historyResponse.snapshots);
-        setSummaries(summaryResponse.summaries);
-        setCounters(cumulativeResponse.counters);
-        setErrorMessage("");
-      } catch (error) {
-        if (!active) return;
-        setErrorMessage(error instanceof Error ? error.message : "載入歷史資料失敗。");
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    void loadHistory();
-    return () => {
-      active = false;
-    };
-  }, [range]);
+      return {
+        counters: cumulativeResponse.counters,
+        snapshots: historyResponse.snapshots,
+        summaries: summaryResponse.summaries
+      };
+    },
+    refreshKey: historyRefresh.refreshKey,
+    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
+  });
+  const snapshots = historyRuntime.payload?.snapshots ?? [];
+  const summaries = historyRuntime.payload?.summaries ?? [];
+  const counters = historyRuntime.payload?.counters ?? [];
+  const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
+  const errorMessage = historyRuntime.errorMessage;
 
   const viewModel = useMemo(
     () =>

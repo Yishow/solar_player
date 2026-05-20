@@ -21,16 +21,22 @@ async function startServer() {
 
     app = await buildApp();
 
-    const metricsAccumulatorService = new MetricsAccumulatorService();
+    const emitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+
+    const metricsAccumulatorService = new MetricsAccumulatorService({
+      emitDisplaySync
+    });
     metricsAccumulatorService.initialize();
     metricsAccumulatorService.start();
 
     const snapshotWriterService = new SnapshotWriterService({
+      emitDisplaySync,
       metricsAccumulatorService
     });
     snapshotWriterService.start();
 
     const dailySummaryService = new DailySummaryService({
+      emitDisplaySync,
       metricsAccumulatorService
     });
     dailySummaryService.start();

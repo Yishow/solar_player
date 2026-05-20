@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDisplayPageRuntimeRefreshSpec } from "./runtimeRefreshRegistry";
+import {
+  resolveDisplayPageRuntimeRefreshSpec,
+  resolveMonitoringHistoryRuntimeRefreshSpec
+} from "./runtimeRefreshRegistry";
 
 test("runtime refresh registry maps each display page to the expected runtime source", () => {
   assert.equal(resolveDisplayPageRuntimeRefreshSpec("overview").sourceKind, "display-story");
@@ -28,4 +31,16 @@ test("runtime refresh registry derives stable refresh keys from page-specific pa
     resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "quarter" }).refreshKey,
     "sustainability:quarter"
   );
+  assert.equal(
+    resolveMonitoringHistoryRuntimeRefreshSpec("week").refreshKey,
+    "monitoring-history:week"
+  );
+});
+
+test("runtime refresh registry assigns dedicated refresh scopes for sustainability and monitoring history", () => {
+  assert.deepEqual(
+    resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "lifetime" }).refreshScopes,
+    ["sustainability"]
+  );
+  assert.deepEqual(resolveMonitoringHistoryRuntimeRefreshSpec("month").refreshScopes, ["monitoring-history"]);
 });

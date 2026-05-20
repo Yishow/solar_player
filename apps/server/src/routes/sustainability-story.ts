@@ -19,7 +19,7 @@ const sustainabilityStoryRoute: FastifyPluginAsync = async (app) => {
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
       reason: "sustainability-story-updated",
-      scope: "display-pages"
+      scope: "sustainability"
     });
     return { story };
   });

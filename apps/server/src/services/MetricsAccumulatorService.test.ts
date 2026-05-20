@@ -53,6 +53,7 @@ function buildSnapshot(
 
 test("MetricsAccumulatorService prefers total metrics, integrates power fallback, skips long gaps, and throttles DB writes", () => {
   const database = createDatabase();
+  const emitted: Array<{ reason: string; scope: string }> = [];
 
   database
     .prepare(
@@ -97,6 +98,9 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
 
   const service = new MetricsAccumulatorService({
     database,
+    emitDisplaySync: (payload) => {
+      emitted.push({ reason: payload.reason, scope: payload.scope });
+    },
     flushIntervalMs: 30_000,
     readSnapshot: () => snapshots[snapshotIndex]!
   });
@@ -154,6 +158,7 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
     { metric_key: "generation", reset_count: 0, total_value: 140 },
     { metric_key: "selfConsumption", reset_count: 0, total_value: 31 }
   ]);
+  assert.deepEqual(emitted, [{ reason: "metrics-counters-flushed", scope: "monitoring-history" }]);
 
   database.close();
 });

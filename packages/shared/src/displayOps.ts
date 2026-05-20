@@ -85,8 +85,10 @@ export type DisplaySyncEventScope =
   | "display-ops"
   | "display-pages"
   | "images"
+  | "monitoring-history"
   | "mqtt"
-  | "playback";
+  | "playback"
+  | "sustainability";
 
 export type DisplaySyncEvent = {
   generatedAt: string;

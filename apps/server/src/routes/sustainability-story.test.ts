@@ -74,6 +74,13 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
 test("PUT /api/sustainability-story persists editorial modules without overriding runtime aggregates", async () => {
   seedSustainabilityCounters();
   const app = await buildApp();
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  const emitted: Array<{ reason: string; scope: string }> = [];
+
+  app.socketService.emitDisplaySync = (payload) => {
+    emitted.push({ reason: payload.reason, scope: payload.scope });
+    originalEmitDisplaySync(payload);
+  };
 
   try {
     const saveResponse = await app.inject({
@@ -172,7 +179,9 @@ test("PUT /api/sustainability-story persists editorial modules without overridin
     assert.match(body.story.modules[0]?.description ?? "", /綠色採購/);
     assert.equal(body.story.modules[0]?.provenance.sourceClass, "manual-module");
     assert.deepEqual(body.story.modules[1]?.bullets, ["導入再生能源", "供應鏈碳管理"]);
+    assert.deepEqual(emitted, [{ reason: "sustainability-story-updated", scope: "sustainability" }]);
   } finally {
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
     await app.close();
   }
 });

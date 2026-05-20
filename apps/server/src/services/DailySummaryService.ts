@@ -1,10 +1,12 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
+import type { DisplaySyncEvent } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import type { CumulativeCounters, MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
 type DailySummaryServiceOptions = {
   database?: Database.Database;
+  emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   intervalMs?: number;
   metricsAccumulatorService: MetricsAccumulatorService;
 };
@@ -26,6 +28,7 @@ function clampDelta(total: number, baseline: number) {
 
 export class DailySummaryService {
   private readonly database: Database.Database;
+  private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly intervalMs: number;
   private readonly metricsAccumulatorService: MetricsAccumulatorService;
   private currentDateKey: string | null = null;
@@ -40,6 +43,7 @@ export class DailySummaryService {
 
   constructor(options: DailySummaryServiceOptions) {
     this.database = options.database ?? getDatabase();
+    this.emitDisplaySync = options.emitDisplaySync;
     this.intervalMs = options.intervalMs ?? 60_000;
     this.metricsAccumulatorService = options.metricsAccumulatorService;
   }
@@ -142,5 +146,11 @@ export class DailySummaryService {
         this.peaks.peakConsumption,
         this.peaks.peakConsumptionTime
       );
+
+    this.emitDisplaySync?.({
+      generatedAt: new Date().toISOString(),
+      reason: "daily-summary-updated",
+      scope: "monitoring-history"
+    });
   }
 }
