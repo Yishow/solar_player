@@ -88,6 +88,37 @@
   font-size: 16px;
 }
 
+.playback-settings-page .ps-preview__alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -8px 0 18px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 158, 30, 0.28);
+  background: rgba(255, 246, 228, 0.86);
+  color: #9a6111;
+}
+
+.playback-settings-page .ps-preview__alert strong {
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.playback-settings-page .ps-preview__alert small {
+  font-size: 13px;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
+.playback-settings-page .ps-preview__alert.is-error {
+  border-color: rgba(193, 74, 74, 0.24);
+  background: rgba(254, 238, 238, 0.9);
+  color: #b24b4b;
+}
+
 .playback-settings-page .ps-preview__list {
   display: flex;
   align-items: center;

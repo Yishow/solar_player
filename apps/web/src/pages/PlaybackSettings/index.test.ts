@@ -22,10 +22,12 @@ test("playback settings keeps save and resync actions wired to the playback APIs
 test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
   assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
+  assert.match(playbackSettingsSource, /ps-preview__alert/);
   assert.doesNotMatch(playbackSettingsSource, /slideOverview/);
   assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
   assert.doesNotMatch(playbackSettingsSource, /viewModel\.skippedRotationRows\.length > 0/);
   assert.doesNotMatch(playbackSettingsSource, /viewModel\.pendingDraftRows\.length > 0/);
+  assert.match(playbackSettingsSource, /showPreviewAlert/);
 });
 
 test("playback settings wires add-page management through display page registry APIs", () => {

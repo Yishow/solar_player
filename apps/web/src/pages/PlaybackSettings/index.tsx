@@ -215,6 +215,14 @@ export function PlaybackSettings() {
         ? "is-saving"
         : "";
   const showSaveBanner = statusVariant !== "";
+  const previewAlertTone = displayOpsErrorMessage
+    ? "is-error"
+    : viewModel.displayOpsBanner.tone === "error"
+      ? "is-error"
+      : viewModel.displayOpsBanner.tone === "warning"
+        ? "is-warning"
+        : "";
+  const showPreviewAlert = Boolean(displayOpsErrorMessage) || previewAlertTone !== "";
 
   const formDisabled = isLoading || !settings;
 
@@ -318,17 +326,16 @@ export function PlaybackSettings() {
         />
       ) : null}
 
-      <div className={`mgmt-status ${viewModel.displayOpsBanner.tone === "error" ? "is-error" : ""}`} role="status">
-        {displayOpsErrorMessage || viewModel.displayOpsBanner.title}
-        <small style={{ display: "block", opacity: 0.75 }}>
-          {displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
-        </small>
-      </div>
-
       <section className="ps-preview">
         <div className="ps-preview__title">
           目前配置輪播鏈 <small>/ Configured Rotation Preview</small>
         </div>
+        {showPreviewAlert ? (
+          <div className={`ps-preview__alert ${previewAlertTone}`.trim()} role="status">
+            <strong>{displayOpsErrorMessage || viewModel.displayOpsBanner.title}</strong>
+            <small>{displayOpsErrorMessage || viewModel.displayOpsBanner.detail}</small>
+          </div>
+        ) : null}
         <div className="ps-preview__list">
           <LiveRotationPreviewList
             definitions={livePreviewCatalog.definitions}

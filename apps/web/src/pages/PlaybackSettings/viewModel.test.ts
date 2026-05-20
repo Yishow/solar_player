@@ -284,6 +284,8 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
     assert.equal(model.triageSummary?.repairDestinationLabel, testCase.expectedDestination);
     assert.equal(model.triageSummary?.faultKind, testCase.expectedKind);
     assert.deepEqual(model.triageSummary?.affectedPages, [testCase.pageId]);
-    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.expectedDestination));
+    assert.equal(model.displayOpsBanner.title, "1 個展示頁需處理");
+    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.message));
+    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.pageId));
   }
 });

@@ -81,11 +81,7 @@ function formatTriagePages(summary: DisplayFaultTriageSummary) {
 }
 
 function formatTriageDetail(summary: DisplayFaultTriageSummary) {
-  const nextStep = summary.repairDestinationLabel
-    ? `下一步：${summary.repairDestinationLabel}`
-    : "請改由管理頁面檢查整體 display readiness。";
-
-  return `受影響頁面：${formatTriagePages(summary)} · 主因：${summary.dominantReason} · ${nextStep}`;
+  return `主因：${summary.dominantReason} · 受影響頁面：${formatTriagePages(summary)}`;
 }
 
 export function reorderPlaybackPages(
@@ -155,9 +151,9 @@ export function buildPlaybackSettingsViewModel({
             ?? "rotation publish、skip 與 draft pending 狀態會在這裡同步。",
       title:
         triageSummary
-          ? `受影響頁面：${formatTriagePages(triageSummary)}`
+          ? `${triageSummary.affectedPages.length} 個展示頁需處理`
           : displayOpsSummary?.draftPending
-          ? `有 ${displayOpsSummary.draftCount} 頁尚未發布`
+          ? `${displayOpsSummary.draftCount} 個展示頁待發布`
           : "Display operations 已同步",
       tone:
         displayOpsSummary?.blockingIssues.some((issue) => issue.severity === "blocking")
