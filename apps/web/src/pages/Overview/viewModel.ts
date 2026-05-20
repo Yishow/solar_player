@@ -1,9 +1,12 @@
 import type {
   MonitoringAlertTone,
   MonitoringBindingState,
+  MonitoringFallbackStrategy,
   MonitoringFallbackReason,
   MonitoringFreshnessState,
   MonitoringMetricBinding,
+  MonitoringMetricProvenance,
+  MonitoringMetricSourceClass,
   ResolvedMonitoringMetricBinding
 } from "@solar-display/shared";
 import {
@@ -56,11 +59,56 @@ type BuildOverviewViewModelArgs = {
 export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
 
 const metricCards: OverviewMetricCard[] = [
-  { accentColor: false, fallbackIndex: 0, iconKey: "bolt", metricKey: "realTimePower", label: "即時發電功率", unit: "kW" },
-  { accentColor: true, fallbackIndex: 1, iconKey: "sun", metricKey: "todayGeneration", label: "今日發電量", unit: "kWh" },
-  { accentColor: false, fallbackIndex: 2, iconKey: "bars", metricKey: "totalGeneration", label: "累積發電量", unit: "GWh" },
-  { accentColor: false, fallbackIndex: 3, iconKey: "co2", metricKey: "todayCo2Reduction", label: "今日 CO₂ 減量", unit: "t" },
-  { accentColor: false, fallbackIndex: 4, iconKey: "leaf", metricKey: "totalCo2Reduction", label: "累積 CO₂ 減量", unit: "t" }
+  {
+    accentColor: false,
+    dependencyKeys: ["realTimePower"],
+    fallbackIndex: 0,
+    iconKey: "bolt",
+    metricKey: "realTimePower",
+    label: "即時發電功率",
+    sourceClass: "mqtt-live",
+    unit: "kW"
+  },
+  {
+    accentColor: true,
+    dependencyKeys: ["todayGeneration"],
+    fallbackIndex: 1,
+    iconKey: "sun",
+    metricKey: "todayGeneration",
+    label: "今日發電量",
+    sourceClass: "mqtt-live",
+    unit: "kWh"
+  },
+  {
+    accentColor: false,
+    dependencyKeys: ["totalGeneration"],
+    fallbackIndex: 2,
+    iconKey: "bars",
+    metricKey: "totalGeneration",
+    label: "累積發電量",
+    sourceClass: "cumulative-counter",
+    unit: "GWh"
+  },
+  {
+    accentColor: false,
+    dependencyKeys: ["todayCo2Reduction"],
+    fallbackIndex: 3,
+    iconKey: "co2",
+    metricKey: "todayCo2Reduction",
+    label: "今日 CO₂ 減量",
+    sourceClass: "mqtt-live",
+    unit: "t"
+  },
+  {
+    accentColor: false,
+    dependencyKeys: ["totalCo2Reduction"],
+    fallbackIndex: 4,
+    iconKey: "leaf",
+    metricKey: "totalCo2Reduction",
+    label: "累積 CO₂ 減量",
+    sourceClass: "cumulative-counter",
+    unit: "t"
+  }
 ];
 
 const validMonitoringAlertTones = new Set<MonitoringAlertTone>(["danger", "normal", "warning"]);
@@ -77,6 +125,22 @@ const validMonitoringFallbackReasons = new Set<MonitoringFallbackReason>([
   "socket-disconnected",
   "stale-data",
   "warning-threshold-exceeded"
+]);
+const validMonitoringFallbackStrategies = new Set<MonitoringFallbackStrategy>([
+  "derive-from-dependencies",
+  "placeholder",
+  "retain-last-reading"
+]);
+const validMonitoringProvenances = new Set<MonitoringMetricProvenance>([
+  "cumulative",
+  "derived",
+  "fallback",
+  "live"
+]);
+const validMonitoringSourceClasses = new Set<MonitoringMetricSourceClass>([
+  "cumulative-counter",
+  "derived-metric",
+  "mqtt-live"
 ]);
 
 function resolveSummaryStatus(connectionState: SocketConnectionState["status"]): OverviewStatus {
@@ -144,12 +208,16 @@ function resolveStoryMetricCards(
       accentColor: metricCard.accentColor,
       alertTone: storyMetric.alertTone,
       bindingState: storyMetric.bindingState,
+      dependencyKeys: storyMetric.dependencyKeys,
+      fallbackStrategy: storyMetric.fallbackStrategy,
       fallbackReason: storyMetric.fallbackReason,
       freshnessState: storyMetric.freshnessState,
       helper: storyMetric.helper,
       iconKey: metricCard.iconKey,
       label: storyMetric.label,
       metricKey: metricCard.metricKey,
+      provenance: storyMetric.provenance,
+      sourceClass: storyMetric.sourceClass,
       unit: storyMetric.unit,
       value: storyMetric.value
     };
@@ -177,7 +245,14 @@ function isResolvedStoryMetric(value: unknown): value is ResolvedMonitoringMetri
     typeof candidate.label === "string" &&
     typeof candidate.unit === "string" &&
     typeof candidate.value === "string" &&
-    typeof candidate.helper === "string"
+    typeof candidate.helper === "string" &&
+    typeof candidate.fallbackStrategy === "string" &&
+    validMonitoringFallbackStrategies.has(candidate.fallbackStrategy as MonitoringFallbackStrategy) &&
+    typeof candidate.provenance === "string" &&
+    validMonitoringProvenances.has(candidate.provenance as MonitoringMetricProvenance) &&
+    typeof candidate.sourceClass === "string" &&
+    validMonitoringSourceClasses.has(candidate.sourceClass as MonitoringMetricSourceClass) &&
+    Array.isArray(candidate.dependencyKeys)
   );
 }
 
@@ -224,12 +299,16 @@ export function buildOverviewViewModel({
         accentColor,
         alertTone: metricCard.alertTone,
         bindingState: metricCard.bindingState,
+        dependencyKeys: metricCard.dependencyKeys,
+        fallbackStrategy: metricCard.fallbackStrategy,
         fallbackReason: metricCard.fallbackReason,
         freshnessState: metricCard.freshnessState,
         helper: metricCard.helper,
         iconKey,
         label: metricCard.label,
         metricKey: metricCard.metricKey,
+        provenance: metricCard.provenance,
+        sourceClass: metricCard.sourceClass,
         unit: metricCard.unit,
         value: metricCard.value
       };
@@ -252,12 +331,16 @@ export function buildOverviewViewModel({
       accentColor,
       alertTone: resolved.alertTone,
       bindingState: resolved.bindingState,
+      dependencyKeys: resolved.dependencyKeys,
+      fallbackStrategy: resolved.fallbackStrategy,
       fallbackReason: resolved.fallbackReason,
       freshnessState: resolved.freshnessState,
       helper: resolved.helper,
       iconKey,
       label: resolved.label,
       metricKey: resolved.metricKey,
+      provenance: resolved.provenance,
+      sourceClass: resolved.sourceClass,
       unit: resolved.unit,
       value: resolved.value
     };

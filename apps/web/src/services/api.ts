@@ -260,10 +260,10 @@ export type DisplayStoryPayload = {
     };
   };
   solar: {
-    kpis: Array<MonitoringMetricBinding<string> & {
+    kpis: Array<ResolvedMonitoringMetricBinding<string> & {
       comparison: {
         state: "unavailable" | "below-target" | "above-target" | "at-target";
-        delta: number | null;
+        delta: string | null;
         fallbackReason: string | null;
         label: string;
       };

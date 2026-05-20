@@ -1,4 +1,9 @@
-import type { MonitoringMetricBinding, SolarComparisonTarget } from "@solar-display/shared";
+import type {
+  MonitoringMetricBinding,
+  MonitoringMetricProvenance,
+  MonitoringMetricSourceClass,
+  SolarComparisonTarget
+} from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
   resolveSolarComparison,
@@ -38,21 +43,25 @@ type BuildSolarViewModelArgs = {
   snapshot: LiveMetricsSnapshot;
   solarStory?: {
     kpis: Array<{
-      metricKey: string;
-      label: string;
-      unit: string;
-      value?: string;
+      alertTone?: string;
+      bindingState?: string;
       comparison: {
         state: string;
-        delta: number | null;
+        delta: string | null;
         fallbackReason: string | null;
         label: string;
       };
+      dependencyKeys?: string[];
       helper?: string;
       fallbackReason?: string | null;
+      fallbackStrategy?: string;
       freshnessState?: string;
-      bindingState?: string;
-      alertTone?: string;
+      metricKey: string;
+      label: string;
+      provenance?: string;
+      sourceClass?: string;
+      unit: string;
+      value?: string;
     }>;
     story: {
       flowState: {
@@ -65,11 +74,55 @@ type BuildSolarViewModelArgs = {
 };
 
 const kpiBindings: SolarMetricBinding[] = [
-  { fallbackIndex: 1, iconKey: "metric-generation-sun", metricKey: "todayGeneration", label: "今日發電量", unit: "kWh" },
-  { fallbackIndex: 2, iconKey: "metric-self-consumption", metricKey: "selfConsumptionRatio", label: "自發自用比例", unit: "%" },
-  { fallbackIndex: 3, iconKey: "metric-co2-today", metricKey: "todayCo2Reduction", label: "今日減碳量", unit: "t" },
-  { fallbackHelper: "累積成果", fallbackIndex: 3, fallbackValue: "9,842", iconKey: "metric-co2-total", metricKey: "totalCo2Reduction", label: "累積減碳量", unit: "t" },
-  { fallbackIndex: 4, iconKey: "metric-efficiency", metricKey: "systemEfficiency", label: "系統效率", unit: "%" }
+  {
+    dependencyKeys: ["todayGeneration"],
+    fallbackIndex: 1,
+    iconKey: "metric-generation-sun",
+    metricKey: "todayGeneration",
+    label: "今日發電量",
+    sourceClass: "mqtt-live",
+    unit: "kWh"
+  },
+  {
+    dependencyKeys: ["selfConsumptionRatio", "selfConsumptionEnergy", "consumptionEnergy"],
+    fallbackHelper: "缺少自發自用比例所需輸入",
+    fallbackIndex: 2,
+    fallbackStrategy: "derive-from-dependencies",
+    iconKey: "metric-self-consumption",
+    metricKey: "selfConsumptionRatio",
+    label: "自發自用比例",
+    sourceClass: "derived-metric",
+    unit: "%"
+  },
+  {
+    dependencyKeys: ["todayCo2Reduction"],
+    fallbackIndex: 3,
+    iconKey: "metric-co2-today",
+    metricKey: "todayCo2Reduction",
+    label: "今日減碳量",
+    sourceClass: "mqtt-live",
+    unit: "t"
+  },
+  {
+    dependencyKeys: ["totalCo2Reduction"],
+    fallbackHelper: "累積成果",
+    fallbackIndex: 3,
+    fallbackValue: "9,842",
+    iconKey: "metric-co2-total",
+    metricKey: "totalCo2Reduction",
+    label: "累積減碳量",
+    sourceClass: "cumulative-counter",
+    unit: "t"
+  },
+  {
+    dependencyKeys: ["systemEfficiency"],
+    fallbackIndex: 4,
+    iconKey: "metric-efficiency",
+    metricKey: "systemEfficiency",
+    label: "系統效率",
+    sourceClass: "mqtt-live",
+    unit: "%"
+  }
 ];
 
 function resolveMetricValue(
@@ -106,19 +159,39 @@ export function buildSolarViewModel({
     );
     const kpis = kpiBindings.map((binding) => {
       const storyKpi = storyKpiByKey.get(binding.metricKey);
-      const value = storyKpi?.value ?? resolveMetricValue(binding, isSocketConnected, snapshot).value;
+      const fallbackResolved = resolveMetricValue(binding, isSocketConnected, snapshot);
+      const value = storyKpi?.value ?? fallbackResolved.value;
       const resolved = storyKpi
-        ? { helper: storyKpi.helper ?? "", ...storyKpi }
-        : resolveMetricValue(binding, isSocketConnected, snapshot);
+        ? {
+            alertTone: storyKpi.alertTone ?? fallbackResolved.alertTone,
+            bindingState: storyKpi.bindingState ?? fallbackResolved.bindingState,
+            dependencyKeys: storyKpi.dependencyKeys ?? binding.dependencyKeys ?? fallbackResolved.dependencyKeys,
+            fallbackReason: storyKpi.fallbackReason ?? fallbackResolved.fallbackReason,
+            fallbackStrategy: storyKpi.fallbackStrategy ?? fallbackResolved.fallbackStrategy,
+            freshnessState: storyKpi.freshnessState ?? fallbackResolved.freshnessState,
+            helper: storyKpi.helper ?? fallbackResolved.helper,
+            provenance: (storyKpi.provenance as MonitoringMetricProvenance | undefined) ?? fallbackResolved.provenance,
+            sourceClass: (storyKpi.sourceClass as MonitoringMetricSourceClass | undefined) ?? binding.sourceClass ?? fallbackResolved.sourceClass,
+            unit: storyKpi.unit ?? fallbackResolved.unit
+          }
+        : fallbackResolved;
       return {
+        alertTone: resolved.alertTone,
+        bindingState: resolved.bindingState,
         comparison: storyKpi?.comparison ?? resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: isSocketConnected ? snapshot.metrics[binding.metricKey]?.value ?? null : null,
           target: comparisonTargets?.[binding.metricKey]
         }),
+        dependencyKeys: resolved.dependencyKeys,
+        fallbackReason: resolved.fallbackReason,
+        fallbackStrategy: resolved.fallbackStrategy,
+        freshnessState: resolved.freshnessState,
         helper: resolved.helper,
         iconKey: binding.iconKey,
         label: storyKpi?.label ?? binding.label,
+        provenance: resolved.provenance,
+        sourceClass: resolved.sourceClass,
         unit: storyKpi?.unit ?? resolved.unit,
         value
       };
@@ -193,14 +266,22 @@ export function buildSolarViewModel({
     kpis: kpiBindings.map((binding) => {
       const resolved = resolveMetricValue(binding, isSocketConnected, snapshot);
       return {
+        alertTone: resolved.alertTone,
+        bindingState: resolved.bindingState,
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: isSocketConnected ? snapshot.metrics[binding.metricKey]?.value ?? null : null,
           target: comparisonTargets?.[binding.metricKey]
         }),
+        dependencyKeys: resolved.dependencyKeys,
+        fallbackReason: resolved.fallbackReason,
+        fallbackStrategy: resolved.fallbackStrategy,
+        freshnessState: resolved.freshnessState,
         helper: resolved.helper,
         iconKey: binding.iconKey,
         label: binding.label,
+        provenance: resolved.provenance,
+        sourceClass: resolved.sourceClass,
         unit: resolved.unit,
         value: resolved.value
       };

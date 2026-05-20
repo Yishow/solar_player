@@ -76,17 +76,47 @@ function buildMetricFindings(): DisplayReadinessFinding[] {
   const mappings = new Map(readTopicMappings().map((row) => [row.metric_key, row]));
 
   return displayMetricRequirements.map((requirement) => {
-    const mapping = mappings.get(requirement.requirementKey);
-    const topic = mapping?.topic?.trim() ?? "";
-    const available = Boolean(mapping && toBoolean(mapping.enabled) && topic.length > 0);
+    const metricKeys = requirement.dependencyKeys ?? [requirement.requirementKey];
+    const directMapping = mappings.get(requirement.requirementKey);
+    const directTopic = directMapping?.topic?.trim() ?? "";
+    const directAvailable =
+      Boolean(directMapping && toBoolean(directMapping.enabled) && directTopic.length > 0);
+    const derivedDependencyKeys = metricKeys.filter((metricKey) => metricKey !== requirement.requirementKey);
+    const derivedMappings = derivedDependencyKeys.map((metricKey) => ({
+      metricKey,
+      mapping: mappings.get(metricKey)
+    }));
+    const derivedAvailable =
+      derivedMappings.length > 0 &&
+      derivedMappings.every(
+        ({ mapping }) =>
+          Boolean(mapping && toBoolean(mapping.enabled) && (mapping.topic?.trim().length ?? 0) > 0)
+      );
+    const available =
+      requirement.sourceType === "derived-metric"
+        ? directAvailable || derivedAvailable
+        : directAvailable;
+    const derivedReason = derivedMappings
+      .map(({ mapping, metricKey }) => mapping?.topic?.trim() || metricKey)
+      .join(", ");
 
     return {
       blocking: !available,
       pageId: requirement.pageId,
-      reason: available ? `mapped to ${topic}` : `missing MQTT mapping for ${requirement.requirementKey}`,
+      reason: available
+        ? directAvailable
+          ? `mapped to ${directTopic}`
+          : `derived from ${derivedReason}`
+        : requirement.sourceType === "derived-metric"
+          ? `missing derived metric coverage for ${requirement.requirementKey}; expected ${metricKeys.join(", ")}`
+          : `missing MQTT mapping for ${requirement.requirementKey}`,
       requirementKey: requirement.requirementKey,
-      sourceId: available ? topic : requirement.requirementKey,
-      sourceType: "mqtt-metric",
+      sourceId: available
+        ? directAvailable
+          ? directTopic
+          : derivedReason
+        : requirement.requirementKey,
+      sourceType: requirement.sourceType,
       status: available ? "ready" : "blocking"
     };
   });

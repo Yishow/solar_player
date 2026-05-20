@@ -10,10 +10,11 @@ export const displayCircuitSlotKeys = [
 ] as const;
 
 export type DisplayCircuitSlotKey = (typeof displayCircuitSlotKeys)[number];
-export type DisplayReadinessSourceType = "circuit-slot" | "mqtt-metric";
+export type DisplayReadinessSourceType = "circuit-slot" | "derived-metric" | "mqtt-metric";
 export type DisplayReadinessStatus = "blocking" | "ready" | "warning";
 
 export type DisplayRequirementDescriptor = {
+  dependencyKeys?: string[];
   pageId: DisplayPageKey;
   requirementKey: string;
   sourceType: DisplayReadinessSourceType;
@@ -60,7 +61,18 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "overview", requirementKey: "realTimePower", sourceType: "mqtt-metric" },
   { pageId: "overview", requirementKey: "todayGeneration", sourceType: "mqtt-metric" },
   { pageId: "overview", requirementKey: "totalGeneration", sourceType: "mqtt-metric" },
+  { pageId: "overview", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
+  { pageId: "overview", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "realTimePower", sourceType: "mqtt-metric" },
+  { pageId: "solar", requirementKey: "todayGeneration", sourceType: "mqtt-metric" },
+  {
+    dependencyKeys: ["selfConsumptionRatio", "selfConsumptionEnergy", "consumptionEnergy"],
+    pageId: "solar",
+    requirementKey: "selfConsumptionRatio",
+    sourceType: "derived-metric"
+  },
+  { pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
+  { pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "systemEfficiency", sourceType: "mqtt-metric" },
   { pageId: "sustainability", requirementKey: "consumptionEnergy", sourceType: "mqtt-metric" },
   {

@@ -4,6 +4,10 @@ import type { MetricKey } from "./types.js";
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
 export type MonitoringAlertTone = "danger" | "normal" | "warning";
 export type MonitoringBindingState = "bound" | "conflict" | "missing";
+export type MonitoringFallbackStrategy =
+  | "derive-from-dependencies"
+  | "placeholder"
+  | "retain-last-reading";
 export type MonitoringFallbackReason =
   | "attention-threshold-exceeded"
   | "comparison-target-missing"
@@ -15,6 +19,15 @@ export type MonitoringFallbackReason =
   | "socket-disconnected"
   | "stale-data"
   | "warning-threshold-exceeded";
+export type MonitoringMetricProvenance =
+  | "cumulative"
+  | "derived"
+  | "fallback"
+  | "live";
+export type MonitoringMetricSourceClass =
+  | "cumulative-counter"
+  | "derived-metric"
+  | "mqtt-live";
 
 export type MonitoringStoryState = {
   alertTone: MonitoringAlertTone;
@@ -31,20 +44,27 @@ export type MonitoringMetricReading = {
 };
 
 export type MonitoringMetricBinding<TMetric extends string = MetricKey> = {
+  dependencyKeys?: string[];
   fallbackHelper?: string;
   fallbackIndex: number;
+  fallbackStrategy?: MonitoringFallbackStrategy;
   fallbackValue?: string;
   label: string;
   metricKey: TMetric;
+  sourceClass?: MonitoringMetricSourceClass;
   staleAfterMs?: number;
   unit: string;
 };
 
 export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> =
   MonitoringStoryState & {
+    dependencyKeys: string[];
+    fallbackStrategy: MonitoringFallbackStrategy;
     helper: string;
     label: string;
     metricKey: TMetric;
+    provenance: MonitoringMetricProvenance;
+    sourceClass: MonitoringMetricSourceClass;
     unit: string;
     value: string;
   };
@@ -148,6 +168,9 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   now?: string;
   reading: MonitoringMetricReading | null;
 }) {
+  const dependencyKeys = args.binding.dependencyKeys ?? [args.binding.metricKey];
+  const fallbackStrategy = args.binding.fallbackStrategy ?? "placeholder";
+  const sourceClass = args.binding.sourceClass ?? "mqtt-live";
   const state = resolveFreshnessState({
     isConnected: args.isConnected,
     now: args.now,
@@ -158,9 +181,13 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   if (state.bindingState !== "bound" || !args.reading) {
     return {
       ...state,
+      dependencyKeys,
+      fallbackStrategy,
       helper: args.binding.fallbackHelper ?? "顯示 fallback 資料",
       label: args.binding.label,
       metricKey: args.binding.metricKey,
+      provenance: "fallback",
+      sourceClass,
       unit: args.binding.unit,
       value: args.binding.fallbackValue ?? "--"
     } satisfies ResolvedMonitoringMetricBinding<TMetric>;
@@ -168,9 +195,13 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
 
   return {
     ...state,
+    dependencyKeys,
+    fallbackStrategy,
     helper: `最後更新 ${args.reading.timestamp}`,
     label: args.binding.label,
     metricKey: args.binding.metricKey,
+    provenance: sourceClass === "cumulative-counter" ? "cumulative" : "live",
+    sourceClass,
     unit: args.reading.unit ?? args.binding.unit,
     value: formatMonitoringValue(args.reading.value, args.reading.unit ?? args.binding.unit)
   } satisfies ResolvedMonitoringMetricBinding<TMetric>;

@@ -24,22 +24,30 @@ const snapshot: LiveMetricsSnapshot = {
 function createResolvedStoryMetric(args: {
   alertTone?: "danger" | "normal" | "warning";
   bindingState?: "bound" | "conflict" | "missing";
+  dependencyKeys?: string[];
   fallbackReason?: "metric-unavailable" | "stale-data" | null;
+  fallbackStrategy?: "placeholder" | "retain-last-reading";
   freshnessState?: "fallback" | "fresh" | "stale";
   helper?: string;
   label: string;
   metricKey: string;
+  provenance?: "cumulative" | "derived" | "fallback" | "live";
+  sourceClass?: "cumulative-counter" | "derived-metric" | "mqtt-live";
   unit: string;
   value?: string;
 }) {
   return {
     alertTone: args.alertTone ?? "normal",
     bindingState: args.bindingState ?? "bound",
+    dependencyKeys: args.dependencyKeys ?? [args.metricKey],
+    fallbackStrategy: args.fallbackStrategy ?? "placeholder",
     fallbackReason: args.fallbackReason ?? null,
     freshnessState: args.freshnessState ?? "fresh",
     helper: args.helper ?? `共享故事 ${args.label}`,
     label: args.label,
     metricKey: args.metricKey,
+    provenance: args.provenance ?? "live",
+    sourceClass: args.sourceClass ?? "mqtt-live",
     unit: args.unit,
     value: args.value ?? "--"
   };
@@ -156,7 +164,14 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
     },
     storyOverview: {
       metrics: [
-        createResolvedStoryMetric({ label: "故事版累積發電量", metricKey: "totalGeneration", unit: "MWh", value: "18.6" }),
+        createResolvedStoryMetric({
+          label: "故事版累積發電量",
+          metricKey: "totalGeneration",
+          provenance: "cumulative",
+          sourceClass: "cumulative-counter",
+          unit: "MWh",
+          value: "18.6"
+        }),
         createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "612" }),
         createResolvedStoryMetric({ label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh", value: "3,842" })
       ],
@@ -172,8 +187,10 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
   assert.equal(model.metrics.length, 5);
   assert.equal(model.metrics[0]?.label, "故事版即時功率");
   assert.equal(model.metrics[0]?.iconKey, "bolt");
+  assert.equal(model.metrics[0]?.provenance, "live");
   assert.equal(model.metrics[1]?.label, "故事版今日發電量");
   assert.equal(model.metrics[2]?.label, "故事版累積發電量");
+  assert.equal(model.metrics[2]?.provenance, "cumulative");
   assert.equal(model.metrics[2]?.unit, "MWh");
   assert.equal(model.metrics[3]?.label, "今日 CO₂ 減量");
   assert.equal(model.summary.alertTone, "normal");
@@ -261,22 +278,30 @@ test("buildOverviewViewModel accepts resolved display-story overview metrics wit
         {
           alertTone: "normal",
           bindingState: "bound",
+          dependencyKeys: ["realTimePower"],
+          fallbackStrategy: "placeholder",
           fallbackReason: null,
           freshnessState: "fresh",
           helper: "共享故事即時功率",
           label: "故事版即時功率",
           metricKey: "realTimePower",
+          provenance: "live",
+          sourceClass: "mqtt-live",
           unit: "kW",
           value: "601"
         },
         {
           alertTone: "warning",
           bindingState: "missing",
+          dependencyKeys: ["todayGeneration"],
+          fallbackStrategy: "placeholder",
           fallbackReason: "metric-unavailable",
           freshnessState: "fallback",
           helper: "共享故事缺少今日發電量",
           label: "故事版今日發電量",
           metricKey: "todayGeneration",
+          provenance: "fallback",
+          sourceClass: "mqtt-live",
           unit: "kWh",
           value: "--"
         }
@@ -310,11 +335,15 @@ test("buildOverviewViewModel tolerates incomplete shared story payloads and fall
       ] as unknown as Array<{
         alertTone: "danger" | "normal" | "warning";
         bindingState: "bound" | "conflict" | "missing";
+        dependencyKeys: string[];
         fallbackReason: "metric-unavailable" | "stale-data" | null;
+        fallbackStrategy: "derive-from-dependencies" | "placeholder" | "retain-last-reading";
         freshnessState: "fallback" | "fresh" | "stale";
         helper: string;
         label: string;
         metricKey: string;
+        provenance: "cumulative" | "derived" | "fallback" | "live";
+        sourceClass: "cumulative-counter" | "derived-metric" | "mqtt-live";
         unit: string;
         value: string;
       }>,
@@ -340,11 +369,15 @@ test("buildOverviewViewModel rejects invalid shared story state enums and falls 
       }] as unknown as Array<{
         alertTone: "danger" | "normal" | "warning";
         bindingState: "bound" | "conflict" | "missing";
+        dependencyKeys: string[];
         fallbackReason: "metric-unavailable" | "stale-data" | null;
+        fallbackStrategy: "derive-from-dependencies" | "placeholder" | "retain-last-reading";
         freshnessState: "fallback" | "fresh" | "stale";
         helper: string;
         label: string;
         metricKey: string;
+        provenance: "cumulative" | "derived" | "fallback" | "live";
+        sourceClass: "cumulative-counter" | "derived-metric" | "mqtt-live";
         unit: string;
         value: string;
       }>,

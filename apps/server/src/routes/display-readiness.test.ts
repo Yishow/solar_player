@@ -51,11 +51,83 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
     assert.equal(
       body.readiness.findings.some(
         (finding) =>
+          finding.pageId === "overview" &&
+          finding.requirementKey === "todayCo2Reduction" &&
+          finding.sourceType === "mqtt-metric"
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "overview" &&
+          finding.requirementKey === "totalCo2Reduction" &&
+          finding.sourceType === "mqtt-metric"
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "solar" &&
+          finding.requirementKey === "selfConsumptionRatio" &&
+          finding.sourceType === "derived-metric"
+      ),
+      true
+    );
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
           finding.pageId === "factory-circuit" &&
           finding.requirementKey === "production" &&
           finding.sourceType === "circuit-slot" &&
           finding.status === "blocking" &&
           finding.blocking
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-readiness keeps solar self-consumption ready through derived dependencies", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("selfConsumptionRatio");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          reason: string;
+          requirementKey: string;
+          sourceType: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "solar" &&
+          finding.requirementKey === "selfConsumptionRatio" &&
+          finding.sourceType === "derived-metric" &&
+          finding.status === "ready" &&
+          finding.blocking === false &&
+          /derived from/i.test(finding.reason) &&
+          /self_consumption/i.test(finding.reason) &&
+          /consumption/i.test(finding.reason)
       ),
       true
     );

@@ -39,19 +39,96 @@ type OverviewMetricDefinition = MonitoringMetricBinding<StoryMetricKey> & {
 };
 
 const overviewMetrics: OverviewMetricDefinition[] = [
-  { fallbackIndex: 0, fallbackValue: "--", label: "即時發電功率", metricKey: "realTimePower", unit: "kW" },
-  { fallbackIndex: 1, fallbackValue: "--", label: "今日發電量", metricKey: "todayGeneration", unit: "kWh" },
-  { fallbackIndex: 2, fallbackValue: "--", label: "累積發電量", metricKey: "totalGeneration", unit: "GWh" },
-  { fallbackIndex: 3, fallbackValue: "--", label: "今日 CO₂ 減量", metricKey: "todayCo2Reduction", unit: "t" },
-  { fallbackIndex: 4, fallbackValue: "--", label: "累積 CO₂ 減量", metricKey: "totalCo2Reduction", unit: "t" }
+  {
+    dependencyKeys: ["realTimePower"],
+    fallbackIndex: 0,
+    fallbackValue: "--",
+    label: "即時發電功率",
+    metricKey: "realTimePower",
+    sourceClass: "mqtt-live",
+    unit: "kW"
+  },
+  {
+    dependencyKeys: ["todayGeneration"],
+    fallbackIndex: 1,
+    fallbackValue: "--",
+    label: "今日發電量",
+    metricKey: "todayGeneration",
+    sourceClass: "mqtt-live",
+    unit: "kWh"
+  },
+  {
+    dependencyKeys: ["totalGeneration"],
+    fallbackIndex: 2,
+    fallbackValue: "--",
+    label: "累積發電量",
+    metricKey: "totalGeneration",
+    sourceClass: "cumulative-counter",
+    unit: "GWh"
+  },
+  {
+    dependencyKeys: ["todayCo2Reduction"],
+    fallbackIndex: 3,
+    fallbackValue: "--",
+    label: "今日 CO₂ 減量",
+    metricKey: "todayCo2Reduction",
+    sourceClass: "mqtt-live",
+    unit: "t"
+  },
+  {
+    dependencyKeys: ["totalCo2Reduction"],
+    fallbackIndex: 4,
+    fallbackValue: "--",
+    label: "累積 CO₂ 減量",
+    metricKey: "totalCo2Reduction",
+    sourceClass: "cumulative-counter",
+    unit: "t"
+  }
 ];
 
 const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
-  { fallbackIndex: 1, label: "今日發電量", metricKey: "todayGeneration", unit: "kWh" },
-  { fallbackIndex: 2, label: "自發自用比例", metricKey: "selfConsumptionRatio", unit: "%" },
-  { fallbackIndex: 3, label: "今日減碳量", metricKey: "todayCo2Reduction", unit: "t" },
-  { fallbackIndex: 3, label: "累積減碳量", metricKey: "totalCo2Reduction", unit: "t" },
-  { fallbackIndex: 4, label: "系統效率", metricKey: "systemEfficiency", unit: "%" }
+  {
+    dependencyKeys: ["todayGeneration"],
+    fallbackIndex: 1,
+    label: "今日發電量",
+    metricKey: "todayGeneration",
+    sourceClass: "mqtt-live",
+    unit: "kWh"
+  },
+  {
+    dependencyKeys: ["selfConsumptionRatio", "selfConsumptionEnergy", "consumptionEnergy"],
+    fallbackHelper: "缺少自發自用比例所需輸入",
+    fallbackIndex: 2,
+    fallbackStrategy: "derive-from-dependencies",
+    label: "自發自用比例",
+    metricKey: "selfConsumptionRatio",
+    sourceClass: "derived-metric",
+    unit: "%"
+  },
+  {
+    dependencyKeys: ["todayCo2Reduction"],
+    fallbackIndex: 3,
+    label: "今日減碳量",
+    metricKey: "todayCo2Reduction",
+    sourceClass: "mqtt-live",
+    unit: "t"
+  },
+  {
+    dependencyKeys: ["totalCo2Reduction"],
+    fallbackIndex: 3,
+    label: "累積減碳量",
+    metricKey: "totalCo2Reduction",
+    sourceClass: "cumulative-counter",
+    unit: "t"
+  },
+  {
+    dependencyKeys: ["systemEfficiency"],
+    fallbackIndex: 4,
+    label: "系統效率",
+    metricKey: "systemEfficiency",
+    sourceClass: "mqtt-live",
+    unit: "%"
+  }
 ];
 
 const solarTargets: Partial<Record<StoryMetricKey, SolarComparisonTarget>> = {
@@ -136,6 +213,70 @@ function resolveCircuitState(args: {
   };
 }
 
+function resolveSolarKpiBinding(args: {
+  binding: MonitoringMetricBinding<StoryMetricKey>;
+  isConnected: boolean;
+  now?: string;
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
+}) {
+  if (args.binding.metricKey !== "selfConsumptionRatio") {
+    return resolveMonitoringMetricBinding({
+      binding: args.binding,
+      isConnected: args.isConnected,
+      now: args.now,
+      reading: args.snapshot.metrics[args.binding.metricKey] ?? null
+    });
+  }
+
+  const directReading = args.snapshot.metrics.selfConsumptionRatio ?? null;
+  if (directReading) {
+    return resolveMonitoringMetricBinding({
+      binding: args.binding,
+      isConnected: args.isConnected,
+      now: args.now,
+      reading: directReading
+    });
+  }
+
+  const selfConsumptionReading = args.snapshot.metrics.selfConsumptionEnergy ?? null;
+  const consumptionReading = args.snapshot.metrics.consumptionEnergy ?? null;
+  if (
+    args.isConnected &&
+    selfConsumptionReading &&
+    consumptionReading &&
+    consumptionReading.value > 0
+  ) {
+    const observedAt =
+      selfConsumptionReading.timestamp > consumptionReading.timestamp
+        ? selfConsumptionReading.timestamp
+        : consumptionReading.timestamp;
+    const resolved = resolveMonitoringMetricBinding({
+      binding: args.binding,
+      isConnected: true,
+      now: args.now,
+      reading: {
+        quality: selfConsumptionReading.quality ?? consumptionReading.quality,
+        timestamp: observedAt,
+        unit: "%",
+        value: (selfConsumptionReading.value / consumptionReading.value) * 100
+      }
+    });
+
+    return {
+      ...resolved,
+      helper: "由自發自用量與總用電推導",
+      provenance: "derived" as const
+    };
+  }
+
+  return resolveMonitoringMetricBinding({
+    binding: args.binding,
+    isConnected: args.isConnected,
+    now: args.now,
+    reading: null
+  });
+}
+
 export function readDisplayStory() {
   const snapshot = readLiveMetricsSnapshot();
   const isConnected = snapshot.timestamp !== null;
@@ -211,11 +352,11 @@ export function readDisplayStory() {
     },
     solar: {
       kpis: solarKpis.map((binding) => {
-        const resolved = resolveMonitoringMetricBinding({
+        const resolved = resolveSolarKpiBinding({
           binding,
           isConnected,
           now: snapshot.timestamp ?? undefined,
-          reading: snapshot.metrics[binding.metricKey] ?? null
+          snapshot
         });
         return {
           ...resolved,
