@@ -5,6 +5,7 @@
 ## Structure
 
 - `openapi.yaml` — 目前 server 使用的 OpenAPI 規格檔。
+- `runbooks/device-diagnostics-safe-ops.md` — `Device Status` safe diagnostics、host-level restart 與 unsupported controls 的維運 runbook。
 - `archive/prompt-pack/` — 舊的 root README 與 Phase 1–10 提示詞／工作流文件。
 - `archive/solar-display/` — `solar-display/` 子目錄時期留下的歷史 README。
 - `reference/solar_complete_spec_md/` — UI 規格、分頁提示詞與設計 token 參考。
@@ -17,4 +18,5 @@
 
 - 想了解目前產品如何運作與如何開發：請優先看 repo 根目錄 `README.md`。
 - 想依照正式變更流程提案、實作與封存：請看 root `AGENTS.md`、`CLAUDE.md` 與 `openspec/`。
+- 想處理 `Device Status`、安全 diagnostics 與 host-level restart 邊界：先看 `runbooks/device-diagnostics-safe-ops.md`。
 - 想查歷史提示詞、UI 參考稿、prototype 或 MQTT 補充素材：從這個目錄往下找對應子目錄。

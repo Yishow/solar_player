@@ -16,6 +16,7 @@ type DeviceRouteStatus = {
 
 type DeviceStatusContentProps = {
   activeAction: string | null;
+  displayOpsAccessDenied: boolean;
   displayOpsErrorMessage: string;
   handleDiagnostic: (action: "export-summary" | "refresh-readiness", label: string) => Promise<void>;
   isLoading: boolean;
@@ -62,6 +63,7 @@ function NetworkGlyph() {
 
 export function DeviceStatusContent({
   activeAction,
+  displayOpsAccessDenied,
   displayOpsErrorMessage,
   handleDiagnostic,
   isLoading,
@@ -126,10 +128,14 @@ export function DeviceStatusContent({
               viewModel.displayOpsSummary.degraded ? "is-warning" : "is-neutral"
             }`}
           >
-            {displayOpsErrorMessage ? "摘要不可用" : viewModel.displayOpsSummary.statusTitle}
+            {displayOpsAccessDenied
+              ? viewModel.displayOpsSummary.statusTitle
+              : displayOpsErrorMessage
+                ? "摘要不可用"
+                : viewModel.displayOpsSummary.statusTitle}
           </span>
           <span className="ds-status-card__detail">
-            {displayOpsErrorMessage ||
+            {(displayOpsAccessDenied ? "" : displayOpsErrorMessage) ||
               `${viewModel.displayOpsSummary.liveVersion} · ${viewModel.displayOpsSummary.skipLabel} · ${viewModel.displayOpsSummary.readinessLabel}`}
           </span>
         </article>
@@ -188,11 +194,14 @@ export function DeviceStatusContent({
               </small>
             </div>
           </div>
-          <div className={`mgmt-status ${displayOpsErrorMessage ? "is-error" : ""}`} style={{ marginTop: 12 }}>
-            {displayOpsErrorMessage || viewModel.displayOpsSummary.helper}
+          <div
+            className={`mgmt-status ${displayOpsErrorMessage || displayOpsAccessDenied ? "is-error" : ""}`}
+            style={{ marginTop: 12 }}
+          >
+            {(displayOpsAccessDenied ? "" : displayOpsErrorMessage) || viewModel.displayOpsSummary.helper}
           </div>
           <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-            {(displayOpsErrorMessage ? [] : viewModel.displayOpsSummary.alerts).map((alert) => (
+            {(displayOpsErrorMessage || displayOpsAccessDenied ? [] : viewModel.displayOpsSummary.alerts).map((alert) => (
               <div
                 key={`${alert.code}-${alert.pageLabel}-${alert.message}`}
                 className={`mgmt-status ${alert.severity === "blocking" ? "is-error" : ""}`}
@@ -200,9 +209,15 @@ export function DeviceStatusContent({
                 [{alert.pageLabel}] {alert.message}
               </div>
             ))}
-            {!displayOpsErrorMessage && viewModel.displayOpsSummary.alerts.length === 0 ? (
+            {!displayOpsErrorMessage && !displayOpsAccessDenied && viewModel.displayOpsSummary.alerts.length === 0 ? (
               <div className="mgmt-status">目前沒有 display readiness、skip 或 asset 警示。</div>
             ) : null}
+          </div>
+          <div className="mgmt-status" style={{ marginTop: 12 }}>
+            {viewModel.displayOpsSummary.safeOpsHelper}
+          </div>
+          <div className="mgmt-status" style={{ marginTop: 12 }}>
+            目前不支援的裝置控制：{viewModel.displayOpsSummary.unsupportedControlsLabel}
           </div>
 
           <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
@@ -312,11 +327,11 @@ export function DeviceStatusContent({
             key={action.action}
             type="button"
             className="ds-action"
-            disabled={activeAction !== null || Boolean(displayOpsErrorMessage) || isLoading}
+            disabled={activeAction !== null || displayOpsAccessDenied || Boolean(displayOpsErrorMessage) || isLoading}
             onClick={() => void handleDiagnostic(action.action, action.label)}
           >
             {activeAction === action.action ? "執行中..." : action.label}
-            <small>{action.action}</small>
+            <small>{action.safeScope}</small>
           </button>
         ))}
       </section>

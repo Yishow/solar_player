@@ -6,6 +6,20 @@ import type {
 import type { DisplayPageKey } from "./displayPageConfig.js";
 
 export type DeviceDisplayDiagnosticAction = "export-summary" | "refresh-readiness";
+export type DeviceDiagnosticSafeScope = "safe-read" | "safe-refresh";
+export type DeviceUnsupportedControlAction = "clear-cache" | "reboot";
+
+export type DeviceSafeOpsGuidance = {
+  hostRestartCommand: string;
+  hostRestartLabel: string;
+  runbookPath: string;
+  unsupportedOperations: Array<{
+    action: DeviceUnsupportedControlAction;
+    executed: false;
+    guidance: string;
+    label: string;
+  }>;
+};
 
 export type DeviceDisplayAlert = {
   code: DisplayOpsIssueCode | "readiness-blocking";
@@ -54,6 +68,7 @@ export type DeviceDisplayOpsSummary = {
   diagnosticActions: Array<{
     action: DeviceDisplayDiagnosticAction;
     label: string;
+    safeScope: DeviceDiagnosticSafeScope;
   }>;
   draftCount: number;
   generatedAt: string;
@@ -67,14 +82,24 @@ export type DeviceDisplayOpsSummary = {
     count: number;
     pages: DisplayPageKey[];
   };
+  safeOpsGuidance: DeviceSafeOpsGuidance;
   triageSummary?: DisplayFaultTriageSummary | null;
 };
 
 export type DeviceDisplayDiagnosticResult = {
   action: DeviceDisplayDiagnosticAction;
   generatedAt: string;
+  guidance: DeviceSafeOpsGuidance;
   message: string;
+  safeScope: DeviceDiagnosticSafeScope;
   summary: DeviceDisplayOpsSummary;
+};
+
+export type DeviceUnsupportedControlResult = {
+  action: DeviceUnsupportedControlAction;
+  executed: false;
+  guidance: DeviceSafeOpsGuidance;
+  message: string;
 };
 
 type TriageIssue = Pick<DeviceDisplayAlert, "code" | "message" | "pageId" | "severity">;

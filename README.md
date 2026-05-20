@@ -72,6 +72,11 @@ Solar Display 是一套部署在 Raspberry Pi、Linux mini PC 或 kiosk browser 
 - `deploy/deploy.sh`：先在 repo 根目錄執行 `pnpm run build`，再把 `apps/`、`packages/`、workspace manifests 與 `.env.example` 複製到預設安裝位置 `/opt/solar-display`
 - `deploy/solar-display.service`：systemd 服務範本，使用 `WorkingDirectory=/opt/solar-display`，並將 `DATA_DIR`、`LOG_DIR` 指向 `/opt/solar-display/data`、`/opt/solar-display/logs`
 
+## 維運 Runbook
+
+- 裝置診斷安全操作與 host-level escalation：`docs/runbooks/device-diagnostics-safe-ops.md`
+- 目前 app 內只支援 safe diagnostics；若需主機層處置，請依 runbook 使用 `systemctl restart solar-display`
+
 ## Spectra 與文件導覽
 
 - 正式變更流程：`openspec/changes/`

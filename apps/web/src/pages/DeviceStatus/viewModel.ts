@@ -1,6 +1,7 @@
 import {
   resolveDisplayFaultTriageSummaryFromAlerts,
   type DeviceDisplayOpsSummary,
+  type DeviceSafeOpsGuidance,
   type DisplayFaultTriageSummary
 } from "@solar-display/shared";
 import type { DeviceLogExportMetadata } from "../../services/api";
@@ -25,11 +26,14 @@ export type DeviceActionFeedback = {
 
 type BuildDeviceStatusViewModelArgs = {
   actionFeedback: DeviceActionFeedback;
+  displayOpsAccessDenied?: boolean;
   displayOpsSummary?: DeviceDisplayOpsSummary | null;
   isLoading: boolean;
   logExport: DeviceLogExportMetadata | null;
+  logExportAccessDenied?: boolean;
   logExportError: string;
   status: DeviceRouteStatus | null;
+  statusAccessDenied?: boolean;
 };
 
 function parseGaugeValue(label: string, valueLabel: string) {
@@ -56,7 +60,18 @@ function gaugePercentForCard(label: string, gaugeValue: string, valueLabel: stri
   return parseGaugeValue(label, gaugeValue);
 }
 
-function buildRuntimeSummary(isLoading: boolean, status: DeviceRouteStatus | null) {
+function buildRuntimeSummary(
+  isLoading: boolean,
+  status: DeviceRouteStatus | null,
+  accessDenied: boolean
+) {
+  if (accessDenied) {
+    return {
+      detail: "此頁面僅對受信任的管理端開放。",
+      title: "存取受限"
+    };
+  }
+
   if (isLoading) {
     return {
       detail: "Normalizing runtime status...",
@@ -135,18 +150,29 @@ function formatTriageHelper(summary: DisplayFaultTriageSummary) {
   return `受影響頁面：${formatTriagePages(summary)} · 主因：${summary.dominantReason} · ${nextStep}`;
 }
 
+const defaultSafeOpsGuidance: DeviceSafeOpsGuidance = {
+  hostRestartCommand: "systemctl restart solar-display",
+  hostRestartLabel: "Host-level restart",
+  runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
+  unsupportedOperations: []
+};
+
 export function buildDeviceStatusViewModel({
   actionFeedback,
+  displayOpsAccessDenied = false,
   displayOpsSummary,
   isLoading,
   logExport,
+  logExportAccessDenied = false,
   logExportError,
-  status
+  status,
+  statusAccessDenied = false
 }: BuildDeviceStatusViewModelArgs) {
-  const runtimeSummary = buildRuntimeSummary(isLoading, status);
+  const runtimeSummary = buildRuntimeSummary(isLoading, status, statusAccessDenied);
   const triageSummary =
     displayOpsSummary?.triageSummary
     ?? resolveDisplayFaultTriageSummaryFromAlerts(displayOpsSummary?.alerts ?? null);
+  const safeOpsGuidance = displayOpsSummary?.safeOpsGuidance ?? defaultSafeOpsGuidance;
 
   return {
     feedback:
@@ -166,11 +192,23 @@ export function buildDeviceStatusViewModel({
     networkRows: [
       {
         label: "網路狀態",
-        value: isLoading ? "同步中" : status ? "● 管理通道可達" : "● 未連線"
+        value:
+          statusAccessDenied
+            ? "● 存取受限"
+            : isLoading
+              ? "同步中"
+              : status
+                ? "● 管理通道可達"
+                : "● 未連線"
       },
       {
         label: "訊號強度",
-        value: status ? "目前無可信訊號強度量測" : "需待裝置狀態恢復後確認"
+        value:
+          statusAccessDenied
+            ? "僅受信任管理端可讀取裝置診斷。"
+            : status
+              ? "目前無可信訊號強度量測"
+              : "需待裝置狀態恢復後確認"
       }
     ],
     displayOpsSummary: {
@@ -186,22 +224,43 @@ export function buildDeviceStatusViewModel({
         displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") ?? "--",
       diagnostics: displayOpsSummary?.diagnosticActions ?? [],
       draftCount: displayOpsSummary?.draftCount ?? 0,
+      hostRestartCommand: safeOpsGuidance.hostRestartCommand,
       helper:
-        triageSummary
-          ? formatTriageHelper(triageSummary)
-          : displayOpsSummary?.alerts[0]?.message
-            ?? "可在此查看 live publish、skip 與 readiness 摘要。",
+        displayOpsAccessDenied
+          ? "此頁面僅對受信任的管理端開放。"
+          : triageSummary
+            ? formatTriageHelper(triageSummary)
+            : displayOpsSummary?.alerts[0]?.message
+              ?? "可在此查看 live publish、skip 與 readiness 摘要。",
       lastPublishLabel: formatTimestamp(displayOpsSummary?.lastPublishAt),
       liveVersion:
         displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined
           ? "--"
           : `v${displayOpsSummary.liveVersion}`,
       readinessLabel: `${displayOpsSummary?.readinessSummary.blockingCount ?? 0} blocking`,
+      runbookPath: safeOpsGuidance.runbookPath,
+      safeOpsHelper: `安全操作：${displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") || "--"} · 主機層處置：${safeOpsGuidance.hostRestartCommand} · Runbook：${safeOpsGuidance.runbookPath}`,
       skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
-      statusTitle: displayOpsSummary?.degraded ? "展示退化" : "展示正常"
+      statusTitle:
+        displayOpsAccessDenied
+          ? "存取受限"
+          : displayOpsSummary?.degraded
+            ? "展示退化"
+            : "展示正常",
+      unsupportedControlsLabel:
+        safeOpsGuidance.unsupportedOperations.length > 0
+          ? safeOpsGuidance.unsupportedOperations.map((operation) => operation.label).join(" / ")
+          : "目前沒有其他不支援控制"
     },
     triageSummary,
-    logsSummary: logExportError
+    logsSummary: logExportAccessDenied
+      ? {
+          detail: "此頁面僅對受信任的管理端開放。",
+          directoryLabel: "--",
+          fileCountLabel: "--",
+          statusTitle: "存取受限"
+        }
+      : logExportError
       ? {
           detail: logExportError,
           directoryLabel: "--",

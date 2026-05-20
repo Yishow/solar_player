@@ -93,10 +93,15 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
       summary: {
         alerts: Array<{ code: string }>;
         assetHealthSummary: { unhealthyCount: number };
-        diagnosticActions: Array<{ action: string }>;
+        diagnosticActions: Array<{ action: string; safeScope: string }>;
         draftCount: number;
         liveVersion: number | null;
         readinessSummary: { blockingCount: number };
+        safeOpsGuidance: {
+          hostRestartCommand: string;
+          runbookPath: string;
+          unsupportedOperations: Array<{ action: string }>;
+        };
         skipSummary: { count: number };
       };
     };
@@ -113,6 +118,19 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
     assert.deepEqual(
       body.summary.diagnosticActions.map((action) => action.action),
       ["refresh-readiness", "export-summary"]
+    );
+    assert.deepEqual(
+      body.summary.diagnosticActions.map((action) => action.safeScope),
+      ["safe-refresh", "safe-read"]
+    );
+    assert.equal(body.summary.safeOpsGuidance.hostRestartCommand, "systemctl restart solar-display");
+    assert.equal(
+      body.summary.safeOpsGuidance.runbookPath,
+      "docs/runbooks/device-diagnostics-safe-ops.md"
+    );
+    assert.deepEqual(
+      body.summary.safeOpsGuidance.unsupportedOperations.map((operation) => operation.action),
+      ["reboot", "clear-cache"]
     );
   } finally {
     await app.close();
@@ -150,8 +168,13 @@ test("POST /api/device-display-ops/diagnostics returns a truthful safe result fo
       success: boolean;
       data: {
         action: string;
-        generatedAt: string;
+        guidance: {
+          hostRestartCommand: string;
+          runbookPath: string;
+        };
         message: string;
+        safeScope: string;
+        generatedAt: string;
         summary: {
           draftCount: number;
           generatedAt: string;
@@ -164,6 +187,12 @@ test("POST /api/device-display-ops/diagnostics returns a truthful safe result fo
     assert.equal(diagnosticBody.success, true);
     assert.equal(diagnosticBody.data.action, "refresh-readiness");
     assert.match(diagnosticBody.data.message, /Refreshed the bounded display readiness summary\./);
+    assert.equal(diagnosticBody.data.safeScope, "safe-refresh");
+    assert.equal(diagnosticBody.data.guidance.hostRestartCommand, "systemctl restart solar-display");
+    assert.equal(
+      diagnosticBody.data.guidance.runbookPath,
+      "docs/runbooks/device-diagnostics-safe-ops.md"
+    );
     assert.equal(typeof diagnosticBody.data.generatedAt, "string");
     assert.equal(
       diagnosticBody.data.summary.draftCount,
@@ -178,6 +207,42 @@ test("POST /api/device-display-ops/diagnostics returns a truthful safe result fo
       true
     );
     assert.equal(diagnosticBody.data.generatedAt, diagnosticBody.data.summary.generatedAt);
+  } finally {
+    await app.close();
+  }
+});
+
+test("device display diagnostics deny untrusted readers and do not return diagnostic results", async () => {
+  const app = await buildApp();
+
+  try {
+    const [summaryResponse, diagnosticsResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/device-display-ops",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      }),
+      app.inject({
+        method: "POST",
+        url: "/api/device-display-ops/diagnostics",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        },
+        payload: {
+          action: "refresh-readiness"
+        }
+      })
+    ]);
+
+    assert.equal(summaryResponse.statusCode, 403);
+    assert.equal(diagnosticsResponse.statusCode, 403);
+    assert.equal(summaryResponse.json<{ access: string }>().access, "denied");
+    assert.equal(diagnosticsResponse.json<{ access: string; data?: unknown }>().access, "denied");
+    assert.equal("data" in diagnosticsResponse.json<Record<string, unknown>>(), false);
   } finally {
     await app.close();
   }

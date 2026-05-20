@@ -24,8 +24,8 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       },
       degraded: true,
       diagnosticActions: [
-        { action: "refresh-readiness", label: "Refresh readiness" },
-        { action: "export-summary", label: "Export summary" }
+        { action: "refresh-readiness", label: "Refresh readiness", safeScope: "safe-refresh" },
+        { action: "export-summary", label: "Export summary", safeScope: "safe-read" }
       ],
       draftCount: 2,
       generatedAt: "2026-05-18T09:30:00.000Z",
@@ -34,6 +34,25 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       readinessSummary: {
         blockingCount: 3,
         warningCount: 0
+      },
+      safeOpsGuidance: {
+        hostRestartCommand: "systemctl restart solar-display",
+        hostRestartLabel: "Host-level restart",
+        runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
+        unsupportedOperations: [
+          {
+            action: "reboot",
+            executed: false,
+            guidance: "Use the host-level restart runbook instead.",
+            label: "Reboot device"
+          },
+          {
+            action: "clear-cache",
+            executed: false,
+            guidance: "Cache purge is not supported in-app.",
+            label: "Clear cache"
+          }
+        ]
       },
       skipSummary: {
         count: 1,
@@ -78,6 +97,10 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.displayOpsSummary.assetHealthLabel, "1 unhealthy");
   assert.equal(model.displayOpsSummary.alerts[0]?.message, "overview live asset missing");
   assert.equal(model.displayOpsSummary.diagnostics[0]?.action, "refresh-readiness");
+  assert.equal(model.displayOpsSummary.runbookPath, "docs/runbooks/device-diagnostics-safe-ops.md");
+  assert.equal(model.displayOpsSummary.hostRestartCommand, "systemctl restart solar-display");
+  assert.match(model.displayOpsSummary.safeOpsHelper, /systemctl restart solar-display/);
+  assert.match(model.displayOpsSummary.safeOpsHelper, /docs\/runbooks\/device-diagnostics-safe-ops\.md/);
   assert.equal(model.logsSummary.statusTitle, "最近日誌");
   assert.equal(model.logsSummary.fileCountLabel, "2 files");
   assert.match(model.logsSummary.detail, /server\.log/);
@@ -145,6 +168,12 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
         blockingCount: 1,
         warningCount: 0
       },
+      safeOpsGuidance: {
+        hostRestartCommand: "systemctl restart solar-display",
+        hostRestartLabel: "Host-level restart",
+        runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
+        unsupportedOperations: []
+      },
       skipSummary: {
         count: 1,
         pages: ["factory-circuit"]
@@ -168,4 +197,29 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
   assert.deepEqual(model.triageSummary?.affectedPages, ["factory-circuit"]);
   assert.equal(model.triageSummary?.repairDestinationLabel, "Display Pages Editor");
   assert.match(model.displayOpsSummary.helper, /Display Pages Editor/);
+});
+
+test("buildDeviceStatusViewModel keeps denied reads distinct from empty and generic failure states", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: {
+      detail: "此頁面僅對受信任的管理端開放。",
+      title: "存取受限",
+      tone: "error"
+    },
+    displayOpsAccessDenied: true,
+    isLoading: false,
+    logExport: null,
+    logExportAccessDenied: true,
+    logExportError: "",
+    status: null,
+    statusAccessDenied: true
+  });
+
+  assert.equal(model.runtimeSummary.title, "存取受限");
+  assert.equal(model.runtimeSummary.detail, "此頁面僅對受信任的管理端開放。");
+  assert.equal(model.displayOpsSummary.statusTitle, "存取受限");
+  assert.match(model.displayOpsSummary.helper, /受信任的管理端/);
+  assert.match(model.displayOpsSummary.safeOpsHelper, /systemctl restart solar-display/);
+  assert.equal(model.logsSummary.statusTitle, "存取受限");
+  assert.match(model.logsSummary.detail, /受信任的管理端/);
 });

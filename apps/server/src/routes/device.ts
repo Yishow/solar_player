@@ -2,7 +2,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { existsSync, readFileSync, readdirSync, statSync, statfsSync } from "node:fs";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
 import { join } from "node:path";
-import { readDeviceDisplayOpsSummary } from "../services/deviceDisplayOpsService.js";
+import {
+  buildUnsupportedDeviceControlResult,
+  readDeviceDisplayOpsSummary
+} from "../services/deviceDisplayOpsService.js";
 
 function getUptimeSeconds(): number {
   if (platform() === "linux") {
@@ -85,7 +88,11 @@ function getRecentLogs(logDir: string, limit: number): Array<{ file: string; siz
 
 const deviceRoute: FastifyPluginAsync = async (app) => {
   // GET /api/device/status
-  app.get("/api/device/status", async () => {
+  app.get("/api/device/status", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     const disk = getDiskUsage(process.env.DATA_DIR ?? "/tmp");
     const memory = getMemoryUsage();
     const cpu = getCpuUsage();
@@ -112,21 +119,32 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
 
   // POST /api/device/reboot
   app.post("/api/device/reboot", async (_request, reply) => {
-    // Stub: dangerous operation
-    return {
+    return reply.status(501).send({
+      data: undefined,
+      error: "Unsupported device control",
+      result: buildUnsupportedDeviceControlResult("reboot"),
       success: false,
-      error: "Reboot is disabled in production. Use systemctl restart solar-display instead."
-    };
+      timestamp: new Date().toISOString()
+    });
   });
 
   // POST /api/device/clear-cache
   app.post("/api/device/clear-cache", async (_request, reply) => {
-    // Stub: cache clearing
-    return { success: true, message: "Cache cleared (stub)." };
+    return reply.status(501).send({
+      data: undefined,
+      error: "Unsupported device control",
+      result: buildUnsupportedDeviceControlResult("clear-cache"),
+      success: false,
+      timestamp: new Date().toISOString()
+    });
   });
 
   // GET /api/device/logs
   app.get<{ Querystring: { limit?: string } }>("/api/device/logs", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     const limit = Number.parseInt(request.query.limit ?? "20", 10) || 20;
     const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
     if (!existsSync(logDir)) {
@@ -144,7 +162,11 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
   });
 
   // GET /api/device/logs/export
-  app.get("/api/device/logs/export", async (_request, reply) => {
+  app.get("/api/device/logs/export", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
     if (!existsSync(logDir)) {
       reply.code(404);

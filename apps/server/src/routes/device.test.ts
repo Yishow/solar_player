@@ -107,3 +107,102 @@ test("GET /api/device/logs and /api/device/logs/export return safe error envelop
     }
   }
 });
+
+test("device status and log metadata deny untrusted remote readers", async () => {
+  const logDir = join(tempDir, "logs");
+  mkdirSync(logDir, { recursive: true });
+  writeFileSync(join(logDir, "player.log"), "ready\n", "utf8");
+  process.env.LOG_DIR = logDir;
+
+  const app = await buildApp();
+
+  try {
+    const responses = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/device/status",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/device/logs/export",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      })
+    ]);
+
+    responses.forEach((response) => {
+      assert.equal(response.statusCode, 403);
+      assert.equal(response.json<{ access: string }>().access, "denied");
+    });
+  } finally {
+    await app.close();
+    delete process.env.LOG_DIR;
+  }
+});
+
+test("unsupported device controls stay informational and point operators to the host runbook", async () => {
+  const app = await buildApp();
+
+  try {
+    const [rebootResponse, clearCacheResponse] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: "/api/device/reboot"
+      }),
+      app.inject({
+        method: "POST",
+        url: "/api/device/clear-cache"
+      })
+    ]);
+
+    assert.equal(rebootResponse.statusCode, 501);
+    assert.equal(clearCacheResponse.statusCode, 501);
+
+    const rebootBody = rebootResponse.json() as {
+      error: string;
+      result: {
+        action: string;
+        executed: boolean;
+        guidance: {
+          hostRestartCommand: string;
+          runbookPath: string;
+        };
+      };
+      success: boolean;
+    };
+    const clearCacheBody = clearCacheResponse.json() as {
+      result: {
+        action: string;
+        executed: boolean;
+        guidance: {
+          hostRestartCommand: string;
+          runbookPath: string;
+        };
+      };
+      success: boolean;
+    };
+
+    assert.equal(rebootBody.success, false);
+    assert.equal(rebootBody.error, "Unsupported device control");
+    assert.equal(rebootBody.result.action, "reboot");
+    assert.equal(rebootBody.result.executed, false);
+    assert.equal(
+      rebootBody.result.guidance.hostRestartCommand,
+      "systemctl restart solar-display"
+    );
+    assert.equal(
+      rebootBody.result.guidance.runbookPath,
+      "docs/runbooks/device-diagnostics-safe-ops.md"
+    );
+    assert.equal(clearCacheBody.result.action, "clear-cache");
+    assert.equal(clearCacheBody.result.executed, false);
+  } finally {
+    await app.close();
+  }
+});
