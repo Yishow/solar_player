@@ -8,13 +8,14 @@ TBD - created by archiving change 'add-display-editor-schema-aware-inspector'. U
 
 ### Requirement: Describe region fields with a schema-aware inspector contract
 
-The system SHALL describe display editor region fields with a schema-aware inspector contract so the UI can render typed controls consistently.
+The system SHALL describe display editor region fields with a schema-aware inspector contract so the UI can render typed controls consistently, and supported display pages SHALL use that contract for their page-specific authoring controls instead of stopping at preview-only coverage.
 
 #### Scenario: Inspector renders mixed field types
 
 - **WHEN** a region schema includes text, number, toggle, select, or array-backed fields
 - **THEN** the inspector renders those typed controls from the schema
 - **AND** the field values remain bound to the editable draft
+- **AND** supported page-specific authoring flows use the same inspector contract instead of bypassing it with page-local special cases
 
 ##### Example: Highlight rail region renders text and array-backed controls
 
@@ -25,199 +26,86 @@ The system SHALL describe display editor region fields with a schema-aware inspe
 
 
 <!-- @trace
-source: add-display-editor-schema-aware-inspector
-updated: 2026-05-19
+source: expand-display-page-editor-page-specific-authoring-coverage
+updated: 2026-05-20
 code:
-  - apps/server/src/routes/display-pages.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/web/src/pages/CircuitSettings/index.tsx
-  - apps/web/src/hooks/useDisplayPageConfig.ts
-  - apps/server/src/services/displayPageAssetService.ts
-  - apps/web/src/pages/DisplayPagesEditor/fallbackPageDefinitions.ts
-  - package.json
-  - apps/web/src/pages/DisplayPagesEditor/canvasCard.tsx
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
-  - apps/web/src/components/AppHeader.tsx
-  - .hermes/codex_goal1_change3.md
-  - apps/server/src/app.ts
-  - apps/web/src/layouts/LayoutShell.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtime.tsx
-  - apps/web/src/components/PanelCard.tsx
-  - packages/shared/src/displayRotation.ts
-  - AGENTS.md
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
-  - .superpowers/brainstorm/4903-1779123645/content/design-3col.html
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/Overview/viewModel.ts
-  - apps/web/src/components/AppFooterNav.tsx
-  - apps/web/src/hooks/displayPageDraftSession.ts
-  - .hermes/codex_goal2.md
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorValidation.ts
-  - apps/server/src/services/displayRotationService.ts
-  - apps/web/src/pages/Sustainability/viewModel.ts
-  - apps/server/src/db/migrations/008_display_readiness_slots.sql
-  - .superpowers/brainstorm/4903-1779123645/state/server.log
-  - apps/server/src/routes/device.ts
-  - .hermes/codex_fix_bugs.md
-  - .hermes/codex_goal4.md
-  - apps/server/src/routes/display-pages-asset-governance.test-support.ts
-  - apps/web/src/components/DisplayCanvas.tsx
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/components/displayPageAssetHealthPanels.tsx
-  - apps/web/src/services/api.ts
-  - .superpowers/brainstorm/4903-1779123645/content/waiting-1.html
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - apps/web/src/pages/DisplayPagesEditor/history.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/web/src/pages/Images/index.tsx
-  - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - apps/web/src/pages/Solar/viewModel.ts
-  - apps/web/src/services/socket.ts
-  - apps/web/package.json
-  - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/components/PlaybackTitleGroup.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.tsx
-  - apps/web/src/hooks/usePageRotation.ts
-  - apps/web/src/components/LeafOrnament.tsx
-  - packages/shared/src/displayPageConfig.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
-  - packages/shared/src/types.ts
-  - apps/web/src/layouts/ManagementShell.tsx
-  - packages/shared/src/displayEditorSchema.ts
-  - .hermes/codex_goal3.md
-  - apps/server/src/routes/display-pages-asset-governance-health.test-suite.ts
-  - apps/web/src/pages/DisplayPagesEditor/pageRegionSchemas.ts
-  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
-  - apps/web/src/pages/FactoryCircuit/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorRegionState.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.ts
-  - apps/web/src/pages/displayPageMediaStyle.ts
-  - apps/web/src/components/PageContainer.tsx
-  - apps/web/src/components/TitleBlock.tsx
-  - apps/web/src/components/SectionTitle.tsx
-  - apps/server/src/services/imagePlaylistService.ts
-  - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/hooks/usePlaybackController.ts
-  - apps/server/src/services/displayReadinessService.ts
-  - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
-  - apps/web/src/components/SectionWrapper.tsx
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - packages/shared/src/displayReadiness.ts
-  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/server/src/db/migrations/007_display_page_publishing.sql
-  - apps/server/src/routes/device-display-ops.ts
-  - apps/web/src/pages/ImageManagement/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/inspectorTools.tsx
-  - apps/web/src/hooks/useDisplayReadiness.ts
-  - apps/server/src/services/deviceDisplayOpsService.ts
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/pages/Solar/displayPageConfig.ts
-  - apps/server/src/services/displayOpsService.ts
-  - apps/web/src/pages/PlaybackSettings/index.tsx
-  - apps/server/src/routes/display-readiness.ts
-  - apps/web/src/hooks/useImageAssetReferences.ts
-  - apps/server/src/routes/display-pages-asset-governance-placement.test-suite.ts
-  - apps/server/src/routes/circuits.ts
-  - apps/web/src/pages/Images/displayPageConfig.ts
-  - apps/web/src/pages/Images/viewModel.ts
-  - packages/shared/src/sustainabilityStory.ts
-  - .hermes/codex_goal2_remaining.md
-  - apps/web/src/components/StatusBadge.tsx
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - docs/superpowers/specs/2026-05-19-editor-three-column-layout-design.md
-  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
-  - apps/server/src/services/displayStoryService.ts
-  - apps/web/src/pages/DisplayPagesEditor/publishingStatus.tsx
-  - apps/web/src/hooks/useDeviceDisplayOpsSummary.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
-  - packages/shared/src/displayOps.ts
-  - apps/server/src/realtime/SocketService.ts
-  - apps/server/src/routes/sustainability-story.ts
-  - packages/shared/src/deviceDisplayOps.ts
-  - packages/shared/src/imagePlaylist.ts
-  - apps/server/src/routes/images.ts
-  - apps/server/src/routes/playback.ts
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
-  - apps/web/src/components/DisplayReadinessPanel.tsx
-  - .superpowers/brainstorm/4903-1779123645/state/server.pid
+  - AGENTS.md
   - apps/web/src/pages/PlaybackSettings/viewModel.ts
-  - packages/shared/src/displayStory.ts
-  - .hermes/plan_publish_safety.md
-  - apps/server/src/routes/imagesSupport.ts
-  - apps/web/src/main.tsx
-  - apps/server/src/services/displayPagePublishingService.ts
-  - apps/web/src/hooks/useDisplayOpsSummary.ts
-  - .hermes/codex_goal1_change2.md
-  - apps/web/src/pages/shared/PageScaffold.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
-  - .hermes/codex_goal1_change2_remaining.md
-  - .hermes/codex_prompt_goal1_change1.md
-  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
-  - .superpowers/brainstorm/4903-1779123645/content/editor-layouts.html
-  - .superpowers/brainstorm/4903-1779123645/state/server-stopped
-  - apps/web/src/hooks/useDisplayEditor.ts
-  - apps/server/src/routes/display-story.ts
-  - apps/web/src/layouts/offlineRouting.ts
-  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
-  - packages/shared/src/index.ts
-  - apps/web/src/hooks/displayPageConfigPaths.ts
-  - apps/server/src/routes/image-playlist.ts
-  - apps/web/src/components/PageNumberPill.tsx
-  - apps/server/src/db/seed.ts
-  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/ImageManagement/index.tsx
+  - apps/web/src/pages/CircuitSettings/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/pageRegionSchemas.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/EnergyTrend/viewModel.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - apps/web/src/pages/OfflineError/index.tsx
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/server/src/routes/device.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtime.tsx
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - CLAUDE.md
   - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/ImageManagement/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
+  - apps/server/src/services/displayOpsService.ts
+  - apps/web/src/pages/EnergyHistory/index.tsx
+  - scripts/dev.mjs
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - apps/web/src/pages/BrandAssets/index.tsx
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
+  - apps/server/src/routes/metrics-history.ts
+  - apps/web/src/pages/SlideshowPreview/index.tsx
+  - packages/shared/src/deviceDisplayOps.ts
+  - packages/shared/src/displayOps.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - package.json
   - apps/web/src/hooks/useDisplaySyncRefresh.ts
-  - apps/server/src/routes/display-ops.ts
-  - apps/web/src/hooks/useDisplayPageAssetHealth.ts
+  - apps/server/src/services/deviceDisplayOpsService.ts
+  - apps/web/src/pages/PlaybackSettings/index.tsx
+  - apps/web/src/pages/SlideshowPreview/viewModel.ts
+  - apps/web/src/hooks/displaySyncDraftGuard.ts
+  - apps/web/src/pages/energyMonitoringState.ts
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/web/src/pages/managementDisplaySyncScopes.ts
+  - apps/server/src/logger.ts
+  - apps/web/src/services/api.ts
+  - apps/web/src/hooks/useDisplayPageRegistry.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.tsx
+  - apps/web/src/pages/OfflineError/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
 tests:
-  - apps/web/src/hooks/usePageRotation.test.ts
-  - apps/server/src/routes/display-pages-asset-governance.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
-  - apps/web/src/pages/Solar/viewModel.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
-  - apps/server/src/services/imagePlaylistService.test.ts
-  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/web/src/pages/managementDisplaySync.test.ts
+  - apps/web/src/pages/OfflineError/viewModel.test.ts
+  - apps/server/src/routes/device.test.ts
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
-  - apps/server/src/routes/device-display-ops.test.ts
-  - apps/web/src/pages/Images/viewModel.test.ts
-  - apps/server/src/routes/playback.test.ts
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/web/src/pages/PlaybackSettings/index.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/server/src/routes/image-playlist.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/hooks/displayPageDraftSession.test.ts
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/web/src/hooks/useDisplayPageConfig.test.ts
-  - apps/web/src/hooks/usePlaybackController.test.ts
-  - apps/web/src/pages/displayPageMediaStyle.test.tsx
+  - apps/web/src/hooks/displaySyncDraftGuard.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+  - apps/web/src/pages/SlideshowPreview/viewModel.test.ts
   - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
-  - apps/web/src/pages/Sustainability/viewModel.test.ts
-  - apps/server/src/routes/display-ops.test.ts
-  - apps/server/src/routes/display-readiness.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
+  - apps/web/src/pages/EnergyHistory/index.test.ts
+  - apps/server/src/routes/device-display-ops.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+  - apps/web/src/pages/ImageManagement/index.test.tsx
+  - apps/web/src/pages/EnergyTrend/viewModel.test.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/ImageManagement/viewModel.test.ts
   - apps/web/src/pages/PlaybackSettings/viewModel.test.ts
-  - apps/web/src/hooks/useDisplayEditor.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/web/src/layouts/offlineRouting.test.ts
-  - apps/web/src/components/displayPageAssetHealthPanels.test.tsx
-  - apps/web/src/pages/Overview/viewModel.test.ts
-  - apps/web/src/layouts/LayoutShell.test.ts
-  - apps/server/src/routes/display-pages-fallback.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/history.test.ts
+  - apps/web/src/hooks/useDisplaySyncRefresh.test.ts
+  - apps/web/src/pages/EnergyTrend/index.test.ts
+  - apps/web/src/pages/EnergyHistory/viewModel.test.ts
 -->
 
 ---
