@@ -13,6 +13,7 @@ import {
 } from "./aspectRatio";
 import "./imageManagement.css";
 import { buildImageManagementViewModel } from "./viewModel";
+import type { ImageManagementResolvedPlaylistEntry } from "./viewModel";
 
 type ImageStorageUsage = {
   fileCount: number;
@@ -62,6 +63,7 @@ type ImageManagementContentProps = {
     capturedAt: string;
     tags: string[];
   }>;
+  resolvedPlaylistEntries: ImageManagementResolvedPlaylistEntry[];
   remoteSyncBanner: ReactNode;
   resyncLibrary: () => Promise<void>;
   selectedImageId: number | null;
@@ -72,8 +74,6 @@ type ImageManagementContentProps = {
     updates: Partial<{
       aspectRatio: number | null;
       description: string | null;
-      displayDuration: number;
-      includedInSlideshow: boolean;
       title: string | null;
     }>
   ) => void;
@@ -117,6 +117,7 @@ export function ImageManagementContent({
   isUploading,
   message,
   playlistEntries,
+  resolvedPlaylistEntries,
   remoteSyncBanner,
   resyncLibrary,
   selectedImageId,
@@ -134,7 +135,8 @@ export function ImageManagementContent({
     message,
     selectedImageId,
     storageUsage,
-    playlistEntries
+    playlistEntries,
+    resolvedPlaylistEntries
   });
   const statusVariant =
     viewModel.actionBanner.tone === "error"
@@ -306,6 +308,10 @@ export function ImageManagementContent({
                   此素材目前對應多個 playlist rows，以下正在編輯排序最前的 {viewModel.selection.playlistEntryId}。
                 </div>
               ) : null}
+
+              <div className="mgmt-status">
+                {viewModel.selection.playlistRuntimeStatus}
+              </div>
 
               {viewModel.selection.playlistEntryId ? (
                 <>

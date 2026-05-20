@@ -293,6 +293,7 @@ export async function fetchImagePlaylistGovernance() {
       entries: ImagePlaylistEntryInput[];
       generatedAt: string;
       hasPlaylistRows: boolean;
+      resolvedEntries: ResolvedImagePlaylistEntry[];
     };
   }>("/api/image-playlist/governance");
 }
@@ -303,6 +304,7 @@ export async function bootstrapImagePlaylistGovernance() {
       entries: ImagePlaylistEntryInput[];
       generatedAt: string;
       hasPlaylistRows: boolean;
+      resolvedEntries: ResolvedImagePlaylistEntry[];
     };
   }>("/api/image-playlist/governance/bootstrap", {
     method: "POST"

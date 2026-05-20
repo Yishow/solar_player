@@ -23,6 +23,13 @@ export type ImageManagementPlaylistEntry = {
   tags: string[];
 };
 
+export type ImageManagementResolvedPlaylistEntry = {
+  entryId: string;
+  fallbackActive: boolean;
+  fallbackReason: string | null;
+  isPlayable: boolean;
+};
+
 export function normalizeManagementPlaylistAssetId(assetId: string | null, entryId: string) {
   if (assetId === null) {
     return null;
@@ -45,6 +52,7 @@ type BuildImageManagementViewModelArgs = {
   selectedImageId: number | null;
   storageUsage: ImageStorageUsage;
   playlistEntries?: ImageManagementPlaylistEntry[];
+  resolvedPlaylistEntries?: ImageManagementResolvedPlaylistEntry[];
   liveDisplayReferences?: Array<{ pageKey: string; stage: string; label: string }>;
 };
 
@@ -134,6 +142,45 @@ export function resolvePlaylistRuntimeInclusion(
   return matches.some((entry) => entry.enabled);
 }
 
+function buildPlaylistBadge(
+  playlistEntries: ImageManagementPlaylistEntry[] | undefined,
+  asset: ImageAsset
+) {
+  if (playlistEntries === undefined) {
+    return asset.includedInSlideshow ? "輪播中" : "未加入輪播";
+  }
+
+  const runtimeInclusion = resolvePlaylistRuntimeInclusion(playlistEntries, asset.id);
+  if (runtimeInclusion === null) {
+    return "未配置 Playlist";
+  }
+
+  return runtimeInclusion ? "輪播中" : "未加入輪播";
+}
+
+function buildPlaylistRuntimeStatus(args: {
+  playlistEntry: ImageManagementPlaylistEntry | null;
+  resolvedEntry: ImageManagementResolvedPlaylistEntry | null;
+}) {
+  if (args.playlistEntry === null) {
+    return "未配置 Playlist runtime row";
+  }
+
+  if (args.playlistEntry.enabled === false) {
+    return "Playlist runtime 已停用，屬於 degraded 狀態";
+  }
+
+  if (args.resolvedEntry?.fallbackActive) {
+    return `Playlist runtime 目前使用 fallback：${args.resolvedEntry.fallbackReason ?? "unknown"}`;
+  }
+
+  if (args.resolvedEntry?.isPlayable === false) {
+    return "Playlist runtime 目前不可播放，屬於 degraded 狀態";
+  }
+
+  return "Playlist Runtime 正常播放";
+}
+
 export function buildImageManagementViewModel(args: BuildImageManagementViewModelArgs) {
   const {
     assets,
@@ -145,22 +192,22 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
     selectedImageId,
     storageUsage,
     playlistEntries,
+    resolvedPlaylistEntries,
     liveDisplayReferences
   } = args;
   const sortedAssets = sortAssets(assets);
   const selectedAsset =
     sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
-  const resolveEffectiveInPlaylist = (asset: ImageAsset) => {
-    const runtimeInclusion = resolvePlaylistRuntimeInclusion(playlistEntries, asset.id);
-    if (runtimeInclusion !== null) {
-      return runtimeInclusion;
+  const resolvedEntryMap = new Map(
+    (resolvedPlaylistEntries ?? []).map((entry) => [entry.entryId, entry])
+  );
+  const slideshowCount = sortedAssets.filter((asset) => {
+    if (playlistEntries === undefined) {
+      return asset.includedInSlideshow;
     }
 
-    return asset.includedInSlideshow;
-  };
-  const slideshowCount = sortedAssets.filter(
-    (asset) => resolveEffectiveInPlaylist(asset)
-  ).length;
+    return resolvePlaylistRuntimeInclusion(playlistEntries, asset.id) === true;
+  }).length;
   const usagePercent = Math.min(
     100,
     Math.round((storageUsage.usedBytes / totalStorageBytes) * 100)
@@ -199,13 +246,7 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
           }
         : null,
     library: sortedAssets.map((asset, index) => ({
-      badges: (() => {
-        const inPlaylist = resolveEffectiveInPlaylist(asset);
-        return [
-          ...(inPlaylist ? ["輪播中"] : ["未加入輪播"]),
-          ...(asset.isCover ? ["封面"] : [])
-        ];
-      })(),
+      badges: [buildPlaylistBadge(playlistEntries, asset), ...(asset.isCover ? ["封面"] : [])],
       filename: asset.originalName ?? asset.filename ?? `image-${asset.id}`,
       id: asset.id,
       isSelected: asset.id === selectedAsset?.id,
@@ -220,18 +261,20 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
         : (() => {
             const playlistEntry = resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id);
             const playlistAssetEntries = resolvePlaylistEntriesForAsset(args.playlistEntries, selectedAsset.id);
+            const runtimeInclusion =
+              playlistEntries === undefined
+                ? selectedAsset.includedInSlideshow
+                : resolvePlaylistRuntimeInclusion(playlistEntries, selectedAsset.id);
+            const resolvedEntry =
+              playlistEntry === null ? null : resolvedEntryMap.get(playlistEntry.entryId) ?? null;
             const playlistEntryCount = playlistAssetEntries.length;
-            const inPlaylist = resolveEffectiveInPlaylist(selectedAsset);
             return {
-              badges: [
-                ...(inPlaylist ? ["輪播中"] : ["未加入輪播"]),
-                ...(selectedAsset.isCover ? ["封面"] : [])
-              ],
+              badges: [buildPlaylistBadge(playlistEntries, selectedAsset), ...(selectedAsset.isCover ? ["封面"] : [])],
               description: selectedAsset.description ?? "尚未填寫圖片說明",
               displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
               filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
               id: selectedAsset.id,
-              includedInSlideshow: inPlaylist,
+              includedInSlideshow: runtimeInclusion,
               isCover: selectedAsset.isCover,
               meta: `${selectedAsset.width ?? "--"} × ${selectedAsset.height ?? "--"} • ${formatMimeType(selectedAsset.mimeType)} • ${formatBytes(selectedAsset.fileSize ?? 0)}`,
               previewUrl: buildPreviewUrl(selectedAsset.filename),
@@ -241,6 +284,10 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
               playlistEntryCount,
               playlistDisplayOrder: playlistEntry?.displayOrder ?? null,
               playlistDurationSeconds: playlistEntry?.durationSeconds ?? null,
+              playlistRuntimeStatus: buildPlaylistRuntimeStatus({
+                playlistEntry,
+                resolvedEntry
+              }),
               playlistFallbackMode: playlistEntry?.fallbackMode ?? null,
               playlistEnabled: playlistEntry?.enabled ?? null,
               playlistTitle: playlistEntry?.title ?? null,

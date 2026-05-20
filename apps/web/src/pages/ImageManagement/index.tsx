@@ -21,12 +21,13 @@ import {
   uploadImageAsset
 } from "../../services/api";
 import { ImageManagementContent } from "./ImageManagementContent";
-import type { ImageManagementPlaylistEntry } from "./viewModel";
+import type {
+  ImageManagementPlaylistEntry,
+  ImageManagementResolvedPlaylistEntry
+} from "./viewModel";
 import {
   normalizeManagementPlaylistAssetId,
-  resolvePlaylistEntriesForAsset,
-  resolvePlaylistRuntimeInclusion,
-  resolvePrimaryPlaylistEntry
+  resolvePlaylistEntriesForAsset
 } from "./viewModel";
 
 const initialStorageUsage: ImageStorageUsage = {
@@ -56,6 +57,17 @@ function normalizeManagementPlaylistEntry(entry: Awaited<ReturnType<typeof fetch
   };
 }
 
+function normalizeResolvedPlaylistEntry(
+  entry: Awaited<ReturnType<typeof fetchImagePlaylistGovernance>>["playlist"]["resolvedEntries"][number]
+): ImageManagementResolvedPlaylistEntry {
+  return {
+    entryId: entry.entryId,
+    fallbackActive: entry.fallbackActive,
+    fallbackReason: entry.fallbackReason,
+    isPlayable: entry.isPlayable
+  };
+}
+
 export function ImageManagement() {
   const [assets, setAssets] = useState<ImageAsset[]>([]);
   const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>([]);
@@ -70,6 +82,7 @@ export function ImageManagement() {
   const [errorMessage, setErrorMessage] = useState("");
   const [playlistEntries, setPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
   const [lastSyncedPlaylistEntries, setLastSyncedPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
+  const [resolvedPlaylistEntries, setResolvedPlaylistEntries] = useState<ImageManagementResolvedPlaylistEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
@@ -91,11 +104,13 @@ export function ImageManagement() {
       fetchImagePlaylistGovernance()
     ]);
     const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
+    const nextResolvedPlaylistEntries = playlistRes.playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry);
     setAssets(nextAssets);
     setLastSyncedAssets(nextAssets);
     setStorageUsage(nextStorageUsage);
     setPlaylistEntries(nextPlaylistEntries);
     setLastSyncedPlaylistEntries(nextPlaylistEntries);
+    setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
     setSelectedImageId((currentSelected) => {
       const candidateId = preferredImageId ?? currentSelected;
       if (candidateId !== null && nextAssets.some((asset) => asset.id === candidateId)) {
@@ -117,11 +132,13 @@ export function ImageManagement() {
         ]);
         if (!active) return;
         const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
+        const nextResolvedPlaylistEntries = playlistRes.playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry);
         setAssets(nextAssets);
         setLastSyncedAssets(nextAssets);
         setStorageUsage(nextStorageUsage);
         setPlaylistEntries(nextPlaylistEntries);
         setLastSyncedPlaylistEntries(nextPlaylistEntries);
+        setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
         setSelectedImageId(nextAssets[0]?.id ?? null);
         setMessage("圖片庫已同步。");
         setErrorMessage("");
@@ -147,8 +164,6 @@ export function ImageManagement() {
     aspectRatio: number | null;
     title: string | null;
     description: string | null;
-    displayDuration: number;
-    includedInSlideshow: boolean;
   }>) => {
     markDirty();
     setAssets((current) => current.map((asset) => (asset.id === id ? { ...asset, ...updates } : asset)));
@@ -202,10 +217,6 @@ export function ImageManagement() {
     if (!selectedAsset) return;
     const assetPlaylistEntries = resolvePlaylistEntriesForAsset(playlistEntries, selectedAsset.id);
     const selectedPlaylistEntry = assetPlaylistEntries[0] ?? null;
-    const shouldMirrorLegacyPlaybackState = assetPlaylistEntries.length <= 1;
-    const effectiveIncludedInSlideshow =
-      resolvePlaylistRuntimeInclusion(playlistEntries, selectedAsset.id)
-      ?? selectedAsset.includedInSlideshow;
     setIsSaving(true);
     setErrorMessage("");
     try {
@@ -213,12 +224,6 @@ export function ImageManagement() {
         updateImageAsset(selectedAsset.id, {
           aspectRatio: selectedAsset.aspectRatio,
           description: selectedAsset.description,
-          ...(shouldMirrorLegacyPlaybackState
-            ? {
-                displayDuration: selectedPlaylistEntry?.durationSeconds ?? selectedAsset.displayDuration,
-                includedInSlideshow: effectiveIncludedInSlideshow
-              }
-            : {}),
           title: selectedAsset.title
         }),
         ...(selectedPlaylistEntry === null
@@ -356,6 +361,7 @@ export function ImageManagement() {
       isUploading={isUploading}
       message={message}
       playlistEntries={playlistEntries}
+      resolvedPlaylistEntries={resolvedPlaylistEntries}
       remoteSyncBanner={
         syncDraftGuard.hasPendingRemoteChange ? (
           <RemoteSyncBanner

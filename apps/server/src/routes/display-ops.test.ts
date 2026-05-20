@@ -474,7 +474,7 @@ test("GET /api/display-ops/assets/:id/references ignores legacy slideshow fallba
   }
 });
 
-test("GET /api/display-ops/assets/:id/references clears the legacy slideshow flag when a playlist row is disabled", async () => {
+test("GET /api/display-ops/assets/:id/references ignores the legacy slideshow flag when a playlist row is disabled", async () => {
   const first = seedManagedImageAsset("playlist-disable-first.png");
   const app = await buildApp();
 
@@ -523,7 +523,7 @@ test("GET /api/display-ops/assets/:id/references clears the legacy slideshow fla
       };
     };
 
-    assert.equal(firstAsset.included_in_slideshow, 0);
+    assert.equal(firstAsset.included_in_slideshow, 1);
     assert.equal(body.references.liveCount, 0);
     assert.equal(
       body.references.references.some(

@@ -102,11 +102,12 @@ export function resolveImagePlaylistEntries(args: {
   assets: ImagePlaylistAssetInput[];
   coverAssetSource?: string | null;
   entries: ImagePlaylistEntryInput[];
+  includeDisabled?: boolean;
 }) {
   const assetMap = new Map(args.assets.map((asset) => [asset.assetId, asset]));
 
   return args.entries
-    .filter((entry) => entry.enabled)
+    .filter((entry) => args.includeDisabled === true || entry.enabled)
     .sort((left, right) => left.displayOrder - right.displayOrder || left.entryId.localeCompare(right.entryId))
     .map((entry) => {
       const asset = entry.assetId ? assetMap.get(entry.assetId) ?? null : null;
@@ -125,7 +126,7 @@ export function resolveImagePlaylistEntries(args: {
         fallbackReason,
         hasAsset: fallbackReason === null && assetSource !== null,
         infoPanel: buildInfoPanel(entry),
-        isPlayable: fallbackReason === null || entry.fallbackMode !== "skip",
+        isPlayable: entry.enabled && (fallbackReason === null || entry.fallbackMode !== "skip"),
         resolution:
           asset?.width && asset.height
             ? `${asset.width}x${asset.height}`

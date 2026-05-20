@@ -227,37 +227,6 @@ function ensureBootstrappedEntries() {
   }
 }
 
-function syncImageAssetSlideshowState(assetIds: Iterable<number | null>) {
-  const ids = [...new Set(
-    Array.from(assetIds).filter((assetId): assetId is number => typeof assetId === "number")
-  )];
-
-  if (ids.length === 0 || !hasPlaylistTable()) {
-    return;
-  }
-
-  const selectEnabledCount = getDatabase().prepare(
-    `
-      SELECT COUNT(*) AS count
-      FROM image_playlist_entries
-      WHERE asset_id = ? AND enabled = 1
-    `
-  );
-  const updateAsset = getDatabase().prepare(
-    `
-      UPDATE image_assets
-      SET included_in_slideshow = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `
-  );
-
-  for (const assetId of ids) {
-    const enabledCount = Number((selectEnabledCount.get(assetId) as { count: number }).count);
-    updateAsset.run(enabledCount > 0 ? 1 : 0, assetId);
-  }
-}
-
 function resolveAssets() {
   return readAssets().map((asset) => ({
     assetId: String(asset.id),
@@ -336,9 +305,16 @@ export function readImagePlaylistSnapshot(activeIndex = 0, options?: ReadImagePl
 
 export function readImagePlaylistGovernanceSnapshot(options?: ReadImagePlaylistOptions) {
   const entries = resolveEntries(options);
+  const resolvedEntries = resolveImagePlaylistEntries({
+    assets: resolveAssets(),
+    coverAssetSource: coverAssetSource(),
+    entries,
+    includeDisabled: true
+  });
 
   return {
     entries,
+    resolvedEntries,
     generatedAt: new Date().toISOString(),
     hasPlaylistRows: entries.length > 0
   };
@@ -361,9 +337,6 @@ export function deleteImagePlaylistEntriesForAsset(assetId: number) {
 
 export function bootstrapImagePlaylistGovernance() {
   ensureBootstrappedEntries();
-  syncImageAssetSlideshowState(
-    readAssets().map((asset) => asset.id)
-  );
   return readImagePlaylistGovernanceSnapshot({
     bootstrapEntries: false
   });
@@ -424,17 +397,6 @@ export function updateImagePlaylistEntry(entryId: string, input: PlaylistUpdateI
       input.fallbackMode ?? previousRow.fallback_mode,
       entryId
     );
-
-  const nextRow = getDatabase()
-    .prepare(
-    `
-      SELECT asset_id
-      FROM image_playlist_entries
-      WHERE entry_id = ?
-    `
-    )
-    .get(entryId) as { asset_id: number | null } | undefined;
-  syncImageAssetSlideshowState([previousRow.asset_id, nextRow?.asset_id ?? null]);
 }
 
 export function reorderImagePlaylist(entries: ReorderInput) {
@@ -459,15 +421,4 @@ export function reorderImagePlaylist(entries: ReorderInput) {
       );
     }
   })(entries);
-  syncImageAssetSlideshowState(
-    (getDatabase()
-      .prepare(
-        `
-          SELECT DISTINCT asset_id
-          FROM image_playlist_entries
-          WHERE asset_id IS NOT NULL
-        `
-      )
-      .all() as Array<{ asset_id: number }>).map((row) => row.asset_id)
-  );
 }

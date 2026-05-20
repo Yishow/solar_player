@@ -91,7 +91,7 @@ test("buildImageManagementViewModel keeps an empty-state contract when no assets
   assert.match(model.emptyState?.title ?? "", /尚未上傳圖片/);
 });
 
-test("buildImageManagementViewModel preserves legacy slideshow state when no playlist row exists yet", () => {
+test("buildImageManagementViewModel keeps asset-library metadata separate when no playlist row exists yet", () => {
   const model = buildImageManagementViewModel({
     assets,
     errorMessage: "",
@@ -108,10 +108,11 @@ test("buildImageManagementViewModel preserves legacy slideshow state when no pla
     }
   });
 
-  assert.deepEqual(model.library[0]?.badges, ["輪播中", "封面"]);
-  assert.deepEqual(model.selection?.badges, ["輪播中", "封面"]);
-  assert.equal(model.selection?.includedInSlideshow, true);
-  assert.equal(model.summary.slideshowCount, 1);
+  assert.deepEqual(model.library[0]?.badges, ["未配置 Playlist", "封面"]);
+  assert.deepEqual(model.selection?.badges, ["未配置 Playlist", "封面"]);
+  assert.equal(model.selection?.includedInSlideshow, null);
+  assert.match(model.selection?.playlistRuntimeStatus ?? "", /未建立|未配置/);
+  assert.equal(model.summary.slideshowCount, 0);
   assert.equal(resolvePlaylistRuntimeInclusion([], 3), null);
 });
 
@@ -153,6 +154,7 @@ test("buildImageManagementViewModel matches playlist runtime fields by string as
   assert.equal(model.selection?.playlistFallbackMode, "use-cover");
   assert.equal(model.selection?.playlistArea, "首頁 Hero");
   assert.deepEqual(model.selection?.playlistTags, ["封面", "太陽能"]);
+  assert.match(model.selection?.playlistRuntimeStatus ?? "", /正常播放|runtime/);
 });
 
 test("buildImageManagementViewModel edits the first ordered playlist row when one asset appears multiple times", () => {
@@ -207,6 +209,7 @@ test("buildImageManagementViewModel edits the first ordered playlist row when on
   assert.equal(model.selection?.includedInSlideshow, true);
   assert.equal(model.summary.slideshowCount, 1);
   assert.equal(model.selection?.playlistEnabled, false);
+  assert.match(model.selection?.playlistRuntimeStatus ?? "", /停用|degraded/);
   assert.equal(resolvePlaylistRuntimeInclusion(model.selection ? [
     {
       area: "備援輪播",

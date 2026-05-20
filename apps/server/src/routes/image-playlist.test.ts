@@ -132,6 +132,10 @@ test("GET /api/image-playlist/governance keeps disabled rows visible for managem
           enabled: boolean;
           entryId: string;
         }>;
+        resolvedEntries: Array<{
+          entryId: string;
+          isPlayable: boolean;
+        }>;
         hasPlaylistRows: boolean;
       };
     };
@@ -140,6 +144,50 @@ test("GET /api/image-playlist/governance keeps disabled rows visible for managem
     assert.equal(body.playlist.entries.length, 2);
     assert.equal(body.playlist.entries[0]?.entryId, "IMG-01");
     assert.equal(body.playlist.entries[0]?.enabled, false);
+    assert.equal(body.playlist.resolvedEntries[0]?.entryId, "IMG-01");
+    assert.equal(body.playlist.resolvedEntries[0]?.isPlayable, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("playlist entry updates do not mirror duration or enabled state back into legacy asset slideshow fields", async () => {
+  const asset = seedManagedImageAsset("playlist-ownership-audit.png");
+  enableImageInSlideshow(asset.assetId);
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      payload: {
+        durationSeconds: 18,
+        enabled: false
+      },
+      url: "/api/image-playlist/IMG-01"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const assetRow = getDatabase()
+      .prepare(
+        `
+          SELECT display_duration, included_in_slideshow
+          FROM image_assets
+          WHERE id = ?
+        `
+      )
+      .get(asset.assetId) as {
+        display_duration: number;
+        included_in_slideshow: number;
+      };
+
+    assert.equal(assetRow.display_duration, 10);
+    assert.equal(assetRow.included_in_slideshow, 1);
   } finally {
     await app.close();
   }

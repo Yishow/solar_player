@@ -8,9 +8,9 @@ const imageManagementContentSource = readFileSync(path.join(import.meta.dirname,
 
 test("image management persists playlist-facing metadata through the playlist runtime API", () => {
   assert.match(imageManagementSource, /updateImagePlaylistEntry\(selectedPlaylistEntry\.entryId/);
-  assert.match(imageManagementSource, /const shouldMirrorLegacyPlaybackState = assetPlaylistEntries\.length <= 1/);
-  assert.match(imageManagementSource, /shouldMirrorLegacyPlaybackState/);
-  assert.match(imageManagementSource, /displayDuration: selectedPlaylistEntry\?\.durationSeconds \?\? selectedAsset\.displayDuration/);
+  assert.doesNotMatch(imageManagementSource, /shouldMirrorLegacyPlaybackState/);
+  assert.doesNotMatch(imageManagementSource, /includedInSlideshow: effectiveIncludedInSlideshow/);
+  assert.doesNotMatch(imageManagementSource, /displayDuration: selectedPlaylistEntry\?\.durationSeconds \?\? selectedAsset\.displayDuration/);
   assert.match(imageManagementSource, /normalizeManagementPlaylistAssetId\(entry\.assetId, entry\.entryId\)/);
   assert.match(imageManagementSource, /title: normalizeNullablePlaylistText\(selectedPlaylistEntry\.title\)/);
   assert.match(imageManagementSource, /area: normalizeNullablePlaylistText\(selectedPlaylistEntry\.area\)/);
@@ -19,6 +19,7 @@ test("image management persists playlist-facing metadata through the playlist ru
 test("image management editor surfaces playlist runtime controls and server-driven delete blockers", () => {
   assert.match(imageManagementContentSource, /播放設定/);
   assert.match(imageManagementContentSource, /Playlist Runtime/);
+  assert.match(imageManagementContentSource, /playlistRuntimeStatus/);
   assert.match(imageManagementContentSource, /playlistFallbackMode/);
   assert.match(imageManagementContentSource, /updatePlaylistEntryField/);
   assert.match(imageManagementSource, /deleteBlocked=\{\(assetReferences\?\.blockingIssues\.length \?\? 0\) > 0\}/);
