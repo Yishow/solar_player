@@ -1,18 +1,21 @@
 import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { routeMetaMap } from "../app/routeMeta";
+import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { DisplayCanvas } from "../components/DisplayCanvas";
+import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
-import { shouldRedirectToOffline } from "./offlineRouting";
 import { usePageRotation } from "../hooks/usePageRotation";
+import { shouldRedirectToOffline } from "./offlineRouting";
 
 export function LayoutShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const registry = useDisplayPageRegistry();
   const { isHydrated, status } = useMqttStatus();
-  const routeMeta = routeMetaMap.get(location.pathname) ?? routeMetaMap.get("/overview");
+  const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
+  const playbackEntries = buildPlaybackFooterEntries(registry.pages);
   const controller = usePageRotation({
     currentPath: location.pathname,
     onRouteChange: (route) => {
@@ -55,7 +58,10 @@ export function LayoutShell() {
   ]);
 
   return (
-    <DisplayCanvas header={<AppHeader />} footer={<AppFooterNav />}>
+    <DisplayCanvas
+      header={<AppHeader />}
+      footer={<AppFooterNav playbackEntries={playbackEntries} resolvedPlaybackRouteMeta={routeMeta} />}
+    >
       <Outlet />
     </DisplayCanvas>
   );

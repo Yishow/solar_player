@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DisplayPageInstance } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "./AppFooterNav";
 import { AppHeader } from "./AppHeader";
@@ -20,6 +22,26 @@ import { MediaSlot } from "./MediaSlot";
 import { PanelCard } from "./PanelCard";
 import { PlaybackTitleGroup } from "./PlaybackTitleGroup";
 import { StatusBadge } from "./StatusBadge";
+
+function createPlaybackPage(
+  overrides: Partial<DisplayPageInstance> & Pick<DisplayPageInstance, "id" | "pageKey" | "route" | "routeSlug" | "templateKey">
+): DisplayPageInstance {
+  return {
+    archivedAt: null,
+    createdAt: "2026-05-22T00:00:00.000Z",
+    displayNameEn: "Overview",
+    displayNameZh: "總覽",
+    displayOrder: 1,
+    draftVersion: 1,
+    durationSeconds: 15,
+    enabled: true,
+    hasDraftChanges: false,
+    lastPublishedAt: "2026-05-22T00:00:00.000Z",
+    liveVersion: 1,
+    updatedAt: "2026-05-22T00:00:00.000Z",
+    ...overrides
+  };
+}
 
 test("shell witness routes declare the shared density contract", () => {
   assert.equal(routeMetaMap.get("/overview")?.shellDensity, "playback");
@@ -134,6 +156,120 @@ test("playback footer keeps the five display routes only", () => {
   assert.doesNotMatch(footerHtml, />MQTT</);
   assert.doesNotMatch(footerHtml, />圖片管理</);
   assert.doesNotMatch(footerHtml, /border-left:1px solid var\(--shell-divider\)/);
+});
+
+test("playback footer follows resolved registry-backed order, labels, and active duplicate instances", () => {
+  const pages = [
+    createPlaybackPage({
+      id: 1,
+      pageKey: "overview",
+      route: "/overview",
+      routeSlug: "overview",
+      templateKey: "overview"
+    }),
+    createPlaybackPage({
+      id: 2,
+      pageKey: "overview-2",
+      route: "/overview-campus",
+      routeSlug: "overview-campus",
+      templateKey: "overview",
+      displayNameEn: "Overview Campus",
+      displayNameZh: "校園總覽",
+      displayOrder: 2
+    }),
+    createPlaybackPage({
+      id: 3,
+      pageKey: "solar",
+      route: "/solar",
+      routeSlug: "solar",
+      templateKey: "solar",
+      displayNameEn: "Solar",
+      displayNameZh: "太陽能",
+      displayOrder: 3
+    })
+  ];
+
+  const footerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview-campus"]
+      },
+      React.createElement(AppFooterNav, {
+        playbackEntries: buildPlaybackFooterEntries(pages),
+        resolvedPlaybackRouteMeta: resolvePlaybackRouteMeta("/overview-campus", pages)
+      })
+    )
+  );
+
+  assert.match(footerHtml, /href="\/overview"/);
+  assert.match(footerHtml, /href="\/overview-campus"/);
+  assert.match(footerHtml, /href="\/solar"/);
+  assert.match(footerHtml, />校園總覽</);
+  assert.match(footerHtml, /aria-current="page"[^>]*href="\/overview-campus"/);
+  assert.ok(footerHtml.indexOf(">總覽<") < footerHtml.indexOf(">校園總覽<"));
+  assert.ok(footerHtml.indexOf(">校園總覽<") < footerHtml.indexOf(">太陽能<"));
+});
+
+test("playback footer removes archived registry-backed entries after the refreshed snapshot", () => {
+  const activePages = [
+    createPlaybackPage({
+      id: 1,
+      pageKey: "overview",
+      route: "/overview",
+      routeSlug: "overview",
+      templateKey: "overview"
+    }),
+    createPlaybackPage({
+      id: 2,
+      pageKey: "overview-2",
+      route: "/overview-campus",
+      routeSlug: "overview-campus",
+      templateKey: "overview",
+      displayNameEn: "Overview Campus",
+      displayNameZh: "校園總覽",
+      displayOrder: 2
+    })
+  ];
+  const refreshedPages = [
+    createPlaybackPage({
+      id: 1,
+      pageKey: "overview",
+      route: "/overview",
+      routeSlug: "overview",
+      templateKey: "overview"
+    })
+  ];
+
+  const activeFooterHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview-campus"]
+      },
+      React.createElement(AppFooterNav, {
+        playbackEntries: buildPlaybackFooterEntries(activePages),
+        resolvedPlaybackRouteMeta: resolvePlaybackRouteMeta("/overview-campus", activePages)
+      })
+    )
+  );
+  const refreshedFooterHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview-campus"]
+      },
+      React.createElement(AppFooterNav, {
+        playbackEntries: buildPlaybackFooterEntries(refreshedPages),
+        resolvedPlaybackRouteMeta: resolvePlaybackRouteMeta("/overview-campus", refreshedPages)
+      })
+    )
+  );
+
+  assert.match(activeFooterHtml, /href="\/overview-campus"/);
+  assert.match(activeFooterHtml, /aria-current="page"/);
+  assert.doesNotMatch(refreshedFooterHtml, /href="\/overview-campus"/);
+  assert.doesNotMatch(refreshedFooterHtml, /aria-current="page"/);
 });
 
 test("settings footer keeps overview return plus settings-related routes only", () => {

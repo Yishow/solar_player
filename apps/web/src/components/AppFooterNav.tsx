@@ -1,6 +1,7 @@
 import React, { Fragment } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
+import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { useBrandAssets } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
 import { PageNumberPill } from "./PageNumberPill";
@@ -13,23 +14,36 @@ type FooterEntry = {
 
 type FooterMode = "playback" | "management";
 
-function buildEntries(currentPath: string): {
+function buildEntries(
+  currentPath: string,
+  playbackNavigation?: {
+    entries: PlaybackFooterEntry[];
+    routeMeta: ResolvedPlaybackRouteMeta;
+  }
+): {
   entries: FooterEntry[];
   mode: FooterMode;
   isActivePath: (path: string) => boolean;
 } {
   const currentRoute = routeMetaMap.get(currentPath);
-  const isPlayback = !currentRoute || currentRoute.group === "playback";
+  const isPlayback =
+    playbackNavigation?.routeMeta.group === "playback" || !currentRoute || currentRoute.group === "playback";
 
   if (isPlayback) {
-    const playbackTabs: FooterEntry[] = routeMetaList
-      .filter((route): route is RouteMeta => route.group === "playback")
-      .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
+    const playbackTabs: FooterEntry[] =
+      playbackNavigation?.entries.map((entry) => ({
+        key: entry.key,
+        label: entry.label,
+        path: entry.path
+      })) ??
+      routeMetaList
+        .filter((route): route is RouteMeta => route.group === "playback")
+        .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
 
     return {
       entries: playbackTabs,
       mode: "playback",
-      isActivePath: (path) => path === currentPath
+      isActivePath: (path) => path === (playbackNavigation?.routeMeta.matchedPath ?? currentPath)
     };
   }
 
@@ -46,10 +60,23 @@ function buildEntries(currentPath: string): {
   };
 }
 
-export function AppFooterNav() {
+export function AppFooterNav({
+  playbackEntries,
+  resolvedPlaybackRouteMeta
+}: {
+  playbackEntries?: PlaybackFooterEntry[];
+  resolvedPlaybackRouteMeta?: ResolvedPlaybackRouteMeta;
+}) {
   const { pathname } = useLocation();
-  const currentRoute = routeMetaMap.get(pathname) ?? routeMetaList[0]!;
-  const { entries, mode, isActivePath } = buildEntries(pathname);
+  const { entries, mode, isActivePath } = buildEntries(
+    pathname,
+    playbackEntries && resolvedPlaybackRouteMeta
+      ? {
+          entries: playbackEntries,
+          routeMeta: resolvedPlaybackRouteMeta
+        }
+      : undefined
+  );
   const brand = useBrandAssets();
 
   // Settings nav has more entries; tighten typography & spacing so they fit.
