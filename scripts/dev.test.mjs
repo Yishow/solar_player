@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseDotEnv, resolveDevPorts, resolveServerPort } from "./dev-lib.mjs";
+import {
+  isSharedWatchReadyLine,
+  parseSharedWatchStatusLine,
+  parseDotEnv,
+  resolveDevPorts,
+  resolveServerPort,
+  stripAnsi
+} from "./dev-lib.mjs";
 
 test("parseDotEnv ignores comments and trims quoted values", () => {
   const parsed = parseDotEnv(`
@@ -42,5 +49,40 @@ test("resolveDevPorts always frees configured web port and deduplicates ports", 
       serverPort: 5173,
       portsToFree: [5173]
     }
+  );
+});
+
+test("stripAnsi removes terminal color escape sequences", () => {
+  assert.equal(
+    stripAnsi("\u001B[0m[shared]\u001B[0m 2:05:50 AM - Found 0 errors. Watching for file changes."),
+    "[shared] 2:05:50 AM - Found 0 errors. Watching for file changes."
+  );
+});
+
+test("parseSharedWatchStatusLine extracts the shared watch error count", () => {
+  assert.equal(
+    parseSharedWatchStatusLine(
+      "\u001B[0m[shared]\u001B[0m 2:05:50 AM - Found 0 errors. Watching for file changes."
+    ),
+    0
+  );
+  assert.equal(
+    parseSharedWatchStatusLine("2:05:50 AM - Found 2 errors. Watching for file changes."),
+    2
+  );
+  assert.equal(
+    parseSharedWatchStatusLine("2:05:50 AM - Starting compilation in watch mode..."),
+    null
+  );
+});
+
+test("isSharedWatchReadyLine only accepts the successful shared watch ready message", () => {
+  assert.equal(
+    isSharedWatchReadyLine("\u001B[0m[shared]\u001B[0m 2:05:50 AM - Found 0 errors. Watching for file changes."),
+    true
+  );
+  assert.equal(
+    isSharedWatchReadyLine("2:05:50 AM - Found 1 error. Watching for file changes."),
+    false
   );
 });

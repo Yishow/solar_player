@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 const DEFAULT_WEB_PORT = 5173;
 const DEFAULT_SERVER_PORT = 3000;
+const sharedWatchStatusPattern = /Found (?<count>\d+) errors?\. Watching for file changes\./u;
 
 function parseInteger(value) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -63,4 +64,22 @@ export function resolveDevPorts(dotEnv, inheritedEnv = process.env) {
     serverPort,
     portsToFree: [...new Set([DEFAULT_WEB_PORT, serverPort])]
   };
+}
+
+export function stripAnsi(value) {
+  return value.replace(/\u001B\[[0-9;]*m/gu, "");
+}
+
+export function parseSharedWatchStatusLine(value) {
+  const matched = sharedWatchStatusPattern.exec(stripAnsi(value));
+
+  if (!matched?.groups?.count) {
+    return null;
+  }
+
+  return Number.parseInt(matched.groups.count, 10);
+}
+
+export function isSharedWatchReadyLine(value) {
+  return parseSharedWatchStatusLine(value) === 0;
 }
