@@ -11,6 +11,7 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useImagesAutoplay } from "../../hooks/useImagesAutoplay";
 import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
@@ -69,9 +70,15 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
-  const [activeIndex, setActiveIndex] = useState(0);
-  const playlistRuntime = useImagePlaylistRuntime(activeIndex, {
+  const [requestedIndex, setRequestedIndex] = useState(0);
+  const playlistRuntime = useImagePlaylistRuntime(requestedIndex, {
     enabled: runtimeHydrationEnabled
+  });
+  const autoplay = useImagesAutoplay({
+    activeEntry: playlistRuntime.payload?.activeEntry ?? null,
+    entries: playlistRuntime.payload?.entries ?? [],
+    requestedIndex,
+    setRequestedIndex
   });
 
   if (
@@ -92,7 +99,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   );
   const viewModel = buildImagesViewModel({
     activeEntry: playlistRuntime.payload?.activeEntry ?? null,
-    activeIndex,
+    activeIndex: autoplay.activeIndex,
     assets: [],
     coverAssetSource: mainStageSource,
     entries: playlistRuntime.payload?.entries ?? []
@@ -213,7 +220,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           style={{
             height: `${resolvedConfig.chrome.modules.counter.progressThickness}px`,
             top: `${resolvedConfig.chrome.modules.counter.progressTopOffset}px`,
-            ["--progress-width" as string]: `${((viewModel.activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
+            ["--progress-width" as string]: `${((autoplay.activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
           }}
         />
       </section>
@@ -293,15 +300,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           top: `${resolvedConfig.arrows.left.top - CONTENT_TOP_OFFSET}px`,
           width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
-        onClick={() =>
-          setActiveIndex(() =>
-            viewModel.thumbnails.length === 0
-              ? 0
-              : viewModel.activeIndex > 0
-                ? viewModel.activeIndex - 1
-                : viewModel.thumbnails.length - 1
-          )
-        }
+        onClick={() => autoplay.prev()}
       >
         ‹
       </button>
@@ -315,15 +314,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           top: `${resolvedConfig.arrows.right.top - CONTENT_TOP_OFFSET}px`,
           width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
-        onClick={() =>
-          setActiveIndex(() =>
-            viewModel.thumbnails.length === 0
-              ? 0
-              : viewModel.activeIndex < viewModel.thumbnails.length - 1
-                ? viewModel.activeIndex + 1
-                : 0
-          )
-        }
+        onClick={() => autoplay.next()}
       >
         ›
       </button>
@@ -345,7 +336,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
               top: `${layout.top - CONTENT_TOP_OFFSET}px`,
               width: `${layout.width}px`
             }}
-            onClick={() => setActiveIndex(visibleStart + thumbIndex)}
+            onClick={() => autoplay.selectIndex(visibleStart + thumbIndex)}
           >
             {thumbnail.assetSource ? (
               <img alt={thumbnail.infoPanel.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />

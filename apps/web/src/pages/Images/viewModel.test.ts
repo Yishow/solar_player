@@ -174,4 +174,72 @@ test("buildImagesViewModel honors the server-resolved active entry and keeps use
   assert.equal(model.active.entryId, "IMG-03");
   assert.equal(model.active.assetSource, "cover.jpg");
   assert.equal(model.active.fallbackMode, "use-cover");
+  assert.equal(model.thumbnails[1]?.isActive, true);
+});
+
+test("buildImagesViewModel keeps fallback-active thumbnails inside the same ordered slideshow loop", () => {
+  const resolvedEntries = [
+    {
+      assetId: "asset-1",
+      assetSource: "hero.jpg",
+      capturedAt: "2026/05/10 14:32",
+      description: "首頁封面展示最新太陽能陣列成果。",
+      displayOrder: 1,
+      durationSeconds: 25,
+      enabled: true,
+      entryId: "IMG-01",
+      fallbackActive: false,
+      fallbackMode: "display-placeholder" as const,
+      fallbackReason: null,
+      hasAsset: true,
+      infoPanel: {
+        area: "首頁 Hero",
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      },
+      isPlayable: true,
+      resolution: "3840x2160",
+      tags: ["封面", "太陽能"],
+      title: "太陽能板鳥瞰"
+    },
+    {
+      assetId: "asset-2",
+      assetSource: "cover.jpg",
+      capturedAt: "2026/05/10 09:18",
+      description: "",
+      displayOrder: 2,
+      durationSeconds: 10,
+      enabled: true,
+      entryId: "IMG-02",
+      fallbackActive: true,
+      fallbackMode: "use-cover" as const,
+      fallbackReason: "asset-missing" as const,
+      hasAsset: false,
+      infoPanel: {
+        area: "迴路頁",
+        capturedAt: "2026/05/10 09:18",
+        description: "尚未提供圖片說明",
+        tags: [],
+        title: "工廠迴路導覽"
+      },
+      isPlayable: true,
+      resolution: "1920x1080",
+      tags: [],
+      title: "工廠迴路導覽"
+    }
+  ];
+  const model = buildImagesViewModel({
+    activeEntry: resolvedEntries[1],
+    activeIndex: 1,
+    assets: [],
+    entries: resolvedEntries
+  });
+
+  assert.equal(model.active.entryId, "IMG-02");
+  assert.equal(model.active.fallbackMode, "use-cover");
+  assert.equal(model.counter.current, "02");
+  assert.equal(model.counter.total, "02");
+  assert.equal(model.thumbnails[1]?.isActive, true);
 });

@@ -7,6 +7,7 @@ import { createImagesDisplayPageSeedConfig } from "./displayPageConfig";
 const imagesSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
 test("images runtime reads resolved display config for copy, main stage, info panel, thumb grid, and arrows", () => {
+  assert.match(imagesSource, /useImagesAutoplay\(/);
   assert.match(imagesSource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(imagesSource, /resolvedConfig\.hero\.title/);
   assert.match(imagesSource, /resolvedConfig\.hero\.subtitle/);
@@ -29,6 +30,10 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
   assert.match(imagesSource, /activeEntry: playlistRuntime\.payload\?\.activeEntry \?\? null/);
   assert.match(imagesSource, /entries: playlistRuntime\.payload\?\.entries \?\? \[\]/);
+  assert.match(imagesSource, /activeIndex: autoplay\.activeIndex/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
   assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
   assert.match(imagesSource, /DisplayCardFrame/);
   assert.match(imagesSource, /DisplayCardFooter/);
