@@ -1,26 +1,27 @@
-import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
+  type LiveDisplayPagePreviewState,
   type LiveDisplayPagePreviewDefinition,
-  type LiveDisplayPagePreviewState
 } from "../shared/liveDisplayPagePreview";
+import {
+  resolveLiveDisplayPagePreviewState,
+  type LiveDisplayPagePreviewStates
+} from "../shared/liveDisplayPagePreviewState";
 import type { RotationPreviewRow } from "../DisplayPagesEditor/rotationPreview";
 
 function resolvePreviewState(
-  templateKey: DisplayPageTemplateKey | null,
-  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>
-) {
+  templateKey: string | null,
+  pageId: string,
+  states: LiveDisplayPagePreviewStates
+) : LiveDisplayPagePreviewState {
   if (!templateKey) {
     return {
       detail: "目前無法從輪播頁面資料解析對應的展示頁 template。",
       status: "renderer-unavailable"
-    } satisfies LiveDisplayPagePreviewState;
+    };
   }
 
-  return states[templateKey] ?? {
-    detail: "正在同步正式預覽...",
-    status: "loading"
-  };
+  return resolveLiveDisplayPagePreviewState(pageId, states);
 }
 
 const PLAYBACK_ROTATION_PREVIEW_SCALE = 101 / 1080;
@@ -32,7 +33,7 @@ export function LiveRotationPreviewList({
 }: {
   definitions: LiveDisplayPagePreviewDefinition[];
   rows: RotationPreviewRow[];
-  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>;
+  states: LiveDisplayPagePreviewStates;
 }) {
   return (
     <>
@@ -46,7 +47,7 @@ export function LiveRotationPreviewList({
                   templateKey={page.templateKey ?? "overview"}
                   pageLabel={page.labelZh}
                   previewScale={PLAYBACK_ROTATION_PREVIEW_SCALE}
-                  state={resolvePreviewState(page.templateKey, states)}
+                  state={resolvePreviewState(page.templateKey, page.pageId, states)}
                 />
               </div>
               <div className="ps-preview__label">

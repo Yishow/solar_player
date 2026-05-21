@@ -2,9 +2,13 @@ import type { DisplayPageTemplateKey, PlaybackPage } from "@solar-display/shared
 import { isDisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
+  type LiveDisplayPagePreviewState,
   type LiveDisplayPagePreviewDefinition,
-  type LiveDisplayPagePreviewState
 } from "../shared/liveDisplayPagePreview";
+import {
+  resolveLiveDisplayPagePreviewState,
+  type LiveDisplayPagePreviewStates
+} from "../shared/liveDisplayPagePreviewState";
 import { slideshowCardOffsets } from "./layout";
 
 type SlideshowPreviewCard = Pick<
@@ -27,19 +31,17 @@ function resolveCardTemplateKey(card: SlideshowPreviewCard): DisplayPageTemplate
 
 function resolvePreviewState(
   templateKey: DisplayPageTemplateKey | null,
-  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>
-) {
+  pageKey: string,
+  states: LiveDisplayPagePreviewStates
+) : LiveDisplayPagePreviewState {
   if (!templateKey) {
     return {
       detail: "目前無法解析此輪播卡片對應的展示頁。",
       status: "renderer-unavailable"
-    } satisfies LiveDisplayPagePreviewState;
+    };
   }
 
-  return states[templateKey] ?? {
-    detail: "正在同步正式預覽...",
-    status: "loading"
-  };
+  return resolveLiveDisplayPagePreviewState(pageKey, states);
 }
 
 export function LiveSlideshowPreviewCards({
@@ -49,7 +51,7 @@ export function LiveSlideshowPreviewCards({
 }: {
   cards: SlideshowPreviewCard[];
   definitions: LiveDisplayPagePreviewDefinition[];
-  states: Partial<Record<DisplayPageTemplateKey, LiveDisplayPagePreviewState>>;
+  states: LiveDisplayPagePreviewStates;
 }) {
   return (
     <>
@@ -69,7 +71,7 @@ export function LiveSlideshowPreviewCards({
               <LiveDisplayPagePreview
                 definitions={definitions}
                 pageLabel={card.labelZh}
-                state={resolvePreviewState(templateKey, states)}
+                state={resolvePreviewState(templateKey, card.pageKey, states)}
                 templateKey={templateKey ?? "overview"}
               />
             </div>
