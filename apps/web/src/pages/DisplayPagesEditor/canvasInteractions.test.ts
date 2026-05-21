@@ -163,3 +163,29 @@ test("panCanvasViewport offsets the preview without changing the zoom level", ()
 
   assert.deepEqual(panned, { offsetX: 20, offsetY: 14, zoom: 1.25 });
 });
+
+test("applyCanvasDrag clamps a rail card inside its parent rail bounds", () => {
+  const moved = applyCanvasDrag(
+    {
+      height: 108,
+      left: 309,
+      top: 432,
+      width: 229
+    },
+    { x: 80, y: 0 },
+    {
+      canvasHeight: 108,
+      canvasWidth: 470,
+      minHeight: 64,
+      minWidth: 120,
+      originLeft: 68,
+      originTop: 432
+    }
+  );
+
+  assert.equal(moved.rect.left, 309);
+  assert.deepEqual(moved.guides, [
+    { axis: "x", position: 538 },
+    { axis: "y", position: 432 }
+  ]);
+});

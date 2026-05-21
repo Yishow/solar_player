@@ -13,6 +13,22 @@ export function applyRegionRect(
   region: ResolvedDisplayEditorRegion,
   nextRect: CanvasRect
 ) {
+  if (region.nodeType === "card-rail-card" && region.cardPath && region.geometryConstraint) {
+    let nextConfig = setValueAtPath(
+      config,
+      [...region.cardPath, "frame", "left"],
+      nextRect.left - region.geometryConstraint.left
+    );
+    nextConfig = setValueAtPath(
+      nextConfig,
+      [...region.cardPath, "frame", "top"],
+      nextRect.top - region.geometryConstraint.top
+    );
+    nextConfig = setValueAtPath(nextConfig, [...region.cardPath, "frame", "width"], nextRect.width);
+    nextConfig = setValueAtPath(nextConfig, [...region.cardPath, "frame", "height"], nextRect.height);
+    return nextConfig;
+  }
+
   if (!region.schema.geometry) {
     return config;
   }

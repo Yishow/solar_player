@@ -3,7 +3,14 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
+import {
+  createSustainabilityDisplayPageSeedConfig,
+  sustainabilityDisplayPageEditorRegions
+} from "../Sustainability/displayPageConfig";
+import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import { DisplayPagesEditor, type DisplayEditorPageDefinition } from "./index";
+import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
+import { DisplayEditorLeftPanel } from "./regionTree";
 
 test("display page editor shell exposes the full rollout page switcher and idle inspector guidance", () => {
   const html = renderToStaticMarkup(
@@ -90,13 +97,76 @@ test("display page editor keeps the region tree selection and inspector in sync"
 
   assert.match(html, /Region Tree/);
   assert.match(html, /Overview Hero Media/);
-  assert.match(html, /Image Source/);
+  assert.match(html, /Source Mode/);
+  assert.match(html, /Image Alt/);
   assert.match(html, /Fit Mode/);
   assert.match(html, /Reset Region/);
   assert.match(html, /Copy Geometry/);
   assert.match(html, /Undo/);
   assert.match(html, /Redo/);
   assert.match(html, /Region Presets/);
+});
+
+test("display page editor renders rail card hierarchy and template-aware controls for sustainability cards", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig();
+  const regions = resolveDisplayEditorRegions(
+    seedConfig as unknown as Record<string, unknown>,
+    sustainabilityDisplayPageEditorRegions,
+    seedConfig as unknown as Record<string, unknown>
+  );
+  const selectedCard = regions.find((region) => region.id === "sustainability-highlight-rail/household-today");
+  assert.ok(selectedCard);
+
+  const html = renderToStaticMarkup(
+    React.createElement("div", {}, [
+      React.createElement(DisplayEditorLeftPanel, {
+        dirty: false,
+        editMode: true,
+        errorMessage: "",
+        isLoading: false,
+        isPublishing: false,
+        isPublishBlocked: false,
+        isSaving: false,
+        key: "tree",
+        lockedRegionIds: [],
+        message: "展示頁設定已同步。",
+        onPublish: () => {},
+        onReload: () => {},
+        onSave: () => {},
+        onSelectRegion: () => {},
+        onToggleRegionLock: () => {},
+        regions,
+        selectedRegionId: selectedCard.id
+      }),
+      React.createElement(CardRailInspectorActions, {
+        key: "actions",
+        onAddCard: () => {},
+        onDeleteCard: () => {},
+        onDuplicateCard: () => {},
+        onMoveEarlier: () => {},
+        onMoveLater: () => {},
+        onSelectTemplate: () => {},
+        onToggleVisibility: () => {},
+        selectedRegion: selectedCard,
+        selectedRegionLocked: false
+      }),
+      React.createElement(DisplayEditorInspectorFields, {
+        fields: selectedCard.fields,
+        key: "fields",
+        onChange: () => {}
+      })
+    ])
+  );
+
+  assert.match(html, /Sustainability Highlight Rail/);
+  assert.match(html, /今日綠電效益/);
+  assert.match(html, /累積綠能成果/);
+  assert.match(html, /Add Card/);
+  assert.match(html, /Duplicate Card/);
+  assert.match(html, /Delete Card/);
+  assert.match(html, /Card Template/);
+  assert.match(html, /Supporting Line/);
+  assert.match(html, /Disclaimer/);
 });
 
 test("locked regions remain selectable but do not expose resize interaction handles", () => {

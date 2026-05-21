@@ -3,13 +3,25 @@ import type { ReactNode } from "react";
 import {
   displayEditorPathKey,
   type DisplayEditorArrayFieldSchema,
+  type DisplayEditorCardRailChildSourceSchema,
   type DisplayEditorFieldSchema,
   type DisplayEditorNumberFieldSchema,
   type DisplayEditorPath,
   type DisplayEditorRegionSchema,
   type DisplayEditorSelectFieldSchema
 } from "../../../../../packages/shared/src/displayEditorSchema";
+import {
+  isDisplayPageCardRail,
+  sortDisplayPageCardRailCards,
+  type DisplayPageCardRailCard,
+  type DisplayPageCardRailTemplateKey
+} from "@solar-display/shared";
 import { getValueAtPath } from "../../hooks/displayPageConfigPaths";
+import {
+  buildCardRailCardFields,
+  buildCardRailCardRegionSchema,
+  resolveCardRailCardLabel
+} from "./cardRailTemplateFields";
 import { resolveDisplayEditorFieldValidationIssues } from "./displayEditorValidation";
 
 export type ResolvedDisplayEditorRect = {
@@ -27,13 +39,20 @@ export type ResolvedDisplayEditorField = {
 };
 
 export type ResolvedDisplayEditorRegion = {
+  cardId?: string;
+  cardPath?: DisplayEditorPath;
   description?: string;
   fields: ResolvedDisplayEditorField[];
   geometry?: ResolvedDisplayEditorRect;
+  geometryConstraint?: ResolvedDisplayEditorRect;
   id: string;
   label: string;
+  nodeType: "card-rail-card" | "region";
+  parentId?: string;
   presetKey?: string;
+  railPath?: DisplayEditorPath;
   schema: DisplayEditorRegionSchema;
+  templateKey?: DisplayPageCardRailTemplateKey;
 };
 
 export function resolveDisplayEditorFieldIssues(field: ResolvedDisplayEditorField) {
@@ -72,9 +91,6 @@ export function DisplayEditorCanvasOverlay({
 
         const isSelected = selectedRegionId === region.id;
         const isLocked = lockedRegionIds.includes(region.id);
-        if (!isSelected) {
-          return null;
-        }
         return (
           <div
             key={region.id}
@@ -85,13 +101,13 @@ export function DisplayEditorCanvasOverlay({
                 ? "rgba(82, 91, 66, 0.1)"
                 : isSelected
                   ? "rgba(95, 140, 80, 0.18)"
-                  : "rgba(95, 140, 80, 0.08)",
+                  : "rgba(95, 140, 80, 0.04)",
               borderColor: isSelected ? "rgba(63, 122, 52, 0.9)" : "rgba(95, 140, 80, 0.42)",
               height: `${region.geometry.height}px`,
               left: `${region.geometry.left}px`,
               top: `${region.geometry.top}px`,
               width: `${region.geometry.width}px`,
-              zIndex: 50
+              zIndex: region.parentId ? (isSelected ? 65 : 55) : isSelected ? 60 : 45
             }}
           >
             <button
@@ -138,28 +154,115 @@ export function resolveDisplayEditorRegions(
   regionSchemas: DisplayEditorRegionSchema[],
   seedConfig: Record<string, unknown>
 ): ResolvedDisplayEditorRegion[] {
-  return regionSchemas.map((schema) => ({
-    description: schema.description,
-    fields: schema.fields
-      .filter((field) => {
-        if (!field.visibleWhen) {
-          return true;
-        }
+  return regionSchemas.flatMap((schema) => {
+    const resolvedRegion: ResolvedDisplayEditorRegion = {
+      description: schema.description,
+      fields: resolveRegionFields(config, seedConfig, schema.fields),
+      geometry: resolveRegionGeometry(config, schema),
+      id: schema.id,
+      label: schema.label,
+      nodeType: "region",
+      presetKey: schema.presetKey,
+      schema
+    };
 
-        return getValueAtPath(config, field.visibleWhen.path) === field.visibleWhen.equals;
-      })
-      .map((field) => ({
-        dirty: JSON.stringify(getValueAtPath(config, field.path)) !== JSON.stringify(getValueAtPath(seedConfig, field.path)),
-        path: field.path,
-        schema: field,
-        value: getValueAtPath(config, field.path)
-      })),
-    geometry: resolveRegionGeometry(config, schema),
-    id: schema.id,
-    label: schema.label,
-    presetKey: schema.presetKey,
-    schema
-  }));
+    const childRegions = resolveCardRailChildRegions(config, seedConfig, resolvedRegion);
+
+    return [resolvedRegion, ...childRegions];
+  });
+}
+
+function resolveRegionFields(
+  config: Record<string, unknown>,
+  seedConfig: Record<string, unknown>,
+  fields: DisplayEditorFieldSchema[]
+): ResolvedDisplayEditorField[] {
+  return fields
+    .filter((field) => {
+      if (!field.visibleWhen) {
+        return true;
+      }
+
+      return getValueAtPath(config, field.visibleWhen.path) === field.visibleWhen.equals;
+    })
+    .map((field) => ({
+      dirty: JSON.stringify(getValueAtPath(config, field.path)) !== JSON.stringify(getValueAtPath(seedConfig, field.path)),
+      path: field.path,
+      schema: field,
+      value: getValueAtPath(config, field.path)
+    }));
+}
+
+function resolveCardRailChildRegions(
+  config: Record<string, unknown>,
+  seedConfig: Record<string, unknown>,
+  parentRegion: ResolvedDisplayEditorRegion
+): ResolvedDisplayEditorRegion[] {
+  const childSource = parentRegion.schema.childSource;
+  const parentGeometry = parentRegion.geometry;
+  if (!childSource || childSource.type !== "card-rail" || !parentGeometry) {
+    return [];
+  }
+
+  const railValue = getValueAtPath(config, childSource.cardsPath.slice(0, -1));
+  if (!isDisplayPageCardRail(railValue)) {
+    return [];
+  }
+
+  return sortDisplayPageCardRailCards(railValue.cards).map((card) =>
+    buildCardRailChildRegion({
+      card,
+      childSource,
+      config,
+      index: railValue.cards.findIndex((entry) => entry.id === card.id),
+      parentGeometry,
+      parentRegion,
+      seedConfig
+    })
+  );
+}
+
+function buildCardRailChildRegion(args: {
+  card: DisplayPageCardRailCard;
+  childSource: DisplayEditorCardRailChildSourceSchema;
+  config: Record<string, unknown>;
+  index: number;
+  parentGeometry: ResolvedDisplayEditorRect;
+  parentRegion: ResolvedDisplayEditorRegion;
+  seedConfig: Record<string, unknown>;
+}): ResolvedDisplayEditorRegion {
+  const cardPath = [...args.childSource.cardsPath, args.index];
+  const schema = buildCardRailCardRegionSchema({
+    cardPath,
+    id: `${args.parentRegion.schema.id}-card`,
+    label: `${args.parentRegion.schema.label} Card`
+  });
+  const fields = buildCardRailCardFields(args.card, cardPath);
+
+  return {
+    cardId: args.card.id,
+    cardPath,
+    description: args.parentRegion.description,
+    fields: resolveRegionFields(args.config, args.seedConfig, fields),
+    geometry: {
+      height: args.card.frame.height,
+      left: args.parentGeometry.left + args.card.frame.left,
+      top: args.parentGeometry.top + args.card.frame.top,
+      width: args.card.frame.width
+    },
+    geometryConstraint: args.parentGeometry,
+    id: `${args.parentRegion.id}/${args.card.id}`,
+    label: resolveCardRailCardLabel(args.card),
+    nodeType: "card-rail-card",
+    parentId: args.parentRegion.id,
+    presetKey: args.parentRegion.presetKey,
+    railPath: args.childSource.cardsPath.slice(0, -1),
+    schema: {
+      ...schema,
+      fields
+    },
+    templateKey: args.card.template
+  };
 }
 
 export function DisplayEditorInspectorFields({

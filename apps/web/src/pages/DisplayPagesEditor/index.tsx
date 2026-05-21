@@ -1,4 +1,7 @@
-import type { DisplayPageTemplateKey } from "@solar-display/shared";
+import {
+  type DisplayPageCardRailTemplateKey,
+  type DisplayPageTemplateKey
+} from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,6 +25,15 @@ import { resolveDisplayEditorRegions } from "./inspectorFields";
 import { DisplayEditorInspectorTools } from "./inspectorTools";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
+import {
+  addCardRailCard,
+  duplicateCardRailCard,
+  moveCardRailCard,
+  removeCardRailCard,
+  switchCardRailCardTemplate,
+  toggleCardRailCardVisibility
+} from "./cardRailAuthoring";
+import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import {
   EDITOR_PREVIEW_SURFACE_HEIGHT,
   EDITOR_PREVIEW_SURFACE_WIDTH,
@@ -129,6 +141,7 @@ export function DisplayPagesEditor({
     () => editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null,
     [editableRegions, selectedRegionId]
   );
+  const selectedCardRegion = selectedRegion?.nodeType === "card-rail-card" ? selectedRegion : null;
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
   const regionPresetOptions = useMemo(() => resolveRegionPresetOptions(selectedRegion, editableRegions), [editableRegions, selectedRegion]);
@@ -182,6 +195,16 @@ export function DisplayPagesEditor({
     await save();
     await refresh();
     await reloadAssetHealth();
+  };
+
+  const handleSelectCardTemplate = (template: DisplayPageCardRailTemplateKey) => {
+    if (!selectedCardRegion?.cardId || !selectedCardRegion.railPath) {
+      return;
+    }
+
+    applyConfigUpdate((current) =>
+      switchCardRailCardTemplate(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!, template)
+    );
   };
 
   const handleSelectPage = (pageId: string) => {
@@ -241,6 +264,44 @@ export function DisplayPagesEditor({
       })}
     </div>
   );
+
+  const cardRailActions = selectedCardRegion ? (
+    <CardRailInspectorActions
+      selectedRegion={selectedCardRegion}
+      selectedRegionLocked={selectedRegionLocked}
+      onAddCard={() =>
+        applyConfigUpdate((current) =>
+          addCardRailCard(current, selectedCardRegion.railPath!, selectedCardRegion.templateKey!)
+        )
+      }
+      onDeleteCard={() =>
+        applyConfigUpdate((current) =>
+          removeCardRailCard(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!)
+        )
+      }
+      onDuplicateCard={() =>
+        applyConfigUpdate((current) =>
+          duplicateCardRailCard(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!)
+        )
+      }
+      onMoveEarlier={() =>
+        applyConfigUpdate((current) =>
+          moveCardRailCard(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!, "earlier")
+        )
+      }
+      onMoveLater={() =>
+        applyConfigUpdate((current) =>
+          moveCardRailCard(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!, "later")
+        )
+      }
+      onSelectTemplate={handleSelectCardTemplate}
+      onToggleVisibility={() =>
+        applyConfigUpdate((current) =>
+          toggleCardRailCardVisibility(current, selectedCardRegion.railPath!, selectedCardRegion.cardId!)
+        )
+      }
+    />
+  ) : null;
 
   return (
     <PageContainer
@@ -353,25 +414,28 @@ export function DisplayPagesEditor({
                 flat
                 actions={
                   selectedRegion ? (
-                    <DisplayEditorInspectorTools
-                      geometryClipboard={geometryClipboard}
-                      geometryClipboardCompatibility={geometryClipboardCompatibility}
-                      presetOptions={regionPresetOptions}
-                      selectedRegion={selectedRegion}
-                      selectedRegionLocked={selectedRegionLocked}
-                      onApplyPreset={(option) =>
-                        applyConfigUpdate((current) =>
-                          applyRegionPreset(current, selectedRegion, option.preset)
-                        )
-                      }
-                      onCopyGeometry={() => setGeometryClipboard(createGeometryClipboard(selectedRegion))}
-                      onPasteGeometry={() =>
-                        applyConfigUpdate((current) =>
-                          applyGeometryClipboard(current, selectedRegion, geometryClipboard)
-                        )
-                      }
-                      onResetRegion={() => resetPaths(selectedRegion.fields.map((field) => field.path))}
-                    />
+                    <>
+                      {cardRailActions}
+                      <DisplayEditorInspectorTools
+                        geometryClipboard={geometryClipboard}
+                        geometryClipboardCompatibility={geometryClipboardCompatibility}
+                        presetOptions={regionPresetOptions}
+                        selectedRegion={selectedRegion}
+                        selectedRegionLocked={selectedRegionLocked}
+                        onApplyPreset={(option) =>
+                          applyConfigUpdate((current) =>
+                            applyRegionPreset(current, selectedRegion, option.preset)
+                          )
+                        }
+                        onCopyGeometry={() => setGeometryClipboard(createGeometryClipboard(selectedRegion))}
+                        onPasteGeometry={() =>
+                          applyConfigUpdate((current) =>
+                            applyGeometryClipboard(current, selectedRegion, geometryClipboard)
+                          )
+                        }
+                        onResetRegion={() => resetPaths(selectedRegion.fields.map((field) => field.path))}
+                      />
+                    </>
                   ) : null
                 }
                 editMode={editMode}

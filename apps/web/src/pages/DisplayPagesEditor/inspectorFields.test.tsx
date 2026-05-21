@@ -433,3 +433,64 @@ test("display editor inspector keeps sustainability page-specific fields bound t
   assert.equal(resetField.value, seedConfig.hero.title[0]);
   assert.equal(resetField.dirty, false);
 });
+
+test("display editor resolves card rail child nodes as first-class authoring regions", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig();
+  const regions = resolveDisplayEditorRegions(
+    seedConfig as unknown as Record<string, unknown>,
+    sustainabilityDisplayPageEditorRegions,
+    seedConfig as unknown as Record<string, unknown>
+  );
+
+  const railRegion = regions.find((region) => region.id === "sustainability-highlight-rail");
+  const todayCard = regions.find((region) => region.id === "sustainability-highlight-rail/household-today");
+  const cumulativeCard = regions.find(
+    (region) => region.id === "sustainability-highlight-rail/household-cumulative"
+  );
+
+  assert.ok(railRegion);
+  assert.ok(todayCard);
+  assert.ok(cumulativeCard);
+  assert.equal(todayCard?.parentId, railRegion?.id);
+  assert.equal(cumulativeCard?.parentId, railRegion?.id);
+  assert.equal(todayCard?.schema.id, "sustainability-highlight-rail-card");
+  assert.deepEqual(
+    todayCard?.fields.map((field) => field.schema.id),
+    [
+      "card-eyebrow",
+      "card-household-count-display",
+      "card-household-label",
+      "card-supporting-line",
+      "card-disclaimer",
+      "card-basis-source-label",
+      "card-frame-left",
+      "card-frame-top",
+      "card-frame-width",
+      "card-frame-height"
+    ]
+  );
+});
+
+test("display editor inspector renders household-equivalent template fields from the card rail schema", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig();
+  const cardRegion = resolveDisplayEditorRegions(
+    seedConfig as unknown as Record<string, unknown>,
+    sustainabilityDisplayPageEditorRegions,
+    seedConfig as unknown as Record<string, unknown>
+  ).find((region) => region.id === "sustainability-highlight-rail/household-today");
+
+  assert.ok(cardRegion);
+
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorInspectorFields, {
+      fields: cardRegion.fields,
+      onChange: () => {}
+    })
+  );
+
+  assert.match(html, /Eyebrow/);
+  assert.match(html, /Household Count Display/);
+  assert.match(html, /Supporting Line/);
+  assert.match(html, /Disclaimer/);
+  assert.match(html, /Basis Source Label/);
+});

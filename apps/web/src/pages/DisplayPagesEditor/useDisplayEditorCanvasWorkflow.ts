@@ -22,6 +22,20 @@ const EDITOR_PREVIEW_VIEWPORT_WIDTH = Math.round(EDITOR_PREVIEW_SURFACE_WIDTH * 
 
 export { EDITOR_PREVIEW_SURFACE_HEIGHT, EDITOR_PREVIEW_SURFACE_WIDTH, EDITOR_PREVIEW_VIEWPORT_HEIGHT, EDITOR_PREVIEW_VIEWPORT_WIDTH };
 
+function resolveRegionConstraint(region: ResolvedDisplayEditorRegion) {
+  const schema = region.schema.geometry;
+  const boundary = region.geometryConstraint;
+
+  return {
+    canvasHeight: boundary?.height ?? EDITOR_PREVIEW_SURFACE_HEIGHT,
+    canvasWidth: boundary?.width ?? EDITOR_PREVIEW_SURFACE_WIDTH,
+    minHeight: schema?.minHeight ?? 40,
+    minWidth: schema?.minWidth ?? 40,
+    originLeft: boundary?.left ?? 0,
+    originTop: boundary?.top ?? 0
+  };
+}
+
 type CanvasInteractionState = {
   handle?: CanvasResizeHandle;
   origin: { x: number; y: number };
@@ -95,12 +109,7 @@ export function useDisplayEditorCanvasWorkflow({
         selectedRegion.geometry,
         directionByKey[event.key as keyof typeof directionByKey],
         event.shiftKey ? 10 : 1,
-        {
-          canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
-          canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
-          minHeight: selectedRegion.schema.geometry?.minHeight ?? 40,
-          minWidth: selectedRegion.schema.geometry?.minWidth ?? 40
-        }
+        resolveRegionConstraint(selectedRegion)
       );
 
       event.preventDefault();
@@ -165,12 +174,7 @@ export function useDisplayEditorCanvasWorkflow({
         x: Math.round((event.clientX - activeInteraction.origin.x) / effectiveScale),
         y: Math.round((event.clientY - activeInteraction.origin.y) / effectiveScale)
       };
-      const constraint = {
-        canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
-        canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
-        minHeight: schema.minHeight ?? 40,
-        minWidth: schema.minWidth ?? 40
-      };
+      const constraint = resolveRegionConstraint(region);
       const interactionResult =
         activeInteraction.type === "resize" && activeInteraction.handle
           ? applyCanvasResize(activeInteraction.startRect, activeInteraction.handle, delta, constraint)

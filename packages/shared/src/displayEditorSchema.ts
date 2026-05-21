@@ -97,7 +97,13 @@ export type DisplayEditorRegionGeometrySchema = {
   widthPath: DisplayEditorPath;
 };
 
+export type DisplayEditorCardRailChildSourceSchema = {
+  cardsPath: DisplayEditorPath;
+  type: "card-rail";
+};
+
 export type DisplayEditorRegionSchema = {
+  childSource?: DisplayEditorCardRailChildSourceSchema;
   description?: string;
   fields: DisplayEditorFieldSchema[];
   geometry?: DisplayEditorRegionGeometrySchema;

@@ -20,6 +20,8 @@ export type CanvasRectConstraint = {
   canvasWidth: number;
   minHeight: number;
   minWidth: number;
+  originLeft?: number;
+  originTop?: number;
 };
 
 export type CanvasResizeHandle =
@@ -49,10 +51,18 @@ function normalizeCanvasDimension(value: number, fallback: number) {
 export function clampCanvasRect(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasRect {
   const normalizedWidth = normalizeCanvasDimension(rect.width, constraint.minWidth);
   const normalizedHeight = normalizeCanvasDimension(rect.height, constraint.minHeight);
+  const originLeft = constraint.originLeft ?? 0;
+  const originTop = constraint.originTop ?? 0;
   const width = Math.max(constraint.minWidth, Math.min(normalizedWidth, constraint.canvasWidth));
   const height = Math.max(constraint.minHeight, Math.min(normalizedHeight, constraint.canvasHeight));
-  const left = Math.max(0, Math.min(normalizeCanvasCoordinate(rect.left), constraint.canvasWidth - width));
-  const top = Math.max(0, Math.min(normalizeCanvasCoordinate(rect.top), constraint.canvasHeight - height));
+  const left = Math.max(
+    originLeft,
+    Math.min(normalizeCanvasCoordinate(rect.left), originLeft + constraint.canvasWidth - width)
+  );
+  const top = Math.max(
+    originTop,
+    Math.min(normalizeCanvasCoordinate(rect.top), originTop + constraint.canvasHeight - height)
+  );
 
   return {
     height,
@@ -166,11 +176,22 @@ export function panCanvasViewport(
 
 function resolveBoundaryGuides(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasGuide[] {
   const guides: CanvasGuide[] = [];
-  if (rect.left === 0 || rect.left + rect.width === constraint.canvasWidth) {
-    guides.push({ axis: "x", position: rect.left === 0 ? rect.left : rect.left + rect.width });
+  const originLeft = constraint.originLeft ?? 0;
+  const originTop = constraint.originTop ?? 0;
+  const maxRight = originLeft + constraint.canvasWidth;
+  const maxBottom = originTop + constraint.canvasHeight;
+
+  if (rect.left === originLeft || rect.left + rect.width === maxRight) {
+    guides.push({
+      axis: "x",
+      position: rect.left === originLeft ? rect.left : rect.left + rect.width
+    });
   }
-  if (rect.top === 0 || rect.top + rect.height === constraint.canvasHeight) {
-    guides.push({ axis: "y", position: rect.top === 0 ? rect.top : rect.top + rect.height });
+  if (rect.top === originTop || rect.top + rect.height === maxBottom) {
+    guides.push({
+      axis: "y",
+      position: rect.top === originTop ? rect.top : rect.top + rect.height
+    });
   }
   return guides;
 }

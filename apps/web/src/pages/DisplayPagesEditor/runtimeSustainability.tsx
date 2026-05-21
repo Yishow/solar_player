@@ -2,6 +2,7 @@ import { Sustainability } from "../Sustainability";
 import { sustainabilityAssetMap } from "../Sustainability/assets";
 import {
   createSustainabilityDisplayPageSeedConfig,
+  type SustainabilityDisplayRect,
   type SustainabilityDisplayPageConfig
 } from "../Sustainability/displayPageConfig";
 import type { DisplayEditorPageDefinition, DisplayEditorRegion } from "./index";
@@ -18,6 +19,18 @@ function buildSustainabilityRegions(
   updatePath: UpdatePath
 ): DisplayEditorRegion[] {
   const typedConfig = config as SustainabilityDisplayPageConfig;
+  const firstHighlightCard = typedConfig.highlightRail.cards[0];
+
+  function resolveHighlightCardFrameValue(
+    frame: SustainabilityDisplayRect | undefined,
+    key: keyof SustainabilityDisplayRect
+  ) {
+    if (!frame) {
+      return key === "width" || key === "height" ? 0 : 0;
+    }
+
+    return frame[key];
+  }
 
   return [
     {
@@ -59,7 +72,7 @@ function buildSustainabilityRegions(
     {
       id: "sustainability-highlight-rail",
       label: "Sustainability Highlight Rail",
-      description: "調整 highlight rail 容器與四個 highlight 文案。",
+      description: "調整 highlight rail 容器與 card rail payload。",
       rect: {
         ...typedConfig.highlightRail.container,
         top: toContentTop(typedConfig.highlightRail.container.top)
@@ -69,8 +82,38 @@ function buildSustainabilityRegions(
         numberField("highlight-top", "Top", typedConfig.highlightRail.container.top, ["highlightRail", "container", "top"], updatePath),
         numberField("highlight-width", "Width", typedConfig.highlightRail.container.width, ["highlightRail", "container", "width"], updatePath),
         numberField("highlight-height", "Height", typedConfig.highlightRail.container.height, ["highlightRail", "container", "height"], updatePath),
-        textField("highlight-1-label", "Item 1 Label", typedConfig.highlightRail.items[0]?.label ?? "", ["highlightRail", "items", 0, "label"], updatePath),
-        textField("highlight-1-value", "Item 1 Value", typedConfig.highlightRail.items[0]?.value ?? "", ["highlightRail", "items", 0, "value"], updatePath)
+        textField(
+          "highlight-1-eyebrow",
+          "Card 1 Eyebrow",
+          firstHighlightCard?.template === "household-equivalent"
+            ? firstHighlightCard.contentSource.payload.eyebrow
+            : "",
+          ["highlightRail", "cards", 0, "contentSource", "payload", "eyebrow"],
+          updatePath
+        ),
+        textField(
+          "highlight-1-household-count",
+          "Card 1 Household Count",
+          firstHighlightCard?.template === "household-equivalent"
+            ? firstHighlightCard.contentSource.payload.householdCountDisplay
+            : "",
+          ["highlightRail", "cards", 0, "contentSource", "payload", "householdCountDisplay"],
+          updatePath
+        ),
+        numberField(
+          "highlight-1-card-left",
+          "Card 1 Left",
+          resolveHighlightCardFrameValue(firstHighlightCard?.frame, "left"),
+          ["highlightRail", "cards", 0, "frame", "left"],
+          updatePath
+        ),
+        numberField(
+          "highlight-1-card-width",
+          "Card 1 Width",
+          resolveHighlightCardFrameValue(firstHighlightCard?.frame, "width"),
+          ["highlightRail", "cards", 0, "frame", "width"],
+          updatePath
+        )
       ]
     },
     ...Object.entries(typedConfig.kpiCards).map(([key, rect]) => ({

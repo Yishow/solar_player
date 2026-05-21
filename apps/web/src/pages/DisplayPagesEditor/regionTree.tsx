@@ -1,6 +1,14 @@
 import { useState } from "react";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
 
+function groupRegionsByParent(regions: ResolvedDisplayEditorRegion[]) {
+  return regions.reduce<Record<string, ResolvedDisplayEditorRegion[]>>((groups, region) => {
+    const key = region.parentId ?? "__root__";
+    groups[key] = [...(groups[key] ?? []), region];
+    return groups;
+  }, {});
+}
+
 export function DisplayEditorLeftPanel({
   dirty,
   editMode,
@@ -39,6 +47,58 @@ export function DisplayEditorLeftPanel({
   const [tab, setTab] = useState<"regions" | "actions">("regions");
   const saveDisabled = isLoading || isSaving || !dirty;
   const publishDisabled = isLoading || isSaving || isPublishing || isPublishBlocked;
+  const groupedRegions = groupRegionsByParent(regions);
+
+  function renderRegionNodes(parentId?: string, depth = 0) {
+    const children = groupedRegions[parentId ?? "__root__"] ?? [];
+
+    return children.map((region) => {
+      const isSelected = selectedRegionId === region.id;
+      const isLocked = lockedRegionIds.includes(region.id);
+
+      return (
+        <div key={region.id} className="grid gap-2">
+          <div
+            className={[
+              "rounded-[16px] border px-3 py-2",
+              isSelected
+                ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.08)]"
+                : "border-[var(--shell-divider)] bg-white/80"
+            ].join(" ")}
+            style={{ marginLeft: `${depth * 14}px` }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                aria-pressed={isSelected}
+                className="min-w-0 flex-1 text-left"
+                onClick={() => onSelectRegion(region.id)}
+              >
+                <div className="break-words text-[14px] font-semibold text-[var(--shell-title-ink)]">
+                  {region.label}
+                </div>
+                <div className="mt-1 text-[11px] text-[var(--shell-subtitle-ink)]">{region.id}</div>
+              </button>
+              <button
+                type="button"
+                aria-label={`${region.label} ${isLocked ? "unlock" : "lock"}`}
+                className={[
+                  "rounded-full px-3 py-1 text-[11px] font-semibold",
+                  isLocked
+                    ? "bg-[rgba(82,91,66,0.12)] text-[var(--shell-title-ink)]"
+                    : "border border-[var(--shell-divider)] text-[var(--shell-copy-ink)]"
+                ].join(" ")}
+                onClick={() => onToggleRegionLock(region.id)}
+              >
+                {isLocked ? "已鎖定" : "可拖曳"}
+              </button>
+            </div>
+          </div>
+          {renderRegionNodes(region.id, depth + 1)}
+        </div>
+      );
+    });
+  }
 
   return (
     <section className="flex h-full flex-col border-r border-[var(--shell-divider)] bg-white/70 backdrop-blur-sm">
@@ -71,50 +131,7 @@ export function DisplayEditorLeftPanel({
             </p>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
-            <div className="grid gap-2">
-              {regions.map((region) => {
-                const isSelected = selectedRegionId === region.id;
-                const isLocked = lockedRegionIds.includes(region.id);
-                return (
-                  <div
-                    key={region.id}
-                    className={[
-                      "rounded-[16px] border px-3 py-2",
-                      isSelected
-                        ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.08)]"
-                        : "border-[var(--shell-divider)] bg-white/80"
-                    ].join(" ")}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <button
-                        type="button"
-                        aria-pressed={isSelected}
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => onSelectRegion(region.id)}
-                      >
-                        <div className="break-words text-[14px] font-semibold text-[var(--shell-title-ink)]">
-                          {region.label}
-                        </div>
-                        <div className="mt-1 text-[11px] text-[var(--shell-subtitle-ink)]">{region.id}</div>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`${region.label} ${isLocked ? "unlock" : "lock"}`}
-                        className={[
-                          "rounded-full px-3 py-1 text-[11px] font-semibold",
-                          isLocked
-                            ? "bg-[rgba(82,91,66,0.12)] text-[var(--shell-title-ink)]"
-                            : "border border-[var(--shell-divider)] text-[var(--shell-copy-ink)]"
-                        ].join(" ")}
-                        onClick={() => onToggleRegionLock(region.id)}
-                      >
-                        {isLocked ? "已鎖定" : "可拖曳"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <div className="grid gap-2">{renderRegionNodes()}</div>
           </div>
         </>
       )}
