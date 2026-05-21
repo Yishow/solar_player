@@ -1,5 +1,6 @@
 import type { HouseholdEquivalenceCard } from "./householdEquivalence.js";
 import type { SustainabilityProvenance } from "./sustainabilityStory.js";
+import { cloneValue } from "./cloneValue.js";
 
 export const displayPageCardRailTemplateKeys = [
   "metric-highlight",
@@ -68,10 +69,6 @@ export function isDisplayPageCardRailTemplateKey(
     typeof value === "string" &&
     (displayPageCardRailTemplateKeys as readonly string[]).includes(value)
   );
-}
-
-function cloneValue<T>(value: T): T {
-  return structuredClone(value);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
