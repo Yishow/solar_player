@@ -41,10 +41,6 @@ export const router = createBrowserRouter([
         element: <BrandAssets />
       },
       {
-        path: "display-pages/editor",
-        element: <DisplayPagesEditorRoute />
-      },
-      {
         path: "settings/playback",
         element: <PlaybackSettings />
       },
@@ -77,5 +73,9 @@ export const router = createBrowserRouter([
         element: <DeviceStatus />
       }
     ]
+  },
+  {
+    path: "display-pages/editor",
+    element: <DisplayPagesEditorRoute />
   }
 ]);

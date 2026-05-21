@@ -12,7 +12,8 @@ import {
   MANAGEMENT_FIXED_LAYOUT_HEIGHT,
   MANAGEMENT_FIXED_LAYOUT_WIDTH
 } from "./ManagementFixedLayoutFrame";
-import { ManagementShell } from "../layouts/ManagementShell";
+import { DisplayPagesEditor } from "../pages/DisplayPagesEditor";
+import { ManagementShell, ManagementShellFrame } from "../layouts/ManagementShell";
 import { PageScaffold } from "../pages/shared/PageScaffold";
 import { ActionCluster } from "./ActionCluster";
 import { MediaSlot } from "./MediaSlot";
@@ -241,6 +242,59 @@ test("management shell wraps fixed-layout management routes in a dedicated scale
   assert.match(fixedLayoutHtml, /fixed-layout-body/);
   assert.doesNotMatch(fluidLayoutHtml, /data-shell-primitive="management-fixed-layout-frame"/);
   assert.match(fluidLayoutHtml, /fluid-layout-body/);
+});
+
+test("display pages editor hides management header and footer while edit mode is active", () => {
+  const editModeHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(
+        ManagementShellFrame,
+        {
+          hideChrome: true
+        },
+        React.createElement(DisplayPagesEditor, {
+          editMode: true,
+          initialEditorState: {
+            editMode: true
+          },
+          onEditModeChange: () => {},
+          renderPreview: false
+        })
+      )
+    )
+  );
+
+  const viewModeHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(
+        ManagementShellFrame,
+        {
+          hideChrome: false
+        },
+        React.createElement(DisplayPagesEditor, {
+          editMode: false,
+          initialEditorState: {
+            editMode: false
+          },
+          onEditModeChange: () => {},
+          renderPreview: false
+        })
+      )
+    )
+  );
+
+  assert.doesNotMatch(editModeHtml, /data-shell-primitive="app-header"/);
+  assert.doesNotMatch(editModeHtml, /data-shell-primitive="footer-nav"/);
+  assert.match(viewModeHtml, /data-shell-primitive="app-header"/);
+  assert.match(viewModeHtml, /data-shell-primitive="footer-nav"/);
 });
 
 test("management fixed layout scale clamps to the available viewport without enlarging", () => {

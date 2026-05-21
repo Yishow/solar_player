@@ -65,17 +65,21 @@ function renderDisplayEditorFallback(label: string) {
 const editorRouteMeta = routeMetaMap.get("/display-pages/editor")!;
 
 export function DisplayPagesEditor({
+  editMode: controlledEditMode,
   initialEditorState,
+  onEditModeChange,
   initialPublishingStateByPage,
   pageDefinitions = fallbackPageDefinitions,
   renderPreview = true
 }: {
+  editMode?: boolean;
   initialEditorState?: {
     editMode?: boolean;
     lockedRegionIds?: string[];
     selectedRegionId?: string | null;
   };
   initialPublishingStateByPage?: DisplayPagePublishingStateMap;
+  onEditModeChange?: (nextEditMode: boolean) => void;
   pageDefinitions?: DisplayEditorPageDefinition[];
   renderPreview?: boolean;
 }) {
@@ -94,7 +98,7 @@ export function DisplayPagesEditor({
     requestedPageId && pageIdSet.has(requestedPageId)
       ? requestedPageId
       : defaultPageId;
-  const [editMode, setEditMode] = useState(initialEditorState?.editMode ?? false);
+  const [internalEditMode, setInternalEditMode] = useState(initialEditorState?.editMode ?? false);
   const [canvasContainerScale, setCanvasContainerScale] = useState(1);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
   const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
@@ -104,6 +108,7 @@ export function DisplayPagesEditor({
         ? { [selectedPageId]: initialEditorState.lockedRegionIds }
         : {}
   );
+  const editMode = controlledEditMode ?? internalEditMode;
 
   const selectedPage = useMemo(
     () => resolvedPageDefinitions.find((page) => page.id === selectedPageId) ?? resolvedPageDefinitions[0]!,
@@ -179,9 +184,22 @@ export function DisplayPagesEditor({
     }
   }, [editMode, editableRegions, selectedRegionId]);
 
+  const setEditMode = useCallback(
+    (nextEditMode: boolean | ((current: boolean) => boolean)) => {
+      const resolvedNextEditMode =
+        typeof nextEditMode === "function" ? nextEditMode(editMode) : nextEditMode;
+
+      if (controlledEditMode === undefined) {
+        setInternalEditMode(resolvedNextEditMode);
+      }
+      onEditModeChange?.(resolvedNextEditMode);
+    },
+    [controlledEditMode, editMode, onEditModeChange]
+  );
+
   const toggleEditMode = useCallback(() => {
     setEditMode((current) => !current);
-  }, []);
+  }, [setEditMode]);
 
   useDisplayEditorKeybinding(toggleEditMode);
 

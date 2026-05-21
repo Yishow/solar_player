@@ -5,11 +5,15 @@ import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { ManagementFixedLayoutFrame } from "../components/ManagementFixedLayoutFrame";
 
-export function ManagementShell() {
-  const location = useLocation();
-  const routeMeta = routeMetaMap.get(location.pathname);
-  const usesFixedLayoutFrame = routeMeta?.managementFrame === "fixed-fhd";
-
+export function ManagementShellFrame({
+  children,
+  hideChrome = false,
+  usesFixedLayoutFrame = false
+}: {
+  children?: React.ReactNode;
+  hideChrome?: boolean;
+  usesFixedLayoutFrame?: boolean;
+}) {
   return (
     <div
       data-shell-primitive="management-shell-viewport"
@@ -20,7 +24,7 @@ export function ManagementShell() {
         className="shell-stage-surface relative flex h-full w-full flex-col overflow-hidden"
       >
         <div className="shell-stage-overlay pointer-events-none absolute inset-0" />
-        <AppHeader />
+        {!hideChrome ? <AppHeader /> : null}
         <main
           data-shell-primitive="management-shell-content"
           className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
@@ -31,15 +35,27 @@ export function ManagementShell() {
           >
             {usesFixedLayoutFrame ? (
               <ManagementFixedLayoutFrame>
-                <Outlet />
+                {children}
               </ManagementFixedLayoutFrame>
             ) : (
-              <Outlet />
+              children
             )}
           </div>
         </main>
-        <AppFooterNav />
+        {!hideChrome ? <AppFooterNav /> : null}
       </div>
     </div>
+  );
+}
+
+export function ManagementShell() {
+  const location = useLocation();
+  const routeMeta = routeMetaMap.get(location.pathname);
+  const usesFixedLayoutFrame = routeMeta?.managementFrame === "fixed-fhd";
+
+  return (
+    <ManagementShellFrame usesFixedLayoutFrame={usesFixedLayoutFrame}>
+      <Outlet />
+    </ManagementShellFrame>
   );
 }
