@@ -372,6 +372,135 @@ test("POST /api/display-pages/:pageId/publish promotes draft to live", async () 
   }
 });
 
+test("draft and live channels roundtrip the same card rail payload through the shared display page config envelope", async () => {
+  const app = await buildApp();
+  const highlightRail = {
+    cards: [
+      {
+        contentSource: {
+          mode: "static",
+          payload: {
+            label: "本月減碳",
+            unit: "tCO₂e",
+            value: "38.4"
+          }
+        },
+        displayOrder: 1,
+        frame: {
+          height: 108,
+          left: 0,
+          top: 0,
+          width: 108
+        },
+        id: "summary-1",
+        template: "metric-highlight",
+        visible: true
+      },
+      {
+        contentSource: {
+          mode: "static",
+          payload: {
+            label: "年度節電",
+            unit: "MWh",
+            value: "214"
+          }
+        },
+        displayOrder: 2,
+        frame: {
+          height: 108,
+          left: 120,
+          top: 0,
+          width: 108
+        },
+        id: "summary-2",
+        template: "metric-highlight",
+        visible: true
+      },
+      {
+        contentSource: {
+          mode: "static",
+          payload: {
+            label: "綠電自用",
+            unit: "%",
+            value: "71"
+          }
+        },
+        displayOrder: 3,
+        frame: {
+          height: 108,
+          left: 240,
+          top: 0,
+          width: 108
+        },
+        id: "summary-3",
+        template: "metric-highlight",
+        visible: false
+      }
+    ],
+    container: {
+      height: 108,
+      left: 68,
+      top: 578,
+      width: 470
+    }
+  };
+
+  try {
+    const saveResponse = await saveDraftConfig(app, "sustainability", {
+      highlightRail
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+    const draftSaveBody = saveResponse.json() as {
+      config: {
+        regions: {
+          highlightRail: typeof highlightRail;
+        };
+      };
+    };
+    assert.deepEqual(draftSaveBody.config.regions.highlightRail, highlightRail);
+
+    const draftReadResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/sustainability/draft"
+    });
+    assert.equal(draftReadResponse.statusCode, 200);
+    const draftReadBody = draftReadResponse.json() as {
+      config: {
+        regions: {
+          highlightRail: typeof highlightRail;
+        };
+      };
+    };
+    assert.deepEqual(draftReadBody.config.regions.highlightRail, highlightRail);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/publish",
+      payload: { publishedBy: "card-rail-operator" }
+    });
+    assert.equal(publishResponse.statusCode, 200);
+
+    const liveReadResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/sustainability/live"
+    });
+    assert.equal(liveReadResponse.statusCode, 200);
+    const liveReadBody = liveReadResponse.json() as {
+      config: {
+        publishedBy: string | null;
+        regions: {
+          highlightRail: typeof highlightRail;
+        };
+      };
+    };
+    assert.equal(liveReadBody.config.publishedBy, "card-rail-operator");
+    assert.deepEqual(liveReadBody.config.regions.highlightRail, highlightRail);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/display-pages/:pageId/rollback restores previous version", async () => {
   const app = await buildApp();
 
@@ -488,6 +617,196 @@ test("POST publish with negative dimensions is rejected", async () => {
     const body = publishRes.json() as { validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> } };
     assert.equal(body.validation.canPublish, false);
     assert.ok(body.validation.findings.some((f) => f.code === "GEOMETRY_INVALID_VALUE" && f.regionId === "kpiCard"));
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST publish blocks rail cards that overflow the parent rail bounds", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "sustainability", {
+      highlightRail: {
+        cards: [
+          {
+            contentSource: {
+              mode: "static",
+              payload: {
+                label: "本月減碳",
+                unit: "tCO₂e",
+                value: "38.4"
+              }
+            },
+            displayOrder: 1,
+            frame: {
+              height: 108,
+              left: 420,
+              top: 0,
+              width: 140
+            },
+            id: "summary-1",
+            template: "metric-highlight",
+            visible: true
+          }
+        ],
+        container: {
+          height: 108,
+          left: 68,
+          top: 578,
+          width: 470
+        }
+      }
+    });
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 422);
+    const body = publishRes.json() as {
+      success: false;
+      validation: {
+        canPublish: boolean;
+        findings: Array<{ code: string; regionId?: string }>;
+      };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.equal(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "CARD_RAIL_OUT_OF_BOUNDS" &&
+          finding.regionId === "highlightRail.cards.summary-1"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST publish blocks visible rail cards that omit metric-highlight template fields", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "sustainability", {
+      highlightRail: {
+        cards: [
+          {
+            contentSource: {
+              mode: "static",
+              payload: {
+                label: "",
+                unit: "tCO₂e",
+                value: "38.4"
+              }
+            },
+            displayOrder: 1,
+            frame: {
+              height: 108,
+              left: 0,
+              top: 0,
+              width: 108
+            },
+            id: "summary-1",
+            template: "metric-highlight",
+            visible: true
+          }
+        ],
+        container: {
+          height: 108,
+          left: 68,
+          top: 578,
+          width: 470
+        }
+      }
+    });
+
+    const validateRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/validate"
+    });
+
+    assert.equal(validateRes.statusCode, 200);
+    const body = validateRes.json() as {
+      validation: {
+        canPublish: boolean;
+        findings: Array<{ code: string; regionId?: string }>;
+      };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.equal(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "CARD_RAIL_TEMPLATE_REQUIRED" &&
+          finding.regionId === "highlightRail.cards.summary-1"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST publish blocks visible rail cards that use an unknown template key", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "sustainability", {
+      highlightRail: {
+        cards: [
+          {
+            contentSource: {
+              mode: "static",
+              payload: {
+                label: "未知模板",
+                unit: "kWh",
+                value: "18"
+              }
+            },
+            displayOrder: 1,
+            frame: {
+              height: 108,
+              left: 0,
+              top: 0,
+              width: 108
+            },
+            id: "summary-unknown",
+            template: "story-teaser",
+            visible: true
+          }
+        ],
+        container: {
+          height: 108,
+          left: 68,
+          top: 578,
+          width: 470
+        }
+      }
+    });
+
+    const validateRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/validate"
+    });
+
+    assert.equal(validateRes.statusCode, 200);
+    const body = validateRes.json() as {
+      validation: {
+        canPublish: boolean;
+        findings: Array<{ code: string; regionId?: string }>;
+      };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.equal(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "CARD_RAIL_TEMPLATE_UNKNOWN" &&
+          finding.regionId === "highlightRail.cards.summary-unknown"
+      ),
+      true
+    );
   } finally {
     await app.close();
   }

@@ -1,11 +1,17 @@
 import type {
   ConfigStage,
+  DisplayPageCardRail,
   DisplayPageConfigEnvelope,
   DisplayPageId,
   FallbackPolicy,
   ManagementDraftSaveConflict
 } from "@solar-display/shared";
-import { defaultFallbackPolicy } from "@solar-display/shared";
+import {
+  defaultFallbackPolicy,
+  isDisplayPageCardRail,
+  isLegacyDisplayPageMetricHighlightRail,
+  upgradeLegacyMetricHighlightRail
+} from "@solar-display/shared";
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -35,14 +41,34 @@ export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown
     return deepClone(seedConfig);
   }
 
+  if (isDisplayPageCardRail(seedConfig) && isLegacyDisplayPageMetricHighlightRail(overrideConfig)) {
+    return upgradeLegacyMetricHighlightRail(overrideConfig, seedConfig.cards) as T;
+  }
+
   if (Array.isArray(seedConfig)) {
     if (!Array.isArray(overrideConfig)) {
       return deepClone(seedConfig);
     }
 
-    const mergedArray = seedConfig.map((seedValue, index) =>
-      mergeDisplayPageConfig(seedValue, overrideConfig[index])
-    );
+    const usesIdentityMerge =
+      seedConfig.some((item) => isPlainObject(item) && typeof item.id === "string") ||
+      overrideConfig.some((item) => isPlainObject(item) && typeof item.id === "string");
+
+    const mergedArray = usesIdentityMerge
+      ? overrideConfig.map((overrideValue, index) => {
+          const seedValue =
+            isPlainObject(overrideValue) && typeof overrideValue.id === "string"
+              ? seedConfig.find(
+                  (candidate) =>
+                    isPlainObject(candidate) && candidate.id === overrideValue.id
+                ) ?? seedConfig[index] ?? overrideValue
+              : seedConfig[index] ?? overrideValue;
+
+          return mergeDisplayPageConfig(seedValue, overrideValue);
+        })
+      : seedConfig.map((seedValue, index) =>
+          mergeDisplayPageConfig(seedValue, overrideConfig[index])
+        );
 
     return mergedArray as T;
   }

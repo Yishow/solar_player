@@ -12,6 +12,8 @@ import type {
 } from "@solar-display/shared";
 import {
   defaultFallbackPolicy,
+  isDisplayPageCardRail,
+  isDisplayPageCardRailTemplateKey,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -153,18 +155,246 @@ function readNextLiveVersion(pageId: DisplayPageId) {
   return readStageConfig(pageId, "live").version + 1;
 }
 
+type LayoutRect = {
+  bottom: number;
+  height: number;
+  left: number;
+  regionId: string;
+  right: number;
+  top: number;
+  width: number;
+};
+
+function pushGeometryValidationFindings(
+  findings: ValidationFinding[],
+  regionId: string,
+  rect: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  }
+) {
+  if (rect.left + rect.width > 1920) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_OUT_OF_BOUNDS",
+      message: `${regionId} 超出畫布右邊界 (1920px)`,
+      regionId
+    });
+  }
+  if (rect.top + rect.height > 1080) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_OUT_OF_BOUNDS",
+      message: `${regionId} 超出畫布底邊界 (1080px)`,
+      regionId
+    });
+  }
+  if (rect.left < 0) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_OUT_OF_BOUNDS",
+      message: `${regionId} 超出畫布左邊界`,
+      regionId
+    });
+  }
+  if (rect.top < 0) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_OUT_OF_BOUNDS",
+      message: `${regionId} 超出畫布上邊界`,
+      regionId
+    });
+  }
+  if (rect.width <= 0) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_INVALID_VALUE",
+      message: `${regionId}.width 必須大於 0`,
+      regionId
+    });
+  }
+  if (rect.height <= 0) {
+    findings.push({
+      severity: "blocking",
+      code: "GEOMETRY_INVALID_VALUE",
+      message: `${regionId}.height 必須大於 0`,
+      regionId
+    });
+  }
+}
+
+function pushLayoutRect(layoutRects: LayoutRect[], regionId: string, rect: {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}) {
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+
+  layoutRects.push({
+    bottom: rect.top + rect.height,
+    height: rect.height,
+    left: rect.left,
+    regionId,
+    right: rect.left + rect.width,
+    top: rect.top,
+    width: rect.width
+  });
+}
+
+function validateCardRailContent(
+  findings: ValidationFinding[],
+  regionId: string,
+  card: {
+    contentSource: {
+      mode: string;
+      payload?: Record<string, unknown>;
+    };
+    template: string;
+    visible: boolean;
+  }
+) {
+  if (!card.visible) {
+    return;
+  }
+
+  if (!isDisplayPageCardRailTemplateKey(card.template)) {
+    findings.push({
+      severity: "blocking",
+      code: "CARD_RAIL_TEMPLATE_UNKNOWN",
+      message: `${regionId} 使用未支援的 card rail template`,
+      regionId
+    });
+    return;
+  }
+
+  if (card.contentSource.mode !== "static") {
+    findings.push({
+      severity: "blocking",
+      code: "CARD_RAIL_TEMPLATE_REQUIRED",
+      message: `${regionId} 缺少可渲染的 static content payload`,
+      regionId
+    });
+    return;
+  }
+
+  if (card.template === "metric-highlight") {
+    const payload = card.contentSource.payload ?? {};
+    const label = typeof payload.label === "string" ? payload.label.trim() : "";
+    const unit = typeof payload.unit === "string" ? payload.unit.trim() : "";
+    const value = typeof payload.value === "string" ? payload.value.trim() : "";
+
+    if (label.length === 0 || unit.length === 0 || value.length === 0) {
+      findings.push({
+        severity: "blocking",
+        code: "CARD_RAIL_TEMPLATE_REQUIRED",
+        message: `${regionId} 缺少 metric-highlight 模板必填欄位`,
+        regionId
+      });
+    }
+    return;
+  }
+
+  if (card.template === "household-equivalent") {
+    const payload = card.contentSource.payload ?? {};
+    const eyebrow = typeof payload.eyebrow === "string" ? payload.eyebrow.trim() : "";
+    const householdCountDisplay =
+      typeof payload.householdCountDisplay === "string"
+        ? payload.householdCountDisplay.trim()
+        : "";
+    const householdLabel =
+      typeof payload.householdLabel === "string" ? payload.householdLabel.trim() : "";
+    const supportingLine =
+      typeof payload.supportingLine === "string" ? payload.supportingLine.trim() : "";
+
+    if (
+      eyebrow.length === 0 ||
+      householdCountDisplay.length === 0 ||
+      householdLabel.length === 0 ||
+      supportingLine.length === 0
+    ) {
+      findings.push({
+        severity: "blocking",
+        code: "CARD_RAIL_TEMPLATE_REQUIRED",
+        message: `${regionId} 缺少 household-equivalent 模板必填欄位`,
+        regionId
+      });
+    }
+  }
+}
+
+function validateCardRail(
+  findings: ValidationFinding[],
+  layoutRects: LayoutRect[],
+  regionId: string,
+  rail: {
+    cards: Array<{
+      contentSource: {
+        mode: string;
+        payload?: Record<string, unknown>;
+      };
+      frame: {
+        height: number;
+        left: number;
+        top: number;
+        width: number;
+      };
+      id: string;
+      template: string;
+      visible: boolean;
+    }>;
+    container: {
+      height: number;
+      left: number;
+      top: number;
+      width: number;
+    };
+  }
+) {
+  pushGeometryValidationFindings(findings, regionId, rail.container);
+  pushLayoutRect(layoutRects, regionId, rail.container);
+
+  for (const card of rail.cards) {
+    if (!card.visible) {
+      continue;
+    }
+
+    const cardRegionId = `${regionId}.cards.${card.id}`;
+    const { frame } = card;
+
+    if (frame.left < 0 || frame.top < 0 || frame.width <= 0 || frame.height <= 0) {
+      findings.push({
+        severity: "blocking",
+        code: "CARD_RAIL_OUT_OF_BOUNDS",
+        message: `${cardRegionId} 具有無效 frame`,
+        regionId: cardRegionId
+      });
+    }
+
+    if (
+      frame.left + frame.width > rail.container.width ||
+      frame.top + frame.height > rail.container.height
+    ) {
+      findings.push({
+        severity: "blocking",
+        code: "CARD_RAIL_OUT_OF_BOUNDS",
+        message: `${cardRegionId} 超出 rail 邊界`,
+        regionId: cardRegionId
+      });
+    }
+
+    validateCardRailContent(findings, cardRegionId, card);
+  }
+}
+
 function validateConfigDraft(regions: Record<string, unknown>): ValidationResult {
   const findings: ValidationFinding[] = [];
   const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
-  const layoutRects: Array<{
-    bottom: number;
-    height: number;
-    left: number;
-    regionId: string;
-    right: number;
-    top: number;
-    width: number;
-  }> = [];
+  const layoutRects: LayoutRect[] = [];
 
   if (placementIssues.length > 0) {
     findings.push(
@@ -178,6 +408,11 @@ function validateConfigDraft(regions: Record<string, unknown>): ValidationResult
   }
 
   for (const [regionId, value] of Object.entries(regions)) {
+    if (isDisplayPageCardRail(value)) {
+      validateCardRail(findings, layoutRects, regionId, value);
+      continue;
+    }
+
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const rect = value as Record<string, unknown>;
       const { left, top, width, height } = rect;
@@ -226,12 +461,9 @@ function validateConfigDraft(regions: Record<string, unknown>): ValidationResult
         nWidth > 0 &&
         nHeight > 0
       ) {
-        layoutRects.push({
-          bottom: nTop + nHeight,
+        pushLayoutRect(layoutRects, regionId, {
           height: nHeight,
           left: nLeft,
-          regionId,
-          right: nLeft + nWidth,
           top: nTop,
           width: nWidth
         });
