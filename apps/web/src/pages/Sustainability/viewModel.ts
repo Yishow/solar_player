@@ -193,6 +193,7 @@ export function buildSustainabilityViewModel({
       resolved.period.highlights.length > 0
         ? resolved.period.highlights
         : buildDerivedHighlights(resolved.period),
+    householdEquivalents: normalized.householdEquivalents,
     periodOptions: normalized.availablePeriods,
     provenance: resolved.period.provenance,
     selectedPeriod: resolved.selectedPeriod,

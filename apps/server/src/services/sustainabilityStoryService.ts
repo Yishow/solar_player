@@ -11,6 +11,7 @@ import {
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
 
 const settingKey = "sustainability_story";
 const treeEquivalentFactor = 2.6;
@@ -37,6 +38,7 @@ function roundTo(value: number, digits: number) {
 function defaultStory(): SustainabilityStoryInput {
   return {
     availablePeriods: ["month", "quarter", "year", "lifetime"],
+    householdEquivalents: {},
     modules: [
       {
         description: "內容整理中",
@@ -396,6 +398,7 @@ function mergePeriod(
 export function readSustainabilityStory(period?: SustainabilityPeriodKey) {
   const storyConfig = readStoredStory();
   const counterMap = readCounterSnapshots();
+  const householdEquivalents = readHouseholdEquivalenceCards();
   const derivedPeriods = Object.fromEntries(
     storyConfig.availablePeriods.map((periodKey) => [
       periodKey,
@@ -404,6 +407,7 @@ export function readSustainabilityStory(period?: SustainabilityPeriodKey) {
   ) as SustainabilityStoryInput["periods"];
   const story = normalizeSustainabilityStory({
     ...storyConfig,
+    householdEquivalents,
     periods: derivedPeriods
   });
   const resolved = resolveSustainabilityStoryPeriod(story, period);

@@ -31,4 +31,13 @@ test("all five display pages expose non-empty seed-backed editor config", () => 
   assert.equal(factoryCircuit.iconSources.nodes.solar.mode, "page-icon-key");
   assert.equal(sustainability.iconSources.statCards.esg.mode, "page-icon-key");
   assert.equal(sustainability.heroMedia.sourceMode, "seed-default");
+  assert.equal(sustainability.highlightRail.cards.length, 2);
+  assert.equal(sustainability.highlightRail.cards[0]?.template, "household-equivalent");
+  assert.equal(sustainability.highlightRail.cards[0]?.frame.left, 0);
+  assert.equal(
+    sustainability.highlightRail.cards[1]?.template === "household-equivalent"
+      ? sustainability.highlightRail.cards[1].contentSource.payload.householdLabel
+      : null,
+    "戶4口之家"
+  );
 });

@@ -1,5 +1,11 @@
 import type { SustainabilityPeriodKey } from "@solar-display/shared";
-import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import {
+  type DisplayPageHouseholdEquivalentCard,
+  type DisplayPageHouseholdEquivalentCardPayload,
+  resolveDisplayPageMediaSource,
+  type DisplayPageMetricHighlightCard,
+  type DisplayPageMetricHighlightCardPayload
+} from "@solar-display/shared";
 import { useMemo, useState } from "react";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
@@ -22,10 +28,12 @@ import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
+import { resolveDisplayPageCardRailCards } from "../shared/displayPageCardRailRenderer";
 import {
   createSustainabilityDisplayPageSeedConfig,
   type SustainabilityDisplayPageConfig
 } from "./displayPageConfig";
+import { resolveHouseholdEquivalentRuntimePayload } from "./householdEquivalentRuntime";
 import {
   sustainabilityAssetMap,
   sustainabilityCopyLayout,
@@ -68,6 +76,20 @@ const sustainabilityKpiOrder = [
 ] as const;
 
 const sustainabilityStatOrder = ["procure", "esg", "trees"] as const;
+
+type ResolvedHighlightCard =
+  | {
+      frame: DisplayPageMetricHighlightCard["frame"];
+      id: string;
+      kind: "metric-highlight";
+      payload: DisplayPageMetricHighlightCardPayload;
+    }
+  | {
+      frame: DisplayPageHouseholdEquivalentCard["frame"];
+      id: string;
+      kind: "household-equivalent";
+      payload: DisplayPageHouseholdEquivalentCardPayload;
+    };
 
 export function Sustainability({
   config,
@@ -115,6 +137,66 @@ export function Sustainability({
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const metricHighlightCards = resolvedConfig.highlightRail.cards.filter(
+    (card): card is DisplayPageMetricHighlightCard => card.template === "metric-highlight"
+  );
+  const householdCards = resolvedConfig.highlightRail.cards.filter(
+    (card): card is DisplayPageHouseholdEquivalentCard => card.template === "household-equivalent"
+  );
+  const highlightContentByCardId = new Map<string, DisplayPageMetricHighlightCardPayload>();
+  const householdContentByCardId = new Map<string, DisplayPageHouseholdEquivalentCardPayload>();
+  metricHighlightCards.forEach((card, index) => {
+    const runtimeItem = viewModel.highlights[index];
+    const fallbackPayload = card.contentSource.payload;
+
+    highlightContentByCardId.set(card.id, {
+      label: runtimeItem?.label ?? fallbackPayload.label,
+      provenance: runtimeItem?.provenance ?? fallbackPayload.provenance,
+      unit: runtimeItem?.unit ?? fallbackPayload.unit,
+      value: runtimeItem?.value ?? fallbackPayload.value
+    });
+  });
+  householdCards.forEach((card) => {
+    householdContentByCardId.set(
+      card.id,
+      resolveHouseholdEquivalentRuntimePayload(card, viewModel.householdEquivalents)
+    );
+  });
+  const resolvedHighlightCards = resolveDisplayPageCardRailCards<
+    {
+      highlightContentByCardId: Map<string, DisplayPageMetricHighlightCardPayload>;
+      householdContentByCardId: Map<string, DisplayPageHouseholdEquivalentCardPayload>;
+    },
+    ResolvedHighlightCard
+  >(
+    resolvedConfig.highlightRail,
+    {
+      highlightContentByCardId,
+      householdContentByCardId
+    },
+    {
+      "household-equivalent": (card, context) => {
+        const payload = context.householdContentByCardId.get(card.id) ?? card.contentSource.payload;
+
+        return {
+          frame: card.frame,
+          id: card.id,
+          kind: "household-equivalent" as const,
+          payload
+        };
+      },
+      "metric-highlight": (card, context) => {
+        const payload = context.highlightContentByCardId.get(card.id) ?? card.contentSource.payload;
+
+        return {
+          frame: card.frame,
+          id: card.id,
+          kind: "metric-highlight" as const,
+          payload
+        };
+      }
+    }
+  );
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
@@ -255,17 +337,37 @@ export function Sustainability({
           width: `${resolvedConfig.highlightRail.container.width}px`
         }}
       >
-        {resolvedConfig.highlightRail.items.slice(0, viewModel.highlights.length).map((seedItem, index) => {
-          const item = viewModel.highlights[index] ?? seedItem;
-
-          return (
-            <article key={`${item.label}-${item.unit}`} className="sustainability-highlight-item">
-              <strong>{item.value}</strong>
-              <span>{item.unit}</span>
-              <small>{item.label}</small>
-            </article>
-          );
-        })}
+        {resolvedHighlightCards.map((card) => (
+          <article
+            key={card.id}
+            className={
+              card.kind === "household-equivalent"
+                ? "sustainability-highlight-item sustainability-highlight-item-household"
+                : "sustainability-highlight-item"
+            }
+            style={{
+              height: `${card.frame.height}px`,
+              left: `${card.frame.left}px`,
+              top: `${card.frame.top}px`,
+              width: `${card.frame.width}px`
+            }}
+          >
+            {card.kind === "household-equivalent" ? (
+              <>
+                <small className="sustainability-household-eyebrow">{card.payload.eyebrow}</small>
+                <strong>{card.payload.householdCountDisplay}</strong>
+                <span>{card.payload.householdLabel}</span>
+                <small>{card.payload.supportingLine}</small>
+              </>
+            ) : (
+              <>
+                <strong>{card.payload.value}</strong>
+                <span>{card.payload.unit}</span>
+                <small>{card.payload.label}</small>
+              </>
+            )}
+          </article>
+        ))}
       </section>
 
       {viewModel.bigNumbers.map((item, index) => {

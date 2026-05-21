@@ -24,6 +24,25 @@ function seedSustainabilityCounters() {
 
 test("GET /api/sustainability-story derives periodized aggregates and exposes unavailable comparison provenance", async () => {
   seedSustainabilityCounters();
+  const today = "2026-05-21";
+  getDatabase().prepare("DELETE FROM daily_energy_summaries").run();
+  getDatabase()
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total,
+          peak_generation,
+          peak_generation_time,
+          peak_consumption,
+          peak_consumption_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
   const app = await buildApp();
 
   try {
@@ -35,6 +54,16 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       story: {
+        householdEquivalents: {
+          today: {
+            calcProfile?: {
+              label: string;
+            } | null;
+            derivedStatus: string;
+            disclaimer?: string;
+            householdCountDisplay: string;
+          };
+        };
         period: {
           bigNumberProvenance: {
             accumulatedGenerationGwh: {
@@ -66,6 +95,10 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     assert.match(body.story.period.comparison.label, /未提供|無法/);
     assert.equal(body.story.period.provenance.source, "cumulative-counters");
     assert.equal(body.story.period.provenance.syncState, "fresh");
+    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "18");
+    assert.equal(body.story.householdEquivalents.today.calcProfile?.label, "預設四口之家");
+    assert.equal(body.story.householdEquivalents.today.derivedStatus, "available");
+    assert.match(body.story.householdEquivalents.today.disclaimer ?? "", /估算/);
   } finally {
     await app.close();
   }
@@ -189,6 +222,7 @@ test("PUT /api/sustainability-story persists editorial modules without overridin
 test("GET /api/sustainability-story marks missing aggregate dependencies explicitly instead of returning silent fallback numbers", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
   const app = await buildApp();
 
   try {
@@ -200,6 +234,16 @@ test("GET /api/sustainability-story marks missing aggregate dependencies explici
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       story: {
+        householdEquivalents: {
+          cumulative: {
+            derivedStatus: string;
+            householdCountDisplay: string;
+          };
+          today: {
+            derivedStatus: string;
+            householdCountDisplay: string;
+          };
+        };
         period: {
           bigNumberProvenance: {
             accumulatedGenerationGwh: {
@@ -217,6 +261,10 @@ test("GET /api/sustainability-story marks missing aggregate dependencies explici
     assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, null);
     assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.sourceClass, "missing");
     assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.syncState, "missing");
+    assert.equal(body.story.householdEquivalents.today.derivedStatus, "unavailable");
+    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "--");
+    assert.equal(body.story.householdEquivalents.cumulative.derivedStatus, "unavailable");
+    assert.equal(body.story.householdEquivalents.cumulative.householdCountDisplay, "--");
   } finally {
     await app.close();
   }

@@ -20,6 +20,15 @@ export type SustainabilityStoryModuleType =
   | "esg-summary"
   | "milestone"
   | "project-outcome";
+import type {
+  HouseholdEquivalenceCard,
+  HouseholdEquivalenceCardInput,
+  HouseholdEquivalenceCardKey
+} from "./householdEquivalence.js";
+import {
+  createDefaultHouseholdEquivalenceCalcProfile,
+  createUnavailableHouseholdEquivalenceCard
+} from "./householdEquivalence.js";
 
 export type SustainabilityProvenance = {
   label: string;
@@ -83,6 +92,7 @@ export type SustainabilityPeriodStory = {
 
 export type SustainabilityStoryInput = {
   availablePeriods: SustainabilityPeriodKey[];
+  householdEquivalents?: Partial<Record<HouseholdEquivalenceCardKey, HouseholdEquivalenceCardInput>>;
   modules: SustainabilityStoryModuleInput[];
   periods: Partial<Record<SustainabilityPeriodKey, SustainabilityPeriodStoryInput>>;
   selectedPeriod?: SustainabilityPeriodKey;
@@ -99,6 +109,7 @@ export type SustainabilityStoryModule = {
 
 export type SustainabilityStory = {
   availablePeriods: SustainabilityPeriodKey[];
+  householdEquivalents: Record<HouseholdEquivalenceCardKey, HouseholdEquivalenceCard>;
   modules: SustainabilityStoryModule[];
   periods: Partial<Record<SustainabilityPeriodKey, SustainabilityPeriodStory>>;
   selectedPeriod: SustainabilityPeriodKey;
@@ -216,6 +227,47 @@ function normalizePeriodStory(input: SustainabilityPeriodStoryInput): Sustainabi
   };
 }
 
+function normalizeHouseholdEquivalents(
+  input: Partial<Record<HouseholdEquivalenceCardKey, HouseholdEquivalenceCardInput>> | undefined
+) {
+  const defaultCalcProfile = createDefaultHouseholdEquivalenceCalcProfile();
+
+  return {
+    cumulative: input?.cumulative
+      ? {
+          ...createUnavailableHouseholdEquivalenceCard("cumulative"),
+          ...input.cumulative,
+          calcProfile: input.cumulative.calcProfile
+            ? {
+                ...defaultCalcProfile,
+                ...input.cumulative.calcProfile
+              }
+            : defaultCalcProfile,
+          provenance: {
+            ...createUnavailableHouseholdEquivalenceCard("cumulative").provenance,
+            ...(input.cumulative.provenance ?? {})
+          }
+        }
+      : createUnavailableHouseholdEquivalenceCard("cumulative"),
+    today: input?.today
+      ? {
+          ...createUnavailableHouseholdEquivalenceCard("today"),
+          ...input.today,
+          calcProfile: input.today.calcProfile
+            ? {
+                ...defaultCalcProfile,
+                ...input.today.calcProfile
+              }
+            : defaultCalcProfile,
+          provenance: {
+            ...createUnavailableHouseholdEquivalenceCard("today").provenance,
+            ...(input.today.provenance ?? {})
+          }
+        }
+      : createUnavailableHouseholdEquivalenceCard("today")
+  } satisfies Record<HouseholdEquivalenceCardKey, HouseholdEquivalenceCard>;
+}
+
 export function normalizeSustainabilityStory(input: SustainabilityStoryInput) {
   const availablePeriods = input.availablePeriods.filter((period) =>
     sustainabilityPeriodKeys.includes(period)
@@ -226,6 +278,7 @@ export function normalizeSustainabilityStory(input: SustainabilityStoryInput) {
 
   return {
     availablePeriods,
+    householdEquivalents: normalizeHouseholdEquivalents(input.householdEquivalents),
     modules: input.modules.map((module) => ({
       bullets: (module.bullets ?? []).filter(
         (bullet): bullet is string => Boolean(bullet?.trim())

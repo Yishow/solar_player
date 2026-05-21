@@ -1,4 +1,14 @@
-import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type {
+  DisplayPageCardRail,
+  DisplayPageCardRailFrame,
+  DisplayPageHouseholdEquivalentCardPayload,
+  DisplayPageMediaBinding
+} from "@solar-display/shared";
+import {
+  createDefaultHouseholdEquivalenceCalcProfile,
+  createMetricHighlightCard,
+  createUnavailableHouseholdEquivalenceCard
+} from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
   buildDisplayCardStyleFields,
@@ -61,14 +71,7 @@ export type SustainabilityDisplayPageConfig = {
     title: [string, string];
   };
   heroMedia: SustainabilityDisplayRect & DisplayPageMediaBinding;
-  highlightRail: {
-    container: SustainabilityDisplayRect;
-    items: Array<{
-      label: string;
-      unit: string;
-      value: string;
-    }>;
-  };
+  highlightRail: DisplayPageCardRail;
   iconSources: {
     kpiCards: Record<"annualSaving" | "totalCo2" | "totalGeneration", DisplayPageIconSource>;
     statCards: Record<"esg" | "procure" | "trees", DisplayPageIconSource>;
@@ -81,6 +84,26 @@ export function createSustainabilityDisplayPageSeedConfig(
   heroSrc = "/brand-logo.png",
   heroAlt = "國瑞汽車永續成果場域"
 ): SustainabilityDisplayPageConfig {
+  const highlightRailContainer = {
+    ...sustainabilityHighlightRailLayout
+  } satisfies DisplayPageCardRailFrame;
+
+  const highlightCardFrames: DisplayPageCardRailFrame[] = [
+    { height: 108, left: 0, top: 0, width: 229 },
+    { height: 108, left: 241, top: 0, width: 229 }
+  ];
+  const calcProfile = createDefaultHouseholdEquivalenceCalcProfile();
+  const householdFallbacks: DisplayPageHouseholdEquivalentCardPayload[] = [
+    {
+      ...createUnavailableHouseholdEquivalenceCard("today"),
+      calcProfile
+    },
+    {
+      ...createUnavailableHouseholdEquivalenceCard("cumulative"),
+      calcProfile
+    }
+  ];
+
   return {
     cardStyles: {
       annualSaving: createDisplayCardStyleConfig({
@@ -166,13 +189,33 @@ export function createSustainabilityDisplayPageSeedConfig(
       src: heroSrc
     },
     highlightRail: {
-      container: { ...sustainabilityHighlightRailLayout },
-      items: [
-        { label: "本月減碳", unit: "tCO₂e", value: "38.4" },
-        { label: "年度節電", unit: "MWh", value: "214" },
-        { label: "綠電自用", unit: "%", value: "71" },
-        { label: "等效植樹", unit: "株", value: "25,600" }
-      ]
+      cards: [
+        {
+          contentSource: {
+            mode: "static",
+            payload: householdFallbacks[0]!
+          },
+          displayOrder: 1,
+          frame: highlightCardFrames[0]!,
+          id: "household-today",
+          stylePreset: null,
+          template: "household-equivalent",
+          visible: true
+        },
+        {
+          contentSource: {
+            mode: "static",
+            payload: householdFallbacks[1]!
+          },
+          displayOrder: 2,
+          frame: highlightCardFrames[1]!,
+          id: "household-cumulative",
+          stylePreset: null,
+          template: "household-equivalent",
+          visible: true
+        }
+      ],
+      container: highlightRailContainer
     },
     iconSources: {
       kpiCards: {
@@ -302,7 +345,11 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
   {
     id: "sustainability-highlight-rail",
     label: "Sustainability Highlight Rail",
-    description: "調整 highlight rail 容器與四個 highlight 文案。",
+    description: "調整 highlight rail 容器與 template-tagged cards。",
+    childSource: {
+      cardsPath: ["highlightRail", "cards"],
+      type: "card-rail"
+    },
     geometry: {
       compatibilityKey: "sustainability-highlight-geometry",
       heightPath: ["highlightRail", "container", "height"],
@@ -318,19 +365,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       { constraints: { min: 0 }, fieldType: "number", id: "highlight-left", label: "Left", path: ["highlightRail", "container", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "highlight-top", label: "Top", path: ["highlightRail", "container", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "highlight-width", label: "Width", path: ["highlightRail", "container", "width"] },
-      { constraints: { min: 0 }, fieldType: "number", id: "highlight-height", label: "Height", path: ["highlightRail", "container", "height"] },
-      {
-        fieldType: "array",
-        id: "highlight-items",
-        itemFields: [
-          { fieldType: "text", id: "label", label: "Label", path: ["label"] },
-          { fieldType: "text", id: "value", label: "Value", path: ["value"] },
-          { fieldType: "text", id: "unit", label: "Unit", path: ["unit"] }
-        ],
-        itemLabel: "Highlight Item",
-        label: "Highlight Items",
-        path: ["highlightRail", "items"]
-      }
+      { constraints: { min: 0 }, fieldType: "number", id: "highlight-height", label: "Height", path: ["highlightRail", "container", "height"] }
     ],
     presetKey: "sustainability-highlight"
   },

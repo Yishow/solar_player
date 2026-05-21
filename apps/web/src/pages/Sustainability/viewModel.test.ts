@@ -5,6 +5,48 @@ import { buildSustainabilityViewModel } from "./viewModel";
 
 const periodStory: SustainabilityStoryInput = {
   availablePeriods: ["month", "quarter", "year", "lifetime"],
+  householdEquivalents: {
+    cumulative: {
+      basisSourceLabel: "累積自發自用量",
+      calcProfile: {
+        id: "default-four-person",
+        label: "預設四口之家"
+      },
+      derivedStatus: "available",
+      disclaimer: "依四口之家平均用電與估算電價換算",
+      eyebrow: "累積綠能成果",
+      householdCountDisplay: "35",
+      householdLabel: "戶4口之家",
+      provenance: {
+        label: "累積自發自用量",
+        source: "cumulative-self-consumption",
+        sourceClass: "derived-metric",
+        syncState: "fresh",
+        updatedAt: "2026-05-21T10:00:00.000Z"
+      },
+      supportingLine: "約相當於一個月電費"
+    },
+    today: {
+      basisSourceLabel: "今日自發自用量",
+      calcProfile: {
+        id: "default-four-person",
+        label: "預設四口之家"
+      },
+      derivedStatus: "available",
+      disclaimer: "依四口之家平均用電與估算電價換算",
+      eyebrow: "今日綠電效益",
+      householdCountDisplay: "18",
+      householdLabel: "戶4口之家",
+      provenance: {
+        label: "今日自發自用量",
+        source: "daily-self-consumption",
+        sourceClass: "derived-metric",
+        syncState: "fresh",
+        updatedAt: "2026-05-21T10:00:00.000Z"
+      },
+      supportingLine: "約可折抵一日電費"
+    }
+  },
   modules: [
     {
       description: "2026 年綠色採購聚焦低碳供應鏈",
@@ -214,6 +256,9 @@ test("buildSustainabilityViewModel preserves runtime module content and provenan
   assert.equal(model.esgCards[1]?.provenance.sourceClass, "manual-module");
   assert.equal(model.esgCards[0] && "value" in model.esgCards[0] ? model.esgCards[0].value : null, null);
   assert.deepEqual(model.storyModules[1]?.bullets, ["導入再生能源", "供應鏈碳管理"]);
+  assert.equal(model.householdEquivalents.today.householdCountDisplay, "18");
+  assert.equal(model.householdEquivalents.today.calcProfile?.label, "預設四口之家");
+  assert.match(model.householdEquivalents.today.disclaimer ?? "", /估算電價/);
 });
 
 test("buildSustainabilityViewModel marks missing editorial and aggregate data explicitly instead of using silent mocks", () => {
@@ -256,4 +301,23 @@ test("buildSustainabilityViewModel marks missing editorial and aggregate data ex
   assert.equal(model.esgCards[0]?.provenance.sourceClass, "missing");
   assert.equal(model.esgCards[1]?.provenance.sourceClass, "missing");
   assert.equal(model.esgCards[0] && "items" in model.esgCards[0] ? model.esgCards[0].items[0] : null, "模組未提供");
+  assert.equal(model.householdEquivalents.today.derivedStatus, "unavailable");
+  assert.equal(model.householdEquivalents.today.householdCountDisplay, "--");
+  assert.equal(model.householdEquivalents.cumulative.derivedStatus, "unavailable");
+});
+
+test("buildSustainabilityViewModel keeps four compatibility highlight slots when explicit runtime highlights are absent", () => {
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "year",
+    story: periodStory
+  });
+
+  assert.deepEqual(
+    model.highlights.map((item) => item.label),
+    ["累積發電", "累積減碳", "節能成效", "植樹等效"]
+  );
+  assert.deepEqual(
+    model.highlights.map((item) => item.unit),
+    ["GWh", "tCO₂e", "%", "株"]
+  );
 });

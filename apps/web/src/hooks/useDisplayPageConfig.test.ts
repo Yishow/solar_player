@@ -130,6 +130,140 @@ test("mergeDisplayPageConfig keeps hero content and geometry untouched during pa
   assert.deepEqual(merged.statCards.procure, seedConfig.statCards.procure);
 });
 
+test("mergeDisplayPageConfig preserves template-tagged highlight rail cards with independent frames", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    highlightRail: {
+      cards: [
+        {
+          contentSource: {
+            mode: "static",
+            payload: {
+              basisSourceLabel: "今日自發自用量",
+              calcProfile: {
+                id: "default-four-person",
+                label: "預設四口之家"
+              },
+              derivedStatus: "available",
+              disclaimer: "依四口之家平均用電與估算電價換算",
+              eyebrow: "今日綠電效益",
+              householdCountDisplay: "18",
+              householdLabel: "戶4口之家",
+              provenance: {
+                label: "今日自發自用量",
+                source: "daily-self-consumption",
+                sourceClass: "derived-metric",
+                syncState: "fresh",
+                updatedAt: "2026-05-21T10:00:00.000Z"
+              },
+              supportingLine: "約可折抵一日電費"
+            }
+          },
+          displayOrder: 2,
+          frame: {
+            height: 108,
+            left: 241,
+            top: 0,
+            width: 229
+          },
+          id: "household-cumulative",
+          template: "household-equivalent",
+          visible: true
+        }
+      ],
+      container: {
+        height: 108,
+        left: 68,
+        top: 578,
+        width: 470
+      }
+    }
+  });
+
+  assert.equal(merged.highlightRail.container.left, 68);
+  assert.equal(merged.highlightRail.cards.length, 1);
+  assert.equal(merged.highlightRail.cards[0]?.id, "household-cumulative");
+  assert.equal(merged.highlightRail.cards[0]?.template, "household-equivalent");
+  assert.equal(merged.highlightRail.cards[0]?.frame.left, 241);
+  assert.equal(merged.highlightRail.cards[0]?.contentSource.mode, "static");
+  assert.equal(
+    merged.highlightRail.cards[0]?.template === "household-equivalent"
+      ? merged.highlightRail.cards[0].contentSource.payload.householdLabel
+      : null,
+    "戶4口之家"
+  );
+});
+
+test("mergeDisplayPageConfig preserves newly added rail cards instead of truncating them back to the seed length", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    highlightRail: {
+      cards: [
+        ...seedConfig.highlightRail.cards,
+        {
+          contentSource: {
+            mode: "static",
+            payload: {
+              label: "新增指標",
+              unit: "kWh",
+              value: "--"
+            }
+          },
+          displayOrder: 3,
+          frame: {
+            height: 108,
+            left: 120,
+            top: 0,
+            width: 160
+          },
+          id: "metric-highlight-copy-1",
+          template: "metric-highlight",
+          visible: true
+        }
+      ],
+      container: seedConfig.highlightRail.container
+    }
+  });
+
+  assert.equal(merged.highlightRail.cards.length, 3);
+  assert.equal(merged.highlightRail.cards[2]?.id, "metric-highlight-copy-1");
+  assert.equal(merged.highlightRail.cards[2]?.template, "metric-highlight");
+});
+
+test("mergeDisplayPageConfig upgrades legacy highlight items into metric-highlight cards", () => {
+  const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    highlightRail: {
+      container: {
+        height: 108,
+        left: 68,
+        top: 578,
+        width: 470
+      },
+      items: [
+        { label: "本月減碳", unit: "tCO₂e", value: "38.4" },
+        { label: "年度節電", unit: "MWh", value: "214" }
+      ]
+    }
+  });
+
+  assert.equal(merged.highlightRail.cards.length, 2);
+  assert.equal(merged.highlightRail.cards[0]?.template, "metric-highlight");
+  assert.equal(
+    merged.highlightRail.cards[0]?.template === "metric-highlight"
+      ? merged.highlightRail.cards[0].contentSource.payload.value
+      : null,
+    "38.4"
+  );
+  assert.equal(
+    merged.highlightRail.cards[1]?.template === "metric-highlight"
+      ? merged.highlightRail.cards[1].contentSource.payload.label
+      : null,
+    "年度節電"
+  );
+  assert.equal("items" in merged.highlightRail, false);
+});
+
 test("resolveDisplayPageConfigForPage falls back to seed config while the next page is still loading", () => {
   const overviewSeed = {
     heroContainer: {

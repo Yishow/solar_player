@@ -121,12 +121,11 @@
 
 .sustainability-highlight-rail {
   z-index: 11;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  position: relative;
 }
 
 .sustainability-highlight-item {
+  position: absolute;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -135,6 +134,15 @@
   background: rgba(255, 253, 247, 0.88);
   box-shadow: 0 12px 24px rgba(96, 81, 56, 0.08);
   padding: 14px 16px;
+}
+
+.sustainability-highlight-item-household {
+  align-items: center;
+  text-align: center;
+}
+
+.sustainability-household-eyebrow {
+  margin-top: 0;
 }
 
 .sustainability-highlight-item strong {
