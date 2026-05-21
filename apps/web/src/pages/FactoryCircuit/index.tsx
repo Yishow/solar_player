@@ -1,5 +1,5 @@
 import type { CircuitConfig } from "@solar-display/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -7,6 +7,7 @@ import {
   shouldDeferDisplayPageRuntimeRender,
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
+import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { trendSeries } from "../../mocks/metrics";
@@ -24,6 +25,7 @@ import {
   factoryCircuitLeafLayout,
   factoryCircuitTitleLayout
 } from "./layout";
+import { resolveDisplayPageRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
 import "./factoryCircuit.css";
 import {
   buildFactoryCircuitRuntimes,
@@ -76,36 +78,61 @@ export function FactoryCircuit({
   });
   const [circuits, setCircuits] = useState<FactoryCircuitRuntime[]>([]);
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
+  const circuitsRef = useRef<FactoryCircuitRuntime[]>([]);
+  const requestIdRef = useRef(0);
+  const loadCircuitsRef = useRef<(mode: "bootstrap" | "refresh") => Promise<void>>(async () => {});
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let active = true;
+    circuitsRef.current = circuits;
+  }, [circuits]);
 
-    const load = async () => {
-      try {
-        const data = await requestJson<{ success: boolean; data: CircuitConfig[] }>("/api/circuits");
+  const factoryCircuitRefreshSpec = useMemo(
+    () => resolveDisplayPageRuntimeRefreshSpec("factory-circuit"),
+    []
+  );
 
-        if (!active) {
-          return;
-        }
+  loadCircuitsRef.current = async (mode) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
-        setCircuits(buildFactoryCircuitRuntimes(data.data));
-        setLoadState("ready");
-      } catch {
-        if (!active) {
-          return;
-        }
+    if (mode === "bootstrap" && circuitsRef.current.length === 0) {
+      setLoadState("loading");
+    }
 
-        setCircuits([]);
-        setLoadState("error");
+    try {
+      const data = await requestJson<{ success: boolean; data: CircuitConfig[] }>("/api/circuits");
+
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
       }
-    };
 
-    void load();
+      setCircuits(buildFactoryCircuitRuntimes(data.data));
+      setLoadState("ready");
+    } catch {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setLoadState("error");
+    }
+  };
+
+  useEffect(() => {
+    void loadCircuitsRef.current("bootstrap");
 
     return () => {
-      active = false;
+      mountedRef.current = false;
+      requestIdRef.current += 1;
     };
   }, []);
+
+  useDisplaySyncRefresh(
+    async () => {
+      await loadCircuitsRef.current("refresh");
+    },
+    factoryCircuitRefreshSpec.fallbackRefreshScopes
+  );
   const circuitDependencyKey = useMemo(
     () =>
       circuits

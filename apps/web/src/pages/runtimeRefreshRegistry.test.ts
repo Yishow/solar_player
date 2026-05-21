@@ -39,6 +39,10 @@ test("runtime refresh registry derives stable refresh keys from page-specific pa
 
 test("runtime refresh registry assigns dedicated refresh scopes for sustainability and monitoring history", () => {
   assert.deepEqual(
+    resolveDisplayPageRuntimeRefreshSpec("factory-circuit").fallbackRefreshScopes,
+    ["circuits", "display-pages"]
+  );
+  assert.deepEqual(
     resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "lifetime" }).refreshScopes,
     ["sustainability"]
   );

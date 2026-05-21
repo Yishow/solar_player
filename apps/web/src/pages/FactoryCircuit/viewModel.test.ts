@@ -316,3 +316,26 @@ test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitSto
   assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
   assert.equal(model.summary.statusLabel, "部分迴路尚未回報即時功率");
 });
+
+test("buildFactoryCircuitViewModel keeps the last settled fallback rows visible when refresh fails", () => {
+  const runtimes = buildFactoryCircuitRuntimes(circuitConfigs).map((circuit) =>
+    circuit.id === 1
+      ? { ...circuit, livePowerKw: 520 }
+      : circuit.id === 2
+        ? { ...circuit, livePowerKw: 310 }
+        : circuit
+  );
+  const model = buildFactoryCircuitViewModel({
+    circuits: runtimes,
+    connectionState: "connected",
+    loadState: "error",
+    snapshot
+  });
+
+  assert.equal(model.emptyState, null);
+  assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
+  assert.equal(model.loadRows[0]?.isEmpty, false);
+  assert.equal(model.loadRows[0]?.livePowerKw, 520);
+  assert.equal(model.loadRows[1]?.labelZh, "空調與環境設備");
+  assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
+});

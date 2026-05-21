@@ -19,6 +19,7 @@ type RuntimeRefreshRegistryContext = {
 };
 
 type RuntimeRefreshRegistryEntry = {
+  fallbackRefreshScopes?: DisplaySyncEventScope[];
   sourceKind: DisplayPageRuntimeSourceKind;
   refreshKey: (context: RuntimeRefreshRegistryContext) => string;
   refreshScopes: DisplaySyncEventScope[];
@@ -26,6 +27,7 @@ type RuntimeRefreshRegistryEntry = {
 
 const runtimeRefreshRegistry: Record<DisplayPageKey, RuntimeRefreshRegistryEntry> = {
   "factory-circuit": {
+    fallbackRefreshScopes: ["circuits", "display-pages"],
     refreshKey: (context) =>
       context.dependencyKey ? `factory-circuit:${context.dependencyKey}` : "factory-circuit",
     refreshScopes: ["circuits", "display-pages", "mqtt"],
@@ -60,6 +62,7 @@ export function resolveDisplayPageRuntimeRefreshSpec(
   const entry = runtimeRefreshRegistry[pageKey];
 
   return {
+    fallbackRefreshScopes: entry.fallbackRefreshScopes ?? entry.refreshScopes,
     pageKey,
     refreshKey: entry.refreshKey(context),
     refreshScopes: entry.refreshScopes,
