@@ -1,31 +1,16 @@
-import type { DisplayStoryPayload } from "../services/api";
-import { fetchDisplayStory } from "../services/api";
+import type { DisplayStoryPageId, DisplayStoryPayloadByPageId } from "@solar-display/shared";
+import { fetchDisplayStoryPage } from "../services/api";
 import { resolveDisplayPageRuntimeRefreshSpec } from "../pages/runtimeRefreshRegistry";
 import { useRuntimeRefreshLifecycle } from "./useRuntimeRefreshLifecycle";
 
-type DisplayStoryPageKey = "overview" | "solar" | "factory-circuit";
-type DisplayStoryPayloadByPageKey = {
-  "factory-circuit": DisplayStoryPayload["factoryCircuit"];
-  overview: DisplayStoryPayload["overview"];
-  solar: DisplayStoryPayload["solar"];
-};
-
-function readDisplayStoryPagePayload<PageKey extends DisplayStoryPageKey>(
-  story: DisplayStoryPayload,
+export async function loadDisplayStoryRuntimePayload<PageKey extends DisplayStoryPageId>(
   pageKey: PageKey
-): DisplayStoryPayloadByPageKey[PageKey] {
-  switch (pageKey) {
-    case "factory-circuit":
-      return story.factoryCircuit as DisplayStoryPayloadByPageKey[PageKey];
-    case "solar":
-      return story.solar as DisplayStoryPayloadByPageKey[PageKey];
-    case "overview":
-    default:
-      return story.overview as DisplayStoryPayloadByPageKey[PageKey];
-  }
+) {
+  const response = await fetchDisplayStoryPage(pageKey);
+  return response.payload as DisplayStoryPayloadByPageId[PageKey];
 }
 
-export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageKey>(
+export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageId>(
   pageKey: PageKey,
   options?: {
     dependencyKey?: string | null;
@@ -36,12 +21,9 @@ export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageKey>(
     dependencyKey: options?.dependencyKey
   });
 
-  return useRuntimeRefreshLifecycle<DisplayStoryPayloadByPageKey[PageKey]>({
+  return useRuntimeRefreshLifecycle<DisplayStoryPayloadByPageId[PageKey]>({
     enabled: options?.enabled ?? true,
-    load: async () => {
-      const story = await fetchDisplayStory();
-      return readDisplayStoryPagePayload(story, pageKey);
-    },
+    load: () => loadDisplayStoryRuntimePayload(pageKey),
     refreshKey: spec.refreshKey,
     shouldRefresh: (event) => spec.refreshScopes.includes(event.scope)
   });

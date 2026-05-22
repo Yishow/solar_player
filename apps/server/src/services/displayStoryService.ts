@@ -1,9 +1,14 @@
 import type {
+  DisplayStoryPageId,
+  DisplayStoryPagePayload,
+  DisplayStoryPayload,
+  DisplayStoryPayloadByPageId,
   DisplayCircuitSlotKey,
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload,
   MonitoringMetricBinding,
   MonitoringStoryState,
+  OverviewStoryPayload,
   SolarComparisonTarget
 } from "@solar-display/shared";
 import {
@@ -158,6 +163,14 @@ const slotOrder: DisplayCircuitSlotKey[] = [
   "ev",
   "infrastructure"
 ];
+
+type DisplayStorySourceContext = {
+  circuits: CircuitRow[];
+  flowState: ReturnType<typeof resolveSolarFlowState>;
+  generatedAt: string;
+  isConnected: boolean;
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
+};
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
@@ -563,29 +576,78 @@ function resolveFactoryCircuitKpis(args: {
   return [totalPower, solarShare, selfConsumptionKpi, peak, flow];
 }
 
-export function readDisplayStory() {
+function createDisplayStorySourceContext(): DisplayStorySourceContext {
   const snapshot = readLiveMetricsSnapshot();
   const isConnected = snapshot.timestamp !== null;
+  const power = snapshot.metrics.realTimePower?.value ?? null;
+  const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
+
+  return {
+    circuits: readCircuits().filter((circuit) => toBoolean(circuit.enabled)),
+    flowState: resolveSolarFlowState({
+      efficiencyPercent: isConnected ? efficiency : null,
+      isConnected,
+      powerKw: isConnected ? power : null
+    }),
+    generatedAt: new Date().toISOString(),
+    isConnected,
+    snapshot
+  };
+}
+
+export function readOverviewDisplayStory(
+  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+): OverviewStoryPayload {
   const overview = overviewMetrics.map((binding) =>
     resolveMonitoringMetricBinding({
       binding,
-      isConnected,
-      now: snapshot.timestamp ?? undefined,
-      reading: snapshot.metrics[binding.metricKey] ?? null
+      isConnected: context.isConnected,
+      now: context.snapshot.timestamp ?? undefined,
+      reading: context.snapshot.metrics[binding.metricKey] ?? null
     })
   );
-  const power = snapshot.metrics.realTimePower?.value ?? null;
-  const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
-  const flowState = resolveSolarFlowState({
-    efficiencyPercent: isConnected ? efficiency : null,
-    isConnected,
-    powerKw: isConnected ? power : null
-  });
-  const circuits = readCircuits().filter((circuit) => toBoolean(circuit.enabled));
+
+  return {
+    metrics: overview,
+    summary: resolveMonitoringSummaryState(overview)
+  };
+}
+
+export function readSolarDisplayStory(
+  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+): DisplayStoryPayload["solar"] {
+  return {
+    kpis: solarKpis.map((binding) => {
+      const resolved = resolveSolarKpiBinding({
+        binding,
+        isConnected: context.isConnected,
+        now: context.snapshot.timestamp ?? undefined,
+        snapshot: context.snapshot
+      });
+      return {
+        ...resolved,
+        comparison: resolveSolarComparison({
+          actualUnit: resolved.unit,
+          actualValue: context.isConnected
+            ? context.snapshot.metrics[binding.metricKey]?.value ?? null
+            : null,
+          target: solarTargets[binding.metricKey]
+        })
+      };
+    }),
+    story: {
+      flowState: context.flowState
+    }
+  };
+}
+
+export function readFactoryCircuitDisplayStory(
+  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+): FactoryCircuitStoryPayload {
   const slotStates: MonitoringStoryState[] = [];
 
   const factorySlots = slotOrder.map((slotKey) => {
-    const matches = circuits.filter((circuit) => circuit.display_slot === slotKey);
+    const matches = context.circuits.filter((circuit) => circuit.display_slot === slotKey);
     const binding = resolveMonitoringSlotBinding({
       circuitId: matches.length === 1 ? matches[0]!.id : null,
       conflictingCircuitIds: matches.map((circuit) => circuit.id),
@@ -593,7 +655,7 @@ export function readDisplayStory() {
     });
     const circuit = matches.length === 1 ? matches[0]! : null;
     const metricKey = slotMetricMap[slotKey];
-    const reading = metricKey ? snapshot.metrics[metricKey] ?? null : null;
+    const reading = metricKey ? context.snapshot.metrics[metricKey] ?? null : null;
     const state =
       binding.bindingState !== "bound"
         ? ({
@@ -605,10 +667,10 @@ export function readDisplayStory() {
         : (() => {
             const readingState = resolveFactoryMetricBinding({
               dependencyKeys: [metricKey],
-              isConnected,
+              isConnected: context.isConnected,
               label: circuit?.name_zh ?? circuit?.name_en ?? slotKey,
               metricKey,
-              now: snapshot.timestamp ?? undefined,
+              now: context.snapshot.timestamp ?? undefined,
               reading,
               unit: "kW"
             });
@@ -653,41 +715,48 @@ export function readDisplayStory() {
   const factorySummary = resolveMonitoringSummaryState(slotStates);
 
   return {
-    factoryCircuit: {
-      kpis: resolveFactoryCircuitKpis({
-        isConnected,
-        slots: factorySlots,
-        snapshot,
-        summary: factorySummary
-      }),
+    kpis: resolveFactoryCircuitKpis({
+      isConnected: context.isConnected,
       slots: factorySlots,
+      snapshot: context.snapshot,
       summary: factorySummary
-    },
-    generatedAt: new Date().toISOString(),
-    overview: {
-      metrics: overview,
-      summary: resolveMonitoringSummaryState(overview)
-    },
-    solar: {
-      kpis: solarKpis.map((binding) => {
-        const resolved = resolveSolarKpiBinding({
-          binding,
-          isConnected,
-          now: snapshot.timestamp ?? undefined,
-          snapshot
-        });
-        return {
-          ...resolved,
-          comparison: resolveSolarComparison({
-            actualUnit: resolved.unit,
-            actualValue: isConnected ? snapshot.metrics[binding.metricKey]?.value ?? null : null,
-            target: solarTargets[binding.metricKey]
-          })
-        };
-      }),
-      story: {
-        flowState
-      }
-    }
+    }),
+    slots: factorySlots,
+    summary: factorySummary
+  };
+}
+
+export function readDisplayStoryPages(
+  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+): DisplayStoryPayloadByPageId {
+  return {
+    "factory-circuit": readFactoryCircuitDisplayStory(context),
+    overview: readOverviewDisplayStory(context),
+    solar: readSolarDisplayStory(context)
+  };
+}
+
+export function readDisplayStoryPage<PageId extends DisplayStoryPageId>(
+  pageId: PageId,
+  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+): DisplayStoryPagePayload<PageId> {
+  const pages = readDisplayStoryPages(context);
+
+  return {
+    generatedAt: context.generatedAt,
+    pageId,
+    payload: pages[pageId]
+  };
+}
+
+export function readDisplayStory(): DisplayStoryPayload {
+  const context = createDisplayStorySourceContext();
+  const pages = readDisplayStoryPages(context);
+
+  return {
+    factoryCircuit: pages["factory-circuit"],
+    generatedAt: context.generatedAt,
+    overview: pages.overview,
+    solar: pages.solar
   };
 }

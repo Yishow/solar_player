@@ -5,7 +5,7 @@ import {
   getDatabase
 } from "./display-pages-asset-governance.test-support.js";
 
-test("GET /api/display-story exposes monitoring semantics for overview, solar, and factory slots", async () => {
+function seedDisplayStoryFixture() {
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
   database
@@ -118,6 +118,10 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       "UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?"
     )
     .run("factory/power/hvac");
+}
+
+test("GET /api/display-story exposes monitoring semantics for overview, solar, and factory slots", async () => {
+  seedDisplayStoryFixture();
 
   const app = await buildApp();
 
@@ -229,6 +233,124 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(selfConsumptionKpi.provenance, "live");
     assert.equal(selfConsumptionKpi.sourceClass, "mqtt-live");
     assert.equal(selfConsumptionKpi.value, "30.0");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story/:pageId returns only the requested page payload wrapper", async () => {
+  seedDisplayStoryFixture();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/overview"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      generatedAt: string;
+      pageId: string;
+      payload: {
+        metrics: Array<{
+          metricKey: string;
+        }>;
+        summary: {
+          bindingState: string;
+        };
+      };
+      solar?: unknown;
+      factoryCircuit?: unknown;
+      overview?: unknown;
+    };
+
+    assert.equal(body.pageId, "overview");
+    assert.equal(typeof body.generatedAt, "string");
+    assert.equal(body.payload.summary.bindingState, "bound");
+    assert.equal(body.payload.metrics.some((metric) => metric.metricKey === "totalGeneration"), true);
+    assert.equal("overview" in body, false);
+    assert.equal("solar" in body, false);
+    assert.equal("factoryCircuit" in body, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story/:pageId rejects unsupported monitoring pages", async () => {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/images"
+    });
+
+    assert.equal(response.statusCode, 404);
+    assert.deepEqual(response.json(), {
+      error: "Unsupported display story page: images",
+      success: false,
+      timestamp: response.json().timestamp
+    });
+    assert.equal(typeof response.json().timestamp, "string");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story remains compatible with page-scoped readers during migration", async () => {
+  seedDisplayStoryFixture();
+
+  const app = await buildApp();
+
+  try {
+    const aggregateResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story"
+    });
+    const overviewResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story/overview"
+    });
+    const solarResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story/solar"
+    });
+    const factoryResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+
+    assert.equal(aggregateResponse.statusCode, 200);
+    assert.equal(overviewResponse.statusCode, 200);
+    assert.equal(solarResponse.statusCode, 200);
+    assert.equal(factoryResponse.statusCode, 200);
+
+    const aggregateBody = aggregateResponse.json() as {
+      factoryCircuit: unknown;
+      overview: unknown;
+      solar: unknown;
+    };
+    const overviewBody = overviewResponse.json() as {
+      pageId: string;
+      payload: unknown;
+    };
+    const solarBody = solarResponse.json() as {
+      pageId: string;
+      payload: unknown;
+    };
+    const factoryBody = factoryResponse.json() as {
+      pageId: string;
+      payload: unknown;
+    };
+
+    assert.equal(overviewBody.pageId, "overview");
+    assert.equal(solarBody.pageId, "solar");
+    assert.equal(factoryBody.pageId, "factory-circuit");
+    assert.deepEqual(overviewBody.payload, aggregateBody.overview);
+    assert.deepEqual(solarBody.payload, aggregateBody.solar);
+    assert.deepEqual(factoryBody.payload, aggregateBody.factoryCircuit);
   } finally {
     await app.close();
   }

@@ -3,6 +3,9 @@ import type {
   ConfigStage,
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
+  DisplayStoryPageId,
+  DisplayStoryPagePayload,
+  DisplayStoryPayload,
   DisplayPageInstance,
   DisplayOpsAssetReferenceSummary,
   DisplayOpsSummary,
@@ -12,22 +15,14 @@ import type {
   DisplayPageConfigEnvelope,
   DisplayPageId,
   DisplayReadinessReport,
-  FactoryCircuitStoryPayload,
   ImageAsset,
-  MonitoringAlertTone,
-  MonitoringBindingState,
   ManagementDraftSaveConflict,
   ManagementDraftSavePrecondition,
-  MonitoringFallbackReason,
-  MonitoringFreshnessState,
   MonitoringMetricBinding,
-  ResolvedMonitoringMetricBinding,
   PlaybackPage,
   PlaybackSettings,
   ImagePlaylistEntryInput,
   ResolvedImagePlaylistEntry,
-  SolarComparisonState,
-  SolarFlowStoryState,
   SustainabilityPeriodKey,
   SustainabilityPeriodStory,
   SustainabilityStory,
@@ -352,30 +347,12 @@ export async function getDisplayReadiness() {
   return response.readiness;
 }
 
-export type DisplayStoryPayload = {
-  factoryCircuit: FactoryCircuitStoryPayload;
-  generatedAt: string;
-  overview: {
-    metrics: Array<ResolvedMonitoringMetricBinding<string>>;
-    summary: {
-      alertTone: MonitoringAlertTone;
-      bindingState: MonitoringBindingState;
-      fallbackReason: MonitoringFallbackReason | null;
-      freshnessState: MonitoringFreshnessState;
-    };
-  };
-  solar: {
-    kpis: Array<ResolvedMonitoringMetricBinding<string> & {
-      comparison: SolarComparisonState;
-    }>;
-    story: {
-      flowState: SolarFlowStoryState;
-    };
-  };
-};
-
 export async function fetchDisplayStory() {
   return requestJson<DisplayStoryPayload>("/api/display-story");
+}
+
+export async function fetchDisplayStoryPage<PageId extends DisplayStoryPageId>(pageId: PageId) {
+  return requestJson<DisplayStoryPagePayload<PageId>>(`/api/display-story/${pageId}`);
 }
 
 export async function fetchImagePlaylist(activeIndex = 0) {

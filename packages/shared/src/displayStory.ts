@@ -111,6 +111,43 @@ export type SolarFlowStoryState = {
   state: "degraded" | "normal" | "standby";
 };
 
+export type DisplayStoryPageId = "overview" | "solar" | "factory-circuit";
+
+export type OverviewStoryPayload = {
+  metrics: Array<ResolvedMonitoringMetricBinding<string>>;
+  summary: MonitoringSummaryState;
+};
+
+export type SolarStoryPayload = {
+  kpis: Array<
+    ResolvedMonitoringMetricBinding<string> & {
+      comparison: SolarComparisonState;
+    }
+  >;
+  story: {
+    flowState: SolarFlowStoryState;
+  };
+};
+
+export type DisplayStoryPayload = {
+  factoryCircuit: FactoryCircuitStoryPayload;
+  generatedAt: string;
+  overview: OverviewStoryPayload;
+  solar: SolarStoryPayload;
+};
+
+export type DisplayStoryPayloadByPageId = {
+  "factory-circuit": FactoryCircuitStoryPayload;
+  overview: OverviewStoryPayload;
+  solar: SolarStoryPayload;
+};
+
+export type DisplayStoryPagePayload<PageId extends DisplayStoryPageId = DisplayStoryPageId> = {
+  generatedAt: string;
+  pageId: PageId;
+  payload: DisplayStoryPayloadByPageId[PageId];
+};
+
 const defaultStaleAfterMs = 15 * 60 * 1000;
 
 export function formatMonitoringValue(value: number, unit: string | null) {

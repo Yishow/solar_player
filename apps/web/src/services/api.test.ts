@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   bootstrapImagePlaylistGovernance,
   buildApiUrl,
+  fetchDisplayStoryPage,
   isManagementAccessDeniedError,
   isManagementDraftConflictError,
   fetchImagePlaylist,
@@ -231,6 +232,52 @@ test("requestJson keeps caller headers while still using the normalized Headers 
 
     assert.equal(response.success, true);
     assert.equal(seenTraceId, "brand-review");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetchDisplayStoryPage requests the page-scoped display story endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenUrl = "";
+
+  globalThis.fetch = async (input) => {
+    seenUrl = String(input);
+
+    return new Response(
+      JSON.stringify({
+        generatedAt: "2026-05-22T13:30:00.000Z",
+        pageId: "overview",
+        payload: {
+          metrics: [
+            {
+              metricKey: "todayGeneration"
+            }
+          ],
+          summary: {
+            alertTone: "normal",
+            bindingState: "bound",
+            fallbackReason: null,
+            freshnessState: "fresh"
+          }
+        }
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const response = await fetchDisplayStoryPage("overview");
+
+    assert.match(seenUrl, /\/api\/display-story\/overview$/);
+    assert.equal(response.pageId, "overview");
+    assert.equal(response.payload.summary.bindingState, "bound");
+    assert.equal(response.payload.metrics[0]?.metricKey, "todayGeneration");
   } finally {
     globalThis.fetch = originalFetch;
   }
