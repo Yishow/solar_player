@@ -125,3 +125,55 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
   assert.match(cards.today.supportingLine, /資料不足|不可用/);
   assert.equal(cards.cumulative.derivedStatus, "available");
 });
+
+test("readHouseholdEquivalenceCards falls back to the latest daily summary when today has no row yet", () => {
+  const database = getDatabase();
+  const latestAvailable = "2026-05-21";
+
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total,
+          peak_generation,
+          peak_generation_time,
+          peak_consumption,
+          peak_consumption_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(
+      latestAvailable,
+      120,
+      92,
+      72,
+      18,
+      30,
+      `${latestAvailable}T10:00:00.000Z`,
+      24,
+      `${latestAvailable}T11:00:00.000Z`
+    );
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+      `
+    )
+    .run();
+
+  const cards = readHouseholdEquivalenceCards({
+    now: new Date("2026-05-22T12:00:00.000Z")
+  });
+
+  assert.equal(cards.today.householdCountDisplay, "18");
+  assert.equal(cards.today.derivedStatus, "available");
+  assert.equal(cards.today.provenance?.updatedAt, `${latestAvailable}T00:00:00.000Z`);
+});

@@ -34,7 +34,9 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
       `
         SELECT date, self_consumption_total
         FROM daily_energy_summaries
-        WHERE date = ?
+        WHERE date <= ?
+        ORDER BY date DESC
+        LIMIT 1
       `
     )
     .get(todayDate) as DailySummaryRow | undefined;
