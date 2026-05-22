@@ -112,6 +112,7 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         memory,
         disk,
         displayOps,
+        displayClients: app.socketService.getDisplayClientLivenessSnapshot(),
         pid: process.pid
       }
     };

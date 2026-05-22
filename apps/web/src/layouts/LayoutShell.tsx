@@ -4,6 +4,7 @@ import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/pla
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { DisplayCanvas } from "../components/DisplayCanvas";
+import { useDisplayClientHeartbeat } from "../hooks/useDisplayClientHeartbeat";
 import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
 import { usePageRotation } from "../hooks/usePageRotation";
@@ -22,6 +23,12 @@ export function LayoutShell() {
       navigate(route, { replace: true });
     },
     routeRotationEnabled: routeMeta?.group === "playback"
+  });
+  useDisplayClientHeartbeat({
+    isIdle: controller.isIdle,
+    isPlaying: controller.isPlaying,
+    pageKey: controller.currentPage?.pageKey ?? null,
+    route: location.pathname
   });
 
   useEffect(() => {

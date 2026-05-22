@@ -214,6 +214,116 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
   assert.match(model.displayOpsSummary.helper, /Display Pages Editor/);
 });
 
+test("buildDeviceStatusViewModel maps display client liveness rows and summary badges", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logExport: null,
+    logExportError: "",
+    now: new Date("2026-05-22T12:00:10.000Z"),
+    status: {
+      arch: "arm64",
+      cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
+      disk: { availableMB: 40000, totalMB: 64000, usePercent: 35, usedMB: 24000 },
+      displayClients: {
+        clients: [
+          {
+            clientTime: "2026-05-22T12:00:05.000Z",
+            connected: true,
+            connectedAt: "2026-05-22T12:00:00.000Z",
+            isIdle: false,
+            isPlaying: true,
+            lastSeenAt: "2026-05-22T12:00:05.000Z",
+            pageKey: "overview",
+            remoteAddress: "10.0.0.42",
+            route: "/overview",
+            sessionClass: "playback-safe",
+            socketId: "socket-1",
+            state: "online",
+            viewport: {
+              height: 1080,
+              width: 1920
+            }
+          },
+          {
+            clientTime: "2026-05-22T11:59:25.000Z",
+            connected: true,
+            connectedAt: "2026-05-22T11:59:00.000Z",
+            isIdle: true,
+            isPlaying: false,
+            lastSeenAt: "2026-05-22T11:59:25.000Z",
+            pageKey: null,
+            remoteAddress: "10.0.0.43",
+            route: "/offline",
+            sessionClass: "playback-safe",
+            socketId: "socket-2",
+            state: "stale",
+            viewport: {
+              height: 1080,
+              width: 1920
+            }
+          },
+          {
+            clientTime: null,
+            connected: false,
+            connectedAt: "2026-05-22T11:58:00.000Z",
+            isIdle: false,
+            isPlaying: false,
+            lastSeenAt: "2026-05-22T11:59:20.000Z",
+            pageKey: "solar",
+            remoteAddress: "10.0.0.44",
+            route: "/solar",
+            sessionClass: "playback-safe",
+            socketId: "socket-3",
+            state: "offline",
+            viewport: {
+              height: 1080,
+              width: 1920
+            }
+          }
+        ],
+        summary: {
+          offline: 1,
+          online: 1,
+          stale: 1,
+          total: 3
+        }
+      },
+      hostname: "KZ-Display-01",
+      memory: { freeMB: 4600, totalMB: 8000, usePercent: 42, usedMB: 3400 },
+      nodeVersion: "v24.15.0",
+      pid: 1234,
+      platform: "linux",
+      uptimeSeconds: 1315800
+    }
+  });
+
+  assert.deepEqual(
+    model.displayClientSummary.badges.map((badge) => ({
+      count: badge.count,
+      tone: badge.tone
+    })),
+    [
+      { count: 1, tone: "is-good" },
+      { count: 1, tone: "is-warning" },
+      { count: 1, tone: "is-error" }
+    ]
+  );
+  assert.equal(model.displayClientSummary.totalLabel, "3 clients");
+  assert.equal(model.displayClientSummary.rows[0]?.pageLabel, "Overview");
+  assert.equal(model.displayClientSummary.rows[0]?.playbackLabel, "播放中");
+  assert.equal(model.displayClientSummary.rows[0]?.lastSeenLabel, "5 秒前");
+  assert.equal(model.displayClientSummary.rows[0]?.badgeTone, "is-good");
+  assert.equal(model.displayClientSummary.rows[1]?.pageLabel, "Route /offline");
+  assert.equal(model.displayClientSummary.rows[1]?.playbackLabel, "閒置中");
+  assert.equal(model.displayClientSummary.rows[1]?.lastSeenLabel, "45 秒前");
+  assert.equal(model.displayClientSummary.rows[1]?.badgeTone, "is-warning");
+  assert.equal(model.displayClientSummary.rows[2]?.pageLabel, "Solar");
+  assert.equal(model.displayClientSummary.rows[2]?.playbackLabel, "已離線");
+  assert.equal(model.displayClientSummary.rows[2]?.lastSeenLabel, "50 秒前");
+  assert.equal(model.displayClientSummary.rows[2]?.badgeTone, "is-error");
+});
+
 test("buildDeviceStatusViewModel keeps configuration-readiness distinct from operational health", () => {
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,

@@ -228,6 +228,34 @@ export function DeviceStatusContent({
 
           <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
             <h2 style={{ marginBottom: 12 }}>
+              展示端心跳
+              <small>Display Client Liveness</small>
+            </h2>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {viewModel.displayClientSummary.badges.map((badge) => (
+                <div key={badge.label} className={`mgmt-status ${badge.tone}`}>
+                  {badge.label} {badge.count}
+                </div>
+              ))}
+              <div className="mgmt-status">{viewModel.displayClientSummary.totalLabel}</div>
+            </div>
+            <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+              {viewModel.displayClientSummary.rows.map((client) => (
+                <div key={client.socketId} className={`mgmt-status ${client.badgeTone}`}>
+                  <strong>{client.pageLabel}</strong> · {client.playbackLabel} · {client.lastSeenLabel}
+                  <small style={{ display: "block", opacity: 0.72 }}>
+                    {client.stateLabel} · {client.routeLabel}
+                  </small>
+                </div>
+              ))}
+              {viewModel.displayClientSummary.rows.length === 0 ? (
+                <div className="mgmt-status">目前沒有展示端 heartbeat。</div>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
+            <h2 style={{ marginBottom: 12 }}>
               系統日誌
               <small>Recent Logs</small>
             </h2>

@@ -146,6 +146,102 @@ test("device status and log metadata deny untrusted remote readers", async () =>
   }
 });
 
+test("trusted device status responses include display client liveness while untrusted requests stay denied", async () => {
+  const app = await buildApp();
+  const originalGetSnapshot = app.socketService.getDisplayClientLivenessSnapshot.bind(app.socketService);
+  app.socketService.getDisplayClientLivenessSnapshot = () => ({
+    clients: [
+      {
+        clientTime: "2026-05-22T12:00:05.000Z",
+        connected: true,
+        connectedAt: "2026-05-22T12:00:00.000Z",
+        isIdle: false,
+        isPlaying: true,
+        lastSeenAt: "2026-05-22T12:00:10.000Z",
+        pageKey: "overview",
+        remoteAddress: "10.0.0.42",
+        route: "/overview",
+        sessionClass: "playback-safe",
+        socketId: "socket-1",
+        state: "online",
+        viewport: {
+          height: 1080,
+          width: 1920
+        }
+      }
+    ],
+    summary: {
+      offline: 0,
+      online: 1,
+      stale: 0,
+      total: 1
+    }
+  });
+
+  try {
+    const [trustedResponse, untrustedResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/api/device/status"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/device/status",
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        }
+      })
+    ]);
+
+    assert.equal(trustedResponse.statusCode, 200);
+    assert.deepEqual(
+      trustedResponse.json<{
+        data: {
+          displayClients: {
+            summary: {
+              offline: number;
+              online: number;
+              stale: number;
+              total: number;
+            };
+            clients: Array<{ pageKey: string | null; state: string }>;
+          };
+        };
+      }>().data.displayClients.summary,
+      {
+        offline: 0,
+        online: 1,
+        stale: 0,
+        total: 1
+      }
+    );
+    assert.equal(
+      trustedResponse.json<{
+        data: {
+          displayClients: {
+            clients: Array<{ pageKey: string | null; state: string }>;
+          };
+        };
+      }>().data.displayClients.clients[0]?.pageKey,
+      "overview"
+    );
+
+    assert.equal(untrustedResponse.statusCode, 403);
+    const deniedBody = untrustedResponse.json<{
+      access: string;
+      data?: {
+        displayClients?: unknown;
+      };
+    }>();
+    assert.equal(deniedBody.access, "denied");
+    assert.equal("data" in deniedBody, false);
+  } finally {
+    app.socketService.getDisplayClientLivenessSnapshot = originalGetSnapshot;
+    await app.close();
+  }
+});
+
 test("unsupported device controls stay informational and point operators to the host runbook", async () => {
   const app = await buildApp();
 

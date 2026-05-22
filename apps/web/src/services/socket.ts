@@ -1,5 +1,9 @@
-import type { DisplaySyncEvent, PlaybackSettingsUpdatedEvent } from "@solar-display/shared";
-import type { ManagementSocketSessionClass } from "@solar-display/shared";
+import type {
+  DisplayClientHeartbeat,
+  DisplaySyncEvent,
+  ManagementSocketSessionClass,
+  PlaybackSettingsUpdatedEvent
+} from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 import { routeMetaMap } from "../app/routeMeta";
 import { resolveBrowserApiOrigin } from "./api";
@@ -44,12 +48,10 @@ type ServerToClientEvents = {
 };
 
 type ClientToServerEvents = {
-  "client:heartbeat": {
-    sentAt: string;
-  };
+  "client:heartbeat": DisplayClientHeartbeat;
 };
 
-let socketClient: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+let socketClient: Socket | null = null;
 let socketSessionClass: ManagementSocketSessionClass | null = null;
 let cachedLiveMetrics: LiveMetricsSnapshot = {
   metrics: {},
@@ -121,7 +123,7 @@ function resolveCurrentSocketSessionClass() {
   return resolveSocketSessionClass(window.location.pathname);
 }
 
-function attachHeartbeat(client: Socket<ServerToClientEvents, ClientToServerEvents>) {
+function attachHeartbeat(client: Socket) {
   const syncHeartbeat = () => {
     setConnectionState({
       lastHeartbeatAt: new Date().toISOString(),
@@ -238,6 +240,25 @@ export function subscribeConnectionState(listener: (state: SocketConnectionState
   return () => {
     connectionStateListeners.delete(listener);
   };
+}
+
+export function emitClientHeartbeatViaClient(
+  client: {
+    connected: boolean;
+    emit: (event: string, payload: unknown) => unknown;
+  },
+  payload: DisplayClientHeartbeat
+) {
+  if (!client.connected) {
+    return false;
+  }
+
+  client.emit("client:heartbeat", payload);
+  return true;
+}
+
+export function emitClientHeartbeat(payload: DisplayClientHeartbeat) {
+  return emitClientHeartbeatViaClient(ensureSocketClient(), payload);
 }
 
 export function subscribeSocketEvent<EventName extends keyof ServerToClientEvents>(

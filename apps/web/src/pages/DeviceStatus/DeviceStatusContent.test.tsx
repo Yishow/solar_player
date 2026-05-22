@@ -14,6 +14,10 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.alerts\)\.map/);
   assert.match(deviceStatusContentSource, /handleDiagnostic\(action\.action, action\.label\)/);
   assert.match(deviceStatusContentSource, /displayOpsSummary\.helper/);
+  assert.match(deviceStatusContentSource, /Display Client Liveness/);
+  assert.match(deviceStatusContentSource, /viewModel\.displayClientSummary\.badges\.map/);
+  assert.match(deviceStatusContentSource, /viewModel\.displayClientSummary\.rows\.map/);
+  assert.match(deviceStatusContentSource, /目前沒有展示端 heartbeat/);
   assert.match(deviceStatusContentSource, /viewModel\.logsSummary\.statusTitle/);
   assert.match(deviceStatusContentSource, /Recent Logs/);
 });

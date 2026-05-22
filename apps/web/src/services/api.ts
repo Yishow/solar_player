@@ -3,6 +3,7 @@ import type {
   ConfigStage,
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
+  DisplayClientLivenessSnapshot,
   DisplayStoryPageId,
   DisplayStoryPagePayload,
   DisplayStoryPayload,
@@ -494,6 +495,7 @@ export type DeviceStatusResponseData = {
   cpu: { cores: number; loadAvg: [number, number, number] };
   memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  displayClients: DisplayClientLivenessSnapshot;
   pid: number;
 };
 

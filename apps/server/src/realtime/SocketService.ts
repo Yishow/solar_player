@@ -1,7 +1,13 @@
 import type { Server as HttpServer } from "node:http";
 import { Server as SocketIoServer } from "socket.io";
-import type { ManagementSocketSessionClass } from "@solar-display/shared";
-import type { DisplaySyncEvent } from "@solar-display/shared";
+import {
+  buildDisplayClientLivenessSnapshot,
+  type DisplayClientHeartbeat,
+  type DisplayClientLivenessEntry,
+  type DisplayClientLivenessSnapshot,
+  type DisplaySyncEvent,
+  type ManagementSocketSessionClass
+} from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
 export type MqttStatus = {
@@ -27,6 +33,7 @@ type SocketClientLike = {
   };
   id?: string;
   join?: (room: string) => void;
+  on?: (event: string, listener: (payload?: unknown) => void) => void;
 };
 
 type SocketServerLike = {
@@ -52,19 +59,58 @@ type SocketServiceOptions = {
   getMqttStatus: () => MqttStatus;
   io?: SocketServerLike;
   logger: LoggerLike;
+  now?: () => Date;
   server?: HttpServer;
 };
+
+function isDisplayClientHeartbeat(payload: unknown): payload is DisplayClientHeartbeat {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  if (typeof candidate.route !== "string") {
+    return false;
+  }
+  if (candidate.pageKey !== null && typeof candidate.pageKey !== "string") {
+    return false;
+  }
+  if (typeof candidate.isPlaying !== "boolean" || typeof candidate.isIdle !== "boolean") {
+    return false;
+  }
+  if (
+    candidate.sessionClass !== "playback-safe"
+    && candidate.sessionClass !== "management-trusted"
+  ) {
+    return false;
+  }
+  if (typeof candidate.clientTime !== "string") {
+    return false;
+  }
+
+  const viewport = candidate.viewport;
+  if (typeof viewport !== "object" || viewport === null) {
+    return false;
+  }
+
+  const viewportWidth = (viewport as Record<string, unknown>).width;
+  const viewportHeight = (viewport as Record<string, unknown>).height;
+  return typeof viewportWidth === "number" && typeof viewportHeight === "number";
+}
 
 export class SocketService {
   private readonly io: SocketServerLike;
   private readonly classifySession;
   private readonly logger: LoggerLike;
+  private readonly now: () => Date;
+  private readonly displayClientRegistry = new Map<string, DisplayClientLivenessEntry>();
   private liveMetricsSnapshot: LiveMetricsSnapshot;
   private mqttStatus: MqttStatus;
 
   constructor(options: SocketServiceOptions) {
     this.classifySession = options.classifySession;
     this.logger = options.logger;
+    this.now = options.now ?? (() => new Date());
     this.liveMetricsSnapshot = options.getLiveMetricsSnapshot();
     this.mqttStatus = options.getMqttStatus();
     this.io =
@@ -81,11 +127,72 @@ export class SocketService {
       const sessionClass = socket.handshake
         ? this.classifySession?.(socket.handshake) ?? "playback-safe"
         : "playback-safe";
+      const connectedAt = this.now().toISOString();
+      const socketId = socket.id;
 
       socket.join?.("playback-safe");
       if (sessionClass === "management-trusted") {
         socket.join?.("management-trusted");
       }
+
+      if (socketId) {
+        this.displayClientRegistry.set(socketId, {
+          clientTime: null,
+          connected: true,
+          connectedAt,
+          isIdle: false,
+          isPlaying: false,
+          lastSeenAt: connectedAt,
+          pageKey: null,
+          remoteAddress: socket.handshake?.address ?? null,
+          route: "/",
+          sessionClass,
+          socketId,
+          viewport: {
+            height: 0,
+            width: 0
+          }
+        });
+      }
+
+      socket.on?.("client:heartbeat", (payload) => {
+        const heartbeatSocketId = socket.id;
+        if (!heartbeatSocketId) {
+          return;
+        }
+
+        const entry = this.displayClientRegistry.get(heartbeatSocketId);
+        if (!entry) {
+          return;
+        }
+
+        if (!isDisplayClientHeartbeat(payload)) {
+          this.logger.warn(
+            { payload, socketId: heartbeatSocketId },
+            "Ignored invalid display client heartbeat payload"
+          );
+          return;
+        }
+
+        this.displayClientRegistry.set(heartbeatSocketId, {
+          ...entry,
+          clientTime: payload.clientTime,
+          isIdle: payload.isIdle,
+          isPlaying: payload.isPlaying,
+          lastSeenAt: this.now().toISOString(),
+          pageKey: payload.pageKey,
+          route: payload.route,
+          viewport: payload.viewport
+        });
+      });
+
+      socket.on?.("disconnect", () => {
+        if (!socket.id) {
+          return;
+        }
+
+        this.displayClientRegistry.delete(socket.id);
+      });
 
       this.logger.info({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
       socket.emit("mqtt:status", this.mqttStatus);
@@ -134,6 +241,13 @@ export class SocketService {
 
   emitDisplaySync(data: DisplaySyncEvent) {
     this.io.emit("display:sync", data);
+  }
+
+  getDisplayClientLivenessSnapshot(now = this.now()): DisplayClientLivenessSnapshot {
+    return buildDisplayClientLivenessSnapshot(
+      [...this.displayClientRegistry.values()],
+      now
+    );
   }
 
   emitSystemError(data: SystemNotification) {

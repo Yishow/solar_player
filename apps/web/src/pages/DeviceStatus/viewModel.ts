@@ -1,5 +1,6 @@
 import {
   resolveDisplayFaultTriageSummaryFromAlerts,
+  type DisplayClientLivenessSnapshot,
   type DeviceDisplayOpsSummary,
   type DeviceSafeOpsGuidance,
   type DisplayFaultTriageSummary
@@ -15,6 +16,7 @@ type DeviceRouteStatus = {
   cpu: { cores: number; loadAvg: [number, number, number] };
   memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  displayClients?: DisplayClientLivenessSnapshot;
   pid: number;
 };
 
@@ -32,6 +34,7 @@ type BuildDeviceStatusViewModelArgs = {
   logExport: DeviceLogExportMetadata | null;
   logExportAccessDenied?: boolean;
   logExportError: string;
+  now?: Date;
   status: DeviceRouteStatus | null;
   statusAccessDenied?: boolean;
 };
@@ -138,6 +141,95 @@ function formatTimestamp(value: string | null | undefined) {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
+function formatRelativeTime(value: string | null | undefined, now: Date) {
+  if (!value) {
+    return "--";
+  }
+
+  const timestamp = new Date(value).getTime();
+  const nowValue = now.getTime();
+  if (!Number.isFinite(timestamp) || !Number.isFinite(nowValue)) {
+    return "--";
+  }
+
+  const deltaSeconds = Math.max(0, Math.round((nowValue - timestamp) / 1000));
+  if (deltaSeconds < 60) {
+    return `${deltaSeconds} 秒前`;
+  }
+
+  const deltaMinutes = Math.round(deltaSeconds / 60);
+  if (deltaMinutes < 60) {
+    return `${deltaMinutes} 分前`;
+  }
+
+  const deltaHours = Math.round(deltaMinutes / 60);
+  return `${deltaHours} 小時前`;
+}
+
+const displayClientPageLabels: Record<string, string> = {
+  "factory-circuit": "Factory Circuit",
+  images: "Images",
+  overview: "Overview",
+  solar: "Solar",
+  sustainability: "Sustainability"
+};
+
+function buildDisplayClientSummary(
+  snapshot: DisplayClientLivenessSnapshot | undefined,
+  now: Date
+) {
+  const summary = snapshot?.summary ?? {
+    offline: 0,
+    online: 0,
+    stale: 0,
+    total: 0
+  };
+
+  return {
+    badges: [
+      {
+        count: summary.online,
+        label: "Online",
+        tone: "is-good"
+      },
+      {
+        count: summary.stale,
+        label: "Stale",
+        tone: "is-warning"
+      },
+      {
+        count: summary.offline,
+        label: "Offline",
+        tone: "is-error"
+      }
+    ],
+    rows: (snapshot?.clients ?? []).map((client) => ({
+      badgeTone:
+        client.state === "online"
+          ? "is-good"
+          : client.state === "stale"
+            ? "is-warning"
+            : "is-error",
+      lastSeenLabel: formatRelativeTime(client.lastSeenAt, now),
+      pageLabel: client.pageKey
+        ? displayClientPageLabels[client.pageKey] ?? client.pageKey
+        : `Route ${client.route}`,
+      playbackLabel:
+        client.state === "offline"
+          ? "已離線"
+          : client.isIdle
+            ? "閒置中"
+            : client.isPlaying
+              ? "播放中"
+              : "待命中",
+      routeLabel: client.route,
+      socketId: client.socketId,
+      stateLabel: client.state
+    })),
+    totalLabel: `${summary.total} clients`
+  };
+}
+
 function formatTriagePages(summary: DisplayFaultTriageSummary) {
   return summary.affectedPages.length > 0 ? summary.affectedPages.join("、") : "global";
 }
@@ -165,6 +257,7 @@ export function buildDeviceStatusViewModel({
   logExport,
   logExportAccessDenied = false,
   logExportError,
+  now = new Date(),
   status,
   statusAccessDenied = false
 }: BuildDeviceStatusViewModelArgs) {
@@ -284,6 +377,7 @@ export function buildDeviceStatusViewModel({
           fileCountLabel: logExport === null ? "--" : `${logExport.files.length} files`,
           statusTitle: logExport === null ? "尚未載入" : "最近日誌"
         },
+    displayClientSummary: buildDisplayClientSummary(status?.displayClients, now),
     resourceCards: [
       {
         gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",
