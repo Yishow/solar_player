@@ -4,6 +4,7 @@ import { buildApp } from "./app.js";
 import { migrateDatabase } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
 import { DailySummaryService } from "./services/DailySummaryService.js";
+import { MetricHistoryRetentionService } from "./services/MetricHistoryRetentionService.js";
 import { MetricsAccumulatorService } from "./services/MetricsAccumulatorService.js";
 import { SnapshotWriterService } from "./services/SnapshotWriterService.js";
 
@@ -23,6 +24,12 @@ type StartServerOptions = {
   createDailySummaryService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
     metricsAccumulatorService: MetricsAccumulatorService;
+  }) => LifecycleService;
+  createMetricHistoryRetentionService?: (options: {
+    logger: AppLike["log"];
+    snapshotRetentionDays: number;
+    summaryRetentionDays: number;
+    vacuumEnabled: boolean;
   }) => LifecycleService;
   createMetricsAccumulatorService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
@@ -48,6 +55,9 @@ export async function startServer(options: StartServerOptions = {}) {
   const createDailySummaryService =
     options.createDailySummaryService ??
     ((serviceOptions) => new DailySummaryService(serviceOptions));
+  const createMetricHistoryRetentionService =
+    options.createMetricHistoryRetentionService ??
+    ((serviceOptions) => new MetricHistoryRetentionService(serviceOptions));
 
   let app: AppLike | null = null;
 
@@ -77,7 +87,16 @@ export async function startServer(options: StartServerOptions = {}) {
     });
     dailySummaryService.start();
 
+    const metricHistoryRetentionService = createMetricHistoryRetentionService({
+      logger: app.log,
+      snapshotRetentionDays: config.metricSnapshotRetentionDays,
+      summaryRetentionDays: config.dailySummaryRetentionDays,
+      vacuumEnabled: config.metricRetentionVacuumEnabled
+    });
+    metricHistoryRetentionService.start();
+
     app.addHook("onClose", async () => {
+      metricHistoryRetentionService.stop();
       dailySummaryService.stop();
       snapshotWriterService.stop();
       metricsAccumulatorService.stop();

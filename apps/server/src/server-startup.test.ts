@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { config } from "./config.js";
 import { startServer } from "./server-startup.js";
 
 test("startServer starts listening before awaiting MQTT initial connection", async () => {
@@ -65,4 +66,76 @@ test("startServer starts listening before awaiting MQTT initial connection", asy
 
   await startPromise;
   assert.deepEqual(callOrder, ["listen", "connect-resolved"]);
+});
+
+test("startServer wires MetricHistoryRetentionService into server lifecycle", async () => {
+  const callOrder: string[] = [];
+  let onCloseHook: (() => Promise<void> | void) | null = null;
+  const app = {
+    addHook: (_name: string, hook: () => Promise<void> | void) => {
+      onCloseHook = hook;
+    },
+    close: async () => undefined,
+    listen: async () => {
+      callOrder.push("listen");
+    },
+    log: {
+      error: () => undefined,
+      warn: () => undefined
+    },
+    mqttClientService: {
+      connect: async () => undefined
+    },
+    socketService: {
+      emitDisplaySync: () => undefined
+    }
+  } as unknown as Awaited<ReturnType<typeof import("./app.js").buildApp>>;
+
+  let started = 0;
+  let stopped = 0;
+
+  await startServer({
+    buildApp: async () => app,
+    createDailySummaryService: () => ({
+      start: () => undefined,
+      stop: () => undefined
+    }),
+    createMetricHistoryRetentionService: (options) => {
+      assert.equal(options.logger, app.log);
+      assert.equal(options.snapshotRetentionDays, config.metricSnapshotRetentionDays);
+      assert.equal(options.summaryRetentionDays, config.dailySummaryRetentionDays);
+      assert.equal(options.vacuumEnabled, config.metricRetentionVacuumEnabled);
+
+      return {
+        start: () => {
+          started += 1;
+        },
+        stop: () => {
+          stopped += 1;
+        }
+      };
+    },
+    createMetricsAccumulatorService: () => ({
+      initialize: () => undefined,
+      start: () => undefined,
+      stop: () => undefined
+    }),
+    createSnapshotWriterService: () => ({
+      start: () => undefined,
+      stop: () => undefined
+    }),
+    migrateDatabase: () => undefined,
+    seedDatabase: () => undefined
+  });
+
+  assert.equal(started, 1);
+  assert.ok(onCloseHook);
+  if (!onCloseHook) {
+    throw new Error("Expected onClose hook to be registered");
+  }
+
+  const closeHook = onCloseHook as () => Promise<void> | void;
+  await closeHook();
+  assert.equal(stopped, 1);
+  assert.deepEqual(callOrder, ["listen"]);
 });

@@ -56,5 +56,14 @@ export const config = {
   get managementAccessToken() {
     const value = process.env.MANAGEMENT_ACCESS_TOKEN?.trim();
     return value && value.length > 0 ? value : null;
+  },
+  get metricSnapshotRetentionDays() {
+    return readNumber(process.env.METRIC_SNAPSHOT_RETENTION_DAYS, 90);
+  },
+  get dailySummaryRetentionDays() {
+    return readNumber(process.env.DAILY_SUMMARY_RETENTION_DAYS, 1_825);
+  },
+  get metricRetentionVacuumEnabled() {
+    return process.env.METRIC_RETENTION_VACUUM_ENABLED?.trim() !== "false";
   }
 };
