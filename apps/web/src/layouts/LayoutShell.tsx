@@ -4,10 +4,12 @@ import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/pla
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { DisplayCanvas } from "../components/DisplayCanvas";
+import { PlaybackErrorBoundary } from "../components/PlaybackErrorBoundary";
 import { useDisplayClientHeartbeat } from "../hooks/useDisplayClientHeartbeat";
 import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
 import { usePageRotation } from "../hooks/usePageRotation";
+import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
 import { shouldRedirectToOffline } from "./offlineRouting";
 
 export function LayoutShell() {
@@ -29,6 +31,12 @@ export function LayoutShell() {
     isPlaying: controller.isPlaying,
     pageKey: controller.currentPage?.pageKey ?? null,
     route: location.pathname
+  });
+  usePlaybackWatchdog({
+    currentPageKey: controller.currentPage?.pageKey ?? null,
+    expectedDurationMs: (controller.currentPage?.durationSeconds ?? 0) * 1000,
+    isPlaying: controller.isPlaying,
+    playablePageCount: controller.pages.length
   });
 
   useEffect(() => {
@@ -69,7 +77,9 @@ export function LayoutShell() {
       header={<AppHeader />}
       footer={<AppFooterNav playbackEntries={playbackEntries} resolvedPlaybackRouteMeta={routeMeta} />}
     >
-      <Outlet />
+      <PlaybackErrorBoundary>
+        <Outlet />
+      </PlaybackErrorBoundary>
     </DisplayCanvas>
   );
 }

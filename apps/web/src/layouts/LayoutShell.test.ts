@@ -29,6 +29,13 @@ test("LayoutShell wires display client heartbeats to the active playback page st
   assert.match(layoutShellSource, /route: location\.pathname/);
 });
 
+test("LayoutShell contains playback render failures and monitors rotation stalls", () => {
+  assert.match(layoutShellSource, /usePlaybackWatchdog\(\{/);
+  assert.match(layoutShellSource, /playablePageCount: controller\.pages\.length/);
+  assert.match(layoutShellSource, /expectedDurationMs: \(controller\.currentPage\?\.durationSeconds \?\? 0\) \* 1000/);
+  assert.match(layoutShellSource, /<PlaybackErrorBoundary>\s*<Outlet \/>\s*<\/PlaybackErrorBoundary>/s);
+});
+
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {
   assert.match(registryHookSource, /setPages\(nextPages\.filter\(\(page\) => page\.enabled && page\.archivedAt === null\)\)/);
   assert.doesNotMatch(registryHookSource, /catch[\s\S]*setPages\(\[\]\)/);
