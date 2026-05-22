@@ -7,6 +7,7 @@ export * from "./displayPageCardRail.js";
 export * from "./householdEquivalence.js";
 export * from "./displayOps.js";
 export * from "./displayReadiness.js";
+export * from "./displayPageFreshness.js";
 export * from "./deviceDisplayOps.js";
 export * from "./displayStory.js";
 export * from "./imagePlaylist.js";

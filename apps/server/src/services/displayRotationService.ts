@@ -10,7 +10,9 @@ import type {
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
+  evaluatePageRuntimeFreshness,
   evaluateDisplayRotation,
+  resolveLiveMetricKeysForPage,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -149,10 +151,11 @@ function resolveReadinessSkipReason(findings: DisplayReadinessFinding[]) {
 
 function resolveRuntimeDataCondition(args: {
   fallbackPolicy: FallbackPolicy;
-  liveMetricsTimestamp: string | null;
-  metricsFresh: boolean;
   mqttStatus: MqttStatusLike;
   pageRequiresLiveData: boolean;
+  pageFresh: boolean;
+  stalestMetricKey: string | null;
+  stalestTimestamp: string | null;
 }) {
   if (!args.pageRequiresLiveData) {
     return null;
@@ -167,14 +170,16 @@ function resolveRuntimeDataCondition(args: {
       : null;
   }
 
-  if (args.metricsFresh) {
+  if (args.pageFresh) {
     return null;
   }
 
   return args.fallbackPolicy.staleData === "hide"
     ? {
-        detail: args.liveMetricsTimestamp
-          ? `最後資料時間 ${args.liveMetricsTimestamp} 已超過 freshness window`
+        detail: args.stalestTimestamp
+          ? args.stalestMetricKey
+            ? `所需 metric ${args.stalestMetricKey} 最後時間 ${args.stalestTimestamp} 已超過 freshness window`
+            : `最後資料時間 ${args.stalestTimestamp} 已超過 freshness window`
           : "尚未收到可用的即時資料",
         skipReason: "stale-runtime"
       }
@@ -455,9 +460,6 @@ function buildPageConditions(
   const liveMetrics = readLiveMetricsSnapshot();
   const readinessFindingsByTemplateKey = buildReadinessFindingsByTemplateKey();
   const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
-  const metricsFresh =
-    liveMetrics.timestamp !== null &&
-    now.getTime() - new Date(liveMetrics.timestamp).getTime() <= freshMetricsDeadlineMs;
   const pageConditions: Record<number, DisplayRotationPageCondition> = {};
 
   for (const page of pages) {
@@ -471,6 +473,18 @@ function buildPageConditions(
     );
     const pageRequiresLiveData =
       page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
+    const runtimeFreshness = page.templateKey === undefined
+      ? {
+          fresh: true,
+          stalestMetricKey: null,
+          stalestTimestamp: null
+        }
+      : evaluatePageRuntimeFreshness({
+          freshnessWindowMs: freshMetricsDeadlineMs,
+          metrics: liveMetrics.metrics,
+          nowMs: now.getTime(),
+          requiredMetricKeys: resolveLiveMetricKeysForPage(page.templateKey)
+        });
     const readinessCondition =
       page.templateKey === undefined
         ? null
@@ -479,10 +493,11 @@ function buildPageConditions(
           );
     const runtimeDataCondition = resolveRuntimeDataCondition({
       fallbackPolicy,
-      liveMetricsTimestamp: liveMetrics.timestamp,
-      metricsFresh,
       mqttStatus,
-      pageRequiresLiveData
+      pageFresh: runtimeFreshness.fresh,
+      pageRequiresLiveData,
+      stalestMetricKey: runtimeFreshness.stalestMetricKey,
+      stalestTimestamp: runtimeFreshness.stalestTimestamp
     });
     const assetCondition = resolveAssetCondition({
       assetMessage: assetFindings[0]?.message ?? null,
@@ -496,7 +511,7 @@ function buildPageConditions(
     const isReady =
       readinessCondition === null &&
       (!pageRequiresLiveData ||
-        metricsFresh ||
+        runtimeFreshness.fresh ||
         mqttStatus.reason === "mock" ||
         fallbackPolicy.staleData !== "hide");
 
