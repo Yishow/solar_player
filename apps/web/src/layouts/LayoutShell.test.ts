@@ -40,6 +40,18 @@ test("LayoutShell keeps the playback screen awake while mounted", () => {
   assert.match(layoutShellSource, /useScreenWakeLock\(\{\s*enabled: true\s*\}\)/s);
 });
 
+test("LayoutShell maps the hydrated mqtt status into the playback header meta", () => {
+  assert.match(layoutShellSource, /resolveHeaderConnectionMeta/);
+  assert.match(
+    layoutShellSource,
+    /resolveHeaderConnectionMeta\(\{\s*connected: status\.connected,\s*reason: status\.reason,\s*isHydrated\s*\}\)/s
+  );
+  assert.match(
+    layoutShellSource,
+    /<AppHeader[^>]*meta=\{\{\s*status: [^,]+,\s*statusLabel: [^}]+\}\}/s
+  );
+});
+
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {
   assert.match(registryHookSource, /setPages\(nextPages\.filter\(\(page\) => page\.enabled && page\.archivedAt === null\)\)/);
   assert.doesNotMatch(registryHookSource, /catch[\s\S]*setPages\(\[\]\)/);

@@ -8,9 +8,13 @@ type AppHeaderMeta = {
   status?: "connected" | "connecting" | "disconnected";
   statusLabel?: string;
   time?: string;
-  weather?: string;
   weekday?: string;
 };
+
+const DEFAULT_HEADER_META = {
+  status: "connecting",
+  statusLabel: "連線中"
+} as const;
 
 function pad(value: number) {
   return value.toString().padStart(2, "0");
@@ -74,6 +78,13 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
 
 export function AppHeader({ meta }: AppHeaderProps) {
   const brand = useBrandAssets();
+  const statusMeta =
+    meta?.status && meta?.statusLabel
+      ? {
+          status: meta.status,
+          statusLabel: meta.statusLabel
+        }
+      : DEFAULT_HEADER_META;
 
   return (
     <header
@@ -131,42 +142,14 @@ export function AppHeader({ meta }: AppHeaderProps) {
         <div className="ml-auto flex items-center">
           <ClockArea meta={meta} />
 
-          <div
-            className="ml-[40px] flex items-center gap-[12px] text-[18px] font-medium"
-            style={{ color: "var(--shell-meta-weather-ink)" }}
-          >
-            <SunGlyph />
-            <span>{meta?.weather ?? "晴  26°C"}</span>
-          </div>
-
           <div className="ml-[40px]">
             <StatusBadge
-              status={meta?.status ?? "connected"}
-              label={meta?.statusLabel ?? "Online"}
+              status={statusMeta.status}
+              label={statusMeta.statusLabel}
             />
           </div>
         </div>
       </div>
     </header>
-  );
-}
-
-function SunGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="26"
-      height="26"
-      fill="none"
-      stroke="#F59E0B" /* Warm amber tone instead of default accent */
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
-    </svg>
   );
 }

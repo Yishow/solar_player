@@ -5,6 +5,7 @@ import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { DisplayCanvas } from "../components/DisplayCanvas";
 import { PlaybackErrorBoundary } from "../components/PlaybackErrorBoundary";
+import { resolveHeaderConnectionMeta } from "../components/headerConnectionMeta";
 import { useDisplayClientHeartbeat } from "../hooks/useDisplayClientHeartbeat";
 import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
@@ -20,6 +21,11 @@ export function LayoutShell() {
   const { isHydrated, status } = useMqttStatus();
   const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
   const playbackEntries = buildPlaybackFooterEntries(registry.pages);
+  const headerConnectionMeta = resolveHeaderConnectionMeta({
+    connected: status.connected,
+    reason: status.reason,
+    isHydrated
+  });
   const controller = usePageRotation({
     currentPath: location.pathname,
     onRouteChange: (route) => {
@@ -78,7 +84,14 @@ export function LayoutShell() {
 
   return (
     <DisplayCanvas
-      header={<AppHeader />}
+      header={
+        <AppHeader
+          meta={{
+            status: headerConnectionMeta.status,
+            statusLabel: headerConnectionMeta.label
+          }}
+        />
+      }
       footer={<AppFooterNav playbackEntries={playbackEntries} resolvedPlaybackRouteMeta={routeMeta} />}
     >
       <PlaybackErrorBoundary>
