@@ -36,6 +36,10 @@ test("LayoutShell contains playback render failures and monitors rotation stalls
   assert.match(layoutShellSource, /<PlaybackErrorBoundary>\s*<Outlet \/>\s*<\/PlaybackErrorBoundary>/s);
 });
 
+test("LayoutShell keeps the playback screen awake while mounted", () => {
+  assert.match(layoutShellSource, /useScreenWakeLock\(\{\s*enabled: true\s*\}\)/s);
+});
+
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {
   assert.match(registryHookSource, /setPages\(nextPages\.filter\(\(page\) => page\.enabled && page\.archivedAt === null\)\)/);
   assert.doesNotMatch(registryHookSource, /catch[\s\S]*setPages\(\[\]\)/);

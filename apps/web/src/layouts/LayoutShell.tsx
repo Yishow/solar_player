@@ -10,6 +10,7 @@ import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
 import { usePageRotation } from "../hooks/usePageRotation";
 import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
+import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { shouldRedirectToOffline } from "./offlineRouting";
 
 export function LayoutShell() {
@@ -37,6 +38,9 @@ export function LayoutShell() {
     expectedDurationMs: (controller.currentPage?.durationSeconds ?? 0) * 1000,
     isPlaying: controller.isPlaying,
     playablePageCount: controller.pages.length
+  });
+  useScreenWakeLock({
+    enabled: true
   });
 
   useEffect(() => {
