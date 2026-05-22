@@ -464,7 +464,7 @@ test("getRuntimeBrandProfile targets the public active-brand bootstrap endpoint"
           brandNameZh: "國瑞汽車",
           brandNameEn: "KUOZUI MOTORS",
           logoUrl: "/uploads/brand/default.png",
-          productTitleZh: "國瑞汽車中廠綠能展示播放器",
+          productTitleZh: "國瑞汽車綠能展示播放器",
           productTitleEn: "KUOZUI GREEN ENERGY DISPLAY PLAYER",
           sloganZh: "永續，從現在開始",
           sloganEn: "/ Sustainability Starts with Us"

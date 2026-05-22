@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>國瑞汽車中廠綠能展示播放器</title>
+    <title>綠能展示播放器</title>
+    <script>
+      try {
+        const rawBrandView = window.localStorage.getItem("solar-display:brand-view");
+        if (rawBrandView) {
+          const parsedBrandView = JSON.parse(rawBrandView);
+          const cachedTitle = typeof parsedBrandView?.productTitleZh === "string"
+            ? parsedBrandView.productTitleZh.trim()
+            : "";
+          if (cachedTitle.length > 0) {
+            document.title = cachedTitle;
+          }
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -136,6 +136,40 @@ test("header and footer expose shell primitives without centered max-width wrapp
   assert.doesNotMatch(footerHtml, /max-w-\[var\(--screen-width\)\]/);
 });
 
+test("header and footer render the provided bootstrap brand view on first paint", () => {
+  const brandView = {
+    logoSrc: "/uploads/brand/live.png",
+    brandNameZh: "測試品牌",
+    brandNameEn: "TEST BRAND",
+    productTitleZh: "首屏中文標題",
+    productTitleEn: "BOOTSTRAPPED PRODUCT",
+    sloganZh: "首屏標語",
+    sloganEn: "BOOTSTRAPPED SLOGAN"
+  };
+
+  const headerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/overview"] },
+      React.createElement(AppHeader, { brandView })
+    )
+  );
+  const footerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview"]
+      },
+      React.createElement(AppFooterNav, { brandView })
+    )
+  );
+
+  assert.match(headerHtml, /首屏中文標題/);
+  assert.match(headerHtml, /BOOTSTRAPPED PRODUCT/);
+  assert.match(footerHtml, /首屏標語/);
+  assert.match(footerHtml, /BOOTSTRAPPED SLOGAN/);
+});
+
 test("playback footer keeps the five display routes only", () => {
   const footerHtml = renderToStaticMarkup(
     React.createElement(

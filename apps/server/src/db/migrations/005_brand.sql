@@ -25,6 +25,6 @@ INSERT INTO brand_profiles (
 )
 SELECT
   '預設品牌', '國瑞汽車', 'KUOZUI MOTORS',
-  '國瑞汽車中廠綠能展示播放器', 'KUOZUI GREEN ENERGY DISPLAY PLAYER',
+  '國瑞汽車綠能展示播放器', 'KUOZUI GREEN ENERGY DISPLAY PLAYER',
   '永續，從現在開始', '/ Sustainability Starts with Us', 1
 WHERE NOT EXISTS (SELECT 1 FROM brand_profiles);

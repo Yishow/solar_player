@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useBrandAssets } from "../hooks/useBrandAssets";
+import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { StatusBadge } from "./StatusBadge";
 
 type AppHeaderMeta = {
@@ -36,6 +36,7 @@ function defaultWeekday(now: Date) {
 }
 
 type AppHeaderProps = {
+  brandView?: BrandView;
   meta?: AppHeaderMeta;
 };
 
@@ -76,8 +77,7 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
   );
 }
 
-export function AppHeader({ meta }: AppHeaderProps) {
-  const brand = useBrandAssets();
+export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps) {
   const statusMeta =
     meta?.status && meta?.statusLabel
       ? {
@@ -100,8 +100,8 @@ export function AppHeader({ meta }: AppHeaderProps) {
             className="flex h-[68px] w-[68px] items-center justify-center transition-transform hover:scale-105 active:scale-95"
           >
             <img
-              src={brand.logoSrc}
-              alt={brand.brandNameEn}
+              src={brandView.logoSrc}
+              alt={brandView.brandNameEn}
               className="h-[60px] w-[60px] object-contain drop-shadow-sm"
               draggable={false}
             />
@@ -111,13 +111,13 @@ export function AppHeader({ meta }: AppHeaderProps) {
               className="text-[35px] font-extrabold tracking-[0.11em]"
               style={{ color: "var(--ink-strong)" }}
             >
-              {brand.brandNameZh}
+              {brandView.brandNameZh}
             </div>
             <div
               className="mt-[10px] font-en text-[15px] font-bold tracking-[0.34em]"
               style={{ color: "var(--ink-strong)" }}
             >
-              {brand.brandNameEn}
+              {brandView.brandNameEn}
             </div>
           </div>
         </div>
@@ -128,13 +128,13 @@ export function AppHeader({ meta }: AppHeaderProps) {
             className="text-[22px] font-semibold tracking-[0.32em]"
             style={{ color: "var(--ink-strong)" }}
           >
-            {brand.productTitleZh}
+            {brandView.productTitleZh}
           </div>
           <div
             className="mt-[14px] font-en text-[15px] font-medium tracking-[0.14em]"
             style={{ color: "var(--shell-kicker-muted)" }}
           >
-            {brand.productTitleEn}
+            {brandView.productTitleEn}
           </div>
         </div>
 

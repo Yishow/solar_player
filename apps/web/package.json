@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "pretest": "pnpm --filter @solar-display/shared build",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {

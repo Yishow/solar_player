@@ -30,7 +30,7 @@ function clearBrandProfiles() {
     "預設品牌",
     "國瑞汽車",
     "KUOZUI MOTORS",
-    "國瑞汽車中廠綠能展示播放器",
+    "國瑞汽車綠能展示播放器",
     "KUOZUI GREEN ENERGY DISPLAY PLAYER",
     "永續，從現在開始",
     "/ Sustainability Starts with Us"
@@ -208,6 +208,7 @@ test("GET /api/brand/profiles/active returns only the playback runtime brand pay
       "sloganEn",
       "sloganZh"
     ]);
+    assert.equal(body.data.productTitleZh, "國瑞汽車綠能展示播放器");
   } finally {
     await app.close();
   }

@@ -120,6 +120,7 @@ export function FactoryCircuit({
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     void loadCircuitsRef.current("bootstrap");
 
     return () => {

@@ -2,7 +2,7 @@ import React, { Fragment } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
-import { useBrandAssets } from "../hooks/useBrandAssets";
+import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
 import { PageNumberPill } from "./PageNumberPill";
 
@@ -61,9 +61,11 @@ function buildEntries(
 }
 
 export function AppFooterNav({
+  brandView = defaultBrandView,
   playbackEntries,
   resolvedPlaybackRouteMeta
 }: {
+  brandView?: BrandView;
   playbackEntries?: PlaybackFooterEntry[];
   resolvedPlaybackRouteMeta?: ResolvedPlaybackRouteMeta;
 }) {
@@ -77,8 +79,6 @@ export function AppFooterNav({
         }
       : undefined
   );
-  const brand = useBrandAssets();
-
   // Settings nav has more entries; tighten typography & spacing so they fit.
   // 縮小間距以讓項目更近
   const navItemPaddingX = mode === "playback" ? 24 : 14;
@@ -179,13 +179,13 @@ export function AppFooterNav({
                 textShadow: "0 1px 1px rgba(255, 255, 255, 0.8), 0 -1px 1px rgba(0, 0, 0, 0.05)"
               }}
             >
-              {brand.sloganZh}
+              {brandView.sloganZh}
             </div>
             <div
               className="mt-[4px] font-en text-[11px] font-medium tracking-[0.12em]"
               style={{ color: "var(--shell-slogan-soft-ink)" }}
             >
-              {brand.sloganEn}
+              {brandView.sloganEn}
             </div>
           </div>
           <FooterBranch />

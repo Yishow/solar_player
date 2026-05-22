@@ -1,6 +1,7 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
-import { LayoutShell } from "../layouts/LayoutShell";
-import { ManagementShell } from "../layouts/ManagementShell";
+import { loadRuntimeBrandView } from "../hooks/useBrandAssets";
+import { LayoutShellRoute } from "../layouts/LayoutShell";
+import { ManagementShellRoute } from "../layouts/ManagementShell";
 import { BrandAssets } from "../pages/BrandAssets";
 import { CircuitSettings } from "../pages/CircuitSettings";
 import { DeviceStatus } from "../pages/DeviceStatus";
@@ -21,7 +22,8 @@ export const router = createBrowserRouter([
     element: <Navigate to="/overview" replace />
   },
   {
-    element: <LayoutShell />,
+    element: <LayoutShellRoute />,
+    loader: loadRuntimeBrandView,
     children: [
       {
         path: ":displayPageSlug",
@@ -30,7 +32,8 @@ export const router = createBrowserRouter([
     ]
   },
   {
-    element: <ManagementShell />,
+    element: <ManagementShellRoute />,
+    loader: loadRuntimeBrandView,
     children: [
       {
         path: "trends",

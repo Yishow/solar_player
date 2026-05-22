@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLoaderData, useLocation, useNavigate } from "react-router-dom";
 import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { DisplayCanvas } from "../components/DisplayCanvas";
 import { PlaybackErrorBoundary } from "../components/PlaybackErrorBoundary";
 import { resolveHeaderConnectionMeta } from "../components/headerConnectionMeta";
+import { useBrandAssets, type BrandView } from "../hooks/useBrandAssets";
 import { useDisplayClientHeartbeat } from "../hooks/useDisplayClientHeartbeat";
 import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
@@ -14,9 +15,10 @@ import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
 import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { shouldRedirectToOffline } from "./offlineRouting";
 
-export function LayoutShell() {
+export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const brandView = useBrandAssets(initialBrandView);
   const registry = useDisplayPageRegistry();
   const { isHydrated, status } = useMqttStatus();
   const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
@@ -86,17 +88,29 @@ export function LayoutShell() {
     <DisplayCanvas
       header={
         <AppHeader
+          brandView={brandView}
           meta={{
             status: headerConnectionMeta.status,
             statusLabel: headerConnectionMeta.label
           }}
         />
       }
-      footer={<AppFooterNav playbackEntries={playbackEntries} resolvedPlaybackRouteMeta={routeMeta} />}
+      footer={
+        <AppFooterNav
+          brandView={brandView}
+          playbackEntries={playbackEntries}
+          resolvedPlaybackRouteMeta={routeMeta}
+        />
+      }
     >
       <PlaybackErrorBoundary>
         <Outlet />
       </PlaybackErrorBoundary>
     </DisplayCanvas>
   );
+}
+
+export function LayoutShellRoute() {
+  const initialBrandView = useLoaderData() as BrandView;
+  return <LayoutShell initialBrandView={initialBrandView} />;
 }
