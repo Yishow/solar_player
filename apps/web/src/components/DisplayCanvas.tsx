@@ -1,12 +1,8 @@
 import React, { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
+import { computeCanvasLayout } from "./displayCanvasLayout";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
-
-type CanvasScale = {
-  x: number;
-  y: number;
-};
 
 function getViewportSize() {
   if (typeof window === "undefined") {
@@ -22,35 +18,32 @@ function getViewportSize() {
   };
 }
 
-function computeCanvasScale(): CanvasScale {
-  const viewport = getViewportSize();
-
-  return {
-    x: viewport.width / DESIGN_WIDTH,
-    y: viewport.height / DESIGN_HEIGHT
-  };
-}
-
 type DisplayCanvasProps = PropsWithChildren<{
   footer?: ReactNode;
   header?: ReactNode;
 }>;
 
 export function DisplayCanvas({ footer, header, children }: DisplayCanvasProps) {
-  const [scale, setScale] = useState<CanvasScale>(() => computeCanvasScale());
+  const [layout, setLayout] = useState(() => computeCanvasLayout(
+    getViewportSize(),
+    { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
+  ));
 
   useEffect(() => {
-    const updateScale = () => {
-      setScale(computeCanvasScale());
+    const updateLayout = () => {
+      setLayout(computeCanvasLayout(
+        getViewportSize(),
+        { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
+      ));
     };
 
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    window.visualViewport?.addEventListener("resize", updateScale);
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    window.visualViewport?.addEventListener("resize", updateLayout);
 
     return () => {
-      window.removeEventListener("resize", updateScale);
-      window.visualViewport?.removeEventListener("resize", updateScale);
+      window.removeEventListener("resize", updateLayout);
+      window.visualViewport?.removeEventListener("resize", updateLayout);
     };
   }, []);
 
@@ -58,13 +51,16 @@ export function DisplayCanvas({ footer, header, children }: DisplayCanvasProps) 
     <div
       data-shell-primitive="display-canvas-viewport"
       className="shell-stage relative h-screen w-screen overflow-hidden text-neutral-900"
+      style={{
+        backgroundColor: "var(--stage-bg)"
+      }}
     >
       <div
         data-shell-primitive="display-canvas-frame"
         className="absolute left-0 top-0"
         style={{
           height: `${DESIGN_HEIGHT}px`,
-          transform: `scale(${scale.x}, ${scale.y})`,
+          transform: `translate(${layout.offsetX}px, ${layout.offsetY}px) scale(${layout.scale})`,
           transformOrigin: "top left",
           width: `${DESIGN_WIDTH}px`
         }}
