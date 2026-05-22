@@ -6,6 +6,7 @@ import {
   DisplayCardFrame,
   DisplayCardHeader
 } from "../../components/displayPageCards";
+import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -89,7 +90,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       stage: runtimeStage
     })
   ) {
-    return null;
+    return <DisplayPageLoadingState />;
   }
 
   const resolvedConfig = config ?? runtimeConfig.config;

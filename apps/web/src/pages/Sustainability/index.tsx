@@ -15,6 +15,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
+import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -122,7 +123,7 @@ export function Sustainability({
       stage: runtimeStage
     })
   ) {
-    return null;
+    return <DisplayPageLoadingState />;
   }
 
   const resolvedConfig = config ?? runtimeConfig.config;

@@ -1,5 +1,6 @@
 import type { CircuitConfig } from "@solar-display/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -153,7 +154,7 @@ export function FactoryCircuit({
       stage: runtimeStage
     })
   ) {
-    return null;
+    return <DisplayPageLoadingState />;
   }
 
   const resolvedConfig = config ?? runtimeConfig.config;

@@ -25,10 +25,16 @@ test("live runtime display pages defer first paint until persisted config hydrat
     const source = readFileSync(path.join(import.meta.dirname, pageName, "index.tsx"), "utf8");
     const guardIndex = source.indexOf("shouldDeferDisplayPageRuntimeRender");
     const viewModelIndex = source.indexOf(viewModelBuilders[pageName]);
+    const guardSlice =
+      guardIndex !== -1 && viewModelIndex !== -1
+        ? source.slice(guardIndex, viewModelIndex)
+        : "";
 
     assert.match(source, /shouldDeferDisplayPageRuntimeRender/, `${pageName} should use runtime render defer guard`);
     assert.match(source, /lastLoadedEnvelope:\s*runtimeConfig\.lastLoadedEnvelope/, `${pageName} should key defer logic off the first hydration envelope`);
     assert.match(source, /RuntimeConfigFallbackBanner/, `${pageName} should surface runtime hydration fallback warnings`);
+    assert.match(source, /DisplayPageLoadingState/, `${pageName} should render the shared loading state during cold hydration`);
+    assert.doesNotMatch(guardSlice, /return null;/, `${pageName} should not render blank content during the defer window`);
     assert.ok(guardIndex !== -1 && viewModelIndex !== -1 && guardIndex < viewModelIndex, `${pageName} should defer before building its runtime view model`);
   }
 });

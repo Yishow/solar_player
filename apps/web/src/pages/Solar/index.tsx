@@ -7,6 +7,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
+import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
@@ -166,7 +167,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       stage: runtimeStage
     })
   ) {
-    return null;
+    return <DisplayPageLoadingState />;
   }
 
   const resolvedConfig = config ?? runtimeConfig.config;
