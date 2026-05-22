@@ -23,6 +23,7 @@ export type DeviceSafeOpsGuidance = {
 
 export type DeviceDisplayAlert = {
   code: DisplayOpsIssueCode | "readiness-blocking";
+  domain: "configuration-readiness" | "operational-health";
   message: string;
   pageId?: DisplayPageKey;
   severity: "blocking" | "warning";
@@ -64,6 +65,10 @@ export type DeviceDisplayOpsSummary = {
     affectedPages: DisplayPageKey[];
     unhealthyCount: number;
   };
+  configurationReadinessSummary: {
+    blockingCount: number;
+    warningCount: number;
+  };
   degraded: boolean;
   diagnosticActions: Array<{
     action: DeviceDisplayDiagnosticAction;
@@ -74,8 +79,9 @@ export type DeviceDisplayOpsSummary = {
   generatedAt: string;
   lastPublishAt: string | null;
   liveVersion: number | null;
-  readinessSummary: {
+  operationalHealthSummary: {
     blockingCount: number;
+    degraded: boolean;
     warningCount: number;
   };
   skipSummary: {

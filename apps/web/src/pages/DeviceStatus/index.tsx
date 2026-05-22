@@ -122,7 +122,7 @@ export function DeviceStatus() {
     try {
       const result = await runDeviceDisplayDiagnostic(action);
       setActionFeedback({
-        detail: `${result.message} ${formatGeneratedAt(result.generatedAt)} · ${result.summary.skipSummary.count} skipped · ${result.summary.readinessSummary.blockingCount} blocking · ${result.summary.assetHealthSummary.unhealthyCount} unhealthy · host: ${result.guidance.hostRestartCommand}`,
+        detail: `${result.message} ${formatGeneratedAt(result.generatedAt)} · operational: ${result.summary.operationalHealthSummary.blockingCount} blocking · config: ${result.summary.configurationReadinessSummary.blockingCount} blocking · ${result.summary.skipSummary.count} skipped · ${result.summary.assetHealthSummary.unhealthyCount} unhealthy · host: ${result.guidance.hostRestartCommand}`,
         title: label,
         tone: "ready"
       });

@@ -1,11 +1,13 @@
 import type {
   DeviceDisplayDiagnosticAction,
   DeviceDisplayDiagnosticResult,
+  DeviceDisplayAlert,
   DeviceDisplayOpsSummary,
   DeviceSafeOpsGuidance,
   DeviceUnsupportedControlAction,
   DeviceUnsupportedControlResult
 } from "@solar-display/shared";
+import { resolveDisplayFaultTriageSummaryFromAlerts } from "@solar-display/shared";
 import { readDisplayOpsSummary } from "./displayOpsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 
@@ -39,6 +41,49 @@ const diagnosticActions: DeviceDisplayOpsSummary["diagnosticActions"] = [
   { action: "export-summary", label: "Export summary", safeScope: "safe-read" }
 ];
 
+function toConfigurationReadinessAlert(
+  finding: ReturnType<typeof readDisplayReadinessReport>["findings"][number]
+): DeviceDisplayAlert {
+  if (finding.sourceType === "mqtt-metric") {
+    return {
+      code: "mqtt-mapping-missing",
+      domain: "configuration-readiness",
+      message: finding.reason,
+      pageId: finding.pageId,
+      severity: "blocking"
+    };
+  }
+
+  if (finding.sourceType === "circuit-slot") {
+    return {
+      code: finding.reason.startsWith("slot conflict:")
+        ? "slot-binding-conflict"
+        : "slot-binding-missing",
+      domain: "configuration-readiness",
+      message: finding.reason,
+      pageId: finding.pageId,
+      severity: "blocking"
+    };
+  }
+
+  return {
+    code: "readiness-blocking",
+    domain: "configuration-readiness",
+    message: finding.reason,
+    pageId: finding.pageId,
+    severity: "blocking"
+  };
+}
+
+function toOperationalHealthAlert(
+  issue: ReturnType<typeof readDisplayOpsSummary>["blockingIssues"][number]
+): DeviceDisplayAlert {
+  return {
+    ...issue,
+    domain: "operational-health"
+  };
+}
+
 export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLike }): DeviceDisplayOpsSummary {
   const displayOps = readDisplayOpsSummary(options);
   const readiness = readDisplayReadinessReport();
@@ -50,37 +95,43 @@ export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLik
     (issue) =>
       issue.code === "data-not-ready" ||
       issue.code === "derived-metric-missing" ||
-      issue.code === "mqtt-mapping-missing" ||
-      issue.code === "slot-binding-conflict" ||
-      issue.code === "slot-binding-missing" ||
       issue.code === "stale-runtime" ||
+      issue.code === "draft-pending" ||
+      issue.code === "live-reference" ||
+      issue.code === "skip-active" ||
       issue.code === "unpublished"
   );
   const readinessAlerts = readiness.findings
     .filter((finding) => finding.blocking)
-    .map((finding) => ({
-      code: "readiness-blocking" as const,
-      message: finding.reason,
-      pageId: finding.pageId,
-      severity: "blocking" as const
-    }));
+    .map(toConfigurationReadinessAlert);
+  const operationalAlerts = [...assetAlerts, ...runtimeReadinessAlerts].map(
+    toOperationalHealthAlert
+  );
+  const configurationReadinessSummary = {
+    blockingCount: readiness.summary.blockingCount,
+    warningCount: readiness.summary.warningCount
+  };
+  const operationalHealthSummary = {
+    blockingCount: operationalAlerts.filter((alert) => alert.severity === "blocking").length,
+    degraded: operationalAlerts.length > 0,
+    warningCount: operationalAlerts.filter((alert) => alert.severity === "warning").length
+  };
+  const alerts = [...operationalAlerts, ...readinessAlerts];
 
   return {
-    alerts: [...assetAlerts, ...runtimeReadinessAlerts, ...readinessAlerts],
+    alerts,
     assetHealthSummary: {
       affectedPages: affectedAssetPages,
       unhealthyCount: affectedAssetPages.length
     },
-    degraded: displayOps.blockingIssues.length > 0 || readiness.summary.blockingCount > 0,
+    configurationReadinessSummary,
+    degraded: operationalHealthSummary.degraded,
     diagnosticActions,
     draftCount: displayOps.draftCount,
     generatedAt: new Date().toISOString(),
     lastPublishAt: displayOps.lastPublishAt,
     liveVersion: displayOps.liveVersion,
-    readinessSummary: {
-      blockingCount: readiness.summary.blockingCount + runtimeReadinessAlerts.length,
-      warningCount: readiness.summary.warningCount
-    },
+    operationalHealthSummary,
     skipSummary: {
       count: displayOps.skipCount,
       pages: displayOps.pages
@@ -88,7 +139,7 @@ export function readDeviceDisplayOpsSummary(options: { mqttStatus: MqttStatusLik
         .map((page) => page.pageId)
     },
     safeOpsGuidance,
-    triageSummary: displayOps.triageSummary ?? null
+    triageSummary: resolveDisplayFaultTriageSummaryFromAlerts(alerts) ?? null
   };
 }
 

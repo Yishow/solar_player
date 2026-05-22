@@ -13,6 +13,7 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       alerts: [
         {
           code: "asset-unhealthy",
+          domain: "operational-health",
           message: "overview live asset missing",
           pageId: "overview",
           severity: "blocking"
@@ -31,8 +32,13 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       generatedAt: "2026-05-18T09:30:00.000Z",
       lastPublishAt: "2026-05-18T08:45:00.000Z",
       liveVersion: 14,
-      readinessSummary: {
+      configurationReadinessSummary: {
         blockingCount: 3,
+        warningCount: 0
+      },
+      operationalHealthSummary: {
+        blockingCount: 1,
+        degraded: true,
         warningCount: 0
       },
       safeOpsGuidance: {
@@ -96,6 +102,9 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.displayOpsSummary.lastPublishLabel, "2026-05-18 08:45");
   assert.equal(model.displayOpsSummary.assetHealthLabel, "1 unhealthy");
   assert.equal(model.displayOpsSummary.alerts[0]?.message, "overview live asset missing");
+  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "operational-health");
+  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "3 blocking");
+  assert.equal(model.displayOpsSummary.operationalHealthLabel, "1 blocking");
   assert.equal(model.displayOpsSummary.diagnostics[0]?.action, "refresh-readiness");
   assert.equal(model.displayOpsSummary.runbookPath, "docs/runbooks/device-diagnostics-safe-ops.md");
   assert.equal(model.displayOpsSummary.hostRestartCommand, "systemctl restart solar-display");
@@ -149,6 +158,7 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
       alerts: [
         {
           code: "unpublished",
+          domain: "operational-health",
           message: "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播",
           pageId: "factory-circuit",
           severity: "blocking"
@@ -164,8 +174,13 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
       generatedAt: "2026-05-20T02:45:00.000Z",
       lastPublishAt: "2026-05-20T01:30:00.000Z",
       liveVersion: 6,
-      readinessSummary: {
+      configurationReadinessSummary: {
         blockingCount: 1,
+        warningCount: 0
+      },
+      operationalHealthSummary: {
+        blockingCount: 1,
+        degraded: true,
         warningCount: 0
       },
       safeOpsGuidance: {
@@ -197,6 +212,61 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
   assert.deepEqual(model.triageSummary?.affectedPages, ["factory-circuit"]);
   assert.equal(model.triageSummary?.repairDestinationLabel, "Display Pages Editor");
   assert.match(model.displayOpsSummary.helper, /Display Pages Editor/);
+});
+
+test("buildDeviceStatusViewModel keeps configuration-readiness distinct from operational health", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    displayOpsSummary: {
+      alerts: [
+        {
+          code: "mqtt-mapping-missing",
+          domain: "configuration-readiness",
+          message: "missing MQTT mapping for realTimePower",
+          pageId: "overview",
+          severity: "blocking"
+        }
+      ],
+      assetHealthSummary: {
+        affectedPages: [],
+        unhealthyCount: 0
+      },
+      configurationReadinessSummary: {
+        blockingCount: 1,
+        warningCount: 0
+      },
+      degraded: false,
+      diagnosticActions: [],
+      draftCount: 0,
+      generatedAt: "2026-05-22T10:00:00.000Z",
+      lastPublishAt: null,
+      liveVersion: 3,
+      operationalHealthSummary: {
+        blockingCount: 0,
+        degraded: false,
+        warningCount: 0
+      },
+      safeOpsGuidance: {
+        hostRestartCommand: "systemctl restart solar-display",
+        hostRestartLabel: "Host-level restart",
+        runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
+        unsupportedOperations: []
+      },
+      skipSummary: {
+        count: 0,
+        pages: []
+      }
+    } as never,
+    isLoading: false,
+    logExport: null,
+    logExportError: "",
+    status: null
+  });
+
+  assert.equal(model.displayOpsSummary.statusTitle, "設定待完成");
+  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "1 blocking");
+  assert.equal(model.displayOpsSummary.operationalHealthLabel, "0 blocking");
+  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "configuration-readiness");
 });
 
 test("buildDeviceStatusViewModel keeps denied reads distinct from empty and generic failure states", () => {

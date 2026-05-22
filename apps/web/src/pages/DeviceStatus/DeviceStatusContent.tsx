@@ -136,7 +136,7 @@ export function DeviceStatusContent({
           </span>
           <span className="ds-status-card__detail">
             {(displayOpsAccessDenied ? "" : displayOpsErrorMessage) ||
-              `${viewModel.displayOpsSummary.liveVersion} · ${viewModel.displayOpsSummary.skipLabel} · ${viewModel.displayOpsSummary.readinessLabel}`}
+              `${viewModel.displayOpsSummary.liveVersion} · ${viewModel.displayOpsSummary.operationalHealthLabel} · ${viewModel.displayOpsSummary.configurationReadinessLabel}`}
           </span>
         </article>
       </aside>
@@ -188,9 +188,15 @@ export function DeviceStatusContent({
               </small>
             </div>
             <div className="mgmt-status">
-              {viewModel.displayOpsSummary.assetHealthLabel}
+              {viewModel.displayOpsSummary.configurationReadinessLabel}
               <small style={{ display: "block", opacity: 0.72 }}>
-                {viewModel.displayOpsSummary.readinessLabel}
+                Configuration readiness
+              </small>
+            </div>
+            <div className="mgmt-status">
+              {viewModel.displayOpsSummary.operationalHealthLabel}
+              <small style={{ display: "block", opacity: 0.72 }}>
+                Operational health · {viewModel.displayOpsSummary.assetHealthLabel}
               </small>
             </div>
           </div>
@@ -206,7 +212,7 @@ export function DeviceStatusContent({
                 key={`${alert.code}-${alert.pageLabel}-${alert.message}`}
                 className={`mgmt-status ${alert.severity === "blocking" ? "is-error" : ""}`}
               >
-                [{alert.pageLabel}] {alert.message}
+                [{alert.domainLabel}] [{alert.pageLabel}] {alert.message}
               </div>
             ))}
             {!displayOpsErrorMessage && !displayOpsAccessDenied && viewModel.displayOpsSummary.alerts.length === 0 ? (

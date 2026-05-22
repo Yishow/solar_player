@@ -7,7 +7,10 @@ const deviceStatusContentSource = readFileSync(path.join(import.meta.dirname, "D
 
 test("device status content renders degraded display operations summary wiring", () => {
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.degraded \? "is-warning" : "is-neutral"/);
-  assert.match(deviceStatusContentSource, /displayOpsErrorMessage \? "摘要不可用" : viewModel\.displayOpsSummary\.statusTitle/);
+  assert.match(deviceStatusContentSource, /displayOpsErrorMessage\s*\?\s*"摘要不可用"\s*:\s*viewModel\.displayOpsSummary\.statusTitle/s);
+  assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.configurationReadinessLabel/);
+  assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.operationalHealthLabel/);
+  assert.match(deviceStatusContentSource, /alert\.domainLabel/);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.alerts\)\.map/);
   assert.match(deviceStatusContentSource, /handleDiagnostic\(action\.action, action\.label\)/);
   assert.match(deviceStatusContentSource, /displayOpsSummary\.helper/);

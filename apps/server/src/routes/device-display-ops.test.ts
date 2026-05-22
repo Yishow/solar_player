@@ -78,6 +78,9 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
     updatedAt: "2026-05-18T09:00:00.000Z",
     version: 5
   });
+  getDatabase()
+    .prepare("UPDATE topic_mappings SET enabled = 0 WHERE metric_key = ?")
+    .run("realTimePower");
   unlinkSync(join(uploadsDir, asset.filename));
 
   const app = await buildApp();
@@ -91,12 +94,13 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
     assert.equal(response.statusCode, 200);
     const body = response.json() as {
       summary: {
-        alerts: Array<{ code: string }>;
+        alerts: Array<{ code: string; domain: string; severity: string }>;
         assetHealthSummary: { unhealthyCount: number };
+        configurationReadinessSummary: { blockingCount: number };
         diagnosticActions: Array<{ action: string; safeScope: string }>;
         draftCount: number;
         liveVersion: number | null;
-        readinessSummary: { blockingCount: number };
+        operationalHealthSummary: { blockingCount: number; degraded: boolean };
         safeOpsGuidance: {
           hostRestartCommand: string;
           runbookPath: string;
@@ -109,11 +113,28 @@ test("GET /api/device-display-ops returns display summary, alerts, and safe diag
     assert.equal(body.summary.liveVersion, 4);
     assert.equal(body.summary.draftCount, 1);
     assert.ok(body.summary.skipSummary.count >= 1);
-    assert.ok(body.summary.readinessSummary.blockingCount >= 1);
+    assert.ok(body.summary.configurationReadinessSummary.blockingCount >= 1);
+    assert.ok(body.summary.operationalHealthSummary.blockingCount >= 1);
     assert.equal(body.summary.assetHealthSummary.unhealthyCount, 1);
     assert.equal(
-      body.summary.alerts.some((alert) => alert.code === "asset-unhealthy"),
+      body.summary.alerts.some(
+        (alert) => alert.code === "asset-unhealthy" && alert.domain === "operational-health"
+      ),
       true
+    );
+    assert.equal(
+      body.summary.alerts.some((alert) => alert.domain === "configuration-readiness"),
+      true
+    );
+    assert.equal(
+      body.summary.configurationReadinessSummary.blockingCount,
+      body.summary.alerts.filter((alert) => alert.domain === "configuration-readiness").length
+    );
+    assert.equal(
+      body.summary.operationalHealthSummary.blockingCount,
+      body.summary.alerts.filter(
+        (alert) => alert.domain === "operational-health" && alert.severity === "blocking"
+      ).length
     );
     assert.deepEqual(
       body.summary.diagnosticActions.map((action) => action.action),
@@ -178,7 +199,8 @@ test("POST /api/device-display-ops/diagnostics returns a truthful safe result fo
         summary: {
           draftCount: number;
           generatedAt: string;
-          readinessSummary: { blockingCount: number };
+          configurationReadinessSummary: { blockingCount: number };
+          operationalHealthSummary: { blockingCount: number; degraded: boolean };
           skipSummary: { count: number };
         };
       };
@@ -203,8 +225,12 @@ test("POST /api/device-display-ops/diagnostics returns a truthful safe result fo
       summaryBody.summary.skipSummary.count
     );
     assert.equal(
-      diagnosticBody.data.summary.readinessSummary.blockingCount >= 0,
+      diagnosticBody.data.summary.configurationReadinessSummary.blockingCount >= 0,
       true
+    );
+    assert.equal(
+      typeof diagnosticBody.data.summary.operationalHealthSummary.degraded,
+      "boolean"
     );
     assert.equal(diagnosticBody.data.generatedAt, diagnosticBody.data.summary.generatedAt);
   } finally {
@@ -269,7 +295,9 @@ test("GET /api/device/status keeps host health while adding a degraded display s
         };
         displayOps: {
           degraded: boolean;
+          configurationReadinessSummary: { blockingCount: number };
           diagnosticActions: Array<{ action: string }>;
+          operationalHealthSummary: { degraded: boolean };
         };
         hostname: string;
       };
@@ -284,6 +312,8 @@ test("GET /api/device/status keeps host health while adding a degraded display s
     assert.ok(body.data.disk.usedMB >= 0);
     assert.ok(body.data.disk.usePercent >= 0);
     assert.equal(typeof body.data.displayOps.degraded, "boolean");
+    assert.ok(body.data.displayOps.configurationReadinessSummary.blockingCount >= 0);
+    assert.equal(typeof body.data.displayOps.operationalHealthSummary.degraded, "boolean");
     assert.deepEqual(
       body.data.displayOps.diagnosticActions.map((action) => action.action),
       ["refresh-readiness", "export-summary"]

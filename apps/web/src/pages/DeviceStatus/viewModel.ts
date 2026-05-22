@@ -216,10 +216,13 @@ export function buildDeviceStatusViewModel({
       alerts:
         displayOpsSummary?.alerts.map((alert) => ({
           ...alert,
+          domainLabel: alert.domain,
           pageLabel: alert.pageId ? `${alert.pageId}` : "global"
         })) ?? [],
       assetHealthLabel: `${displayOpsSummary?.assetHealthSummary.unhealthyCount ?? 0} unhealthy`,
-      degraded: displayOpsSummary?.degraded ?? false,
+      configurationReadinessLabel:
+        `${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} blocking`,
+      degraded: displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded ?? false,
       diagnosticsLabel:
         displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") ?? "--",
       diagnostics: displayOpsSummary?.diagnosticActions ?? [],
@@ -237,15 +240,18 @@ export function buildDeviceStatusViewModel({
         displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined
           ? "--"
           : `v${displayOpsSummary.liveVersion}`,
-      readinessLabel: `${displayOpsSummary?.readinessSummary.blockingCount ?? 0} blocking`,
+      operationalHealthLabel:
+        `${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} blocking`,
       runbookPath: safeOpsGuidance.runbookPath,
       safeOpsHelper: `安全操作：${displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") || "--"} · 主機層處置：${safeOpsGuidance.hostRestartCommand} · Runbook：${safeOpsGuidance.runbookPath}`,
       skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
       statusTitle:
         displayOpsAccessDenied
           ? "存取受限"
-          : displayOpsSummary?.degraded
+          : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
             ? "展示退化"
+            : (displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0) > 0
+              ? "設定待完成"
             : "展示正常",
       unsupportedControlsLabel:
         safeOpsGuidance.unsupportedOperations.length > 0
