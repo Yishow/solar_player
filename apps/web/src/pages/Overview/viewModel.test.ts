@@ -33,6 +33,7 @@ function createResolvedStoryMetric(args: {
   metricKey: string;
   provenance?: "cumulative" | "derived" | "fallback" | "live";
   sourceClass?: "cumulative-counter" | "derived-metric" | "mqtt-live";
+  trendSeries?: number[];
   unit: string;
   value?: string;
 }) {
@@ -48,6 +49,7 @@ function createResolvedStoryMetric(args: {
     metricKey: args.metricKey,
     provenance: args.provenance ?? "live",
     sourceClass: args.sourceClass ?? "mqtt-live",
+    trendSeries: args.trendSeries,
     unit: args.unit,
     value: args.value ?? "--"
   };
@@ -405,4 +407,53 @@ test("buildOverviewViewModel keeps socket bindings when display-story request fa
   assert.equal(model.metrics[0]?.label, "即時發電功率");
   assert.equal(model.metrics[1]?.label, "今日發電量");
   assert.equal(model.summary.statusLabel, "部分 KPI 缺資料，使用 fallback 顯示");
+});
+
+test("buildOverviewViewModel leaves trendSeries undefined when runtime story metrics do not provide sequences", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot
+  });
+
+  assert.equal(model.metrics.every((metric) => metric.trendSeries === undefined), true);
+});
+
+test("buildOverviewViewModel exposes runtime trendSeries from story metrics when available", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          label: "故事版即時功率",
+          metricKey: "realTimePower",
+          trendSeries: [82, 95, 101, 108],
+          unit: "kW",
+          value: "612"
+        }),
+        createResolvedStoryMetric({
+          label: "故事版今日發電量",
+          metricKey: "todayGeneration",
+          unit: "kWh",
+          value: "3,842"
+        })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  assert.deepEqual(model.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries, [
+    82,
+    95,
+    101,
+    108
+  ]);
+  assert.equal(model.metrics.find((metric) => metric.metricKey === "todayGeneration")?.trendSeries, undefined);
 });

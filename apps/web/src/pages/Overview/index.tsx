@@ -14,7 +14,6 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
-import { trendSeries } from "../../mocks/metrics";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
@@ -234,9 +233,11 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
               title={metric.label}
             />
             <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
-            <DisplayCardFooter>
-              <Sparkline className="overview-kpi-sparkline" values={trendSeries} />
-            </DisplayCardFooter>
+            {metric.trendSeries && metric.trendSeries.length > 0 ? (
+              <DisplayCardFooter>
+                <Sparkline className="overview-kpi-sparkline" values={metric.trendSeries} />
+              </DisplayCardFooter>
+            ) : null}
           </DisplayCardFrame>
         );
       })}

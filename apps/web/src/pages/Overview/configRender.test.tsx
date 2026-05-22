@@ -22,6 +22,9 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /DisplayCardFrame/);
   assert.match(overviewSource, /DisplayCardValueRow/);
   assert.match(overviewSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
+  assert.match(overviewSource, /metric\.trendSeries && metric\.trendSeries\.length > 0/);
+  assert.match(overviewSource, /Sparkline className=\"overview-kpi-sparkline\" values=\{metric\.trendSeries\}/);
+  assert.doesNotMatch(overviewSource, /import \{ trendSeries \} from \"\.\.\/\.\.\/mocks\/metrics\"/);
   assert.doesNotMatch(overviewSource, /Shared Story Summary/);
 });
 

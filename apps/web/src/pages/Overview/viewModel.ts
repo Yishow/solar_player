@@ -29,7 +29,12 @@ type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
 type OverviewMetricCard = {
   accentColor?: boolean;
   iconKey: OverviewMetricIconKey;
+  trendSeries?: number[];
 } & MonitoringMetricBinding<OverviewMetricKey>;
+
+type OverviewResolvedStoryMetric = ResolvedMonitoringMetricBinding<string> & {
+  trendSeries?: number[];
+};
 
 type OverviewStorySummary = {
   alertTone: MonitoringAlertTone;
@@ -193,7 +198,7 @@ function resolveSummaryLabel(args: {
 
 function resolveStoryMetricCards(
   metricBindings: OverviewMetricCard[],
-  storyMetrics: Array<ResolvedMonitoringMetricBinding<string>>
+  storyMetrics: OverviewResolvedStoryMetric[]
 ) {
   const storyMetricByKey = new Map(storyMetrics.map((metric) => [metric.metricKey, metric]));
 
@@ -218,13 +223,14 @@ function resolveStoryMetricCards(
       metricKey: metricCard.metricKey,
       provenance: storyMetric.provenance,
       sourceClass: storyMetric.sourceClass,
+      trendSeries: Array.isArray(storyMetric.trendSeries) ? storyMetric.trendSeries : undefined,
       unit: storyMetric.unit,
       value: storyMetric.value
     };
   });
 }
 
-function isResolvedStoryMetric(value: unknown): value is ResolvedMonitoringMetricBinding<string> {
+function isResolvedStoryMetric(value: unknown): value is OverviewResolvedStoryMetric {
   if (!value || typeof value !== "object") {
     return false;
   }
@@ -309,6 +315,7 @@ export function buildOverviewViewModel({
         metricKey: metricCard.metricKey,
         provenance: metricCard.provenance,
         sourceClass: metricCard.sourceClass,
+        trendSeries: metricCard.trendSeries,
         unit: metricCard.unit,
         value: metricCard.value
       };
@@ -341,6 +348,7 @@ export function buildOverviewViewModel({
       metricKey: resolved.metricKey,
       provenance: resolved.provenance,
       sourceClass: resolved.sourceClass,
+      trendSeries: metricCard.trendSeries,
       unit: resolved.unit,
       value: resolved.value
     };
