@@ -611,6 +611,73 @@ test("buildMqttSettingsViewModel merges editable topic rows with runtime and cov
   assert.equal(model.topicWorkspaceSummary.coverageCount, 1);
 });
 
+test("buildMqttSettingsViewModel explains the unconfigured CWA weather source instead of failing silently", () => {
+  const baseArgs = {
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "Weather settings 已同步。",
+    readiness: null,
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt",
+      host: "localhost",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "localhost:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    },
+    topics: [],
+    weatherOptionsErrorMessage: "",
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings({ enabled: true })
+  } satisfies Omit<Parameters<typeof buildMqttSettingsViewModel>[0], "weatherOptions" | "weatherPreviewContract">;
+
+  const unconfiguredModel = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherOptions: createWeatherOptions({
+      counties: [],
+      fetchState: "unconfigured",
+      stations: [],
+      updatedAt: null
+    }),
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({ fetchState: "unconfigured" })
+    })
+  });
+
+  assert.match(unconfiguredModel.weatherCard.configFeedback, /CWA/);
+  assert.match(unconfiguredModel.weatherCard.configFeedback, /CWA_AUTHORIZATION/);
+
+  const configuredModel = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherOptions: createWeatherOptions(),
+    weatherPreviewContract: createWeatherPreviewContract()
+  });
+
+  assert.equal(configuredModel.weatherCard.configFeedback, "");
+});
+
 test("buildMqttSettingsViewModel models weather presets preview and custom-field fallback", () => {
   const model = buildMqttSettingsViewModel({
     actionState: {

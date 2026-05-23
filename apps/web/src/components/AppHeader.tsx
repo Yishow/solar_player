@@ -154,7 +154,7 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
           <div
             data-shell-primitive="header-weather"
             data-weather-state={weatherMeta.state}
-            className="ml-[40px] flex w-[320px] min-w-0 items-center gap-[12px]"
+            className="ml-[40px] flex w-[180px] min-w-0 items-center gap-[12px]"
             style={{ color: "var(--shell-meta-weather-ink)" }}
           >
             <WeatherGlyph />

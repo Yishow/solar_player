@@ -563,3 +563,72 @@ test("mqtt settings content exposes custom field controls and unavailable previe
   assert.match(html, /目前無法載入測站選項。/);
   assert.match(html, /目前無法取得 weather preview。/);
 });
+
+test("mqtt settings content surfaces a setup notice when the CWA weather source is unconfigured", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MqttSettingsContent, {
+      actionState: {
+        isLoadingSettings: false,
+        isLoadingTopics: false,
+        isReloadingTopics: false,
+        isSavingSettings: false,
+        isSavingTopics: false,
+        isTestingConnection: false
+      },
+      addTopicMapping: () => undefined,
+      errorMessage: "",
+      handleSettingChange: () => undefined,
+      handleTopicChange: () => undefined,
+      handleWeatherSettingChange: () => undefined,
+      lastConnectionTest: null,
+      liveMetricsConnectionState: "connected",
+      liveMetricsSnapshot: {
+        metrics: {},
+        timestamp: null
+      },
+      message: "Weather settings 已同步。",
+      readiness: null,
+      readinessErrorMessage: "",
+      reloadTopics: async () => undefined,
+      remoteSyncBanner: null,
+      removeTopicMapping: () => undefined,
+      saveSettings: async () => undefined,
+      saveTopicMappings: async () => undefined,
+      settings: {
+        clientId: "solar-display-player",
+        dataMode: "mqtt",
+        host: "localhost",
+        messageTimeout: "30",
+        password: "",
+        port: "1883",
+        reconnectInterval: "5000",
+        username: ""
+      },
+      status: {
+        broker: "localhost:1883",
+        clientId: "solar-display-player",
+        connected: true,
+        reason: null,
+        updatedAt: "2026-05-23T09:31:00.000Z"
+      },
+      testConnection: async () => undefined,
+      toggleWeatherField: () => undefined,
+      topics: [],
+      weatherOptions: createWeatherOptions({
+        counties: [],
+        fetchState: "unconfigured",
+        stations: [],
+        updatedAt: null
+      }),
+      weatherOptionsErrorMessage: "",
+      weatherPreviewContract: createWeatherPreviewContract({
+        current: createWeatherCurrent({ fetchState: "unconfigured" })
+      }),
+      weatherPreviewErrorMessage: "",
+      weatherSettings: createWeatherSettings({ enabled: true })
+    })
+  );
+
+  assert.match(html, /mqtt-weather-card__config-notice/);
+  assert.match(html, /CWA_AUTHORIZATION/);
+});

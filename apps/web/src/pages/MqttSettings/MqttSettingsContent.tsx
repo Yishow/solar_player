@@ -142,20 +142,26 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
           {props.readinessErrorMessage ? (
             <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
           ) : viewModel.coverageRows.length > 0 ? (
-            <div className="mqtt-runtime-feedback">
-              {viewModel.coverageRows.slice(0, 3).map((row) => (
-                <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
-                  <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
-                  <div className="mqtt-runtime-feedback__copy">
-                    <strong>{row.metricLabelZh}</strong>
-                    <small>{row.detail}</small>
+            <details className="mqtt-coverage-details">
+              <summary className="mqtt-coverage-summary-toggle">
+                <span>播放器指標覆蓋狀況 (Coverage Findings)</span>
+                <span className="coverage-badge-count">{viewModel.topicWorkspaceSummary.coverageCount}</span>
+              </summary>
+              <div className="mqtt-runtime-feedback">
+                {viewModel.coverageRows.slice(0, 3).map((row) => (
+                  <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
+                    <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
+                    <div className="mqtt-runtime-feedback__copy">
+                      <strong>{row.metricLabelZh}</strong>
+                      <small>{row.detail}</small>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {viewModel.coverageRows.length > 3 ? (
-                <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
-              ) : null}
-            </div>
+                ))}
+                {viewModel.coverageRows.length > 3 ? (
+                  <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
+                ) : null}
+              </div>
+            </details>
           ) : null}
         </div>
         {viewModel.topicWorkspaceRows.length === 0 ? (
@@ -207,6 +213,9 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
 
       <section className="settings-card mqtt-weather-card" data-mqtt-section="weather-card">
         <div className="settings-card__title">天氣設定<small>Weather Settings</small></div>
+        {viewModel.weatherCard.configFeedback ? (
+          <div className="mgmt-status mqtt-weather-card__config-notice">{viewModel.weatherCard.configFeedback}</div>
+        ) : null}
         <div className="mqtt-weather-card__controls">
           <label className="map-row__toggle mqtt-weather-card__toggle">
             <input

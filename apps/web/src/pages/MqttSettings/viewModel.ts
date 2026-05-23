@@ -412,6 +412,9 @@ export function buildMqttSettingsViewModel({
         ? "目前無可用測站，請重新選擇縣市或稍後再試。"
         : ""
     );
+  const configFeedback = weatherOptions?.fetchState === "unconfigured"
+    ? "天氣資料來源（CWA 中央氣象署）尚未設定，因此無法載入縣市與測站清單。請在伺服器 .env 設定 CWA_AUTHORIZATION 後重新啟動服務。"
+    : "";
 
   return {
     actions: {
@@ -607,6 +610,7 @@ export function buildMqttSettingsViewModel({
     ],
     topicRows: mappedTopics,
     weatherCard: {
+      configFeedback,
       countyOptions: weatherOptions?.counties ?? [],
       customFieldOptions,
       enabled: weatherSettings.enabled,

@@ -66,7 +66,7 @@
   gap: 10px;
 }
 
-.mqtt-settings-page .mqtt-runtime-status {
+.mqtt-settings-page .conn-status.mqtt-runtime-status {
   position: static;
   left: auto;
   right: auto;
@@ -75,9 +75,59 @@
   padding-top: 0;
 }
 
+/* Coverage details accordion */
+.mqtt-settings-page .mqtt-coverage-details {
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  border-radius: 12px;
+  background: #fffdf8;
+  padding: 10px 14px;
+}
+
+.mqtt-settings-page .mqtt-coverage-details[open] {
+  padding-bottom: 14px;
+}
+
+.mqtt-settings-page .mqtt-coverage-summary-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #344039;
+  list-style: none;
+}
+
+.mqtt-settings-page .mqtt-coverage-summary-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.mqtt-settings-page .mqtt-coverage-summary-toggle::after {
+  content: "▼";
+  font-size: 10px;
+  color: #5c854b;
+  transition: transform 150ms ease;
+}
+
+.mqtt-settings-page .mqtt-coverage-details[open] .mqtt-coverage-summary-toggle::after {
+  transform: rotate(180deg);
+}
+
+.mqtt-settings-page .coverage-badge-count {
+  background: #e6eae4;
+  color: #4c5a4d;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
 .mqtt-settings-page .mqtt-runtime-feedback {
   display: grid;
   gap: 8px;
+  margin-top: 12px;
 }
 
 .mqtt-settings-page .mqtt-runtime-feedback__row {
@@ -458,6 +508,14 @@
 
 .mqtt-settings-page .mqtt-weather-card__feedback {
   margin-top: 12px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__config-notice {
+  margin-bottom: 14px;
+  text-align: left;
+  background: rgba(252, 240, 217, 0.75);
+  border-color: rgba(201, 136, 26, 0.32);
+  color: #c9881a;
 }
 
 .mqtt-settings-page .mqtt-weather-card__preview {
