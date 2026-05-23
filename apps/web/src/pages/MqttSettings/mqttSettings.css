@@ -338,6 +338,7 @@
 }
 .mqtt-settings-page .topic-workspace-row__runtime b {
   font: 700 22px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
   color: #557a43;
 }
 .mqtt-settings-page .topic-workspace-row__runtime b small {

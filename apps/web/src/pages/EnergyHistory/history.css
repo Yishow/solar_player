@@ -162,6 +162,7 @@
   left: 22px;
   bottom: 48px;
   font: 700 38px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
   color: #4d7141;
   display: flex;
   align-items: baseline;
@@ -317,6 +318,7 @@
 .eh-page .eh-table td {
   color: var(--ink-strong);
   font: 500 13px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
 }
 
 .eh-page .eh-chart-empty {
@@ -359,6 +361,7 @@
   display: block;
   margin-top: 8px;
   font: 700 24px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
   color: var(--green);
 }
 

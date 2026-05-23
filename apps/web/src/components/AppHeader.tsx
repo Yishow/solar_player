@@ -66,7 +66,7 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
   const weekdayLabel = meta?.weekday ?? defaultWeekday(now);
 
   return (
-    <>
+    <div className="flex items-center gap-x-[40px]">
       <div
         className="font-en text-[50px] font-bold leading-none tracking-[0.1em] tabular-nums"
         style={{ color: "var(--ink-strong)" }}
@@ -75,13 +75,13 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
       </div>
 
       <div
-        className="ml-[40px] font-en text-[18px] font-medium leading-[1.3]"
+        className="font-en text-[18px] font-medium leading-[1.3]"
         style={{ color: "var(--shell-meta-date-ink)" }}
       >
         <div>{dateLabel}</div>
         <div>{weekdayLabel}</div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -100,7 +100,7 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
       data-shell-primitive="app-header"
       className="shell-header-bar relative flex h-[var(--header-height)] w-full shrink-0 items-stretch"
     >
-      <div className="flex w-full items-center pl-[34px] pr-[40px]">
+      <div className="flex w-full items-center gap-x-[48px] pl-[34px] pr-[40px]">
         {/* Brand cluster */}
         <div className="flex items-center gap-[15px]">
           <Link
@@ -132,7 +132,7 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
         </div>
 
         {/* Product title (Whitespace divider instead of solid line) */}
-        <div className="ml-[48px] leading-none">
+        <div className="leading-none">
           <div
             className="text-[22px] font-semibold tracking-[0.32em]"
             style={{ color: "var(--ink-strong)" }}
@@ -148,16 +148,27 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
         </div>
 
         {/* Right meta cluster */}
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-x-[40px]">
           <ClockArea meta={meta} />
 
           <div
             data-shell-primitive="header-weather"
             data-weather-state={weatherMeta.state}
-            className="ml-[40px] flex w-[180px] min-w-0 items-center gap-[12px]"
+            className={`flex max-w-[220px] w-auto shrink min-w-0 items-center gap-[12px] ${
+              weatherMeta.state === "stale" ? "opacity-75" : ""
+            }`}
             style={{ color: "var(--shell-meta-weather-ink)" }}
           >
             <WeatherGlyph />
+            {weatherMeta.state === "stale" ? (
+              <span
+                className="text-[20px] leading-none shrink-0 animate-pulse"
+                title="資料已延遲/過期"
+                style={{ filter: "drop-shadow(var(--glow-warning))", color: "var(--orange, #F59E0B)" }}
+              >
+                ⚠️
+              </span>
+            ) : null}
             <div className="min-w-0 flex-1 leading-[1.2]">
               <div className="truncate text-[18px] font-medium">
                 {weatherMeta.primaryText}
@@ -170,12 +181,10 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
             </div>
           </div>
 
-          <div className="ml-[40px]">
-            <StatusBadge
-              status={statusMeta.status}
-              label={statusMeta.statusLabel}
-            />
-          </div>
+          <StatusBadge
+            status={statusMeta.status}
+            label={statusMeta.statusLabel}
+          />
         </div>
       </div>
     </header>
@@ -193,7 +202,7 @@ function WeatherGlyph() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
+      style={{ filter: "drop-shadow(var(--glow-brand))" }}
       aria-hidden="true"
     >
       <circle cx="12" cy="12" r="4" />

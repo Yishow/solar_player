@@ -137,4 +137,8 @@
   --motion-autoplay-default-duration-sec: 10;
   --motion-data-refresh-sec: 30;
   --motion-offline-retry-sec: 30;
+
+  /* Glow effects variables */
+  --glow-brand: 0 0 6px rgba(245, 158, 11, 0.4);
+  --glow-warning: 0 0 8px rgba(245, 158, 11, 0.8);
 }

@@ -203,6 +203,7 @@
   left: 30px;
   top: 110px;
   font: 700 52px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
   color: #4f6745;
   letter-spacing: 1px;
 }
