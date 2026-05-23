@@ -57,6 +57,16 @@ export const config = {
     const value = process.env.MANAGEMENT_ACCESS_TOKEN?.trim();
     return value && value.length > 0 ? value : null;
   },
+  get cwaAuthorization() {
+    const value = process.env.CWA_AUTHORIZATION?.trim();
+    return value && value.length > 0 ? value : null;
+  },
+  get cwaOpenDataUrl() {
+    return process.env.CWA_OPEN_DATA_URL?.trim() || "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001";
+  },
+  get weatherRequestTimeoutMs() {
+    return readNumber(process.env.WEATHER_REQUEST_TIMEOUT_MS, 5_000);
+  },
   get metricSnapshotRetentionDays() {
     return readNumber(process.env.METRIC_SNAPSHOT_RETENTION_DAYS, 90);
   },

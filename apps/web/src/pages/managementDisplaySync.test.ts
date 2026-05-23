@@ -120,6 +120,10 @@ test("irrelevant display-sync scopes no longer trigger management reloads", asyn
     false
   );
   assert.equal(
+    shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "weather" }, MQTT_SETTINGS_DISPLAY_SYNC_SCOPES),
+    true
+  );
+  assert.equal(
     shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "mqtt" }, CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES),
     false
   );
@@ -177,6 +181,40 @@ test("relevant draft conflicts stay deferred while unrelated scopes stay quiet",
   assert.equal(deferredPlaybackSync.nextState.hasPendingRemoteChange, true);
   assert.equal(ignoredPlaybackSync.outcome, "ignored");
   assert.equal(ignoredPlaybackSync.nextState.hasPendingRemoteChange, false);
+  assert.equal(reloadCount, 0);
+});
+
+test("weather-scoped management sync is treated as relevant only for MQTT settings drafts", async () => {
+  let reloadCount = 0;
+
+  const deferredWeatherSync = await applyDisplaySyncDraftGuard(
+    { hasPendingRemoteChange: false },
+    {
+      event: { ...baseDisplaySyncEvent, scope: "weather" },
+      isDirty: true,
+      relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
+      reloadNow: async () => {
+        reloadCount += 1;
+      }
+    }
+  );
+
+  const ignoredWeatherSync = await applyDisplaySyncDraftGuard(
+    { hasPendingRemoteChange: false },
+    {
+      event: { ...baseDisplaySyncEvent, scope: "weather" },
+      isDirty: true,
+      relevantScopes: BRAND_ASSETS_DISPLAY_SYNC_SCOPES,
+      reloadNow: async () => {
+        reloadCount += 1;
+      }
+    }
+  );
+
+  assert.equal(deferredWeatherSync.outcome, "deferred");
+  assert.equal(deferredWeatherSync.nextState.hasPendingRemoteChange, true);
+  assert.equal(ignoredWeatherSync.outcome, "ignored");
+  assert.equal(ignoredWeatherSync.nextState.hasPendingRemoteChange, false);
   assert.equal(reloadCount, 0);
 });
 

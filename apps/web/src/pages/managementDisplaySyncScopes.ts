@@ -6,7 +6,7 @@ function defineDisplaySyncScopes<const T extends readonly DisplaySyncEventScope[
 
 export const BRAND_ASSETS_DISPLAY_SYNC_SCOPES = defineDisplaySyncScopes(["brand"]);
 
-export const MQTT_SETTINGS_DISPLAY_SYNC_SCOPES = defineDisplaySyncScopes(["mqtt"]);
+export const MQTT_SETTINGS_DISPLAY_SYNC_SCOPES = defineDisplaySyncScopes(["mqtt", "weather"]);
 
 export const CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES = defineDisplaySyncScopes(["circuits"]);
 

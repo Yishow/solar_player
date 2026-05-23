@@ -34,6 +34,7 @@ import displayStoryRoute from "./routes/display-story.js";
 import imagePlaylistRoute from "./routes/image-playlist.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
+import weatherRoute from "./routes/weather.js";
 
 function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -143,6 +144,7 @@ export async function buildApp() {
   await app.register(imagePlaylistRoute);
   await app.register(settingsMqttRoute);
   await app.register(sustainabilityStoryRoute);
+  await app.register(weatherRoute);
 
   mkdirSync(config.uploadsDir, { recursive: true });
   await app.register(fastifyStatic, {

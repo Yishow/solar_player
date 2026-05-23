@@ -88,7 +88,8 @@ export type DisplaySyncEventScope =
   | "monitoring-history"
   | "mqtt"
   | "playback"
-  | "sustainability";
+  | "sustainability"
+  | "weather";
 
 export type DisplaySyncEvent = {
   generatedAt: string;
