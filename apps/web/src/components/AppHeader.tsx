@@ -8,6 +8,7 @@ type AppHeaderMeta = {
   status?: "connected" | "connecting" | "disconnected";
   statusLabel?: string;
   time?: string;
+  weather?: string;
   weekday?: string;
 };
 
@@ -142,6 +143,15 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
         <div className="ml-auto flex items-center">
           <ClockArea meta={meta} />
 
+          <div
+            data-shell-primitive="header-weather"
+            className="ml-[40px] flex items-center gap-[12px] text-[18px] font-medium"
+            style={{ color: "var(--shell-meta-weather-ink)" }}
+          >
+            <WeatherGlyph />
+            <span>{meta?.weather?.trim() ? meta.weather : "天氣資料同步中"}</span>
+          </div>
+
           <div className="ml-[40px]">
             <StatusBadge
               status={statusMeta.status}
@@ -151,5 +161,25 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
         </div>
       </div>
     </header>
+  );
+}
+
+function WeatherGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="26"
+      height="26"
+      fill="none"
+      stroke="#F59E0B"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
+    </svg>
   );
 }
