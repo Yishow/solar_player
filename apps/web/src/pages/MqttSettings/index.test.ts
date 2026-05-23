@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+
+const pageDir = path.resolve(import.meta.dirname);
+const mqttSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
+
+test("mqtt settings only marks broker settings synced after weather settings save succeeds", () => {
+  const saveSettingsSource = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const saveSettings = async () => {"),
+    mqttSettingsSource.indexOf("const testConnection = async () => {")
+  );
+  const weatherSaveIndex = saveSettingsSource.indexOf(
+    "const savedWeatherSettings = await updateWeatherSettings(weatherSettings);"
+  );
+  const lastSyncedSettingsIndex = saveSettingsSource.indexOf("setLastSyncedSettings(nextSettings);");
+
+  assert.notEqual(weatherSaveIndex, -1);
+  assert.notEqual(lastSyncedSettingsIndex, -1);
+  assert.ok(
+    weatherSaveIndex < lastSyncedSettingsIndex,
+    "broker settings should not be marked synced before weather settings save succeeds"
+  );
+});
+
+test("mqtt settings uses a phase-neutral fallback error when the combined save fails", () => {
+  assert.match(mqttSettingsSource, /儲存設定失敗。/);
+  assert.doesNotMatch(mqttSettingsSource, /儲存 MQTT 設定失敗。/);
+});

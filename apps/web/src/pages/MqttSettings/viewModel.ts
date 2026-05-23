@@ -1,7 +1,16 @@
-import type { DisplayReadinessReport } from "@solar-display/shared";
+import type {
+  DisplayReadinessReport,
+  WeatherFieldKey,
+  WeatherHeaderContract,
+  WeatherOptionsResponse,
+  WeatherSettings
+} from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
+import { resolveHeaderWeatherMeta } from "../../components/headerWeatherMeta";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import { weatherFieldKeys } from "@solar-display/shared";
+import { weatherFieldPresetOptions } from "./weatherFieldPresets";
 
 export type DataMode = "mqtt" | "mock";
 
@@ -63,6 +72,24 @@ type BuildMqttSettingsViewModelArgs = {
   settings: MqttSettingsForm;
   status: MqttStatus;
   topics: TopicMapping[];
+  weatherOptions: WeatherOptionsResponse | null;
+  weatherOptionsErrorMessage: string;
+  weatherPreviewContract: WeatherHeaderContract | null;
+  weatherPreviewErrorMessage: string;
+  weatherSettings: WeatherSettings;
+};
+
+const weatherFieldLabelMap: Record<WeatherFieldKey, string> = {
+  airPressure: "氣壓",
+  airTemperature: "溫度",
+  dailyHigh: "最高溫",
+  dailyLow: "最低溫",
+  observationTime: "觀測時間",
+  precipitation: "降雨量",
+  relativeHumidity: "相對濕度",
+  weather: "天氣現象",
+  windDirection: "風向",
+  windSpeed: "風速"
 };
 
 const metricLabelMap: Record<string, { en: string; zh: string; icon: ReferenceGlyphName }> = {
@@ -243,7 +270,12 @@ export function buildMqttSettingsViewModel({
   readiness,
   settings,
   status,
-  topics
+  topics,
+  weatherOptions,
+  weatherOptionsErrorMessage,
+  weatherPreviewContract,
+  weatherPreviewErrorMessage,
+  weatherSettings
 }: BuildMqttSettingsViewModelArgs) {
   const connection = resolveConnectionState(settings, status);
   const mappedTopics = topics.map((topic) => {
@@ -331,6 +363,55 @@ export function buildMqttSettingsViewModel({
         stateTone: "connected" as const
       };
     });
+
+  const coverageByMetricKey = new Map(
+    coverageRows.map((row) => [row.requirementKey, row] as const)
+  );
+
+  const topicWorkspaceRows = mappedTopics.map((topic) => {
+    const coverage = coverageByMetricKey.get(topic.metricKey) ?? null;
+
+    return {
+      ...topic,
+      coverageDetail: coverage?.detail ?? null,
+      coverageStateLabel: coverage?.stateLabel ?? null,
+      lastUpdatedLabel: formatTimestamp(topic.updatedAt),
+      qualityLabel: topic.quality ? `Quality: ${topic.quality}` : "Quality: --",
+      valueLabel: formatValue(topic.lastValue)
+    };
+  });
+
+  const stationOptions = (weatherOptions?.stations ?? []).filter((station) => {
+    if (!weatherSettings.countyName) {
+      return true;
+    }
+
+    return station.countyName === weatherSettings.countyName;
+  });
+  const weatherPreview = resolveHeaderWeatherMeta({
+    current: weatherPreviewContract?.current ?? null,
+    isHydrated: Boolean(weatherPreviewContract) || weatherPreviewErrorMessage.trim().length > 0,
+    settings: {
+      enabled: weatherSettings.enabled,
+      fieldKeys: weatherSettings.fieldKeys,
+      preset: weatherSettings.preset
+    }
+  });
+  const customFieldOptions = weatherSettings.preset === "custom"
+    ? weatherFieldKeys.map((fieldKey) => ({
+        checked: weatherSettings.fieldKeys.includes(fieldKey),
+        label: weatherFieldLabelMap[fieldKey],
+        value: fieldKey
+      }))
+    : [];
+  const stationFeedback = weatherOptionsErrorMessage
+    || (
+      weatherSettings.locationMode === "station"
+      && stationOptions.length === 0
+      && weatherOptions?.fetchState !== "unconfigured"
+        ? "目前無可用測站，請重新選擇縣市或稍後再試。"
+        : ""
+    );
 
   return {
     actions: {
@@ -441,6 +522,13 @@ export function buildMqttSettingsViewModel({
       visualTone: feedbackToneMap[feedbackTone]
     },
     coverageRows,
+    topicWorkspaceRows,
+    topicWorkspaceSummary: {
+      coverageCount: coverageRows.length,
+      runtimeStatusDetail: runtimePreview.statusDetail,
+      runtimeStatusLabel: runtimePreview.statusLabel,
+      runtimeStatusTone: runtimePreview.statusTone
+    },
     liveTopicRows: mappedTopics,
     mappingRows: mappedTopics,
     modeOptions: [
@@ -517,6 +605,22 @@ export function buildMqttSettingsViewModel({
         value: String(connectedTopics.length)
       }
     ],
-    topicRows: mappedTopics
+    topicRows: mappedTopics,
+    weatherCard: {
+      countyOptions: weatherOptions?.counties ?? [],
+      customFieldOptions,
+      enabled: weatherSettings.enabled,
+      locationMode: weatherSettings.locationMode,
+      locationOptions: [
+        { label: "指定測站", value: "station" as const },
+        { label: "依縣市", value: "county" as const }
+      ],
+      preset: weatherSettings.preset,
+      presetOptions: weatherFieldPresetOptions,
+      preview: weatherPreview,
+      previewFeedback: weatherPreviewErrorMessage,
+      stationFeedback,
+      stationOptions
+    }
   };
 }

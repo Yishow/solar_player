@@ -24,6 +24,8 @@ import type {
   PlaybackSettings,
   ImagePlaylistEntryInput,
   WeatherHeaderContract,
+  WeatherOptionsResponse,
+  WeatherSettings,
   ResolvedImagePlaylistEntry,
   SustainabilityPeriodKey,
   SustainabilityPeriodStory,
@@ -652,6 +654,31 @@ export async function getRuntimeMqttStatus() {
 export async function getHeaderWeatherContract() {
   const response = await requestJson<WeatherHeaderContract>("/api/weather/current");
   return response;
+}
+
+export async function getWeatherSettings() {
+  const response = await requestJson<{ settings: WeatherSettings }>("/api/weather/settings");
+  return response.settings;
+}
+
+export async function updateWeatherSettings(settings: WeatherSettings) {
+  const response = await requestJson<{ settings: WeatherSettings }>("/api/weather/settings", {
+    body: JSON.stringify(settings),
+    method: "PUT"
+  });
+  return response.settings;
+}
+
+export async function getWeatherOptions(countyName: string | null) {
+  const query = countyName ? `?countyName=${encodeURIComponent(countyName)}` : "";
+  return requestJson<WeatherOptionsResponse>(`/api/weather/options${query}`);
+}
+
+export async function getWeatherPreview(settings: WeatherSettings) {
+  return requestJson<WeatherHeaderContract>("/api/weather/preview", {
+    body: JSON.stringify(settings),
+    method: "POST"
+  });
 }
 
 export async function createBrandProfile(payload: BrandProfileUpdate & { name: string }) {

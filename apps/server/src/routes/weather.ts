@@ -49,6 +49,30 @@ function buildPublicWeatherHeaderSettings(
   };
 }
 
+async function validateWeatherSelection(settings: WeatherSettings) {
+  if (!config.cwaAuthorization) {
+    return;
+  }
+
+  const options = await getWeatherService().getOptions({
+    countyName: settings.countyName
+  });
+
+  if (
+    settings.countyName
+    && !options.counties.includes(settings.countyName)
+  ) {
+    throw new WeatherSettingsValidationError("Weather county does not exist");
+  }
+
+  if (
+    settings.stationId
+    && !options.stations.some((station) => station.stationId === settings.stationId)
+  ) {
+    throw new WeatherSettingsValidationError("Weather station does not exist");
+  }
+}
+
 const weatherRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/weather/settings", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
@@ -63,26 +87,7 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Body: Record<string, unknown> }>("/api/weather/settings", async (request, reply) => {
     try {
       const nextSettings = normalizeWeatherSettingsInput(request.body as never);
-
-      if (config.cwaAuthorization) {
-        const options = await getWeatherService().getOptions({
-          countyName: nextSettings.countyName
-        });
-
-        if (
-          nextSettings.countyName
-          && !options.counties.includes(nextSettings.countyName)
-        ) {
-          return reply.status(400).send(errorResponse("Weather county does not exist"));
-        }
-
-        if (
-          nextSettings.stationId
-          && !options.stations.some((station) => station.stationId === nextSettings.stationId)
-        ) {
-          return reply.status(400).send(errorResponse("Weather station does not exist"));
-        }
-      }
+      await validateWeatherSelection(nextSettings);
 
       saveWeatherSettings(nextSettings);
 
@@ -94,6 +99,32 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
 
       return {
         settings: nextSettings
+      };
+    } catch (error) {
+      if (error instanceof WeatherSettingsValidationError) {
+        return reply.status(error.statusCode).send(errorResponse(error.message));
+      }
+
+      throw error;
+    }
+  });
+
+  app.post<{ Body: Record<string, unknown> }>("/api/weather/preview", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    try {
+      const previewSettings = normalizeWeatherSettingsInput(request.body as never);
+      await validateWeatherSelection(previewSettings);
+
+      const current = previewSettings.enabled
+        ? await getWeatherService().getCurrentWeather(previewSettings)
+        : buildNeutralCurrentWeatherSnapshot("unconfigured");
+
+      return {
+        current,
+        settings: buildPublicWeatherHeaderSettings(previewSettings)
       };
     } catch (error) {
       if (error instanceof WeatherSettingsValidationError) {

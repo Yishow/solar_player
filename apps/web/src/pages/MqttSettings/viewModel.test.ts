@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DisplayReadinessReport } from "@solar-display/shared";
+import type {
+  DisplayReadinessReport,
+  WeatherCurrentSnapshot,
+  WeatherHeaderContract,
+  WeatherOptionsResponse,
+  WeatherSettings
+} from "@solar-display/shared";
 import { buildMqttSettingsViewModel } from "./viewModel";
 
 function createReadinessReport(findings: DisplayReadinessReport["findings"]): DisplayReadinessReport {
@@ -22,6 +28,76 @@ function createReadinessReport(findings: DisplayReadinessReport["findings"]): Di
       },
       warningCount: findings.filter((finding) => !finding.blocking).length
     }
+  };
+}
+
+function createWeatherSettings(overrides: Partial<WeatherSettings> = {}): WeatherSettings {
+  return {
+    countyName: "臺北市",
+    enabled: true,
+    fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+    locationMode: "station",
+    preset: "standard",
+    stationId: "C0I080",
+    ...overrides
+  };
+}
+
+function createWeatherCurrent(overrides: Partial<WeatherCurrentSnapshot> = {}): WeatherCurrentSnapshot {
+  return {
+    airPressure: 1008.2,
+    airTemperature: 31.4,
+    countyName: "臺北市",
+    dailyHigh: 33.8,
+    dailyLow: 25.2,
+    fetchState: "fresh",
+    observationTime: "2026-05-23T06:18:00.000Z",
+    precipitation: 0,
+    relativeHumidity: 70,
+    staleAt: null,
+    stationId: "C0I080",
+    stationName: "內湖",
+    townName: "內湖區",
+    updatedAt: "2026-05-23T06:20:00.000Z",
+    weather: "晴",
+    windDirection: 180,
+    windSpeed: 2.4,
+    ...overrides
+  };
+}
+
+function createWeatherPreviewContract(overrides: Partial<WeatherHeaderContract> = {}): WeatherHeaderContract {
+  return {
+    current: createWeatherCurrent(),
+    settings: {
+      enabled: true,
+      fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+      preset: "standard"
+    },
+    ...overrides
+  };
+}
+
+function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): WeatherOptionsResponse {
+  return {
+    counties: ["新北市", "臺北市"],
+    fetchState: "fresh",
+    stations: [
+      {
+        countyName: "臺北市",
+        stationId: "C0I080",
+        stationName: "內湖",
+        townName: "內湖區"
+      },
+      {
+        countyName: "新北市",
+        stationId: "C0I090",
+        stationName: "板橋",
+        townName: "板橋區"
+      }
+    ],
+    updatedAt: "2026-05-23T06:20:00.000Z",
+    ...overrides
   };
 }
 
@@ -88,7 +164,12 @@ test("buildMqttSettingsViewModel centralizes broker status and topic runtime map
         updatedAt: null,
         valuePath: "$.value"
       }
-    ]
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
   });
 
   assert.equal(model.connection.statusLabel, "Broker 已連線");
@@ -143,7 +224,21 @@ test("buildMqttSettingsViewModel surfaces test/save failures and mock mode expli
       reason: "offline",
       updatedAt: "2026-05-13T10:05:00.000Z"
     },
-    topics: []
+    topics: [],
+    weatherOptions: createWeatherOptions({
+      fetchState: "unconfigured",
+      stations: []
+    }),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({
+        fetchState: "unconfigured"
+      })
+    }),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings({
+      enabled: false
+    })
   });
 
   assert.equal(model.connection.statusLabel, "Mock mode");
@@ -197,7 +292,12 @@ test("buildMqttSettingsViewModel elevates explicit test-connection success feedb
       reason: "offline",
       updatedAt: "2026-05-13T10:05:00.000Z"
     },
-    topics: []
+    topics: [],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
   });
 
   assert.equal(model.connection.statusLabel, "Broker 未連線");
@@ -264,7 +364,12 @@ test("buildMqttSettingsViewModel prefers streamed live metric updates over stale
         updatedAt: "2026-05-20T10:05:00.000Z",
         valuePath: "$.value"
       }
-    ]
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
   });
 
   assert.equal(model.previewCards[0]?.valueLabel, "601.4");
@@ -332,7 +437,12 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
         updatedAt: "2026-05-20T10:05:00.000Z",
         valuePath: "$.value"
       }
-    ]
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
   } satisfies Parameters<typeof buildMqttSettingsViewModel>[0];
   const idleModel = buildMqttSettingsViewModel(baseArgs);
   const disconnectedModel = buildMqttSettingsViewModel({
@@ -351,4 +461,295 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
   assert.equal(idleModel.coverageRows[0]?.stateLabel, "Idle Runtime");
   assert.equal(disconnectedModel.liveTopicRows[0]?.runtimeLabel, "Disconnected");
   assert.equal(disconnectedModel.runtimePreview.statusLabel, "串流不可用");
+});
+
+test("buildMqttSettingsViewModel marks polled topic rows as fallback when streaming disconnects", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "disconnected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "Topic mappings 已同步。",
+    readiness: createReadinessReport([]),
+    settings: {
+      clientId: "kuozui-green-display-01",
+      dataMode: "mqtt",
+      host: "broker.internal",
+      messageTimeout: "30",
+      password: "****",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: "kuozui_display"
+    },
+    status: {
+      broker: "broker.internal:1883",
+      clientId: "kuozui-green-display-01",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T09:31:00.000Z"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: "2026-05-23T09:29:00.000Z",
+        lastValue: 580.1,
+        metricKey: "realTimePower",
+        quality: "good",
+        rawPayload: "{\"value\":580.1}",
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: "2026-05-23T09:28:00.000Z",
+        valuePath: "$.value"
+      }
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
+  });
+
+  assert.equal(model.topicWorkspaceSummary.runtimeStatusLabel, "Polling fallback");
+  assert.equal(model.topicWorkspaceRows[0]?.runtimeLabel, "Fallback");
+  assert.equal(model.topicWorkspaceRows[0]?.valueLabel, "580.1");
+  assert.match(model.topicWorkspaceRows[0]?.lastReceivedLabel ?? "", /2026/);
+  assert.match(model.topicWorkspaceRows[0]?.lastUpdatedLabel ?? "", /2026/);
+});
+
+test("buildMqttSettingsViewModel merges editable topic rows with runtime and coverage summaries", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {
+        realTimePower: {
+          quality: "good",
+          timestamp: "2026-05-23T09:31:00.000Z",
+          unit: "kW",
+          value: 588.8
+        }
+      },
+      timestamp: "2026-05-23T09:31:00.000Z"
+    },
+    message: "Topic mappings 已同步。",
+    readiness: createReadinessReport([
+      {
+        blocking: true,
+        pageId: "overview",
+        reason: "尚未設定 todayGeneration mapping。",
+        requirementKey: "todayGeneration",
+        sourceId: null,
+        sourceType: "mqtt-metric",
+        status: "blocking"
+      }
+    ]),
+    settings: {
+      clientId: "kuozui-green-display-01",
+      dataMode: "mqtt",
+      host: "broker.internal",
+      messageTimeout: "30",
+      password: "****",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: "kuozui_display"
+    },
+    status: {
+      broker: "broker.internal:1883",
+      clientId: "kuozui-green-display-01",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T09:31:00.000Z"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: "2026-05-23T09:29:00.000Z",
+        lastValue: 580.1,
+        metricKey: "realTimePower",
+        quality: "good",
+        rawPayload: "{\"value\":580.1}",
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: "2026-05-23T09:28:00.000Z",
+        valuePath: "$.value"
+      }
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
+  });
+
+  assert.equal(model.topicWorkspaceRows[0]?.metricLabelZh, "即時發電功率");
+  assert.equal(model.topicWorkspaceRows[0]?.runtimeLabel, "Live");
+  assert.equal(model.topicWorkspaceRows[0]?.valueLabel, "588.8");
+  assert.match(model.topicWorkspaceRows[0]?.lastReceivedLabel ?? "", /2026/);
+  assert.equal(model.topicWorkspaceSummary.runtimeStatusLabel, "即時串流中");
+  assert.equal(model.topicWorkspaceSummary.coverageCount, 1);
+});
+
+test("buildMqttSettingsViewModel models weather presets preview and custom-field fallback", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "Weather settings 已同步。",
+    readiness: null,
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt",
+      host: "localhost",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "localhost:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    },
+    topics: [],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({
+        airTemperature: 30.1,
+        countyName: "新北市",
+        stationId: "C0I090",
+        stationName: "板橋",
+        townName: "板橋區",
+        weather: "多雲"
+      }),
+      settings: {
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        preset: "compact"
+      }
+    }),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings({
+      countyName: "新北市",
+      fieldKeys: ["weather", "airTemperature"],
+      preset: "compact",
+      stationId: "C0I090"
+    })
+  });
+
+  assert.deepEqual(
+    model.weatherCard.presetOptions.map((option) => option.value),
+    ["compact", "standard", "complete", "custom"]
+  );
+  assert.equal(model.weatherCard.preview.primaryText, "板橋 多雲 30°C");
+  assert.equal(model.weatherCard.preview.secondaryText, "");
+  assert.equal(model.weatherCard.stationOptions[0]?.stationName, "板橋");
+  assert.equal(model.weatherCard.customFieldOptions.length, 0);
+});
+
+test("buildMqttSettingsViewModel surfaces weather preview fallback and custom field controls", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "Weather settings 已同步。",
+    readiness: null,
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt",
+      host: "localhost",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "localhost:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    },
+    topics: [],
+    weatherOptions: createWeatherOptions({
+      stations: []
+    }),
+    weatherOptionsErrorMessage: "目前無法載入測站選項。",
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({
+        fetchState: "unavailable",
+        stationId: null,
+        stationName: null,
+        weather: null
+      }),
+      settings: {
+        enabled: true,
+        fieldKeys: ["weather", "dailyHigh"],
+        preset: "custom"
+      }
+    }),
+    weatherPreviewErrorMessage: "目前無法取得 weather preview。",
+    weatherSettings: createWeatherSettings({
+      fieldKeys: ["weather", "dailyHigh"],
+      preset: "custom",
+      stationId: null
+    })
+  });
+
+  assert.equal(model.weatherCard.preview.primaryText, "天氣暫不可用");
+  assert.equal(model.weatherCard.preview.state, "unavailable");
+  assert.equal(model.weatherCard.stationFeedback, "目前無法載入測站選項。");
+  assert.equal(model.weatherCard.previewFeedback, "目前無法取得 weather preview。");
+  assert.equal(model.weatherCard.customFieldOptions.length > 0, true);
+  assert.equal(model.weatherCard.customFieldOptions.find((option) => option.value === "dailyHigh")?.checked, true);
 });

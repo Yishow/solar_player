@@ -13,10 +13,9 @@ export const mqttSettingsLayout = {
     test: { left: 1316, top: 22, width: 250 }
   },
   cards: {
-    map: { height: 604, left: 890, top: 162, width: 520 },
     mode: { height: 604, left: 50, top: 162, width: 435 },
-    preview: { height: 604, left: 1428, top: 162, width: 435 },
-    topic: { height: 604, left: 504, top: 162, width: 370 }
+    topicWorkspace: { height: 604, left: 504, top: 162, width: 760 },
+    weather: { height: 604, left: 1288, top: 162, width: 575 }
   },
   title: { left: 80, top: 44 }
 } as const;

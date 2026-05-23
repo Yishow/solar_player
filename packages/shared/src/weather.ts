@@ -13,7 +13,7 @@ export const weatherFieldKeys = [
 
 export type WeatherFieldKey = (typeof weatherFieldKeys)[number];
 
-export const weatherFieldPresets = ["standard", "custom"] as const;
+export const weatherFieldPresets = ["compact", "standard", "complete", "custom"] as const;
 export type WeatherFieldPreset = (typeof weatherFieldPresets)[number];
 
 export const weatherLocationModes = ["station", "county"] as const;

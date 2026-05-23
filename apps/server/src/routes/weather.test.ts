@@ -381,6 +381,74 @@ test("weather options filter stations by county and current weather returns a no
   }
 });
 
+test("weather preview resolves pending station selections without mutating persisted settings", async () => {
+  process.env.CWA_AUTHORIZATION = "test-token";
+  installFetchStub(sampleDataset);
+
+  const app = await buildApp();
+
+  try {
+    const previewResponse = await app.inject({
+      method: "POST",
+      payload: {
+        countyName: "新北市",
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
+        preset: "compact",
+        stationId: "C0I090"
+      },
+      url: "/api/weather/preview"
+    });
+
+    assert.equal(previewResponse.statusCode, 200);
+    assert.deepEqual(previewResponse.json(), {
+      current: {
+        airPressure: 1007.1,
+        airTemperature: 30.1,
+        countyName: "新北市",
+        dailyHigh: 31.5,
+        dailyLow: 24.7,
+        fetchState: "fresh",
+        observationTime: "2026-05-23T06:15:00.000Z",
+        precipitation: 0,
+        relativeHumidity: 74,
+        staleAt: null,
+        stationId: "C0I090",
+        stationName: "板橋",
+        townName: "板橋區",
+        updatedAt: previewResponse.json<{ current: { updatedAt: string } }>().current.updatedAt,
+        weather: "多雲",
+        windDirection: 180,
+        windSpeed: 1.1
+      },
+      settings: {
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        preset: "compact"
+      }
+    });
+
+    const persisted = await app.inject({
+      method: "GET",
+      url: "/api/weather/settings"
+    });
+
+    assert.deepEqual(persisted.json(), {
+      settings: {
+        countyName: null,
+        enabled: false,
+        fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        locationMode: "station",
+        preset: "standard",
+        stationId: null
+      }
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 test("invalid weather station selections are rejected before persistence mutates stored settings", async () => {
   process.env.CWA_AUTHORIZATION = "test-token";
   installFetchStub(sampleDataset);

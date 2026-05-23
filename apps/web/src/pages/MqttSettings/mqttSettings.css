@@ -41,14 +41,20 @@
 .mqtt-settings-page .mqtt-test-conn { left: 1316px; width: 250px; }
 .mqtt-settings-page .mqtt-save { left: 1595px; width: 250px; }
 
-/* card positioning */
+/* card positioning (converged 3-card layout: mode | topic workspace | weather) */
 .mqtt-settings-page .mqtt-mode { left: 50px; top: 162px; width: 435px; height: 604px; }
-.mqtt-settings-page .mqtt-topic { left: 504px; top: 162px; width: 370px; height: 604px; }
-.mqtt-settings-page .mqtt-map { left: 890px; top: 162px; width: 520px; height: 604px; }
-.mqtt-settings-page .mqtt-preview {
-  left: 1428px;
+.mqtt-settings-page .mqtt-topic-workspace {
+  left: 504px;
   top: 162px;
-  width: 435px;
+  width: 760px;
+  height: 604px;
+  display: flex;
+  flex-direction: column;
+}
+.mqtt-settings-page .mqtt-weather-card {
+  left: 1288px;
+  top: 162px;
+  width: 575px;
   height: 604px;
   display: flex;
   flex-direction: column;
@@ -218,32 +224,37 @@
   color: #747a73;
 }
 
-/* live topic rows */
-.mqtt-settings-page .topic-list {
+/* topic workspace rows (merged editable topic + runtime + coverage) */
+.mqtt-settings-page .topic-workspace-list {
   margin-top: 4px;
-  max-height: 484px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.mqtt-settings-page .topic-row {
-  position: relative;
-  min-height: 74px;
+.mqtt-settings-page .topic-workspace-row {
   border: 1px solid rgba(92, 105, 79, 0.16);
   border-radius: 12px;
   margin-top: 14px;
   background: #fffdf8;
-  padding: 14px 18px 14px 50px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+.mqtt-settings-page .topic-workspace-row:first-child { margin-top: 0; }
+
+.mqtt-settings-page .topic-workspace-row__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .mqtt-settings-page .topic-row__dot {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
+  flex: 0 0 auto;
   background: #64a84f;
   box-shadow: 0 0 0 3px rgba(100, 168, 79, 0.18);
 }
@@ -256,59 +267,42 @@
   box-shadow: 0 0 0 3px rgba(179, 182, 176, 0.2);
 }
 
-.mqtt-settings-page .topic-row__topic {
-  font: 500 15px/1.2 var(--font-family-en);
-  color: #4d554f;
-  word-break: break-all;
-}
-
-.mqtt-settings-page .topic-row__meta {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
-  color: #777b75;
-}
-
-/* mapping rows */
-.mqtt-settings-page .map-list {
-  margin-top: 8px;
-  max-height: 432px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.mqtt-settings-page .map-row {
+.mqtt-settings-page .topic-workspace-row__metric {
   display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 10px;
-  align-items: start;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(92, 105, 79, 0.14);
+  gap: 2px;
 }
-
-.mqtt-settings-page .map-row:last-child { border-bottom: 0; }
-
-.mqtt-settings-page .map-row__label {
-  font-size: 14px;
+.mqtt-settings-page .topic-workspace-row__metric strong {
+  font-size: 15px;
   color: #344039;
-  padding-top: 8px;
 }
-
-.mqtt-settings-page .map-row__label small {
-  display: block;
-  margin-top: 4px;
+.mqtt-settings-page .topic-workspace-row__metric small {
   font: 400 11px/1.2 var(--font-family-en);
   color: #777;
 }
 
-.mqtt-settings-page .map-row__fields {
-  display: grid;
-  grid-template-columns: 1fr 70px;
-  gap: 6px;
+.mqtt-settings-page .topic-workspace-row__runtime {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mqtt-settings-page .topic-workspace-row__runtime b {
+  font: 700 22px/1 var(--font-family-en);
+  color: #557a43;
+}
+.mqtt-settings-page .topic-workspace-row__runtime b small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #555;
+  margin-left: 4px;
 }
 
-.mqtt-settings-page .map-row__fields select,
-.mqtt-settings-page .map-row__fields input {
+.mqtt-settings-page .topic-workspace-row__fields {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 8px;
+}
+.mqtt-settings-page .topic-workspace-row__fields input {
   height: 34px;
   border: 1px solid rgba(93, 119, 69, 0.22);
   border-radius: 8px;
@@ -318,12 +312,19 @@
   color: #4b504c;
   outline: none;
 }
-
-.mqtt-settings-page .map-row__fields select:focus,
-.mqtt-settings-page .map-row__fields input:focus {
+.mqtt-settings-page .topic-workspace-row__fields input:focus {
   border-color: rgba(93, 119, 69, 0.55);
 }
 
+.mqtt-settings-page .topic-workspace-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  color: #777b75;
+}
+
+/* row controls + workspace actions */
 .mqtt-settings-page .map-row__controls {
   grid-column: 1 / -1;
   display: flex;
@@ -352,10 +353,7 @@
 }
 
 .mqtt-settings-page .map-actions {
-  position: absolute;
-  bottom: 22px;
-  left: 22px;
-  right: 22px;
+  margin-top: 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -392,83 +390,99 @@
   cursor: not-allowed;
 }
 
-/* preview rows */
-.mqtt-settings-page .preview-list {
+/* weather card */
+.mqtt-settings-page .mqtt-weather-card__controls {
+  display: grid;
+  gap: 14px;
   margin-top: 4px;
-  flex: 1;
-  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.mqtt-settings-page .preview-row {
-  min-height: 78px;
-  border: 1px solid rgba(92, 105, 79, 0.14);
-  border-radius: 10px;
-  margin-top: 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 16px;
-  background: #fffdf8;
-}
-
-.mqtt-settings-page .preview-row__header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.mqtt-settings-page .preview-row__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  flex: 0 0 auto;
-  background: rgba(92, 105, 79, 0.1);
-  color: #8a9785;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  transition: background 120ms ease, color 120ms ease;
-}
-.mqtt-settings-page .preview-row__icon.is-live {
-  background: rgba(92, 133, 75, 0.14);
-  color: #4c7540;
-}
-
-.mqtt-settings-page .preview-row__label {
-  font-size: 14px;
+.mqtt-settings-page .mqtt-weather-card__toggle {
+  font-size: 15px;
   color: #344039;
 }
 
-.mqtt-settings-page .preview-row__label small {
-  display: block;
-  margin-top: 2px;
-  font: 400 11px/1.2 var(--font-family-en);
-  color: #777;
+.mqtt-settings-page .mqtt-weather-card__field {
+  display: grid;
+  gap: 6px;
+  align-items: stretch;
 }
 
-.mqtt-settings-page .preview-row__value {
-  font: 700 40px/1 var(--font-family-en);
-  color: #557a43;
-  padding-left: 2px;
+.mqtt-settings-page .mqtt-weather-card__field .field-label {
+  min-width: 0;
+  font-size: 14px;
+  color: #5d655d;
 }
 
-.mqtt-settings-page .preview-row__value small {
-  font-size: 15px;
-  font-weight: 400;
-  color: #555;
-  margin-left: 6px;
+.mqtt-settings-page .mqtt-weather-card__field select {
+  height: 38px;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 0 12px;
+  font: 400 15px/1 var(--font-family-en);
+  color: #4b504c;
+  outline: none;
 }
 
-.mqtt-settings-page .last-update {
-  position: static;
+.mqtt-settings-page .mqtt-weather-card__field select:focus {
+  border-color: rgba(93, 119, 69, 0.55);
+}
+
+.mqtt-settings-page .mqtt-weather-card__preset-group {
+  display: grid;
+  gap: 6px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__presets {
+  grid-template-columns: repeat(4, 1fr);
   margin: 0;
+}
+
+.mqtt-settings-page .mqtt-weather-card__presets button {
+  font-size: 15px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__custom-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__custom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__feedback {
   margin-top: 12px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__preview {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(92, 105, 79, 0.16);
+  display: grid;
+  gap: 4px;
+}
+
+.mqtt-settings-page .mqtt-weather-card__preview strong {
   font-size: 13px;
-  color: #777;
-  border-top: 1px solid rgba(92, 105, 79, 0.14);
-  padding-top: 10px;
+  letter-spacing: 0.04em;
+  color: #6f766f;
+}
+
+.mqtt-settings-page .mqtt-weather-card__preview p {
+  margin: 0;
+  font-size: 20px;
+  color: #344039;
+}
+
+.mqtt-settings-page .mqtt-weather-card__preview small {
+  font-size: 13px;
+  color: #6f766f;
 }
 
 .mqtt-settings-page .empty-block {

@@ -1,4 +1,10 @@
-import type { DisplayReadinessReport } from "@solar-display/shared";
+import type {
+  DisplayReadinessReport,
+  WeatherFieldKey,
+  WeatherHeaderContract,
+  WeatherOptionsResponse,
+  WeatherSettings
+} from "@solar-display/shared";
 import type { ReactNode } from "react";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import type {
@@ -9,16 +15,6 @@ import type {
   TopicMapping
 } from "./viewModel";
 import { buildMqttSettingsViewModel } from "./viewModel";
-
-const PREVIEW_ICON_GLYPHS: Record<string, string> = {
-  bars: "▤",
-  bolt: "⚡",
-  co2: "CO₂",
-  leaf: "🌱",
-  plug: "⌁",
-  refresh: "↻",
-  sun: "☀"
-};
 
 type MqttSettingsContentProps = {
   actionState: ActionState;
@@ -32,6 +28,10 @@ type MqttSettingsContentProps = {
     rowId: number,
     key: Key,
     value: TopicMapping[Key]
+  ) => void;
+  handleWeatherSettingChange: <Key extends keyof WeatherSettings>(
+    key: Key,
+    value: WeatherSettings[Key]
   ) => void;
   lastConnectionTest: ConnectionTestFeedback;
   liveMetricsConnectionState: SocketConnectionState["status"];
@@ -47,7 +47,13 @@ type MqttSettingsContentProps = {
   settings: MqttSettingsForm;
   status: MqttStatus;
   testConnection: () => Promise<void>;
+  toggleWeatherField: (fieldKey: WeatherFieldKey, enabled: boolean) => void;
   topics: TopicMapping[];
+  weatherOptions: WeatherOptionsResponse | null;
+  weatherOptionsErrorMessage: string;
+  weatherPreviewContract: WeatherHeaderContract | null;
+  weatherPreviewErrorMessage: string;
+  weatherSettings: WeatherSettings;
 };
 
 function resolveConnStatus(statusTone: "connected" | "connecting" | "disconnected") {
@@ -74,7 +80,12 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
     readiness: props.readiness,
     settings: props.settings,
     status: props.status,
-    topics: props.topics
+    topics: props.topics,
+    weatherOptions: props.weatherOptions,
+    weatherOptionsErrorMessage: props.weatherOptionsErrorMessage,
+    weatherPreviewContract: props.weatherPreviewContract,
+    weatherPreviewErrorMessage: props.weatherPreviewErrorMessage,
+    weatherSettings: props.weatherSettings
   });
   const connStatusVariant = resolveConnStatus(viewModel.connection.statusTone);
 
@@ -120,63 +131,13 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
         </div>
       </section>
 
-      <section className="settings-card mqtt-topic">
-        <div className="settings-card__title">即時 Topic 清單<small>Live Topic List</small></div>
-        {viewModel.liveTopicRows.length === 0 ? (
-          <div className="empty-block">尚未建立 topic mapping，新增後這裡會顯示 broker 的即時收值。</div>
-        ) : (
-          <div className="topic-list">
-            {viewModel.liveTopicRows.map((topic) => (
-              <div className="topic-row" key={`live-${topic.id}`}>
-                <span className={`topic-row__dot ${!topic.enabled ? "is-disabled" : topic.runtimeTone === "connected" ? "" : "is-idle"}`} aria-hidden />
-                <div className="topic-row__topic">{topic.topic || "未設定 topic"}</div>
-                <small className="topic-row__meta">{topic.metricLabelZh} · {topic.runtimeLabel} · 最後收值 {topic.lastReceivedLabel}</small>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="settings-card mqtt-map">
-        <div className="settings-card__title">Topic 對應設定<small>Topic Mapping</small></div>
-        <div className="map-list">
-          {viewModel.mappingRows.length === 0 ? (
-            <div className="empty-block">尚未設定任何 topic mapping。</div>
-          ) : (
-            viewModel.mappingRows.map((topic) => (
-              <div className="map-row" key={`map-${topic.id}`}>
-                <label className="map-row__label">{topic.metricLabelZh}<small>{topic.metricLabelEn}</small></label>
-                <div className="map-row__fields">
-                  <input type="text" placeholder="topic" value={topic.topic} onChange={(event) => props.handleTopicChange(topic.id, "topic", event.target.value)} />
-                  <input type="text" placeholder="unit" value={topic.unit} onChange={(event) => props.handleTopicChange(topic.id, "unit", event.target.value)} />
-                </div>
-                <div className="map-row__controls">
-                  <label className="map-row__toggle">
-                    <input type="checkbox" checked={topic.enabled} onChange={(event) => props.handleTopicChange(topic.id, "enabled", event.target.checked)} />
-                    啟用 ({topic.enabledLabel})
-                  </label>
-                  <button type="button" className="map-row__remove" onClick={() => props.removeTopicMapping(topic.id)}>移除</button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        <div className="map-actions">
-          <button type="button" className="map-add" onClick={props.addTopicMapping}>＋ 新增 mapping</button>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="map-add" disabled={viewModel.actions.reloadTopicsDisabled} onClick={() => void props.reloadTopics()}>{viewModel.actions.reloadTopicsLabel}</button>
-            <button type="button" className="map-save" disabled={viewModel.actions.saveMappingsDisabled} onClick={() => void props.saveTopicMappings()}>{viewModel.actions.saveMappingsLabel}</button>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-card mqtt-preview">
-        <div className="settings-card__title">即時資料預覽<small>Live Data Preview</small></div>
+      <section className="settings-card mqtt-topic-workspace" data-mqtt-section="topic-workspace">
+        <div className="settings-card__title">Topic 工作區<small>Topic Workspace</small></div>
         <div className="mqtt-runtime-summary">
-          <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.runtimePreview.statusTone)}`} role="status">
+          <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.topicWorkspaceSummary.runtimeStatusTone)}`} role="status">
             <span className="conn-status__dot" aria-hidden />
-            {viewModel.runtimePreview.statusLabel}
-            <small>{viewModel.runtimePreview.statusDetail}</small>
+            {viewModel.topicWorkspaceSummary.runtimeStatusLabel}
+            <small>{viewModel.topicWorkspaceSummary.runtimeStatusDetail}</small>
           </div>
           {props.readinessErrorMessage ? (
             <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
@@ -197,22 +158,157 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
             </div>
           ) : null}
         </div>
-        {viewModel.emptyState ? (
-          <div className="empty-block">{viewModel.emptyState.title}<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>{viewModel.emptyState.description}</span></div>
+        {viewModel.topicWorkspaceRows.length === 0 ? (
+          <div className="empty-block">尚未設定任何 topic mapping。<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>新增後即可在同一張卡內直接查看 runtime 狀態、coverage 與編輯欄位。</span></div>
         ) : (
-          <div className="preview-list">
-            {viewModel.previewCards.map((topic) => (
-              <div className="preview-row" key={`preview-${topic.id}`}>
-                <div className="preview-row__header">
-                  <span className={`preview-row__icon ${topic.runtimeTone === "connected" ? "is-live" : ""}`} aria-hidden>{PREVIEW_ICON_GLYPHS[topic.icon] ?? "·"}</span>
-                  <label className="preview-row__label">{topic.metricLabelZh}<small>{topic.metricLabelEn}</small></label>
+          <div className="topic-workspace-list">
+            {viewModel.topicWorkspaceRows.map((topic) => (
+              <div className="topic-workspace-row" data-mqtt-row="editable-topic-row" key={`workspace-${topic.id}`}>
+                <div className="topic-workspace-row__header">
+                  <span className={`topic-row__dot ${!topic.enabled ? "is-disabled" : topic.runtimeTone === "connected" ? "" : "is-idle"}`} aria-hidden />
+                  <div className="topic-workspace-row__metric">
+                    <strong>{topic.metricLabelZh}</strong>
+                    <small>{topic.metricLabelEn}</small>
+                  </div>
+                  <div className="topic-workspace-row__runtime">
+                    <span className={`mgmt-chip ${topic.runtimeTone === "connected" ? "is-success" : topic.runtimeTone === "connecting" ? "is-warning" : "is-danger"}`}>{topic.runtimeLabel}</span>
+                    <b>{topic.valueLabel}<small>{topic.unit || "--"}</small></b>
+                  </div>
                 </div>
-                <b className="preview-row__value">{topic.valueLabel}<small>{topic.unitLabel || "--"}</small></b>
+                <div className="topic-workspace-row__fields">
+                  <input type="text" placeholder="topic" value={topic.topic} onChange={(event) => props.handleTopicChange(topic.id, "topic", event.target.value)} />
+                  <input type="text" placeholder="unit" value={topic.unit} onChange={(event) => props.handleTopicChange(topic.id, "unit", event.target.value)} />
+                </div>
+                <div className="topic-workspace-row__meta">
+                  <span>最後收值 {topic.lastReceivedLabel}</span>
+                  <span>最後更新 {topic.lastUpdatedLabel}</span>
+                  <span>{topic.qualityLabel}</span>
+                  {topic.coverageStateLabel ? <span>{topic.coverageStateLabel} · {topic.coverageDetail}</span> : null}
+                </div>
+                <div className="map-row__controls">
+                  <label className="map-row__toggle">
+                    <input type="checkbox" checked={topic.enabled} onChange={(event) => props.handleTopicChange(topic.id, "enabled", event.target.checked)} />
+                    啟用 ({topic.enabledLabel})
+                  </label>
+                  <button type="button" className="map-row__remove" onClick={() => props.removeTopicMapping(topic.id)}>移除</button>
+                </div>
               </div>
             ))}
           </div>
         )}
-        <p className="last-update">最後更新時間 {viewModel.connection.lastUpdateLabel}</p>
+        <div className="map-actions">
+          <button type="button" className="map-add" onClick={props.addTopicMapping}>＋ 新增 mapping</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="map-add" disabled={viewModel.actions.reloadTopicsDisabled} onClick={() => void props.reloadTopics()}>{viewModel.actions.reloadTopicsLabel}</button>
+            <button type="button" className="map-save" disabled={viewModel.actions.saveMappingsDisabled} onClick={() => void props.saveTopicMappings()}>{viewModel.actions.saveMappingsLabel}</button>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-card mqtt-weather-card" data-mqtt-section="weather-card">
+        <div className="settings-card__title">天氣設定<small>Weather Settings</small></div>
+        <div className="mqtt-weather-card__controls">
+          <label className="map-row__toggle mqtt-weather-card__toggle">
+            <input
+              type="checkbox"
+              checked={viewModel.weatherCard.enabled}
+              onChange={(event) => props.handleWeatherSettingChange("enabled", event.target.checked)}
+            />
+            啟用天氣顯示
+          </label>
+
+          <label className="text-field mqtt-weather-card__field">
+            <span className="field-label">定位方式</span>
+            <select
+              value={viewModel.weatherCard.locationMode}
+              onChange={(event) => props.handleWeatherSettingChange("locationMode", event.target.value as WeatherSettings["locationMode"])}
+            >
+              {viewModel.weatherCard.locationOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-field mqtt-weather-card__field">
+            <span className="field-label">縣市</span>
+            <select
+              value={props.weatherSettings.countyName ?? ""}
+              onChange={(event) => props.handleWeatherSettingChange("countyName", event.target.value || null)}
+            >
+              <option value="">請選擇縣市</option>
+              {viewModel.weatherCard.countyOptions.map((county) => (
+                <option key={county} value={county}>{county}</option>
+              ))}
+            </select>
+          </label>
+
+          {viewModel.weatherCard.locationMode === "station" ? (
+            <label className="text-field mqtt-weather-card__field">
+              <span className="field-label">測站</span>
+              <select
+                value={props.weatherSettings.stationId ?? ""}
+                onChange={(event) => props.handleWeatherSettingChange("stationId", event.target.value || null)}
+              >
+                <option value="">請選擇測站</option>
+                {viewModel.weatherCard.stationOptions.map((station) => (
+                  <option key={station.stationId} value={station.stationId}>{station.stationName}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <div className="mqtt-weather-card__preset-group">
+            <span className="field-label">Preset</span>
+            <div className="seg mqtt-weather-card__presets" role="tablist">
+              {viewModel.weatherCard.presetOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewModel.weatherCard.preset === option.value}
+                  className={viewModel.weatherCard.preset === option.value ? "active" : ""}
+                  onClick={() => props.handleWeatherSettingChange("preset", option.value as WeatherSettings["preset"])}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {viewModel.weatherCard.customFieldOptions.length > 0 ? (
+            <div className="mqtt-weather-card__custom-fields">
+              <span className="field-label">自訂欄位</span>
+              <div className="mqtt-weather-card__custom-grid">
+                {viewModel.weatherCard.customFieldOptions.map((option) => (
+                  <label key={option.value} className="map-row__toggle">
+                    <input
+                      type="checkbox"
+                      checked={option.checked}
+                      onChange={(event) => props.toggleWeatherField(option.value, event.target.checked)}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {viewModel.weatherCard.stationFeedback ? (
+          <div className="mgmt-status is-error mqtt-weather-card__feedback">{viewModel.weatherCard.stationFeedback}</div>
+        ) : null}
+
+        <div className="mqtt-weather-card__preview">
+          <strong>Header Preview</strong>
+          <p>{viewModel.weatherCard.preview.primaryText}</p>
+          {viewModel.weatherCard.preview.secondaryText ? (
+            <small>{viewModel.weatherCard.preview.secondaryText}</small>
+          ) : null}
+        </div>
+
+        {viewModel.weatherCard.previewFeedback ? (
+          <div className="mgmt-status is-error mqtt-weather-card__feedback">{viewModel.weatherCard.previewFeedback}</div>
+        ) : null}
       </section>
     </div>
   );

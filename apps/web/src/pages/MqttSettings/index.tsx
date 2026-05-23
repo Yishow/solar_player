@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_WEATHER_SETTINGS,
+  type WeatherFieldKey,
+  type WeatherHeaderContract,
+  type WeatherOptionsResponse,
+  type WeatherSettings
+} from "@solar-display/shared";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
   hasDisplaySyncDraftChanges,
@@ -8,10 +15,17 @@ import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
-import { requestJson } from "../../services/api";
+import {
+  getWeatherOptions,
+  getWeatherPreview,
+  getWeatherSettings,
+  requestJson,
+  updateWeatherSettings
+} from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
 import { type ActionState, type ConnectionTestFeedback, type DataMode, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
+import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
 const defaultMetricOptions = [
@@ -115,6 +129,13 @@ export function MqttSettings() {
   });
   const [topics, setTopics] = useState<TopicMapping[]>([]);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>([]);
+  const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(DEFAULT_WEATHER_SETTINGS);
+  const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
+    useState<WeatherSettings>(DEFAULT_WEATHER_SETTINGS);
+  const [weatherOptions, setWeatherOptions] = useState<WeatherOptionsResponse | null>(null);
+  const [weatherOptionsErrorMessage, setWeatherOptionsErrorMessage] = useState("");
+  const [weatherPreviewContract, setWeatherPreviewContract] = useState<WeatherHeaderContract | null>(null);
+  const [weatherPreviewErrorMessage, setWeatherPreviewErrorMessage] = useState("");
   const [lastConnectionTest, setLastConnectionTest] = useState<ConnectionTestFeedback>(null);
   const [message, setMessage] = useState("正在載入 MQTT 設定...");
   const [errorMessage, setErrorMessage] = useState("");
@@ -211,11 +232,27 @@ export function MqttSettings() {
     }
   };
 
+  const loadWeatherSettings = async ({ propagateError = false }: { propagateError?: boolean } = {}) => {
+    try {
+      const nextWeatherSettings = await getWeatherSettings();
+      setWeatherSettings(nextWeatherSettings);
+      setLastSyncedWeatherSettings(nextWeatherSettings);
+    } catch (error) {
+      if (propagateError) {
+        throw error instanceof Error ? error : new Error("載入天氣設定失敗。");
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
       try {
-        await Promise.all([loadSettings(), loadTopics({ isPolling: false })]);
+        await Promise.all([
+          loadSettings(),
+          loadTopics({ isPolling: false }),
+          loadWeatherSettings()
+        ]);
       } catch {
         // individual loaders surface their own errors
       }
@@ -233,6 +270,63 @@ export function MqttSettings() {
       window.clearInterval(pollTimer);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const options = await getWeatherOptions(weatherSettings.countyName);
+        if (active) {
+          setWeatherOptions(options);
+          setWeatherOptionsErrorMessage("");
+        }
+      } catch (error) {
+        if (active) {
+          setWeatherOptionsErrorMessage(
+            error instanceof Error ? error.message : "目前無法載入測站選項。"
+          );
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [weatherSettings.countyName]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const contract = await getWeatherPreview(weatherSettings);
+          if (active) {
+            setWeatherPreviewContract(contract);
+            setWeatherPreviewErrorMessage("");
+          }
+        } catch (error) {
+          if (active) {
+            setWeatherPreviewContract(null);
+            setWeatherPreviewErrorMessage(
+              error instanceof Error ? error.message : "目前無法取得 weather preview。"
+            );
+          }
+        }
+      })();
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+    // Preview only depends on the server-resolved location snapshot; field/preset
+    // composition is applied locally in the view model.
+  }, [
+    weatherSettings.enabled,
+    weatherSettings.locationMode,
+    weatherSettings.countyName,
+    weatherSettings.stationId
+  ]);
 
   const handleSettingChange = <Key extends keyof MqttSettingsForm>(
     key: Key,
@@ -253,6 +347,21 @@ export function MqttSettings() {
     );
   };
 
+  const handleWeatherSettingChange = <Key extends keyof WeatherSettings>(
+    key: Key,
+    value: WeatherSettings[Key]
+  ) => {
+    markDirty("天氣設定已變更，尚未儲存。");
+    setWeatherSettings((current) =>
+      applyWeatherSettingChange(current, key, value, weatherOptions?.stations ?? [])
+    );
+  };
+
+  const toggleWeatherField = (fieldKey: WeatherFieldKey, enabled: boolean) => {
+    markDirty("天氣顯示欄位已變更，尚未儲存。");
+    setWeatherSettings((current) => toggleWeatherFieldKey(current, fieldKey, enabled));
+  };
+
   const saveSettings = async () => {
     setActionState((current) => ({ ...current, isSavingSettings: true }));
     try {
@@ -261,15 +370,18 @@ export function MqttSettings() {
         method: "PUT"
       });
       const nextSettings = toFormState(response.settings);
+      const savedWeatherSettings = await updateWeatherSettings(weatherSettings);
       setSettings(nextSettings);
       setLastSyncedSettings(nextSettings);
       setStatus(response.status);
+      setWeatherSettings(savedWeatherSettings);
+      setLastSyncedWeatherSettings(savedWeatherSettings);
       setLastConnectionTest(null);
-      setMessage("MQTT broker 設定已儲存並重新連線。");
+      setMessage("MQTT broker 與天氣設定已儲存並重新連線。");
       setErrorMessage("");
       await reloadReadiness();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "儲存 MQTT 設定失敗。");
+      setErrorMessage(error instanceof Error ? error.message : "儲存設定失敗。");
     } finally {
       setActionState((current) => ({ ...current, isSavingSettings: false }));
     }
@@ -364,8 +476,9 @@ export function MqttSettings() {
   const isDirty = useMemo(
     () =>
       hasDisplaySyncDraftChanges(settings, lastSyncedSettings)
-      || hasDisplaySyncDraftChanges(topics, lastSyncedTopics),
-    [lastSyncedSettings, lastSyncedTopics, settings, topics]
+      || hasDisplaySyncDraftChanges(topics, lastSyncedTopics)
+      || hasDisplaySyncDraftChanges(weatherSettings, lastSyncedWeatherSettings),
+    [lastSyncedSettings, lastSyncedTopics, lastSyncedWeatherSettings, settings, topics, weatherSettings]
   );
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
@@ -374,6 +487,7 @@ export function MqttSettings() {
       await Promise.all([
         loadSettings({ propagateError: true }),
         loadTopics({ isPolling: true, propagateError: true }),
+        loadWeatherSettings({ propagateError: true }),
         reloadReadiness()
       ]);
     }
@@ -409,7 +523,14 @@ export function MqttSettings() {
       settings={settings}
       status={status}
       testConnection={testConnection}
+      toggleWeatherField={toggleWeatherField}
       topics={topics}
+      handleWeatherSettingChange={handleWeatherSettingChange}
+      weatherOptions={weatherOptions}
+      weatherOptionsErrorMessage={weatherOptionsErrorMessage}
+      weatherPreviewContract={weatherPreviewContract}
+      weatherPreviewErrorMessage={weatherPreviewErrorMessage}
+      weatherSettings={weatherSettings}
     />
   );
 }

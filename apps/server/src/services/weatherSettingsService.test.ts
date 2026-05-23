@@ -64,3 +64,56 @@ test("weather settings survive a reload with the saved management contract", () 
     stationId: "C0I080"
   });
 });
+
+test("weather settings accept compact and complete presets as first-class saved values", () => {
+  saveWeatherSettings({
+    countyName: "臺北市",
+    enabled: true,
+    fieldKeys: ["weather", "airTemperature"],
+    locationMode: "station",
+    preset: "compact",
+    stationId: "C0I080"
+  });
+
+  assert.equal(readWeatherSettings().preset, "compact");
+
+  saveWeatherSettings({
+    countyName: "臺北市",
+    enabled: true,
+    fieldKeys: [
+      "weather",
+      "airTemperature",
+      "relativeHumidity",
+      "observationTime",
+      "windSpeed",
+      "windDirection",
+      "airPressure",
+      "precipitation",
+      "dailyHigh",
+      "dailyLow"
+    ],
+    locationMode: "station",
+    preset: "complete",
+    stationId: "C0I080"
+  });
+
+  assert.deepEqual(readWeatherSettings(), {
+    countyName: "臺北市",
+    enabled: true,
+    fieldKeys: [
+      "weather",
+      "airTemperature",
+      "relativeHumidity",
+      "observationTime",
+      "windSpeed",
+      "windDirection",
+      "airPressure",
+      "precipitation",
+      "dailyHigh",
+      "dailyLow"
+    ],
+    locationMode: "station",
+    preset: "complete",
+    stationId: "C0I080"
+  });
+});
