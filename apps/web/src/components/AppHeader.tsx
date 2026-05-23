@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import type { HeaderWeatherMeta } from "@solar-display/shared";
 import { Link } from "react-router-dom";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { StatusBadge } from "./StatusBadge";
@@ -8,7 +9,7 @@ type AppHeaderMeta = {
   status?: "connected" | "connecting" | "disconnected";
   statusLabel?: string;
   time?: string;
-  weather?: string;
+  weather?: HeaderWeatherMeta;
   weekday?: string;
 };
 
@@ -16,6 +17,12 @@ const DEFAULT_HEADER_META = {
   status: "connecting",
   statusLabel: "連線中"
 } as const;
+
+const DEFAULT_WEATHER_META: HeaderWeatherMeta = {
+  primaryText: "天氣資料同步中",
+  secondaryText: "",
+  state: "loading"
+};
 
 function pad(value: number) {
   return value.toString().padStart(2, "0");
@@ -86,6 +93,7 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
           statusLabel: meta.statusLabel
         }
       : DEFAULT_HEADER_META;
+  const weatherMeta = meta?.weather ?? DEFAULT_WEATHER_META;
 
   return (
     <header
@@ -145,11 +153,21 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
 
           <div
             data-shell-primitive="header-weather"
-            className="ml-[40px] flex items-center gap-[12px] text-[18px] font-medium"
+            data-weather-state={weatherMeta.state}
+            className="ml-[40px] flex w-[320px] min-w-0 items-center gap-[12px]"
             style={{ color: "var(--shell-meta-weather-ink)" }}
           >
             <WeatherGlyph />
-            <span>{meta?.weather?.trim() ? meta.weather : "天氣資料同步中"}</span>
+            <div className="min-w-0 flex-1 leading-[1.2]">
+              <div className="truncate text-[18px] font-medium">
+                {weatherMeta.primaryText}
+              </div>
+              {weatherMeta.secondaryText ? (
+                <div className="mt-[4px] truncate text-[14px] font-medium text-[var(--shell-kicker-muted)]">
+                  {weatherMeta.secondaryText}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="ml-[40px]">

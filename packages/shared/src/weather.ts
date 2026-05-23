@@ -22,6 +22,9 @@ export type WeatherLocationMode = (typeof weatherLocationModes)[number];
 export const weatherFetchStates = ["fresh", "stale", "unconfigured", "unavailable"] as const;
 export type WeatherFetchState = (typeof weatherFetchStates)[number];
 
+export const headerWeatherStates = ["loading", "ready", "disabled", "unavailable", "stale"] as const;
+export type HeaderWeatherState = (typeof headerWeatherStates)[number];
+
 export type WeatherSettings = {
   countyName: string | null;
   enabled: boolean;
@@ -63,6 +66,17 @@ export type WeatherCurrentSnapshot = {
   weather: string | null;
   windDirection: number | null;
   windSpeed: number | null;
+};
+
+export type HeaderWeatherMeta = {
+  primaryText: string;
+  secondaryText: string;
+  state: HeaderWeatherState;
+};
+
+export type WeatherHeaderContract = {
+  current: WeatherCurrentSnapshot;
+  settings: Pick<WeatherSettings, "enabled" | "fieldKeys" | "preset">;
 };
 
 export const DEFAULT_WEATHER_FIELD_KEYS: WeatherFieldKey[] = [

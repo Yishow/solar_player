@@ -5,6 +5,7 @@ import test from "node:test";
 
 const layoutDir = path.resolve(import.meta.dirname);
 const layoutShellSource = fs.readFileSync(path.join(layoutDir, "LayoutShell.tsx"), "utf8");
+const managementShellSource = fs.readFileSync(path.join(layoutDir, "ManagementShell.tsx"), "utf8");
 const registryHookSource = fs.readFileSync(
   path.join(layoutDir, "../hooks/useDisplayPageRegistry.ts"),
   "utf8"
@@ -48,8 +49,19 @@ test("LayoutShell maps the hydrated mqtt status into the playback header meta", 
   );
   assert.match(
     layoutShellSource,
-    /<AppHeader[^>]*meta=\{\{\s*status: [^,]+,\s*statusLabel: [^}]+\}\}/s
+    /<AppHeader[^>]*meta=\{\{\s*status: [^,]+,\s*statusLabel: [^,]+,\s*weather: headerWeatherMeta\s*\}\}/s
   );
+  assert.match(layoutShellSource, /useHeaderWeatherMeta\(\)/);
+});
+
+test("playback and management shells share the same header weather mapper", () => {
+  assert.match(layoutShellSource, /useHeaderWeatherMeta\(\)/);
+  assert.match(
+    managementShellSource,
+    /headerMeta=\{\{\s*weather: headerWeatherMeta\s*\}\}/s
+  );
+  assert.match(managementShellSource, /useHeaderWeatherMeta\(\)/);
+  assert.match(managementShellSource, /<AppHeader[^>]*meta=\{headerMeta\}/s);
 });
 
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {

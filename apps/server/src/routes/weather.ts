@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import type { WeatherCurrentSnapshot, WeatherHeaderContract, WeatherSettings } from "@solar-display/shared";
 import { config } from "../config.js";
 import {
   normalizeWeatherSettingsInput,
@@ -13,6 +14,38 @@ function errorResponse(error: string) {
     success: false,
     error,
     timestamp: new Date().toISOString()
+  };
+}
+
+function buildNeutralCurrentWeatherSnapshot(fetchState: WeatherCurrentSnapshot["fetchState"]): WeatherCurrentSnapshot {
+  return {
+    airPressure: null,
+    airTemperature: null,
+    countyName: null,
+    dailyHigh: null,
+    dailyLow: null,
+    fetchState,
+    observationTime: null,
+    precipitation: null,
+    relativeHumidity: null,
+    staleAt: null,
+    stationId: null,
+    stationName: null,
+    townName: null,
+    updatedAt: null,
+    weather: null,
+    windDirection: null,
+    windSpeed: null
+  };
+}
+
+function buildPublicWeatherHeaderSettings(
+  settings: WeatherSettings
+): WeatherHeaderContract["settings"] {
+  return {
+    enabled: settings.enabled,
+    fieldKeys: settings.fieldKeys,
+    preset: settings.preset
   };
 }
 
@@ -84,9 +117,14 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/api/weather/current", async () => {
-    const current = await getWeatherService().getCurrentWeather(readWeatherSettings());
+    const settings = readWeatherSettings();
+    const current = settings.enabled
+      ? await getWeatherService().getCurrentWeather(settings)
+      : buildNeutralCurrentWeatherSnapshot("unconfigured");
+
     return {
-      current
+      current,
+      settings: buildPublicWeatherHeaderSettings(settings)
     };
   });
 };

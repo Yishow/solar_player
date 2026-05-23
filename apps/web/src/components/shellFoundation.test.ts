@@ -136,6 +136,32 @@ test("header and footer expose shell primitives without centered max-width wrapp
   assert.doesNotMatch(footerHtml, /max-w-\[var\(--screen-width\)\]/);
 });
 
+test("header weather metadata renders alongside the live status badge", () => {
+  const headerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/overview"] },
+      React.createElement(AppHeader, {
+        meta: {
+          status: "connected",
+          statusLabel: "Online",
+          weather: {
+            primaryText: "台北 多雲 31°C",
+            secondaryText: "濕度 72%・觀測 14:20",
+            state: "ready"
+          }
+        }
+      })
+    )
+  );
+
+  assert.match(headerHtml, /data-shell-primitive="header-weather"/);
+  assert.match(headerHtml, /data-weather-state="ready"/);
+  assert.match(headerHtml, /台北 多雲 31°C/);
+  assert.match(headerHtml, /濕度 72%・觀測 14:20/);
+  assert.match(headerHtml, />Online</);
+});
+
 test("header and footer render the provided bootstrap brand view on first paint", () => {
   const brandView = {
     logoSrc: "/uploads/brand/live.png",

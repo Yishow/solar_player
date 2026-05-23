@@ -8,6 +8,7 @@ import { PlaybackErrorBoundary } from "../components/PlaybackErrorBoundary";
 import { resolveHeaderConnectionMeta } from "../components/headerConnectionMeta";
 import { useBrandAssets, type BrandView } from "../hooks/useBrandAssets";
 import { useDisplayClientHeartbeat } from "../hooks/useDisplayClientHeartbeat";
+import { useHeaderWeatherMeta } from "../hooks/useHeaderWeatherMeta";
 import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
 import { usePageRotation } from "../hooks/usePageRotation";
@@ -23,6 +24,7 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
   const { isHydrated, status } = useMqttStatus();
   const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
   const playbackEntries = buildPlaybackFooterEntries(registry.pages);
+  const headerWeatherMeta = useHeaderWeatherMeta();
   const headerConnectionMeta = resolveHeaderConnectionMeta({
     connected: status.connected,
     reason: status.reason,
@@ -91,7 +93,8 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
           brandView={brandView}
           meta={{
             status: headerConnectionMeta.status,
-            statusLabel: headerConnectionMeta.label
+            statusLabel: headerConnectionMeta.label,
+            weather: headerWeatherMeta
           }}
         />
       }

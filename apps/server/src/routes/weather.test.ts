@@ -234,7 +234,51 @@ test("weather management reads stay trusted while current weather stays public-s
     assert.equal(settingsResponse.statusCode, 403);
     assert.equal(optionsResponse.statusCode, 403);
     assert.equal(currentResponse.statusCode, 200);
-    assert.equal(currentResponse.json<{ current: { fetchState: string } }>().current.fetchState, "fresh");
+    assert.equal(currentResponse.json<{ current: { fetchState: string } }>().current.fetchState, "unconfigured");
+  } finally {
+    await app.close();
+  }
+});
+
+test("current weather exposes only the safe header settings subset and stays neutral while weather is disabled", async () => {
+  process.env.CWA_AUTHORIZATION = "test-token";
+  installFetchStub(sampleDataset);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/weather/current"
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      current: {
+        airPressure: null,
+        airTemperature: null,
+        countyName: null,
+        dailyHigh: null,
+        dailyLow: null,
+        fetchState: "unconfigured",
+        observationTime: null,
+        precipitation: null,
+        relativeHumidity: null,
+        staleAt: null,
+        stationId: null,
+        stationName: null,
+        townName: null,
+        updatedAt: null,
+        weather: null,
+        windDirection: null,
+        windSpeed: null
+      },
+      settings: {
+        enabled: false,
+        fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        preset: "standard"
+      }
+    });
   } finally {
     await app.close();
   }
@@ -247,6 +291,21 @@ test("weather options filter stations by county and current weather returns a no
   const app = await buildApp();
 
   try {
+    const saveResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        countyName: "臺北市",
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        locationMode: "station",
+        preset: "standard",
+        stationId: "C0I080"
+      },
+      url: "/api/weather/settings"
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+
     const [optionsResponse, currentResponse] = await Promise.all([
       app.inject({
         method: "GET",
@@ -291,6 +350,11 @@ test("weather options filter stations by county and current weather returns a no
         windDirection: number | null;
         windSpeed: number | null;
       };
+      settings: {
+        enabled: boolean;
+        fieldKeys: string[];
+        preset: string;
+      };
     };
 
     assert.equal(currentBody.current.fetchState, "fresh");
@@ -307,6 +371,11 @@ test("weather options filter stations by county and current weather returns a no
     assert.equal(currentBody.current.dailyHigh, 33.8);
     assert.equal(currentBody.current.dailyLow, 25.2);
     assert.equal(currentBody.current.observationTime, "2026-05-23T06:18:00.000Z");
+    assert.deepEqual(currentBody.settings, {
+      enabled: true,
+      fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+      preset: "standard"
+    });
   } finally {
     await app.close();
   }
@@ -383,6 +452,11 @@ test("current weather reports an explicit unconfigured state when CWA auth is ab
         weather: null,
         windDirection: null,
         windSpeed: null
+      },
+      settings: {
+        enabled: false,
+        fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        preset: "standard"
       }
     });
   } finally {

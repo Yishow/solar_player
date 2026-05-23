@@ -23,6 +23,7 @@ import type {
   PlaybackPage,
   PlaybackSettings,
   ImagePlaylistEntryInput,
+  WeatherHeaderContract,
   ResolvedImagePlaylistEntry,
   SustainabilityPeriodKey,
   SustainabilityPeriodStory,
@@ -646,6 +647,11 @@ export async function getRuntimeMqttStatus() {
     "/api/runtime/mqtt-status"
   );
   return response.status;
+}
+
+export async function getHeaderWeatherContract() {
+  const response = await requestJson<WeatherHeaderContract>("/api/weather/current");
+  return response;
 }
 
 export async function createBrandProfile(payload: BrandProfileUpdate & { name: string }) {
