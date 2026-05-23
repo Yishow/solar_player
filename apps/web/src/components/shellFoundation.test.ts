@@ -5,15 +5,11 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/playbackRouteMeta";
-import { routeMetaMap } from "../app/routeMeta";
+import { routeMetaList, routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "./AppFooterNav";
 import { AppHeader } from "./AppHeader";
 import { DisplayCanvas } from "./DisplayCanvas";
-import {
-  computeManagementFixedLayoutScale,
-  MANAGEMENT_FIXED_LAYOUT_HEIGHT,
-  MANAGEMENT_FIXED_LAYOUT_WIDTH
-} from "./ManagementFixedLayoutFrame";
+import { computeCanvasLayout } from "./displayCanvasLayout";
 import { DisplayPagesEditor } from "../pages/DisplayPagesEditor";
 import { ManagementShell, ManagementShellFrame } from "../layouts/ManagementShell";
 import { PageScaffold } from "../pages/shared/PageScaffold";
@@ -43,22 +39,46 @@ function createPlaybackPage(
   };
 }
 
+function renderManagementRoute(pathname: string, body: string): string {
+  return renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: [pathname] },
+      React.createElement(
+        Routes,
+        null,
+        React.createElement(
+          Route,
+          {
+            element: React.createElement(ManagementShell),
+            path: "/"
+          },
+          React.createElement(Route, {
+            element: React.createElement("div", null, body),
+            path: pathname.replace(/^\//, "")
+          })
+        )
+      )
+    )
+  );
+}
+
 test("shell witness routes declare the shared density contract", () => {
   assert.equal(routeMetaMap.get("/overview")?.shellDensity, "playback");
   assert.equal(routeMetaMap.get("/brand")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/display-pages/editor")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/settings/playback")?.shellDensity, "management");
   assert.equal(routeMetaMap.get("/device-status")?.shellDensity, "device-detail");
-  assert.equal(routeMetaMap.get("/trends")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/settings/playback")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/settings/images")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/settings/mqtt")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/settings/circuits")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/history")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/slideshow-preview")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/device-status")?.managementFrame, "fixed-fhd");
-  assert.equal(routeMetaMap.get("/brand")?.managementFrame, undefined);
-  assert.equal(routeMetaMap.get("/display-pages/editor")?.managementFrame, undefined);
+});
+
+test("route metadata no longer splits management routes with a fixed-frame flag", () => {
+  for (const route of routeMetaList) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(route, "managementFrame"),
+      false,
+      `${route.path} should not carry a managementFrame split flag`
+    );
+  }
 });
 
 test("display canvas host renders a fixed FHD surface with explicit shell primitives", () => {
@@ -360,84 +380,156 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.doesNotMatch(footerHtml, />離線</);
 });
 
-test("management shell keeps its own primitives while fixed-layout routes avoid the playback canvas contract", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      MemoryRouter,
-      {
-        initialEntries: ["/settings/mqtt"]
-      },
-      React.createElement(ManagementShell)
-    )
-  );
+test("management shell renders every route inside one whole-page management canvas", () => {
+  for (const [pathname, body] of [
+    ["/brand", "brand-body"],
+    ["/settings/playback", "playback-body"]
+  ] as const) {
+    const html = renderManagementRoute(pathname, body);
 
-  assert.match(html, /data-shell-primitive="management-shell-viewport"/);
-  assert.match(html, /data-shell-primitive="management-shell-surface"/);
-  assert.match(html, /data-shell-primitive="management-shell-content"/);
-  assert.match(html, /data-shell-primitive="management-scroll"/);
-  assert.match(html, /overflow-y-auto/);
-  assert.match(html, /overflow-x-hidden/);
-  assert.match(html, /data-shell-primitive="management-fixed-layout-frame"/);
-  assert.match(html, /width:1920px/);
-  assert.match(html, /height:838px/);
-  assert.doesNotMatch(html, /data-shell-primitive="display-canvas-viewport"/);
-  assert.doesNotMatch(html, /data-shell-primitive="display-canvas-frame"/);
-  assert.doesNotMatch(html, /height:1080px/);
+    assert.match(html, /data-shell-primitive="management-shell-viewport"/);
+    assert.match(html, /data-shell-primitive="management-shell-frame"/);
+    assert.match(html, /data-shell-primitive="management-shell-surface"/);
+    assert.match(html, /data-shell-primitive="management-shell-content"/);
+    assert.match(html, /data-shell-primitive="management-scroll"/);
+    assert.match(html, /data-shell-primitive="app-header"/);
+    assert.match(html, /data-shell-primitive="footer-nav"/);
+    assert.match(html, new RegExp(body));
+
+    // header, content, and footer share a single scaled 1920x1080 canvas
+    assert.match(html, /width:1920px/);
+    assert.match(html, /height:1080px/);
+
+    // the legacy split model (separate 1920x838 fixed frame) is gone
+    assert.doesNotMatch(html, /data-shell-primitive="management-fixed-layout-frame"/);
+    assert.doesNotMatch(html, /height:838px/);
+
+    // management keeps its own primitives rather than the playback canvas primitives
+    assert.doesNotMatch(html, /data-shell-primitive="display-canvas-viewport"/);
+    assert.doesNotMatch(html, /data-shell-primitive="display-canvas-frame"/);
+  }
 });
 
-test("management shell wraps fixed-layout management routes in a dedicated scaled frame", () => {
-  const fixedLayoutHtml = renderToStaticMarkup(
+test("management shell reuses playback canvas geometry, slot heights, and uniform scale", () => {
+  const html = renderManagementRoute("/settings/playback", "playback-body");
+
+  // 1920x1080 canvas matches the playback DisplayCanvas, not the legacy 838 content frame
+  assert.match(html, /width:1920px/);
+  assert.match(html, /height:1080px/);
+  assert.doesNotMatch(html, /height:838px/);
+
+  // a single translated uniform scale, same semantics as DisplayCanvas
+  assert.match(html, /transform:translate\([^)]*\) scale\([^)]*\)/);
+
+  // explicit slots: header 110px, footer 72px, content fills the remaining 898px via flex-1
+  assert.match(html, /h-\[var\(--header-height\)\]/);
+  assert.match(html, /h-\[var\(--footer-height\)\]/);
+  assert.match(html, /data-shell-primitive="management-shell-content"[^>]*flex-1/);
+
+  // the scale is computed from the limiting viewport dimension and is NOT clamped to 1
+  const design = { height: 1080, width: 1920 };
+  assert.equal(
+    computeCanvasLayout({ height: 720, width: 1280 }, design).scale,
+    Math.min(1280 / 1920, 720 / 1080)
+  );
+  assert.equal(
+    computeCanvasLayout({ height: 1440, width: 2560 }, design).scale,
+    Math.min(2560 / 1920, 1440 / 1080)
+  );
+  assert.ok(computeCanvasLayout({ height: 1440, width: 2560 }, design).scale > 1);
+});
+
+test("management shell keeps the canvas contract when chrome is hidden", () => {
+  const hiddenHtml = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
       {
-        initialEntries: ["/settings/playback"]
+        initialEntries: ["/display-pages/editor"]
       },
       React.createElement(
-        Routes,
-        null,
-        React.createElement(
-          Route,
-          {
-            element: React.createElement(ManagementShell),
-            path: "/"
-          },
-          React.createElement(Route, {
-            element: React.createElement("div", null, "fixed-layout-body"),
-            path: "settings/playback"
-          })
-        )
+        ManagementShellFrame,
+        {
+          hideChrome: true
+        },
+        React.createElement("div", null, "edit-body")
+      )
+    )
+  );
+  const chromeHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor"]
+      },
+      React.createElement(
+        ManagementShellFrame,
+        {
+          hideChrome: false
+        },
+        React.createElement("div", null, "view-body")
       )
     )
   );
 
-  const fluidLayoutHtml = renderToStaticMarkup(
+  // the management canvas frame remains in both chrome states
+  for (const html of [hiddenHtml, chromeHtml]) {
+    assert.match(html, /data-shell-primitive="management-shell-viewport"/);
+    assert.match(html, /data-shell-primitive="management-shell-frame"/);
+    assert.match(html, /data-shell-primitive="management-shell-content"/);
+    assert.match(html, /width:1920px/);
+    assert.match(html, /height:1080px/);
+  }
+
+  // hidden chrome → header and footer are omitted, content still renders inside the canvas
+  assert.doesNotMatch(hiddenHtml, /data-shell-primitive="app-header"/);
+  assert.doesNotMatch(hiddenHtml, /data-shell-primitive="footer-nav"/);
+  assert.match(hiddenHtml, /edit-body/);
+
+  // visible chrome → header and footer share the same canvas
+  assert.match(chromeHtml, /data-shell-primitive="app-header"/);
+  assert.match(chromeHtml, /data-shell-primitive="footer-nav"/);
+  assert.match(chromeHtml, /view-body/);
+});
+
+test("management header shares the playback header canvas scale at the same viewport", () => {
+  const playbackHtml = renderToStaticMarkup(
     React.createElement(
-      MemoryRouter,
+      DisplayCanvas,
       {
-        initialEntries: ["/brand"]
+        header: React.createElement(
+          MemoryRouter,
+          { initialEntries: ["/overview"] },
+          React.createElement(AppHeader)
+        ),
+        footer: React.createElement("footer", null, "footer")
       },
-      React.createElement(
-        Routes,
-        null,
-        React.createElement(
-          Route,
-          {
-            element: React.createElement(ManagementShell),
-            path: "/"
-          },
-          React.createElement(Route, {
-            element: React.createElement("div", null, "fluid-layout-body"),
-            path: "brand"
-          })
-        )
-      )
+      React.createElement("div", null, "playback-body")
     )
   );
+  const managementHtml = renderManagementRoute("/settings/playback", "management-body");
 
-  assert.match(fixedLayoutHtml, /data-shell-primitive="management-fixed-layout-frame"/);
-  assert.match(fixedLayoutHtml, /fixed-layout-body/);
-  assert.doesNotMatch(fluidLayoutHtml, /data-shell-primitive="management-fixed-layout-frame"/);
-  assert.match(fluidLayoutHtml, /fluid-layout-body/);
+  // both surfaces host their header inside an identical 1920x1080 uniformly-scaled canvas,
+  // so the same viewport yields the same header scale on playback and management
+  for (const html of [playbackHtml, managementHtml]) {
+    assert.match(html, /data-shell-primitive="app-header"/);
+    assert.match(html, /width:1920px/);
+    assert.match(html, /height:1080px/);
+    assert.match(html, /transform:translate\([^)]*\) scale\([^)]*\)/);
+    assert.match(html, /h-\[var\(--header-height\)\]/);
+  }
+
+  // the management canvas matches the playback design dimensions exactly via the shared math
+  const design = { height: 1080, width: 1920 };
+  for (const viewport of [
+    { height: 720, width: 1280 },
+    { height: 1080, width: 1920 },
+    { height: 1440, width: 2560 }
+  ]) {
+    assert.equal(
+      computeCanvasLayout(viewport, design).scale,
+      Math.min(viewport.width / 1920, viewport.height / 1080)
+    );
+  }
 });
 
 test("display pages editor hides management header and footer while edit mode is active", () => {
@@ -491,30 +583,6 @@ test("display pages editor hides management header and footer while edit mode is
   assert.doesNotMatch(editModeHtml, /data-shell-primitive="footer-nav"/);
   assert.match(viewModeHtml, /data-shell-primitive="app-header"/);
   assert.match(viewModeHtml, /data-shell-primitive="footer-nav"/);
-});
-
-test("management fixed layout scale clamps to the available viewport without enlarging", () => {
-  assert.equal(
-    computeManagementFixedLayoutScale({
-      height: MANAGEMENT_FIXED_LAYOUT_HEIGHT,
-      width: MANAGEMENT_FIXED_LAYOUT_WIDTH
-    }),
-    1
-  );
-  assert.equal(
-    computeManagementFixedLayoutScale({
-      height: 600,
-      width: 1280
-    }),
-    Math.min(1280 / MANAGEMENT_FIXED_LAYOUT_WIDTH, 600 / MANAGEMENT_FIXED_LAYOUT_HEIGHT)
-  );
-  assert.equal(
-    computeManagementFixedLayoutScale({
-      height: 2000,
-      width: 4000
-    }),
-    1
-  );
 });
 
 test("shell primitives expose reusable section, action, media, and status wrappers", () => {

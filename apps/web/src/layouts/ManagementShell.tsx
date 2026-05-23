@@ -1,65 +1,107 @@
-import React from "react";
-import { Outlet, useLoaderData, useLocation } from "react-router-dom";
-import { routeMetaMap } from "../app/routeMeta";
+import React, { useEffect, useState } from "react";
+import { Outlet, useLoaderData } from "react-router-dom";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
-import { ManagementFixedLayoutFrame } from "../components/ManagementFixedLayoutFrame";
+import { computeCanvasLayout } from "../components/displayCanvasLayout";
 import { useBrandAssets, type BrandView } from "../hooks/useBrandAssets";
 import { useHeaderWeatherMeta } from "../hooks/useHeaderWeatherMeta";
+
+const DESIGN_WIDTH = 1920;
+const DESIGN_HEIGHT = 1080;
+
+function getViewportSize() {
+  if (typeof window === "undefined") {
+    return {
+      height: DESIGN_HEIGHT,
+      width: DESIGN_WIDTH
+    };
+  }
+
+  return {
+    height: window.visualViewport?.height ?? window.innerHeight,
+    width: window.visualViewport?.width ?? window.innerWidth
+  };
+}
 
 export function ManagementShellFrame({
   children,
   headerMeta,
   hideChrome = false,
-  initialBrandView,
-  usesFixedLayoutFrame = false
+  initialBrandView
 }: {
   children?: React.ReactNode;
   headerMeta?: Parameters<typeof AppHeader>[0]["meta"];
   hideChrome?: boolean;
   initialBrandView?: BrandView;
-  usesFixedLayoutFrame?: boolean;
 }) {
+  const [layout, setLayout] = useState(() => computeCanvasLayout(
+    getViewportSize(),
+    { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
+  ));
+
+  useEffect(() => {
+    const updateLayout = () => {
+      setLayout(computeCanvasLayout(
+        getViewportSize(),
+        { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
+      ));
+    };
+
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    window.visualViewport?.addEventListener("resize", updateLayout);
+
+    return () => {
+      window.removeEventListener("resize", updateLayout);
+      window.visualViewport?.removeEventListener("resize", updateLayout);
+    };
+  }, []);
+
   return (
     <div
       data-shell-primitive="management-shell-viewport"
       className="shell-stage relative h-screen w-screen overflow-hidden text-neutral-900"
+      style={{
+        backgroundColor: "var(--stage-bg)"
+      }}
     >
       <div
-        data-shell-primitive="management-shell-surface"
-        className="shell-stage-surface relative flex h-full w-full flex-col overflow-hidden"
+        data-shell-primitive="management-shell-frame"
+        className="absolute left-0 top-0"
+        style={{
+          height: `${DESIGN_HEIGHT}px`,
+          transform: `translate(${layout.offsetX}px, ${layout.offsetY}px) scale(${layout.scale})`,
+          transformOrigin: "top left",
+          width: `${DESIGN_WIDTH}px`
+        }}
       >
-        <div className="shell-stage-overlay pointer-events-none absolute inset-0" />
-        {!hideChrome ? <AppHeader brandView={initialBrandView} meta={headerMeta} /> : null}
-        <main
-          data-shell-primitive="management-shell-content"
-          className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
+        <div
+          data-shell-primitive="management-shell-surface"
+          className="shell-stage-surface relative flex h-full w-full flex-col overflow-hidden"
         >
-          <div
-            data-shell-primitive="management-scroll"
-            className="h-full w-full overflow-y-auto overflow-x-hidden"
+          <div className="shell-stage-overlay pointer-events-none absolute inset-0" />
+          {!hideChrome ? <AppHeader brandView={initialBrandView} meta={headerMeta} /> : null}
+          <main
+            data-shell-primitive="management-shell-content"
+            className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
           >
-            {usesFixedLayoutFrame ? (
-              <ManagementFixedLayoutFrame>
-                {children}
-              </ManagementFixedLayoutFrame>
-            ) : (
-              children
-            )}
-          </div>
-        </main>
-        {!hideChrome ? <AppFooterNav brandView={initialBrandView} /> : null}
+            <div
+              data-shell-primitive="management-scroll"
+              className="h-full w-full overflow-y-auto overflow-x-hidden"
+            >
+              {children}
+            </div>
+          </main>
+          {!hideChrome ? <AppFooterNav brandView={initialBrandView} /> : null}
+        </div>
       </div>
     </div>
   );
 }
 
 export function ManagementShell({ initialBrandView }: { initialBrandView?: BrandView }) {
-  const location = useLocation();
   const brandView = useBrandAssets(initialBrandView);
   const headerWeatherMeta = useHeaderWeatherMeta();
-  const routeMeta = routeMetaMap.get(location.pathname);
-  const usesFixedLayoutFrame = routeMeta?.managementFrame === "fixed-fhd";
 
   return (
     <ManagementShellFrame
@@ -67,7 +109,6 @@ export function ManagementShell({ initialBrandView }: { initialBrandView?: Brand
         weather: headerWeatherMeta
       }}
       initialBrandView={brandView}
-      usesFixedLayoutFrame={usesFixedLayoutFrame}
     >
       <Outlet />
     </ManagementShellFrame>

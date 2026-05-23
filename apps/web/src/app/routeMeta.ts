@@ -9,7 +9,6 @@ export type RouteMeta = {
   title: string;
   subtitle: string;
   group: RouteGroup;
-  managementFrame?: "fixed-fhd";
   order: number;
   shellDensity: ShellDensity;
 };
@@ -71,7 +70,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "能源趨勢",
     subtitle: "Energy Trend",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 6,
     shellDensity: "management"
   },
@@ -99,7 +97,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "播放設定",
     subtitle: "Playback Settings",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 9,
     shellDensity: "management"
   },
@@ -109,7 +106,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "圖片管理",
     subtitle: "Image Management",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 10,
     shellDensity: "management"
   },
@@ -119,7 +115,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "MQTT 設定",
     subtitle: "MQTT Settings",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 11,
     shellDensity: "management"
   },
@@ -129,7 +124,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "迴路設定",
     subtitle: "Circuit Settings",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 12,
     shellDensity: "management"
   },
@@ -139,7 +133,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "發電歷史",
     subtitle: "Energy History",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 13,
     shellDensity: "management"
   },
@@ -158,7 +151,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "輪播預覽",
     subtitle: "Slideshow Preview",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 15,
     shellDensity: "management"
   },
@@ -168,7 +160,6 @@ export const routeMetaList: RouteMeta[] = [
     title: "裝置狀態",
     subtitle: "Device Status",
     group: "management",
-    managementFrame: "fixed-fhd",
     order: 16,
     shellDensity: "device-detail"
   }
