@@ -4,3 +4,7 @@ multi_agent = true
 [agents.frontend_guide]
 description = "Use this agent for frontend UX, UI structure, interaction flow, and visual implementation work."
 config_file = "agents/frontend_guide.toml"
+
+[agents.display_asset_guide]
+description = "Use this agent for display wall asset generation, prompt recipes, asset manifests, export specs, and preview QA for the five playback pages."
+config_file = "agents/display_asset_guide.toml"
