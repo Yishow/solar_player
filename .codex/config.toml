@@ -1,0 +1,6 @@
+[features]
+multi_agent = true
+
+[agents.frontend_guide]
+description = "Use this agent for frontend UX, UI structure, interaction flow, and visual implementation work."
+config_file = "agents/frontend_guide.toml"
