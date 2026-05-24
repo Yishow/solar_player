@@ -1,8 +1,19 @@
 ## ADDED Requirements
 
+### Requirement: Provide a formal display asset generation skill package
+
+The implementation SHALL provide a formal skill package for display wall asset generation so asset planning, prompt recipes, export specs, and preview QA can be reused consistently for the five playback display pages.
+
+#### Scenario: Skill package is available in the repository
+
+- **WHEN** repository skills are inspected
+- **THEN** `skills/display-asset-generation/SKILL.md` exists
+- **AND** the skill metadata identifies `display-asset-generation` as the skill name
+- **AND** the skill describes when to use it, manifest workflow, naming rules, photo workflow, icon workflow, ornament workflow, prompt recipe structure, and preview QA
+
 ### Requirement: Provide a dedicated display asset generation agent
 
-The implementation SHALL provide a dedicated Codex agent for display wall asset generation so asset planning, prompt recipes, export specs, and preview QA can be handled consistently for the five playback display pages.
+The implementation SHALL provide a dedicated Codex agent for display wall asset generation so the formal skill can be applied through the repo's multi-agent workflow.
 
 #### Scenario: Agent is discoverable in Codex config
 
@@ -29,14 +40,14 @@ The implementation SHALL define an asset manifest workflow that records display 
 
 ### Requirement: Provide reusable prompt recipe structure
 
-The implementation SHALL provide prompt recipe documentation that separates shared visual style, page intent, asset role, composition, constraints, and negative prompt guidance.
+The implementation SHALL provide prompt recipe documentation that separates shared visual style, page intent, asset role, composition, constraints, and avoid-list guidance.
 
 #### Scenario: Recipes avoid one-off prompt drift
 
 - **WHEN** a user requests new display assets for any of the five playback pages
 - **THEN** the asset generation process starts from a reusable prompt recipe
 - **AND** the recipe includes shared green-energy display-wall style and page-specific intent
-- **AND** negative prompt guidance prevents text, logos, people details, fake UI, low resolution, over-stylization, and inconsistent icon grammar
+- **AND** avoid-list guidance prevents text, logos, people details, fake UI, low resolution, over-stylization, and inconsistent icon grammar
 
 ### Requirement: Separate photo, icon, ornament, and placeholder generation skills
 
