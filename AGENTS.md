@@ -1,3 +1,32 @@
+<!-- SPECTRA:START v1.0.2 -->
+
+# Spectra Instructions
+
+This project uses Spectra for Spec-Driven Development(SDD). Specs live in `openspec/specs/`, change proposals in `openspec/changes/`.
+
+## Use `$spectra-*` skills when:
+
+- A discussion needs structure before coding → `$spectra-discuss`
+- User wants to plan, propose, or design a change → `$spectra-propose`
+- Tasks are ready to implement → `$spectra-apply`
+- There's an in-progress change to continue → `$spectra-ingest`
+- User asks about specs or how something works → `$spectra-ask`
+- Implementation is done → `$spectra-archive`
+- Commit only files related to a specific change → `$spectra-commit`
+
+## Workflow
+
+discuss? → propose → apply ⇄ ingest → archive
+
+- `discuss` is optional — skip if requirements are clear
+- Requirements change mid-work? `ingest` → resume `apply`
+
+## Parked Changes
+
+Changes can be parked（暫存）— temporarily moved out of `openspec/changes/`. Parked changes won't appear in `spectra list` but can be found with `spectra list --parked`. To restore: `spectra unpark <name>`. The `$spectra-apply` and `$spectra-ingest` skills handle parked changes automatically.
+
+<!-- SPECTRA:END -->
+
 # Agent 工作指引
 
 ## 正式工作目錄與入口
@@ -75,72 +104,3 @@
 - 預設只修改目前 task / change 直接要求的檔案；不要順手重構無關模組。
 - 若文件、規格與現況衝突，優先回到 root scripts、`apps/server`、`apps/web`、`packages/shared` 與 `deploy/` 查實作，再決定是否更新 artifact。
 - 若要描述 repo 規則，必須能回指出目前實際檔案或行為；找不到事實支撐時，應刪掉該規則，而不是補上通用政策。
-
-<claude-mem-context>
-# Memory Context
-
-# [solar_player] recent context, 2026-05-23 11:47pm GMT+8
-
-Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
-Format: ID TIME TYPE TITLE
-Fetch details: get_observations([IDs]) | Search: mem-search skill
-
-Stats: 50 obs (10,198t read) | 250,079t work | 96% savings
-
-### May 22, 2026
-321 10:48p 🟣 Implement Display Client Liveness Heartbeat System
-322 11:12p ✅ Initiate $spectra-apply implementation process
-323 11:22p ✅ Initiate $spectra-apply implementation process
-324 11:25p ✅ Initiated $spectra-apply implementation process
-325 11:28p 🔄 Optimize WakeLock Controller Access
-327 11:31p ✅ Initiate $spectra-apply workflow
-### May 23, 2026
-328 1:19a 🔵 MetricHistoryRetentionService Test Verification
-329 1:24a ✅ Initiate $spectra-apply implementation process
-330 1:25a ✅ Initiate $spectra-apply implementation process
-331 1:26a 🔵 Verification of Page Freshness Logic
-332 1:28a ✅ Initiate $spectra-apply implementation process
-333 1:32a ✅ Update task list and specification for per-page metric freshness
-334 1:33a ✅ Initiate $spectra-apply workflow
-335 1:36a 🟣 Implement connection status metadata in AppHeader
-336 1:42a 🟣 Add trendSeries support to Overview ViewModel and tests
-337 1:44a ✅ Initialize change: fix-display-canvas-uniform-scaling-letterbox
-338 1:45a ✅ Initiate $spectra-apply implementation workflow
-339 1:48a ✅ Initiate $spectra-apply implementation workflow
-340 3:05p ✅ Initiate $spectra-apply implementation workflow
-341 3:34p ✅ Initiate $spectra-apply implementation workflow
-342 3:36p ✅ Update AGENTS.md rule regarding repository rule descriptions
-343 3:45p ✅ Initiate $spectra-apply implementation workflow
-344 4:00p ✅ Initiate $spectra-apply implementation process
-345 4:02p ⚖️ Architectural Design for CWA Weather Integration
-346 4:08p ✅ Initiate $spectra-apply implementation process
-347 4:26p ✅ Initiate $spectra-apply implementation process
-S1 Implement $spectra-apply workflow with weather-related testing (May 23 at 4:34 PM)
-348 4:35p ✅ Initiate $spectra-apply implementation process
-349 4:36p 🔵 Test execution failure due to missing modules
-350 4:46p ✅ Initiate $spectra-apply workflow
-351 4:58p ✅ Initiate $spectra-apply implementation workflow
-352 5:00p ✅ Initiate $spectra-apply workflow
-353 6:37p ⚖️ Implementation Plan for $spectra-apply
-354 8:36p ✅ Initiate $spectra-apply implementation workflow
-355 8:48p ✅ Initiate $spectra-apply implementation workflow
-356 9:19p ✅ Initiate $spectra-apply implementation process
-358 " 🔄 Refactor AppHeader weather display to use structured metadata
-357 9:20p ✅ Initiated $spectra-apply workflow
-359 9:22p ✅ Initiate $spectra-apply implementation process
-361 9:50p 🟣 Implemented shared weather mapper for playback and management shell
-360 9:51p ✅ Initiating $spectra-apply implementation process
-362 9:52p 🔵 Status of MQTT and Weather Management reorganization change
-363 10:03p ✅ Initiate $spectra-apply implementation process
-364 10:08p ✅ Initiate $spectra-apply workflow
-365 10:10p ✅ Initiate $spectra-apply implementation process
-S2 Implement all changes for $spectra-apply with code review, bug fixing, and Traditional Chinese (zhtw) commits (May 23 at 10:28 PM)
-366 10:36p ✅ **title**: Initiation of $spectra-apply task
-367 10:42p ✅ **title**: Initiation of $spectra-apply implementation process
-368 11:03p ✅ Initiated $spectra-apply implementation workflow
-369 11:10p ✅ Initiate $spectra-apply implementation process
-370 11:30p ✅ Initiate $spectra-apply implementation workflow
-371 11:40p ✅ Initiate $spectra-apply implementation process
-
-Access 250k tokens of past work via get_observations([IDs]) or mem-search skill.
-</claude-mem-context>
