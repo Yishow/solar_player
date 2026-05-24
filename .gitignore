@@ -25,3 +25,4 @@ uploads/brand/*
 !uploads/brand/.gitkeep
 
 .playwright-cli/
+.superpowers/
