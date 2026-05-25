@@ -97,6 +97,7 @@ export type CanvasAlignmentAction =
   | "v-center";
 
 export type CanvasDistributionAction = "h-distribute" | "v-distribute";
+export type CanvasNudgeStepTier = "accelerated" | "fine" | "normal";
 
 function normalizeCanvasCoordinate(value: number) {
   return Number.isFinite(value) ? value : 0;
@@ -259,6 +260,36 @@ export function applyCanvasNudge(
   } as const;
 
   return applyCanvasDrag(rect, deltaByDirection[direction], constraint);
+}
+
+export function resolveCanvasNudgeStep({
+  altKey,
+  shiftKey
+}: {
+  altKey: boolean;
+  shiftKey: boolean;
+}): {
+  label: CanvasNudgeStepTier;
+  step: number;
+} {
+  if (altKey && !shiftKey) {
+    return {
+      label: "fine",
+      step: 1
+    };
+  }
+
+  if (!altKey && shiftKey) {
+    return {
+      label: "accelerated",
+      step: 24
+    };
+  }
+
+  return {
+    label: "normal",
+    step: 8
+  };
 }
 
 export function resolveViewportAfterZoom(

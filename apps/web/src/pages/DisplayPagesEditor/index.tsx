@@ -25,7 +25,15 @@ import {
 import { defaultDisplayEditorOverlayPreset } from "./canvasOverlayState";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
 import { DisplayEditorCanvasOverlay } from "./inspectorFields";
-import { applyRegionRect } from "./displayEditorGeometry";
+import {
+  applyGeometryClipboard,
+  applyGeometryClipboardBatch,
+  applyRegionRect,
+  createGeometryClipboard,
+  resolveGeometryClipboardCompatibility,
+  type DisplayEditorGeometryClipboard,
+  type DisplayEditorGeometrySubset
+} from "./displayEditorGeometry";
 import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
@@ -119,6 +127,8 @@ export function DisplayPagesEditor({
           ? [initialEditorState.selectedRegionId]
           : []
   );
+  const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
+  const [productivityMessage, setProductivityMessage] = useState<string | null>(null);
   const [selectionFeedbackLabel, setSelectionFeedbackLabel] = useState<string | null>(null);
   const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Record<string, string[]>>(
     () =>
@@ -214,6 +224,7 @@ export function DisplayPagesEditor({
   useEffect(() => {
     setSelectedRegionId(null);
     setSelectedRegionIds([]);
+    setProductivityMessage(null);
     setSelectionFeedbackLabel(null);
   }, [selectedPage.id]);
 
@@ -221,6 +232,7 @@ export function DisplayPagesEditor({
     if (!editMode) {
       setSelectedRegionId(null);
       setSelectedRegionIds([]);
+      setProductivityMessage(null);
       setSelectionFeedbackLabel(null);
       return;
     }
@@ -245,6 +257,7 @@ export function DisplayPagesEditor({
 
   const handleSelectRegion = useCallback(
     (regionId: string, options?: { additive?: boolean }) => {
+      setProductivityMessage(null);
       setSelectionFeedbackLabel(null);
       if (!options?.additive) {
         setSelectedRegionId(regionId);
@@ -340,6 +353,90 @@ export function DisplayPagesEditor({
       setSelectionFeedbackLabel(actionLabel);
     },
     [applyConfigUpdate, editableRegions]
+  );
+
+  const geometryPasteTargets = useMemo(() => {
+    if (!selectedRegion?.geometry) {
+      return [];
+    }
+
+    const selectedTargets =
+      selectedRegions.length > 1
+        ? selectedRegions.filter((region) => region.id !== geometryClipboard?.sourceRegionId)
+        : [selectedRegion];
+    return selectedTargets;
+  }, [geometryClipboard?.sourceRegionId, lockedRegionIds, selectedRegion, selectedRegions]);
+  const geometryPasteCompatibility = useMemo(
+    () =>
+      geometryPasteTargets.map((region) => ({
+        compatibility: resolveGeometryClipboardCompatibility(region, geometryClipboard),
+        locked: isRegionLocked(lockedRegionIds, region.id),
+        region
+      })),
+    [geometryClipboard, geometryPasteTargets, lockedRegionIds]
+  );
+  const compatibleGeometryPasteCount = geometryPasteCompatibility.filter(
+    (entry) => !entry.locked && entry.compatibility.compatible
+  ).length;
+
+  const handlePasteGeometry = useCallback(
+    (subset: DisplayEditorGeometrySubset) => {
+      if (!selectedRegion?.geometry || !geometryClipboard || geometryPasteTargets.length === 0) {
+        return;
+      }
+
+      if (geometryPasteTargets.length > 1) {
+        const compatibleTargets = geometryPasteCompatibility
+          .filter((entry) => !entry.locked && entry.compatibility.compatible)
+          .map((entry) => entry.region);
+        const result = applyGeometryClipboardBatch(
+          config,
+          compatibleTargets,
+          geometryClipboard,
+          subset
+        );
+        const failedTargetIds = [
+          ...geometryPasteCompatibility
+            .filter((entry) => entry.locked || !entry.compatibility.compatible)
+            .map((entry) => entry.region.id),
+          ...result.failedTargetIds
+        ];
+        applyConfigUpdate(result.config);
+        setProductivityMessage(
+          failedTargetIds.length > 0
+            ? `已貼用 ${compatibleGeometryPasteCount} 個相容區域，${failedTargetIds.length} 個目標被拒絕。`
+            : `已將${subset === "position" ? "位置" : subset === "size" ? "尺寸" : "完整框"}貼到 ${compatibleGeometryPasteCount} 個區域。`
+        );
+        return;
+      }
+
+      const [targetEntry] = geometryPasteCompatibility;
+      if (!targetEntry) {
+        return;
+      }
+      if (targetEntry.locked) {
+        setProductivityMessage("已鎖定區域不可貼用幾何。");
+        return;
+      }
+      if (!targetEntry.compatibility.compatible) {
+        setProductivityMessage(targetEntry.compatibility.reason);
+        return;
+      }
+
+      applyConfigUpdate(applyGeometryClipboard(config, targetEntry.region, geometryClipboard, subset));
+      setProductivityMessage(
+        `已貼上${subset === "position" ? "位置" : subset === "size" ? "尺寸" : "完整框"}。`
+      );
+    },
+    [
+      applyConfigUpdate,
+      compatibleGeometryPasteCount,
+      config,
+      geometryClipboard,
+      geometryPasteCompatibility,
+      geometryPasteTargets,
+      selectedRegion
+    ]
   );
 
   const {
@@ -473,6 +570,53 @@ export function DisplayPagesEditor({
         )
       }
     />
+  ) : null;
+  const geometryActions = selectedRegion?.geometry ? (
+    <div className="space-y-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] p-3">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold"
+          onClick={() => {
+            setGeometryClipboard(createGeometryClipboard(selectedRegion));
+            setProductivityMessage(`已複製 ${localizeDisplayEditorLabel(selectedRegion.label)} 幾何。`);
+          }}
+        >
+          複製幾何
+        </button>
+        {([
+          { label: "貼上位置", subset: "position" },
+          { label: "貼上尺寸", subset: "size" },
+          { label: "貼上完整框", subset: "full-frame" }
+        ] as const).map((action) => (
+          <button
+            key={action.subset}
+            type="button"
+            disabled={!geometryClipboard || compatibleGeometryPasteCount === 0}
+            className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+            onClick={() => handlePasteGeometry(action.subset)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-1 text-[12px] text-[var(--shell-copy-ink)]">
+        <p>方向鍵 8px / Alt + 方向鍵 1px / Shift + 方向鍵 24px</p>
+        {geometryClipboard ? (
+          <p>
+            幾何來源：{localizeDisplayEditorLabel(geometryClipboard.sourceRegionLabel)}
+            {compatibleGeometryPasteCount > 0
+              ? `，目前可貼用 ${compatibleGeometryPasteCount} 個相容區域。`
+              : "，目前沒有相容貼用目標。"}
+          </p>
+        ) : (
+          <p>先複製一個相容區域，再貼用 position、size 或 full-frame。</p>
+        )}
+        {productivityMessage ? (
+          <p className="font-semibold text-[var(--shell-title-ink)]">{productivityMessage}</p>
+        ) : null}
+      </div>
+    </div>
   ) : null;
 
   return (
@@ -867,7 +1011,7 @@ export function DisplayPagesEditor({
             {rightTab === "inspector" && (
               <DisplayEditorInspectorCard
                 flat
-                actions={selectedRegion ? cardRailActions : null}
+                actions={selectedRegion ? <div className="space-y-4">{geometryActions}{cardRailActions}</div> : null}
                 editMode={editMode}
                 emptyMessage={
                   editableRegions.length > 0

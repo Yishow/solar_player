@@ -8,6 +8,7 @@ import {
   applyCanvasResize,
   applyMeasurementHandleDrag,
   panCanvasViewport,
+  resolveCanvasNudgeStep,
   resolveDistanceLockSession,
   resolveViewportAfterZoom,
   type CanvasSnapOptions,
@@ -243,7 +244,6 @@ export function useDisplayEditorCanvasWorkflow({
         !selectedRegion.geometry ||
         !["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key) ||
         target?.matches("input, textarea, select") ||
-        event.altKey ||
         event.ctrlKey ||
         event.metaKey
       ) {
@@ -256,10 +256,14 @@ export function useDisplayEditorCanvasWorkflow({
         ArrowRight: "right",
         ArrowUp: "up"
       } as const;
+      const nudgeStep = resolveCanvasNudgeStep({
+        altKey: event.altKey,
+        shiftKey: event.shiftKey
+      });
       const result = applyCanvasNudge(
         selectedRegion.geometry,
         directionByKey[event.key as keyof typeof directionByKey],
-        event.shiftKey ? 10 : 1,
+        nudgeStep.step,
         resolveRegionConstraint(selectedRegion)
       );
 

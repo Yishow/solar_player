@@ -6,7 +6,10 @@ export type DisplayEditorGeometryClipboard = {
   compatibilityKey?: string;
   rect: CanvasRect;
   sourceRegionId: string;
+  sourceRegionLabel: string;
 };
+
+export type DisplayEditorGeometrySubset = "full-frame" | "position" | "size";
 
 export function applyRegionRect(
   config: Record<string, unknown>,
@@ -55,7 +58,8 @@ export function createGeometryClipboard(
   return {
     compatibilityKey: region.schema.geometry.compatibilityKey,
     rect: region.geometry,
-    sourceRegionId: region.id
+    sourceRegionId: region.id,
+    sourceRegionLabel: region.label
   };
 }
 
@@ -87,12 +91,62 @@ export function resolveGeometryClipboardCompatibility(
 export function applyGeometryClipboard(
   config: Record<string, unknown>,
   region: ResolvedDisplayEditorRegion,
-  clipboard: DisplayEditorGeometryClipboard | null
+  clipboard: DisplayEditorGeometryClipboard | null,
+  subset: DisplayEditorGeometrySubset = "full-frame"
 ) {
   const compatibility = resolveGeometryClipboardCompatibility(region, clipboard);
   if (!compatibility.compatible || !clipboard) {
     return config;
   }
 
-  return applyRegionRect(config, region, clipboard.rect);
+  return applyRegionRect(config, region, resolveGeometrySubsetRect(region.geometry!, clipboard.rect, subset));
+}
+
+export function applyGeometryClipboardBatch(
+  config: Record<string, unknown>,
+  regions: ResolvedDisplayEditorRegion[],
+  clipboard: DisplayEditorGeometryClipboard | null,
+  subset: DisplayEditorGeometrySubset = "full-frame"
+) {
+  let nextConfig = config;
+  const failedTargetIds: string[] = [];
+
+  for (const region of regions) {
+    const compatibility = resolveGeometryClipboardCompatibility(region, clipboard);
+    if (!compatibility.compatible || !clipboard) {
+      failedTargetIds.push(region.id);
+      continue;
+    }
+
+    nextConfig = applyRegionRect(nextConfig, region, resolveGeometrySubsetRect(region.geometry!, clipboard.rect, subset));
+  }
+
+  return {
+    config: nextConfig,
+    failedTargetIds
+  };
+}
+
+function resolveGeometrySubsetRect(
+  targetRect: CanvasRect,
+  sourceRect: CanvasRect,
+  subset: DisplayEditorGeometrySubset
+) {
+  if (subset === "position") {
+    return {
+      ...targetRect,
+      left: sourceRect.left,
+      top: sourceRect.top
+    };
+  }
+
+  if (subset === "size") {
+    return {
+      ...targetRect,
+      height: sourceRect.height,
+      width: sourceRect.width
+    };
+  }
+
+  return sourceRect;
 }

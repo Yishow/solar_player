@@ -10,6 +10,7 @@ import {
   mapCanvasPointToDesignPoint,
   mapDesignPointToCanvasPoint,
   panCanvasViewport,
+  resolveCanvasNudgeStep,
   resolveDistanceLockSession,
   resolveRelationalMeasurements,
   resolveCanvasDesignMapping,
@@ -430,4 +431,23 @@ test("distributeCanvasSelections keeps outer bounds anchored while equalizing in
   assert.equal(distributed[3]!.rect.left + distributed[3]!.rect.width, 920);
   assert.deepEqual(gaps, [107, 106, 107]);
   assert.deepEqual(bounds, { height: 140, left: 120, top: 220, width: 800 });
+});
+
+test("resolveCanvasNudgeStep exposes fine, normal, and accelerated tiers with a safe fallback", () => {
+  assert.deepEqual(resolveCanvasNudgeStep({ altKey: true, shiftKey: false }), {
+    label: "fine",
+    step: 1
+  });
+  assert.deepEqual(resolveCanvasNudgeStep({ altKey: false, shiftKey: false }), {
+    label: "normal",
+    step: 8
+  });
+  assert.deepEqual(resolveCanvasNudgeStep({ altKey: false, shiftKey: true }), {
+    label: "accelerated",
+    step: 24
+  });
+  assert.deepEqual(resolveCanvasNudgeStep({ altKey: true, shiftKey: true }), {
+    label: "normal",
+    step: 8
+  });
 });
