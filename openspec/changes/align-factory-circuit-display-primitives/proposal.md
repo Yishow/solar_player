@@ -41,3 +41,4 @@
   - `pnpm --filter @solar-display/web exec tsc --noEmit -p tsconfig.json`
   - FactoryCircuit focused tests
   - `spectra validate --strict --changes align-factory-circuit-display-primitives`
+  - review checklist: `docs/display-surface-visual-review-checklist.md`

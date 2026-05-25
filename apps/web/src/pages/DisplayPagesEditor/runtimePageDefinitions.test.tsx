@@ -254,6 +254,6 @@ test("display page editor no longer falls back to the phase-only inspector messa
     );
 
     assert.doesNotMatch(html, /page-specific editor 尚未在本 phase 展開/);
-    assert.match(html, new RegExp(firstRegion.label));
+    assert.match(html, new RegExp(firstRegion.id));
   }
 });

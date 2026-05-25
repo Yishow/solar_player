@@ -11,6 +11,13 @@ The implementation SHALL provide a repeatable visual review checklist for playba
 - **AND** the checklist covers hero typography, photo fade, card family, ornament consistency, preview mode, FHD geometry, and distance readability
 - **AND** any intentional deviation from shared primitives is documented
 
+##### Example: Playback visual change references the checklist
+
+- **GIVEN** a change updates shared display chrome or playback-page presentation
+- **WHEN** reviewers inspect the change artifact or review note
+- **THEN** they can find `docs/display-surface-visual-review-checklist.md`
+- **AND** the note records any shared primitive or geometry exceptions
+
 ### Requirement: Guard shared primitive adoption with lightweight tests or assertions
 
 The implementation SHALL use lightweight tests or assertions to guard core shared primitive contracts for display playback pages without requiring a heavy screenshot-diff service.
@@ -49,3 +56,10 @@ The implementation SHALL guard semantic token usage for common display chrome ro
 - **WHEN** a change adds or edits CSS for shared display chrome roles such as hero title, emphasis, card surface, photo fade, or ornaments
 - **THEN** those roles use display semantic tokens where a token exists
 - **AND** raw literal exceptions are documented when needed for data URI SVGs, masks, or specialized gradients
+
+##### Example: Shared chrome file keeps semantic token roles
+
+- **GIVEN** `displaySurfaceChrome.css` defines hero, fade, and ornament roles
+- **WHEN** a guardrail test scans the shared chrome file
+- **THEN** hero/fade/ornament properties continue to reference `var(--display-...)` tokens
+- **AND** raw color literals remain limited to documented exception cases outside shared chrome roles

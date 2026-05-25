@@ -45,3 +45,4 @@
   - `pnpm --filter @solar-display/web exec tsc --noEmit -p tsconfig.json`
   - targeted web tests for shared chrome primitives where applicable
   - `spectra validate --strict --changes normalize-display-surface-chrome-tokens`
+  - review checklist: `docs/display-surface-visual-review-checklist.md`
