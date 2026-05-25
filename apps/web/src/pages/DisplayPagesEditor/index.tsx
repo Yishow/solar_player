@@ -626,6 +626,8 @@ export function DisplayPagesEditor({
       title={editorRouteMeta.title}
       subtitle={editorRouteMeta.subtitle}
       description="切換五個展示頁畫布，並在同一頁完成區域選取、屬性調整與草稿發布。"
+      hideTitleBlockHeading={editMode}
+      spacing={editMode ? "compact" : "default"}
       aside={pageTabs}
     >
       <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">

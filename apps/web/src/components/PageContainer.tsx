@@ -9,6 +9,8 @@ type PageContainerProps = PropsWithChildren<{
   description?: string;
   aside?: ReactNode;
   density?: ShellDensity;
+  hideTitleBlockHeading?: boolean;
+  spacing?: "compact" | "default";
   shellPrimitive?: string;
 }>;
 
@@ -18,17 +20,22 @@ export function PageContainer({
   description,
   aside,
   density = "management",
+  hideTitleBlockHeading = false,
+  spacing = "default",
   shellPrimitive = "page-container",
   children
 }: PageContainerProps) {
   const usesFixedHeight = density === "playback";
+  const spacingClasses =
+    spacing === "compact" ? "gap-4 px-page-x pt-4 pb-5" : "gap-6 px-page-x py-page-y";
 
   return (
     <section
       data-shell-density={density}
       data-shell-primitive={shellPrimitive}
       className={[
-        "flex w-full flex-col gap-6 px-page-x py-page-y",
+        "flex w-full flex-col",
+        spacingClasses,
         usesFixedHeight ? "h-full" : "min-h-full"
       ].join(" ")}
     >
@@ -37,6 +44,7 @@ export function PageContainer({
           aside={aside}
           density={density}
           description={description}
+          hideHeading={hideTitleBlockHeading}
           subtitle={subtitle}
           title={title}
         />

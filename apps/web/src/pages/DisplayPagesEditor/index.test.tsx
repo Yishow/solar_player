@@ -47,6 +47,28 @@ test("display page editor shell exposes the full rollout page switcher and idle 
   assert.match(html, /按 E 啟用編輯模式/);
 });
 
+test("display page editor hides the page title block while edit mode is active", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.doesNotMatch(html, /展示頁編輯/);
+  assert.doesNotMatch(html, /切換五個展示頁畫布，並在同一頁完成區域選取、屬性調整與草稿發布。/);
+  assert.match(html, /data-shell-primitive="management-scaffold"[^>]*class="[^"]*gap-4[^"]*pt-4[^"]*pb-5[^"]*h-full/);
+  assert.doesNotMatch(html, /data-shell-primitive="management-scaffold"[^>]*class="[^"]*py-page-y/);
+});
+
 test("display page editor shows blocking validation and fallback publishing status for the selected page", () => {
   const html = renderToStaticMarkup(
     React.createElement(
