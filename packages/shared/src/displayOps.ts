@@ -46,7 +46,12 @@ export type DisplayOpsPageSummary = {
   skipState: "playable" | "skipped";
 };
 
-export type DisplayOpsAssetReferenceKind = "cover" | "display-page" | "slideshow";
+export type DisplayOpsAssetReferenceKind =
+  | "cover"
+  | "display-page"
+  | "page-object"
+  | "shell-decoration"
+  | "slideshow";
 export type DisplayOpsAssetReferenceStage = "draft" | "live";
 
 export type DisplayOpsAssetReference = {

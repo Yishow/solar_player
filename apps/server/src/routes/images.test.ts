@@ -104,12 +104,29 @@ function createMinimalJpeg(): Buffer {
   ]);
 }
 
+function createMinimalSvg(): Buffer {
+  return Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2f855a"/></svg>'
+  );
+}
+
 // Helper: build a proper multipart/form-data body for inject
-function buildMultipartBody(filename: string, mimeType: string, content: Buffer): { payload: Buffer; contentType: string } {
+function buildMultipartBody(
+  filename: string,
+  mimeType: string,
+  content: Buffer,
+  fields: Record<string, string> = {}
+): { payload: Buffer; contentType: string } {
   const boundary = `----FastifyFormBoundary${Date.now()}`;
   const contentTypeHeader = `multipart/form-data; boundary=${boundary}`;
 
   const bodyParts: Buffer[] = [];
+
+  for (const [fieldName, fieldValue] of Object.entries(fields)) {
+    bodyParts.push(Buffer.from(`--${boundary}\r\n`));
+    bodyParts.push(Buffer.from(`Content-Disposition: form-data; name="${fieldName}"\r\n\r\n`));
+    bodyParts.push(Buffer.from(`${fieldValue}\r\n`));
+  }
 
   // Add file field
   bodyParts.push(Buffer.from(`--${boundary}\r\n`));
@@ -211,6 +228,57 @@ test("POST /api/images uploads a valid JPEG image", async () => {
     const body = response.json() as { success: boolean; data: ImageAsset };
     assert.equal(body.success, true);
     assert.equal(body.data.originalName, "test-image.jpg");
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images stores upload-time asset metadata for svg display assets", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const svgBuffer = createMinimalSvg();
+    const { payload, contentType } = buildMultipartBody("leaf-icon.svg", "image/svg+xml", svgBuffer, {
+      category: "icon",
+      usageScope: "page-only"
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 201);
+    const body = response.json() as {
+      success: boolean;
+      data: ImageAsset & {
+        category: string;
+        usageScope: string;
+      };
+    };
+    assert.equal(body.success, true);
+    assert.equal(body.data.originalName, "leaf-icon.svg");
+    assert.equal(body.data.mimeType, "image/svg+xml");
+    assert.equal(body.data.category, "icon");
+    assert.equal(body.data.usageScope, "page-only");
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/images"
+    });
+    assert.equal(listResponse.statusCode, 200);
+    const listBody = listResponse.json() as {
+      data: Array<ImageAsset & { category: string; usageScope: string }>;
+      success: boolean;
+    };
+    assert.equal(listBody.data[0]?.category, "icon");
+    assert.equal(listBody.data[0]?.usageScope, "page-only");
   } finally {
     await app.close();
   }

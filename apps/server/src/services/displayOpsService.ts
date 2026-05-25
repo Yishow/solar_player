@@ -11,7 +11,11 @@ import type {
   PlaybackPage
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
-import { computeDisplayPageAssetHealthReport, collectDisplayPageAssetReferences } from "./displayPageAssetService.js";
+import {
+  collectDisplayPageAssetReferences,
+  collectShellDecorationAssetReferences,
+  computeDisplayPageAssetHealthReport
+} from "./displayPageAssetService.js";
 import { readDisplayRotationPreview, readPlaybackPages } from "./displayRotationService.js";
 
 type StageConfigRow = {
@@ -33,21 +37,43 @@ type MqttStatusLike = {
   reason: string | null;
 };
 
-function parseRegions(raw: string | null | undefined) {
+function parseStagePayload(raw: string | null | undefined) {
   if (!raw) {
-    return {};
+    return {
+      freeformObjects: [],
+      regions: {}
+    };
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
+      if ("regions" in parsed && parsed.regions && typeof parsed.regions === "object" && !Array.isArray(parsed.regions)) {
+        return {
+          freeformObjects:
+            "freeformObjects" in parsed && Array.isArray(parsed.freeformObjects)
+              ? parsed.freeformObjects
+              : [],
+          regions: parsed.regions as Record<string, unknown>
+        };
+      }
+
+      return {
+        freeformObjects: [],
+        regions: parsed as Record<string, unknown>
+      };
     }
   } catch {
-    return {};
+    return {
+      freeformObjects: [],
+      regions: {}
+    };
   }
 
-  return {};
+  return {
+    freeformObjects: [],
+    regions: {}
+  };
 }
 
 function readStageRows() {
@@ -182,17 +208,52 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
   const stageReferences: DisplayOpsAssetReference[] = [];
 
   for (const row of readStageRows()) {
-    const references = collectDisplayPageAssetReferences(row.page_key, parseRegions(row.config_json));
+    const payload = parseStagePayload(row.config_json);
+    const references = collectDisplayPageAssetReferences(
+      row.page_key,
+      payload.regions,
+      payload.freeformObjects
+    );
     references
       .filter((reference) => Number(reference.assetId) === assetId)
       .forEach((reference) => {
         stageReferences.push({
           bindingId: reference.bindingId,
-          kind: "display-page",
-          message: `${row.page_key} ${row.stage} 引用了此素材`,
+          kind: reference.kind,
+          message:
+            reference.kind === "page-object"
+              ? `${row.page_key} ${row.stage} 自由物件引用了此素材`
+              : `${row.page_key} ${row.stage} 引用了此素材`,
           pageId: row.page_key,
           stage: row.stage,
           targetLabel: `${row.page_key}:${reference.bindingId}`
+        });
+      });
+  }
+
+  const shellRows = getDatabase()
+    .prepare(
+      `
+        SELECT stage, config_json
+        FROM shell_decoration_stage_configs
+      `
+    )
+    .all() as Array<{
+      config_json: string | null;
+      stage: "draft" | "live";
+    }>;
+
+  for (const row of shellRows) {
+    collectShellDecorationAssetReferences(row.config_json)
+      .filter((reference) => Number(reference.assetId) === assetId)
+      .forEach((reference) => {
+        stageReferences.push({
+          bindingId: reference.bindingId,
+          kind: "shell-decoration",
+          message: `shared shell ${row.stage} 引用了此素材`,
+          pageId: null,
+          stage: row.stage,
+          targetLabel: `shared-shell:${reference.bindingId}`
         });
       });
   }
@@ -263,8 +324,14 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
 
   const liveCount = stageReferences.filter((reference) => reference.stage === "live").length;
   const draftCount = stageReferences.filter((reference) => reference.stage === "draft").length;
-  const hasBlockingLiveDisplayReference = stageReferences.some(
-    (reference) => reference.kind === "display-page" && reference.stage === "live"
+  const hasBlockingLiveSurfaceReference = stageReferences.some(
+    (reference) =>
+      reference.stage === "live"
+      && (
+        reference.kind === "display-page"
+        || reference.kind === "page-object"
+        || reference.kind === "shell-decoration"
+      )
   );
   const hasBlockingPlaylistReference = stageReferences.some(
     (reference) =>
@@ -276,7 +343,7 @@ function buildAssetReferenceSummary(assetId: number): DisplayOpsAssetReferenceSu
    (reference) => reference.stage === "live" && reference.kind === "cover"
   );
   const blockingIssues = [
-    ...(hasBlockingLiveDisplayReference
+    ...(hasBlockingLiveSurfaceReference
       ? [
           buildIssue({
             assetId,

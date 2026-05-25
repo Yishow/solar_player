@@ -102,8 +102,8 @@ test("image management asset health panel renders healthy and unhealthy summarie
     })
   );
 
-  assert.match(healthyHtml, /所有展示頁素材引用正常/);
-  assert.match(healthyHtml, /展示頁素材健康/);
+  assert.match(healthyHtml, /所有展示素材引用正常/);
+  assert.match(healthyHtml, /展示素材健康/);
   assert.match(healthyHtml, /健康/);
   assert.match(unhealthyHtml, /目前有 1 個素材引用異常/);
   assert.match(unhealthyHtml, /異常/);

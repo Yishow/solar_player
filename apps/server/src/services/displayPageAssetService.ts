@@ -9,6 +9,7 @@ import type {
 import {
   displayPageMediaFitModes,
   isDisplayPageMediaBinding,
+  normalizeDisplayPageFreeformObjects,
   normalizeDisplayPageMediaBindingBySourceMode,
   resolveDisplayPageMediaSourceMode
 } from "@solar-display/shared";
@@ -100,6 +101,7 @@ function resolveMediaBinding(binding: UnknownRecord) {
 type DisplayPageAssetReference = {
   assetId: string | number;
   bindingId: string;
+  kind: "display-page" | "page-object" | "shell-decoration";
   pageId: DisplayPageId;
 };
 
@@ -136,11 +138,12 @@ export function resolveDisplayPageRegions<T extends Record<string, unknown>>(reg
 
 export function collectDisplayPageAssetFindings(
   pageId: DisplayPageId,
-  regions: Record<string, unknown>
+  regions: Record<string, unknown>,
+  freeformObjects: unknown[] = []
 ) {
   const findings: DisplayPageAssetFinding[] = [];
 
-  for (const reference of collectDisplayPageAssetReferences(pageId, regions)) {
+  for (const reference of collectDisplayPageAssetReferences(pageId, regions, freeformObjects)) {
     const { reason } = readManagedAssetResolution(reference.assetId);
     if (!reason) {
       continue;
@@ -151,8 +154,8 @@ export function collectDisplayPageAssetFindings(
       bindingId: reference.bindingId,
       message:
         reason === "missing-file"
-          ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
-          : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
+          ? `素材檔案遺失，無法解析${reference.kind === "page-object" ? " page object" : ""} binding ${reference.bindingId}`
+          : `素材引用不存在，無法解析${reference.kind === "page-object" ? " page object" : ""} binding ${reference.bindingId}`,
       pageId: reference.pageId,
       reason,
       status: "unhealthy"
@@ -222,30 +225,46 @@ export function collectDisplayPageMediaPlacementIssues(regions: Record<string, u
   return issues;
 }
 
-function parseRegions(raw: string | null | undefined) {
+function parseDisplayPageConfigPayload(raw: string | null | undefined) {
   if (!raw) {
-    return {};
+    return {
+      freeformObjects: [],
+      regions: {}
+    };
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       if ("regions" in parsed && parsed.regions && typeof parsed.regions === "object" && !Array.isArray(parsed.regions)) {
-        return parsed.regions as Record<string, unknown>;
+        return {
+          freeformObjects:
+            "freeformObjects" in parsed && Array.isArray(parsed.freeformObjects)
+              ? normalizeDisplayPageFreeformObjects(parsed.freeformObjects)
+              : [],
+          regions: parsed.regions as Record<string, unknown>
+        };
       }
 
-      return parsed as Record<string, unknown>;
+      return {
+        freeformObjects: [],
+        regions: parsed as Record<string, unknown>
+      };
     }
   } catch {
     // ignore malformed config rows
   }
 
-  return {};
+  return {
+    freeformObjects: [],
+    regions: {}
+  };
 }
 
 export function collectDisplayPageAssetReferences(
   pageId: DisplayPageId,
-  regions: Record<string, unknown>
+  regions: Record<string, unknown>,
+  freeformObjects: unknown[] = []
 ) {
   const references: DisplayPageAssetReference[] = [];
 
@@ -269,6 +288,7 @@ export function collectDisplayPageAssetReferences(
         references.push({
           assetId,
           bindingId: path,
+          kind: "display-page",
           pageId
         });
       }
@@ -280,6 +300,72 @@ export function collectDisplayPageAssetReferences(
   }
 
   scan(regions, "");
+
+  for (const object of normalizeDisplayPageFreeformObjects(freeformObjects)) {
+    if (object.type !== "asset-image" && object.type !== "icon-asset") {
+      continue;
+    }
+
+    const assetId = object.source.assetId;
+    if (typeof assetId !== "number" && typeof assetId !== "string") {
+      continue;
+    }
+
+    references.push({
+      assetId,
+      bindingId: object.id,
+      kind: "page-object",
+      pageId
+    });
+  }
+
+  return references;
+}
+
+export function collectShellDecorationAssetReferences(raw: string | null | undefined) {
+  const references: DisplayPageAssetReference[] = [];
+
+  if (!raw) {
+    return references;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      footerObjects?: unknown;
+      headerObjects?: unknown;
+    };
+    const groups: Array<{ mount: "footer" | "header"; objects: unknown[] }> = [];
+
+    if (Array.isArray(parsed.headerObjects)) {
+      groups.push({ mount: "header", objects: parsed.headerObjects });
+    }
+    if (Array.isArray(parsed.footerObjects)) {
+      groups.push({ mount: "footer", objects: parsed.footerObjects });
+    }
+
+    for (const group of groups) {
+      for (const object of group.objects) {
+        if (!isPlainObject(object) || object.type !== "asset-image" || !isPlainObject(object.source)) {
+          continue;
+        }
+
+        const assetId = object.source.assetId;
+        if ((typeof assetId !== "number" && typeof assetId !== "string") || typeof object.id !== "string") {
+          continue;
+        }
+
+        references.push({
+          assetId,
+          bindingId: object.id,
+          kind: "shell-decoration",
+          pageId: "shared-shell"
+        });
+      }
+    }
+  } catch {
+    return references;
+  }
+
   return references;
 }
 
@@ -301,7 +387,12 @@ export function computeDisplayPageAssetHealthReport(): DisplayPageAssetHealthRep
   const findings: DisplayPageAssetFinding[] = [];
 
   for (const row of rows) {
-    const references = collectDisplayPageAssetReferences(row.page_key, parseRegions(row.config_json));
+    const payload = parseDisplayPageConfigPayload(row.config_json);
+    const references = collectDisplayPageAssetReferences(
+      row.page_key,
+      payload.regions,
+      payload.freeformObjects
+    );
 
     for (const reference of references) {
       const key = assetReferenceKey(reference.assetId);
@@ -314,8 +405,81 @@ export function computeDisplayPageAssetHealthReport(): DisplayPageAssetHealthRep
               bindingId: reference.bindingId,
               message:
                 resolution.reason === "missing-file"
-                  ? `素材檔案遺失，無法解析 binding ${reference.bindingId}`
-                  : `素材引用不存在，無法解析 binding ${reference.bindingId}`,
+                  ? `素材檔案遺失，無法解析${reference.kind === "page-object" ? " page object" : ""} binding ${reference.bindingId}`
+                  : `素材引用不存在，無法解析${reference.kind === "page-object" ? " page object" : ""} binding ${reference.bindingId}`,
+              pageId: reference.pageId,
+              reason: resolution.reason,
+              status: "unhealthy" as const
+            };
+
+      const existingEntry = assetEntries.get(key) ?? {
+        assetId: reference.assetId,
+        affectedPages: [],
+        bindings: [],
+        filename: resolution.filename,
+        findings: [],
+        reasons: [],
+        status: "healthy" as const,
+        title: resolution.title
+      };
+
+      if (!existingEntry.affectedPages.includes(reference.pageId)) {
+        existingEntry.affectedPages.push(reference.pageId);
+      }
+
+      if (
+        !existingEntry.bindings.some(
+          (binding) => binding.pageId === reference.pageId && binding.bindingId === reference.bindingId
+        )
+      ) {
+        existingEntry.bindings.push({
+          bindingId: reference.bindingId,
+          pageId: reference.pageId
+        });
+      }
+
+      if (finding) {
+        existingEntry.status = "unhealthy";
+        if (!existingEntry.reasons.includes(finding.reason)) {
+          existingEntry.reasons.push(finding.reason);
+        }
+        if (
+          !existingEntry.findings.some(
+            (entryFinding) =>
+              entryFinding.pageId === finding.pageId &&
+              entryFinding.bindingId === finding.bindingId &&
+              entryFinding.reason === finding.reason
+          )
+        ) {
+          existingEntry.findings.push(finding);
+          findings.push(finding);
+        }
+      }
+
+      assetEntries.set(key, existingEntry);
+    }
+  }
+
+  const shellRows = database.prepare(
+    "SELECT config_json FROM shell_decoration_stage_configs"
+  ).all() as Array<{ config_json: string | null }>;
+
+  for (const row of shellRows) {
+    const references = collectShellDecorationAssetReferences(row.config_json);
+
+    for (const reference of references) {
+      const key = assetReferenceKey(reference.assetId);
+      const resolution = readManagedAssetResolution(reference.assetId);
+      const finding =
+        resolution.reason === null
+          ? null
+          : {
+              assetId: reference.assetId,
+              bindingId: reference.bindingId,
+              message:
+                resolution.reason === "missing-file"
+                  ? `素材檔案遺失，無法解析 shell binding ${reference.bindingId}`
+                  : `素材引用不存在，無法解析 shell binding ${reference.bindingId}`,
               pageId: reference.pageId,
               reason: resolution.reason,
               status: "unhealthy" as const

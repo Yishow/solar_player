@@ -96,6 +96,18 @@ export interface PlaybackSettingsUpdatedEvent {
   settings?: PlaybackSettings;
 }
 
+export const managedAssetCategories = ["background", "object", "icon"] as const;
+export type ManagedAssetCategory = (typeof managedAssetCategories)[number];
+
+export const managedAssetUsageScopes = ["both", "page-only", "shell-only"] as const;
+export type ManagedAssetUsageScope = (typeof managedAssetUsageScopes)[number];
+
+export interface ImageAssetUsageSummary {
+  draftCount: number;
+  liveCount: number;
+  referenceCount: number;
+}
+
 export interface ImageAsset {
   id: number;
   filename: string | null;
@@ -111,6 +123,9 @@ export interface ImageAsset {
   isCover: boolean;
   displayDuration: number;
   displayOrder: number | null;
+  category?: ManagedAssetCategory;
+  usageScope?: ManagedAssetUsageScope;
+  usageSummary?: ImageAssetUsageSummary;
 }
 
 export interface BrandProfile {

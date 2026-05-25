@@ -102,7 +102,7 @@ function resolveAssetFallbackSrc(asset: ImageAsset) {
 function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPageObjectAssetOption[] {
   return assets.flatMap((asset) => {
     const fallbackSrc = resolveAssetFallbackSrc(asset);
-    if (!fallbackSrc) {
+    if (!fallbackSrc || asset.usageScope === "shell-only") {
       return [];
     }
 

@@ -119,7 +119,11 @@ function resolveEnvelope<TRegions extends Record<string, unknown>>(
 ) {
   return {
     ...envelope,
-    assetFindings: collectDisplayPageAssetFindings(envelope.pageId, envelope.regions),
+    assetFindings: collectDisplayPageAssetFindings(
+      envelope.pageId,
+      envelope.regions,
+      envelope.freeformObjects ?? []
+    ),
     regions: resolveDisplayPageRegions(envelope.regions)
   };
 }

@@ -586,7 +586,11 @@ function publishDraft(
   if (imageWarnings.length > 0) {
     validation.findings.push(...imageWarnings);
   }
-  const assetWarnings = collectDisplayPageAssetFindings(pageId, draft.regions).map((finding) => ({
+  const assetWarnings = collectDisplayPageAssetFindings(
+    pageId,
+    draft.regions,
+    draft.freeformObjects ?? []
+  ).map((finding) => ({
     code: "ASSET_REFERENCE_MISSING",
     message: finding.message,
     regionId: finding.bindingId,
@@ -697,7 +701,11 @@ function readFallbackStatus(pageId: DisplayPageId): DisplayPageFallbackStatus {
   const live = readStageConfig(pageId, "live");
   const policy = live.fallbackPolicy ?? defaultFallbackPolicy;
   const imageWarnings = checkImageReferences(live.regions);
-  const assetFindings = collectDisplayPageAssetFindings(pageId, live.regions);
+  const assetFindings = collectDisplayPageAssetFindings(
+    pageId,
+    live.regions,
+    live.freeformObjects ?? []
+  );
   const items: FallbackStatusItem[] = [
     { key: "staleData", mode: policy.staleData, active: false },
     {

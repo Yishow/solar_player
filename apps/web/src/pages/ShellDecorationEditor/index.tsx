@@ -70,7 +70,7 @@ function resolveAssetFallbackSrc(asset: ImageAsset) {
 export function resolveShellDecorationAssetOptions(assets: ImageAsset[]): ShellDecorationAssetOption[] {
   return assets.flatMap((asset) => {
     const fallbackSrc = resolveAssetFallbackSrc(asset);
-    if (!fallbackSrc) {
+    if (!fallbackSrc || asset.usageScope === "page-only") {
       return [];
     }
 

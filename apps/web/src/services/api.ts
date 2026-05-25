@@ -580,6 +580,30 @@ export async function getImageStorageUsage() {
 export async function uploadImageAsset(file: File) {
   const formData = new FormData();
   formData.set("file", file);
+  formData.set("category", "background");
+  formData.set("usageScope", "both");
+
+  const response = await requestJson<{
+    data: ImageAsset;
+    success: boolean;
+  }>("/api/images", {
+    body: formData,
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function uploadManagedAsset(
+  file: File,
+  metadata: {
+    category: "background" | "icon" | "object";
+    usageScope: "both" | "page-only" | "shell-only";
+  }
+) {
+  const formData = new FormData();
+  formData.set("file", file);
+  formData.set("category", metadata.category);
+  formData.set("usageScope", metadata.usageScope);
 
   const response = await requestJson<{
     data: ImageAsset;

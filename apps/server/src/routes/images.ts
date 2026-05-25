@@ -1,6 +1,11 @@
 import { extname, resolve } from "node:path";
 import { writeFileSync } from "node:fs";
 import type { FastifyPluginAsync } from "fastify";
+import type {
+  ImageAsset,
+  ManagedAssetCategory,
+  ManagedAssetUsageScope
+} from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readDisplayOpsAssetReferences } from "../services/displayOpsService.js";
 import { deleteImagePlaylistEntriesForAsset } from "../services/imagePlaylistService.js";
@@ -19,6 +24,9 @@ import {
 } from "./imagesSupport.js";
 import { config } from "../config.js";
 
+const MANAGED_ASSET_CATEGORY_SET = new Set<ManagedAssetCategory>(["background", "object", "icon"]);
+const MANAGED_ASSET_USAGE_SCOPE_SET = new Set<ManagedAssetUsageScope>(["both", "page-only", "shell-only"]);
+
 function errorResponse(error: string) {
   return {
     success: false,
@@ -35,6 +43,49 @@ function successResponse<T>(data: T) {
   };
 }
 
+function summarizeImageUsage(assetId: number) {
+  const references = readDisplayOpsAssetReferences(assetId);
+
+  return {
+    draftCount: references.draftCount,
+    liveCount: references.liveCount,
+    referenceCount: references.references.length
+  };
+}
+
+function serializeImageCatalogRow(row: ReturnType<typeof getImageById> extends infer TResult
+  ? Exclude<TResult, undefined>
+  : never): ImageAsset {
+  return {
+    ...serializeImageRow(row),
+    usageSummary: summarizeImageUsage(row.id)
+  };
+}
+
+function readMultipartFieldValue(field: unknown) {
+  if (!field || typeof field !== "object" || !("value" in field)) {
+    return null;
+  }
+
+  return typeof field.value === "string" ? field.value : null;
+}
+
+function normalizeAssetCategory(value: string | null): ManagedAssetCategory {
+  if (value && MANAGED_ASSET_CATEGORY_SET.has(value as ManagedAssetCategory)) {
+    return value as ManagedAssetCategory;
+  }
+
+  return "background";
+}
+
+function normalizeAssetUsageScope(value: string | null): ManagedAssetUsageScope {
+  if (value && MANAGED_ASSET_USAGE_SCOPE_SET.has(value as ManagedAssetUsageScope)) {
+    return value as ManagedAssetUsageScope;
+  }
+
+  return "both";
+}
+
 const imagesRoute: FastifyPluginAsync = async (app) => {
   await app.register(import("@fastify/multipart"), {
     limits: {
@@ -43,7 +94,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     }
   });
 
-  app.get("/api/images", async () => successResponse(getAllImages().map(serializeImageRow)));
+  app.get("/api/images", async () => successResponse(getAllImages().map(serializeImageCatalogRow)));
 
   app.post("/api/images", async (request, reply) => {
     const data = await request.file();
@@ -64,6 +115,8 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send(errorResponse("File too large. Maximum size is 10MB."));
     }
 
+    const category = normalizeAssetCategory(readMultipartFieldValue(data.fields.category));
+    const usageScope = normalizeAssetUsageScope(readMultipartFieldValue(data.fields.usageScope));
     const uniqueFilename = generateUniqueFilename(data.filename);
     writeFileSync(resolve(config.uploadsDir, uniqueFilename), buffer);
 
@@ -72,13 +125,15 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       .prepare(
         `
           INSERT INTO image_assets (
-            filename, original_name, title, description,
+            category, usage_scope, filename, original_name, title, description,
             mime_type, file_size, display_duration, display_order,
             included_in_slideshow, is_cover, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 10, NULL, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, NULL, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `
       )
       .run(
+        category,
+        usageScope,
         uniqueFilename,
         data.filename,
         data.filename.replace(extname(data.filename), ""),
@@ -95,7 +150,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
 
     app.socketService.emitImagesUpdated({
       action: "created",
-      image: serializeImageRow(inserted)
+      image: serializeImageCatalogRow(inserted)
     });
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
@@ -103,7 +158,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       scope: "images"
     });
 
-    return reply.status(201).send(successResponse(serializeImageRow(inserted)));
+    return reply.status(201).send(successResponse(serializeImageCatalogRow(inserted)));
   });
 
   app.put<{ Params: { id: string }; Body: ImageUpdateBody }>("/api/images/:id", async (request, reply) => {
@@ -128,6 +183,8 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
           included_in_slideshow = COALESCE(?, included_in_slideshow),
           is_cover = COALESCE(?, is_cover),
           display_duration = COALESCE(?, display_duration),
+          category = COALESCE(?, category),
+          usage_scope = COALESCE(?, usage_scope),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
@@ -147,6 +204,8 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         body.includedInSlideshow === undefined ? undefined : body.includedInSlideshow ? 1 : 0,
         body.isCover === undefined ? undefined : body.isCover ? 1 : 0,
         body.displayDuration ?? undefined,
+        body.category ?? undefined,
+        body.usageScope ?? undefined,
         id
       );
     })();
@@ -158,7 +217,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
 
     app.socketService.emitImagesUpdated({
       action: "updated",
-      image: serializeImageRow(updated)
+      image: serializeImageCatalogRow(updated)
     });
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
@@ -166,7 +225,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       scope: "images"
     });
 
-    return successResponse(serializeImageRow(updated));
+    return successResponse(serializeImageCatalogRow(updated));
   });
 
   app.delete<{ Params: { id: string } }>("/api/images/:id", async (request, reply) => {
@@ -219,7 +278,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       }
     })(request.body?.images ?? []);
 
-    const updated = getAllImages().map(serializeImageRow);
+    const updated = getAllImages().map(serializeImageCatalogRow);
     app.socketService.emitImagesUpdated({
       action: "reordered",
       images: updated

@@ -7,11 +7,17 @@ import {
   statSync
 } from "node:fs";
 import { extname, resolve } from "node:path";
-import type { ImageAsset } from "@solar-display/shared";
+import type {
+  ImageAsset,
+  ManagedAssetCategory,
+  ManagedAssetUsageScope
+} from "@solar-display/shared";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
 
 export type ImageAssetRow = {
+  category: ManagedAssetCategory;
+  usage_scope: ManagedAssetUsageScope;
   id: number;
   filename: string | null;
   original_name: string | null;
@@ -37,6 +43,8 @@ export type ImageUpdateBody = {
   includedInSlideshow?: boolean;
   isCover?: boolean;
   displayDuration?: number;
+  category?: ManagedAssetCategory;
+  usageScope?: ManagedAssetUsageScope;
 };
 
 export type ImageReorderItem = {
@@ -48,7 +56,7 @@ export type ImageReorderBody = {
   images: ImageReorderItem[];
 };
 
-export const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+export const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".svg"]);
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export function serializeImageRow(row: ImageAssetRow): ImageAsset {
@@ -66,7 +74,9 @@ export function serializeImageRow(row: ImageAssetRow): ImageAsset {
     includedInSlideshow: row.included_in_slideshow === 1,
     isCover: row.is_cover === 1,
     displayDuration: row.display_duration,
-    displayOrder: row.display_order
+    displayOrder: row.display_order,
+    category: row.category,
+    usageScope: row.usage_scope
   };
 }
 
@@ -75,7 +85,7 @@ export function getAllImages(): ImageAssetRow[] {
     .prepare(
       `
         SELECT
-          id, filename, original_name, title, description,
+          id, category, usage_scope, filename, original_name, title, description,
           mime_type, file_size, width, height, aspect_ratio,
           included_in_slideshow, is_cover, display_duration,
           display_order, created_at, updated_at
@@ -91,7 +101,7 @@ export function getImageById(id: number): ImageAssetRow | undefined {
     .prepare(
       `
         SELECT
-          id, filename, original_name, title, description,
+          id, category, usage_scope, filename, original_name, title, description,
           mime_type, file_size, width, height, aspect_ratio,
           included_in_slideshow, is_cover, display_duration,
           display_order, created_at, updated_at

@@ -8,6 +8,7 @@ import { DeviceStatus } from "../pages/DeviceStatus";
 import { DisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
 import { EnergyHistory } from "../pages/EnergyHistory";
 import { EnergyTrend } from "../pages/EnergyTrend";
+import { AssetLibrary } from "../pages/AssetLibrary";
 import { ImageManagement } from "../pages/ImageManagement";
 import { MqttSettings } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
@@ -47,6 +48,10 @@ export const router = createBrowserRouter([
       {
         path: "settings/playback",
         element: <PlaybackSettings />
+      },
+      {
+        path: "settings/assets",
+        element: <AssetLibrary />
       },
       {
         path: "settings/images",

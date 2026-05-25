@@ -6,6 +6,7 @@ const displayPageLabels = {
   "factory-circuit": "Factory Circuit",
   images: "Images",
   overview: "Overview",
+  "shared-shell": "Shared Shell",
   solar: "Solar",
   sustainability: "Sustainability"
 } as const;
@@ -112,7 +113,7 @@ export function ImageManagementAssetHealthPanel({
   const unhealthyEntries = report?.assets.filter((entry) => entry.status === "unhealthy") ?? [];
   const banner = renderStateBanner({
     errorMessage,
-    healthyLabel: `所有展示頁素材引用正常，共追蹤 ${report?.assets.length ?? 0} 個素材引用`,
+    healthyLabel: `所有展示素材引用正常，共追蹤 ${report?.assets.length ?? 0} 個素材引用`,
     isLoading,
     unhealthyLabel: unhealthyEntries.length > 0 ? `目前有 ${unhealthyEntries.length} 個素材引用異常` : ""
   });
@@ -122,7 +123,7 @@ export function ImageManagementAssetHealthPanel({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">展示引用健康狀態</h3>
-          <p className="mt-1 text-[12px] text-[#6e756d]">展示頁素材健康</p>
+          <p className="mt-1 text-[12px] text-[#6e756d]">展示素材健康</p>
         </div>
         <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
           {unhealthyEntries.length > 0 ? "異常" : "健康"}

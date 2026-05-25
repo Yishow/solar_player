@@ -9,6 +9,8 @@ import {
   uploadsDir
 } from "./display-pages-asset-governance.test-support.js";
 
+type InjectableApp = Awaited<ReturnType<typeof buildApp>>;
+
 function upsertStageConfig(input: {
   config: Record<string, unknown>;
   pageKey: string;
@@ -47,6 +49,25 @@ function upsertStageConfig(input: {
       input.publishedAt ?? null,
       input.publishedBy ?? null
     );
+}
+
+async function saveShellDecorationDraft(
+  app: InjectableApp,
+  channel: { footerObjects: unknown[]; headerObjects: unknown[] }
+) {
+  const current = (await app.inject({
+    method: "GET",
+    url: "/api/shell-decorations/draft"
+  })).json() as { config: { version: number } };
+
+  return app.inject({
+    method: "PUT",
+    url: "/api/shell-decorations/draft",
+    payload: {
+      ...channel,
+      baseVersion: current.config.version
+    }
+  });
 }
 
 test("GET /api/display-ops summarizes pending drafts, skip reasons, and live publish state", async () => {
@@ -228,6 +249,107 @@ test("GET /api/display-ops/assets/:id/references returns display-page and slides
   }
 });
 
+test("GET /api/display-ops/assets/:id/references returns shell-decoration and page-object references", async () => {
+  const asset = seedManagedImageAsset("cross-surface-asset.png");
+  upsertStageConfig({
+    config: {
+      freeformObjects: [
+        {
+          frame: { height: 96, left: 240, top: 120, width: 96 },
+          id: "overview-icon",
+          locked: false,
+          metadata: {},
+          mount: "content",
+          source: { assetId: asset.assetId, fallbackSrc: `/uploads/images/${asset.filename}`, kind: "icon-asset" },
+          style: {},
+          type: "icon-asset",
+          visible: true,
+          zIndex: 3
+        }
+      ],
+      regions: {}
+    },
+    pageKey: "overview",
+    stage: "draft",
+    updatedAt: "2026-05-18T09:30:00.000Z",
+    version: 4
+  });
+
+  const app = await buildApp();
+
+  try {
+    const shellSave = await saveShellDecorationDraft(app, {
+      footerObjects: [
+        {
+          frame: { height: 36, left: 32, top: 18, width: 36 },
+          id: "footer-badge",
+          locked: false,
+          metadata: {},
+          mount: "footer",
+          source: { assetId: asset.assetId, fallbackSrc: `/uploads/images/${asset.filename}`, kind: "asset-image" },
+          style: {},
+          type: "asset-image",
+          visible: true,
+          zIndex: 1
+        }
+      ],
+      headerObjects: []
+    });
+    assert.equal(shellSave.statusCode, 200);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/shell-decorations/publish",
+      payload: { publishedBy: "ops.live" }
+    });
+    assert.equal(publishResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/display-ops/assets/${asset.assetId}/references`
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      references: {
+        draftCount: number;
+        liveCount: number;
+        references: Array<{
+          bindingId: string | null;
+          kind: string;
+          pageId: string | null;
+          stage: string;
+        }>;
+      };
+    };
+
+    assert.equal(body.references.liveCount, 1);
+    assert.equal(body.references.draftCount, 2);
+    assert.equal(
+      body.references.references.some(
+        (reference) =>
+          reference.kind === "shell-decoration"
+          && reference.bindingId === "footer-badge"
+          && reference.pageId === null
+          && reference.stage === "live"
+      ),
+      true
+    );
+    assert.equal(
+      body.references.references.some(
+        (reference) =>
+          reference.kind === "page-object"
+          && reference.bindingId === "overview-icon"
+          && reference.pageId === "overview"
+          && reference.stage === "draft"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("DELETE /api/images/:id blocks removal when the asset is still referenced by a live display page", async () => {
   const asset = seedManagedImageAsset("live-blocker.png");
   upsertStageConfig({
@@ -271,6 +393,68 @@ test("DELETE /api/images/:id blocks removal when the asset is still referenced b
           reference.kind === "display-page" &&
           reference.pageId === "overview" &&
           reference.stage === "live"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("DELETE /api/images/:id blocks removal when the asset is still referenced by a live shell decoration", async () => {
+  const asset = seedManagedImageAsset("live-shell-blocker.png");
+  const app = await buildApp();
+
+  try {
+    const draftSave = await saveShellDecorationDraft(app, {
+      footerObjects: [
+        {
+          frame: { height: 42, left: 24, top: 12, width: 42 },
+          id: "footer-shell-logo",
+          locked: false,
+          metadata: {},
+          mount: "footer",
+          source: { assetId: asset.assetId, fallbackSrc: `/uploads/images/${asset.filename}`, kind: "asset-image" },
+          style: {},
+          type: "asset-image",
+          visible: true,
+          zIndex: 1
+        }
+      ],
+      headerObjects: []
+    });
+    assert.equal(draftSave.statusCode, 200);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/shell-decorations/publish",
+      payload: { publishedBy: "ops.live" }
+    });
+    assert.equal(publishResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/images/${asset.assetId}`
+    });
+
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as {
+      error: string;
+      references?: {
+        blockingIssues: Array<{ code: string }>;
+        references: Array<{ bindingId: string | null; kind: string; stage: string }>;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, false);
+    assert.equal(body.references?.blockingIssues.some((issue) => issue.code === "live-reference"), true);
+    assert.equal(
+      body.references?.references.some(
+        (reference) =>
+          reference.kind === "shell-decoration"
+          && reference.bindingId === "footer-shell-logo"
+          && reference.stage === "live"
       ),
       true
     );
