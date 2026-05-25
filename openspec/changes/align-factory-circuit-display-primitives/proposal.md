@@ -26,11 +26,11 @@
 
 ### Modified Capabilities
 
-- `factory-circuit-slot-binding-and-alerts`: 保留既有 binding/alert 行為，補充 visual primitive alignment 不得破壞 slot/alert semantics。
+(none)
 
 ## Impact
 
-- Affected specs: `factory-circuit-display-primitive-alignment`, `factory-circuit-slot-binding-and-alerts`
+- Affected specs: `factory-circuit-display-primitive-alignment`
 - Affected code:
   - `apps/web/src/pages/FactoryCircuit/index.tsx`
   - `apps/web/src/pages/FactoryCircuit/factoryCircuit.css`

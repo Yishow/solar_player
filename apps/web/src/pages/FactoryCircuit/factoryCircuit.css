@@ -1,10 +1,16 @@
 @import "../shared/displaySurfaceChrome.css";
+@import "../shared/displaySurfaceNodes.css";
 
 .factory-circuit-display-page {
   position: relative;
   height: 100%;
   width: 100%;
   overflow: hidden;
+  --factory-routing-line-color: #668d54;
+  --factory-routing-line-neutral-color: #7c827a;
+  --factory-routing-line-accent-color: #8daf72;
+  --factory-routing-endpoint-color: #668d54;
+  --factory-routing-endpoint-stroke-color: rgba(255, 253, 247, 0.86);
 }
 
 .factory-circuit-title,
@@ -82,39 +88,21 @@
 
 .factory-circuit-node {
   z-index: 12;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--display-card-border-soft);
-  border-radius: 28px;
-  background: var(--display-card-surface-strong);
-  box-shadow: var(--display-shadow-soft);
-  text-align: center;
+  --display-node-border: var(--display-card-border-soft);
+  --display-node-icon-color: #648557;
+  --display-node-radius: 28px;
+  --display-node-shadow: var(--display-shadow-soft);
+  --display-node-surface: var(--display-card-surface-strong);
+  --display-node-subtitle-color: #757b75;
+  --display-node-subtitle-size: 16px;
+  --display-node-title-color: #34553a;
+  --display-node-title-size: 24px;
+  --display-node-title-letter-spacing: 0.2em;
 }
 
 .factory-circuit-node-board {
-  background: linear-gradient(180deg, rgba(238, 244, 228, 0.76), rgba(255, 253, 247, 0.92));
-  border-color: rgba(96, 137, 77, 0.55);
-}
-
-.factory-circuit-node-icon {
-  width: 78px;
-  height: 78px;
-  color: #648557;
-}
-
-.factory-circuit-node h3 {
-  margin: 18px 0 0;
-  color: #34553a;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 5px;
-}
-
-.factory-circuit-node p {
-  margin: 8px 0 0;
-  color: #757b75;
-  font-family: var(--font-family-en);
-  font-size: 16px;
+  --display-node-border: rgba(96, 137, 77, 0.55);
+  --display-node-surface: linear-gradient(180deg, rgba(238, 244, 228, 0.76), rgba(255, 253, 247, 0.92));
 }
 
 .factory-circuit-node-inverter::after {
@@ -123,7 +111,7 @@
   left: 50%;
   top: 218px;
   height: 178px;
-  border-left: 2px dashed rgba(81, 105, 68, 0.72);
+  border-left: 2px dashed var(--factory-routing-line-neutral-color);
   transform: translateX(-50%);
 }
 
@@ -134,7 +122,7 @@
   top: 266px;
   width: 48px;
   height: 48px;
-  border: 1.5px solid rgba(88, 113, 72, 0.76);
+  border: 1.5px solid var(--factory-routing-line-neutral-color);
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%, rgba(255, 253, 247, 0.92), rgba(247, 248, 239, 0.82));
   box-shadow: 0 0 0 7px rgba(255, 253, 247, 0.42);
@@ -151,7 +139,7 @@
 .factory-circuit-connector {
   z-index: 10;
   height: 3px;
-  background: #5f8c50;
+  background: var(--factory-routing-line-color);
 }
 
 .factory-circuit-connector::before,
@@ -161,8 +149,8 @@
   top: -6px;
   width: 11px;
   height: 11px;
-  border-right: 2.5px solid #8daf72;
-  border-top: 2.5px solid #8daf72;
+  border-right: 2.5px solid var(--factory-routing-line-accent-color);
+  border-top: 2.5px solid var(--factory-routing-line-accent-color);
   transform: rotate(45deg);
 }
 
@@ -179,7 +167,7 @@
   inset: 0;
   width: 1920px;
   height: 1080px;
-  color: #668d54;
+  color: var(--factory-routing-line-color);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -189,8 +177,8 @@
 }
 
 .factory-circuit-routing circle {
-  fill: currentColor;
-  stroke: rgba(255, 253, 247, 0.86);
+  fill: var(--factory-routing-endpoint-color);
+  stroke: var(--factory-routing-endpoint-stroke-color);
   stroke-width: 2;
 }
 
@@ -202,7 +190,7 @@
   display: flex;
   align-items: center;
   gap: 22px;
-  border: 1px solid rgba(97, 105, 81, 0.16);
+  border: 1px solid var(--display-card-border-soft);
   border-radius: 13px;
   background: var(--display-card-surface);
   box-shadow: var(--display-shadow-soft);
@@ -266,85 +254,39 @@
 
 .factory-circuit-kpi-card {
   z-index: 12;
-  border: 1px solid var(--display-card-border-strong);
-  border-radius: 24px;
-  background: var(--display-card-surface-strong);
-  box-shadow: var(--display-shadow-soft);
+  --display-card-background: var(--display-card-surface-strong);
+  --display-card-border: var(--display-card-border-strong);
+  --display-card-footer-padding-top: 18px;
+  --display-card-header-gap: 16px;
+  --display-card-icon-box-size: 52px;
+  --display-card-radius: 24px;
+  --display-card-shadow: var(--display-shadow-soft);
+  --display-card-subtitle-color: #6d736c;
+  --display-card-subtitle-letter-spacing: 0.08em;
+  --display-card-subtitle-size: 12px;
+  --display-card-subtitle-transform: none;
+  --display-card-title-color: #37413a;
+  --display-card-title-letter-spacing: 0.05em;
+  --display-card-title-size: 18px;
+  --display-card-unit-color: #60675f;
+  --display-card-unit-size: 16px;
+  --display-card-value-color: #53774b;
+  --display-card-value-size: 60px;
+  --display-card-value-line-height: 0.92;
+  --display-card-value-margin-top: 28px;
 }
 
-.factory-circuit-kpi-head {
-  position: absolute;
-  left: 26px;
-  top: 20px;
-  right: 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.factory-circuit-kpi-routing {
+  --display-card-title-size: 17px;
+  --display-card-unit-size: 18px;
+  --display-card-value-size: 42px;
 }
 
-.factory-circuit-kpi-icon {
-  width: 52px;
-  height: 52px;
-  color: #6a8a50;
-}
-
-.factory-circuit-kpi-head h3 {
-  margin: 0 0 4px;
-  color: #37413a;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.factory-circuit-kpi-head p {
-  margin: 0;
-  color: #6d736c;
-  font-family: var(--font-family-en);
-  font-size: 12px;
-}
-
-.factory-circuit-kpi-value {
-  position: absolute;
-  left: 62px;
-  top: 100px;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.factory-circuit-kpi-value span {
-  color: #53774b;
-  font-size: 60px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  line-height: 0.92;
-}
-
-.factory-circuit-kpi-value small {
-  margin-bottom: 6px;
-  color: #60675f;
-  font-family: var(--font-family-en);
-  font-size: 16px;
-  font-weight: 300;
-}
-
-.factory-circuit-kpi-routing .factory-circuit-kpi-value {
-  left: 58px;
-}
-
-.factory-circuit-kpi-routing .factory-circuit-kpi-value span {
-  font-size: 42px;
+.factory-circuit-kpi-routing .display-card-value {
   white-space: nowrap;
 }
 
-.factory-circuit-kpi-routing .factory-circuit-kpi-value small {
-  font-size: 18px;
-}
-
 .factory-circuit-kpi-sparkline {
-  position: absolute;
-  left: 30px;
-  right: 30px;
-  bottom: 18px;
   height: 30px;
+  width: 100%;
 }

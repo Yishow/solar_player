@@ -1,5 +1,11 @@
 import type { CircuitConfig } from "@solar-display/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DisplayCardFooter,
+  DisplayCardFrame,
+  DisplayCardHeader,
+  DisplayCardValueRow
+} from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
@@ -27,6 +33,7 @@ import {
   factoryCircuitTitleLayout
 } from "./layout";
 import { resolveDisplayPageRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
+import "../../components/displayPageCards.css";
 import "./factoryCircuit.css";
 import {
   buildFactoryCircuitRuntimes,
@@ -272,7 +279,7 @@ export function FactoryCircuit({
         return (
           <article
             key={node.label}
-            className={["factory-circuit-node", `factory-circuit-node-${node.key}`].join(" ")}
+            className={["factory-circuit-node", "display-node-frame", `factory-circuit-node-${node.key}`].join(" ")}
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,
@@ -280,7 +287,7 @@ export function FactoryCircuit({
               width: `${layout.width}px`
             }}
           >
-            <div className="factory-circuit-node-icon">
+            <div className="display-node-icon">
               {renderDisplayPageIcon({
                 alt: node.label,
                 className: "h-full w-full",
@@ -288,8 +295,8 @@ export function FactoryCircuit({
                 source: resolvedConfig.iconSources.nodes[node.key]
               })}
             </div>
-            <h3>{node.label}</h3>
-            <p>{node.subtitle}</p>
+            <h3 className="display-node-title">{node.label}</h3>
+            <p className="display-node-subtitle">{node.subtitle}</p>
           </article>
         );
       })}
@@ -373,8 +380,9 @@ export function FactoryCircuit({
           kpiLayoutOrder[index] === "flow" ? "factory-circuit-kpi-card factory-circuit-kpi-routing" : "factory-circuit-kpi-card";
 
         return (
-          <article
+          <DisplayCardFrame
             key={metric.label}
+            surface="metric"
             className={className}
             style={{
               height: `${layout.height}px`,
@@ -383,26 +391,21 @@ export function FactoryCircuit({
               width: `${layout.width}px`
             }}
           >
-            <div className="factory-circuit-kpi-head">
-              <div className="factory-circuit-kpi-icon">
-                {renderDisplayPageIcon({
-                  alt: metric.label,
-                  className: "h-full w-full",
-                  seedSource: seedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!],
-                  source: resolvedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!]
-                })}
-              </div>
-              <div>
-                <h3>{metric.label}</h3>
-                <p>{metric.helper}</p>
-              </div>
-            </div>
-            <div className="factory-circuit-kpi-value">
-              <span>{metric.value}</span>
-              <small>{metric.unit}</small>
-            </div>
-            <Sparkline className="factory-circuit-kpi-sparkline" values={trendSeries.map((value) => value - index * 1.5)} />
-          </article>
+            <DisplayCardHeader
+              icon={renderDisplayPageIcon({
+                alt: metric.label,
+                className: "h-full w-full",
+                seedSource: seedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!],
+                source: resolvedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!]
+              })}
+              subtitle={metric.helper}
+              title={metric.label}
+            />
+            <DisplayCardValueRow unit={metric.unit} value={metric.value} />
+            <DisplayCardFooter>
+              <Sparkline className="factory-circuit-kpi-sparkline" values={trendSeries.map((value) => value - index * 1.5)} />
+            </DisplayCardFooter>
+          </DisplayCardFrame>
         );
       })}
     </section>
