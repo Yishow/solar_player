@@ -82,12 +82,13 @@ export function DisplayEditorCanvasOverlay({
   overlayState,
   regions,
   selectedRegionId,
+  selectedRegionIds,
   temporaryMeasureMode,
   onSelect
 }: {
   isInteractive: boolean;
   lockedRegionIds: string[];
-  onSelect: (regionId: string) => void;
+  onSelect: (regionId: string, options?: { additive?: boolean }) => void;
   onSelectTemporaryMeasureTarget: (regionId: string) => void;
   onStartInteraction: (
     event: React.PointerEvent<HTMLButtonElement>,
@@ -101,6 +102,7 @@ export function DisplayEditorCanvasOverlay({
   overlayState: DisplayEditorOverlayState;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegionId: string | null;
+  selectedRegionIds: string[];
   temporaryMeasureMode: boolean;
 }) {
   if (!isInteractive) {
@@ -146,29 +148,77 @@ export function DisplayEditorCanvasOverlay({
           />
         ))}
         {overlayState.activeInteraction.guides.map((guide, index) => (
-          <div
-            key={`${guide.axis}-${guide.position}-${index}`}
-            className="absolute border-[rgba(63,122,52,0.88)]"
-            data-guide-kind="active-boundary"
-            style={
-              guide.axis === "x"
-                ? {
-                    borderLeftStyle: "solid",
-                    borderLeftWidth: "2px",
-                    bottom: 0,
-                    left: `${guide.position}px`,
-                    top: 0
-                  }
-                : {
-                    borderTopStyle: "solid",
-                    borderTopWidth: "2px",
-                    left: 0,
-                    right: 0,
-                    top: `${guide.position}px`
-                  }
-            }
-          />
+          <React.Fragment key={`${guide.axis}-${guide.position}-${index}`}>
+            <div
+              className="absolute border-[rgba(63,122,52,0.88)]"
+              data-guide-kind={guide.targetType ? `snap-${guide.targetType}` : "active-boundary"}
+              style={
+                guide.axis === "x"
+                  ? {
+                      borderLeftStyle: "solid",
+                      borderLeftWidth: "2px",
+                      bottom: 0,
+                      left: `${guide.position}px`,
+                      top: 0
+                    }
+                  : {
+                      borderTopStyle: "solid",
+                      borderTopWidth: "2px",
+                      left: 0,
+                      right: 0,
+                      top: `${guide.position}px`
+                    }
+              }
+            />
+            {guide.label ? (
+              <span
+                className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[10px] font-semibold text-white"
+                style={
+                  guide.axis === "x"
+                    ? { left: `${guide.position + 6}px`, top: "8px" }
+                    : { left: "8px", top: `${guide.position + 6}px` }
+                }
+              >
+                {guide.label}
+              </span>
+            ) : null}
+          </React.Fragment>
         ))}
+        {overlayState.selectionBounds ? (
+          <>
+            <div
+              className="absolute rounded-[28px] border-2 border-dashed border-[rgba(63,122,52,0.42)]"
+              data-selection-bounds="true"
+              style={{
+                height: `${overlayState.selectionBounds.height}px`,
+                left: `${overlayState.selectionBounds.left}px`,
+                top: `${overlayState.selectionBounds.top}px`,
+                width: `${overlayState.selectionBounds.width}px`
+              }}
+            />
+            {overlayState.selectionLabel ? (
+              <span
+                className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[11px] font-semibold text-white"
+                style={{
+                  left: `${overlayState.selectionBounds.left + overlayState.selectionBounds.width / 2}px`,
+                  top: `${Math.max(8, overlayState.selectionBounds.top - 12)}px`,
+                  transform: "translateX(-50%)"
+                }}
+              >
+                {overlayState.selectionLabel}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+        {overlayState.sessionDistanceLock ? (
+          <span
+            className="absolute rounded-full bg-[rgba(201,136,26,0.9)] px-2 py-1 text-[11px] font-semibold text-white"
+            style={{ left: "16px", top: "36px" }}
+          >
+            {overlayState.sessionDistanceLock.axis.toUpperCase()} 間距 {overlayState.sessionDistanceLock.distance}
+            {overlayState.sessionDistanceLock.boundaryClamped ? " / 邊界優先" : ""}
+          </span>
+        ) : null}
         {overlayState.axisTicks.map((tick) => (
           <div
             key={`${tick.axis}-${tick.designPosition}`}
@@ -308,7 +358,7 @@ export function DisplayEditorCanvasOverlay({
         }
 
         const frame = overlayState.frames.find((item) => item.regionId === region.id);
-        const isSelected = selectedRegionId === region.id || frame?.isSelected === true;
+        const isSelected = selectedRegionIds.includes(region.id) || frame?.isSelected === true;
         const isLocked = lockedRegionIds.includes(region.id) || frame?.isLocked === true;
         const isVisible = frame?.visible ?? false;
         return (
@@ -343,8 +393,9 @@ export function DisplayEditorCanvasOverlay({
                   onSelectTemporaryMeasureTarget(region.id);
                   return;
                 }
-                onSelect(region.id);
-                if (!isLocked) {
+                const additive = event.metaKey || event.ctrlKey || event.shiftKey;
+                onSelect(region.id, { additive });
+                if (!isLocked && !additive) {
                   onStartInteraction(event, region, "drag");
                 }
               }}

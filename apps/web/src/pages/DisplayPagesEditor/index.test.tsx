@@ -122,7 +122,19 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.match(html, /重做/);
   assert.match(html, /點中區域/);
   assert.match(html, /全畫參考/);
+  assert.match(html, /吸附/);
+  assert.match(html, /Guide/);
+  assert.match(html, /邊界/);
+  assert.match(html, /中心/);
+  assert.match(html, /頁心線/);
+  assert.match(html, /鎖定間距/);
   assert.match(html, /暫時量測/);
+  assert.match(html, /左對齊/);
+  assert.match(html, /右對齊/);
+  assert.match(html, /上對齊/);
+  assert.match(html, /下對齊/);
+  assert.match(html, /水平分布/);
+  assert.match(html, /垂直分布/);
   assert.match(html, /設計尺寸/);
   assert.doesNotMatch(html, /區域預設/);
 });
@@ -333,4 +345,29 @@ test("display page editor falls back to the default overlay preset when stored s
 
   assert.match(html, /1920 × 1080/);
   assert.match(html, /點中區域/);
+});
+
+test("display page editor enables multi-select tools only when the initial selection contains enough regions", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-hero-media",
+          selectedRegionIds: ["overview-hero-media", "overview-hero-copy", "overview-summary"]
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /多選 3 區/);
+  assert.match(html, /左對齊/);
+  assert.match(html, /水平分布/);
+  assert.doesNotMatch(html, /disabled=""[^>]*>左對齊</);
+  assert.doesNotMatch(html, /disabled=""[^>]*>水平分布</);
 });

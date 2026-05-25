@@ -235,6 +235,7 @@ test("display editor canvas overlay exposes localized accessibility labels for s
       }),
       regions,
       selectedRegionId: "overview-hero-media",
+      selectedRegionIds: ["overview-hero-media"],
       temporaryMeasureMode: false
     })
   );
@@ -288,6 +289,7 @@ test("display editor canvas overlay renders full-canvas guides and region labels
       }),
       regions,
       selectedRegionId: "overview-hero-media",
+      selectedRegionIds: ["overview-hero-media"],
       temporaryMeasureMode: false
     })
   );
@@ -334,10 +336,12 @@ test("display editor canvas overlay renders relational rulers without replacing 
         overlayPreset: defaultDisplayEditorOverlayPreset,
         regions,
         selectedRegion,
+        selectedRegionIds: ["overview-hero-copy"],
         temporaryMeasureMode: true
       }),
       regions,
       selectedRegionId: "overview-hero-copy",
+      selectedRegionIds: ["overview-hero-copy"],
       temporaryMeasureMode: true
     })
   );
@@ -346,6 +350,64 @@ test("display editor canvas overlay renders relational rulers without replacing 
   assert.match(html, /調整 水平 量測/);
   assert.match(html, /140/);
   assert.match(html, /aria-pressed="true"/);
+});
+
+test("display editor canvas overlay renders multi-select bounds and snap feedback labels", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 140, left: 120, top: 220, width: 180 },
+      id: "overview-stat-a",
+      label: "Overview Stat A",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-stat-a", "Overview Stat A")
+    },
+    {
+      fields: [],
+      geometry: { height: 160, left: 420, top: 260, width: 220 },
+      id: "overview-stat-b",
+      label: "Overview Stat B",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-stat-b", "Overview Stat B")
+    }
+  ];
+  const selectedRegion = regions[0]!;
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
+      onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
+      overlayState: resolveDisplayEditorOverlayState({
+        activeInteraction: {
+          boundaryClamped: false,
+          constraintRect: { height: 934, left: 0, top: 0, width: 1920 },
+          guides: [{ axis: "x", label: "Center Line", position: 960, targetType: "center-line" }],
+          rect: regions[0]!.geometry!,
+          type: "drag"
+        },
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        overlayPreset: defaultDisplayEditorOverlayPreset,
+        regions,
+        selectedRegion,
+        selectedRegionIds: ["overview-stat-a", "overview-stat-b"],
+        selectionFeedbackLabel: "水平分布"
+      }),
+      regions,
+      selectedRegionId: "overview-stat-a",
+      selectedRegionIds: ["overview-stat-a", "overview-stat-b"],
+      temporaryMeasureMode: false
+    })
+  );
+
+  assert.match(html, /data-selection-bounds="true"/);
+  assert.match(html, /水平分布/);
+  assert.match(html, /data-guide-kind="snap-center-line"/);
+  assert.match(html, />Center Line</);
 });
 
 test("display editor canvas overlay falls back to alternate ruler label placement when the canvas is crowded", () => {
@@ -384,10 +446,12 @@ test("display editor canvas overlay falls back to alternate ruler label placemen
         overlayPreset: defaultDisplayEditorOverlayPreset,
         regions,
         selectedRegion,
+        selectedRegionIds: ["overview-kpi-a"],
         temporaryMeasureMode: true
       }),
       regions,
       selectedRegionId: "overview-kpi-a",
+      selectedRegionIds: ["overview-kpi-a"],
       temporaryMeasureMode: true
     })
   );
@@ -430,10 +494,12 @@ test("display editor canvas overlay keeps relational handles disabled when selec
         overlayPreset: defaultDisplayEditorOverlayPreset,
         regions,
         selectedRegion: null,
+        selectedRegionIds: [],
         temporaryMeasureMode: true
       }),
       regions,
       selectedRegionId: null,
+      selectedRegionIds: [],
       temporaryMeasureMode: true
     })
   );

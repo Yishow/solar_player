@@ -2,12 +2,16 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isDisplayEditorHistoryKey } from "../../hooks/useDisplayEditor";
 import {
+  type CanvasDistanceLockSession,
   applyCanvasDrag,
-  applyMeasurementHandleDrag,
   applyCanvasNudge,
   applyCanvasResize,
+  applyMeasurementHandleDrag,
   panCanvasViewport,
+  resolveDistanceLockSession,
   resolveViewportAfterZoom,
+  type CanvasSnapOptions,
+  type CanvasSnapTarget,
   type CanvasGuide,
   type CanvasRect,
   type CanvasResizeHandle
@@ -63,7 +67,72 @@ function constraintToRect(constraint: ReturnType<typeof resolveRegionConstraint>
   };
 }
 
+function resolveCanvasSnapTargets(
+  activeRegionId: string,
+  regions: ResolvedDisplayEditorRegion[],
+  overlayPreset: DisplayEditorOverlayPreset
+): CanvasSnapTarget[] {
+  const targets: CanvasSnapTarget[] = [];
+
+  if (overlayPreset.snapCenterLines) {
+    targets.push(
+      { axis: "x", position: EDITOR_PREVIEW_SURFACE_WIDTH / 2, type: "center-line" },
+      { axis: "y", position: EDITOR_PREVIEW_SURFACE_HEIGHT / 2, type: "center-line" }
+    );
+  }
+
+  for (const region of regions) {
+    if (!region.geometry || region.id === activeRegionId) {
+      continue;
+    }
+
+    if (overlayPreset.snapGuides && !region.parentId) {
+      targets.push(
+        { axis: "x", position: region.geometry.left, type: "guide" },
+        { axis: "x", position: region.geometry.left + region.geometry.width, type: "guide" },
+        { axis: "y", position: region.geometry.top, type: "guide" },
+        { axis: "y", position: region.geometry.top + region.geometry.height, type: "guide" }
+      );
+    }
+
+    if (overlayPreset.snapRegionEdges) {
+      targets.push(
+        { axis: "x", position: region.geometry.left, type: "region-edge" },
+        { axis: "x", position: region.geometry.left + region.geometry.width, type: "region-edge" },
+        { axis: "y", position: region.geometry.top, type: "region-edge" },
+        { axis: "y", position: region.geometry.top + region.geometry.height, type: "region-edge" }
+      );
+    }
+
+    if (overlayPreset.snapRegionCenters) {
+      targets.push(
+        { axis: "x", position: region.geometry.left + region.geometry.width / 2, type: "region-center" },
+        { axis: "y", position: region.geometry.top + region.geometry.height / 2, type: "region-center" }
+      );
+    }
+  }
+
+  return targets;
+}
+
+function resolveSnapOptions(
+  activeRegionId: string,
+  regions: ResolvedDisplayEditorRegion[],
+  overlayPreset: DisplayEditorOverlayPreset
+): CanvasSnapOptions | undefined {
+  if (!overlayPreset.snapEnabled) {
+    return undefined;
+  }
+
+  return {
+    enabled: true,
+    targets: resolveCanvasSnapTargets(activeRegionId, regions, overlayPreset),
+    threshold: 16
+  };
+}
+
 type CanvasInteractionState = {
+  distanceLock: CanvasDistanceLockSession | null;
   handle?: CanvasResizeHandle;
   origin: { x: number; y: number };
   regionId: string;
@@ -73,6 +142,7 @@ type CanvasInteractionState = {
 };
 
 type CanvasInteractionFeedback = {
+  boundaryClamped?: boolean;
   constraintRect: CanvasRect;
   guides: CanvasGuide[];
   rect: CanvasRect;
@@ -86,9 +156,12 @@ export function useDisplayEditorCanvasWorkflow({
   canvasContainerScale = 1,
   config,
   editMode,
+  distanceLockTargetRegion,
   lockedRegionIds,
   redo,
   selectedRegion,
+  selectedRegionIds,
+  selectionFeedbackLabel,
   undo,
   regions
 }: {
@@ -100,11 +173,14 @@ export function useDisplayEditorCanvasWorkflow({
   canUndo: boolean;
   canvasContainerScale?: number;
   config: Record<string, unknown>;
+  distanceLockTargetRegion: ResolvedDisplayEditorRegion | null;
   editMode: boolean;
   lockedRegionIds: string[];
   redo: () => void;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegion: ResolvedDisplayEditorRegion | null;
+  selectedRegionIds: string[];
+  selectionFeedbackLabel: string | null;
   undo: () => void;
 }) {
   const [viewport, setViewport] = useState({ offsetX: 0, offsetY: 0, zoom: 1 });
@@ -113,6 +189,7 @@ export function useDisplayEditorCanvasWorkflow({
   const [overlayPreset, setOverlayPreset] = useState<DisplayEditorOverlayPreset>(() =>
     resolveInitialDisplayEditorOverlayPreset()
   );
+  const [distanceLockArmed, setDistanceLockArmed] = useState(false);
   const [temporaryMeasureMode, setTemporaryMeasureMode] = useState(false);
   const [temporaryMeasureTargetRegionId, setTemporaryMeasureTargetRegionId] = useState<string | null>(null);
   const viewportRef = useRef(viewport);
@@ -133,6 +210,7 @@ export function useDisplayEditorCanvasWorkflow({
     if (!editMode) {
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
+      setDistanceLockArmed(false);
       setTemporaryMeasureMode(false);
       setTemporaryMeasureTargetRegionId(null);
     }
@@ -147,6 +225,12 @@ export function useDisplayEditorCanvasWorkflow({
       setTemporaryMeasureTargetRegionId(null);
     }
   }, [selectedRegion, temporaryMeasureTargetRegion]);
+
+  useEffect(() => {
+    if (!selectedRegion?.geometry || !distanceLockTargetRegion?.geometry || selectedRegionIds.length !== 2) {
+      setDistanceLockArmed(false);
+    }
+  }, [distanceLockTargetRegion, selectedRegion, selectedRegionIds]);
 
   useEffect(() => {
     if (!editMode || !selectedRegion?.geometry || selectedRegionLocked) {
@@ -242,9 +326,17 @@ export function useDisplayEditorCanvasWorkflow({
         y: Math.round((event.clientY - activeInteraction.origin.y) / effectiveScale)
       };
       const constraint = resolveRegionConstraint(region);
+      const snap = resolveSnapOptions(region.id, regions, overlayPreset);
       const interactionResult =
         activeInteraction.type === "resize" && activeInteraction.handle
-          ? applyCanvasResize(activeInteraction.startRect, activeInteraction.handle, delta, constraint)
+          ? applyCanvasResize(
+              activeInteraction.startRect,
+              activeInteraction.handle,
+              delta,
+              constraint,
+              snap,
+              activeInteraction.distanceLock
+            )
           : activeInteraction.type === "measure-x" || activeInteraction.type === "measure-y"
             ? applyMeasurementHandleDrag(
                 activeInteraction.startRect,
@@ -252,9 +344,10 @@ export function useDisplayEditorCanvasWorkflow({
                 activeInteraction.type === "measure-x" ? delta.x : delta.y,
                 constraint
               )
-          : applyCanvasDrag(activeInteraction.startRect, delta, constraint);
+          : applyCanvasDrag(activeInteraction.startRect, delta, constraint, snap, activeInteraction.distanceLock);
 
       setCanvasInteractionFeedback({
+        boundaryClamped: interactionResult.boundaryClamped,
         constraintRect: constraintToRect(constraint),
         guides: interactionResult.guides,
         rect: interactionResult.rect,
@@ -272,6 +365,7 @@ export function useDisplayEditorCanvasWorkflow({
       });
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
+      setDistanceLockArmed(false);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -280,7 +374,7 @@ export function useDisplayEditorCanvasWorkflow({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [applyConfigUpdate, canvasInteraction, lockedRegionIds, regions]);
+  }, [applyConfigUpdate, canvasInteraction, lockedRegionIds, overlayPreset, regions]);
 
   useEffect(() => {
     if (selectedRegionLocked && canvasInteraction) {
@@ -342,19 +436,25 @@ export function useDisplayEditorCanvasWorkflow({
         activeInteraction: canvasInteractionFeedback,
         canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
         canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
+        distanceLockSession: canvasInteraction?.distanceLock ?? null,
         lockedRegionIds,
         measurementTargetRegion: temporaryMeasureTargetRegion,
         overlayPreset,
         regions,
         selectedRegion,
+        selectedRegionIds,
+        selectionFeedbackLabel,
         temporaryMeasureMode
       }),
     [
+      canvasInteraction?.distanceLock,
       canvasInteractionFeedback,
       lockedRegionIds,
       overlayPreset,
       regions,
       selectedRegion,
+      selectedRegionIds,
+      selectionFeedbackLabel,
       temporaryMeasureMode,
       temporaryMeasureTargetRegion
     ]
@@ -363,6 +463,7 @@ export function useDisplayEditorCanvasWorkflow({
   return {
     overlayPreset,
     overlayState,
+    distanceLockArmed,
     onSelectTemporaryMeasureTarget: (regionId: string) => {
       if (!selectedRegion || regionId === selectedRegion.id) {
         return;
@@ -381,7 +482,12 @@ export function useDisplayEditorCanvasWorkflow({
       }
 
       const constraint = resolveRegionConstraint(region);
+      const distanceLock =
+        distanceLockArmed && distanceLockTargetRegion?.geometry
+          ? resolveDistanceLockSession(region.geometry, distanceLockTargetRegion.geometry)
+          : null;
       setCanvasInteraction({
+        distanceLock,
         handle: type === "resize" ? "se" : undefined,
         origin: { x: event.clientX, y: event.clientY },
         regionId: region.id,
@@ -395,6 +501,7 @@ export function useDisplayEditorCanvasWorkflow({
         rect: region.geometry,
         type
       });
+      setDistanceLockArmed(false);
     },
     onStartMeasurementHandleDrag: (
       event: ReactPointerEvent<HTMLButtonElement>,
@@ -406,6 +513,7 @@ export function useDisplayEditorCanvasWorkflow({
 
       const constraint = resolveRegionConstraint(selectedRegion);
       setCanvasInteraction({
+        distanceLock: null,
         origin: { x: event.clientX, y: event.clientY },
         regionId: selectedRegion.id,
         startConfig: config,
@@ -420,6 +528,7 @@ export function useDisplayEditorCanvasWorkflow({
       });
     },
     onZoomDelta,
+    setDistanceLockArmed,
     setOverlayPreset,
     setTemporaryMeasureMode,
     temporaryMeasureMode,

@@ -4,6 +4,8 @@ import {
   mapCanvasPointToDesignPoint,
   resolveCanvasDesignMapping,
   type CanvasDesignMapping,
+  resolveSelectionBounds,
+  type CanvasDistanceLockSession,
   type CanvasRect
 } from "./canvasInteractions";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
@@ -20,6 +22,11 @@ export type DisplayEditorOverlayPreset = {
   designPreset: DisplayEditorOverlayDesignPresetKey;
   displayMode: DisplayEditorOverlayDisplayMode;
   frameDensity: DisplayEditorOverlayFrameDensity;
+  snapCenterLines: boolean;
+  snapEnabled: boolean;
+  snapGuides: boolean;
+  snapRegionCenters: boolean;
+  snapRegionEdges: boolean;
   showAxes: boolean;
   showCenterLines: boolean;
   showRegionLabels: boolean;
@@ -92,6 +99,14 @@ export type DisplayEditorOverlayState = {
   pageGuides: DisplayEditorOverlayGuide[];
   preset: DisplayEditorOverlayPreset;
   relationalRulers: DisplayEditorOverlayRuler[];
+  selectionBounds: CanvasRect | null;
+  selectionLabel: string | null;
+  sessionDistanceLock: {
+    axis: "x" | "y";
+    boundaryClamped: boolean;
+    distance: number;
+  } | null;
+  snapGuides: CanvasGuide[];
   temporaryMeasureMode: boolean;
   temporaryMeasureTargetRegionId: string | null;
 };
@@ -104,6 +119,11 @@ export const defaultDisplayEditorOverlayPreset: DisplayEditorOverlayPreset = {
   designPreset: "fhd",
   displayMode: "selected-only",
   frameDensity: "soft",
+  snapCenterLines: true,
+  snapEnabled: true,
+  snapGuides: true,
+  snapRegionCenters: true,
+  snapRegionEdges: true,
   showAxes: true,
   showCenterLines: false,
   showRegionLabels: false
@@ -160,6 +180,11 @@ function normalizeOverlayPreset(value: unknown): DisplayEditorOverlayPreset | nu
     designPreset: normalizeDesignPreset(candidate.designPreset),
     displayMode: normalizeDisplayMode(candidate.displayMode),
     frameDensity: normalizeFrameDensity(candidate.frameDensity),
+    snapCenterLines: candidate.snapCenterLines !== false,
+    snapEnabled: candidate.snapEnabled !== false,
+    snapGuides: candidate.snapGuides !== false,
+    snapRegionCenters: candidate.snapRegionCenters !== false,
+    snapRegionEdges: candidate.snapRegionEdges !== false,
     showAxes: candidate.showAxes !== false,
     showCenterLines: candidate.showCenterLines === true,
     showRegionLabels: candidate.showRegionLabels === true
@@ -289,6 +314,31 @@ function resolvePageGuides(
     }
   }
 
+  if (showCenterLines) {
+    for (const item of [
+      { axis: "x" as const, canvasPosition: mapping.canvasWidth / 2, kind: "center" as const },
+      { axis: "y" as const, canvasPosition: mapping.canvasHeight / 2, kind: "center" as const }
+    ]) {
+      const designPosition =
+        item.axis === "x"
+          ? mapCanvasPointToDesignPoint({ x: item.canvasPosition, y: 0 }, mapping).x
+          : mapCanvasPointToDesignPoint({ x: 0, y: item.canvasPosition }, mapping).y;
+      const key = createGuideKey(item.axis, designPosition, item.kind);
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      guides.push({
+        axis: item.axis,
+        canvasPosition: Math.round(item.canvasPosition),
+        designPosition,
+        kind: item.kind
+      });
+    }
+  }
+
   return guides.sort((a, b) => a.canvasPosition - b.canvasPosition);
 }
 
@@ -398,14 +448,18 @@ export function resolveDisplayEditorOverlayState({
   activeInteraction,
   canvasHeight,
   canvasWidth,
+  distanceLockSession,
   lockedRegionIds,
   measurementTargetRegion,
   overlayPreset,
   regions,
   selectedRegion,
+  selectedRegionIds,
+  selectionFeedbackLabel,
   temporaryMeasureMode = false
 }: {
   activeInteraction?: {
+    boundaryClamped?: boolean;
     constraintRect: CanvasRect;
     guides: CanvasGuide[];
     rect: CanvasRect;
@@ -413,11 +467,14 @@ export function resolveDisplayEditorOverlayState({
   } | null;
   canvasHeight: number;
   canvasWidth: number;
+  distanceLockSession?: CanvasDistanceLockSession | null;
   lockedRegionIds: string[];
   measurementTargetRegion?: ResolvedDisplayEditorRegion | null;
   overlayPreset: DisplayEditorOverlayPreset;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegion: ResolvedDisplayEditorRegion | null;
+  selectedRegionIds?: string[];
+  selectionFeedbackLabel?: string | null;
   temporaryMeasureMode?: boolean;
 }): DisplayEditorOverlayState {
   const designSpace = resolveDisplayEditorOverlayDesignSpace(overlayPreset);
@@ -425,6 +482,11 @@ export function resolveDisplayEditorOverlayState({
     { height: canvasHeight, width: canvasWidth },
     designSpace
   );
+  const activeSelectedRegionIds = selectedRegionIds ?? (selectedRegion ? [selectedRegion.id] : []);
+  const selectedRects = regions
+    .filter((region) => region.geometry && activeSelectedRegionIds.includes(region.id))
+    .map((region) => ({ id: region.id, rect: region.geometry! }));
+  const selectionBounds = activeSelectedRegionIds.length > 1 ? resolveSelectionBounds(selectedRects) : null;
 
   return {
     activeInteraction: activeInteraction
@@ -448,17 +510,30 @@ export function resolveDisplayEditorOverlayState({
       .filter((region) => Boolean(region.geometry))
       .map((region) => ({
         isLocked: lockedRegionIds.includes(region.id),
-        isSelected: selectedRegion?.id === region.id,
+        isSelected: activeSelectedRegionIds.includes(region.id),
         label: overlayPreset.showRegionLabels ? region.label : null,
         rect: region.geometry!,
         regionId: region.id,
         tone: selectedRegion?.id === region.id ? "primary" : "secondary",
-        visible: overlayPreset.displayMode === "full-canvas" || selectedRegion?.id === region.id
+        visible:
+          overlayPreset.displayMode === "full-canvas" ||
+          activeSelectedRegionIds.includes(region.id)
       })),
     measurement: resolveMeasurement(selectedRegion, designMapping, activeInteraction?.rect),
     pageGuides: resolvePageGuides(regions, designMapping, overlayPreset.showCenterLines),
     preset: overlayPreset,
     relationalRulers: resolveRelationalRulers(selectedRegion, measurementTargetRegion ?? null, designMapping),
+    selectionBounds,
+    selectionLabel:
+      selectionFeedbackLabel ?? (selectionBounds && activeSelectedRegionIds.length > 1 ? `已選 ${activeSelectedRegionIds.length} 區` : null),
+    sessionDistanceLock: distanceLockSession
+      ? {
+          axis: distanceLockSession.axis,
+          boundaryClamped: activeInteraction?.boundaryClamped === true,
+          distance: distanceLockSession.distance
+        }
+      : null,
+    snapGuides: activeInteraction?.guides.filter((guide) => Boolean(guide.targetType)) ?? [],
     temporaryMeasureMode,
     temporaryMeasureTargetRegionId: measurementTargetRegion?.id ?? null
   };

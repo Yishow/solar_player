@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  alignCanvasSelections,
   applyCanvasDrag,
   applyCanvasNudge,
   applyCanvasResize,
+  distributeCanvasSelections,
   clampCanvasRect,
   mapCanvasPointToDesignPoint,
   mapDesignPointToCanvasPoint,
   panCanvasViewport,
+  resolveDistanceLockSession,
   resolveRelationalMeasurements,
   resolveCanvasDesignMapping,
+  resolveSelectionBounds,
   applyMeasurementHandleDrag,
   resolveViewportAfterZoom
 } from "./canvasInteractions";
@@ -258,4 +262,172 @@ test("applyMeasurementHandleDrag mutates only the selected region geometry", () 
   assert.equal(moved.rect.top, 132);
   assert.equal(moved.rect.width, 320);
   assert.equal(moved.rect.height, 180);
+});
+
+test("applyCanvasDrag snaps to explicit guide, region edge, region center, and center-line targets", () => {
+  const guideSnap = applyCanvasDrag(
+    { height: 180, left: 148, top: 200, width: 120 },
+    { x: 0, y: 0 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    {
+      enabled: true,
+      targets: [{ axis: "x", position: 160, type: "guide" }],
+      threshold: 16
+    }
+  );
+  const edgeSnap = applyCanvasDrag(
+    { height: 180, left: 256, top: 200, width: 120 },
+    { x: 0, y: 0 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    {
+      enabled: true,
+      targets: [{ axis: "x", position: 400, type: "region-edge" }],
+      threshold: 30
+    }
+  );
+  const centerSnap = applyCanvasDrag(
+    { height: 180, left: 468, top: 200, width: 120 },
+    { x: 0, y: 0 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    {
+      enabled: true,
+      targets: [{ axis: "x", position: 540, type: "region-center" }],
+      threshold: 16
+    }
+  );
+  const centerLineSnap = applyCanvasDrag(
+    { height: 180, left: 892, top: 200, width: 120 },
+    { x: 0, y: 0 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    {
+      enabled: true,
+      targets: [{ axis: "x", position: 960, type: "center-line" }],
+      threshold: 16
+    }
+  );
+
+  assert.equal(guideSnap.rect.left, 160);
+  assert.equal(guideSnap.guides[0]?.targetType, "guide");
+  assert.equal(edgeSnap.rect.left + edgeSnap.rect.width, 400);
+  assert.equal(edgeSnap.guides[0]?.targetType, "region-edge");
+  assert.equal(centerSnap.rect.left + centerSnap.rect.width / 2, 540);
+  assert.equal(centerSnap.guides[0]?.targetType, "region-center");
+  assert.equal(centerLineSnap.rect.left + centerLineSnap.rect.width / 2, 960);
+  assert.equal(centerLineSnap.guides[0]?.targetType, "center-line");
+});
+
+test("distance lock is scoped to one interaction session and clamp wins when lock conflicts with bounds", () => {
+  const session = resolveDistanceLockSession(
+    { height: 180, left: 40, top: 240, width: 160 },
+    { height: 180, left: 224, top: 240, width: 220 }
+  );
+  const locked = applyCanvasDrag(
+    { height: 180, left: 40, top: 240, width: 160 },
+    { x: 88, y: 32 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    undefined,
+    session
+  );
+  const unlocked = applyCanvasDrag(
+    { height: 180, left: 40, top: 240, width: 160 },
+    { x: 88, y: 32 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    }
+  );
+  const clamped = applyCanvasDrag(
+    { height: 180, left: 0, top: 240, width: 180 },
+    { x: -20, y: 0 },
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    },
+    undefined,
+    {
+      axis: "x",
+      distance: 24,
+      relation: "before",
+      targetRect: { height: 180, left: 120, top: 240, width: 80 }
+    }
+  );
+
+  assert.equal(locked.rect.left, 40);
+  assert.equal(locked.rect.top, 272);
+  assert.equal(unlocked.rect.left, 128);
+  assert.equal(clamped.rect.left, 0);
+  assert.equal(clamped.boundaryClamped, true);
+});
+
+test("alignCanvasSelections uses a stable selection bounds box for edge and center alignment", () => {
+  const aligned = alignCanvasSelections(
+    [
+      { id: "a", rect: { height: 120, left: 120, top: 220, width: 180 } },
+      { id: "b", rect: { height: 180, left: 240, top: 160, width: 220 } },
+      { id: "c", rect: { height: 160, left: 420, top: 280, width: 200 } }
+    ],
+    "top"
+  );
+  const centered = alignCanvasSelections(
+    [
+      { id: "a", rect: { height: 120, left: 120, top: 220, width: 180 } },
+      { id: "b", rect: { height: 180, left: 240, top: 160, width: 220 } }
+    ],
+    "h-center"
+  );
+
+  assert.deepEqual(aligned.map((selection) => selection.rect.top), [160, 160, 160]);
+  assert.deepEqual(centered.map((selection) => selection.rect.left), [200, 180]);
+});
+
+test("distributeCanvasSelections keeps outer bounds anchored while equalizing interior gaps", () => {
+  const distributed = distributeCanvasSelections(
+    [
+      { id: "a", rect: { height: 140, left: 120, top: 220, width: 120 } },
+      { id: "b", rect: { height: 140, left: 320, top: 220, width: 140 } },
+      { id: "c", rect: { height: 140, left: 560, top: 220, width: 120 } },
+      { id: "d", rect: { height: 140, left: 820, top: 220, width: 100 } }
+    ],
+    "h-distribute"
+  );
+  const bounds = resolveSelectionBounds(distributed);
+  const gaps = [
+    distributed[1]!.rect.left - (distributed[0]!.rect.left + distributed[0]!.rect.width),
+    distributed[2]!.rect.left - (distributed[1]!.rect.left + distributed[1]!.rect.width),
+    distributed[3]!.rect.left - (distributed[2]!.rect.left + distributed[2]!.rect.width)
+  ];
+
+  assert.equal(distributed[0]!.rect.left, 120);
+  assert.equal(distributed[3]!.rect.left + distributed[3]!.rect.width, 920);
+  assert.deepEqual(gaps, [107, 106, 107]);
+  assert.deepEqual(bounds, { height: 140, left: 120, top: 220, width: 800 });
 });

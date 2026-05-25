@@ -12,7 +12,9 @@ export type CanvasDelta = {
 
 export type CanvasGuide = {
   axis: "x" | "y";
+  label?: string;
   position: number;
+  targetType?: "center-line" | "guide" | "region-center" | "region-edge";
 };
 
 export type CanvasRectConstraint = {
@@ -61,6 +63,40 @@ export type CanvasDesignMapping = {
   scaleX: number;
   scaleY: number;
 };
+
+export type CanvasSnapTarget = {
+  axis: "x" | "y";
+  position: number;
+  type: "center-line" | "guide" | "region-center" | "region-edge";
+};
+
+export type CanvasSnapOptions = {
+  enabled: boolean;
+  targets: CanvasSnapTarget[];
+  threshold: number;
+};
+
+export type CanvasDistanceLockSession = {
+  axis: "x" | "y";
+  distance: number;
+  relation: "after" | "before";
+  targetRect: CanvasRect;
+};
+
+export type CanvasSelectionRect = {
+  id: string;
+  rect: CanvasRect;
+};
+
+export type CanvasAlignmentAction =
+  | "bottom"
+  | "h-center"
+  | "left"
+  | "right"
+  | "top"
+  | "v-center";
+
+export type CanvasDistributionAction = "h-distribute" | "v-distribute";
 
 function normalizeCanvasCoordinate(value: number) {
   return Number.isFinite(value) ? value : 0;
@@ -138,22 +174,26 @@ export function clampCanvasRect(rect: CanvasRect, constraint: CanvasRectConstrai
 export function applyCanvasDrag(
   rect: CanvasRect,
   delta: CanvasDelta,
-  constraint: CanvasRectConstraint
+  constraint: CanvasRectConstraint,
+  snap?: CanvasSnapOptions,
+  distanceLock?: CanvasDistanceLockSession | null
 ): {
+  boundaryClamped?: boolean;
   guides: CanvasGuide[];
   rect: CanvasRect;
 } {
-  const nextRect = clampCanvasRect(
-    {
-      ...rect,
-      left: rect.left + delta.x,
-      top: rect.top + delta.y
-    },
-    constraint
-  );
+  const unlockedRect = {
+    ...rect,
+    left: rect.left + delta.x,
+    top: rect.top + delta.y
+  };
+  const lockedRect = distanceLock ? applyDistanceLockToDrag(unlockedRect, distanceLock) : unlockedRect;
+  const snapped = resolveSnapRect(lockedRect, snap, { x: "move", y: "move" });
+  const nextRect = clampCanvasRect(snapped.rect, constraint);
 
   return {
-    guides: resolveBoundaryGuides(nextRect, constraint),
+    boundaryClamped: nextRect.left !== snapped.rect.left || nextRect.top !== snapped.rect.top,
+    guides: [...snapped.guides, ...resolveBoundaryGuides(nextRect, constraint)],
     rect: nextRect
   };
 }
@@ -162,8 +202,11 @@ export function applyCanvasResize(
   rect: CanvasRect,
   handle: CanvasResizeHandle,
   delta: CanvasDelta,
-  constraint: CanvasRectConstraint
+  constraint: CanvasRectConstraint,
+  snap?: CanvasSnapOptions,
+  distanceLock?: CanvasDistanceLockSession | null
 ): {
+  boundaryClamped?: boolean;
   guides: CanvasGuide[];
   rect: CanvasRect;
 } {
@@ -184,10 +227,20 @@ export function applyCanvasResize(
     nextRect.height = rect.height - delta.y;
   }
 
-  nextRect = clampCanvasRect(nextRect, constraint);
+  nextRect = distanceLock ? applyDistanceLockToResize(nextRect, handle, distanceLock) : nextRect;
+  const snapped = resolveSnapRect(nextRect, snap, {
+    x: handle.includes("e") ? "resize-end" : handle.includes("w") ? "resize-start" : "none",
+    y: handle.includes("s") ? "resize-end" : handle.includes("n") ? "resize-start" : "none"
+  });
+  nextRect = clampCanvasRect(snapped.rect, constraint);
 
   return {
-    guides: resolveBoundaryGuides(nextRect, constraint),
+    boundaryClamped:
+      nextRect.left !== snapped.rect.left ||
+      nextRect.top !== snapped.rect.top ||
+      nextRect.width !== snapped.rect.width ||
+      nextRect.height !== snapped.rect.height,
+    guides: [...snapped.guides, ...resolveBoundaryGuides(nextRect, constraint)],
     rect: nextRect
   };
 }
@@ -302,6 +355,133 @@ export function applyMeasurementHandleDrag(
   );
 }
 
+export function resolveDistanceLockSession(
+  sourceRect: CanvasRect,
+  targetRect: CanvasRect
+): CanvasDistanceLockSession {
+  const horizontalGap = resolveDirectionalGap(
+    sourceRect.left,
+    sourceRect.left + sourceRect.width,
+    targetRect.left,
+    targetRect.left + targetRect.width
+  );
+  const verticalGap = resolveDirectionalGap(
+    sourceRect.top,
+    sourceRect.top + sourceRect.height,
+    targetRect.top,
+    targetRect.top + targetRect.height
+  );
+  const axis = horizontalGap.distance >= verticalGap.distance ? "x" : "y";
+  const selectedGap = axis === "x" ? horizontalGap : verticalGap;
+
+  return {
+    axis,
+    distance: selectedGap.distance,
+    relation: selectedGap.relation,
+    targetRect
+  };
+}
+
+export function resolveSelectionBounds(selections: CanvasSelectionRect[]): CanvasRect | null {
+  if (selections.length === 0) {
+    return null;
+  }
+
+  const left = Math.min(...selections.map((selection) => selection.rect.left));
+  const top = Math.min(...selections.map((selection) => selection.rect.top));
+  const right = Math.max(...selections.map((selection) => selection.rect.left + selection.rect.width));
+  const bottom = Math.max(...selections.map((selection) => selection.rect.top + selection.rect.height));
+
+  return {
+    height: bottom - top,
+    left,
+    top,
+    width: right - left
+  };
+}
+
+export function alignCanvasSelections(
+  selections: CanvasSelectionRect[],
+  action: CanvasAlignmentAction
+): CanvasSelectionRect[] {
+  const bounds = resolveSelectionBounds(selections);
+  if (!bounds || selections.length < 2) {
+    return selections;
+  }
+
+  return selections.map((selection) => {
+    switch (action) {
+      case "left":
+        return { ...selection, rect: { ...selection.rect, left: bounds.left } };
+      case "right":
+        return {
+          ...selection,
+          rect: { ...selection.rect, left: bounds.left + bounds.width - selection.rect.width }
+        };
+      case "top":
+        return { ...selection, rect: { ...selection.rect, top: bounds.top } };
+      case "bottom":
+        return {
+          ...selection,
+          rect: { ...selection.rect, top: bounds.top + bounds.height - selection.rect.height }
+        };
+      case "h-center":
+        return {
+          ...selection,
+          rect: {
+            ...selection.rect,
+            left: Math.round(bounds.left + bounds.width / 2 - selection.rect.width / 2)
+          }
+        };
+      case "v-center":
+        return {
+          ...selection,
+          rect: {
+            ...selection.rect,
+            top: Math.round(bounds.top + bounds.height / 2 - selection.rect.height / 2)
+          }
+        };
+    }
+  });
+}
+
+export function distributeCanvasSelections(
+  selections: CanvasSelectionRect[],
+  action: CanvasDistributionAction
+): CanvasSelectionRect[] {
+  const bounds = resolveSelectionBounds(selections);
+  if (!bounds || selections.length < 3) {
+    return selections;
+  }
+
+  const axis = action === "h-distribute" ? "x" : "y";
+  const sorted = [...selections].sort((left, right) =>
+    axis === "x" ? left.rect.left - right.rect.left : left.rect.top - right.rect.top
+  );
+  const totalSize = sorted.reduce(
+    (sum, selection) => sum + (axis === "x" ? selection.rect.width : selection.rect.height),
+    0
+  );
+  const gap = ((axis === "x" ? bounds.width : bounds.height) - totalSize) / (selections.length - 1);
+  let cursor = axis === "x" ? bounds.left : bounds.top;
+  const nextById = new Map<string, CanvasRect>();
+
+  for (const selection of sorted) {
+    nextById.set(
+      selection.id,
+      axis === "x"
+        ? { ...selection.rect, left: Math.round(cursor) }
+        : { ...selection.rect, top: Math.round(cursor) }
+    );
+    cursor += (axis === "x" ? selection.rect.width : selection.rect.height) + gap;
+  }
+
+  return selections.map((selection) => ({
+    ...selection,
+    rect: nextById.get(selection.id) ?? selection.rect
+  }));
+}
+
 function resolveBoundaryGuides(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasGuide[] {
   const guides: CanvasGuide[] = [];
   const originLeft = constraint.originLeft ?? 0;
@@ -322,4 +502,216 @@ function resolveBoundaryGuides(rect: CanvasRect, constraint: CanvasRectConstrain
     });
   }
   return guides;
+}
+
+function resolveSnapRect(
+  rect: CanvasRect,
+  snap: CanvasSnapOptions | undefined,
+  mode: {
+    x: "move" | "none" | "resize-end" | "resize-start";
+    y: "move" | "none" | "resize-end" | "resize-start";
+  }
+) {
+  if (!snap?.enabled || snap.targets.length === 0 || snap.threshold <= 0) {
+    return { guides: [] as CanvasGuide[], rect };
+  }
+
+  let nextRect = { ...rect };
+  const guides: CanvasGuide[] = [];
+
+  const xGuide = resolveSnapGuide(nextRect, snap, "x", mode.x);
+  if (xGuide) {
+    nextRect = xGuide.rect;
+    guides.push(xGuide.guide);
+  }
+
+  const yGuide = resolveSnapGuide(nextRect, snap, "y", mode.y);
+  if (yGuide) {
+    nextRect = yGuide.rect;
+    guides.push(yGuide.guide);
+  }
+
+  return { guides, rect: nextRect };
+}
+
+function resolveSnapGuide(
+  rect: CanvasRect,
+  snap: CanvasSnapOptions,
+  axis: "x" | "y",
+  mode: "move" | "none" | "resize-end" | "resize-start"
+) {
+  if (mode === "none") {
+    return null;
+  }
+
+  const axisTargets = snap.targets.filter((target) => target.axis === axis);
+  const start = axis === "x" ? rect.left : rect.top;
+  const size = axis === "x" ? rect.width : rect.height;
+  const anchors =
+    mode === "move"
+      ? [0, size / 2, size]
+      : mode === "resize-start"
+        ? [0]
+        : [size];
+  let winner:
+    | {
+        delta: number;
+        rect: CanvasRect;
+        target: CanvasSnapTarget;
+      }
+    | null = null;
+
+  for (const target of axisTargets) {
+    for (const anchor of anchors) {
+      const delta = target.position - (start + anchor);
+      if (Math.abs(delta) > snap.threshold) {
+        continue;
+      }
+
+      const candidate = applyAxisDelta(rect, axis, mode, delta);
+      if (!winner || Math.abs(delta) < Math.abs(winner.delta)) {
+        winner = {
+          delta,
+          rect: candidate,
+          target
+        };
+      }
+    }
+  }
+
+  if (!winner) {
+    return null;
+  }
+
+  return {
+    guide: {
+      axis,
+      label: resolveSnapTargetLabel(winner.target.type),
+      position: winner.target.position,
+      targetType: winner.target.type
+    },
+    rect: winner.rect
+  };
+}
+
+function applyAxisDelta(
+  rect: CanvasRect,
+  axis: "x" | "y",
+  mode: "move" | "resize-end" | "resize-start",
+  delta: number
+) {
+  if (axis === "x") {
+    if (mode === "move") {
+      return { ...rect, left: rect.left + delta };
+    }
+    if (mode === "resize-end") {
+      return { ...rect, width: rect.width + delta };
+    }
+    return { ...rect, left: rect.left + delta, width: rect.width - delta };
+  }
+
+  if (mode === "move") {
+    return { ...rect, top: rect.top + delta };
+  }
+  if (mode === "resize-end") {
+    return { ...rect, height: rect.height + delta };
+  }
+  return { ...rect, height: rect.height - delta, top: rect.top + delta };
+}
+
+function resolveSnapTargetLabel(type: CanvasSnapTarget["type"]) {
+  switch (type) {
+    case "guide":
+      return "Guide";
+    case "region-edge":
+      return "Region Edge";
+    case "region-center":
+      return "Region Center";
+    case "center-line":
+      return "Center Line";
+  }
+}
+
+function resolveDirectionalGap(
+  sourceStart: number,
+  sourceEnd: number,
+  targetStart: number,
+  targetEnd: number
+) {
+  if (sourceEnd <= targetStart) {
+    return {
+      distance: targetStart - sourceEnd,
+      relation: "before" as const
+    };
+  }
+
+  return {
+    distance: Math.max(0, sourceStart - targetEnd),
+    relation: "after" as const
+  };
+}
+
+function applyDistanceLockToDrag(
+  rect: CanvasRect,
+  session: CanvasDistanceLockSession
+) {
+  if (session.axis === "x") {
+    return {
+      ...rect,
+      left:
+        session.relation === "before"
+          ? session.targetRect.left - rect.width - session.distance
+          : session.targetRect.left + session.targetRect.width + session.distance
+    };
+  }
+
+  return {
+    ...rect,
+    top:
+      session.relation === "before"
+        ? session.targetRect.top - rect.height - session.distance
+        : session.targetRect.top + session.targetRect.height + session.distance
+  };
+}
+
+function applyDistanceLockToResize(
+  rect: CanvasRect,
+  handle: CanvasResizeHandle,
+  session: CanvasDistanceLockSession
+) {
+  if (session.axis === "x" && handle.includes("e") && session.relation === "before") {
+    return {
+      ...rect,
+      width: session.targetRect.left - rect.left - session.distance
+    };
+  }
+
+  if (session.axis === "x" && handle.includes("w") && session.relation === "after") {
+    const nextLeft = session.targetRect.left + session.targetRect.width + session.distance;
+    const right = rect.left + rect.width;
+    return {
+      ...rect,
+      left: nextLeft,
+      width: right - nextLeft
+    };
+  }
+
+  if (session.axis === "y" && handle.includes("s") && session.relation === "before") {
+    return {
+      ...rect,
+      height: session.targetRect.top - rect.top - session.distance
+    };
+  }
+
+  if (session.axis === "y" && handle.includes("n") && session.relation === "after") {
+    const nextTop = session.targetRect.top + session.targetRect.height + session.distance;
+    const bottom = rect.top + rect.height;
+    return {
+      ...rect,
+      height: bottom - nextTop,
+      top: nextTop
+    };
+  }
+
+  return rect;
 }

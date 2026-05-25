@@ -18,9 +18,14 @@ import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard } from "./canvasCard";
+import {
+  alignCanvasSelections,
+  distributeCanvasSelections
+} from "./canvasInteractions";
 import { defaultDisplayEditorOverlayPreset } from "./canvasOverlayState";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
 import { DisplayEditorCanvasOverlay } from "./inspectorFields";
+import { applyRegionRect } from "./displayEditorGeometry";
 import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
@@ -81,6 +86,7 @@ export function DisplayPagesEditor({
     editMode?: boolean;
     lockedRegionIds?: string[];
     selectedRegionId?: string | null;
+    selectedRegionIds?: string[];
   };
   initialPublishingStateByPage?: DisplayPagePublishingStateMap;
   onEditModeChange?: (nextEditMode: boolean) => void;
@@ -105,6 +111,15 @@ export function DisplayPagesEditor({
   const [internalEditMode, setInternalEditMode] = useState(initialEditorState?.editMode ?? false);
   const [canvasContainerScale, setCanvasContainerScale] = useState(1);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
+  const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>(
+    () =>
+      initialEditorState?.selectedRegionIds?.length
+        ? [...new Set(initialEditorState.selectedRegionIds)]
+        : initialEditorState?.selectedRegionId
+          ? [initialEditorState.selectedRegionId]
+          : []
+  );
+  const [selectionFeedbackLabel, setSelectionFeedbackLabel] = useState<string | null>(null);
   const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Record<string, string[]>>(
     () =>
       initialEditorState?.lockedRegionIds?.length
@@ -145,9 +160,32 @@ export function DisplayPagesEditor({
     () => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.templateKey), seedConfig),
     [config, seedConfig, selectedPage.templateKey]
   );
+  const editableRegionIds = useMemo(
+    () => new Set(editableRegions.map((region) => region.id)),
+    [editableRegions]
+  );
+  const resolvedSelectedRegionIds = useMemo(
+    () => selectedRegionIds.filter((regionId) => editableRegionIds.has(regionId)),
+    [editableRegionIds, selectedRegionIds]
+  );
   const selectedRegion = useMemo(
-    () => editableRegions.find((region) => region.id === selectedRegionId) ?? editableRegions[0] ?? null,
-    [editableRegions, selectedRegionId]
+    () =>
+      editableRegions.find((region) => region.id === selectedRegionId) ??
+      editableRegions.find((region) => region.id === resolvedSelectedRegionIds[resolvedSelectedRegionIds.length - 1]) ??
+      editableRegions[0] ??
+      null,
+    [editableRegions, resolvedSelectedRegionIds, selectedRegionId]
+  );
+  const selectedRegions = useMemo(
+    () => editableRegions.filter((region) => resolvedSelectedRegionIds.includes(region.id) && region.geometry),
+    [editableRegions, resolvedSelectedRegionIds]
+  );
+  const distanceLockTargetRegion = useMemo(
+    () =>
+      selectedRegions.length === 2
+        ? selectedRegions.find((region) => region.id !== selectedRegion?.id) ?? null
+        : null,
+    [selectedRegion, selectedRegions]
   );
   const selectedCardRegion = selectedRegion?.nodeType === "card-rail-card" ? selectedRegion : null;
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
@@ -173,18 +211,61 @@ export function DisplayPagesEditor({
     report: assetHealthReport
   } = useDisplayPageAssetHealth();
 
-  useEffect(() => { setSelectedRegionId(null); }, [selectedPage.id]);
+  useEffect(() => {
+    setSelectedRegionId(null);
+    setSelectedRegionIds([]);
+    setSelectionFeedbackLabel(null);
+  }, [selectedPage.id]);
 
   useEffect(() => {
     if (!editMode) {
       setSelectedRegionId(null);
+      setSelectedRegionIds([]);
+      setSelectionFeedbackLabel(null);
       return;
     }
 
     if (!selectedRegionId && editableRegions[0]) {
       setSelectedRegionId(editableRegions[0].id);
+      setSelectedRegionIds([editableRegions[0].id]);
     }
   }, [editMode, editableRegions, selectedRegionId]);
+
+  useEffect(() => {
+    if (selectedRegionId && !editableRegionIds.has(selectedRegionId)) {
+      setSelectedRegionId(editableRegions[0]?.id ?? null);
+    }
+  }, [editableRegionIds, editableRegions, selectedRegionId]);
+
+  useEffect(() => {
+    if (resolvedSelectedRegionIds.length !== selectedRegionIds.length) {
+      setSelectedRegionIds(resolvedSelectedRegionIds);
+    }
+  }, [resolvedSelectedRegionIds, selectedRegionIds.length]);
+
+  const handleSelectRegion = useCallback(
+    (regionId: string, options?: { additive?: boolean }) => {
+      setSelectionFeedbackLabel(null);
+      if (!options?.additive) {
+        setSelectedRegionId(regionId);
+        setSelectedRegionIds([regionId]);
+        return;
+      }
+
+      setSelectedRegionIds((current) => {
+        const exists = current.includes(regionId);
+        if (exists) {
+          const next = current.filter((id) => id !== regionId);
+          setSelectedRegionId(next[next.length - 1] ?? null);
+          return next;
+        }
+
+        setSelectedRegionId(regionId);
+        return [...current, regionId];
+      });
+    },
+    []
+  );
 
   const setEditMode = useCallback(
     (nextEditMode: boolean | ((current: boolean) => boolean)) => {
@@ -233,13 +314,43 @@ export function DisplayPagesEditor({
     setSearchParams(nextParams, { replace: true });
   };
 
+  const applySelectionRects = useCallback(
+    (
+      actionLabel: string,
+      nextSelections: Array<{ id: string; rect: { height: number; left: number; top: number; width: number } }>
+    ) => {
+      if (nextSelections.length === 0) {
+        return;
+      }
+
+      const nextById = new Map(nextSelections.map((selection) => [selection.id, selection.rect]));
+      applyConfigUpdate((current) => {
+        let nextConfig = current;
+
+        for (const region of editableRegions) {
+          const nextRect = nextById.get(region.id);
+          if (!nextRect) {
+            continue;
+          }
+          nextConfig = applyRegionRect(nextConfig, region, nextRect);
+        }
+
+        return nextConfig;
+      });
+      setSelectionFeedbackLabel(actionLabel);
+    },
+    [applyConfigUpdate, editableRegions]
+  );
+
   const {
+    distanceLockArmed,
     onSelectTemporaryMeasureTarget,
     onStartInteraction,
     onStartMeasurementHandleDrag,
     onZoomDelta,
     overlayPreset,
     overlayState,
+    setDistanceLockArmed,
     setOverlayPreset,
     setTemporaryMeasureMode,
     temporaryMeasureMode,
@@ -252,11 +363,14 @@ export function DisplayPagesEditor({
     canUndo,
     canvasContainerScale,
     config,
+    distanceLockTargetRegion,
     editMode,
     lockedRegionIds,
     redo,
     regions: editableRegions,
     selectedRegion,
+    selectedRegionIds: resolvedSelectedRegionIds,
+    selectionFeedbackLabel,
     undo
   });
   const previewContent = useMemo(() => {
@@ -275,6 +389,9 @@ export function DisplayPagesEditor({
     () => editableRegions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
     [editableRegions, temporaryMeasureTargetRegionId]
   );
+  const multiSelectCount = selectedRegions.length;
+  const alignDisabled = multiSelectCount < 2 || selectedRegions.some((region) => isRegionLocked(lockedRegionIds, region.id));
+  const distributeDisabled = multiSelectCount < 3 || selectedRegions.some((region) => isRegionLocked(lockedRegionIds, region.id));
 
   const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
@@ -380,7 +497,7 @@ export function DisplayPagesEditor({
           onPublish={() => void publish()}
           onReload={() => void handleReload()}
           onSave={() => void handleSave()}
-          onSelectRegion={setSelectedRegionId}
+          onSelectRegion={handleSelectRegion}
           onToggleRegionLock={(regionId) => {
             setLockedRegionIdsByPage((current) => ({
               ...current,
@@ -491,6 +608,72 @@ export function DisplayPagesEditor({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      aria-pressed={overlayPreset.snapEnabled}
+                      className={[
+                        "rounded-full border px-3 py-1.5",
+                        overlayPreset.snapEnabled
+                          ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                          : "border-[var(--shell-divider)]"
+                      ].join(" ")}
+                      onClick={() =>
+                        setOverlayPreset((current) => ({
+                          ...current,
+                          snapEnabled: !current.snapEnabled
+                        }))
+                      }
+                    >
+                      吸附
+                    </button>
+                    {[
+                      { key: "snapGuides", label: "Guide" },
+                      { key: "snapRegionEdges", label: "邊界" },
+                      { key: "snapRegionCenters", label: "中心" },
+                      { key: "snapCenterLines", label: "頁心線" }
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        aria-pressed={overlayPreset[option.key as keyof typeof overlayPreset] === true}
+                        className={[
+                          "rounded-full border px-3 py-1.5",
+                          overlayPreset.snapEnabled && overlayPreset[option.key as keyof typeof overlayPreset] === true
+                            ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                            : "border-[var(--shell-divider)] text-[var(--shell-subtitle-ink)]"
+                        ].join(" ")}
+                        onClick={() =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            [option.key]:
+                              !current[option.key as "snapCenterLines" | "snapGuides" | "snapRegionCenters" | "snapRegionEdges"]
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={distanceLockArmed}
+                      disabled={!distanceLockTargetRegion}
+                      className={[
+                        "rounded-full border px-3 py-1.5 disabled:opacity-45",
+                        distanceLockArmed
+                          ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                          : "border-[var(--shell-divider)]"
+                      ].join(" ")}
+                      onClick={() => setDistanceLockArmed((current: boolean) => !current)}
+                    >
+                      鎖定間距
+                    </button>
+                    {distanceLockTargetRegion ? (
+                      <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1.5 text-[12px] text-[var(--shell-subtitle-ink)]">
+                        對象：{distanceLockTargetRegion.label}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
                       aria-pressed={temporaryMeasureMode}
                       className={[
                         "rounded-full border px-3 py-1.5",
@@ -507,6 +690,44 @@ export function DisplayPagesEditor({
                         目標：{temporaryMeasureTargetRegion.label}
                       </span>
                     ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { action: "left", disabled: alignDisabled, label: "左對齊" },
+                      { action: "right", disabled: alignDisabled, label: "右對齊" },
+                      { action: "top", disabled: alignDisabled, label: "上對齊" },
+                      { action: "bottom", disabled: alignDisabled, label: "下對齊" },
+                      { action: "h-center", disabled: alignDisabled, label: "水平置中" },
+                      { action: "v-center", disabled: alignDisabled, label: "垂直置中" },
+                      { action: "h-distribute", disabled: distributeDisabled, label: "水平分布" },
+                      { action: "v-distribute", disabled: distributeDisabled, label: "垂直分布" }
+                    ].map((option) => (
+                      <button
+                        key={option.action}
+                        type="button"
+                        disabled={option.disabled}
+                        className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 disabled:opacity-45"
+                        onClick={() => {
+                          const selections = selectedRegions.map((region) => ({
+                            id: region.id,
+                            rect: region.geometry!
+                          }));
+                          const nextSelections =
+                            option.action === "h-distribute" || option.action === "v-distribute"
+                              ? distributeCanvasSelections(selections, option.action)
+                              : alignCanvasSelections(
+                                  selections,
+                                  option.action as "bottom" | "h-center" | "left" | "right" | "top" | "v-center"
+                                );
+                          applySelectionRects(option.label, nextSelections);
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                    <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1.5 text-[12px] text-[var(--shell-subtitle-ink)]">
+                      {multiSelectCount > 1 ? `多選 ${multiSelectCount} 區` : "多選需按 Shift 或 Cmd/Ctrl"}
+                    </span>
                     {[
                       { key: "showAxes", label: "座標刻度" },
                       { key: "showCenterLines", label: "中心線" },
@@ -601,8 +822,9 @@ export function DisplayPagesEditor({
                       overlayState={overlayState}
                       regions={editableRegions}
                       selectedRegionId={selectedRegion?.id ?? null}
+                      selectedRegionIds={resolvedSelectedRegionIds}
                       temporaryMeasureMode={temporaryMeasureMode}
-                      onSelect={setSelectedRegionId}
+                      onSelect={handleSelectRegion}
                       onStartInteraction={onStartInteraction}
                     />
                   </div>
