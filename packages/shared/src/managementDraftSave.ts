@@ -1,6 +1,6 @@
 import type { DisplayPageConfigEnvelope } from "./displayPageConfig.js";
 
-export type ManagementDraftResourceType = "display-page-draft";
+export type ManagementDraftResourceType = "display-page-draft" | "shell-decoration-draft";
 
 export type ManagementDraftSaveConflictCode = "management_draft_conflict";
 
