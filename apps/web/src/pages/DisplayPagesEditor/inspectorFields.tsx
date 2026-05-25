@@ -76,23 +76,32 @@ function localizeRegionAccessibilityLabel(label: string) {
 export function DisplayEditorCanvasOverlay({
   isInteractive,
   lockedRegionIds,
+  onSelectTemporaryMeasureTarget,
   onStartInteraction,
+  onStartMeasurementHandleDrag,
   overlayState,
   regions,
   selectedRegionId,
+  temporaryMeasureMode,
   onSelect
 }: {
   isInteractive: boolean;
   lockedRegionIds: string[];
   onSelect: (regionId: string) => void;
+  onSelectTemporaryMeasureTarget: (regionId: string) => void;
   onStartInteraction: (
     event: React.PointerEvent<HTMLButtonElement>,
     region: ResolvedDisplayEditorRegion,
     type: "drag" | "resize"
   ) => void;
+  onStartMeasurementHandleDrag: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    axis: "x" | "y"
+  ) => void;
   overlayState: DisplayEditorOverlayState;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegionId: string | null;
+  temporaryMeasureMode: boolean;
 }) {
   if (!isInteractive) {
     return null;
@@ -233,7 +242,66 @@ export function DisplayEditorCanvasOverlay({
             </span>
           </>
         ) : null}
+        {overlayState.relationalRulers.map((ruler) => (
+          <React.Fragment key={`${ruler.axis}-${ruler.targetRegionId}`}>
+            <div
+              className="absolute border-[rgba(201,136,26,0.9)]"
+              data-ruler-axis={ruler.axis}
+              style={
+                ruler.axis === "x"
+                  ? {
+                      borderTopStyle: "solid",
+                      borderTopWidth: "2px",
+                      left: `${Math.min(ruler.start.x, ruler.end.x)}px`,
+                      top: `${ruler.start.y}px`,
+                      width: `${Math.abs(ruler.end.x - ruler.start.x)}px`
+                    }
+                  : {
+                      borderLeftStyle: "solid",
+                      borderLeftWidth: "2px",
+                      height: `${Math.abs(ruler.end.y - ruler.start.y)}px`,
+                      left: `${ruler.start.x}px`,
+                      top: `${Math.min(ruler.start.y, ruler.end.y)}px`
+                    }
+              }
+            />
+            <span
+              className={[
+                "absolute rounded-full bg-[rgba(255,247,230,0.94)] px-2 py-1 text-[11px] font-semibold text-[#8e6410]",
+                ruler.compact ? "text-[10px]" : ""
+              ].join(" ")}
+              data-ruler-label-placement={ruler.labelPlacement}
+              style={{
+                left: `${ruler.labelPosition.x}px`,
+                top: `${ruler.labelPosition.y}px`,
+                transform: ruler.axis === "x" ? "translate(-50%, -50%)" : "translate(-50%, -50%)"
+              }}
+            >
+              {ruler.distance}
+            </span>
+          </React.Fragment>
+        ))}
       </div>
+      {overlayState.relationalRulers.map((ruler) =>
+        ruler.canDrag ? (
+          <button
+            key={`handle-${ruler.axis}-${ruler.targetRegionId}`}
+            type="button"
+            aria-label={`調整 ${ruler.axis === "x" ? "水平" : "垂直"} 量測`}
+            className="absolute h-4 w-4 rounded-full border-2 border-white bg-[#c9881a]"
+            style={{
+              left: `${ruler.handlePosition.x}px`,
+              top: `${ruler.handlePosition.y}px`,
+              transform: "translate(-50%, -50%)"
+            }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onStartMeasurementHandleDrag(event, ruler.axis);
+            }}
+          />
+        ) : null
+      )}
       {regions.map((region) => {
         if (!region.geometry) {
           return null;
@@ -271,6 +339,10 @@ export function DisplayEditorCanvasOverlay({
               data-region-locked={isLocked ? "true" : "false"}
               onPointerDown={(event) => {
                 event.preventDefault();
+                if (temporaryMeasureMode && selectedRegionId && selectedRegionId !== region.id) {
+                  onSelectTemporaryMeasureTarget(region.id);
+                  return;
+                }
                 onSelect(region.id);
                 if (!isLocked) {
                   onStartInteraction(event, region, "drag");

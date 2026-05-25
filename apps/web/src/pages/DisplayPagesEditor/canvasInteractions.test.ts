@@ -8,7 +8,9 @@ import {
   mapCanvasPointToDesignPoint,
   mapDesignPointToCanvasPoint,
   panCanvasViewport,
+  resolveRelationalMeasurements,
   resolveCanvasDesignMapping,
+  applyMeasurementHandleDrag,
   resolveViewportAfterZoom
 } from "./canvasInteractions";
 
@@ -220,4 +222,40 @@ test("applyCanvasDrag clamps a rail card inside its parent rail bounds", () => {
     { axis: "x", position: 538 },
     { axis: "y", position: 432 }
   ]);
+});
+
+test("resolveRelationalMeasurements reports design-space gaps between two editable regions", () => {
+  const mapping = resolveCanvasDesignMapping(
+    { height: 934, width: 1920 },
+    { height: 1080, width: 1920 }
+  );
+  const measurements = resolveRelationalMeasurements(
+    { height: 280, left: 920, top: 120, width: 320 },
+    { height: 360, left: 160, top: 96, width: 620 },
+    mapping
+  );
+
+  assert.deepEqual(measurements.map((measurement) => ({ axis: measurement.axis, distance: measurement.distance })), [
+    { axis: "x", distance: 140 },
+    { axis: "y", distance: 0 }
+  ]);
+});
+
+test("applyMeasurementHandleDrag mutates only the selected region geometry", () => {
+  const moved = applyMeasurementHandleDrag(
+    { height: 180, left: 920, top: 132, width: 320 },
+    "x",
+    -12,
+    {
+      canvasHeight: 934,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 120
+    }
+  );
+
+  assert.equal(moved.rect.left, 908);
+  assert.equal(moved.rect.top, 132);
+  assert.equal(moved.rect.width, 320);
+  assert.equal(moved.rect.height, 180);
 });

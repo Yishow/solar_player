@@ -222,7 +222,9 @@ test("display editor canvas overlay exposes localized accessibility labels for s
       isInteractive: true,
       lockedRegionIds: [],
       onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
       onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -232,7 +234,8 @@ test("display editor canvas overlay exposes localized accessibility labels for s
         selectedRegion
       }),
       regions,
-      selectedRegionId: "overview-hero-media"
+      selectedRegionId: "overview-hero-media",
+      temporaryMeasureMode: false
     })
   );
 
@@ -267,7 +270,9 @@ test("display editor canvas overlay renders full-canvas guides and region labels
       isInteractive: true,
       lockedRegionIds: [],
       onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
       onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -282,7 +287,8 @@ test("display editor canvas overlay renders full-canvas guides and region labels
         selectedRegion
       }),
       regions,
-      selectedRegionId: "overview-hero-media"
+      selectedRegionId: "overview-hero-media",
+      temporaryMeasureMode: false
     })
   );
 
@@ -290,6 +296,150 @@ test("display editor canvas overlay renders full-canvas guides and region labels
   assert.match(html, /data-guide-kind="center"/);
   assert.match(html, /主視覺圖片/);
   assert.match(html, /主視覺文案/);
+});
+
+test("display editor canvas overlay renders relational rulers without replacing the current selection", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 280, left: 920, top: 120, width: 320 },
+      id: "overview-hero-copy",
+      label: "Overview Hero Copy",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-hero-copy", "Overview Hero Copy")
+    },
+    {
+      fields: [],
+      geometry: { height: 360, left: 160, top: 96, width: 620 },
+      id: "overview-hero-media",
+      label: "Overview Hero Media",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-hero-media", "Overview Hero Media")
+    }
+  ];
+  const selectedRegion = regions[0]!;
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
+      onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
+      overlayState: resolveDisplayEditorOverlayState({
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        measurementTargetRegion: regions[1],
+        overlayPreset: defaultDisplayEditorOverlayPreset,
+        regions,
+        selectedRegion,
+        temporaryMeasureMode: true
+      }),
+      regions,
+      selectedRegionId: "overview-hero-copy",
+      temporaryMeasureMode: true
+    })
+  );
+
+  assert.match(html, /data-ruler-axis="x"/);
+  assert.match(html, /調整 水平 量測/);
+  assert.match(html, /140/);
+  assert.match(html, /aria-pressed="true"/);
+});
+
+test("display editor canvas overlay falls back to alternate ruler label placement when the canvas is crowded", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 180, left: 240, top: 240, width: 280 },
+      id: "overview-kpi-a",
+      label: "Overview KPI A",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-kpi-a", "Overview KPI A")
+    },
+    {
+      fields: [],
+      geometry: { height: 180, left: 240, top: 450, width: 280 },
+      id: "overview-kpi-b",
+      label: "Overview KPI B",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-kpi-b", "Overview KPI B")
+    }
+  ];
+  const selectedRegion = regions[0]!;
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
+      onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
+      overlayState: resolveDisplayEditorOverlayState({
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        measurementTargetRegion: regions[1],
+        overlayPreset: defaultDisplayEditorOverlayPreset,
+        regions,
+        selectedRegion,
+        temporaryMeasureMode: true
+      }),
+      regions,
+      selectedRegionId: "overview-kpi-a",
+      temporaryMeasureMode: true
+    })
+  );
+
+  assert.match(html, /data-ruler-axis="y"/);
+  assert.match(html, /data-ruler-label-placement="after"|data-ruler-label-placement="before"/);
+});
+
+test("display editor canvas overlay keeps relational handles disabled when selection or geometry is missing", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 180, left: 240, top: 240, width: 280 },
+      id: "overview-kpi-a",
+      label: "Overview KPI A",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-kpi-a", "Overview KPI A")
+    },
+    {
+      fields: [],
+      id: "overview-kpi-b",
+      label: "Overview KPI B",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-kpi-b", "Overview KPI B")
+    }
+  ];
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onSelectTemporaryMeasureTarget: () => {},
+      onStartInteraction: () => {},
+      onStartMeasurementHandleDrag: () => {},
+      overlayState: resolveDisplayEditorOverlayState({
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        measurementTargetRegion: regions[1],
+        overlayPreset: defaultDisplayEditorOverlayPreset,
+        regions,
+        selectedRegion: null,
+        temporaryMeasureMode: true
+      }),
+      regions,
+      selectedRegionId: null,
+      temporaryMeasureMode: true
+    })
+  );
+
+  assert.doesNotMatch(html, /調整 水平 量測/);
+  assert.doesNotMatch(html, /調整 垂直 量測/);
 });
 
 test("display editor inspector resolves only the payload fields owned by the selected media source mode", () => {

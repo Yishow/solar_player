@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isDisplayEditorHistoryKey } from "../../hooks/useDisplayEditor";
 import {
   applyCanvasDrag,
+  applyMeasurementHandleDrag,
   applyCanvasNudge,
   applyCanvasResize,
   panCanvasViewport,
@@ -68,14 +69,14 @@ type CanvasInteractionState = {
   regionId: string;
   startConfig: Record<string, unknown>;
   startRect: CanvasRect;
-  type: "drag" | "resize";
+  type: "drag" | "measure-x" | "measure-y" | "resize";
 };
 
 type CanvasInteractionFeedback = {
   constraintRect: CanvasRect;
   guides: CanvasGuide[];
   rect: CanvasRect;
-  type: "drag" | "resize";
+  type: "drag" | "measure-x" | "measure-y" | "resize";
 };
 
 export function useDisplayEditorCanvasWorkflow({
@@ -112,11 +113,17 @@ export function useDisplayEditorCanvasWorkflow({
   const [overlayPreset, setOverlayPreset] = useState<DisplayEditorOverlayPreset>(() =>
     resolveInitialDisplayEditorOverlayPreset()
   );
+  const [temporaryMeasureMode, setTemporaryMeasureMode] = useState(false);
+  const [temporaryMeasureTargetRegionId, setTemporaryMeasureTargetRegionId] = useState<string | null>(null);
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   const containerScaleRef = useRef(canvasContainerScale);
   containerScaleRef.current = canvasContainerScale;
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
+  const temporaryMeasureTargetRegion = useMemo(
+    () => regions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
+    [regions, temporaryMeasureTargetRegionId]
+  );
 
   useEffect(() => {
     writeStoredDisplayEditorOverlayPreset(overlayPreset);
@@ -126,8 +133,20 @@ export function useDisplayEditorCanvasWorkflow({
     if (!editMode) {
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
+      setTemporaryMeasureMode(false);
+      setTemporaryMeasureTargetRegionId(null);
     }
   }, [editMode]);
+
+  useEffect(() => {
+    if (
+      !selectedRegion?.geometry ||
+      !temporaryMeasureTargetRegion?.geometry ||
+      temporaryMeasureTargetRegion.id === selectedRegion.id
+    ) {
+      setTemporaryMeasureTargetRegionId(null);
+    }
+  }, [selectedRegion, temporaryMeasureTargetRegion]);
 
   useEffect(() => {
     if (!editMode || !selectedRegion?.geometry || selectedRegionLocked) {
@@ -226,6 +245,13 @@ export function useDisplayEditorCanvasWorkflow({
       const interactionResult =
         activeInteraction.type === "resize" && activeInteraction.handle
           ? applyCanvasResize(activeInteraction.startRect, activeInteraction.handle, delta, constraint)
+          : activeInteraction.type === "measure-x" || activeInteraction.type === "measure-y"
+            ? applyMeasurementHandleDrag(
+                activeInteraction.startRect,
+                activeInteraction.type === "measure-x" ? "x" : "y",
+                activeInteraction.type === "measure-x" ? delta.x : delta.y,
+                constraint
+              )
           : applyCanvasDrag(activeInteraction.startRect, delta, constraint);
 
       setCanvasInteractionFeedback({
@@ -317,16 +343,34 @@ export function useDisplayEditorCanvasWorkflow({
         canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
         canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
         lockedRegionIds,
+        measurementTargetRegion: temporaryMeasureTargetRegion,
         overlayPreset,
         regions,
-        selectedRegion
+        selectedRegion,
+        temporaryMeasureMode
       }),
-    [canvasInteractionFeedback, lockedRegionIds, overlayPreset, regions, selectedRegion]
+    [
+      canvasInteractionFeedback,
+      lockedRegionIds,
+      overlayPreset,
+      regions,
+      selectedRegion,
+      temporaryMeasureMode,
+      temporaryMeasureTargetRegion
+    ]
   );
 
   return {
     overlayPreset,
     overlayState,
+    onSelectTemporaryMeasureTarget: (regionId: string) => {
+      if (!selectedRegion || regionId === selectedRegion.id) {
+        return;
+      }
+
+      setTemporaryMeasureTargetRegionId(regionId);
+      setTemporaryMeasureMode(false);
+    },
     onStartInteraction: (
       event: ReactPointerEvent<HTMLButtonElement>,
       region: ResolvedDisplayEditorRegion,
@@ -352,8 +396,34 @@ export function useDisplayEditorCanvasWorkflow({
         type
       });
     },
+    onStartMeasurementHandleDrag: (
+      event: ReactPointerEvent<HTMLButtonElement>,
+      axis: "x" | "y"
+    ) => {
+      if (!selectedRegion?.geometry || !temporaryMeasureTargetRegion?.geometry || selectedRegionLocked) {
+        return;
+      }
+
+      const constraint = resolveRegionConstraint(selectedRegion);
+      setCanvasInteraction({
+        origin: { x: event.clientX, y: event.clientY },
+        regionId: selectedRegion.id,
+        startConfig: config,
+        startRect: selectedRegion.geometry,
+        type: axis === "x" ? "measure-x" : "measure-y"
+      });
+      setCanvasInteractionFeedback({
+        constraintRect: constraintToRect(constraint),
+        guides: [],
+        rect: selectedRegion.geometry,
+        type: axis === "x" ? "measure-x" : "measure-y"
+      });
+    },
     onZoomDelta,
     setOverlayPreset,
+    setTemporaryMeasureMode,
+    temporaryMeasureMode,
+    temporaryMeasureTargetRegionId,
     viewport,
     viewportControls
   };

@@ -1,5 +1,6 @@
 import {
   type CanvasGuide,
+  resolveRelationalMeasurements,
   mapCanvasPointToDesignPoint,
   resolveCanvasDesignMapping,
   type CanvasDesignMapping,
@@ -59,12 +60,25 @@ export type DisplayEditorOverlayMeasurement = {
   };
 };
 
+export type DisplayEditorOverlayRuler = {
+  axis: "x" | "y";
+  canDrag: boolean;
+  compact: boolean;
+  distance: number;
+  handlePosition: { x: number; y: number };
+  labelPlacement: "after" | "before";
+  labelPosition: { x: number; y: number };
+  targetRegionId: string;
+  end: { x: number; y: number };
+  start: { x: number; y: number };
+};
+
 export type DisplayEditorOverlayState = {
   activeInteraction: {
     constraintRect: CanvasRect | null;
     guides: CanvasGuide[];
     rect: CanvasRect | null;
-    type: "drag" | "idle" | "resize";
+    type: "drag" | "idle" | "measure-x" | "measure-y" | "resize";
   };
   axisTicks: DisplayEditorOverlayTick[];
   designMapping: CanvasDesignMapping;
@@ -77,6 +91,9 @@ export type DisplayEditorOverlayState = {
   measurement: DisplayEditorOverlayMeasurement | null;
   pageGuides: DisplayEditorOverlayGuide[];
   preset: DisplayEditorOverlayPreset;
+  relationalRulers: DisplayEditorOverlayRuler[];
+  temporaryMeasureMode: boolean;
+  temporaryMeasureTargetRegionId: string | null;
 };
 
 export const DISPLAY_EDITOR_OVERLAY_STORAGE_KEY = "solar-display:display-editor-overlay";
@@ -333,27 +350,75 @@ function resolveMeasurement(
   };
 }
 
+function resolveRelationalRulers(
+  selectedRegion: ResolvedDisplayEditorRegion | null,
+  targetRegion: ResolvedDisplayEditorRegion | null,
+  mapping: CanvasDesignMapping
+): DisplayEditorOverlayRuler[] {
+  if (!selectedRegion?.geometry || !targetRegion?.geometry) {
+    return [];
+  }
+
+  return resolveRelationalMeasurements(selectedRegion.geometry, targetRegion.geometry, mapping).map((measurement) => {
+    const labelPlacement =
+      measurement.axis === "x"
+        ? measurement.midpoint.y >= targetRegion.geometry!.top
+          ? "before"
+          : "after"
+        : measurement.midpoint.x >= targetRegion.geometry!.left
+          ? "after"
+          : "before";
+    const labelPosition =
+      measurement.axis === "x"
+        ? {
+            x: measurement.midpoint.x,
+            y: labelPlacement === "before" ? measurement.midpoint.y - 14 : measurement.midpoint.y + 14
+          }
+        : {
+            x: labelPlacement === "before" ? measurement.midpoint.x - 14 : measurement.midpoint.x + 14,
+            y: measurement.midpoint.y
+          };
+
+    return {
+      axis: measurement.axis,
+      canDrag: measurement.distance > 0,
+      compact: measurement.distance < 32,
+      distance: measurement.distance,
+      end: measurement.end,
+      handlePosition: measurement.midpoint,
+      labelPlacement,
+      labelPosition,
+      start: measurement.start,
+      targetRegionId: targetRegion.id
+    };
+  });
+}
+
 export function resolveDisplayEditorOverlayState({
   activeInteraction,
   canvasHeight,
   canvasWidth,
   lockedRegionIds,
+  measurementTargetRegion,
   overlayPreset,
   regions,
-  selectedRegion
+  selectedRegion,
+  temporaryMeasureMode = false
 }: {
   activeInteraction?: {
     constraintRect: CanvasRect;
     guides: CanvasGuide[];
     rect: CanvasRect;
-    type: "drag" | "resize";
+    type: "drag" | "measure-x" | "measure-y" | "resize";
   } | null;
   canvasHeight: number;
   canvasWidth: number;
   lockedRegionIds: string[];
+  measurementTargetRegion?: ResolvedDisplayEditorRegion | null;
   overlayPreset: DisplayEditorOverlayPreset;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegion: ResolvedDisplayEditorRegion | null;
+  temporaryMeasureMode?: boolean;
 }): DisplayEditorOverlayState {
   const designSpace = resolveDisplayEditorOverlayDesignSpace(overlayPreset);
   const designMapping = resolveCanvasDesignMapping(
@@ -392,6 +457,9 @@ export function resolveDisplayEditorOverlayState({
       })),
     measurement: resolveMeasurement(selectedRegion, designMapping, activeInteraction?.rect),
     pageGuides: resolvePageGuides(regions, designMapping, overlayPreset.showCenterLines),
-    preset: overlayPreset
+    preset: overlayPreset,
+    relationalRulers: resolveRelationalRulers(selectedRegion, measurementTargetRegion ?? null, designMapping),
+    temporaryMeasureMode,
+    temporaryMeasureTargetRegionId: measurementTargetRegion?.id ?? null
   };
 }

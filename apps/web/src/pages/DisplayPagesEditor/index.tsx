@@ -233,7 +233,20 @@ export function DisplayPagesEditor({
     setSearchParams(nextParams, { replace: true });
   };
 
-  const { onStartInteraction, onZoomDelta, overlayPreset, overlayState, setOverlayPreset, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
+  const {
+    onSelectTemporaryMeasureTarget,
+    onStartInteraction,
+    onStartMeasurementHandleDrag,
+    onZoomDelta,
+    overlayPreset,
+    overlayState,
+    setOverlayPreset,
+    setTemporaryMeasureMode,
+    temporaryMeasureMode,
+    temporaryMeasureTargetRegionId,
+    viewport,
+    viewportControls
+  } = useDisplayEditorCanvasWorkflow({
     applyConfigUpdate,
     canRedo,
     canUndo,
@@ -258,6 +271,10 @@ export function DisplayPagesEditor({
   }, [config, renderPreview, selectedPage]);
 
   const overlayDesignSpace = overlayState.designSpace;
+  const temporaryMeasureTargetRegion = useMemo(
+    () => editableRegions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
+    [editableRegions, temporaryMeasureTargetRegionId]
+  );
 
   const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
@@ -472,6 +489,24 @@ export function DisplayPagesEditor({
                     </span>
                   )}
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={temporaryMeasureMode}
+                      className={[
+                        "rounded-full border px-3 py-1.5",
+                        temporaryMeasureMode
+                          ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                          : "border-[var(--shell-divider)]"
+                      ].join(" ")}
+                      onClick={() => setTemporaryMeasureMode((current: boolean) => !current)}
+                    >
+                      暫時量測
+                    </button>
+                    {temporaryMeasureTargetRegion ? (
+                      <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1.5 text-[12px] text-[var(--shell-subtitle-ink)]">
+                        目標：{temporaryMeasureTargetRegion.label}
+                      </span>
+                    ) : null}
                     {[
                       { key: "showAxes", label: "座標刻度" },
                       { key: "showCenterLines", label: "中心線" },
@@ -561,9 +596,12 @@ export function DisplayPagesEditor({
                     <DisplayEditorCanvasOverlay
                       isInteractive={editMode}
                       lockedRegionIds={lockedRegionIds}
+                      onSelectTemporaryMeasureTarget={onSelectTemporaryMeasureTarget}
+                      onStartMeasurementHandleDrag={onStartMeasurementHandleDrag}
                       overlayState={overlayState}
                       regions={editableRegions}
                       selectedRegionId={selectedRegion?.id ?? null}
+                      temporaryMeasureMode={temporaryMeasureMode}
                       onSelect={setSelectedRegionId}
                       onStartInteraction={onStartInteraction}
                     />

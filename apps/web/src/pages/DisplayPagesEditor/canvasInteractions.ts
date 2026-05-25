@@ -40,6 +40,14 @@ export type CanvasViewport = {
   zoom: number;
 };
 
+export type CanvasRelationalMeasurement = {
+  axis: "x" | "y";
+  distance: number;
+  end: { x: number; y: number };
+  midpoint: { x: number; y: number };
+  start: { x: number; y: number };
+};
+
 export type CanvasSpace = {
   height: number;
   width: number;
@@ -227,6 +235,71 @@ export function panCanvasViewport(
     offsetX: viewport.offsetX + delta.x,
     offsetY: viewport.offsetY + delta.y
   };
+}
+
+export function resolveRelationalMeasurements(
+  sourceRect: CanvasRect,
+  targetRect: CanvasRect,
+  mapping: CanvasDesignMapping
+): CanvasRelationalMeasurement[] {
+  const sourceRight = sourceRect.left + sourceRect.width;
+  const targetRight = targetRect.left + targetRect.width;
+  const sourceBottom = sourceRect.top + sourceRect.height;
+  const targetBottom = targetRect.top + targetRect.height;
+  const horizontalSourceFirst = sourceRect.left <= targetRect.left;
+  const verticalSourceFirst = sourceRect.top <= targetRect.top;
+  const horizontalStart = horizontalSourceFirst ? sourceRight : targetRight;
+  const horizontalEnd = horizontalSourceFirst ? targetRect.left : sourceRect.left;
+  const verticalStart = verticalSourceFirst ? sourceBottom : targetBottom;
+  const verticalEnd = verticalSourceFirst ? targetRect.top : sourceRect.top;
+  const overlapTop = Math.max(sourceRect.top, targetRect.top);
+  const overlapBottom = Math.min(sourceBottom, targetBottom);
+  const overlapLeft = Math.max(sourceRect.left, targetRect.left);
+  const overlapRight = Math.min(sourceRight, targetRight);
+  const horizontalY =
+    overlapTop <= overlapBottom
+      ? overlapTop + (overlapBottom - overlapTop) / 2
+      : (sourceRect.top + sourceBottom + targetRect.top + targetBottom) / 4;
+  const verticalX =
+    overlapLeft <= overlapRight
+      ? overlapLeft + (overlapRight - overlapLeft) / 2
+      : (sourceRect.left + sourceRight + targetRect.left + targetRight) / 4;
+
+  return [
+    {
+      axis: "x",
+      distance:
+        overlapLeft <= overlapRight
+          ? 0
+          : Math.max(0, Math.round(Math.abs(horizontalEnd - horizontalStart) / mapping.scaleX)),
+      end: { x: horizontalEnd, y: horizontalY },
+      midpoint: { x: (horizontalStart + horizontalEnd) / 2, y: horizontalY },
+      start: { x: horizontalStart, y: horizontalY }
+    },
+    {
+      axis: "y",
+      distance:
+        overlapTop <= overlapBottom
+          ? 0
+          : Math.max(0, Math.round(Math.abs(verticalEnd - verticalStart) / mapping.scaleY)),
+      end: { x: verticalX, y: verticalEnd },
+      midpoint: { x: verticalX, y: (verticalStart + verticalEnd) / 2 },
+      start: { x: verticalX, y: verticalStart }
+    }
+  ];
+}
+
+export function applyMeasurementHandleDrag(
+  rect: CanvasRect,
+  axis: "x" | "y",
+  delta: number,
+  constraint: CanvasRectConstraint
+) {
+  return applyCanvasDrag(
+    rect,
+    axis === "x" ? { x: delta, y: 0 } : { x: 0, y: delta },
+    constraint
+  );
 }
 
 function resolveBoundaryGuides(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasGuide[] {

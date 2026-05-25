@@ -122,6 +122,7 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.match(html, /重做/);
   assert.match(html, /點中區域/);
   assert.match(html, /全畫參考/);
+  assert.match(html, /暫時量測/);
   assert.match(html, /設計尺寸/);
   assert.doesNotMatch(html, /區域預設/);
 });
