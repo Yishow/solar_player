@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { displayPageTemplateKeys } from "@solar-display/shared";
@@ -34,12 +34,27 @@ const runtimeDefinitionSources = [
   "DisplayPagesEditor/runtimeSustainability.tsx"
 ].map((relativePath) => readFileSync(path.join(import.meta.dirname, relativePath), "utf8"));
 
+function resolveChangeProposalPath(changeName: string) {
+  const activePath = path.join(repoRoot, "openspec/changes", changeName, "proposal.md");
+  if (existsSync(activePath)) {
+    return activePath;
+  }
+
+  const archiveRoot = path.join(repoRoot, "openspec/changes/archive");
+  const archivedDir = readdirSync(archiveRoot).find((entry) => entry.endsWith(`-${changeName}`));
+  if (!archivedDir) {
+    throw new Error(`Cannot find proposal for change ${changeName}`);
+  }
+
+  return path.join(archiveRoot, archivedDir, "proposal.md");
+}
+
 const proposalPaths = [
-  "openspec/changes/add-display-surface-visual-guardrails/proposal.md",
-  "openspec/changes/normalize-display-surface-chrome-tokens/proposal.md",
-  "openspec/changes/align-factory-circuit-display-primitives/proposal.md",
-  "openspec/changes/split-live-display-preview-showcase-mode/proposal.md"
-].map((relativePath) => path.join(repoRoot, relativePath));
+  "add-display-surface-visual-guardrails",
+  "normalize-display-surface-chrome-tokens",
+  "align-factory-circuit-display-primitives",
+  "split-live-display-preview-showcase-mode"
+].map((changeName) => resolveChangeProposalPath(changeName));
 
 const pageSources = [
   "Overview/index.tsx",

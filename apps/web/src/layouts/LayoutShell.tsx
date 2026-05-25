@@ -13,6 +13,7 @@ import { useDisplayPageRegistry } from "../hooks/useDisplayPageRegistry";
 import { useMqttStatus } from "../hooks/useMqttStatus";
 import { usePageRotation } from "../hooks/usePageRotation";
 import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
+import { useShellDecorations } from "../hooks/useShellDecorations";
 import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { shouldRedirectToOffline } from "./offlineRouting";
 
@@ -25,6 +26,7 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
   const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
   const playbackEntries = buildPlaybackFooterEntries(registry.pages);
   const headerWeatherMeta = useHeaderWeatherMeta();
+  const shellDecorations = useShellDecorations();
   const headerConnectionMeta = resolveHeaderConnectionMeta({
     connected: status.connected,
     reason: status.reason,
@@ -91,6 +93,7 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
       header={
         <AppHeader
           brandView={brandView}
+          decorationObjects={shellDecorations.headerObjects}
           meta={{
             status: headerConnectionMeta.status,
             statusLabel: headerConnectionMeta.label,
@@ -101,6 +104,7 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
       footer={
         <AppFooterNav
           brandView={brandView}
+          decorationObjects={shellDecorations.footerObjects}
           playbackEntries={playbackEntries}
           resolvedPlaybackRouteMeta={routeMeta}
         />

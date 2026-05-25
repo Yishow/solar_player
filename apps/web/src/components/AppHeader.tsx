@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import type { HeaderWeatherMeta } from "@solar-display/shared";
+import type { ShellDecorationObject } from "@solar-display/shared";
 import { Link } from "react-router-dom";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
+import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 import { StatusBadge } from "./StatusBadge";
 
 type AppHeaderMeta = {
@@ -45,6 +47,7 @@ function defaultWeekday(now: Date) {
 
 type AppHeaderProps = {
   brandView?: BrandView;
+  decorationObjects?: ShellDecorationObject[];
   meta?: AppHeaderMeta;
 };
 
@@ -85,7 +88,7 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
   );
 }
 
-export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps) {
+export function AppHeader({ brandView = defaultBrandView, decorationObjects, meta }: AppHeaderProps) {
   const statusMeta =
     meta?.status && meta?.statusLabel
       ? {
@@ -100,7 +103,12 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
       data-shell-primitive="app-header"
       className="shell-header-bar relative flex h-[var(--header-height)] w-full shrink-0 items-stretch"
     >
-      <div className="flex w-full items-center gap-x-[48px] pl-[34px] pr-[40px]">
+      <ShellDecorationLayer mount="header" objects={decorationObjects} plane="background" />
+      <div
+        data-shell-primitive="header-content"
+        className="relative flex w-full items-center gap-x-[48px] pl-[34px] pr-[40px]"
+        style={{ zIndex: SHELL_CHROME_CONTENT_Z_INDEX }}
+      >
         {/* Brand cluster */}
         <div className="flex items-center gap-[15px]">
           <Link
@@ -187,6 +195,7 @@ export function AppHeader({ brandView = defaultBrandView, meta }: AppHeaderProps
           />
         </div>
       </div>
+      <ShellDecorationLayer mount="header" objects={decorationObjects} plane="foreground" />
     </header>
   );
 }

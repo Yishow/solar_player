@@ -64,6 +64,15 @@ test("playback and management shells share the same header weather mapper", () =
   assert.match(managementShellSource, /<AppHeader[^>]*meta=\{headerMeta\}/s);
 });
 
+test("playback and management shells reuse one shared shell decoration runtime loader", () => {
+  assert.match(layoutShellSource, /useShellDecorations\(\)/);
+  assert.match(layoutShellSource, /<AppHeader[\s\S]*decorationObjects=\{shellDecorations\.headerObjects\}/);
+  assert.match(layoutShellSource, /<AppFooterNav[\s\S]*decorationObjects=\{shellDecorations\.footerObjects\}/);
+  assert.match(managementShellSource, /useShellDecorations\(\)/);
+  assert.match(managementShellSource, /headerDecorationObjects=\{shellDecorations\.headerObjects\}/);
+  assert.match(managementShellSource, /footerDecorationObjects=\{shellDecorations\.footerObjects\}/);
+});
+
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {
   assert.match(registryHookSource, /setPages\(nextPages\.filter\(\(page\) => page\.enabled && page\.archivedAt === null\)\)/);
   assert.doesNotMatch(registryHookSource, /catch[\s\S]*setPages\(\[\]\)/);

@@ -5,6 +5,8 @@ import { AppHeader } from "../components/AppHeader";
 import { computeCanvasLayout } from "../components/displayCanvasLayout";
 import { useBrandAssets, type BrandView } from "../hooks/useBrandAssets";
 import { useHeaderWeatherMeta } from "../hooks/useHeaderWeatherMeta";
+import { useShellDecorations } from "../hooks/useShellDecorations";
+import type { ShellDecorationObject } from "@solar-display/shared";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
@@ -25,12 +27,16 @@ function getViewportSize() {
 
 export function ManagementShellFrame({
   children,
+  footerDecorationObjects,
   headerMeta,
+  headerDecorationObjects,
   hideChrome = false,
   initialBrandView
 }: {
   children?: React.ReactNode;
+  footerDecorationObjects?: ShellDecorationObject[];
   headerMeta?: Parameters<typeof AppHeader>[0]["meta"];
+  headerDecorationObjects?: ShellDecorationObject[];
   hideChrome?: boolean;
   initialBrandView?: BrandView;
 }) {
@@ -80,7 +86,13 @@ export function ManagementShellFrame({
           className="shell-stage-surface relative flex h-full w-full flex-col overflow-hidden"
         >
           <div className="shell-stage-overlay pointer-events-none absolute inset-0" />
-          {!hideChrome ? <AppHeader brandView={initialBrandView} meta={headerMeta} /> : null}
+          {!hideChrome ? (
+            <AppHeader
+              brandView={initialBrandView}
+              decorationObjects={headerDecorationObjects}
+              meta={headerMeta}
+            />
+          ) : null}
           <main
             data-shell-primitive="management-shell-content"
             className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
@@ -92,7 +104,7 @@ export function ManagementShellFrame({
               {children}
             </div>
           </main>
-          {!hideChrome ? <AppFooterNav brandView={initialBrandView} /> : null}
+          {!hideChrome ? <AppFooterNav brandView={initialBrandView} decorationObjects={footerDecorationObjects} /> : null}
         </div>
       </div>
     </div>
@@ -102,12 +114,15 @@ export function ManagementShellFrame({
 export function ManagementShell({ initialBrandView }: { initialBrandView?: BrandView }) {
   const brandView = useBrandAssets(initialBrandView);
   const headerWeatherMeta = useHeaderWeatherMeta();
+  const shellDecorations = useShellDecorations();
 
   return (
     <ManagementShellFrame
+      footerDecorationObjects={shellDecorations.footerObjects}
       headerMeta={{
         weather: headerWeatherMeta
       }}
+      headerDecorationObjects={shellDecorations.headerObjects}
       initialBrandView={brandView}
     >
       <Outlet />

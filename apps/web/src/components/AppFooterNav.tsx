@@ -1,10 +1,12 @@
 import React, { Fragment } from "react";
+import type { ShellDecorationObject } from "@solar-display/shared";
 import { Link, useLocation } from "react-router-dom";
 import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
 import { PageNumberPill } from "./PageNumberPill";
+import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 
 type FooterEntry = {
   key: string;
@@ -62,10 +64,12 @@ function buildEntries(
 
 export function AppFooterNav({
   brandView = defaultBrandView,
+  decorationObjects,
   playbackEntries,
   resolvedPlaybackRouteMeta
 }: {
   brandView?: BrandView;
+  decorationObjects?: ShellDecorationObject[];
   playbackEntries?: PlaybackFooterEntry[];
   resolvedPlaybackRouteMeta?: ResolvedPlaybackRouteMeta;
 }) {
@@ -92,7 +96,12 @@ export function AppFooterNav({
       data-shell-primitive="footer-nav"
       className="shell-footer-bar relative flex h-[var(--footer-height)] w-full shrink-0 items-stretch"
     >
-      <div className="flex w-full items-center pl-[32px] pr-[32px]">
+      <ShellDecorationLayer mount="footer" objects={decorationObjects} plane="background" />
+      <div
+        data-shell-primitive="footer-nav-content"
+        className="relative flex w-full items-center pl-[32px] pr-[32px]"
+        style={{ zIndex: SHELL_CHROME_CONTENT_Z_INDEX }}
+      >
         {/* 已移除 PageNumberPill */}
 
         <div>
@@ -191,6 +200,7 @@ export function AppFooterNav({
           <FooterBranch />
         </div>
       </div>
+      <ShellDecorationLayer mount="footer" objects={decorationObjects} plane="foreground" />
     </footer>
   );
 }

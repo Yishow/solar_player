@@ -9,6 +9,7 @@ import { routeMetaList, routeMetaMap } from "../app/routeMeta";
 import { AppFooterNav } from "./AppFooterNav";
 import { AppHeader } from "./AppHeader";
 import { DisplayCanvas } from "./DisplayCanvas";
+import { SHELL_CHROME_CONTENT_Z_INDEX } from "./ShellDecorationLayer";
 import { computeCanvasLayout } from "./displayCanvasLayout";
 import { DisplayPagesEditor } from "../pages/DisplayPagesEditor";
 import { ManagementShell, ManagementShellFrame } from "../layouts/ManagementShell";
@@ -154,6 +155,52 @@ test("header and footer expose shell primitives without centered max-width wrapp
   assert.match(footerHtml, /data-shell-primitive="footer-nav"/);
   assert.doesNotMatch(headerHtml, /max-w-\[var\(--screen-width\)\]/);
   assert.doesNotMatch(footerHtml, /max-w-\[var\(--screen-width\)\]/);
+});
+
+test("footer decoration layers stay inside the shared footer band around the interactive chrome", () => {
+  const footerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/overview"]
+      },
+      React.createElement(AppFooterNav, {
+        decorationObjects: [
+          {
+            frame: { height: 44, left: 22, top: 12, width: 44 },
+            id: "footer-leaf",
+            locked: false,
+            metadata: {},
+            mount: "footer",
+            source: { kind: "ornament-image", ornamentKey: "leaf" },
+            style: {},
+            type: "ornament-image",
+            visible: true,
+            zIndex: 1
+          },
+          {
+            frame: { height: 2, left: 820, top: 56, width: 420 },
+            id: "footer-line",
+            locked: false,
+            metadata: {},
+            mount: "footer",
+            source: { kind: "line" },
+            style: {},
+            type: "line",
+            visible: true,
+            zIndex: SHELL_CHROME_CONTENT_Z_INDEX + 1
+          }
+        ]
+      })
+    )
+  );
+
+  assert.match(footerHtml, /data-shell-decoration-mount="footer"/);
+  assert.match(footerHtml, /data-shell-decoration-plane="background"/);
+  assert.match(footerHtml, /data-shell-decoration-plane="foreground"/);
+  assert.match(footerHtml, /data-shell-primitive="footer-nav-content"/);
+  assert.ok(footerHtml.indexOf('data-shell-decoration-plane="background"') < footerHtml.indexOf('data-shell-primitive="footer-nav-content"'));
+  assert.ok(footerHtml.indexOf('data-shell-primitive="footer-nav-content"') < footerHtml.indexOf('data-shell-decoration-plane="foreground"'));
 });
 
 test("header weather metadata renders alongside the live status badge", () => {
