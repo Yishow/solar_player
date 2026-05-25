@@ -121,7 +121,7 @@ tests:
 ---
 ### Requirement: Support zoom, pan, and keyboard nudge during canvas editing
 
-The system SHALL support zoom, pan, and keyboard nudge controls during display editor canvas editing.
+The system SHALL support zoom, pan, and keyboard nudge controls during display editor canvas editing. Keyboard nudging SHALL provide explicit step tiers so operators can choose fine, normal, or accelerated movement without leaving the canvas workflow.
 
 #### Scenario: Operator nudges a selected region
 
@@ -136,198 +136,399 @@ The system SHALL support zoom, pan, and keyboard nudge controls during display e
 - **THEN** that region moves by the configured single-step increment
 - **AND** the preview reflects the nudge without requiring manual number entry
 
+#### Scenario: Operator chooses a different nudge step tier
+
+- **WHEN** a region is selected and the operator invokes a fine or accelerated nudge tier
+- **THEN** the region moves by the design-space increment assigned to that tier
+- **AND** the editor keeps that nudge inside the same undoable draft history workflow
+
+##### Example: Accelerated nudge moves a KPI card by ten pixels
+
+- **GIVEN** a KPI card is selected on the canvas
+- **WHEN** the operator triggers the accelerated nudge tier once toward the right
+- **THEN** the card moves right by `10` design-space pixels
+- **AND** the operator can undo that move from the draft history
+
 <!-- @trace
-source: strengthen-display-editor-canvas-workflow
-updated: 2026-05-19
+source: extend-display-editor-layout-reuse-productivity
+updated: 2026-05-26
 code:
-  - apps/server/src/routes/display-story.ts
-  - apps/server/src/routes/display-pages-asset-governance-placement.test-suite.ts
-  - apps/web/src/hooks/useDisplayReadiness.ts
-  - apps/web/src/pages/PlaybackSettings/viewModel.ts
-  - apps/web/src/components/PlaybackTitleGroup.tsx
-  - packages/shared/src/displayReadiness.ts
-  - apps/web/src/components/StatusBadge.tsx
-  - .hermes/codex_goal2_remaining.md
-  - AGENTS.md
-  - apps/web/src/pages/Images/displayPageConfig.ts
-  - apps/web/src/pages/displayPageMediaStyle.ts
-  - apps/server/src/routes/device.ts
-  - apps/web/src/pages/FactoryCircuit/viewModel.ts
-  - apps/web/src/hooks/useDisplaySyncRefresh.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/web/src/layouts/offlineRouting.ts
-  - apps/web/src/pages/Solar/displayPageConfig.ts
-  - apps/server/src/services/displayRotationService.ts
-  - .superpowers/brainstorm/4903-1779123645/state/server-stopped
-  - packages/shared/src/displayOps.ts
-  - apps/web/src/hooks/displayPageDraftSession.ts
-  - apps/web/src/hooks/usePlaybackController.ts
-  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
-  - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
-  - apps/web/src/components/PageNumberPill.tsx
-  - apps/web/src/components/LeafOrnament.tsx
-  - apps/web/src/hooks/useDisplayEditor.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - .hermes/plan_publish_safety.md
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - apps/server/src/routes/circuits.ts
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - apps/web/src/hooks/displayPageConfigPaths.ts
+  - .codex/hooks.json
+  - apps/web/src/styles/global.css
   - apps/web/src/pages/Images/index.tsx
-  - .hermes/codex_fix_bugs.md
-  - apps/server/src/services/displayReadinessService.ts
-  - apps/web/src/pages/CircuitSettings/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtime.tsx
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorRegionState.ts
-  - packages/shared/src/imagePlaylist.ts
-  - apps/server/src/db/migrations/007_display_page_publishing.sql
-  - apps/web/src/pages/ImageManagement/index.tsx
-  - .hermes/codex_goal1_change2_remaining.md
-  - apps/web/src/components/SectionWrapper.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.tsx
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - apps/server/src/routes/device-display-ops.ts
-  - apps/server/src/services/displayPageAssetService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
-  - packages/shared/src/types.ts
-  - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorValidation.ts
-  - package.json
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
-  - apps/web/src/hooks/useDeviceDisplayOpsSummary.ts
-  - apps/server/src/services/displayPagePublishingService.ts
-  - apps/server/src/routes/display-readiness.ts
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
-  - apps/server/src/realtime/SocketService.ts
-  - apps/web/src/hooks/useDisplayPageAssetHealth.ts
-  - apps/web/src/pages/DisplayPagesEditor/canvasCard.tsx
-  - apps/server/src/routes/playback.ts
-  - apps/web/src/pages/Images/viewModel.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - .hermes/codex_goal2.md
-  - .superpowers/brainstorm/4903-1779123645/content/waiting-1.html
-  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
-  - apps/web/src/pages/DisplayPagesEditor/pageRegionSchemas.ts
-  - packages/shared/src/displayRotation.ts
-  - apps/server/src/db/seed.ts
-  - apps/web/src/components/TitleBlock.tsx
-  - .superpowers/brainstorm/4903-1779123645/content/editor-layouts.html
-  - apps/web/src/hooks/useImageAssetReferences.ts
-  - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
-  - apps/web/src/components/displayPageAssetHealthPanels.tsx
-  - apps/web/src/pages/PlaybackSettings/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/history.ts
-  - apps/web/src/components/PanelCard.tsx
-  - packages/shared/src/displayPageConfig.ts
-  - apps/web/src/hooks/useDisplayOpsSummary.ts
-  - apps/server/src/routes/sustainability-story.ts
-  - apps/web/src/pages/Overview/viewModel.ts
-  - apps/server/src/services/displayOpsService.ts
-  - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - apps/web/src/hooks/useDisplayPageConfig.ts
-  - apps/web/src/components/DisplayReadinessPanel.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
-  - .hermes/codex_goal1_change2.md
-  - packages/shared/src/sustainabilityStory.ts
-  - packages/shared/src/displayEditorSchema.ts
-  - packages/shared/src/displayStory.ts
-  - apps/web/src/services/socket.ts
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/server/src/routes/images.ts
-  - apps/server/src/routes/image-playlist.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
-  - .hermes/codex_goal3.md
-  - apps/web/src/components/AppHeader.tsx
-  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
-  - packages/shared/src/deviceDisplayOps.ts
-  - apps/web/src/pages/DisplayPagesEditor/publishingStatus.tsx
-  - apps/server/src/routes/settings-mqtt.ts
-  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.ts
-  - .hermes/codex_prompt_goal1_change1.md
-  - apps/web/src/pages/DisplayPagesEditor/fallbackPageDefinitions.ts
-  - apps/server/src/routes/imagesSupport.ts
-  - apps/web/src/pages/Overview/displayPageConfig.ts
-  - apps/web/src/components/SectionTitle.tsx
-  - apps/server/src/routes/display-pages.ts
+  - apps/web/src/pages/Solar/solar.css
   - apps/web/src/components/PageContainer.tsx
-  - .superpowers/brainstorm/4903-1779123645/state/server.log
-  - apps/server/src/services/imagePlaylistService.ts
-  - apps/server/src/routes/display-pages-asset-governance.test-support.ts
-  - apps/web/package.json
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/web/src/main.tsx
-  - packages/shared/src/index.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
-  - .hermes/codex_goal1_change3.md
-  - .hermes/codex_goal4.md
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
-  - apps/web/src/components/AppFooterNav.tsx
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/app.ts
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/Sustainability/viewModel.ts
-  - apps/web/src/services/api.ts
-  - apps/web/src/hooks/usePageRotation.ts
-  - .superpowers/brainstorm/4903-1779123645/state/server.pid
-  - .superpowers/brainstorm/4903-1779123645/content/design-3col.html
-  - apps/server/src/services/deviceDisplayOpsService.ts
-  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/layouts/LayoutShell.tsx
-  - docs/superpowers/specs/2026-05-19-editor-three-column-layout-design.md
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/inspectorTools.tsx
-  - apps/web/src/pages/Solar/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/shared/displaySurfaceNodes.css
+  - apps/web/src/styles/tokens.css
+  - AGENTS.md
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/server/src/db/migrations/008_display_readiness_slots.sql
-  - apps/server/src/routes/display-ops.ts
-  - apps/web/src/pages/shared/PageScaffold.tsx
-  - apps/web/src/components/DisplayCanvas.tsx
-  - apps/server/src/routes/display-pages-asset-governance-health.test-suite.ts
+  - apps/web/src/components/TitleBlock.tsx
+  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/Overview/overview.css
 tests:
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/web/src/components/displayPageAssetHealthPanels.test.tsx
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
-  - apps/server/src/routes/display-readiness.test.ts
-  - apps/web/src/pages/PlaybackSettings/viewModel.test.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
-  - apps/web/src/pages/Images/viewModel.test.ts
-  - apps/web/src/pages/Sustainability/viewModel.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/layouts/offlineRouting.test.ts
-  - apps/web/src/hooks/displayPageDraftSession.test.ts
   - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
-  - apps/server/src/routes/display-ops.test.ts
-  - apps/server/src/routes/playback.test.ts
-  - apps/web/src/pages/Solar/viewModel.test.ts
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/hooks/usePageRotation.test.ts
-  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - apps/web/src/hooks/usePlaybackController.test.ts
-  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
+  - apps/web/src/styles/tokens.test.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
   - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
-  - apps/web/src/hooks/useDisplayEditor.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/history.test.ts
-  - apps/web/src/pages/displayPageMediaStyle.test.tsx
-  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/server/src/routes/image-playlist.test.ts
-  - apps/server/src/routes/display-pages-fallback.test.ts
-  - apps/web/src/pages/PlaybackSettings/index.test.ts
-  - apps/web/src/hooks/useDisplayPageConfig.test.ts
-  - apps/server/src/services/imagePlaylistService.test.ts
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/routes/display-pages-asset-governance.test.ts
-  - apps/server/src/routes/device-display-ops.test.ts
+  - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+-->
+
+---
+### Requirement: Render page-aligned guide overlays in the editor viewport with design-space mapping
+
+The system SHALL render a dashed guide overlay inside the `DisplayEditorCanvasCard` viewport whenever edit mode is enabled for a supported display page. The overlay SHALL interpret guide geometry in a configurable design space whose default size is `1920x1080`, and it SHALL map that design space into the current viewport so the guides remain aligned while the operator switches pages, zooms, or pans.
+
+#### Scenario: Operator opens edit mode on a supported page
+
+- **WHEN** the operator enables edit mode on a supported display page
+- **THEN** the canvas shows that page's guide overlay
+- **AND** the guides remain aligned with the preview content after viewport scaling, zoom, and pan actions
+
+##### Example: Overview page keeps guides aligned after zoom
+
+- **GIVEN** `/display-pages/editor?page=overview` is open in edit mode
+- **WHEN** the operator zooms the preview to `125%` and pans the canvas
+- **THEN** the hero, content, and card-band guides remain anchored to the same Overview layout positions
+- **AND** no separate unscaled guide layer appears outside the preview surface
+
+#### Scenario: Viewport is smaller than the configured design space
+
+- **WHEN** the editor viewport is smaller than the configured design-space width or height
+- **THEN** the guide overlay still renders inside the current viewport
+- **AND** its labels and measurements continue to use design-space coordinates instead of raw viewport pixels
+
+##### Example: FHD guides are mapped into a narrower preview card
+
+- **GIVEN** the configured design space is `1920x1080`
+- **AND** the current `DisplayEditorCanvasCard` viewport is rendered at half that width
+- **WHEN** edit mode is active
+- **THEN** the dashed guide overlay is visibly compressed into the preview card
+- **AND** the guide geometry still corresponds to the original `1920x1080` layout
+
+
+<!-- @trace
+source: add-display-editor-dimension-guides
+updated: 2026-05-26
+code:
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/shared/displaySurfaceNodes.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/components/TitleBlock.tsx
+  - apps/web/src/pages/Overview/index.tsx
+  - .codex/hooks.json
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/Solar/solar.css
+  - AGENTS.md
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/styles/tokens.css
+  - apps/web/src/components/PageContainer.tsx
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+tests:
+  - apps/web/src/styles/tokens.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+-->
+
+---
+### Requirement: Expose overlay display modes for selected-only and full-canvas framing
+
+The system SHALL let operators change the display editor overlay mode from the controls shown with `DisplayEditorCanvasCard`. The available modes SHALL include a selected-only mode that emphasizes only the active region and a full-canvas mode that reveals page-wide guides and reference frames for all editable regions.
+
+#### Scenario: Operator switches from selected-only mode to full-canvas mode
+
+- **WHEN** the operator changes the overlay mode from selected-only to full-canvas
+- **THEN** the editor immediately updates the visible guides and region frames inside the same viewport
+- **AND** the change does not modify any saved region geometry
+
+##### Example: Full-canvas mode reveals all region reference frames
+
+- **GIVEN** the editor is open with one selected hero region
+- **WHEN** the operator enables full-canvas overlay mode
+- **THEN** the editor shows the page-wide dashed guides
+- **AND** the other editable regions gain reference frames without becoming selected
+
+#### Scenario: Selected-only mode keeps non-selected regions passive
+
+- **WHEN** the selected-only overlay mode is active
+- **THEN** only the selected region shows the primary framing treatment
+- **AND** non-selected regions do not appear with the same emphasis as the active region
+
+##### Example: Selecting one image tile no longer frames every other tile
+
+- **GIVEN** an `Images` page contains multiple editable tiles
+- **WHEN** the operator selects a single tile while selected-only mode is active
+- **THEN** the chosen tile shows the primary frame
+- **AND** the remaining tiles do not receive matching full-strength selection frames
+
+
+<!-- @trace
+source: add-display-editor-dimension-guides
+updated: 2026-05-26
+code:
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/shared/displaySurfaceNodes.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/components/TitleBlock.tsx
+  - apps/web/src/pages/Overview/index.tsx
+  - .codex/hooks.json
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/Solar/solar.css
+  - AGENTS.md
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/styles/tokens.css
+  - apps/web/src/components/PageContainer.tsx
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+tests:
+  - apps/web/src/styles/tokens.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+-->
+
+---
+### Requirement: Persist and restore overlay guide presets
+
+The system SHALL let operators configure guide presets from `DisplayEditorCanvasCard` controls, including design-space presets, axis or tick visibility, center-line visibility, region labels, and full-canvas frame density options. The editor SHALL restore the most recent valid preset when the operator returns to the editor.
+
+#### Scenario: Operator changes overlay preset options
+
+- **WHEN** the operator updates an overlay preset option from the canvas controls
+- **THEN** the current viewport immediately reflects that setting
+- **AND** the setting remains available when the operator returns to the editor later
+
+##### Example: Operator keeps FHD axes and region labels enabled
+
+- **GIVEN** the operator enables `1920x1080` design-space preset, axis ticks, and region labels
+- **WHEN** the operator leaves and later reopens `Display Pages Editor`
+- **THEN** the editor restores that same preset combination
+- **AND** the reopened overlay shows axis ticks and region labels without requiring manual reconfiguration
+
+#### Scenario: Editor falls back from an invalid stored preset
+
+- **WHEN** the editor cannot parse the last stored overlay preset
+- **THEN** the overlay falls back to the default preset
+- **AND** the operator can continue editing without losing canvas interaction
+
+##### Example: Broken preset storage falls back to default FHD overlay
+
+- **GIVEN** the stored overlay preset payload is malformed
+- **WHEN** the operator opens `Display Pages Editor`
+- **THEN** the editor falls back to its default overlay preset
+- **AND** the canvas remains interactive with the default `1920x1080` design-space settings
+
+
+<!-- @trace
+source: add-display-editor-dimension-guides
+updated: 2026-05-26
+code:
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/shared/displaySurfaceNodes.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/components/TitleBlock.tsx
+  - apps/web/src/pages/Overview/index.tsx
+  - .codex/hooks.json
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/Solar/solar.css
+  - AGENTS.md
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/styles/tokens.css
+  - apps/web/src/components/PageContainer.tsx
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+tests:
+  - apps/web/src/styles/tokens.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+-->
+
+---
+### Requirement: Show live dimensions for the selected canvas region
+
+The system SHALL show live dimension feedback for the selected editable region or selected card rail child card. During drag or resize interactions, the feedback SHALL update the region size and the distances to its editable container bounds in real time using design-space values. Locked regions SHALL remain selectable but SHALL NOT enter active drag or resize measurement states.
+
+#### Scenario: Operator drags or resizes a selected region
+
+- **WHEN** the operator drags or resizes a selected editable region
+- **THEN** the canvas shows the region width and height
+- **AND** the canvas shows distances from that region to the active container bounds
+- **AND** the feedback updates as the geometry changes
+
+##### Example: Rail card measurements use the parent rail bounds
+
+- **GIVEN** a selected card rail child is constrained by a `470` pixel wide parent rail
+- **WHEN** the operator drags the card toward the right boundary
+- **THEN** the measurement feedback reports distances relative to that parent rail
+- **AND** the card does not report distances relative to the full page surface
+
+#### Scenario: Operator selects a locked region
+
+- **WHEN** the operator selects a locked region
+- **THEN** the region remains selectable on the canvas
+- **AND** the canvas does not enter an active drag or resize measurement state for that region
+
+##### Example: Locked Overview hero copy stays passive
+
+- **GIVEN** the `Overview Hero Copy` region is locked in edit mode
+- **WHEN** the operator clicks that region on the canvas
+- **THEN** the editor keeps that region selected
+- **AND** the canvas does not start drag or resize measurements for it
+
+<!-- @trace
+source: add-display-editor-dimension-guides
+updated: 2026-05-26
+code:
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/shared/displaySurfaceNodes.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - apps/web/src/pages/SlideshowPreview/preview.css
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/components/TitleBlock.tsx
+  - apps/web/src/pages/Overview/index.tsx
+  - .codex/hooks.json
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/Solar/solar.css
+  - AGENTS.md
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/styles/tokens.css
+  - apps/web/src/components/PageContainer.tsx
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+tests:
+  - apps/web/src/styles/tokens.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - apps/web/src/pages/SlideshowPreview/index.test.ts
+  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
 -->
