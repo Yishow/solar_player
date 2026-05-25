@@ -115,14 +115,11 @@
   overflow: hidden;
   border-radius: 16px;
   box-shadow: var(--display-shadow-soft);
-  --display-photo-fade-bottom-height: 120px;
 }
 
 .images-main-stage img {
   height: 100%;
   width: 100%;
-  object-fit: cover;
-  object-position: center 52%;
   transform: translateX(-76px) scale(1.14);
   transform-origin: center center;
 }

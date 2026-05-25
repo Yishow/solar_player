@@ -16,8 +16,11 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useImagesAutoplay } from "../../hooks/useImagesAutoplay";
 import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
-import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import {
+  imagesMainStageMediaEffectResolverOptions
+} from "../shared/displayPageMediaEffectConfig";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -99,6 +102,10 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const mainStageSource = resolveDisplayPageMediaSource(
     resolvedConfig.mainStage,
     seedConfig.mainStage.src
+  );
+  const mainStageMediaPresentation = buildDisplayPageMediaPresentation(
+    resolvedConfig.mainStage,
+    imagesMainStageMediaEffectResolverOptions
   );
   const viewModel = buildImagesViewModel({
     activeEntry: playlistRuntime.payload?.activeEntry ?? null,
@@ -236,8 +243,9 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       </section>
 
       <figure
-        className="images-main-stage display-surface-media-stage display-surface-media-fade-left display-surface-media-fade-bottom"
+        className={`images-main-stage display-surface-media-stage${mainStageMediaPresentation.stageClassName ? ` ${mainStageMediaPresentation.stageClassName}` : ""}`}
         style={{
+          ...mainStageMediaPresentation.stageStyle,
           height: `${mainLayout.height}px`,
           left: `${mainLayout.left}px`,
           top: `${mainLayout.top}px`,
@@ -248,7 +256,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
             src={viewModel.active.assetSource ?? mainStageSource ?? undefined}
-            style={buildDisplayPageMediaStyle(resolvedConfig.mainStage)}
+            style={mainStageMediaPresentation.mediaStyle}
           />
         ) : (
           <div className="images-main-placeholder">

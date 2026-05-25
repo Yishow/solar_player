@@ -25,6 +25,10 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
+  buildDisplayPageMediaEffectFields,
+  imagesMainStageMediaEffectResolverOptions
+} from "../shared/displayPageMediaEffectConfig";
+import {
   imagesArrowLayout,
   imagesCopyLayout,
   imagesInfoLayout,
@@ -146,6 +150,7 @@ export function createImagesDisplayPageSeedConfig(
       alignX: 0.5,
       alignY: 0.52,
       alt: mainStageAlt,
+      effects: imagesMainStageMediaEffectResolverOptions.defaults,
       fitMode: "cover",
       focusX: 0.5,
       focusY: 0.52,
@@ -246,7 +251,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
   {
     id: "images-main-stage",
     label: "Images Main Stage",
-    description: "調整主舞台 geometry、備援素材與 placement controls。",
+    description: "調整主舞台 geometry、備援素材，以及 placement 與 effect controls。",
     geometry: {
       compatibilityKey: "images-main-stage-geometry",
       heightPath: ["mainStage", "height"],
@@ -312,6 +317,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-focus-y", label: "Focus Y", path: ["mainStage", "focusY"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-align-x", label: "Align X", path: ["mainStage", "alignX"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "images-stage-align-y", label: "Align Y", path: ["mainStage", "alignY"], step: 0.05 },
+      ...buildDisplayPageMediaEffectFields("images-stage", ["mainStage"]),
       { constraints: { min: 0 }, fieldType: "number", id: "images-stage-left", label: "Left", path: ["mainStage", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "images-stage-top", label: "Top", path: ["mainStage", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "images-stage-width", label: "Width", path: ["mainStage", "width"] },

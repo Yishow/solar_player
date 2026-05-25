@@ -54,14 +54,11 @@
 .overview-hero-banner {
   z-index: 5;
   pointer-events: none;
-  --display-photo-fade-bottom-height: 55%;
 }
 
 .overview-hero-banner img {
   height: 100%;
   width: 100%;
-  object-fit: contain;
-  object-position: 100% 0%;
   transform-origin: top right;
   transform: none;
 }

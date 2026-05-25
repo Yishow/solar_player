@@ -1,4 +1,9 @@
-import type { DisplayPageMediaBinding, DisplayPageMediaFitMode } from "@solar-display/shared";
+import {
+  resolveDisplayPageMediaEffects,
+  type DisplayPageMediaBinding,
+  type DisplayPageMediaEffectResolverOptions,
+  type DisplayPageMediaFitMode
+} from "@solar-display/shared";
 import type { CSSProperties } from "react";
 
 function normalizeFitMode(fitMode?: DisplayPageMediaFitMode) {
@@ -23,5 +28,39 @@ export function buildDisplayPageMediaStyle(binding: DisplayPageMediaBinding): CS
   return {
     objectFit: fitMode,
     objectPosition: `${positionX * 100}% ${positionY * 100}%`
+  };
+}
+
+export function buildDisplayPageMediaPresentation(
+  binding: DisplayPageMediaBinding,
+  options: DisplayPageMediaEffectResolverOptions
+) {
+  const mediaStyle = buildDisplayPageMediaStyle(binding);
+  const effects = resolveDisplayPageMediaEffects(binding.effects, options);
+  const stageClassNames: string[] = [];
+  const stageStyle: CSSProperties & Record<string, string> = {};
+
+  if (effects.edgeFade.enabled) {
+    stageClassNames.push(`display-surface-media-fade-${effects.edgeFade.direction}`);
+    stageStyle["--display-photo-fade-edge-width" as string] = `${effects.edgeFade.width * 100}%`;
+  }
+
+  if (effects.bottomFade.enabled) {
+    stageClassNames.push("display-surface-media-fade-bottom");
+    stageStyle["--display-photo-fade-bottom-height" as string] = `${effects.bottomFade.height * 100}%`;
+  }
+
+  if (effects.blur.enabled && effects.blur.amount > 0) {
+    mediaStyle.filter = `blur(${effects.blur.amount}px)`;
+  }
+
+  if (effects.opacity.enabled) {
+    mediaStyle.opacity = effects.opacity.value;
+  }
+
+  return {
+    mediaStyle,
+    stageClassName: stageClassNames.join(" "),
+    stageStyle
   };
 }

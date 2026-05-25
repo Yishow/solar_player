@@ -18,8 +18,11 @@ import {
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
-import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import {
+  overviewHeroMediaEffectResolverOptions
+} from "../shared/displayPageMediaEffectConfig";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -110,6 +113,10 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     usesRuntimeFallback: storyRuntime.usesFallback
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const heroMediaPresentation = buildDisplayPageMediaPresentation(
+    resolvedConfig.heroMedia,
+    overviewHeroMediaEffectResolverOptions
+  );
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
@@ -190,8 +197,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       </section>
 
       <figure
-        className="overview-hero-banner display-surface-media-stage display-surface-media-fade-right display-surface-media-fade-bottom"
+        className={`overview-hero-banner display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
         style={{
+          ...heroMediaPresentation.stageStyle,
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,
           top: `${heroLayout.top}px`,
@@ -201,7 +209,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <img
           alt={resolvedConfig.heroMedia.alt}
           src={heroMediaSource ?? undefined}
-          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
+          style={heroMediaPresentation.mediaStyle}
         />
       </figure>
 

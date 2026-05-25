@@ -1,3 +1,4 @@
+import type { DisplayPageMediaEffects } from "./displayPageMediaEffects.js";
 import type { DisplayPageFreeformObject } from "./displayPageObjects.js";
 
 export const displayPageTemplateKeys = [
@@ -68,6 +69,7 @@ export type DisplayPageMediaBinding = {
   alignX?: number;
   alignY?: number;
   assetId?: DisplayPageManagedAssetId | null;
+  effects?: DisplayPageMediaEffects;
   fitMode?: DisplayPageMediaFitMode;
   focusX?: number;
   focusY?: number;
@@ -180,7 +182,7 @@ export function isDisplayPageMediaBinding(value: unknown): value is DisplayPageM
     return false;
   }
 
-  return ["alignX", "alignY", "assetId", "fitMode", "focusX", "focusY", "sourceMode", "src"].some(
+  return ["alignX", "alignY", "assetId", "effects", "fitMode", "focusX", "focusY", "sourceMode", "src"].some(
     (key) => key in value
   );
 }

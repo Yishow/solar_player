@@ -217,6 +217,51 @@ test("runtime page definitions keep supported pages on the shared schema-aware i
   }
 });
 
+test("page region schemas expose effect controls only on supported media surfaces", () => {
+  const overviewHeroRegion = resolvePageRegionSchemas("overview").find((region) => region.id === "overview-hero-media");
+  const imagesStageRegion = resolvePageRegionSchemas("images").find((region) => region.id === "images-main-stage");
+  const solarHeroRegion = resolvePageRegionSchemas("solar").find((region) => region.id === "solar-hero-media");
+
+  assert.deepEqual(
+    overviewHeroRegion?.fields
+      .map((field) => field.id)
+      .filter((fieldId) => fieldId.includes("fade") || fieldId.includes("blur") || fieldId.includes("opacity")),
+    [
+      "hero-edge-fade-enabled",
+      "hero-edge-fade-direction",
+      "hero-edge-fade-width",
+      "hero-bottom-fade-enabled",
+      "hero-bottom-fade-height",
+      "hero-blur-enabled",
+      "hero-blur-amount",
+      "hero-opacity-enabled",
+      "hero-opacity-value"
+    ]
+  );
+  assert.deepEqual(
+    imagesStageRegion?.fields
+      .map((field) => field.id)
+      .filter((fieldId) => fieldId.includes("fade") || fieldId.includes("blur") || fieldId.includes("opacity")),
+    [
+      "images-stage-edge-fade-enabled",
+      "images-stage-edge-fade-direction",
+      "images-stage-edge-fade-width",
+      "images-stage-bottom-fade-enabled",
+      "images-stage-bottom-fade-height",
+      "images-stage-blur-enabled",
+      "images-stage-blur-amount",
+      "images-stage-opacity-enabled",
+      "images-stage-opacity-value"
+    ]
+  );
+  assert.equal(
+    solarHeroRegion?.fields.some(
+      (field) => field.id.includes("fade") || field.id.includes("blur") || field.id.includes("opacity")
+    ) ?? false,
+    false
+  );
+});
+
 test("display page editor no longer falls back to the phase-only inspector message for supported runtime pages", () => {
   const pageLabels: Record<DisplayPageTemplateKey, string> = {
     "factory-circuit": "Factory Circuit",

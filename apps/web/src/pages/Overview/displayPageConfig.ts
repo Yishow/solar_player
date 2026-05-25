@@ -21,6 +21,10 @@ import {
   createReferenceGlyphIconSource,
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
+import {
+  buildDisplayPageMediaEffectFields,
+  overviewHeroMediaEffectResolverOptions
+} from "../shared/displayPageMediaEffectConfig";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
 export type OverviewDisplayRect = {
@@ -163,6 +167,7 @@ export function createOverviewDisplayPageSeedConfig(
       alignX: 1,
       alignY: 0,
       alt: heroAlt,
+      effects: overviewHeroMediaEffectResolverOptions.defaults,
       fitMode: "contain",
       focusX: 1,
       focusY: 0,
@@ -224,7 +229,7 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
   {
     id: "overview-hero-media",
     label: "Overview Hero Media",
-    description: "切換 hero image、alt 文案與 placement controls。",
+    description: "切換 hero image、alt 文案，以及 placement 與 effect controls。",
     geometry: {
       compatibilityKey: "hero-media-geometry",
       heightPath: ["heroContainer", "height"],
@@ -285,7 +290,8 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-x", label: "Focus X", path: ["heroMedia", "focusX"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-y", label: "Focus Y", path: ["heroMedia", "focusY"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-x", label: "Align X", path: ["heroMedia", "alignX"], step: 0.05 },
-      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 }
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 },
+      ...buildDisplayPageMediaEffectFields("hero", ["heroMedia"])
     ],
     presetKey: "hero-media"
   },

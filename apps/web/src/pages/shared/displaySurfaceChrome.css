@@ -58,7 +58,10 @@
 }
 
 .display-surface-media-fade-left::before {
-  inset: 0;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--display-photo-fade-edge-width, 56%);
   background: linear-gradient(
     90deg,
     var(--display-photo-fade-paper) 0%,
@@ -69,7 +72,10 @@
 }
 
 .display-surface-media-fade-right::before {
-  inset: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--display-photo-fade-edge-width, 56%);
   background: linear-gradient(
     270deg,
     var(--display-photo-fade-paper) 0%,

@@ -60,10 +60,10 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-title",
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
-        "display-surface-media-fade-bottom",
-        "display-surface-media-fade-right",
         "display-surface-leaf-ornament",
-        "display-surface-gold-line"
+        "display-surface-gold-line",
+        /buildDisplayPageMediaPresentation/,
+        /overviewHeroMediaEffectResolverOptions/
       ],
       file: path.resolve(sharedDir, "../Overview/index.tsx")
     },
@@ -97,9 +97,9 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-title-emphasis",
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
-        "display-surface-media-fade-left",
-        "display-surface-media-fade-bottom",
-        "display-surface-gold-ornament"
+        "display-surface-gold-ornament",
+        /buildDisplayPageMediaPresentation/,
+        /imagesMainStageMediaEffectResolverOptions/
       ],
       file: path.resolve(sharedDir, "../Images/index.tsx")
     },
@@ -121,8 +121,11 @@ test("playback pages wire shared display chrome classes into hero, media, and or
   pages.forEach(({ expected, file }) => {
     const source = fs.readFileSync(file, "utf8");
 
-    expected.forEach((className) => {
-      assert.match(source, new RegExp(className.replaceAll("-", "\\-")));
+    expected.forEach((pattern) => {
+      assert.match(
+        source,
+        typeof pattern === "string" ? new RegExp(pattern.replaceAll("-", "\\-")) : pattern
+      );
     });
   });
 });
