@@ -1,0 +1,206 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import type { ImageAsset, ShellDecorationEnvelope } from "@solar-display/shared";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
+import {
+  loadShellDecorationEditorData,
+  publishShellDecorationEditorDraft,
+  resolveShellDecorationAssetOptions,
+  saveShellDecorationEditorDraft,
+  ShellDecorationEditor
+} from "./index";
+
+function lineObject(id: string): ShellDecorationEnvelope["headerObjects"][number] {
+  return {
+    frame: { height: 2, left: 86, top: 24, width: 320 },
+    id,
+    locked: false,
+    metadata: {},
+    mount: "header",
+    source: { kind: "line" },
+    style: { color: "#d2b46a", thickness: 2 },
+    type: "line",
+    visible: true,
+    zIndex: 1
+  };
+}
+
+const routeMetaSource = readFileSync(path.join(import.meta.dirname, "../../app/routeMeta.ts"), "utf8");
+const routerSource = readFileSync(path.join(import.meta.dirname, "../../app/router.tsx"), "utf8");
+const runtimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
+const editorSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+
+const initialDraft: ShellDecorationEnvelope = {
+  footerObjects: [],
+  headerObjects: [lineObject("header-line")],
+  publishedAt: null,
+  publishedBy: null,
+  stage: "draft",
+  updatedAt: "2026-05-26T00:00:00.000Z",
+  version: 3
+};
+
+const initialAssets: ImageAsset[] = [
+  {
+    aspectRatio: 1.5,
+    description: "shell ornament",
+    displayDuration: 15,
+    displayOrder: 1,
+    fileSize: 1024,
+    filename: "shell-ornament.png",
+    height: 400,
+    id: 7,
+    includedInSlideshow: false,
+    isCover: false,
+    mimeType: "image/png",
+    originalName: "shell-ornament.png",
+    title: "殼層裝飾",
+    width: 600
+  },
+  {
+    aspectRatio: 1.5,
+    description: "missing file",
+    displayDuration: 15,
+    displayOrder: 2,
+    fileSize: 1024,
+    filename: null,
+    height: 400,
+    id: 9,
+    includedInSlideshow: false,
+    isCover: false,
+    mimeType: "image/png",
+    originalName: "draft-only.png",
+    title: "沒有檔案",
+    width: 600
+  }
+];
+
+test("shell decoration editor exposes a dedicated authoring surface without display page selection", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/shell-decorations/editor"] },
+      React.createElement(ShellDecorationEditor, {
+        initialDraft,
+        initialImages: initialAssets,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /共用殼層裝飾/);
+  assert.match(html, /Shared Shell Decorations/);
+  assert.match(html, /header-line/);
+  assert.match(html, /Header/);
+  assert.match(html, /Footer/);
+  assert.match(html, /新增物件/);
+  assert.match(html, /幾何/);
+  assert.match(html, /厚度/);
+  assert.doesNotMatch(html, /展示頁編輯/);
+  assert.doesNotMatch(html, /切換五個展示頁畫布/);
+});
+
+test("shell decoration editor preview highlights the selected shell object at FHD geometry", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/shell-decorations/editor"] },
+      React.createElement(ShellDecorationEditor, {
+        initialDraft,
+        initialImages: initialAssets,
+        initialSelectedObjectId: "header-line"
+      })
+    )
+  );
+
+  assert.match(html, /data-shell-preview-surface="true"/);
+  assert.match(html, /data-shell-preview-selection="header-line"/);
+  assert.match(html, /left:86px/);
+  assert.match(html, /width:320px/);
+});
+
+test("resolveShellDecorationAssetOptions keeps asset-image picking typed and excludes unusable assets without files", () => {
+  const options = resolveShellDecorationAssetOptions(initialAssets);
+
+  assert.deepEqual(
+    options.map((option) => option.assetId),
+    [7]
+  );
+  assert.equal(options[0]?.fallbackSrc, "http://localhost:3000/uploads/images/shell-ornament.png");
+});
+
+test("shell decoration editor route and navigation register a dedicated shell authoring path", () => {
+  assert.match(routeMetaSource, /path: "\/shell-decorations\/editor"/);
+  assert.match(routeMetaSource, /navLabel: "殼層裝飾"/);
+  assert.match(routerSource, /path: "shell-decorations\/editor"/);
+  assert.match(routerSource, /element: <ShellDecorationEditorRoute \/>/);
+  assert.match(runtimeSource, /ManagementShellFrame hideChrome/);
+});
+
+test("shell decoration editor workflow stays on shell draft services instead of display page draft services", () => {
+  assert.match(editorSource, /getShellDecorationDraft/);
+  assert.match(editorSource, /saveShellDecorationDraft/);
+  assert.match(editorSource, /publishShellDecorations/);
+  assert.doesNotMatch(editorSource, /useDisplayPageConfig/);
+  assert.doesNotMatch(editorSource, /publishDisplayPageDraft/);
+});
+
+test("shell decoration editor load, save, and publish helpers stay scoped to shared shell draft services", async () => {
+  const calls: string[] = [];
+  const loaded = await loadShellDecorationEditorData(
+    async () => {
+      calls.push("load-draft");
+      return initialDraft;
+    },
+    async () => {
+      calls.push("load-images");
+      return initialAssets;
+    }
+  );
+
+  assert.deepEqual(calls, ["load-draft", "load-images"]);
+  assert.equal(loaded.draft.version, 3);
+  assert.equal(loaded.images.length, 2);
+
+  const saved = await saveShellDecorationEditorDraft(initialDraft, async (channel, baseVersion) => {
+    calls.push(`save:${baseVersion}:${channel.headerObjects.length}:${channel.footerObjects.length}`);
+    return {
+      ...initialDraft,
+      version: baseVersion + 1
+    };
+  });
+
+  assert.equal(saved.version, 4);
+
+  const published = await publishShellDecorationEditorDraft(
+    async () => {
+      calls.push("publish");
+      return {
+        config: initialDraft,
+        validation: { canPublish: true, findings: [] }
+      };
+    },
+    async () => {
+      calls.push("reload-draft");
+      return {
+        ...initialDraft,
+        publishedAt: "2026-05-26T01:00:00.000Z",
+        version: 5
+      };
+    }
+  );
+
+  assert.deepEqual(calls, [
+    "load-draft",
+    "load-images",
+    "save:3:1:0",
+    "publish",
+    "reload-draft"
+  ]);
+  assert.equal(published.draft.version, 5);
+  assert.equal(published.validation.canPublish, true);
+});

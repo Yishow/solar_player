@@ -12,6 +12,7 @@ import { ImageManagement } from "../pages/ImageManagement";
 import { MqttSettings } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
 import { PlaybackSettings } from "../pages/PlaybackSettings";
+import { ShellDecorationEditorRoute } from "../pages/ShellDecorationEditor/runtime";
 import { SlideshowPreview } from "../pages/SlideshowPreview";
 import { DisplayPageRouteHost } from "../pages/shared/displayPageRouteHost";
 
@@ -80,5 +81,9 @@ export const router = createBrowserRouter([
   {
     path: "display-pages/editor",
     element: <DisplayPagesEditorRoute />
+  },
+  {
+    path: "shell-decorations/editor",
+    element: <ShellDecorationEditorRoute />
   }
 ]);
