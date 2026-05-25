@@ -2,6 +2,7 @@ import type {
   ConfigStage,
   DisplayPageCardRail,
   DisplayPageConfigEnvelope,
+  DisplayPageFreeformObject,
   DisplayPageId,
   FallbackPolicy,
   ManagementDraftSaveConflict
@@ -10,6 +11,7 @@ import {
   defaultFallbackPolicy,
   isDisplayPageCardRail,
   isLegacyDisplayPageMetricHighlightRail,
+  normalizeDisplayPageFreeformObjects,
   upgradeLegacyMetricHighlightRail
 } from "@solar-display/shared";
 import type { Dispatch, SetStateAction } from "react";
@@ -26,6 +28,10 @@ export { getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+
+type DisplayPageConfigWithFreeformObjects = {
+  freeformObjects?: DisplayPageFreeformObject[];
+};
 
 export function resolveDisplayPageConfigForPage<T>(
   pageId: DisplayPageId,
@@ -91,6 +97,24 @@ export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown
   }
 
   return deepClone(overrideConfig as T);
+}
+
+export function mergeDisplayPageConfigEnvelope<T>(
+  seedConfig: T,
+  envelope: Pick<DisplayPageConfigEnvelope, "freeformObjects" | "regions">
+) {
+  const merged = mergeDisplayPageConfig(seedConfig, envelope.regions) as T & DisplayPageConfigWithFreeformObjects;
+  merged.freeformObjects = normalizeDisplayPageFreeformObjects(envelope.freeformObjects);
+  return merged as T;
+}
+
+export function splitDisplayPageConfigEnvelopePayload(config: Record<string, unknown>) {
+  const { freeformObjects, ...regions } = config as Record<string, unknown> & DisplayPageConfigWithFreeformObjects;
+
+  return {
+    freeformObjects: normalizeDisplayPageFreeformObjects(freeformObjects),
+    regions
+  };
 }
 
 export function resolveDisplayPageConfigStagePath(pageId: DisplayPageId, stage: ConfigStage) {
@@ -223,7 +247,7 @@ export function useDisplayPageConfig<T>(
           return;
         }
 
-        const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
+        const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
         setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
         setMessage(resolveLoadMessage(stage, envelope));
       } catch (error) {
@@ -260,7 +284,7 @@ export function useDisplayPageConfig<T>(
 
     try {
       const envelope = await getDisplayPageConfig(pageId, stage);
-      const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
+      const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
       setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
       setMessage(resolveLoadMessage(stage, envelope));
     } catch (error) {
@@ -287,19 +311,21 @@ export function useDisplayPageConfig<T>(
     setErrorMessage("");
 
     try {
+      const payload = splitDisplayPageConfigEnvelopePayload(config as Record<string, unknown>);
       const envelope = await updateDisplayPageConfig(
         pageId,
-        config as Record<string, unknown>,
+        payload.regions,
         stage,
-        { baseVersion: lastLoadedEnvelope.version }
+        { baseVersion: lastLoadedEnvelope.version },
+        payload.freeformObjects
       );
-      const mergedConfig = mergeDisplayPageConfig(seedConfig, envelope.regions);
+      const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
       setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
       setMessage("展示頁設定已儲存。");
     } catch (error) {
       if (isManagementDraftConflictError(error)) {
         const latestEnvelope = error.conflict.latestEnvelope as DisplayPageConfigEnvelope;
-        const latestConfig = mergeDisplayPageConfig(seedConfig, latestEnvelope.regions);
+        const latestConfig = mergeDisplayPageConfigEnvelope(seedConfig, latestEnvelope);
         setSessions((current) => {
           const session = current[pageId] ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy);
 

@@ -1,5 +1,5 @@
 import type { DisplayPageConfigEnvelope, DisplayPageInstance } from "@solar-display/shared";
-import { mergeDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
+import { mergeDisplayPageConfigEnvelope } from "../../hooks/useDisplayPageConfig";
 import type { LiveDisplayPagePreviewState } from "./liveDisplayPagePreview";
 import type { LiveDisplayPagePreviewRegistryEntry } from "./liveDisplayPagePreviewRegistry";
 
@@ -50,7 +50,7 @@ export function buildLiveDisplayPagePreviewState(args: {
   }
 
   return {
-    config: mergeDisplayPageConfig(args.definition.createSeedConfig(), args.envelope.regions),
+    config: mergeDisplayPageConfigEnvelope(args.definition.createSeedConfig(), args.envelope),
     status: "ready"
   };
 }

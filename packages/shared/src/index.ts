@@ -3,6 +3,7 @@ export * from "./brandRuntime.js";
 export * from "./playback.js";
 export * from "./displayRotation.js";
 export * from "./displayPageConfig.js";
+export * from "./displayPageObjects.js";
 export * from "./shellDecorations.js";
 export * from "./displayPageCardRail.js";
 export * from "./householdEquivalence.js";

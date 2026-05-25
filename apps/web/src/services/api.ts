@@ -14,6 +14,7 @@ import type {
   DisplayPageAssetHealthReport,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
+  DisplayPageFreeformObject,
   DisplayPageId,
   DisplayReadinessReport,
   ImageAsset,
@@ -282,13 +283,15 @@ export async function updateDisplayPageConfig(
   pageId: DisplayPageId,
   regions: Record<string, unknown>,
   stage: ConfigStage | "config" = "config",
-  precondition?: ManagementDraftSavePrecondition
+  precondition?: ManagementDraftSavePrecondition,
+  freeformObjects: DisplayPageFreeformObject[] = []
 ) {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
   }>(resolveDisplayPageConfigApiPath(pageId, stage), {
     body: JSON.stringify({
       ...(precondition ?? {}),
+      freeformObjects,
       regions
     }),
     method: "PUT"

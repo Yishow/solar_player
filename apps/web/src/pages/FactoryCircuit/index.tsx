@@ -1,5 +1,6 @@
-import type { CircuitConfig } from "@solar-display/shared";
+import type { CircuitConfig, DisplayPageFreeformObject } from "@solar-display/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import {
   DisplayCardFooter,
   DisplayCardFrame,
@@ -179,6 +180,8 @@ export function FactoryCircuit({
     usesRuntimeFallback: factoryStoryRuntime.usesFallback
   });
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
@@ -408,6 +411,7 @@ export function FactoryCircuit({
           </DisplayCardFrame>
         );
       })}
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

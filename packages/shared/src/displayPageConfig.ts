@@ -1,3 +1,5 @@
+import type { DisplayPageFreeformObject } from "./displayPageObjects.js";
+
 export const displayPageTemplateKeys = [
   "overview",
   "solar",
@@ -137,6 +139,7 @@ export type PublishHistoryEntry = {
 
 export type DisplayPageConfigEnvelope<TRegions extends Record<string, unknown> = Record<string, unknown>> = {
   assetFindings?: DisplayPageAssetFinding[];
+  freeformObjects?: DisplayPageFreeformObject[];
   pageId: DisplayPageId;
   regions: TRegions;
   updatedAt: string | null;
@@ -164,6 +167,7 @@ export function createEmptyDisplayPageConfig(
   pageId: DisplayPageId
 ): DisplayPageConfigEnvelope<Record<string, never>> {
   return {
+    freeformObjects: [],
     pageId,
     regions: {},
     updatedAt: null,

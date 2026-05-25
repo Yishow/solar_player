@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
   DisplayCardFooter,
@@ -111,6 +113,8 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     usesRuntimeFallback: playlistRuntime.usesFallback
   });
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
   const visibleStart = Math.min(Math.max(viewModel.activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
 
@@ -359,6 +363,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           </button>
         );
       })}
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

@@ -3,6 +3,7 @@ import type {
   DisplayPageId,
   DisplayPageFallbackStatus,
   DisplayPageConfigEnvelope,
+  DisplayPageFreeformObject,
   ManagementDraftSaveConflict,
   FallbackPolicy,
   FallbackStatusItem,
@@ -14,6 +15,7 @@ import {
   defaultFallbackPolicy,
   isDisplayPageCardRail,
   isDisplayPageCardRailTemplateKey,
+  normalizeDisplayPageFreeformObjects,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -25,6 +27,7 @@ import {
   collectDisplayPageMediaPlacementIssues,
   normalizeDisplayPageRegionsForStorage
 } from "./displayPageAssetService.js";
+import { validateDisplayPageObjectDraft } from "./displayPageObjectValidation.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -67,10 +70,40 @@ function parseRegions(raw: string | null | undefined): Record<string, unknown> {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if ("regions" in parsed && parsed.regions && typeof parsed.regions === "object" && !Array.isArray(parsed.regions)) {
+        return parsed.regions as Record<string, unknown>;
+      }
       return parsed as Record<string, unknown>;
     }
   } catch { /* fall through */ }
   return {};
+}
+
+function parseFreeformObjects(raw: string | null | undefined): DisplayPageFreeformObject[] {
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.freeformObjects)) {
+      return normalizeDisplayPageFreeformObjects(parsed.freeformObjects);
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function serializeDisplayPageConfigPayload(
+  regions: Record<string, unknown>,
+  freeformObjects: DisplayPageFreeformObject[]
+) {
+  return JSON.stringify({
+    freeformObjects,
+    regions
+  });
 }
 
 function toEnvelope(
@@ -80,6 +113,7 @@ function toEnvelope(
 ): DisplayPageConfigEnvelope {
   if (!row) {
     return {
+      freeformObjects: [],
       pageId,
       regions: {},
       updatedAt: null,
@@ -89,6 +123,7 @@ function toEnvelope(
     };
   }
   return {
+    freeformObjects: parseFreeformObjects(row.config_json),
     pageId,
     regions: parseRegions(row.config_json),
     updatedAt: row.updated_at,
@@ -113,6 +148,7 @@ function writeStageConfig(
   pageId: DisplayPageId,
   stage: ConfigStage,
   regions: Record<string, unknown>,
+  freeformObjects: DisplayPageFreeformObject[] = [],
   options: WriteStageConfigOptions = {}
 ): DisplayPageConfigEnvelope {
   const db = getDatabase();
@@ -138,6 +174,7 @@ function writeStageConfig(
   }
 
   const normalizedRegions = normalizeDisplayPageRegionsForStorage(regions);
+  const normalizedFreeformObjects = normalizeDisplayPageFreeformObjects(freeformObjects);
   const nextVersion = current.version + 1;
   const now = new Date().toISOString();
   db.prepare(
@@ -147,7 +184,7 @@ function writeStageConfig(
        config_json = excluded.config_json,
        version = excluded.version,
        updated_at = excluded.updated_at`
-  ).run(pageId, stage, JSON.stringify(normalizedRegions), nextVersion, now);
+  ).run(pageId, stage, serializeDisplayPageConfigPayload(normalizedRegions, normalizedFreeformObjects), nextVersion, now);
   return readStageConfig(pageId, stage);
 }
 
@@ -391,7 +428,10 @@ function validateCardRail(
   }
 }
 
-function validateConfigDraft(regions: Record<string, unknown>): ValidationResult {
+function validateConfigDraft(
+  regions: Record<string, unknown>,
+  freeformObjects: DisplayPageFreeformObject[] = []
+): ValidationResult {
   const findings: ValidationFinding[] = [];
   const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
   const layoutRects: LayoutRect[] = [];
@@ -500,6 +540,11 @@ function validateConfigDraft(regions: Record<string, unknown>): ValidationResult
     }
   }
 
+  const objectValidation = validateDisplayPageObjectDraft(freeformObjects);
+  if (objectValidation.findings.length > 0) {
+    findings.push(...objectValidation.findings);
+  }
+
   return { findings, canPublish: !findings.some((f) => f.severity === "blocking") };
 }
 
@@ -531,7 +576,7 @@ function publishDraft(
   publishedBy?: string
 ): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
   const draft = readStageConfig(pageId, "draft");
-  const validation = validateConfigDraft(draft.regions);
+  const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? []);
 
   if (!validation.canPublish) {
     return { live: readStageConfig(pageId, "live"), validation };
@@ -553,7 +598,7 @@ function publishDraft(
 
   const newVersion = readNextLiveVersion(pageId);
   const now = new Date().toISOString();
-  const serializedRegions = JSON.stringify(draft.regions);
+  const serializedRegions = serializeDisplayPageConfigPayload(draft.regions, draft.freeformObjects ?? []);
 
   const db = getDatabase();
   const tx = db.transaction(() => {
@@ -599,9 +644,10 @@ function rollbackToVersion(
   }
 
   const regions = parseRegions(historyRow.config_json);
+  const freeformObjects = parseFreeformObjects(historyRow.config_json);
   const newVersion = readNextLiveVersion(pageId);
   const now = new Date().toISOString();
-  const serializedRegions = JSON.stringify(regions);
+  const serializedRegions = serializeDisplayPageConfigPayload(regions, freeformObjects);
 
   const tx = db.transaction(() => {
     db.prepare(

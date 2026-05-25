@@ -33,7 +33,8 @@ after(() => {
 async function saveDraftConfig(
   app: Awaited<ReturnType<typeof buildApp>>,
   pageId: string,
-  regions: Record<string, unknown>
+  regions: Record<string, unknown>,
+  freeformObjects: unknown[] = []
 ) {
   const draftResponse = await app.inject({
     method: "GET",
@@ -46,6 +47,7 @@ async function saveDraftConfig(
     url: `/api/display-pages/${pageId}/draft`,
     payload: {
       baseVersion: draftBody.config.version,
+      freeformObjects,
       regions
     }
   });
@@ -367,6 +369,113 @@ test("POST /api/display-pages/:pageId/publish promotes draft to live", async () 
     const liveBody = liveRes.json() as { config: { regions: { heroCopyLayout: { left: number } }; publishedBy: string | null } };
     assert.equal(liveBody.config.regions.heroCopyLayout.left, 120);
     assert.equal(liveBody.config.publishedBy, "test-operator");
+  } finally {
+    await app.close();
+  }
+});
+
+test("display page freeform objects roundtrip from draft publish into the live config envelope", async () => {
+  const app = await buildApp();
+  const freeformObjects = [
+    {
+      frame: { height: 4, left: 48, top: 24, width: 240 },
+      id: "page-line",
+      locked: false,
+      metadata: {},
+      mount: "content",
+      source: { kind: "line" },
+      style: { color: "#d2b46a", thickness: 4 },
+      type: "line",
+      visible: true,
+      zIndex: 1
+    },
+    {
+      frame: { height: 64, left: 320, top: 40, width: 64 },
+      id: "page-icon",
+      locked: false,
+      metadata: {},
+      mount: "content",
+      source: { assetId: 7, fallbackSrc: "/uploads/images/freeform-icon.svg", kind: "icon-asset" },
+      style: {},
+      type: "icon-asset",
+      visible: true,
+      zIndex: 2
+    }
+  ];
+
+  try {
+    const draftSave = await saveDraftConfig(
+      app,
+      "overview",
+      { heroCopyLayout: { left: 120 } },
+      freeformObjects
+    );
+
+    assert.equal(draftSave.statusCode, 200);
+    const draftBody = draftSave.json() as { config: { freeformObjects: typeof freeformObjects } };
+    assert.deepEqual(draftBody.config.freeformObjects, freeformObjects);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/overview/publish",
+      payload: {}
+    });
+
+    assert.equal(publishResponse.statusCode, 200);
+
+    const liveResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/live"
+    });
+
+    assert.equal(liveResponse.statusCode, 200);
+    const liveBody = liveResponse.json() as { config: { freeformObjects: typeof freeformObjects } };
+    assert.deepEqual(liveBody.config.freeformObjects, freeformObjects);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST publish rejects malformed icon-asset freeform objects before they reach live", async () => {
+  const app = await buildApp();
+
+  try {
+    const draftSave = await saveDraftConfig(
+      app,
+      "overview",
+      { heroCopyLayout: { left: 120 } },
+      [
+        {
+          frame: { height: 64, left: 320, top: 40, width: 64 },
+          id: "page-icon",
+          locked: false,
+          metadata: {},
+          mount: "content",
+          source: { kind: "icon-asset" },
+          style: {},
+          type: "icon-asset",
+          visible: true,
+          zIndex: 2
+        }
+      ]
+    );
+
+    assert.equal(draftSave.statusCode, 200);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/overview/publish",
+      payload: {}
+    });
+
+    assert.equal(publishResponse.statusCode, 422);
+    const publishBody = publishResponse.json() as { validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> } };
+    assert.equal(publishBody.validation.canPublish, false);
+    assert.ok(
+      publishBody.validation.findings.some((finding) =>
+        finding.code === "PAGE_OBJECT_INVALID_SOURCE" && finding.regionId === "page-icon"
+      )
+    );
   } finally {
     await app.close();
   }

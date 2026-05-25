@@ -1,4 +1,6 @@
+import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { useMemo } from "react";
+import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
 import {
@@ -109,6 +111,8 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
 
   const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -242,6 +246,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           </DisplayCardFrame>
         );
       })}
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

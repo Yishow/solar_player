@@ -1,4 +1,4 @@
-import type { SustainabilityPeriodKey } from "@solar-display/shared";
+import type { DisplayPageFreeformObject, SustainabilityPeriodKey } from "@solar-display/shared";
 import {
   type DisplayPageHouseholdEquivalentCard,
   type DisplayPageHouseholdEquivalentCardPayload,
@@ -7,6 +7,7 @@ import {
   type DisplayPageMetricHighlightCardPayload
 } from "@solar-display/shared";
 import { useMemo, useState } from "react";
+import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import { Sparkline } from "../../components/Sparkline";
 import {
@@ -138,6 +139,8 @@ export function Sustainability({
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
   const metricHighlightCards = resolvedConfig.highlightRail.cards.filter(
     (card): card is DisplayPageMetricHighlightCard => card.template === "metric-highlight"
   );
@@ -481,6 +484,7 @@ export function Sustainability({
           </DisplayCardFrame>
         );
       })}
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

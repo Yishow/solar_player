@@ -1,10 +1,13 @@
 import type {
   DisplayPageConfigEnvelope,
   DisplayPageDraftSaveConflictResponse,
+  DisplayPageFreeformObject,
   DisplayPageId
 } from "@solar-display/shared";
 import {
-  createEmptyDisplayPageConfig
+  createEmptyDisplayPageConfig,
+  isDisplayPageFreeformObjectShape,
+  normalizeDisplayPageFreeformObjects
 } from "@solar-display/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
@@ -28,7 +31,11 @@ import {
 import { readDisplayRotationPreview } from "../services/displayRotationService.js";
 
 type DisplayPageRouteParams = { pageId: string };
-type DisplayPageConfigBody = { baseVersion?: number; regions?: Record<string, unknown> };
+type DisplayPageConfigBody = {
+  baseVersion?: number;
+  freeformObjects?: DisplayPageFreeformObject[];
+  regions?: Record<string, unknown>;
+};
 type PublishRequestBody = { publishedBy?: string };
 type RollbackRequestBody = { targetVersion: number; publishedBy?: string };
 
@@ -52,10 +59,30 @@ function parseRegions(raw: string | null | undefined) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if ("regions" in parsed && parsed.regions && typeof parsed.regions === "object" && !Array.isArray(parsed.regions)) {
+        return parsed.regions as Record<string, unknown>;
+      }
       return parsed as Record<string, unknown>;
     }
   } catch { /* fall through */ }
   return {};
+}
+
+function parseFreeformObjects(raw: string | null | undefined) {
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.freeformObjects)) {
+      return normalizeDisplayPageFreeformObjects(parsed.freeformObjects);
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
 }
 
 function sendPlacementValidationError(
@@ -78,7 +105,13 @@ function readStoredDisplayPageConfig(pageId: DisplayPageId): DisplayPageConfigEn
 
   if (!row) return createEmptyDisplayPageConfig(pageId);
 
-  return { pageId, regions: parseRegions(row.config_json), updatedAt: row.updated_at, version: 1 };
+  return {
+    freeformObjects: parseFreeformObjects(row.config_json),
+    pageId,
+    regions: parseRegions(row.config_json),
+    updatedAt: row.updated_at,
+    version: 1
+  };
 }
 
 function resolveEnvelope<TRegions extends Record<string, unknown>>(
@@ -104,9 +137,17 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const pageId = assertDisplayPageId(request.params.pageId);
       const regions = request.body?.regions;
+      const freeformObjects = request.body?.freeformObjects ?? [];
 
       if (regions === undefined || regions === null || Array.isArray(regions) || typeof regions !== "object") {
         const error = new Error("Display page config regions must be an object");
+        // @ts-expect-error fastify reads statusCode
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (!Array.isArray(freeformObjects) || freeformObjects.some((object) => !isDisplayPageFreeformObjectShape(object))) {
+        const error = new Error("Display page freeformObjects must be an array of display objects");
         // @ts-expect-error fastify reads statusCode
         error.statusCode = 400;
         throw error;
@@ -130,7 +171,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
              config_json = excluded.config_json,
              updated_at = CURRENT_TIMESTAMP`
         )
-        .run(pageId, JSON.stringify(normalizedRegions));
+        .run(pageId, JSON.stringify({ freeformObjects, regions: normalizedRegions }));
       app.socketService.emitDisplaySync({
         generatedAt: new Date().toISOString(),
         reason: "display-page-config-updated",
@@ -153,9 +194,17 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const pageId = assertDisplayPageId(request.params.pageId);
       const regions = request.body?.regions;
+      const freeformObjects = request.body?.freeformObjects ?? [];
 
       if (regions === undefined || regions === null || Array.isArray(regions) || typeof regions !== "object") {
         const error = new Error("Display page config regions must be an object");
+        // @ts-expect-error fastify reads statusCode
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (!Array.isArray(freeformObjects) || freeformObjects.some((object) => !isDisplayPageFreeformObjectShape(object))) {
+        const error = new Error("Display page freeformObjects must be an array of display objects");
         // @ts-expect-error fastify reads statusCode
         error.statusCode = 400;
         throw error;
@@ -171,7 +220,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
       try {
         const config = resolveEnvelope(
-          writeStageConfig(pageId, "draft", regions, {
+          writeStageConfig(pageId, "draft", regions, freeformObjects, {
             baseVersion: request.body?.baseVersion
           })
         );
@@ -240,7 +289,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     const pageId = assertDisplayPageId(request.params.pageId);
     const draft = readStageConfig(pageId, "draft");
     const { validateConfigDraft, checkImageReferences } = await import("../services/displayPagePublishingService.js");
-    const validation = validateConfigDraft(draft.regions);
+    const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? []);
     const imageWarnings = checkImageReferences(draft.regions);
     if (imageWarnings.length > 0) validation.findings.push(...imageWarnings);
     const assetFindings = collectDisplayPageAssetFindings(pageId, draft.regions);

@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
   DisplayCardFooter,
@@ -184,6 +186,8 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
 
   const titleLayout = withContentOffset(solarTitleLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
@@ -376,6 +380,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
           </DisplayCardFrame>
         );
       })}
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

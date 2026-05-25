@@ -230,6 +230,10 @@ function parseRegions(raw: string | null | undefined) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if ("regions" in parsed && parsed.regions && typeof parsed.regions === "object" && !Array.isArray(parsed.regions)) {
+        return parsed.regions as Record<string, unknown>;
+      }
+
       return parsed as Record<string, unknown>;
     }
   } catch {

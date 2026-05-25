@@ -320,12 +320,27 @@ test("updateDisplayPageConfig forwards the draft baseVersion precondition to the
       "overview",
       { heroCopyLayout: { left: 120 } },
       "draft",
-      { baseVersion: 4 }
+      { baseVersion: 4 },
+      [
+        {
+          frame: { height: 4, left: 48, top: 24, width: 240 },
+          id: "page-line",
+          locked: false,
+          metadata: {},
+          mount: "content",
+          source: { kind: "line" },
+          style: { color: "#d2b46a", thickness: 4 },
+          type: "line",
+          visible: true,
+          zIndex: 1
+        }
+      ]
     );
 
     assert.equal(response.version, 5);
     assert.match(seenUrl, /\/api\/display-pages\/overview\/draft$/);
     assert.match(seenBody, /"baseVersion":4/);
+    assert.match(seenBody, /"freeformObjects":\[/);
   } finally {
     globalThis.fetch = originalFetch;
   }
