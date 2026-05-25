@@ -203,7 +203,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     <section className="solar-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <div
-        className="solar-leaf-watermark"
+        className="solar-leaf-watermark display-surface-leaf-ornament"
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
@@ -215,7 +215,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       />
 
       <div
-        className="solar-gold-line"
+        className="solar-gold-line display-surface-gold-line"
         style={{
           height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLineLayout.left}px`,
@@ -226,7 +226,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       />
 
       <section
-        className="solar-title-group"
+        className="solar-title-group display-surface-hero-group"
         style={{
           left: `${titleLayout.left}px`,
           top: `${titleLayout.top}px`,
@@ -234,7 +234,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         }}
       >
         <p
-          className="solar-eyebrow"
+          className="solar-eyebrow display-surface-hero-eyebrow"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
@@ -244,7 +244,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
           {resolvedConfig.heroCopy.eyebrow}
         </p>
         <h2
-          className="solar-display-title"
+          className="solar-display-title display-surface-hero-title"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
@@ -255,11 +255,16 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
           <br />
           {solarTitleLine2.prefix}
           {solarTitleLine2.emphasis ? (
-            <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{solarTitleLine2.emphasis}</em>
+            <em
+              className="display-surface-hero-title-emphasis"
+              style={{ fontWeight: heroTypography.titleEmphasisWeight }}
+            >
+              {solarTitleLine2.emphasis}
+            </em>
           ) : null}
         </h2>
         <p
-          className="solar-subtitle"
+          className="solar-subtitle display-surface-hero-subtitle"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
@@ -272,7 +277,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       </section>
 
       <figure
-        className="solar-hero-banner"
+        className="solar-hero-banner display-surface-media-stage display-surface-media-fade-bottom"
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,
@@ -286,7 +291,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
           src={heroMediaSource ?? undefined}
           style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
         />
-        <div className="solar-hero-fade" />
       </figure>
 
       {flowNodeOrder.map((flowItem, index) => {

@@ -1,3 +1,5 @@
+@import "../shared/displaySurfaceChrome.css";
+
 .sustainability-display-page {
   position: relative;
   height: 100%;
@@ -17,11 +19,11 @@
 
 .sustainability-title {
   z-index: 8;
+  --display-title-emphasis-color: var(--display-emphasis-green);
 }
 
 .sustainability-eyebrow {
   margin: 0 0 18px;
-  color: #4f7d3d;
   font-size: 24px;
   font-weight: 600;
   letter-spacing: 9px;
@@ -29,7 +31,6 @@
 
 .sustainability-display-title {
   margin: 0;
-  color: #313538;
   font-size: 80px;
   font-weight: 800;
   line-height: 1.15;
@@ -37,13 +38,11 @@
 }
 
 .sustainability-display-title em {
-  color: #5b8046;
   font-style: normal;
 }
 
 .sustainability-subtitle {
   margin: 20px 0 0;
-  color: #616667;
   font-family: var(--font-family-en);
   font-size: 26px;
   line-height: 1.4;
@@ -51,7 +50,7 @@
 
 .sustainability-copy {
   z-index: 8;
-  color: #4e5550;
+  color: var(--display-copy-ink);
   font-size: 17px;
   line-height: 1.78;
 }
@@ -63,7 +62,7 @@
 .sustainability-copy-en {
   display: block;
   margin-top: 14px;
-  color: #6f756d;
+  color: var(--display-copy-muted);
   font-family: var(--font-family-en);
   font-size: 14px;
   line-height: 1.82;
@@ -71,27 +70,7 @@
 
 .sustainability-leaf-watermark {
   opacity: 0.42;
-}
-
-.sustainability-leaf-watermark::before,
-.sustainability-leaf-watermark::after {
-  content: "";
-  position: absolute;
-  border-radius: 90% 0 90% 0;
-  background: linear-gradient(135deg, rgba(129, 149, 103, 0.24), rgba(129, 149, 103, 0.08));
-  transform: rotate(-28deg);
-}
-
-.sustainability-leaf-watermark::before {
-  width: 150px;
-  height: 74px;
-}
-
-.sustainability-leaf-watermark::after {
-  left: 98px;
-  top: 42px;
-  width: 98px;
-  height: 50px;
+  --display-leaf-rotation: -28deg;
 }
 
 .sustainability-hero {
@@ -105,20 +84,6 @@
   object-position: center 48%;
 }
 
-.sustainability-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(255, 253, 247, 0.96) 0%, rgba(255, 253, 247, 0.72) 15%, rgba(255, 253, 247, 0.18) 36%, rgba(255, 253, 247, 0) 56%);
-}
-
-.sustainability-hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 253, 247, 0) 54%, rgba(255, 253, 247, 0.58) 88%, rgba(255, 253, 247, 0.8) 100%);
-}
-
 .sustainability-highlight-rail {
   z-index: 11;
   position: relative;
@@ -129,10 +94,10 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border: 1px solid rgba(155, 139, 92, 0.22);
+  border: 1px solid var(--display-card-border-soft);
   border-radius: 18px;
-  background: rgba(255, 253, 247, 0.88);
-  box-shadow: 0 12px 24px rgba(96, 81, 56, 0.08);
+  background: var(--display-card-surface-soft);
+  box-shadow: var(--display-shadow-soft);
   padding: 14px 16px;
 }
 
@@ -176,9 +141,9 @@
   --display-card-value-weight: 800;
   --display-card-value-line-height: 0.88;
   --display-card-unit-color: #566152;
-  border: 1px solid rgba(155, 139, 92, 0.28);
-  background: rgba(255, 253, 247, 0.92);
-  box-shadow: 0 12px 28px rgba(96, 81, 56, 0.11);
+  border: 1px solid var(--display-card-border-soft);
+  background: var(--display-card-surface);
+  box-shadow: var(--display-shadow-soft);
 }
 
 .sustainability-card-icon {

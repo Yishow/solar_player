@@ -127,7 +127,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     <section className="images-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
-        className="images-title-group"
+        className="images-title-group display-surface-hero-group"
         style={{
           left: `${titleLayout.left}px`,
           top: `${titleLayout.top}px`,
@@ -135,7 +135,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         }}
       >
         <p
-          className="images-eyebrow"
+          className="images-eyebrow display-surface-hero-eyebrow"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
@@ -145,18 +145,23 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           {resolvedConfig.hero.eyebrow}
         </p>
         <h2
-          className="images-display-title"
+          className="images-display-title display-surface-hero-title"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
           }}
         >
-          <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{titleTokens.emphasis}</em>
+          <em
+            className="display-surface-hero-title-emphasis"
+            style={{ fontWeight: heroTypography.titleEmphasisWeight }}
+          >
+            {titleTokens.emphasis}
+          </em>
           {titleTokens.suffix}
         </h2>
         <p
-          className="images-hero-subtitle"
+          className="images-hero-subtitle display-surface-hero-subtitle"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
@@ -183,7 +188,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       </p>
 
       <div
-        className="images-gold-ornament"
+        className="images-gold-ornament display-surface-gold-ornament"
         style={{
           height: `${goldLayout.height}px`,
           left: `${goldLayout.left}px`,
@@ -227,7 +232,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       </section>
 
       <figure
-        className="images-main-stage"
+        className="images-main-stage display-surface-media-stage display-surface-media-fade-left display-surface-media-fade-bottom"
         style={{
           height: `${mainLayout.height}px`,
           left: `${mainLayout.left}px`,

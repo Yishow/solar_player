@@ -36,3 +36,18 @@ test("shared shell css keeps the accepted single-line header and footer divider 
   assert.doesNotMatch(globalCss, /\.shell-header-bar::before\s*\{/);
   assert.doesNotMatch(globalCss, /\.shell-footer-bar::before\s*\{/);
 });
+
+test("display playback pages define semantic chrome tokens separately from global shell and brand roles", () => {
+  assert.match(tokensCss, /\/\*\s*Display playback chrome tokens\s*\*\//);
+  assert.match(tokensCss, /--display-title-ink:\s*var\(--ink-strong\);/);
+  assert.match(tokensCss, /--display-eyebrow-green:\s*var\(--green\);/);
+  assert.match(tokensCss, /--display-emphasis-green:\s*var\(--green-2\);/);
+  assert.match(tokensCss, /--display-emphasis-gold:\s*var\(--accent\);/);
+  assert.match(tokensCss, /--display-card-surface:\s*rgba\(255,\s*253,\s*247,\s*0\.92\);/);
+  assert.match(tokensCss, /--display-card-border-soft:\s*rgba\(155,\s*139,\s*92,\s*0\.28\);/);
+  assert.match(tokensCss, /--display-photo-fade-paper:\s*rgba\(255,\s*253,\s*247,\s*0\.96\);/);
+  assert.match(tokensCss, /--display-ornament-leaf-fill:\s*rgba\(130,\s*154,\s*104,\s*0\.16\);/);
+  assert.match(tokensCss, /--display-ornament-leaf-stroke:\s*rgba\(130,\s*154,\s*104,\s*0\.72\);/);
+  assert.match(tokensCss, /--display-shadow-soft:\s*0\s+12px\s+28px\s+rgba\(59,\s*54,\s*40,\s*0\.1\);/);
+  assert.match(tokensCss, /\/\*\s*Global shell and brand tokens remain the cross-surface baseline\s*\*\//);
+});

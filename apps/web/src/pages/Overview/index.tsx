@@ -118,7 +118,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     <section className="overview-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <div
-        className="overview-leaf-watermark"
+        className="overview-leaf-watermark display-surface-leaf-ornament"
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
@@ -130,7 +130,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       />
 
       <div
-        className="overview-gold-line"
+        className="overview-gold-line display-surface-gold-line"
         style={{
           height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLineLayout.left}px`,
@@ -141,7 +141,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       />
 
       <section
-        className="overview-title-group"
+        className="overview-title-group display-surface-hero-group"
         style={{
           left: `${titleLayout.left}px`,
           top: `${titleLayout.top}px`,
@@ -149,7 +149,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         }}
       >
         <p
-          className="overview-eyebrow"
+          className="overview-eyebrow display-surface-hero-eyebrow"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
@@ -159,7 +159,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           {resolvedConfig.heroCopy.eyebrow}
         </p>
         <h2
-          className="overview-display-title"
+          className="overview-display-title display-surface-hero-title"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
             fontWeight: heroTypography.titleEmphasisWeight,
@@ -172,7 +172,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           {resolvedConfig.heroCopy.titleLines[1]}
         </h2>
         <p
-          className="overview-hero-subtitle"
+          className="overview-hero-subtitle display-surface-hero-subtitle"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
@@ -186,7 +186,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       </section>
 
       <figure
-        className="overview-hero-banner"
+        className="overview-hero-banner display-surface-media-stage display-surface-media-fade-right display-surface-media-fade-bottom"
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,

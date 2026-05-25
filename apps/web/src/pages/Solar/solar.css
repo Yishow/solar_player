@@ -1,3 +1,5 @@
+@import "../shared/displaySurfaceChrome.css";
+
 .solar-display-page {
   position: relative;
   height: 100%;
@@ -21,7 +23,6 @@
 
 .solar-eyebrow {
   margin: 0 0 18px;
-  color: #4f7d3d;
   font-size: 24px;
   font-weight: 600;
   letter-spacing: 9px;
@@ -29,7 +30,6 @@
 
 .solar-display-title {
   margin: 0;
-  color: #313538;
   font-size: 80px;
   font-weight: 800;
   line-height: 1.15;
@@ -38,12 +38,11 @@
 
 .solar-display-title em {
   font-style: normal;
-  color: #587e46;
 }
 
 .solar-subtitle {
   margin: 20px 0 0;
-  color: #646968;
+  color: var(--display-copy-muted);
   font-size: 22px;
   line-height: 1.45;
 }
@@ -59,34 +58,14 @@
 .solar-leaf-watermark {
   opacity: 0.36;
   pointer-events: none;
-}
-
-.solar-leaf-watermark::before,
-.solar-leaf-watermark::after {
-  content: "";
-  position: absolute;
-  border-radius: 90% 0 90% 0;
-  background: linear-gradient(135deg, rgba(104, 130, 66, 0.32), rgba(104, 130, 66, 0.05));
-  transform: rotate(-35deg);
-}
-
-.solar-leaf-watermark::before {
-  width: 140px;
-  height: 70px;
-}
-
-.solar-leaf-watermark::after {
-  top: 40px;
-  left: 95px;
-  width: 90px;
-  height: 48px;
+  --display-leaf-rotation: -35deg;
 }
 
 .solar-gold-line {
   height: 1px;
-  transform: rotate(-4deg);
   opacity: 0.8;
-  background: linear-gradient(90deg, transparent, rgba(218, 177, 77, 0.55), transparent);
+  --display-gold-line-gradient: linear-gradient(90deg, transparent, rgba(218, 177, 77, 0.55), transparent);
+  --display-gold-line-rotation: -4deg;
 }
 
 .solar-hero-banner {
@@ -99,12 +78,6 @@
   width: 100%;
   object-fit: cover;
   object-position: center 52%;
-}
-
-.solar-hero-fade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 253, 247, 0) 48%, rgba(255, 253, 247, 0.36) 74%, rgba(255, 253, 247, 0.88) 100%);
 }
 
 .solar-flow-node {

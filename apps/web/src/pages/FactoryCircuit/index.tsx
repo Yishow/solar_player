@@ -182,7 +182,7 @@ export function FactoryCircuit({
     <section className="factory-circuit-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
-        className="factory-circuit-title"
+        className="factory-circuit-title display-surface-hero-group"
         style={{
           left: `${titleLayout.left}px`,
           top: `${titleLayout.top}px`,
@@ -190,7 +190,7 @@ export function FactoryCircuit({
         }}
       >
         <p
-          className="factory-circuit-eyebrow"
+          className="factory-circuit-eyebrow display-surface-hero-eyebrow"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
@@ -200,7 +200,7 @@ export function FactoryCircuit({
           {resolvedConfig.hero.eyebrow}
         </p>
         <h2
-          className="factory-circuit-display-title"
+          className="factory-circuit-display-title display-surface-hero-title"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
             fontWeight: heroTypography.titleEmphasisWeight,
@@ -211,7 +211,7 @@ export function FactoryCircuit({
           {resolvedConfig.hero.title}
         </h2>
         <p
-          className="factory-circuit-subtitle"
+          className="factory-circuit-subtitle display-surface-hero-subtitle"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
@@ -245,7 +245,7 @@ export function FactoryCircuit({
       </p>
 
       <div
-        className="factory-circuit-gold-line"
+        className="factory-circuit-gold-line display-surface-gold-line"
         style={{
           height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLayout.left}px`,
@@ -256,7 +256,7 @@ export function FactoryCircuit({
       />
 
       <div
-        className="factory-circuit-leaf-watermark"
+        className="factory-circuit-leaf-watermark display-surface-leaf-ornament"
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,

@@ -96,7 +96,7 @@ export function createGoldLineChromeConfig(
     opacity:
       typeof overrides.opacity === "number" && Number.isFinite(overrides.opacity) && overrides.opacity >= 0 && overrides.opacity <= 1
         ? overrides.opacity
-        : 0.8,
+        : 0.82,
     thickness: resolveNonNegativeNumber(overrides.thickness, 1)
   };
 }
@@ -131,7 +131,7 @@ export function createLeafOrnamentChromeConfig(
     opacity:
       typeof overrides.opacity === "number" && Number.isFinite(overrides.opacity) && overrides.opacity >= 0 && overrides.opacity <= 1
         ? overrides.opacity
-        : 0.4,
+        : 0.42,
     scale: resolveNonNegativeNumber(overrides.scale, 1)
   };
 }

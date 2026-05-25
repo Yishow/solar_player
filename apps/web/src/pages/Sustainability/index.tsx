@@ -208,7 +208,7 @@ export function Sustainability({
     <section className="sustainability-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
-        className="sustainability-title"
+        className="sustainability-title display-surface-hero-group"
         style={{
           left: `${titleLayout.left}px`,
           top: `${titleLayout.top}px`,
@@ -216,7 +216,7 @@ export function Sustainability({
         }}
       >
         <p
-          className="sustainability-eyebrow"
+          className="sustainability-eyebrow display-surface-hero-eyebrow"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
@@ -226,19 +226,24 @@ export function Sustainability({
           {resolvedConfig.hero.eyebrow}
         </p>
         <h2
-          className="sustainability-display-title"
+          className="sustainability-display-title display-surface-hero-title"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
             letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
           }}
         >
-          <em style={{ fontWeight: heroTypography.titleEmphasisWeight }}>{resolvedConfig.hero.title[0]}</em>
+          <em
+            className="display-surface-hero-title-emphasis"
+            style={{ fontWeight: heroTypography.titleEmphasisWeight }}
+          >
+            {resolvedConfig.hero.title[0]}
+          </em>
           <br />
           {resolvedConfig.hero.title[1]}
         </h2>
         <p
-          className="sustainability-subtitle"
+          className="sustainability-subtitle display-surface-hero-subtitle"
           style={{
             fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
             lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
@@ -302,7 +307,7 @@ export function Sustainability({
       </div>
 
       <div
-        className="sustainability-leaf-watermark"
+        className="sustainability-leaf-watermark display-surface-leaf-ornament"
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
@@ -314,7 +319,7 @@ export function Sustainability({
       />
 
       <figure
-        className="sustainability-hero"
+        className="sustainability-hero display-surface-media-stage display-surface-media-fade-left display-surface-media-fade-bottom"
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,

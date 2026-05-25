@@ -1,0 +1,164 @@
+.display-surface-hero-group {
+  z-index: 8;
+}
+
+.display-surface-hero-eyebrow {
+  margin: 0 0 18px;
+  color: var(--display-eyebrow-green);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 9px;
+  text-align: left;
+}
+
+.display-surface-hero-title {
+  margin: 0;
+  color: var(--display-title-ink);
+  font-size: 80px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 6px;
+  text-align: left;
+}
+
+.display-surface-hero-title-emphasis {
+  color: var(--display-title-emphasis-color, var(--display-emphasis-green));
+  font-style: normal;
+  font-weight: var(--display-title-emphasis-weight, inherit);
+}
+
+.display-surface-hero-subtitle {
+  margin: 20px 0 0;
+  color: var(--display-subtitle-ink);
+  font-family: var(--font-family-en);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.display-surface-media-stage {
+  position: absolute;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.display-surface-media-stage::before,
+.display-surface-media-stage::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.display-surface-media-stage > img,
+.display-surface-media-stage > div {
+  position: relative;
+  z-index: 0;
+}
+
+.display-surface-media-fade-left::before {
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--display-photo-fade-paper) 0%,
+    var(--display-photo-fade-paper-soft) 15%,
+    var(--display-photo-fade-paper-tint) 36%,
+    var(--display-photo-fade-paper-clear) 56%
+  );
+}
+
+.display-surface-media-fade-right::before {
+  inset: 0;
+  background: linear-gradient(
+    270deg,
+    var(--display-photo-fade-paper) 0%,
+    var(--display-photo-fade-paper-soft) 15%,
+    var(--display-photo-fade-paper-tint) 36%,
+    var(--display-photo-fade-paper-clear) 56%
+  );
+}
+
+.display-surface-media-fade-bottom::after {
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--display-photo-fade-bottom-height, 46%);
+  background: linear-gradient(
+    180deg,
+    var(--display-photo-fade-paper-clear) 0%,
+    var(--display-photo-fade-paper-bottom-soft) 54%,
+    var(--display-photo-fade-paper-bottom-strong) 100%
+  );
+}
+
+.display-surface-leaf-ornament {
+  pointer-events: none;
+}
+
+.display-surface-leaf-ornament::before,
+.display-surface-leaf-ornament::after {
+  content: "";
+  position: absolute;
+  border-radius: 90% 0 90% 0;
+  background: linear-gradient(135deg, var(--display-ornament-leaf-fill), var(--display-ornament-leaf-fill-soft));
+  box-shadow: inset 0 0 0 1.5px var(--display-ornament-leaf-stroke);
+}
+
+.display-surface-leaf-ornament::before {
+  width: 74%;
+  height: 52%;
+  transform: rotate(var(--display-leaf-rotation, -30deg));
+}
+
+.display-surface-leaf-ornament::after {
+  left: 48%;
+  top: 32%;
+  width: 48%;
+  height: 34%;
+  transform: rotate(var(--display-leaf-rotation, -30deg));
+}
+
+.display-surface-gold-line {
+  background: var(
+    --display-gold-line-gradient,
+    linear-gradient(90deg, transparent, var(--display-ornament-gold-strong), transparent)
+  );
+  transform: rotate(var(--display-gold-line-rotation, 0deg));
+  transform-origin: center;
+}
+
+.display-surface-gold-ornament {
+  pointer-events: none;
+}
+
+.display-surface-gold-ornament::before,
+.display-surface-gold-ornament::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.display-surface-gold-ornament::before {
+  inset: 0;
+  background: var(
+    --display-gold-ornament-line,
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--display-ornament-gold-strong) 48%,
+      var(--display-ornament-gold-soft) 78%,
+      transparent 100%
+    )
+  );
+}
+
+.display-surface-gold-ornament::after {
+  left: var(--display-gold-ornament-leaf-left, 64%);
+  top: var(--display-gold-ornament-leaf-top, -8%);
+  width: var(--display-gold-ornament-leaf-width, 28%);
+  height: var(--display-gold-ornament-leaf-height, 110%);
+  border-radius: 90% 0 90% 0;
+  background: linear-gradient(135deg, var(--display-ornament-leaf-fill), var(--display-ornament-leaf-fill-soft));
+  box-shadow: inset 0 0 0 1.5px var(--display-ornament-leaf-stroke);
+  transform: rotate(-24deg);
+}
