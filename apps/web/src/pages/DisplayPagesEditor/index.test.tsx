@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ImageAsset } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
@@ -11,6 +12,25 @@ import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import { DisplayPagesEditor, type DisplayEditorPageDefinition } from "./index";
 import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
 import { DisplayEditorLeftPanel } from "./regionTree";
+
+const initialImages: ImageAsset[] = [
+  {
+    aspectRatio: 1.25,
+    description: "page image",
+    displayDuration: 12,
+    displayOrder: 1,
+    fileSize: 4096,
+    filename: "page-object.png",
+    height: 640,
+    id: 7,
+    includedInSlideshow: false,
+    isCover: false,
+    mimeType: "image/png",
+    originalName: "page-object.png",
+    title: "Page Object Asset",
+    width: 800
+  }
+];
 
 function withMockWindow<T>(windowValue: Window & typeof globalThis, callback: () => T) {
   const target = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
@@ -163,6 +183,60 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.doesNotMatch(html, /區域預設/);
 });
 
+test("display page editor exposes freeform object list and asset-backed inspector fields inside the existing editor", () => {
+  const pageDefinitions: DisplayEditorPageDefinition[] = [
+    {
+      createSeedConfig: () => ({
+        freeformObjects: [
+          {
+            frame: { height: 140, left: 420, top: 96, width: 220 },
+            id: "overview-object-asset",
+            locked: false,
+            metadata: {},
+            mount: "content",
+            source: { assetId: 7, fallbackSrc: "/uploads/images/page-object.png", kind: "asset-image" },
+            style: { opacity: 1, rotation: 0 },
+            type: "asset-image",
+            visible: true,
+            zIndex: 1
+          }
+        ],
+        heroCopyLayout: { align: "left", maxWidth: 720, top: 124 }
+      }),
+      id: "overview",
+      label: "Overview",
+      templateKey: "overview"
+    }
+  ];
+
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-object-asset"
+        },
+        initialImages,
+        pageDefinitions,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /自由物件/);
+  assert.match(html, /新增線條/);
+  assert.match(html, /新增圖片/);
+  assert.match(html, /新增圖示/);
+  assert.match(html, /自由圖片物件/);
+  assert.match(html, /目前素材：Page Object Asset/);
+  assert.match(html, /選擇圖片素材/);
+  assert.match(html, /替代文字/);
+});
+
 test("display page editor renders rail card hierarchy and template-aware controls for sustainability cards", () => {
   const seedConfig = createSustainabilityDisplayPageSeedConfig();
   const regions = resolveDisplayEditorRegions(
@@ -176,6 +250,7 @@ test("display page editor renders rail card hierarchy and template-aware control
   const html = renderToStaticMarkup(
     React.createElement("div", {}, [
       React.createElement(DisplayEditorLeftPanel, {
+        freeformObjects: [],
         dirty: false,
         editMode: true,
         errorMessage: "",
@@ -186,12 +261,21 @@ test("display page editor renders rail card hierarchy and template-aware control
         key: "tree",
         lockedRegionIds: [],
         message: "展示頁設定已同步。",
+        onAddObject: () => {},
+        onDeleteObject: () => {},
+        onDuplicateObject: () => {},
+        onMoveObjectBackward: () => {},
+        onMoveObjectForward: () => {},
         onPublish: () => {},
         onReload: () => {},
         onSave: () => {},
+        onSelectObject: () => {},
         onSelectRegion: () => {},
+        onToggleObjectLocked: () => {},
+        onToggleObjectVisible: () => {},
         onToggleRegionLock: () => {},
         regions,
+        selectedObjectId: null,
         selectedRegionId: selectedCard.id
       }),
       React.createElement(CardRailInspectorActions, {

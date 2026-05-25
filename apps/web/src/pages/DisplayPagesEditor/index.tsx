@@ -1,5 +1,8 @@
 import {
+  normalizeDisplayPageFreeformObjects,
+  type DisplayPageFreeformObject,
   type DisplayPageCardRailTemplateKey,
+  type ImageAsset,
   type DisplayPageTemplateKey
 } from "@solar-display/shared";
 import React from "react";
@@ -15,6 +18,7 @@ import { routeMetaMap } from "../../app/routeMeta";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
 import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
+import { buildApiUrl, getImages } from "../../services/api";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard } from "./canvasCard";
@@ -37,9 +41,23 @@ import {
 import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
+import { resolveDisplayPageFreeformObjectRegions } from "./inspectorFields";
 import { localizeDisplayEditorLabel } from "./localization";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
+import {
+  addDisplayPageObject,
+  deleteDisplayPageObject,
+  duplicateDisplayPageObject,
+  moveDisplayPageObject,
+  toggleDisplayPageObjectLocked,
+  toggleDisplayPageObjectVisible,
+  updateDisplayPageObject
+} from "./freeformObjectList";
+import {
+  buildShellDecorationAssetLabel,
+  ShellDecorationAssetPicker
+} from "../ShellDecorationEditor/assetPicker";
 import {
   addCardRailCard,
   duplicateCardRailCard,
@@ -71,6 +89,33 @@ export type DisplayEditorPageDefinition = {
   templateKey: DisplayPageTemplateKey;
 };
 
+type DisplayPageObjectAssetOption = {
+  assetId: number;
+  fallbackSrc: string;
+  label: string;
+};
+
+function resolveAssetFallbackSrc(asset: ImageAsset) {
+  return asset.filename ? buildApiUrl(`/uploads/images/${asset.filename}`) : null;
+}
+
+function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPageObjectAssetOption[] {
+  return assets.flatMap((asset) => {
+    const fallbackSrc = resolveAssetFallbackSrc(asset);
+    if (!fallbackSrc) {
+      return [];
+    }
+
+    return [
+      {
+        assetId: asset.id,
+        fallbackSrc,
+        label: buildShellDecorationAssetLabel(asset)
+      }
+    ];
+  });
+}
+
 function renderDisplayEditorFallback(label: string) {
   return (
     <div className="flex h-full items-center justify-center bg-[#e8eddf] text-[40px] font-semibold text-[var(--shell-title-ink)]">
@@ -84,6 +129,7 @@ const editorRouteMeta = routeMetaMap.get("/display-pages/editor")!;
 export function DisplayPagesEditor({
   editMode: controlledEditMode,
   initialEditorState,
+  initialImages,
   onEditModeChange,
   initialPublishingStateByPage,
   pageDefinitions = fallbackPageDefinitions,
@@ -96,6 +142,7 @@ export function DisplayPagesEditor({
     selectedRegionId?: string | null;
     selectedRegionIds?: string[];
   };
+  initialImages?: ImageAsset[];
   initialPublishingStateByPage?: DisplayPagePublishingStateMap;
   onEditModeChange?: (nextEditMode: boolean) => void;
   pageDefinitions?: DisplayEditorPageDefinition[];
@@ -136,6 +183,8 @@ export function DisplayPagesEditor({
         ? { [selectedPageId]: initialEditorState.lockedRegionIds }
         : {}
   );
+  const [images, setImages] = useState<ImageAsset[]>(initialImages ?? []);
+  const [imagePickerError, setImagePickerError] = useState("");
   const editMode = controlledEditMode ?? internalEditMode;
 
   const selectedPage = useMemo(
@@ -166,29 +215,41 @@ export function DisplayPagesEditor({
   const updatePath = (path: Array<number | string>, value: unknown) => {
     setConfig((current) => setValueAtPath(current, path, value));
   };
+  const freeformObjects = useMemo(
+    () => normalizeDisplayPageFreeformObjects((config as { freeformObjects?: unknown }).freeformObjects),
+    [config]
+  );
   const editableRegions = useMemo(
     () => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.templateKey), seedConfig),
     [config, seedConfig, selectedPage.templateKey]
   );
-  const editableRegionIds = useMemo(
-    () => new Set(editableRegions.map((region) => region.id)),
-    [editableRegions]
+  const editableFreeformObjects = useMemo(
+    () => resolveDisplayPageFreeformObjectRegions(config, seedConfig),
+    [config, seedConfig]
+  );
+  const editableItems = useMemo(
+    () => [...editableRegions, ...editableFreeformObjects],
+    [editableFreeformObjects, editableRegions]
+  );
+  const editableItemIds = useMemo(
+    () => new Set(editableItems.map((item) => item.id)),
+    [editableItems]
   );
   const resolvedSelectedRegionIds = useMemo(
-    () => selectedRegionIds.filter((regionId) => editableRegionIds.has(regionId)),
-    [editableRegionIds, selectedRegionIds]
+    () => selectedRegionIds.filter((regionId) => editableItemIds.has(regionId)),
+    [editableItemIds, selectedRegionIds]
   );
   const selectedRegion = useMemo(
     () =>
-      editableRegions.find((region) => region.id === selectedRegionId) ??
-      editableRegions.find((region) => region.id === resolvedSelectedRegionIds[resolvedSelectedRegionIds.length - 1]) ??
-      editableRegions[0] ??
+      editableItems.find((region) => region.id === selectedRegionId) ??
+      editableItems.find((region) => region.id === resolvedSelectedRegionIds[resolvedSelectedRegionIds.length - 1]) ??
+      editableItems[0] ??
       null,
-    [editableRegions, resolvedSelectedRegionIds, selectedRegionId]
+    [editableItems, resolvedSelectedRegionIds, selectedRegionId]
   );
   const selectedRegions = useMemo(
-    () => editableRegions.filter((region) => resolvedSelectedRegionIds.includes(region.id) && region.geometry),
-    [editableRegions, resolvedSelectedRegionIds]
+    () => editableItems.filter((region) => resolvedSelectedRegionIds.includes(region.id) && region.geometry),
+    [editableItems, resolvedSelectedRegionIds]
   );
   const distanceLockTargetRegion = useMemo(
     () =>
@@ -198,8 +259,24 @@ export function DisplayPagesEditor({
     [selectedRegion, selectedRegions]
   );
   const selectedCardRegion = selectedRegion?.nodeType === "card-rail-card" ? selectedRegion : null;
+  const selectedFreeformObjectRegion = selectedRegion?.nodeType === "freeform-object" ? selectedRegion : null;
+  const selectedFreeformObject = useMemo(
+    () =>
+      selectedFreeformObjectRegion
+        ? freeformObjects.find((object) => object.id === selectedFreeformObjectRegion.id) ?? null
+        : null,
+    [freeformObjects, selectedFreeformObjectRegion]
+  );
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
-  const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
+  const lockedObjectIds = useMemo(
+    () => freeformObjects.filter((object) => object.locked).map((object) => object.id),
+    [freeformObjects]
+  );
+  const lockedSelectionIds = useMemo(
+    () => [...lockedRegionIds, ...lockedObjectIds],
+    [lockedObjectIds, lockedRegionIds]
+  );
+  const selectedRegionLocked = isRegionLocked(lockedSelectionIds, selectedRegion?.id);
   const {
     blockingCount,
     isPublishBlocked,
@@ -222,6 +299,35 @@ export function DisplayPagesEditor({
   } = useDisplayPageAssetHealth();
 
   useEffect(() => {
+    if (initialImages) {
+      return;
+    }
+
+    let active = true;
+
+    void getImages()
+      .then((nextImages) => {
+        if (!active) {
+          return;
+        }
+
+        setImages(nextImages);
+        setImagePickerError("");
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+
+        setImagePickerError(error instanceof Error ? error.message : "載入圖片素材失敗。");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialImages]);
+
+  useEffect(() => {
     setSelectedRegionId(null);
     setSelectedRegionIds([]);
     setProductivityMessage(null);
@@ -237,17 +343,17 @@ export function DisplayPagesEditor({
       return;
     }
 
-    if (!selectedRegionId && editableRegions[0]) {
-      setSelectedRegionId(editableRegions[0].id);
-      setSelectedRegionIds([editableRegions[0].id]);
+    if (!selectedRegionId && editableItems[0]) {
+      setSelectedRegionId(editableItems[0].id);
+      setSelectedRegionIds([editableItems[0].id]);
     }
-  }, [editMode, editableRegions, selectedRegionId]);
+  }, [editMode, editableItems, selectedRegionId]);
 
   useEffect(() => {
-    if (selectedRegionId && !editableRegionIds.has(selectedRegionId)) {
-      setSelectedRegionId(editableRegions[0]?.id ?? null);
+    if (selectedRegionId && !editableItemIds.has(selectedRegionId)) {
+      setSelectedRegionId(editableItems[0]?.id ?? null);
     }
-  }, [editableRegionIds, editableRegions, selectedRegionId]);
+  }, [editableItemIds, editableItems, selectedRegionId]);
 
   useEffect(() => {
     if (resolvedSelectedRegionIds.length !== selectedRegionIds.length) {
@@ -311,6 +417,42 @@ export function DisplayPagesEditor({
     await reloadAssetHealth();
   };
 
+  const applyFreeformObjectUpdate = useCallback(
+    (
+      updater: (
+        objects: DisplayPageFreeformObject[]
+      ) => { objects: DisplayPageFreeformObject[]; selectedObjectId?: string | null } | DisplayPageFreeformObject[]
+    ) => {
+      const nextValue = updater(freeformObjects);
+      const nextObjects = Array.isArray(nextValue) ? nextValue : nextValue.objects;
+      const nextSelectedObjectId = Array.isArray(nextValue) ? undefined : nextValue.selectedObjectId;
+
+      applyConfigUpdate((current) => ({
+        ...current,
+        freeformObjects: nextObjects
+      }));
+
+      if (nextSelectedObjectId !== undefined) {
+        setSelectedRegionId(nextSelectedObjectId);
+        setSelectedRegionIds(nextSelectedObjectId ? [nextSelectedObjectId] : []);
+      }
+    },
+    [applyConfigUpdate, freeformObjects]
+  );
+
+  const updateSelectedFreeformObject = useCallback(
+    (updater: (object: DisplayPageFreeformObject) => DisplayPageFreeformObject) => {
+      if (!selectedFreeformObject) {
+        return;
+      }
+
+      applyFreeformObjectUpdate((objects) =>
+        updateDisplayPageObject(objects, selectedFreeformObject.id, updater)
+      );
+    },
+    [applyFreeformObjectUpdate, selectedFreeformObject]
+  );
+
   const handleSelectCardTemplate = (template: DisplayPageCardRailTemplateKey) => {
     if (!selectedCardRegion?.cardId || !selectedCardRegion.railPath) {
       return;
@@ -340,7 +482,7 @@ export function DisplayPagesEditor({
       applyConfigUpdate((current) => {
         let nextConfig = current;
 
-        for (const region of editableRegions) {
+        for (const region of editableItems) {
           const nextRect = nextById.get(region.id);
           if (!nextRect) {
             continue;
@@ -352,7 +494,7 @@ export function DisplayPagesEditor({
       });
       setSelectionFeedbackLabel(actionLabel);
     },
-    [applyConfigUpdate, editableRegions]
+    [applyConfigUpdate, editableItems]
   );
 
   const geometryPasteTargets = useMemo(() => {
@@ -365,15 +507,15 @@ export function DisplayPagesEditor({
         ? selectedRegions.filter((region) => region.id !== geometryClipboard?.sourceRegionId)
         : [selectedRegion];
     return selectedTargets;
-  }, [geometryClipboard?.sourceRegionId, lockedRegionIds, selectedRegion, selectedRegions]);
+  }, [geometryClipboard?.sourceRegionId, selectedRegion, selectedRegions]);
   const geometryPasteCompatibility = useMemo(
     () =>
       geometryPasteTargets.map((region) => ({
         compatibility: resolveGeometryClipboardCompatibility(region, geometryClipboard),
-        locked: isRegionLocked(lockedRegionIds, region.id),
+        locked: isRegionLocked(lockedSelectionIds, region.id),
         region
       })),
-    [geometryClipboard, geometryPasteTargets, lockedRegionIds]
+    [geometryClipboard, geometryPasteTargets, lockedSelectionIds]
   );
   const compatibleGeometryPasteCount = geometryPasteCompatibility.filter(
     (entry) => !entry.locked && entry.compatibility.compatible
@@ -462,9 +604,9 @@ export function DisplayPagesEditor({
     config,
     distanceLockTargetRegion,
     editMode,
-    lockedRegionIds,
+    lockedRegionIds: lockedSelectionIds,
     redo,
-    regions: editableRegions,
+    regions: editableItems,
     selectedRegion,
     selectedRegionIds: resolvedSelectedRegionIds,
     selectionFeedbackLabel,
@@ -483,12 +625,14 @@ export function DisplayPagesEditor({
 
   const overlayDesignSpace = overlayState.designSpace;
   const temporaryMeasureTargetRegion = useMemo(
-    () => editableRegions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
-    [editableRegions, temporaryMeasureTargetRegionId]
+    () => editableItems.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
+    [editableItems, temporaryMeasureTargetRegionId]
   );
   const multiSelectCount = selectedRegions.length;
-  const alignDisabled = multiSelectCount < 2 || selectedRegions.some((region) => isRegionLocked(lockedRegionIds, region.id));
-  const distributeDisabled = multiSelectCount < 3 || selectedRegions.some((region) => isRegionLocked(lockedRegionIds, region.id));
+  const alignDisabled =
+    multiSelectCount < 2 || selectedRegions.some((region) => isRegionLocked(lockedSelectionIds, region.id));
+  const distributeDisabled =
+    multiSelectCount < 3 || selectedRegions.some((region) => isRegionLocked(lockedSelectionIds, region.id));
 
   const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
@@ -496,6 +640,7 @@ export function DisplayPagesEditor({
     () => resolvePlaybackRouteMeta(`/${selectedPage.id}`, []),
     [selectedPage.id]
   );
+  const assetOptions = useMemo(() => resolveDisplayPageObjectAssetOptions(images), [images]);
 
   const pageTabs = (
     <div className="flex items-end gap-2">
@@ -571,6 +716,64 @@ export function DisplayPagesEditor({
       }
     />
   ) : null;
+  const freeformObjectActions = selectedFreeformObject ? (
+    <div className="space-y-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] p-3">
+      <div className="space-y-1 text-[12px] text-[var(--shell-copy-ink)]">
+        <p className="font-semibold text-[var(--shell-title-ink)]">
+          {selectedFreeformObject.type === "line" ? "自由線條" : selectedFreeformObject.type === "icon-asset" ? "自由圖示" : "自由圖片"}
+        </p>
+        <p>{selectedFreeformObject.id}</p>
+      </div>
+      {selectedFreeformObject.type !== "line" ? (
+        <div className="space-y-2">
+          <ShellDecorationAssetPicker
+            options={assetOptions}
+            value={typeof selectedFreeformObject.source.assetId === "number" ? selectedFreeformObject.source.assetId : null}
+            onChange={(assetId) => {
+              const selectedAsset = assetOptions.find((option) => option.assetId === assetId);
+              if (!selectedAsset) {
+                return;
+              }
+
+              updateSelectedFreeformObject((object) => {
+                if (object.type === "line") {
+                  return object;
+                }
+
+                if (object.type === "asset-image") {
+                  return {
+                    ...object,
+                    source: {
+                      ...object.source,
+                      assetId,
+                      fallbackSrc: selectedAsset.fallbackSrc
+                    }
+                  };
+                }
+
+                return {
+                  ...object,
+                  source: {
+                    ...object.source,
+                    assetId,
+                    fallbackSrc: selectedAsset.fallbackSrc
+                  }
+                };
+              });
+            }}
+          />
+          {selectedFreeformObject.source.fallbackSrc ? (
+            <p className="text-[12px] text-[var(--shell-copy-ink)]">
+              目前素材：{assetOptions.find((option) => option.assetId === selectedFreeformObject.source.assetId)?.label ?? selectedFreeformObject.source.fallbackSrc}
+            </p>
+          ) : (
+            <p className="text-[12px] text-[#8f452d]">請先從素材庫選擇圖片來源。</p>
+          )}
+          {imagePickerError ? <p className="text-[12px] text-[#8f452d]">{imagePickerError}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
   const geometryActions = selectedRegion?.geometry ? (
     <div className="space-y-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] p-3">
       <div className="flex flex-wrap gap-2">
@@ -632,6 +835,7 @@ export function DisplayPagesEditor({
     >
       <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
         <DisplayEditorLeftPanel
+          freeformObjects={freeformObjects}
           dirty={dirty}
           editMode={editMode}
           errorMessage={errorMessage}
@@ -640,10 +844,36 @@ export function DisplayPagesEditor({
           isPublishBlocked={isPublishBlocked}
           isSaving={isSaving}
           message={message}
+          onAddObject={(type) => {
+            applyFreeformObjectUpdate((objects) => addDisplayPageObject(objects, type));
+          }}
+          onDeleteObject={(objectId) => {
+            applyFreeformObjectUpdate((objects) =>
+              selectedFreeformObject
+                ? deleteDisplayPageObject(objects, objectId, selectedFreeformObject.id)
+                : objects.filter((object) => object.id !== objectId)
+            );
+          }}
+          onDuplicateObject={(objectId) => {
+            applyFreeformObjectUpdate((objects) => duplicateDisplayPageObject(objects, objectId));
+          }}
+          onMoveObjectBackward={(objectId) => {
+            applyFreeformObjectUpdate((objects) => moveDisplayPageObject(objects, objectId, "backward"));
+          }}
+          onMoveObjectForward={(objectId) => {
+            applyFreeformObjectUpdate((objects) => moveDisplayPageObject(objects, objectId, "forward"));
+          }}
           onPublish={() => void publish()}
           onReload={() => void handleReload()}
           onSave={() => void handleSave()}
+          onSelectObject={handleSelectRegion}
           onSelectRegion={handleSelectRegion}
+          onToggleObjectLocked={(objectId) => {
+            applyFreeformObjectUpdate((objects) => toggleDisplayPageObjectLocked(objects, objectId));
+          }}
+          onToggleObjectVisible={(objectId) => {
+            applyFreeformObjectUpdate((objects) => toggleDisplayPageObjectVisible(objects, objectId));
+          }}
           onToggleRegionLock={(regionId) => {
             setLockedRegionIdsByPage((current) => ({
               ...current,
@@ -651,6 +881,7 @@ export function DisplayPagesEditor({
             }));
           }}
           regions={editableRegions}
+          selectedObjectId={selectedFreeformObject?.id ?? null}
           lockedRegionIds={lockedRegionIds}
           selectedRegionId={selectedRegion?.id ?? null}
         />
@@ -963,11 +1194,11 @@ export function DisplayPagesEditor({
                     </div>
                     <DisplayEditorCanvasOverlay
                       isInteractive={editMode}
-                      lockedRegionIds={lockedRegionIds}
+                      lockedRegionIds={lockedSelectionIds}
                       onSelectTemporaryMeasureTarget={onSelectTemporaryMeasureTarget}
                       onStartMeasurementHandleDrag={onStartMeasurementHandleDrag}
                       overlayState={overlayState}
-                      regions={editableRegions}
+                      regions={editableItems}
                       selectedRegionId={selectedRegion?.id ?? null}
                       selectedRegionIds={resolvedSelectedRegionIds}
                       temporaryMeasureMode={temporaryMeasureMode}
@@ -1014,11 +1245,13 @@ export function DisplayPagesEditor({
             {rightTab === "inspector" && (
               <DisplayEditorInspectorCard
                 flat
-                actions={selectedRegion ? <div className="space-y-4">{geometryActions}{cardRailActions}</div> : null}
+                actions={
+                  selectedRegion ? <div className="space-y-4">{geometryActions}{freeformObjectActions}{cardRailActions}</div> : null
+                }
                 editMode={editMode}
                 emptyMessage={
-                  editableRegions.length > 0
-                    ? "請先在畫布上選取一個可編輯區域。"
+                  editableItems.length > 0
+                    ? "請先在畫布或物件列表中選取一個可編輯項目。"
                     : "這個頁面的專屬編輯區域尚未展開，先保留預覽與路由覆蓋。"
                 }
                 onChange={updatePath}

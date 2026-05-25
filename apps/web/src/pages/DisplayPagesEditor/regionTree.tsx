@@ -1,4 +1,6 @@
-import { useState } from "react";
+import type { DisplayPageFreeformObject } from "@solar-display/shared";
+import { useEffect, useState } from "react";
+import { DisplayPageObjectList } from "./freeformObjectList";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
 import { localizeDisplayEditorLabel, localizeDisplayEditorRegionTreeLabel } from "./localization";
 
@@ -11,6 +13,7 @@ function groupRegionsByParent(regions: ResolvedDisplayEditorRegion[]) {
 }
 
 export function DisplayEditorLeftPanel({
+  freeformObjects,
   dirty,
   editMode,
   errorMessage,
@@ -19,15 +22,25 @@ export function DisplayEditorLeftPanel({
   isPublishBlocked,
   isSaving,
   message,
+  onAddObject,
+  onDeleteObject,
+  onDuplicateObject,
+  onMoveObjectBackward,
+  onMoveObjectForward,
   onPublish,
   onReload,
   onSave,
+  onSelectObject,
   onSelectRegion,
+  onToggleObjectLocked,
+  onToggleObjectVisible,
   onToggleRegionLock,
   regions,
   lockedRegionIds,
+  selectedObjectId,
   selectedRegionId
 }: {
+  freeformObjects: DisplayPageFreeformObject[];
   dirty: boolean;
   editMode: boolean;
   errorMessage: string;
@@ -36,19 +49,34 @@ export function DisplayEditorLeftPanel({
   isPublishBlocked: boolean;
   isSaving: boolean;
   message: string;
+  onAddObject: (type: DisplayPageFreeformObject["type"]) => void;
+  onDeleteObject: (objectId: string) => void;
+  onDuplicateObject: (objectId: string) => void;
+  onMoveObjectBackward: (objectId: string) => void;
+  onMoveObjectForward: (objectId: string) => void;
   onPublish: () => void;
   onReload: () => void;
   onSave: () => void;
+  onSelectObject: (objectId: string) => void;
   onSelectRegion: (regionId: string) => void;
+  onToggleObjectLocked: (objectId: string) => void;
+  onToggleObjectVisible: (objectId: string) => void;
   onToggleRegionLock: (regionId: string) => void;
   regions: ResolvedDisplayEditorRegion[];
+  selectedObjectId: string | null;
   selectedRegionId: string | null;
   lockedRegionIds: string[];
 }) {
-  const [tab, setTab] = useState<"regions" | "actions">("regions");
+  const [tab, setTab] = useState<"objects" | "regions" | "actions">(selectedObjectId ? "objects" : "regions");
   const saveDisabled = isLoading || isSaving || !dirty;
   const publishDisabled = isLoading || isSaving || isPublishing || isPublishBlocked;
   const groupedRegions = groupRegionsByParent(regions);
+
+  useEffect(() => {
+    if (selectedObjectId) {
+      setTab("objects");
+    }
+  }, [selectedObjectId]);
 
   function renderRegionNodes(parentId?: string, depth = 0) {
     const children = groupedRegions[parentId ?? "__root__"] ?? [];
@@ -104,8 +132,8 @@ export function DisplayEditorLeftPanel({
   return (
     <section className="flex h-full flex-col border-r border-[var(--shell-divider)] bg-white/70 backdrop-blur-sm">
       <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
-        {(["regions", "actions"] as const).map((t) => {
-          const labels = { regions: "區域樹", actions: "操作" };
+        {(["regions", "objects", "actions"] as const).map((t) => {
+          const labels = { regions: "區域樹", objects: "自由物件", actions: "操作" };
           return (
             <button
               key={t}
@@ -133,6 +161,46 @@ export function DisplayEditorLeftPanel({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
             <div className="grid gap-2">{renderRegionNodes()}</div>
+          </div>
+        </>
+      )}
+
+      {tab === "objects" && (
+        <>
+          <div className="shrink-0 px-4 pt-3 pb-2">
+            <p className="text-[12px] text-[var(--shell-copy-ink)]">
+              {editMode ? "用物件列表精準挑選、排序與管理自由物件。" : "開啟編輯模式後可管理自由物件。"}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {([
+                { label: "新增線條", type: "line" },
+                { label: "新增圖片", type: "asset-image" },
+                { label: "新增圖示", type: "icon-asset" }
+              ] as const).map((action) => (
+                <button
+                  key={action.type}
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[11px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-45"
+                  disabled={!editMode}
+                  onClick={() => onAddObject(action.type)}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+            <DisplayPageObjectList
+              objects={freeformObjects}
+              onDelete={onDeleteObject}
+              onDuplicate={onDuplicateObject}
+              onMoveBackward={onMoveObjectBackward}
+              onMoveForward={onMoveObjectForward}
+              onSelect={onSelectObject}
+              onToggleLocked={onToggleObjectLocked}
+              onToggleVisible={onToggleObjectVisible}
+              selectedObjectId={selectedObjectId}
+            />
           </div>
         </>
       )}

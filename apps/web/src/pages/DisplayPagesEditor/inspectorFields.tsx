@@ -11,8 +11,12 @@ import {
   type DisplayEditorSelectFieldSchema
 } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  DISPLAY_PAGE_CONTENT_SURFACE_HEIGHT,
+  DISPLAY_PAGE_CONTENT_SURFACE_WIDTH,
+  normalizeDisplayPageFreeformObjects,
   isDisplayPageCardRail,
   sortDisplayPageCardRailCards,
+  type DisplayPageFreeformObject,
   type DisplayPageCardRailCard,
   type DisplayPageCardRailTemplateKey
 } from "@solar-display/shared";
@@ -45,11 +49,13 @@ export type ResolvedDisplayEditorRegion = {
   cardPath?: DisplayEditorPath;
   description?: string;
   fields: ResolvedDisplayEditorField[];
+  freeformObjectType?: DisplayPageFreeformObject["type"];
   geometry?: ResolvedDisplayEditorRect;
   geometryConstraint?: ResolvedDisplayEditorRect;
   id: string;
   label: string;
-  nodeType: "card-rail-card" | "region";
+  nodeType: "card-rail-card" | "freeform-object" | "region";
+  objectPath?: DisplayEditorPath;
   parentId?: string;
   presetKey?: string;
   railPath?: DisplayEditorPath;
@@ -451,6 +457,109 @@ export function resolveDisplayEditorRegions(
     const childRegions = resolveCardRailChildRegions(config, seedConfig, resolvedRegion);
 
     return [resolvedRegion, ...childRegions];
+  });
+}
+
+function buildFreeformObjectFieldSchemas(
+  object: DisplayPageFreeformObject,
+  objectPath: DisplayEditorPath
+): DisplayEditorFieldSchema[] {
+  const baseFields: DisplayEditorFieldSchema[] = [
+    { fieldType: "number", id: "left", label: "X 座標", path: [...objectPath, "frame", "left"], step: 1 },
+    { fieldType: "number", id: "top", label: "Y 座標", path: [...objectPath, "frame", "top"], step: 1 },
+    { fieldType: "number", id: "width", label: "寬度", path: [...objectPath, "frame", "width"], step: 1 },
+    { fieldType: "number", id: "height", label: "高度", path: [...objectPath, "frame", "height"], step: 1 },
+    { fieldType: "number", id: "opacity", label: "透明度", path: [...objectPath, "style", "opacity"], step: 0.05 },
+    { fieldType: "number", id: "rotation", label: "旋轉角度", path: [...objectPath, "style", "rotation"], step: 1 }
+  ];
+
+  if (object.type === "line") {
+    return [
+      ...baseFields,
+      { fieldType: "text", id: "color", label: "線條顏色", path: [...objectPath, "style", "color"] },
+      { fieldType: "number", id: "thickness", label: "線條厚度", path: [...objectPath, "style", "thickness"], step: 1 }
+    ];
+  }
+
+  return [
+    ...baseFields,
+    { fieldType: "text", id: "alt", label: "替代文字", path: [...objectPath, "source", "alt"] }
+  ];
+}
+
+function resolveFreeformObjectLabel(type: DisplayPageFreeformObject["type"]) {
+  switch (type) {
+    case "asset-image":
+      return "自由圖片物件";
+    case "icon-asset":
+      return "自由圖示物件";
+    case "line":
+    default:
+      return "自由線條物件";
+  }
+}
+
+export function resolveDisplayPageFreeformObjectRegions(
+  config: Record<string, unknown>,
+  seedConfig: Record<string, unknown>
+): ResolvedDisplayEditorRegion[] {
+  const objects = normalizeDisplayPageFreeformObjects((config as { freeformObjects?: unknown }).freeformObjects);
+  const seedObjects = normalizeDisplayPageFreeformObjects((seedConfig as { freeformObjects?: unknown }).freeformObjects);
+  const comparableSeedConfig = {
+    ...seedConfig,
+    freeformObjects: objects.map(
+      (object) =>
+        seedObjects.find((candidate) => candidate.id === object.id) ??
+        ({
+          ...object,
+          frame: { height: 0, left: 0, top: 0, width: 0 },
+          source:
+            object.type === "line"
+              ? { kind: "line" }
+              : { ...object.source, assetId: "", fallbackSrc: "" }
+        } as DisplayPageFreeformObject)
+    )
+  };
+
+  return objects.map((object, index) => {
+    const objectPath: DisplayEditorPath = ["freeformObjects", index];
+    const schema: DisplayEditorRegionSchema = {
+      description:
+        object.type === "line"
+          ? "調整自由線條的位置、長度與樣式。"
+          : "調整自由物件的位置、尺寸與素材來源。",
+      fields: buildFreeformObjectFieldSchemas(object, objectPath),
+      geometry: {
+        compatibilityKey: `freeform-object:${object.type}`,
+        heightPath: [...objectPath, "frame", "height"],
+        leftPath: [...objectPath, "frame", "left"],
+        maxHeight: DISPLAY_PAGE_CONTENT_SURFACE_HEIGHT,
+        maxWidth: DISPLAY_PAGE_CONTENT_SURFACE_WIDTH,
+        minHeight: object.type === "line" ? 2 : 16,
+        minWidth: object.type === "line" ? 40 : 16,
+        topPath: [...objectPath, "frame", "top"],
+        widthPath: [...objectPath, "frame", "width"]
+      },
+      id: object.id,
+      label: resolveFreeformObjectLabel(object.type)
+    };
+
+    return {
+      description: schema.description,
+      fields: resolveRegionFields(config, comparableSeedConfig, schema.fields),
+      freeformObjectType: object.type,
+      geometry: {
+        height: object.frame.height,
+        left: object.frame.left,
+        top: object.frame.top,
+        width: object.frame.width
+      },
+      id: object.id,
+      label: schema.label,
+      nodeType: "freeform-object",
+      objectPath,
+      schema
+    };
   });
 }
 

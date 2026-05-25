@@ -16,6 +16,14 @@ export function applyRegionRect(
   region: ResolvedDisplayEditorRegion,
   nextRect: CanvasRect
 ) {
+  if (region.nodeType === "freeform-object" && region.objectPath) {
+    let nextConfig = setValueAtPath(config, [...region.objectPath, "frame", "left"], nextRect.left);
+    nextConfig = setValueAtPath(nextConfig, [...region.objectPath, "frame", "top"], nextRect.top);
+    nextConfig = setValueAtPath(nextConfig, [...region.objectPath, "frame", "width"], nextRect.width);
+    nextConfig = setValueAtPath(nextConfig, [...region.objectPath, "frame", "height"], nextRect.height);
+    return nextConfig;
+  }
+
   if (region.nodeType === "card-rail-card" && region.cardPath && region.geometryConstraint) {
     let nextConfig = setValueAtPath(
       config,
