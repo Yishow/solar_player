@@ -10,7 +10,7 @@
 ## 3. Multi-Select Alignment
 
 - [x] 3.1 Implement multi-select state and **Define multi-select alignment around a stable bounding selection box** so the editor satisfies **Align and distribute multiple selected regions**, and verify with align-command cases in `apps/web/src/pages/DisplayPagesEditor/index.test.tsx` and geometry assertions in `apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts`.
-- [ ] 3.2 Implement distribute actions and **Surface snap and alignment feedback on the canvas, not only in menus** so operators can trust **Align and distribute multiple selected regions**, and verify with equal-gap cases in tests plus one manual multi-card alignment check.
+- [x] 3.2 Implement distribute actions and **Surface snap and alignment feedback on the canvas, not only in menus** so operators can trust **Align and distribute multiple selected regions**, and verify with equal-gap cases in tests plus one manual multi-card alignment check.
 
 ## 4. Verification
 
