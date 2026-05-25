@@ -26,3 +26,4 @@ uploads/brand/*
 
 .playwright-cli/
 .superpowers/
+graphify-out/
