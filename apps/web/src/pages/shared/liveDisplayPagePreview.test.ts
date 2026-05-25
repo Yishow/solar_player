@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import {
   LiveDisplayPagePreview,
+  type LiveDisplayPagePreviewMode,
   type LiveDisplayPagePreviewState
 } from "./liveDisplayPagePreview";
 
@@ -38,10 +39,11 @@ const previewDefinitions: PreviewDefinition[] = [
   }
 ];
 
-function renderPreview(state: LiveDisplayPagePreviewState) {
+function renderPreview(state: LiveDisplayPagePreviewState, mode?: LiveDisplayPagePreviewMode) {
   return renderToStaticMarkup(
     React.createElement(LiveDisplayPagePreview, {
       definitions: previewDefinitions,
+      mode,
       pageLabel: "總覽頁",
       state,
       templateKey: "overview"
@@ -60,6 +62,7 @@ test("live display page preview renders the latest published config through the 
 
   assert.match(html, /已發布新英雄圖/);
   assert.match(html, /\/media\/overview-hero-v2\.png/);
+  assert.match(html, /data-live-preview-mode="editor"/);
   assert.match(html, /data-live-preview-status="ready"/);
   assert.match(html, /唯讀預覽/);
   assert.match(html, /data-live-preview-scaled-content="true"/);
@@ -75,5 +78,53 @@ test("live display page preview exposes explicit fallback state when the publish
   assert.match(html, /總覽頁/);
   assert.match(html, /預覽暫時無法顯示/);
   assert.match(html, /缺少正式素材/);
+  assert.match(html, /data-live-preview-mode="editor"/);
   assert.match(html, /data-live-preview-status="asset-unavailable"/);
+});
+
+test("live display page preview keeps editor behavior when mode is omitted", () => {
+  const html = renderPreview({
+    config: {
+      headline: "維持 editor 模式",
+      mediaSrc: "/media/overview-editor-default.png"
+    },
+    status: "ready"
+  });
+
+  assert.match(html, /data-live-preview-mode="editor"/);
+  assert.match(html, /唯讀預覽/);
+});
+
+test("live display page preview uses showcase mode without editor badge chrome", () => {
+  const html = renderPreview(
+    {
+      config: {
+        headline: "展示模式",
+        mediaSrc: "/media/overview-showcase.png"
+      },
+      status: "ready"
+    },
+    "showcase"
+  );
+
+  assert.match(html, /data-live-preview-mode="showcase"/);
+  assert.match(html, /data-live-preview-status="ready"/);
+  assert.doesNotMatch(html, /唯讀預覽/);
+  assert.match(html, /展示模式/);
+});
+
+test("showcase fallback stays concise and does not expose editor diagnostics", () => {
+  const html = renderPreview(
+    {
+      detail: "缺少正式素材",
+      status: "asset-unavailable"
+    },
+    "showcase"
+  );
+
+  assert.match(html, /data-live-preview-mode="showcase"/);
+  assert.match(html, /總覽頁/);
+  assert.match(html, /展示頁暫不可用/);
+  assert.doesNotMatch(html, /缺少正式素材/);
+  assert.doesNotMatch(html, /唯讀預覽/);
 });

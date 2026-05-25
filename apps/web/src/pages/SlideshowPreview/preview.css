@@ -263,6 +263,10 @@
   border: 0;
 }
 
+.sp-page .sp-card-preview [data-live-preview-mode="showcase"] {
+  box-shadow: none;
+}
+
 @keyframes card-active-breath {
   0%, 100% {
     box-shadow: 0 20px 50px var(--active-glow, rgba(82, 122, 67, 0.18)), 0 0 10px var(--active-glow, rgba(82, 122, 67, 0.1));

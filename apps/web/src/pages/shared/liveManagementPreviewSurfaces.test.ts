@@ -76,8 +76,11 @@ test("playback settings and slideshow preview surfaces render the same live prev
 
   assert.match(playbackHtml, /Overview live hero v2/);
   assert.match(playbackHtml, /\/media\/overview-live-v2\.png/);
+  assert.match(playbackHtml, /data-live-preview-mode="editor"/);
   assert.match(slideshowHtml, /Overview live hero v2/);
   assert.match(slideshowHtml, /\/media\/overview-live-v2\.png/);
+  assert.match(slideshowHtml, /data-live-preview-mode="showcase"/);
+  assert.doesNotMatch(slideshowHtml, /唯讀預覽/);
 });
 
 test("playback settings preview list keeps duplicate template instances on their own page-instance state", () => {

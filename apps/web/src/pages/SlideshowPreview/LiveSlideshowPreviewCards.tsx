@@ -70,6 +70,7 @@ export function LiveSlideshowPreviewCards({
             <div className="sp-card-preview">
               <LiveDisplayPagePreview
                 definitions={definitions}
+                mode="showcase"
                 pageLabel={card.labelZh}
                 state={resolvePreviewState(templateKey, card.pageKey, states)}
                 templateKey={templateKey ?? "overview"}

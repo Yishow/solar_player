@@ -27,11 +27,11 @@
 
 ### Modified Capabilities
 
-- `slideshow-preview-rotation-debugging`: 保留 debug/readiness 內容，但不要求所有 preview contexts 都以管理 UI 視覺呈現。
+- (none)
 
 ## Impact
 
-- Affected specs: `live-display-preview-showcase-mode`, `slideshow-preview-rotation-debugging`
+- Affected specs: `live-display-preview-showcase-mode`
 - Affected code:
   - `apps/web/src/pages/shared/liveDisplayPagePreview.tsx`
   - `apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx`

@@ -85,6 +85,7 @@ test("slideshow preview cards keep duplicate template instances bound to their o
   assert.match(html, /Campus overview hero v5/);
   assert.match(html, /\/media\/overview-live-v2\.png/);
   assert.match(html, /\/media\/overview-campus-v5\.png/);
+  assert.match(html, /data-live-preview-mode="showcase"/);
 });
 
 test("slideshow preview keeps renderer-unavailable fallback when a card has no template renderer", () => {
@@ -115,6 +116,8 @@ test("slideshow preview keeps renderer-unavailable fallback when a card has no t
   );
 
   assert.match(html, /自訂展示頁 live preview fallback/);
+  assert.match(html, /data-live-preview-mode="showcase"/);
   assert.match(html, /renderer-unavailable/);
-  assert.match(html, /目前無法解析此輪播卡片對應的展示頁。/);
+  assert.match(html, /展示頁暫不可用/);
+  assert.doesNotMatch(html, /目前無法解析此輪播卡片對應的展示頁。/);
 });
