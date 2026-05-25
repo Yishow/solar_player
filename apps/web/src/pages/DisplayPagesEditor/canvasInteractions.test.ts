@@ -5,7 +5,10 @@ import {
   applyCanvasNudge,
   applyCanvasResize,
   clampCanvasRect,
+  mapCanvasPointToDesignPoint,
+  mapDesignPointToCanvasPoint,
   panCanvasViewport,
+  resolveCanvasDesignMapping,
   resolveViewportAfterZoom
 } from "./canvasInteractions";
 
@@ -162,6 +165,35 @@ test("panCanvasViewport offsets the preview without changing the zoom level", ()
   );
 
   assert.deepEqual(panned, { offsetX: 20, offsetY: 14, zoom: 1.25 });
+});
+
+test("resolveCanvasDesignMapping compresses a larger design space into the editor surface", () => {
+  const mapping = resolveCanvasDesignMapping(
+    { height: 934, width: 1920 },
+    { height: 1080, width: 1920 }
+  );
+
+  assert.equal(mapping.canvasHeight, 934);
+  assert.equal(mapping.canvasWidth, 1920);
+  assert.equal(mapping.designHeight, 1080);
+  assert.equal(mapping.designWidth, 1920);
+  assert.equal(mapping.scaleX, 1);
+  assert.equal(mapping.scaleY, 934 / 1080);
+});
+
+test("canvas and design points round-trip through the current mapping", () => {
+  const mapping = resolveCanvasDesignMapping(
+    { height: 934, width: 1920 },
+    { height: 1080, width: 1920 }
+  );
+  const designPoint = { x: 960, y: 540 };
+  const canvasPoint = mapDesignPointToCanvasPoint(designPoint, mapping);
+
+  assert.deepEqual(canvasPoint, {
+    x: 960,
+    y: Math.round(540 * (934 / 1080))
+  });
+  assert.deepEqual(mapCanvasPointToDesignPoint(canvasPoint, mapping), designPoint);
 });
 
 test("applyCanvasDrag clamps a rail card inside its parent rail bounds", () => {

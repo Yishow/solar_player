@@ -27,6 +27,10 @@ import {
   resolveDisplayEditorFieldIssues,
   type ResolvedDisplayEditorField
 } from "./inspectorFields";
+import {
+  defaultDisplayEditorOverlayPreset,
+  resolveDisplayEditorOverlayState
+} from "./canvasOverlayState";
 
 function createField(
   schema: DisplayEditorFieldSchema,
@@ -202,22 +206,32 @@ test("display editor inspector renders validation feedback inline for invalid fi
 });
 
 test("display editor canvas overlay exposes localized accessibility labels for selected regions", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 280, left: 160, top: 120, width: 640 },
+      id: "overview-hero-media",
+      label: "Overview Hero Media",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-hero-media", "Overview Hero Media")
+    }
+  ];
+  const selectedRegion = regions[0]!;
   const html = renderToStaticMarkup(
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
       onSelect: () => {},
       onStartInteraction: () => {},
-      regions: [
-        {
-          fields: [],
-          geometry: { height: 280, left: 160, top: 120, width: 640 },
-          id: "overview-hero-media",
-          label: "Overview Hero Media",
-          nodeType: "region",
-          schema: createRegionSchema("overview-hero-media", "Overview Hero Media")
-        }
-      ],
+      overlayState: resolveDisplayEditorOverlayState({
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        overlayPreset: defaultDisplayEditorOverlayPreset,
+        regions,
+        selectedRegion
+      }),
+      regions,
       selectedRegionId: "overview-hero-media"
     })
   );
@@ -225,6 +239,57 @@ test("display editor canvas overlay exposes localized accessibility labels for s
   assert.match(html, /主視覺圖片/);
   assert.match(html, /主視覺圖片 調整大小控制點/);
   assert.doesNotMatch(html, /Overview Hero Media resize handle/);
+  assert.match(html, /160 × 324|640 × 324|640 × 323|640 × 324/);
+});
+
+test("display editor canvas overlay renders full-canvas guides and region labels when preset options are enabled", () => {
+  const regions = [
+    {
+      fields: [],
+      geometry: { height: 280, left: 160, top: 120, width: 640 },
+      id: "overview-hero-media",
+      label: "Overview Hero Media",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-hero-media", "Overview Hero Media")
+    },
+    {
+      fields: [],
+      geometry: { height: 180, left: 920, top: 132, width: 320 },
+      id: "overview-hero-copy",
+      label: "Overview Hero Copy",
+      nodeType: "region" as const,
+      schema: createRegionSchema("overview-hero-copy", "Overview Hero Copy")
+    }
+  ];
+  const selectedRegion = regions[0]!;
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onStartInteraction: () => {},
+      overlayState: resolveDisplayEditorOverlayState({
+        canvasHeight: 934,
+        canvasWidth: 1920,
+        lockedRegionIds: [],
+        overlayPreset: {
+          ...defaultDisplayEditorOverlayPreset,
+          displayMode: "full-canvas",
+          showCenterLines: true,
+          showRegionLabels: true
+        },
+        regions,
+        selectedRegion
+      }),
+      regions,
+      selectedRegionId: "overview-hero-media"
+    })
+  );
+
+  assert.match(html, /data-guide-kind="boundary"/);
+  assert.match(html, /data-guide-kind="center"/);
+  assert.match(html, /主視覺圖片/);
+  assert.match(html, /主視覺文案/);
 });
 
 test("display editor inspector resolves only the payload fields owned by the selected media source mode", () => {

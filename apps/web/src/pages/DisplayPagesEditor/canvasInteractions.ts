@@ -40,12 +40,67 @@ export type CanvasViewport = {
   zoom: number;
 };
 
+export type CanvasSpace = {
+  height: number;
+  width: number;
+};
+
+export type CanvasDesignMapping = {
+  canvasHeight: number;
+  canvasWidth: number;
+  designHeight: number;
+  designWidth: number;
+  scaleX: number;
+  scaleY: number;
+};
+
 function normalizeCanvasCoordinate(value: number) {
   return Number.isFinite(value) ? value : 0;
 }
 
 function normalizeCanvasDimension(value: number, fallback: number) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function normalizeCanvasSpace(space: CanvasSpace, fallback: CanvasSpace): CanvasSpace {
+  return {
+    height: normalizeCanvasDimension(space.height, fallback.height),
+    width: normalizeCanvasDimension(space.width, fallback.width)
+  };
+}
+
+export function resolveCanvasDesignMapping(canvas: CanvasSpace, design: CanvasSpace): CanvasDesignMapping {
+  const normalizedCanvas = normalizeCanvasSpace(canvas, { height: 1, width: 1 });
+  const normalizedDesign = normalizeCanvasSpace(design, normalizedCanvas);
+
+  return {
+    canvasHeight: normalizedCanvas.height,
+    canvasWidth: normalizedCanvas.width,
+    designHeight: normalizedDesign.height,
+    designWidth: normalizedDesign.width,
+    scaleX: normalizedCanvas.width / normalizedDesign.width,
+    scaleY: normalizedCanvas.height / normalizedDesign.height
+  };
+}
+
+export function mapCanvasPointToDesignPoint(
+  point: { x: number; y: number },
+  mapping: CanvasDesignMapping
+) {
+  return {
+    x: Math.round(point.x / mapping.scaleX),
+    y: Math.round(point.y / mapping.scaleY)
+  };
+}
+
+export function mapDesignPointToCanvasPoint(
+  point: { x: number; y: number },
+  mapping: CanvasDesignMapping
+) {
+  return {
+    x: Math.round(point.x * mapping.scaleX),
+    y: Math.round(point.y * mapping.scaleY)
+  };
 }
 
 export function clampCanvasRect(rect: CanvasRect, constraint: CanvasRectConstraint): CanvasRect {

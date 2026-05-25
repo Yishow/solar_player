@@ -12,6 +12,18 @@ import { DisplayPagesEditor, type DisplayEditorPageDefinition } from "./index";
 import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
 import { DisplayEditorLeftPanel } from "./regionTree";
 
+function withMockWindow<T>(windowValue: Window & typeof globalThis, callback: () => T) {
+  const target = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+  const previousWindow = target.window;
+
+  target.window = windowValue;
+  try {
+    return callback();
+  } finally {
+    target.window = previousWindow;
+  }
+}
+
 test("display page editor shell exposes the full rollout page switcher and idle inspector guidance", () => {
   const html = renderToStaticMarkup(
     React.createElement(
@@ -99,7 +111,7 @@ test("display page editor keeps the region tree selection and inspector in sync"
 
   assert.match(html, /區域樹/);
   assert.match(html, /主視覺圖片/);
-  assert.doesNotMatch(html, /總覽 主視覺文案/);
+  assert.match(html, />主視覺文案</);
   assert.match(html, /素材來源/);
   assert.match(html, /替代文字/);
   assert.match(html, /填滿模式/);
@@ -108,6 +120,9 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.doesNotMatch(html, /貼上幾何/);
   assert.match(html, /復原/);
   assert.match(html, /重做/);
+  assert.match(html, /點中區域/);
+  assert.match(html, /全畫參考/);
+  assert.match(html, /設計尺寸/);
   assert.doesNotMatch(html, /區域預設/);
 });
 
@@ -243,4 +258,78 @@ test("display page editor preview surface keeps positive minimum dimensions for 
 
   assert.match(html, /min-height:1080px/);
   assert.match(html, /min-width:1920px/);
+});
+
+test("display page editor restores the stored overlay preset when the editor opens again", () => {
+  const html = withMockWindow(
+    {
+      localStorage: {
+        getItem: () =>
+          JSON.stringify({
+            customHeight: 900,
+            customWidth: 1600,
+            designPreset: "custom",
+            displayMode: "full-canvas",
+            frameDensity: "strong",
+            showAxes: false,
+            showCenterLines: true,
+            showRegionLabels: true
+          }),
+        removeItem: () => {},
+        setItem: () => {}
+      }
+    } as unknown as Window & typeof globalThis,
+    () =>
+      renderToStaticMarkup(
+        React.createElement(
+          MemoryRouter,
+          {
+            initialEntries: ["/display-pages/editor?page=overview"]
+          },
+          React.createElement(DisplayPagesEditor, {
+            initialEditorState: {
+              editMode: true,
+              selectedRegionId: "overview-hero-media"
+            },
+            renderPreview: false
+          })
+        )
+      )
+  );
+
+  assert.match(html, /value="1600"/);
+  assert.match(html, /value="900"/);
+  assert.match(html, /全畫參考/);
+  assert.match(html, /區域標籤/);
+});
+
+test("display page editor falls back to the default overlay preset when stored state is malformed", () => {
+  const html = withMockWindow(
+    {
+      localStorage: {
+        getItem: () => "{broken",
+        removeItem: () => {},
+        setItem: () => {}
+      }
+    } as unknown as Window & typeof globalThis,
+    () =>
+      renderToStaticMarkup(
+        React.createElement(
+          MemoryRouter,
+          {
+            initialEntries: ["/display-pages/editor?page=overview"]
+          },
+          React.createElement(DisplayPagesEditor, {
+            initialEditorState: {
+              editMode: true,
+              selectedRegionId: "overview-hero-media"
+            },
+            renderPreview: false
+          })
+        )
+      )
+  );
+
+  assert.match(html, /1920 × 1080/);
+  assert.match(html, /點中區域/);
 });

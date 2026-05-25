@@ -7,9 +7,16 @@ import {
   applyCanvasResize,
   panCanvasViewport,
   resolveViewportAfterZoom,
+  type CanvasGuide,
   type CanvasRect,
   type CanvasResizeHandle
 } from "./canvasInteractions";
+import {
+  resolveDisplayEditorOverlayState,
+  resolveInitialDisplayEditorOverlayPreset,
+  writeStoredDisplayEditorOverlayPreset,
+  type DisplayEditorOverlayPreset
+} from "./canvasOverlayState";
 import { applyRegionRect } from "./displayEditorGeometry";
 import { isRegionLocked } from "./displayEditorRegionState";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
@@ -46,12 +53,28 @@ function resolveRegionConstraint(region: ResolvedDisplayEditorRegion) {
   };
 }
 
+function constraintToRect(constraint: ReturnType<typeof resolveRegionConstraint>): CanvasRect {
+  return {
+    height: constraint.canvasHeight,
+    left: constraint.originLeft,
+    top: constraint.originTop,
+    width: constraint.canvasWidth
+  };
+}
+
 type CanvasInteractionState = {
   handle?: CanvasResizeHandle;
   origin: { x: number; y: number };
   regionId: string;
   startConfig: Record<string, unknown>;
   startRect: CanvasRect;
+  type: "drag" | "resize";
+};
+
+type CanvasInteractionFeedback = {
+  constraintRect: CanvasRect;
+  guides: CanvasGuide[];
+  rect: CanvasRect;
   type: "drag" | "resize";
 };
 
@@ -85,11 +108,26 @@ export function useDisplayEditorCanvasWorkflow({
 }) {
   const [viewport, setViewport] = useState({ offsetX: 0, offsetY: 0, zoom: 1 });
   const [canvasInteraction, setCanvasInteraction] = useState<CanvasInteractionState | null>(null);
+  const [canvasInteractionFeedback, setCanvasInteractionFeedback] = useState<CanvasInteractionFeedback | null>(null);
+  const [overlayPreset, setOverlayPreset] = useState<DisplayEditorOverlayPreset>(() =>
+    resolveInitialDisplayEditorOverlayPreset()
+  );
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   const containerScaleRef = useRef(canvasContainerScale);
   containerScaleRef.current = canvasContainerScale;
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
+
+  useEffect(() => {
+    writeStoredDisplayEditorOverlayPreset(overlayPreset);
+  }, [overlayPreset]);
+
+  useEffect(() => {
+    if (!editMode) {
+      setCanvasInteraction(null);
+      setCanvasInteractionFeedback(null);
+    }
+  }, [editMode]);
 
   useEffect(() => {
     if (!editMode || !selectedRegion?.geometry || selectedRegionLocked) {
@@ -190,6 +228,13 @@ export function useDisplayEditorCanvasWorkflow({
           ? applyCanvasResize(activeInteraction.startRect, activeInteraction.handle, delta, constraint)
           : applyCanvasDrag(activeInteraction.startRect, delta, constraint);
 
+      setCanvasInteractionFeedback({
+        constraintRect: constraintToRect(constraint),
+        guides: interactionResult.guides,
+        rect: interactionResult.rect,
+        type: activeInteraction.type
+      });
+
       applyConfigUpdate((current) => applyRegionRect(current, region, interactionResult.rect), {
         recordHistory: false
       });
@@ -200,6 +245,7 @@ export function useDisplayEditorCanvasWorkflow({
         historyBase: activeInteraction.startConfig
       });
       setCanvasInteraction(null);
+      setCanvasInteractionFeedback(null);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -209,6 +255,13 @@ export function useDisplayEditorCanvasWorkflow({
       window.removeEventListener("pointerup", handlePointerUp);
     };
   }, [applyConfigUpdate, canvasInteraction, lockedRegionIds, regions]);
+
+  useEffect(() => {
+    if (selectedRegionLocked && canvasInteraction) {
+      setCanvasInteraction(null);
+      setCanvasInteractionFeedback(null);
+    }
+  }, [canvasInteraction, selectedRegionLocked]);
 
   const viewportControls = useMemo(
     () => [
@@ -257,7 +310,23 @@ export function useDisplayEditorCanvasWorkflow({
     []
   );
 
+  const overlayState = useMemo(
+    () =>
+      resolveDisplayEditorOverlayState({
+        activeInteraction: canvasInteractionFeedback,
+        canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
+        canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
+        lockedRegionIds,
+        overlayPreset,
+        regions,
+        selectedRegion
+      }),
+    [canvasInteractionFeedback, lockedRegionIds, overlayPreset, regions, selectedRegion]
+  );
+
   return {
+    overlayPreset,
+    overlayState,
     onStartInteraction: (
       event: ReactPointerEvent<HTMLButtonElement>,
       region: ResolvedDisplayEditorRegion,
@@ -267,6 +336,7 @@ export function useDisplayEditorCanvasWorkflow({
         return;
       }
 
+      const constraint = resolveRegionConstraint(region);
       setCanvasInteraction({
         handle: type === "resize" ? "se" : undefined,
         origin: { x: event.clientX, y: event.clientY },
@@ -275,8 +345,15 @@ export function useDisplayEditorCanvasWorkflow({
         startRect: region.geometry,
         type
       });
+      setCanvasInteractionFeedback({
+        constraintRect: constraintToRect(constraint),
+        guides: [],
+        rect: region.geometry,
+        type
+      });
     },
     onZoomDelta,
+    setOverlayPreset,
     viewport,
     viewportControls
   };

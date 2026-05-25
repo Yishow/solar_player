@@ -18,6 +18,7 @@ import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard } from "./canvasCard";
+import { defaultDisplayEditorOverlayPreset } from "./canvasOverlayState";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
 import { DisplayEditorCanvasOverlay } from "./inspectorFields";
 import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
@@ -232,7 +233,7 @@ export function DisplayPagesEditor({
     setSearchParams(nextParams, { replace: true });
   };
 
-  const { onStartInteraction, onZoomDelta, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
+  const { onStartInteraction, onZoomDelta, overlayPreset, overlayState, setOverlayPreset, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
     applyConfigUpdate,
     canRedo,
     canUndo,
@@ -255,6 +256,8 @@ export function DisplayPagesEditor({
       config
     );
   }, [config, renderPreview, selectedPage]);
+
+  const overlayDesignSpace = overlayState.designSpace;
 
   const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
@@ -375,18 +378,154 @@ export function DisplayPagesEditor({
         <div className="overflow-y-auto p-5">
           <DisplayEditorCanvasCard
             controls={
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-[var(--shell-copy-ink)]">
-                {viewportControls.map((control) => (
-                  <button
-                    key={control.label}
-                    type="button"
-                    className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 disabled:opacity-45"
-                    disabled={control.disabled}
-                    onClick={control.action}
-                  >
-                    {control.label}
-                  </button>
-                ))}
+              <div className="mt-4 grid gap-3 text-[13px] text-[var(--shell-copy-ink)]">
+                <div className="flex flex-wrap items-center gap-3">
+                  {viewportControls.map((control) => (
+                    <button
+                      key={control.label}
+                      type="button"
+                      className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 disabled:opacity-45"
+                      disabled={control.disabled}
+                      onClick={control.action}
+                    >
+                      {control.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-[var(--shell-divider)] bg-white/70 px-4 py-3">
+                  <span className="font-semibold text-[var(--shell-title-ink)]">Overlay</span>
+                  <div className="flex items-center gap-2">
+                    {[
+                      { label: "點中區域", value: "selected-only" },
+                      { label: "全畫參考", value: "full-canvas" }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={overlayPreset.displayMode === option.value}
+                        className={[
+                          "rounded-full border px-3 py-1.5",
+                          overlayPreset.displayMode === option.value
+                            ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                            : "border-[var(--shell-divider)]"
+                        ].join(" ")}
+                        onClick={() =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            displayMode: option.value as typeof current.displayMode
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <span>設計尺寸</span>
+                    <select
+                      className="rounded-full border border-[var(--shell-divider)] bg-white px-3 py-1.5"
+                      value={overlayPreset.designPreset}
+                      onChange={(event) =>
+                        setOverlayPreset((current) => ({
+                          ...current,
+                          designPreset: event.target.value as typeof current.designPreset
+                        }))
+                      }
+                    >
+                      <option value="hd">1280 × 720</option>
+                      <option value="fhd">1920 × 1080</option>
+                      <option value="uhd">3840 × 2160</option>
+                      <option value="custom">自訂</option>
+                    </select>
+                  </label>
+                  {overlayPreset.designPreset === "custom" ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={320}
+                        className="w-24 rounded-full border border-[var(--shell-divider)] bg-white px-3 py-1.5"
+                        value={overlayPreset.customWidth}
+                        onChange={(event) =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            customWidth: Math.max(320, Number(event.target.value) || defaultDisplayEditorOverlayPreset.customWidth)
+                          }))
+                        }
+                      />
+                      <span>×</span>
+                      <input
+                        type="number"
+                        min={180}
+                        className="w-24 rounded-full border border-[var(--shell-divider)] bg-white px-3 py-1.5"
+                        value={overlayPreset.customHeight}
+                        onChange={(event) =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            customHeight: Math.max(180, Number(event.target.value) || defaultDisplayEditorOverlayPreset.customHeight)
+                          }))
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1.5 text-[12px] text-[var(--shell-subtitle-ink)]">
+                      {overlayDesignSpace.width} × {overlayDesignSpace.height}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {[
+                      { key: "showAxes", label: "座標刻度" },
+                      { key: "showCenterLines", label: "中心線" },
+                      { key: "showRegionLabels", label: "區域標籤" }
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        aria-pressed={overlayPreset[option.key as keyof typeof overlayPreset] === true}
+                        className={[
+                          "rounded-full border px-3 py-1.5",
+                          overlayPreset[option.key as keyof typeof overlayPreset] === true
+                            ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                            : "border-[var(--shell-divider)]"
+                        ].join(" ")}
+                        onClick={() =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            [option.key]: !current[option.key as "showAxes" | "showCenterLines" | "showRegionLabels"]
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>框線強度</span>
+                    {[
+                      { label: "淡", value: "soft" },
+                      { label: "強", value: "strong" }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={overlayPreset.frameDensity === option.value}
+                        className={[
+                          "rounded-full border px-3 py-1.5",
+                          overlayPreset.frameDensity === option.value
+                            ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                            : "border-[var(--shell-divider)]"
+                        ].join(" ")}
+                        onClick={() =>
+                          setOverlayPreset((current) => ({
+                            ...current,
+                            frameDensity: option.value as typeof current.frameDensity
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             }
             onScaleChange={setCanvasContainerScale}
@@ -422,6 +561,7 @@ export function DisplayPagesEditor({
                     <DisplayEditorCanvasOverlay
                       isInteractive={editMode}
                       lockedRegionIds={lockedRegionIds}
+                      overlayState={overlayState}
                       regions={editableRegions}
                       selectedRegionId={selectedRegion?.id ?? null}
                       onSelect={setSelectedRegionId}

@@ -24,6 +24,7 @@ import {
 } from "./cardRailTemplateFields";
 import { localizeDisplayEditorLabel, localizeDisplayEditorMessage } from "./localization";
 import { resolveDisplayEditorFieldValidationIssues } from "./displayEditorValidation";
+import type { DisplayEditorOverlayState } from "./canvasOverlayState";
 
 export type ResolvedDisplayEditorRect = {
   height: number;
@@ -76,6 +77,7 @@ export function DisplayEditorCanvasOverlay({
   isInteractive,
   lockedRegionIds,
   onStartInteraction,
+  overlayState,
   regions,
   selectedRegionId,
   onSelect
@@ -88,6 +90,7 @@ export function DisplayEditorCanvasOverlay({
     region: ResolvedDisplayEditorRegion,
     type: "drag" | "resize"
   ) => void;
+  overlayState: DisplayEditorOverlayState;
   regions: ResolvedDisplayEditorRegion[];
   selectedRegionId: string | null;
 }) {
@@ -95,15 +98,151 @@ export function DisplayEditorCanvasOverlay({
     return null;
   }
 
+  const frameStyle =
+    overlayState.preset.frameDensity === "strong"
+      ? {
+          background: "rgba(95, 140, 80, 0.08)",
+          borderColor: "rgba(95, 140, 80, 0.42)"
+        }
+      : {
+          background: "rgba(95, 140, 80, 0.02)",
+          borderColor: "rgba(95, 140, 80, 0.18)"
+        };
+
   return (
     <>
+      <div className="pointer-events-none absolute inset-0">
+        {overlayState.pageGuides.map((guide) => (
+          <div
+            key={`${guide.axis}-${guide.kind}-${guide.designPosition}`}
+            className="absolute border-[rgba(103,124,84,0.5)]"
+            data-guide-kind={guide.kind}
+            style={
+              guide.axis === "x"
+                ? {
+                    borderLeftStyle: "dashed",
+                    borderLeftWidth: guide.kind === "center" ? "2px" : "1px",
+                    bottom: 0,
+                    left: `${guide.canvasPosition}px`,
+                    top: 0
+                  }
+                : {
+                    borderTopStyle: "dashed",
+                    borderTopWidth: guide.kind === "center" ? "2px" : "1px",
+                    left: 0,
+                    right: 0,
+                    top: `${guide.canvasPosition}px`
+                  }
+            }
+          />
+        ))}
+        {overlayState.activeInteraction.guides.map((guide, index) => (
+          <div
+            key={`${guide.axis}-${guide.position}-${index}`}
+            className="absolute border-[rgba(63,122,52,0.88)]"
+            data-guide-kind="active-boundary"
+            style={
+              guide.axis === "x"
+                ? {
+                    borderLeftStyle: "solid",
+                    borderLeftWidth: "2px",
+                    bottom: 0,
+                    left: `${guide.position}px`,
+                    top: 0
+                  }
+                : {
+                    borderTopStyle: "solid",
+                    borderTopWidth: "2px",
+                    left: 0,
+                    right: 0,
+                    top: `${guide.position}px`
+                  }
+            }
+          />
+        ))}
+        {overlayState.axisTicks.map((tick) => (
+          <div
+            key={`${tick.axis}-${tick.designPosition}`}
+            className="absolute text-[10px] font-semibold text-[rgba(82,91,66,0.88)]"
+            style={
+              tick.axis === "x"
+                ? {
+                    left: `${tick.canvasPosition + 4}px`,
+                    top: "6px"
+                  }
+                : {
+                    left: "6px",
+                    top: `${tick.canvasPosition + 4}px`
+                  }
+            }
+          >
+            {tick.designPosition}
+          </div>
+        ))}
+        {overlayState.measurement ? (
+          <>
+            <span
+              className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[11px] font-semibold text-white"
+              style={{
+                left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
+                top: `${Math.max(8, overlayState.measurement.rect.top - 8)}px`,
+                transform: "translateX(-50%)"
+              }}
+            >
+              {overlayState.measurement.designRect.width} × {overlayState.measurement.designRect.height}
+            </span>
+            <span
+              className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
+              style={{
+                left: `${overlayState.measurement.constraintRect.left + (overlayState.measurement.rect.left - overlayState.measurement.constraintRect.left) / 2}px`,
+                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2}px`,
+                transform: "translate(-100%, -50%)"
+              }}
+            >
+              L {overlayState.measurement.distances.left}
+            </span>
+            <span
+              className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
+              style={{
+                left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width + (overlayState.measurement.constraintRect.left + overlayState.measurement.constraintRect.width - (overlayState.measurement.rect.left + overlayState.measurement.rect.width)) / 2}px`,
+                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2}px`,
+                transform: "translateY(-50%)"
+              }}
+            >
+              R {overlayState.measurement.distances.right}
+            </span>
+            <span
+              className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
+              style={{
+                left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
+                top: `${overlayState.measurement.constraintRect.top + (overlayState.measurement.rect.top - overlayState.measurement.constraintRect.top) / 2}px`,
+                transform: "translate(-50%, -100%)"
+              }}
+            >
+              T {overlayState.measurement.distances.top}
+            </span>
+            <span
+              className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
+              style={{
+                left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
+                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height + (overlayState.measurement.constraintRect.top + overlayState.measurement.constraintRect.height - (overlayState.measurement.rect.top + overlayState.measurement.rect.height)) / 2}px`,
+                transform: "translateX(-50%)"
+              }}
+            >
+              B {overlayState.measurement.distances.bottom}
+            </span>
+          </>
+        ) : null}
+      </div>
       {regions.map((region) => {
         if (!region.geometry) {
           return null;
         }
 
-        const isSelected = selectedRegionId === region.id;
-        const isLocked = lockedRegionIds.includes(region.id);
+        const frame = overlayState.frames.find((item) => item.regionId === region.id);
+        const isSelected = selectedRegionId === region.id || frame?.isSelected === true;
+        const isLocked = lockedRegionIds.includes(region.id) || frame?.isLocked === true;
+        const isVisible = frame?.visible ?? false;
         return (
           <div
             key={region.id}
@@ -114,15 +253,17 @@ export function DisplayEditorCanvasOverlay({
                 ? "rgba(82, 91, 66, 0.1)"
                 : isSelected
                   ? "rgba(95, 140, 80, 0.18)"
-                  : "rgba(95, 140, 80, 0.04)",
-              borderColor: isSelected ? "rgba(63, 122, 52, 0.9)" : "rgba(95, 140, 80, 0.42)",
+                  : isVisible
+                    ? frameStyle.background
+                    : "transparent",
+              borderColor: isSelected ? "rgba(63, 122, 52, 0.9)" : isVisible ? frameStyle.borderColor : "transparent",
               height: `${region.geometry.height}px`,
               left: `${region.geometry.left}px`,
               top: `${region.geometry.top}px`,
               width: `${region.geometry.width}px`,
               zIndex: region.parentId ? (isSelected ? 65 : 55) : isSelected ? 60 : 45
             }}
-          >
+            >
             <button
               type="button"
               aria-pressed={isSelected}
@@ -138,6 +279,11 @@ export function DisplayEditorCanvasOverlay({
             >
               <span className="sr-only">{localizeRegionAccessibilityLabel(region.label)}</span>
             </button>
+            {frame?.label ? (
+              <span className="absolute left-3 top-3 rounded-full bg-[rgba(255,255,255,0.9)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]">
+                {localizeDisplayEditorLabel(frame.label)}
+              </span>
+            ) : null}
             {isSelected && isLocked ? (
               <span className="absolute right-3 top-3 rounded-full bg-[rgba(82,91,66,0.82)] px-2 py-1 text-[11px] font-semibold text-white">
                 {localizeDisplayEditorLabel("Locked")}
