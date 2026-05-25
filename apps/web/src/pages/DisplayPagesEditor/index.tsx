@@ -936,6 +936,7 @@ export function DisplayPagesEditor({
               <div
                 className="absolute left-0 top-0 origin-top-left"
                 style={{
+                  ["--shell-divider-scale-y" as string]: 1,
                   height: `${EDITOR_PREVIEW_SHELL_HEIGHT}px`,
                   minHeight: `${EDITOR_PREVIEW_SHELL_HEIGHT}px`,
                   minWidth: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`,

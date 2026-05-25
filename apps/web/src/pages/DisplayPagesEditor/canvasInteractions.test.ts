@@ -29,7 +29,7 @@ test("applyCanvasDrag moves the selected region by the interaction delta", () =>
     },
     { x: 24, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 40,
       minWidth: 40
@@ -51,7 +51,7 @@ test("applyCanvasResize expands geometry from the south-east handle", () => {
     "se",
     { x: 32, y: 18 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -72,7 +72,7 @@ test("clampCanvasRect keeps geometry inside the FHD editor bounds", () => {
         width: 160
       },
       {
-        canvasHeight: 934,
+        canvasHeight: 898,
         canvasWidth: 1920,
         minHeight: 80,
         minWidth: 120
@@ -89,19 +89,19 @@ test("clampCanvasRect keeps geometry inside the FHD editor bounds", () => {
 
 test("clampCanvasRect falls back to minimum dimensions when incoming geometry is incomplete", () => {
   const rect = clampCanvasRect(
-    {
-      height: undefined as unknown as number,
-      left: 24,
-      top: 18,
-      width: 220
-    },
-    {
-      canvasHeight: 934,
-      canvasWidth: 1920,
-      minHeight: 80,
-      minWidth: 120
-    }
-  );
+      {
+        height: undefined as unknown as number,
+        left: 24,
+        top: 18,
+        width: 220
+      },
+      {
+        canvasHeight: 898,
+        canvasWidth: 1920,
+        minHeight: 80,
+        minWidth: 120
+      }
+    );
 
   assert.equal(rect.height, 80);
   assert.equal(rect.width, 220);
@@ -131,7 +131,7 @@ test("applyCanvasNudge moves the selected region by one configured step", () => 
     "right",
     1,
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 40,
       minWidth: 40
@@ -152,7 +152,7 @@ test("applyCanvasResize can pull geometry from the north-west handle without lea
     "nw",
     { x: -48, y: -36 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -176,21 +176,21 @@ test("panCanvasViewport offsets the preview without changing the zoom level", ()
 
 test("resolveCanvasDesignMapping compresses a larger design space into the editor surface", () => {
   const mapping = resolveCanvasDesignMapping(
-    { height: 934, width: 1920 },
+    { height: 898, width: 1920 },
     { height: 1080, width: 1920 }
   );
 
-  assert.equal(mapping.canvasHeight, 934);
+  assert.equal(mapping.canvasHeight, 898);
   assert.equal(mapping.canvasWidth, 1920);
   assert.equal(mapping.designHeight, 1080);
   assert.equal(mapping.designWidth, 1920);
   assert.equal(mapping.scaleX, 1);
-  assert.equal(mapping.scaleY, 934 / 1080);
+  assert.equal(mapping.scaleY, 898 / 1080);
 });
 
 test("canvas and design points round-trip through the current mapping", () => {
   const mapping = resolveCanvasDesignMapping(
-    { height: 934, width: 1920 },
+    { height: 898, width: 1920 },
     { height: 1080, width: 1920 }
   );
   const designPoint = { x: 960, y: 540 };
@@ -198,7 +198,7 @@ test("canvas and design points round-trip through the current mapping", () => {
 
   assert.deepEqual(canvasPoint, {
     x: 960,
-    y: Math.round(540 * (934 / 1080))
+    y: Math.round(540 * (898 / 1080))
   });
   assert.deepEqual(mapCanvasPointToDesignPoint(canvasPoint, mapping), designPoint);
 });
@@ -231,7 +231,7 @@ test("applyCanvasDrag clamps a rail card inside its parent rail bounds", () => {
 
 test("resolveRelationalMeasurements reports design-space gaps between two editable regions", () => {
   const mapping = resolveCanvasDesignMapping(
-    { height: 934, width: 1920 },
+    { height: 898, width: 1920 },
     { height: 1080, width: 1920 }
   );
   const measurements = resolveRelationalMeasurements(
@@ -252,7 +252,7 @@ test("applyMeasurementHandleDrag mutates only the selected region geometry", () 
     "x",
     -12,
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -270,7 +270,7 @@ test("applyCanvasDrag snaps to explicit guide, region edge, region center, and c
     { height: 180, left: 148, top: 200, width: 120 },
     { x: 0, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -285,7 +285,7 @@ test("applyCanvasDrag snaps to explicit guide, region edge, region center, and c
     { height: 180, left: 256, top: 200, width: 120 },
     { x: 0, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -300,7 +300,7 @@ test("applyCanvasDrag snaps to explicit guide, region edge, region center, and c
     { height: 180, left: 468, top: 200, width: 120 },
     { x: 0, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -315,7 +315,7 @@ test("applyCanvasDrag snaps to explicit guide, region edge, region center, and c
     { height: 180, left: 892, top: 200, width: 120 },
     { x: 0, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -346,7 +346,7 @@ test("distance lock is scoped to one interaction session and clamp wins when loc
     { height: 180, left: 40, top: 240, width: 160 },
     { x: 88, y: 32 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -358,7 +358,7 @@ test("distance lock is scoped to one interaction session and clamp wins when loc
     { height: 180, left: 40, top: 240, width: 160 },
     { x: 88, y: 32 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120
@@ -368,7 +368,7 @@ test("distance lock is scoped to one interaction session and clamp wins when loc
     { height: 180, left: 0, top: 240, width: 180 },
     { x: -20, y: 0 },
     {
-      canvasHeight: 934,
+      canvasHeight: 898,
       canvasWidth: 1920,
       minHeight: 80,
       minWidth: 120

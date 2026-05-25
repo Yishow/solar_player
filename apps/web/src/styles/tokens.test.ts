@@ -31,6 +31,8 @@ test("header and footer bars do not rely on blur to fake the divider line", () =
 test("shared shell css keeps the accepted single-line header and footer divider treatment", () => {
   assert.match(globalCss, /\.shell-header-bar::after\s*\{[\s\S]*?width:\s*66\.667%;/);
   assert.match(globalCss, /\.shell-footer-bar::after\s*\{[\s\S]*?width:\s*90%;/);
+  assert.match(globalCss, /\.shell-header-bar::after\s*\{[\s\S]*?transform:\s*scaleY\(var\(--shell-divider-scale-y,\s*0\.5\)\);/);
+  assert.match(globalCss, /\.shell-footer-bar::after\s*\{[\s\S]*?transform:\s*scaleY\(var\(--shell-divider-scale-y,\s*0\.5\)\);/);
   assert.doesNotMatch(globalCss, /\.shell-header-bar::before\s*\{/);
   assert.doesNotMatch(globalCss, /\.shell-footer-bar::before\s*\{/);
 });

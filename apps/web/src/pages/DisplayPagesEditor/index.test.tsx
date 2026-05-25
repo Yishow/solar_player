@@ -297,6 +297,27 @@ test("display page editor preview surface keeps positive minimum dimensions for 
   assert.match(html, /min-width:1920px/);
 });
 
+test("display page editor preview keeps shell dividers visible at scaled preview size", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /--shell-divider-scale-y:1/);
+  assert.match(html, /height:898px/);
+  assert.match(html, /top:110px/);
+});
+
 test("display page editor restores the stored overlay preset when the editor opens again", () => {
   const html = withMockWindow(
     {
