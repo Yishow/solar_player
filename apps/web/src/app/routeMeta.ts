@@ -86,7 +86,7 @@ export const routeMetaList: RouteMeta[] = [
     path: "/display-pages/editor",
     navLabel: "展示編輯",
     title: "展示頁編輯",
-    subtitle: "Display Pages Editor",
+    subtitle: "展示頁編輯器",
     group: "management",
     order: 8,
     shellDensity: "management"

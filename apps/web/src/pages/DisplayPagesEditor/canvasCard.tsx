@@ -3,21 +3,15 @@ import { useEffect, useRef, useState } from "react";
 
 export function DisplayEditorCanvasCard({
   controls,
-  editMode,
   onScaleChange,
-  onToggleEditMode,
   onZoomDelta,
-  pageLabel,
   preview,
   viewportHeight,
   viewportWidth
 }: {
   controls: ReactNode;
-  editMode: boolean;
   onScaleChange?: (scale: number) => void;
-  onToggleEditMode: () => void;
   onZoomDelta: (delta: number, focusPoint: { x: number; y: number }) => void;
-  pageLabel: string;
   preview: ReactNode;
   viewportHeight: number;
   viewportWidth: number;
@@ -60,35 +54,11 @@ export function DisplayEditorCanvasCard({
   }, []);
 
   return (
-    <article className="self-start rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(252,251,246,0.96)] p-5 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-[var(--shell-subtitle-ink)]">
-            Canvas Preview
-          </p>
-          <h3 className="mt-2 text-[24px] font-semibold text-[var(--shell-title-ink)]">
-            {pageLabel}
-          </h3>
-        </div>
-        <button
-          type="button"
-          aria-pressed={editMode}
-          title="切換編輯模式 (E)"
-          className={[
-            "rounded-full px-4 py-2 text-[13px] font-semibold transition-colors",
-            editMode
-              ? "bg-[rgba(95,140,80,0.16)] text-[var(--shell-title-ink)] hover:bg-[rgba(95,140,80,0.26)]"
-              : "bg-[rgba(82,91,66,0.08)] text-[var(--shell-muted-ink)] hover:bg-[rgba(82,91,66,0.14)] hover:text-[var(--shell-title-ink)]"
-          ].join(" ")}
-          onClick={onToggleEditMode}
-        >
-          {editMode ? "Edit Mode ON" : "Edit Mode OFF"}
-        </button>
-      </div>
+    <div className="self-start w-full">
       {controls}
       <div
         ref={wrapperRef}
-        className="mt-5 w-full overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7]"
+        className="mt-4 w-full overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7] shadow-[0_20px_45px_rgba(80,94,54,0.08)]"
         style={{ aspectRatio: `${viewportWidth} / ${viewportHeight}` }}
       >
         <div
@@ -103,6 +73,6 @@ export function DisplayEditorCanvasCard({
           {preview}
         </div>
       </div>
-    </article>
+    </div>
   );
 }

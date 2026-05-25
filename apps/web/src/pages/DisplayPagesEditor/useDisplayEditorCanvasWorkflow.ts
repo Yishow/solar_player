@@ -13,14 +13,24 @@ import {
 import { applyRegionRect } from "./displayEditorGeometry";
 import { isRegionLocked } from "./displayEditorRegionState";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
+import { localizeDisplayEditorLabel } from "./localization";
 
 const EDITOR_PREVIEW_SCALE = 0.5;
+const EDITOR_PREVIEW_CONTENT_TOP = 146;
+const EDITOR_PREVIEW_SHELL_HEIGHT = 1080;
 const EDITOR_PREVIEW_SURFACE_HEIGHT = 934;
 const EDITOR_PREVIEW_SURFACE_WIDTH = 1920;
-const EDITOR_PREVIEW_VIEWPORT_HEIGHT = Math.round(EDITOR_PREVIEW_SURFACE_HEIGHT * EDITOR_PREVIEW_SCALE);
+const EDITOR_PREVIEW_VIEWPORT_HEIGHT = Math.round(EDITOR_PREVIEW_SHELL_HEIGHT * EDITOR_PREVIEW_SCALE);
 const EDITOR_PREVIEW_VIEWPORT_WIDTH = Math.round(EDITOR_PREVIEW_SURFACE_WIDTH * EDITOR_PREVIEW_SCALE);
 
-export { EDITOR_PREVIEW_SURFACE_HEIGHT, EDITOR_PREVIEW_SURFACE_WIDTH, EDITOR_PREVIEW_VIEWPORT_HEIGHT, EDITOR_PREVIEW_VIEWPORT_WIDTH };
+export {
+  EDITOR_PREVIEW_CONTENT_TOP,
+  EDITOR_PREVIEW_SHELL_HEIGHT,
+  EDITOR_PREVIEW_SURFACE_HEIGHT,
+  EDITOR_PREVIEW_SURFACE_WIDTH,
+  EDITOR_PREVIEW_VIEWPORT_HEIGHT,
+  EDITOR_PREVIEW_VIEWPORT_WIDTH
+};
 
 function resolveRegionConstraint(region: ResolvedDisplayEditorRegion) {
   const schema = region.schema.geometry;
@@ -210,7 +220,7 @@ export function useDisplayEditorCanvasWorkflow({
               y: EDITOR_PREVIEW_VIEWPORT_HEIGHT / 2
             })
           ),
-        label: "Zoom -"
+        label: localizeDisplayEditorLabel("Zoom -")
       },
       {
         action: () =>
@@ -220,13 +230,22 @@ export function useDisplayEditorCanvasWorkflow({
               y: EDITOR_PREVIEW_VIEWPORT_HEIGHT / 2
             })
           ),
-        label: "Zoom +"
+        label: localizeDisplayEditorLabel("Zoom +")
       },
-      { action: () => setViewport({ offsetX: 0, offsetY: 0, zoom: 1 }), label: "Reset View" },
-      { action: () => setViewport((current) => panCanvasViewport(current, { x: 40, y: 0 })), label: "Pan Left" },
-      { action: () => setViewport((current) => panCanvasViewport(current, { x: -40, y: 0 })), label: "Pan Right" },
-      { action: () => undo(), disabled: !canUndo, label: "Undo" },
-      { action: () => redo(), disabled: !canRedo, label: "Redo" }
+      {
+        action: () => setViewport({ offsetX: 0, offsetY: 0, zoom: 1 }),
+        label: localizeDisplayEditorLabel("Reset View")
+      },
+      {
+        action: () => setViewport((current) => panCanvasViewport(current, { x: 40, y: 0 })),
+        label: localizeDisplayEditorLabel("Pan Left")
+      },
+      {
+        action: () => setViewport((current) => panCanvasViewport(current, { x: -40, y: 0 })),
+        label: localizeDisplayEditorLabel("Pan Right")
+      },
+      { action: () => undo(), disabled: !canUndo, label: localizeDisplayEditorLabel("Undo") },
+      { action: () => redo(), disabled: !canRedo, label: localizeDisplayEditorLabel("Redo") }
     ],
     [canRedo, canUndo, redo, undo]
   );

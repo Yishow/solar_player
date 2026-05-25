@@ -80,9 +80,9 @@ test("display page editor asset health panel renders healthy and unhealthy state
     })
   );
 
-  assert.match(healthyHtml, /Healthy/);
-  assert.match(healthyHtml, /Overview 的素材引用目前正常/);
-  assert.match(unhealthyHtml, /Unhealthy/);
+  assert.match(healthyHtml, /健康/);
+  assert.match(healthyHtml, /總覽的素材引用目前正常/);
+  assert.match(unhealthyHtml, /異常/);
   assert.match(unhealthyHtml, /mainStage/);
 });
 
@@ -103,7 +103,12 @@ test("image management asset health panel renders healthy and unhealthy summarie
   );
 
   assert.match(healthyHtml, /所有展示頁素材引用正常/);
+  assert.match(healthyHtml, /展示頁素材健康/);
+  assert.match(healthyHtml, /健康/);
   assert.match(unhealthyHtml, /目前有 1 個素材引用異常/);
+  assert.match(unhealthyHtml, /異常/);
   assert.match(unhealthyHtml, /Images/);
   assert.match(unhealthyHtml, /檔案遺失/);
+  assert.doesNotMatch(unhealthyHtml, /Display Page Asset Health/);
+  assert.doesNotMatch(unhealthyHtml, /Unhealthy/);
 });

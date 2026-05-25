@@ -22,16 +22,16 @@ export function countBlockingFindings(validation?: ValidationResult | null) {
 export function formatFallbackMode(mode: FallbackPolicyMode) {
   return {
     hide: "隱藏內容",
-    "show-placeholder": "顯示 placeholder",
-    "show-seed": "顯示 seed"
+    "show-placeholder": "顯示佔位內容",
+    "show-seed": "顯示預設內容"
   }[mode];
 }
 
 export function formatFallbackKey(key: FallbackPolicyKey) {
   return {
-    staleData: "staleData",
-    missingAsset: "missingAsset",
-    emptyContent: "emptyContent"
+    staleData: "資料過期",
+    missingAsset: "素材遺失",
+    emptyContent: "內容為空"
   }[key];
 }
 

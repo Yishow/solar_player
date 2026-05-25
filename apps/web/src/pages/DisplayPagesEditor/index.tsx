@@ -6,6 +6,9 @@ import React from "react";
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../../app/playbackRouteMeta";
+import { AppFooterNav } from "../../components/AppFooterNav";
+import { AppHeader } from "../../components/AppHeader";
 import { DisplayPageEditorAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
 import { routeMetaMap } from "../../app/routeMeta";
@@ -17,12 +20,10 @@ import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { DisplayEditorCanvasCard } from "./canvasCard";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
 import { DisplayEditorCanvasOverlay } from "./inspectorFields";
-import { applyGeometryClipboard, createGeometryClipboard, resolveGeometryClipboardCompatibility, type DisplayEditorGeometryClipboard } from "./displayEditorGeometry";
-import { applyRegionPreset } from "./displayEditorPresets";
-import { isRegionLocked, resolveRegionPresetOptions, toggleRegionLock } from "./displayEditorRegionState";
+import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
-import { DisplayEditorInspectorTools } from "./inspectorTools";
+import { localizeDisplayEditorLabel } from "./localization";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
 import {
@@ -35,6 +36,8 @@ import {
 } from "./cardRailAuthoring";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import {
+  EDITOR_PREVIEW_CONTENT_TOP,
+  EDITOR_PREVIEW_SHELL_HEIGHT,
   EDITOR_PREVIEW_SURFACE_HEIGHT,
   EDITOR_PREVIEW_SURFACE_WIDTH,
   EDITOR_PREVIEW_VIEWPORT_HEIGHT,
@@ -57,7 +60,7 @@ export type DisplayEditorPageDefinition = {
 function renderDisplayEditorFallback(label: string) {
   return (
     <div className="flex h-full items-center justify-center bg-[#e8eddf] text-[40px] font-semibold text-[var(--shell-title-ink)]">
-      {label}
+      {localizeDisplayEditorLabel(label)}
     </div>
   );
 }
@@ -101,7 +104,6 @@ export function DisplayPagesEditor({
   const [internalEditMode, setInternalEditMode] = useState(initialEditorState?.editMode ?? false);
   const [canvasContainerScale, setCanvasContainerScale] = useState(1);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialEditorState?.selectedRegionId ?? null);
-  const [geometryClipboard, setGeometryClipboard] = useState<DisplayEditorGeometryClipboard | null>(null);
   const [lockedRegionIdsByPage, setLockedRegionIdsByPage] = useState<Record<string, string[]>>(
     () =>
       initialEditorState?.lockedRegionIds?.length
@@ -149,7 +151,6 @@ export function DisplayPagesEditor({
   const selectedCardRegion = selectedRegion?.nodeType === "card-rail-card" ? selectedRegion : null;
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
-  const regionPresetOptions = useMemo(() => resolveRegionPresetOptions(selectedRegion, editableRegions), [editableRegions, selectedRegion]);
   const {
     blockingCount,
     isPublishBlocked,
@@ -231,9 +232,6 @@ export function DisplayPagesEditor({
     setSearchParams(nextParams, { replace: true });
   };
 
-  const geometryClipboardCompatibility = selectedRegion
-    ? resolveGeometryClipboardCompatibility(selectedRegion, geometryClipboard)
-    : { compatible: false, reason: "幾何剪貼簿只可貼到相容的 region。" };
   const { onStartInteraction, onZoomDelta, viewport, viewportControls } = useDisplayEditorCanvasWorkflow({
     applyConfigUpdate,
     canRedo,
@@ -259,9 +257,28 @@ export function DisplayPagesEditor({
   }, [config, renderPreview, selectedPage]);
 
   const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
+  const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
+  const previewRouteMeta = useMemo(
+    () => resolvePlaybackRouteMeta(`/${selectedPage.id}`, []),
+    [selectedPage.id]
+  );
 
   const pageTabs = (
-    <div className="flex self-end items-end gap-2">
+    <div className="flex items-end gap-2">
+      <button
+        type="button"
+        title="切換編輯模式 (E)"
+        aria-pressed={editMode}
+        className={[
+          "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
+          editMode
+            ? "bg-[rgba(95,140,80,0.16)] text-[var(--shell-title-ink)] hover:bg-[rgba(95,140,80,0.26)]"
+            : "bg-[rgba(82,91,66,0.08)] text-[var(--shell-muted-ink)] hover:bg-[rgba(82,91,66,0.14)] hover:text-[var(--shell-title-ink)]"
+        ].join(" ")}
+        onClick={toggleEditMode}
+      >
+        {editMode ? "編輯模式開啟" : "編輯模式關閉"}
+      </button>
       {resolvedPageDefinitions.map((page) => {
         const active = page.id === selectedPageId;
         return (
@@ -276,7 +293,7 @@ export function DisplayPagesEditor({
             ].join(" ")}
             onClick={() => handleSelectPage(page.id)}
           >
-            {page.label}
+            {localizeDisplayEditorLabel(page.label)}
           </button>
         );
       })}
@@ -327,7 +344,7 @@ export function DisplayPagesEditor({
       shellPrimitive="management-scaffold"
       title={editorRouteMeta.title}
       subtitle={editorRouteMeta.subtitle}
-      description="切換五個展示頁畫布，後續分 phase 接上 overlay、inspector 與 persisted page config。"
+      description="切換五個展示頁畫布，並在同一頁完成區域選取、屬性調整與草稿發布。"
       aside={pageTabs}
     >
       <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
@@ -372,32 +389,52 @@ export function DisplayPagesEditor({
                 ))}
               </div>
             }
-            editMode={editMode}
             onScaleChange={setCanvasContainerScale}
-            onToggleEditMode={toggleEditMode}
             onZoomDelta={onZoomDelta}
-            pageLabel={selectedPage.label}
             preview={
               <div
                 className="absolute left-0 top-0 origin-top-left"
                 style={{
-                  height: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
-                  minHeight: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
+                  height: `${EDITOR_PREVIEW_SHELL_HEIGHT}px`,
+                  minHeight: `${EDITOR_PREVIEW_SHELL_HEIGHT}px`,
                   minWidth: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`,
                   transform: `translate(${viewport.offsetX}px, ${viewport.offsetY}px) scale(${0.5 * viewport.zoom})`,
                   transformOrigin: "top left",
                   width: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`
                 }}
               >
-                {previewContent}
-                <DisplayEditorCanvasOverlay
-                  isInteractive={editMode}
-                  lockedRegionIds={lockedRegionIds}
-                  regions={editableRegions}
-                  selectedRegionId={selectedRegion?.id ?? null}
-                  onSelect={setSelectedRegionId}
-                  onStartInteraction={onStartInteraction}
-                />
+                <div className="shell-stage-surface relative h-full w-full overflow-hidden">
+                  <div className="shell-stage-overlay pointer-events-none absolute inset-0" />
+                  <div className="pointer-events-none absolute inset-x-0 top-0 z-10">
+                    <AppHeader />
+                  </div>
+                  <div
+                    className="absolute left-0 overflow-hidden"
+                    style={{
+                      height: `${EDITOR_PREVIEW_SURFACE_HEIGHT}px`,
+                      top: `${EDITOR_PREVIEW_CONTENT_TOP}px`,
+                      width: `${EDITOR_PREVIEW_SURFACE_WIDTH}px`
+                    }}
+                  >
+                    <div className="pointer-events-none relative h-full w-full">
+                      {previewContent}
+                    </div>
+                    <DisplayEditorCanvasOverlay
+                      isInteractive={editMode}
+                      lockedRegionIds={lockedRegionIds}
+                      regions={editableRegions}
+                      selectedRegionId={selectedRegion?.id ?? null}
+                      onSelect={setSelectedRegionId}
+                      onStartInteraction={onStartInteraction}
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+                    <AppFooterNav
+                      playbackEntries={previewPlaybackEntries}
+                      resolvedPlaybackRouteMeta={previewRouteMeta}
+                    />
+                  </div>
+                </div>
               </div>
             }
             viewportHeight={EDITOR_PREVIEW_VIEWPORT_HEIGHT}
@@ -408,7 +445,7 @@ export function DisplayPagesEditor({
         <div className="flex flex-col overflow-hidden border-l border-[var(--shell-divider)]">
           <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
             {(["inspector", "health", "publish"] as const).map((tab) => {
-              const labels = { inspector: "Inspector", health: "Asset Health", publish: "Publishing" };
+              const labels = { inspector: "屬性", health: "素材健康", publish: "發布" };
               return (
                 <button
                   key={tab}
@@ -430,37 +467,12 @@ export function DisplayPagesEditor({
             {rightTab === "inspector" && (
               <DisplayEditorInspectorCard
                 flat
-                actions={
-                  selectedRegion ? (
-                    <>
-                      {cardRailActions}
-                      <DisplayEditorInspectorTools
-                        geometryClipboard={geometryClipboard}
-                        geometryClipboardCompatibility={geometryClipboardCompatibility}
-                        presetOptions={regionPresetOptions}
-                        selectedRegion={selectedRegion}
-                        selectedRegionLocked={selectedRegionLocked}
-                        onApplyPreset={(option) =>
-                          applyConfigUpdate((current) =>
-                            applyRegionPreset(current, selectedRegion, option.preset)
-                          )
-                        }
-                        onCopyGeometry={() => setGeometryClipboard(createGeometryClipboard(selectedRegion))}
-                        onPasteGeometry={() =>
-                          applyConfigUpdate((current) =>
-                            applyGeometryClipboard(current, selectedRegion, geometryClipboard)
-                          )
-                        }
-                        onResetRegion={() => resetPaths(selectedRegion.fields.map((field) => field.path))}
-                      />
-                    </>
-                  ) : null
-                }
+                actions={selectedRegion ? cardRailActions : null}
                 editMode={editMode}
                 emptyMessage={
                   editableRegions.length > 0
-                    ? "請先在畫布上選取一個 editable region。"
-                    : "這個頁面的 page-specific editor 尚未在本 phase 展開，先保留 preview 與 route coverage。"
+                    ? "請先在畫布上選取一個可編輯區域。"
+                    : "這個頁面的專屬編輯區域尚未展開，先保留預覽與路由覆蓋。"
                 }
                 onChange={updatePath}
                 onResetField={(path) => resetPaths([path])}

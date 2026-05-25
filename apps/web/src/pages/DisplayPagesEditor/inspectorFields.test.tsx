@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { DisplayEditorFieldSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import type {
+  DisplayEditorFieldSchema,
+  DisplayEditorRegionSchema
+} from "../../../../../packages/shared/src/displayEditorSchema";
 import { setValueAtPath } from "../../hooks/displayPageConfigPaths";
 import { applyDraftConfigUpdate, createDraftSession, resetDraftPaths } from "../../hooks/displayPageDraftSession";
 import {
@@ -18,6 +21,7 @@ import {
   sustainabilityDisplayPageEditorRegions
 } from "../Sustainability/displayPageConfig";
 import {
+  DisplayEditorCanvasOverlay,
   DisplayEditorInspectorFields,
   resolveDisplayEditorRegions,
   resolveDisplayEditorFieldIssues,
@@ -34,6 +38,14 @@ function createField(
     path: schema.path,
     schema,
     value
+  };
+}
+
+function createRegionSchema(id: string, label: string): DisplayEditorRegionSchema {
+  return {
+    fields: [],
+    id,
+    label
   };
 }
 
@@ -90,9 +102,9 @@ test("display editor inspector renders typed controls for text, number, toggle, 
   assert.match(html, /type="number"/);
   assert.match(html, /type="checkbox"/);
   assert.match(html, /<select/);
-  assert.match(html, /Image Source/);
-  assert.match(html, /Highlight Item 1/);
-  assert.match(html, /dirty/);
+  assert.match(html, /圖片來源/);
+  assert.match(html, /高亮項目 1/);
+  assert.match(html, /已修改/);
 });
 
 test("display editor inspector surfaces range, required, and select compatibility validation errors", () => {
@@ -109,7 +121,7 @@ test("display editor inspector surfaces range, required, and select compatibilit
         -24
       )
     ),
-    ["Width 必須大於或等於 0。"]
+    ["寬度必須大於或等於 0。"]
   );
 
   assert.deepEqual(
@@ -125,7 +137,7 @@ test("display editor inspector surfaces range, required, and select compatibilit
         ""
       )
     ),
-    ["Headline 為必填欄位。"]
+    ["標題文案為必填欄位。"]
   );
 
   assert.deepEqual(
@@ -144,7 +156,7 @@ test("display editor inspector surfaces range, required, and select compatibilit
         "stretch"
       )
     ),
-    ["Fit Mode 的值與可用選項不相容。"]
+    ["填滿模式的值與可用選項不相容。"]
   );
 
   assert.deepEqual(
@@ -184,9 +196,35 @@ test("display editor inspector renders validation feedback inline for invalid fi
     })
   );
 
-  assert.match(html, /Width 必須大於或等於 0。/);
+  assert.match(html, /寬度必須大於或等於 0。/);
   assert.match(html, /role="alert"/);
-  assert.match(html, /dirty/);
+  assert.match(html, /已修改/);
+});
+
+test("display editor canvas overlay exposes localized accessibility labels for selected regions", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayEditorCanvasOverlay, {
+      isInteractive: true,
+      lockedRegionIds: [],
+      onSelect: () => {},
+      onStartInteraction: () => {},
+      regions: [
+        {
+          fields: [],
+          geometry: { height: 280, left: 160, top: 120, width: 640 },
+          id: "overview-hero-media",
+          label: "Overview Hero Media",
+          nodeType: "region",
+          schema: createRegionSchema("overview-hero-media", "Overview Hero Media")
+        }
+      ],
+      selectedRegionId: "overview-hero-media"
+    })
+  );
+
+  assert.match(html, /主視覺圖片/);
+  assert.match(html, /主視覺圖片 調整大小控制點/);
+  assert.doesNotMatch(html, /Overview Hero Media resize handle/);
 });
 
 test("display editor inspector resolves only the payload fields owned by the selected media source mode", () => {
@@ -349,7 +387,7 @@ test("display editor inspector surfaces validation issues for invalid icon sourc
   const invalidField = region?.fields.find((field) => field.schema.id === "solar-icon-key-sustainability");
   assert.ok(invalidField);
   assert.deepEqual(resolveDisplayEditorFieldIssues(invalidField), [
-    "Sustainability Icon 的值與可用選項不相容。"
+    "永續成果圖示的值與可用選項不相容。"
   ]);
 });
 
@@ -488,9 +526,9 @@ test("display editor inspector renders household-equivalent template fields from
     })
   );
 
-  assert.match(html, /Eyebrow/);
-  assert.match(html, /Household Count Display/);
-  assert.match(html, /Supporting Line/);
-  assert.match(html, /Disclaimer/);
-  assert.match(html, /Basis Source Label/);
+  assert.match(html, /頁眉短標/);
+  assert.match(html, /家庭等值數值/);
+  assert.match(html, /補充說明/);
+  assert.match(html, /免責說明/);
+  assert.match(html, /基準來源標籤/);
 });

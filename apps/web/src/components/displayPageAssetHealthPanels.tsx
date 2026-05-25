@@ -1,5 +1,6 @@
 import React from "react";
 import type { DisplayPageAssetHealthEntry, DisplayPageAssetHealthReport } from "@solar-display/shared";
+import { localizeDisplayPageLabel } from "../pages/DisplayPagesEditor/localization";
 
 const displayPageLabels = {
   "factory-circuit": "Factory Circuit",
@@ -63,10 +64,10 @@ export function DisplayPageEditorAssetHealthPanel({
     pageEntries.flatMap((entry) => entry.findings.filter((finding) => finding.pageId === pageId));
   const banner = renderStateBanner({
     errorMessage,
-    healthyLabel: `${formatPageLabel(pageId)} 的素材引用目前正常`,
+    healthyLabel: `${localizeDisplayPageLabel(pageId)}的素材引用目前正常`,
     isLoading,
     unhealthyLabel:
-      pageFindings.length > 0 ? `${formatPageLabel(pageId)} 有 ${pageFindings.length} 項素材異常` : ""
+      pageFindings.length > 0 ? `${localizeDisplayPageLabel(pageId)}有 ${pageFindings.length} 項素材異常` : ""
   });
 
   return (
@@ -74,12 +75,12 @@ export function DisplayPageEditorAssetHealthPanel({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--shell-subtitle-ink)]">
-            Asset Health
+            素材健康
           </p>
           <h4 className="mt-1 text-[16px] font-semibold text-[var(--shell-title-ink)]">展示頁素材健康狀態</h4>
         </div>
         <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
-          {pageFindings.length > 0 ? "Unhealthy" : "Healthy"}
+          {pageFindings.length > 0 ? "異常" : "健康"}
         </span>
       </div>
       <div className={`mt-3 rounded-[14px] border px-3 py-2 text-[13px] ${banner.toneClass}`} role="status">
@@ -121,10 +122,10 @@ export function ImageManagementAssetHealthPanel({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">展示引用健康狀態</h3>
-          <p className="mt-1 text-[12px] text-[#6e756d]">Display Page Asset Health</p>
+          <p className="mt-1 text-[12px] text-[#6e756d]">展示頁素材健康</p>
         </div>
         <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
-          {unhealthyEntries.length > 0 ? "Unhealthy" : "Healthy"}
+          {unhealthyEntries.length > 0 ? "異常" : "健康"}
         </span>
       </div>
       <div className={`mt-3 rounded-[14px] border px-3 py-2 text-[13px] ${banner.toneClass}`} role="status">

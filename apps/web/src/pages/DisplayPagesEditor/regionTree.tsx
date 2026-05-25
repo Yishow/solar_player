@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
+import { localizeDisplayEditorLabel, localizeDisplayEditorRegionTreeLabel } from "./localization";
 
 function groupRegionsByParent(regions: ResolvedDisplayEditorRegion[]) {
   return regions.reduce<Record<string, ResolvedDisplayEditorRegion[]>>((groups, region) => {
@@ -75,13 +76,13 @@ export function DisplayEditorLeftPanel({
                 onClick={() => onSelectRegion(region.id)}
               >
                 <div className="break-words text-[14px] font-semibold text-[var(--shell-title-ink)]">
-                  {region.label}
+                  {localizeDisplayEditorRegionTreeLabel(region.label)}
                 </div>
                 <div className="mt-1 text-[11px] text-[var(--shell-subtitle-ink)]">{region.id}</div>
               </button>
               <button
                 type="button"
-                aria-label={`${region.label} ${isLocked ? "unlock" : "lock"}`}
+                aria-label={`${localizeDisplayEditorRegionTreeLabel(region.label)} ${isLocked ? "解除鎖定" : "鎖定"}`}
                 className={[
                   "rounded-full px-3 py-1 text-[11px] font-semibold",
                   isLocked
@@ -104,7 +105,7 @@ export function DisplayEditorLeftPanel({
     <section className="flex h-full flex-col border-r border-[var(--shell-divider)] bg-white/70 backdrop-blur-sm">
       <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
         {(["regions", "actions"] as const).map((t) => {
-          const labels = { regions: "Region Tree", actions: "Actions" };
+          const labels = { regions: "區域樹", actions: "操作" };
           return (
             <button
               key={t}
@@ -127,7 +128,7 @@ export function DisplayEditorLeftPanel({
         <>
           <div className="shrink-0 px-4 pt-3 pb-1">
             <p className="text-[12px] text-[var(--shell-copy-ink)]">
-              {editMode ? "選取或鎖定 region。" : "開啟 Edit Mode 後可管理 region。"}
+              {editMode ? "選取或鎖定區域。" : "開啟編輯模式後可管理區域。"}
             </p>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">

@@ -22,6 +22,7 @@ import {
   buildCardRailCardRegionSchema,
   resolveCardRailCardLabel
 } from "./cardRailTemplateFields";
+import { localizeDisplayEditorLabel, localizeDisplayEditorMessage } from "./localization";
 import { resolveDisplayEditorFieldValidationIssues } from "./displayEditorValidation";
 
 export type ResolvedDisplayEditorRect = {
@@ -56,7 +57,19 @@ export type ResolvedDisplayEditorRegion = {
 };
 
 export function resolveDisplayEditorFieldIssues(field: ResolvedDisplayEditorField) {
-  return resolveDisplayEditorFieldValidationIssues(field.schema, field.value);
+  return resolveDisplayEditorFieldValidationIssues(
+    {
+      ...field.schema,
+      label: localizeDisplayEditorLabel(field.schema.label)
+    },
+    field.value
+  ).map((issue) =>
+    issue.replace(/([^\x00-\x7F])\s+(必須|為|的值)/g, "$1$2")
+  );
+}
+
+function localizeRegionAccessibilityLabel(label: string) {
+  return localizeDisplayEditorLabel(label);
 }
 
 export function DisplayEditorCanvasOverlay({
@@ -123,17 +136,17 @@ export function DisplayEditorCanvasOverlay({
                 }
               }}
             >
-              <span className="sr-only">{region.label}</span>
+              <span className="sr-only">{localizeRegionAccessibilityLabel(region.label)}</span>
             </button>
             {isSelected && isLocked ? (
               <span className="absolute right-3 top-3 rounded-full bg-[rgba(82,91,66,0.82)] px-2 py-1 text-[11px] font-semibold text-white">
-                Locked
+                {localizeDisplayEditorLabel("Locked")}
               </span>
             ) : null}
             {isSelected && !isLocked ? (
               <button
                 type="button"
-                aria-label={`${region.label} resize handle`}
+                aria-label={`${localizeRegionAccessibilityLabel(region.label)} 調整大小控制點`}
                 className="absolute bottom-[-8px] right-[-8px] h-5 w-5 rounded-full border-2 border-white bg-[var(--shell-accent)]"
                 onPointerDown={(event) => {
                   event.preventDefault();
@@ -288,11 +301,11 @@ function renderField(
 ) {
   const label = (
     <span className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-2 font-semibold text-[var(--shell-title-ink)]">
-        {field.schema.label}
+        <span className="flex items-center gap-2 font-semibold text-[var(--shell-title-ink)]">
+        {localizeDisplayEditorLabel(field.schema.label)}
         {field.dirty ? (
           <span className="rounded-full bg-[rgba(201,136,26,0.12)] px-2 py-0.5 text-[11px] text-[#8e6410]">
-            dirty
+            {localizeDisplayEditorLabel("dirty")}
           </span>
         ) : null}
       </span>
@@ -302,7 +315,7 @@ function renderField(
           className="rounded-full border border-[var(--shell-divider)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-copy-ink)]"
           onClick={() => onResetField(field.path)}
         >
-          Reset Field
+          {localizeDisplayEditorLabel("Reset Field")}
         </button>
       ) : null}
     </span>
@@ -320,7 +333,7 @@ function renderField(
         {items.map((item, index) => (
           <div key={`${displayEditorPathKey(field.path)}-${index}`} className="grid gap-3 rounded-[14px] bg-white p-3">
             <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--shell-subtitle-ink)]">
-              {arraySchema.itemLabel} {index + 1}
+              {localizeDisplayEditorLabel(arraySchema.itemLabel)} {index + 1}
             </div>
             <div className="grid gap-3">
               {arraySchema.itemFields.map((itemField) =>
@@ -395,7 +408,7 @@ function renderFieldInput(
       >
         {field.schema.options.map((option) => (
           <option key={String(option.value)} value={String(option.value)}>
-            {option.label}
+            {localizeDisplayEditorLabel(option.label)}
           </option>
         ))}
       </select>
@@ -431,7 +444,7 @@ function renderFieldInput(
 
   return (
     <div className="rounded-[14px] border border-dashed border-[var(--shell-divider-strong)] bg-[rgba(82,91,66,0.04)] px-3 py-2 text-[12px] text-[var(--shell-subtitle-ink)]">
-      Unknown field type: {field.schema.fieldType}
+      {localizeDisplayEditorMessage("Unknown field type")}: {field.schema.fieldType}
     </div>
   );
 }

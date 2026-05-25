@@ -3,6 +3,7 @@ import {
   type DisplayPageCardRailTemplateKey
 } from "@solar-display/shared";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
+import { localizeDisplayEditorLabel } from "./localization";
 import { resolveCardRailTemplateLabel } from "./cardRailTemplateFields";
 
 export function CardRailInspectorActions({
@@ -29,7 +30,7 @@ export function CardRailInspectorActions({
   return (
     <div className="grid gap-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.03)] p-3">
       <label className="grid gap-2 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
-        <span>Card Template</span>
+        <span>{localizeDisplayEditorLabel("Card Template")}</span>
         <select
           className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none"
           value={selectedRegion.templateKey}
@@ -39,7 +40,7 @@ export function CardRailInspectorActions({
         >
           {displayPageCardRailTemplateKeys.map((template) => (
             <option key={template} value={template}>
-              {resolveCardRailTemplateLabel(template)}
+              {localizeDisplayEditorLabel(resolveCardRailTemplateLabel(template))}
             </option>
           ))}
         </select>
@@ -51,7 +52,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onAddCard}
         >
-          Add Card
+          {localizeDisplayEditorLabel("Add Card")}
         </button>
         <button
           type="button"
@@ -59,7 +60,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onDuplicateCard}
         >
-          Duplicate Card
+          {localizeDisplayEditorLabel("Duplicate Card")}
         </button>
         <button
           type="button"
@@ -67,7 +68,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onMoveEarlier}
         >
-          Move Earlier
+          {localizeDisplayEditorLabel("Move Earlier")}
         </button>
         <button
           type="button"
@@ -75,7 +76,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onMoveLater}
         >
-          Move Later
+          {localizeDisplayEditorLabel("Move Later")}
         </button>
         <button
           type="button"
@@ -83,7 +84,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onToggleVisibility}
         >
-          Toggle Visible
+          {localizeDisplayEditorLabel("Toggle Visible")}
         </button>
         <button
           type="button"
@@ -91,7 +92,7 @@ export function CardRailInspectorActions({
           disabled={selectedRegionLocked}
           onClick={onDeleteCard}
         >
-          Delete Card
+          {localizeDisplayEditorLabel("Delete Card")}
         </button>
       </div>
     </div>

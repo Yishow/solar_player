@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { DisplayEditorInspectorFields, type ResolvedDisplayEditorRegion } from "./inspectorFields";
+import { localizeDisplayEditorLabel } from "./localization";
 
 function InspectorContent({
   actions,
@@ -30,7 +31,7 @@ function InspectorContent({
     <div className="space-y-4">
       <div>
         <h4 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">
-          {selectedRegion.label}
+          {localizeDisplayEditorLabel(selectedRegion.label)}
         </h4>
         {selectedRegion.description ? (
           <p className="mt-1 text-[12px] leading-5 text-[var(--shell-copy-ink)]">
@@ -81,7 +82,7 @@ export function DisplayEditorInspectorCard({
   return (
     <article className="rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-5 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
       <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-[var(--shell-subtitle-ink)]">
-        Inspector
+        {localizeDisplayEditorLabel("Inspector")}
       </p>
       <div className="mt-3">{content}</div>
     </article>

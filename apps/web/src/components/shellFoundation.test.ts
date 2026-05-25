@@ -579,10 +579,10 @@ test("display pages editor hides management header and footer while edit mode is
     )
   );
 
-  assert.doesNotMatch(editModeHtml, /data-shell-primitive="app-header"/);
-  assert.doesNotMatch(editModeHtml, /data-shell-primitive="footer-nav"/);
-  assert.match(viewModeHtml, /data-shell-primitive="app-header"/);
-  assert.match(viewModeHtml, /data-shell-primitive="footer-nav"/);
+  assert.equal((editModeHtml.match(/data-shell-primitive="app-header"/g) ?? []).length, 1);
+  assert.equal((editModeHtml.match(/data-shell-primitive="footer-nav"/g) ?? []).length, 1);
+  assert.equal((viewModeHtml.match(/data-shell-primitive="app-header"/g) ?? []).length, 2);
+  assert.equal((viewModeHtml.match(/data-shell-primitive="footer-nav"/g) ?? []).length, 2);
 });
 
 test("shell primitives expose reusable section, action, media, and status wrappers", () => {

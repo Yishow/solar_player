@@ -1,13 +1,13 @@
 ---
 name: display-asset-generation
-description: Use this skill when planning, generating, exporting, reviewing, or wiring visual assets for the five solar_player playback display pages: Overview, Solar, FactoryCircuit, Images, and Sustainability. This covers hero photos, gallery photos, KPI icons, flow/circuit icons, load icons, ESG icons, ornaments, placeholders, asset manifests, prompt recipes, export specs, and preview QA.
+description: 'Use this skill whenever the user wants to create, replace, refine, review, or wire visual assets for the five solar_player playback pages: Overview, Solar, FactoryCircuit, Images, and Sustainability. This skill is optimized for low-friction requests like "幫 Solar 換 hero 圖", "補幾個 Sustainability icon", or "幫 Images 做一組一致的圖". Use it even when the user does not know the exact file, route, source mode, or asset path.'
 ---
 
 # Display Asset Generation Skill
 
-This skill defines a repeatable workflow for generating and governing visual assets used by the five playback display pages.
+This skill is for quickly producing assets for the five playback pages without making the user remember repo internals.
 
-It is not a general marketing-image skill. It is primarily for the display wall runtime pages:
+Primary targets:
 
 - `Overview`
 - `Solar`
@@ -15,262 +15,220 @@ It is not a general marketing-image skill. It is primarily for the display wall 
 - `Images`
 - `Sustainability`
 
-`/slideshow-preview` is included only as a QA surface because it embeds those pages as miniatures.
+`/slideshow-preview` is a QA surface, not a separate design target.
 
-## Output formats
+Detailed guidance and examples live in `README.md` beside this file.
 
-Use different file types for different asset classes:
+## Default behavior
 
-| Asset class | Preferred production output | Notes |
-| --- | --- | --- |
-| Hero photo | `.webp` | Usually `2400x1350` or `2880x1620`. |
-| Gallery photo | `.webp` | Usually `2400x1350`; thumbnail derivatives come from the approved source. |
-| KPI icon | `.svg` | Usually `viewBox 0 0 96 96`; use `currentColor` when possible. |
-| Flow node icon | `.svg` | Usually `viewBox 0 0 128 128`; used by Solar flow nodes. |
-| Circuit node icon | `.svg` | Usually `viewBox 0 0 128 128`; used by FactoryCircuit topology nodes. |
-| Load row icon | `.svg` | Usually `viewBox 0 0 96 96`; used by FactoryCircuit load rows. |
-| ESG icon | `.svg` | Usually `viewBox 0 0 96 96`; used by Sustainability cards/lists. |
-| Ornament | `.svg` or CSS primitive | Leaf watermark, gold line, branch accents; token-driven color/opacity. |
-| Placeholder | `.svg` | Quiet fallback surface/glyph for missing asset states. |
+When this skill triggers:
 
-Use `.png` only as an intermediate source or when a tool requires it during editing. Do not treat `.png` as the preferred final runtime format unless there is a specific reason.
+1. Infer the page and asset type from the user's wording.
+2. Inspect the current page wiring before proposing file changes.
+3. Choose the smallest asset path that matches the current repo pattern.
+4. Generate or wire only the requested asset.
+5. Verify on the target route and, when relevant, `/slideshow-preview`.
 
-## Core rule
+Do not force the user to provide:
 
-A production asset must move through this chain:
+- exact route names
+- source mode names
+- asset path conventions
+- manifest fields
+- prompt recipe ids
 
-```text
-Asset intent
-→ Manifest record
-→ Prompt recipe
-→ Candidate generation or curation
-→ Post-process / SVG normalization
-→ Runtime or preview placement
-→ Preview QA
-→ Approved or revised
-```
+Translate the user's request into those details yourself.
 
-If any step is missing, keep the asset as `draft` or `candidate`, not `approved`.
+## Fast request examples
 
-## Required manifest fields
+Treat requests like these as direct triggers:
 
-Every approved asset should have:
+- "幫 Overview 換 hero 圖"
+- "幫 Solar 補一組比較一致的 icon"
+- "Factory Circuit 的 load icon 太醜，重做一下"
+- "Images 頁面想換一批比較乾淨的現場照片"
+- "Sustainability 補幾個比較像同系列的 ESG icon"
+- "幫我看這 5 頁現在哪些素材最值得先補"
 
-- `page`: `overview`, `solar`, `factory-circuit`, `images`, `sustainability`, or `shared`.
-- `slot`: `heroMedia`, `gallery`, `kpiIcon`, `flowNodeIcon`, `circuitNodeIcon`, `loadIcon`, `ornament`, or `placeholder`.
-- `assetKey`: stable kebab-case key.
-- `role`: `photo`, `icon`, `ornament`, or `placeholder`.
-- `format`: usually `webp` for photos and `svg` for icons/ornaments/placeholders.
-- `targetSize`: for example `2400x1350`, `2880x1620`, `viewBox 0 0 96 96`, or `viewBox 0 0 128 128`.
-- `sourceMode`: `seed-default`, `managed-asset`, or `direct-src`.
-- `promptRecipe`: recipe id used to generate or prepare the asset.
-- `version`: start at `v001`.
-- `status`: `draft`, `candidate`, `approved`, or `deprecated`.
-- `qaNotes`: required before `approved`.
+## First decision: what kind of asset is this?
 
-## Naming convention
+Map the request to one of these asset paths:
 
-Use predictable versioned paths:
+| Request type | Usual implementation path |
+| --- | --- |
+| Hero image / gallery photo | page config media binding: `managed-asset`, `direct-src`, or `seed-default` |
+| Page-local raster icon | `asset-image` source |
+| Shared glyph-like icon | `reference-glyph` source |
+| Page-owned vector icon set | `page-icon-key` plus the page `iconRegistry.tsx` |
+| Ornament / decorative chrome | page-local chrome config or existing ornament component/CSS |
+| Placeholder / fallback icon | usually `reference-glyph`, `page-icon-key`, or a small page-local asset |
 
-```text
-public/display-assets/{page}/{role}/{asset-key}@v001.webp
-public/display-assets/{page}/{role}/{asset-key}@v001.svg
-```
+Do not assume every icon should become a new SVG file. The current repo already uses three icon source modes:
 
-Examples:
+- `asset-image`
+- `reference-glyph`
+- `page-icon-key`
 
-```text
-public/display-assets/solar/hero/solar-carport@v001.webp
-public/display-assets/solar/icons/solar-flow-panel@v001.svg
-public/display-assets/sustainability/icons/esg-renewable@v001.svg
-```
+## Current repo reality
 
-Avoid informal names such as `final.png`, `new-new.png`, `漂亮圖.png`, or `最後版2.webp`.
+Follow the real implementation patterns already in the repo.
 
-## Shared visual style
+### Media source modes
 
-Use this shared display-wall style for all generated or curated assets:
+Hero and gallery-like media are wired through:
 
-- Warm ivory paper surface.
-- Corporate green-energy display wall.
-- Clean factory sustainability context.
-- Soft natural light.
-- Low saturation.
-- Deep green primary accents.
-- Misty green secondary accents.
-- Subtle solar gold highlights.
-- Quiet botanical ornament language.
-- High readability from display-wall distance.
-- Premium enterprise presentation.
+- `managed-asset`
+- `direct-src`
+- `seed-default`
 
-Avoid generated text, UI screenshots, fake marks, unreadable signs, chart labels, close-up identity details, watermarks, oversaturated colors, heavy bokeh, excessive 3D rendering, and random decorative glow spots.
+Relevant files usually include:
 
-## Page asset map
+- `apps/web/src/pages/*/displayPageConfig.ts`
+- `apps/web/src/pages/*/assets.ts`
+- `packages/shared/src/displayPageConfig.ts`
+
+### Icon source modes
+
+Icons are wired through:
+
+- `asset-image`
+- `reference-glyph`
+- `page-icon-key`
+
+Relevant files usually include:
+
+- `apps/web/src/pages/*/displayPageConfig.ts`
+- `apps/web/src/pages/*/iconRegistry.tsx`
+- `apps/web/src/pages/shared/displayIconSourceConfig.ts`
+- `apps/web/src/components/displayPageIconResolver.tsx`
+
+## Page-specific patterns
+
+Use these defaults unless the current code says otherwise:
 
 ### Overview
 
-Generate or curate:
-
-- Hero photo: factory or green-energy site photo, final `.webp`.
-- KPI icons: real-time power, today generation, total generation, today CO2 reduction, total CO2 reduction, final `.svg`.
-- Ornaments: leaf watermark and gold line, final `.svg` or CSS primitive.
-
-QA focus: hero image must blend with left-side copy and warm fade without reducing KPI readability.
+- Hero: media binding in `apps/web/src/pages/Overview/displayPageConfig.ts`
+- Seed hero reference: `apps/web/src/pages/Overview/assets.ts`
+- KPI icons: mostly `reference-glyph`
+- Ornaments: page chrome config, not separate asset governance
 
 ### Solar
 
-Generate or curate:
-
-- Hero photo: solar carport or solar panel field, final `.webp`.
-- Flow icons: solar panel, inverter, factory consumption, CO2 reduction, final `.svg`.
-- KPI icons: generation, self-consumption, CO2 today, CO2 total, efficiency, final `.svg`.
-
-QA focus: flow node icons and KPI icons must share one icon grammar.
+- Hero: media binding in `apps/web/src/pages/Solar/displayPageConfig.ts`
+- Seed hero and raster icons: existing generated/reference assets
+- Flow/KPI icons: mostly `asset-image`
+- This is the page with the most explicit existing asset binding
 
 ### FactoryCircuit
 
-Generate or curate:
-
-- Circuit node icons: source, inverter, switchboard, equipment/load, endpoints, final `.svg`.
-- Load row icons: equipment, lighting, HVAC, production, final `.svg`.
-- Optional endpoint/ornament assets, final `.svg` or CSS primitive.
-
-Routing lines should remain React/SVG/CSS-rendered, not bitmap images.
-
-QA focus: asset polish must not weaken electrical topology or status meaning.
+- Icons: primarily `page-icon-key`
+- Registry implementation: `apps/web/src/pages/FactoryCircuit/iconRegistry.tsx`
+- Do not replace topology lines with bitmap artwork
 
 ### Images
 
-Generate or curate:
-
-- Gallery photos, final `.webp`.
-- Placeholder, final `.svg`.
-- Info/location icon, final `.svg`.
-- Arrow icons only if not supplied by the runtime icon library, final `.svg`.
-
-QA focus: gallery set must share crop, color grading, and thumbnail readability.
+- Main stage: media binding in `apps/web/src/pages/Images/displayPageConfig.ts`
+- Gallery behavior also depends on runtime playlist/fallback logic
+- Placeholder/info imagery is often glyph-driven, not a standalone asset pipeline
 
 ### Sustainability
 
-Generate or curate:
+- Hero: media binding in `apps/web/src/pages/Sustainability/displayPageConfig.ts`
+- KPI/stat icons: primarily `page-icon-key`
+- Registry implementation: `apps/web/src/pages/Sustainability/iconRegistry.tsx`
 
-- Hero photo: green factory or ESG achievement scene, final `.webp`.
-- KPI/ESG icons: energy, CO2, tree, renewable energy, efficiency, supply chain, final `.svg`.
-- Optional achievement ornaments, final `.svg` or CSS primitive.
+## Workflow
 
-QA focus: achievement and brand tone, not real-time monitoring tone.
+### 1. Identify the target
 
-## Photo workflow
+Infer:
 
-1. Draft the manifest record.
-2. Select the shared style and page recipe.
-3. Generate or curate 4-8 candidates.
-4. Reject candidates with baked-in text, brand-like marks, fake signage, distorted industrial details, overly dark lighting, or inconsistent color tone.
-5. Select 1-2 candidates for post-processing.
-6. Crop to the target ratio.
-7. Normalize color temperature, saturation, midtone brightness, and sharpness.
-8. Export as `.webp`.
-9. Place in the target page route or managed asset slot.
-10. Run preview QA before approval.
+- page
+- slot or area
+- asset class
+- whether the user wants new generation, refinement, or only wiring
 
-## Icon workflow
+Ask one clarifying question only if ambiguity would change the implementation path.
 
-AI-generated icon imagery is only a concept reference. Production icons must be normalized SVG.
+### 2. Inspect before changing
 
-1. Draft the manifest record.
-2. Select the page and icon recipe.
-3. Generate/sketch concept candidates if useful.
-4. Select the clearest semantic direction.
-5. Rebuild or trace as SVG.
-6. Normalize viewBox and stroke width.
-7. Use `currentColor` where possible.
-8. Test in the target card, flow node, circuit node, or row.
-9. Review the whole icon set together.
-10. Update manifest status and QA notes.
+Check the real files that own the asset:
 
-Final SVG should avoid embedded bitmaps, page-specific hardcoded colors, heavy filters, shadows, gradients, and inconsistent detail density.
+- page `displayPageConfig.ts`
+- page `assets.ts`
+- page `iconRegistry.tsx`
+- shared icon/media resolver files if the request crosses page boundaries
 
-## Ornament workflow
+Do not invent a new asset storage convention if the page already has one.
 
-Use for leaf watermarks, gold lines, branch accents, and quiet placeholders.
+### 3. Choose the smallest valid implementation
 
-1. Identify the ornament role and page slot.
-2. Choose display semantic token colors and opacity range.
-3. Sketch as SVG path or CSS primitive.
-4. Test behind hero title, KPI cards, routing diagrams, and gallery stage.
-5. Reduce opacity/detail until the ornament supports content instead of competing with it.
-6. Record manifest entry and QA notes.
+Prefer this order:
 
-Ornaments should usually be SVG or CSS primitives, not bitmap images.
+1. Reuse existing source mode and swap the underlying asset or config value.
+2. Extend an existing page icon registry if the page already uses `page-icon-key`.
+3. Add a page-local asset-image source when the page already uses raster icons.
+4. Introduce a new asset file or new pattern only if the current page cannot express the requested result.
 
-## Prompt recipe structure
+### 4. Generate or wire
 
-Each recipe should include:
+If the user needs a new photo-like asset:
 
-1. Shared style.
-2. Page intent.
-3. Asset role.
-4. Composition.
-5. Constraints.
-6. Avoid list.
-7. Output specification.
+- keep the page's warm ivory / green-energy display tone
+- avoid baked-in text, UI, logos, watermarks, and fake signage
+- prefer crops that leave readable title/card areas intact
 
-Example recipe id pattern:
+If the user needs a new icon:
 
-```text
-{page}.{asset-role}.v1
-```
+- match the page's current icon grammar
+- prefer the existing source mode for that page
+- only build a standalone SVG asset when that is the simplest fit
 
-Examples:
+### 5. Verify in the actual page
 
-- `overview.hero-photo.v1`
-- `solar.flow-icon.v1`
-- `factory-circuit.node-icon.v1`
-- `images.gallery-photo.v1`
-- `sustainability.esg-icon.v1`
-
-## Preview QA
-
-Before marking an asset as `approved`, check the relevant route and slideshow preview when applicable:
+Check the target playback route:
 
 - `/overview`
 - `/solar`
 - `/factory-circuit`
 - `/images`
 - `/sustainability`
-- `/slideshow-preview`
 
-Check:
+Also check `/slideshow-preview` when the asset is visible there.
 
-- Page topic is understandable within three seconds.
-- The asset supports the page story rather than becoming accidental clutter.
-- Text and metric readability remain strong.
-- No important visual detail sits behind title, KPI cards, route lines, or charts.
-- The asset matches the warm paper / green-energy display family.
-- The asset still works as a small slideshow preview card.
-- Icons in a set share line weight, detail density, optical size, and color behavior.
-- Ornaments remain quiet and token-compatible.
+Verification questions:
 
-Use this QA note template:
+- Is the page readable within three seconds?
+- Does the new asset match the existing page family?
+- Does it avoid colliding with title, KPI, or diagram content?
+- If this is an icon set, do the icons still feel like one family?
 
-```text
-QA route(s):
-Slot:
-Asset key/version:
-Readability:
-Fade/crop:
-Icon/ornament consistency:
-Slideshow preview:
-Decision: approved | revise | deprecated
-Notes:
-```
+## Response structure when using this skill
 
-## Response style when using this skill
+Keep responses practical and low-friction:
 
-When asked to generate or plan assets:
+1. State what page and asset type you inferred.
+2. State which files or source mode you will touch.
+3. Make the asset or wiring change.
+4. Report the verification result.
 
-1. Start with asset manifest rows.
-2. Then provide the prompt recipe or recipe id.
-3. Then provide export and QA steps.
-4. Do not mark an asset approved unless QA evidence exists.
-5. If asked for immediate visual generation, state the manifest assumptions first, then generate candidates.
+Do not start with manifest templates unless the user explicitly asks for asset governance, inventory, or recipe documentation.
+
+## Governance is optional, not the default
+
+Manifest rows, prompt recipes, and formal QA notes are useful when the user asks for:
+
+- a reusable asset inventory
+- a prompt library
+- approval tracking
+- page-by-page asset planning
+
+In those cases, also consult:
+
+- `README.md`
+- `docs/display-assets/README.md`
+- `docs/display-assets/asset-manifest.template.md`
+- `docs/display-assets/prompt-recipes/`
+
+But for ordinary requests, optimize for speed and correctness first.

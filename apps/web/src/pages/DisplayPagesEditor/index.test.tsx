@@ -25,11 +25,13 @@ test("display page editor shell exposes the full rollout page switcher and idle 
     )
   );
 
-  assert.match(html, />Overview</);
-  assert.match(html, />Solar</);
-  assert.match(html, />Factory Circuit</);
-  assert.match(html, />Images</);
-  assert.match(html, />Sustainability</);
+  assert.match(html, />總覽</);
+  assert.match(html, />太陽能</);
+  assert.match(html, />工廠迴路</);
+  assert.match(html, />展示圖像</);
+  assert.match(html, />永續成果</);
+  assert.match(html, /編輯模式關閉/);
+  assert.ok(html.indexOf("編輯模式關閉") < html.indexOf(">總覽<"));
   assert.match(html, /按 E 啟用編輯模式/);
 });
 
@@ -95,16 +97,18 @@ test("display page editor keeps the region tree selection and inspector in sync"
     )
   );
 
-  assert.match(html, /Region Tree/);
-  assert.match(html, /Overview Hero Media/);
-  assert.match(html, /Source Mode/);
-  assert.match(html, /Image Alt/);
-  assert.match(html, /Fit Mode/);
-  assert.match(html, /Reset Region/);
-  assert.match(html, /Copy Geometry/);
-  assert.match(html, /Undo/);
-  assert.match(html, /Redo/);
-  assert.match(html, /Region Presets/);
+  assert.match(html, /區域樹/);
+  assert.match(html, /主視覺圖片/);
+  assert.doesNotMatch(html, /總覽 主視覺文案/);
+  assert.match(html, /素材來源/);
+  assert.match(html, /替代文字/);
+  assert.match(html, /填滿模式/);
+  assert.doesNotMatch(html, /重設區域/);
+  assert.doesNotMatch(html, /複製幾何/);
+  assert.doesNotMatch(html, /貼上幾何/);
+  assert.match(html, /復原/);
+  assert.match(html, /重做/);
+  assert.doesNotMatch(html, /區域預設/);
 });
 
 test("display page editor renders rail card hierarchy and template-aware controls for sustainability cards", () => {
@@ -158,15 +162,16 @@ test("display page editor renders rail card hierarchy and template-aware control
     ])
   );
 
-  assert.match(html, /Sustainability Highlight Rail/);
+  assert.match(html, /重點卡片列/);
+  assert.doesNotMatch(html, /永續成果 重點卡片列/);
   assert.match(html, /今日綠電效益/);
   assert.match(html, /累積綠能成果/);
-  assert.match(html, /Add Card/);
-  assert.match(html, /Duplicate Card/);
-  assert.match(html, /Delete Card/);
-  assert.match(html, /Card Template/);
-  assert.match(html, /Supporting Line/);
-  assert.match(html, /Disclaimer/);
+  assert.match(html, /新增卡片/);
+  assert.match(html, /複製卡片/);
+  assert.match(html, /刪除卡片/);
+  assert.match(html, /卡片模板/);
+  assert.match(html, /補充說明/);
+  assert.match(html, /免責說明/);
 });
 
 test("locked regions remain selectable but do not expose resize interaction handles", () => {
@@ -190,7 +195,7 @@ test("locked regions remain selectable but do not expose resize interaction hand
   assert.match(html, /已鎖定/);
   assert.match(html, /data-locked="true"/);
   assert.doesNotMatch(html, /Overview Hero Media resize handle/);
-  assert.match(html, /Locked regions 無法直接改動/);
+  assert.doesNotMatch(html, /已鎖定區域無法直接修改/);
 });
 
 test("display page editor falls back to built-in page definitions when a caller passes an empty set", () => {
@@ -207,9 +212,11 @@ test("display page editor falls back to built-in page definitions when a caller 
     )
   );
 
-  assert.match(html, />Overview</);
-  assert.match(html, />Factory Circuit</);
-  assert.match(html, /Canvas Preview/);
+  assert.match(html, />總覽</);
+  assert.match(html, />工廠迴路</);
+  assert.match(html, /data-shell-primitive="app-header"/);
+  assert.match(html, /data-shell-primitive="footer-nav"/);
+  assert.doesNotMatch(html, /畫布預覽/);
 });
 
 test("display page editor preview surface keeps positive minimum dimensions for preview widgets", () => {
@@ -234,6 +241,6 @@ test("display page editor preview surface keeps positive minimum dimensions for 
     )
   );
 
-  assert.match(html, /min-height:934px/);
+  assert.match(html, /min-height:1080px/);
   assert.match(html, /min-width:1920px/);
 });
