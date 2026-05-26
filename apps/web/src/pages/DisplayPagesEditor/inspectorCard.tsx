@@ -6,6 +6,7 @@ function InspectorContent({
   actions,
   editMode,
   emptyMessage,
+  extraContent,
   onChange,
   onOpenAssetLibrary,
   onResetField,
@@ -14,6 +15,7 @@ function InspectorContent({
   actions?: ReactNode;
   editMode: boolean;
   emptyMessage: string;
+  extraContent?: ReactNode;
   onChange: Parameters<typeof DisplayEditorInspectorFields>[0]["onChange"];
   onOpenAssetLibrary?: Parameters<typeof DisplayEditorInspectorFields>[0]["onOpenAssetLibrary"];
   onResetField?: Parameters<typeof DisplayEditorInspectorFields>[0]["onResetField"];
@@ -42,6 +44,7 @@ function InspectorContent({
         ) : null}
       </div>
       {actions}
+      {extraContent}
       <DisplayEditorInspectorFields
         fields={selectedRegion.fields}
         onChange={onChange}
@@ -56,6 +59,7 @@ export function DisplayEditorInspectorCard({
   actions,
   editMode,
   emptyMessage,
+  extraContent,
   flat = false,
   onChange,
   onOpenAssetLibrary,
@@ -65,6 +69,7 @@ export function DisplayEditorInspectorCard({
   actions?: ReactNode;
   editMode: boolean;
   emptyMessage: string;
+  extraContent?: ReactNode;
   flat?: boolean;
   onChange: Parameters<typeof DisplayEditorInspectorFields>[0]["onChange"];
   onOpenAssetLibrary?: Parameters<typeof DisplayEditorInspectorFields>[0]["onOpenAssetLibrary"];
@@ -76,6 +81,7 @@ export function DisplayEditorInspectorCard({
       actions={actions}
       editMode={editMode}
       emptyMessage={emptyMessage}
+      extraContent={extraContent}
       onChange={onChange}
       onOpenAssetLibrary={onOpenAssetLibrary}
       onResetField={onResetField}

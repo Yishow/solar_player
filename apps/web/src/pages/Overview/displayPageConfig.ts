@@ -22,8 +22,8 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
-  buildDisplayPageMediaEffectFields,
-  overviewHeroMediaEffectResolverOptions
+  createSupportedDisplayPageMediaEffectSurface,
+  overviewHeroDefaultMediaEffects
 } from "../shared/displayPageMediaEffectConfig";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
@@ -167,7 +167,7 @@ export function createOverviewDisplayPageSeedConfig(
       alignX: 1,
       alignY: 0,
       alt: heroAlt,
-      effects: overviewHeroMediaEffectResolverOptions.defaults,
+      effects: overviewHeroDefaultMediaEffects,
       fitMode: "contain",
       focusX: 1,
       focusY: 0,
@@ -290,9 +290,9 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-x", label: "Focus X", path: ["heroMedia", "focusX"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-y", label: "Focus Y", path: ["heroMedia", "focusY"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-x", label: "Align X", path: ["heroMedia", "alignX"], step: 0.05 },
-      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 },
-      ...buildDisplayPageMediaEffectFields("hero", ["heroMedia"])
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 }
     ],
+    mediaEffectSurface: createSupportedDisplayPageMediaEffectSurface(["heroMedia"]),
     presetKey: "hero-media"
   },
   {

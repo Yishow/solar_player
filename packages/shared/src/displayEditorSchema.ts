@@ -109,6 +109,12 @@ export type DisplayEditorRegionSchema = {
   geometry?: DisplayEditorRegionGeometrySchema;
   id: string;
   label: string;
+  mediaEffectSurface?: {
+    bindingPath: DisplayEditorPath;
+    reason?: string;
+    status: "supported" | "unsupported";
+    support?: import("./displayPageMediaEffects.js").DisplayPageMediaEffectSupport;
+  };
   presetKey?: string;
 };
 

@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveDisplayPageMediaEffects } from "@solar-display/shared";
 import { createFactoryCircuitDisplayPageSeedConfig } from "./FactoryCircuit/displayPageConfig";
 import { createImagesDisplayPageSeedConfig } from "./Images/displayPageConfig";
 import { createOverviewDisplayPageSeedConfig } from "./Overview/displayPageConfig";
 import { createSolarDisplayPageSeedConfig } from "./Solar/displayPageConfig";
 import { createSustainabilityDisplayPageSeedConfig } from "./Sustainability/displayPageConfig";
+import {
+  imagesMainStageMediaEffectResolverOptions,
+  overviewHeroMediaEffectResolverOptions
+} from "./shared/displayPageMediaEffectConfig";
 
 test("all five display pages expose non-empty seed-backed editor config", () => {
   const overview = createOverviewDisplayPageSeedConfig("/overview-hero.png");
@@ -22,15 +27,11 @@ test("all five display pages expose non-empty seed-backed editor config", () => 
   assert.equal(factoryCircuit.hero.copyZhLines.length, 3);
   assert.equal(overview.iconSources.power.mode, "reference-glyph");
   assert.equal(overview.heroMedia.sourceMode, "seed-default");
-  assert.equal(overview.heroMedia.effects?.edgeFade?.direction, "left");
-  assert.equal(overview.heroMedia.effects?.bottomFade?.enabled, true);
   assert.equal(solar.iconSources.kpiCards.generation.mode, "asset-image");
   assert.equal(solar.heroMedia.sourceMode, "seed-default");
   assert.equal(images.hero.copyLines.length, 3);
   assert.equal(images.iconSources.infoPanel.mode, "reference-glyph");
   assert.equal(images.mainStage.sourceMode, "seed-default");
-  assert.equal(images.mainStage.effects?.edgeFade?.direction, "left");
-  assert.equal(images.mainStage.effects?.blur?.enabled, false);
   assert.equal(sustainability.hero.copyEnLines.length, 3);
   assert.equal(factoryCircuit.iconSources.nodes.solar.mode, "page-icon-key");
   assert.equal(sustainability.iconSources.statCards.esg.mode, "page-icon-key");
@@ -43,5 +44,28 @@ test("all five display pages expose non-empty seed-backed editor config", () => 
       ? sustainability.highlightRail.cards[1].contentSource.payload.householdLabel
       : null,
     "戶4口之家"
+  );
+});
+
+test("legacy Overview and Images seed effects still resolve into canonical composable layers", () => {
+  const overview = createOverviewDisplayPageSeedConfig("/overview-hero.png");
+  const images = createImagesDisplayPageSeedConfig("/images-main.jpg");
+
+  const overviewLayers = resolveDisplayPageMediaEffects(
+    overview.heroMedia.effects,
+    overviewHeroMediaEffectResolverOptions
+  ).layers;
+  const imagesLayers = resolveDisplayPageMediaEffects(
+    images.mainStage.effects,
+    imagesMainStageMediaEffectResolverOptions
+  ).layers;
+
+  assert.deepEqual(
+    overviewLayers.map((layer) => `${layer.kind}:${layer.zone}`),
+    ["fade:left", "mist:left", "fade:bottom", "mist:bottom"]
+  );
+  assert.deepEqual(
+    imagesLayers.map((layer) => `${layer.kind}:${layer.zone}`),
+    ["fade:left", "mist:left", "fade:bottom", "mist:bottom"]
   );
 });

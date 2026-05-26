@@ -213,6 +213,14 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           src={heroMediaSource ?? undefined}
           style={heroMediaPresentation.mediaStyle}
         />
+        {heroMediaPresentation.overlayLayers.map((layer) => (
+          <span
+            key={layer.id}
+            aria-hidden="true"
+            className={layer.className}
+            style={layer.style}
+          />
+        ))}
       </figure>
 
       {overviewCardOrder.map((cardItem, index) => {

@@ -22,6 +22,9 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
+  createUnsupportedDisplayPageMediaEffectSurface
+} from "../shared/displayPageMediaEffectConfig";
+import {
   solarConnectorLayout,
   solarFlowNodeLayout,
   solarHeroLayout,
@@ -264,6 +267,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "solar-hero-width", label: "Width", path: ["heroContainer", "width"] },
       { constraints: { min: 0 }, fieldType: "number", id: "solar-hero-height", label: "Height", path: ["heroContainer", "height"] }
     ],
+    mediaEffectSurface: createUnsupportedDisplayPageMediaEffectSurface(
+      ["heroMedia"],
+      "此頁面的主視覺素材尚未開放可組合媒體效果。"
+    ),
     presetKey: "hero-media"
   },
   {

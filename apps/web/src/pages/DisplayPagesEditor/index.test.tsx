@@ -5,13 +5,20 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import {
+  createOverviewDisplayPageSeedConfig,
+  overviewDisplayPageEditorRegions
+} from "../Overview/displayPageConfig";
+import {
   createSustainabilityDisplayPageSeedConfig,
   sustainabilityDisplayPageEditorRegions
 } from "../Sustainability/displayPageConfig";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import {
+  applyManagedAssetSelectionToRegionConfig,
+  applyManagedAssetSelectionToShellDraft,
   DisplayPagesEditor,
   resolveDisplayPageObjectAssetOptions,
+  restoreRegionSourceToSeedDefault,
   type DisplayEditorPageDefinition
 } from "./index";
 import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
@@ -229,6 +236,51 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.doesNotMatch(html, /區域預設/);
 });
 
+test("display page editor routes a visible hero container selection to the owning media effect inspector", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-hero-container"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /媒體效果/);
+  assert.match(html, /新增效果層/);
+  assert.match(html, /上緣霧化/);
+  assert.match(html, /Overview Hero Media 目前使用可組合效果層/);
+});
+
+test("display page editor explains unsupported media effect surfaces in the inspector", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=sustainability"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "sustainability-hero-media"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /媒體效果/);
+  assert.match(html, /尚未開放可組合媒體效果/);
+  assert.doesNotMatch(html, /新增效果層/);
+});
+
 test("display page editor exposes freeform object list and asset-backed inspector fields inside the existing editor", () => {
   const pageDefinitions: DisplayEditorPageDefinition[] = [
     {
@@ -296,6 +348,82 @@ test("display page object asset picker hides shell-only assets", () => {
   assert.equal(options[0]?.usageScope, "page-only");
 });
 
+test("managed asset replacement updates page media bindings with a previewable managed source", () => {
+  const seedConfig = createOverviewDisplayPageSeedConfig();
+  const heroRegion = resolveDisplayEditorRegions(
+    seedConfig as unknown as Record<string, unknown>,
+    overviewDisplayPageEditorRegions,
+    seedConfig as unknown as Record<string, unknown>
+  ).find((region) => region.id === "overview-hero-media");
+
+  assert.ok(heroRegion);
+
+  const nextConfig = applyManagedAssetSelectionToRegionConfig(
+    seedConfig as unknown as Record<string, unknown>,
+    heroRegion ?? null,
+    initialImages[0]!
+  ) as { heroMedia: { assetId?: number | null; sourceMode?: string; src?: string } };
+
+  assert.equal(nextConfig.heroMedia.sourceMode, "managed-asset");
+  assert.equal(nextConfig.heroMedia.assetId, 7);
+  assert.match(nextConfig.heroMedia.src ?? "", /\/uploads\/images\/page-object\.png$/);
+});
+
+test("restoring seed-default clears managed page media overrides instead of leaving the replacement active", () => {
+  const seedConfig = createOverviewDisplayPageSeedConfig();
+  const heroRegion = resolveDisplayEditorRegions(
+    seedConfig as unknown as Record<string, unknown>,
+    overviewDisplayPageEditorRegions,
+    seedConfig as unknown as Record<string, unknown>
+  ).find((region) => region.id === "overview-hero-media");
+
+  assert.ok(heroRegion);
+
+  const managedConfig = applyManagedAssetSelectionToRegionConfig(
+    seedConfig as unknown as Record<string, unknown>,
+    heroRegion ?? null,
+    initialImages[0]!
+  );
+  const restoredConfig = restoreRegionSourceToSeedDefault(managedConfig, heroRegion ?? null) as {
+    heroMedia: { assetId?: number | null; sourceMode?: string; src?: string };
+  };
+
+  assert.equal(restoredConfig.heroMedia.sourceMode, "seed-default");
+  assert.equal(restoredConfig.heroMedia.assetId, undefined);
+  assert.equal(restoredConfig.heroMedia.src, undefined);
+});
+
+test("managed asset replacement can be applied back into the shell draft before returning from the asset workspace", () => {
+  const draft: ShellDecorationEnvelope = {
+    ...initialShellDecorationDraft,
+    headerObjects: [
+      {
+        frame: { height: 40, left: 120, top: 12, width: 120 },
+        id: "header-logo",
+        locked: false,
+        metadata: {},
+        mount: "header",
+        source: {
+          assetId: 7,
+          fallbackSrc: "http://localhost:3000/uploads/images/page-object.png",
+          kind: "asset-image"
+        },
+        style: {},
+        type: "asset-image",
+        visible: true,
+        zIndex: 1
+      }
+    ]
+  };
+
+  const nextDraft = applyManagedAssetSelectionToShellDraft(draft, "header-logo", initialImages[1]!);
+  const updatedObject = nextDraft?.headerObjects.find((object) => object.id === "header-logo");
+
+  assert.equal(updatedObject?.type, "asset-image");
+  assert.equal(updatedObject?.source.assetId, 8);
+  assert.match(updatedObject?.source.fallbackSrc ?? "", /\/uploads\/images\/shell-only\.png$/);
+});
+
 test("display page editor exposes the asset library as an integrated workspace", () => {
   const html = renderToStaticMarkup(
     React.createElement(
@@ -311,7 +439,6 @@ test("display page editor exposes the asset library as an integrated workspace",
   );
 
   assert.match(html, /資產庫/);
-  assert.match(html, /Asset Library/);
   assert.match(html, /返回展示頁編輯/);
   assert.match(html, /Page Object Asset/);
   assert.match(html, /舒適縮圖/);
@@ -335,8 +462,9 @@ test("display page editor exposes shared shell decorations as an integrated work
   );
 
   assert.match(html, /殼層裝飾/);
-  assert.match(html, /Shared Shell Decorations/);
+  assert.match(html, /共用殼層工作區/);
   assert.match(html, /header-line/);
+  assert.match(html, /返回頁面編輯/);
   assert.match(html, /儲存殼層草稿/);
   assert.match(html, /發布殼層正式版/);
   assert.doesNotMatch(html, /\/shell-decorations\/editor/);

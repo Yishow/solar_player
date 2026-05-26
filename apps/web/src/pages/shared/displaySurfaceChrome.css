@@ -43,18 +43,129 @@
   isolation: isolate;
 }
 
+.display-surface-media-stage > img,
+.display-surface-media-stage > div {
+  position: relative;
+  z-index: 0;
+}
+
+.display-surface-media-stage > .display-surface-media-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.display-surface-media-overlay {
+  opacity: calc(var(--display-photo-effect-strength, 100%) / 100%);
+}
+
+.display-surface-media-overlay--top {
+  inset-inline: 0;
+  top: 0;
+  height: var(--display-photo-effect-coverage, 56%);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+}
+
+.display-surface-media-overlay--right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--display-photo-effect-coverage, 56%);
+  -webkit-mask-image: linear-gradient(
+    270deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    270deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+}
+
+.display-surface-media-overlay--bottom {
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--display-photo-effect-coverage, 46%);
+  -webkit-mask-image: linear-gradient(
+    0deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    0deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+}
+
+.display-surface-media-overlay--left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--display-photo-effect-coverage, 56%);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    black 0%,
+    black calc(100% - var(--display-photo-effect-feather, 58%)),
+    transparent 100%
+  );
+}
+
+.display-surface-media-overlay--fade {
+  background: linear-gradient(
+    180deg,
+    var(--display-photo-fade-paper) 0%,
+    var(--display-photo-fade-paper-soft) 56%,
+    var(--display-photo-fade-paper-clear) 100%
+  );
+}
+
+.display-surface-media-overlay--mist {
+  background: linear-gradient(
+    180deg,
+    var(--display-photo-fade-paper-soft) 0%,
+    var(--display-photo-fade-paper-tint) 52%,
+    var(--display-photo-fade-paper-clear) 100%
+  );
+  backdrop-filter: blur(var(--display-photo-effect-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--display-photo-effect-blur, 16px));
+}
+
+.display-surface-media-overlay--blur {
+  background: transparent;
+  backdrop-filter: blur(var(--display-photo-effect-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--display-photo-effect-blur, 16px));
+}
+
 .display-surface-media-stage::before,
 .display-surface-media-stage::after {
   content: "";
   position: absolute;
   pointer-events: none;
   z-index: 1;
-}
-
-.display-surface-media-stage > img,
-.display-surface-media-stage > div {
-  position: relative;
-  z-index: 0;
 }
 
 .display-surface-media-fade-left::before {

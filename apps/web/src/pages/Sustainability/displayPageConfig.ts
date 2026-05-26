@@ -35,6 +35,9 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
+  createUnsupportedDisplayPageMediaEffectSurface
+} from "../shared/displayPageMediaEffectConfig";
+import {
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityKpiLayout,
@@ -340,6 +343,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       { constraints: { min: 0 }, fieldType: "number", id: "sustainability-hero-width", label: "Width", path: ["heroMedia", "width"] },
       { constraints: { min: 0 }, fieldType: "number", id: "sustainability-hero-height", label: "Height", path: ["heroMedia", "height"] }
     ],
+    mediaEffectSurface: createUnsupportedDisplayPageMediaEffectSurface(
+      ["heroMedia"],
+      "此頁面的主視覺素材尚未開放可組合媒體效果。"
+    ),
     presetKey: "hero-media"
   },
   {

@@ -217,48 +217,43 @@ test("runtime page definitions keep supported pages on the shared schema-aware i
   }
 });
 
-test("page region schemas expose effect controls only on supported media surfaces", () => {
+test("page region schemas expose composable effect support matrices only on the rolled-out media surfaces", () => {
   const overviewHeroRegion = resolvePageRegionSchemas("overview").find((region) => region.id === "overview-hero-media");
   const imagesStageRegion = resolvePageRegionSchemas("images").find((region) => region.id === "images-main-stage");
   const solarHeroRegion = resolvePageRegionSchemas("solar").find((region) => region.id === "solar-hero-media");
+  const sustainabilityHeroRegion = resolvePageRegionSchemas("sustainability").find((region) => region.id === "sustainability-hero-media");
 
-  assert.deepEqual(
-    overviewHeroRegion?.fields
-      .map((field) => field.id)
-      .filter((fieldId) => fieldId.includes("fade") || fieldId.includes("blur") || fieldId.includes("opacity")),
-    [
-      "hero-edge-fade-enabled",
-      "hero-edge-fade-direction",
-      "hero-edge-fade-width",
-      "hero-bottom-fade-enabled",
-      "hero-bottom-fade-height",
-      "hero-blur-enabled",
-      "hero-blur-amount",
-      "hero-opacity-enabled",
-      "hero-opacity-value"
-    ]
-  );
-  assert.deepEqual(
-    imagesStageRegion?.fields
-      .map((field) => field.id)
-      .filter((fieldId) => fieldId.includes("fade") || fieldId.includes("blur") || fieldId.includes("opacity")),
-    [
-      "images-stage-edge-fade-enabled",
-      "images-stage-edge-fade-direction",
-      "images-stage-edge-fade-width",
-      "images-stage-bottom-fade-enabled",
-      "images-stage-bottom-fade-height",
-      "images-stage-blur-enabled",
-      "images-stage-blur-amount",
-      "images-stage-opacity-enabled",
-      "images-stage-opacity-value"
-    ]
+  assert.equal(
+    overviewHeroRegion?.mediaEffectSurface?.status,
+    "supported"
   );
   assert.equal(
-    solarHeroRegion?.fields.some(
-      (field) => field.id.includes("fade") || field.id.includes("blur") || field.id.includes("opacity")
-    ) ?? false,
-    false
+    imagesStageRegion?.mediaEffectSurface?.status,
+    "supported"
+  );
+  assert.equal(
+    solarHeroRegion?.mediaEffectSurface?.status,
+    "unsupported"
+  );
+  assert.equal(
+    sustainabilityHeroRegion?.mediaEffectSurface?.status,
+    "unsupported"
+  );
+  assert.deepEqual(
+    overviewHeroRegion?.mediaEffectSurface?.support?.fade?.zones,
+    ["top", "bottom", "left", "right", "top-bottom", "left-right", "all-edges"]
+  );
+  assert.deepEqual(
+    imagesStageRegion?.mediaEffectSurface?.support?.blur?.zones,
+    ["top", "bottom", "left", "right", "top-bottom", "left-right", "all-edges", "full-frame"]
+  );
+  assert.match(
+    solarHeroRegion?.mediaEffectSurface?.reason ?? "",
+    /尚未/
+  );
+  assert.match(
+    sustainabilityHeroRegion?.mediaEffectSurface?.reason ?? "",
+    /尚未/
   );
 });
 

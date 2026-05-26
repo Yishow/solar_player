@@ -45,10 +45,16 @@ import { isRegionLocked, toggleRegionLock } from "./displayEditorRegionState";
 import { fallbackPageDefinitions } from "./fallbackPageDefinitions";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
 import { resolveDisplayPageFreeformObjectRegions } from "./inspectorFields";
-import { localizeDisplayEditorLabel } from "./localization";
+import {
+  resolveDisplayPageMediaEffectRegion
+} from "./displayPageMediaEffectAuthoring";
+import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
+import { localizeDisplayEditorLabel, localizeDisplayPageLabel } from "./localization";
+import { DisplayPageMediaEffectInspector } from "./mediaEffectInspector";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
 import { SourceConnectionPanel } from "./sourceConnectionPanel";
+import { resolveSourceConnectionRegion } from "./sourceConnectionPanel";
 import {
   addDisplayPageObject,
   deleteDisplayPageObject,
@@ -102,8 +108,175 @@ type DisplayPageObjectAssetOption = {
   usageScope?: string | null;
 };
 
+type AssetWorkspaceOrigin = "editor" | "shell";
+type RegionPathCarrier = {
+  fields: Array<{ path: Array<number | string> }>;
+};
+
 function resolveAssetFallbackSrc(asset: ImageAsset) {
   return asset.filename ? buildApiUrl(`/uploads/images/${asset.filename}`) : null;
+}
+
+function pathTail(path: Array<number | string>) {
+  return String(path[path.length - 1] ?? "");
+}
+
+function updateRegionFieldValue(
+  config: Record<string, unknown>,
+  region: RegionPathCarrier | null,
+  matcher: (tail: string) => boolean,
+  value: unknown
+) {
+  let nextConfig = config;
+
+  for (const field of region?.fields ?? []) {
+    if (matcher(pathTail(field.path))) {
+      nextConfig = setValueAtPath(nextConfig, field.path, value);
+    }
+  }
+
+  return nextConfig;
+}
+
+function resolveRegionSourceParentPath(region: RegionPathCarrier | null, tails: string[]) {
+  for (const field of region?.fields ?? []) {
+    if (tails.includes(pathTail(field.path))) {
+      return field.path.slice(0, -1);
+    }
+  }
+
+  return null;
+}
+
+function updateRegionSiblingSourceValue(
+  config: Record<string, unknown>,
+  region: RegionPathCarrier | null,
+  fieldName: string,
+  value: unknown
+) {
+  const parentPath = resolveRegionSourceParentPath(region, ["assetId", "fallbackSrc", "mode", "sourceMode", "src"]);
+  if (!parentPath) {
+    return config;
+  }
+
+  return setValueAtPath(config, [...parentPath, fieldName], value);
+}
+
+function regionHasPathTail(region: RegionPathCarrier | null, tail: string) {
+  return (region?.fields ?? []).some((field) => pathTail(field.path) === tail);
+}
+
+export function applyManagedAssetSelectionToRegionConfig(
+  config: Record<string, unknown>,
+  region: RegionPathCarrier | null,
+  asset: ImageAsset
+) {
+  const previewSrc = resolveAssetFallbackSrc(asset);
+  let nextConfig = updateRegionFieldValue(config, region, (tail) => tail === "sourceMode" || tail === "mode", "managed-asset");
+  nextConfig = updateRegionFieldValue(nextConfig, region, (tail) => tail === "assetId", asset.id);
+  nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "assetId", asset.id);
+
+  if (previewSrc) {
+    nextConfig = updateRegionFieldValue(nextConfig, region, (tail) => tail === "src" || tail === "fallbackSrc", previewSrc);
+    nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "src", previewSrc);
+    if (regionHasPathTail(region, "mode") || regionHasPathTail(region, "fallbackSrc")) {
+      nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "fallbackSrc", previewSrc);
+    }
+  }
+
+  return nextConfig;
+}
+
+export function restoreRegionSourceToSeedDefault(
+  config: Record<string, unknown>,
+  region: RegionPathCarrier | null
+) {
+  let nextConfig = updateRegionFieldValue(config, region, (tail) => tail === "sourceMode", "seed-default");
+  nextConfig = updateRegionFieldValue(nextConfig, region, (tail) => tail === "assetId", undefined);
+  nextConfig = updateRegionFieldValue(nextConfig, region, (tail) => tail === "src" || tail === "fallbackSrc", undefined);
+  nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "assetId", undefined);
+  nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "src", undefined);
+  if (regionHasPathTail(region, "mode") || regionHasPathTail(region, "fallbackSrc")) {
+    nextConfig = updateRegionSiblingSourceValue(nextConfig, region, "fallbackSrc", undefined);
+  }
+  return nextConfig;
+}
+
+export function applyManagedAssetSelectionToShellDraft(
+  draft: ShellDecorationEnvelope | undefined,
+  objectId: string | null,
+  asset: ImageAsset
+) {
+  if (!draft || !objectId) {
+    return draft;
+  }
+
+  const previewSrc = resolveAssetFallbackSrc(asset);
+  if (!previewSrc) {
+    return draft;
+  }
+
+  const updateObject = (object: ShellDecorationEnvelope["headerObjects"][number]) => {
+    if (object.id !== objectId || object.type === "line") {
+      return object;
+    }
+
+    if (object.type === "asset-image") {
+      return {
+        ...object,
+        source: {
+          assetId: asset.id,
+          fallbackSrc: previewSrc,
+          kind: "asset-image" as const
+        }
+      };
+    }
+
+    return {
+      ...object,
+      source: {
+        assetId: asset.id,
+        fallbackSrc: previewSrc,
+        kind: "ornament-image" as const,
+        ornamentKey: object.source.ornamentKey
+      }
+    };
+  };
+
+  return {
+    ...draft,
+    footerObjects: draft.footerObjects.map(updateObject),
+    headerObjects: draft.headerObjects.map(updateObject)
+  };
+}
+
+function formatShellMountLabel(mount: "header" | "footer") {
+  return mount === "header" ? "頁首" : "頁尾";
+}
+
+export function resolveAssetWorkspaceContextLabel(args: {
+  editableItems: ResolvedDisplayEditorRegion[];
+  pageId: string;
+  returnWorkspace: AssetWorkspaceOrigin;
+  shellDraft?: ShellDecorationEnvelope;
+  targetId: string | null;
+}) {
+  if (args.returnWorkspace === "shell") {
+    const targetObject = [...(args.shellDraft?.headerObjects ?? []), ...(args.shellDraft?.footerObjects ?? [])]
+      .find((object) => object.id === args.targetId);
+    if (!targetObject) {
+      return null;
+    }
+
+    return `共用殼層 ${formatShellMountLabel(targetObject.mount)} ${targetObject.id}`;
+  }
+
+  const targetRegion = args.editableItems.find((item) => item.id === args.targetId);
+  if (!targetRegion) {
+    return null;
+  }
+
+  return `${localizeDisplayPageLabel(args.pageId)} ${localizeDisplayEditorLabel(targetRegion.label)}`;
 }
 
 export function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPageObjectAssetOption[] {
@@ -172,6 +345,8 @@ export function DisplayPagesEditor({
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
+  const assetContextId = searchParams.get("assetContext");
+  const assetReturnWorkspace: AssetWorkspaceOrigin = searchParams.get("assetReturn") === "shell" ? "shell" : "editor";
   const selectedWorkspace: DisplayEditorWorkspace =
     searchParams.get("workspace") === "assets"
       ? "assets"
@@ -204,6 +379,13 @@ export function DisplayPagesEditor({
   );
   const [images, setImages] = useState<ImageAsset[]>(initialImages ?? []);
   const [imagePickerError, setImagePickerError] = useState("");
+  const [shellDraftState, setShellDraftState] = useState<ShellDecorationEnvelope | undefined>(initialShellDecorationDraft);
+  const [shellImagesState, setShellImagesState] = useState<ImageAsset[] | undefined>(
+    initialShellDecorationImages ?? initialImages
+  );
+  const [shellSelectedObjectId, setShellSelectedObjectId] = useState<string | null>(
+    initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
+  );
   const editMode = controlledEditMode ?? internalEditMode;
 
   const selectedPage = useMemo(
@@ -285,6 +467,10 @@ export function DisplayPagesEditor({
         ? freeformObjects.find((object) => object.id === selectedFreeformObjectRegion.id) ?? null
         : null,
     [freeformObjects, selectedFreeformObjectRegion]
+  );
+  const inspectorRegion = useMemo(
+    () => resolveDisplayPageMediaEffectRegion(selectedRegion, editableItems) ?? selectedRegion,
+    [editableItems, selectedRegion]
   );
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const lockedObjectIds = useMemo(
@@ -384,25 +570,28 @@ export function DisplayPagesEditor({
     (regionId: string, options?: { additive?: boolean }) => {
       setProductivityMessage(null);
       setSelectionFeedbackLabel(null);
+      const targetRegion = editableItems.find((region) => region.id === regionId) ?? null;
+      const resolvedRegionId =
+        resolveDisplayPageMediaEffectRegion(targetRegion, editableItems)?.id ?? regionId;
       if (!options?.additive) {
-        setSelectedRegionId(regionId);
-        setSelectedRegionIds([regionId]);
+        setSelectedRegionId(resolvedRegionId);
+        setSelectedRegionIds([resolvedRegionId]);
         return;
       }
 
       setSelectedRegionIds((current) => {
-        const exists = current.includes(regionId);
+        const exists = current.includes(resolvedRegionId);
         if (exists) {
-          const next = current.filter((id) => id !== regionId);
+          const next = current.filter((id) => id !== resolvedRegionId);
           setSelectedRegionId(next[next.length - 1] ?? null);
           return next;
         }
 
-        setSelectedRegionId(regionId);
-        return [...current, regionId];
+        setSelectedRegionId(resolvedRegionId);
+        return [...current, resolvedRegionId];
       });
     },
-    []
+    [editableItems]
   );
 
   const setEditMode = useCallback(
@@ -487,20 +676,28 @@ export function DisplayPagesEditor({
     nextParams.set("page", pageId);
     setSearchParams(nextParams, { replace: true });
   };
-  const handleSelectWorkspace = (workspace: DisplayEditorWorkspace, context?: string) => {
+  const handleSelectWorkspace = useCallback((workspace: DisplayEditorWorkspace, context?: string, returnWorkspace: AssetWorkspaceOrigin = "editor") => {
     const nextParams = new URLSearchParams(searchParams);
-    if (workspace !== "editor") {
+    if (workspace === "assets") {
       nextParams.set("workspace", workspace);
       if (context) {
         nextParams.set("assetContext", context);
+        nextParams.set("assetReturn", returnWorkspace);
+      } else {
+        nextParams.delete("assetContext");
+        nextParams.delete("assetReturn");
       }
     } else {
       nextParams.delete("workspace");
       nextParams.delete("assetContext");
+      nextParams.delete("assetReturn");
+      if (workspace === "shell") {
+        nextParams.set("workspace", workspace);
+      }
     }
     nextParams.set("page", selectedPage.id);
     setSearchParams(nextParams, { replace: true });
-  };
+  }, [searchParams, selectedPage.id, setSearchParams]);
 
   const applySelectionRects = useCallback(
     (
@@ -674,6 +871,53 @@ export function DisplayPagesEditor({
     [selectedPage.id]
   );
   const assetOptions = useMemo(() => resolveDisplayPageObjectAssetOptions(images), [images]);
+  const selectedShellObject = useMemo(
+    () =>
+      [...(shellDraftState?.headerObjects ?? []), ...(shellDraftState?.footerObjects ?? [])]
+        .find((object) => object.id === shellSelectedObjectId) ?? null,
+    [shellDraftState, shellSelectedObjectId]
+  );
+  const assetWorkspaceContextLabel = useMemo(
+    () =>
+      resolveAssetWorkspaceContextLabel({
+        editableItems,
+        pageId: selectedPage.id,
+        returnWorkspace: assetReturnWorkspace,
+        shellDraft: shellDraftState,
+        targetId: assetContextId
+      }),
+    [assetContextId, assetReturnWorkspace, editableItems, selectedPage.id, shellDraftState]
+  );
+  const assetWorkspaceReturnLabel = assetReturnWorkspace === "shell" ? "返回殼層裝飾" : "返回展示頁編輯";
+  const sourceConnectionRegion = useMemo(
+    () => resolveSourceConnectionRegion(selectedRegion, editableItems),
+    [editableItems, selectedRegion]
+  );
+
+  const handleApplyAssetSelectionAndReturn = useCallback((asset: ImageAsset) => {
+    if (assetReturnWorkspace === "shell") {
+      setShellDraftState((current) => applyManagedAssetSelectionToShellDraft(current, assetContextId, asset));
+      handleSelectWorkspace("shell");
+      return;
+    }
+
+    const targetRegion =
+      editableItems.find((item) => item.id === assetContextId)
+      ?? selectedRegion;
+    if (targetRegion) {
+      applyConfigUpdate((current) => applyManagedAssetSelectionToRegionConfig(current, targetRegion, asset));
+      setSelectedRegionId(targetRegion.id);
+      setSelectedRegionIds([targetRegion.id]);
+    }
+    handleSelectWorkspace("editor");
+  }, [
+    applyConfigUpdate,
+    assetContextId,
+    assetReturnWorkspace,
+    editableItems,
+    handleSelectWorkspace,
+    selectedRegion
+  ]);
 
   const pageTabs = (
     <div className="flex flex-wrap items-end gap-2">
@@ -705,7 +949,13 @@ export function DisplayPagesEditor({
               ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
               : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-muted-ink)] hover:border-[var(--shell-divider-strong)] hover:text-[var(--shell-title-ink)]"
           ].join(" ")}
-          onClick={() => handleSelectWorkspace(workspace.value)}
+          onClick={() =>
+            handleSelectWorkspace(
+              workspace.value,
+              undefined,
+              selectedWorkspace === "shell" ? "shell" : "editor"
+            )
+          }
         >
           {workspace.label}
         </button>
@@ -779,7 +1029,7 @@ export function DisplayPagesEditor({
       {selectedFreeformObject.type !== "line" ? (
         <div className="space-y-2">
           <ShellDecorationAssetPicker
-            onOpenAssetWorkspace={() => handleSelectWorkspace("assets", selectedFreeformObject.id)}
+            onOpenAssetWorkspace={() => handleSelectWorkspace("assets", selectedFreeformObject.id, "editor")}
             options={assetOptions}
             value={typeof selectedFreeformObject.source.assetId === "number" ? selectedFreeformObject.source.assetId : null}
             onChange={(assetId) => {
@@ -890,7 +1140,14 @@ export function DisplayPagesEditor({
           <AssetLibrary
             embedded
             initialAssets={initialImages ? images : undefined}
-            onReturnToEditor={() => handleSelectWorkspace("editor")}
+            contextLabel={assetWorkspaceContextLabel ?? undefined}
+            onApplySelection={assetWorkspaceContextLabel ? handleApplyAssetSelectionAndReturn : undefined}
+            onAssetsChange={(nextAssets) => {
+              setImages(nextAssets);
+              setShellImagesState(nextAssets);
+            }}
+            onReturnToEditor={() => handleSelectWorkspace(assetReturnWorkspace)}
+            returnLabel={assetWorkspaceReturnLabel}
           />
         </div>
       </PageContainer>
@@ -911,15 +1168,39 @@ export function DisplayPagesEditor({
         <div className="h-full min-h-0 overflow-y-auto">
           <div className="mb-3">
             <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
-              Shared Shell Decorations
+              共用殼層工作區
             </p>
-            <h2 className="mt-1 text-[24px] font-semibold text-[var(--shell-title-ink)]">共用殼層裝飾</h2>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-[24px] font-semibold text-[var(--shell-title-ink)]">共用殼層裝飾</h2>
+              <div className="flex flex-wrap gap-2">
+                {selectedShellObject && selectedShellObject.type !== "line" ? (
+                  <button
+                    type="button"
+                    className="rounded-full border border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-title-ink)]"
+                    onClick={() => handleSelectWorkspace("assets", selectedShellObject.id, "shell")}
+                  >
+                    更換目前素材
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)]"
+                  onClick={() => handleSelectWorkspace("editor")}
+                >
+                  返回頁面編輯
+                </button>
+              </div>
+            </div>
           </div>
           <ShellDecorationEditor
             embedded
-            initialDraft={initialShellDecorationDraft}
-            initialImages={initialShellDecorationImages}
-            onOpenAssetWorkspace={(context) => handleSelectWorkspace("assets", context ?? "shell")}
+            initialDraft={shellDraftState}
+            initialImages={shellImagesState}
+            initialSelectedObjectId={shellSelectedObjectId}
+            onDraftChange={setShellDraftState}
+            onImagesChange={setShellImagesState}
+            onOpenAssetWorkspace={(context) => handleSelectWorkspace("assets", context ?? shellSelectedObjectId ?? "shell", "shell")}
+            onSelectedObjectIdChange={setShellSelectedObjectId}
             renderPreview={renderPreview}
           />
         </div>
@@ -1351,18 +1632,28 @@ export function DisplayPagesEditor({
               <DisplayEditorInspectorCard
                 flat
                 actions={
-                  selectedRegion ? <div className="space-y-4">{geometryActions}{freeformObjectActions}{cardRailActions}</div> : null
+                  inspectorRegion ? <div className="space-y-4">{geometryActions}{freeformObjectActions}{cardRailActions}</div> : null
                 }
                 editMode={editMode}
+                extraContent={
+                  inspectorRegion ? (
+                    <DisplayPageMediaEffectInspector
+                      availableRegions={editableItems}
+                      config={config}
+                      onConfigChange={applyConfigUpdate}
+                      selectedRegion={inspectorRegion}
+                    />
+                  ) : null
+                }
                 emptyMessage={
                   editableItems.length > 0
                     ? "請先在畫布或物件列表中選取一個可編輯項目。"
                     : "這個頁面的專屬編輯區域尚未展開，先保留預覽與路由覆蓋。"
                 }
                 onChange={updatePath}
-                onOpenAssetLibrary={() => handleSelectWorkspace("assets", selectedRegion?.id)}
+                onOpenAssetLibrary={() => handleSelectWorkspace("assets", inspectorRegion?.id, "editor")}
                 onResetField={(path) => resetPaths([path])}
-                selectedRegion={selectedRegion}
+                selectedRegion={inspectorRegion}
               />
             )}
             {rightTab === "health" && (
@@ -1377,9 +1668,19 @@ export function DisplayPagesEditor({
               <SourceConnectionPanel
                 editMode={editMode}
                 freeformObject={selectedFreeformObject}
-                onJumpToProperties={() => setRightTab("inspector")}
-                onOpenAssetLibrary={() => handleSelectWorkspace("assets", selectedRegion?.id ?? selectedFreeformObject?.id)}
-                onRestoreSeedDefault={(path) => updatePath(path, "seed-default")}
+                config={config}
+                onJumpToProperties={() => {
+                  if (sourceConnectionRegion && sourceConnectionRegion.id !== selectedRegion?.id) {
+                    setSelectedRegionId(sourceConnectionRegion.id);
+                    setSelectedRegionIds([sourceConnectionRegion.id]);
+                  }
+                  setRightTab("inspector");
+                }}
+                onOpenAssetLibrary={() => handleSelectWorkspace("assets", sourceConnectionRegion?.id ?? selectedFreeformObject?.id ?? undefined, "editor")}
+                onRestoreSeedDefault={() =>
+                  applyConfigUpdate((current) => restoreRegionSourceToSeedDefault(current, sourceConnectionRegion))
+                }
+                availableRegions={editableItems}
                 selectedRegion={selectedRegion}
               />
             )}

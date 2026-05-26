@@ -3,10 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { createDisplayPageMediaEffects } from "@solar-display/shared";
-import {
-  buildDisplayPageMediaPresentation,
-  buildDisplayPageMediaStyle
-} from "./displayPageMediaStyle";
+import { buildDisplayPageMediaPresentation, buildDisplayPageMediaStyle } from "./displayPageMediaStyle";
 import {
   imagesMainStageMediaEffectResolverOptions,
   overviewHeroMediaEffectResolverOptions
@@ -43,27 +40,15 @@ test("display page media style uses focus anchors for cover mode", () => {
   });
 });
 
-test("display page media presentation clamps supported effect settings into shared classes and safe values", () => {
+test("display page media presentation clamps canonical full-frame and localized layers into bounded overlay output", () => {
   const presentation = buildDisplayPageMediaPresentation(
     {
       effects: {
-        blur: {
-          amount: 40,
-          enabled: true
-        },
-        bottomFade: {
-          enabled: true,
-          height: 0
-        },
-        edgeFade: {
-          direction: "left",
-          enabled: true,
-          width: 1.4
-        },
-        opacity: {
-          enabled: true,
-          value: 1.4
-        }
+        layers: [
+          { kind: "blur", strength: 40, zone: "full-frame" },
+          { kind: "opacity", strength: 1.4, zone: "full-frame" },
+          { kind: "mist", blur: 40, coverage: 0, strength: 1.4, zone: "top" }
+        ]
       },
       fitMode: "cover",
       focusX: 0.3,
@@ -73,18 +58,27 @@ test("display page media presentation clamps supported effect settings into shar
     overviewHeroMediaEffectResolverOptions
   );
 
-  assert.equal(
-    presentation.stageClassName,
-    "display-surface-media-fade-left display-surface-media-mist-left display-surface-media-fade-bottom display-surface-media-mist-bottom"
+  assert.deepEqual(
+    presentation.overlayLayers.map((layer) => ({
+      className: layer.className,
+      kind: layer.kind,
+      style: layer.style,
+      zone: layer.zone
+    })),
+    [
+      {
+        className: "display-surface-media-overlay display-surface-media-overlay--mist display-surface-media-overlay--top",
+        kind: "mist",
+        style: {
+          "--display-photo-effect-blur": "24px",
+          "--display-photo-effect-coverage": "5%",
+          "--display-photo-effect-feather": "58%",
+          "--display-photo-effect-strength": "100%"
+        },
+        zone: "top"
+      }
+    ]
   );
-  assert.deepEqual(presentation.stageStyle, {
-    "--display-photo-fade-bottom-height": "5%",
-    "--display-photo-fade-edge-width": "100%",
-    "--display-photo-mist-blur": "24px",
-    "--display-photo-mist-bottom-height": "5%",
-    "--display-photo-mist-edge-width": "100%",
-    "--display-photo-mist-opacity": "0.72"
-  });
   assert.deepEqual(presentation.mediaStyle, {
     filter: "blur(24px)",
     objectFit: "cover",
@@ -93,75 +87,81 @@ test("display page media presentation clamps supported effect settings into shar
   });
 });
 
-test("display page media presentation derives localized mist from edge and bottom fade controls", () => {
+test("display page media presentation preserves same-zone stacking order for localized effects", () => {
   const presentation = buildDisplayPageMediaPresentation(
     {
       effects: {
-        bottomFade: {
-          enabled: true,
-          height: 0.32
-        },
-        edgeFade: {
-          direction: "right",
-          enabled: true,
-          width: 0.42
-        }
+        layers: [
+          { coverage: 0.42, kind: "fade", strength: 1, zone: "left" },
+          { coverage: 0.42, feather: 0.36, kind: "blur", strength: 14, zone: "left" }
+        ]
       },
       src: "/overview-mist.png"
     },
     overviewHeroMediaEffectResolverOptions
   );
 
-  assert.equal(
-    presentation.stageClassName,
-    "display-surface-media-fade-right display-surface-media-mist-right display-surface-media-fade-bottom display-surface-media-mist-bottom"
+  assert.deepEqual(
+    presentation.overlayLayers.map((layer) => ({
+      kind: layer.kind,
+      zone: layer.zone
+    })),
+    [
+      { kind: "fade", zone: "left" },
+      { kind: "blur", zone: "left" }
+    ]
   );
-  assert.deepEqual(presentation.stageStyle, {
-    "--display-photo-fade-bottom-height": "32%",
-    "--display-photo-fade-edge-width": "42%",
-    "--display-photo-mist-blur": "16px",
-    "--display-photo-mist-bottom-height": "32%",
-    "--display-photo-mist-edge-width": "42%",
-    "--display-photo-mist-opacity": "0.72"
-  });
   assert.deepEqual(presentation.mediaStyle, {
     objectFit: "cover",
     objectPosition: "50% 50%"
   });
 });
 
-test("display page media presentation drops unsupported effect groups without hiding the media", () => {
+test("display page media presentation expands all-edge layers into bounded per-edge overlays", () => {
   const presentation = buildDisplayPageMediaPresentation(
     {
       effects: {
-        blur: {
-          amount: 12,
-          enabled: true
-        },
-        edgeFade: {
-          direction: "right",
-          enabled: true,
-          width: 0.4
-        }
+        layers: [
+          { coverage: 0.4, kind: "fade", strength: 1, zone: "all-edges" }
+        ]
+      },
+      src: "/all-edges-effects.png"
+    },
+    overviewHeroMediaEffectResolverOptions
+  );
+
+  assert.deepEqual(
+    presentation.overlayLayers.map((layer) => layer.zone),
+    ["top", "right", "bottom", "left"]
+  );
+});
+
+test("display page media presentation drops unsupported canonical layers without hiding the media", () => {
+  const presentation = buildDisplayPageMediaPresentation(
+    {
+      effects: {
+        layers: [
+          { kind: "mist", strength: 0.72, zone: "left" },
+          { kind: "opacity", strength: 0.82, zone: "full-frame" }
+        ]
       },
       src: "/unsupported-effects.png"
     },
     {
       defaults: createDisplayPageMediaEffects(),
       support: {
-        blur: false,
-        bottomFade: false,
-        edgeFade: false,
-        opacity: false
+        opacity: {
+          zones: ["full-frame"]
+        }
       }
     }
   );
 
-  assert.equal(presentation.stageClassName, "");
-  assert.deepEqual(presentation.stageStyle, {});
+  assert.deepEqual(presentation.overlayLayers, []);
   assert.deepEqual(presentation.mediaStyle, {
     objectFit: "cover",
-    objectPosition: "50% 50%"
+    objectPosition: "50% 50%",
+    opacity: 0.82
   });
 });
 

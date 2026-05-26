@@ -4,6 +4,10 @@ import {
 } from "../../../../../packages/shared/src/displayEditorSchema";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import type { ResolvedDisplayEditorField, ResolvedDisplayEditorRegion } from "./inspectorFields";
+import {
+  resolveDisplayPageMediaEffectBinding,
+  resolveDisplayPageMediaEffectSummary
+} from "./displayPageMediaEffectAuthoring";
 import { localizeDisplayEditorLabel } from "./localization";
 
 export type SourceConnectionRow = {
@@ -15,6 +19,10 @@ export type SourcePresentationSummary = {
   label: string;
   value: string;
 };
+
+type SourceReplacementSupport =
+  | { enabled: true }
+  | { enabled: false; reason: string };
 
 function pathTail(path: DisplayEditorPath) {
   return String(path[path.length - 1] ?? "");
@@ -69,6 +77,95 @@ function rowLabel(field: ResolvedDisplayEditorField) {
   return localizeDisplayEditorLabel(field.schema.label);
 }
 
+function resolveSeedDefaultDescription(selectedRegion: ResolvedDisplayEditorRegion | null) {
+  if (!selectedRegion) {
+    return null;
+  }
+
+  return `${localizeDisplayEditorLabel(selectedRegion.label)}預設素材`;
+}
+
+function resolveFreeformObjectLabel(freeformObject: DisplayPageFreeformObject) {
+  switch (freeformObject.type) {
+    case "asset-image":
+      return "自由圖片物件";
+    case "icon-asset":
+      return "自由圖示物件";
+    case "line":
+    default:
+      return "自由線條物件";
+  }
+}
+
+function fieldSchemaTail(path: DisplayEditorPath) {
+  return String(path[path.length - 1] ?? "");
+}
+
+function schemaSupportsManagedReplacement(selectedRegion: ResolvedDisplayEditorRegion | null) {
+  const schemaFields = selectedRegion?.schema.fields ?? [];
+
+  if (schemaFields.some((field) => fieldSchemaTail(field.path) === "sourceMode")) {
+    return true;
+  }
+
+  const modeField = schemaFields.find((field) => fieldSchemaTail(field.path) === "mode");
+  if (modeField?.fieldType === "select" && "options" in modeField) {
+    const optionValues = modeField.options.map((option) => String(option.value));
+    if (optionValues.includes("managed-asset") || optionValues.includes("asset-image")) {
+      return true;
+    }
+  }
+
+  return schemaFields.some((field) => fieldSchemaTail(field.path) === "assetId");
+}
+
+function sameGeometryBinding(a: ResolvedDisplayEditorRegion | null, b: ResolvedDisplayEditorRegion) {
+  const aGeometry = a?.schema.geometry;
+  const bGeometry = b.schema.geometry;
+  if (!aGeometry || !bGeometry) {
+    return false;
+  }
+
+  return JSON.stringify(aGeometry.leftPath) === JSON.stringify(bGeometry.leftPath)
+    && JSON.stringify(aGeometry.topPath) === JSON.stringify(bGeometry.topPath)
+    && JSON.stringify(aGeometry.widthPath) === JSON.stringify(bGeometry.widthPath)
+    && JSON.stringify(aGeometry.heightPath ?? null) === JSON.stringify(bGeometry.heightPath ?? null);
+}
+
+export function resolveSourceConnectionRegion(
+  selectedRegion: ResolvedDisplayEditorRegion | null,
+  availableRegions: ResolvedDisplayEditorRegion[] = []
+) {
+  if (!selectedRegion) {
+    return null;
+  }
+
+  if (schemaSupportsManagedReplacement(selectedRegion) || selectedRegion.fields.some((field) => isSourceField(field))) {
+    return selectedRegion;
+  }
+
+  return availableRegions.find((region) =>
+    region.id !== selectedRegion.id
+    && sameGeometryBinding(selectedRegion, region)
+    && schemaSupportsManagedReplacement(region)
+  ) ?? selectedRegion;
+}
+
+function resolveSourceReplacementSupport(args: {
+  freeformObject?: DisplayPageFreeformObject | null;
+  selectedRegion: ResolvedDisplayEditorRegion | null;
+}): SourceReplacementSupport {
+  if (args.freeformObject && args.freeformObject.type !== "line") {
+    return { enabled: true };
+  }
+
+  if (schemaSupportsManagedReplacement(args.selectedRegion)) {
+    return { enabled: true };
+  }
+
+  return { enabled: false, reason: "此來源型別尚未支援管理素材替換。" };
+}
+
 export function resolveSourceConnectionRows(args: {
   freeformObject?: DisplayPageFreeformObject | null;
   selectedRegion: ResolvedDisplayEditorRegion | null;
@@ -88,6 +185,16 @@ export function resolveSourceConnectionRows(args: {
         label: rowLabel(field),
         value: formatValue(field.value)
       });
+
+      if (pathTail(field.path) === "sourceMode" && field.value === "seed-default") {
+        const seedDefaultDescription = resolveSeedDefaultDescription(args.selectedRegion);
+        if (seedDefaultDescription) {
+          rows.push({
+            label: "預設來源",
+            value: seedDefaultDescription
+          });
+        }
+      }
     }
   }
 
@@ -116,6 +223,8 @@ function findSeedDefaultPath(selectedRegion: ResolvedDisplayEditorRegion | null)
 }
 
 export function SourceConnectionPanel({
+  availableRegions = [],
+  config,
   editMode,
   freeformObject,
   onJumpToProperties,
@@ -123,6 +232,8 @@ export function SourceConnectionPanel({
   onRestoreSeedDefault,
   selectedRegion
 }: {
+  availableRegions?: ResolvedDisplayEditorRegion[];
+  config?: Record<string, unknown>;
   editMode: boolean;
   freeformObject?: DisplayPageFreeformObject | null;
   onJumpToProperties: () => void;
@@ -130,25 +241,49 @@ export function SourceConnectionPanel({
   onRestoreSeedDefault: (path: DisplayEditorPath) => void;
   selectedRegion: ResolvedDisplayEditorRegion | null;
 }) {
-  const rows = resolveSourceConnectionRows({ freeformObject, selectedRegion });
-  const summaries = resolveSourcePresentationSummary(selectedRegion);
-  const seedDefaultPath = findSeedDefaultPath(selectedRegion);
+  const sourceRegion = resolveSourceConnectionRegion(selectedRegion, availableRegions);
+  const rows = resolveSourceConnectionRows({ freeformObject, selectedRegion: sourceRegion });
+  const summaries = resolveSourcePresentationSummary(sourceRegion);
+  const seedDefaultPath = findSeedDefaultPath(sourceRegion);
+  const replacementSupport = resolveSourceReplacementSupport({ freeformObject, selectedRegion: sourceRegion });
+  const effectBinding = config ? resolveDisplayPageMediaEffectBinding(config, sourceRegion) : null;
+  const effectSummary =
+    sourceRegion?.schema.mediaEffectSurface?.status === "supported" && effectBinding
+      ? resolveDisplayPageMediaEffectSummary(
+          effectBinding.binding?.effects ?? [],
+          sourceRegion.schema.mediaEffectSurface.support ?? {}
+        )
+      : [];
+  const effectSurfaceReason =
+    sourceRegion?.schema.mediaEffectSurface?.status === "unsupported"
+      ? sourceRegion.schema.mediaEffectSurface.reason
+      : "";
+  const panelLabel = sourceRegion
+    ? localizeDisplayEditorLabel(sourceRegion.label)
+    : freeformObject
+      ? resolveFreeformObjectLabel(freeformObject)
+      : null;
+  const isLinkedFromDifferentSelection =
+    Boolean(sourceRegion && selectedRegion && sourceRegion.id !== selectedRegion.id);
 
   if (!editMode) {
     return <p className="text-[14px] leading-7 text-[var(--shell-copy-ink)]">按 E 啟用編輯模式後可檢視來源連接。</p>;
   }
 
-  if (!selectedRegion) {
+  if (!selectedRegion && !freeformObject) {
     return <p className="text-[14px] leading-7 text-[var(--shell-copy-ink)]">請先選取畫布區域或自由物件。</p>;
   }
 
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">
-          {localizeDisplayEditorLabel(selectedRegion.label)}
-        </h4>
+        <h4 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">{panelLabel}</h4>
         <p className="mt-1 text-[12px] leading-5 text-[var(--shell-copy-ink)]">目前選取項目的來源連接摘要。</p>
+        {isLinkedFromDifferentSelection ? (
+          <p className="mt-1 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]">
+            目前畫布選到的是版位容器，來源替換與霧化設定已連到對應的素材區域。
+          </p>
+        ) : null}
       </div>
       {rows.length > 0 ? (
         <div className="grid gap-2">
@@ -172,11 +307,19 @@ export function SourceConnectionPanel({
       <div className="grid gap-2">
         <button
           type="button"
-          className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[12px] font-semibold text-[var(--shell-copy-ink)]"
-          onClick={onOpenAssetLibrary}
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[12px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-50"
+          disabled={!replacementSupport.enabled}
+          onClick={() => {
+            if (replacementSupport.enabled) {
+              onOpenAssetLibrary();
+            }
+          }}
         >
           從圖庫替換 / 開啟資產庫
         </button>
+        {!replacementSupport.enabled ? (
+          <p className="text-[12px] text-[var(--shell-subtitle-ink)]">{replacementSupport.reason}</p>
+        ) : null}
         <button
           type="button"
           className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[12px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-50"
@@ -187,10 +330,10 @@ export function SourceConnectionPanel({
             }
           }}
         >
-          回復 seed/default source
+          回復預設素材來源
         </button>
         {!seedDefaultPath ? (
-          <p className="text-[12px] text-[var(--shell-subtitle-ink)]">此選取項目尚無可直接回復的 seed source mode。</p>
+          <p className="text-[12px] text-[var(--shell-subtitle-ink)]">此選取項目目前沒有可直接回復的預設來源模式。</p>
         ) : null}
         <button
           type="button"
@@ -210,6 +353,23 @@ export function SourceConnectionPanel({
               </div>
             ))}
           </div>
+        </div>
+      ) : null}
+      {effectSummary.length > 0 ? (
+        <div className="rounded-[14px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-3 py-2">
+          <div className="text-[12px] font-semibold text-[var(--shell-title-ink)]">效果摘要</div>
+          <div className="mt-2 grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
+            {effectSummary.map((item) => (
+              <div key={`${item.label}:${item.value}`}>
+                {item.label}: {item.value}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {!effectSummary.length && effectSurfaceReason ? (
+        <div className="rounded-[14px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-3 py-2 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]">
+          效果摘要: {effectSurfaceReason}
         </div>
       ) : null}
     </div>

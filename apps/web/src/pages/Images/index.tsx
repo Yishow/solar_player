@@ -272,6 +272,14 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             <p>{viewModel.active.placeholderLabel}</p>
           </div>
         )}
+        {mainStageMediaPresentation.overlayLayers.map((layer) => (
+          <span
+            key={layer.id}
+            aria-hidden="true"
+            className={layer.className}
+            style={layer.style}
+          />
+        ))}
       </figure>
 
       <DisplayCardFrame

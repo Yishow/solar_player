@@ -74,7 +74,12 @@ test("live display page preview renders the latest published config through the 
 test("live display page preview preserves shared media mist presentation from runtime renderers", () => {
   const presentation = buildDisplayPageMediaPresentation(
     {
-      effects: overviewHeroMediaEffectResolverOptions.defaults,
+      effects: {
+        layers: [
+          { kind: "opacity", strength: 0.78, zone: "full-frame" },
+          { blur: 18, coverage: 0.3, kind: "mist", strength: 0.72, zone: "top" }
+        ]
+      },
       src: "/media/overview-hero-mist.png"
     },
     overviewHeroMediaEffectResolverOptions
@@ -86,10 +91,22 @@ test("live display page preview preserves shared media mist presentation from ru
           id: "overview",
           label: "Overview",
           renderPreview: () =>
-            React.createElement("figure", {
-              className: `display-surface-media-stage ${presentation.stageClassName}`,
-              style: presentation.stageStyle
-            })
+            React.createElement(
+              "figure",
+              {
+                className: "display-surface-media-stage",
+                style: presentation.stageStyle
+              },
+              presentation.overlayLayers.map((layer) =>
+                React.createElement("span", {
+                  "data-effect-kind": layer.kind,
+                  "data-effect-zone": layer.zone,
+                  className: layer.className,
+                  key: `${layer.kind}-${layer.zone}`,
+                  style: layer.style
+                })
+              )
+            )
         }
       ],
       pageLabel: "總覽頁",
@@ -101,8 +118,9 @@ test("live display page preview preserves shared media mist presentation from ru
     })
   );
 
-  assert.match(html, /display-surface-media-mist-left/);
-  assert.match(html, /--display-photo-mist-edge-width/);
+  assert.match(html, /display-surface-media-overlay--mist/);
+  assert.match(html, /display-surface-media-overlay--top/);
+  assert.match(html, /--display-photo-effect-blur:18px/);
   assert.match(html, /data-live-preview-status="ready"/);
 });
 

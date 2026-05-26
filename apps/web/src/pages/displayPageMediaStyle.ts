@@ -2,11 +2,23 @@ import {
   resolveDisplayPageMediaEffects,
   type DisplayPageMediaBinding,
   type DisplayPageMediaEffectResolverOptions,
-  type DisplayPageMediaFitMode
+  type DisplayPageLocalizedMediaEffectZone,
+  type DisplayPageResolvedMediaEffectLayer,
+  type DisplayPageResolvedMediaBlurEffectLayer,
+  type DisplayPageResolvedMediaOpacityEffectLayer,
+  type DisplayPageResolvedMediaEffects
 } from "@solar-display/shared";
 import type { CSSProperties } from "react";
 
-function normalizeFitMode(fitMode?: DisplayPageMediaFitMode) {
+type DisplayPageMediaOverlayLayer = {
+  className: string;
+  id: string;
+  kind: DisplayPageResolvedMediaEffectLayer["kind"];
+  style: CSSProperties & Record<string, string>;
+  zone: DisplayPageLocalizedMediaEffectZone;
+};
+
+function normalizeFitMode(fitMode?: DisplayPageMediaBinding["fitMode"]) {
   return fitMode === "contain" ? "contain" : "cover";
 }
 
@@ -16,6 +28,103 @@ function normalizeAnchor(value: number | undefined) {
 
 function formatPercent(value: number) {
   return `${Math.round(value * 10000) / 100}%`;
+}
+
+function formatBlurPixels(value: number) {
+  return `${Math.round(value)}px`;
+}
+
+function normalizeOverlayStrength(
+  layer: Extract<DisplayPageResolvedMediaEffectLayer, { kind: "blur" | "fade" | "mist" }>
+) {
+  if (layer.kind === "blur") {
+    return formatPercent(Math.min(1, layer.strength / 24));
+  }
+
+  return formatPercent(layer.strength);
+}
+
+function expandLocalizedZone(zone: DisplayPageLocalizedMediaEffectZone): DisplayPageLocalizedMediaEffectZone[] {
+  switch (zone) {
+    case "all-edges":
+      return ["top", "right", "bottom", "left"];
+    case "left-right":
+      return ["left", "right"];
+    case "top-bottom":
+      return ["top", "bottom"];
+    default:
+      return [zone];
+  }
+}
+
+function buildOverlayLayer(
+  layer: Extract<DisplayPageResolvedMediaEffectLayer, { kind: "blur" | "fade" | "mist" }>,
+  zone: DisplayPageLocalizedMediaEffectZone,
+  index: number
+): DisplayPageMediaOverlayLayer {
+  const style: CSSProperties & Record<string, string> = {
+    "--display-photo-effect-coverage": formatPercent(layer.coverage),
+    "--display-photo-effect-feather": formatPercent(layer.feather),
+    "--display-photo-effect-strength": normalizeOverlayStrength(layer)
+  };
+
+  if (layer.kind === "blur" || layer.kind === "mist") {
+    style["--display-photo-effect-blur"] =
+      layer.kind === "blur" ? formatBlurPixels(layer.strength) : formatBlurPixels(layer.blur);
+  }
+
+  return {
+    className: `display-surface-media-overlay display-surface-media-overlay--${layer.kind} display-surface-media-overlay--${zone}`,
+    id: `${layer.kind}-${zone}-${index}`,
+    kind: layer.kind,
+    style,
+    zone
+  };
+}
+
+function buildOverlayLayers(effects: DisplayPageResolvedMediaEffects) {
+  const overlays: DisplayPageMediaOverlayLayer[] = [];
+
+  effects.layers.forEach((layer, index) => {
+    if (layer.kind === "opacity" || layer.zone === "full-frame") {
+      return;
+    }
+
+    expandLocalizedZone(layer.zone).forEach((zone, expandedIndex) => {
+      overlays.push(
+        buildOverlayLayer(
+          layer,
+          zone,
+          index * 10 + expandedIndex
+        )
+      );
+    });
+  });
+
+  return overlays;
+}
+
+function buildFullFrameMediaStyle(
+  mediaStyle: CSSProperties,
+  effects: DisplayPageResolvedMediaEffects
+) {
+  const fullFrameBlurAmount = effects.layers
+    .filter((layer): layer is DisplayPageResolvedMediaBlurEffectLayer =>
+      layer.kind === "blur" && layer.zone === "full-frame"
+    )
+    .reduce((sum, layer) => sum + layer.strength, 0);
+
+  if (fullFrameBlurAmount > 0) {
+    mediaStyle.filter = `blur(${Math.min(24, fullFrameBlurAmount)}px)`;
+  }
+
+  const fullFrameOpacityLayers = effects.layers.filter(
+    (layer): layer is DisplayPageResolvedMediaOpacityEffectLayer =>
+      layer.kind === "opacity"
+  );
+  if (fullFrameOpacityLayers.length > 0) {
+    mediaStyle.opacity = fullFrameOpacityLayers.reduce((current, layer) => current * layer.strength, 1);
+  }
 }
 
 export function buildDisplayPageMediaStyle(binding: DisplayPageMediaBinding): CSSProperties {
@@ -41,41 +150,12 @@ export function buildDisplayPageMediaPresentation(
 ) {
   const mediaStyle = buildDisplayPageMediaStyle(binding);
   const effects = resolveDisplayPageMediaEffects(binding.effects, options);
-  const stageClassNames: string[] = [];
-  const stageStyle: CSSProperties & Record<string, string> = {};
-  const mistBlurAmount = effects.blur.enabled && effects.blur.amount > 0 ? effects.blur.amount : 16;
-  const setMistStyle = () => {
-    stageStyle["--display-photo-mist-blur" as string] = `${mistBlurAmount}px`;
-    stageStyle["--display-photo-mist-opacity" as string] = "0.72";
-  };
-
-  if (effects.edgeFade.enabled) {
-    stageClassNames.push(`display-surface-media-fade-${effects.edgeFade.direction}`);
-    stageClassNames.push(`display-surface-media-mist-${effects.edgeFade.direction}`);
-    stageStyle["--display-photo-fade-edge-width" as string] = formatPercent(effects.edgeFade.width);
-    stageStyle["--display-photo-mist-edge-width" as string] = formatPercent(effects.edgeFade.width);
-    setMistStyle();
-  }
-
-  if (effects.bottomFade.enabled) {
-    stageClassNames.push("display-surface-media-fade-bottom");
-    stageClassNames.push("display-surface-media-mist-bottom");
-    stageStyle["--display-photo-fade-bottom-height" as string] = formatPercent(effects.bottomFade.height);
-    stageStyle["--display-photo-mist-bottom-height" as string] = formatPercent(effects.bottomFade.height);
-    setMistStyle();
-  }
-
-  if (effects.blur.enabled && effects.blur.amount > 0) {
-    mediaStyle.filter = `blur(${effects.blur.amount}px)`;
-  }
-
-  if (effects.opacity.enabled) {
-    mediaStyle.opacity = effects.opacity.value;
-  }
+  buildFullFrameMediaStyle(mediaStyle, effects);
 
   return {
     mediaStyle,
-    stageClassName: stageClassNames.join(" "),
-    stageStyle
+    overlayLayers: buildOverlayLayers(effects),
+    stageClassName: "",
+    stageStyle: {}
   };
 }

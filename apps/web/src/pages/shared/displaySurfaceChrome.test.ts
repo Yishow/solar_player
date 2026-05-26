@@ -11,18 +11,21 @@ import {
 const sharedDir = path.resolve(import.meta.dirname);
 const displaySurfaceChromeCss = fs.readFileSync(path.join(sharedDir, "displaySurfaceChrome.css"), "utf8");
 
-test("shared display chrome css exposes hero typography, media fade, and ornament primitives", () => {
+test("shared display chrome css exposes hero typography, composable media overlays, and ornament primitives", () => {
   assert.match(displaySurfaceChromeCss, /\.display-surface-hero-eyebrow\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-hero-title\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-hero-title-emphasis\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-hero-subtitle\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-stage\s*\{/);
-  assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-left::before\s*\{/);
-  assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-right::before\s*\{/);
-  assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-bottom::after\s*\{/);
-  assert.match(displaySurfaceChromeCss, /\.display-surface-media-mist-left::before\s*\{/);
-  assert.match(displaySurfaceChromeCss, /\.display-surface-media-mist-bottom::after\s*\{/);
-  assert.match(displaySurfaceChromeCss, /backdrop-filter:\s*blur\(var\(--display-photo-mist-blur, 16px\)\)/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay\s*\{/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--fade/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--mist/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--blur/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--top/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--left/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--bottom/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--right/);
+  assert.match(displaySurfaceChromeCss, /backdrop-filter:\s*blur\(var\(--display-photo-effect-blur, 16px\)\)/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-leaf-ornament\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-line\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-ornament::before\s*\{/);
@@ -32,7 +35,7 @@ test("shared display chrome css exposes hero typography, media fade, and ornamen
 test("shared media effect stages keep mist layers bounded inside the owning media layer", () => {
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-stage\s*\{[\s\S]*?overflow:\s*hidden;/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-stage\s*\{[\s\S]*?isolation:\s*isolate;/);
-  assert.doesNotMatch(displaySurfaceChromeCss, /\.display-surface-media-mist-[^{]+\{[\s\S]*?position:\s*fixed;/);
+  assert.doesNotMatch(displaySurfaceChromeCss, /\.display-surface-media-overlay[^{]+\{[\s\S]*?position:\s*fixed;/);
 });
 
 test("shared display chrome config defaults preserve the prototype rhythm and ornament controls", () => {
@@ -87,7 +90,6 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-title-emphasis",
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
-        "display-surface-media-fade-bottom",
         "display-surface-leaf-ornament",
         "display-surface-gold-line"
       ],
@@ -123,8 +125,6 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-title-emphasis",
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
-        "display-surface-media-fade-left",
-        "display-surface-media-fade-bottom",
         "display-surface-leaf-ornament"
       ],
       file: path.resolve(sharedDir, "../Sustainability/index.tsx")

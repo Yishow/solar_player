@@ -1,52 +1,88 @@
 import {
   createDisplayPageMediaEffects,
   displayPageMediaEffectBounds,
-  type DisplayPageMediaEffectResolverOptions
+  type DisplayPageMediaEffectResolverOptions,
+  type DisplayPageMediaEffects,
+  type DisplayPageMediaEffectSupport
 } from "@solar-display/shared";
 import type { DisplayEditorFieldSchema, DisplayEditorPath } from "../../../../../packages/shared/src/displayEditorSchema";
 
-export const overviewHeroMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
-  defaults: createDisplayPageMediaEffects({
-    bottomFade: {
-      enabled: true,
-      height: 0.55
-    },
-    edgeFade: {
-      direction: "left",
-      enabled: true,
-      width: 0.56
-    }
-  }),
-  support: {
-    blur: true,
-    bottomFade: true,
-    edgeFade: {
-      directions: ["left", "right"]
-    },
-    opacity: true
+const composableLocalizedZones = [
+  "top",
+  "bottom",
+  "left",
+  "right",
+  "top-bottom",
+  "left-right",
+  "all-edges"
+] as const;
+
+export const firstBatchDisplayPageMediaEffectSupport: DisplayPageMediaEffectSupport = {
+  blur: {
+    zones: [...composableLocalizedZones, "full-frame"]
+  },
+  fade: {
+    zones: [...composableLocalizedZones]
+  },
+  mist: {
+    zones: [...composableLocalizedZones]
+  },
+  opacity: {
+    zones: ["full-frame"]
   }
 };
 
-export const imagesMainStageMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
-  defaults: createDisplayPageMediaEffects({
-    bottomFade: {
-      enabled: true,
-      height: 120 / 622
-    },
-    edgeFade: {
-      direction: "left",
-      enabled: true,
-      width: 0.56
-    }
-  }),
-  support: {
-    blur: true,
-    bottomFade: true,
-    edgeFade: {
-      directions: ["left", "right"]
-    },
-    opacity: true
+export function createSupportedDisplayPageMediaEffectSurface(bindingPath: DisplayEditorPath) {
+  return {
+    bindingPath,
+    status: "supported" as const,
+    support: firstBatchDisplayPageMediaEffectSupport
+  };
+}
+
+export function createUnsupportedDisplayPageMediaEffectSurface(
+  bindingPath: DisplayEditorPath,
+  reason: string
+) {
+  return {
+    bindingPath,
+    reason,
+    status: "unsupported" as const
+  };
+}
+
+export const overviewHeroDefaultMediaEffects: DisplayPageMediaEffects = createDisplayPageMediaEffects({
+  bottomFade: {
+    enabled: true,
+    height: 0.55
+  },
+  edgeFade: {
+    direction: "left",
+    enabled: true,
+    width: 0.56
   }
+});
+
+export const overviewHeroMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
+  defaults: overviewHeroDefaultMediaEffects,
+  support: firstBatchDisplayPageMediaEffectSupport
+};
+
+export const imagesMainStageDefaultMediaEffects: DisplayPageMediaEffects = createDisplayPageMediaEffects({
+  bottomFade: {
+    enabled: true,
+    height: 120 / 622
+  },
+  edgeFade: {
+    direction: "left",
+    enabled: true,
+    width: 0.56
+  }
+});
+
+export const imagesMainStageMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
+  defaults: imagesMainStageDefaultMediaEffects,
+  support: firstBatchDisplayPageMediaEffectSupport
 };
 
 export function buildDisplayPageMediaEffectFields(
