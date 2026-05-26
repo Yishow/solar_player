@@ -421,6 +421,8 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.match(footerHtml, />歷史</);
   assert.match(footerHtml, />預覽</);
   assert.match(footerHtml, />裝置狀態</);
+  assert.doesNotMatch(footerHtml, />資產庫</);
+  assert.doesNotMatch(footerHtml, />殼層裝飾</);
   assert.doesNotMatch(footerHtml, />太陽能</);
   assert.doesNotMatch(footerHtml, />永續</);
   assert.doesNotMatch(footerHtml, />進入設定</);

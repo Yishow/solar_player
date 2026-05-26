@@ -51,3 +51,21 @@ The system SHALL preserve the existing workflow contracts for apply-and-return, 
 - **WHEN** they switch through the asset workspace and return
 - **THEN** the shell draft and selected object remain recoverable
 - **AND** the aligned UI does not reset that authoring session
+
+### Requirement: Keep compatibility entry routes as editor handoffs rather than standalone destinations
+
+The system SHALL treat `/settings/assets` and `/shell-decorations/editor` as compatibility entry routes into `/display-pages/editor` workspaces. Those routes SHALL preserve the integrated editor workflow and SHALL NOT be restored as primary management-footer destinations.
+
+#### Scenario: Operator enters asset authoring from the legacy assets route
+
+- **WHEN** the operator opens `/settings/assets`
+- **THEN** the route hands off into the integrated asset workspace inside `/display-pages/editor`
+- **AND** the operator lands inside the same product surface family as the main editor
+- **AND** the management footer does not present `/settings/assets` as a first-class destination again
+
+##### Example: Compatibility routing preserves the integrated editor model
+
+- **GIVEN** the product keeps old deep links or bookmarks for asset and shell authoring
+- **WHEN** those entry routes are opened
+- **THEN** they continue to work as handoffs into the editor workspace
+- **AND** the aligned design does not regress back to separate standalone pages

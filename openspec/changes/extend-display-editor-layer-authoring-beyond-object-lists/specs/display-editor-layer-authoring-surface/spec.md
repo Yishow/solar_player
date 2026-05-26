@@ -34,6 +34,23 @@ The system SHALL explain when the selected region belongs to fixed page layout r
 - **THEN** the editor states that layer ordering is not editable for that region
 - **AND** the absence of controls is explicit rather than silent
 
+### Requirement: Distinguish z-order authoring from selection-routed media-effect editing
+
+The system SHALL distinguish z-order authoring eligibility from media-effect authoring support. A selection that routes to a media-effect-owning source SHALL NOT automatically be treated as reorderable unless that node explicitly supports layer ordering.
+
+#### Scenario: Operator selects a media surface that supports effects but not reordering
+
+- **WHEN** the operator selects a fixed-layout media container that routes to an effect-owning source region
+- **THEN** the editor SHALL show either media-effect authoring or an unsupported effect explanation for that source
+- **AND** it does not show z-order controls unless the resolved node is explicitly reorderable
+
+##### Example: Fixed hero media keeps effect editing separate from layer ordering
+
+- **GIVEN** a hero media source supports composable effects but remains part of a fixed template stack
+- **WHEN** the operator opens the selection context for that surface
+- **THEN** the editor keeps effect editing available
+- **AND** it separately explains that layer ordering is not editable for that selection
+
 ### Requirement: Keep parallel layer entry points synchronized
 
 The system SHALL keep layer controls in the object list, shell object list, and current selection context synchronized. Any reorder action from one entry point SHALL update the others without divergence.

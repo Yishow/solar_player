@@ -4,6 +4,8 @@
 - [ ] Implement `Introduce shared workspace surface primitives` for context boards, selection detail boards, sticky actions, empty states, and blocked states.
 - [ ] Implement `Integrated workspaces provide actionable context instead of placeholder chrome` by `Require practical action density inside integrated workspaces` for context, selected item detail, return/apply actions, and blocked explanations.
 - [ ] Implement `Preserve workflow contracts while aligning the surfaces` so apply-and-return, return-to-editor, source-connection jumps, and shell draft preservation remain intact.
+- [ ] Preserve the current `屬性` / `來源連接` responsibility split for media effects while aligning the right-side editor surfaces to shared tokens.
+- [ ] Implement `Keep compatibility entry routes as editor handoffs rather than standalone destinations` by `Keep compatibility entry routes as handoffs, not restored standalone navigation` for `/settings/assets` and `/shell-decorations/editor`.
 - [ ] Remove primary hardcoded visual styling from the affected editor/workspace surfaces in favor of semantic tokens or new editor-specific token roles.
 - [ ] Add route and component tests covering context banners, action visibility, apply/return state, and empty/blocked states.
 - [ ] Run affected web tests for DisplayPagesEditor, AssetLibrary, ShellDecorationEditor, and shell navigation.

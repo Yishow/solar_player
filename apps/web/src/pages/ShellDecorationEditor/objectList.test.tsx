@@ -45,6 +45,21 @@ function ornamentObject(id: string, mount: "header" | "footer", zIndex: number):
   };
 }
 
+function assetObject(id: string, mount: "header" | "footer", zIndex: number): ShellDecorationObject {
+  return {
+    frame: { height: 40, left: 22, top: 12, width: 40 },
+    id,
+    locked: false,
+    metadata: {},
+    mount,
+    source: { assetId: 42, fallbackSrc: "", kind: "asset-image" },
+    style: {},
+    type: "asset-image",
+    visible: true,
+    zIndex
+  };
+}
+
 const baseChannel: ShellDecorationChannel = {
   footerObjects: [ornamentObject("footer-ornament", "footer", 1), lineObject("footer-line", "footer", 2)],
   headerObjects: [lineObject("header-line", "header", 1)]
@@ -84,6 +99,28 @@ test("ShellDecorationObjectList renders grouped header/footer rows and list-firs
   assert.match(html, /鎖定/);
   assert.match(html, /複製/);
   assert.match(html, /刪除/);
+});
+
+test("ShellDecorationObjectList localizes asset source summaries", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ShellDecorationObjectList, {
+      channel: {
+        footerObjects: [],
+        headerObjects: [assetObject("header-asset", "header", 1)]
+      },
+      onDelete: () => {},
+      onDuplicate: () => {},
+      onMoveBackward: () => {},
+      onMoveForward: () => {},
+      onSelect: () => {},
+      onToggleLocked: () => {},
+      onToggleVisible: () => {},
+      selectedObjectId: "header-asset"
+    })
+  );
+
+  assert.match(html, /素材 #42/);
+  assert.doesNotMatch(html, /Asset #42/);
 });
 
 test("moveShellDecorationObject keeps the selected object stable while swapping z-order within its mount", () => {

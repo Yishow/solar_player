@@ -143,6 +143,29 @@ test("embedded asset library shows return context and blocks deletion for refere
   assert.match(html, /disabled=""/);
 });
 
+test("embedded asset library exposes apply-and-return actions when opened from editor context", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?workspace=assets&assetContext=overview-hero-media"] },
+      React.createElement(AssetLibrary, {
+        embedded: true,
+        contextLabel: "總覽 主視覺圖片",
+        initialAssets,
+        initialReferences,
+        onApplySelection: () => {},
+        onReturnToEditor: () => {},
+        returnLabel: "返回展示頁編輯"
+      })
+    )
+  );
+
+  assert.match(html, /返回目標/);
+  assert.match(html, /總覽 主視覺圖片/);
+  assert.match(html, /套用目前素材並返回/);
+  assert.match(html, /返回展示頁編輯/);
+});
+
 test("asset library route remains as compatibility entry to the editor workspace", () => {
   assert.match(routeMetaSource, /path: "\/settings\/assets"/);
   assert.match(routeMetaSource, /navLabel: "資產庫"/);

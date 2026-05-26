@@ -1,6 +1,6 @@
 ## Why
 
-目前 display editor 的上下層操作主要藏在左側 object list，導致使用者即使已經在畫布上選到物件，仍找不到可以直接調整 stacking order 的入口。更糟的是，固定版位區塊、可重排 freeform object、shared shell object 之間沒有清楚區分，讓「這個不能調」和「其實能調但藏起來了」看起來一模一樣。
+目前 display editor 已經有從可見 media container 自動導向 effect-owning source 的 selection routing，但 z-order authoring 仍主要藏在左側 object list。結果是使用者即使已經在畫布上選到可重排物件，仍找不到可以直接調整 stacking order 的入口；而固定版位區塊、可重排 freeform object、shared shell object、以及只支援 effect authoring 的 media surfaces 之間，也沒有被清楚區分。
 
 ## What Changes
 
@@ -8,6 +8,7 @@
 - 讓 freeform objects、shared shell decoration objects，以及其他明確宣告可重排的 authoring nodes，在目前 selection context 下都能看到層級操作。
 - 對固定版位 regions 顯示不可調整上下層的明確說明，避免使用者誤以為功能遺失。
 - 保留既有 object list 的前移/後移操作，並要求它與右側或畫布上的 layer controls 同步。
+- 保留目前 media-effect selection routing 與 unsupported messaging 的邊界，不把「可編輯 effects」誤當成「可調 z-order」。
 
 ## Capabilities
 

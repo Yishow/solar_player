@@ -82,7 +82,7 @@ function resolveSourceSummary(object: DisplayPageFreeformObject) {
     return `${object.frame.width}px / ${object.style.color ?? "#d2b46a"}`;
   }
 
-  return object.source.fallbackSrc || `Asset #${object.source.assetId}`;
+  return object.source.fallbackSrc || `素材 #${object.source.assetId}`;
 }
 
 export function resolveDisplayPageObjectRows(objects: DisplayPageFreeformObject[]) {

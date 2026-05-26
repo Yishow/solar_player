@@ -16,6 +16,11 @@ type FooterEntry = {
 
 type FooterMode = "playback" | "management";
 
+const hiddenManagementFooterPaths = new Set([
+  "/settings/assets",
+  "/shell-decorations/editor"
+]);
+
 function buildEntries(
   currentPath: string,
   playbackNavigation?: {
@@ -50,7 +55,12 @@ function buildEntries(
   }
 
   const managementTabs: FooterEntry[] = routeMetaList
-    .filter((route): route is RouteMeta => route.group === "management" && route.path !== "/offline")
+    .filter(
+      (route): route is RouteMeta =>
+        route.group === "management"
+        && route.path !== "/offline"
+        && !hiddenManagementFooterPaths.has(route.path)
+    )
     .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
 
   const overviewEntry: FooterEntry = { key: "overview-return", label: "回總覽", path: "/overview" };

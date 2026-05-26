@@ -97,6 +97,30 @@ test("DisplayPageObjectList renders list-first controls for page freeform object
   assert.match(html, /刪除/);
 });
 
+test("DisplayPageObjectList localizes asset source summaries", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayPageObjectList, {
+      objects: [
+        {
+          ...assetObject("asset-blank", 1),
+          source: { assetId: 42, fallbackSrc: "", kind: "asset-image" }
+        } as DisplayPageFreeformObject
+      ],
+      onDelete: () => {},
+      onDuplicate: () => {},
+      onMoveBackward: () => {},
+      onMoveForward: () => {},
+      onSelect: () => {},
+      onToggleLocked: () => {},
+      onToggleVisible: () => {},
+      selectedObjectId: "asset-blank"
+    })
+  );
+
+  assert.match(html, /素材 #42/);
+  assert.doesNotMatch(html, /Asset #42/);
+});
+
 test("moveDisplayPageObject keeps object identity stable while swapping z-order", () => {
   const moved = moveDisplayPageObject(baseObjects, "asset-1", "forward");
 

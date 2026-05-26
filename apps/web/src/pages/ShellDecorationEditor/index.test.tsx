@@ -237,6 +237,13 @@ test("shell decoration editor workflow stays on shell draft services instead of 
   assert.doesNotMatch(editorSource, /publishDisplayPageDraft/);
 });
 
+test("shell decoration editor only syncs parent workspace state after initial data hydration", () => {
+  assert.match(editorSource, /const \[hasHydratedInitialData, setHasHydratedInitialData\] = useState/);
+  assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onDraftChange\?\.\(draft\);/);
+  assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onImagesChange\?\.\(images\);/);
+  assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onSelectedObjectIdChange\?\.\(selectedObjectId\);/);
+});
+
 test("shell decoration editor load, save, and publish helpers stay scoped to shared shell draft services", async () => {
   const calls: string[] = [];
   const loaded = await loadShellDecorationEditorData(

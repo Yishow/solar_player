@@ -20,10 +20,14 @@ type ManagedAssetUsageScope = "both" | "page-only" | "shell-only";
 type ThumbnailDensity = "comfortable" | "compact";
 
 type AssetLibraryProps = {
+  contextLabel?: string;
   embedded?: boolean;
   initialAssets?: ImageAsset[];
   initialReferences?: DisplayOpsAssetReferenceSummary;
+  onApplySelection?: (asset: ImageAsset) => void;
+  onAssetsChange?: (assets: ImageAsset[]) => void;
   onReturnToEditor?: () => void;
+  returnLabel?: string;
 };
 
 const categoryLabels: Record<AssetCategory, string> = {
@@ -82,10 +86,14 @@ function formatReferenceKind(kind: string) {
 }
 
 export function AssetLibrary({
+  contextLabel,
   embedded = false,
   initialAssets,
   initialReferences,
-  onReturnToEditor
+  onApplySelection,
+  onAssetsChange,
+  onReturnToEditor,
+  returnLabel = "返回展示頁編輯"
 }: AssetLibraryProps) {
   const [assets, setAssets] = useState<ImageAsset[]>(initialAssets ?? []);
   const [isLoading, setIsLoading] = useState(initialAssets === undefined);
@@ -116,6 +124,7 @@ export function AssetLibrary({
   const syncAssets = async (preferredAssetId: number | null = selectedAssetId) => {
     const nextAssets = await getImages();
     setAssets(nextAssets);
+    onAssetsChange?.(nextAssets);
     setSelectedAssetId((currentSelected) => {
       const candidate = preferredAssetId ?? currentSelected;
       if (candidate !== null && nextAssets.some((asset) => asset.id === candidate)) {
@@ -139,6 +148,7 @@ export function AssetLibrary({
         }
 
         setAssets(nextAssets);
+        onAssetsChange?.(nextAssets);
         setSelectedAssetId(nextAssets[0]?.id ?? null);
         setMessage("資產庫已同步。");
         setErrorMessage("");
@@ -277,16 +287,30 @@ export function AssetLibrary({
             <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
               資產庫管理
             </p>
-            <h2 className="mt-1 text-[24px] font-semibold text-[var(--shell-title-ink)]">Asset Library</h2>
+            <h2 className="mt-1 text-[24px] font-semibold text-[var(--shell-title-ink)]">資產庫</h2>
           </div>
           <div className="flex flex-wrap gap-2">
+            {contextLabel && onApplySelection ? (
+              <button
+                type="button"
+                className="rounded-full border border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-title-ink)] disabled:opacity-60"
+                disabled={!selectedAsset}
+                onClick={() => {
+                  if (selectedAsset) {
+                    onApplySelection(selectedAsset);
+                  }
+                }}
+              >
+                套用目前素材並返回
+              </button>
+            ) : null}
             {onReturnToEditor ? (
               <button
                 type="button"
                 className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)]"
                 onClick={onReturnToEditor}
               >
-                返回展示頁編輯
+                {returnLabel}
               </button>
             ) : null}
             <button
@@ -303,6 +327,15 @@ export function AssetLibrary({
         <div className="mt-4 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-4 py-3 text-[13px] text-[var(--shell-copy-ink)]" role="status">
           {errorMessage || message}
         </div>
+
+        {contextLabel ? (
+          <div className="mt-4 rounded-[18px] border border-[rgba(95,140,80,0.18)] bg-[rgba(95,140,80,0.06)] px-4 py-3">
+            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
+              返回目標
+            </div>
+            <div className="mt-1 text-[14px] font-semibold text-[var(--shell-title-ink)]">{contextLabel}</div>
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_180px]">
           <label className="flex flex-col gap-1 text-[13px] text-[var(--shell-copy-ink)]">
@@ -401,7 +434,7 @@ export function AssetLibrary({
                 <div className="mt-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-[15px] font-semibold text-[var(--shell-title-ink)]">
-                      {asset.title ?? asset.originalName ?? `Asset ${asset.id}`}
+                      {asset.title ?? asset.originalName ?? `素材 ${asset.id}`}
                     </div>
                     <div className="mt-1 text-[12px] text-[var(--shell-subtitle-ink)]">
                       {categoryLabels[normalizeAssetCategory(asset)]} · {usageScopeLabels[normalizeAssetUsageScope(asset)]}
@@ -464,7 +497,7 @@ export function AssetLibrary({
                 </div>
               ) : null}
               <div className="text-[16px] font-semibold text-[var(--shell-title-ink)]">
-                {selectedAsset.title ?? selectedAsset.originalName ?? `Asset ${selectedAsset.id}`}
+                {selectedAsset.title ?? selectedAsset.originalName ?? `素材 ${selectedAsset.id}`}
               </div>
               <div className="mt-2 text-[13px] text-[var(--shell-copy-ink)]">
                 使用範圍：{usageScopeLabels[normalizeAssetUsageScope(selectedAsset)]}

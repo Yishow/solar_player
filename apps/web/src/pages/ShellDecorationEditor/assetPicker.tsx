@@ -145,5 +145,5 @@ export function ShellDecorationAssetPicker({
 }
 
 export function buildShellDecorationAssetLabel(asset: ImageAsset) {
-  return asset.title ?? asset.originalName ?? asset.filename ?? `Image ${asset.id}`;
+  return asset.title ?? asset.originalName ?? asset.filename ?? `素材 ${asset.id}`;
 }

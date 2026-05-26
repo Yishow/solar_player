@@ -50,3 +50,20 @@ The system SHALL preserve explicit loading, disabled, success, error, broker sta
 - **WHEN** the aligned page renders those states
 - **THEN** the user can still distinguish success, warning, error, and fallback conditions
 - **AND** the page does not lose its explicit feedback hierarchy
+
+### Requirement: Keep asset and shell authoring as editor handoffs rather than revived settings destinations
+
+The system SHALL keep `/settings/assets` and `/shell-decorations/editor` as compatibility handoffs into `/display-pages/editor` workspaces while the display-ops settings family is aligned. The display-ops footer and route hierarchy SHALL NOT reintroduce those routes as first-class settings destinations.
+
+#### Scenario: Operator navigates the display-ops settings family after workspace integration
+
+- **WHEN** the operator moves through playback, image management, MQTT, circuits, and slideshow preview
+- **THEN** the primary settings family focuses on operational governance and preview surfaces
+- **AND** asset or shell authoring remains reachable through editor handoff flows rather than restored footer tabs
+
+##### Example: Footer stays focused on display operations
+
+- **GIVEN** asset and shell authoring now live inside `/display-pages/editor`
+- **WHEN** the aligned management footer renders its first-class destinations
+- **THEN** it keeps playback, images, MQTT, circuits, preview, and related ops surfaces visible
+- **AND** it does not surface `/settings/assets` or `/shell-decorations/editor` as peer destinations again

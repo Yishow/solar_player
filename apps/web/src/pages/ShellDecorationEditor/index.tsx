@@ -135,14 +135,20 @@ export function ShellDecorationEditor({
   initialDraft,
   initialImages,
   initialSelectedObjectId,
+  onDraftChange,
+  onImagesChange,
   onOpenAssetWorkspace,
+  onSelectedObjectIdChange,
   renderPreview = true
 }: {
   embedded?: boolean;
   initialDraft?: ShellDecorationEnvelope;
   initialImages?: ImageAsset[];
   initialSelectedObjectId?: string | null;
+  onDraftChange?: (draft: ShellDecorationEnvelope) => void;
+  onImagesChange?: (images: ImageAsset[]) => void;
   onOpenAssetWorkspace?: (context: string | null) => void;
+  onSelectedObjectIdChange?: (selectedObjectId: string | null) => void;
   renderPreview?: boolean;
 }) {
   const [draft, setDraft] = useState<ShellDecorationEnvelope>(initialDraft ?? createEmptyDraftEnvelope());
@@ -150,6 +156,9 @@ export function ShellDecorationEditor({
   const [images, setImages] = useState<ImageAsset[]>(initialImages ?? []);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(
     initialSelectedObjectId ?? initialDraft?.headerObjects[0]?.id ?? initialDraft?.footerObjects[0]?.id ?? null
+  );
+  const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
+    initialDraft !== undefined && initialImages !== undefined
   );
   const [isLoading, setIsLoading] = useState(initialDraft === undefined || initialImages === undefined);
   const [isSaving, setIsSaving] = useState(false);
@@ -177,6 +186,7 @@ export function ShellDecorationEditor({
         setLastSavedDraft(nextDraft);
         setImages(nextImages);
         setSelectedObjectId(nextDraft.headerObjects[0]?.id ?? nextDraft.footerObjects[0]?.id ?? null);
+        setHasHydratedInitialData(true);
         setMessage("共用殼層草稿已同步。");
         setErrorMessage("");
       })
@@ -197,6 +207,30 @@ export function ShellDecorationEditor({
       active = false;
     };
   }, [initialDraft, initialImages]);
+
+  useEffect(() => {
+    if (!hasHydratedInitialData) {
+      return;
+    }
+
+    onDraftChange?.(draft);
+  }, [draft, hasHydratedInitialData, onDraftChange]);
+
+  useEffect(() => {
+    if (!hasHydratedInitialData) {
+      return;
+    }
+
+    onImagesChange?.(images);
+  }, [hasHydratedInitialData, images, onImagesChange]);
+
+  useEffect(() => {
+    if (!hasHydratedInitialData) {
+      return;
+    }
+
+    onSelectedObjectIdChange?.(selectedObjectId);
+  }, [hasHydratedInitialData, onSelectedObjectIdChange, selectedObjectId]);
 
   const channel = useMemo(() => toShellDecorationChannel(draft), [draft]);
   const baselineChannel = useMemo(() => toShellDecorationChannel(lastSavedDraft), [lastSavedDraft]);

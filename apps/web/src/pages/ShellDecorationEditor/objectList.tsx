@@ -104,7 +104,7 @@ function resolveMountLabel(mount: ShellDecorationMount) {
 
 function resolveSourceSummary(object: ShellDecorationObject) {
   if (object.type === "asset-image") {
-    return object.source.fallbackSrc || `Asset #${object.source.assetId}`;
+    return object.source.fallbackSrc || `素材 #${object.source.assetId}`;
   }
 
   if (object.type === "ornament-image") {
