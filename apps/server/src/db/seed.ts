@@ -6,6 +6,7 @@ import {
   type MqttSettingsRow,
   shouldBootstrapStoredMqttSettings
 } from "../mqtt/settings-source.js";
+import { bootstrapDisplaySeedAssets } from "../services/displaySeedAssetBootstrapService.js";
 import { closeDatabaseConnection, getDatabase } from "./index.js";
 
 const topicMappings = [
@@ -323,6 +324,8 @@ export function seedDatabase() {
         updated_at = CURRENT_TIMESTAMP
     `).run(1, 1, 1, 0, "fade", 1000, 0, "08:00", "18:00", "1,2,3,4,5", 0, 300, 100, "landscape");
   })();
+
+  bootstrapDisplaySeedAssets();
 }
 
 async function runFromCli() {

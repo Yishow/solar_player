@@ -36,6 +36,14 @@ export type ImageAssetRow = {
   updated_at: string | null;
 };
 
+const DISPLAY_SEED_ORIGINAL_NAME_PREFIX = "display-seed:";
+
+function resolveSeedKey(originalName: string | null) {
+  return originalName?.startsWith(DISPLAY_SEED_ORIGINAL_NAME_PREFIX)
+    ? originalName.slice(DISPLAY_SEED_ORIGINAL_NAME_PREFIX.length)
+    : null;
+}
+
 export type ImageUpdateBody = {
   title?: string;
   description?: string;
@@ -76,7 +84,8 @@ export function serializeImageRow(row: ImageAssetRow): ImageAsset {
     displayDuration: row.display_duration,
     displayOrder: row.display_order,
     category: row.category,
-    usageScope: row.usage_scope
+    usageScope: row.usage_scope,
+    seedKey: resolveSeedKey(row.original_name)
   };
 }
 

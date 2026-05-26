@@ -34,6 +34,7 @@ const initialAssets: Array<ImageAsset & {
     isCover: false,
     mimeType: "image/png",
     originalName: "overview-hero.png",
+    seedKey: "overview.hero",
     title: "總覽背景",
     usageScope: "both",
     usageSummary: {
@@ -88,6 +89,8 @@ test("asset library exposes a dedicated management surface with category tabs an
   assert.match(html, /使用範圍/);
   assert.match(html, /Live 2/);
   assert.match(html, /Draft 1/);
+  assert.match(html, /內建素材/);
+  assert.match(html, /overview\.hero/);
   assert.doesNotMatch(html, /輪播治理/);
 });
 

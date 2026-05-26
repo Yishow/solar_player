@@ -126,6 +126,7 @@ export interface ImageAsset {
   category?: ManagedAssetCategory;
   usageScope?: ManagedAssetUsageScope;
   usageSummary?: ImageAssetUsageSummary;
+  seedKey?: string | null;
 }
 
 export interface BrandProfile {

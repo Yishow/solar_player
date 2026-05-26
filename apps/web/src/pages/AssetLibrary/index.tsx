@@ -39,6 +39,10 @@ function formatUsageSummary(asset: ImageAsset) {
   return `Live ${summary.liveCount} · Draft ${summary.draftCount}`;
 }
 
+function isSeedAsset(asset: ImageAsset) {
+  return typeof asset.seedKey === "string" && asset.seedKey.length > 0;
+}
+
 function normalizeAssetCategory(asset: ImageAsset): ManagedAssetCategory {
   return asset.category === "icon" || asset.category === "object" ? asset.category : "background";
 }
@@ -348,6 +352,11 @@ export function AssetLibrary({
                     <div className="mt-1 text-[12px] text-[var(--shell-subtitle-ink)]">
                       {categoryLabels[normalizeAssetCategory(asset)]} · {usageScopeLabels[normalizeAssetUsageScope(asset)]}
                     </div>
+                    {isSeedAsset(asset) ? (
+                      <div className="mt-2 inline-flex rounded-full bg-[rgba(95,140,80,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]">
+                        內建素材 · {asset.seedKey}
+                      </div>
+                    ) : null}
                   </div>
                   <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
                     #{asset.id}
@@ -403,6 +412,11 @@ export function AssetLibrary({
                 <div className="mt-1 text-[13px] text-[var(--shell-copy-ink)]">
                   {formatUsageSummary(selectedAsset)}
                 </div>
+                {isSeedAsset(selectedAsset) ? (
+                  <div className="mt-2 text-[13px] font-semibold text-[var(--shell-title-ink)]">
+                    內建素材：{selectedAsset.seedKey}
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-[18px] border border-[var(--shell-divider)] p-4">

@@ -169,6 +169,33 @@ test("GET /api/images returns empty list when no images exist", async () => {
   }
 });
 
+test("GET /api/images includes display seed assets after database seed", async () => {
+  migrateDatabase();
+  clearImagesTable();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/images"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { success: boolean; data: ImageAsset[] };
+    const overviewSeed = body.data.find((asset) => asset.seedKey === "overview.hero");
+
+    assert.equal(body.success, true);
+    assert.ok(overviewSeed);
+    assert.equal(overviewSeed.category, "background");
+    assert.equal(overviewSeed.usageScope, "page-only");
+    assert.equal(overviewSeed.filename?.startsWith("display-seed-"), true);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/images uploads a valid PNG image and stores it in the database", async () => {
   migrateDatabase();
   seedDatabase();
