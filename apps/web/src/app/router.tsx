@@ -8,7 +8,6 @@ import { DeviceStatus } from "../pages/DeviceStatus";
 import { DisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
 import { EnergyHistory } from "../pages/EnergyHistory";
 import { EnergyTrend } from "../pages/EnergyTrend";
-import { AssetLibrary } from "../pages/AssetLibrary";
 import { ImageManagement } from "../pages/ImageManagement";
 import { MqttSettings } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
@@ -51,7 +50,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/assets",
-        element: <AssetLibrary />
+        element: <Navigate to="/display-pages/editor?workspace=assets" replace />
       },
       {
         path: "settings/images",

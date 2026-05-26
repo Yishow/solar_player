@@ -234,7 +234,30 @@ test("display page editor exposes freeform object list and asset-backed inspecto
   assert.match(html, /自由圖片物件/);
   assert.match(html, /目前素材：Page Object Asset/);
   assert.match(html, /選擇圖片素材/);
+  assert.match(html, /在資產庫開啟/);
   assert.match(html, /替代文字/);
+});
+
+test("display page editor exposes the asset library as an integrated workspace", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview&workspace=assets"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialImages,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /資產庫/);
+  assert.match(html, /Asset Library/);
+  assert.match(html, /返回展示頁編輯/);
+  assert.match(html, /Page Object Asset/);
+  assert.match(html, /舒適縮圖/);
+  assert.doesNotMatch(html, /\/settings\/assets/);
 });
 
 test("display page editor renders rail card hierarchy and template-aware controls for sustainability cards", () => {

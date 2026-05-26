@@ -675,15 +675,17 @@ function buildCardRailChildRegion(args: {
 export function DisplayEditorInspectorFields({
   fields,
   onChange,
+  onOpenAssetLibrary,
   onResetField
 }: {
   fields: ResolvedDisplayEditorField[];
   onChange: (path: DisplayEditorPath, value: unknown) => void;
+  onOpenAssetLibrary?: () => void;
   onResetField?: (path: DisplayEditorPath) => void;
 }) {
   return (
     <div className="grid gap-3">
-      {fields.map((field) => renderField(field, onChange, onResetField))}
+      {fields.map((field) => renderField(field, onChange, onResetField, onOpenAssetLibrary))}
     </div>
   );
 }
@@ -691,7 +693,8 @@ export function DisplayEditorInspectorFields({
 function renderField(
   field: ResolvedDisplayEditorField,
   onChange: (path: DisplayEditorPath, value: unknown) => void,
-  onResetField?: (path: DisplayEditorPath) => void
+  onResetField?: (path: DisplayEditorPath) => void,
+  onOpenAssetLibrary?: () => void
 ) {
   const label = (
     <span className="flex items-center justify-between gap-2">
@@ -739,7 +742,8 @@ function renderField(
                     value: getValueAtPath(item, itemField.path)
                   },
                   onChange,
-                  undefined
+                  undefined,
+                  onOpenAssetLibrary
                 )
               )}
             </div>
@@ -752,7 +756,7 @@ function renderField(
   return (
     <label key={displayEditorPathKey(field.path)} className="grid gap-2 text-[13px] text-[var(--shell-copy-ink)]">
       {label}
-      {renderFieldInput(field, onChange)}
+      {renderFieldInput(field, onChange, onOpenAssetLibrary)}
       {resolveDisplayEditorFieldIssues(field).map((issue) => (
         <span
           key={`${displayEditorPathKey(field.path)}-${issue}`}
@@ -768,7 +772,8 @@ function renderField(
 
 function renderFieldInput(
   field: ResolvedDisplayEditorField,
-  onChange: (path: DisplayEditorPath, value: unknown) => void
+  onChange: (path: DisplayEditorPath, value: unknown) => void,
+  onOpenAssetLibrary?: () => void
 ): ReactNode {
   if (isNumberFieldSchema(field.schema)) {
     return (
@@ -811,17 +816,28 @@ function renderFieldInput(
 
   if (field.schema.fieldType === "asset") {
     return (
-      <input
-        className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none focus:border-[var(--shell-divider-strong)]"
-        placeholder={"placeholder" in field.schema ? field.schema.placeholder : undefined}
-        type="text"
-        value={
-          typeof field.value === "number" || typeof field.value === "string"
-            ? String(field.value)
-            : ""
-        }
-        onChange={(event) => onChange(field.path, event.target.value)}
-      />
+      <div className="grid gap-2">
+        <input
+          className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none focus:border-[var(--shell-divider-strong)]"
+          placeholder={"placeholder" in field.schema ? field.schema.placeholder : undefined}
+          type="text"
+          value={
+            typeof field.value === "number" || typeof field.value === "string"
+              ? String(field.value)
+              : ""
+          }
+          onChange={(event) => onChange(field.path, event.target.value)}
+        />
+        {onOpenAssetLibrary ? (
+          <button
+            type="button"
+            className="justify-self-start rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold text-[var(--shell-copy-ink)]"
+            onClick={onOpenAssetLibrary}
+          >
+            在資產庫開啟
+          </button>
+        ) : null}
+      </div>
     );
   }
 

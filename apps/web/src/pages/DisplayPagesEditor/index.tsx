@@ -21,6 +21,7 @@ import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { buildApiUrl, getImages } from "../../services/api";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
+import { AssetLibrary } from "../AssetLibrary";
 import { DisplayEditorCanvasCard } from "./canvasCard";
 import {
   alignCanvasSelections,
@@ -78,6 +79,7 @@ import {
 } from "./useDisplayEditorCanvasWorkflow";
 
 type DisplayEditorField = { id: string; label: string; onChange: (value: string) => void; step?: number; type: "number" | "text"; value: number | string };
+type DisplayEditorWorkspace = "assets" | "editor";
 type DisplayEditorRect = { height?: number; left: number; top: number; width: number };
 export type DisplayEditorRegion = { description?: string; fields: DisplayEditorField[]; id: string; label: string; rect?: DisplayEditorRect };
 export type DisplayEditorPageDefinition = {
@@ -159,6 +161,7 @@ export function DisplayPagesEditor({
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
+  const selectedWorkspace: DisplayEditorWorkspace = searchParams.get("workspace") === "assets" ? "assets" : "editor";
   const selectedPageId =
     requestedPageId && pageIdSet.has(requestedPageId)
       ? requestedPageId
@@ -468,6 +471,20 @@ export function DisplayPagesEditor({
     nextParams.set("page", pageId);
     setSearchParams(nextParams, { replace: true });
   };
+  const handleSelectWorkspace = (workspace: DisplayEditorWorkspace, context?: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (workspace === "assets") {
+      nextParams.set("workspace", "assets");
+      if (context) {
+        nextParams.set("assetContext", context);
+      }
+    } else {
+      nextParams.delete("workspace");
+      nextParams.delete("assetContext");
+    }
+    nextParams.set("page", selectedPage.id);
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const applySelectionRects = useCallback(
     (
@@ -643,7 +660,7 @@ export function DisplayPagesEditor({
   const assetOptions = useMemo(() => resolveDisplayPageObjectAssetOptions(images), [images]);
 
   const pageTabs = (
-    <div className="flex items-end gap-2">
+    <div className="flex flex-wrap items-end gap-2">
       <button
         type="button"
         title="切換編輯模式 (E)"
@@ -658,6 +675,24 @@ export function DisplayPagesEditor({
       >
         {editMode ? "編輯模式開啟" : "編輯模式關閉"}
       </button>
+      {([
+        { label: "頁面編輯", value: "editor" },
+        { label: "資產庫", value: "assets" }
+      ] as const).map((workspace) => (
+        <button
+          key={workspace.value}
+          type="button"
+          className={[
+            "rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors",
+            selectedWorkspace === workspace.value
+              ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+              : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-muted-ink)] hover:border-[var(--shell-divider-strong)] hover:text-[var(--shell-title-ink)]"
+          ].join(" ")}
+          onClick={() => handleSelectWorkspace(workspace.value)}
+        >
+          {workspace.label}
+        </button>
+      ))}
       {resolvedPageDefinitions.map((page) => {
         const active = page.id === selectedPageId;
         return (
@@ -762,6 +797,13 @@ export function DisplayPagesEditor({
               });
             }}
           />
+          <button
+            type="button"
+            className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold text-[var(--shell-copy-ink)]"
+            onClick={() => handleSelectWorkspace("assets", selectedFreeformObject.type)}
+          >
+            在資產庫開啟
+          </button>
           {selectedFreeformObject.source.fallbackSrc ? (
             <p className="text-[12px] text-[var(--shell-copy-ink)]">
               目前素材：{assetOptions.find((option) => option.assetId === selectedFreeformObject.source.assetId)?.label ?? selectedFreeformObject.source.fallbackSrc}
@@ -821,6 +863,28 @@ export function DisplayPagesEditor({
       </div>
     </div>
   ) : null;
+
+  if (selectedWorkspace === "assets") {
+    return (
+      <PageContainer
+        density="playback"
+        shellPrimitive="management-scaffold"
+        title={editorRouteMeta.title}
+        subtitle={editorRouteMeta.subtitle}
+        description="在展示頁編輯器內管理可替換的背景、物件、圖示與殼層素材。"
+        spacing="compact"
+        aside={pageTabs}
+      >
+        <div className="h-full min-h-0 overflow-y-auto">
+          <AssetLibrary
+            embedded
+            initialAssets={initialImages ? images : undefined}
+            onReturnToEditor={() => handleSelectWorkspace("editor")}
+          />
+        </div>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer
@@ -1255,6 +1319,7 @@ export function DisplayPagesEditor({
                     : "這個頁面的專屬編輯區域尚未展開，先保留預覽與路由覆蓋。"
                 }
                 onChange={updatePath}
+                onOpenAssetLibrary={() => handleSelectWorkspace("assets", selectedRegion?.id)}
                 onResetField={(path) => resetPaths([path])}
                 selectedRegion={selectedRegion}
               />

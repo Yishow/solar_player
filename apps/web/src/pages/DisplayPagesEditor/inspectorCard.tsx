@@ -7,6 +7,7 @@ function InspectorContent({
   editMode,
   emptyMessage,
   onChange,
+  onOpenAssetLibrary,
   onResetField,
   selectedRegion
 }: {
@@ -14,6 +15,7 @@ function InspectorContent({
   editMode: boolean;
   emptyMessage: string;
   onChange: Parameters<typeof DisplayEditorInspectorFields>[0]["onChange"];
+  onOpenAssetLibrary?: Parameters<typeof DisplayEditorInspectorFields>[0]["onOpenAssetLibrary"];
   onResetField?: Parameters<typeof DisplayEditorInspectorFields>[0]["onResetField"];
   selectedRegion: ResolvedDisplayEditorRegion | null;
 }) {
@@ -43,6 +45,7 @@ function InspectorContent({
       <DisplayEditorInspectorFields
         fields={selectedRegion.fields}
         onChange={onChange}
+        onOpenAssetLibrary={onOpenAssetLibrary}
         onResetField={onResetField}
       />
     </div>
@@ -55,6 +58,7 @@ export function DisplayEditorInspectorCard({
   emptyMessage,
   flat = false,
   onChange,
+  onOpenAssetLibrary,
   onResetField,
   selectedRegion
 }: {
@@ -63,6 +67,7 @@ export function DisplayEditorInspectorCard({
   emptyMessage: string;
   flat?: boolean;
   onChange: Parameters<typeof DisplayEditorInspectorFields>[0]["onChange"];
+  onOpenAssetLibrary?: Parameters<typeof DisplayEditorInspectorFields>[0]["onOpenAssetLibrary"];
   onResetField?: Parameters<typeof DisplayEditorInspectorFields>[0]["onResetField"];
   selectedRegion: ResolvedDisplayEditorRegion | null;
 }) {
@@ -72,6 +77,7 @@ export function DisplayEditorInspectorCard({
       editMode={editMode}
       emptyMessage={emptyMessage}
       onChange={onChange}
+      onOpenAssetLibrary={onOpenAssetLibrary}
       onResetField={onResetField}
       selectedRegion={selectedRegion}
     />
