@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FHD.01 — 版面規格文件</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e14;
+    --surface: #111720;
+    --surface2: #161d28;
+    --border: #1e2d3d;
+    --border-bright: #2aa9d5;
+    --cyan: #86d7f0;
+    --cyan-dim: #3fa8cc;
+    --green: #2fb86a;
+    --text: #c8d8e8;
+    --text-dim: #6a8099;
+    --text-bright: #e8f4ff;
+    --accent: #35aeda;
+    --accent2: #8adaf2;
+    --code-bg: #0d1117;
+    --tag-bg: #0e1c2c;
+  }
+
+  html { background: var(--bg); }
+
+  body {
+    font-family: 'Noto Sans TC', 'IBM Plex Mono', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Blueprint grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(42, 169, 213, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 169, 213, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Radial glow */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(42, 169, 213, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 64px 48px 120px;
+  }
+
+  /* ── Header ── */
+  .doc-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 40px;
+    margin-bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .doc-id {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: var(--cyan-dim);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .doc-id::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .doc-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .doc-title span {
+    color: var(--cyan);
+  }
+
+  .doc-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .doc-meta {
+    display: flex;
+    gap: 24px;
+    margin-top: 8px;
+  }
+
+  .meta-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  .meta-tag.hi {
+    border-color: var(--border-bright);
+    color: var(--accent2);
+  }
+
+  /* ── Sections ── */
+  .section {
+    margin-bottom: 56px;
+    animation: fadeIn 0.4s ease both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .section:nth-child(2) { animation-delay: 0.05s; }
+  .section:nth-child(3) { animation-delay: 0.10s; }
+  .section:nth-child(4) { animation-delay: 0.15s; }
+  .section:nth-child(5) { animation-delay: 0.20s; }
+  .section:nth-child(6) { animation-delay: 0.25s; }
+  .section:nth-child(7) { animation-delay: 0.30s; }
+  .section:nth-child(8) { animation-delay: 0.35s; }
+  .section:nth-child(9) { animation-delay: 0.40s; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .section-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--cyan);
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: 0;
+  }
+
+  .section-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -0.01em;
+  }
+
+  .section-body {
+    padding-left: 36px;
+  }
+
+  /* ── Tables ── */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  thead tr {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border-bright);
+  }
+
+  th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cyan-dim);
+    padding: 10px 16px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 10px 16px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 13px;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td { background: rgba(42, 169, 213, 0.04); }
+
+  td.mono, th.mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+
+  td.note {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  td.label {
+    font-weight: 500;
+    color: var(--text-bright);
+  }
+
+  /* color swatch inline */
+  .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .swatch-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── Code Block ── */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--border-bright);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .code-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #0d1117;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-dots {
+    display: flex;
+    gap: 5px;
+  }
+
+  .code-dots span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .code-dots .d1 { background: #ff5f57; }
+  .code-dots .d2 { background: #ffbd2e; }
+  .code-dots .d3 { background: #28c840; }
+
+  .code-lang {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    margin-left: 4px;
+  }
+
+  pre {
+    margin: 0;
+    padding: 24px;
+    overflow-x: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: #c9d1d9;
+  }
+
+  .tok-selector { color: #79c0ff; }
+  .tok-prop     { color: #ff7b72; }
+  .tok-value    { color: #a5d6ff; }
+  .tok-unit     { color: #3fb950; }
+  .tok-hash     { color: #ffa657; }
+  .tok-comment  { color: #6a8099; font-style: italic; }
+  .tok-num      { color: #d2a8ff; }
+
+  /* ── Notes / callouts ── */
+  .callout {
+    display: flex;
+    gap: 12px;
+    background: rgba(47, 184, 106, 0.06);
+    border: 1px solid rgba(47, 184, 106, 0.25);
+    border-left: 3px solid var(--green);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+
+  .callout-icon {
+    flex-shrink: 0;
+    font-size: 15px;
+    margin-top: 1px;
+  }
+
+  .callout.cyan {
+    background: rgba(42, 169, 213, 0.05);
+    border-color: rgba(42, 169, 213, 0.2);
+    border-left-color: var(--cyan);
+  }
+
+  /* ── Typography spec table ── */
+  .typo-row td.size {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+  }
+
+  .typo-row td.weight {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  /* ── Summary ── */
+  .summary {
+    margin-top: 64px;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--cyan);
+    border-radius: 8px;
+  }
+
+  .summary-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 16px;
+  }
+
+  .summary-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .summary-stats {
+    display: flex;
+    gap: 0;
+    margin-top: 24px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .stat {
+    flex: 1;
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
+  }
+
+  .stat:last-child { border-right: none; }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'Sora', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: -0.02em;
+  }
+
+  .stat-value span {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, var(--border-bright), transparent);
+    margin: 40px 0;
+    opacity: 0.4;
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 700px) {
+    .page { padding: 32px 20px 80px; }
+    .doc-title { font-size: 28px; }
+    .section-body { padding-left: 0; }
+    .summary-stats { flex-direction: column; }
+    .stat { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Document Header ── -->
+  <header class="doc-header">
+    <div class="doc-id">DOC · FHD.01 · LAYOUT SPECIFICATION</div>
+    <h1 class="doc-title">FHD <span>1920 × 1080</span><br>版面規格文件</h1>
+    <p class="doc-subtitle">
+      以 FHD 1920×1080 畫布換算，座標原點為左上角。<br>
+      以下為依圖片像素推估，可能有 ±2–4px 誤差。
+    </p>
+    <div class="doc-meta">
+      <span class="meta-tag hi">1920 × 1080 px</span>
+      <span class="meta-tag">Dashboard / Playback</span>
+      <span class="meta-tag">Wireframe</span>
+    </div>
+  </header>
+
+  <!-- ── Section 1 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <h2 class="section-title">畫布與安全區</h2>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>推估尺寸 / 位置</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="label">目標畫布</td><td class="mono">1920 × 1080</td></tr>
+            <tr><td class="label">主內容白色畫布</td><td class="mono">x: 28, y: 24, w: 1864, h: 1024</td></tr>
+            <tr><td class="label">外側灰色背景</td><td>約 28px 左右邊界、24px 上邊界、32px 下邊界</td></tr>
+            <tr><td class="label">主要安全區左線</td><td class="mono">x: 112</td></tr>
+            <tr><td class="label">主要安全區右線</td><td class="mono">x: 1810</td></tr>
+            <tr><td class="label">內容有效寬度</td><td class="mono">約 1698px</td></tr>
+            <tr><td class="label">上方 header 高度</td><td class="mono">約 86px</td></tr>
+            <tr><td class="label">下方 footer / progress 區</td><td class="mono">y: 960–1026</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <h2 class="section-title">主要版面區塊</h2>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>區塊</th>
+              <th class="mono">x</th>
+              <th class="mono">y</th>
+              <th class="mono">w</th>
+              <th class="mono">h</th>
+              <th>備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="label">Header 外框</td>
+              <td class="mono">112</td><td class="mono">24</td><td class="mono">1698</td><td class="mono">86</td>
+              <td class="note">LOGO、時間區</td>
+            </tr>
+            <tr>
+              <td class="label">Logo 文字區</td>
+              <td class="mono">112</td><td class="mono">55</td><td class="mono">260</td><td class="mono">42</td>
+              <td class="note">LOGO 約 150×42</td>
+            </tr>
+            <tr>
+              <td class="label">Header 左裝飾條</td>
+              <td class="mono">112</td><td class="mono">55</td><td class="mono">260</td><td class="mono">42</td>
+              <td class="note">淺藍底</td>
+            </tr>
+            <tr>
+              <td class="label">Header 中裝飾條</td>
+              <td class="mono">422</td><td class="mono">55</td><td class="mono">345</td><td class="mono">42</td>
+              <td class="note">淺藍底</td>
+            </tr>
+            <tr>
+              <td class="label">時間區</td>
+              <td class="mono">1290</td><td class="mono">55</td><td class="mono">520</td><td class="mono">42</td>
+              <td class="note">21:55 置中偏左</td>
+            </tr>
+            <tr>
+              <td class="label">左側文字資訊區</td>
+              <td class="mono">112</td><td class="mono">145</td><td class="mono">498</td><td class="mono">520</td>
+              <td class="note">Hero 文案與段落</td>
+            </tr>
+            <tr>
+              <td class="label">右側主視覺區</td>
+              <td class="mono">695</td><td class="mono">125</td><td class="mono">1195</td><td class="mono">560</td>
+              <td class="note">大圖 / Hero media</td>
+            </tr>
+            <tr>
+              <td class="label">KPI 卡片列</td>
+              <td class="mono">112</td><td class="mono">715</td><td class="mono">1698</td><td class="mono">210</td>
+              <td class="note">5 張卡片</td>
+            </tr>
+            <tr>
+              <td class="label">Bottom progress / ticker</td>
+              <td class="mono">112</td><td class="mono">985</td><td class="mono">1698</td><td class="mono">18</td>
+              <td class="note">底部進度條或裝飾列</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 3 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <h2 class="section-title">左側 Hero 文案區</h2>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>元素</th>
+              <th class="mono">x</th>
+              <th class="mono">y</th>
+              <th class="mono">w</th>
+              <th class="mono">h</th>
+              <th>備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="label">小標 / eyebrow</td>
+              <td class="mono">112</td><td class="mono">145</td><td class="mono">498</td><td class="mono">28</td>
+              <td class="note">XXXXXX XXXXX</td>
+            </tr>
+            <tr>
+              <td class="label">主標第 1 行</td>
+              <td class="mono">112</td><td class="mono">203</td><td class="mono">498</td><td class="mono">70</td>
+              <td class="note">「以綠色製造」</td>
+            </tr>
+            <tr>
+              <td class="label">主標第 2 行</td>
+              <td class="mono">112</td><td class="mono">285</td><td class="mono">498</td><td class="mono">70</td>
+              <td class="note">「驅動美好生活」</td>
+            </tr>
+            <tr>
+              <td class="label">分隔 / 小標條</td>
+              <td class="mono">112</td><td class="mono">385</td><td class="mono">498</td><td class="mono">28</td>
+              <td class="note">cyan bar</td>
+            </tr>
+            <tr>
+              <td class="label">內文段落區</td>
+              <td class="mono">112</td><td class="mono">435</td><td class="mono">498</td><td class="mono">230</td>
+              <td class="note">約 5 行文字</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider" style="margin-top:24px;"></div>
+
+      <!-- Typography table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>文字</th>
+              <th>推估字級</th>
+              <th>字重</th>
+            </tr>
+          </thead>
+          <tbody class="typo-row">
+            <tr><td class="label">LOGO</td><td class="size">38–44px</td><td class="weight">800–900</td></tr>
+            <tr><td class="label">時間</td><td class="size">38–44px</td><td class="weight">800–900</td></tr>
+            <tr><td class="label">小標</td><td class="size">24–28px</td><td class="weight">700–800</td></tr>
+            <tr><td class="label">主標中文</td><td class="size">56–64px</td><td class="weight">900</td></tr>
+            <tr><td class="label">主標綠色關鍵字</td><td class="size">60–66px</td><td class="weight">900</td></tr>
+            <tr><td class="label">內文</td><td class="size">24–28px</td><td class="weight">700</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:16px;">
+        <span class="callout-icon">🎨</span>
+        <div>
+          主標的綠色字建議色票約為
+          <strong style="font-family:'IBM Plex Mono',monospace;">
+            <span class="swatch"><span class="swatch-dot" style="background:#2FB86A;"></span>#2FB86A</span>
+            /
+            <span class="swatch"><span class="swatch-dot" style="background:#32B86B;"></span>#32B86B</span>
+          </strong>，
+          其他主要文字為黑色
+          <strong style="font-family:'IBM Plex Mono',monospace;">
+            <span class="swatch"><span class="swatch-dot" style="background:#050505;border:1px solid #333;"></span>#050505</span>
+          </strong>。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 4 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <h2 class="section-title">右側主視覺 Hero 區</h2>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th class="mono">x</th>
+              <th class="mono">y</th>
+              <th class="mono">w</th>
+              <th class="mono">h</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="label">Hero 大圖容器</td>
+              <td class="mono">695</td><td class="mono">125</td><td class="mono">1195</td><td class="mono">560</td>
+            </tr>
+            <tr>
+              <td class="label">建議實際圖片裁切</td>
+              <td colspan="4" class="note">16:7.5 左右</td>
+            </tr>
+            <tr>
+              <td class="label">圖片安全區</td>
+              <td colspan="4" class="note">左右各 40–60px，上下各 40px</td>
+            </tr>
+            <tr>
+              <td class="label">避免重要內容</td>
+              <td colspan="4" class="note">靠左 0–80px、靠右 0–80px、底部 0–50px</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout cyan" style="margin-top:16px;">
+        <span class="callout-icon">📐</span>
+        <div>
+          這塊是整張版面的主視覺，若要放照片或生成 hero 圖，建議<strong>主體偏右或置中偏右</strong>，左側避免太複雜，因為會和左文案形成視覺競爭。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 5 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <h2 class="section-title">KPI 卡片列尺寸</h2>
+    </div>
+    <div class="section-body">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;font-family:'IBM Plex Mono',monospace;">
+        整列約從 x:112 到 x:1810，y 約 715–925
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>卡片</th>
+              <th class="mono">x</th>
+              <th class="mono">y</th>
+              <th class="mono">w</th>
+              <th class="mono">h</th>
+              <th>間距</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="label">Card 1</td><td class="mono">112</td><td class="mono">715</td><td class="mono">305</td><td class="mono">210</td><td class="note">—</td></tr>
+            <tr><td class="label">Card 2</td><td class="mono">465</td><td class="mono">715</td><td class="mono">305</td><td class="mono">210</td><td class="note">48px</td></tr>
+            <tr><td class="label">Card 3</td><td class="mono">812</td><td class="mono">715</td><td class="mono">305</td><td class="mono">210</td><td class="note">42px</td></tr>
+            <tr><td class="label">Card 4</td><td class="mono">1160</td><td class="mono">715</td><td class="mono">305</td><td class="mono">210</td><td class="note">43px</td></tr>
+            <tr><td class="label">Card 5</td><td class="mono">1508</td><td class="mono">715</td><td class="mono">305</td><td class="mono">210</td><td class="note">43px</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:16px;">
+        <span class="callout-icon">💡</span>
+        <div>
+          卡片圓角推估：<strong style="font-family:'IBM Plex Mono',monospace;">18–22px</strong><br>
+          卡片背景：
+          <span class="swatch"><span class="swatch-dot" style="background:#86D7F0;"></span></span>
+          <strong style="font-family:'IBM Plex Mono',monospace;">#86D7F0 / #8ADAF2</strong> &nbsp;|&nbsp;
+          卡片內線框：
+          <span class="swatch"><span class="swatch-dot" style="background:#2AA9D5;"></span></span>
+          <strong style="font-family:'IBM Plex Mono',monospace;">#2AA9D5 / #35AEDA</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 6 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <h2 class="section-title">單張 KPI 卡片內部結構</h2>
+    </div>
+    <div class="section-body">
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">以第一張卡為例：</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>元素</th>
+              <th>相對 x</th>
+              <th>相對 y</th>
+              <th class="mono">w</th>
+              <th class="mono">h</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="label">卡片內框</td><td class="mono">35</td><td class="mono">18</td><td class="mono">235</td><td class="mono">178</td></tr>
+            <tr><td class="label">左上 icon 方塊</td><td class="mono">35</td><td class="mono">18</td><td class="mono">48</td><td class="mono">55</td></tr>
+            <tr><td class="label">標題</td><td class="mono">105</td><td class="mono">18</td><td class="mono">150</td><td class="mono">26</td></tr>
+            <tr><td class="label">小文字區</td><td class="mono">105</td><td class="mono">48</td><td class="mono">145</td><td class="mono">42</td></tr>
+            <tr><td class="label">主要數字區</td><td class="mono">35</td><td class="mono">88</td><td class="mono">235</td><td class="mono">48</td></tr>
+            <tr><td class="label">圖表 / 內容區</td><td class="mono">35</td><td class="mono">137</td><td class="mono">235</td><td class="mono">42</td></tr>
+            <tr><td class="label">底部小字</td><td class="mono">35</td><td class="mono">180</td><td class="mono">235</td><td class="mono">16</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout cyan" style="margin-top:16px;">
+        <span class="callout-icon">🔢</span>
+        <div>
+          KPI 卡主數字字級約 <strong style="font-family:'IBM Plex Mono',monospace;">42–52px</strong>，單位字約 <strong style="font-family:'IBM Plex Mono',monospace;">20–24px</strong>。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 7 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <h2 class="section-title">CSS / Tailwind 落地建議</h2>
+    </div>
+    <div class="section-body">
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-dots">
+            <span class="d1"></span><span class="d2"></span><span class="d3"></span>
+          </div>
+          <span class="code-lang">CSS</span>
+        </div>
+        <pre><span class="tok-selector">.screen</span> {
+  <span class="tok-prop">width</span>: <span class="tok-value">1920<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">1080<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">background</span>: <span class="tok-hash">#5b5b5b</span>;
+  <span class="tok-prop">position</span>: <span class="tok-value">relative</span>;
+}
+
+<span class="tok-selector">.stage</span> {
+  <span class="tok-prop">position</span>: <span class="tok-value">absolute</span>;
+  <span class="tok-prop">left</span>: <span class="tok-value">28<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">top</span>: <span class="tok-value">24<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">width</span>: <span class="tok-value">1864<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">1024<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">background</span>: <span class="tok-hash">#fff</span>;
+}
+
+<span class="tok-selector">.safe</span> {
+  <span class="tok-prop">position</span>: <span class="tok-value">absolute</span>;
+  <span class="tok-prop">left</span>: <span class="tok-value">112<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">top</span>: <span class="tok-value">24<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">width</span>: <span class="tok-value">1698<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">1002<span class="tok-unit">px</span></span>;
+}
+
+<span class="tok-selector">.heroText</span> {
+  <span class="tok-prop">position</span>: <span class="tok-value">absolute</span>;
+  <span class="tok-prop">left</span>: <span class="tok-value">112<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">top</span>: <span class="tok-value">145<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">width</span>: <span class="tok-value">498<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">520<span class="tok-unit">px</span></span>;
+}
+
+<span class="tok-selector">.heroMedia</span> {
+  <span class="tok-prop">position</span>: <span class="tok-value">absolute</span>;
+  <span class="tok-prop">left</span>: <span class="tok-value">695<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">top</span>: <span class="tok-value">125<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">width</span>: <span class="tok-value">1195<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">560<span class="tok-unit">px</span></span>;
+}
+
+<span class="tok-selector">.kpiRow</span> {
+  <span class="tok-prop">position</span>: <span class="tok-value">absolute</span>;
+  <span class="tok-prop">left</span>: <span class="tok-value">112<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">top</span>: <span class="tok-value">715<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">width</span>: <span class="tok-value">1698<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">height</span>: <span class="tok-value">210<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">display</span>: <span class="tok-value">grid</span>;
+  <span class="tok-prop">grid-template-columns</span>: <span class="tok-value">repeat(<span class="tok-num">5</span>, 305<span class="tok-unit">px</span>)</span>;
+  <span class="tok-prop">column-gap</span>: <span class="tok-value">43<span class="tok-unit">px</span></span>;
+}
+
+<span class="tok-selector">.kpiCard</span> {
+  <span class="tok-prop">height</span>: <span class="tok-value">210<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">border-radius</span>: <span class="tok-value">20<span class="tok-unit">px</span></span>;
+  <span class="tok-prop">background</span>: <span class="tok-hash">#86d7f0</span>;
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 8 ── -->
+  <section class="section">
+    <div class="section-header">
+      <div class="section-num">8</div>
+      <h2 class="section-title">出圖 / 切圖規格建議</h2>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>素材</th>
+              <th>建議尺寸</th>
+              <th>格式</th>
+              <th>備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="label">Hero 主視覺</td>
+              <td class="mono">1195 × 560</td>
+              <td class="note">WebP / PNG / JPG</td>
+              <td class="note">不要烘焙文字</td>
+            </tr>
+            <tr>
+              <td class="label">KPI icon</td>
+              <td class="mono">64×64 或 96×96</td>
+              <td class="note">SVG / PNG</td>
+              <td class="note">透明背景</td>
+            </tr>
+            <tr>
+              <td class="label">KPI 卡片背景</td>
+              <td class="note">可用 CSS 畫</td>
+              <td class="note">不必切圖</td>
+              <td class="note">圓角 + 線框即可</td>
+            </tr>
+            <tr>
+              <td class="label">Header 裝飾條</td>
+              <td class="note">CSS</td>
+              <td class="note">不必切圖</td>
+              <td class="note">淺藍矩形</td>
+            </tr>
+            <tr>
+              <td class="label">Bottom progress</td>
+              <td class="note">CSS</td>
+              <td class="note">不必切圖</td>
+              <td class="note">分段條即可</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Summary ── -->
+  <div class="summary">
+    <div class="summary-title">OVERVIEW · 整體總結</div>
+    <p class="summary-text">
+      這張是 FHD dashboard / playback page wireframe，重點比例是：<br>
+      左文案約 <strong>30% 寬</strong>、右 hero 約 <strong>70% 寬</strong>、下方 KPI 列佔約 <strong>20% 高度</strong>。
+    </p>
+    <div class="summary-stats">
+      <div class="stat">
+        <div class="stat-label">畫布尺寸</div>
+        <div class="stat-value">1920<span>× 1080</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">有效寬度</div>
+        <div class="stat-value">1698<span>px</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">KPI 卡片數</div>
+        <div class="stat-value">5<span>張</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Hero 比例</div>
+        <div class="stat-value">16<span>: 7.5</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
