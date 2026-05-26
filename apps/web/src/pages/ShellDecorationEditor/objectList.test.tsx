@@ -8,6 +8,7 @@ import {
   deleteShellDecorationObject,
   duplicateShellDecorationObject,
   moveShellDecorationObject,
+  moveShellDecorationObjectToBoundary,
   resolveShellObjectSections,
   ShellDecorationObjectList,
   toggleShellDecorationObjectLocked,
@@ -127,6 +128,14 @@ test("moveShellDecorationObject keeps the selected object stable while swapping 
   const moved = moveShellDecorationObject(baseChannel, "footer-ornament", "forward");
 
   assert.deepEqual(moved.footerObjects.map((object) => object.id), ["footer-line", "footer-ornament"]);
+});
+
+test("moveShellDecorationObjectToBoundary keeps shell ordering coherent when selection actions jump to the front or back", () => {
+  const toFront = moveShellDecorationObjectToBoundary(baseChannel, "footer-ornament", "forward");
+  const toBack = moveShellDecorationObjectToBoundary(baseChannel, "footer-line", "backward");
+
+  assert.deepEqual(toFront.footerObjects.map((object) => object.id), ["footer-line", "footer-ornament"]);
+  assert.deepEqual(toBack.footerObjects.map((object) => object.id), ["footer-line", "footer-ornament"]);
 });
 
 test("toggleShellDecorationObjectVisible and toggleShellDecorationObjectLocked mutate only the targeted object", () => {

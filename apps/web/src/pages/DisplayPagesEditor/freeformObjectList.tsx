@@ -144,6 +144,34 @@ export function moveDisplayPageObject(
   return sorted;
 }
 
+export function moveDisplayPageObjectToBoundary(
+  objects: DisplayPageFreeformObject[],
+  objectId: string,
+  boundary: "backward" | "forward"
+) {
+  const sorted = sortDisplayPageFreeformObjects(objects).map((object) => deepClone(object));
+  const currentIndex = sorted.findIndex((object) => object.id === objectId);
+
+  if (currentIndex === -1) {
+    return objects;
+  }
+
+  const targetIndex = boundary === "backward" ? 0 : sorted.length - 1;
+  if (currentIndex === targetIndex) {
+    return sorted;
+  }
+
+  const [target] = sorted.splice(currentIndex, 1);
+  if (!target) {
+    return sorted;
+  }
+  sorted.splice(targetIndex, 0, target);
+  return sorted.map((object, index) => ({
+    ...object,
+    zIndex: index + 1
+  }));
+}
+
 export function deleteDisplayPageObject(
   objects: DisplayPageFreeformObject[],
   objectId: string,

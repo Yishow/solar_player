@@ -220,6 +220,9 @@ test("shell decoration editor can render inside an integrated editor workspace",
   assert.match(html, /data-workspace-surface="shell-preview-context"/);
   assert.match(html, /data-workspace-surface="selection-board"/);
   assert.match(html, /header-line/);
+  assert.match(html, /圖層順序/);
+  assert.match(html, /移到最下層/);
+  assert.match(html, /移到最上層/);
   assert.match(html, /儲存殼層草稿/);
   assert.match(html, /發布殼層正式版/);
 });

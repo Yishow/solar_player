@@ -184,6 +184,41 @@ export function moveShellDecorationObject(
   });
 }
 
+export function moveShellDecorationObjectToBoundary(
+  channel: ShellDecorationChannel,
+  objectId: string,
+  boundary: "backward" | "forward"
+) {
+  const found = findObject(channel, objectId);
+  if (!found) {
+    return channel;
+  }
+
+  return updateObjectsForMount(channel, found.mount, (objects) => {
+    const sorted = sortShellDecorationObjects(objects).map((object) => deepClone(object));
+    const currentIndex = sorted.findIndex((object) => object.id === objectId);
+
+    if (currentIndex === -1) {
+      return objects;
+    }
+
+    const targetIndex = boundary === "backward" ? 0 : sorted.length - 1;
+    if (currentIndex === targetIndex) {
+      return sorted;
+    }
+
+    const [target] = sorted.splice(currentIndex, 1);
+    if (!target) {
+      return sorted;
+    }
+    sorted.splice(targetIndex, 0, target);
+    return sorted.map((object, index) => ({
+      ...object,
+      zIndex: index + 1
+    }));
+  });
+}
+
 export function deleteShellDecorationObject(
   channel: ShellDecorationChannel,
   objectId: string,

@@ -336,6 +336,33 @@ test("display page editor exposes freeform object list and asset-backed inspecto
   assert.match(html, /搜尋素材/);
   assert.match(html, /開啟資產庫/);
   assert.match(html, /替代文字/);
+  assert.match(html, /圖層順序/);
+  assert.match(html, /移到最下層/);
+  assert.match(html, /前移一層/);
+  assert.match(html, /後移一層/);
+  assert.match(html, /移到最上層/);
+});
+
+test("display page editor explains when a fixed-layout media region cannot change layer order", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-hero-media"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /圖層順序由頁面模板固定/);
+  assert.match(html, /可調整來源與效果，但不能重排這個版位的上下層。/);
+  assert.doesNotMatch(html, /移到最上層/);
 });
 
 test("display page object asset picker hides shell-only assets", () => {

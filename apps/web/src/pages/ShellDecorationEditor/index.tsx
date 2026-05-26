@@ -25,6 +25,7 @@ import {
   deleteShellDecorationObject,
   duplicateShellDecorationObject,
   moveShellDecorationObject,
+  moveShellDecorationObjectToBoundary,
   resolveShellObjectSections,
   ShellDecorationObjectList,
   toggleShellDecorationObjectLocked,
@@ -418,6 +419,46 @@ export function ShellDecorationEditor({
             <WorkspaceBoard className="px-3 py-2" surface="selection-board" tone="subtle">
               <div className="font-semibold text-[var(--shell-title-ink)]">{selectedObject.id}</div>
               <div className="mt-1 text-[12px]">{formatShellMountLabel(selectedObject.mount)} / {formatShellObjectTypeLabel(selectedObject.type)}</div>
+            </WorkspaceBoard>
+            <WorkspaceBoard className="space-y-3" surface="layer-controls" tone="subtle">
+              <div className="space-y-1 text-[12px]">
+                <div className="font-semibold text-[var(--shell-title-ink)]">圖層順序</div>
+                <div>這組控制會直接同步 Header / Footer 物件列表的排序。</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                  disabled={selectedObject.locked}
+                  onClick={() => applyChannel(moveShellDecorationObjectToBoundary(channel, selectedObject.id, "backward"))}
+                >
+                  移到最下層
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                  disabled={selectedObject.locked}
+                  onClick={() => applyChannel(moveShellDecorationObject(channel, selectedObject.id, "backward"))}
+                >
+                  前移一層
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                  disabled={selectedObject.locked}
+                  onClick={() => applyChannel(moveShellDecorationObject(channel, selectedObject.id, "forward"))}
+                >
+                  後移一層
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+                  disabled={selectedObject.locked}
+                  onClick={() => applyChannel(moveShellDecorationObjectToBoundary(channel, selectedObject.id, "forward"))}
+                >
+                  移到最上層
+                </button>
+              </div>
             </WorkspaceBoard>
 
             {([

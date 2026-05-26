@@ -61,6 +61,7 @@ import {
   deleteDisplayPageObject,
   duplicateDisplayPageObject,
   moveDisplayPageObject,
+  moveDisplayPageObjectToBoundary,
   toggleDisplayPageObjectLocked,
   toggleDisplayPageObjectVisible,
   updateDisplayPageObject
@@ -1078,6 +1079,77 @@ export function DisplayPagesEditor({
       ) : null}
     </div>
   ) : null;
+  const layerAuthoringActions = selectedFreeformObject ? (
+    <WorkspaceBoard className="space-y-3" surface="layer-controls" tone="subtle">
+      <div className="space-y-1 text-[12px] text-[var(--shell-copy-ink)]">
+        <p className="font-semibold text-[var(--shell-title-ink)]">圖層順序</p>
+        <p>目前選取的自由物件會和左側物件列表共用同一份排序狀態。</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+          disabled={selectedFreeformObject.locked}
+          onClick={() =>
+            applyFreeformObjectUpdate((objects) => ({
+              objects: moveDisplayPageObjectToBoundary(objects, selectedFreeformObject.id, "backward"),
+              selectedObjectId: selectedFreeformObject.id
+            }))
+          }
+        >
+          移到最下層
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+          disabled={selectedFreeformObject.locked}
+          onClick={() =>
+            applyFreeformObjectUpdate((objects) => ({
+              objects: moveDisplayPageObject(objects, selectedFreeformObject.id, "backward"),
+              selectedObjectId: selectedFreeformObject.id
+            }))
+          }
+        >
+          前移一層
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+          disabled={selectedFreeformObject.locked}
+          onClick={() =>
+            applyFreeformObjectUpdate((objects) => ({
+              objects: moveDisplayPageObject(objects, selectedFreeformObject.id, "forward"),
+              selectedObjectId: selectedFreeformObject.id
+            }))
+          }
+        >
+          後移一層
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
+          disabled={selectedFreeformObject.locked}
+          onClick={() =>
+            applyFreeformObjectUpdate((objects) => ({
+              objects: moveDisplayPageObjectToBoundary(objects, selectedFreeformObject.id, "forward"),
+              selectedObjectId: selectedFreeformObject.id
+            }))
+          }
+        >
+          移到最上層
+        </button>
+      </div>
+    </WorkspaceBoard>
+  ) : selectedRegion && !selectedCardRegion ? (
+    <WorkspaceBoard className="space-y-1 text-[12px] text-[var(--shell-copy-ink)]" surface="blocked-state" tone="subtle">
+      <p className="font-semibold text-[var(--shell-title-ink)]">圖層順序由頁面模板固定</p>
+      <p>
+        {selectedRegion.schema.mediaEffectSurface?.status === "supported" || (inspectorRegion && inspectorRegion.id !== selectedRegion.id)
+          ? "可調整來源與效果，但不能重排這個版位的上下層。"
+          : "這個版位目前不支援任意重排，請維持既有模板層級。"}
+      </p>
+    </WorkspaceBoard>
+  ) : null;
   const geometryActions = selectedRegion?.geometry ? (
     <div className="space-y-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] p-3">
       <div className="flex flex-wrap gap-2">
@@ -1643,7 +1715,7 @@ export function DisplayPagesEditor({
               <DisplayEditorInspectorCard
                 flat
                 actions={
-                  inspectorRegion ? <div className="space-y-4">{geometryActions}{freeformObjectActions}{cardRailActions}</div> : null
+                  inspectorRegion ? <div className="space-y-4">{layerAuthoringActions}{geometryActions}{freeformObjectActions}{cardRailActions}</div> : null
                 }
                 editMode={editMode}
                 extraContent={

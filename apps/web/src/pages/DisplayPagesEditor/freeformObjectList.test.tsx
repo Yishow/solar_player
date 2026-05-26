@@ -9,6 +9,7 @@ import {
   DisplayPageObjectList,
   duplicateDisplayPageObject,
   moveDisplayPageObject,
+  moveDisplayPageObjectToBoundary,
   resolveDisplayPageObjectRows,
   toggleDisplayPageObjectLocked,
   toggleDisplayPageObjectVisible,
@@ -125,6 +126,14 @@ test("moveDisplayPageObject keeps object identity stable while swapping z-order"
   const moved = moveDisplayPageObject(baseObjects, "asset-1", "forward");
 
   assert.deepEqual(moved.map((object) => object.id), ["line-1", "icon-1", "asset-1"]);
+});
+
+test("moveDisplayPageObjectToBoundary can send a freeform object to the front or back from the selection path", () => {
+  const toFront = moveDisplayPageObjectToBoundary(baseObjects, "line-1", "forward");
+  const toBack = moveDisplayPageObjectToBoundary(baseObjects, "icon-1", "backward");
+
+  assert.deepEqual(toFront.map((object) => object.id), ["asset-1", "icon-1", "line-1"]);
+  assert.deepEqual(toBack.map((object) => object.id), ["icon-1", "line-1", "asset-1"]);
 });
 
 test("toggleDisplayPageObjectVisible and toggleDisplayPageObjectLocked mutate only the target", () => {
