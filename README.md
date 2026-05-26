@@ -83,6 +83,9 @@ Solar Display 是一套部署在 Raspberry Pi、Linux mini PC 或 kiosk browser 
 - 穩定規格：`openspec/specs/`
 - 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 - 已有明確 change 要實作時：從 repo 根目錄使用 `/spectra-apply <change-name>`
+- FHD / display workflow 入口：`docs/reference-match/fhd-workflow-entrypoints.md`
+- playback visual canonicals：`docs/reference-match/playback-visual-canonicals.md`
+- launch witness docs：`docs/reference-match/display-launch-witness-matrix.md`
 - 歷史提示詞、prototype、MQTT 參考與其他補充文件：先看 `docs/README.md` 再進入對應子目錄
 
 如果你是第一次進入這個 repo，建議順序是：先讀本 README 取得產品、指令與路徑全貌；需要補充脈絡時讀 `docs/README.md`；需要進入正式變更流程時，再查看 root `AGENTS.md`、`CLAUDE.md` 與 `openspec/`。

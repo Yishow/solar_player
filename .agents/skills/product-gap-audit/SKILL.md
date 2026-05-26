@@ -177,6 +177,15 @@ If a task does not support the MVP outcome, treat it as suspect:
 
 Keep the skill generic. Apply project-specific guardrails only when the change artifacts or implementation surface clearly match them.
 
+For this repository's FHD/display work, keep the repo vocabulary aligned with the entrypoints:
+
+- `witness batch`
+- `evidence bundle`
+- `visual canonicals`
+- `launch witness gates`
+
+If the change touches playback/FHD review surfaces, route yourself through `docs/reference-match/fhd-workflow-entrypoints.md` instead of inventing alternate names.
+
 For this repository, when a change touches `display-pages/editor`, verify the contract includes the intended route and UI surface:
 
 - `/display-pages/editor`, not a standalone page, unless explicitly requested

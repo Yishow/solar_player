@@ -54,6 +54,27 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 
+## FHD / Display Workflow 入口
+
+當 change 會碰 playback 頁面、shared display chrome、`/display-pages/editor`，或其他 FHD witness surface 時，先用同一套 workflow vocabulary 判斷 scope：
+
+- `witness batch`
+- `evidence bundle`
+- `visual canonicals`
+- `launch witness gates`
+
+入口索引在 `docs/reference-match/fhd-workflow-entrypoints.md`。
+
+實際查閱順序：
+
+1. `docs/reference-match/playback-visual-canonicals.md`
+2. `docs/display-surface-visual-review-checklist.md`
+3. `docs/reference-match/fhd-surface-split-guide.md`
+4. `docs/reference-match/fhd-evidence-bundle-template.md`
+5. `docs/reference-match/display-launch-witness-matrix.md`
+
+`CLAUDE.md` 只負責入口與 repo 規則，不在這裡複製完整 evidence workflow 或 launch witness gate 細節。
+
 ## 以現有 repo 為準的工作方式
 
 ### 指令與驗證入口

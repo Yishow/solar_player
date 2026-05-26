@@ -4,6 +4,17 @@ This README explains how the `display-asset-generation` skill should be used in 
 
 The main goal is convenience: help produce assets for the five playback pages without making the user remember repo structure, source-mode names, or asset-governance steps.
 
+## Workflow vocabulary
+
+This skill should reuse the same repo vocabulary as the entrypoints:
+
+- `witness batch`
+- `evidence bundle`
+- `visual canonicals`
+- `launch witness gates`
+
+For the canonical map, start from `docs/reference-match/fhd-workflow-entrypoints.md`.
+
 ## What this skill is for
 
 Use this skill when the user wants to:
@@ -48,10 +59,12 @@ The skill should translate these into implementation details on its own.
 When a request arrives, think in this order:
 
 1. Which page is this for?
-2. Is this media, icon, ornament, or placeholder work?
-3. What is the page already using today?
-4. What is the smallest change that fits the current implementation?
-5. Which route should be checked after the change?
+2. What is the `witness batch` for this request?
+3. Which `visual canonicals` matter for this page?
+4. Is this media, icon, ornament, or placeholder work?
+5. What is the page already using today?
+6. What is the smallest change that fits the current implementation?
+7. Which route should be checked after the change, and does any `launch witness gate` become relevant?
 
 Do not start from an ideal asset-governance process.
 Start from the page the user wants fixed.
@@ -203,10 +216,11 @@ Use fast mode when the user just wants assets produced or replaced.
 Process:
 
 1. infer page and asset type
-2. inspect the current files
-3. choose the smallest fitting source mode
-4. generate or wire the asset
-5. verify on the route
+2. name the `witness batch` and `evidence bundle` scope if the change affects route-level visuals
+3. inspect the current files
+4. choose the smallest fitting source mode
+5. generate or wire the asset
+6. verify on the route
 
 Output style:
 

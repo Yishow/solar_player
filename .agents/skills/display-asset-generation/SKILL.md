@@ -24,10 +24,11 @@ Detailed guidance and examples live in `README.md` beside this file.
 When this skill triggers:
 
 1. Infer the page and asset type from the user's wording.
-2. Inspect the current page wiring before proposing file changes.
-3. Choose the smallest asset path that matches the current repo pattern.
-4. Generate or wire only the requested asset.
-5. Verify on the target route and, when relevant, `/slideshow-preview`.
+2. If the request affects more than one page or could change route-level presentation, identify the `witness batch`, `evidence bundle`, and relevant `visual canonicals` first.
+3. Inspect the current page wiring before proposing file changes.
+4. Choose the smallest asset path that matches the current repo pattern.
+5. Generate or wire only the requested asset.
+6. Verify on the target route and, when relevant, `/slideshow-preview` and any downstream `launch witness gate`.
 
 Do not force the user to provide:
 
@@ -38,6 +39,8 @@ Do not force the user to provide:
 - prompt recipe ids
 
 Translate the user's request into those details yourself.
+
+If you need the repo's FHD workflow map, start from `docs/reference-match/fhd-workflow-entrypoints.md`.
 
 ## Fast request examples
 
