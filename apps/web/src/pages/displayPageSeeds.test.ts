@@ -22,7 +22,7 @@ test("all five display pages expose non-empty seed-backed editor config", () => 
   assert.equal(factoryCircuit.hero.copyZhLines.length, 3);
   assert.equal(overview.iconSources.power.mode, "reference-glyph");
   assert.equal(overview.heroMedia.sourceMode, "seed-default");
-  assert.equal(overview.heroMedia.effects?.edgeFade?.direction, "right");
+  assert.equal(overview.heroMedia.effects?.edgeFade?.direction, "left");
   assert.equal(overview.heroMedia.effects?.bottomFade?.enabled, true);
   assert.equal(solar.iconSources.kpiCards.generation.mode, "asset-image");
   assert.equal(solar.heroMedia.sourceMode, "seed-default");

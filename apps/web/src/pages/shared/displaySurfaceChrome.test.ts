@@ -20,10 +20,19 @@ test("shared display chrome css exposes hero typography, media fade, and ornamen
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-left::before\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-right::before\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-fade-bottom::after\s*\{/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-mist-left::before\s*\{/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-mist-bottom::after\s*\{/);
+  assert.match(displaySurfaceChromeCss, /backdrop-filter:\s*blur\(var\(--display-photo-mist-blur, 16px\)\)/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-leaf-ornament\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-line\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-ornament::before\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-ornament::after\s*\{/);
+});
+
+test("shared media effect stages keep mist layers bounded inside the owning media layer", () => {
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-stage\s*\{[\s\S]*?overflow:\s*hidden;/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-media-stage\s*\{[\s\S]*?isolation:\s*isolate;/);
+  assert.doesNotMatch(displaySurfaceChromeCss, /\.display-surface-media-mist-[^{]+\{[\s\S]*?position:\s*fixed;/);
 });
 
 test("shared display chrome config defaults preserve the prototype rhythm and ornament controls", () => {

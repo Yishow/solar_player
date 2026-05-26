@@ -12,7 +12,7 @@ export const overviewHeroMediaEffectResolverOptions: DisplayPageMediaEffectResol
       height: 0.55
     },
     edgeFade: {
-      direction: "right",
+      direction: "left",
       enabled: true,
       width: 0.56
     }

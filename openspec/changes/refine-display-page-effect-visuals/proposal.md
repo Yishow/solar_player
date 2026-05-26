@@ -23,5 +23,5 @@
 
 - Affected specs: display-page-effect-visual-fidelity
 - Affected code:
-  - Modified: apps/web/src/pages/shared/displayPageMediaStyle.ts, apps/web/src/pages/shared/displayPageMediaEffectConfig.ts, apps/web/src/pages/DisplayPagesEditor/mediaEffectFields.tsx
-  - Tests: apps/web/src/pages/shared/displayPageMediaStyle.test.ts, apps/web/src/pages/DisplayPagesEditor/mediaEffectFields.test.tsx, apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+  - Modified: apps/web/src/pages/displayPageMediaStyle.ts, apps/web/src/pages/shared/displayPageMediaEffectConfig.ts, apps/web/src/pages/shared/displaySurfaceChrome.css
+  - Tests: apps/web/src/pages/displayPageMediaStyle.test.tsx, apps/web/src/pages/displayPageSeeds.test.ts, apps/web/src/pages/shared/displaySurfaceChrome.test.ts, apps/web/src/pages/shared/liveDisplayPagePreview.test.ts, apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx

@@ -3,6 +3,8 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DisplayPageTemplateKey } from "@solar-display/shared";
+import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
+import { overviewHeroMediaEffectResolverOptions } from "./displayPageMediaEffectConfig";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewMode,
@@ -67,6 +69,41 @@ test("live display page preview renders the latest published config through the 
   assert.match(html, /唯讀預覽/);
   assert.match(html, /data-live-preview-scaled-content="true"/);
   assert.match(html, /transform:scale\(/);
+});
+
+test("live display page preview preserves shared media mist presentation from runtime renderers", () => {
+  const presentation = buildDisplayPageMediaPresentation(
+    {
+      effects: overviewHeroMediaEffectResolverOptions.defaults,
+      src: "/media/overview-hero-mist.png"
+    },
+    overviewHeroMediaEffectResolverOptions
+  );
+  const html = renderToStaticMarkup(
+    React.createElement(LiveDisplayPagePreview, {
+      definitions: [
+        {
+          id: "overview",
+          label: "Overview",
+          renderPreview: () =>
+            React.createElement("figure", {
+              className: `display-surface-media-stage ${presentation.stageClassName}`,
+              style: presentation.stageStyle
+            })
+        }
+      ],
+      pageLabel: "總覽頁",
+      state: {
+        config: {},
+        status: "ready"
+      },
+      templateKey: "overview"
+    })
+  );
+
+  assert.match(html, /display-surface-media-mist-left/);
+  assert.match(html, /--display-photo-mist-edge-width/);
+  assert.match(html, /data-live-preview-status="ready"/);
 });
 
 test("live display page preview exposes explicit fallback state when the published preview cannot resolve", () => {
