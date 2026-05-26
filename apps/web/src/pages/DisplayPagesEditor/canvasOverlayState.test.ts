@@ -165,3 +165,30 @@ test("resolveDisplayEditorOverlayState exposes passive full-canvas frames and pa
   assert.ok(state.pageGuides.some((guide) => guide.kind === "center"));
   assert.ok(state.frames.every((frame) => frame.label !== null));
 });
+
+test("resolveDisplayEditorOverlayState exposes shell band guides in shell coordinates", () => {
+  const state = resolveDisplayEditorOverlayState({
+    canvasHeight: 898,
+    canvasWidth: 1920,
+    contentOffsetTop: 110,
+    lockedRegionIds: [],
+    overlayPreset: defaultDisplayEditorOverlayPreset,
+    regions: [],
+    selectedRegion: null,
+    shellHeight: 1080
+  });
+
+  assert.deepEqual(
+    state.shellBandGuides.map((guide) => ({
+      canvasPosition: guide.canvasPosition,
+      designPosition: guide.designPosition,
+      id: guide.id
+    })),
+    [
+      { canvasPosition: 0, designPosition: 0, id: "shell-top" },
+      { canvasPosition: 110, designPosition: 110, id: "header-content" },
+      { canvasPosition: 1008, designPosition: 1008, id: "content-footer" },
+      { canvasPosition: 1080, designPosition: 1080, id: "shell-bottom" }
+    ]
+  );
+});

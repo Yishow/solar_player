@@ -67,6 +67,13 @@ export type DisplayEditorOverlayMeasurement = {
   };
 };
 
+export type DisplayEditorOverlayShellBandGuide = {
+  canvasPosition: number;
+  designPosition: number;
+  id: "content-footer" | "header-content" | "shell-bottom" | "shell-top";
+  label: string;
+};
+
 export type DisplayEditorOverlayRuler = {
   axis: "x" | "y";
   canDrag: boolean;
@@ -88,6 +95,7 @@ export type DisplayEditorOverlayState = {
     type: "drag" | "idle" | "measure-x" | "measure-y" | "resize";
   };
   axisTicks: DisplayEditorOverlayTick[];
+  contentOffsetTop: number;
   designMapping: CanvasDesignMapping;
   designSpace: {
     height: number;
@@ -106,6 +114,7 @@ export type DisplayEditorOverlayState = {
     boundaryClamped: boolean;
     distance: number;
   } | null;
+  shellBandGuides: DisplayEditorOverlayShellBandGuide[];
   snapGuides: CanvasGuide[];
   temporaryMeasureMode: boolean;
   temporaryMeasureTargetRegionId: string | null;
@@ -368,6 +377,32 @@ function resolveAxisTicks(mapping: CanvasDesignMapping, showAxes: boolean): Disp
   return ticks;
 }
 
+function resolveShellBandGuides({
+  contentHeight,
+  contentOffsetTop,
+  mapping,
+  shellHeight
+}: {
+  contentHeight: number;
+  contentOffsetTop: number;
+  mapping: CanvasDesignMapping;
+  shellHeight: number;
+}): DisplayEditorOverlayShellBandGuide[] {
+  const positions = [
+    { id: "shell-top" as const, label: "Shell top", position: 0 },
+    { id: "header-content" as const, label: "Header / content", position: contentOffsetTop },
+    { id: "content-footer" as const, label: "Content / footer", position: contentOffsetTop + contentHeight },
+    { id: "shell-bottom" as const, label: "Shell bottom", position: shellHeight }
+  ];
+
+  return positions.map((guide) => ({
+    canvasPosition: guide.position,
+    designPosition: mapCanvasPointToDesignPoint({ x: 0, y: guide.position }, mapping).y,
+    id: guide.id,
+    label: guide.label
+  }));
+}
+
 function resolveMeasurement(
   selectedRegion: ResolvedDisplayEditorRegion | null,
   mapping: CanvasDesignMapping,
@@ -448,6 +483,7 @@ export function resolveDisplayEditorOverlayState({
   activeInteraction,
   canvasHeight,
   canvasWidth,
+  contentOffsetTop = 0,
   distanceLockSession,
   lockedRegionIds,
   measurementTargetRegion,
@@ -456,6 +492,7 @@ export function resolveDisplayEditorOverlayState({
   selectedRegion,
   selectedRegionIds,
   selectionFeedbackLabel,
+  shellHeight = canvasHeight,
   temporaryMeasureMode = false
 }: {
   activeInteraction?: {
@@ -467,6 +504,7 @@ export function resolveDisplayEditorOverlayState({
   } | null;
   canvasHeight: number;
   canvasWidth: number;
+  contentOffsetTop?: number;
   distanceLockSession?: CanvasDistanceLockSession | null;
   lockedRegionIds: string[];
   measurementTargetRegion?: ResolvedDisplayEditorRegion | null;
@@ -475,11 +513,16 @@ export function resolveDisplayEditorOverlayState({
   selectedRegion: ResolvedDisplayEditorRegion | null;
   selectedRegionIds?: string[];
   selectionFeedbackLabel?: string | null;
+  shellHeight?: number;
   temporaryMeasureMode?: boolean;
 }): DisplayEditorOverlayState {
   const designSpace = resolveDisplayEditorOverlayDesignSpace(overlayPreset);
   const designMapping = resolveCanvasDesignMapping(
     { height: canvasHeight, width: canvasWidth },
+    designSpace
+  );
+  const shellDesignMapping = resolveCanvasDesignMapping(
+    { height: shellHeight, width: canvasWidth },
     designSpace
   );
   const activeSelectedRegionIds = selectedRegionIds ?? (selectedRegion ? [selectedRegion.id] : []);
@@ -503,6 +546,7 @@ export function resolveDisplayEditorOverlayState({
           type: "idle"
         },
     axisTicks: resolveAxisTicks(designMapping, overlayPreset.showAxes),
+    contentOffsetTop,
     designMapping,
     designSpace,
     displayMode: overlayPreset.displayMode,
@@ -533,6 +577,12 @@ export function resolveDisplayEditorOverlayState({
           distance: distanceLockSession.distance
         }
       : null,
+    shellBandGuides: resolveShellBandGuides({
+      contentHeight: canvasHeight,
+      contentOffsetTop,
+      mapping: shellDesignMapping,
+      shellHeight
+    }),
     snapGuides: activeInteraction?.guides.filter((guide) => Boolean(guide.targetType)) ?? [],
     temporaryMeasureMode,
     temporaryMeasureTargetRegionId: measurementTargetRegion?.id ?? null

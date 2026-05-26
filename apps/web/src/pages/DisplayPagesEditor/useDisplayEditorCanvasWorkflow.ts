@@ -440,6 +440,7 @@ export function useDisplayEditorCanvasWorkflow({
         activeInteraction: canvasInteractionFeedback,
         canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
         canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
+        contentOffsetTop: EDITOR_PREVIEW_CONTENT_TOP,
         distanceLockSession: canvasInteraction?.distanceLock ?? null,
         lockedRegionIds,
         measurementTargetRegion: temporaryMeasureTargetRegion,
@@ -448,6 +449,7 @@ export function useDisplayEditorCanvasWorkflow({
         selectedRegion,
         selectedRegionIds,
         selectionFeedbackLabel,
+        shellHeight: EDITOR_PREVIEW_SHELL_HEIGHT,
         temporaryMeasureMode
       }),
     [

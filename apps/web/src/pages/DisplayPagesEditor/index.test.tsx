@@ -402,6 +402,29 @@ test("display page editor preview keeps shell dividers visible at scaled preview
   assert.match(html, /top:110px/);
 });
 
+test("display page editor renders guide overlay across the full shell preview", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /data-shell-guide-id="shell-top"/);
+  assert.match(html, /data-shell-guide-id="header-content"[^>]*top:110px/);
+  assert.match(html, /data-shell-guide-id="content-footer"[^>]*top:1008px/);
+  assert.match(html, /data-shell-guide-id="shell-bottom"/);
+  assert.match(html, /height:1080px/);
+});
+
 test("display page editor restores the stored overlay preset when the editor opens again", () => {
   const html = withMockWindow(
     {

@@ -1192,19 +1192,6 @@ export function DisplayPagesEditor({
                     <div className="pointer-events-none relative h-full w-full">
                       {previewContent}
                     </div>
-                    <DisplayEditorCanvasOverlay
-                      isInteractive={editMode}
-                      lockedRegionIds={lockedSelectionIds}
-                      onSelectTemporaryMeasureTarget={onSelectTemporaryMeasureTarget}
-                      onStartMeasurementHandleDrag={onStartMeasurementHandleDrag}
-                      overlayState={overlayState}
-                      regions={editableItems}
-                      selectedRegionId={selectedRegion?.id ?? null}
-                      selectedRegionIds={resolvedSelectedRegionIds}
-                      temporaryMeasureMode={temporaryMeasureMode}
-                      onSelect={handleSelectRegion}
-                      onStartInteraction={onStartInteraction}
-                    />
                   </div>
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
                     <AppFooterNav
@@ -1212,6 +1199,19 @@ export function DisplayPagesEditor({
                       resolvedPlaybackRouteMeta={previewRouteMeta}
                     />
                   </div>
+                  <DisplayEditorCanvasOverlay
+                    isInteractive={editMode}
+                    lockedRegionIds={lockedSelectionIds}
+                    onSelectTemporaryMeasureTarget={onSelectTemporaryMeasureTarget}
+                    onStartMeasurementHandleDrag={onStartMeasurementHandleDrag}
+                    overlayState={overlayState}
+                    regions={editableItems}
+                    selectedRegionId={selectedRegion?.id ?? null}
+                    selectedRegionIds={resolvedSelectedRegionIds}
+                    temporaryMeasureMode={temporaryMeasureMode}
+                    onSelect={handleSelectRegion}
+                    onStartInteraction={onStartInteraction}
+                  />
                 </div>
               </div>
             }

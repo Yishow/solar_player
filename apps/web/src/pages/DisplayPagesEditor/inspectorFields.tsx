@@ -125,10 +125,26 @@ export function DisplayEditorCanvasOverlay({
           background: "rgba(95, 140, 80, 0.02)",
           borderColor: "rgba(95, 140, 80, 0.18)"
         };
+  const contentOffsetTop = overlayState.contentOffsetTop;
+  const toShellY = (value: number) => value + contentOffsetTop;
 
   return (
     <>
       <div className="pointer-events-none absolute inset-0">
+        {overlayState.shellBandGuides.map((guide) => (
+          <div
+            key={guide.id}
+            className="absolute border-[rgba(40,57,31,0.46)]"
+            data-shell-guide-id={guide.id}
+            style={{
+              borderTopStyle: "dashed",
+              borderTopWidth: guide.id === "shell-top" || guide.id === "shell-bottom" ? "2px" : "1px",
+              left: 0,
+              right: 0,
+              top: `${guide.canvasPosition}px`
+            }}
+          />
+        ))}
         {overlayState.pageGuides.map((guide) => (
           <div
             key={`${guide.axis}-${guide.kind}-${guide.designPosition}`}
@@ -148,7 +164,7 @@ export function DisplayEditorCanvasOverlay({
                     borderTopWidth: guide.kind === "center" ? "2px" : "1px",
                     left: 0,
                     right: 0,
-                    top: `${guide.canvasPosition}px`
+                    top: `${toShellY(guide.canvasPosition)}px`
                   }
             }
           />
@@ -172,7 +188,7 @@ export function DisplayEditorCanvasOverlay({
                       borderTopWidth: "2px",
                       left: 0,
                       right: 0,
-                      top: `${guide.position}px`
+                      top: `${toShellY(guide.position)}px`
                     }
               }
             />
@@ -181,8 +197,8 @@ export function DisplayEditorCanvasOverlay({
                 className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[10px] font-semibold text-white"
                 style={
                   guide.axis === "x"
-                    ? { left: `${guide.position + 6}px`, top: "8px" }
-                    : { left: "8px", top: `${guide.position + 6}px` }
+                    ? { left: `${guide.position + 6}px`, top: `${toShellY(8)}px` }
+                    : { left: "8px", top: `${toShellY(guide.position) + 6}px` }
                 }
               >
                 {guide.label}
@@ -198,7 +214,7 @@ export function DisplayEditorCanvasOverlay({
               style={{
                 height: `${overlayState.selectionBounds.height}px`,
                 left: `${overlayState.selectionBounds.left}px`,
-                top: `${overlayState.selectionBounds.top}px`,
+                top: `${toShellY(overlayState.selectionBounds.top)}px`,
                 width: `${overlayState.selectionBounds.width}px`
               }}
             />
@@ -207,7 +223,7 @@ export function DisplayEditorCanvasOverlay({
                 className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[11px] font-semibold text-white"
                 style={{
                   left: `${overlayState.selectionBounds.left + overlayState.selectionBounds.width / 2}px`,
-                  top: `${Math.max(8, overlayState.selectionBounds.top - 12)}px`,
+                  top: `${Math.max(8, toShellY(overlayState.selectionBounds.top) - 12)}px`,
                   transform: "translateX(-50%)"
                 }}
               >
@@ -219,7 +235,7 @@ export function DisplayEditorCanvasOverlay({
         {overlayState.sessionDistanceLock ? (
           <span
             className="absolute rounded-full bg-[rgba(201,136,26,0.9)] px-2 py-1 text-[11px] font-semibold text-white"
-            style={{ left: "16px", top: "36px" }}
+            style={{ left: "16px", top: `${toShellY(36)}px` }}
           >
             {overlayState.sessionDistanceLock.axis.toUpperCase()} 間距 {overlayState.sessionDistanceLock.distance}
             {overlayState.sessionDistanceLock.boundaryClamped ? " / 邊界優先" : ""}
@@ -233,11 +249,11 @@ export function DisplayEditorCanvasOverlay({
               tick.axis === "x"
                 ? {
                     left: `${tick.canvasPosition + 4}px`,
-                    top: "6px"
+                    top: `${toShellY(6)}px`
                   }
                 : {
                     left: "6px",
-                    top: `${tick.canvasPosition + 4}px`
+                    top: `${toShellY(tick.canvasPosition) + 4}px`
                   }
             }
           >
@@ -250,7 +266,7 @@ export function DisplayEditorCanvasOverlay({
               className="absolute rounded-full bg-[rgba(40,57,31,0.84)] px-2 py-1 text-[11px] font-semibold text-white"
               style={{
                 left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
-                top: `${Math.max(8, overlayState.measurement.rect.top - 8)}px`,
+                top: `${Math.max(8, toShellY(overlayState.measurement.rect.top) - 8)}px`,
                 transform: "translateX(-50%)"
               }}
             >
@@ -260,7 +276,7 @@ export function DisplayEditorCanvasOverlay({
               className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
               style={{
                 left: `${overlayState.measurement.constraintRect.left + (overlayState.measurement.rect.left - overlayState.measurement.constraintRect.left) / 2}px`,
-                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2}px`,
+                top: `${toShellY(overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2)}px`,
                 transform: "translate(-100%, -50%)"
               }}
             >
@@ -270,7 +286,7 @@ export function DisplayEditorCanvasOverlay({
               className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
               style={{
                 left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width + (overlayState.measurement.constraintRect.left + overlayState.measurement.constraintRect.width - (overlayState.measurement.rect.left + overlayState.measurement.rect.width)) / 2}px`,
-                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2}px`,
+                top: `${toShellY(overlayState.measurement.rect.top + overlayState.measurement.rect.height / 2)}px`,
                 transform: "translateY(-50%)"
               }}
             >
@@ -280,7 +296,7 @@ export function DisplayEditorCanvasOverlay({
               className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
               style={{
                 left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
-                top: `${overlayState.measurement.constraintRect.top + (overlayState.measurement.rect.top - overlayState.measurement.constraintRect.top) / 2}px`,
+                top: `${toShellY(overlayState.measurement.constraintRect.top + (overlayState.measurement.rect.top - overlayState.measurement.constraintRect.top) / 2)}px`,
                 transform: "translate(-50%, -100%)"
               }}
             >
@@ -290,7 +306,7 @@ export function DisplayEditorCanvasOverlay({
               className="absolute rounded-full bg-[rgba(255,255,255,0.92)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]"
               style={{
                 left: `${overlayState.measurement.rect.left + overlayState.measurement.rect.width / 2}px`,
-                top: `${overlayState.measurement.rect.top + overlayState.measurement.rect.height + (overlayState.measurement.constraintRect.top + overlayState.measurement.constraintRect.height - (overlayState.measurement.rect.top + overlayState.measurement.rect.height)) / 2}px`,
+                top: `${toShellY(overlayState.measurement.rect.top + overlayState.measurement.rect.height + (overlayState.measurement.constraintRect.top + overlayState.measurement.constraintRect.height - (overlayState.measurement.rect.top + overlayState.measurement.rect.height)) / 2)}px`,
                 transform: "translateX(-50%)"
               }}
             >
@@ -309,7 +325,7 @@ export function DisplayEditorCanvasOverlay({
                       borderTopStyle: "solid",
                       borderTopWidth: "2px",
                       left: `${Math.min(ruler.start.x, ruler.end.x)}px`,
-                      top: `${ruler.start.y}px`,
+                      top: `${toShellY(ruler.start.y)}px`,
                       width: `${Math.abs(ruler.end.x - ruler.start.x)}px`
                     }
                   : {
@@ -317,7 +333,7 @@ export function DisplayEditorCanvasOverlay({
                       borderLeftWidth: "2px",
                       height: `${Math.abs(ruler.end.y - ruler.start.y)}px`,
                       left: `${ruler.start.x}px`,
-                      top: `${Math.min(ruler.start.y, ruler.end.y)}px`
+                      top: `${toShellY(Math.min(ruler.start.y, ruler.end.y))}px`
                     }
               }
             />
@@ -329,7 +345,7 @@ export function DisplayEditorCanvasOverlay({
               data-ruler-label-placement={ruler.labelPlacement}
               style={{
                 left: `${ruler.labelPosition.x}px`,
-                top: `${ruler.labelPosition.y}px`,
+                top: `${toShellY(ruler.labelPosition.y)}px`,
                 transform: ruler.axis === "x" ? "translate(-50%, -50%)" : "translate(-50%, -50%)"
               }}
             >
@@ -347,7 +363,7 @@ export function DisplayEditorCanvasOverlay({
             className="absolute h-4 w-4 rounded-full border-2 border-white bg-[#c9881a]"
             style={{
               left: `${ruler.handlePosition.x}px`,
-              top: `${ruler.handlePosition.y}px`,
+              top: `${toShellY(ruler.handlePosition.y)}px`,
               transform: "translate(-50%, -50%)"
             }}
             onPointerDown={(event) => {
@@ -383,7 +399,7 @@ export function DisplayEditorCanvasOverlay({
               borderColor: isSelected ? "rgba(63, 122, 52, 0.9)" : isVisible ? frameStyle.borderColor : "transparent",
               height: `${region.geometry.height}px`,
               left: `${region.geometry.left}px`,
-              top: `${region.geometry.top}px`,
+              top: `${toShellY(region.geometry.top)}px`,
               width: `${region.geometry.width}px`,
               zIndex: region.parentId ? (isSelected ? 65 : 55) : isSelected ? 60 : 45
             }}
