@@ -28,6 +28,14 @@ test("image management editor surfaces playlist runtime controls and server-driv
   assert.match(imageManagementSource, /deleteBlocked=\{\(assetReferences\?\.blockingIssues\.length \?\? 0\) > 0\}/);
 });
 
+test("image management repositions the page around governance and editor handoff instead of presenting a second asset-library home", () => {
+  assert.match(imageManagementContentSource, /輪播治理與素材交接/);
+  assert.match(imageManagementContentSource, /Governance &amp; Editor Handoff/);
+  assert.match(imageManagementContentSource, /to="\/display-pages\/editor\?workspace=assets"/);
+  assert.match(imageManagementContentSource, /素材替換、版面配置與批次整理請前往展示頁編輯器資產工作區。/);
+  assert.doesNotMatch(imageManagementContentSource, /素材庫\s*<small>Asset Library/);
+});
+
 test("image management blocks cross-selection context switches when the current draft is still dirty", () => {
   assert.match(imageManagementSource, /const handleSelectImage = \(nextImageId: number\) => {/);
   assert.match(imageManagementSource, /hasSelectedImageManagementDraftChanges\(/);

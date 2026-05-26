@@ -4,6 +4,7 @@ import type {
   ImageAsset
 } from "@solar-display/shared";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { Link } from "react-router-dom";
 import { Switch } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import {
@@ -193,8 +194,19 @@ export function ImageManagementContent({
 
       <section className="settings-card im-card-library">
         <div className="settings-card__title">
-          素材庫
-          <small>Asset Library · {viewModel.summary.totalImages} 張</small>
+          輪播治理與素材交接
+          <small>Governance &amp; Editor Handoff · {viewModel.summary.totalImages} 張</small>
+        </div>
+
+        <div className="im-handoff">
+          <div className="im-handoff__copy">
+            <strong>素材替換、版面配置與批次整理請前往展示頁編輯器資產工作區。</strong>
+            <small>這裡保留 playlist runtime、素材健康、封面與引用治理；要換圖或整理版面，請到 editor workspace。</small>
+          </div>
+          <Link className="im-handoff__link" to="/display-pages/editor?workspace=assets">
+            前往展示頁編輯器
+            <small>Asset Workspace</small>
+          </Link>
         </div>
 
         <div className="im-stats">
@@ -453,7 +465,7 @@ export function ImageManagementContent({
           <div className="im-empty">
             <strong>尚未選取圖片</strong>
             <br />
-            <span style={{ fontSize: 13, marginTop: 6, display: "inline-block" }}>從左側素材庫選擇一張圖片，即可調整標題、描述、輪播納入與封面設定。</span>
+            <span style={{ fontSize: 13, marginTop: 6, display: "inline-block" }}>從左側治理清單選擇一張圖片，即可檢查 playlist runtime、引用與封面設定。要替換素材或調整版面，請前往展示頁編輯器資產工作區。</span>
           </div>
         )}
       </section>
