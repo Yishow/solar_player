@@ -13,6 +13,15 @@
 
 此文件回答的是「目前每條 route 的 closeout 狀態與證據」，不是重新定義 migration scope。
 
+## Launch Status Handoff
+
+如果 review 已進入 launch readiness：
+
+- authoritative launch status：`docs/reference-match/display-launch-witness-matrix.md`
+- procedure / rerun guide：`docs/reference-match/display-launch-verification-pack.md`
+
+本文件保留 closeout evidence 與 supporting input，不再充當 authoritative launch status ledger。
+
 ## Playback Protected-Canonical Inputs
 
 對 `/overview`、`/solar`、`/factory-circuit`、`/images`、`/sustainability` 做 visual review 時，除了本文件的 closeout evidence，還要額外檢查：

@@ -209,3 +209,26 @@ tests:
   - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
   - apps/web/src/pages/DisplayPagesEditor/cardRailAuthoring.test.ts
 -->
+
+---
+### Requirement: Page-specific authoring coverage is not launch-complete without runtime parity witness
+
+Page-specific authoring coverage SHALL NOT be treated as launch-complete unless the same page also has a documented runtime parity witness showing that editor-authored content survives save, reset, preview, and playback use.
+
+#### Scenario: Editor coverage requires runtime parity before launch
+
+- **WHEN** a page exposes typed fields and editable regions in `Display Pages Editor`
+- **THEN** launch review still requires a runtime parity witness for that page
+- **AND** editor-only completion does not automatically imply launch readiness
+
+<!-- @trace
+source: add-display-launch-witness-gates
+updated: 2026-05-27
+code:
+  - openspec/specs/display-editor-page-authoring-coverage/spec.md
+  - openspec/specs/display-launch-witness-gates/spec.md
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/reference-match/display-launch-verification-pack.md
+tests:
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+-->

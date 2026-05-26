@@ -31,6 +31,15 @@
 
 本文件最初建立於 2026-05-13，作為全站 reference migration 的 baseline audit。經過 shared shell、display pages、settings pages 與最後三頁 migration 後，目前 14 條 route 都已有對應 reference page，且現況可判定為 14 條 route 全部 `close`、0 條 `matched`；authoritative closeout 狀態以 `docs/reference-match/all-pages-checklist.md` 為準。
 
+## Launch Status Role
+
+這份文件現在只負責 launch review 的 supporting input / supporting reference。
+
+- authoritative launch status：`docs/reference-match/display-launch-witness-matrix.md`
+- procedure / rerun pack：`docs/reference-match/display-launch-verification-pack.md`
+
+本文件不再維護 page-by-page pass/fail/blocked。
+
 ## Reference HTML Pages
 
 1. `01-overview.html`
