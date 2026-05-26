@@ -97,6 +97,7 @@ Each prompt MUST be ready for a new session to run with `spectra-apply` and MUST
 - code review requirement
 - bug-fix loop requirement
 - Traditional Chinese commit requirement
+- a next-change gate that forbids starting the next change before review, fixes, verification, and commit are complete
 
 Use this format:
 
@@ -133,6 +134,7 @@ Completion requirements:
 - Fix any review findings or bugs before claiming completion.
 - Re-run affected verification after fixes.
 - Commit only files related to this change with a Traditional Chinese commit message.
+- Do not start the next change until this change has passed verification, code review, bug fixes, re-verification, and zh-TW commit.
 - Final report must say either:
   - Verified: On [route], the user can now [MVP outcome].
   - Not product-verified yet: [reason].
@@ -200,6 +202,18 @@ If the implementation discovers the contract is wrong or incomplete, stop and up
 
 Do not report complete from `spectra validate`, checked tasks, or tests alone.
 
+When multiple changes are provided, the generated prompts MUST make the boundary between changes explicit:
+
+```text
+Between-change gate:
+- Stop after this change.
+- Review the diff before starting the next change.
+- Fix review findings and bugs.
+- Re-run affected verification.
+- Commit only this change with a Traditional Chinese commit message.
+- Only after the commit succeeds may the next change begin.
+```
+
 Each `spectra-apply` prompt must require this completion sequence:
 
 1. Implement only the current change.
@@ -208,7 +222,8 @@ Each `spectra-apply` prompt must require this completion sequence:
 4. Fix bugs, regressions, missing tests, and MVP drift.
 5. Re-run affected verification.
 6. Commit only files related to the current change with a Traditional Chinese commit message.
-7. Report completion only in this form:
+7. Stop; do not begin the next change until the commit succeeds.
+8. Report completion only in this form:
 
 ```text
 Verified: On [route], the user can now [MVP outcome].

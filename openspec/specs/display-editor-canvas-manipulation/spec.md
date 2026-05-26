@@ -203,26 +203,28 @@ tests:
 ---
 ### Requirement: Render page-aligned guide overlays in the editor viewport with design-space mapping
 
-The system SHALL render a dashed guide overlay inside the `DisplayEditorCanvasCard` viewport whenever edit mode is enabled for a supported display page. The overlay SHALL interpret guide geometry in a configurable design space whose default size is `1920x1080`, and it SHALL map that design space into the current viewport so the guides remain aligned while the operator switches pages, zooms, or pans.
+The system SHALL render a dashed guide overlay across the full `DisplayEditorCanvasCard` shell preview whenever edit mode is enabled for a supported display page. The overlay SHALL include header, content, and footer shell bands, SHALL interpret guide geometry in a configurable design space whose default size is `1920x1080`, and SHALL map that design space into the current viewport so the guides remain aligned while the operator switches pages, zooms, or pans.
 
 #### Scenario: Operator opens edit mode on a supported page
 
 - **WHEN** the operator enables edit mode on a supported display page
 - **THEN** the canvas shows that page's guide overlay
 - **AND** the guides remain aligned with the preview content after viewport scaling, zoom, and pan actions
+- **AND** dashed shell band guides are visible in the header and footer areas of the same preview shell
 
 ##### Example: Overview page keeps guides aligned after zoom
 
 - **GIVEN** `/display-pages/editor?page=overview` is open in edit mode
 - **WHEN** the operator zooms the preview to `125%` and pans the canvas
-- **THEN** the hero, content, and card-band guides remain anchored to the same Overview layout positions
+- **THEN** the hero, content, header, and footer guides remain anchored to the same Overview shell layout positions
 - **AND** no separate unscaled guide layer appears outside the preview surface
 
 #### Scenario: Viewport is smaller than the configured design space
 
 - **WHEN** the editor viewport is smaller than the configured design-space width or height
-- **THEN** the guide overlay still renders inside the current viewport
+- **THEN** the guide overlay still renders inside the current full shell preview
 - **AND** its labels and measurements continue to use design-space coordinates instead of raw viewport pixels
+- **AND** header/content/footer boundary guides remain visible after scaling
 
 ##### Example: FHD guides are mapped into a narrower preview card
 
@@ -230,58 +232,83 @@ The system SHALL render a dashed guide overlay inside the `DisplayEditorCanvasCa
 - **AND** the current `DisplayEditorCanvasCard` viewport is rendered at half that width
 - **WHEN** edit mode is active
 - **THEN** the dashed guide overlay is visibly compressed into the preview card
-- **AND** the guide geometry still corresponds to the original `1920x1080` layout
+- **AND** the guide geometry still corresponds to the original `1920x1080` shell and content layout
 
 
 <!-- @trace
-source: add-display-editor-dimension-guides
+source: fix-display-editor-shell-guide-overlay
 updated: 2026-05-26
 code:
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
-  - apps/web/src/pages/shared/liveDisplayPagePreview.tsx
-  - apps/web/src/pages/Images/images.css
-  - apps/web/src/pages/shared/displaySurfaceNodes.css
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
-  - apps/web/src/styles/global.css
   - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
-  - apps/web/src/pages/SlideshowPreview/preview.css
-  - apps/web/src/pages/Overview/overview.css
-  - apps/web/src/components/TitleBlock.tsx
-  - apps/web/src/pages/Overview/index.tsx
-  - .codex/hooks.json
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
-  - apps/web/src/pages/Solar/solar.css
-  - AGENTS.md
-  - apps/web/src/pages/Sustainability/sustainability.css
-  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
-  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/localization.ts
-  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/ShellDecorationEditor/objectList.tsx
+  - apps/server/src/db/seed.ts
+  - apps/web/src/pages/shared/DisplayLeafOrnament.tsx
+  - apps/server/src/routes/imagesSupport.ts
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
   - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - docs/display-surface-visual-review-checklist.md
-  - apps/web/src/styles/tokens.css
-  - apps/web/src/components/PageContainer.tsx
+  - packages/shared/src/displayEditorSchema.ts
+  - packages/shared/src/types.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
+  - packages/shared/src/displayPageMediaEffects.ts
+  - apps/web/src/pages/displayPageMediaStyle.ts
+  - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/localization.ts
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/server/src/services/displayPageAssetService.ts
+  - apps/web/src/pages/Images/displayPageConfig.ts
+  - apps/web/src/pages/ShellDecorationEditor/assetPicker.tsx
+  - packages/shared/src/shellDecorations.ts
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - apps/web/src/pages/DisplayPagesEditor/freeformObjectList.tsx
+  - apps/web/src/app/router.tsx
+  - apps/server/src/services/displaySeedAssetManifest.ts
+  - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
+  - apps/web/src/pages/shared/displayIconSourceConfig.ts
+  - apps/web/src/pages/ShellDecorationEditor/canvasAuthoring.ts
+  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/components/ShellDecorationLayer.tsx
+  - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/services/displaySeedAssetBootstrapService.ts
+  - apps/web/src/pages/AssetLibrary/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
+  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
+  - apps/web/src/components/displayPageIconResolver.tsx
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/pages/ShellDecorationEditor/index.tsx
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/shared/displayPageChromeConfig.ts
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/web/src/pages/ShellDecorationEditor/previewCanvas.tsx
 tests:
-  - apps/web/src/styles/tokens.test.ts
-  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/freeformObjectList.test.tsx
+  - packages/shared/src/displayPageMediaEffects.test.ts
+  - apps/web/src/pages/displayPageSeeds.test.ts
+  - apps/web/src/pages/displayPageMediaStyle.test.tsx
+  - apps/web/src/pages/ShellDecorationEditor/index.test.tsx
   - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.test.ts
-  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
-  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/ShellDecorationEditor/canvasAuthoring.test.ts
+  - apps/web/src/components/ShellDecorationLayer.test.ts
+  - apps/web/src/components/displayPageIconResolver.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.test.tsx
+  - apps/server/src/routes/images.test.ts
+  - apps/web/src/pages/AssetLibrary/index.test.tsx
   - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
-  - apps/web/src/pages/SlideshowPreview/index.test.ts
-  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/server/src/services/displaySeedAssetBootstrapService.test.ts
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/server/src/routes/display-ops.test.ts
+  - apps/web/src/pages/shared/DisplayLeafOrnament.test.tsx
+  - apps/web/src/pages/ShellDecorationEditor/objectList.test.tsx
   - apps/web/src/pages/shared/liveDisplayPagePreview.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
 -->
 
 ---
