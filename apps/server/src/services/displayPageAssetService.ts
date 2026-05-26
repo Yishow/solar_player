@@ -77,6 +77,36 @@ function normalizeMediaBindingForStorage(binding: UnknownRecord) {
   return normalizeDisplayPageMediaBindingBySourceMode(cloneValue(binding));
 }
 
+function isManagedVisualSource(value: UnknownRecord) {
+  return value.mode === "managed-asset" && ("assetId" in value || "fallbackSrc" in value || "src" in value);
+}
+
+function normalizeManagedVisualSourceForStorage(source: UnknownRecord) {
+  const normalized = cloneValue(source);
+
+  if (normalized.mode === "managed-asset") {
+    delete normalized.src;
+  }
+
+  return normalized;
+}
+
+function resolveManagedVisualSource(source: UnknownRecord) {
+  const resolved = normalizeManagedVisualSourceForStorage(source);
+  const assetId = resolved.assetId;
+
+  if (resolved.mode === "managed-asset" && (typeof assetId === "number" || typeof assetId === "string")) {
+    const { filename } = readManagedAssetResolution(assetId);
+    if (filename) {
+      resolved.src = `/uploads/images/${filename}`;
+    } else {
+      delete resolved.src;
+    }
+  }
+
+  return resolved;
+}
+
 function resolveMediaBinding(binding: UnknownRecord) {
   const resolved = normalizeDisplayPageMediaBindingBySourceMode(cloneValue(binding));
   const sourceMode = resolveDisplayPageMediaSourceMode(resolved);
@@ -107,10 +137,11 @@ type DisplayPageAssetReference = {
 
 function mapDisplayPageRegions(
   value: unknown,
-  transformBinding: (binding: UnknownRecord) => UnknownRecord
+  transformBinding: (binding: UnknownRecord) => UnknownRecord,
+  transformVisualSource: (source: UnknownRecord) => UnknownRecord
 ): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => mapDisplayPageRegions(item, transformBinding));
+    return value.map((item) => mapDisplayPageRegions(item, transformBinding, transformVisualSource));
   }
 
   if (!isPlainObject(value)) {
@@ -121,19 +152,23 @@ function mapDisplayPageRegions(
     return transformBinding(value);
   }
 
+  if (isManagedVisualSource(value)) {
+    return transformVisualSource(value);
+  }
+
   const output: UnknownRecord = {};
   for (const [key, child] of Object.entries(value)) {
-    output[key] = mapDisplayPageRegions(child, transformBinding);
+    output[key] = mapDisplayPageRegions(child, transformBinding, transformVisualSource);
   }
   return output;
 }
 
 export function normalizeDisplayPageRegionsForStorage<T extends Record<string, unknown>>(regions: T) {
-  return mapDisplayPageRegions(regions, normalizeMediaBindingForStorage) as T;
+  return mapDisplayPageRegions(regions, normalizeMediaBindingForStorage, normalizeManagedVisualSourceForStorage) as T;
 }
 
 export function resolveDisplayPageRegions<T extends Record<string, unknown>>(regions: T) {
-  return mapDisplayPageRegions(regions, resolveMediaBinding) as T;
+  return mapDisplayPageRegions(regions, resolveMediaBinding, resolveManagedVisualSource) as T;
 }
 
 export function collectDisplayPageAssetFindings(
@@ -280,9 +315,25 @@ export function collectDisplayPageAssetReferences(
 
     if (isDisplayPageMediaBinding(value)) {
       if (resolveDisplayPageMediaSourceMode(value) !== "managed-asset") {
+        for (const [key, child] of Object.entries(value)) {
+          scan(child, path ? `${path}.${key}` : key);
+        }
         return;
       }
 
+      const assetId = value.assetId;
+      if (typeof assetId === "number" || typeof assetId === "string") {
+        references.push({
+          assetId,
+          bindingId: path,
+          kind: "display-page",
+          pageId
+        });
+      }
+      return;
+    }
+
+    if (isManagedVisualSource(value)) {
       const assetId = value.assetId;
       if (typeof assetId === "number" || typeof assetId === "string") {
         references.push({
@@ -345,7 +396,11 @@ export function collectShellDecorationAssetReferences(raw: string | null | undef
 
     for (const group of groups) {
       for (const object of group.objects) {
-        if (!isPlainObject(object) || object.type !== "asset-image" || !isPlainObject(object.source)) {
+        if (!isPlainObject(object) || !isPlainObject(object.source)) {
+          continue;
+        }
+
+        if (object.type !== "asset-image" && object.type !== "ornament-image") {
           continue;
         }
 

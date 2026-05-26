@@ -18,6 +18,7 @@ import {
 
 export const displayPageIconSourceModes = [
   "asset-image",
+  "managed-asset",
   "reference-glyph",
   "page-icon-key"
 ] as const;
@@ -38,6 +39,13 @@ export type DisplayPageIconSource =
       src?: string;
     }
   | {
+      alt?: string;
+      assetId?: number | string | null;
+      fallbackSrc?: string;
+      mode: "managed-asset";
+      src?: string;
+    }
+  | {
       glyphName?: string;
       mode: "reference-glyph";
     }
@@ -53,6 +61,7 @@ function option<T extends DisplayEditorOptionValue>(label: string, value: T) {
 
 export const displayPageIconSourceModeOptions = [
   option("Asset Image", "asset-image"),
+  option("Managed Asset", "managed-asset"),
   option("Reference Glyph", "reference-glyph"),
   option("Page Icon Key", "page-icon-key")
 ];
@@ -81,6 +90,19 @@ export function createAssetImageIconSource(src: string, alt?: string): DisplayPa
     alt,
     mode: "asset-image",
     src
+  };
+}
+
+export function createManagedAssetIconSource(
+  assetId: number | string,
+  fallbackSrc?: string,
+  alt?: string
+): DisplayPageIconSource {
+  return {
+    alt,
+    assetId,
+    fallbackSrc,
+    mode: "managed-asset"
   };
 }
 
@@ -120,9 +142,20 @@ export function isSustainabilityRegistryIconKey(
   return typeof value === "string" && sustainabilityIconKeys.includes(value as SustainabilityRegistryIconKey);
 }
 
+function isValidManagedAssetReference(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function isValidDisplayPageIconSource(source: DisplayPageIconSource) {
   if (source.mode === "asset-image") {
     return typeof source.src === "string" && source.src.trim().length > 0;
+  }
+
+  if (source.mode === "managed-asset") {
+    return isValidManagedAssetReference(source.assetId);
   }
 
   if (source.mode === "reference-glyph") {
@@ -174,6 +207,29 @@ export function buildDisplayPageIconSourceFields({
       label: "Image Alt",
       path: [...path, "alt"],
       visibleWhen: visibleWhen(modePath, "asset-image")
+    },
+    {
+      constraints: { required: true },
+      fieldType: "asset",
+      id: `${idPrefix}-icon-managed-asset`,
+      label: "Managed Icon Asset",
+      path: [...path, "assetId"],
+      placeholder: "image_assets.id",
+      visibleWhen: visibleWhen(modePath, "managed-asset")
+    },
+    {
+      fieldType: "text",
+      id: `${idPrefix}-icon-managed-fallback-src`,
+      label: "Managed Icon Fallback Src",
+      path: [...path, "fallbackSrc"],
+      visibleWhen: visibleWhen(modePath, "managed-asset")
+    },
+    {
+      fieldType: "text",
+      id: `${idPrefix}-icon-managed-alt`,
+      label: "Managed Icon Alt",
+      path: [...path, "alt"],
+      visibleWhen: visibleWhen(modePath, "managed-asset")
     },
     {
       fieldType: "select",

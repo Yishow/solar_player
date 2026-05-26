@@ -120,7 +120,30 @@ export type LeafOrnamentChromeConfig = {
   offsetY: number;
   opacity: number;
   scale: number;
+  source: LeafOrnamentSource;
 };
+
+export type LeafOrnamentSource =
+  | {
+      mode: "builtin";
+      ornamentKey: "leaf";
+    }
+  | {
+      assetId?: number | string | null;
+      fallbackSrc?: string;
+      mode: "managed-asset";
+      ornamentKey: "leaf";
+      src?: string;
+    };
+
+function isLeafOrnamentSource(value: unknown): value is LeafOrnamentSource {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const source = value as Partial<LeafOrnamentSource>;
+  return source.mode === "managed-asset" || source.mode === "builtin";
+}
 
 export function createLeafOrnamentChromeConfig(
   overrides: Partial<Record<keyof LeafOrnamentChromeConfig, unknown>> = {}
@@ -132,7 +155,8 @@ export function createLeafOrnamentChromeConfig(
       typeof overrides.opacity === "number" && Number.isFinite(overrides.opacity) && overrides.opacity >= 0 && overrides.opacity <= 1
         ? overrides.opacity
         : 0.42,
-    scale: resolveNonNegativeNumber(overrides.scale, 1)
+    scale: resolveNonNegativeNumber(overrides.scale, 1),
+    source: isLeafOrnamentSource(overrides.source) ? overrides.source : { mode: "builtin", ornamentKey: "leaf" }
   };
 }
 
@@ -143,7 +167,35 @@ export function buildLeafOrnamentFields({
   idPrefix: string;
   path: DisplayEditorPath;
 }): DisplayEditorFieldSchema[] {
+  const sourceModePath = [...path, "source", "mode"];
+
   return [
+    {
+      fieldType: "select",
+      id: `${idPrefix}-leaf-source-mode`,
+      label: "Leaf Source Mode",
+      options: [
+        { label: "Built-in Leaf", value: "builtin" },
+        { label: "Managed Asset", value: "managed-asset" }
+      ],
+      path: sourceModePath
+    },
+    {
+      constraints: { required: true },
+      fieldType: "asset",
+      id: `${idPrefix}-leaf-managed-asset`,
+      label: "Leaf Managed Asset",
+      path: [...path, "source", "assetId"],
+      placeholder: "image_assets.id",
+      visibleWhen: { equals: "managed-asset", path: sourceModePath }
+    },
+    {
+      fieldType: "text",
+      id: `${idPrefix}-leaf-managed-fallback-src`,
+      label: "Leaf Fallback Src",
+      path: [...path, "source", "fallbackSrc"],
+      visibleWhen: { equals: "managed-asset", path: sourceModePath }
+    },
     numberField(`${idPrefix}-leaf-offset-x`, "Leaf Offset X", [...path, "offsetX"], { step: 1 }),
     numberField(`${idPrefix}-leaf-offset-y`, "Leaf Offset Y", [...path, "offsetY"], { step: 1 }),
     numberField(`${idPrefix}-leaf-opacity`, "Leaf Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 }),

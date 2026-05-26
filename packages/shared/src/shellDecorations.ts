@@ -41,6 +41,8 @@ export type ShellDecorationAssetImageSource = {
 };
 
 export type ShellDecorationOrnamentImageSource = {
+  assetId?: DisplayPageManagedAssetId | null;
+  fallbackSrc?: string;
   kind: "ornament-image";
   ornamentKey: string;
 };

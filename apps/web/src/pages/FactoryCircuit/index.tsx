@@ -24,6 +24,7 @@ import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
+import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
@@ -265,8 +266,9 @@ export function FactoryCircuit({
         }}
       />
 
-      <div
+      <DisplayLeafOrnament
         className="factory-circuit-leaf-watermark display-surface-leaf-ornament"
+        config={resolvedConfig.chrome.ornaments.leaf}
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,

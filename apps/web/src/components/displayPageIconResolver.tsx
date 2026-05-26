@@ -19,6 +19,13 @@ function resolveRenderableSource(
   source: DisplayPageIconSource,
   seedSource: DisplayPageIconSource
 ): DisplayPageIconSource {
+  if (source.mode === "managed-asset") {
+    const hasResolvedSource =
+      (typeof source.src === "string" && source.src.trim().length > 0) ||
+      (typeof source.fallbackSrc === "string" && source.fallbackSrc.trim().length > 0);
+    return hasResolvedSource ? source : seedSource;
+  }
+
   if (isValidDisplayPageIconSource(source)) {
     return source;
   }
@@ -44,6 +51,16 @@ export function renderDisplayPageIcon({
     isValidDisplayPageIconSource(resolvedSource)
   ) {
     return <img alt={resolvedSource.alt ?? alt ?? ""} className={className} src={resolvedSource.src} />;
+  }
+
+  if (resolvedSource.mode === "managed-asset") {
+    const src = typeof resolvedSource.src === "string" && resolvedSource.src.trim().length > 0
+      ? resolvedSource.src
+      : resolvedSource.fallbackSrc;
+
+    if (typeof src === "string" && src.trim().length > 0) {
+      return <img alt={resolvedSource.alt ?? alt ?? ""} className={className} src={src} />;
+    }
   }
 
   if (resolvedSource.mode === "reference-glyph" && isReferenceGlyphName(resolvedSource.glyphName)) {

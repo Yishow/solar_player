@@ -20,6 +20,7 @@ import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   overviewHeroMediaEffectResolverOptions
 } from "../shared/displayPageMediaEffectConfig";
@@ -128,8 +129,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   return (
     <section className="overview-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
-      <div
+      <DisplayLeafOrnament
         className="overview-leaf-watermark display-surface-leaf-ornament"
+        config={resolvedConfig.chrome.ornaments.leaf}
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,

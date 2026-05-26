@@ -34,12 +34,12 @@ function resolveRenderableShellDecorationObjects(args: {
       return false;
     }
 
-    if (args.failedObjectIds.has(object.id)) {
+    if (args.failedObjectIds.has(object.id) && object.type === "asset-image") {
       return false;
     }
 
     if (object.type === "ornament-image") {
-      return object.source.ornamentKey === "leaf";
+      return object.source.ornamentKey === "leaf" || typeof object.source.fallbackSrc === "string";
     }
 
     return true;
@@ -93,6 +93,7 @@ function LeafShellDecoration() {
 
 function renderShellDecorationObject(
   object: ShellDecorationObject,
+  hasAssetFailed: boolean,
   onAssetError: (objectId: string) => void
 ): ReactNode {
   const style = buildObjectStyle(object);
@@ -125,6 +126,28 @@ function renderShellDecorationObject(
           onAssetError(object.id);
         }}
         src={object.source.fallbackSrc}
+        style={{
+          ...style,
+          objectFit: "contain"
+        }}
+      />
+    );
+  }
+
+  const ornamentAssetSrc = typeof object.source.fallbackSrc === "string" ? object.source.fallbackSrc.trim() : "";
+
+  if (!hasAssetFailed && ornamentAssetSrc.length > 0) {
+    return (
+      <img
+        key={object.id}
+        data-shell-decoration-object-id={object.id}
+        data-shell-decoration-object-type={object.type}
+        alt=""
+        draggable={false}
+        onError={() => {
+          onAssetError(object.id);
+        }}
+        src={ornamentAssetSrc}
         style={{
           ...style,
           objectFit: "contain"
@@ -215,7 +238,9 @@ export function ShellDecorationLayer({
       {plane === "both" || plane === "background" ? (
         <ShellDecorationPlane
           mount={mount}
-          objects={background.map((object) => renderShellDecorationObject(object, markAssetFailed))}
+          objects={background.map((object) =>
+            renderShellDecorationObject(object, failedObjectIds.has(object.id), markAssetFailed)
+          )}
           plane="background"
           zIndex={0}
         />
@@ -223,7 +248,9 @@ export function ShellDecorationLayer({
       {plane === "both" || plane === "foreground" ? (
         <ShellDecorationPlane
           mount={mount}
-          objects={foreground.map((object) => renderShellDecorationObject(object, markAssetFailed))}
+          objects={foreground.map((object) =>
+            renderShellDecorationObject(object, failedObjectIds.has(object.id), markAssetFailed)
+          )}
           plane="foreground"
           zIndex={SHELL_CHROME_CONTENT_Z_INDEX + 1}
         />

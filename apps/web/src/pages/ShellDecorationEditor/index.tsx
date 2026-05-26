@@ -497,13 +497,42 @@ export function ShellDecorationEditor({
             ) : null}
 
             {selectedObject.type === "ornament-image" ? (
-              <label className="grid gap-2">
-                <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">Ornament</span>
-                <select
-                  className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                  value={selectedObject.source.ornamentKey}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
+              <>
+                <label className="grid gap-2">
+                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">Ornament</span>
+                  <select
+                    className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                    value={selectedObject.source.ornamentKey}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      updateSelectedObject((object) => {
+                        if (object.type !== "ornament-image") {
+                          return object;
+                        }
+
+                        return {
+                          ...object,
+                          source: {
+                            ...object.source,
+                            kind: "ornament-image",
+                            ornamentKey: nextValue
+                          }
+                        };
+                      });
+                    }}
+                  >
+                    <option value="leaf">Leaf</option>
+                  </select>
+                </label>
+                <ShellDecorationAssetPicker
+                  options={assetOptions}
+                  value={typeof selectedObject.source.assetId === "number" ? selectedObject.source.assetId : null}
+                  onChange={(assetId) => {
+                    const selectedAsset = assetOptions.find((option) => option.assetId === assetId);
+                    if (!selectedAsset) {
+                      return;
+                    }
+
                     updateSelectedObject((object) => {
                       if (object.type !== "ornament-image") {
                         return object;
@@ -512,16 +541,16 @@ export function ShellDecorationEditor({
                       return {
                         ...object,
                         source: {
+                          assetId,
+                          fallbackSrc: selectedAsset.fallbackSrc,
                           kind: "ornament-image",
-                          ornamentKey: nextValue
+                          ornamentKey: object.source.ornamentKey
                         }
                       };
                     });
                   }}
-                >
-                  <option value="leaf">Leaf</option>
-                </select>
-              </label>
+                />
+              </>
             ) : null}
           </div>
         ) : (

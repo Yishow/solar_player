@@ -463,6 +463,70 @@ test("DELETE /api/images/:id blocks removal when the asset is still referenced b
   }
 });
 
+test("DELETE /api/images/:id blocks removal when the asset is used by a managed shell ornament", async () => {
+  const asset = seedManagedImageAsset("live-shell-ornament.png");
+  const app = await buildApp();
+
+  try {
+    const draftSave = await saveShellDecorationDraft(app, {
+      footerObjects: [
+        {
+          frame: { height: 48, left: 28, top: 8, width: 48 },
+          id: "footer-managed-leaf",
+          locked: false,
+          metadata: {},
+          mount: "footer",
+          source: {
+            assetId: asset.assetId,
+            fallbackSrc: `/uploads/images/${asset.filename}`,
+            kind: "ornament-image",
+            ornamentKey: "leaf"
+          },
+          style: {},
+          type: "ornament-image",
+          visible: true,
+          zIndex: 1
+        }
+      ],
+      headerObjects: []
+    });
+    assert.equal(draftSave.statusCode, 200);
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/shell-decorations/publish",
+      payload: { publishedBy: "ops.live" }
+    });
+    assert.equal(publishResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/images/${asset.assetId}`
+    });
+
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as {
+      references?: {
+        references: Array<{ bindingId: string | null; kind: string; stage: string }>;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, false);
+    assert.equal(
+      body.references?.references.some(
+        (reference) =>
+          reference.kind === "shell-decoration" &&
+          reference.bindingId === "footer-managed-leaf" &&
+          reference.stage === "live"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("DELETE /api/images/:id allows removal when the asset is only referenced by a draft display page", async () => {
   const asset = seedManagedImageAsset("draft-only-reference.png");
   upsertStageConfig({

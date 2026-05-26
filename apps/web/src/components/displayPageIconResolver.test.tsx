@@ -90,3 +90,38 @@ test("display page icon resolver keeps solar asset fallback output on img when a
   assert.match(html, /src="\/assets\/solar-kpi\.png"/);
   assert.match(html, /alt="Solar KPI"/);
 });
+
+test("display page icon resolver renders managed asset sources before seed glyphs", () => {
+  const html = renderIcon(
+    {
+      alt: "Managed Icon",
+      assetId: 42,
+      fallbackSrc: "/uploads/images/managed-icon.png",
+      mode: "managed-asset"
+    },
+    {
+      glyphName: "bolt",
+      mode: "reference-glyph"
+    }
+  );
+
+  assert.match(html, /<img/);
+  assert.match(html, /src="\/uploads\/images\/managed-icon\.png"/);
+  assert.match(html, /alt="Managed Icon"/);
+});
+
+test("display page icon resolver falls back when a managed asset source has not resolved", () => {
+  const html = renderIcon(
+    {
+      assetId: 42,
+      mode: "managed-asset"
+    },
+    {
+      glyphName: "bolt",
+      mode: "reference-glyph"
+    }
+  );
+
+  assert.match(html, /<svg/);
+  assert.doesNotMatch(html, /managed-asset/);
+});

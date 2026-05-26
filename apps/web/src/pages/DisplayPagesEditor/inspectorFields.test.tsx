@@ -672,6 +672,32 @@ test("display editor inspector surfaces validation issues for invalid icon sourc
   ]);
 });
 
+test("display editor inspector exposes managed asset controls for card icon sources", () => {
+  const solarConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  solarConfig.iconSources.kpiCards.generation = {
+    assetId: 42,
+    fallbackSrc: "/uploads/images/generation-icon.png",
+    mode: "managed-asset"
+  };
+
+  const [generationRegion] = resolveDisplayEditorRegions(
+    solarConfig as unknown as Record<string, unknown>,
+    solarDisplayPageEditorRegions.filter((region) => region.id === "solar-kpi-generation"),
+    createSolarDisplayPageSeedConfig("/solar-hero.png") as unknown as Record<string, unknown>
+  );
+
+  assert.ok(generationRegion);
+  assert.equal(
+    generationRegion.fields.some(
+      (field) =>
+        field.schema.id === "generation-icon-managed-asset" &&
+        field.path.join(".") === "iconSources.kpiCards.generation.assetId" &&
+        field.value === 42
+    ),
+    true
+  );
+});
+
 test("display editor inspector resolves persisted card-style controls for eligible shared-card regions", () => {
   const overviewConfig = createOverviewDisplayPageSeedConfig("/overview-hero.png");
   const solarConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");

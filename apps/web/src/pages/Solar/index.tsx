@@ -11,6 +11,7 @@ import {
 } from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
@@ -206,8 +207,9 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
   return (
     <section className="solar-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
-      <div
+      <DisplayLeafOrnament
         className="solar-leaf-watermark display-surface-leaf-ornament"
+        config={resolvedConfig.chrome.ornaments.leaf}
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,

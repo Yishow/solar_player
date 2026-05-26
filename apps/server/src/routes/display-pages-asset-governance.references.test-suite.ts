@@ -238,6 +238,90 @@ test("draft config surfaces a missing managed asset finding when the reference n
   }
 });
 
+test("draft config resolves managed visual primitive sources and reports missing references", async () => {
+  const app = await buildApp();
+  const managedIcon = seedManagedImageAsset("managed-kpi-icon.png");
+  const managedLeaf = seedManagedImageAsset("managed-leaf.png");
+
+  try {
+    const saveResponse = await saveDraftConfig(app, "solar", {
+      chrome: {
+        ornaments: {
+          leaf: {
+            offsetX: 0,
+            offsetY: 0,
+            opacity: 0.4,
+            scale: 1,
+            source: {
+              assetId: managedLeaf.assetId,
+              fallbackSrc: "/uploads/images/seed-leaf.png",
+              mode: "managed-asset",
+              ornamentKey: "leaf",
+              src: "/should-not-persist.png"
+            }
+          }
+        }
+      },
+      iconSources: {
+        kpiCards: {
+          generation: {
+            assetId: managedIcon.assetId,
+            fallbackSrc: "/uploads/images/seed-icon.png",
+            mode: "managed-asset",
+            src: "/should-not-persist.png"
+          }
+        }
+      }
+    });
+
+    assert.equal(saveResponse.statusCode, 200);
+
+    const storedRow = getDatabase()
+      .prepare("SELECT config_json FROM display_page_stage_configs WHERE page_key = ? AND stage = ?")
+      .get("solar", "draft") as { config_json: string };
+    const storedConfig = JSON.parse(storedRow.config_json) as {
+      regions: {
+        chrome: { ornaments: { leaf: { source: { src?: string } } } };
+        iconSources: { kpiCards: { generation: { src?: string } } };
+      };
+    };
+    assert.equal("src" in storedConfig.regions.iconSources.kpiCards.generation, false);
+    assert.equal("src" in storedConfig.regions.chrome.ornaments.leaf.source, false);
+
+    getDatabase().prepare("DELETE FROM image_assets WHERE id = ?").run(managedIcon.assetId);
+
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/solar/draft"
+    });
+    assert.equal(readResponse.statusCode, 200);
+    const readBody = readResponse.json() as {
+      config: {
+        assetFindings?: Array<{ assetId: number; bindingId: string; pageId: string; reason: string }>;
+        regions: {
+          chrome: { ornaments: { leaf: { source: { src?: string } } } };
+          iconSources: { kpiCards: { generation: { src?: string } } };
+        };
+      };
+    };
+
+    assert.equal(readBody.config.regions.iconSources.kpiCards.generation.src, undefined);
+    assert.equal(readBody.config.regions.chrome.ornaments.leaf.source.src, `/uploads/images/${managedLeaf.filename}`);
+    assert.equal(
+      readBody.config.assetFindings?.some(
+        (finding) =>
+          finding.assetId === managedIcon.assetId &&
+          finding.bindingId === "iconSources.kpiCards.generation" &&
+          finding.pageId === "solar" &&
+          finding.reason === "missing-asset"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("draft validation reports missing managed asset references as warnings", async () => {
   const app = await buildApp();
   const managedAsset = seedManagedImageAsset();

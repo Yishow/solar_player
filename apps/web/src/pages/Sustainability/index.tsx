@@ -26,6 +26,7 @@ import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStor
 import { trendSeries } from "../../mocks/metrics";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
@@ -309,8 +310,9 @@ export function Sustainability({
         </div>
       </div>
 
-      <div
+      <DisplayLeafOrnament
         className="sustainability-leaf-watermark display-surface-leaf-ornament"
+        config={resolvedConfig.chrome.ornaments.leaf}
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,

@@ -109,3 +109,24 @@ test("ShellDecorationLayer skips invisible, mount-mismatched, and unresolved orn
   assert.doesNotMatch(html, /wrong-mount/);
   assert.doesNotMatch(html, /unknown-ornament/);
 });
+
+test("ShellDecorationLayer renders managed shell ornament images before built-in ornament fallback", () => {
+  const managedOrnament = ornamentObject("managed-leaf", 1);
+  managedOrnament.source = {
+    assetId: 42,
+    fallbackSrc: "/uploads/images/managed-leaf.png",
+    kind: "ornament-image",
+    ornamentKey: "leaf"
+  };
+
+  const html = renderToStaticMarkup(
+    React.createElement(ShellDecorationLayer, {
+      mount: "footer",
+      objects: [managedOrnament]
+    })
+  );
+
+  assert.match(html, /<img/);
+  assert.match(html, /data-shell-decoration-object-id="managed-leaf"/);
+  assert.match(html, /src="\/uploads\/images\/managed-leaf\.png"/);
+});

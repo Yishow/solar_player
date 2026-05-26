@@ -57,7 +57,11 @@ test("shared display chrome config defaults preserve the prototype rhythm and or
     offsetX: 0,
     offsetY: 0,
     opacity: 0.42,
-    scale: 1
+    scale: 1,
+    source: {
+      mode: "builtin",
+      ornamentKey: "leaf"
+    }
   });
 });
 
