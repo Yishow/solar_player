@@ -76,8 +76,10 @@ export function resolveShellDecorationAssetOptions(assets: ImageAsset[]): ShellD
 
     return [{
       assetId: asset.id,
+      category: asset.category,
       fallbackSrc,
-      label: buildShellDecorationAssetLabel(asset)
+      label: buildShellDecorationAssetLabel(asset),
+      usageScope: asset.usageScope
     }];
   });
 }
@@ -123,12 +125,14 @@ export function ShellDecorationEditor({
   initialDraft,
   initialImages,
   initialSelectedObjectId,
+  onOpenAssetWorkspace,
   renderPreview = true
 }: {
   embedded?: boolean;
   initialDraft?: ShellDecorationEnvelope;
   initialImages?: ImageAsset[];
   initialSelectedObjectId?: string | null;
+  onOpenAssetWorkspace?: (context: string | null) => void;
   renderPreview?: boolean;
 }) {
   const [draft, setDraft] = useState<ShellDecorationEnvelope>(initialDraft ?? createEmptyDraftEnvelope());
@@ -470,6 +474,7 @@ export function ShellDecorationEditor({
 
             {selectedObject.type === "asset-image" ? (
               <ShellDecorationAssetPicker
+                onOpenAssetWorkspace={() => onOpenAssetWorkspace?.(selectedObject.id)}
                 options={assetOptions}
                 value={typeof selectedObject.source.assetId === "number" ? selectedObject.source.assetId : null}
                 onChange={(assetId) => {
@@ -525,6 +530,7 @@ export function ShellDecorationEditor({
                   </select>
                 </label>
                 <ShellDecorationAssetPicker
+                  onOpenAssetWorkspace={() => onOpenAssetWorkspace?.(selectedObject.id)}
                   options={assetOptions}
                   value={typeof selectedObject.source.assetId === "number" ? selectedObject.source.assetId : null}
                   onChange={(assetId) => {

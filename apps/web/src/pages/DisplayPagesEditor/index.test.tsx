@@ -9,7 +9,11 @@ import {
   sustainabilityDisplayPageEditorRegions
 } from "../Sustainability/displayPageConfig";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
-import { DisplayPagesEditor, type DisplayEditorPageDefinition } from "./index";
+import {
+  DisplayPagesEditor,
+  resolveDisplayPageObjectAssetOptions,
+  type DisplayEditorPageDefinition
+} from "./index";
 import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
 import { DisplayEditorLeftPanel } from "./regionTree";
 
@@ -28,7 +32,25 @@ const initialImages: ImageAsset[] = [
     mimeType: "image/png",
     originalName: "page-object.png",
     title: "Page Object Asset",
+    usageScope: "page-only",
     width: 800
+  },
+  {
+    aspectRatio: 1,
+    description: "shell-only asset",
+    displayDuration: 12,
+    displayOrder: 2,
+    fileSize: 4096,
+    filename: "shell-only.png",
+    height: 640,
+    id: 8,
+    includedInSlideshow: false,
+    isCover: false,
+    mimeType: "image/png",
+    originalName: "shell-only.png",
+    title: "Shell Only Asset",
+    usageScope: "shell-only",
+    width: 640
   }
 ];
 
@@ -255,10 +277,22 @@ test("display page editor exposes freeform object list and asset-backed inspecto
   assert.match(html, /新增圖片/);
   assert.match(html, /新增圖示/);
   assert.match(html, /自由圖片物件/);
-  assert.match(html, /目前素材：Page Object Asset/);
-  assert.match(html, /選擇圖片素材/);
-  assert.match(html, /在資產庫開啟/);
+  assert.match(html, /Page Object Asset/);
+  assert.match(html, /data-asset-picker-card="7"/);
+  assert.doesNotMatch(html, /data-asset-picker-card="8"/);
+  assert.match(html, /搜尋素材/);
+  assert.match(html, /開啟資產庫/);
   assert.match(html, /替代文字/);
+});
+
+test("display page object asset picker hides shell-only assets", () => {
+  const options = resolveDisplayPageObjectAssetOptions(initialImages);
+
+  assert.deepEqual(
+    options.map((option) => option.assetId),
+    [7]
+  );
+  assert.equal(options[0]?.usageScope, "page-only");
 });
 
 test("display page editor exposes the asset library as an integrated workspace", () => {

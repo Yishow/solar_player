@@ -59,13 +59,31 @@ const initialAssets: ImageAsset[] = [
     mimeType: "image/png",
     originalName: "shell-ornament.png",
     title: "殼層裝飾",
+    usageScope: "shell-only",
     width: 600
+  },
+  {
+    aspectRatio: 1.25,
+    description: "page image",
+    displayDuration: 15,
+    displayOrder: 2,
+    fileSize: 1024,
+    filename: "page-only.png",
+    height: 400,
+    id: 8,
+    includedInSlideshow: false,
+    isCover: false,
+    mimeType: "image/png",
+    originalName: "page-only.png",
+    title: "頁面專用",
+    usageScope: "page-only",
+    width: 500
   },
   {
     aspectRatio: 1.5,
     description: "missing file",
     displayDuration: 15,
-    displayOrder: 2,
+    displayOrder: 3,
     fileSize: 1024,
     filename: null,
     height: 400,
@@ -135,6 +153,52 @@ test("resolveShellDecorationAssetOptions keeps asset-image picking typed and exc
     [7]
   );
   assert.equal(options[0]?.fallbackSrc, "http://localhost:3000/uploads/images/shell-ornament.png");
+  assert.equal(options[0]?.usageScope, "shell-only");
+});
+
+test("shell decoration editor asset picker renders gallery cards and preserves workspace context", () => {
+  const draft: ShellDecorationEnvelope = {
+    ...initialDraft,
+    headerObjects: [
+      {
+        frame: { height: 40, left: 120, top: 12, width: 120 },
+        id: "header-logo",
+        locked: false,
+        metadata: {},
+        mount: "header",
+        source: {
+          assetId: 7,
+          fallbackSrc: "http://localhost:3000/uploads/images/shell-ornament.png",
+          kind: "asset-image"
+        },
+        style: {},
+        type: "asset-image",
+        visible: true,
+        zIndex: 1
+      }
+    ]
+  };
+  const openedContexts: Array<string | null> = [];
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?workspace=shell"] },
+      React.createElement(ShellDecorationEditor, {
+        embedded: true,
+        initialDraft: draft,
+        initialImages: initialAssets,
+        initialSelectedObjectId: "header-logo",
+        onOpenAssetWorkspace: (context) => openedContexts.push(context),
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /data-asset-picker-card="7"/);
+  assert.doesNotMatch(html, /data-asset-picker-card="8"/);
+  assert.match(html, /aria-pressed="true"/);
+  assert.match(html, /搜尋素材/);
+  assert.match(html, /開啟資產庫/);
 });
 
 test("shell decoration editor can render inside an integrated editor workspace", () => {
@@ -188,7 +252,7 @@ test("shell decoration editor load, save, and publish helpers stay scoped to sha
 
   assert.deepEqual(calls, ["load-draft", "load-images"]);
   assert.equal(loaded.draft.version, 3);
-  assert.equal(loaded.images.length, 2);
+  assert.equal(loaded.images.length, 3);
 
   const saved = await saveShellDecorationEditorDraft(initialDraft, async (channel, baseVersion) => {
     calls.push(`save:${baseVersion}:${channel.headerObjects.length}:${channel.footerObjects.length}`);

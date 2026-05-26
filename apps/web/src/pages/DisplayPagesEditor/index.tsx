@@ -95,15 +95,17 @@ export type DisplayEditorPageDefinition = {
 
 type DisplayPageObjectAssetOption = {
   assetId: number;
+  category?: string | null;
   fallbackSrc: string;
   label: string;
+  usageScope?: string | null;
 };
 
 function resolveAssetFallbackSrc(asset: ImageAsset) {
   return asset.filename ? buildApiUrl(`/uploads/images/${asset.filename}`) : null;
 }
 
-function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPageObjectAssetOption[] {
+export function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPageObjectAssetOption[] {
   return assets.flatMap((asset) => {
     const fallbackSrc = resolveAssetFallbackSrc(asset);
     if (!fallbackSrc || asset.usageScope === "shell-only") {
@@ -113,8 +115,10 @@ function resolveDisplayPageObjectAssetOptions(assets: ImageAsset[]): DisplayPage
     return [
       {
         assetId: asset.id,
+        category: asset.category,
         fallbackSrc,
-        label: buildShellDecorationAssetLabel(asset)
+        label: buildShellDecorationAssetLabel(asset),
+        usageScope: asset.usageScope
       }
     ];
   });
@@ -774,6 +778,7 @@ export function DisplayPagesEditor({
       {selectedFreeformObject.type !== "line" ? (
         <div className="space-y-2">
           <ShellDecorationAssetPicker
+            onOpenAssetWorkspace={() => handleSelectWorkspace("assets", selectedFreeformObject.id)}
             options={assetOptions}
             value={typeof selectedFreeformObject.source.assetId === "number" ? selectedFreeformObject.source.assetId : null}
             onChange={(assetId) => {
@@ -809,13 +814,6 @@ export function DisplayPagesEditor({
               });
             }}
           />
-          <button
-            type="button"
-            className="rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold text-[var(--shell-copy-ink)]"
-            onClick={() => handleSelectWorkspace("assets", selectedFreeformObject.type)}
-          >
-            在資產庫開啟
-          </button>
           {selectedFreeformObject.source.fallbackSrc ? (
             <p className="text-[12px] text-[var(--shell-copy-ink)]">
               目前素材：{assetOptions.find((option) => option.assetId === selectedFreeformObject.source.assetId)?.label ?? selectedFreeformObject.source.fallbackSrc}
@@ -920,6 +918,7 @@ export function DisplayPagesEditor({
             embedded
             initialDraft={initialShellDecorationDraft}
             initialImages={initialShellDecorationImages}
+            onOpenAssetWorkspace={(context) => handleSelectWorkspace("assets", context ?? "shell")}
             renderPreview={renderPreview}
           />
         </div>
