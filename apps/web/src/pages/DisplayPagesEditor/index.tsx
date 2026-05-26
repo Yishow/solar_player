@@ -3,7 +3,8 @@ import {
   type DisplayPageFreeformObject,
   type DisplayPageCardRailTemplateKey,
   type ImageAsset,
-  type DisplayPageTemplateKey
+  type DisplayPageTemplateKey,
+  type ShellDecorationEnvelope
 } from "@solar-display/shared";
 import React from "react";
 import type { ReactElement } from "react";
@@ -22,6 +23,7 @@ import { buildApiUrl, getImages } from "../../services/api";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
 import { DisplayPagePublishingPanels } from "./publishingStatus";
 import { AssetLibrary } from "../AssetLibrary";
+import { ShellDecorationEditor } from "../ShellDecorationEditor";
 import { DisplayEditorCanvasCard } from "./canvasCard";
 import {
   alignCanvasSelections,
@@ -79,7 +81,7 @@ import {
 } from "./useDisplayEditorCanvasWorkflow";
 
 type DisplayEditorField = { id: string; label: string; onChange: (value: string) => void; step?: number; type: "number" | "text"; value: number | string };
-type DisplayEditorWorkspace = "assets" | "editor";
+type DisplayEditorWorkspace = "assets" | "editor" | "shell";
 type DisplayEditorRect = { height?: number; left: number; top: number; width: number };
 export type DisplayEditorRegion = { description?: string; fields: DisplayEditorField[]; id: string; label: string; rect?: DisplayEditorRect };
 export type DisplayEditorPageDefinition = {
@@ -132,6 +134,8 @@ export function DisplayPagesEditor({
   editMode: controlledEditMode,
   initialEditorState,
   initialImages,
+  initialShellDecorationDraft,
+  initialShellDecorationImages,
   onEditModeChange,
   initialPublishingStateByPage,
   pageDefinitions = fallbackPageDefinitions,
@@ -145,6 +149,8 @@ export function DisplayPagesEditor({
     selectedRegionIds?: string[];
   };
   initialImages?: ImageAsset[];
+  initialShellDecorationDraft?: ShellDecorationEnvelope;
+  initialShellDecorationImages?: ImageAsset[];
   initialPublishingStateByPage?: DisplayPagePublishingStateMap;
   onEditModeChange?: (nextEditMode: boolean) => void;
   pageDefinitions?: DisplayEditorPageDefinition[];
@@ -161,7 +167,12 @@ export function DisplayPagesEditor({
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
-  const selectedWorkspace: DisplayEditorWorkspace = searchParams.get("workspace") === "assets" ? "assets" : "editor";
+  const selectedWorkspace: DisplayEditorWorkspace =
+    searchParams.get("workspace") === "assets"
+      ? "assets"
+      : searchParams.get("workspace") === "shell"
+        ? "shell"
+        : "editor";
   const selectedPageId =
     requestedPageId && pageIdSet.has(requestedPageId)
       ? requestedPageId
@@ -473,8 +484,8 @@ export function DisplayPagesEditor({
   };
   const handleSelectWorkspace = (workspace: DisplayEditorWorkspace, context?: string) => {
     const nextParams = new URLSearchParams(searchParams);
-    if (workspace === "assets") {
-      nextParams.set("workspace", "assets");
+    if (workspace !== "editor") {
+      nextParams.set("workspace", workspace);
       if (context) {
         nextParams.set("assetContext", context);
       }
@@ -677,7 +688,8 @@ export function DisplayPagesEditor({
       </button>
       {([
         { label: "頁面編輯", value: "editor" },
-        { label: "資產庫", value: "assets" }
+        { label: "資產庫", value: "assets" },
+        { label: "殼層裝飾", value: "shell" }
       ] as const).map((workspace) => (
         <button
           key={workspace.value}
@@ -880,6 +892,35 @@ export function DisplayPagesEditor({
             embedded
             initialAssets={initialImages ? images : undefined}
             onReturnToEditor={() => handleSelectWorkspace("editor")}
+          />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (selectedWorkspace === "shell") {
+    return (
+      <PageContainer
+        density="playback"
+        shellPrimitive="management-scaffold"
+        title={editorRouteMeta.title}
+        subtitle={editorRouteMeta.subtitle}
+        description="在展示頁編輯器內管理 header 與 footer 的共用殼層裝飾。"
+        spacing="compact"
+        aside={pageTabs}
+      >
+        <div className="h-full min-h-0 overflow-y-auto">
+          <div className="mb-3">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
+              Shared Shell Decorations
+            </p>
+            <h2 className="mt-1 text-[24px] font-semibold text-[var(--shell-title-ink)]">共用殼層裝飾</h2>
+          </div>
+          <ShellDecorationEditor
+            embedded
+            initialDraft={initialShellDecorationDraft}
+            initialImages={initialShellDecorationImages}
+            renderPreview={renderPreview}
           />
         </div>
       </PageContainer>

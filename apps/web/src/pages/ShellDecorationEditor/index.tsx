@@ -119,11 +119,13 @@ export async function publishShellDecorationEditorDraft(
 }
 
 export function ShellDecorationEditor({
+  embedded = false,
   initialDraft,
   initialImages,
   initialSelectedObjectId,
   renderPreview = true
 }: {
+  embedded?: boolean;
   initialDraft?: ShellDecorationEnvelope;
   initialImages?: ImageAsset[];
   initialSelectedObjectId?: string | null;
@@ -250,6 +252,279 @@ export function ShellDecorationEditor({
     applyChannel(updateShellDecorationObject(channel, selectedObjectId, updater));
   };
 
+  const content = (
+    <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_320px] gap-4">
+      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
+        <div className="grid gap-2">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
+            新增物件
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addMount} onChange={(event) => setAddMount(event.target.value as ShellDecorationMount)}>
+              <option value="header">Header</option>
+              <option value="footer">Footer</option>
+            </select>
+            <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addType} onChange={(event) => setAddType(event.target.value as ShellDecorationObject["type"])}>
+              <option value="line">Line</option>
+              <option value="asset-image">Asset Image</option>
+              <option value="ornament-image">Ornament Image</option>
+            </select>
+          </div>
+          <button type="button" className="rounded-full bg-[#5f8c50] px-3 py-2 text-[13px] font-semibold text-white" onClick={handleAddObject}>
+            新增物件
+          </button>
+        </div>
+
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          <ShellDecorationObjectList
+            channel={channel}
+            onDelete={handleDelete}
+            onDuplicate={(objectId) => {
+              const next = duplicateShellDecorationObject(channel, objectId);
+              applyChannel(next.channel, next.selectedObjectId);
+            }}
+            onMoveBackward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "backward"))}
+            onMoveForward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "forward"))}
+            onSelect={setSelectedObjectId}
+            onToggleLocked={(objectId) => applyChannel(toggleShellDecorationObjectLocked(channel, objectId))}
+            onToggleVisible={(objectId) => applyChannel(toggleShellDecorationObjectVisible(channel, objectId))}
+            selectedObjectId={selectedObjectId}
+          />
+        </div>
+      </section>
+
+      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(255,255,255,0.54)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
+              預覽
+            </div>
+            <div className="text-[13px] text-[var(--shell-copy-ink)]">共用殼層草稿會直接套用到 header / footer。</div>
+          </div>
+          <div className="text-right text-[12px] text-[var(--shell-copy-ink)]">
+            <div>{dirty ? "殼層尚未儲存" : "殼層已同步"}</div>
+            <div>version {draft.version}</div>
+          </div>
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          {renderPreview ? <ShellDecorationPreviewCanvas channel={channel} selectedObjectId={selectedObjectId} /> : null}
+        </div>
+        <div className="mt-3 grid gap-2 text-[12px]">
+          <div
+            className={[
+              "rounded-[18px] border px-3 py-2",
+              errorMessage
+                ? "border-[rgba(180,82,52,0.25)] bg-[rgba(180,82,52,0.08)] text-[#8f452d]"
+                : dirty
+                  ? "border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] text-[#8e6410]"
+                  : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-copy-ink)]"
+            ].join(" ")}
+          >
+            {errorMessage || message}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-55"
+              disabled={isLoading || isSaving || !dirty}
+              onClick={() => void handleSave()}
+            >
+              {isSaving ? "儲存中..." : "儲存殼層草稿"}
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-[#34383a] px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-55"
+              disabled={isLoading || isPublishing}
+              onClick={() => void handlePublish()}
+            >
+              {isPublishing ? "發布中..." : "發布殼層正式版"}
+            </button>
+          </div>
+          {publishValidation?.findings.length ? (
+            <div className="rounded-[18px] border border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] px-3 py-2 text-[#8e6410]">
+              <div className="font-semibold">Validation</div>
+              <ul className="mt-1 list-disc pl-5">
+                {publishValidation.findings.map((finding) => (
+                  <li key={`${finding.code}-${finding.regionId ?? "global"}`}>{finding.message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
+          幾何
+        </div>
+        {selectedObject ? (
+          <div className="mt-3 grid gap-3 overflow-y-auto text-[13px] text-[var(--shell-copy-ink)]">
+            <div className="rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2">
+              <div className="font-semibold text-[var(--shell-title-ink)]">{selectedObject.id}</div>
+              <div className="mt-1 text-[12px]">{selectedObject.mount.toUpperCase()} / {selectedObject.type}</div>
+            </div>
+
+            {([
+              ["left", "Left"],
+              ["top", "Top"],
+              ["width", "Width"],
+              ["height", "Height"],
+              ["zIndex", "Z Index"]
+            ] as const).map(([field, label]) => (
+              <label key={field} className="grid gap-2">
+                <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">{label}</span>
+                <input
+                  type="number"
+                  className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                  value={field === "zIndex" ? selectedObject.zIndex : selectedObject.frame[field]}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    updateSelectedObject((object) =>
+                      field === "zIndex"
+                        ? { ...object, zIndex: nextValue }
+                        : {
+                            ...object,
+                            frame: {
+                              ...object.frame,
+                              [field]: nextValue
+                            }
+                          }
+                    );
+                  }}
+                />
+              </label>
+            ))}
+
+            <label className="grid gap-2">
+              <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">透明度</span>
+              <input
+                type="number"
+                step="0.1"
+                className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                value={selectedObject.style.opacity ?? 1}
+                onChange={(event) => {
+                  const nextValue = Number(event.target.value);
+                  updateSelectedObject((object) => ({
+                    ...object,
+                    style: {
+                      ...object.style,
+                      opacity: nextValue
+                    }
+                  }));
+                }}
+              />
+            </label>
+
+            {selectedObject.type === "line" ? (
+              <>
+                <label className="grid gap-2">
+                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">厚度</span>
+                  <input
+                    type="number"
+                    className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                    value={selectedObject.style.thickness ?? selectedObject.frame.height}
+                    onChange={(event) => {
+                      const nextValue = Number(event.target.value);
+                      updateSelectedObject((object) => ({
+                        ...object,
+                        style: {
+                          ...object.style,
+                          thickness: nextValue
+                        }
+                      }));
+                    }}
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">顏色</span>
+                  <input
+                    type="text"
+                    className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                    value={selectedObject.style.color ?? ""}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      updateSelectedObject((object) => ({
+                        ...object,
+                        style: {
+                          ...object.style,
+                          color: nextValue
+                        }
+                      }));
+                    }}
+                  />
+                </label>
+              </>
+            ) : null}
+
+            {selectedObject.type === "asset-image" ? (
+              <ShellDecorationAssetPicker
+                options={assetOptions}
+                value={typeof selectedObject.source.assetId === "number" ? selectedObject.source.assetId : null}
+                onChange={(assetId) => {
+                  const selectedAsset = assetOptions.find((option) => option.assetId === assetId);
+                  if (!selectedAsset) {
+                    return;
+                  }
+
+                  updateSelectedObject((object) => {
+                    if (object.type !== "asset-image") {
+                      return object;
+                    }
+
+                    return {
+                      ...object,
+                      source: {
+                        assetId,
+                        fallbackSrc: selectedAsset.fallbackSrc,
+                        kind: "asset-image"
+                      }
+                    };
+                  });
+                }}
+              />
+            ) : null}
+
+            {selectedObject.type === "ornament-image" ? (
+              <label className="grid gap-2">
+                <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">Ornament</span>
+                <select
+                  className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+                  value={selectedObject.source.ornamentKey}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    updateSelectedObject((object) => {
+                      if (object.type !== "ornament-image") {
+                        return object;
+                      }
+
+                      return {
+                        ...object,
+                        source: {
+                          kind: "ornament-image",
+                          ornamentKey: nextValue
+                        }
+                      };
+                    });
+                  }}
+                >
+                  <option value="leaf">Leaf</option>
+                </select>
+              </label>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]">
+            從 Header / Footer 物件列表選取要編輯的裝飾。
+          </div>
+        )}
+      </section>
+    </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
   return (
     <PageContainer
       title="共用殼層裝飾"
@@ -258,272 +533,7 @@ export function ShellDecorationEditor({
       shellPrimitive="shell-decoration-editor"
       spacing="compact"
     >
-      <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_320px] gap-4">
-        <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
-          <div className="grid gap-2">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
-              新增物件
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addMount} onChange={(event) => setAddMount(event.target.value as ShellDecorationMount)}>
-                <option value="header">Header</option>
-                <option value="footer">Footer</option>
-              </select>
-              <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addType} onChange={(event) => setAddType(event.target.value as ShellDecorationObject["type"])}>
-                <option value="line">Line</option>
-                <option value="asset-image">Asset Image</option>
-                <option value="ornament-image">Ornament Image</option>
-              </select>
-            </div>
-            <button type="button" className="rounded-full bg-[#5f8c50] px-3 py-2 text-[13px] font-semibold text-white" onClick={handleAddObject}>
-              新增物件
-            </button>
-          </div>
-
-          <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-            <ShellDecorationObjectList
-              channel={channel}
-              onDelete={handleDelete}
-              onDuplicate={(objectId) => {
-                const next = duplicateShellDecorationObject(channel, objectId);
-                applyChannel(next.channel, next.selectedObjectId);
-              }}
-              onMoveBackward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "backward"))}
-              onMoveForward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "forward"))}
-              onSelect={setSelectedObjectId}
-              onToggleLocked={(objectId) => applyChannel(toggleShellDecorationObjectLocked(channel, objectId))}
-              onToggleVisible={(objectId) => applyChannel(toggleShellDecorationObjectVisible(channel, objectId))}
-              selectedObjectId={selectedObjectId}
-            />
-          </div>
-        </section>
-
-        <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(255,255,255,0.54)] p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
-                預覽
-              </div>
-              <div className="text-[13px] text-[var(--shell-copy-ink)]">共用殼層草稿會直接套用到 header / footer。</div>
-            </div>
-            <div className="text-right text-[12px] text-[var(--shell-copy-ink)]">
-              <div>{dirty ? "尚未儲存" : "已同步"}</div>
-              <div>version {draft.version}</div>
-            </div>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            {renderPreview ? <ShellDecorationPreviewCanvas channel={channel} selectedObjectId={selectedObjectId} /> : null}
-          </div>
-          <div className="mt-3 grid gap-2 text-[12px]">
-            <div
-              className={[
-                "rounded-[18px] border px-3 py-2",
-                errorMessage
-                  ? "border-[rgba(180,82,52,0.25)] bg-[rgba(180,82,52,0.08)] text-[#8f452d]"
-                  : dirty
-                    ? "border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] text-[#8e6410]"
-                    : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-copy-ink)]"
-              ].join(" ")}
-            >
-              {errorMessage || message}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-55"
-                disabled={isLoading || isSaving || !dirty}
-                onClick={() => void handleSave()}
-              >
-                {isSaving ? "儲存中..." : "儲存草稿"}
-              </button>
-              <button
-                type="button"
-                className="rounded-full bg-[#34383a] px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-55"
-                disabled={isLoading || isPublishing}
-                onClick={() => void handlePublish()}
-              >
-                {isPublishing ? "發布中..." : "發布正式版"}
-              </button>
-            </div>
-            {publishValidation?.findings.length ? (
-              <div className="rounded-[18px] border border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] px-3 py-2 text-[#8e6410]">
-                <div className="font-semibold">Validation</div>
-                <ul className="mt-1 list-disc pl-5">
-                  {publishValidation.findings.map((finding) => (
-                    <li key={`${finding.code}-${finding.regionId ?? "global"}`}>{finding.message}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
-            幾何
-          </div>
-          {selectedObject ? (
-            <div className="mt-3 grid gap-3 overflow-y-auto text-[13px] text-[var(--shell-copy-ink)]">
-              <div className="rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2">
-                <div className="font-semibold text-[var(--shell-title-ink)]">{selectedObject.id}</div>
-                <div className="mt-1 text-[12px]">{selectedObject.mount.toUpperCase()} / {selectedObject.type}</div>
-              </div>
-
-              {([
-                ["left", "Left"],
-                ["top", "Top"],
-                ["width", "Width"],
-                ["height", "Height"],
-                ["zIndex", "Z Index"]
-              ] as const).map(([field, label]) => (
-                <label key={field} className="grid gap-2">
-                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">{label}</span>
-                  <input
-                    type="number"
-                    className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                    value={field === "zIndex" ? selectedObject.zIndex : selectedObject.frame[field]}
-                    onChange={(event) => {
-                      const nextValue = Number(event.target.value);
-                      updateSelectedObject((object) =>
-                        field === "zIndex"
-                          ? { ...object, zIndex: nextValue }
-                          : {
-                              ...object,
-                              frame: {
-                                ...object.frame,
-                                [field]: nextValue
-                              }
-                            }
-                      );
-                    }}
-                  />
-                </label>
-              ))}
-
-              <label className="grid gap-2">
-                <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">透明度</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                  value={selectedObject.style.opacity ?? 1}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    updateSelectedObject((object) => ({
-                      ...object,
-                      style: {
-                        ...object.style,
-                        opacity: nextValue
-                      }
-                    }));
-                  }}
-                />
-              </label>
-
-              {selectedObject.type === "line" ? (
-                <>
-                  <label className="grid gap-2">
-                    <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">厚度</span>
-                    <input
-                      type="number"
-                      className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                      value={selectedObject.style.thickness ?? selectedObject.frame.height}
-                      onChange={(event) => {
-                        const nextValue = Number(event.target.value);
-                        updateSelectedObject((object) => ({
-                          ...object,
-                          style: {
-                            ...object.style,
-                            thickness: nextValue
-                          }
-                        }));
-                      }}
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">顏色</span>
-                    <input
-                      type="text"
-                      className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                      value={selectedObject.style.color ?? ""}
-                      onChange={(event) => {
-                        const nextValue = event.target.value;
-                        updateSelectedObject((object) => ({
-                          ...object,
-                          style: {
-                            ...object.style,
-                            color: nextValue
-                          }
-                        }));
-                      }}
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              {selectedObject.type === "asset-image" ? (
-                <ShellDecorationAssetPicker
-                  options={assetOptions}
-                  value={typeof selectedObject.source.assetId === "number" ? selectedObject.source.assetId : null}
-                  onChange={(assetId) => {
-                    const selectedAsset = assetOptions.find((option) => option.assetId === assetId);
-                    if (!selectedAsset) {
-                      return;
-                    }
-
-                    updateSelectedObject((object) => {
-                      if (object.type !== "asset-image") {
-                        return object;
-                      }
-
-                      return {
-                        ...object,
-                        source: {
-                          assetId,
-                          fallbackSrc: selectedAsset.fallbackSrc,
-                          kind: "asset-image"
-                        }
-                      };
-                    });
-                  }}
-                />
-              ) : null}
-
-              {selectedObject.type === "ornament-image" ? (
-                <label className="grid gap-2">
-                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">Ornament</span>
-                  <select
-                    className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-                    value={selectedObject.source.ornamentKey}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      updateSelectedObject((object) => {
-                        if (object.type !== "ornament-image") {
-                          return object;
-                        }
-
-                        return {
-                          ...object,
-                          source: {
-                            kind: "ornament-image",
-                            ornamentKey: nextValue
-                          }
-                        };
-                      });
-                    }}
-                  >
-                    <option value="leaf">Leaf</option>
-                  </select>
-                </label>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]">
-              從 Header / Footer 物件列表選取要編輯的裝飾。
-            </div>
-          )}
-        </section>
-      </div>
+      {content}
     </PageContainer>
   );
 }

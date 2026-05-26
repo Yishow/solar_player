@@ -133,11 +133,31 @@ test("resolveShellDecorationAssetOptions keeps asset-image picking typed and exc
   assert.equal(options[0]?.fallbackSrc, "http://localhost:3000/uploads/images/shell-ornament.png");
 });
 
-test("shell decoration editor route and navigation register a dedicated shell authoring path", () => {
+test("shell decoration editor can render inside an integrated editor workspace", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?workspace=shell"] },
+      React.createElement(ShellDecorationEditor, {
+        embedded: true,
+        initialDraft,
+        initialImages: initialAssets,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.doesNotMatch(html, /data-shell-primitive="shell-decoration-editor"/);
+  assert.match(html, /header-line/);
+  assert.match(html, /儲存殼層草稿/);
+  assert.match(html, /發布殼層正式版/);
+});
+
+test("shell decoration editor route remains as compatibility entry to the editor workspace", () => {
   assert.match(routeMetaSource, /path: "\/shell-decorations\/editor"/);
   assert.match(routeMetaSource, /navLabel: "殼層裝飾"/);
   assert.match(routerSource, /path: "shell-decorations\/editor"/);
-  assert.match(routerSource, /element: <ShellDecorationEditorRoute \/>/);
+  assert.match(routerSource, /<Navigate to="\/display-pages\/editor\?workspace=shell" replace \/>/);
   assert.match(runtimeSource, /ManagementShellFrame hideChrome/);
 });
 

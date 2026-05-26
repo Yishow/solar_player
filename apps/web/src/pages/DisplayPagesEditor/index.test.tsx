@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ImageAsset } from "@solar-display/shared";
+import type { ImageAsset, ShellDecorationEnvelope } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
@@ -31,6 +31,29 @@ const initialImages: ImageAsset[] = [
     width: 800
   }
 ];
+
+const initialShellDecorationDraft: ShellDecorationEnvelope = {
+  footerObjects: [],
+  headerObjects: [
+    {
+      frame: { height: 2, left: 86, top: 24, width: 320 },
+      id: "header-line",
+      locked: false,
+      metadata: {},
+      mount: "header",
+      source: { kind: "line" },
+      style: { color: "#d2b46a", thickness: 2 },
+      type: "line",
+      visible: true,
+      zIndex: 1
+    }
+  ],
+  publishedAt: null,
+  publishedBy: null,
+  stage: "draft",
+  updatedAt: "2026-05-26T00:00:00.000Z",
+  version: 3
+};
 
 function withMockWindow<T>(windowValue: Window & typeof globalThis, callback: () => T) {
   const target = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
@@ -258,6 +281,30 @@ test("display page editor exposes the asset library as an integrated workspace",
   assert.match(html, /Page Object Asset/);
   assert.match(html, /舒適縮圖/);
   assert.doesNotMatch(html, /\/settings\/assets/);
+});
+
+test("display page editor exposes shared shell decorations as an integrated workspace", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview&workspace=shell"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialImages,
+        initialShellDecorationDraft,
+        initialShellDecorationImages: initialImages,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /殼層裝飾/);
+  assert.match(html, /Shared Shell Decorations/);
+  assert.match(html, /header-line/);
+  assert.match(html, /儲存殼層草稿/);
+  assert.match(html, /發布殼層正式版/);
+  assert.doesNotMatch(html, /\/shell-decorations\/editor/);
 });
 
 test("display page editor renders rail card hierarchy and template-aware controls for sustainability cards", () => {
