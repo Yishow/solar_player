@@ -48,6 +48,7 @@ import { resolveDisplayPageFreeformObjectRegions } from "./inspectorFields";
 import { localizeDisplayEditorLabel } from "./localization";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
+import { SourceConnectionPanel } from "./sourceConnectionPanel";
 import {
   addDisplayPageObject,
   deleteDisplayPageObject,
@@ -666,7 +667,7 @@ export function DisplayPagesEditor({
   const distributeDisabled =
     multiSelectCount < 3 || selectedRegions.some((region) => isRegionLocked(lockedSelectionIds, region.id));
 
-  const [rightTab, setRightTab] = useState<"inspector" | "health" | "publish">("inspector");
+  const [rightTab, setRightTab] = useState<"health" | "inspector" | "publish" | "source">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
   const previewRouteMeta = useMemo(
     () => resolvePlaybackRouteMeta(`/${selectedPage.id}`, []),
@@ -1326,8 +1327,8 @@ export function DisplayPagesEditor({
 
         <div className="flex flex-col overflow-hidden border-l border-[var(--shell-divider)]">
           <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
-            {(["inspector", "health", "publish"] as const).map((tab) => {
-              const labels = { inspector: "屬性", health: "素材健康", publish: "發布" };
+            {(["inspector", "source", "health", "publish"] as const).map((tab) => {
+              const labels = { inspector: "屬性", source: "來源連接", health: "素材健康", publish: "發布" };
               return (
                 <button
                   key={tab}
@@ -1370,6 +1371,16 @@ export function DisplayPagesEditor({
                 isLoading={isAssetHealthLoading}
                 pageId={selectedPage.id}
                 report={assetHealthReport}
+              />
+            )}
+            {rightTab === "source" && (
+              <SourceConnectionPanel
+                editMode={editMode}
+                freeformObject={selectedFreeformObject}
+                onJumpToProperties={() => setRightTab("inspector")}
+                onOpenAssetLibrary={() => handleSelectWorkspace("assets", selectedRegion?.id ?? selectedFreeformObject?.id)}
+                onRestoreSeedDefault={(path) => updatePath(path, "seed-default")}
+                selectedRegion={selectedRegion}
               />
             )}
             {rightTab === "publish" && (

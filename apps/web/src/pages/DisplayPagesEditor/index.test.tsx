@@ -209,6 +209,7 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.match(html, /方向鍵 8px \/ Alt \+ 方向鍵 1px \/ Shift \+ 方向鍵 24px/);
   assert.match(html, /復原/);
   assert.match(html, /重做/);
+  assert.match(html, /來源連接/);
   assert.match(html, /點中區域/);
   assert.match(html, /全畫參考/);
   assert.match(html, /吸附/);
