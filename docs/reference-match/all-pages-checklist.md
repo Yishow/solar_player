@@ -13,6 +13,24 @@
 
 此文件回答的是「目前每條 route 的 closeout 狀態與證據」，不是重新定義 migration scope。
 
+## Playback Protected-Canonical Inputs
+
+對 `/overview`、`/solar`、`/factory-circuit`、`/images`、`/sustainability` 做 visual review 時，除了本文件的 closeout evidence，還要額外檢查：
+
+- `docs/display-surface-visual-review-checklist.md`
+- `docs/reference-match/playback-visual-canonicals.md`
+
+review 不能只寫 `close` 或 `needs manual QA`；還要明確看過：
+
+- `Hero hierarchy`
+- `Card-family rhythm`
+- `Photo fade`
+- `Source-like icon language`
+- `Absolute composition`
+- `Distance readability`
+
+如果有任何 shared primitive reuse 讓 playback focus region 看起來像 settings board、toolbar、table-first panel，必須標記為 `management-surface drift`，不能當作單純微調。
+
 ## Status Vocabulary
 
 - `matched`
