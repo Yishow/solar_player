@@ -140,6 +140,8 @@ test("embedded asset library shows return context and blocks deletion for refere
   assert.match(html, /殼層裝飾/);
   assert.match(html, /Shared Shell Decorations 正在使用此素材/);
   assert.match(html, /解除引用後可刪除/);
+  assert.match(html, /data-workspace-surface="status-board"/);
+  assert.match(html, /data-workspace-surface="selection-board"/);
   assert.match(html, /disabled=""/);
 });
 
@@ -164,6 +166,8 @@ test("embedded asset library exposes apply-and-return actions when opened from e
   assert.match(html, /總覽 主視覺圖片/);
   assert.match(html, /套用目前素材並返回/);
   assert.match(html, /返回展示頁編輯/);
+  assert.match(html, /data-workspace-surface="context-board"/);
+  assert.match(html, /data-workspace-surface="asset-actions"/);
 });
 
 test("asset library route remains as compatibility entry to the editor workspace", () => {

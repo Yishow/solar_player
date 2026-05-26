@@ -14,6 +14,7 @@ import {
   saveShellDecorationDraft
 } from "../../services/shellDecorations";
 import { PageContainer } from "../../components/PageContainer";
+import { WorkspaceActionBar, WorkspaceBoard, WorkspacePanel } from "../../components/workspaceSurface";
 import {
   buildShellDecorationAssetLabel,
   ShellDecorationAssetPicker,
@@ -302,7 +303,7 @@ export function ShellDecorationEditor({
 
   const content = (
     <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_320px] gap-4">
-      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
+      <WorkspacePanel className="flex min-h-0 flex-col p-4" surface="shell-object-list">
         <div className="grid gap-2">
           <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
             新增物件
@@ -339,10 +340,10 @@ export function ShellDecorationEditor({
             selectedObjectId={selectedObjectId}
           />
         </div>
-      </section>
+      </WorkspacePanel>
 
-      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-[rgba(255,255,255,0.54)] p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <WorkspacePanel className="flex min-h-0 flex-col p-4" surface="shell-preview">
+        <WorkspaceActionBar className="static mb-3 rounded-[18px] border-none bg-transparent px-0 py-0 shadow-none backdrop-blur-0" surface="shell-preview-context">
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
               預覽
@@ -353,7 +354,7 @@ export function ShellDecorationEditor({
             <div>{dirty ? "殼層尚未儲存" : "殼層已同步"}</div>
             <div>version {draft.version}</div>
           </div>
-        </div>
+        </WorkspaceActionBar>
         <div className="flex min-h-0 flex-1 items-center justify-center">
           {renderPreview ? (
             <ShellDecorationPreviewCanvas
@@ -370,18 +371,13 @@ export function ShellDecorationEditor({
           ) : null}
         </div>
         <div className="mt-3 grid gap-2 text-[12px]">
-          <div
-            className={[
-              "rounded-[18px] border px-3 py-2",
-              errorMessage
-                ? "border-[rgba(180,82,52,0.25)] bg-[rgba(180,82,52,0.08)] text-[#8f452d]"
-                : dirty
-                  ? "border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] text-[#8e6410]"
-                  : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-copy-ink)]"
-            ].join(" ")}
+          <WorkspaceBoard
+            className="px-3 py-2"
+            surface="status-board"
+            tone={errorMessage ? "danger" : dirty ? "warning" : "base"}
           >
             {errorMessage || message}
-          </div>
+          </WorkspaceBoard>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -401,28 +397,28 @@ export function ShellDecorationEditor({
             </button>
           </div>
           {publishValidation?.findings.length ? (
-            <div className="rounded-[18px] border border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] px-3 py-2 text-[#8e6410]">
+            <WorkspaceBoard className="px-3 py-2 text-[#8e6410]" surface="blocked-state" tone="warning">
               <div className="font-semibold">驗證結果</div>
               <ul className="mt-1 list-disc pl-5">
                 {publishValidation.findings.map((finding) => (
                   <li key={`${finding.code}-${finding.regionId ?? "global"}`}>{finding.message}</li>
                 ))}
               </ul>
-            </div>
+            </WorkspaceBoard>
           ) : null}
         </div>
-      </section>
+      </WorkspacePanel>
 
-      <section className="flex min-h-0 flex-col rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-4">
+      <WorkspacePanel className="flex min-h-0 flex-col p-4" surface="shell-selection">
         <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-muted-ink)]">
           幾何
         </div>
         {selectedObject ? (
           <div className="mt-3 grid gap-3 overflow-y-auto text-[13px] text-[var(--shell-copy-ink)]">
-            <div className="rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2">
+            <WorkspaceBoard className="px-3 py-2" surface="selection-board" tone="subtle">
               <div className="font-semibold text-[var(--shell-title-ink)]">{selectedObject.id}</div>
               <div className="mt-1 text-[12px]">{formatShellMountLabel(selectedObject.mount)} / {formatShellObjectTypeLabel(selectedObject.type)}</div>
-            </div>
+            </WorkspaceBoard>
 
             {([
               ["left", "左側"],
@@ -604,11 +600,11 @@ export function ShellDecorationEditor({
             ) : null}
           </div>
         ) : (
-          <div className="mt-3 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]">
+          <WorkspaceBoard className="mt-3 px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]" surface="empty-state" tone="empty">
             從 Header / Footer 物件列表選取要編輯的裝飾。
-          </div>
+          </WorkspaceBoard>
         )}
-      </section>
+      </WorkspacePanel>
     </div>
   );
 

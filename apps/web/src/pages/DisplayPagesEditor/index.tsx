@@ -15,6 +15,7 @@ import { AppFooterNav } from "../../components/AppFooterNav";
 import { AppHeader } from "../../components/AppHeader";
 import { DisplayPageEditorAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
+import { WorkspaceActionBar, WorkspaceBoard } from "../../components/workspaceSurface";
 import { routeMetaMap } from "../../app/routeMeta";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPageConfig";
@@ -1166,32 +1167,42 @@ export function DisplayPagesEditor({
         aside={pageTabs}
       >
         <div className="h-full min-h-0 overflow-y-auto">
-          <div className="mb-3">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
-              共用殼層工作區
-            </p>
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[24px] font-semibold text-[var(--shell-title-ink)]">共用殼層裝飾</h2>
-              <div className="flex flex-wrap gap-2">
-                {selectedShellObject && selectedShellObject.type !== "line" ? (
-                  <button
-                    type="button"
-                    className="rounded-full border border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-title-ink)]"
-                    onClick={() => handleSelectWorkspace("assets", selectedShellObject.id, "shell")}
-                  >
-                    更換目前素材
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)]"
-                  onClick={() => handleSelectWorkspace("editor")}
-                >
-                  返回頁面編輯
-                </button>
+          <WorkspaceActionBar className="mb-3 static rounded-[20px]" surface="context-board">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
+                共用殼層工作區
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h2 className="text-[24px] font-semibold text-[var(--shell-title-ink)]">共用殼層裝飾</h2>
+                <span className="text-[12px] text-[var(--shell-copy-ink)]">
+                  {selectedShellObject ? `目前選取 ${selectedShellObject.id}` : "先從物件列表選一個殼層物件"}
+                </span>
               </div>
             </div>
-          </div>
+            <div className="flex flex-wrap gap-2">
+              {selectedShellObject && selectedShellObject.type !== "line" ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-title-ink)]"
+                  onClick={() => handleSelectWorkspace("assets", selectedShellObject.id, "shell")}
+                >
+                  更換目前素材
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="rounded-full border border-[var(--shell-divider)] px-4 py-2 text-[13px] font-semibold text-[var(--shell-copy-ink)]"
+                onClick={() => handleSelectWorkspace("editor")}
+              >
+                返回頁面編輯
+              </button>
+            </div>
+          </WorkspaceActionBar>
+          <WorkspaceBoard className="mb-3 text-[13px] text-[var(--shell-copy-ink)]" surface="selection-board" tone="subtle">
+            {shellDraftState
+              ? `草稿 version ${shellDraftState.version}，${shellDraftState.headerObjects.length + shellDraftState.footerObjects.length} 個殼層物件可直接在此調整幾何、層級與素材來源。`
+              : "正在同步殼層草稿與可用素材。"}
+          </WorkspaceBoard>
           <ShellDecorationEditor
             embedded
             initialDraft={shellDraftState}

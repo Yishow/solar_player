@@ -76,6 +76,19 @@
   --status-warning-border: rgba(224, 161, 42, 0.28);
   --status-error-bg: rgba(239, 99, 99, 0.12);
   --status-error-border: rgba(239, 99, 99, 0.28);
+  --workspace-surface: rgba(255, 255, 249, 0.84);
+  --workspace-surface-strong: rgba(255, 255, 249, 0.94);
+  --workspace-surface-muted: rgba(82, 91, 66, 0.04);
+  --workspace-surface-accent: rgba(95, 140, 80, 0.08);
+  --workspace-surface-accent-border: rgba(95, 140, 80, 0.2);
+  --workspace-surface-warning: rgba(201, 136, 26, 0.08);
+  --workspace-surface-warning-border: rgba(201, 136, 26, 0.24);
+  --workspace-surface-warning-ink: #8e6410;
+  --workspace-surface-danger: rgba(180, 82, 52, 0.08);
+  --workspace-surface-danger-border: rgba(180, 82, 52, 0.24);
+  --workspace-surface-danger-ink: #8f452d;
+  --workspace-surface-border: rgba(198, 192, 179, 0.62);
+  --workspace-surface-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 12px 28px rgba(55, 50, 38, 0.08);
 
   --color-brand-green-900: #244b28;
   --color-brand-green-800: #36593a;

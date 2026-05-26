@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { WorkspacePanel } from "../../components/workspaceSurface";
 import { DisplayEditorInspectorFields, type ResolvedDisplayEditorRegion } from "./inspectorFields";
 import { localizeDisplayEditorLabel } from "./localization";
 
@@ -92,11 +93,11 @@ export function DisplayEditorInspectorCard({
   if (flat) return content;
 
   return (
-    <article className="rounded-[28px] border border-[var(--shell-divider)] bg-white/78 p-5 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+    <WorkspacePanel className="p-5" surface="properties-panel">
       <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-[var(--shell-subtitle-ink)]">
         {localizeDisplayEditorLabel("Inspector")}
       </p>
       <div className="mt-3">{content}</div>
-    </article>
+    </WorkspacePanel>
   );
 }

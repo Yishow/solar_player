@@ -58,7 +58,9 @@ export function DisplayEditorCanvasCard({
       {controls}
       <div
         ref={wrapperRef}
-        className="mt-4 w-full overflow-hidden rounded-[24px] border border-[var(--shell-divider)] bg-[#eef1e7] shadow-[0_20px_45px_rgba(80,94,54,0.08)]"
+        data-shell-primitive="workspace-panel"
+        data-workspace-surface="preview-surface"
+        className="mt-4 w-full overflow-hidden rounded-[24px] border border-[var(--workspace-surface-border)] bg-[var(--workspace-surface-muted)] shadow-[var(--workspace-surface-shadow)]"
         style={{ aspectRatio: `${viewportWidth} / ${viewportHeight}` }}
       >
         <div

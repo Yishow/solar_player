@@ -3,6 +3,7 @@ import {
   displayEditorPathKey
 } from "../../../../../packages/shared/src/displayEditorSchema";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
+import { WorkspaceActionBar, WorkspaceBoard } from "../../components/workspaceSurface";
 import type { ResolvedDisplayEditorField, ResolvedDisplayEditorRegion } from "./inspectorFields";
 import {
   resolveDisplayPageMediaEffectBinding,
@@ -288,23 +289,25 @@ export function SourceConnectionPanel({
       {rows.length > 0 ? (
         <div className="grid gap-2">
           {rows.map((row) => (
-            <div
+            <WorkspaceBoard
               key={`${row.label}:${row.value}`}
-              className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
+              className="rounded-[14px] px-3 py-2"
+              surface="detail-board"
+              tone="base"
             >
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--shell-subtitle-ink)]">
                 {row.label}
               </div>
               <div className="mt-1 break-all text-[13px] text-[var(--shell-title-ink)]">{row.value}</div>
-            </div>
+            </WorkspaceBoard>
           ))}
         </div>
       ) : (
-        <div className="rounded-[14px] border border-dashed border-[var(--shell-divider)] px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]">
+        <WorkspaceBoard className="rounded-[14px] px-3 py-2 text-[13px] text-[var(--shell-copy-ink)]" surface="empty-state" tone="empty">
           這個選取項目沒有可辨識的來源欄位。
-        </div>
+        </WorkspaceBoard>
       )}
-      <div className="grid gap-2">
+      <WorkspaceActionBar className="static grid gap-2 rounded-[14px] px-3 py-3 shadow-none" surface="sticky-actions">
         <button
           type="button"
           className="rounded-full border border-[var(--shell-divider)] px-3 py-2 text-[12px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-50"
@@ -342,9 +345,9 @@ export function SourceConnectionPanel({
         >
           回到屬性調整呈現
         </button>
-      </div>
+      </WorkspaceActionBar>
       {summaries.length > 0 ? (
-        <div className="rounded-[14px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-3 py-2">
+        <WorkspaceBoard className="rounded-[14px] px-3 py-2" surface="summary-board" tone="subtle">
           <div className="text-[12px] font-semibold text-[var(--shell-title-ink)]">呈現設定摘要</div>
           <div className="mt-2 grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
             {summaries.map((summary) => (
@@ -353,10 +356,10 @@ export function SourceConnectionPanel({
               </div>
             ))}
           </div>
-        </div>
+        </WorkspaceBoard>
       ) : null}
       {effectSummary.length > 0 ? (
-        <div className="rounded-[14px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-3 py-2">
+        <WorkspaceBoard className="rounded-[14px] px-3 py-2" surface="effect-summary-board" tone="subtle">
           <div className="text-[12px] font-semibold text-[var(--shell-title-ink)]">效果摘要</div>
           <div className="mt-2 grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
             {effectSummary.map((item) => (
@@ -365,12 +368,12 @@ export function SourceConnectionPanel({
               </div>
             ))}
           </div>
-        </div>
+        </WorkspaceBoard>
       ) : null}
       {!effectSummary.length && effectSurfaceReason ? (
-        <div className="rounded-[14px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-3 py-2 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]">
+        <WorkspaceBoard className="rounded-[14px] px-3 py-2 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]" surface="blocked-state" tone="subtle">
           效果摘要: {effectSurfaceReason}
-        </div>
+        </WorkspaceBoard>
       ) : null}
     </div>
   );

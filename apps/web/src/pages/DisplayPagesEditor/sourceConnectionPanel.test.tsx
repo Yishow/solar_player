@@ -102,6 +102,9 @@ test("SourceConnectionPanel renders actions and read-only presentation summaries
   assert.match(html, /呈現設定摘要/);
   assert.match(html, /填滿模式: cover/);
   assert.match(html, /模糊啟用: 啟用/);
+  assert.match(html, /data-workspace-surface="detail-board"/);
+  assert.match(html, /data-workspace-surface="sticky-actions"/);
+  assert.match(html, /data-workspace-surface="summary-board"/);
   assert.doesNotMatch(html, /type="number"/);
 });
 

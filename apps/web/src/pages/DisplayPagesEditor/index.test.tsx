@@ -467,6 +467,8 @@ test("display page editor exposes shared shell decorations as an integrated work
   assert.match(html, /返回頁面編輯/);
   assert.match(html, /儲存殼層草稿/);
   assert.match(html, /發布殼層正式版/);
+  assert.match(html, /data-workspace-surface="context-board"/);
+  assert.match(html, /data-workspace-surface="selection-board"/);
   assert.doesNotMatch(html, /\/shell-decorations\/editor/);
 });
 

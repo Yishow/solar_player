@@ -2,6 +2,7 @@ import type { DisplayOpsAssetReferenceSummary, ImageAsset } from "@solar-display
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
+import { WorkspaceActionBar, WorkspaceBoard, WorkspacePanel } from "../../components/workspaceSurface";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useImageAssetReferences } from "../../hooks/useImageAssetReferences";
@@ -272,7 +273,7 @@ export function AssetLibrary({
 
   const content = (
     <div className="grid gap-4 lg:grid-cols-[1.25fr_0.9fr]">
-      <section className="rounded-[24px] border border-[var(--shell-divider)] bg-white/85 p-5">
+      <WorkspacePanel surface="asset-library">
         <input
           ref={fileInputRef}
           hidden
@@ -282,7 +283,7 @@ export function AssetLibrary({
           onChange={(event) => void handleUpload(event)}
         />
 
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <WorkspaceActionBar className="static rounded-[20px] border-none bg-transparent px-0 py-0 shadow-none backdrop-blur-0" surface="asset-actions">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
               資產庫管理
@@ -322,19 +323,19 @@ export function AssetLibrary({
               {isUploading ? "上傳中..." : "上傳資產"}
             </button>
           </div>
-        </div>
+        </WorkspaceActionBar>
 
-        <div className="mt-4 rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] px-4 py-3 text-[13px] text-[var(--shell-copy-ink)]" role="status">
+        <WorkspaceBoard className="mt-4 text-[13px] text-[var(--shell-copy-ink)]" role="status" surface="status-board" tone={errorMessage ? "danger" : "subtle"}>
           {errorMessage || message}
-        </div>
+        </WorkspaceBoard>
 
         {contextLabel ? (
-          <div className="mt-4 rounded-[18px] border border-[rgba(95,140,80,0.18)] bg-[rgba(95,140,80,0.06)] px-4 py-3">
+          <WorkspaceBoard className="mt-4" surface="context-board" tone="accent">
             <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
               返回目標
             </div>
             <div className="mt-1 text-[14px] font-semibold text-[var(--shell-title-ink)]">{contextLabel}</div>
-          </div>
+          </WorkspaceBoard>
         ) : null}
 
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_180px]">
@@ -456,9 +457,9 @@ export function AssetLibrary({
         </div>
 
         {filteredAssets.length === 0 ? (
-          <div className="mt-4 rounded-[18px] border border-dashed border-[var(--shell-divider)] px-4 py-6 text-[13px] text-[var(--shell-subtitle-ink)]">
+          <WorkspaceBoard className="mt-4 py-6 text-[13px] text-[var(--shell-subtitle-ink)]" surface="empty-state" tone="empty">
             目前沒有符合條件的資產。
-          </div>
+          </WorkspaceBoard>
         ) : null}
 
         <div className="mt-4">
@@ -468,9 +469,9 @@ export function AssetLibrary({
             report={assetHealthReport}
           />
         </div>
-      </section>
+      </WorkspacePanel>
 
-      <section className="rounded-[24px] border border-[var(--shell-divider)] bg-white/85 p-5">
+      <WorkspacePanel surface="asset-selection">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtitle-ink)]">
@@ -490,7 +491,7 @@ export function AssetLibrary({
 
         {selectedAsset ? (
           <div className="mt-4 space-y-3">
-            <div className="rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] p-4">
+            <WorkspaceBoard className="p-4" surface="selection-board" tone="subtle">
               {selectedAssetPreviewSrc ? (
                 <div className="mb-3 overflow-hidden rounded-[14px] border border-[var(--shell-divider)] bg-white">
                   <img src={selectedAssetPreviewSrc} alt="" className="h-40 w-full object-cover" />
@@ -510,9 +511,9 @@ export function AssetLibrary({
                   內建素材：{selectedAsset.seedKey}
                 </div>
               ) : null}
-            </div>
+            </WorkspaceBoard>
 
-            <div className="rounded-[18px] border border-[var(--shell-divider)] p-4">
+            <WorkspaceBoard className="p-4" surface="usage-board" tone="base">
               <div className="text-[13px] font-semibold text-[var(--shell-title-ink)]">引用位置</div>
               <div className="mt-2 text-[13px] text-[var(--shell-subtitle-ink)]">
                 {assetReferencesErrorMessage || (isAssetReferencesLoading ? "正在同步引用..." : "")}
@@ -536,14 +537,14 @@ export function AssetLibrary({
                   </div>
                 )}
               </div>
-            </div>
+            </WorkspaceBoard>
           </div>
         ) : (
-          <div className="mt-4 rounded-[18px] border border-dashed border-[var(--shell-divider)] px-4 py-6 text-[13px] text-[var(--shell-subtitle-ink)]">
+          <WorkspaceBoard className="mt-4 py-6 text-[13px] text-[var(--shell-subtitle-ink)]" surface="empty-state" tone="empty">
             {isLoading ? "正在同步資產..." : "請先從左側選擇一筆資產。"}
-          </div>
+          </WorkspaceBoard>
         )}
-      </section>
+      </WorkspacePanel>
     </div>
   );
 
