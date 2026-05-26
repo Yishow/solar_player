@@ -173,10 +173,10 @@ export function buildLeafOrnamentFields({
     {
       fieldType: "select",
       id: `${idPrefix}-leaf-source-mode`,
-      label: "Leaf Source Mode",
+      label: "葉片來源模式",
       options: [
-        { label: "Built-in Leaf", value: "builtin" },
-        { label: "Managed Asset", value: "managed-asset" }
+        { label: "內建葉片", value: "builtin" },
+        { label: "已管理素材", value: "managed-asset" }
       ],
       path: sourceModePath
     },
@@ -184,7 +184,7 @@ export function buildLeafOrnamentFields({
       constraints: { required: true },
       fieldType: "asset",
       id: `${idPrefix}-leaf-managed-asset`,
-      label: "Leaf Managed Asset",
+      label: "葉片素材",
       path: [...path, "source", "assetId"],
       placeholder: "image_assets.id",
       visibleWhen: { equals: "managed-asset", path: sourceModePath }
@@ -192,7 +192,7 @@ export function buildLeafOrnamentFields({
     {
       fieldType: "text",
       id: `${idPrefix}-leaf-managed-fallback-src`,
-      label: "Leaf Fallback Src",
+      label: "葉片備援來源",
       path: [...path, "source", "fallbackSrc"],
       visibleWhen: { equals: "managed-asset", path: sourceModePath }
     },

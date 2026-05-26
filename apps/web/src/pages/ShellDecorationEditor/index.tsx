@@ -59,6 +59,16 @@ function findSelectedObject(channel: ShellDecorationChannel, selectedObjectId: s
   return [...channel.headerObjects, ...channel.footerObjects].find((object) => object.id === selectedObjectId) ?? null;
 }
 
+function formatShellMountLabel(mount: ShellDecorationMount) {
+  return mount === "header" ? "頁首" : "頁尾";
+}
+
+function formatShellObjectTypeLabel(type: ShellDecorationObject["type"]) {
+  if (type === "asset-image") return "圖片素材";
+  if (type === "ornament-image") return "裝飾圖片";
+  return "線條";
+}
+
 function isChannelDirty(draft: ShellDecorationChannel, baseline: ShellDecorationChannel) {
   return JSON.stringify(resolveShellObjectSections(draft)) !== JSON.stringify(resolveShellObjectSections(baseline));
 }
@@ -265,13 +275,13 @@ export function ShellDecorationEditor({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addMount} onChange={(event) => setAddMount(event.target.value as ShellDecorationMount)}>
-              <option value="header">Header</option>
-              <option value="footer">Footer</option>
+              <option value="header">頁首</option>
+              <option value="footer">頁尾</option>
             </select>
             <select className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2" value={addType} onChange={(event) => setAddType(event.target.value as ShellDecorationObject["type"])}>
-              <option value="line">Line</option>
-              <option value="asset-image">Asset Image</option>
-              <option value="ornament-image">Ornament Image</option>
+              <option value="line">線條</option>
+              <option value="asset-image">圖片素材</option>
+              <option value="ornament-image">裝飾圖片</option>
             </select>
           </div>
           <button type="button" className="rounded-full bg-[#5f8c50] px-3 py-2 text-[13px] font-semibold text-white" onClick={handleAddObject}>
@@ -358,7 +368,7 @@ export function ShellDecorationEditor({
           </div>
           {publishValidation?.findings.length ? (
             <div className="rounded-[18px] border border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] px-3 py-2 text-[#8e6410]">
-              <div className="font-semibold">Validation</div>
+              <div className="font-semibold">驗證結果</div>
               <ul className="mt-1 list-disc pl-5">
                 {publishValidation.findings.map((finding) => (
                   <li key={`${finding.code}-${finding.regionId ?? "global"}`}>{finding.message}</li>
@@ -377,15 +387,15 @@ export function ShellDecorationEditor({
           <div className="mt-3 grid gap-3 overflow-y-auto text-[13px] text-[var(--shell-copy-ink)]">
             <div className="rounded-[18px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] px-3 py-2">
               <div className="font-semibold text-[var(--shell-title-ink)]">{selectedObject.id}</div>
-              <div className="mt-1 text-[12px]">{selectedObject.mount.toUpperCase()} / {selectedObject.type}</div>
+              <div className="mt-1 text-[12px]">{formatShellMountLabel(selectedObject.mount)} / {formatShellObjectTypeLabel(selectedObject.type)}</div>
             </div>
 
             {([
-              ["left", "Left"],
-              ["top", "Top"],
-              ["width", "Width"],
-              ["height", "Height"],
-              ["zIndex", "Z Index"]
+              ["left", "左側"],
+              ["top", "上方"],
+              ["width", "寬度"],
+              ["height", "高度"],
+              ["zIndex", "層級"]
             ] as const).map(([field, label]) => (
               <label key={field} className="grid gap-2">
                 <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">{label}</span>
@@ -504,7 +514,7 @@ export function ShellDecorationEditor({
             {selectedObject.type === "ornament-image" ? (
               <>
                 <label className="grid gap-2">
-                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">Ornament</span>
+                  <span className="text-[12px] font-semibold text-[var(--shell-title-ink)]">裝飾</span>
                   <select
                     className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
                     value={selectedObject.source.ornamentKey}
@@ -526,7 +536,7 @@ export function ShellDecorationEditor({
                       });
                     }}
                   >
-                    <option value="leaf">Leaf</option>
+                    <option value="leaf">葉片</option>
                   </select>
                 </label>
                 <ShellDecorationAssetPicker

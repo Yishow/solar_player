@@ -113,8 +113,8 @@ test("shell decoration editor exposes a dedicated authoring surface without disp
   assert.match(html, /共用殼層裝飾/);
   assert.match(html, /Shared Shell Decorations/);
   assert.match(html, /header-line/);
-  assert.match(html, /Header/);
-  assert.match(html, /Footer/);
+  assert.match(html, /頁首/);
+  assert.match(html, /頁尾/);
   assert.match(html, /新增物件/);
   assert.match(html, /幾何/);
   assert.match(html, /厚度/);

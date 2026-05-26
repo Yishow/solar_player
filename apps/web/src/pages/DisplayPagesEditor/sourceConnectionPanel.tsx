@@ -59,13 +59,13 @@ function isPresentationField(field: ResolvedDisplayEditorField) {
 function rowLabel(field: ResolvedDisplayEditorField) {
   const tail = pathTail(field.path);
   if (tail === "sourceMode" || tail === "mode") return "來源模式";
-  if (tail === "assetId") return "Managed Asset";
-  if (tail === "src") return "Direct Src";
-  if (tail === "fallbackSrc") return "Fallback Src";
-  if (tail === "registry") return "Icon Registry";
-  if (tail === "iconKey") return "Icon Key";
-  if (tail === "glyphName") return "Reference Glyph";
-  if (tail === "ornamentKey") return "Ornament";
+  if (tail === "assetId") return "已管理素材";
+  if (tail === "src") return "直接來源";
+  if (tail === "fallbackSrc") return "備援來源";
+  if (tail === "registry") return "圖示庫";
+  if (tail === "iconKey") return "圖示鍵值";
+  if (tail === "glyphName") return "參考符號";
+  if (tail === "ornamentKey") return "裝飾";
   return localizeDisplayEditorLabel(field.schema.label);
 }
 
@@ -77,8 +77,8 @@ export function resolveSourceConnectionRows(args: {
 
   if (args.freeformObject && args.freeformObject.type !== "line") {
     rows.push({ label: "來源模式", value: args.freeformObject.source.kind });
-    rows.push({ label: "Managed Asset", value: formatValue(args.freeformObject.source.assetId) });
-    rows.push({ label: "Fallback Src", value: formatValue(args.freeformObject.source.fallbackSrc) });
+    rows.push({ label: "已管理素材", value: formatValue(args.freeformObject.source.assetId) });
+    rows.push({ label: "備援來源", value: formatValue(args.freeformObject.source.fallbackSrc) });
     return rows;
   }
 

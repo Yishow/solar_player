@@ -45,8 +45,8 @@ test("resolveSourceConnectionRows summarizes media source fields", () => {
 
   assert.deepEqual(resolveSourceConnectionRows({ selectedRegion }), [
     { label: "來源模式", value: "seed-default" },
-    { label: "Managed Asset", value: "42" },
-    { label: "Direct Src", value: "/uploads/images/hero.png" }
+    { label: "已管理素材", value: "42" },
+    { label: "直接來源", value: "/uploads/images/hero.png" }
   ]);
 });
 
@@ -69,8 +69,8 @@ test("resolveSourceConnectionRows summarizes freeform managed asset objects", ()
     }),
     [
       { label: "來源模式", value: "icon-asset" },
-      { label: "Managed Asset", value: "7" },
-      { label: "Fallback Src", value: "/uploads/images/icon.png" }
+      { label: "已管理素材", value: "7" },
+      { label: "備援來源", value: "/uploads/images/icon.png" }
     ]
   );
 });
@@ -99,7 +99,7 @@ test("SourceConnectionPanel renders actions and read-only presentation summaries
   assert.match(html, /回復 seed\/default source/);
   assert.match(html, /呈現設定摘要/);
   assert.match(html, /填滿模式: cover/);
-  assert.match(html, /Blur Enabled: 啟用/);
+  assert.match(html, /模糊啟用: 啟用/);
   assert.doesNotMatch(html, /type="number"/);
 });
 

@@ -73,8 +73,8 @@ test("ShellDecorationObjectList renders grouped header/footer rows and list-firs
     })
   );
 
-  assert.match(html, />Header</);
-  assert.match(html, />Footer</);
+  assert.match(html, />頁首</);
+  assert.match(html, />頁尾</);
   assert.match(html, /header-line/);
   assert.match(html, /footer-ornament/);
   assert.match(html, /footer-line/);

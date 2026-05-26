@@ -60,15 +60,15 @@ function option<T extends DisplayEditorOptionValue>(label: string, value: T) {
 }
 
 export const displayPageIconSourceModeOptions = [
-  option("Asset Image", "asset-image"),
-  option("Managed Asset", "managed-asset"),
-  option("Reference Glyph", "reference-glyph"),
-  option("Page Icon Key", "page-icon-key")
+  option("圖片來源", "asset-image"),
+  option("已管理素材", "managed-asset"),
+  option("參考符號", "reference-glyph"),
+  option("頁面圖示鍵值", "page-icon-key")
 ];
 
 export const displayPageIconRegistryOptions = [
-  option("Factory Circuit", "factory-circuit"),
-  option("Sustainability", "sustainability")
+  option("工廠迴路", "factory-circuit"),
+  option("永續成果", "sustainability")
 ];
 
 const referenceGlyphOptions = referenceGlyphNames.map((name) => option(name, name));
@@ -189,7 +189,7 @@ export function buildDisplayPageIconSourceFields({
     {
       fieldType: "select",
       id: `${idPrefix}-icon-source-mode`,
-      label: "Icon Source Mode",
+      label: "圖示來源模式",
       options: displayPageIconSourceModeOptions,
       path: modePath
     },
@@ -197,14 +197,14 @@ export function buildDisplayPageIconSourceFields({
       constraints: { required: true },
       fieldType: "text",
       id: `${idPrefix}-icon-src`,
-      label: "Image Source",
+      label: "圖片來源",
       path: [...path, "src"],
       visibleWhen: visibleWhen(modePath, "asset-image")
     },
     {
       fieldType: "text",
       id: `${idPrefix}-icon-alt`,
-      label: "Image Alt",
+      label: "替代文字",
       path: [...path, "alt"],
       visibleWhen: visibleWhen(modePath, "asset-image")
     },
@@ -212,7 +212,7 @@ export function buildDisplayPageIconSourceFields({
       constraints: { required: true },
       fieldType: "asset",
       id: `${idPrefix}-icon-managed-asset`,
-      label: "Managed Icon Asset",
+      label: "圖示素材",
       path: [...path, "assetId"],
       placeholder: "image_assets.id",
       visibleWhen: visibleWhen(modePath, "managed-asset")
@@ -220,21 +220,21 @@ export function buildDisplayPageIconSourceFields({
     {
       fieldType: "text",
       id: `${idPrefix}-icon-managed-fallback-src`,
-      label: "Managed Icon Fallback Src",
+      label: "圖示備援來源",
       path: [...path, "fallbackSrc"],
       visibleWhen: visibleWhen(modePath, "managed-asset")
     },
     {
       fieldType: "text",
       id: `${idPrefix}-icon-managed-alt`,
-      label: "Managed Icon Alt",
+      label: "圖示替代文字",
       path: [...path, "alt"],
       visibleWhen: visibleWhen(modePath, "managed-asset")
     },
     {
       fieldType: "select",
       id: `${idPrefix}-icon-glyph-name`,
-      label: "Reference Glyph",
+      label: "參考符號",
       options: referenceGlyphOptions,
       path: [...path, "glyphName"],
       visibleWhen: visibleWhen(modePath, "reference-glyph")
@@ -242,7 +242,7 @@ export function buildDisplayPageIconSourceFields({
     {
       fieldType: "select",
       id: `${idPrefix}-icon-registry`,
-      label: "Icon Registry",
+      label: "圖示庫",
       options: displayPageIconRegistryOptions,
       path: registryPath,
       visibleWhen: visibleWhen(modePath, "page-icon-key")
@@ -250,7 +250,7 @@ export function buildDisplayPageIconSourceFields({
     {
       fieldType: "select",
       id: `${idPrefix}-icon-key-factory-circuit`,
-      label: "Factory Circuit Icon",
+      label: "工廠迴路圖示",
       options: pageRegistryIconOptions["factory-circuit"],
       path: [...path, "iconKey"],
       visibleWhen: visibleWhen(registryPath, "factory-circuit")
@@ -258,7 +258,7 @@ export function buildDisplayPageIconSourceFields({
     {
       fieldType: "select",
       id: `${idPrefix}-icon-key-sustainability`,
-      label: "Sustainability Icon",
+      label: "永續成果圖示",
       options: pageRegistryIconOptions.sustainability,
       path: [...path, "iconKey"],
       visibleWhen: visibleWhen(registryPath, "sustainability")

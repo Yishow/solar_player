@@ -59,16 +59,16 @@ export function buildDisplayPageMediaEffectFields(
     {
       fieldType: "toggle",
       id: `${idPrefix}-edge-fade-enabled`,
-      label: "Edge Fade",
+      label: "邊緣淡出",
       path: [...effectsPath, "edgeFade", "enabled"]
     },
     {
       fieldType: "select",
       id: `${idPrefix}-edge-fade-direction`,
-      label: "Edge Fade Side",
+      label: "邊緣淡出方向",
       options: [
-        { label: "Left", value: "left" },
-        { label: "Right", value: "right" }
+        { label: "左側", value: "left" },
+        { label: "右側", value: "right" }
       ],
       path: [...effectsPath, "edgeFade", "direction"],
       visibleWhen: {
@@ -83,7 +83,7 @@ export function buildDisplayPageMediaEffectFields(
       },
       fieldType: "number",
       id: `${idPrefix}-edge-fade-width`,
-      label: "Edge Fade Width",
+      label: "邊緣淡出寬度",
       path: [...effectsPath, "edgeFade", "width"],
       step: displayPageMediaEffectBounds.edgeFadeWidth.step,
       visibleWhen: {
@@ -94,7 +94,7 @@ export function buildDisplayPageMediaEffectFields(
     {
       fieldType: "toggle",
       id: `${idPrefix}-bottom-fade-enabled`,
-      label: "Bottom Fade",
+      label: "底部淡出",
       path: [...effectsPath, "bottomFade", "enabled"]
     },
     {
@@ -104,7 +104,7 @@ export function buildDisplayPageMediaEffectFields(
       },
       fieldType: "number",
       id: `${idPrefix}-bottom-fade-height`,
-      label: "Bottom Fade Height",
+      label: "底部淡出高度",
       path: [...effectsPath, "bottomFade", "height"],
       step: displayPageMediaEffectBounds.bottomFadeHeight.step,
       visibleWhen: {
@@ -115,7 +115,7 @@ export function buildDisplayPageMediaEffectFields(
     {
       fieldType: "toggle",
       id: `${idPrefix}-blur-enabled`,
-      label: "Blur",
+      label: "模糊",
       path: [...effectsPath, "blur", "enabled"]
     },
     {
@@ -125,7 +125,7 @@ export function buildDisplayPageMediaEffectFields(
       },
       fieldType: "number",
       id: `${idPrefix}-blur-amount`,
-      label: "Blur Amount",
+      label: "模糊強度",
       path: [...effectsPath, "blur", "amount"],
       step: displayPageMediaEffectBounds.blurAmount.step,
       visibleWhen: {
@@ -136,7 +136,7 @@ export function buildDisplayPageMediaEffectFields(
     {
       fieldType: "toggle",
       id: `${idPrefix}-opacity-enabled`,
-      label: "Opacity",
+      label: "不透明度",
       path: [...effectsPath, "opacity", "enabled"]
     },
     {
@@ -146,7 +146,7 @@ export function buildDisplayPageMediaEffectFields(
       },
       fieldType: "number",
       id: `${idPrefix}-opacity-value`,
-      label: "Opacity Value",
+      label: "不透明度數值",
       path: [...effectsPath, "opacity", "value"],
       step: displayPageMediaEffectBounds.opacityValue.step,
       visibleWhen: {

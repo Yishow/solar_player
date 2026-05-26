@@ -89,17 +89,17 @@ function resolveNextZIndex(objects: ShellDecorationObject[]) {
 function resolveTypeLabel(type: ObjectKind) {
   switch (type) {
     case "asset-image":
-      return "Asset Image";
+      return "圖片素材";
     case "ornament-image":
-      return "Ornament Image";
+      return "裝飾圖片";
     case "line":
     default:
-      return "Line";
+      return "線條";
   }
 }
 
 function resolveMountLabel(mount: ShellDecorationMount) {
-  return mount === "header" ? "Header" : "Footer";
+  return mount === "header" ? "頁首" : "頁尾";
 }
 
 function resolveSourceSummary(object: ShellDecorationObject) {
@@ -108,7 +108,7 @@ function resolveSourceSummary(object: ShellDecorationObject) {
   }
 
   if (object.type === "ornament-image") {
-    return `Ornament ${object.source.ornamentKey}`;
+    return `裝飾 ${object.source.ornamentKey}`;
   }
 
   return `${object.frame.width}px`;
