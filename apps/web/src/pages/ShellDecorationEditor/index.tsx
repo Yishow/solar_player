@@ -307,7 +307,19 @@ export function ShellDecorationEditor({
           </div>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center">
-          {renderPreview ? <ShellDecorationPreviewCanvas channel={channel} selectedObjectId={selectedObjectId} /> : null}
+          {renderPreview ? (
+            <ShellDecorationPreviewCanvas
+              channel={channel}
+              selectedObjectId={selectedObjectId}
+              onSelectObject={setSelectedObjectId}
+              onUpdateObjectFrame={(objectId, frame) => {
+                applyChannel(updateShellDecorationObject(channel, objectId, (object) => ({
+                  ...object,
+                  frame
+                })));
+              }}
+            />
+          ) : null}
         </div>
         <div className="mt-3 grid gap-2 text-[12px]">
           <div

@@ -118,7 +118,11 @@ test("shell decoration editor preview highlights the selected shell object at FH
   );
 
   assert.match(html, /data-shell-preview-surface="true"/);
+  assert.match(html, /data-shell-band-guide="header"/);
+  assert.match(html, /data-shell-band-guide="footer"/);
   assert.match(html, /data-shell-preview-selection="header-line"/);
+  assert.match(html, /data-shell-measurement="header-line"/);
+  assert.match(html, /W 320/);
   assert.match(html, /left:86px/);
   assert.match(html, /width:320px/);
 });
