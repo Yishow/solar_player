@@ -3,10 +3,13 @@ import { Outlet, useLoaderData } from "react-router-dom";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { computeCanvasLayout } from "../components/displayCanvasLayout";
+import { resolveHeaderConnectionMeta } from "../components/headerConnectionMeta";
 import { useBrandAssets, type BrandView } from "../hooks/useBrandAssets";
 import { useHeaderWeatherMeta } from "../hooks/useHeaderWeatherMeta";
+import { useMqttStatus } from "../hooks/useMqttStatus";
 import { useShellDecorations } from "../hooks/useShellDecorations";
 import type { ShellDecorationObject } from "@solar-display/shared";
+import type { ShellBootstrap } from "./shellBootstrap";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
@@ -111,15 +114,29 @@ export function ManagementShellFrame({
   );
 }
 
-export function ManagementShell({ initialBrandView }: { initialBrandView?: BrandView }) {
-  const brandView = useBrandAssets(initialBrandView);
-  const headerWeatherMeta = useHeaderWeatherMeta();
+export function ManagementShell({
+  initialBrandView,
+  initialShellBootstrap
+}: {
+  initialBrandView?: BrandView;
+  initialShellBootstrap?: ShellBootstrap;
+}) {
+  const brandView = useBrandAssets(initialShellBootstrap?.brandView ?? initialBrandView);
+  const { isHydrated, status } = useMqttStatus(initialShellBootstrap?.mqttStatus);
+  const headerWeatherMeta = useHeaderWeatherMeta(initialShellBootstrap?.weatherContract);
+  const headerConnectionMeta = resolveHeaderConnectionMeta({
+    connected: status.connected,
+    reason: status.reason,
+    isHydrated
+  });
   const shellDecorations = useShellDecorations();
 
   return (
     <ManagementShellFrame
       footerDecorationObjects={shellDecorations.footerObjects}
       headerMeta={{
+        status: headerConnectionMeta.status,
+        statusLabel: headerConnectionMeta.label,
         weather: headerWeatherMeta
       }}
       headerDecorationObjects={shellDecorations.headerObjects}
@@ -131,6 +148,6 @@ export function ManagementShell({ initialBrandView }: { initialBrandView?: Brand
 }
 
 export function ManagementShellRoute() {
-  const initialBrandView = useLoaderData() as BrandView;
-  return <ManagementShell initialBrandView={initialBrandView} />;
+  const initialShellBootstrap = useLoaderData() as ShellBootstrap;
+  return <ManagementShell initialShellBootstrap={initialShellBootstrap} />;
 }

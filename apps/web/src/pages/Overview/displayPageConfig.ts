@@ -27,6 +27,117 @@ import {
 } from "../shared/displayPageMediaEffectConfig";
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
+const overviewMetricCardStyle = {
+  cornerRadius: 20,
+  footerPaddingTop: 12,
+  headerGap: 14,
+  iconBoxSize: 54,
+  paddingBottom: 16,
+  paddingLeft: 24,
+  paddingRight: 24,
+  paddingTop: 20,
+  subtitleFontSize: 13,
+  titleFontSize: 18,
+  unitFontSize: 18,
+  unitPaddingBottom: 5,
+  valueFontSize: 64,
+  valueMarginTop: 20,
+  valueRowAlign: "center"
+} as const;
+
+const legacyOverviewHeroCopyLayout = {
+  left: 86,
+  top: 172,
+  width: 642
+} as const;
+
+const legacyOverviewHeroContainers = [
+  {
+    height: 700,
+    left: 430,
+    top: 146,
+    width: 1490
+  },
+  {
+    height: 820,
+    left: 430,
+    top: 140,
+    width: 1490
+  }
+] as const;
+
+const legacyOverviewKpiLayout = {
+  co2Today: { height: 220, left: 1156, top: 760, width: 352 },
+  co2Total: { height: 220, left: 1528, top: 760, width: 352 },
+  power: { height: 220, left: 40, top: 760, width: 352 },
+  today: { height: 220, left: 412, top: 760, width: 352 },
+  total: { height: 220, left: 784, top: 760, width: 352 }
+} as const;
+
+const legacyOverviewCardStyleVariants = [
+  {
+    cornerRadius: 26,
+    footerPaddingTop: 18,
+    headerGap: 16,
+    iconBoxSize: 58,
+    paddingBottom: 18,
+    paddingLeft: 22,
+    paddingRight: 22,
+    paddingTop: 20,
+    subtitleFontSize: 14,
+    titleFontSize: 20,
+    unitFontSize: 16,
+    unitPaddingBottom: 6,
+    valueFontSize: 54,
+    valueMarginTop: 28,
+    valueRowAlign: "center"
+  },
+  {
+    cornerRadius: 26,
+    footerPaddingTop: 18,
+    headerGap: 16,
+    iconBoxSize: 58,
+    paddingBottom: 18,
+    paddingLeft: 22,
+    paddingRight: 22,
+    paddingTop: 20,
+    subtitleFontSize: 14,
+    titleFontSize: 20,
+    unitFontSize: 18,
+    unitPaddingBottom: 6,
+    valueFontSize: 72,
+    valueMarginTop: 28,
+    valueRowAlign: "center"
+  }
+] as const;
+
+const legacyOverviewHeroTypography = {
+  eyebrowFontSize: 26,
+  eyebrowLetterSpacing: 5,
+  eyebrowMarginBottom: 20,
+  subtitleFontSize: 26,
+  subtitleLineHeight: 1.35,
+  subtitleMarginTop: 30,
+  titleEmphasisWeight: 900,
+  titleFontSize: 84,
+  titleLetterSpacing: 4,
+  titleLineHeight: 1.15
+} as const;
+
+function matchesRecord(
+  candidate: Record<string, unknown>,
+  expected: Record<string, unknown>
+) {
+  return Object.entries(expected).every(([key, value]) => candidate[key] === value);
+}
+
+function matchesAnyRecord(
+  candidate: Record<string, unknown>,
+  expectedRecords: readonly Record<string, unknown>[]
+) {
+  return expectedRecords.some((expected) => matchesRecord(candidate, expected));
+}
+
 export type OverviewDisplayRect = {
   height: number;
   left: number;
@@ -74,33 +185,9 @@ export function createOverviewDisplayPageSeedConfig(
 ): OverviewDisplayPageConfig {
   return {
     cardStyles: {
-      co2Today: createDisplayCardStyleConfig({
-        paddingBottom: 18,
-        paddingLeft: 22,
-        paddingRight: 22,
-        paddingTop: 20,
-        unitFontSize: 18,
-        valueFontSize: 72,
-        valueRowAlign: "center"
-      }),
-      co2Total: createDisplayCardStyleConfig({
-        paddingBottom: 18,
-        paddingLeft: 22,
-        paddingRight: 22,
-        paddingTop: 20,
-        unitFontSize: 18,
-        valueFontSize: 72,
-        valueRowAlign: "center"
-      }),
-      power: createDisplayCardStyleConfig({
-        paddingBottom: 18,
-        paddingLeft: 22,
-        paddingRight: 22,
-        paddingTop: 20,
-        unitFontSize: 18,
-        valueFontSize: 72,
-        valueRowAlign: "center"
-      }),
+      co2Today: createDisplayCardStyleConfig(overviewMetricCardStyle),
+      co2Total: createDisplayCardStyleConfig(overviewMetricCardStyle),
+      power: createDisplayCardStyleConfig(overviewMetricCardStyle),
       summary: createDisplayCardStyleConfig({
         cornerRadius: 18,
         paddingBottom: 14,
@@ -109,36 +196,20 @@ export function createOverviewDisplayPageSeedConfig(
         paddingTop: 14,
         titleFontSize: 13
       }),
-      today: createDisplayCardStyleConfig({
-        paddingBottom: 18,
-        paddingLeft: 22,
-        paddingRight: 22,
-        paddingTop: 20,
-        unitFontSize: 18,
-        valueFontSize: 72,
-        valueRowAlign: "center"
-      }),
-      total: createDisplayCardStyleConfig({
-        paddingBottom: 18,
-        paddingLeft: 22,
-        paddingRight: 22,
-        paddingTop: 20,
-        unitFontSize: 18,
-        valueFontSize: 72,
-        valueRowAlign: "center"
-      })
+      today: createDisplayCardStyleConfig(overviewMetricCardStyle),
+      total: createDisplayCardStyleConfig(overviewMetricCardStyle)
     },
     chrome: {
       heroTypography: createHeroTypographyConfig({
         eyebrowFontSize: 26,
         eyebrowLetterSpacing: 5,
-        eyebrowMarginBottom: 20,
+        eyebrowMarginBottom: 18,
         subtitleFontSize: 26,
         subtitleLineHeight: 1.35,
-        subtitleMarginTop: 30,
+        subtitleMarginTop: 24,
         titleEmphasisWeight: 900,
-        titleFontSize: 84,
-        titleLetterSpacing: 4
+        titleFontSize: 82,
+        titleLetterSpacing: 3
       }),
       ornaments: {
         goldLine: createGoldLineChromeConfig({
@@ -160,8 +231,8 @@ export function createOverviewDisplayPageSeedConfig(
     },
     heroCopyLayout: {
       left: 86,
-      top: 172,
-      width: 642
+      top: 210,
+      width: 600
     },
     heroMedia: {
       alignX: 1,
@@ -193,6 +264,46 @@ export function createOverviewDisplayPageSeedConfig(
       top: 430,
       width: 520
     }
+  };
+}
+
+export function resolveOverviewModernDefaultConfig(
+  config: OverviewDisplayPageConfig,
+  seedConfig: OverviewDisplayPageConfig
+): OverviewDisplayPageConfig {
+  const kpiCards = Object.fromEntries(
+    Object.entries(config.kpiCards).map(([key, value]) => [
+      key,
+      matchesRecord(value, legacyOverviewKpiLayout[key as keyof typeof legacyOverviewKpiLayout])
+        ? { ...seedConfig.kpiCards[key as keyof OverviewDisplayPageConfig["kpiCards"]] }
+        : value
+    ])
+  ) as OverviewDisplayPageConfig["kpiCards"];
+  const cardStyles = Object.fromEntries(
+    Object.entries(config.cardStyles).map(([key, value]) => [
+      key,
+      key !== "summary" && matchesAnyRecord(value, legacyOverviewCardStyleVariants)
+        ? { ...seedConfig.cardStyles[key as keyof OverviewDisplayPageConfig["cardStyles"]] }
+        : value
+    ])
+  ) as OverviewDisplayPageConfig["cardStyles"];
+
+  return {
+    ...config,
+    cardStyles,
+    chrome: {
+      ...config.chrome,
+      heroTypography: matchesRecord(config.chrome.heroTypography, legacyOverviewHeroTypography)
+        ? { ...seedConfig.chrome.heroTypography }
+        : config.chrome.heroTypography
+    },
+    heroContainer: matchesAnyRecord(config.heroContainer, legacyOverviewHeroContainers)
+      ? { ...seedConfig.heroContainer }
+      : config.heroContainer,
+    heroCopyLayout: matchesRecord(config.heroCopyLayout, legacyOverviewHeroCopyLayout)
+      ? { ...seedConfig.heroCopyLayout }
+      : config.heroCopyLayout,
+    kpiCards
   };
 }
 

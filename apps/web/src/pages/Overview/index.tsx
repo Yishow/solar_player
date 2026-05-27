@@ -31,6 +31,7 @@ import {
 import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
+  resolveOverviewModernDefaultConfig,
   type OverviewDisplayPageConfig
 } from "./displayPageConfig";
 import {
@@ -73,6 +74,23 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
+function renderOverviewTitleLine(line: string) {
+  const emphasisText = "綠色";
+  const emphasisIndex = line.indexOf(emphasisText);
+
+  if (emphasisIndex === -1) {
+    return line;
+  }
+
+  return (
+    <>
+      {line.slice(0, emphasisIndex)}
+      <em>{emphasisText}</em>
+      {line.slice(emphasisIndex + emphasisText.length)}
+    </>
+  );
+}
+
 export function Overview({ config, pageId = "overview" }: { config?: OverviewDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
@@ -101,7 +119,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig = resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig);
   const viewModel = buildOverviewViewModel({
     connectionState,
     isSocketConnected,
@@ -180,9 +198,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
             lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
           }}
         >
-          {resolvedConfig.heroCopy.titleLines[0]}
+          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[0])}
           <br />
-          {resolvedConfig.heroCopy.titleLines[1]}
+          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[1])}
         </h2>
         <p
           className="overview-hero-subtitle display-surface-hero-subtitle"

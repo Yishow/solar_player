@@ -1,7 +1,7 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
-import { loadRuntimeBrandView } from "../hooks/useBrandAssets";
 import { LayoutShellRoute } from "../layouts/LayoutShell";
 import { ManagementShellRoute } from "../layouts/ManagementShell";
+import { loadShellBootstrap } from "../layouts/shellBootstrap";
 import { BrandAssets } from "../pages/BrandAssets";
 import { CircuitSettings } from "../pages/CircuitSettings";
 import { DeviceStatus } from "../pages/DeviceStatus";
@@ -13,7 +13,7 @@ import { MqttSettings } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
 import { PlaybackSettings } from "../pages/PlaybackSettings";
 import { SlideshowPreview } from "../pages/SlideshowPreview";
-import { DisplayPageRouteHost } from "../pages/shared/displayPageRouteHost";
+import { DisplayPageRouteHost, loadDisplayPageRoute } from "../pages/shared/displayPageRouteHost";
 
 export const router = createBrowserRouter([
   {
@@ -23,17 +23,21 @@ export const router = createBrowserRouter([
   },
   {
     element: <LayoutShellRoute />,
-    loader: loadRuntimeBrandView,
+    loader: loadShellBootstrap,
+    hydrateFallbackElement: <></>,
     children: [
       {
         path: ":displayPageSlug",
+        loader: loadDisplayPageRoute,
+        hydrateFallbackElement: <></>,
         element: <DisplayPageRouteHost />
       }
     ]
   },
   {
     element: <ManagementShellRoute />,
-    loader: loadRuntimeBrandView,
+    loader: loadShellBootstrap,
+    hydrateFallbackElement: <></>,
     children: [
       {
         path: "trends",

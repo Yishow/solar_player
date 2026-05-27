@@ -9,9 +9,9 @@ export async function loadHeaderWeatherContract(
   return loadContract();
 }
 
-export function useHeaderWeatherMeta(): HeaderWeatherMeta {
-  const [contract, setContract] = useState<WeatherHeaderContract | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+export function useHeaderWeatherMeta(initialContract?: WeatherHeaderContract | null): HeaderWeatherMeta {
+  const [contract, setContract] = useState<WeatherHeaderContract | null>(initialContract ?? null);
+  const [isHydrated, setIsHydrated] = useState(initialContract !== undefined);
 
   useEffect(() => {
     let active = true;

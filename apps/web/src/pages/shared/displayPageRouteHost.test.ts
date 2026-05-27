@@ -12,6 +12,7 @@ const registryHookSource = readFileSync(
   "utf8"
 );
 const layoutShellSource = readFileSync(path.join(import.meta.dirname, "../../layouts/LayoutShell.tsx"), "utf8");
+const routerSource = readFileSync(path.join(import.meta.dirname, "../../app/router.tsx"), "utf8");
 
 function createPage(
   overrides: Partial<DisplayPageInstance> & Pick<DisplayPageInstance, "id" | "pageKey" | "route" | "routeSlug" | "templateKey">
@@ -107,6 +108,21 @@ test("display page route host resolves duplicate route slugs to the correct regi
 test("display page route host consumes refreshed registry snapshots after display-pages mutations", () => {
   assert.match(registryHookSource, /useDisplaySyncRefresh\(load,\s*\["display-pages"\]\)/);
   assert.match(routeHostSource, /resolveDisplayPageRouteInstance\(registry\.pages, location\.pathname\)/);
+});
+
+test("display page route navigation preloads live config before swapping runtime pages", () => {
+  assert.match(routeHostSource, /export async function loadDisplayPageRoute/);
+  assert.match(routeHostSource, /getDisplayPageRegistry\(\)/);
+  assert.match(routeHostSource, /getDisplayPageConfig\(page\.pageKey,\s*"live"\)/);
+  assert.match(routeHostSource, /primeDisplayPageConfigCache\(page\.pageKey,\s*"live",\s*envelope\)/);
+  assert.match(routerSource, /loader:\s*loadDisplayPageRoute/);
+});
+
+test("router loader routes provide silent hydrate fallbacks", () => {
+  const shellLoaderFallbacks = routerSource.match(/loader:\s*loadShellBootstrap,\s*hydrateFallbackElement:\s*<><\/>/g);
+
+  assert.equal(shellLoaderFallbacks?.length, 2);
+  assert.match(routerSource, /loader:\s*loadDisplayPageRoute,\s*hydrateFallbackElement:\s*<><\/>/);
 });
 
 test("display page route host drops archived routes once the registry snapshot refreshes", () => {

@@ -7,6 +7,8 @@ import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConf
 import {
   applyDisplayPageSaveConflict,
   mergeDisplayPageConfig,
+  primeDisplayPageConfigCache,
+  resolveCachedDisplayPageConfigSession,
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage,
@@ -290,6 +292,31 @@ test("resolveDisplayPageConfigForPage falls back to seed config while the next p
   );
 
   assert.deepEqual(resolved, overviewSeed);
+});
+
+test("display page config cache primes live route hydration before first render", () => {
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: "2026-05-27T00:00:00.000Z",
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["預載太陽能", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "live" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 8
+  };
+
+  primeDisplayPageConfigCache("solar-cache-test", "live", envelope);
+
+  const session = resolveCachedDisplayPageConfigSession("solar-cache-test", "live", seedConfig);
+
+  assert.equal(session?.config.heroCopy.titleLines[0], "預載太陽能");
+  assert.equal(session?.lastLoadedEnvelope, envelope);
 });
 
 test("display page runtime previews skip draft-session hydration when persistence is disabled", () => {

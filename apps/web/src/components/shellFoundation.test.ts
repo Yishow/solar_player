@@ -279,6 +279,12 @@ test("playback footer keeps the five display routes only", () => {
   assert.match(footerHtml, />迴路</);
   assert.match(footerHtml, />圖庫</);
   assert.match(footerHtml, />永續</);
+  assert.equal((footerHtml.match(/>總覽</g) ?? []).length, 1);
+  assert.match(footerHtml, /font-size:15px/);
+  assert.doesNotMatch(footerHtml, /font-size:17px/);
+  assert.doesNotMatch(footerHtml, /font-size:13px/);
+  assert.doesNotMatch(footerHtml, /data-shell-primitive="page-number-pill"/);
+  assert.doesNotMatch(footerHtml, /animate-arrow-wave/);
   assert.doesNotMatch(footerHtml, />進入設定</);
   assert.doesNotMatch(footerHtml, />MQTT</);
   assert.doesNotMatch(footerHtml, />圖片管理</);
@@ -409,18 +415,38 @@ test("settings footer keeps overview return plus settings-related routes only", 
       React.createElement(AppFooterNav)
     )
   );
+  const expectedOrder = [
+    "回總覽",
+    "播放設定",
+    "MQTT",
+    "圖片管理",
+    "迴路設定",
+    "裝置狀態",
+    "趨勢",
+    "歷史",
+    "品牌",
+    "展示編輯",
+    "預覽"
+  ];
 
-  assert.match(footerHtml, />回總覽</);
-  assert.match(footerHtml, />趨勢</);
-  assert.match(footerHtml, />品牌</);
-  assert.match(footerHtml, />展示編輯</);
-  assert.match(footerHtml, />播放設定</);
-  assert.match(footerHtml, />圖片管理</);
-  assert.match(footerHtml, />MQTT</);
-  assert.match(footerHtml, />迴路設定</);
-  assert.match(footerHtml, />歷史</);
-  assert.match(footerHtml, />預覽</);
-  assert.match(footerHtml, />裝置狀態</);
+  for (const label of expectedOrder) {
+    assert.match(footerHtml, new RegExp(`>${label}<`));
+  }
+
+  expectedOrder.slice(1).reduce((previousLabel, label) => {
+    assert.ok(
+      footerHtml.indexOf(`>${previousLabel}<`) < footerHtml.indexOf(`>${label}<`),
+      `${previousLabel} should appear before ${label}`
+    );
+    return label;
+  }, expectedOrder[0]!);
+
+  assert.match(footerHtml, /aria-current="page"[^>]*href="\/settings\/mqtt"/);
+  assert.match(footerHtml, /font-size:15px/);
+  assert.doesNotMatch(footerHtml, /font-size:17px/);
+  assert.doesNotMatch(footerHtml, /font-size:13px/);
+  assert.doesNotMatch(footerHtml, /animate-arrow-wave/);
+  assert.doesNotMatch(footerHtml, /<path d="M9 18l6-6-6-6"/);
   assert.doesNotMatch(footerHtml, />資產庫</);
   assert.doesNotMatch(footerHtml, />殼層裝飾</);
   assert.doesNotMatch(footerHtml, />太陽能</);

@@ -51,16 +51,18 @@ test("LayoutShell maps the hydrated mqtt status into the playback header meta", 
     layoutShellSource,
     /<AppHeader[^>]*meta=\{\{\s*status: [^,]+,\s*statusLabel: [^,]+,\s*weather: headerWeatherMeta\s*\}\}/s
   );
-  assert.match(layoutShellSource, /useHeaderWeatherMeta\(\)/);
+  assert.match(layoutShellSource, /useHeaderWeatherMeta\(initialShellBootstrap\?\.weatherContract\)/);
 });
 
-test("playback and management shells share the same header weather mapper", () => {
-  assert.match(layoutShellSource, /useHeaderWeatherMeta\(\)/);
+test("playback and management shells share bootstrapped weather and mqtt header state", () => {
+  assert.match(layoutShellSource, /useHeaderWeatherMeta\(initialShellBootstrap\?\.weatherContract\)/);
+  assert.match(layoutShellSource, /useMqttStatus\(initialShellBootstrap\?\.mqttStatus\)/);
   assert.match(
     managementShellSource,
-    /headerMeta=\{\{\s*weather: headerWeatherMeta\s*\}\}/s
+    /headerMeta=\{\{\s*status: headerConnectionMeta\.status,\s*statusLabel: headerConnectionMeta\.label,\s*weather: headerWeatherMeta\s*\}\}/s
   );
-  assert.match(managementShellSource, /useHeaderWeatherMeta\(\)/);
+  assert.match(managementShellSource, /useHeaderWeatherMeta\(initialShellBootstrap\?\.weatherContract\)/);
+  assert.match(managementShellSource, /useMqttStatus\(initialShellBootstrap\?\.mqttStatus\)/);
   assert.match(managementShellSource, /<AppHeader[^>]*meta=\{headerMeta\}/s);
 });
 

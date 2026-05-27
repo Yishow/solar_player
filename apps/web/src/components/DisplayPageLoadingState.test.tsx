@@ -7,7 +7,7 @@ import {
   displayPageLoadingStateStyles
 } from "./DisplayPageLoadingState";
 
-test("DisplayPageLoadingState exposes an accessible status region with motion hooks", () => {
+test("DisplayPageLoadingState exposes an accessible status region without visible loading copy", () => {
   const html = renderToStaticMarkup(React.createElement(DisplayPageLoadingState));
 
   assert.match(html, /role="status"/);
@@ -15,6 +15,8 @@ test("DisplayPageLoadingState exposes an accessible status region with motion ho
   assert.match(html, /display-page-loading-state/);
   assert.match(html, /display-page-loading-state__pulse/);
   assert.match(html, /載入展示頁/);
+  assert.doesNotMatch(html, /display-page-loading-state__headline/);
+  assert.doesNotMatch(html, /display-page-loading-state__copy/);
 });
 
 test("DisplayPageLoadingState styles inherit stage tokens and disable motion when reduced motion is requested", () => {

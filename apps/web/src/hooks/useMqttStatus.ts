@@ -13,9 +13,34 @@ export async function loadRuntimeMqttStatus(
   return loadStatus();
 }
 
-export function useMqttStatus() {
-  const [status, setStatus] = useState<MqttConnectionStatus>(getCachedMqttStatus());
-  const [isHydrated, setIsHydrated] = useState<boolean>(getCachedMqttStatus().updatedAt !== null);
+const DEFAULT_BOOTSTRAP_MQTT_STATUS: MqttConnectionStatus = {
+  broker: "",
+  clientId: "",
+  connected: false,
+  reason: "unavailable",
+  updatedAt: null
+};
+
+export function resolveInitialMqttState(
+  initialStatus?: MqttConnectionStatus | null,
+  cachedStatus: MqttConnectionStatus = getCachedMqttStatus()
+) {
+  const status =
+    initialStatus === undefined
+      ? cachedStatus
+      : initialStatus ?? DEFAULT_BOOTSTRAP_MQTT_STATUS;
+
+  return {
+    isHydrated:
+      initialStatus === undefined
+        ? cachedStatus.updatedAt !== null
+        : initialStatus !== null,
+    status
+  };
+}
+
+export function useMqttStatus(initialStatus?: MqttConnectionStatus | null) {
+  const [{ isHydrated, status }, setState] = useState(() => resolveInitialMqttState(initialStatus));
 
   useEffect(() => {
     let active = true;
@@ -27,16 +52,20 @@ export function useMqttStatus() {
           return;
         }
 
-        setStatus(response);
-        setIsHydrated(true);
+        setState({
+          isHydrated: true,
+          status: response
+        });
       } catch {
         // Socket.IO will keep trying; bootstrap failure should not block route rendering.
       }
     };
 
     const unsubscribe = subscribeSocketEvent("mqtt:status", (nextStatus) => {
-      setStatus(nextStatus);
-      setIsHydrated(true);
+      setState({
+        isHydrated: true,
+        status: nextStatus
+      });
     });
 
     getSocketClient();

@@ -25,7 +25,7 @@ test("display page seed configs persist card style records separately from geome
   const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
 
   assert.equal(overview.cardStyles.summary.titleFontSize, 13);
-  assert.equal(overview.cardStyles.power.valueFontSize, 72);
+  assert.equal(overview.cardStyles.power.valueFontSize, 64);
   assert.equal(solar.cardStyles.generation.valueRowAlign, "center");
   assert.equal(images.cardStyles.infoPanel.titleFontSize, 28);
   assert.equal(sustainability.cardStyles.totalGeneration.valueFontSize, 66);
@@ -33,6 +33,7 @@ test("display page seed configs persist card style records separately from geome
 
   assert.equal(overview.summaryCard.width, 520);
   assert.equal(overview.kpiCards.power.width, 352);
+  assert.equal(overview.kpiCards.power.height, 232);
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(images.infoPanel.width, 374);
   assert.equal(sustainability.statCards.esg.height, 220);

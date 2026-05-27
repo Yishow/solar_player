@@ -37,6 +37,68 @@ tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
 -->
 
+
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-05-27
+code:
+  - docs/reference-match/display-launch-witness-matrix.md
+  - apps/web/src/app/router.tsx
+  - docs/README.md
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - docs/reference-match/all-pages-checklist.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/hooks/useMqttStatus.ts
+  - AGENTS.md
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - README.md
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - CLAUDE.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/all-pages-audit.md
+  - .codex/hooks.json
+  - docs/reference-match/fhd-surface-split-guide.md
+  - .agents/skills/display-asset-generation/README.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - docs/FHD.01.html
+  - apps/server/src/mqtt/MqttClientService.ts
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+-->
+
 ---
 ### Requirement: Split FHD work by surface family and reviewable scope
 
@@ -69,6 +131,68 @@ tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
 -->
 
+
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-05-27
+code:
+  - docs/reference-match/display-launch-witness-matrix.md
+  - apps/web/src/app/router.tsx
+  - docs/README.md
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - docs/reference-match/all-pages-checklist.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/hooks/useMqttStatus.ts
+  - AGENTS.md
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - README.md
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - CLAUDE.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/all-pages-audit.md
+  - .codex/hooks.json
+  - docs/reference-match/fhd-surface-split-guide.md
+  - .agents/skills/display-asset-generation/README.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - docs/FHD.01.html
+  - apps/server/src/mqtt/MqttClientService.ts
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+-->
+
 ---
 ### Requirement: Record FHD exceptions as durable review artifacts
 
@@ -99,4 +223,65 @@ code:
   - .codex/hooks/fhd-evidence-reminder.js
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+-->
+
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-05-27
+code:
+  - docs/reference-match/display-launch-witness-matrix.md
+  - apps/web/src/app/router.tsx
+  - docs/README.md
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - docs/reference-match/all-pages-checklist.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/hooks/useMqttStatus.ts
+  - AGENTS.md
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - README.md
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - CLAUDE.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/all-pages-audit.md
+  - .codex/hooks.json
+  - docs/reference-match/fhd-surface-split-guide.md
+  - .agents/skills/display-asset-generation/README.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - docs/FHD.01.html
+  - apps/server/src/mqtt/MqttClientService.ts
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
 -->

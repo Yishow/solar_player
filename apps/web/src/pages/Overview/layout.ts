@@ -1,27 +1,27 @@
 export const overviewTitleLayout = {
   left: 86,
-  top: 172,
-  width: 642
+  top: 210,
+  width: 600
 } as const;
 
 export const overviewHeroLayout = {
-  height: 820,
-  left: 430,
-  top: 140,
-  width: 1490
+  height: 690,
+  left: 540,
+  top: 182,
+  width: 1340
 } as const;
 
 export const overviewLeafLayout = {
-  height: 168,
-  left: 420,
-  top: 528,
-  width: 296
+  height: 150,
+  left: 430,
+  top: 558,
+  width: 264
 } as const;
 
 export const overviewGoldLineLayout = {
   left: 12,
-  top: 610,
-  width: 760
+  top: 642,
+  width: 680
 } as const;
 
 export const overviewSummaryLayout = {
@@ -32,33 +32,33 @@ export const overviewSummaryLayout = {
 
 export const overviewKpiLayout = {
   co2Today: {
-    height: 250,
+    height: 232,
     left: 1156,
-    top: 760,
+    top: 758,
     width: 352
   },
   co2Total: {
-    height: 250,
+    height: 232,
     left: 1528,
-    top: 760,
+    top: 758,
     width: 352
   },
   power: {
-    height: 250,
+    height: 232,
     left: 40,
-    top: 760,
+    top: 758,
     width: 352
   },
   today: {
-    height: 250,
+    height: 232,
     left: 412,
-    top: 760,
+    top: 758,
     width: 352
   },
   total: {
-    height: 250,
+    height: 232,
     left: 784,
-    top: 760,
+    top: 758,
     width: 352
   }
 } as const;

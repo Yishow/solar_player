@@ -16,19 +16,14 @@ export const displayPageLoadingStateStyles = `
   color: var(--ink);
 }
 
-.display-page-loading-state__panel {
+.display-page-loading-state__veil {
   position: relative;
   display: flex;
-  min-width: 420px;
-  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  border: 1px solid rgba(89, 124, 67, 0.18);
-  border-radius: 24px;
-  background: rgba(255, 253, 248, 0.86);
-  box-shadow: 0 18px 38px rgba(55, 50, 38, 0.12);
-  padding: 32px 40px;
-  text-align: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  opacity: 0.72;
 }
 
 .display-page-loading-state__pulse {
@@ -40,18 +35,14 @@ export const displayPageLoadingStateStyles = `
   animation: display-page-loading-state-pulse 1.8s ease-out infinite;
 }
 
-.display-page-loading-state__headline {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.35;
-}
-
-.display-page-loading-state__copy {
-  max-width: 480px;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1.7;
+.display-page-loading-state__accessible-copy {
+  position: absolute;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 @keyframes display-page-loading-state-pulse {
@@ -92,10 +83,11 @@ export function DisplayPageLoadingState({
       role="status"
     >
       <style>{displayPageLoadingStateStyles}</style>
-      <div className="display-page-loading-state__panel">
+      <span className="display-page-loading-state__accessible-copy">
+        {label} {description}
+      </span>
+      <div aria-hidden="true" className="display-page-loading-state__veil">
         <div aria-hidden="true" className="display-page-loading-state__pulse" />
-        <strong className="display-page-loading-state__headline">{label}</strong>
-        <p className="display-page-loading-state__copy">{description}</p>
       </div>
     </section>
   );

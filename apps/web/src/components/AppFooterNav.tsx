@@ -5,7 +5,6 @@ import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
-import { PageNumberPill } from "./PageNumberPill";
 import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 
 type FooterEntry = {
@@ -20,6 +19,19 @@ const hiddenManagementFooterPaths = new Set([
   "/settings/assets",
   "/shell-decorations/editor"
 ]);
+
+const managementFooterOrder = [
+  "/settings/playback",
+  "/settings/mqtt",
+  "/settings/images",
+  "/settings/circuits",
+  "/device-status",
+  "/trends",
+  "/history",
+  "/brand",
+  "/display-pages/editor",
+  "/slideshow-preview"
+] as const;
 
 function buildEntries(
   currentPath: string,
@@ -54,13 +66,11 @@ function buildEntries(
     };
   }
 
-  const managementTabs: FooterEntry[] = routeMetaList
-    .filter(
-      (route): route is RouteMeta =>
-        route.group === "management"
-        && route.path !== "/offline"
-        && !hiddenManagementFooterPaths.has(route.path)
-    )
+  const managementTabs: FooterEntry[] = managementFooterOrder
+    .map((path) => routeMetaMap.get(path))
+    .filter((route): route is RouteMeta => {
+      return route !== undefined && !hiddenManagementFooterPaths.has(route.path);
+    })
     .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
 
   const overviewEntry: FooterEntry = { key: "overview-return", label: "回總覽", path: "/overview" };
@@ -93,11 +103,10 @@ export function AppFooterNav({
         }
       : undefined
   );
-  // Settings nav has more entries; tighten typography & spacing so they fit.
-  // 縮小間距以讓項目更近
-  const navItemPaddingX = mode === "playback" ? 24 : 14;
-  const navItemFontSize = mode === "playback" ? 16 : 14;
+  const navItemPaddingX = mode === "playback" ? 26 : 12;
+  const navItemFontSize = 15;
   const navItemTracking = mode === "playback" ? "0.04em" : "0.02em";
+  const activeUnderlineInset = mode === "playback" ? 26 : 12;
 
   const activeIndex = entries.findIndex((entry) => isActivePath(entry.path));
 
@@ -112,30 +121,32 @@ export function AppFooterNav({
         className="relative flex w-full items-center pl-[32px] pr-[32px]"
         style={{ zIndex: SHELL_CHROME_CONTENT_Z_INDEX }}
       >
-        {/* 已移除 PageNumberPill */}
-
         <div>
           <LeafOrnament variant="footer-mini" />
         </div>
 
-        <nav className="ml-[12px] flex h-[64px] flex-1 items-stretch overflow-hidden group">
+        <nav
+          className={[
+            "flex h-[64px] flex-1 items-stretch overflow-hidden",
+            mode === "playback" ? "ml-[88px] justify-center" : "ml-[44px] justify-center"
+          ].join(" ")}
+        >
           {entries.map((entry, index) => {
             const active = index === activeIndex;
 
-            // 加入了 group/item 與 active 的背景光暈 (Radial Gradient)
-            const baseClasses = "group/item relative flex items-center font-en leading-none whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
+            const baseClasses = "relative flex items-center font-en leading-none whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
 
             const playbackClasses = active
-              ? "font-medium opacity-100"
-              : "font-medium opacity-60 group-hover:opacity-40 hover:!opacity-100 hover:-translate-y-[1px] active:scale-[0.97]";
+              ? "font-semibold opacity-100"
+              : "font-medium opacity-[0.58] hover:opacity-100 active:scale-[0.98]";
 
             const managementClasses = active
-              ? "font-bold opacity-100"
-              : "font-semibold opacity-70 hover:opacity-100";
+              ? "font-semibold opacity-100"
+              : "font-medium opacity-[0.62] hover:opacity-100 active:scale-[0.98]";
 
             return (
               <Fragment key={entry.key}>
-                {index > 0 && <NavArrow isNext={mode === "playback" && index === activeIndex + 1} />}
+                {index > 0 && <NavDivider compact={mode === "management"} />}
                 <Link
                   to={entry.path}
                   aria-current={active ? "page" : undefined}
@@ -144,54 +155,34 @@ export function AppFooterNav({
                     color: active
                       ? "var(--shell-nav-active-ink)"
                       : "var(--shell-nav-rest-ink)",
-                    textShadow: active && mode === "playback" ? "0 0 12px rgba(63, 122, 52, 0.4)" : "none",
+                    textShadow: "none",
                     fontSize: `${navItemFontSize}px`,
                     letterSpacing: active && mode === "management" ? "0.06em" : navItemTracking,
                     paddingLeft: `${navItemPaddingX}px`,
                     paddingRight: `${navItemPaddingX}px`
                   }}
                 >
-                  {/* 環境光暈 - 實作第 5 點 */}
-                  {active && mode === "playback" && (
-                     <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(63,122,52,0.12)_0%,transparent_70%)] pointer-events-none" />
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute bottom-[12px] h-[2px] rounded-full bg-[var(--shell-nav-active-ink)]"
+                      style={{
+                        left: `${activeUnderlineInset}px`,
+                        right: `${activeUnderlineInset}px`
+                      }}
+                    />
                   )}
                   {entry.label}
                 </Link>
               </Fragment>
             );
           })}
-          {mode === "playback" && (
-            <div
-              aria-hidden="true"
-              className={`flex items-center transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                activeIndex === entries.length - 1
-                  ? "opacity-100 translate-x-0"
-                  : "opacity-0 -translate-x-[10px] pointer-events-none"
-              }`}
-            >
-              <NavArrow isNext={activeIndex === entries.length - 1} />
-              <span
-                className="font-en font-medium leading-none whitespace-nowrap"
-                style={{
-                  color: "var(--shell-nav-rest-ink)",
-                  fontSize: `${navItemFontSize}px`,
-                  letterSpacing: navItemTracking,
-                  opacity: 0.3,
-                  paddingLeft: `${navItemPaddingX}px`,
-                  paddingRight: `${navItemPaddingX}px`
-                }}
-              >
-                {entries[0]?.label}
-              </span>
-            </div>
-          )}
         </nav>
 
         <div className="ml-[24px] flex items-center gap-[24px]">
           <div className="text-right">
             <div
               className="text-[17px] font-semibold tracking-[0.42em]"
-              // 實作第 3 點：字體的活版印刷感 (Engraved Typography)
               style={{ 
                 color: "var(--shell-slogan-ink)", 
                 marginRight: "-0.42em",
@@ -224,7 +215,6 @@ function FooterBranch() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="shrink-0 opacity-90 relative z-10 animate-branch"
-      // 實作第 4 點：為圖示增加物理維度與浮雕感
       style={{ transform: "translateY(-4px)", filter: "drop-shadow(0 2px 4px rgba(104, 130, 66, 0.2)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.5))" }}
       stroke="var(--shell-branch-stroke, #9aa05e)"
       strokeWidth="1.45"
@@ -241,48 +231,10 @@ function FooterBranch() {
   );
 }
 
-function NavArrow({ isNext }: { isNext?: boolean }) {
-  if (isNext) {
-    return (
-      <div className="flex h-full items-center px-[2px] gap-[1px]" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <svg
-            key={i}
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="var(--shell-nav-active-ink)"
-            // 稍微加粗一點讓動畫箭頭更明顯
-            strokeWidth="2.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="animate-arrow-wave"
-            style={{ animationDelay: `${i * 0.2}s` }}
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        ))}
-      </div>
-    );
-  }
-
+function NavDivider({ compact = false }: { compact?: boolean }) {
   return (
-    // 縮小左右 padding 讓項目更靠近，並調深顏色透明度讓分隔標更明顯
-    <div className="flex h-full items-center px-[4px]" aria-hidden="true">
-      <svg
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-        fill="none"
-        stroke="var(--shell-divider-strong)"
-        strokeWidth="2.0"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ opacity: 0.7 }}
-      >
-        <path d="M9 18l6-6-6-6" />
-      </svg>
-    </div>
+    <span className={`flex h-full items-center ${compact ? "px-[6px]" : "px-[10px]"}`} aria-hidden="true">
+      <span className="h-[18px] w-px bg-[var(--shell-divider-strong)] opacity-45" />
+    </span>
   );
 }

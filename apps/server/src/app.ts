@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import Fastify, { type FastifyError } from "fastify";
+import Fastify, { type FastifyError, type FastifyServerOptions } from "fastify";
 import { mkdirSync } from "node:fs";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,10 +66,15 @@ function shouldServeSpaFallback(request: { headers: { accept?: string }; method:
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
 }
 
-export async function buildApp() {
-  const app = Fastify({
+export function createFastifyOptions(): FastifyServerOptions {
+  return {
+    disableRequestLogging: true,
     logger: createLoggerOptions()
-  });
+  };
+}
+
+export async function buildApp() {
+  const app = Fastify(createFastifyOptions());
   const trustedManagementOrigins = parseManagementTrustedOrigins(config.managementTrustedOrigins);
   const managementCorsOrigin = createManagementCorsOriginDelegate(trustedManagementOrigins);
   const managementAccess = createManagementAccessControl({

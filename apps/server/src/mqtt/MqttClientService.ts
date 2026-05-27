@@ -328,7 +328,9 @@ export class MqttClientService {
         reason: "connected"
       });
       this.notifySystemRecovered("MQTT connection restored");
-      void this.syncSubscriptions();
+      void this.syncSubscriptions().catch((error) => {
+        this.handleSubscriptionSyncError(error);
+      });
     });
     client.on("reconnect", () => {
       this.setStatus({
@@ -388,6 +390,27 @@ export class MqttClientService {
         this.activeTopics.add(topic);
       });
     }
+  }
+
+  private handleSubscriptionSyncError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    this.setStatus({
+      connected: this.client?.connected ?? this.status.connected,
+      reason: message
+    });
+    this.logger.warn(
+      {
+        broker: this.status.broker,
+        clientId: this.status.clientId,
+        error
+      },
+      "MQTT subscription sync failed"
+    );
+    this.notifySystemError("MQTT subscription sync failed", {
+      broker: this.status.broker,
+      clientId: this.status.clientId,
+      error: message
+    });
   }
 
   private async loadEnabledTopics() {

@@ -127,6 +127,38 @@ export function resolveDisplayPageFallbackPolicy(
   return envelope?.fallbackPolicy ?? defaultFallbackPolicy;
 }
 
+const displayPageConfigCache = new Map<string, DisplayPageConfigEnvelope>();
+
+function resolveDisplayPageConfigCacheKey(pageId: DisplayPageId, stage: ConfigStage) {
+  return `${stage}:${pageId}`;
+}
+
+export function primeDisplayPageConfigCache(
+  pageId: DisplayPageId,
+  stage: ConfigStage,
+  envelope: DisplayPageConfigEnvelope
+) {
+  displayPageConfigCache.set(resolveDisplayPageConfigCacheKey(pageId, stage), envelope);
+}
+
+export function resolveCachedDisplayPageConfigSession<T>(
+  pageId: DisplayPageId,
+  stage: ConfigStage,
+  seedConfig: T
+): (DisplayPageDraftSession<T> & { lastLoadedEnvelope: DisplayPageConfigEnvelope }) | null {
+  const envelope = displayPageConfigCache.get(resolveDisplayPageConfigCacheKey(pageId, stage));
+
+  if (!envelope) {
+    return null;
+  }
+
+  const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
+  return {
+    ...createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)),
+    lastLoadedEnvelope: envelope
+  };
+}
+
 export function applyDisplayPageSaveConflict<T>(
   session: DisplayPageDraftSession<T>,
   latestConfig: T,
@@ -203,8 +235,13 @@ export function useDisplayPageConfig<T>(
 ): UseDisplayPageConfigResult<T> {
   const enabled = options.enabled ?? true;
   const stage = options.stage ?? "live";
-  const [sessions, setSessions] = useState<Record<string, DisplayPageDraftSession<T>>>({});
-  const [isLoading, setIsLoading] = useState(enabled);
+  const initialCachedSession = enabled
+    ? resolveCachedDisplayPageConfigSession(pageId, stage, seedConfig)
+    : null;
+  const [sessions, setSessions] = useState<Record<string, DisplayPageDraftSession<T>>>(() =>
+    initialCachedSession ? { [pageId]: initialCachedSession } : {}
+  );
+  const [isLoading, setIsLoading] = useState(enabled && initialCachedSession === null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState(enabled ? "正在同步展示頁設定..." : "使用頁面預設設定。");
   const [errorMessage, setErrorMessage] = useState("");
@@ -236,6 +273,15 @@ export function useDisplayPageConfig<T>(
       return;
     }
 
+    const cachedSession = resolveCachedDisplayPageConfigSession(pageId, stage, seedConfig);
+    if (cachedSession) {
+      setSessions((current) => ({ ...current, [pageId]: cachedSession }));
+      setIsLoading(false);
+      setMessage(resolveLoadMessage(stage, cachedSession.lastLoadedEnvelope));
+      setErrorMessage("");
+      return;
+    }
+
     const load = async () => {
       setIsLoading(true);
       setMessage("正在同步展示頁設定...");
@@ -248,6 +294,7 @@ export function useDisplayPageConfig<T>(
         }
 
         const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
+        primeDisplayPageConfigCache(pageId, stage, envelope);
         setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
         setMessage(resolveLoadMessage(stage, envelope));
       } catch (error) {
@@ -285,6 +332,7 @@ export function useDisplayPageConfig<T>(
     try {
       const envelope = await getDisplayPageConfig(pageId, stage);
       const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
+      primeDisplayPageConfigCache(pageId, stage, envelope);
       setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
       setMessage(resolveLoadMessage(stage, envelope));
     } catch (error) {

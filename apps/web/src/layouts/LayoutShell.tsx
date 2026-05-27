@@ -16,16 +16,23 @@ import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
 import { useShellDecorations } from "../hooks/useShellDecorations";
 import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { shouldRedirectToOffline } from "./offlineRouting";
+import type { ShellBootstrap } from "./shellBootstrap";
 
-export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView }) {
+export function LayoutShell({
+  initialBrandView,
+  initialShellBootstrap
+}: {
+  initialBrandView?: BrandView;
+  initialShellBootstrap?: ShellBootstrap;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const brandView = useBrandAssets(initialBrandView);
+  const brandView = useBrandAssets(initialShellBootstrap?.brandView ?? initialBrandView);
   const registry = useDisplayPageRegistry();
-  const { isHydrated, status } = useMqttStatus();
+  const { isHydrated, status } = useMqttStatus(initialShellBootstrap?.mqttStatus);
   const routeMeta = resolvePlaybackRouteMeta(location.pathname, registry.pages);
   const playbackEntries = buildPlaybackFooterEntries(registry.pages);
-  const headerWeatherMeta = useHeaderWeatherMeta();
+  const headerWeatherMeta = useHeaderWeatherMeta(initialShellBootstrap?.weatherContract);
   const shellDecorations = useShellDecorations();
   const headerConnectionMeta = resolveHeaderConnectionMeta({
     connected: status.connected,
@@ -118,6 +125,6 @@ export function LayoutShell({ initialBrandView }: { initialBrandView?: BrandView
 }
 
 export function LayoutShellRoute() {
-  const initialBrandView = useLoaderData() as BrandView;
-  return <LayoutShell initialBrandView={initialBrandView} />;
+  const initialShellBootstrap = useLoaderData() as ShellBootstrap;
+  return <LayoutShell initialShellBootstrap={initialShellBootstrap} />;
 }

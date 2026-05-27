@@ -11,17 +11,23 @@ const indexHtmlSource = fs.readFileSync(path.join(layoutDir, "../../index.html")
 const headerSource = fs.readFileSync(path.join(layoutDir, "../components/AppHeader.tsx"), "utf8");
 const footerSource = fs.readFileSync(path.join(layoutDir, "../components/AppFooterNav.tsx"), "utf8");
 
-test("shell layouts consume bootstrapped brand loader data for first paint chrome", () => {
+test("shell layouts consume bootstrapped shell loader data for first paint chrome", () => {
   assert.match(layoutShellSource, /useLoaderData/);
-  assert.match(layoutShellSource, /useBrandAssets\(initialBrandView\)/);
+  assert.match(layoutShellSource, /useBrandAssets\(initialShellBootstrap\?\.brandView \?\? initialBrandView\)/);
+  assert.match(layoutShellSource, /useMqttStatus\(initialShellBootstrap\?\.mqttStatus\)/);
+  assert.match(layoutShellSource, /useHeaderWeatherMeta\(initialShellBootstrap\?\.weatherContract\)/);
   assert.match(layoutShellSource, /brandView=\{brandView\}/);
   assert.match(managementShellSource, /useLoaderData/);
-  assert.match(managementShellSource, /useBrandAssets\(initialBrandView\)/);
+  assert.match(managementShellSource, /useBrandAssets\(initialShellBootstrap\?\.brandView \?\? initialBrandView\)/);
+  assert.match(managementShellSource, /useMqttStatus\(initialShellBootstrap\?\.mqttStatus\)/);
+  assert.match(managementShellSource, /useHeaderWeatherMeta\(initialShellBootstrap\?\.weatherContract\)/);
+  assert.match(managementShellSource, /resolveHeaderConnectionMeta/);
   assert.match(managementShellSource, /initialBrandView=\{brandView\}/);
 });
 
-test("router wires a runtime brand loader into both playback and management shells", () => {
-  assert.match(routerSource, /loader:\s*loadRuntimeBrandView/);
+test("router wires a shell bootstrap loader into both playback and management shells", () => {
+  assert.match(routerSource, /loader:\s*loadShellBootstrap/);
+  assert.doesNotMatch(routerSource, /loader:\s*loadRuntimeBrandView/);
 });
 
 test("index.html seeds the browser title from cached brand state instead of a stale hardcoded brand", () => {

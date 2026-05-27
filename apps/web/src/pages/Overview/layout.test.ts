@@ -12,25 +12,25 @@ import {
 test("overview layout centralizes reference hero and KPI geometry", () => {
   assert.deepEqual(overviewTitleLayout, {
     left: 86,
-    top: 172,
-    width: 642
+    top: 210,
+    width: 600
   });
   assert.deepEqual(overviewHeroLayout, {
-    height: 820,
-    left: 430,
-    top: 140,
-    width: 1490
+    height: 690,
+    left: 540,
+    top: 182,
+    width: 1340
   });
   assert.deepEqual(overviewLeafLayout, {
-    height: 168,
-    left: 420,
-    top: 528,
-    width: 296
+    height: 150,
+    left: 430,
+    top: 558,
+    width: 264
   });
   assert.deepEqual(overviewGoldLineLayout, {
     left: 12,
-    top: 610,
-    width: 760
+    top: 642,
+    width: 680
   });
   assert.deepEqual(overviewSummaryLayout, {
     left: 88,
@@ -38,33 +38,33 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
     width: 376
   });
   assert.deepEqual(overviewKpiLayout.power, {
-    height: 250,
+    height: 232,
     left: 40,
-    top: 760,
+    top: 758,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.today, {
-    height: 250,
+    height: 232,
     left: 412,
-    top: 760,
+    top: 758,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.total, {
-    height: 250,
+    height: 232,
     left: 784,
-    top: 760,
+    top: 758,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.co2Today, {
-    height: 250,
+    height: 232,
     left: 1156,
-    top: 760,
+    top: 758,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.co2Total, {
-    height: 250,
+    height: 232,
     left: 1528,
-    top: 760,
+    top: 758,
     width: 352
   });
 

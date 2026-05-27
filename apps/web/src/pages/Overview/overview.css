@@ -21,7 +21,7 @@
 }
 
 .overview-title-group .overview-eyebrow {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 5px;
@@ -30,10 +30,10 @@
 
 .overview-title-group .overview-display-title {
   margin: 0;
-  font-size: 84px;
+  font-size: 82px;
   font-weight: 900;
   line-height: 1.15;
-  letter-spacing: 4px;
+  letter-spacing: 3px;
   text-align: left;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .overview-title-group .overview-hero-subtitle {
-  margin: 30px 0 0;
+  margin: 24px 0 0;
   font-family: var(--font-family-en);
   font-size: 26px;
   line-height: 1.35;
@@ -59,6 +59,7 @@
 .overview-hero-banner img {
   height: 100%;
   width: 100%;
+  object-position: top right;
   transform-origin: top right;
   transform: none;
 }
@@ -81,9 +82,12 @@
   --display-card-subtitle-color: #687068;
   --display-card-value-color: #4f6745;
   --display-card-unit-color: #525851;
-  border: 1px solid var(--display-card-border-strong);
-  background: var(--display-card-surface-strong);
-  box-shadow: var(--display-shadow-soft);
+  --display-card-title-letter-spacing: 0.04em;
+  --display-card-subtitle-letter-spacing: 0.08em;
+  border: 1px solid rgba(98, 117, 78, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 254, 250, 0.96) 0%, rgba(255, 253, 247, 0.9) 100%);
+  box-shadow: 0 12px 28px rgba(63, 75, 55, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   overflow: hidden;
 }
 
@@ -92,8 +96,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid var(--display-card-border-soft);
-  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(99, 132, 78, 0.26);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--display-emphasis-green);
 }
 

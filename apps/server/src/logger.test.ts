@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createFastifyOptions } from "./app.js";
 import { createLoggerOptions } from "./logger.js";
+
+test("createFastifyOptions disables automatic 2xx request access logs", () => {
+  assert.equal(createFastifyOptions().disableRequestLogging, true);
+});
 
 test("createLoggerOptions uses pino-pretty outside production", () => {
   const originalNodeTestContext = process.env.NODE_TEST_CONTEXT;

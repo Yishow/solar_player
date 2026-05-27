@@ -40,6 +40,68 @@ tests:
   - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
 -->
 
+
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-05-27
+code:
+  - apps/web/src/app/router.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .codex/hooks.json
+  - .agents/skills/display-asset-generation/README.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - CLAUDE.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/README.md
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - AGENTS.md
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - docs/reference-match/fhd-surface-split-guide.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - apps/web/src/pages/Overview/index.tsx
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/hooks/useMqttStatus.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - README.md
+  - apps/web/src/layouts/ManagementShell.tsx
+  - docs/reference-match/all-pages-audit.md
+  - docs/reference-match/all-pages-checklist.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - docs/FHD.01.html
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+-->
+
 ---
 ### Requirement: Keep human-facing entrypoints lightweight and navigable
 
@@ -75,6 +137,68 @@ tests:
   - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
 -->
 
+
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-05-27
+code:
+  - apps/web/src/app/router.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .codex/hooks.json
+  - .agents/skills/display-asset-generation/README.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - CLAUDE.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/README.md
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - AGENTS.md
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - docs/reference-match/fhd-surface-split-guide.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - apps/web/src/pages/Overview/index.tsx
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/hooks/useMqttStatus.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - README.md
+  - apps/web/src/layouts/ManagementShell.tsx
+  - docs/reference-match/all-pages-audit.md
+  - docs/reference-match/all-pages-checklist.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - docs/FHD.01.html
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+-->
+
 ---
 ### Requirement: Repo-local skills use the same workflow vocabulary as the entrypoints
 
@@ -108,4 +232,65 @@ code:
   - openspec/specs/agent-and-doc-entrypoint-alignment/spec.md
 tests:
   - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+-->
+
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-05-27
+code:
+  - apps/web/src/app/router.tsx
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .codex/hooks.json
+  - .agents/skills/display-asset-generation/README.md
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - CLAUDE.md
+  - docs/display-surface-visual-review-checklist.md
+  - apps/web/src/components/AppFooterNav.tsx
+  - docs/README.md
+  - apps/web/src/components/DisplayPageLoadingState.tsx
+  - docs/reference-match/display-launch-verification-pack.md
+  - apps/server/src/app.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.css
+  - AGENTS.md
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - .agents/skills/product-gap-audit/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - docs/reference-match/fhd-surface-split-guide.md
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/reference-match/fhd-exception-ledger-template.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - .agents/skills/display-asset-generation/SKILL.md
+  - apps/web/src/pages/Overview/index.tsx
+  - docs/reference-match/fhd-workflow-entrypoints.md
+  - apps/web/src/hooks/useMqttStatus.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - README.md
+  - apps/web/src/layouts/ManagementShell.tsx
+  - docs/reference-match/all-pages-audit.md
+  - docs/reference-match/all-pages-checklist.md
+  - .codex/hooks/fhd-evidence-reminder.js
+  - docs/reference-match/playback-visual-canonicals.md
+  - apps/web/src/layouts/shellBootstrap.ts
+  - docs/FHD.01.html
+tests:
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/layouts/LayoutShell.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/components/DisplayPageLoadingState.test.tsx
+  - apps/web/src/layouts/shellBootstrap.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
 -->
