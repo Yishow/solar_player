@@ -2,6 +2,8 @@ import { sustainabilityAssetMap } from "./assets";
 
 export { sustainabilityAssetMap };
 
+export const sustainabilityContentTopOffset = 110;
+
 export const sustainabilityTitleLayout = {
   left: 88,
   top: 166,
@@ -30,43 +32,43 @@ export const sustainabilityHeroLayout = {
 
 export const sustainabilityKpiLayout = {
   annualSaving: {
-    height: 220,
-    left: 684,
-    top: 760,
-    width: 304
+    height: 232,
+    left: 668,
+    top: 704,
+    width: 284
   },
   totalCo2: {
-    height: 220,
+    height: 232,
     left: 362,
-    top: 760,
-    width: 304
+    top: 704,
+    width: 288
   },
   totalGeneration: {
-    height: 220,
+    height: 232,
     left: 40,
-    top: 760,
+    top: 704,
     width: 304
   }
 } as const;
 
 export const sustainabilityStatLayout = {
   esg: {
-    height: 220,
-    left: 1330,
-    top: 760,
-    width: 304
+    height: 232,
+    left: 1268,
+    top: 704,
+    width: 282
   },
   procure: {
-    height: 220,
-    left: 1008,
-    top: 760,
-    width: 304
+    height: 232,
+    left: 970,
+    top: 704,
+    width: 282
   },
   trees: {
-    height: 220,
-    left: 1652,
-    top: 760,
-    width: 236
+    height: 232,
+    left: 1568,
+    top: 704,
+    width: 304
   }
 } as const;
 

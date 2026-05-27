@@ -32,7 +32,6 @@ import {
 import {
   factoryCircuitContentTopOffset,
   factoryCircuitGoldLayout,
-  factoryCircuitLeafLayout,
   factoryCircuitTitleLayout
 } from "./layout";
 import { resolveDisplayPageRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
@@ -44,12 +43,36 @@ import {
   type FactoryCircuitLoadState,
   type FactoryCircuitRuntime
 } from "./viewModel";
-import {
-  FactoryCircuitReferenceSprite,
-  factoryCircuitReferenceLeafRegions
-} from "./iconRegistry";
 
 const CONTENT_TOP_OFFSET = factoryCircuitContentTopOffset;
+const factoryLineLeafReferenceUrl = new URL(
+  "./assets/factory-line-leaf-reference.png",
+  import.meta.url
+).href;
+const factoryLeafWatermarkReferenceUrl = new URL(
+  "./assets/factory-leaf-watermark-reference.png",
+  import.meta.url
+).href;
+const factoryLeafVineReferenceUrl = new URL(
+  "./assets/factory-leaf-vine-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingPvInverterReferenceUrl = new URL(
+  "./assets/factory-routing-pv-inverter-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingInverterBoardReferenceUrl = new URL(
+  "./assets/factory-routing-inverter-board-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingInverterDropReferenceUrl = new URL(
+  "./assets/factory-routing-inverter-drop-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingLoadReferenceUrl = new URL(
+  "./assets/factory-routing-load-reference.png",
+  import.meta.url
+).href;
 
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
@@ -75,6 +98,23 @@ const loadRowOrder = [
   "infrastructure"
 ] as const;
 
+const powerConnectorReferenceByKey = {
+  inverterToBoard: {
+    height: 38,
+    leftOffset: -4,
+    src: factoryRoutingInverterBoardReferenceUrl,
+    topOffset: -26,
+    width: 80
+  },
+  solarToInverter: {
+    height: 38,
+    leftOffset: -8,
+    src: factoryRoutingPvInverterReferenceUrl,
+    topOffset: -26,
+    width: 66
+  }
+} as const;
+
 function FactoryCircuitLineLeaf({
   className,
   style
@@ -83,9 +123,11 @@ function FactoryCircuitLineLeaf({
   style: CSSProperties;
 }) {
   return (
-    <FactoryCircuitReferenceSprite
+    <img
+      alt=""
       className={className}
-      region={factoryCircuitReferenceLeafRegions.lineLeaf}
+      draggable={false}
+      src={factoryLineLeafReferenceUrl}
       style={style}
     />
   );
@@ -99,9 +141,52 @@ function FactoryCircuitLeafWatermark({
   style: CSSProperties;
 }) {
   return (
-    <FactoryCircuitReferenceSprite
+    <img
+      alt=""
+      aria-hidden="true"
       className={className}
-      region={factoryCircuitReferenceLeafRegions.watermarkLeaf}
+      draggable={false}
+      src={factoryLeafWatermarkReferenceUrl}
+      style={style}
+    />
+  );
+}
+
+function FactoryCircuitLeafVine({
+  className,
+  style
+}: {
+  className: string;
+  style: CSSProperties;
+}) {
+  return (
+    <img
+      alt=""
+      aria-hidden="true"
+      className={className}
+      draggable={false}
+      src={factoryLeafVineReferenceUrl}
+      style={style}
+    />
+  );
+}
+
+function FactoryCircuitRoutingReference({
+  className,
+  src,
+  style
+}: {
+  className: string;
+  src: string;
+  style: CSSProperties;
+}) {
+  return (
+    <img
+      alt=""
+      aria-hidden="true"
+      className={className}
+      draggable={false}
+      src={src}
       style={style}
     />
   );
@@ -224,21 +309,21 @@ export function FactoryCircuit({
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
-  const leafLayout = withContentOffset(factoryCircuitLeafLayout);
   const powerConnectors = Object.keys(resolvedConfig.connectors).map((connectorKey) => {
     const layout = withContentOffset(
       resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
     );
-    const endX = layout.left + layout.width;
-    const chevronOffsets = [30, 16];
+    const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
 
     return {
-      chevrons: chevronOffsets.map((offset) => {
-        const leftX = endX - offset;
-        return `M${leftX} ${layout.top - 10} L${leftX + 12} ${layout.top} L${leftX} ${layout.top + 10}`;
-      }),
       key: connectorKey,
-      linePath: `M${layout.left} ${layout.top} H${endX}`
+      src: reference.src,
+      style: {
+        height: `${reference.height}px`,
+        left: `${layout.left + reference.leftOffset}px`,
+        top: `${layout.top + reference.topOffset}px`,
+        width: `${reference.width}px`
+      }
     };
   });
 
@@ -322,23 +407,31 @@ export function FactoryCircuit({
       <FactoryCircuitLineLeaf
         className="factory-circuit-line-leaf"
         style={{
-          height: "62px",
-          left: `${goldLayout.left + 376}px`,
-          top: `${goldLayout.top - 28}px`,
-          width: "116px"
+          height: "56px",
+          left: "420px",
+          top: `${374 - CONTENT_TOP_OFFSET}px`,
+          width: "140px"
         }}
       />
 
       <FactoryCircuitLeafWatermark
         className="factory-circuit-leaf-watermark display-surface-leaf-ornament"
         style={{
-          height: `${leafLayout.height}px`,
-          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+          height: "148px",
+          left: `${552 + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
           opacity: Math.min(1, resolvedConfig.chrome.ornaments.leaf.opacity / seedConfig.chrome.ornaments.leaf.opacity),
-          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-          transform: `rotate(-10deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
-          transformOrigin: "50% 50%",
-          width: `${leafLayout.width}px`
+          top: `${585 - CONTENT_TOP_OFFSET + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          width: "268px"
+        }}
+      />
+
+      <FactoryCircuitLeafVine
+        className="factory-circuit-leaf-vine"
+        style={{
+          height: "76px",
+          left: "0px",
+          top: `${680 - CONTENT_TOP_OFFSET}px`,
+          width: "650px"
         }}
       />
 
@@ -369,34 +462,36 @@ export function FactoryCircuit({
         );
       })}
 
-      <svg aria-hidden="true" className="factory-circuit-routing" viewBox="0 0 1920 1080">
-        <g className="routing-power-chain">
-          {powerConnectors.map((connector) => (
-            <g key={connector.key}>
-              <path className="routing-power-flow" d={connector.linePath} />
-              {connector.chevrons.map((path, index) => (
-                <path key={`${connector.key}-${index}`} className="routing-power-chevron" d={path} />
-              ))}
-            </g>
-          ))}
-        </g>
-        <g className="routing-load-tree">
-          <path className="routing-trunk" d="M1320 78 V553" />
-          <path className="routing-board-branch" d="M1258 330 H1294 C1309 330 1320 318 1320 303" />
-          <path className="routing-branch" d="M1320 102 C1320 88 1332 78 1346 78 H1382" />
-          <path className="routing-branch" d="M1320 197 C1320 183 1332 173 1346 173 H1382" />
-          <path className="routing-branch" d="M1320 292 C1320 278 1332 268 1346 268 H1382" />
-          <path className="routing-branch" d="M1320 387 C1320 373 1332 363 1346 363 H1382" />
-          <path className="routing-branch" d="M1320 482 C1320 468 1332 458 1346 458 H1382" />
-          <path className="routing-branch" d="M1320 529 C1320 543 1332 553 1346 553 H1382" />
-          <circle cx="1382" cy="78" r="5" />
-          <circle cx="1382" cy="173" r="5" />
-          <circle cx="1382" cy="268" r="5" />
-          <circle cx="1382" cy="363" r="5" />
-          <circle cx="1382" cy="458" r="5" />
-          <circle cx="1382" cy="553" r="5" />
-        </g>
-      </svg>
+      <div aria-hidden="true" className="factory-circuit-routing">
+        {powerConnectors.map((connector) => (
+          <FactoryCircuitRoutingReference
+            key={connector.key}
+            className="factory-circuit-routing-reference"
+            src={connector.src}
+            style={connector.style}
+          />
+        ))}
+        <FactoryCircuitRoutingReference
+          className="factory-circuit-routing-reference"
+          src={factoryRoutingInverterDropReferenceUrl}
+          style={{
+            height: "188px",
+            left: "905px",
+            top: `${562 - CONTENT_TOP_OFFSET}px`,
+            width: "45px"
+          }}
+        />
+        <FactoryCircuitRoutingReference
+          className="factory-circuit-routing-reference"
+          src={factoryRoutingLoadReferenceUrl}
+          style={{
+            height: "526px",
+            left: "1254px",
+            top: `${150 - CONTENT_TOP_OFFSET}px`,
+            width: "140px"
+          }}
+        />
+      </div>
 
       <section
         className="factory-circuit-load-panel"

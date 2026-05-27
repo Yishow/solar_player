@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   imagesAssetMap,
+  imagesContentTopOffset,
   imagesCounterLayout,
   imagesInfoLayout,
   imagesMainLayout,
@@ -11,6 +12,7 @@ import {
 } from "./layout";
 
 test("images layout centralizes title, media stage, and thumbnail geometry", () => {
+  assert.equal(imagesContentTopOffset, 110);
   assert.deepEqual(imagesTitleLayout, {
     left: 88,
     top: 166,
@@ -44,8 +46,8 @@ test("images layout centralizes title, media stage, and thumbnail geometry", () 
   });
 });
 
-test("images asset map keeps provisional gallery assets page-local", () => {
-  assert.match(imagesAssetMap.main.src, /images-main-ref\.jpg$/);
-  assert.match(imagesAssetMap.thumbs[0]?.src ?? "", /thumb-factory-solar\.jpg$/);
-  assert.match(imagesAssetMap.thumbs[3]?.src ?? "", /thumb-showroom\.jpg$/);
+test("images asset map keeps reference-derived gallery assets page-local", () => {
+  assert.match(imagesAssetMap.main.src, /images-hero-reference\.png$/);
+  assert.match(imagesAssetMap.thumbs[0]?.src ?? "", /images-thumb-1-reference\.png$/);
+  assert.match(imagesAssetMap.thumbs[3]?.src ?? "", /images-thumb-4-reference\.png$/);
 });

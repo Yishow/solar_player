@@ -19,9 +19,13 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.fontSize/);
+  assert.match(sustainabilitySource, /shouldRenderPeriodChips/);
+  assert.match(sustainabilitySource, /viewModel\.periodOptions\.length > 1/);
   assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
+  assert.match(sustainabilitySource, /isReferenceHeroMedia/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.cards/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
+  assert.match(sustainabilitySource, /shouldRenderHighlightRail/);
   assert.match(sustainabilitySource, /resolveDisplayPageCardRailCards/);
   assert.match(sustainabilitySource, /householdEquivalents/);
   assert.match(sustainabilitySource, /resolvedConfig\.kpiCards\[/);
@@ -52,7 +56,7 @@ test("sustainability display page seed config captures the current hero and high
     "戶4口之家"
   );
   assert.equal(config.kpiCards.totalGeneration.width, 304);
-  assert.equal(config.statCards.procure.left, 1008);
+  assert.equal(config.statCards.procure.left, 970);
 });
 
 test("sustainability runtime resolves the shared story adapter and clears back to fallback data on request failure", () => {

@@ -112,7 +112,9 @@ export function createImagesDisplayPageSeedConfig(
     },
     chrome: {
       heroTypography: createHeroTypographyConfig({
-        subtitleMarginTop: 20
+        subtitleMarginTop: 20,
+        titleFontSize: 76,
+        titleLetterSpacing: 4
       }),
       modules: {
         arrows: createArrowChromeConfig(),

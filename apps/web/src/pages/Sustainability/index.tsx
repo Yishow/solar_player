@@ -39,6 +39,7 @@ import {
 import { resolveHouseholdEquivalentRuntimePayload } from "./householdEquivalentRuntime";
 import {
   sustainabilityAssetMap,
+  sustainabilityContentTopOffset,
   sustainabilityCopyLayout,
   sustainabilityKpiLayout,
   sustainabilityLeafLayout,
@@ -50,7 +51,7 @@ import "./sustainability.css";
 import { buildSustainabilityViewModel } from "./viewModel";
 import { SustainabilityGlyph } from "./iconRegistry";
 
-const CONTENT_TOP_OFFSET = 146;
+const CONTENT_TOP_OFFSET = sustainabilityContentTopOffset;
 
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
@@ -139,6 +140,7 @@ export function Sustainability({
     usesRuntimeFallback: storyRuntime.usesFallback
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const isReferenceHeroMedia = heroMediaSource === sustainabilityAssetMap.hero.src;
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
@@ -207,6 +209,10 @@ export function Sustainability({
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
   const leafLayout = withContentOffset(sustainabilityLeafLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroMedia);
+  const shouldRenderPeriodChips = viewModel.periodOptions.length > 1;
+  const shouldRenderHighlightRail = resolvedHighlightCards.some(
+    (card) => card.kind === "metric-highlight" || card.payload.derivedStatus === "available"
+  );
 
   return (
     <section className="sustainability-display-page">
@@ -258,35 +264,37 @@ export function Sustainability({
         </p>
       </section>
 
-      <section
-        style={{
-          position: "absolute",
-          right: "88px",
-          top: `${titleLayout.top}px`,
-          zIndex: 14,
-          display: "flex"
-        }}
-      >
-        <div style={{ display: "flex", gap: `${resolvedConfig.chrome.modules.periodChips.chipGap}px` }}>
-          {viewModel.periodOptions.map((period) => (
-            <button
-              key={period}
-              onClick={() => setSelectedPeriod(period)}
-              style={{
-                border: "1px solid rgba(91, 128, 70, 0.24)",
-                borderRadius: `${resolvedConfig.chrome.modules.periodChips.radius}px`,
-                background: viewModel.selectedPeriod === period ? "#5b8046" : "rgba(255, 253, 247, 0.92)",
-                color: viewModel.selectedPeriod === period ? "#fffdf8" : "#57774a",
-                fontSize: `${resolvedConfig.chrome.modules.periodChips.fontSize}px`,
-                fontWeight: 700,
-                padding: `${resolvedConfig.chrome.modules.periodChips.chipPaddingY}px ${resolvedConfig.chrome.modules.periodChips.chipPaddingX}px`
-              }}
-            >
-              {periodLabel(period)}
-            </button>
-          ))}
-        </div>
-      </section>
+      {shouldRenderPeriodChips ? (
+        <section
+          style={{
+            position: "absolute",
+            right: "88px",
+            top: `${titleLayout.top}px`,
+            zIndex: 14,
+            display: "flex"
+          }}
+        >
+          <div style={{ display: "flex", gap: `${resolvedConfig.chrome.modules.periodChips.chipGap}px` }}>
+            {viewModel.periodOptions.map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                style={{
+                  border: "1px solid rgba(91, 128, 70, 0.24)",
+                  borderRadius: `${resolvedConfig.chrome.modules.periodChips.radius}px`,
+                  background: viewModel.selectedPeriod === period ? "#5b8046" : "rgba(255, 253, 247, 0.92)",
+                  color: viewModel.selectedPeriod === period ? "#fffdf8" : "#57774a",
+                  fontSize: `${resolvedConfig.chrome.modules.periodChips.fontSize}px`,
+                  fontWeight: 700,
+                  padding: `${resolvedConfig.chrome.modules.periodChips.chipPaddingY}px ${resolvedConfig.chrome.modules.periodChips.chipPaddingX}px`
+                }}
+              >
+                {periodLabel(period)}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div
         className="sustainability-copy"
@@ -324,7 +332,10 @@ export function Sustainability({
       />
 
       <figure
-        className="sustainability-hero display-surface-media-stage display-surface-media-fade-left display-surface-media-fade-bottom"
+        className={[
+          "sustainability-hero display-surface-media-stage",
+          isReferenceHeroMedia ? "" : "display-surface-media-fade-left display-surface-media-fade-bottom"
+        ].join(" ").trim()}
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,
@@ -339,47 +350,49 @@ export function Sustainability({
         />
       </figure>
 
-      <section
-        className="sustainability-highlight-rail"
-        style={{
-          height: `${resolvedConfig.highlightRail.container.height}px`,
-          left: `${resolvedConfig.highlightRail.container.left}px`,
-          top: `${resolvedConfig.highlightRail.container.top - CONTENT_TOP_OFFSET}px`,
-          width: `${resolvedConfig.highlightRail.container.width}px`
-        }}
-      >
-        {resolvedHighlightCards.map((card) => (
-          <article
-            key={card.id}
-            className={
-              card.kind === "household-equivalent"
-                ? "sustainability-highlight-item sustainability-highlight-item-household"
-                : "sustainability-highlight-item"
-            }
-            style={{
-              height: `${card.frame.height}px`,
-              left: `${card.frame.left}px`,
-              top: `${card.frame.top}px`,
-              width: `${card.frame.width}px`
-            }}
-          >
-            {card.kind === "household-equivalent" ? (
-              <>
-                <small className="sustainability-household-eyebrow">{card.payload.eyebrow}</small>
-                <strong>{card.payload.householdCountDisplay}</strong>
-                <span>{card.payload.householdLabel}</span>
-                <small>{card.payload.supportingLine}</small>
-              </>
-            ) : (
-              <>
-                <strong>{card.payload.value}</strong>
-                <span>{card.payload.unit}</span>
-                <small>{card.payload.label}</small>
-              </>
-            )}
-          </article>
-        ))}
-      </section>
+      {shouldRenderHighlightRail ? (
+        <section
+          className="sustainability-highlight-rail"
+          style={{
+            height: `${resolvedConfig.highlightRail.container.height}px`,
+            left: `${resolvedConfig.highlightRail.container.left}px`,
+            top: `${resolvedConfig.highlightRail.container.top - CONTENT_TOP_OFFSET}px`,
+            width: `${resolvedConfig.highlightRail.container.width}px`
+          }}
+        >
+          {resolvedHighlightCards.map((card) => (
+            <article
+              key={card.id}
+              className={
+                card.kind === "household-equivalent"
+                  ? "sustainability-highlight-item sustainability-highlight-item-household"
+                  : "sustainability-highlight-item"
+              }
+              style={{
+                height: `${card.frame.height}px`,
+                left: `${card.frame.left}px`,
+                top: `${card.frame.top}px`,
+                width: `${card.frame.width}px`
+              }}
+            >
+              {card.kind === "household-equivalent" ? (
+                <>
+                  <small className="sustainability-household-eyebrow">{card.payload.eyebrow}</small>
+                  <strong>{card.payload.householdCountDisplay}</strong>
+                  <span>{card.payload.householdLabel}</span>
+                  <small>{card.payload.supportingLine}</small>
+                </>
+              ) : (
+                <>
+                  <strong>{card.payload.value}</strong>
+                  <span>{card.payload.unit}</span>
+                  <small>{card.payload.label}</small>
+                </>
+              )}
+            </article>
+          ))}
+        </section>
+      ) : null}
 
       {viewModel.bigNumbers.map((item, index) => {
         const cardKey = sustainabilityKpiOrder[index]!;
@@ -467,7 +480,11 @@ export function Sustainability({
                   </DisplayCardFooter>
                 ) : (
                   <>
-                    <DisplayCardValueRow align={cardStyle.valueRowAlign} value={card.value} />
+                    <DisplayCardValueRow
+                      align={cardStyle.valueRowAlign}
+                      unit={"unit" in card ? card.unit : undefined}
+                      value={card.value}
+                    />
                     <DisplayCardFooter className="sustainability-card-footer">
                       <Sparkline className="sustainability-trees-sparkline" values={trendSeries.map((value) => value - 2)} />
                     </DisplayCardFooter>

@@ -5,6 +5,7 @@ import test from "node:test";
 import { createImagesDisplayPageSeedConfig } from "./displayPageConfig";
 
 const imagesSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const imagesCss = readFileSync(path.join(import.meta.dirname, "images.css"), "utf8");
 
 test("images runtime reads resolved display config for copy, main stage, info panel, thumb grid, and arrows", () => {
   assert.match(imagesSource, /useImagesAutoplay\(/);
@@ -28,19 +29,35 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.arrows\.left/);
   assert.match(imagesSource, /resolvedConfig\.arrows\.right/);
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
-  assert.match(imagesSource, /activeEntry: playlistRuntime\.payload\?\.activeEntry \?\? null/);
-  assert.match(imagesSource, /entries: playlistRuntime\.payload\?\.entries \?\? \[\]/);
+  assert.match(imagesSource, /const playbackActiveEntry =/);
+  assert.match(imagesSource, /runtimePlaylistEntries\.length > 0\s*\?\s*playlistRuntime\.payload\?\.activeEntry \?\? null/);
+  assert.match(imagesSource, /imagesReferencePlaylistEntries\[Math\.min\(requestedIndex, imagesReferencePlaylistEntries\.length - 1\)\]/);
+  assert.match(imagesSource, /imagesReferencePlaylistEntries/);
+  assert.match(imagesSource, /useState\(2\)/);
   assert.match(imagesSource, /activeIndex: autoplay\.activeIndex/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
   assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
+  assert.match(imagesSource, /src=\{thumbnail\.assetSource\}/);
+  assert.doesNotMatch(imagesSource, /src=\{runtimeThumb/);
+  assert.match(imagesSource, /isReferenceHeroCrop/);
+  assert.match(imagesSource, /!\s*isReferenceHeroCrop/);
+  assert.match(imagesSource, /images-main-stage-reference/);
   assert.match(imagesSource, /DisplayCardFrame/);
   assert.match(imagesSource, /DisplayCardFooter/);
   assert.doesNotMatch(imagesSource, /目前 fallback：/);
   assert.doesNotMatch(imagesSource, /viewModel\.active\.resolution/);
   assert.doesNotMatch(imagesSource, /viewModel\.active\.infoPanel\.tags/);
   assert.doesNotMatch(imagesSource, /viewModel\.active\.entryId/);
+});
+
+test("images reference hero crop is rendered without secondary transform or overlays", () => {
+  assert.match(imagesCss, /\.images-main-stage img\s*\{[\s\S]*display:\s*block;/);
+  assert.match(imagesCss, /\.images-main-stage-reference\s*\{[\s\S]*border-radius:\s*0;/);
+  assert.match(imagesCss, /\.images-main-stage-reference\s*\{[\s\S]*box-shadow:\s*none;/);
+  assert.doesNotMatch(imagesCss, /translateX\(-76px\)\s*scale\(1\.14\)/);
+  assert.match(imagesSource, /isReferenceHeroCrop \? \[\] : mainStageMediaPresentation\.overlayLayers/);
 });
 
 test("images display page seed config captures the current default gallery layout and hero contract", () => {

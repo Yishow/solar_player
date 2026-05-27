@@ -25,12 +25,13 @@ import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
-import { imagesAssetRuntimeMap } from "./assets";
+import { imagesAssetRuntimeMap, imagesReferencePlaylistEntries } from "./assets";
 import {
   createImagesDisplayPageSeedConfig,
   type ImagesDisplayPageConfig
 } from "./displayPageConfig";
 import {
+  imagesContentTopOffset,
   imagesCounterLayout,
   imagesGoldLayout,
   imagesTitleLayout
@@ -39,7 +40,7 @@ import "../../components/displayPageCards.css";
 import "./images.css";
 import { buildImagesViewModel } from "./viewModel";
 
-const CONTENT_TOP_OFFSET = 146;
+const CONTENT_TOP_OFFSET = imagesContentTopOffset;
 
 const thumbSlotOrder = ["thumb1", "thumb2", "thumb3", "thumb4"] as const;
 
@@ -76,13 +77,20 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
-  const [requestedIndex, setRequestedIndex] = useState(0);
+  const [requestedIndex, setRequestedIndex] = useState(2);
   const playlistRuntime = useImagePlaylistRuntime(requestedIndex, {
     enabled: runtimeHydrationEnabled
   });
+  const runtimePlaylistEntries = playlistRuntime.payload?.entries ?? [];
+  const playbackEntries =
+    runtimePlaylistEntries.length > 0 ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
+  const playbackActiveEntry =
+    runtimePlaylistEntries.length > 0
+      ? playlistRuntime.payload?.activeEntry ?? null
+      : imagesReferencePlaylistEntries[Math.min(requestedIndex, imagesReferencePlaylistEntries.length - 1)] ?? null;
   const autoplay = useImagesAutoplay({
-    activeEntry: playlistRuntime.payload?.activeEntry ?? null,
-    entries: playlistRuntime.payload?.entries ?? [],
+    activeEntry: playbackActiveEntry,
+    entries: playbackEntries,
     requestedIndex,
     setRequestedIndex
   });
@@ -108,11 +116,11 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     imagesMainStageMediaEffectResolverOptions
   );
   const viewModel = buildImagesViewModel({
-    activeEntry: playlistRuntime.payload?.activeEntry ?? null,
+    activeEntry: playbackActiveEntry,
     activeIndex: autoplay.activeIndex,
     assets: [],
     coverAssetSource: mainStageSource,
-    entries: playlistRuntime.payload?.entries ?? []
+    entries: playbackEntries
   });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
@@ -122,7 +130,10 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-  const visibleStart = Math.min(Math.max(viewModel.activeIndex - 1, 0), Math.max(viewModel.thumbnails.length - 4, 0));
+  const visibleStart = Math.min(
+    Math.floor(viewModel.activeIndex / 4) * 4,
+    Math.max(viewModel.thumbnails.length - 4, 0)
+  );
   const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
 
   const titleLayout = withContentOffset(imagesTitleLayout);
@@ -133,6 +144,9 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const infoLayout = withContentOffset(resolvedConfig.infoPanel);
   const infoCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.infoPanel);
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
+  const activeMainStageSource = viewModel.active.assetSource ?? mainStageSource ?? undefined;
+  const isReferenceHeroCrop = activeMainStageSource === imagesAssetRuntimeMap.main;
+  const mainStageOverlayLayers = isReferenceHeroCrop ? [] : mainStageMediaPresentation.overlayLayers;
 
   return (
     <section className="images-display-page">
@@ -243,7 +257,11 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       </section>
 
       <figure
-        className={`images-main-stage display-surface-media-stage${mainStageMediaPresentation.stageClassName ? ` ${mainStageMediaPresentation.stageClassName}` : ""}`}
+        className={[
+          "images-main-stage display-surface-media-stage",
+          isReferenceHeroCrop ? "images-main-stage-reference" : "",
+          mainStageMediaPresentation.stageClassName
+        ].filter(Boolean).join(" ")}
         style={{
           ...mainStageMediaPresentation.stageStyle,
           height: `${mainLayout.height}px`,
@@ -255,7 +273,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         {viewModel.active.assetSource ? (
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
-            src={viewModel.active.assetSource ?? mainStageSource ?? undefined}
+            src={activeMainStageSource}
             style={mainStageMediaPresentation.mediaStyle}
           />
         ) : (
@@ -272,7 +290,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             <p>{viewModel.active.placeholderLabel}</p>
           </div>
         )}
-        {mainStageMediaPresentation.overlayLayers.map((layer) => (
+        {mainStageOverlayLayers.map((layer) => (
           <span
             key={layer.id}
             aria-hidden="true"
@@ -282,39 +300,41 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         ))}
       </figure>
 
-      <DisplayCardFrame
-        cardStyle={infoCardStyle}
-        className="images-info-card"
-        surface="info"
-        style={{
-          height: `${infoLayout.height}px`,
-          left: `${infoLayout.left}px`,
-          top: `${infoLayout.top}px`,
-          width: `${infoLayout.width}px`
-        }}
-      >
-        <DisplayCardHeader
-          icon={renderDisplayPageIcon({
-            alt: "Images Info Icon",
-            className: "h-full w-full",
-            seedSource: seedConfig.iconSources.infoPanel,
-            source: resolvedConfig.iconSources.infoPanel
-          })}
-          iconContainerClassName="images-info-icon"
-          title={viewModel.active.infoPanel.title}
-        />
-        <p className="images-info-card-body">
-          {viewModel.active.infoPanel.description}
-        </p>
-        <DisplayCardFooter>
-          <small className="images-info-card-meta">
-            {viewModel.active.infoPanel.area} · {viewModel.active.durationSeconds} 秒
-            {viewModel.active.infoPanel.capturedAt !== "尚未同步"
-              ? ` · ${viewModel.active.infoPanel.capturedAt}`
-              : ""}
-          </small>
-        </DisplayCardFooter>
-      </DisplayCardFrame>
+      {!isReferenceHeroCrop ? (
+        <DisplayCardFrame
+          cardStyle={infoCardStyle}
+          className="images-info-card"
+          surface="info"
+          style={{
+            height: `${infoLayout.height}px`,
+            left: `${infoLayout.left}px`,
+            top: `${infoLayout.top}px`,
+            width: `${infoLayout.width}px`
+          }}
+        >
+          <DisplayCardHeader
+            icon={renderDisplayPageIcon({
+              alt: "Images Info Icon",
+              className: "h-full w-full",
+              seedSource: seedConfig.iconSources.infoPanel,
+              source: resolvedConfig.iconSources.infoPanel
+            })}
+            iconContainerClassName="images-info-icon"
+            title={viewModel.active.infoPanel.title}
+          />
+          <p className="images-info-card-body">
+            {viewModel.active.infoPanel.description}
+          </p>
+          <DisplayCardFooter>
+            <small className="images-info-card-meta">
+              {viewModel.active.infoPanel.area} · {viewModel.active.durationSeconds} 秒
+              {viewModel.active.infoPanel.capturedAt !== "尚未同步"
+                ? ` · ${viewModel.active.infoPanel.capturedAt}`
+                : ""}
+            </small>
+          </DisplayCardFooter>
+        </DisplayCardFrame>
+      ) : null}
 
       <button
         className="images-gallery-arrow"
@@ -347,7 +367,6 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
 
       {visibleThumbnails.map((thumbnail, thumbIndex) => {
         const layout = resolvedConfig.thumbnailSlots[thumbSlotOrder[thumbIndex]!];
-        const runtimeThumb = imagesAssetRuntimeMap.thumbs[(visibleStart + thumbIndex) % imagesAssetRuntimeMap.thumbs.length];
 
         return (
           <button
@@ -365,7 +384,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             onClick={() => autoplay.selectIndex(visibleStart + thumbIndex)}
           >
             {thumbnail.assetSource ? (
-              <img alt={thumbnail.infoPanel.title} src={runtimeThumb ?? thumbnail.assetSource ?? undefined} />
+              <img alt={thumbnail.infoPanel.title} src={thumbnail.assetSource} />
             ) : (
               <div className="images-thumb-placeholder">
                 {renderDisplayPageIcon({

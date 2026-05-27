@@ -1,10 +1,17 @@
-import type { CSSProperties } from "react";
-import { useId } from "react";
-
-const factoryReferenceSpriteUrl = new URL(
-  "./assets/factory-reference-sprite.png",
-  import.meta.url
-).href;
+const barsIconUrl = new URL("./assets/factory-icon-bars-reference.png", import.meta.url).href;
+const boltIconUrl = new URL("./assets/factory-icon-bolt-reference.png", import.meta.url).href;
+const evIconUrl = new URL("./assets/factory-icon-ev-reference.png", import.meta.url).href;
+const hvacIconUrl = new URL("./assets/factory-icon-hvac-reference.png", import.meta.url).href;
+const infrastructureIconUrl = new URL("./assets/factory-icon-infrastructure-reference.png", import.meta.url).href;
+const inverterIconUrl = new URL("./assets/factory-icon-inverter-reference.png", import.meta.url).href;
+const leafIconUrl = new URL("./assets/factory-icon-leaf-reference.png", import.meta.url).href;
+const lightingIconUrl = new URL("./assets/factory-icon-lighting-reference.png", import.meta.url).href;
+const officeIconUrl = new URL("./assets/factory-icon-office-reference.png", import.meta.url).href;
+const pieIconUrl = new URL("./assets/factory-icon-pie-reference.png", import.meta.url).href;
+const productionLineIconUrl = new URL("./assets/factory-icon-production-line-reference.png", import.meta.url).href;
+const solarIconUrl = new URL("./assets/factory-icon-solar-reference.png", import.meta.url).href;
+const sunIconUrl = new URL("./assets/factory-icon-sun-reference.png", import.meta.url).href;
+const switchboardIconUrl = new URL("./assets/factory-icon-switchboard-reference.png", import.meta.url).href;
 
 export const factoryCircuitIconKeys = [
   "bars",
@@ -25,80 +32,87 @@ export const factoryCircuitIconKeys = [
 
 export type FactoryCircuitRegistryIconKey = (typeof factoryCircuitIconKeys)[number];
 
-type FactoryCircuitSpriteRegion = {
+type FactoryCircuitIconDefinition = {
   height: number;
+  src: string;
   width: number;
-  x: number;
-  y: number;
 };
 
-export const factoryCircuitReferenceLeafRegions = {
-  lineLeaf: { height: 60, width: 85, x: 449, y: 144 },
-  watermarkLeaf: { height: 135, width: 230, x: 4, y: 226 }
-} as const satisfies Record<string, FactoryCircuitSpriteRegion>;
-
-const factoryCircuitReferenceIconRegions = {
-  bars: { height: 72, width: 71, x: 301, y: 144 },
-  bolt: { height: 72, width: 71, x: 70, y: 144 },
-  ev: { height: 56, width: 75, x: 550, y: 4 },
-  hvac: { height: 62, width: 62, x: 340, y: 4 },
-  infrastructure: { height: 61, width: 62, x: 4, y: 144 },
-  inverter: { height: 90, width: 79, x: 83, y: 4 },
-  leaf: { height: 71, width: 69, x: 376, y: 144 },
-  lighting: { height: 68, width: 64, x: 406, y: 4 },
-  office: { height: 59, width: 72, x: 474, y: 4 },
-  pie: { height: 72, width: 70, x: 145, y: 144 },
-  "production-line": { height: 65, width: 70, x: 266, y: 4 },
-  solar: { height: 93, width: 75, x: 4, y: 4 },
-  sun: { height: 78, width: 78, x: 219, y: 144 },
-  switchboard: { height: 136, width: 96, x: 166, y: 4 }
-} as const satisfies Record<FactoryCircuitRegistryIconKey, FactoryCircuitSpriteRegion>;
-
-const FACTORY_REFERENCE_SPRITE_SIZE = {
-  height: 365,
-  width: 640
-} as const;
+const factoryCircuitIconDefinitions = {
+  bars: {
+    src: barsIconUrl,
+    height: 74,
+    width: 84
+  },
+  bolt: {
+    src: boltIconUrl,
+    height: 74,
+    width: 84
+  },
+  ev: {
+    src: evIconUrl,
+    height: 77,
+    width: 84
+  },
+  hvac: {
+    src: hvacIconUrl,
+    height: 72,
+    width: 84
+  },
+  infrastructure: {
+    src: infrastructureIconUrl,
+    height: 76,
+    width: 84
+  },
+  inverter: {
+    src: inverterIconUrl,
+    height: 106,
+    width: 94
+  },
+  leaf: {
+    src: leafIconUrl,
+    height: 90,
+    width: 90
+  },
+  lighting: {
+    src: lightingIconUrl,
+    height: 73,
+    width: 84
+  },
+  office: {
+    src: officeIconUrl,
+    height: 74,
+    width: 84
+  },
+  pie: {
+    src: pieIconUrl,
+    height: 74,
+    width: 84
+  },
+  "production-line": {
+    src: productionLineIconUrl,
+    height: 70,
+    width: 84
+  },
+  solar: {
+    src: solarIconUrl,
+    height: 116,
+    width: 128
+  },
+  sun: {
+    src: sunIconUrl,
+    height: 74,
+    width: 84
+  },
+  switchboard: {
+    src: switchboardIconUrl,
+    height: 142,
+    width: 110
+  }
+} as const satisfies Record<FactoryCircuitRegistryIconKey, FactoryCircuitIconDefinition>;
 
 function iconClassName(className?: string) {
-  return ["h-full w-full", className ?? ""].join(" ").trim();
-}
-
-export function FactoryCircuitReferenceSprite({
-  className,
-  region,
-  style
-}: {
-  className?: string;
-  region: FactoryCircuitSpriteRegion;
-  style?: CSSProperties;
-}) {
-  const clipPathId = `factory-reference-${useId().replace(/:/g, "")}`;
-
-  return (
-    <svg
-      aria-hidden="true"
-      className={iconClassName(className)}
-      fill="none"
-      overflow="hidden"
-      style={{ overflow: "hidden", ...style }}
-      viewBox={`0 0 ${region.width} ${region.height}`}
-    >
-      <defs>
-        <clipPath id={clipPathId}>
-          <rect height={region.height} width={region.width} x="0" y="0" />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipPathId})`}>
-        <image
-          height={FACTORY_REFERENCE_SPRITE_SIZE.height}
-          href={factoryReferenceSpriteUrl}
-          width={FACTORY_REFERENCE_SPRITE_SIZE.width}
-          x={-region.x}
-          y={-region.y}
-        />
-      </g>
-    </svg>
-  );
+  return ["factory-circuit-reference-icon", className ?? ""].join(" ").trim();
 }
 
 export function FactoryCircuitGlyph({
@@ -108,10 +122,20 @@ export function FactoryCircuitGlyph({
   className?: string;
   name: FactoryCircuitRegistryIconKey;
 }) {
+  const definition = factoryCircuitIconDefinitions[name];
+
   return (
-    <FactoryCircuitReferenceSprite
-      className={className}
-      region={factoryCircuitReferenceIconRegions[name]}
+    <img
+      alt=""
+      aria-hidden="true"
+      className={iconClassName(className)}
+      data-factory-circuit-icon={name}
+      draggable={false}
+      src={definition.src}
+      style={{
+        height: "100%",
+        width: "100%"
+      }}
     />
   );
 }

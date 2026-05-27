@@ -137,10 +137,14 @@
   --display-card-title-color: #384039;
   --display-card-subtitle-color: #70766f;
   --display-card-icon-color: #6a8a50;
+  --display-card-subtitle-letter-spacing: 0.04em;
+  --display-card-subtitle-transform: none;
   --display-card-value-color: #57774a;
   --display-card-value-weight: 800;
   --display-card-value-line-height: 0.88;
   --display-card-unit-color: #566152;
+  --display-card-unit-letter-spacing: 0.04em;
+  --display-card-unit-transform: none;
   border: 1px solid var(--display-card-border-soft);
   background: var(--display-card-surface);
   box-shadow: var(--display-shadow-soft);

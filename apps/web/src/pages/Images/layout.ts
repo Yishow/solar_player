@@ -1,3 +1,5 @@
+export const imagesContentTopOffset = 110;
+
 export const imagesTitleLayout = {
   left: 88,
   top: 166,
@@ -63,25 +65,25 @@ export const imagesThumbSize = {
 
 export const imagesAssetMap = {
   main: {
-    assetId: "images-main-ref",
-    src: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/images-main-ref.jpg"
+    assetId: "images-hero-reference",
+    src: "apps/web/src/pages/Images/assets/images-hero-reference.png"
   },
   thumbs: [
     {
-      assetId: "thumb-factory-solar",
-      src: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-factory-solar.jpg"
+      assetId: "images-thumb-1-reference",
+      src: "apps/web/src/pages/Images/assets/images-thumb-1-reference.png"
     },
     {
-      assetId: "thumb-green-trees",
-      src: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-green-trees.jpg"
+      assetId: "images-thumb-2-reference",
+      src: "apps/web/src/pages/Images/assets/images-thumb-2-reference.png"
     },
     {
-      assetId: "thumb-solar-aerial",
-      src: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-solar-aerial.jpg"
+      assetId: "images-thumb-3-reference",
+      src: "apps/web/src/pages/Images/assets/images-thumb-3-reference.png"
     },
     {
-      assetId: "thumb-showroom",
-      src: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-showroom.jpg"
+      assetId: "images-thumb-4-reference",
+      src: "apps/web/src/pages/Images/assets/images-thumb-4-reference.png"
     }
   ]
 } as const;

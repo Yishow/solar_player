@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   sustainabilityAssetMap,
+  sustainabilityContentTopOffset,
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityStatLayout,
@@ -9,6 +10,7 @@ import {
 } from "./layout";
 
 test("sustainability layout centralizes the storytelling reference geometry and assets", () => {
+  assert.equal(sustainabilityContentTopOffset, 110);
   assert.deepEqual(sustainabilityTitleLayout, {
     left: 88,
     top: 166,
@@ -21,22 +23,22 @@ test("sustainability layout centralizes the storytelling reference geometry and 
     width: 1346
   });
   assert.deepEqual(sustainabilityStatLayout.procure, {
-    height: 220,
-    left: 1008,
-    top: 760,
-    width: 304
+    height: 232,
+    left: 970,
+    top: 704,
+    width: 282
   });
   assert.deepEqual(sustainabilityStatLayout.esg, {
-    height: 220,
-    left: 1330,
-    top: 760,
-    width: 304
+    height: 232,
+    left: 1268,
+    top: 704,
+    width: 282
   });
   assert.deepEqual(sustainabilityStatLayout.trees, {
-    height: 220,
-    left: 1652,
-    top: 760,
-    width: 236
+    height: 232,
+    left: 1568,
+    top: 704,
+    width: 304
   });
   assert.deepEqual(sustainabilityHighlightRailLayout, {
     height: 108,
@@ -44,5 +46,5 @@ test("sustainability layout centralizes the storytelling reference geometry and 
     top: 578,
     width: 470
   });
-  assert.match(sustainabilityAssetMap.hero.src, /sustain-hero-ref\.jpg$/);
+  assert.match(sustainabilityAssetMap.hero.src, /sustainability-hero-reference\.png$/);
 });

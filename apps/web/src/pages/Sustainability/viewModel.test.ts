@@ -239,6 +239,25 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   assert.equal(model.comparison.delta, "+4.2%");
 });
 
+test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
+  const model = buildSustainabilityViewModel({});
+
+  assert.equal(model.bigNumbers[0]?.value, "18.6");
+  assert.equal(model.bigNumbers[1]?.value, "9,842");
+  assert.equal(model.bigNumbers[2]?.value, "12.4");
+  assert.equal(model.comparison.state, "available");
+  assert.equal(model.comparison.label, "較去年成長 2.1%");
+  assert.equal(model.esgCards[0]?.label, "綠色採購金額");
+  assert.equal(model.esgCards[0]?.subtitle, "Green Procurement");
+  assert.equal(model.esgCards[0] && "value" in model.esgCards[0] ? model.esgCards[0].value : null, "NT$ 60M+");
+  assert.deepEqual(
+    model.esgCards[1] && "items" in model.esgCards[1] ? model.esgCards[1].items : [],
+    ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"]
+  );
+  assert.equal(model.esgCards[2] && "value" in model.esgCards[2] ? model.esgCards[2].value : null, "25,600");
+  assert.equal(model.esgCards[2] && "unit" in model.esgCards[2] ? model.esgCards[2].unit : null, "trees");
+});
+
 test("buildSustainabilityViewModel preserves runtime module content and provenance without page-local hardcodes", () => {
   const model = buildSustainabilityViewModel({
     selectedPeriod: "year",
@@ -300,7 +319,8 @@ test("buildSustainabilityViewModel marks missing editorial and aggregate data ex
   assert.equal(model.comparison.state, "unavailable");
   assert.equal(model.esgCards[0]?.provenance.sourceClass, "missing");
   assert.equal(model.esgCards[1]?.provenance.sourceClass, "missing");
-  assert.equal(model.esgCards[0] && "items" in model.esgCards[0] ? model.esgCards[0].items[0] : null, "模組未提供");
+  const firstEsgCard = model.esgCards[0];
+  assert.equal(firstEsgCard && "items" in firstEsgCard ? (firstEsgCard.items?.[0] ?? null) : null, "模組未提供");
   assert.equal(model.householdEquivalents.today.derivedStatus, "unavailable");
   assert.equal(model.householdEquivalents.today.householdCountDisplay, "--");
   assert.equal(model.householdEquivalents.cumulative.derivedStatus, "unavailable");

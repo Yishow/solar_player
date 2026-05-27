@@ -1,7 +1,7 @@
 export const sustainabilityAssetMap = {
   hero: {
     src: new URL(
-      "../../../../../docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/sustain-hero-ref.jpg",
+      "./assets/sustainability-hero-reference.png",
       import.meta.url
     ).href
   }

@@ -6,11 +6,6 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
-  --factory-routing-line-color: #668d54;
-  --factory-routing-line-neutral-color: #7c827a;
-  --factory-routing-line-accent-color: #8daf72;
-  --factory-routing-endpoint-color: #668d54;
-  --factory-routing-endpoint-stroke-color: rgba(255, 253, 247, 0.86);
 }
 
 .factory-circuit-title,
@@ -18,6 +13,7 @@
 .factory-circuit-gold-line,
 .factory-circuit-line-leaf,
 .factory-circuit-leaf-watermark,
+.factory-circuit-leaf-vine,
 .factory-circuit-node,
 .factory-circuit-load-panel,
 .factory-circuit-kpi-card {
@@ -82,21 +78,30 @@
 }
 
 .factory-circuit-leaf-watermark {
-  color: rgba(102, 141, 84, 0.82);
+  display: block;
+  object-fit: contain;
   pointer-events: none;
 }
 
 .factory-circuit-line-leaf {
   z-index: 8;
-  color: rgba(102, 141, 84, 0.82);
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.factory-circuit-leaf-vine {
+  display: block;
+  object-fit: contain;
   pointer-events: none;
 }
 
 .factory-circuit-node {
+  display: block;
   z-index: 12;
   --display-node-border: var(--display-card-border-soft);
   --display-node-icon-color: #648557;
-  --display-node-icon-size: 86px;
+  --display-node-icon-size: 112px;
   --display-node-radius: 28px;
   --display-node-shadow: var(--display-shadow-soft);
   --display-node-surface: var(--display-card-surface-strong);
@@ -107,42 +112,68 @@
   --display-node-title-letter-spacing: 0.2em;
 }
 
+.factory-circuit-node .display-node-icon,
+.factory-circuit-node .display-node-title,
+.factory-circuit-node .display-node-subtitle {
+  position: absolute;
+}
+
+.factory-circuit-node .display-node-title,
+.factory-circuit-node .display-node-subtitle {
+  left: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.factory-circuit-node-solar .display-node-icon {
+  left: -5px;
+  top: 29px;
+  width: 128px;
+  height: 116px;
+}
+
+.factory-circuit-node-inverter .display-node-icon {
+  left: 21px;
+  top: 41px;
+  width: 94px;
+  height: 106px;
+}
+
+.factory-circuit-node-board .display-node-icon {
+  left: 31px;
+  top: 59px;
+  width: 110px;
+  height: 142px;
+}
+
+.factory-circuit-node-solar .display-node-title,
+.factory-circuit-node-inverter .display-node-title {
+  top: 156px;
+}
+
+.factory-circuit-node-solar .display-node-subtitle,
+.factory-circuit-node-inverter .display-node-subtitle {
+  top: 193px;
+}
+
+.factory-circuit-node-board .display-node-title {
+  top: 216px;
+}
+
+.factory-circuit-node-board .display-node-subtitle {
+  top: 255px;
+}
+
 .factory-circuit-node-board {
   --display-node-border: rgba(96, 137, 77, 0.55);
-  --display-node-icon-size: 112px;
+  --display-node-icon-size: 138px;
   --display-node-title-size: 26px;
   --display-node-surface: linear-gradient(180deg, rgba(238, 244, 228, 0.76), rgba(255, 253, 247, 0.92));
 }
 
-.factory-circuit-node-inverter::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 218px;
-  height: 178px;
-  border-left: 2px dashed var(--factory-routing-line-neutral-color);
-  transform: translateX(-50%);
-}
-
+.factory-circuit-node-inverter::after,
 .factory-circuit-node-inverter::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 266px;
-  width: 48px;
-  height: 48px;
-  border: 1.5px solid var(--factory-routing-line-neutral-color);
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 253, 247, 0.92), rgba(247, 248, 239, 0.82));
-  box-shadow: 0 0 0 7px rgba(255, 253, 247, 0.42);
-  transform: translateX(-50%);
-}
-
-.factory-circuit-node-inverter::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='%23587e46' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M36 13C24 14 14 22 13 34c11 1 21-6 23-21Z'/%3E%3Cpath d='M15 33c6-7 12-12 20-18'/%3E%3Cpath d='M23 25c-2-2-3-5-2-8M29 20c-2-2-2-4-1-6'/%3E%3C/svg%3E");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 34px 34px;
+  display: none;
 }
 
 .factory-circuit-routing {
@@ -151,40 +182,26 @@
   width: 1920px;
   height: 1080px;
   z-index: 9;
-  color: var(--factory-routing-line-color);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.1;
   pointer-events: none;
 }
 
-.routing-power-chain,
-.routing-load-tree {
-  color: var(--factory-routing-line-color);
+.factory-circuit-routing-reference,
+.factory-circuit-reference-icon {
+  display: block;
+  image-rendering: auto;
+  object-fit: contain;
+  pointer-events: none;
 }
 
-.routing-power-flow,
-.routing-trunk,
-.routing-board-branch {
-  stroke-width: 2.2;
+.factory-circuit-reference-icon {
+  height: 100%;
+  max-height: 100%;
+  max-width: none;
+  width: 100%;
 }
 
-.routing-power-chevron {
-  color: var(--factory-routing-line-accent-color);
-  stroke-width: 2.5;
-}
-
-.routing-branch {
-  color: var(--factory-routing-line-color);
-  stroke-width: 2.1;
-}
-
-.factory-circuit-routing circle {
-  fill: var(--factory-routing-endpoint-color);
-  stroke: var(--factory-routing-endpoint-stroke-color);
-  stroke-width: 2;
+.factory-circuit-routing-reference {
+  position: absolute;
 }
 
 .factory-circuit-load-panel {
@@ -200,14 +217,34 @@
   border-radius: 16px;
   background: var(--display-card-surface);
   box-shadow: var(--display-shadow-soft);
-  padding: 0 26px 0 24px;
+  padding: 0 26px 0 25px;
 }
 
 .factory-circuit-load-icon {
   flex: none;
-  width: 60px;
-  height: 60px;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 76px;
   color: #648557;
+}
+
+.factory-circuit-load-icon [data-factory-circuit-icon="production-line"],
+.factory-circuit-load-icon [data-factory-circuit-icon="lighting"] {
+  transform: translateY(1px);
+}
+
+.factory-circuit-load-icon [data-factory-circuit-icon="hvac"],
+.factory-circuit-load-icon [data-factory-circuit-icon="ev"] {
+  transform: translateY(2px);
+}
+
+.factory-circuit-load-icon [data-factory-circuit-icon="infrastructure"] {
+  transform: translateY(3px);
+}
+
+.factory-circuit-load-icon [data-factory-circuit-icon="office"] {
+  transform: translateY(4px);
 }
 
 .factory-circuit-load-copy {
