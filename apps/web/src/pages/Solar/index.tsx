@@ -31,13 +31,14 @@ import {
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
 import {
+  solarContentTopOffset,
   solarTitleLayout
 } from "./layout";
 import "../../components/displayPageCards.css";
 import "./solar.css";
 import { buildSolarViewModel } from "./viewModel";
 
-const CONTENT_TOP_OFFSET = 146;
+const CONTENT_TOP_OFFSET = solarContentTopOffset;
 
 const flowNodeOrder = [
   {

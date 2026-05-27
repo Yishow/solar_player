@@ -284,9 +284,11 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
 
   assert.equal(model.loadRows.length, 6);
   assert.equal(model.loadRows[0]?.labelZh, "故事版生產線");
+  assert.equal(model.loadRows[0]?.labelEn, "Production Line");
   assert.equal(model.loadRows[0]?.livePowerKw, 520);
   assert.equal(model.loadRows[0]?.statusLabel, "正常");
   assert.equal(model.loadRows[2]?.isEmpty, true);
+  assert.equal(model.loadRows[2]?.labelEn, "Lighting");
   assert.equal(model.loadRows[2]?.statusLabel, "未綁定");
   assert.equal(model.loadRows[2]?.livePowerKw, null);
   assert.equal(model.kpis[0]?.value, "--");

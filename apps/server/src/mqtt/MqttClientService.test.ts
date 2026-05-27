@@ -25,7 +25,7 @@ class FakeMqttClient extends EventEmitter {
   }
 }
 
-function createDatabase() {
+function createDatabase(options?: { reconnectInterval?: number }) {
   return {
     prepare(sql: string) {
       return {
@@ -43,7 +43,7 @@ function createDatabase() {
           data_mode: "mqtt",
           message_timeout: 1,
           password: "",
-          reconnect_interval: 5000,
+          reconnect_interval: options?.reconnectInterval ?? 5000,
           username: ""
         })
       };
@@ -111,6 +111,186 @@ test("MqttClientService keeps connected status when connect-event subscription s
   const status = service.getStatus();
   assert.equal(status.connected, true);
   assert.equal(status.reason, "Subscription ACL denied");
+
+  await service.disconnect();
+});
+
+test("MqttClientService keeps routine reconnect attempts out of info logs", async () => {
+  const client = new FakeMqttClient();
+  const logger = {
+    debugCalls: [] as Array<{ message?: string; payload: unknown }>,
+    error: () => undefined,
+    infoCalls: [] as Array<{ message?: string; payload: unknown }>,
+    info(payload: unknown, message?: string) {
+      this.infoCalls.push({ message, payload });
+    },
+    debug(payload: unknown, message?: string) {
+      this.debugCalls.push({ message, payload });
+    },
+    warn: () => undefined
+  };
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase(),
+    logger
+  });
+
+  await service.connect();
+
+  client.emit("reconnect");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(logger.infoCalls.length, 0);
+  assert.deepEqual(
+    logger.debugCalls.map((call) => call.message),
+    ["MQTT reconnecting"]
+  );
+
+  await service.disconnect();
+});
+
+test("MqttClientService keeps reconnecting status stable across close and offline retry events", async () => {
+  const client = new FakeMqttClient();
+  const emittedStatuses: Array<{ connected: boolean; reason: string | null }> = [];
+  const logger = {
+    debug: () => undefined,
+    error: () => undefined,
+    info: () => undefined,
+    warn: () => undefined
+  };
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase(),
+    logger,
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: (status) => {
+        emittedStatuses.push({
+          connected: status.connected,
+          reason: status.reason
+        });
+      },
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  await service.connect();
+  emittedStatuses.length = 0;
+
+  client.emit("reconnect");
+  client.emit("close");
+  client.emit("offline");
+
+  assert.deepEqual(emittedStatuses, [
+    {
+      connected: false,
+      reason: "reconnecting"
+    }
+  ]);
+  assert.equal(service.getStatus().reason, "reconnecting");
+
+  await service.disconnect();
+});
+
+test("MqttClientService treats offline before reconnect as one stable reconnecting state", async () => {
+  const client = new FakeMqttClient();
+  const emittedStatuses: Array<{ connected: boolean; reason: string | null }> = [];
+  const logger = {
+    debug: () => undefined,
+    error: () => undefined,
+    info: () => undefined,
+    warn: () => undefined
+  };
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase(),
+    logger,
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: (status) => {
+        emittedStatuses.push({
+          connected: status.connected,
+          reason: status.reason
+        });
+      },
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  await service.connect();
+  emittedStatuses.length = 0;
+
+  client.emit("offline");
+  client.emit("reconnect");
+  client.emit("close");
+
+  assert.deepEqual(emittedStatuses, [
+    {
+      connected: false,
+      reason: "reconnecting"
+    }
+  ]);
+  assert.equal(service.getStatus().reason, "reconnecting");
+
+  await service.disconnect();
+});
+
+test("MqttClientService falls back to offline when reconnect interval disables retries", async () => {
+  const client = new FakeMqttClient();
+  const emittedStatuses: Array<{ connected: boolean; reason: string | null }> = [];
+  const logger = {
+    debug: () => undefined,
+    error: () => undefined,
+    info: () => undefined,
+    warn: () => undefined
+  };
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase({ reconnectInterval: 0 }),
+    logger,
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: (status) => {
+        emittedStatuses.push({
+          connected: status.connected,
+          reason: status.reason
+        });
+      },
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  await service.connect();
+  emittedStatuses.length = 0;
+
+  client.emit("offline");
+  client.emit("close");
+
+  assert.deepEqual(emittedStatuses, [
+    {
+      connected: false,
+      reason: "offline"
+    }
+  ]);
+  assert.equal(service.getStatus().reason, "offline");
 
   await service.disconnect();
 });

@@ -21,6 +21,7 @@ test("factory circuit runtime reads resolved display config for copy, status, no
   assert.match(factoryCircuitSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
   assert.doesNotMatch(factoryCircuitSource, /factory-circuit-status-note/);
+  assert.match(factoryCircuitSource, /factory-circuit-load-state/);
 });
 
 test("factory circuit display page seed config captures the current default layout and hero contract", () => {
@@ -31,7 +32,13 @@ test("factory circuit display page seed config captures the current default layo
   assert.equal(config.textBlocks.copy.left, 78);
   assert.equal(config.statusBlock.top, 620);
   assert.equal(config.nodes.board.width, 182);
+  assert.equal(config.nodes.board.height, 336);
   assert.equal(config.connectors.inverterToBoard.width, 74);
   assert.equal(config.loadRows.production.height, 84);
-  assert.equal(config.kpiCards.totalPower.width, 380);
+  assert.equal(config.kpiCards.totalPower.left, 32);
+  assert.deepEqual(config.iconSources.kpiCards.solarShare, {
+    iconKey: "pie",
+    mode: "page-icon-key",
+    registry: "factory-circuit"
+  });
 });

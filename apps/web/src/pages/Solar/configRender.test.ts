@@ -28,6 +28,6 @@ test("solar display page seed config captures the current default hero and layou
   assert.deepEqual(config.heroCopy.titleLines, ["太陽能驅動", "製造新能量"]);
   assert.equal(config.heroMedia.alt, "太陽能車棚與綠能展示場域");
   assert.equal(config.flowNodes.solar.left, 795);
-  assert.equal(config.connectors.inverterToFactory.width, 140);
+  assert.equal(config.connectors.inverterToFactory.width, 108);
   assert.equal(config.kpiCards.efficiency.width, 360);
 });

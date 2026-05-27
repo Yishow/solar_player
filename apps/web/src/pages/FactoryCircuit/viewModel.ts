@@ -24,6 +24,7 @@ export type FactoryCircuitIconKey =
   | "infrastructure"
   | "solar"
   | "inverter"
+  | "pie"
   | "switchboard"
   | "sun";
 
@@ -56,7 +57,7 @@ const kpiIcons: Record<FactoryCircuitKpiKey, FactoryCircuitIconKey> = {
   flow: "leaf",
   peak: "bars",
   selfConsumption: "sun",
-  solarShare: "sun",
+  solarShare: "pie",
   totalPower: "bolt"
 };
 
@@ -307,7 +308,7 @@ export function buildFactoryCircuitViewModel({
           fallbackSharePercent: slot.sharePercent,
           iconKey: slot.iconKey,
           isEmpty: true,
-          labelEn: storySlot?.label ?? slot.defaultEn,
+          labelEn: slot.defaultEn,
           labelZh: storySlot?.label ?? slot.defaultZh,
           livePowerKw: null,
           progressClass: "bg-neutral-300",
@@ -332,7 +333,7 @@ export function buildFactoryCircuitViewModel({
         fallbackSharePercent: slot.sharePercent,
         iconKey: slot.iconKey,
         isEmpty: false,
-        labelEn: storySlot.label,
+        labelEn: slot.defaultEn,
         labelZh: storySlot.label,
         livePowerKw: livePower,
         progressClass: tone.progressClass,
@@ -523,7 +524,7 @@ export function buildFactoryCircuitViewModel({
             fallbackStrategy: "derive-from-dependencies" as const,
             freshnessState: "fresh" as const,
             helper: "Solar Supply Share",
-            iconKey: "sun" as const,
+            iconKey: "pie" as const,
             label: "太陽能供應占比",
             metricKey: "solarShare" as const,
             provenance: "derived" as const,

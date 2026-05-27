@@ -19,6 +19,7 @@ export type MqttStatus = {
 };
 
 type LoggerLike = {
+  debug?: (payload: unknown, message?: string) => void;
   info: (payload: unknown, message?: string) => void;
   warn: (payload: unknown, message?: string) => void;
   error: (payload: unknown, message?: string) => void;
@@ -194,7 +195,7 @@ export class SocketService {
         this.displayClientRegistry.delete(socket.id);
       });
 
-      this.logger.info({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
+      this.logger.debug?.({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
       socket.emit("mqtt:status", this.mqttStatus);
       socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
     });

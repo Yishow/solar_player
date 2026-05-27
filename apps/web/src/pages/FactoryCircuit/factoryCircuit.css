@@ -16,9 +16,9 @@
 .factory-circuit-title,
 .factory-circuit-copy,
 .factory-circuit-gold-line,
+.factory-circuit-line-leaf,
 .factory-circuit-leaf-watermark,
 .factory-circuit-node,
-.factory-circuit-connector,
 .factory-circuit-load-panel,
 .factory-circuit-kpi-card {
   position: absolute;
@@ -82,14 +82,21 @@
 }
 
 .factory-circuit-leaf-watermark {
-  opacity: 0.38;
-  --display-leaf-rotation: -16deg;
+  color: rgba(102, 141, 84, 0.82);
+  pointer-events: none;
+}
+
+.factory-circuit-line-leaf {
+  z-index: 8;
+  color: rgba(102, 141, 84, 0.82);
+  pointer-events: none;
 }
 
 .factory-circuit-node {
   z-index: 12;
   --display-node-border: var(--display-card-border-soft);
   --display-node-icon-color: #648557;
+  --display-node-icon-size: 86px;
   --display-node-radius: 28px;
   --display-node-shadow: var(--display-shadow-soft);
   --display-node-surface: var(--display-card-surface-strong);
@@ -102,6 +109,8 @@
 
 .factory-circuit-node-board {
   --display-node-border: rgba(96, 137, 77, 0.55);
+  --display-node-icon-size: 112px;
+  --display-node-title-size: 26px;
   --display-node-surface: linear-gradient(180deg, rgba(238, 244, 228, 0.76), rgba(255, 253, 247, 0.92));
 }
 
@@ -136,44 +145,40 @@
   background-size: 34px 34px;
 }
 
-.factory-circuit-connector {
-  z-index: 10;
-  height: 3px;
-  background: var(--factory-routing-line-color);
-}
-
-.factory-circuit-connector::before,
-.factory-circuit-connector::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  width: 11px;
-  height: 11px;
-  border-right: 2.5px solid var(--factory-routing-line-accent-color);
-  border-top: 2.5px solid var(--factory-routing-line-accent-color);
-  transform: rotate(45deg);
-}
-
-.factory-circuit-connector::before {
-  right: 11px;
-}
-
-.factory-circuit-connector::after {
-  right: -1px;
-}
-
 .factory-circuit-routing {
   position: absolute;
   inset: 0;
   width: 1920px;
   height: 1080px;
+  z-index: 9;
   color: var(--factory-routing-line-color);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2;
+  stroke-width: 2.1;
   pointer-events: none;
+}
+
+.routing-power-chain,
+.routing-load-tree {
+  color: var(--factory-routing-line-color);
+}
+
+.routing-power-flow,
+.routing-trunk,
+.routing-board-branch {
+  stroke-width: 2.2;
+}
+
+.routing-power-chevron {
+  color: var(--factory-routing-line-accent-color);
+  stroke-width: 2.5;
+}
+
+.routing-branch {
+  color: var(--factory-routing-line-color);
+  stroke-width: 2.1;
 }
 
 .factory-circuit-routing circle {
@@ -187,14 +192,15 @@
 }
 
 .factory-circuit-load-row {
+  position: absolute;
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 24px;
   border: 1px solid var(--display-card-border-soft);
-  border-radius: 13px;
+  border-radius: 16px;
   background: var(--display-card-surface);
   box-shadow: var(--display-shadow-soft);
-  padding: 0 24px;
+  padding: 0 26px 0 24px;
 }
 
 .factory-circuit-load-icon {
@@ -206,20 +212,23 @@
 
 .factory-circuit-load-copy {
   display: grid;
-  gap: 4px;
+  min-width: 0;
+  gap: 6px;
 }
 
 .factory-circuit-load-copy strong {
   color: #344039;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: 1px;
+  line-height: 1.15;
 }
 
 .factory-circuit-load-copy small {
   color: #757b75;
   font-family: var(--font-family-en);
-  font-size: 13px;
+  font-size: 17px;
+  line-height: 1.1;
 }
 
 .factory-circuit-load-state {
@@ -248,8 +257,9 @@
   margin-left: auto;
   color: #557a43;
   font-family: var(--font-family-en);
-  font-size: 30px;
+  font-size: 31px;
   font-weight: 600;
+  line-height: 1;
 }
 
 .factory-circuit-kpi-card {

@@ -119,7 +119,7 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
         flow: createPageIconKeySource("factory-circuit", "leaf"),
         peak: createPageIconKeySource("factory-circuit", "bars"),
         selfConsumption: createPageIconKeySource("factory-circuit", "sun"),
-        solarShare: createPageIconKeySource("factory-circuit", "sun"),
+        solarShare: createPageIconKeySource("factory-circuit", "pie"),
         totalPower: createPageIconKeySource("factory-circuit", "bolt")
       },
       loadRows: {

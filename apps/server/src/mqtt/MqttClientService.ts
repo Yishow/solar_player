@@ -11,6 +11,7 @@ import { parse } from "./PayloadParser.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "./settings-source.js";
 
 type LoggerLike = {
+  debug?: (payload: unknown, message?: string) => void;
   info: (payload: unknown, message?: string) => void;
   warn: (payload: unknown, message?: string) => void;
   error: (payload: unknown, message?: string) => void;
@@ -149,6 +150,7 @@ export class MqttClientService {
   private client: MqttClient | null = null;
   private desiredTopics = new Set<string>();
   private activeTopics = new Set<string>();
+  private reconnectsEnabled = false;
   private status: MqttStatus = {
     broker: "",
     clientId: "",
@@ -182,10 +184,12 @@ export class MqttClientService {
 
     if (settings.data_mode === "mock") {
       this.mockMode = true;
+      this.reconnectsEnabled = false;
       return;
     }
 
     this.mockMode = false;
+    this.reconnectsEnabled = Math.max(settings.reconnect_interval ?? 5000, 0) > 0;
 
     const client = this.connectFn(buildBrokerUrl(settings), this.buildClientOptions(settings));
     this.client = client;
@@ -264,6 +268,7 @@ export class MqttClientService {
     this.status.connected = false;
     this.status.reason = this.mockMode ? "mock" : "offline";
     this.status.updatedAt = new Date().toISOString();
+    this.reconnectsEnabled = false;
     this.activeTopics.clear();
 
     if (!this.client) {
@@ -337,19 +342,13 @@ export class MqttClientService {
         connected: false,
         reason: "reconnecting"
       });
-      this.logger.info({ broker: this.status.broker }, "MQTT reconnecting");
+      this.logger.debug?.({ broker: this.status.broker }, "MQTT reconnecting");
     });
     client.on("close", () => {
-      this.setStatus({
-        connected: false,
-        reason: "offline"
-      });
+      this.setDisconnectedClientStatus(client);
     });
     client.on("offline", () => {
-      this.setStatus({
-        connected: false,
-        reason: "offline"
-      });
+      this.setDisconnectedClientStatus(client);
     });
     client.on("error", (error) => {
       this.setStatus({
@@ -520,12 +519,23 @@ export class MqttClientService {
   }
 
   private setStatus(next: Pick<MqttStatus, "connected" | "reason">) {
+    if (this.status.connected === next.connected && this.status.reason === next.reason) {
+      return;
+    }
+
     this.status = {
       ...this.status,
       ...next,
       updatedAt: new Date().toISOString()
     };
     this.publishStatus();
+  }
+
+  private setDisconnectedClientStatus(client: MqttClient) {
+    this.setStatus({
+      connected: false,
+      reason: this.client === client && this.reconnectsEnabled ? "reconnecting" : "offline"
+    });
   }
 
   private publishStatus() {

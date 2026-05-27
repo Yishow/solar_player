@@ -56,8 +56,15 @@ class FakeIo {
 
 function createLogger() {
   return {
+    debugCalls: [] as unknown[],
+    debug(payload: unknown) {
+      this.debugCalls.push(payload);
+    },
     error() {},
-    info() {},
+    infoCalls: [] as unknown[],
+    info(payload: unknown) {
+      this.infoCalls.push(payload);
+    },
     warnCalls: [] as unknown[],
     warn(payload: unknown) {
       this.warnCalls.push(payload);
@@ -188,4 +195,30 @@ test("SocketService ignores heartbeats from an unknown socket and warns on inval
   assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 1);
   assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.pageKey, null);
   assert.equal(logger.warnCalls.length > 0, true);
+});
+
+test("SocketService keeps routine client connections out of info logs", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  new SocketService({
+    getLiveMetricsSnapshot: () => ({
+      metrics: {},
+      timestamp: "2026-05-22T12:00:00.000Z"
+    }),
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z")
+  });
+  const socket = new FakeSocket();
+
+  io.connect(socket);
+
+  assert.equal(logger.infoCalls.length, 0);
+  assert.deepEqual(logger.debugCalls, [
+    {
+      sessionClass: "playback-safe",
+      socketId: "socket-1"
+    }
+  ]);
 });

@@ -1,3 +1,5 @@
+export const solarContentTopOffset = 110;
+
 export const solarTitleLayout = {
   left: 88,
   top: 166,
@@ -44,19 +46,19 @@ export const solarConnectorLayout = {
     left: 1365,
     top: 582,
     verticalHeight: 170,
-    width: 180
+    width: 148
   },
   inverterToFactory: {
     height: 5,
     left: 1410,
     top: 291,
-    width: 140
+    width: 108
   },
   solarToInverter: {
     height: 5,
     left: 1025,
     top: 291,
-    width: 155
+    width: 123
   }
 } as const;
 

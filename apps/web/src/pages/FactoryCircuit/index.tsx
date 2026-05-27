@@ -1,4 +1,5 @@
 import type { CircuitConfig, DisplayPageFreeformObject } from "@solar-display/shared";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import {
@@ -24,12 +25,12 @@ import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
-import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
 } from "./displayPageConfig";
 import {
+  factoryCircuitContentTopOffset,
   factoryCircuitGoldLayout,
   factoryCircuitLeafLayout,
   factoryCircuitTitleLayout
@@ -43,8 +44,12 @@ import {
   type FactoryCircuitLoadState,
   type FactoryCircuitRuntime
 } from "./viewModel";
+import {
+  FactoryCircuitReferenceSprite,
+  factoryCircuitReferenceLeafRegions
+} from "./iconRegistry";
 
-const CONTENT_TOP_OFFSET = 146;
+const CONTENT_TOP_OFFSET = factoryCircuitContentTopOffset;
 
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
@@ -70,6 +75,38 @@ const loadRowOrder = [
   "infrastructure"
 ] as const;
 
+function FactoryCircuitLineLeaf({
+  className,
+  style
+}: {
+  className: string;
+  style: CSSProperties;
+}) {
+  return (
+    <FactoryCircuitReferenceSprite
+      className={className}
+      region={factoryCircuitReferenceLeafRegions.lineLeaf}
+      style={style}
+    />
+  );
+}
+
+function FactoryCircuitLeafWatermark({
+  className,
+  style
+}: {
+  className: string;
+  style: CSSProperties;
+}) {
+  return (
+    <FactoryCircuitReferenceSprite
+      className={className}
+      region={factoryCircuitReferenceLeafRegions.watermarkLeaf}
+      style={style}
+    />
+  );
+}
+
 export function FactoryCircuit({
   config,
   pageId = "factory-circuit"
@@ -90,7 +127,7 @@ export function FactoryCircuit({
   const [loadState, setLoadState] = useState<FactoryCircuitLoadState>("loading");
   const circuitsRef = useRef<FactoryCircuitRuntime[]>([]);
   const requestIdRef = useRef(0);
-  const loadCircuitsRef = useRef<(mode: "bootstrap" | "refresh") => Promise<void>>(async () => {});
+  const loadCircuitsRef = useRef<(mode: "bootstrap" | "refresh") => Promise<void>>(async () => { });
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -188,6 +225,22 @@ export function FactoryCircuit({
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
   const leafLayout = withContentOffset(factoryCircuitLeafLayout);
+  const powerConnectors = Object.keys(resolvedConfig.connectors).map((connectorKey) => {
+    const layout = withContentOffset(
+      resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
+    );
+    const endX = layout.left + layout.width;
+    const chevronOffsets = [30, 16];
+
+    return {
+      chevrons: chevronOffsets.map((offset) => {
+        const leftX = endX - offset;
+        return `M${leftX} ${layout.top - 10} L${leftX + 12} ${layout.top} L${leftX} ${layout.top + 10}`;
+      }),
+      key: connectorKey,
+      linePath: `M${layout.left} ${layout.top} H${endX}`
+    };
+  });
 
   return (
     <section className="factory-circuit-display-page">
@@ -266,15 +319,25 @@ export function FactoryCircuit({
         }}
       />
 
-      <DisplayLeafOrnament
+      <FactoryCircuitLineLeaf
+        className="factory-circuit-line-leaf"
+        style={{
+          height: "62px",
+          left: `${goldLayout.left + 376}px`,
+          top: `${goldLayout.top - 28}px`,
+          width: "116px"
+        }}
+      />
+
+      <FactoryCircuitLeafWatermark
         className="factory-circuit-leaf-watermark display-surface-leaf-ornament"
-        config={resolvedConfig.chrome.ornaments.leaf}
         style={{
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
-          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+          opacity: Math.min(1, resolvedConfig.chrome.ornaments.leaf.opacity / seedConfig.chrome.ornaments.leaf.opacity),
           top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
+          transform: `rotate(-10deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
+          transformOrigin: "50% 50%",
           width: `${leafLayout.width}px`
         }}
       />
@@ -306,36 +369,33 @@ export function FactoryCircuit({
         );
       })}
 
-      {Object.keys(resolvedConfig.connectors).map((connectorKey) => {
-        const nextLayout = withContentOffset(
-          resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
-        );
-        return (
-          <div
-            key={connectorKey}
-            className="factory-circuit-connector"
-            style={{
-              left: `${nextLayout.left}px`,
-              top: `${nextLayout.top}px`,
-              width: `${nextLayout.width}px`
-            }}
-          />
-        );
-      })}
-
       <svg aria-hidden="true" className="factory-circuit-routing" viewBox="0 0 1920 1080">
-        <path className="routing-main" d="M1258 440 H1306 C1319 440 1324 431 1324 418 V165 C1324 159 1329 154 1335 154 H1392" />
-        <path className="routing-branch" d="M1324 251 C1324 234 1336 229 1353 229 H1392" />
-        <path className="routing-branch" d="M1324 347 C1324 331 1336 324 1353 324 H1392" />
-        <path className="routing-branch" d="M1324 440 H1392" />
-        <path className="routing-branch" d="M1324 535 C1324 519 1336 514 1353 514 H1392" />
-        <path className="routing-branch" d="M1324 630 C1324 614 1336 609 1353 609 H1392" />
-        <circle cx="1324" cy="154" r="5" />
-        <circle cx="1324" cy="249" r="5" />
-        <circle cx="1324" cy="344" r="5" />
-        <circle cx="1324" cy="439" r="5" />
-        <circle cx="1324" cy="534" r="5" />
-        <circle cx="1324" cy="629" r="5" />
+        <g className="routing-power-chain">
+          {powerConnectors.map((connector) => (
+            <g key={connector.key}>
+              <path className="routing-power-flow" d={connector.linePath} />
+              {connector.chevrons.map((path, index) => (
+                <path key={`${connector.key}-${index}`} className="routing-power-chevron" d={path} />
+              ))}
+            </g>
+          ))}
+        </g>
+        <g className="routing-load-tree">
+          <path className="routing-trunk" d="M1320 78 V553" />
+          <path className="routing-board-branch" d="M1258 330 H1294 C1309 330 1320 318 1320 303" />
+          <path className="routing-branch" d="M1320 102 C1320 88 1332 78 1346 78 H1382" />
+          <path className="routing-branch" d="M1320 197 C1320 183 1332 173 1346 173 H1382" />
+          <path className="routing-branch" d="M1320 292 C1320 278 1332 268 1346 268 H1382" />
+          <path className="routing-branch" d="M1320 387 C1320 373 1332 363 1346 363 H1382" />
+          <path className="routing-branch" d="M1320 482 C1320 468 1332 458 1346 458 H1382" />
+          <path className="routing-branch" d="M1320 529 C1320 543 1332 553 1346 553 H1382" />
+          <circle cx="1382" cy="78" r="5" />
+          <circle cx="1382" cy="173" r="5" />
+          <circle cx="1382" cy="268" r="5" />
+          <circle cx="1382" cy="363" r="5" />
+          <circle cx="1382" cy="458" r="5" />
+          <circle cx="1382" cy="553" r="5" />
+        </g>
       </svg>
 
       <section
