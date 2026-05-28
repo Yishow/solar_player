@@ -27,7 +27,8 @@ import type {
 import {
   buildImageManagementDraftSaveTarget,
   hasSelectedImageManagementDraftChanges,
-  normalizeManagementPlaylistAssetId
+  normalizeManagementPlaylistAssetId,
+  resolveSelectedPlaylistEntry
 } from "./viewModel";
 import { IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
@@ -69,6 +70,7 @@ export function ImageManagement() {
   const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>([]);
   const [storageUsage, setStorageUsage] = useState<ImageStorageUsage>(initialStorageUsage);
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+  const [selectedPlaylistEntryId, setSelectedPlaylistEntryId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -107,13 +109,20 @@ export function ImageManagement() {
     setPlaylistEntries(nextPlaylistEntries);
     setLastSyncedPlaylistEntries(nextPlaylistEntries);
     setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
-    setSelectedImageId((currentSelected) => {
-      const candidateId = preferredImageId ?? currentSelected;
-      if (candidateId !== null && nextAssets.some((asset) => asset.id === candidateId)) {
-        return candidateId;
-      }
-      return nextAssets[0]?.id ?? null;
-    });
+    const nextSelectedAssetId =
+      preferredImageId !== null && nextAssets.some((asset) => asset.id === preferredImageId)
+        ? preferredImageId
+        : nextAssets[0]?.id ?? null;
+    setSelectedImageId(nextSelectedAssetId);
+    setSelectedPlaylistEntryId((currentSelectedEntryId) =>
+      nextSelectedAssetId === null
+        ? null
+        : resolveSelectedPlaylistEntry(
+            nextPlaylistEntries,
+            nextSelectedAssetId,
+            currentSelectedEntryId
+          )?.entryId ?? null
+    );
   };
 
   useEffect(() => {
@@ -135,7 +144,13 @@ export function ImageManagement() {
         setPlaylistEntries(nextPlaylistEntries);
         setLastSyncedPlaylistEntries(nextPlaylistEntries);
         setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
-        setSelectedImageId(nextAssets[0]?.id ?? null);
+        const nextSelectedAssetId = nextAssets[0]?.id ?? null;
+        setSelectedImageId(nextSelectedAssetId);
+        setSelectedPlaylistEntryId(
+          nextSelectedAssetId === null
+            ? null
+            : resolveSelectedPlaylistEntry(nextPlaylistEntries, nextSelectedAssetId)?.entryId ?? null
+        );
         setMessage("圖片庫已同步。");
         setErrorMessage("");
       } catch (error) {
@@ -192,9 +207,10 @@ export function ImageManagement() {
         lastSyncedAssets,
         lastSyncedPlaylistEntries,
         playlistEntries,
-        selectedImageId
+        selectedImageId,
+        selectedPlaylistEntryId
       }),
-    [assets, lastSyncedAssets, lastSyncedPlaylistEntries, playlistEntries, selectedImageId]
+    [assets, lastSyncedAssets, lastSyncedPlaylistEntries, playlistEntries, selectedImageId, selectedPlaylistEntryId]
   );
 
   const handleSelectImage = (nextImageId: number) => {
@@ -209,6 +225,24 @@ export function ImageManagement() {
     }
 
     setSelectedImageId(nextImageId);
+    setSelectedPlaylistEntryId(
+      resolveSelectedPlaylistEntry(playlistEntries, nextImageId)?.entryId ?? null
+    );
+    setErrorMessage("");
+  };
+
+  const handleSelectPlaylistEntry = (nextEntryId: string) => {
+    if (nextEntryId === selectedPlaylistEntryId) {
+      return;
+    }
+
+    if (hasSelectedDraftChanges) {
+      setMessage("請先儲存或重新同步目前 playlist row 的未儲存變更，再切換其他治理列。");
+      setErrorMessage("");
+      return;
+    }
+
+    setSelectedPlaylistEntryId(nextEntryId);
     setErrorMessage("");
   };
 
@@ -239,7 +273,8 @@ export function ImageManagement() {
     const saveTarget = buildImageManagementDraftSaveTarget({
       assets,
       playlistEntries,
-      selectedImageId
+      selectedImageId,
+      selectedPlaylistEntryId
     });
     if (saveTarget === null) return;
     setIsSaving(true);
@@ -357,6 +392,7 @@ export function ImageManagement() {
       handleBootstrapPlaylistGovernance={handleBootstrapPlaylistGovernance}
       handleSave={handleSave}
       handleSetCover={handleSetCover}
+      handleSelectPlaylistEntry={handleSelectPlaylistEntry}
       handleUpload={handleUpload}
       isAssetHealthLoading={isAssetHealthLoading}
       isAssetReferencesLoading={isAssetReferencesLoading}
@@ -378,6 +414,7 @@ export function ImageManagement() {
       }
       resyncLibrary={resyncLibrary}
       selectedImageId={selectedImageId}
+      selectedPlaylistEntryId={selectedPlaylistEntryId}
       handleSelectImage={handleSelectImage}
       storageUsage={storageUsage}
       updateAssetField={updateAssetField}

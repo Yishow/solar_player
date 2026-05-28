@@ -1,4 +1,7 @@
-import type { ImageAsset } from "@solar-display/shared";
+import type {
+  DisplayOpsAssetReferenceSummary,
+  ImageAsset
+} from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import { buildApiUrl } from "../../services/api";
@@ -34,6 +37,7 @@ type ImageManagementDraftSessionArgs = {
   assets: ImageAsset[];
   playlistEntries?: ImageManagementPlaylistEntry[];
   selectedImageId: number | null;
+  selectedPlaylistEntryId?: string | null;
 };
 
 type ImageManagementDraftChangeArgs = ImageManagementDraftSessionArgs & {
@@ -44,6 +48,33 @@ type ImageManagementDraftChangeArgs = ImageManagementDraftSessionArgs & {
 export type ImageManagementDraftSession = {
   assetId: number;
   playlistEntryId: string | null;
+};
+
+export type ImageManagementPlaylistEntryRow = {
+  area: string;
+  displayOrder: number;
+  durationSeconds: number;
+  entryId: string;
+  fallbackMode: ImageManagementPlaylistEntry["fallbackMode"];
+  isEnabled: boolean;
+  isSelected: boolean;
+  runtimeLabel: string;
+  title: string;
+};
+
+export type ImageManagementReferenceTriageGroup = {
+  items: Array<{
+    key: string;
+    message: string;
+    targetLabel: string;
+  }>;
+  summary: string;
+  title: string;
+};
+
+export type ImageManagementDeleteBlocker = {
+  message: string;
+  severity: "blocking" | "warning";
 };
 
 export type ImageManagementDraftSaveTarget = {
@@ -64,6 +95,7 @@ export function normalizeManagementPlaylistAssetId(assetId: string | null, entry
 }
 
 type BuildImageManagementViewModelArgs = {
+  assetReferences?: DisplayOpsAssetReferenceSummary | null;
   assets: ImageAsset[];
   errorMessage: string;
   isDeleting: boolean;
@@ -71,10 +103,10 @@ type BuildImageManagementViewModelArgs = {
   isUploading: boolean;
   message: string;
   selectedImageId: number | null;
+  selectedPlaylistEntryId?: string | null;
   storageUsage: ImageStorageUsage;
   playlistEntries?: ImageManagementPlaylistEntry[];
   resolvedPlaylistEntries?: ImageManagementResolvedPlaylistEntry[];
-  liveDisplayReferences?: Array<{ pageKey: string; stage: string; label: string }>;
 };
 
 const totalStorageBytes = 5 * 1024 * 1024 * 1024;
@@ -155,6 +187,23 @@ export function resolvePrimaryPlaylistEntry(
   return resolvePlaylistEntriesForAsset(playlistEntries, assetId)[0] ?? null;
 }
 
+export function resolveSelectedPlaylistEntry(
+  playlistEntries: ImageManagementPlaylistEntry[] | undefined,
+  assetId: number,
+  selectedPlaylistEntryId?: string | null
+) {
+  const matches = resolvePlaylistEntriesForAsset(playlistEntries, assetId);
+  if (matches.length === 0) {
+    return null;
+  }
+
+  if (selectedPlaylistEntryId) {
+    return matches.find((entry) => entry.entryId === selectedPlaylistEntryId) ?? matches[0] ?? null;
+  }
+
+  return matches[0] ?? null;
+}
+
 export function resolveImageManagementDraftSession(
   args: ImageManagementDraftSessionArgs
 ): ImageManagementDraftSession | null {
@@ -165,7 +214,12 @@ export function resolveImageManagementDraftSession(
 
   return {
     assetId: selectedAsset.id,
-    playlistEntryId: resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id)?.entryId ?? null
+    playlistEntryId:
+      resolveSelectedPlaylistEntry(
+        args.playlistEntries,
+        selectedAsset.id,
+        args.selectedPlaylistEntryId
+      )?.entryId ?? null
   };
 }
 
@@ -211,6 +265,12 @@ export function buildImageManagementDraftSaveTarget(
       title: selectedAsset.title
     },
     playlistEntry: resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id)
+      ? resolveSelectedPlaylistEntry(
+          args.playlistEntries,
+          selectedAsset.id,
+          args.selectedPlaylistEntryId
+        )
+      : null
   };
 }
 
@@ -269,8 +329,78 @@ function buildPlaylistRuntimeStatus(args: {
   return "Playlist Runtime 正常播放";
 }
 
+function buildPlaylistEntryRow(
+  entry: ImageManagementPlaylistEntry,
+  selectedEntryId: string | null
+): ImageManagementPlaylistEntryRow {
+  return {
+    area: entry.area || "未命名區域",
+    displayOrder: entry.displayOrder,
+    durationSeconds: entry.durationSeconds,
+    entryId: entry.entryId,
+    fallbackMode: entry.fallbackMode,
+    isEnabled: entry.enabled,
+    isSelected: entry.entryId === selectedEntryId,
+    runtimeLabel: entry.enabled ? "啟用中" : "停用",
+    title: entry.title || "未命名播放列"
+  };
+}
+
+function buildReferenceTriageGroups(
+  assetReferences: DisplayOpsAssetReferenceSummary | null | undefined
+): ImageManagementReferenceTriageGroup[] {
+  if (!assetReferences) {
+    return [];
+  }
+
+  const groups = [
+    {
+      filter: "live",
+      summary: `${assetReferences.liveCount} live references`,
+      title: "Live Runtime"
+    },
+    {
+      filter: "draft",
+      summary: `${assetReferences.draftCount} draft reference${assetReferences.draftCount === 1 ? "" : "s"}`,
+      title: "Draft Configuration"
+    },
+    {
+      filter: "slideshow",
+      summary: `${assetReferences.references.filter((reference) => reference.kind === "slideshow").length} slideshow binding`,
+      title: "Slideshow Governance"
+    }
+  ] as const;
+
+  return groups.flatMap((group) => {
+    const items = assetReferences.references
+      .filter((reference) => {
+        if (group.filter === "slideshow") {
+          return reference.kind === "slideshow";
+        }
+
+        return reference.stage === group.filter && reference.kind !== "slideshow";
+      })
+      .map((reference) => ({
+        key: reference.bindingId ?? `${reference.kind}-${reference.targetLabel}-${reference.stage}`,
+        message: reference.message,
+        targetLabel: reference.targetLabel
+      }));
+
+    if (items.length === 0) {
+      return [];
+    }
+
+    return [{
+      items,
+      summary: group.summary,
+      title: group.title
+    }];
+  });
+}
+
 export function buildImageManagementViewModel(args: BuildImageManagementViewModelArgs) {
   const {
+    assetReferences,
     assets,
     errorMessage,
     isDeleting,
@@ -278,10 +408,10 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
     isUploading,
     message,
     selectedImageId,
+    selectedPlaylistEntryId,
     storageUsage,
     playlistEntries,
-    resolvedPlaylistEntries,
-    liveDisplayReferences
+    resolvedPlaylistEntries
   } = args;
   const sortedAssets = sortAssets(assets);
   const selectedAsset = resolveSelectedImageManagementAsset(assets, selectedImageId);
@@ -346,7 +476,11 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
       selectedAsset === null
         ? null
         : (() => {
-            const playlistEntry = resolvePrimaryPlaylistEntry(args.playlistEntries, selectedAsset.id);
+            const playlistEntry = resolveSelectedPlaylistEntry(
+              args.playlistEntries,
+              selectedAsset.id,
+              selectedPlaylistEntryId
+            );
             const playlistAssetEntries = resolvePlaylistEntriesForAsset(args.playlistEntries, selectedAsset.id);
             const runtimeInclusion =
               playlistEntries === undefined
@@ -357,6 +491,10 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
             const playlistEntryCount = playlistAssetEntries.length;
             return {
               badges: [buildPlaylistBadge(playlistEntries, selectedAsset), ...(selectedAsset.isCover ? ["封面"] : [])],
+              deleteBlockers: (assetReferences?.blockingIssues ?? []).map((issue) => ({
+                message: issue.message,
+                severity: issue.severity
+              })),
               description: selectedAsset.description ?? "尚未填寫圖片說明",
               displayDurationLabel: `${selectedAsset.displayDuration} 秒`,
               filenameLabel: selectedAsset.originalName ?? selectedAsset.filename ?? `image-${selectedAsset.id}`,
@@ -380,8 +518,12 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
               playlistTitle: playlistEntry?.title ?? null,
               playlistDescription: playlistEntry?.description ?? null,
               playlistArea: playlistEntry?.area ?? null,
+              playlistEntryRows: playlistAssetEntries.map((entry) =>
+                buildPlaylistEntryRow(entry, playlistEntry?.entryId ?? null)
+              ),
               playlistTags: playlistEntry?.tags ?? null,
-              playlistCapturedAt: playlistEntry?.capturedAt ?? null
+              playlistCapturedAt: playlistEntry?.capturedAt ?? null,
+              referenceTriageGroups: buildReferenceTriageGroups(assetReferences)
             };
           })(),
     summaryCards: [

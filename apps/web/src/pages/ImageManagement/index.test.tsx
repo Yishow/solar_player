@@ -24,8 +24,13 @@ test("image management editor surfaces playlist runtime controls and server-driv
   assert.match(imageManagementContentSource, /Playlist Runtime/);
   assert.match(imageManagementContentSource, /playlistRuntimeStatus/);
   assert.match(imageManagementContentSource, /playlistFallbackMode/);
+  assert.match(imageManagementContentSource, /playlistEntryRows/);
+  assert.match(imageManagementContentSource, /handleSelectPlaylistEntry/);
   assert.match(imageManagementContentSource, /updatePlaylistEntryField/);
-  assert.match(imageManagementSource, /deleteBlocked=\{\(assetReferences\?\.blockingIssues\.length \?\? 0\) > 0\}/);
+  assert.match(imageManagementContentSource, /Delete Blockers/);
+  assert.match(imageManagementContentSource, /Live Runtime/);
+  assert.match(imageManagementContentSource, /Draft Configuration/);
+  assert.match(imageManagementContentSource, /Slideshow Governance/);
 });
 
 test("image management repositions the page around governance and editor handoff instead of presenting a second asset-library home", () => {
@@ -33,6 +38,9 @@ test("image management repositions the page around governance and editor handoff
   assert.match(imageManagementContentSource, /Governance &amp; Editor Handoff/);
   assert.match(imageManagementContentSource, /to="\/display-pages\/editor\?workspace=assets"/);
   assert.match(imageManagementContentSource, /素材替換、版面配置與批次整理請前往展示頁編輯器資產工作區。/);
+  assert.match(imageManagementContentSource, /intent=focal-point/);
+  assert.match(imageManagementContentSource, /selectedAsset=/);
+  assert.doesNotMatch(imageManagementContentSource, /className="im-crop-btn" disabled/);
   assert.doesNotMatch(imageManagementContentSource, /素材庫\s*<small>Asset Library/);
 });
 

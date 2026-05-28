@@ -243,6 +243,189 @@ test("buildImageManagementViewModel edits the first ordered playlist row when on
   ] : undefined, 3), true);
 });
 
+test("buildImageManagementViewModel exposes one-to-many playlist governance and scopes fields to the selected row", () => {
+  const model = buildImageManagementViewModel({
+    assets,
+    errorMessage: "",
+    isDeleting: false,
+    isSaving: false,
+    isUploading: false,
+    message: "圖片庫已同步。",
+    playlistEntries: [
+      {
+        area: "備援輪播",
+        assetId: 3,
+        capturedAt: "",
+        description: "",
+        displayOrder: 2,
+        durationSeconds: 12,
+        enabled: true,
+        entryId: "IMG-02",
+        fallbackMode: "skip",
+        tags: ["備援"],
+        title: "備援圖"
+      },
+      {
+        area: "首頁 Hero",
+        assetId: 3,
+        capturedAt: "2026/05/10 14:32",
+        description: "首頁封面展示最新太陽能陣列成果。",
+        displayOrder: 1,
+        durationSeconds: 25,
+        enabled: false,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        tags: ["封面", "太陽能"],
+        title: "太陽能板鳥瞰"
+      }
+    ],
+    selectedImageId: 3,
+    selectedPlaylistEntryId: "IMG-02",
+    storageUsage: {
+      fileCount: 2,
+      usedBytes: 2.5 * 1024 * 1024 * 1024,
+      usedMB: 2560
+    }
+  });
+
+  assert.equal(model.selection?.playlistEntryCount, 2);
+  assert.equal(model.selection?.playlistEntryId, "IMG-02");
+  assert.equal(model.selection?.playlistDisplayOrder, 2);
+  assert.equal(model.selection?.playlistDurationSeconds, 12);
+  assert.equal(model.selection?.playlistFallbackMode, "skip");
+  assert.equal(model.selection?.playlistEnabled, true);
+  assert.deepEqual(
+    model.selection?.playlistEntryRows,
+    [
+      {
+        area: "首頁 Hero",
+        displayOrder: 1,
+        durationSeconds: 25,
+        entryId: "IMG-01",
+        fallbackMode: "use-cover",
+        isEnabled: false,
+        isSelected: false,
+        runtimeLabel: "停用",
+        title: "太陽能板鳥瞰"
+      },
+      {
+        area: "備援輪播",
+        displayOrder: 2,
+        durationSeconds: 12,
+        entryId: "IMG-02",
+        fallbackMode: "skip",
+        isEnabled: true,
+        isSelected: true,
+        runtimeLabel: "啟用中",
+        title: "備援圖"
+      }
+    ]
+  );
+});
+
+test("buildImageManagementViewModel groups references and delete blockers into structured triage surfaces", () => {
+  const model = buildImageManagementViewModel({
+    assetReferences: {
+      assetId: 3,
+      blockingIssues: [
+        {
+          assetId: 3,
+          code: "live-reference",
+          message: "Solar live 頁面仍引用這張圖。",
+          pageId: "solar",
+          severity: "blocking"
+        }
+      ],
+      draftCount: 1,
+      liveCount: 2,
+      references: [
+        {
+          bindingId: "live-solar",
+          kind: "display-page",
+          message: "Solar live hero 使用中。",
+          pageId: "solar",
+          stage: "live",
+          targetLabel: "Solar Hero"
+        },
+        {
+          bindingId: "draft-overview",
+          kind: "page-object",
+          message: "Overview draft banner 準備改用這張圖。",
+          pageId: "overview",
+          stage: "draft",
+          targetLabel: "Overview Banner"
+        },
+        {
+          bindingId: "playlist-01",
+          kind: "slideshow",
+          message: "圖片輪播第 1 筆仍啟用。",
+          pageId: null,
+          stage: "live",
+          targetLabel: "Slideshow Runtime"
+        }
+      ]
+    },
+    assets,
+    errorMessage: "",
+    isDeleting: false,
+    isSaving: false,
+    isUploading: false,
+    message: "圖片庫已同步。",
+    playlistEntries: [],
+    selectedImageId: 3,
+    storageUsage: {
+      fileCount: 2,
+      usedBytes: 2.5 * 1024 * 1024 * 1024,
+      usedMB: 2560
+    }
+  });
+
+  assert.deepEqual(
+    model.selection?.referenceTriageGroups,
+    [
+      {
+        items: [
+          {
+            key: "live-solar",
+            message: "Solar live hero 使用中。",
+            targetLabel: "Solar Hero"
+          }
+        ],
+        summary: "2 live references",
+        title: "Live Runtime"
+      },
+      {
+        items: [
+          {
+            key: "draft-overview",
+            message: "Overview draft banner 準備改用這張圖。",
+            targetLabel: "Overview Banner"
+          }
+        ],
+        summary: "1 draft reference",
+        title: "Draft Configuration"
+      },
+      {
+        items: [
+          {
+            key: "playlist-01",
+            message: "圖片輪播第 1 筆仍啟用。",
+            targetLabel: "Slideshow Runtime"
+          }
+        ],
+        summary: "1 slideshow binding",
+        title: "Slideshow Governance"
+      }
+    ]
+  );
+  assert.deepEqual(model.selection?.deleteBlockers, [
+    {
+      message: "Solar live 頁面仍引用這張圖。",
+      severity: "blocking"
+    }
+  ]);
+});
+
 test("resolveImageManagementDraftSession keeps one selected asset and playlist row authoritative", () => {
   const session = resolveImageManagementDraftSession({
     assets,

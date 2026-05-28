@@ -68,7 +68,9 @@ type ImageManagementContentProps = {
   remoteSyncBanner: ReactNode;
   resyncLibrary: () => Promise<void>;
   selectedImageId: number | null;
+  selectedPlaylistEntryId: string | null;
   handleSelectImage: (value: number) => void;
+  handleSelectPlaylistEntry: (entryId: string) => void;
   storageUsage: ImageStorageUsage;
   updateAssetField: (
     id: number,
@@ -122,12 +124,15 @@ export function ImageManagementContent({
   remoteSyncBanner,
   resyncLibrary,
   selectedImageId,
+  selectedPlaylistEntryId,
   handleSelectImage,
+  handleSelectPlaylistEntry,
   storageUsage,
   updateAssetField,
   updatePlaylistEntryField
 }: ImageManagementContentProps) {
   const viewModel = buildImageManagementViewModel({
+    assetReferences,
     assets,
     errorMessage,
     isDeleting,
@@ -135,6 +140,7 @@ export function ImageManagementContent({
     isUploading,
     message,
     selectedImageId,
+    selectedPlaylistEntryId,
     storageUsage,
     playlistEntries,
     resolvedPlaylistEntries
@@ -315,9 +321,26 @@ export function ImageManagementContent({
                 <small>Playlist Runtime</small>
               </div>
 
-              {viewModel.selection.playlistEntryCount > 1 ? (
-                <div className="mgmt-status">
-                  此素材目前對應多個 playlist rows，以下正在編輯排序最前的 {viewModel.selection.playlistEntryId}。
+              {viewModel.selection.playlistEntryRows.length > 0 ? (
+                <div className="im-playlist-rows">
+                  <div className="im-playlist-rows__title">
+                    對應治理列
+                    <small>Playlist Rows</small>
+                  </div>
+                  <div className="im-playlist-rows__list">
+                    {viewModel.selection.playlistEntryRows.map((row) => (
+                      <button
+                        key={row.entryId}
+                        type="button"
+                        className={`im-playlist-row${row.isSelected ? " is-selected" : ""}`}
+                        onClick={() => handleSelectPlaylistEntry(row.entryId)}
+                      >
+                        <strong>{row.entryId} · {row.title}</strong>
+                        <small>{row.area} · #{row.displayOrder} · {row.durationSeconds} 秒 · {row.fallbackMode}</small>
+                        <span>{row.runtimeLabel}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
@@ -414,7 +437,13 @@ export function ImageManagementContent({
 
               <div className="im-form-row">
                 <label>裁切/焦點 <small>Crop / Focus</small></label>
-                <button type="button" className="im-crop-btn" disabled>✂ 調整焦點 Adjust Focus</button>
+                <Link
+                  className="im-crop-link"
+                  to={`/display-pages/editor?workspace=assets&intent=focal-point&selectedAsset=${viewModel.selection.id}`}
+                >
+                  ✂ 調整焦點 Adjust Focus
+                  <small>帶著 {viewModel.selection.title} 前往 editor authoring workflow</small>
+                </Link>
               </div>
 
               <div className="im-form-row">
@@ -434,13 +463,24 @@ export function ImageManagementContent({
                   <div className="mgmt-status">正在載入素材引用...</div>
                 ) : assetReferencesErrorMessage ? (
                   <div className="mgmt-status is-error">{assetReferencesErrorMessage}</div>
-                ) : assetReferences && assetReferences.references.length > 0 ? (
-                  <div className="mgmt-status">
-                    {assetReferences.references.map((reference) => (
-                      <div key={`${reference.kind}-${reference.targetLabel}-${reference.stage}`} style={{ marginTop: 6 }}>
-                        {reference.kind} · {reference.stage} · {reference.targetLabel}
-                        <small style={{ display: "block", opacity: 0.72 }}>{reference.message}</small>
-                      </div>
+                ) : viewModel.selection.referenceTriageGroups.length > 0 ? (
+                  <div className="im-triage">
+                    <div className="im-triage__legend">
+                      Live Runtime / Draft Configuration / Slideshow Governance
+                    </div>
+                    {viewModel.selection.referenceTriageGroups.map((group) => (
+                      <section key={group.title} className="im-triage__group">
+                        <div className="im-triage__title">
+                          {group.title}
+                          <small>{group.summary}</small>
+                        </div>
+                        {group.items.map((item) => (
+                          <div key={item.key} className="im-triage__item">
+                            <strong>{item.targetLabel}</strong>
+                            <small>{item.message}</small>
+                          </div>
+                        ))}
+                      </section>
                     ))}
                   </div>
                 ) : (
@@ -449,8 +489,19 @@ export function ImageManagementContent({
               </div>
 
               {deleteBlocked ? (
-                <div className="mgmt-status is-error">
-                  {deleteBlockMessage ?? "這張圖片仍被 live display surface 或 playlist runtime 引用，請先解除引用後再移除。"}
+                <div className="im-triage">
+                  <section className="im-triage__group is-blocking">
+                    <div className="im-triage__title">
+                      Delete Blockers
+                      <small>{deleteBlockMessage ?? "請先解除 live 或 slideshow 引用後再刪除。"}</small>
+                    </div>
+                    {viewModel.selection.deleteBlockers.map((blocker) => (
+                      <div key={blocker.message} className={`im-triage__item${blocker.severity === "blocking" ? " is-blocking" : ""}`}>
+                        <strong>{blocker.severity === "blocking" ? "Blocking" : "Warning"}</strong>
+                        <small>{blocker.message}</small>
+                      </div>
+                    ))}
+                  </section>
                 </div>
               ) : null}
             </div>
