@@ -12,10 +12,11 @@ const slideshowPreviewSource = fs.readFileSync(path.join(pageDir, "index.tsx"), 
 test("slideshow preview renders cards from the shared live preview catalog instead of prototype asset maps", () => {
   assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(slideshowPreviewSource, /<LiveSlideshowPreviewCards/);
-  assert.match(slideshowPreviewSource, /<RotationOpsSummary/);
-  assert.match(slideshowPreviewSource, /viewModel\.rotationOpsSummary/);
-  assert.match(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
-  assert.match(slideshowPreviewSource, /className="mgmt-action sp-action"/);
+  assert.match(slideshowPreviewSource, /resolveSlideshowCardOffsets\(visibleCards\.length\)/);
+  assert.match(slideshowPreviewSource, /pages\.length > 1/);
+  assert.match(slideshowPreviewSource, /viewModel\.debugStatus/);
+  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.debugRows/);
+  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
   assert.doesNotMatch(slideshowPreviewSource, /slideshowPreviewAssetRuntimeMap/);
   assert.doesNotMatch(slideshowPreviewSource, /<img alt=\{card\.labelZh\} src=\{asset\}/);
 });
@@ -63,6 +64,7 @@ test("slideshow preview cards keep duplicate template instances bound to their o
             )
         }
       ],
+      offsets: [308, 616],
       states: {
         overview: {
           config: {
@@ -112,6 +114,7 @@ test("slideshow preview keeps renderer-unavailable fallback when a card has no t
           renderPreview: (config) => React.createElement("article", null, String(config.headline ?? ""))
         }
       ],
+      offsets: [616],
       states: {}
     })
   );

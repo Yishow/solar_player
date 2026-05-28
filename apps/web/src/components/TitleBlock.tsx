@@ -1,6 +1,5 @@
 import React from "react";
 import type { ReactNode } from "react";
-import { SectionTitle } from "./SectionTitle";
 import { shellDensityClassMap, type ShellDensity } from "./shellDensity";
 
 type TitleBlockProps = {
@@ -28,9 +27,12 @@ export function TitleBlock({
       className={["flex items-start gap-4", hideHeading ? "justify-end" : "justify-between"].join(" ")}
     >
       {hideHeading ? null : (
-        <div className={["space-y-3", shellDensityClassMap[density].title].join(" ")}>
-          <SectionTitle title={title} subtitle={subtitle} />
-          {description ? <p className="text-lg leading-8 text-neutral-600">{description}</p> : null}
+        <div className={["mgmt-shell-title-block", shellDensityClassMap[density].title].join(" ")}>
+          <div className="mgmt-shell-title-row">
+            <h1 className="mgmt-page-title__heading">{title}</h1>
+            <p className="mgmt-page-title__subtitle">{subtitle}</p>
+          </div>
+          {description ? <p className="mgmt-shell-title-description">{description}</p> : null}
         </div>
       )}
       {aside}

@@ -2,7 +2,7 @@
 // resource/network overlap and give every region clear breathing room.
 //
 // Vertical budget:
-//   12-58    title
+//   28-76    title
 //   64-554   left aside (3 status cards, h=156, gap 16)
 //   64-574   info panel
 //   64-304   photo
@@ -19,5 +19,5 @@ export const deviceLayout = {
   photo: { height: 240, left: 1190, top: 64, width: 680 },
   resource: { height: 268, left: 1190, top: 320, width: 680 },
   side: { left: 50, top: 64, width: 390 },
-  title: { left: 58, top: 12 }
+  title: { left: 58, top: 28 }
 } as const;

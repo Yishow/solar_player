@@ -3,26 +3,26 @@
 // on the top-right, range tabs below, and 5 trend cards across the lower half.
 //
 // Vertical budget:
-//   24-110    title block (h1 60px + p 22px subtitle)
-//   136-176   copy line
-//   18-72     refresh status (top right)
-//   88-148    range tabs row (right)
-//   60-248    leaf watermark (decorative, behind copy)
-//   270-738   5 trend cards (h=468)
+//   28-84     title block
+//   112-148   copy line
+//   28-74     refresh status (top right)
+//   86-144    range tabs row (right)
+//   52-224    leaf watermark (decorative, behind copy)
+//   204-766   5 trend cards (h=562)
 
 export const energyTrendLayout = {
   cards: {
-    card1: { height: 468, left: 52, top: 270, width: 304 },
-    card2: { height: 468, left: 368, top: 270, width: 304 },
-    card3: { height: 468, left: 684, top: 270, width: 304 },
-    card4: { height: 468, left: 1000, top: 270, width: 304 },
-    card5: { height: 468, left: 1316, top: 270, width: 304 }
+    card1: { height: 562, left: 50, top: 204, width: 352 },
+    card2: { height: 562, left: 416, top: 204, width: 352 },
+    card3: { height: 562, left: 782, top: 204, width: 352 },
+    card4: { height: 562, left: 1148, top: 204, width: 352 },
+    card5: { height: 562, left: 1514, top: 204, width: 352 }
   },
-  copy: { left: 58, top: 136, width: 700 },
-  leaf: { height: 188, left: 372, top: 60, width: 548 },
-  refresh: { height: 54, left: 1452, top: 18, width: 418 },
-  tabs: { height: 60, left: 1142, top: 88, width: 728 },
-  title: { left: 58, top: 24, width: 720 }
+  copy: { left: 58, top: 112, width: 760 },
+  leaf: { height: 172, left: 386, top: 52, width: 520 },
+  refresh: { height: 46, left: 1440, top: 28, width: 430 },
+  tabs: { height: 58, left: 1168, top: 86, width: 702 },
+  title: { left: 58, top: 28, width: 720 }
 } as const;
 
 export const energyTrendCardKeys = ["card1", "card2", "card3", "card4", "card5"] as const;

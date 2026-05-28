@@ -3,39 +3,37 @@ import test from "node:test";
 import { energyTrendCardKeys, energyTrendLayout } from "./layout";
 
 test("energy trend layout centralizes title, tabs, refresh, and chart card geometry", () => {
-  assert.deepEqual(energyTrendLayout.title, { left: 58, top: 24, width: 720 });
-  assert.deepEqual(energyTrendLayout.copy, { left: 58, top: 136, width: 700 });
+  assert.deepEqual(energyTrendLayout.title, { left: 58, top: 28, width: 720 });
+  assert.deepEqual(energyTrendLayout.copy, { left: 58, top: 112, width: 760 });
   assert.deepEqual(energyTrendLayout.leaf, {
-    height: 188,
-    left: 372,
-    top: 60,
-    width: 548
+    height: 172,
+    left: 386,
+    top: 52,
+    width: 520
   });
   assert.deepEqual(energyTrendLayout.tabs, {
-    height: 60,
-    left: 1142,
-    top: 88,
-    width: 728
+    height: 58,
+    left: 1168,
+    top: 86,
+    width: 702
   });
   assert.deepEqual(energyTrendLayout.refresh, {
-    height: 54,
-    left: 1452,
-    top: 18,
-    width: 418
+    height: 46,
+    left: 1440,
+    top: 28,
+    width: 430
   });
   assert.deepEqual(energyTrendLayout.cards.card5, {
-    height: 468,
-    left: 1316,
-    top: 270,
-    width: 304
+    height: 562,
+    left: 1514,
+    top: 204,
+    width: 352
   });
   assert.deepEqual(energyTrendCardKeys, ["card1", "card2", "card3", "card4", "card5"]);
 });
 
 test("energy trend regions stack within content height 838 and avoid hard collisions", () => {
-  // title bottom (h1 60px line-height 1.05 ≈ 63 + p subtitle 22 + margin 14 ≈ 99)
-  // copy starts at 136 — clear of title ~123. OK.
-  assert.ok(energyTrendLayout.copy.top > energyTrendLayout.title.top + 100, "copy clears title block");
+  assert.ok(energyTrendLayout.copy.top > energyTrendLayout.title.top + 70, "copy clears title block");
 
   // cards start below copy + tabs
   const tabsBottom = energyTrendLayout.tabs.top + energyTrendLayout.tabs.height;

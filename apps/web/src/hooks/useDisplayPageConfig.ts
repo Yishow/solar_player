@@ -15,7 +15,7 @@ import {
   upgradeLegacyMetricHighlightRail
 } from "@solar-display/shared";
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getDisplayPageConfig,
   isManagementDraftConflictError,
@@ -23,11 +23,23 @@ import {
 } from "../services/api";
 import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
 import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
+import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
 export { getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+
+function isDisplayPageMediaEffectLayerCandidate(value: unknown): value is { kind: string; zone: string } {
+  return isPlainObject(value) && typeof value.kind === "string" && typeof value.zone === "string";
+}
+
+function isDisplayPageMediaEffectLayerArray(value: unknown) {
+  return Array.isArray(value) && value.length > 0 && value.every((entry) => isDisplayPageMediaEffectLayerCandidate(entry));
+}
+
+const liveDisplayPageSyncScopes = ["display-pages"] as const;
+const noDisplayPageSyncScopes = [] as const;
 
 type DisplayPageConfigWithFreeformObjects = {
   freeformObjects?: DisplayPageFreeformObject[];
@@ -54,6 +66,10 @@ export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown
   if (Array.isArray(seedConfig)) {
     if (!Array.isArray(overrideConfig)) {
       return deepClone(seedConfig);
+    }
+
+    if (isDisplayPageMediaEffectLayerArray(seedConfig) || isDisplayPageMediaEffectLayerArray(overrideConfig)) {
+      return deepClone(overrideConfig as T);
     }
 
     const usesIdentityMerge =
@@ -192,6 +208,10 @@ export function shouldDeferDisplayPageRuntimeRender(args: {
   return args.runtimeHydrationEnabled && args.stage === "live" && args.isLoading && args.lastLoadedEnvelope === null;
 }
 
+export function resolveDisplayPageConfigSyncScopes(enabled: boolean, stage: ConfigStage) {
+  return enabled && stage === "live" ? liveDisplayPageSyncScopes : noDisplayPageSyncScopes;
+}
+
 function resolveLoadMessage(stage: ConfigStage, envelope: DisplayPageConfigEnvelope) {
   if (envelope.updatedAt) {
     return stage === "live" ? "正式展示頁設定已同步。" : "展示頁設定已同步。";
@@ -320,7 +340,7 @@ export function useDisplayPageConfig<T>(
     };
   }, [dirty, enabled, pageId, seedConfig, sessions, stage]);
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     if (!enabled) {
       return;
     }
@@ -341,7 +361,14 @@ export function useDisplayPageConfig<T>(
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [enabled, pageId, seedConfig, stage]);
+
+  const displaySyncScopes = useMemo(
+    () => resolveDisplayPageConfigSyncScopes(enabled, stage),
+    [enabled, stage]
+  );
+
+  useDisplaySyncRefresh(reload, displaySyncScopes);
 
   const save = async () => {
     if (!enabled || stage !== "draft") {

@@ -27,7 +27,7 @@ export function PageContainer({
 }: PageContainerProps) {
   const usesFixedHeight = density === "playback";
   const spacingClasses =
-    spacing === "compact" ? "gap-4 px-page-x pt-4 pb-5" : "gap-6 px-page-x py-page-y";
+    spacing === "compact" ? "gap-4 px-[58px] pt-[28px] pb-5" : "gap-5 px-[58px] pt-[28px] pb-6";
 
   return (
     <section

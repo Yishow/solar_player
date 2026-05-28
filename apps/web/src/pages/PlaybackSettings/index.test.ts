@@ -13,23 +13,21 @@ test("playback settings keeps save and resync actions wired to the playback APIs
   assert.match(playbackSettingsSource, /updatePlaybackPages\(/);
   assert.match(playbackSettingsSource, /getDisplayRotationPreview\(\)/);
   assert.match(playbackSettingsSource, /const resyncPlaybackConfig = async \(\) => \{/);
-  assert.match(playbackSettingsSource, /usePlaybackController\(\{\s*currentPath:\s*"\/settings\/playback"/);
   assert.match(playbackSettingsSource, /className="mgmt-action ps-resync"/);
   assert.match(playbackSettingsSource, /className="mgmt-action primary ps-save"/);
   assert.match(playbackSettingsSource, /role="status"/);
   assert.match(playbackSettingsSource, /showSaveBanner/);
-  assert.match(playbackSettingsSource, /正式生效輪播鏈/);
+  assert.doesNotMatch(playbackSettingsSource, /正式生效輪播鏈/);
 });
 
 test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
   assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
   assert.match(playbackSettingsSource, /ps-preview__alert/);
-  assert.match(playbackSettingsSource, /viewModel\.configuredRotationRows/);
-  assert.match(playbackSettingsSource, /viewModel\.effectiveRotationRows/);
-  assert.match(playbackSettingsSource, /viewModel\.skippedRotationRows/);
   assert.doesNotMatch(playbackSettingsSource, /slideOverview/);
   assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
+  assert.doesNotMatch(playbackSettingsSource, /viewModel\.skippedRotationRows\.length > 0/);
+  assert.doesNotMatch(playbackSettingsSource, /viewModel\.pendingDraftRows\.length > 0/);
   assert.match(playbackSettingsSource, /showPreviewAlert/);
 });
 

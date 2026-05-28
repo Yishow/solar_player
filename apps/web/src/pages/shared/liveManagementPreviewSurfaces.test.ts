@@ -74,6 +74,7 @@ test("playback settings and slideshow preview surfaces render the same live prev
         }
       ],
       definitions,
+      offsets: [616],
       states: previewStates
     })
   );

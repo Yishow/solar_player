@@ -159,13 +159,13 @@ export function EnergyHistory() {
   return (
     <section className="eh-page">
       <section
-        className="eh-title"
+        className="eh-title mgmt-page-title"
         style={{ left: energyHistoryLayout.title.left, top: energyHistoryLayout.title.top }}
       >
-        <h1>
+        <h1 className="mgmt-page-title__heading">
           能源<em>歷史</em>
         </h1>
-        <p>Energy History</p>
+        <p className="mgmt-page-title__subtitle">Energy History</p>
       </section>
 
       {/* === Side range selector === */}

@@ -2,6 +2,88 @@
  * Provides appearance-only rules; positioning belongs in each page's CSS.
  */
 
+:root {
+  --mgmt-page-title-left: 58px;
+  --mgmt-page-title-top: 28px;
+  --mgmt-page-title-gap: 18px;
+  --mgmt-page-title-font-size: 38px;
+  --mgmt-page-title-letter-spacing: 4px;
+  --mgmt-page-title-line-height: 1;
+  --mgmt-page-subtitle-font-size: 20px;
+  --mgmt-page-subtitle-letter-spacing: 0.04em;
+  --mgmt-page-subtitle-ink: #686e68;
+  --mgmt-page-kicker-font-size: 24px;
+  --mgmt-page-kicker-letter-spacing: 0.08em;
+  --mgmt-page-description-font-size: 15px;
+  --mgmt-page-description-line-height: 1.65;
+  --mgmt-page-description-ink: #5d655d;
+  --mgmt-page-surface-left: 50px;
+  --mgmt-page-surface-top: 118px;
+  --mgmt-page-surface-width: 1820px;
+}
+
+.mgmt-page-title {
+  position: absolute;
+  left: var(--mgmt-page-title-left);
+  top: var(--mgmt-page-title-top);
+  display: flex;
+  align-items: baseline;
+  gap: var(--mgmt-page-title-gap);
+}
+
+.mgmt-page-title__heading {
+  margin: 0;
+  font-size: var(--mgmt-page-title-font-size);
+  font-weight: 700;
+  line-height: var(--mgmt-page-title-line-height);
+  letter-spacing: var(--mgmt-page-title-letter-spacing);
+  color: var(--ink-strong);
+}
+
+.mgmt-page-title__heading em {
+  font-style: normal;
+  color: var(--green);
+}
+
+.mgmt-page-title__subtitle {
+  margin: 0;
+  font: 400 var(--mgmt-page-subtitle-font-size) / 1 var(--font-family-en);
+  letter-spacing: var(--mgmt-page-subtitle-letter-spacing);
+  color: var(--mgmt-page-subtitle-ink);
+}
+
+.mgmt-page-kicker {
+  margin: 0;
+  font-size: var(--mgmt-page-kicker-font-size);
+  font-weight: 700;
+  letter-spacing: var(--mgmt-page-kicker-letter-spacing);
+  color: var(--green);
+}
+
+.mgmt-shell-title-block {
+  display: grid;
+  gap: 10px;
+}
+
+.mgmt-shell-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mgmt-page-title-gap);
+}
+
+.mgmt-shell-title-row .mgmt-page-title__heading,
+.mgmt-shell-title-row .mgmt-page-title__subtitle {
+  position: static;
+}
+
+.mgmt-shell-title-description {
+  margin: 0;
+  max-width: 760px;
+  font-size: var(--mgmt-page-description-font-size);
+  line-height: var(--mgmt-page-description-line-height);
+  color: var(--mgmt-page-description-ink);
+}
+
 /* === Surface Boards === */
 .settings-card,
 .mgmt-surface {

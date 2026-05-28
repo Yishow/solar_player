@@ -114,11 +114,11 @@ export function CircuitSettingsContent({
 
   return (
     <div className="cs-page">
-      <section className="cs-title">
-        <h1>
+      <section className="cs-title mgmt-page-title">
+        <h1 className="mgmt-page-title__heading">
           迴路<em>設定</em>
         </h1>
-        <p>Circuit Settings</p>
+        <p className="mgmt-page-title__subtitle">Circuit Settings</p>
       </section>
 
       <button
@@ -405,13 +405,7 @@ export function CircuitSettingsContent({
                       </td>
                       <td className="col-display">
                         <div className="cs-display-stack">
-                          <div className="cs-impact-summary">
-                            <strong>Display Impact</strong>
-                            <small>{row.slotImpactLabel}</small>
-                            <span className={chipClass(row.rowRiskTone)}>{row.rowRiskLabel}</span>
-                            <small>{row.rowRiskDetail}</small>
-                            <small>{row.thresholdSummaryLabel}</small>
-                          </div>
+                          <p className="cs-cell-caption">{row.slotImpactLabel}</p>
                           <select
                             className="cs-input"
                             value={row.displaySlot ?? ""}
@@ -439,6 +433,7 @@ export function CircuitSettingsContent({
                             <span className="cs-toggle-label">{row.visibilityLabel}</span>
                           </div>
                           <span className={chipClass(row.validationTone)}>{row.validationLabel}</span>
+                          <p className="cs-cell-caption">{row.thresholdSummaryLabel}</p>
                           <p className="cs-cell-caption">
                             Slot: {row.displaySlot ? (slotLabelMap[row.displaySlot] ?? row.displaySlot) : "未綁定"} · {row.validationDetail}
                           </p>

@@ -78,13 +78,13 @@ export function DeviceStatusContent({
   return (
     <section className="ds-page">
       <section
-        className="ds-title"
+        className="ds-title mgmt-page-title"
         style={{ left: deviceLayout.title.left, top: deviceLayout.title.top }}
       >
-        <h1>
+        <h1 className="mgmt-page-title__heading">
           裝置<em>狀態</em>
         </h1>
-        <p>Device Status Details</p>
+        <p className="mgmt-page-title__subtitle">Device Status</p>
       </section>
 
       <aside

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { defaultFallbackPolicy } from "@solar-display/shared";
 import { createImagesDisplayPageSeedConfig } from "../pages/Images/displayPageConfig";
+import { createOverviewDisplayPageSeedConfig } from "../pages/Overview/displayPageConfig";
 import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainability/displayPageConfig";
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
@@ -9,6 +10,7 @@ import {
   mergeDisplayPageConfig,
   primeDisplayPageConfigCache,
   resolveCachedDisplayPageConfigSession,
+  resolveDisplayPageConfigSyncScopes,
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage,
@@ -232,6 +234,19 @@ test("mergeDisplayPageConfig preserves newly added rail cards instead of truncat
   assert.equal(merged.highlightRail.cards[2]?.template, "metric-highlight");
 });
 
+test("mergeDisplayPageConfig preserves explicit empty canonical media effect layers instead of restoring seed defaults", () => {
+  const seedConfig = createOverviewDisplayPageSeedConfig("/overview-seed.jpg");
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    heroMedia: {
+      effects: {
+        layers: []
+      }
+    }
+  });
+
+  assert.deepEqual(merged.heroMedia.effects, { layers: [] });
+});
+
 test("mergeDisplayPageConfig upgrades legacy highlight items into metric-highlight cards", () => {
   const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
   const merged = mergeDisplayPageConfig(seedConfig, {
@@ -377,6 +392,12 @@ test("live runtime pages defer first render until persisted config hydration com
 test("resolveDisplayPageConfigStagePath targets the live publishing channel for runtime reads", () => {
   assert.equal(resolveDisplayPageConfigStagePath("overview", "live"), "/api/display-pages/overview/live");
   assert.equal(resolveDisplayPageConfigStagePath("overview", "draft"), "/api/display-pages/overview/draft");
+});
+
+test("resolveDisplayPageConfigSyncScopes only enables display sync refresh for live runtime hydration", () => {
+  assert.deepEqual(resolveDisplayPageConfigSyncScopes(true, "live"), ["display-pages"]);
+  assert.deepEqual(resolveDisplayPageConfigSyncScopes(true, "draft"), []);
+  assert.deepEqual(resolveDisplayPageConfigSyncScopes(false, "live"), []);
 });
 
 test("resolveDisplayPageFallbackPolicy prefers the envelope fallback policy and falls back to defaults", () => {

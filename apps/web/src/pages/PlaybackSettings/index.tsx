@@ -25,8 +25,7 @@ import {
 import {
   OpsInfoBanner,
   OpsSurface,
-  OpsSurfaceTitle,
-  RotationOpsSummary
+  OpsSurfaceTitle
 } from "../../components/management";
 import { usePlaybackController } from "../../hooks/usePlaybackController";
 import "./playbackSettings.css";
@@ -281,12 +280,12 @@ export function PlaybackSettings() {
   return (
     <div className="playback-settings-page">
       <div className="ps-header-area">
-        <h2 className="ps-header-slogan">綠能驅動・永續未來</h2>
+        <h2 className="ps-header-slogan mgmt-page-kicker">綠能驅動・永續未來</h2>
         <section className="ps-title">
-          <h1>
+          <h1 className="mgmt-page-title__heading">
             播放<em>設定</em>
           </h1>
-          <p>Playback Settings</p>
+          <p className="mgmt-page-title__subtitle">Playback Settings</p>
         </section>
       </div>
 
@@ -319,7 +318,8 @@ export function PlaybackSettings() {
           aria-label="顯示頁面管理"
           onClick={() => setShowAddPageForm((current) => !current)}
         >
-          {showAddPageForm ? "收起頁面管理" : "+ 新增頁面 Add Page"}
+          {showAddPageForm ? "收起管理" : "頁面管理"}
+          <small>Page Registry</small>
         </button>
       </div>
 
@@ -342,10 +342,9 @@ export function PlaybackSettings() {
         />
       ) : null}
 
-      <section className="ps-preview-family">
-        <OpsSurface className="ps-preview ps-preview--configured" family="preview">
+      <OpsSurface className="ps-preview" family="preview">
           <OpsSurfaceTitle
-            caption="/ Configured Rotation Governance"
+            caption="/ Configured Rotation Preview"
             className="ps-preview__title"
             title="目前配置輪播鏈"
           />
@@ -364,33 +363,7 @@ export function PlaybackSettings() {
               states={livePreviewCatalog.states}
             />
           </div>
-        </OpsSurface>
-
-        <RotationOpsSummary
-          items={viewModel.skippedRotationRows.map((row) => ({
-            detail: row.detail ? `${row.skipReasonLabel} · ${row.detail}` : `${row.skipReasonLabel} · ${row.route}`,
-            key: row.pageId,
-            label: row.instanceLabel,
-            tone: "warning"
-          }))}
-          stats={viewModel.runtimeSummaryRows}
-          status={viewModel.effectiveRotationStatus}
-          subtitle="Effective Rotation Diagnostics"
-          title="正式生效輪播鏈"
-        >
-          <div className="ps-preview__embedded-list">
-            {viewModel.effectiveRotationRows.length > 0 ? (
-              <LiveRotationPreviewList
-                definitions={livePreviewCatalog.definitions}
-                rows={viewModel.effectiveRotationRows}
-                states={livePreviewCatalog.states}
-              />
-            ) : (
-              <div className="ps-preview__empty">目前沒有正式納入輪播的展示頁。</div>
-            )}
-          </div>
-        </RotationOpsSummary>
-      </section>
+      </OpsSurface>
       <PlaybackSettingsFormSections
         formDisabled={formDisabled}
         isRegistrySaving={isRegistrySaving}

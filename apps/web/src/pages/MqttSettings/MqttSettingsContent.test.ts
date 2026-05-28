@@ -633,7 +633,7 @@ test("mqtt settings content surfaces a setup notice when the CWA weather source 
   assert.match(html, /CWA_AUTHORIZATION/);
 });
 
-test("mqtt settings content renders section guidance display-impact groups and invalid weather draft feedback", () => {
+test("mqtt settings content keeps draft state in status feedback without rendering extra guidance boards", () => {
   const html = renderToStaticMarkup(
     React.createElement(MqttSettingsContent, {
       actionState: {
@@ -761,10 +761,11 @@ test("mqtt settings content renders section guidance display-impact groups and i
     })
   );
 
-  assert.match(html, /Broker 草稿待儲存/);
-  assert.match(html, /Topic Workspace 有未儲存變更/);
-  assert.match(html, /Display Impact Summary/);
-  assert.match(html, /Overview · 今日發電量/);
-  assert.match(html, /Header Contract 草稿待儲存/);
+  assert.match(html, /Topic mappings 已變更，尚未儲存/);
   assert.match(html, /請先選擇測站，才能確認 header 會顯示哪個站點。/);
+  assert.doesNotMatch(html, /Broker 草稿待儲存/);
+  assert.doesNotMatch(html, /Topic Workspace 有未儲存變更/);
+  assert.doesNotMatch(html, /Display Impact Summary/);
+  assert.doesNotMatch(html, /Overview · 今日發電量/);
+  assert.doesNotMatch(html, /Header Contract 草稿待儲存/);
 });

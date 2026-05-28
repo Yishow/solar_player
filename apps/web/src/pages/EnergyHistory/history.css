@@ -11,34 +11,6 @@
   color: var(--ink);
 }
 
-/* === page title === */
-.eh-page .eh-title {
-  position: absolute;
-  display: flex;
-  align-items: baseline;
-  gap: 18px;
-}
-
-.eh-page .eh-title h1 {
-  margin: 0;
-  font-size: 38px;
-  font-weight: 700;
-  letter-spacing: 4px;
-  color: var(--ink-strong);
-}
-
-.eh-page .eh-title h1 em {
-  font-style: normal;
-  color: var(--green);
-}
-
-.eh-page .eh-title p {
-  margin: 0;
-  font: 400 20px/1 var(--font-family-en);
-  letter-spacing: 0.04em;
-  color: #686e68;
-}
-
 /* === side range selector === */
 .eh-page .eh-side {
   position: absolute;

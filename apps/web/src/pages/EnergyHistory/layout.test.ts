@@ -3,7 +3,7 @@ import test from "node:test";
 import { energyHistoryLayout, energyHistoryMetricCardKeys } from "./layout";
 
 test("energy history layout centralizes selector, metric, chart, and summary band geometry", () => {
-  assert.deepEqual(energyHistoryLayout.title, { left: 58, top: 12 });
+  assert.deepEqual(energyHistoryLayout.title, { left: 58, top: 28 });
   assert.deepEqual(energyHistoryLayout.side, {
     height: 714,
     left: 30,

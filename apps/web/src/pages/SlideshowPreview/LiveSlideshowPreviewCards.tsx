@@ -9,7 +9,6 @@ import {
   resolveLiveDisplayPagePreviewState,
   type LiveDisplayPagePreviewStates
 } from "../shared/liveDisplayPagePreviewState";
-import { slideshowCardOffsets } from "./layout";
 
 type SlideshowPreviewCard = Pick<
   PlaybackPage,
@@ -47,10 +46,12 @@ function resolvePreviewState(
 export function LiveSlideshowPreviewCards({
   cards,
   definitions,
+  offsets,
   states
 }: {
   cards: SlideshowPreviewCard[];
   definitions: LiveDisplayPagePreviewDefinition[];
+  offsets: number[];
   states: LiveDisplayPagePreviewStates;
 }) {
   return (
@@ -62,7 +63,7 @@ export function LiveSlideshowPreviewCards({
           <article
             key={card.id}
             className={`sp-card${card.isCurrent ? " active" : ""}`}
-            style={{ left: slideshowCardOffsets[index] ?? 0 }}
+            style={{ left: offsets[index] ?? 0 }}
           >
             <span className="sp-card-num">
               {String(card.displayOrder).padStart(2, "0")}

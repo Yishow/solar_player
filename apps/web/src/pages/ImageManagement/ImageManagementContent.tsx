@@ -170,11 +170,11 @@ export function ImageManagementContent({
         onChange={(event) => void handleUpload(event)}
       />
 
-      <section className="im-title">
-        <h1>
+      <section className="im-title mgmt-page-title">
+        <h1 className="mgmt-page-title__heading">
           圖片<em>管理</em>
         </h1>
-        <p>Image Management</p>
+        <p className="mgmt-page-title__subtitle">Image Management</p>
       </section>
 
       <button type="button" className="mgmt-action im-resync" disabled={isLoading || isUploading} onClick={() => void resyncLibrary()}>

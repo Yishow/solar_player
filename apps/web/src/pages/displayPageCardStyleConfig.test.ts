@@ -36,7 +36,7 @@ test("display page seed configs persist card style records separately from geome
   assert.equal(overview.kpiCards.power.height, 232);
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(images.infoPanel.width, 374);
-  assert.equal(sustainability.statCards.esg.height, 220);
+  assert.equal(sustainability.statCards.esg.height, 232);
 });
 
 test("display editor schemas expose card style paths only for eligible shared-card regions", () => {

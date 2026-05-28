@@ -196,7 +196,7 @@ test("display seed configs keep protected FHD geometry fixtures stable across th
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(factory.statusBlock.width, 430);
   assert.equal(images.infoPanel.width, 374);
-  assert.equal(sustainability.statCards.esg.height, 220);
+  assert.equal(sustainability.statCards.esg.height, 232);
 });
 
 test("shared display chrome roles use semantic tokens and avoid raw color drift in the shared surface css", () => {

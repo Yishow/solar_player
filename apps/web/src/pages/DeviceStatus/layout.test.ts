@@ -3,7 +3,7 @@ import test from "node:test";
 import { deviceLayout } from "./layout";
 
 test("device status layout centralizes title, info, resource, network, and action geometry", () => {
-  assert.deepEqual(deviceLayout.title, { left: 58, top: 12 });
+  assert.deepEqual(deviceLayout.title, { left: 58, top: 28 });
   assert.deepEqual(deviceLayout.side, { left: 50, top: 64, width: 390 });
   assert.deepEqual(deviceLayout.info, {
     height: 510,

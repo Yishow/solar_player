@@ -13,7 +13,7 @@ export function RemoteSyncBanner({
       <small style={{ display: "block", marginTop: 4, opacity: 0.82 }}>
         目前會保留你的本地編輯。你可以稍後再說，或重新同步並放棄未儲存變更。
       </small>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div className="mgmt-action-row" style={{ marginTop: 12 }}>
         <button type="button" className="mgmt-action" onClick={onKeepEditing}>
           稍後再說
           <small>Keep Editing</small>

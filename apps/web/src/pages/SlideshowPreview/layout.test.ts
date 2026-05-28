@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { slideshowCardOffsets, slideshowLayout } from "./layout";
+import {
+  resolveSlideshowCardOffsets,
+  slideshowCardGap,
+  slideshowCardOffsets,
+  slideshowCardWidth,
+  slideshowLayout
+} from "./layout";
 
 test("slideshow preview layout centralizes title, status rail, carousel, and summary geometry", () => {
-  assert.deepEqual(slideshowLayout.title, { left: 58, top: 40 });
+  assert.deepEqual(slideshowLayout.title, { left: 58, top: 28 });
   assert.deepEqual(slideshowLayout.status, { left: 50, top: 118, width: 282 });
   assert.deepEqual(slideshowLayout.carousel, {
     height: 460,
@@ -26,4 +32,13 @@ test("slideshow preview right column carousel and summary do not overlap and fit
 
   const summaryBottom = slideshowLayout.summary.top + slideshowLayout.summary.height;
   assert.ok(summaryBottom <= 838, "summary fits content height 838");
+});
+
+test("slideshow preview recenters partial card sets instead of pinning them to the left rail", () => {
+  assert.deepEqual(resolveSlideshowCardOffsets(1), [616]);
+  assert.deepEqual(resolveSlideshowCardOffsets(3), [308, 616, 924]);
+
+  const twoCards = resolveSlideshowCardOffsets(2);
+  assert.equal(twoCards[1]! - twoCards[0]!, slideshowCardWidth + slideshowCardGap);
+  assert.equal(twoCards[0], 462);
 });

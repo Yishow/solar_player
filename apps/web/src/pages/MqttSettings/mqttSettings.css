@@ -9,53 +9,26 @@
   color: var(--ink);
 }
 
-.mqtt-settings-page .mqtt-title {
-  position: absolute;
-  left: 80px;
-  top: 44px;
-}
-
-.mqtt-settings-page .mqtt-title h1 {
-  margin: 0;
-  font-size: 60px;
-  font-weight: 700;
-  letter-spacing: 5px;
-  line-height: 1.05;
-  color: var(--ink-strong);
-}
-
-.mqtt-settings-page .mqtt-title h1 em {
-  font-style: normal;
-  color: var(--green);
-}
-
-.mqtt-settings-page .mqtt-title p {
-  margin: 14px 0 0;
-  font: 400 26px/1 var(--font-family-en);
-  letter-spacing: 0.04em;
-  color: #686e68;
-}
-
 /* action button positioning */
 
-.mqtt-settings-page .mqtt-test-conn { left: 1316px; width: 250px; }
-.mqtt-settings-page .mqtt-save { left: 1595px; width: 250px; }
+.mqtt-settings-page .mqtt-test-conn { left: 1340px; width: 230px; }
+.mqtt-settings-page .mqtt-save { left: 1590px; width: 250px; }
 
 /* card positioning (converged 3-card layout: mode | topic workspace | weather) */
-.mqtt-settings-page .mqtt-mode { left: 50px; top: 162px; width: 435px; height: 604px; }
+.mqtt-settings-page .mqtt-mode { left: 50px; top: 118px; width: 500px; height: 648px; }
 .mqtt-settings-page .mqtt-topic-workspace {
-  left: 504px;
-  top: 162px;
-  width: 760px;
-  height: 604px;
+  left: 568px;
+  top: 118px;
+  width: 680px;
+  height: 648px;
   display: flex;
   flex-direction: column;
 }
 .mqtt-settings-page .mqtt-weather-card {
-  left: 1288px;
-  top: 162px;
-  width: 575px;
-  height: 604px;
+  left: 1266px;
+  top: 118px;
+  width: 600px;
+  height: 648px;
   display: flex;
   flex-direction: column;
 }
@@ -64,10 +37,6 @@
   margin-bottom: 18px;
   display: grid;
   gap: 10px;
-}
-
-.mqtt-settings-page .mqtt-section-guide {
-  margin-bottom: 16px;
 }
 
 .mqtt-settings-page .conn-status.mqtt-runtime-status {
@@ -139,6 +108,10 @@
   grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  background: #fffdf8;
 }
 
 .mqtt-settings-page .mqtt-runtime-feedback__copy {
@@ -160,70 +133,6 @@
 .mqtt-settings-page .mqtt-runtime-feedback__more {
   margin: 0;
   font-size: 12px;
-  color: #6f766f;
-}
-
-.mqtt-settings-page .mqtt-impact-groups {
-  margin-bottom: 16px;
-  display: grid;
-  gap: 10px;
-}
-
-.mqtt-settings-page .mqtt-impact-groups__title {
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: #6f766f;
-}
-
-.mqtt-settings-page .mqtt-impact-groups__list {
-  display: grid;
-  gap: 10px;
-}
-
-.mqtt-settings-page .mqtt-impact-group {
-  padding: 10px 12px;
-  border: 1px solid rgba(92, 105, 79, 0.16);
-  border-radius: 12px;
-  background: #fffdf8;
-  display: grid;
-  gap: 8px;
-}
-
-.mqtt-settings-page .mqtt-impact-group.is-warning {
-  border-color: rgba(201, 136, 26, 0.28);
-  background: rgba(252, 240, 217, 0.5);
-}
-
-.mqtt-settings-page .mqtt-impact-group.is-error {
-  border-color: rgba(193, 74, 74, 0.24);
-  background: rgba(254, 243, 241, 0.82);
-}
-
-.mqtt-settings-page .mqtt-impact-group__title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #344039;
-}
-
-.mqtt-settings-page .mqtt-impact-group__title small {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  font-weight: 400;
-  color: #6f766f;
-}
-
-.mqtt-settings-page .mqtt-impact-group__item strong {
-  display: block;
-  font-size: 12px;
-  color: #2f4031;
-}
-
-.mqtt-settings-page .mqtt-impact-group__item small {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.45;
   color: #6f766f;
 }
 

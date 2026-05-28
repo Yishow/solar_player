@@ -60,8 +60,8 @@ function MiniTrendChart({
     (point): point is { label: string; value: number } => point.value !== null
   );
   if (validPoints.length === 0) return null;
-  const width = 230;
-  const height = 170;
+  const width = 272;
+  const height = 220;
   const padding = 8;
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
@@ -144,17 +144,15 @@ export function EnergyTrend() {
   return (
     <section className="et-page">
       <section
-        className="et-title"
+        className="et-title mgmt-page-title"
         style={{
           left: energyTrendLayout.title.left,
           top: energyTrendLayout.title.top,
           width: energyTrendLayout.title.width
         }}
       >
-        <h2>
-          <em>能源趨勢</em>摘要
-        </h2>
-        <p>Energy Trend Summary</p>
+        <h1 className="mgmt-page-title__heading">能源<em>趨勢</em></h1>
+        <p className="mgmt-page-title__subtitle">Energy Trend</p>
       </section>
 
       <p

@@ -3,7 +3,7 @@
 // main chart panel and a bottom summary band — all non-overlapping.
 //
 // Vertical budget:
-//   12-58     title (h ≈ 46)
+//   28-76     title (h ≈ 48)
 //   72-786    side range rail (h=714)
 //   72-258    5 metric cards (h=186)
 //   276-616   chart panel (h=340)
@@ -20,7 +20,7 @@ export const energyHistoryLayout = {
     card5: { height: 186, left: 1598, top: 72, width: 272 }
   },
   side: { height: 714, left: 30, top: 72, width: 290 },
-  title: { left: 58, top: 12 }
+  title: { left: 58, top: 28 }
 } as const;
 
 export const energyHistoryMetricCardKeys = ["card1", "card2", "card3", "card4", "card5"] as const;

@@ -11,9 +11,8 @@ import {
   IconStar,
   IconTransition
 } from "../../components/icons";
-import { RotationOpsSummary } from "../../components/management";
 import { usePageRotation } from "../../hooks/usePageRotation";
-import { slideshowLayout } from "./layout";
+import { resolveSlideshowCardOffsets, slideshowLayout } from "./layout";
 import "./preview.css";
 import { buildSlideshowPreviewViewModel } from "./viewModel";
 import { LiveSlideshowPreviewCards } from "./LiveSlideshowPreviewCards";
@@ -42,7 +41,6 @@ export function SlideshowPreview() {
     progress,
     rotationPreview,
     settings,
-    togglePlay
   } = usePageRotation();
 
   const viewModel = buildSlideshowPreviewViewModel({
@@ -67,19 +65,19 @@ export function SlideshowPreview() {
         return allCards[(activeIdx + offset + allCards.length) % allCards.length];
       }).filter(Boolean) as typeof allCards)
     : allCards;
+  const visibleOffsets = resolveSlideshowCardOffsets(visibleCards.length);
+  const hasMultiplePages = pages.length > 1;
 
   return (
     <section className="sp-page" data-theme={currentPage?.pageKey}>
       <section
-        className="sp-title"
+        className="sp-title mgmt-page-title"
         style={{ left: slideshowLayout.title.left, top: slideshowLayout.title.top }}
       >
-        <div className="sp-title-text">
-          <h1>
-            循環<em>播放預覽頁</em>
-          </h1>
-          <p>Slideshow Preview</p>
-        </div>
+        <h1 className="mgmt-page-title__heading">
+          輪播<em>預覽</em>
+        </h1>
+        <p className="mgmt-page-title__subtitle">Slideshow Preview</p>
       </section>
 
       {/* === Left status rail === */}
@@ -178,20 +176,25 @@ export function SlideshowPreview() {
             statusLabel: card.statusLabel
           }))}
           definitions={livePreviewCatalog.definitions}
+          offsets={visibleOffsets}
           states={livePreviewCatalog.states}
         />
-        <button type="button" className="sp-arrow prev" onClick={prevPage} aria-label="上一張">
-          <IconCaretLeft size={28} />
-        </button>
-        <button type="button" className="sp-arrow next" onClick={nextPage} aria-label="下一張">
-          <IconCaretRight size={28} />
-        </button>
-        <div className="sp-dots">
-          <div className="sp-dots-line" />
-          {pages.map((p, i) => (
-            <i key={p.id} className={p.id === currentPage?.id ? "on" : ""} />
-          ))}
-        </div>
+        {hasMultiplePages ? (
+          <>
+            <button type="button" className="sp-arrow prev" onClick={prevPage} aria-label="上一張">
+              <IconCaretLeft size={28} />
+            </button>
+            <button type="button" className="sp-arrow next" onClick={nextPage} aria-label="下一張">
+              <IconCaretRight size={28} />
+            </button>
+            <div className="sp-dots">
+              <div className="sp-dots-line" />
+              {pages.map((p) => (
+                <i key={p.id} className={p.id === currentPage?.id ? "on" : ""} />
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
 
       {/* === Bottom summary === */}
@@ -209,51 +212,25 @@ export function SlideshowPreview() {
             播放摘要 <small>Playback Summary</small>
           </h2>
         </div>
-        <div className="sp-summary-body">
-          <div className="sp-summary-grid">
-            {viewModel.summaryRows.map((row, index) => (
-              <div key={row.label} className={`sp-summary-item${index === 3 && isPlaying ? " is-on" : ""}`}>
-                <div className="sp-summary-header">
-                  <span className="sp-summary-icon" aria-hidden>
-                    {summaryIcons[index]}
-                  </span>
-                  <div className="sp-summary-labels">
-                    <b>{row.label}</b>
-                    <small>{["Playback route", "Display Duration", "Transition Effect", "Auto Play", "Last Updated"][index]}</small>
-                  </div>
+        <div className="sp-summary-grid">
+          {viewModel.summaryRows.map((row, index) => (
+            <div key={row.label} className={`sp-summary-item${index === 3 && isPlaying ? " is-on" : ""}`}>
+              <div className="sp-summary-header">
+                <span className="sp-summary-icon" aria-hidden>
+                  {summaryIcons[index]}
+                </span>
+                <div className="sp-summary-labels">
+                  <b>{row.label}</b>
+                  <small>{["Playback route", "Display Duration", "Transition Effect", "Auto Play", "Last Updated"][index]}</small>
                 </div>
-                <div className="sp-summary-value">{row.value}</div>
               </div>
-            ))}
-          </div>
-          <RotationOpsSummary
-            actions={(
-              <>
-                <button type="button" className="mgmt-action sp-action" onClick={prevPage}>
-                  上一頁
-                  <small>Prev</small>
-                </button>
-                <button type="button" className="mgmt-action sp-action" onClick={togglePlay}>
-                  {isPlaying ? "暫停輪播" : "恢復輪播"}
-                  <small>{isPlaying ? "Pause" : "Play"}</small>
-                </button>
-                <button type="button" className="mgmt-action sp-action" onClick={nextPage}>
-                  下一頁
-                  <small>Next</small>
-                </button>
-              </>
-            )}
-            items={viewModel.skippedDebugRows.map((row) => ({
-              detail: row.detail ? `${row.skipReasonLabel} · ${row.detail}` : `${row.skipReasonLabel} · ${row.route}`,
-              key: row.pageId,
-              label: row.instanceLabel,
-              tone: "warning"
-            }))}
-            stats={viewModel.rotationOpsSummary.stats}
-            status={viewModel.rotationOpsSummary.status}
-            subtitle="Effective Rotation Diagnostics"
-            title="正式生效輪播鏈"
-          />
+              <div className="sp-summary-value">{row.value}</div>
+            </div>
+          ))}
+        </div>
+        <div className={`sp-debug-status is-${viewModel.debugStatus.tone}`}>
+          <b>{viewModel.debugStatus.title}</b>
+          <small>{viewModel.debugStatus.detail}</small>
         </div>
       </section>
 
