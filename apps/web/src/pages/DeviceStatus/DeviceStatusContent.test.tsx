@@ -10,6 +10,8 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /displayOpsErrorMessage\s*\?\s*"摘要不可用"\s*:\s*viewModel\.displayOpsSummary\.statusTitle/s);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.configurationReadinessLabel/);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.operationalHealthLabel/);
+  assert.match(deviceStatusContentSource, /mgmt-surface--status-dashboard/);
+  assert.match(deviceStatusContentSource, /mgmt-stat-strip ds-display-ops-stats/);
   assert.match(deviceStatusContentSource, /alert\.domainLabel/);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.alerts\)\.map/);
   assert.match(deviceStatusContentSource, /handleDiagnostic\(action\.action, action\.label\)/);

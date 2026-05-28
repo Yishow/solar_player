@@ -95,7 +95,7 @@ export function DeviceStatusContent({
           width: deviceLayout.side.width
         }}
       >
-        <article className="ds-status-card">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
           <span className="ds-status-card__label">
             裝置運作狀態
             <small>Device Operation Status</small>
@@ -109,7 +109,7 @@ export function DeviceStatusContent({
           </span>
         </article>
 
-        <article className="ds-status-card">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
           <span className="ds-status-card__label">
             系統運行時間
             <small>Uptime</small>
@@ -118,7 +118,7 @@ export function DeviceStatusContent({
           <span className="ds-status-card__detail">服務啟動後累積時間</span>
         </article>
 
-        <article className="ds-status-card">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
           <span className="ds-status-card__label">
             展示營運摘要
             <small>Display Operations</small>
@@ -142,7 +142,7 @@ export function DeviceStatusContent({
       </aside>
 
       <section
-        className="ds-card ds-info"
+        className="ds-card ds-info mgmt-surface mgmt-surface--status-dashboard"
         style={{
           height: deviceLayout.info.height,
           left: deviceLayout.info.left,
@@ -169,12 +169,12 @@ export function DeviceStatusContent({
           ))}
         </dl>
 
-        <div style={{ marginTop: 18, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
+        <div className="ds-section">
           <h2 style={{ marginBottom: 12 }}>
             展示營運摘要
             <small>Readiness / Publish / Assets</small>
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          <div className="mgmt-stat-strip ds-display-ops-stats" data-surface-family="status-dashboard">
             <div className="mgmt-status">
               Live {viewModel.displayOpsSummary.liveVersion}
               <small style={{ display: "block", opacity: 0.72 }}>
@@ -206,7 +206,7 @@ export function DeviceStatusContent({
           >
             {(displayOpsAccessDenied ? "" : displayOpsErrorMessage) || viewModel.displayOpsSummary.helper}
           </div>
-          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+          <div className="mgmt-status-stack ds-status-stack">
             {(displayOpsErrorMessage || displayOpsAccessDenied ? [] : viewModel.displayOpsSummary.alerts).map((alert) => (
               <div
                 key={`${alert.code}-${alert.pageLabel}-${alert.message}`}
@@ -226,7 +226,7 @@ export function DeviceStatusContent({
             目前不支援的裝置控制：{viewModel.displayOpsSummary.unsupportedControlsLabel}
           </div>
 
-          <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
+          <div className="ds-section">
             <h2 style={{ marginBottom: 12 }}>
               展示端心跳
               <small>Display Client Liveness</small>
@@ -239,7 +239,7 @@ export function DeviceStatusContent({
               ))}
               <div className="mgmt-status">{viewModel.displayClientSummary.totalLabel}</div>
             </div>
-            <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+            <div className="mgmt-status-stack ds-status-stack">
               {viewModel.displayClientSummary.rows.map((client) => (
                 <div key={client.socketId} className={`mgmt-status ${client.badgeTone}`}>
                   <strong>{client.pageLabel}</strong> · {client.playbackLabel} · {client.lastSeenLabel}
@@ -254,7 +254,7 @@ export function DeviceStatusContent({
             </div>
           </div>
 
-          <div style={{ marginTop: 16, borderTop: "1px solid rgba(92, 105, 79, 0.14)", paddingTop: 16 }}>
+          <div className="ds-section">
             <h2 style={{ marginBottom: 12 }}>
               系統日誌
               <small>Recent Logs</small>
@@ -290,7 +290,7 @@ export function DeviceStatusContent({
       </figure>
 
       <section
-        className="ds-card ds-resource"
+        className="ds-card ds-resource mgmt-surface mgmt-surface--status-dashboard"
         style={{
           height: deviceLayout.resource.height,
           left: deviceLayout.resource.left,

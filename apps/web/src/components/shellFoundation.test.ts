@@ -13,6 +13,7 @@ import { SHELL_CHROME_CONTENT_Z_INDEX } from "./ShellDecorationLayer";
 import { computeCanvasLayout } from "./displayCanvasLayout";
 import { DisplayPagesEditor } from "../pages/DisplayPagesEditor";
 import { ManagementShell, ManagementShellFrame } from "../layouts/ManagementShell";
+import { OpsSurface } from "./management/opsSurfacePrimitives";
 import { PageScaffold } from "../pages/shared/PageScaffold";
 import { ActionCluster } from "./ActionCluster";
 import { MediaSlot } from "./MediaSlot";
@@ -120,6 +121,29 @@ test("page scaffold remains the management witness contract", () => {
   assert.match(html, /data-shell-primitive="page-number-pill"/);
   assert.match(html, /min-h-full/);
   assert.doesNotMatch(html, /class="grid gap-6"/);
+});
+
+test("device-detail scaffold can host dashboard surface primitives without collapsing route density", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      PageScaffold,
+      {
+        path: "/device-status",
+        description: "裝置狀態"
+      },
+      React.createElement(
+        OpsSurface,
+        {
+          family: "status-dashboard"
+        },
+        React.createElement("div", null, "dashboard body")
+      )
+    )
+  );
+
+  assert.match(html, /data-shell-density="device-detail"/);
+  assert.match(html, /class="mgmt-surface mgmt-surface--status-dashboard"/);
+  assert.match(html, /data-surface-family="status-dashboard"/);
 });
 
 test("playback title group is available without the management title block contract", () => {

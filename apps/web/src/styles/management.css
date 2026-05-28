@@ -2,32 +2,164 @@
  * Provides appearance-only rules; positioning belongs in each page's CSS.
  */
 
-/* === Settings Card === */
-.settings-card {
-  position: absolute;
-  background: rgba(255, 253, 247, 0.92);
-  border: 1px solid rgba(98, 105, 86, 0.18);
-  border-radius: 18px;
-  box-shadow: var(--shadow-card);
-  padding: 22px;
+/* === Surface Boards === */
+.settings-card,
+.mgmt-surface {
+  --mgmt-surface-bg: var(--ops-surface-bg);
+  --mgmt-surface-border: var(--ops-surface-border);
+  --mgmt-surface-shadow: var(--ops-surface-shadow);
+  --mgmt-surface-title-ink: var(--ops-surface-title-ink);
+  --mgmt-surface-caption-ink: var(--ops-surface-caption-ink);
+  --mgmt-surface-radius: 18px;
+  --mgmt-surface-padding: 22px;
+  background: var(--mgmt-surface-bg);
+  border: 1px solid var(--mgmt-surface-border);
+  border-radius: var(--mgmt-surface-radius);
+  box-shadow: var(--mgmt-surface-shadow);
+  padding: var(--mgmt-surface-padding);
   overflow: hidden;
 }
 
-.settings-card__title {
+.settings-card {
+  position: absolute;
+}
+
+.mgmt-surface {
+  position: relative;
+}
+
+.mgmt-surface--preview {
+  --mgmt-surface-bg: var(--preview-surface-bg);
+  --mgmt-surface-border: var(--preview-surface-border);
+  --mgmt-surface-shadow: var(--preview-surface-shadow);
+  --mgmt-surface-title-ink: var(--preview-surface-title-ink);
+  --mgmt-surface-caption-ink: var(--preview-surface-caption-ink);
+}
+
+.mgmt-surface--status-dashboard {
+  --mgmt-surface-bg: var(--status-dashboard-surface-bg);
+  --mgmt-surface-border: var(--status-dashboard-surface-border);
+  --mgmt-surface-shadow: var(--status-dashboard-surface-shadow);
+  --mgmt-surface-title-ink: var(--status-dashboard-surface-title-ink);
+  --mgmt-surface-caption-ink: var(--status-dashboard-surface-caption-ink);
+  --mgmt-surface-radius: 16px;
+}
+
+.settings-card__title,
+.mgmt-surface__title {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #344039;
+  color: var(--mgmt-surface-title-ink);
   display: flex;
   align-items: baseline;
   gap: 10px;
   margin-bottom: 18px;
 }
 
-.settings-card__title small {
+.settings-card__title small,
+.mgmt-surface__title small {
   font: 400 13px/1.1 var(--font-family-en);
   letter-spacing: 0.04em;
-  color: #6f766f;
+  color: var(--mgmt-surface-caption-ink);
+}
+
+.mgmt-banner {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-state-accent-border);
+  background: var(--surface-state-accent-bg);
+  color: var(--surface-state-accent-ink);
+}
+
+.mgmt-banner.is-warning {
+  border-color: var(--surface-state-warning-border);
+  background: var(--surface-state-warning-bg);
+  color: var(--surface-state-warning-ink);
+}
+
+.mgmt-banner.is-error {
+  border-color: var(--surface-state-error-border);
+  background: var(--surface-state-error-bg);
+  color: var(--surface-state-error-ink);
+}
+
+.mgmt-banner strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mgmt-banner small {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  opacity: 0.88;
+}
+
+.mgmt-stat-strip {
+  display: flex;
+  gap: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--mgmt-surface-border, var(--ops-surface-border));
+  border-radius: 12px;
+  background: var(--mgmt-surface-bg, var(--ops-surface-bg));
+}
+
+.mgmt-stat-strip--status-dashboard {
+  --mgmt-surface-bg: var(--status-dashboard-surface-bg);
+  --mgmt-surface-border: var(--status-dashboard-surface-border);
+}
+
+.mgmt-stat {
+  flex: 1;
+  min-width: 0;
+}
+
+.mgmt-stat__label {
+  display: block;
+  font-size: 13px;
+  color: var(--mgmt-surface-caption-ink, var(--ops-surface-caption-ink));
+  letter-spacing: 0.04em;
+}
+
+.mgmt-stat__label small {
+  display: block;
+  margin-top: 2px;
+  font: 400 10px/1.1 var(--font-family-en);
+  color: var(--mgmt-surface-caption-ink, var(--ops-surface-caption-ink));
+}
+
+.mgmt-stat__value {
+  display: block;
+  margin-top: 8px;
+  font: 700 24px/1 var(--font-family-en);
+  color: var(--mgmt-surface-title-ink, var(--ops-surface-title-ink));
+}
+
+.mgmt-table-shell {
+  border: 1px solid var(--mgmt-surface-border, var(--ops-surface-border));
+  border-radius: 12px;
+  background: var(--mgmt-surface-bg, var(--ops-surface-bg));
+  overflow: hidden;
+}
+
+.mgmt-status-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.mgmt-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.mgmt-action-row .mgmt-action {
+  position: static;
+  top: auto;
 }
 
 /* === Action Button === */
@@ -35,10 +167,10 @@
   position: absolute;
   top: 22px;
   height: 58px;
-  border: 1px solid rgba(74, 115, 62, 0.35);
+  border: 1px solid var(--surface-state-accent-border);
   border-radius: 12px;
-  background: rgba(255, 253, 247, 0.92);
-  color: var(--green);
+  background: var(--ops-surface-bg);
+  color: var(--surface-state-accent-ink);
   font: 600 18px/1 var(--font-family-zh);
   display: inline-flex;
   flex-direction: column;
@@ -127,24 +259,30 @@
   font-size: 13px;
   line-height: 1.4;
   text-align: right;
-  background: rgba(232, 240, 226, 0.7);
-  border: 1px solid rgba(92, 133, 75, 0.28);
-  color: #4c7540;
+  background: var(--surface-state-ready-bg);
+  border: 1px solid var(--surface-state-ready-border);
+  color: var(--surface-state-ready-ink);
+}
+
+.mgmt-status.is-warning {
+  background: var(--surface-state-warning-bg);
+  border-color: var(--surface-state-warning-border);
+  color: var(--surface-state-warning-ink);
 }
 
 .mgmt-status.is-error {
-  background: rgba(254, 230, 230, 0.7);
-  border-color: rgba(193, 74, 74, 0.32);
-  color: #c14a4a;
+  background: var(--surface-state-error-bg);
+  border-color: var(--surface-state-error-border);
+  color: var(--surface-state-error-ink);
 }
 
 .mgmt-status.is-saving,
 .mgmt-status.is-loading,
 .mgmt-status.is-uploading,
 .mgmt-status.is-deleting {
-  background: rgba(252, 240, 217, 0.75);
-  border-color: rgba(201, 136, 26, 0.32);
-  color: #c9881a;
+  background: var(--surface-state-warning-bg);
+  border-color: var(--surface-state-warning-border);
+  color: var(--surface-state-warning-ink);
 }
 
 /* === Chip === */
@@ -163,21 +301,21 @@
 
 .mgmt-chip.is-success,
 .mgmt-chip.is-on {
-  border-color: rgba(92, 133, 75, 0.4);
-  background: rgba(92, 133, 75, 0.12);
-  color: #4c7540;
+  border-color: var(--surface-state-ready-border);
+  background: var(--surface-state-ready-bg);
+  color: var(--surface-state-ready-ink);
 }
 
 .mgmt-chip.is-warning,
 .mgmt-chip.is-accent,
 .mgmt-chip.is-cover {
-  border-color: rgba(232, 158, 30, 0.32);
-  background: #fff7e8;
-  color: #b27718;
+  border-color: var(--surface-state-warning-border);
+  background: var(--surface-state-warning-bg);
+  color: var(--surface-state-warning-ink);
 }
 
 .mgmt-chip.is-danger {
-  border-color: rgba(193, 74, 74, 0.32);
-  background: rgba(254, 230, 230, 0.7);
-  color: #c14a4a;
+  border-color: var(--surface-state-error-border);
+  background: var(--surface-state-error-bg);
+  color: var(--surface-state-error-ink);
 }

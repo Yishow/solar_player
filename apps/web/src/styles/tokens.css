@@ -89,6 +89,34 @@
   --workspace-surface-danger-ink: #8f452d;
   --workspace-surface-border: rgba(198, 192, 179, 0.62);
   --workspace-surface-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 12px 28px rgba(55, 50, 38, 0.08);
+  /* Display operations surface primitive tokens */
+  --ops-surface-bg: var(--workspace-surface-strong);
+  --ops-surface-border: var(--workspace-surface-border);
+  --ops-surface-shadow: var(--shadow-card);
+  --ops-surface-title-ink: var(--ink-strong);
+  --ops-surface-caption-ink: var(--muted);
+  --preview-surface-bg: var(--display-card-surface-strong);
+  --preview-surface-border: var(--display-card-border-soft);
+  --preview-surface-shadow: var(--display-shadow-soft);
+  --preview-surface-title-ink: var(--display-title-ink);
+  --preview-surface-caption-ink: var(--display-subtitle-ink);
+  --status-dashboard-surface-bg: var(--workspace-surface);
+  --status-dashboard-surface-border: var(--workspace-surface-border);
+  --status-dashboard-surface-shadow: var(--shadow-card);
+  --status-dashboard-surface-title-ink: var(--ink-strong);
+  --status-dashboard-surface-caption-ink: var(--muted);
+  --surface-state-ready-bg: var(--status-connected-bg);
+  --surface-state-ready-border: var(--status-connected-border);
+  --surface-state-ready-ink: var(--color-status-success-500);
+  --surface-state-warning-bg: var(--status-warning-bg);
+  --surface-state-warning-border: var(--status-warning-border);
+  --surface-state-warning-ink: var(--workspace-surface-warning-ink);
+  --surface-state-error-bg: var(--status-error-bg);
+  --surface-state-error-border: var(--status-error-border);
+  --surface-state-error-ink: var(--workspace-surface-danger-ink);
+  --surface-state-accent-bg: var(--workspace-surface-accent);
+  --surface-state-accent-border: var(--workspace-surface-accent-border);
+  --surface-state-accent-ink: var(--green);
 
   --color-brand-green-900: #244b28;
   --color-brand-green-800: #36593a;

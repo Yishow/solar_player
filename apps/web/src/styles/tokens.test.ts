@@ -51,3 +51,18 @@ test("display playback pages define semantic chrome tokens separately from globa
   assert.match(tokensCss, /--display-shadow-soft:\s*0\s+12px\s+28px\s+rgba\(59,\s*54,\s*40,\s*0\.1\);/);
   assert.match(tokensCss, /\/\*\s*Global shell and brand tokens remain the cross-surface baseline\s*\*\//);
 });
+
+test("display operations pages define semantic surface-family and state tokens", () => {
+  assert.match(tokensCss, /\/\*\s*Display operations surface primitive tokens\s*\*\//);
+  assert.match(tokensCss, /--ops-surface-bg:\s*var\(--workspace-surface-strong\);/);
+  assert.match(tokensCss, /--ops-surface-border:\s*var\(--workspace-surface-border\);/);
+  assert.match(tokensCss, /--preview-surface-bg:\s*var\(--display-card-surface-strong\);/);
+  assert.match(tokensCss, /--preview-surface-shadow:\s*var\(--display-shadow-soft\);/);
+  assert.match(tokensCss, /--status-dashboard-surface-bg:\s*var\(--workspace-surface\);/);
+  assert.match(tokensCss, /--status-dashboard-surface-shadow:\s*var\(--shadow-card\);/);
+  assert.match(tokensCss, /--surface-state-ready-bg:\s*var\(--status-connected-bg\);/);
+  assert.match(tokensCss, /--surface-state-warning-bg:\s*var\(--status-warning-bg\);/);
+  assert.match(tokensCss, /--surface-state-error-bg:\s*var\(--status-error-bg\);/);
+  assert.match(tokensCss, /--surface-state-warning-ink:\s*var\(--workspace-surface-warning-ink\);/);
+  assert.match(tokensCss, /--surface-state-error-ink:\s*var\(--workspace-surface-danger-ink\);/);
+});

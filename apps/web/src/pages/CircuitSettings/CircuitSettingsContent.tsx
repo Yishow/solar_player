@@ -149,22 +149,22 @@ export function CircuitSettingsContent({
           <small>Factory Circuits · 共 {viewModel.summary.totalCircuitCount} 筆</small>
         </div>
 
-        <div className="cs-stats">
-          <div className="cs-stat">
+        <div className="cs-stats mgmt-stat-strip">
+          <div className="cs-stat mgmt-stat">
             <span className="cs-stat__label">
               迴路總數
               <small>Total</small>
             </span>
             <span className="cs-stat__value">{viewModel.summary.totalCircuitCount}</span>
           </div>
-          <div className="cs-stat">
+          <div className="cs-stat mgmt-stat">
             <span className="cs-stat__label">
               顯示中
               <small>Visible</small>
             </span>
             <span className="cs-stat__value">{viewModel.summary.enabledCircuitCount}</span>
           </div>
-          <div className="cs-stat">
+          <div className="cs-stat mgmt-stat">
             <span className="cs-stat__label">
               隱藏中
               <small>Hidden</small>
@@ -173,14 +173,14 @@ export function CircuitSettingsContent({
               {viewModel.summary.disabledCircuitCount}
             </span>
           </div>
-          <div className="cs-stat">
+          <div className="cs-stat mgmt-stat">
             <span className="cs-stat__label">
               額定容量總和
               <small>Capacity</small>
             </span>
             <span className="cs-stat__value">{viewModel.summary.capacityLabel}</span>
           </div>
-          <div className="cs-stat">
+          <div className="cs-stat mgmt-stat">
             <span className="cs-stat__label">
               待儲存
               <small>Dirty</small>
@@ -197,7 +197,7 @@ export function CircuitSettingsContent({
         {readinessFindings.length > 0 && !readinessErrorMessage && !readinessLoading ? (
           <div className="cs-readiness-list">
             {readinessFindings.slice(0, 3).map((finding) => (
-              <div key={`${finding.pageId}-${finding.requirementKey}`} className="cs-readiness-item">
+              <div key={`${finding.pageId}-${finding.requirementKey}`} className="cs-readiness-item mgmt-banner">
                 <span className={chipClass(finding.status === "blocking" ? "danger" : "warning")}>
                   {finding.status === "blocking" ? "Blocking" : "Warning"}
                 </span>

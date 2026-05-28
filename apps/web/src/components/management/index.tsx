@@ -1,4 +1,11 @@
 import type { ReactNode } from "react";
+export {
+  OpsActionRow,
+  OpsInfoBanner,
+  OpsStatStrip,
+  OpsSurface,
+  OpsSurfaceTitle
+} from "./opsSurfacePrimitives";
 
 export type SwitchProps = {
   on: boolean;

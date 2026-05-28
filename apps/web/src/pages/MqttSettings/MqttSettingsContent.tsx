@@ -149,7 +149,7 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
               </summary>
               <div className="mqtt-runtime-feedback">
                 {viewModel.coverageRows.slice(0, 3).map((row) => (
-                  <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
+                  <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row mgmt-banner">
                     <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
                     <div className="mqtt-runtime-feedback__copy">
                       <strong>{row.metricLabelZh}</strong>

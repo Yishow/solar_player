@@ -43,12 +43,9 @@
 /* === card base (shared in this page) === */
 .ds-page .ds-card {
   position: absolute;
-  background: rgba(255, 253, 247, 0.92);
-  border: 1px solid rgba(98, 105, 86, 0.18);
-  border-radius: 16px;
-  box-shadow: var(--shadow-card);
-  padding: 22px;
   overflow: hidden;
+  --mgmt-surface-radius: 16px;
+  --mgmt-surface-padding: 22px;
 }
 
 /* === left aside (3 stacked status cards) === */
@@ -62,11 +59,8 @@
 .ds-page .ds-aside .ds-status-card {
   position: relative;
   height: 158px;
-  border: 1px solid rgba(98, 105, 86, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 253, 247, 0.92);
-  box-shadow: var(--shadow-card);
-  padding: 22px;
+  --mgmt-surface-radius: 16px;
+  --mgmt-surface-padding: 22px;
 }
 
 .ds-page .ds-status-card__label {
@@ -80,7 +74,7 @@
   display: block;
   margin-top: 4px;
   font: 400 12px/1.2 var(--font-family-en);
-  color: #686e68;
+  color: var(--status-dashboard-surface-caption-ink);
 }
 
 .ds-page .ds-status-card__value {
@@ -109,7 +103,7 @@
   display: block;
   margin-top: 6px;
   font: 400 13px/1.4 var(--font-family-en);
-  color: #686e68;
+  color: var(--status-dashboard-surface-caption-ink);
 }
 
 .ds-page .ds-status-card__icon {
@@ -154,7 +148,7 @@
 
 .ds-page .ds-info h2 small {
   font: 400 13px/1.1 var(--font-family-en);
-  color: #6f766f;
+  color: var(--status-dashboard-surface-caption-ink);
   letter-spacing: 0.04em;
 }
 
@@ -223,8 +217,32 @@
 
 .ds-page .ds-resource h2 small {
   font: 400 13px/1.1 var(--font-family-en);
-  color: #6f766f;
+  color: var(--status-dashboard-surface-caption-ink);
   letter-spacing: 0.04em;
+}
+
+.ds-page .ds-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--status-dashboard-surface-border);
+  padding-top: 16px;
+}
+
+.ds-page .ds-section:first-of-type {
+  margin-top: 18px;
+}
+
+.ds-page .ds-display-ops-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ds-page .ds-display-ops-stats .mgmt-status {
+  text-align: left;
+}
+
+.ds-page .ds-status-stack {
+  margin-top: 12px;
 }
 
 .ds-page .ds-gauge-grid {

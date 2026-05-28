@@ -135,10 +135,6 @@
   grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: flex-start;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(92, 105, 79, 0.16);
-  background: #fffdf8;
 }
 
 .mqtt-settings-page .mqtt-runtime-feedback__copy {

@@ -22,7 +22,7 @@ import {
   updatePlaybackPages,
   updatePlaybackSettings
 } from "../../services/api";
-import { Switch } from "../../components/management";
+import { OpsInfoBanner, OpsSurface, OpsSurfaceTitle, Switch } from "../../components/management";
 import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
@@ -326,15 +326,19 @@ export function PlaybackSettings() {
         />
       ) : null}
 
-      <section className="ps-preview">
-        <div className="ps-preview__title">
-          目前配置輪播鏈 <small>/ Configured Rotation Preview</small>
-        </div>
+      <OpsSurface className="ps-preview" family="preview">
+        <OpsSurfaceTitle
+          caption="/ Configured Rotation Preview"
+          className="ps-preview__title"
+          title="目前配置輪播鏈"
+        />
         {showPreviewAlert ? (
-          <div className={`ps-preview__alert ${previewAlertTone}`.trim()} role="status">
-            <strong>{displayOpsErrorMessage || viewModel.displayOpsBanner.title}</strong>
-            <small>{displayOpsErrorMessage || viewModel.displayOpsBanner.detail}</small>
-          </div>
+          <OpsInfoBanner
+            className="ps-preview__alert"
+            detail={displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
+            title={displayOpsErrorMessage || viewModel.displayOpsBanner.title}
+            tone={previewAlertTone === "is-error" ? "error" : "warning"}
+          />
         ) : null}
         <div className="ps-preview__list">
           <LiveRotationPreviewList
@@ -343,7 +347,7 @@ export function PlaybackSettings() {
             states={livePreviewCatalog.states}
           />
         </div>
-      </section>
+      </OpsSurface>
       <PlaybackSettingsFormSections
         formDisabled={formDisabled}
         isRegistrySaving={isRegistrySaving}
