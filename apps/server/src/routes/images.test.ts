@@ -19,6 +19,18 @@ const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = a
 
 function clearImagesTable() {
   const db = getDatabase();
+  const playlistTable = db
+    .prepare(
+      `
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'image_playlist_entries'
+      `
+    )
+    .get();
+  if (playlistTable) {
+    db.prepare("DELETE FROM image_playlist_entries").run();
+  }
   const rows = db.prepare("SELECT id FROM image_assets").all() as Array<{ id: number }>;
   const deleteStmt = db.prepare("DELETE FROM image_assets WHERE id = ?");
   for (const row of rows) {
@@ -229,6 +241,70 @@ test("POST /api/images uploads a valid PNG image and stores it in the database",
     assert.equal(emittedEvents.length, 1);
   } finally {
     app.socketService.emitImagesUpdated = originalEmit;
+    await app.close();
+  }
+});
+
+test("POST /api/images can mark an uploaded image as playable in the runtime playlist", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const pngBuffer = createMinimalPng();
+    const { payload, contentType } = buildMultipartBody(
+      "runtime-playable.png",
+      "image/png",
+      pngBuffer,
+      { includedInSlideshow: "true" }
+    );
+
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(uploadResponse.statusCode, 201);
+    const uploadBody = uploadResponse.json() as { success: boolean; data: ImageAsset };
+    assert.equal(uploadBody.success, true);
+    assert.equal(uploadBody.data.includedInSlideshow, true);
+
+    const playlistResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist"
+    });
+    assert.equal(playlistResponse.statusCode, 200);
+    const playlistBody = playlistResponse.json() as {
+      playlist: {
+        activeEntry: { assetId: string | null; assetSource: string | null; enabled: boolean } | null;
+        entries: Array<{ assetId: string | null; assetSource: string | null; enabled: boolean }>;
+      };
+    };
+
+    assert.equal(playlistBody.playlist.entries.length, 1);
+    assert.equal(playlistBody.playlist.entries[0]?.assetId, String(uploadBody.data.id));
+    assert.equal(playlistBody.playlist.entries[0]?.enabled, true);
+    assert.match(playlistBody.playlist.entries[0]?.assetSource ?? "", /\/uploads\/images\//);
+    assert.equal(playlistBody.playlist.activeEntry?.assetId, String(uploadBody.data.id));
+
+    const governanceResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist/governance"
+    });
+    assert.equal(governanceResponse.statusCode, 200);
+    const governanceBody = governanceResponse.json() as {
+      playlist: {
+        entries: Array<{ assetId: string | null; enabled: boolean }>;
+      };
+    };
+    assert.equal(governanceBody.playlist.entries.length, 1);
+    assert.equal(governanceBody.playlist.entries[0]?.assetId, String(uploadBody.data.id));
+    assert.equal(governanceBody.playlist.entries[0]?.enabled, true);
+  } finally {
     await app.close();
   }
 });

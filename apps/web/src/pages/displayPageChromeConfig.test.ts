@@ -33,7 +33,7 @@ test("display page seed configs persist page chrome groups separately from card 
   assert.equal(solar.chrome.ornaments.leaf.scale, 1);
   assert.equal(factory.chrome.modules.statusBlock.titleFontSize, 18);
   assert.equal(images.chrome.modules.counter.currentFontSize, 76);
-  assert.equal(images.chrome.modules.arrows.buttonSize, 64);
+  assert.equal(images.chrome.modules.arrows.buttonSize, 68);
   assert.equal(sustainability.chrome.modules.periodChips.fontSize, 17);
   assert.equal(sustainability.chrome.modules.provenance.fontSize, 15);
 

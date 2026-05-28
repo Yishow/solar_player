@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import {
   connect,
   type IClientOptions,
@@ -45,6 +46,7 @@ type TestConnectionInput = {
 type MqttClientServiceOptions = {
   logger: LoggerLike;
   database?: Database.Database;
+  generatedClientIdFn?: () => string;
   connectFn?: ConnectFunction;
   socketService?: Pick<
     SocketService,
@@ -63,6 +65,13 @@ export type MqttStatus = {
   reason: string | null;
   updatedAt: string;
 };
+
+const MQTT31_CLIENT_ID_LIMIT = 23;
+const TEST_CONNECTION_CLIENT_ID_SUFFIX = "-probe";
+const GENERIC_RUNTIME_CLIENT_IDS = new Set(["", "solar-display", "solar-display-player"]);
+const RUNTIME_CLIENT_ID_PREFIX = "solar-display-";
+const GENERATED_CLIENT_ID_SETTING_KEY = "mqtt_generated_client_id";
+const MQTT_RUNTIME_LEASE_SETTING_KEY = "mqtt_runtime_lease";
 
 function waitForEvent(client: MqttClient, options: { timeoutMs: number }) {
   return new Promise<void>((resolve, reject) => {
@@ -142,15 +151,29 @@ function roundValue(value: number, decimalPlaces: number | null) {
   return Number(value.toFixed(decimalPlaces));
 }
 
+function buildTestConnectionClientId(clientId: string) {
+  const normalizedClientId = clientId.trim() || "solar-display-player";
+  const maxBaseLength = Math.max(
+    MQTT31_CLIENT_ID_LIMIT - TEST_CONNECTION_CLIENT_ID_SUFFIX.length,
+    1
+  );
+
+  return `${normalizedClientId.slice(0, maxBaseLength)}${TEST_CONNECTION_CLIENT_ID_SUFFIX}`;
+}
+
 export class MqttClientService {
   private readonly database: Database.Database;
   private readonly logger: LoggerLike;
   private readonly connectFn: ConnectFunction;
+  private readonly generatedClientIdFn: () => string;
   private readonly socketService: MqttClientServiceOptions["socketService"];
+  private readonly runtimeLeaseOwnerToken = `${process.pid}-${randomBytes(4).toString("hex")}`;
   private client: MqttClient | null = null;
   private desiredTopics = new Set<string>();
   private activeTopics = new Set<string>();
   private reconnectsEnabled = false;
+  private leaseRenewalTimer: NodeJS.Timeout | null = null;
+  private leaseRetryTimer: NodeJS.Timeout | null = null;
   private status: MqttStatus = {
     broker: "",
     clientId: "",
@@ -165,6 +188,9 @@ export class MqttClientService {
     this.database = options.database ?? getDatabase();
     this.logger = options.logger;
     this.connectFn = options.connectFn ?? connect;
+    this.generatedClientIdFn =
+      options.generatedClientIdFn
+      ?? (() => `${RUNTIME_CLIENT_ID_PREFIX}${randomBytes(4).toString("hex")}`);
     this.socketService = options.socketService;
   }
 
@@ -189,7 +215,19 @@ export class MqttClientService {
     }
 
     this.mockMode = false;
-    this.reconnectsEnabled = Math.max(settings.reconnect_interval ?? 5000, 0) > 0;
+    const reconnectIntervalMs = Math.max(settings.reconnect_interval ?? 5000, 0);
+    this.reconnectsEnabled = reconnectIntervalMs > 0;
+
+    if (!this.acquireRuntimeLease(reconnectIntervalMs)) {
+      this.setStatus({
+        connected: false,
+        reason: "standby"
+      });
+      this.scheduleLeaseRetry(reconnectIntervalMs);
+      return;
+    }
+
+    this.startLeaseRenewal(reconnectIntervalMs);
 
     const client = this.connectFn(buildBrokerUrl(settings), this.buildClientOptions(settings));
     this.client = client;
@@ -215,6 +253,8 @@ export class MqttClientService {
         clientId: this.status.clientId,
         error: error instanceof Error ? error.message : String(error)
       });
+      this.stopLeaseRenewal();
+      this.releaseRuntimeLease();
       throw error;
     }
   }
@@ -232,7 +272,7 @@ export class MqttClientService {
       broker_port: input.port,
       username: input.username,
       password: input.password,
-      client_id: input.clientId,
+      client_id: buildTestConnectionClientId(this.resolveRuntimeClientId(input.clientId)),
       reconnect_interval: input.reconnectInterval,
       message_timeout: input.messageTimeout,
       data_mode: input.dataMode
@@ -270,6 +310,9 @@ export class MqttClientService {
     this.status.updatedAt = new Date().toISOString();
     this.reconnectsEnabled = false;
     this.activeTopics.clear();
+    this.stopLeaseRenewal();
+    this.clearLeaseRetry();
+    this.releaseRuntimeLease();
 
     if (!this.client) {
       if (options?.broadcast !== false) {
@@ -312,7 +355,223 @@ export class MqttClientService {
       )
       .get() as MqttSettingsRecord | undefined;
 
-    return resolveMqttSettings(process.env, row);
+    const settings = resolveMqttSettings(process.env, row);
+
+    return {
+      ...settings,
+      client_id: this.resolveRuntimeClientId(settings.client_id)
+    };
+  }
+
+  private resolveRuntimeClientId(clientId: string | null | undefined) {
+    const normalizedClientId = clientId?.trim() ?? "";
+    if (!GENERIC_RUNTIME_CLIENT_IDS.has(normalizedClientId)) {
+      return normalizedClientId || "solar-display-player";
+    }
+
+    return this.readOrCreateGeneratedClientId();
+  }
+
+  private readOrCreateGeneratedClientId() {
+    const storedClientId = this.database
+      .prepare(
+        `
+          SELECT value
+          FROM system_settings
+          WHERE key = ?
+          LIMIT 1
+        `
+      )
+      .get(GENERATED_CLIENT_ID_SETTING_KEY) as { value: string | null } | undefined;
+
+    const normalizedStoredClientId = storedClientId?.value?.trim();
+    if (normalizedStoredClientId) {
+      return normalizedStoredClientId;
+    }
+
+    const generatedClientId = this.generatedClientIdFn().trim();
+    this.database
+      .prepare(
+        `
+          INSERT INTO system_settings (key, value, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = CURRENT_TIMESTAMP
+        `
+      )
+      .run(GENERATED_CLIENT_ID_SETTING_KEY, generatedClientId);
+
+    return generatedClientId;
+  }
+
+  private readRuntimeLease() {
+    const row = this.database
+      .prepare(
+        `
+          SELECT value
+          FROM system_settings
+          WHERE key = ?
+          LIMIT 1
+        `
+      )
+      .get(MQTT_RUNTIME_LEASE_SETTING_KEY) as { value: string | null } | undefined;
+
+    const rawLease = row?.value?.trim();
+    if (!rawLease) {
+      return null;
+    }
+
+    try {
+      const lease = JSON.parse(rawLease) as {
+        acquiredAt?: string;
+        expiresAt?: string;
+        ownerToken?: string;
+        pid?: number;
+      };
+      if (
+        typeof lease.ownerToken !== "string"
+        || typeof lease.expiresAt !== "string"
+        || typeof lease.acquiredAt !== "string"
+      ) {
+        return null;
+      }
+
+      return {
+        acquiredAt: lease.acquiredAt,
+        expiresAt: lease.expiresAt,
+        ownerToken: lease.ownerToken,
+        pid: typeof lease.pid === "number" ? lease.pid : null
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private writeRuntimeLease(expiresAt: Date) {
+    const existingLease = this.readRuntimeLease();
+    const nextLease = JSON.stringify({
+      acquiredAt:
+        existingLease?.ownerToken === this.runtimeLeaseOwnerToken
+          ? existingLease.acquiredAt
+          : new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      ownerToken: this.runtimeLeaseOwnerToken,
+      pid: process.pid
+    });
+
+    this.database
+      .prepare(
+        `
+          INSERT INTO system_settings (key, value, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = CURRENT_TIMESTAMP
+        `
+      )
+      .run(MQTT_RUNTIME_LEASE_SETTING_KEY, nextLease);
+  }
+
+  private acquireRuntimeLease(reconnectIntervalMs: number) {
+    const nowMs = Date.now();
+    const existingLease = this.readRuntimeLease();
+    const existingExpiryMs =
+      existingLease === null ? null : Date.parse(existingLease.expiresAt);
+    const leaseIsActive =
+      existingLease !== null
+      && existingLease.ownerToken !== this.runtimeLeaseOwnerToken
+      && existingExpiryMs !== null
+      && existingExpiryMs > nowMs;
+
+    if (leaseIsActive) {
+      this.logger.warn(
+        {
+          activeLease: existingLease,
+          broker: this.status.broker,
+          clientId: this.status.clientId,
+          ownerToken: this.runtimeLeaseOwnerToken
+        },
+        "MQTT runtime lease already held by another local process"
+      );
+      return false;
+    }
+
+    this.writeRuntimeLease(new Date(nowMs + this.resolveLeaseDurationMs(reconnectIntervalMs)));
+    return true;
+  }
+
+  private releaseRuntimeLease() {
+    const existingLease = this.readRuntimeLease();
+    if (existingLease?.ownerToken !== this.runtimeLeaseOwnerToken) {
+      return;
+    }
+
+    this.database
+      .prepare(
+        `
+          DELETE FROM system_settings
+          WHERE key = ?
+        `
+      )
+      .run(MQTT_RUNTIME_LEASE_SETTING_KEY);
+  }
+
+  private resolveLeaseDurationMs(reconnectIntervalMs: number) {
+    return Math.max(reconnectIntervalMs * 3, 15_000);
+  }
+
+  private startLeaseRenewal(reconnectIntervalMs: number) {
+    this.stopLeaseRenewal();
+
+    const renewalIntervalMs =
+      reconnectIntervalMs > 0 ? Math.min(reconnectIntervalMs, 5_000) : 5_000;
+    this.leaseRenewalTimer = setInterval(() => {
+      const existingLease = this.readRuntimeLease();
+      if (existingLease?.ownerToken !== this.runtimeLeaseOwnerToken) {
+        this.logger.error(
+          {
+            activeLease: existingLease,
+            broker: this.status.broker,
+            clientId: this.status.clientId,
+            ownerToken: this.runtimeLeaseOwnerToken
+          },
+          "MQTT runtime lease lost to another local process"
+        );
+        void this.disconnect();
+        this.scheduleLeaseRetry(reconnectIntervalMs);
+        return;
+      }
+
+      this.writeRuntimeLease(new Date(Date.now() + this.resolveLeaseDurationMs(reconnectIntervalMs)));
+    }, renewalIntervalMs);
+  }
+
+  private stopLeaseRenewal() {
+    if (this.leaseRenewalTimer !== null) {
+      clearInterval(this.leaseRenewalTimer);
+      this.leaseRenewalTimer = null;
+    }
+  }
+
+  private scheduleLeaseRetry(reconnectIntervalMs: number) {
+    if (reconnectIntervalMs <= 0 || this.leaseRetryTimer !== null) {
+      return;
+    }
+
+    this.leaseRetryTimer = setTimeout(() => {
+      this.leaseRetryTimer = null;
+      void this.connect().catch((error) => {
+        this.logger.warn({ error }, "MQTT standby reconnect attempt failed");
+      });
+    }, reconnectIntervalMs);
+  }
+
+  private clearLeaseRetry() {
+    if (this.leaseRetryTimer !== null) {
+      clearTimeout(this.leaseRetryTimer);
+      this.leaseRetryTimer = null;
+    }
   }
 
   private buildClientOptions(settings: MqttSettingsRecord): IClientOptions {
@@ -363,7 +622,9 @@ export class MqttClientService {
       });
     });
     client.on("message", (topic, payload) => {
-      void this.handleMessage(topic, payload.toString());
+      void this.handleMessage(topic, payload.toString()).catch((error) => {
+        this.handleMessageError(topic, error);
+      });
     });
   }
 
@@ -409,6 +670,25 @@ export class MqttClientService {
       broker: this.status.broker,
       clientId: this.status.clientId,
       error: message
+    });
+  }
+
+  private handleMessageError(topic: string, error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.error(
+      {
+        broker: this.status.broker,
+        clientId: this.status.clientId,
+        error,
+        topic
+      },
+      "MQTT message handling failed"
+    );
+    this.notifySystemError("MQTT message handling failed", {
+      broker: this.status.broker,
+      clientId: this.status.clientId,
+      error: message,
+      topic
     });
   }
 

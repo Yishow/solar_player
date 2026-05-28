@@ -41,12 +41,21 @@ test("resolveServerPort falls back to inherited PORT when .env omits it", () => 
   );
 });
 
-test("resolveDevPorts always frees configured web port and deduplicates ports", () => {
+test("resolveDevPorts only frees the web port and leaves the server port guarded", () => {
   assert.deepEqual(
     resolveDevPorts({ PORT: "5173" }, { PORT: "3333" }),
     {
       webPort: 5173,
       serverPort: 5173,
+      portsToFree: [5173]
+    }
+  );
+
+  assert.deepEqual(
+    resolveDevPorts({ PORT: "3000" }, { PORT: "3333" }),
+    {
+      webPort: 5173,
+      serverPort: 3000,
       portsToFree: [5173]
     }
   );

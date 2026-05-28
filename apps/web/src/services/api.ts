@@ -581,6 +581,7 @@ export async function uploadImageAsset(file: File) {
   const formData = new FormData();
   formData.set("file", file);
   formData.set("category", "background");
+  formData.set("includedInSlideshow", "true");
   formData.set("usageScope", "both");
 
   const response = await requestJson<{

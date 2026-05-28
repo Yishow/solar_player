@@ -5,8 +5,10 @@ const imagesThumb1Reference = new URL("./assets/images-thumb-1-reference.png", i
 const imagesThumb2Reference = new URL("./assets/images-thumb-2-reference.png", import.meta.url).href;
 const imagesThumb3Reference = new URL("./assets/images-thumb-3-reference.png", import.meta.url).href;
 const imagesThumb4Reference = new URL("./assets/images-thumb-4-reference.png", import.meta.url).href;
+const imagesLeftOrnamentReference = new URL("./assets/images-left-ornament-reference.png", import.meta.url).href;
 
 export const imagesAssetRuntimeMap = {
+  leftOrnament: imagesLeftOrnamentReference,
   main: imagesHeroReference,
   thumbs: [imagesThumb1Reference, imagesThumb2Reference, imagesThumb3Reference, imagesThumb4Reference]
 } as const;

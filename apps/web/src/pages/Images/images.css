@@ -10,6 +10,7 @@
 .images-title-group,
 .images-copy-block,
 .images-gold-ornament,
+.images-grass-ornament,
 .images-slide-counter,
 .images-main-stage,
 .images-info-card,
@@ -19,8 +20,8 @@
 }
 
 .images-title-group {
-  --display-title-emphasis-color: var(--display-emphasis-gold);
-  --display-subtitle-ink: var(--display-copy-muted);
+  --display-title-emphasis-color: #5f8a4e;
+  --display-subtitle-ink: #727773;
 }
 
 .images-title-group .images-eyebrow {
@@ -28,6 +29,7 @@
   font-size: 24px;
   font-weight: 600;
   letter-spacing: 9px;
+  color: #527a43;
 }
 
 .images-title-group .images-display-title {
@@ -36,6 +38,7 @@
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: 6px;
+  color: #34383a;
 }
 
 .images-title-group .images-display-title em {
@@ -47,29 +50,39 @@
   font-family: var(--font-family-en);
   font-size: 26px;
   line-height: 1.4;
+  color: #747a76;
 }
 
 .images-copy-block {
   margin: 0;
-  color: var(--display-copy-ink);
-  font-size: 23px;
-  line-height: 1.74;
+  color: #686f69;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.72;
   letter-spacing: 0.4px;
 }
 
 .images-gold-ornament {
   opacity: 0.88;
-  --display-gold-ornament-line: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--display-ornament-gold-strong) 46%,
-    rgba(223, 194, 118, 0.36) 74%,
-    transparent 100%
-  );
-  --display-gold-ornament-leaf-left: 63%;
-  --display-gold-ornament-leaf-top: -8%;
-  --display-gold-ornament-leaf-width: 31%;
-  --display-gold-ornament-leaf-height: 110%;
+}
+
+.images-grass-ornament {
+  pointer-events: none;
+  z-index: 2;
+}
+
+.images-display-page .images-grass-ornament.display-surface-gold-ornament::before,
+.images-display-page .images-grass-ornament.display-surface-gold-ornament::after {
+  display: none;
+  background: none;
+  content: none;
+}
+
+.images-grass-ornament img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: fill;
 }
 
 .images-slide-counter b {
@@ -97,7 +110,7 @@
   left: 0;
   top: 134px;
   height: 7px;
-  width: 374px;
+  width: 404px;
   border-radius: 999px;
   background: rgba(93, 105, 76, 0.12);
 }
@@ -106,9 +119,12 @@
   content: "";
   display: block;
   height: 100%;
-  width: var(--progress-width, 0%);
+  width: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, #5f884f, #47733e);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: images-progress-grow var(--images-slide-duration, 15000ms) linear forwards;
 }
 
 .images-main-stage {
@@ -126,6 +142,7 @@
   display: block;
   height: 100%;
   width: 100%;
+  animation: images-main-slide-in 720ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .images-main-placeholder {
@@ -210,15 +227,43 @@
 .images-gallery-arrow {
   z-index: 8;
   display: flex;
-  height: 64px;
-  width: 64px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--display-card-border-soft);
+  border: 1px solid rgba(184, 180, 158, 0.58);
   border-radius: 50%;
-  background: var(--display-card-surface);
-  color: var(--display-emphasis-green);
-  font-size: 54px;
+  background: rgba(255, 253, 247, 0.72);
+  color: #4f7d3d;
+  font-size: 0;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(73, 68, 51, 0.05);
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.images-gallery-arrow:hover {
+  border-color: rgba(93, 126, 75, 0.48);
+  background: rgba(255, 253, 247, 0.94);
+  transform: translateY(-1px);
+}
+
+.images-gallery-arrow:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.images-gallery-arrow-icon {
+  display: block;
+  height: 18px;
+  width: 18px;
+  border-color: #557b47;
+  border-style: solid;
+  border-width: 0 2px 2px 0;
+}
+
+.images-gallery-arrow-icon.is-prev {
+  transform: translateX(3px) rotate(135deg);
+}
+
+.images-gallery-arrow-icon.is-next {
+  transform: translateX(-3px) rotate(-45deg);
 }
 
 .images-thumb {
@@ -237,6 +282,7 @@
 
 .images-thumb-active {
   outline: 3px solid #5c8a49;
+  outline-offset: 5px;
 }
 
 .images-thumb-placeholder {
@@ -251,4 +297,24 @@
 .images-thumb-placeholder svg {
   height: 28px;
   width: 28px;
+}
+
+@keyframes images-main-slide-in {
+  from {
+    opacity: 0.45;
+    transform: translateX(22px) scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes images-progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }

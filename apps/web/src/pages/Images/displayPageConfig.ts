@@ -112,12 +112,17 @@ export function createImagesDisplayPageSeedConfig(
     },
     chrome: {
       heroTypography: createHeroTypographyConfig({
+        eyebrowMarginBottom: 44,
         subtitleMarginTop: 20,
         titleFontSize: 76,
         titleLetterSpacing: 4
       }),
       modules: {
-        arrows: createArrowChromeConfig(),
+        arrows: createArrowChromeConfig({
+          borderRadius: 34,
+          buttonSize: 68,
+          fontSize: 42
+        }),
         counter: createCounterChromeConfig()
       },
       ornaments: {

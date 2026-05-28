@@ -8,7 +8,10 @@ import type {
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readDisplayOpsAssetReferences } from "../services/displayOpsService.js";
-import { deleteImagePlaylistEntriesForAsset } from "../services/imagePlaylistService.js";
+import {
+  deleteImagePlaylistEntriesForAsset,
+  ensureImagePlaylistEntryForAsset
+} from "../services/imagePlaylistService.js";
 import {
   ALLOWED_EXTENSIONS,
   deleteImageFile,
@@ -86,6 +89,18 @@ function normalizeAssetUsageScope(value: string | null): ManagedAssetUsageScope 
   return "both";
 }
 
+function normalizeBooleanField(value: string | null, fallback: boolean) {
+  if (value === "true" || value === "1") {
+    return true;
+  }
+
+  if (value === "false" || value === "0") {
+    return false;
+  }
+
+  return fallback;
+}
+
 const imagesRoute: FastifyPluginAsync = async (app) => {
   await app.register(import("@fastify/multipart"), {
     limits: {
@@ -117,6 +132,10 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
 
     const category = normalizeAssetCategory(readMultipartFieldValue(data.fields.category));
     const usageScope = normalizeAssetUsageScope(readMultipartFieldValue(data.fields.usageScope));
+    const includedInSlideshow = normalizeBooleanField(
+      readMultipartFieldValue(data.fields.includedInSlideshow),
+      false
+    );
     const uniqueFilename = generateUniqueFilename(data.filename);
     writeFileSync(resolve(config.uploadsDir, uniqueFilename), buffer);
 
@@ -128,7 +147,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
             category, usage_scope, filename, original_name, title, description,
             mime_type, file_size, display_duration, display_order,
             included_in_slideshow, is_cover, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, NULL, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, NULL, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `
       )
       .run(
@@ -139,13 +158,18 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         data.filename.replace(extname(data.filename), ""),
         null,
         data.mimetype,
-        buffer.length
+        buffer.length,
+        includedInSlideshow ? 1 : 0
       );
 
     const inserted = getImageById(result.lastInsertRowid as number);
     if (!inserted) {
       deleteImageFile(uniqueFilename);
       return reply.status(500).send(errorResponse("Failed to save image metadata"));
+    }
+
+    if (includedInSlideshow) {
+      ensureImagePlaylistEntryForAsset(inserted.id);
     }
 
     app.socketService.emitImagesUpdated({

@@ -66,6 +66,18 @@ function freePort(port) {
   }
 }
 
+function assertPortAvailable(port) {
+  const pids = listPidsOnPort(port);
+
+  if (pids.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `[dev] tcp:${port} is already in use by pid ${pids.join(", ")}. Stop the existing backend before running pnpm dev.`
+  );
+}
+
 function buildServerArgs() {
   return ["--filter", "@solar-display/server", "dev"];
 }
@@ -270,6 +282,8 @@ async function main() {
   for (const port of portsToFree) {
     freePort(port);
   }
+
+  assertPortAvailable(serverPort);
 
   let sharedWatcher = null;
   let serverProcess = null;

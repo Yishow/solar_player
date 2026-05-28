@@ -19,6 +19,7 @@ type ImageAssetRow = {
   id: number;
   included_in_slideshow: number;
   is_cover: number;
+  original_name: string | null;
   title: string | null;
   width: number | null;
 };
@@ -49,6 +50,11 @@ type PlaylistUpdateInput = Partial<{
   tags: string[];
   title: string | null;
 }>;
+
+type ExistingPlaylistEntryRef = {
+  asset_id: number;
+  entry_id: string;
+};
 
 type ReorderInput = Array<{
   displayOrder: number;
@@ -96,6 +102,18 @@ function formatEntryId(index: number) {
   return `IMG-${String(index).padStart(2, "0")}`;
 }
 
+function resolveNextPlaylistIndex(entries: Array<{ entry_id: string }>) {
+  return entries.reduce((max, row) => {
+    const match = /^IMG-(\d+)$/.exec(row.entry_id);
+    const sequence = match?.[1];
+    if (!sequence) {
+      return max;
+    }
+
+    return Math.max(max, Number.parseInt(sequence, 10));
+  }, 0) + 1;
+}
+
 function readAssets() {
   return getDatabase()
     .prepare(
@@ -110,7 +128,8 @@ function readAssets() {
           display_duration,
           display_order,
           included_in_slideshow,
-          is_cover
+          is_cover,
+          original_name
         FROM image_assets
         ORDER BY display_order ASC, id ASC
       `
@@ -178,7 +197,7 @@ function ensureBootstrappedEntries() {
       WHERE asset_id IS NOT NULL
       ORDER BY entry_id ASC
     `
-  ).all() as Array<{ asset_id: number; entry_id: string }>;
+  ).all() as ExistingPlaylistEntryRef[];
   const existing = new Set(existingEntries.map((row) => row.asset_id));
   const insert = database.prepare(
     `
@@ -197,16 +216,10 @@ function ensureBootstrappedEntries() {
     `
   );
 
-  let nextIndex = existingEntries.reduce((max, row) => {
-    const match = /^IMG-(\d+)$/.exec(row.entry_id);
-    const sequence = match?.[1];
-    if (!sequence) {
-      return max;
-    }
-
-    return Math.max(max, Number.parseInt(sequence, 10));
-  }, 0) + 1;
-  for (const asset of assets) {
+  let nextIndex = resolveNextPlaylistIndex(existingEntries);
+  for (const asset of assets.filter((item) => (
+    item.included_in_slideshow === 1 || !item.original_name?.startsWith("display-seed:")
+  ))) {
     if (existing.has(asset.id)) {
       continue;
     }
@@ -221,6 +234,63 @@ function ensureBootstrappedEntries() {
     );
     nextIndex += 1;
   }
+}
+
+export function ensureImagePlaylistEntryForAsset(assetId: number) {
+  ensurePlaylistTable();
+  const database = getDatabase();
+  const existing = database
+    .prepare(
+      `
+        SELECT entry_id
+        FROM image_playlist_entries
+        WHERE asset_id = ?
+        LIMIT 1
+      `
+    )
+    .get(assetId);
+  if (existing) {
+    return;
+  }
+
+  const asset = readAssets().find((item) => item.id === assetId);
+  if (!asset) {
+    return;
+  }
+
+  const existingEntries = database.prepare(
+    `
+      SELECT asset_id, entry_id
+      FROM image_playlist_entries
+      WHERE asset_id IS NOT NULL
+      ORDER BY entry_id ASC
+    `
+  ).all() as ExistingPlaylistEntryRef[];
+  const nextIndex = resolveNextPlaylistIndex(existingEntries);
+
+  database.prepare(
+    `
+      INSERT INTO image_playlist_entries (
+        entry_id,
+        asset_id,
+        enabled,
+        display_order,
+        duration_seconds,
+        title,
+        description,
+        fallback_mode,
+        tags_json,
+        updated_at
+      ) VALUES (?, ?, 1, ?, ?, ?, ?, 'display-placeholder', '[]', CURRENT_TIMESTAMP)
+    `
+  ).run(
+    formatEntryId(nextIndex),
+    asset.id,
+    asset.display_order ?? nextIndex,
+    asset.display_duration ?? 10,
+    asset.title,
+    asset.description
+  );
 }
 
 function resolveAssets() {

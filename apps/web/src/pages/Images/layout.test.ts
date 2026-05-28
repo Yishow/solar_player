@@ -4,6 +4,7 @@ import {
   imagesAssetMap,
   imagesContentTopOffset,
   imagesCounterLayout,
+  imagesGrassLayout,
   imagesInfoLayout,
   imagesMainLayout,
   imagesThumbLayout,
@@ -14,9 +15,15 @@ import {
 test("images layout centralizes title, media stage, and thumbnail geometry", () => {
   assert.equal(imagesContentTopOffset, 110);
   assert.deepEqual(imagesTitleLayout, {
-    left: 88,
-    top: 166,
-    width: 560
+    left: 82,
+    top: 218,
+    width: 510
+  });
+  assert.deepEqual(imagesGrassLayout, {
+    height: 124,
+    left: 0,
+    top: 584,
+    width: 584
   });
   assert.deepEqual(imagesCounterLayout, {
     height: 170,
@@ -37,7 +44,7 @@ test("images layout centralizes title, media stage, and thumbnail geometry", () 
     width: 374
   });
   assert.deepEqual(imagesThumbSize, {
-    height: 118,
+    height: 132,
     width: 256
   });
   assert.deepEqual(imagesThumbLayout[2], {
@@ -48,6 +55,7 @@ test("images layout centralizes title, media stage, and thumbnail geometry", () 
 
 test("images asset map keeps reference-derived gallery assets page-local", () => {
   assert.match(imagesAssetMap.main.src, /images-hero-reference\.png$/);
+  assert.match(imagesAssetMap.leftOrnament.src, /images-left-ornament-reference\.png$/);
   assert.match(imagesAssetMap.thumbs[0]?.src ?? "", /images-thumb-1-reference\.png$/);
   assert.match(imagesAssetMap.thumbs[3]?.src ?? "", /images-thumb-4-reference\.png$/);
 });

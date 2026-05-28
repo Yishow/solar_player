@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { migrateDatabase } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
+import { acquireServerRuntimeGuard } from "./serverRuntimeGuard.js";
 import { DailySummaryService } from "./services/DailySummaryService.js";
 import { MetricHistoryRetentionService } from "./services/MetricHistoryRetentionService.js";
 import { MetricsAccumulatorService } from "./services/MetricsAccumulatorService.js";
@@ -34,6 +35,7 @@ type StartServerOptions = {
   createMetricsAccumulatorService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
   }) => MetricsAccumulatorLifecycleService;
+  acquireServerRuntimeGuard?: (options: { dataDir: string }) => () => void;
   createSnapshotWriterService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
     metricsAccumulatorService: MetricsAccumulatorService;
@@ -58,10 +60,17 @@ export async function startServer(options: StartServerOptions = {}) {
   const createMetricHistoryRetentionService =
     options.createMetricHistoryRetentionService ??
     ((serviceOptions) => new MetricHistoryRetentionService(serviceOptions));
+  const acquireRuntimeGuard =
+    options.acquireServerRuntimeGuard ??
+    ((guardOptions) => acquireServerRuntimeGuard(guardOptions));
 
   let app: AppLike | null = null;
+  let releaseRuntimeGuard: (() => void) | null = null;
 
   try {
+    releaseRuntimeGuard = acquireRuntimeGuard({
+      dataDir: config.dataDir
+    });
     (options.migrateDatabase ?? migrateDatabase)();
     (options.seedDatabase ?? seedDatabase)();
 
@@ -100,6 +109,8 @@ export async function startServer(options: StartServerOptions = {}) {
       dailySummaryService.stop();
       snapshotWriterService.stop();
       metricsAccumulatorService.stop();
+      releaseRuntimeGuard?.();
+      releaseRuntimeGuard = null;
     });
 
     await app.listen({
@@ -115,6 +126,8 @@ export async function startServer(options: StartServerOptions = {}) {
       app.log.error(error);
       await app.close();
     } else {
+      releaseRuntimeGuard?.();
+      releaseRuntimeGuard = null;
       console.error(error);
     }
 

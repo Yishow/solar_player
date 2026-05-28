@@ -33,7 +33,7 @@ import {
 import {
   imagesContentTopOffset,
   imagesCounterLayout,
-  imagesGoldLayout,
+  imagesGrassLayout,
   imagesTitleLayout
 } from "./layout";
 import "../../components/displayPageCards.css";
@@ -65,6 +65,12 @@ function splitImagesTitle(title: string) {
   };
 }
 
+function resolveImagesReferenceEntry(index: number) {
+  return imagesReferencePlaylistEntries[
+    Math.min(index, imagesReferencePlaylistEntries.length - 1)
+  ] ?? null;
+}
+
 export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const runtimeHydrationEnabled = config === undefined;
@@ -77,17 +83,16 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
-  const [requestedIndex, setRequestedIndex] = useState(2);
+  const [requestedIndex, setRequestedIndex] = useState(0);
   const playlistRuntime = useImagePlaylistRuntime(requestedIndex, {
     enabled: runtimeHydrationEnabled
   });
   const runtimePlaylistEntries = playlistRuntime.payload?.entries ?? [];
-  const playbackEntries =
-    runtimePlaylistEntries.length > 0 ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
+  const playbackEntries = runtimeHydrationEnabled ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
   const playbackActiveEntry =
-    runtimePlaylistEntries.length > 0
+    runtimeHydrationEnabled
       ? playlistRuntime.payload?.activeEntry ?? null
-      : imagesReferencePlaylistEntries[Math.min(requestedIndex, imagesReferencePlaylistEntries.length - 1)] ?? null;
+      : resolveImagesReferenceEntry(requestedIndex);
   const autoplay = useImagesAutoplay({
     activeEntry: playbackActiveEntry,
     entries: playbackEntries,
@@ -138,14 +143,14 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
 
   const titleLayout = withContentOffset(imagesTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
-  const goldLayout = withContentOffset(imagesGoldLayout);
+  const grassLayout = withContentOffset(imagesGrassLayout);
   const counterLayout = withContentOffset(imagesCounterLayout);
   const mainLayout = withContentOffset(resolvedConfig.mainStage);
   const infoLayout = withContentOffset(resolvedConfig.infoPanel);
   const infoCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.infoPanel);
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
   const activeMainStageSource = viewModel.active.assetSource ?? mainStageSource ?? undefined;
-  const isReferenceHeroCrop = activeMainStageSource === imagesAssetRuntimeMap.main;
+  const isReferenceHeroCrop = viewModel.active.assetSource === imagesAssetRuntimeMap.main;
   const mainStageOverlayLayers = isReferenceHeroCrop ? [] : mainStageMediaPresentation.overlayLayers;
 
   return (
@@ -213,17 +218,17 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       </p>
 
       <div
-        className="images-gold-ornament display-surface-gold-ornament"
+        className="images-gold-ornament images-grass-ornament display-surface-gold-ornament"
         style={{
-          height: `${goldLayout.height}px`,
-          left: `${goldLayout.left}px`,
+          height: `${grassLayout.height}px`,
+          left: `${grassLayout.left}px`,
           opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
-          top: `${goldLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
-          transform: `scaleY(${resolvedConfig.chrome.ornaments.goldLine.thickness})`,
-          transformOrigin: "top left",
-          width: `${goldLayout.width}px`
+          top: `${grassLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
+          width: `${grassLayout.width}px`
         }}
-      />
+      >
+        <img alt="" src={imagesAssetRuntimeMap.leftOrnament} />
+      </div>
 
       <section
         className="images-slide-counter"
@@ -247,11 +252,12 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           自動輪播中，目前素材停留 {viewModel.active.durationSeconds} 秒
         </p>
         <div
+          key={viewModel.active.entryId}
           className="images-progress-line"
           style={{
             height: `${resolvedConfig.chrome.modules.counter.progressThickness}px`,
             top: `${resolvedConfig.chrome.modules.counter.progressTopOffset}px`,
-            ["--progress-width" as string]: `${((autoplay.activeIndex + 1) / Math.max(viewModel.thumbnails.length, 1)) * 100}%`
+            ["--images-slide-duration" as string]: `${viewModel.active.durationSeconds * 1000}ms`
           }}
         />
       </section>
@@ -273,6 +279,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         {viewModel.active.assetSource ? (
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
+            key={viewModel.active.entryId}
             src={activeMainStageSource}
             style={mainStageMediaPresentation.mediaStyle}
           />
@@ -337,6 +344,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       ) : null}
 
       <button
+        aria-label="上一張圖片"
         className="images-gallery-arrow"
         style={{
           borderRadius: `${resolvedConfig.chrome.modules.arrows.borderRadius}px`,
@@ -347,10 +355,12 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
         onClick={() => autoplay.prev()}
+        type="button"
       >
-        ‹
+        <span aria-hidden="true" className="images-gallery-arrow-icon is-prev" />
       </button>
       <button
+        aria-label="下一張圖片"
         className="images-gallery-arrow"
         style={{
           borderRadius: `${resolvedConfig.chrome.modules.arrows.borderRadius}px`,
@@ -361,8 +371,9 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           width: `${resolvedConfig.chrome.modules.arrows.buttonSize}px`
         }}
         onClick={() => autoplay.next()}
+        type="button"
       >
-        ›
+        <span aria-hidden="true" className="images-gallery-arrow-icon is-next" />
       </button>
 
       {visibleThumbnails.map((thumbnail, thumbIndex) => {
@@ -382,6 +393,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
               width: `${layout.width}px`
             }}
             onClick={() => autoplay.selectIndex(visibleStart + thumbIndex)}
+            type="button"
           >
             {thumbnail.assetSource ? (
               <img alt={thumbnail.infoPanel.title} src={thumbnail.assetSource} />
