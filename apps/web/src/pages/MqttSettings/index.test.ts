@@ -28,3 +28,14 @@ test("mqtt settings uses a phase-neutral fallback error when the combined save f
   assert.match(mqttSettingsSource, /儲存設定失敗。/);
   assert.doesNotMatch(mqttSettingsSource, /儲存 MQTT 設定失敗。/);
 });
+
+test("mqtt settings computes broker topic and weather draft scopes before rendering the workspace", () => {
+  assert.match(mqttSettingsSource, /const draftSections = useMemo\(/);
+  assert.match(mqttSettingsSource, /broker:\s*hasDisplaySyncDraftChanges\(settings,\s*lastSyncedSettings\)/);
+  assert.match(mqttSettingsSource, /topic:\s*hasDisplaySyncDraftChanges\(topics,\s*lastSyncedTopics\)/);
+  assert.match(
+    mqttSettingsSource,
+    /weather:\s*hasDisplaySyncDraftChanges\(weatherSettings,\s*lastSyncedWeatherSettings\)/
+  );
+  assert.match(mqttSettingsSource, /draftSections=\{draftSections\}/);
+});

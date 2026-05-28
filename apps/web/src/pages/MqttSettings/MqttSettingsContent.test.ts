@@ -632,3 +632,139 @@ test("mqtt settings content surfaces a setup notice when the CWA weather source 
   assert.match(html, /mqtt-weather-card__config-notice/);
   assert.match(html, /CWA_AUTHORIZATION/);
 });
+
+test("mqtt settings content renders section guidance display-impact groups and invalid weather draft feedback", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MqttSettingsContent, {
+      actionState: {
+        isLoadingSettings: false,
+        isLoadingTopics: false,
+        isReloadingTopics: false,
+        isSavingSettings: false,
+        isSavingTopics: false,
+        isTestingConnection: false
+      },
+      addTopicMapping: () => undefined,
+      draftSections: {
+        broker: true,
+        topic: true,
+        weather: true
+      },
+      errorMessage: "",
+      handleSettingChange: () => undefined,
+      handleTopicChange: () => undefined,
+      handleWeatherSettingChange: () => undefined,
+      lastConnectionTest: null,
+      liveMetricsConnectionState: "connected",
+      liveMetricsSnapshot: {
+        metrics: {},
+        timestamp: null
+      },
+      message: "Topic mappings 已變更，尚未儲存。",
+      readiness: {
+        findings: [
+          {
+            blocking: true,
+            pageId: "overview",
+            reason: "尚未設定 todayGeneration mapping。",
+            requirementKey: "todayGeneration",
+            sourceId: null,
+            sourceType: "mqtt-metric",
+            status: "blocking"
+          },
+          {
+            blocking: false,
+            pageId: "solar",
+            reason: "等待 topic 首次收值。",
+            requirementKey: "realTimePower",
+            sourceId: "realTimePower",
+            sourceType: "mqtt-metric",
+            status: "warning"
+          }
+        ],
+        generatedAt: "2026-05-23T09:31:00.000Z",
+        pages: [],
+        summary: {
+          blockingCount: 1,
+          mqttCoverage: {
+            blockingCount: 1,
+            readyCount: 0
+          },
+          readyCount: 0,
+          slotCoverage: {
+            blockingCount: 0,
+            readyCount: 0
+          },
+          warningCount: 1
+        }
+      },
+      readinessErrorMessage: "",
+      reloadTopics: async () => undefined,
+      remoteSyncBanner: null,
+      removeTopicMapping: () => undefined,
+      saveSettings: async () => undefined,
+      saveTopicMappings: async () => undefined,
+      settings: {
+        clientId: "solar-display-player",
+        dataMode: "mqtt",
+        host: "localhost",
+        messageTimeout: "30",
+        password: "",
+        port: "1883",
+        reconnectInterval: "5000",
+        username: ""
+      },
+      status: {
+        broker: "localhost:1883",
+        clientId: "solar-display-player",
+        connected: true,
+        reason: null,
+        updatedAt: "2026-05-23T09:31:00.000Z"
+      },
+      testConnection: async () => undefined,
+      toggleWeatherField: () => undefined,
+      topics: [
+        {
+          enabled: true,
+          id: 1,
+          lastReceivedAt: null,
+          lastValue: null,
+          metricKey: "realTimePower",
+          quality: null,
+          rawPayload: null,
+          topic: "kuozui/plant/solar/power",
+          unit: "kW",
+          updatedAt: "2026-05-23T09:28:00.000Z",
+          valuePath: "$.value"
+        },
+        {
+          enabled: true,
+          id: 2,
+          lastReceivedAt: "2026-05-23T09:30:00.000Z",
+          lastValue: 1280,
+          metricKey: "factoryProductionPower",
+          quality: "good",
+          rawPayload: "{\"value\":1280}",
+          topic: "kuozui/factory/production/power",
+          unit: "kW",
+          updatedAt: "2026-05-23T09:29:00.000Z",
+          valuePath: "$.value"
+        }
+      ],
+      weatherOptions: createWeatherOptions(),
+      weatherOptionsErrorMessage: "",
+      weatherPreviewContract: createWeatherPreviewContract(),
+      weatherPreviewErrorMessage: "",
+      weatherSettings: createWeatherSettings({
+        stationId: null
+      })
+    })
+  );
+
+  assert.match(html, /Broker 草稿待儲存/);
+  assert.match(html, /Topic Workspace 有未儲存變更/);
+  assert.match(html, /Display Impact Summary/);
+  assert.match(html, /Overview · 今日發電量/);
+  assert.match(html, /Header Contract 草稿待儲存/);
+  assert.match(html, /請先選擇測站，才能確認 header 會顯示哪個站點。/);
+});

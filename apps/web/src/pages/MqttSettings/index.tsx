@@ -473,12 +473,17 @@ export function MqttSettings() {
     setTopics((current) => current.filter((topic) => topic.id !== rowId));
   };
 
-  const isDirty = useMemo(
-    () =>
-      hasDisplaySyncDraftChanges(settings, lastSyncedSettings)
-      || hasDisplaySyncDraftChanges(topics, lastSyncedTopics)
-      || hasDisplaySyncDraftChanges(weatherSettings, lastSyncedWeatherSettings),
+  const draftSections = useMemo(
+    () => ({
+      broker: hasDisplaySyncDraftChanges(settings, lastSyncedSettings),
+      topic: hasDisplaySyncDraftChanges(topics, lastSyncedTopics),
+      weather: hasDisplaySyncDraftChanges(weatherSettings, lastSyncedWeatherSettings)
+    }),
     [lastSyncedSettings, lastSyncedTopics, lastSyncedWeatherSettings, settings, topics, weatherSettings]
+  );
+  const isDirty = useMemo(
+    () => draftSections.broker || draftSections.topic || draftSections.weather,
+    [draftSections]
   );
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: isDirty,
@@ -499,6 +504,7 @@ export function MqttSettings() {
     <MqttSettingsContent
       actionState={actionState}
       addTopicMapping={addTopicMapping}
+      draftSections={draftSections}
       errorMessage={errorMessage}
       handleSettingChange={handleSettingChange}
       handleTopicChange={handleTopicChange}

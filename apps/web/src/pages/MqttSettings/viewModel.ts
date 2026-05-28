@@ -61,8 +61,15 @@ export type ConnectionTestFeedback = {
   message: string;
 } | null;
 
+type DraftSections = {
+  broker: boolean;
+  topic: boolean;
+  weather: boolean;
+};
+
 type BuildMqttSettingsViewModelArgs = {
   actionState: ActionState;
+  draftSections?: DraftSections;
   errorMessage: string;
   lastConnectionTest: ConnectionTestFeedback;
   liveMetricsConnectionState: SocketConnectionState["status"];
@@ -77,6 +84,23 @@ type BuildMqttSettingsViewModelArgs = {
   weatherPreviewContract: WeatherHeaderContract | null;
   weatherPreviewErrorMessage: string;
   weatherSettings: WeatherSettings;
+};
+
+type SectionGuide = {
+  detail: string;
+  title: string;
+  tone: "ready" | "warning" | "error";
+};
+
+type TopicImpactGroup = {
+  items: Array<{
+    detail: string;
+    metricLabelZh: string;
+    storyLabel: string;
+  }>;
+  summary: string;
+  title: string;
+  tone: "ready" | "warning" | "error";
 };
 
 const weatherFieldLabelMap: Record<WeatherFieldKey, string> = {
@@ -208,6 +232,14 @@ function resolveTopicRuntime(
   };
 }
 
+const pageLabelMap: Record<string, string> = {
+  factoryCircuit: "Factory Circuit",
+  images: "Images",
+  overview: "Overview",
+  solar: "Solar",
+  sustainability: "Sustainability"
+};
+
 function resolveRuntimePreviewStatus(
   status: MqttStatus,
   liveMetricsConnectionState: SocketConnectionState["status"],
@@ -236,6 +268,99 @@ function resolveRuntimePreviewStatus(
   };
 }
 
+function resolveWeatherValidationFeedback(weatherSettings: WeatherSettings) {
+  if (!weatherSettings.enabled) {
+    return "";
+  }
+
+  if (!weatherSettings.countyName) {
+    return "請先選擇縣市，才能決定 header 會顯示哪個地區。";
+  }
+
+  if (weatherSettings.locationMode === "station" && !weatherSettings.stationId) {
+    return "請先選擇測站，才能確認 header 會顯示哪個站點。";
+  }
+
+  if (weatherSettings.preset === "custom" && weatherSettings.fieldKeys.length === 0) {
+    return "至少勾選一個天氣欄位，header 才有可顯示的 weather metadata。";
+  }
+
+  return "";
+}
+
+function resolvePageLabel(pageId: string | null) {
+  if (!pageId) {
+    return "Mapped Runtime";
+  }
+
+  return pageLabelMap[pageId] ?? pageId;
+}
+
+function buildTopicImpactGroups(args: {
+  coverageRows: Array<{
+    detail: string;
+    metricLabelZh: string;
+    pageId: string | null;
+    requirementKey: string;
+    stateLabel: string;
+  }>;
+  mappedTopics: Array<{
+    enabled: boolean;
+    lastReceivedAt: string | null;
+    metricLabelZh: string;
+    topic: string;
+  }>;
+}): TopicImpactGroup[] {
+  const mappingGapItems = args.coverageRows
+    .filter((row) => row.stateLabel === "Mapping Gap")
+    .map((row) => ({
+      detail: row.detail,
+      metricLabelZh: row.metricLabelZh,
+      storyLabel: resolvePageLabel(row.pageId)
+    }));
+  const idleRuntimeItems = args.coverageRows
+    .filter((row) => row.stateLabel === "Idle Runtime" || row.stateLabel === "Broker Disconnected")
+    .map((row) => ({
+      detail: row.detail,
+      metricLabelZh: row.metricLabelZh,
+      storyLabel: resolvePageLabel(row.pageId)
+    }));
+  const healthyItems = args.mappedTopics
+    .filter((topic) => topic.enabled && topic.topic.trim() !== "" && topic.lastReceivedAt !== null)
+    .map((topic) => ({
+      detail: "已收到最新 topic runtime，可直接對照播放 surface。",
+      metricLabelZh: topic.metricLabelZh,
+      storyLabel: "Mapped Runtime"
+    }));
+
+  return [
+    mappingGapItems.length > 0
+      ? {
+          items: mappingGapItems,
+          summary: `${mappingGapItems.length} 個 display story 仍缺少 mapping`,
+          title: "Mapping Gap Priority",
+          tone: "error" as const
+        }
+      : null,
+    idleRuntimeItems.length > 0
+      ? {
+          items: idleRuntimeItems,
+          summary: `${idleRuntimeItems.length} 個已映射 metrics 正等待新收值`,
+          title: "Idle Runtime",
+          tone: "warning" as const
+        }
+      : null,
+    healthyItems.length > 0
+      ? {
+          items: healthyItems,
+          summary: `${healthyItems.length} 筆 mapping 已可供 display surface 使用`,
+          title: "Healthy Mapping",
+          tone: "ready" as const
+        }
+      : null
+  ].filter((group): group is TopicImpactGroup => group !== null);
+}
+
 function resolveConnectionState(settings: MqttSettingsForm, status: MqttStatus) {
   if (settings.dataMode === "mock") {
     return {
@@ -262,6 +387,7 @@ function resolveConnectionState(settings: MqttSettingsForm, status: MqttStatus) 
 
 export function buildMqttSettingsViewModel({
   actionState,
+  draftSections,
   errorMessage,
   lastConnectionTest,
   liveMetricsConnectionState,
@@ -415,6 +541,57 @@ export function buildMqttSettingsViewModel({
   const configFeedback = weatherOptions?.fetchState === "unconfigured"
     ? "天氣資料來源（CWA 中央氣象署）尚未設定，因此無法載入縣市與測站清單。請在伺服器 .env 設定 CWA_AUTHORIZATION 後重新啟動服務。"
     : "";
+  const localWeatherValidationFeedback = resolveWeatherValidationFeedback(weatherSettings);
+  const topicImpactGroups = buildTopicImpactGroups({
+    coverageRows,
+    mappedTopics
+  });
+  const sectionGuides: Record<keyof DraftSections, SectionGuide> = {
+    broker: draftSections?.broker
+      ? {
+          detail: `目前草稿尚未儲存；runtime 狀態仍為 ${connection.label}。`,
+          title: "Broker 草稿待儲存",
+          tone: connection.tone === "disconnected" ? "error" : "warning"
+        }
+      : {
+          detail: connection.detail,
+          title: connection.label,
+          tone: connection.tone === "disconnected" ? "error" : "ready"
+        },
+    topic: draftSections?.topic
+      ? {
+          detail:
+            topicImpactGroups[0]?.summary
+            ?? "topic row 草稿尚未儲存，請確認 coverage 與 runtime 狀態後再存檔。",
+          title: "Topic Workspace 有未儲存變更",
+          tone: topicImpactGroups[0]?.tone ?? "warning"
+        }
+      : {
+          detail: runtimePreview.statusDetail,
+          title: runtimePreview.statusLabel,
+          tone: runtimePreview.statusTone === "disconnected"
+            ? "error"
+            : runtimePreview.statusTone === "connecting"
+              ? "warning"
+              : "ready"
+        },
+    weather: draftSections?.weather
+      ? {
+          detail:
+            localWeatherValidationFeedback
+            || `儲存後 header 預計顯示：${weatherPreview.primaryText}`,
+          title: "Header Contract 草稿待儲存",
+          tone: localWeatherValidationFeedback ? "error" : "warning"
+        }
+      : {
+          detail: `目前 header 顯示：${weatherPreview.primaryText}`,
+          title: "Header Contract 已同步",
+          tone: weatherPreview.state === "unavailable" ? "warning" : "ready"
+        }
+  };
+  const weatherContractDetail = localWeatherValidationFeedback
+    ? `${localWeatherValidationFeedback} 目前預覽：${weatherPreview.primaryText}`
+    : `${draftSections?.weather ? "儲存後 header 預計顯示：" : "目前 header 顯示："}${weatherPreview.primaryText}`;
 
   return {
     actions: {
@@ -524,10 +701,12 @@ export function buildMqttSettingsViewModel({
       tone: feedbackTone,
       visualTone: feedbackToneMap[feedbackTone]
     },
+    sectionGuides,
     coverageRows,
     topicWorkspaceRows,
     topicWorkspaceSummary: {
       coverageCount: coverageRows.length,
+      impactGroups: topicImpactGroups,
       runtimeStatusDetail: runtimePreview.statusDetail,
       runtimeStatusLabel: runtimePreview.statusLabel,
       runtimeStatusTone: runtimePreview.statusTone
@@ -611,9 +790,12 @@ export function buildMqttSettingsViewModel({
     topicRows: mappedTopics,
     weatherCard: {
       configFeedback,
+      contractStatusDetail: weatherContractDetail,
+      contractStatusTitle: sectionGuides.weather.title,
       countyOptions: weatherOptions?.counties ?? [],
       customFieldOptions,
       enabled: weatherSettings.enabled,
+      localValidationFeedback: localWeatherValidationFeedback,
       locationMode: weatherSettings.locationMode,
       locationOptions: [
         { label: "指定測站", value: "station" as const },

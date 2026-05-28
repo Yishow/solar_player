@@ -66,6 +66,10 @@
   gap: 10px;
 }
 
+.mqtt-settings-page .mqtt-section-guide {
+  margin-bottom: 16px;
+}
+
 .mqtt-settings-page .conn-status.mqtt-runtime-status {
   position: static;
   left: auto;
@@ -156,6 +160,70 @@
 .mqtt-settings-page .mqtt-runtime-feedback__more {
   margin: 0;
   font-size: 12px;
+  color: #6f766f;
+}
+
+.mqtt-settings-page .mqtt-impact-groups {
+  margin-bottom: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.mqtt-settings-page .mqtt-impact-groups__title {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #6f766f;
+}
+
+.mqtt-settings-page .mqtt-impact-groups__list {
+  display: grid;
+  gap: 10px;
+}
+
+.mqtt-settings-page .mqtt-impact-group {
+  padding: 10px 12px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  border-radius: 12px;
+  background: #fffdf8;
+  display: grid;
+  gap: 8px;
+}
+
+.mqtt-settings-page .mqtt-impact-group.is-warning {
+  border-color: rgba(201, 136, 26, 0.28);
+  background: rgba(252, 240, 217, 0.5);
+}
+
+.mqtt-settings-page .mqtt-impact-group.is-error {
+  border-color: rgba(193, 74, 74, 0.24);
+  background: rgba(254, 243, 241, 0.82);
+}
+
+.mqtt-settings-page .mqtt-impact-group__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #344039;
+}
+
+.mqtt-settings-page .mqtt-impact-group__title small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #6f766f;
+}
+
+.mqtt-settings-page .mqtt-impact-group__item strong {
+  display: block;
+  font-size: 12px;
+  color: #2f4031;
+}
+
+.mqtt-settings-page .mqtt-impact-group__item small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
   color: #6f766f;
 }
 

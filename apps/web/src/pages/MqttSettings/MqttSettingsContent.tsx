@@ -19,6 +19,11 @@ import { buildMqttSettingsViewModel } from "./viewModel";
 type MqttSettingsContentProps = {
   actionState: ActionState;
   addTopicMapping: () => void;
+  draftSections?: {
+    broker: boolean;
+    topic: boolean;
+    weather: boolean;
+  };
   errorMessage: string;
   handleSettingChange: <Key extends keyof MqttSettingsForm>(
     key: Key,
@@ -69,9 +74,16 @@ function resolveCoverageChipClass(stateLabel: string) {
   return "mgmt-chip";
 }
 
+function resolveGuideBannerClassName(tone: "ready" | "warning" | "error") {
+  if (tone === "error") return "mgmt-banner is-error";
+  if (tone === "warning") return "mgmt-banner is-warning";
+  return "mgmt-banner";
+}
+
 export function MqttSettingsContent(props: MqttSettingsContentProps) {
   const viewModel = buildMqttSettingsViewModel({
     actionState: props.actionState,
+    draftSections: props.draftSections,
     errorMessage: props.errorMessage,
     lastConnectionTest: props.lastConnectionTest,
     liveMetricsConnectionState: props.liveMetricsConnectionState,
@@ -109,6 +121,10 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
 
       <section className="settings-card mqtt-mode">
         <div className="settings-card__title">資料來源模式<small>Data Mode</small></div>
+        <div className={`mqtt-section-guide ${resolveGuideBannerClassName(viewModel.sectionGuides.broker.tone)}`}>
+          <strong>{viewModel.sectionGuides.broker.title}</strong>
+          <small>{viewModel.sectionGuides.broker.detail}</small>
+        </div>
         <div className="seg" role="tablist">
           {viewModel.modeOptions.map((option) => (
             <button key={option.value} type="button" role="tab" aria-selected={option.isActive} className={option.isActive ? "active" : ""} onClick={() => props.handleSettingChange("dataMode", option.value)}>
@@ -133,6 +149,10 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
 
       <section className="settings-card mqtt-topic-workspace" data-mqtt-section="topic-workspace">
         <div className="settings-card__title">Topic 工作區<small>Topic Workspace</small></div>
+        <div className={`mqtt-section-guide ${resolveGuideBannerClassName(viewModel.sectionGuides.topic.tone)}`}>
+          <strong>{viewModel.sectionGuides.topic.title}</strong>
+          <small>{viewModel.sectionGuides.topic.detail}</small>
+        </div>
         <div className="mqtt-runtime-summary">
           <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.topicWorkspaceSummary.runtimeStatusTone)}`} role="status">
             <span className="conn-status__dot" aria-hidden />
@@ -164,6 +184,30 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
             </details>
           ) : null}
         </div>
+        {viewModel.topicWorkspaceSummary.impactGroups.length > 0 ? (
+          <div className="mqtt-impact-groups">
+            <div className="mqtt-impact-groups__title">Display Impact Summary</div>
+            <div className="mqtt-impact-groups__list">
+              {viewModel.topicWorkspaceSummary.impactGroups.map((group) => (
+                <section
+                  key={group.title}
+                  className={`mqtt-impact-group${group.tone === "error" ? " is-error" : group.tone === "warning" ? " is-warning" : ""}`}
+                >
+                  <div className="mqtt-impact-group__title">
+                    {group.title}
+                    <small>{group.summary}</small>
+                  </div>
+                  {group.items.map((item) => (
+                    <div key={`${group.title}-${item.storyLabel}-${item.metricLabelZh}`} className="mqtt-impact-group__item">
+                      <strong>{item.storyLabel} · {item.metricLabelZh}</strong>
+                      <small>{item.detail}</small>
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {viewModel.topicWorkspaceRows.length === 0 ? (
           <div className="empty-block">尚未設定任何 topic mapping。<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>新增後即可在同一張卡內直接查看 runtime 狀態、coverage 與編輯欄位。</span></div>
         ) : (
@@ -216,6 +260,10 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
         {viewModel.weatherCard.configFeedback ? (
           <div className="mgmt-status mqtt-weather-card__config-notice">{viewModel.weatherCard.configFeedback}</div>
         ) : null}
+        <div className={`mqtt-section-guide ${resolveGuideBannerClassName(viewModel.sectionGuides.weather.tone)}`}>
+          <strong>{viewModel.weatherCard.contractStatusTitle}</strong>
+          <small>{viewModel.weatherCard.contractStatusDetail}</small>
+        </div>
         <div className="mqtt-weather-card__controls">
           <label className="map-row__toggle mqtt-weather-card__toggle">
             <input
@@ -305,6 +353,11 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
 
         {viewModel.weatherCard.stationFeedback ? (
           <div className="mgmt-status is-error mqtt-weather-card__feedback">{viewModel.weatherCard.stationFeedback}</div>
+        ) : null}
+        {viewModel.weatherCard.localValidationFeedback ? (
+          <div className="mgmt-status is-error mqtt-weather-card__feedback">
+            {viewModel.weatherCard.localValidationFeedback}
+          </div>
         ) : null}
 
         <div className="mqtt-weather-card__preview">

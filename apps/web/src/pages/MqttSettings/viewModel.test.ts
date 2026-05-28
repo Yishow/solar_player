@@ -820,3 +820,127 @@ test("buildMqttSettingsViewModel surfaces weather preview fallback and custom fi
   assert.equal(model.weatherCard.customFieldOptions.length > 0, true);
   assert.equal(model.weatherCard.customFieldOptions.find((option) => option.value === "dailyHigh")?.checked, true);
 });
+
+test("buildMqttSettingsViewModel exposes section draft guidance topic impact groups and invalid weather drafts", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    draftSections: {
+      broker: true,
+      topic: true,
+      weather: true
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "Topic mappings 已變更，尚未儲存。",
+    readiness: createReadinessReport([
+      {
+        blocking: true,
+        pageId: "overview",
+        reason: "尚未設定 todayGeneration mapping。",
+        requirementKey: "todayGeneration",
+        sourceId: null,
+        sourceType: "mqtt-metric",
+        status: "blocking"
+      },
+      {
+        blocking: false,
+        pageId: "solar",
+        reason: "等待 topic 首次收值。",
+        requirementKey: "realTimePower",
+        sourceId: "realTimePower",
+        sourceType: "mqtt-metric",
+        status: "warning"
+      }
+    ]),
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt",
+      host: "broker.internal",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "broker.internal:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "realTimePower",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: "2026-05-23T06:18:00.000Z",
+        valuePath: "$.value"
+      },
+      {
+        enabled: true,
+        id: 2,
+        lastReceivedAt: "2026-05-23T06:19:00.000Z",
+        lastValue: 1280,
+        metricKey: "factoryProductionPower",
+        quality: "good",
+        rawPayload: "{\"value\":1280}",
+        topic: "kuozui/factory/production/power",
+        unit: "kW",
+        updatedAt: "2026-05-23T06:19:00.000Z",
+        valuePath: "$.value"
+      }
+    ],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({
+        countyName: "臺北市",
+        stationId: "C0I080",
+        stationName: "內湖",
+        townName: "內湖區",
+        weather: "晴"
+      })
+    }),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings({
+      countyName: "臺北市",
+      locationMode: "station",
+      stationId: null
+    })
+  });
+
+  assert.equal(model.sectionGuides.broker.title, "Broker 草稿待儲存");
+  assert.match(model.sectionGuides.broker.detail, /Broker 已連線/);
+  assert.equal(model.sectionGuides.topic.title, "Topic Workspace 有未儲存變更");
+  assert.equal(
+    model.topicWorkspaceSummary.impactGroups.map((group) => group.title).join(" | "),
+    "Mapping Gap Priority | Idle Runtime | Healthy Mapping"
+  );
+  assert.equal(model.topicWorkspaceSummary.impactGroups[0]?.items[0]?.storyLabel, "Overview");
+  assert.equal(model.topicWorkspaceSummary.impactGroups[0]?.items[0]?.metricLabelZh, "今日發電量");
+  assert.equal(model.weatherCard.contractStatusTitle, "Header Contract 草稿待儲存");
+  assert.match(model.weatherCard.contractStatusDetail, /內湖 晴 31°C/);
+  assert.equal(
+    model.weatherCard.localValidationFeedback,
+    "請先選擇測站，才能確認 header 會顯示哪個站點。"
+  );
+});
