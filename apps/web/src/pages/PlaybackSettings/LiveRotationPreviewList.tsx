@@ -51,8 +51,15 @@ export function LiveRotationPreviewList({
                 />
               </div>
               <div className="ps-preview__label">
-                <span className="ps-badge-number">{index + 1}</span> {page.labelEn}
-                <small style={{ display: "block", opacity: 0.72 }}>{page.durationLabel}</small>
+                <span className="ps-badge-number">{index + 1}</span>
+                <div className="ps-preview__label-copy">
+                  <strong>{page.labelEn}</strong>
+                  <small>{page.instanceLabel}</small>
+                  <small>{page.durationLabel}</small>
+                </div>
+                <span className={`mgmt-chip ${page.stateTone === "warning" ? "is-warning" : page.stateTone === "accent" ? "is-accent" : "is-success"}`}>
+                  {page.stateLabel}
+                </span>
               </div>
             </div>
             {index < arr.length - 1 && <div className="ps-preview__arrow">&gt;</div>}

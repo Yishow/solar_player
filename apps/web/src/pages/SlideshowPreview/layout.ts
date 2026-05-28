@@ -10,7 +10,7 @@
 export const slideshowLayout = {
   carousel: { height: 460, left: 360, top: 78, width: 1510 },
   status: { left: 50, top: 118, width: 282 },
-  summary: { height: 212, left: 360, top: 610, width: 1510 },
+  summary: { height: 244, left: 360, top: 578, width: 1510 },
   title: { left: 58, top: 40 }
 } as const;
 

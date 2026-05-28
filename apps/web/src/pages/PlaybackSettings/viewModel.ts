@@ -9,16 +9,23 @@ import { resolveDisplayFaultTriageSummaryFromDisplayOps } from "@solar-display/s
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import {
+  buildConfiguredRotationRows,
   buildEffectiveRotationRows,
-  buildRotationPreviewRows,
   buildSkippedRotationRows
 } from "../DisplayPagesEditor/rotationPreview";
+import type { RotationOpsSummaryStat, RotationOpsSummaryStatus } from "../../components/management/rotationOpsSummary";
 
 type BuildPlaybackSettingsViewModelArgs = {
   errorMessage: string;
   isSaving: boolean;
   message: string;
   pages: PlaybackPage[];
+  runtimeCountdown: number;
+  runtimeCurrentPage: PlaybackPage | null;
+  runtimeErrorMessage: string;
+  runtimeIsLoading: boolean;
+  runtimeIsPlaying: boolean;
+  runtimeProgress: number;
   displayOpsSummary?: DisplayOpsSummary | null;
   rotationPreview?: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
@@ -84,6 +91,79 @@ function formatTriageDetail(summary: DisplayFaultTriageSummary) {
   return `主因：${summary.dominantReason} · 受影響頁面：${formatTriagePages(summary)}`;
 }
 
+function buildEffectiveRotationStatus(input: {
+  playableCount: number;
+  runtimeCurrentPage: PlaybackPage | null;
+  runtimeErrorMessage: string;
+  runtimeIsLoading: boolean;
+  runtimeIsPlaying: boolean;
+  runtimeProgress: number;
+  skippedCount: number;
+}): RotationOpsSummaryStatus {
+  if (input.runtimeErrorMessage) {
+    return {
+      detail: input.runtimeErrorMessage,
+      title: "輪播狀態同步失敗",
+      tone: "error"
+    };
+  }
+
+  if (input.runtimeIsLoading) {
+    return {
+      detail: "正在同步 effective rotation、目前播放頁與 countdown。",
+      title: "輪播狀態同步中",
+      tone: "warning"
+    };
+  }
+
+  if (input.playableCount === 0) {
+    return {
+      detail: "目前沒有可播放頁面，請先處理 skip 或啟用設定。",
+      title: "正式輪播鏈不可用",
+      tone: "error"
+    };
+  }
+
+  if (input.skippedCount > 0) {
+    return {
+      detail: `目前可播放 ${input.playableCount} 頁，另有 ${input.skippedCount} 頁被 skip。`,
+      title: "輪播狀態已降級",
+      tone: "warning"
+    };
+  }
+
+  const currentLabel = input.runtimeCurrentPage?.labelZh ?? "尚未建立";
+  return {
+    detail: `${currentLabel} · ${Math.round(input.runtimeProgress)}% progress · ${input.runtimeIsPlaying ? "Auto Play" : "Paused"}`,
+    title: "正式輪播鏈正常",
+    tone: "ready"
+  };
+}
+
+function buildRuntimeSummaryRows(input: {
+  configuredCount: number;
+  playableCount: number;
+  runtimeCountdown: number;
+  runtimeCurrentPage: PlaybackPage | null;
+  skippedCount: number;
+}): RotationOpsSummaryStat[] {
+  return [
+    { label: "Configured", value: `${input.configuredCount} 頁`, valueTone: "default" },
+    { label: "Effective", value: `${input.playableCount} 頁`, valueTone: "ready" },
+    { label: "Skipped", value: `${input.skippedCount} 頁`, valueTone: input.skippedCount > 0 ? "warning" : "default" },
+    {
+      label: "Current",
+      value: input.runtimeCurrentPage?.labelZh ?? "尚未決策",
+      valueTone: input.runtimeCurrentPage ? "accent" : "default"
+    },
+    {
+      label: "Countdown",
+      value: `${input.runtimeCountdown} 秒`,
+      valueTone: input.runtimeCurrentPage ? "accent" : "default"
+    }
+  ];
+}
+
 export function reorderPlaybackPages(
   pages: PlaybackPage[],
   id: number,
@@ -117,6 +197,12 @@ export function buildPlaybackSettingsViewModel({
   isSaving,
   message,
   pages,
+  runtimeCountdown,
+  runtimeCurrentPage,
+  runtimeErrorMessage,
+  runtimeIsLoading,
+  runtimeIsPlaying,
+  runtimeProgress,
   displayOpsSummary,
   rotationPreview,
   settings
@@ -125,6 +211,9 @@ export function buildPlaybackSettingsViewModel({
   const enabledCount = sortedPages.filter((page) => page.enabled).length;
   const totalDurationSeconds = sortedPages.reduce((sum, page) => sum + page.durationSeconds, 0);
   const scheduleEnabled = settings?.scheduleEnabled ?? false;
+  const configuredRotationRows = buildConfiguredRotationRows(sortedPages);
+  const effectiveRotationRows = buildEffectiveRotationRows(rotationPreview ?? null, runtimeCurrentPage?.id ?? null);
+  const skippedRotationRows = buildSkippedRotationRows(rotationPreview ?? null);
   const triageSummary =
     displayOpsSummary?.triageSummary
     ?? resolveDisplayFaultTriageSummaryFromDisplayOps(displayOpsSummary ?? null);
@@ -209,9 +298,25 @@ export function buildPlaybackSettingsViewModel({
       value: `${totalDurationSeconds}s`
       }
     ],
-    effectiveRotationRows: buildEffectiveRotationRows(rotationPreview ?? null),
-    rotationPreviewRows: buildRotationPreviewRows(sortedPages),
-    skippedRotationRows: buildSkippedRotationRows(rotationPreview ?? null),
+    configuredRotationRows,
+    effectiveRotationRows,
+    skippedRotationRows,
+    runtimeSummaryRows: buildRuntimeSummaryRows({
+      configuredCount: configuredRotationRows.length,
+      playableCount: effectiveRotationRows.length,
+      runtimeCountdown,
+      runtimeCurrentPage,
+      skippedCount: skippedRotationRows.length
+    }),
+    effectiveRotationStatus: buildEffectiveRotationStatus({
+      playableCount: effectiveRotationRows.length,
+      runtimeCurrentPage,
+      runtimeErrorMessage,
+      runtimeIsLoading,
+      runtimeIsPlaying,
+      runtimeProgress,
+      skippedCount: skippedRotationRows.length
+    }),
     summary: {
       enabledCount,
       scheduleLabel: formatScheduleLabel(settings),

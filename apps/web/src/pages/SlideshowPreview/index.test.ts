@@ -12,9 +12,10 @@ const slideshowPreviewSource = fs.readFileSync(path.join(pageDir, "index.tsx"), 
 test("slideshow preview renders cards from the shared live preview catalog instead of prototype asset maps", () => {
   assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(slideshowPreviewSource, /<LiveSlideshowPreviewCards/);
-  assert.match(slideshowPreviewSource, /viewModel\.debugStatus/);
-  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.debugRows/);
-  assert.doesNotMatch(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
+  assert.match(slideshowPreviewSource, /<RotationOpsSummary/);
+  assert.match(slideshowPreviewSource, /viewModel\.rotationOpsSummary/);
+  assert.match(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
+  assert.match(slideshowPreviewSource, /className="mgmt-action sp-action"/);
   assert.doesNotMatch(slideshowPreviewSource, /slideshowPreviewAssetRuntimeMap/);
   assert.doesNotMatch(slideshowPreviewSource, /<img alt=\{card\.labelZh\} src=\{asset\}/);
 });

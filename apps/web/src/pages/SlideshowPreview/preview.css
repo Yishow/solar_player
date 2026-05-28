@@ -416,13 +416,20 @@
   background: var(--paper);
   border: 1px solid var(--shell-panel-border);
   box-shadow: var(--shadow-panel);
-  padding: 20px 32px;
+  padding: 18px 24px;
   display: flex;
   flex-direction: column;
 }
 
 .sp-page .sp-summary-title {
   margin-bottom: 14px;
+}
+
+.sp-page .sp-summary-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .sp-page .sp-summary h2 {
@@ -501,6 +508,37 @@
 .sp-page .sp-summary-item.is-on .sp-summary-value {
   color: var(--green);
   font-weight: 700;
+}
+
+.sp-page .rotation-ops-summary {
+  --mgmt-surface-padding: 16px;
+  min-height: 100%;
+  gap: 12px;
+}
+
+.sp-page .rotation-ops-summary .mgmt-surface__title {
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.sp-page .rotation-ops-summary .mgmt-stat-strip {
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.sp-page .rotation-ops-summary .mgmt-stat__value {
+  font-size: 20px;
+}
+
+.sp-page .rotation-ops-summary .mgmt-action-row {
+  gap: 8px;
+}
+
+.sp-page .sp-action {
+  min-width: 82px;
+  height: 52px;
+  padding-inline: 14px;
+  font-size: 16px;
 }
 
 .sp-page .sp-debug-status {

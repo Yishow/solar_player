@@ -9,18 +9,26 @@ import { isDisplayPageTemplateKey } from "@solar-display/shared";
 export type RotationPreviewRow = {
   durationLabel: string;
   id: number;
+  instanceLabel: string;
+  isCurrent?: boolean;
   labelEn: string;
   labelZh: string;
   orderLabel: string;
   pageId: string;
   route: string;
+  stateLabel: string;
+  stateTone: "ready" | "warning" | "accent";
   templateKey: DisplayPageTemplateKey | null;
 };
 
 export type SkippedRotationRow = {
   detail: string | null | undefined;
+  instanceLabel: string;
   labelEn: string;
   labelZh: string;
+  orderLabel: string;
+  pageId: string;
+  route: string;
   skipReasonLabel: string;
   skipReasonText: string;
 };
@@ -39,18 +47,24 @@ function resolvePreviewTemplateKey(page: PlaybackPage): DisplayPageTemplateKey |
 }
 
 export function buildRotationPreviewRows(pages: PlaybackPage[]): RotationPreviewRow[] {
+  return buildConfiguredRotationRows(pages);
+}
+
+export function buildConfiguredRotationRows(pages: PlaybackPage[]): RotationPreviewRow[] {
   return pages
     .slice()
     .sort((left, right) => left.displayOrder - right.displayOrder || left.id - right.id)
-    .filter((page) => page.enabled)
     .map((page) => ({
       durationLabel: `${page.durationSeconds} 秒`,
       id: page.id,
+      instanceLabel: `${page.labelZh} / ${page.route}`,
       labelEn: page.labelEn,
       labelZh: page.labelZh,
       orderLabel: padOrder(page.displayOrder),
       pageId: page.pageKey,
       route: page.route,
+      stateLabel: page.enabled ? "已配置" : "已停用",
+      stateTone: page.enabled ? "ready" : "warning",
       templateKey: resolvePreviewTemplateKey(page)
     }));
 }
@@ -82,15 +96,35 @@ export function formatRotationSkipReason(skipReason: DisplayRotationSkipReason) 
   }
 }
 
-export function buildEffectiveRotationRows(preview: DisplayRotationPreview | null) {
-  return buildRotationPreviewRows(preview?.playablePages ?? []);
+export function buildEffectiveRotationRows(
+  preview: DisplayRotationPreview | null,
+  currentPageId?: number | null
+): RotationPreviewRow[] {
+  return (preview?.playablePages ?? []).map((page) => ({
+    durationLabel: `${page.durationSeconds} 秒`,
+    id: page.id,
+    instanceLabel: `${page.labelZh} / ${page.route}`,
+    isCurrent: currentPageId === page.id,
+    labelEn: page.labelEn,
+    labelZh: page.labelZh,
+    orderLabel: padOrder(page.displayOrder),
+    pageId: page.pageKey,
+    route: page.route,
+    stateLabel: currentPageId === page.id ? "目前播放中" : "正式納入",
+    stateTone: currentPageId === page.id ? "accent" : "ready",
+    templateKey: resolvePreviewTemplateKey(page)
+  }));
 }
 
 export function buildSkippedRotationRows(preview: DisplayRotationPreview | null): SkippedRotationRow[] {
   return (preview?.skippedPages ?? []).map((page) => ({
     detail: page.detail,
+    instanceLabel: `${padOrder(page.displayOrder)} · ${page.labelZh}`,
     labelEn: page.labelEn,
     labelZh: page.labelZh,
+    orderLabel: padOrder(page.displayOrder),
+    pageId: page.pageKey,
+    route: page.route,
     skipReasonLabel: formatRotationSkipReason(page.skipReason),
     skipReasonText: page.skipReason
   }));

@@ -65,14 +65,25 @@
 .playback-settings-page .ps-status { position: absolute; left: 68px; top: 310px; width: 422px; }
 
 /* Preview Area */
-.playback-settings-page .ps-preview {
+.playback-settings-page .ps-preview-family {
   position: absolute;
   left: 672px;
   top: 40px;
   width: 1190px;
-  height: 280px;
-  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.playback-settings-page .ps-preview,
+.playback-settings-page .rotation-ops-summary {
+  min-height: 308px;
   --mgmt-surface-radius: 16px;
+}
+
+.playback-settings-page .ps-preview {
+  padding: 24px 24px 20px;
 }
 
 .playback-settings-page .ps-preview__title {
@@ -110,9 +121,11 @@
 .playback-settings-page .ps-preview__list {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 16px;
   margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .playback-settings-page .ps-preview__item {
@@ -162,11 +175,51 @@
 }
 
 .playback-settings-page .ps-preview__label {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 8px;
   font-size: 16px;
   color: #4b504c;
+}
+
+.playback-settings-page .ps-preview__label-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playback-settings-page .ps-preview__label-copy strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.playback-settings-page .ps-preview__label-copy small {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #6c716c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playback-settings-page .ps-preview__embedded-list {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.playback-settings-page .ps-preview__embedded-list .ps-preview__list {
+  margin-top: 0;
+}
+
+.playback-settings-page .ps-preview__empty {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(110, 123, 95, 0.3);
+  color: #6c716c;
+  font-size: 13px;
+  text-align: center;
 }
 
 /* Bottom Cards */

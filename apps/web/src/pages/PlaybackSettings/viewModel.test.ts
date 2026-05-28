@@ -118,6 +118,12 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
     isSaving: false,
     message: "播放設定已同步。",
     pages,
+    runtimeCountdown: 12,
+    runtimeCurrentPage: effectiveRotationPreview.playablePages[0] ?? null,
+    runtimeErrorMessage: "",
+    runtimeIsLoading: false,
+    runtimeIsPlaying: true,
+    runtimeProgress: 62,
     rotationPreview: effectiveRotationPreview,
     settings
   });
@@ -133,27 +139,46 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
   assert.equal(model.pageRows[1]?.orderLabel, "02");
   assert.equal(model.pageRows[2]?.statusLabel, "已停用");
   assert.deepEqual(
-    model.rotationPreviewRows,
+    model.configuredRotationRows,
     [
       {
         durationLabel: "15 秒",
         id: 1,
+        instanceLabel: "總覽 / /overview",
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
         pageId: "overview",
         route: "/overview",
+        stateLabel: "已配置",
+        stateTone: "ready",
         templateKey: "overview"
       },
       {
         durationLabel: "20 秒",
         id: 2,
+        instanceLabel: "太陽能 / /solar",
         labelEn: "Solar",
         labelZh: "太陽能",
         orderLabel: "02",
         pageId: "solar",
         route: "/solar",
+        stateLabel: "已配置",
+        stateTone: "ready",
         templateKey: "solar"
+      },
+      {
+        durationLabel: "12 秒",
+        id: 3,
+        instanceLabel: "圖庫 / /images",
+        labelEn: "Images",
+        labelZh: "圖庫",
+        orderLabel: "03",
+        pageId: "images",
+        route: "/images",
+        stateLabel: "已停用",
+        stateTone: "warning",
+        templateKey: "images"
       }
     ]
   );
@@ -163,11 +188,15 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
       {
         durationLabel: "15 秒",
         id: 1,
+        instanceLabel: "總覽 / /overview",
+        isCurrent: true,
         labelEn: "Overview",
         labelZh: "總覽",
         orderLabel: "01",
         pageId: "overview",
         route: "/overview",
+        stateLabel: "目前播放中",
+        stateTone: "accent",
         templateKey: "overview"
       }
     ]
@@ -177,20 +206,40 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
     [
       {
         detail: "尚未收到可用的即時資料",
+        instanceLabel: "02 · 太陽能",
         labelEn: "Solar",
         labelZh: "太陽能",
+        orderLabel: "02",
+        pageId: "solar",
+        route: "/solar",
         skipReasonLabel: "即時資料逾時",
         skipReasonText: "stale-runtime"
       },
       {
         detail: null,
+        instanceLabel: "03 · 圖庫",
         labelEn: "Images",
         labelZh: "圖庫",
+        orderLabel: "03",
+        pageId: "images",
+        route: "/images",
         skipReasonLabel: "頁面已停用",
         skipReasonText: "disabled"
       }
     ]
   );
+  assert.deepEqual(
+    model.runtimeSummaryRows,
+    [
+      { label: "Configured", value: "3 頁", valueTone: "default" },
+      { label: "Effective", value: "1 頁", valueTone: "ready" },
+      { label: "Skipped", value: "2 頁", valueTone: "warning" },
+      { label: "Current", value: "總覽", valueTone: "accent" },
+      { label: "Countdown", value: "12 秒", valueTone: "accent" }
+    ]
+  );
+  assert.equal(model.effectiveRotationStatus.title, "輪播狀態已降級");
+  assert.match(model.effectiveRotationStatus.detail, /目前可播放 1 頁，另有 2 頁被 skip/);
 });
 
 test("buildPlaybackSettingsViewModel maps dominant display faults into repair destinations", () => {
@@ -277,6 +326,12 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
         ],
         skipCount: 1
       },
+      runtimeCountdown: 7,
+      runtimeCurrentPage: effectiveRotationPreview.playablePages[0] ?? null,
+      runtimeErrorMessage: "",
+      runtimeIsLoading: false,
+      runtimeIsPlaying: true,
+      runtimeProgress: 48,
       rotationPreview: effectiveRotationPreview,
       settings
     });

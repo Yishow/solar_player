@@ -138,6 +138,22 @@
   color: var(--mgmt-surface-title-ink, var(--ops-surface-title-ink));
 }
 
+.mgmt-stat__value.is-ready {
+  color: var(--surface-state-ready-ink);
+}
+
+.mgmt-stat__value.is-warning {
+  color: var(--surface-state-warning-ink);
+}
+
+.mgmt-stat__value.is-error {
+  color: var(--surface-state-error-ink);
+}
+
+.mgmt-stat__value.is-accent {
+  color: var(--surface-state-accent-ink);
+}
+
 .mgmt-table-shell {
   border: 1px solid var(--mgmt-surface-border, var(--ops-surface-border));
   border-radius: 12px;
@@ -160,6 +176,39 @@
 .mgmt-action-row .mgmt-action {
   position: static;
   top: auto;
+}
+
+.rotation-ops-summary {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.rotation-ops-summary__status {
+  margin: 0;
+}
+
+.rotation-ops-summary__items {
+  display: grid;
+  gap: 8px;
+}
+
+.rotation-ops-summary__item {
+  text-align: left;
+}
+
+.rotation-ops-summary__item strong {
+  display: block;
+}
+
+.rotation-ops-summary__item small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.76;
+}
+
+.rotation-ops-summary__actions {
+  margin-top: 4px;
 }
 
 /* === Action Button === */

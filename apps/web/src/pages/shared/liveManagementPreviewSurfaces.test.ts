@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { RotationOpsSummary } from "../../components/management/rotationOpsSummary";
 import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import { LiveRotationPreviewList } from "../PlaybackSettings/LiveRotationPreviewList";
 import { LiveSlideshowPreviewCards } from "../SlideshowPreview/LiveSlideshowPreviewCards";
@@ -42,11 +43,14 @@ test("playback settings and slideshow preview surfaces render the same live prev
         {
           durationLabel: "15 秒",
           id: 1,
+          instanceLabel: "總覽頁 / /overview",
           labelEn: "Overview",
           labelZh: "總覽頁",
           orderLabel: "01",
           pageId: "overview",
           route: "/overview",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: "overview"
         }
       ],
@@ -91,21 +95,27 @@ test("playback settings preview list keeps duplicate template instances on their
         {
           durationLabel: "15 秒",
           id: 1,
+          instanceLabel: "總覽頁 / /overview",
           labelEn: "Overview",
           labelZh: "總覽頁",
           orderLabel: "01",
           pageId: "overview",
           route: "/overview",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: "overview"
         },
         {
           durationLabel: "18 秒",
           id: 2,
+          instanceLabel: "校園總覽 / /overview-campus",
           labelEn: "Overview Campus",
           labelZh: "校園總覽",
           orderLabel: "02",
           pageId: "overview-2",
           route: "/overview-campus",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: "overview"
         }
       ],
@@ -142,21 +152,27 @@ test("missing preview state falls back per instance instead of borrowing another
         {
           durationLabel: "15 秒",
           id: 1,
+          instanceLabel: "總覽頁 / /overview",
           labelEn: "Overview",
           labelZh: "總覽頁",
           orderLabel: "01",
           pageId: "overview",
           route: "/overview",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: "overview"
         },
         {
           durationLabel: "18 秒",
           id: 2,
+          instanceLabel: "校園總覽 / /overview-campus",
           labelEn: "Overview Campus",
           labelZh: "校園總覽",
           orderLabel: "02",
           pageId: "overview-2",
           route: "/overview-campus",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: "overview"
         }
       ],
@@ -186,11 +202,14 @@ test("playback settings preview keeps renderer-unavailable fallback when a row h
         {
           durationLabel: "15 秒",
           id: 9,
+          instanceLabel: "自訂展示頁 / /custom-runtime",
           labelEn: "Custom Runtime",
           labelZh: "自訂展示頁",
           orderLabel: "09",
           pageId: "custom-runtime",
           route: "/custom-runtime",
+          stateLabel: "已配置",
+          stateTone: "ready",
           templateKey: null
         }
       ],
@@ -201,4 +220,41 @@ test("playback settings preview keeps renderer-unavailable fallback when a row h
   assert.match(playbackHtml, /自訂展示頁 live preview fallback/);
   assert.match(playbackHtml, /renderer-unavailable/);
   assert.match(playbackHtml, /目前無法從輪播頁面資料解析對應的展示頁 template。/);
+});
+
+test("playback settings and slideshow preview share one rotation status summary contract", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(RotationOpsSummary, {
+      actions: React.createElement("button", { className: "mgmt-action", type: "button" }, "下一頁"),
+      items: [
+        {
+          detail: "尚未收到可用的即時資料",
+          key: "solar",
+          label: "02 · 太陽能",
+          tone: "warning"
+        }
+      ],
+      stats: [
+        { label: "Configured", value: "3 頁", valueTone: "default" },
+        { label: "Effective", value: "2 頁", valueTone: "ready" },
+        { label: "Skipped", value: "1 頁", valueTone: "warning" },
+        { label: "Current", value: "總覽頁", valueTone: "accent" },
+        { label: "Countdown", value: "12 秒", valueTone: "accent" }
+      ],
+      status: {
+        detail: "目前可播放 2 頁，另有 1 頁被 skip。",
+        title: "輪播狀態已降級",
+        tone: "warning"
+      },
+      subtitle: "Effective Rotation Diagnostics",
+      title: "正式生效輪播鏈"
+    })
+  );
+
+  assert.match(html, /正式生效輪播鏈/);
+  assert.match(html, /Effective Rotation Diagnostics/);
+  assert.match(html, /class="mgmt-stat-strip/);
+  assert.match(html, /class="mgmt-banner is-warning/);
+  assert.match(html, /class="mgmt-action-row/);
+  assert.match(html, /02 · 太陽能/);
 });

@@ -22,7 +22,13 @@ import {
   updatePlaybackPages,
   updatePlaybackSettings
 } from "../../services/api";
-import { OpsInfoBanner, OpsSurface, OpsSurfaceTitle, Switch } from "../../components/management";
+import {
+  OpsInfoBanner,
+  OpsSurface,
+  OpsSurfaceTitle,
+  RotationOpsSummary
+} from "../../components/management";
+import { usePlaybackController } from "../../hooks/usePlaybackController";
 import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
@@ -49,6 +55,10 @@ export function PlaybackSettings() {
     reload: reloadDisplayOpsSummary,
     summary: displayOpsSummary
   } = useDisplayOpsSummary();
+  const runtime = usePlaybackController({
+    currentPath: "/settings/playback",
+    tickMs: 1000
+  });
 
   const applyLoadedPlaybackConfig = (
     nextSettings: PlaybackSettings,
@@ -203,6 +213,12 @@ export function PlaybackSettings() {
     isSaving,
     message,
     pages,
+    runtimeCountdown: runtime.countdown,
+    runtimeCurrentPage: runtime.currentPage,
+    runtimeErrorMessage: runtime.errorMessage,
+    runtimeIsLoading: runtime.isLoading,
+    runtimeIsPlaying: runtime.isPlaying,
+    runtimeProgress: runtime.progress,
     displayOpsSummary,
     rotationPreview,
     settings
@@ -326,28 +342,55 @@ export function PlaybackSettings() {
         />
       ) : null}
 
-      <OpsSurface className="ps-preview" family="preview">
-        <OpsSurfaceTitle
-          caption="/ Configured Rotation Preview"
-          className="ps-preview__title"
-          title="目前配置輪播鏈"
-        />
-        {showPreviewAlert ? (
-          <OpsInfoBanner
-            className="ps-preview__alert"
-            detail={displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
-            title={displayOpsErrorMessage || viewModel.displayOpsBanner.title}
-            tone={previewAlertTone === "is-error" ? "error" : "warning"}
+      <section className="ps-preview-family">
+        <OpsSurface className="ps-preview ps-preview--configured" family="preview">
+          <OpsSurfaceTitle
+            caption="/ Configured Rotation Governance"
+            className="ps-preview__title"
+            title="目前配置輪播鏈"
           />
-        ) : null}
-        <div className="ps-preview__list">
-          <LiveRotationPreviewList
-            definitions={livePreviewCatalog.definitions}
-            rows={viewModel.rotationPreviewRows}
-            states={livePreviewCatalog.states}
-          />
-        </div>
-      </OpsSurface>
+          {showPreviewAlert ? (
+            <OpsInfoBanner
+              className="ps-preview__alert"
+              detail={displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
+              title={displayOpsErrorMessage || viewModel.displayOpsBanner.title}
+              tone={previewAlertTone === "is-error" ? "error" : "warning"}
+            />
+          ) : null}
+          <div className="ps-preview__list">
+            <LiveRotationPreviewList
+              definitions={livePreviewCatalog.definitions}
+              rows={viewModel.configuredRotationRows}
+              states={livePreviewCatalog.states}
+            />
+          </div>
+        </OpsSurface>
+
+        <RotationOpsSummary
+          items={viewModel.skippedRotationRows.map((row) => ({
+            detail: row.detail ? `${row.skipReasonLabel} · ${row.detail}` : `${row.skipReasonLabel} · ${row.route}`,
+            key: row.pageId,
+            label: row.instanceLabel,
+            tone: "warning"
+          }))}
+          stats={viewModel.runtimeSummaryRows}
+          status={viewModel.effectiveRotationStatus}
+          subtitle="Effective Rotation Diagnostics"
+          title="正式生效輪播鏈"
+        >
+          <div className="ps-preview__embedded-list">
+            {viewModel.effectiveRotationRows.length > 0 ? (
+              <LiveRotationPreviewList
+                definitions={livePreviewCatalog.definitions}
+                rows={viewModel.effectiveRotationRows}
+                states={livePreviewCatalog.states}
+              />
+            ) : (
+              <div className="ps-preview__empty">目前沒有正式納入輪播的展示頁。</div>
+            )}
+          </div>
+        </RotationOpsSummary>
+      </section>
       <PlaybackSettingsFormSections
         formDisabled={formDisabled}
         isRegistrySaving={isRegistrySaving}

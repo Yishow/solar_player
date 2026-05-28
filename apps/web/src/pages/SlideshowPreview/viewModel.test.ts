@@ -94,6 +94,17 @@ test("buildSlideshowPreviewViewModel centralizes current slide, queue, and playb
   assert.equal(model.effectiveSequenceRows.length, 2);
   assert.equal(model.effectiveSequenceRows[1]?.pageId, "factory-circuit");
   assert.equal(model.skippedDebugRows[0]?.skipReasonText, "mqtt-mapping-missing");
+  assert.deepEqual(
+    model.rotationOpsSummary.stats,
+    [
+      { label: "Configured", value: "3 頁", valueTone: "default" },
+      { label: "Effective", value: "2 頁", valueTone: "ready" },
+      { label: "Skipped", value: "1 頁", valueTone: "warning" },
+      { label: "Current", value: "廠區用電迴路頁", valueTone: "accent" },
+      { label: "Countdown", value: "12 秒", valueTone: "accent" }
+    ]
+  );
+  assert.equal(model.rotationOpsSummary.status.title, "輪播狀態已降級");
 });
 
 test("buildSlideshowPreviewViewModel keeps fallback state when no pages are enabled", () => {
@@ -122,4 +133,5 @@ test("buildSlideshowPreviewViewModel keeps fallback state when no pages are enab
   assert.equal(model.debugStatus.title, "Fallback routing 中");
   assert.equal(model.fallbackRouteLabel, "/offline");
   assert.match(model.debugRows[2]?.value ?? "", /\/offline/);
+  assert.equal(model.rotationOpsSummary.status.title, "Fallback routing 中");
 });

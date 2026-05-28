@@ -11,6 +11,7 @@ import {
   IconStar,
   IconTransition
 } from "../../components/icons";
+import { RotationOpsSummary } from "../../components/management";
 import { usePageRotation } from "../../hooks/usePageRotation";
 import { slideshowLayout } from "./layout";
 import "./preview.css";
@@ -208,25 +209,51 @@ export function SlideshowPreview() {
             播放摘要 <small>Playback Summary</small>
           </h2>
         </div>
-        <div className="sp-summary-grid">
-          {viewModel.summaryRows.map((row, index) => (
-            <div key={row.label} className={`sp-summary-item${index === 3 && isPlaying ? " is-on" : ""}`}>
-              <div className="sp-summary-header">
-                <span className="sp-summary-icon" aria-hidden>
-                  {summaryIcons[index]}
-                </span>
-                <div className="sp-summary-labels">
-                  <b>{row.label}</b>
-                  <small>{["Playback route", "Display Duration", "Transition Effect", "Auto Play", "Last Updated"][index]}</small>
+        <div className="sp-summary-body">
+          <div className="sp-summary-grid">
+            {viewModel.summaryRows.map((row, index) => (
+              <div key={row.label} className={`sp-summary-item${index === 3 && isPlaying ? " is-on" : ""}`}>
+                <div className="sp-summary-header">
+                  <span className="sp-summary-icon" aria-hidden>
+                    {summaryIcons[index]}
+                  </span>
+                  <div className="sp-summary-labels">
+                    <b>{row.label}</b>
+                    <small>{["Playback route", "Display Duration", "Transition Effect", "Auto Play", "Last Updated"][index]}</small>
+                  </div>
                 </div>
+                <div className="sp-summary-value">{row.value}</div>
               </div>
-              <div className="sp-summary-value">{row.value}</div>
-            </div>
-          ))}
-        </div>
-        <div className={`sp-debug-status is-${viewModel.debugStatus.tone}`}>
-          <b>{viewModel.debugStatus.title}</b>
-          <small>{viewModel.debugStatus.detail}</small>
+            ))}
+          </div>
+          <RotationOpsSummary
+            actions={(
+              <>
+                <button type="button" className="mgmt-action sp-action" onClick={prevPage}>
+                  上一頁
+                  <small>Prev</small>
+                </button>
+                <button type="button" className="mgmt-action sp-action" onClick={togglePlay}>
+                  {isPlaying ? "暫停輪播" : "恢復輪播"}
+                  <small>{isPlaying ? "Pause" : "Play"}</small>
+                </button>
+                <button type="button" className="mgmt-action sp-action" onClick={nextPage}>
+                  下一頁
+                  <small>Next</small>
+                </button>
+              </>
+            )}
+            items={viewModel.skippedDebugRows.map((row) => ({
+              detail: row.detail ? `${row.skipReasonLabel} · ${row.detail}` : `${row.skipReasonLabel} · ${row.route}`,
+              key: row.pageId,
+              label: row.instanceLabel,
+              tone: "warning"
+            }))}
+            stats={viewModel.rotationOpsSummary.stats}
+            status={viewModel.rotationOpsSummary.status}
+            subtitle="Effective Rotation Diagnostics"
+            title="正式生效輪播鏈"
+          />
         </div>
       </section>
 

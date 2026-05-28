@@ -6,6 +6,7 @@ export {
   OpsSurface,
   OpsSurfaceTitle
 } from "./opsSurfacePrimitives";
+export { RotationOpsSummary } from "./rotationOpsSummary";
 
 export type SwitchProps = {
   on: boolean;

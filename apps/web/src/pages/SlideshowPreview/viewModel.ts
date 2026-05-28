@@ -3,6 +3,11 @@ import type {
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
+import type {
+  RotationOpsSummaryItem,
+  RotationOpsSummaryStat,
+  RotationOpsSummaryStatus
+} from "../../components/management/rotationOpsSummary";
 import {
   buildEffectiveRotationRows,
   buildSkippedRotationRows
@@ -38,7 +43,7 @@ function buildDebugStatus(input: {
   fallbackRoute: string | null;
   rotationPreview?: DisplayRotationPreview | null;
   skippedCount: number;
-}) {
+}): RotationOpsSummaryStatus {
   if (!input.rotationPreview) {
     return {
       detail: "尚未取得 effective rotation、skip 與 fallback 狀態。",
@@ -70,6 +75,30 @@ function buildDebugStatus(input: {
   };
 }
 
+function buildRotationOpsStats(input: {
+  configuredCount: number;
+  countdown: number;
+  currentPage: PlaybackPage | null;
+  effectiveCount: number;
+  skippedCount: number;
+}): RotationOpsSummaryStat[] {
+  return [
+    { label: "Configured", value: `${input.configuredCount} 頁`, valueTone: "default" },
+    { label: "Effective", value: `${input.effectiveCount} 頁`, valueTone: "ready" },
+    { label: "Skipped", value: `${input.skippedCount} 頁`, valueTone: input.skippedCount > 0 ? "warning" : "default" },
+    {
+      label: "Current",
+      value: input.currentPage?.labelZh ?? "尚未決策",
+      valueTone: input.currentPage ? "accent" : "default"
+    },
+    {
+      label: "Countdown",
+      value: `${input.countdown} 秒`,
+      valueTone: input.currentPage ? "accent" : "default"
+    }
+  ];
+}
+
 export function buildSlideshowPreviewViewModel({
   countdown,
   currentPage,
@@ -95,6 +124,22 @@ export function buildSlideshowPreviewViewModel({
     rotationPreview,
     skippedCount: skippedDebugRows.length
   });
+  const rotationOpsSummary = {
+    items: skippedDebugRows.map<RotationOpsSummaryItem>((row) => ({
+      detail: row.detail ? `${row.skipReasonLabel} · ${row.detail}` : `${row.skipReasonLabel} · ${row.route}`,
+      key: row.pageId,
+      label: row.instanceLabel,
+      tone: "warning"
+    })),
+    stats: buildRotationOpsStats({
+      configuredCount: pages.length,
+      countdown,
+      currentPage,
+      effectiveCount: effectiveSequenceRows.length,
+      skippedCount: skippedDebugRows.length
+    }),
+    status: debugStatus
+  };
 
   return {
     currentIndexLabel: `${currentIndex} / ${pages.length}`,
@@ -167,6 +212,7 @@ export function buildSlideshowPreviewViewModel({
           : "尚無紀錄"
       }
     ],
+    rotationOpsSummary,
     skippedDebugRows
   };
 }
