@@ -245,6 +245,71 @@
   margin-top: 12px;
 }
 
+.ds-page .ds-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.ds-page .ds-hero-card {
+  padding: 14px 16px;
+  border: 1px solid rgba(92, 105, 79, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.92);
+  display: grid;
+  gap: 6px;
+}
+
+.ds-page .ds-hero-card.is-warning {
+  border-color: rgba(201, 136, 26, 0.28);
+  background: rgba(252, 240, 217, 0.58);
+}
+
+.ds-page .ds-hero-card.is-error {
+  border-color: rgba(193, 74, 74, 0.24);
+  background: rgba(254, 243, 241, 0.82);
+}
+
+.ds-page .ds-hero-card strong {
+  font-size: 13px;
+  color: #5d655d;
+}
+
+.ds-page .ds-hero-card b {
+  font-size: 22px;
+  color: var(--ink-strong);
+}
+
+.ds-page .ds-hero-card small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6f766f;
+}
+
+.ds-page .ds-diagnostics-panel {
+  margin-top: 0;
+}
+
+.ds-page .ds-triage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ds-page .ds-triage-panel {
+  padding: 14px 16px;
+  border: 1px solid rgba(92, 105, 79, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, 0.92);
+}
+
+.ds-page .ds-triage-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
 .ds-page .ds-gauge-grid {
   flex: 1;
   display: grid;

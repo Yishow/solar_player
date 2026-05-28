@@ -11,6 +11,12 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.configurationReadinessLabel/);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.operationalHealthLabel/);
   assert.match(deviceStatusContentSource, /mgmt-surface--status-dashboard/);
+  assert.match(deviceStatusContentSource, /Incident Triage/);
+  assert.match(deviceStatusContentSource, /ds-hero-grid/);
+  assert.match(deviceStatusContentSource, /Safe Diagnostics Result/);
+  assert.match(deviceStatusContentSource, /viewModel\.heroCards\.map/);
+  assert.match(deviceStatusContentSource, /Host-level escalation/);
+  assert.match(deviceStatusContentSource, /ds-triage-grid/);
   assert.match(deviceStatusContentSource, /mgmt-stat-strip ds-display-ops-stats/);
   assert.match(deviceStatusContentSource, /alert\.domainLabel/);
   assert.match(deviceStatusContentSource, /viewModel\.displayOpsSummary\.alerts\)\.map/);

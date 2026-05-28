@@ -266,6 +266,90 @@ export function buildDeviceStatusViewModel({
     displayOpsSummary?.triageSummary
     ?? resolveDisplayFaultTriageSummaryFromAlerts(displayOpsSummary?.alerts ?? null);
   const safeOpsGuidance = displayOpsSummary?.safeOpsGuidance ?? defaultSafeOpsGuidance;
+  const diagnostics = displayOpsSummary?.diagnosticActions ?? [];
+  const unsupportedActions = safeOpsGuidance.unsupportedOperations;
+  const displayStatusTitle =
+    displayOpsAccessDenied
+      ? "存取受限"
+      : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
+        ? "展示退化"
+        : (displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0) > 0
+          ? "設定待完成"
+          : "展示正常";
+  const nextActionDetail =
+    displayOpsAccessDenied
+      ? "此頁面僅對受信任的管理端開放。"
+      : triageSummary
+        ? formatTriageHelper(triageSummary)
+        : diagnostics.length > 0
+          ? `先執行 safe diagnostics，再決定是否升級到 ${safeOpsGuidance.hostRestartCommand}。`
+          : `若問題持續，請依 runbook 改走 ${safeOpsGuidance.hostRestartCommand}。`;
+  const logsSummary = logExportAccessDenied
+    ? {
+        detail: "此頁面僅對受信任的管理端開放。",
+        directoryLabel: "--",
+        fileCountLabel: "--",
+        statusTitle: "存取受限"
+      }
+    : logExportError
+      ? {
+          detail: logExportError,
+          directoryLabel: "--",
+          fileCountLabel: "Unavailable",
+          statusTitle: "日誌不可用"
+        }
+      : {
+          detail:
+            logExport === null
+              ? "尚未載入裝置日誌 metadata。"
+              : logExport.files.length > 0
+                ? logExport.files.slice(0, 3).join(" / ")
+                : "目前沒有可供匯出的 .log 檔案。",
+          directoryLabel: logExport?.directory ?? "--",
+          fileCountLabel: logExport === null ? "--" : `${logExport.files.length} files`,
+          statusTitle: logExport === null ? "尚未載入" : "最近日誌"
+        };
+  const displayClientSummary = buildDisplayClientSummary(status?.displayClients, now);
+  const alerts = displayOpsSummary?.alerts.map((alert) => ({
+    ...alert,
+    domainLabel: alert.domain,
+    pageLabel: alert.pageId ? `${alert.pageId}` : "global"
+  })) ?? [];
+  const heroCards = [
+    {
+      detail: runtimeSummary.detail,
+      title: "Host Health",
+      tone: runtimeSummary.title === "同步失敗" || runtimeSummary.title === "存取受限" ? "error" as const : runtimeSummary.title === "同步中" ? "warning" as const : "ready" as const,
+      value: runtimeSummary.title
+    },
+    {
+      detail:
+        displayOpsAccessDenied
+          ? "此頁面僅對受信任的管理端開放。"
+          : `${displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined ? "--" : `v${displayOpsSummary.liveVersion}`} · ${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} blocking · ${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} config blocking`,
+      title: "Display Operations",
+      tone:
+        displayOpsAccessDenied
+          ? "error" as const
+          : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
+            ? "warning" as const
+            : "ready" as const,
+      value: displayStatusTitle
+    },
+    {
+      detail: nextActionDetail,
+      title: "Next Action Guidance",
+      tone:
+        displayOpsAccessDenied || statusAccessDenied
+          ? "error" as const
+          : triageSummary || (displayOpsSummary?.degraded ?? false)
+            ? "warning" as const
+            : "ready" as const,
+      value:
+        triageSummary?.repairDestinationLabel
+        ?? (diagnostics.length > 0 ? "Run safe diagnostics" : "Keep monitoring")
+    }
+  ];
 
   return {
     feedback:
@@ -306,19 +390,14 @@ export function buildDeviceStatusViewModel({
     ],
     displayOpsSummary: {
       alertCount: displayOpsSummary?.alerts.length ?? 0,
-      alerts:
-        displayOpsSummary?.alerts.map((alert) => ({
-          ...alert,
-          domainLabel: alert.domain,
-          pageLabel: alert.pageId ? `${alert.pageId}` : "global"
-        })) ?? [],
+      alerts,
       assetHealthLabel: `${displayOpsSummary?.assetHealthSummary.unhealthyCount ?? 0} unhealthy`,
       configurationReadinessLabel:
         `${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} blocking`,
       degraded: displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded ?? false,
       diagnosticsLabel:
         displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") ?? "--",
-      diagnostics: displayOpsSummary?.diagnosticActions ?? [],
+      diagnostics,
       draftCount: displayOpsSummary?.draftCount ?? 0,
       hostRestartCommand: safeOpsGuidance.hostRestartCommand,
       helper:
@@ -338,46 +417,52 @@ export function buildDeviceStatusViewModel({
       runbookPath: safeOpsGuidance.runbookPath,
       safeOpsHelper: `安全操作：${displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") || "--"} · 主機層處置：${safeOpsGuidance.hostRestartCommand} · Runbook：${safeOpsGuidance.runbookPath}`,
       skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
-      statusTitle:
-        displayOpsAccessDenied
-          ? "存取受限"
-          : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
-            ? "展示退化"
-            : (displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0) > 0
-              ? "設定待完成"
-            : "展示正常",
+      statusTitle: displayStatusTitle,
       unsupportedControlsLabel:
-        safeOpsGuidance.unsupportedOperations.length > 0
-          ? safeOpsGuidance.unsupportedOperations.map((operation) => operation.label).join(" / ")
+        unsupportedActions.length > 0
+          ? unsupportedActions.map((operation) => operation.label).join(" / ")
           : "目前沒有其他不支援控制"
     },
+    heroCards,
+    diagnosticsSurface: {
+      hostEscalationLabel: safeOpsGuidance.hostRestartCommand,
+      resultDetail:
+        actionFeedback?.detail
+        ?? "執行下方 safe diagnostics actions 時，只會觸發安全讀取或摘要刷新，不會進行危險裝置控制。",
+      resultTitle: actionFeedback?.title ?? "尚未執行 safe diagnostics",
+      runbookPath: safeOpsGuidance.runbookPath,
+      safeScopeLabel: diagnostics.map((action) => `${action.label} (${action.safeScope})`).join(" / ") || "--",
+      unsupportedActions
+    },
     triageSummary,
-    logsSummary: logExportAccessDenied
-      ? {
-          detail: "此頁面僅對受信任的管理端開放。",
-          directoryLabel: "--",
-          fileCountLabel: "--",
-          statusTitle: "存取受限"
-        }
-      : logExportError
-      ? {
-          detail: logExportError,
-          directoryLabel: "--",
-          fileCountLabel: "Unavailable",
-          statusTitle: "日誌不可用"
-        }
-      : {
-          detail:
-            logExport === null
-              ? "尚未載入裝置日誌 metadata。"
-              : logExport.files.length > 0
-                ? logExport.files.slice(0, 3).join(" / ")
-                : "目前沒有可供匯出的 .log 檔案。",
-          directoryLabel: logExport?.directory ?? "--",
-          fileCountLabel: logExport === null ? "--" : `${logExport.files.length} files`,
-          statusTitle: logExport === null ? "尚未載入" : "最近日誌"
-        },
-    displayClientSummary: buildDisplayClientSummary(status?.displayClients, now),
+    alertsTriage: {
+      helper:
+        alerts.length > 0
+          ? displayOpsAccessDenied
+            ? "此頁面僅對受信任的管理端開放。"
+            : triageSummary
+              ? formatTriageHelper(triageSummary)
+              : displayOpsSummary?.alerts[0]?.message ?? "請先處理 blocking alerts。"
+          : "目前沒有 display readiness、skip 或 asset 警示。",
+      items: alerts,
+      summaryTitle: `${alerts.length} display alert${alerts.length === 1 ? "" : "s"}`
+    },
+    logsSummary,
+    logsTriage: {
+      detail: logsSummary.detail,
+      helper: `${logsSummary.fileCountLabel} · ${logsSummary.directoryLabel}`,
+      needsHostInvestigation:
+        logsSummary.statusTitle === "日誌不可用"
+        || runtimeSummary.title === "同步失敗"
+        || displayStatusTitle === "展示退化",
+      summaryTitle: logsSummary.statusTitle
+    },
+    displayClientSummary,
+    livenessTriage: {
+      helper: displayClientSummary.badges.map((badge) => `${badge.label} ${badge.count}`).join(" · "),
+      items: displayClientSummary.rows,
+      summaryTitle: displayClientSummary.totalLabel
+    },
     resourceCards: [
       {
         gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",

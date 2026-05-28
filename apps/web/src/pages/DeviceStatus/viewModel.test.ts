@@ -214,6 +214,104 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
   assert.match(model.displayOpsSummary.helper, /Display Pages Editor/);
 });
 
+test("buildDeviceStatusViewModel exposes summary-first hero cards diagnostics results and triage panels", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: {
+      detail: "Refresh readiness completed at 09:45.",
+      title: "Refresh readiness",
+      tone: "ready"
+    },
+    displayOpsSummary: {
+      alerts: [
+        {
+          code: "asset-unhealthy",
+          domain: "operational-health",
+          message: "overview live asset missing",
+          pageId: "overview",
+          severity: "blocking"
+        }
+      ],
+      assetHealthSummary: {
+        affectedPages: ["overview"],
+        unhealthyCount: 1
+      },
+      configurationReadinessSummary: {
+        blockingCount: 1,
+        warningCount: 0
+      },
+      degraded: true,
+      diagnosticActions: [
+        { action: "refresh-readiness", label: "Refresh readiness", safeScope: "safe-refresh" }
+      ],
+      draftCount: 1,
+      generatedAt: "2026-05-22T09:45:00.000Z",
+      lastPublishAt: "2026-05-22T09:30:00.000Z",
+      liveVersion: 8,
+      operationalHealthSummary: {
+        blockingCount: 1,
+        degraded: true,
+        warningCount: 0
+      },
+      safeOpsGuidance: {
+        hostRestartCommand: "systemctl restart solar-display",
+        hostRestartLabel: "Host-level restart",
+        runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
+        unsupportedOperations: [
+          {
+            action: "reboot",
+            executed: false,
+            guidance: "Use the host-level restart runbook instead.",
+            label: "Reboot device"
+          }
+        ]
+      },
+      skipSummary: {
+        count: 0,
+        pages: []
+      }
+    } as never,
+    isLoading: false,
+    logExport: {
+      directory: "/var/log/solar-display",
+      files: ["server.log"]
+    },
+    logExportError: "",
+    status: {
+      arch: "arm64",
+      cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
+      disk: { availableMB: 40000, totalMB: 64000, usePercent: 35, usedMB: 24000 },
+      displayClients: {
+        clients: [],
+        summary: {
+          offline: 0,
+          online: 0,
+          stale: 0,
+          total: 0
+        }
+      },
+      hostname: "KZ-Display-01",
+      memory: { freeMB: 4600, totalMB: 8000, usePercent: 42, usedMB: 3400 },
+      nodeVersion: "v24.15.0",
+      pid: 1234,
+      platform: "linux",
+      uptimeSeconds: 1315800
+    }
+  });
+
+  assert.equal(model.heroCards[0]?.title, "Host Health");
+  assert.equal(model.heroCards[0]?.value, "正常運作");
+  assert.equal(model.heroCards[1]?.title, "Display Operations");
+  assert.equal(model.heroCards[1]?.value, "展示退化");
+  assert.equal(model.heroCards[2]?.title, "Next Action Guidance");
+  assert.match(model.heroCards[2]?.detail ?? "", /Display Pages Editor/);
+  assert.equal(model.diagnosticsSurface.resultTitle, "Refresh readiness");
+  assert.match(model.diagnosticsSurface.safeScopeLabel, /safe-refresh/);
+  assert.equal(model.diagnosticsSurface.unsupportedActions[0]?.label, "Reboot device");
+  assert.equal(model.alertsTriage.summaryTitle, "1 display alert");
+  assert.equal(model.logsTriage.summaryTitle, "最近日誌");
+  assert.equal(model.livenessTriage.summaryTitle, "0 clients");
+});
+
 test("buildDeviceStatusViewModel maps display client liveness rows and summary badges", () => {
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,

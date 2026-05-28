@@ -151,28 +151,26 @@ export function DeviceStatusContent({
         }}
       >
         <h2>
-          裝置資訊
-          <small>Device Information</small>
+          事件分流
+          <small>Incident Triage</small>
         </h2>
-        <dl>
-          {viewModel.systemRows.map((row) => (
-            <div key={row.label} className="contents">
-              <dt>{row.label}</dt>
-              <dd>{row.value}</dd>
-            </div>
+        <div className="ds-hero-grid">
+          {viewModel.heroCards.map((card) => (
+            <article
+              key={card.title}
+              className={`ds-hero-card${card.tone === "error" ? " is-error" : card.tone === "warning" ? " is-warning" : ""}`}
+            >
+              <strong>{card.title}</strong>
+              <b>{card.value}</b>
+              <small>{card.detail}</small>
+            </article>
           ))}
-          {viewModel.networkRows.map((row) => (
-            <div key={row.label} className="contents">
-              <dt>{row.label}</dt>
-              <dd className={row.value.includes("●") ? "is-good" : ""}>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
+        </div>
 
-        <div className="ds-section">
+        <div className="ds-section ds-diagnostics-panel">
           <h2 style={{ marginBottom: 12 }}>
-            展示營運摘要
-            <small>Readiness / Publish / Assets</small>
+            Safe Diagnostics Result
+            <small>Host-level escalation / truthful safe scope</small>
           </h2>
           <div className="mgmt-stat-strip ds-display-ops-stats" data-surface-family="status-dashboard">
             <div className="mgmt-status">
@@ -194,39 +192,67 @@ export function DeviceStatusContent({
               </small>
             </div>
             <div className="mgmt-status">
-              {viewModel.displayOpsSummary.operationalHealthLabel}
+              {viewModel.diagnosticsSurface.hostEscalationLabel}
               <small style={{ display: "block", opacity: 0.72 }}>
-                Operational health · {viewModel.displayOpsSummary.assetHealthLabel}
+                Host-level escalation
               </small>
             </div>
           </div>
-          <div
-            className={`mgmt-status ${displayOpsErrorMessage || displayOpsAccessDenied ? "is-error" : ""}`}
-            style={{ marginTop: 12 }}
-          >
-            {(displayOpsAccessDenied ? "" : displayOpsErrorMessage) || viewModel.displayOpsSummary.helper}
-          </div>
-          <div className="mgmt-status-stack ds-status-stack">
-            {(displayOpsErrorMessage || displayOpsAccessDenied ? [] : viewModel.displayOpsSummary.alerts).map((alert) => (
-              <div
-                key={`${alert.code}-${alert.pageLabel}-${alert.message}`}
-                className={`mgmt-status ${alert.severity === "blocking" ? "is-error" : ""}`}
-              >
-                [{alert.domainLabel}] [{alert.pageLabel}] {alert.message}
-              </div>
-            ))}
-            {!displayOpsErrorMessage && !displayOpsAccessDenied && viewModel.displayOpsSummary.alerts.length === 0 ? (
-              <div className="mgmt-status">目前沒有 display readiness、skip 或 asset 警示。</div>
-            ) : null}
+          <div className={`mgmt-status ${viewModel.feedback.tone === "error" ? "is-error" : ""}`} style={{ marginTop: 12 }}>
+            {viewModel.diagnosticsSurface.resultTitle}
+            <small style={{ display: "block", opacity: 0.72 }}>
+              {viewModel.diagnosticsSurface.resultDetail}
+            </small>
           </div>
           <div className="mgmt-status" style={{ marginTop: 12 }}>
-            {viewModel.displayOpsSummary.safeOpsHelper}
+            Safe scope：{viewModel.diagnosticsSurface.safeScopeLabel}
+          </div>
+          <div className="mgmt-status" style={{ marginTop: 12 }}>
+            {displayOpsErrorMessage || displayOpsAccessDenied
+              ? (displayOpsAccessDenied ? "" : displayOpsErrorMessage)
+              : viewModel.displayOpsSummary.helper}
+          </div>
+          <div className="mgmt-status" style={{ marginTop: 12 }}>
+            Host-level escalation：{viewModel.diagnosticsSurface.hostEscalationLabel} · Runbook：{viewModel.diagnosticsSurface.runbookPath}
           </div>
           <div className="mgmt-status" style={{ marginTop: 12 }}>
             目前不支援的裝置控制：{viewModel.displayOpsSummary.unsupportedControlsLabel}
+            {viewModel.diagnosticsSurface.unsupportedActions.length > 0 ? (
+              <small style={{ display: "block", opacity: 0.72 }}>
+                {viewModel.diagnosticsSurface.unsupportedActions.map((action) => `${action.label}: ${action.guidance}`).join(" / ")}
+              </small>
+            ) : null}
           </div>
+        </div>
 
-          <div className="ds-section">
+        <div className="ds-section ds-triage-grid">
+          <article className="ds-triage-panel">
+            <h2 style={{ marginBottom: 12 }}>
+              Display Alerts
+              <small>Purpose / priority / repair path</small>
+            </h2>
+            <div className="mgmt-status">
+              {viewModel.alertsTriage.summaryTitle}
+              <small style={{ display: "block", opacity: 0.72 }}>
+                {viewModel.alertsTriage.helper}
+              </small>
+            </div>
+            <div className="ds-triage-list">
+              {(displayOpsErrorMessage || displayOpsAccessDenied ? [] : viewModel.displayOpsSummary.alerts).map((alert) => (
+                <div
+                  key={`${alert.code}-${alert.pageLabel}-${alert.message}`}
+                  className={`mgmt-status ${alert.severity === "blocking" ? "is-error" : ""}`}
+                >
+                  [{alert.domainLabel}] [{alert.pageLabel}] {alert.message}
+                </div>
+              ))}
+              {!displayOpsErrorMessage && !displayOpsAccessDenied && viewModel.displayOpsSummary.alerts.length === 0 ? (
+                <div className="mgmt-status">目前沒有 display readiness、skip 或 asset 警示。</div>
+              ) : null}
+            </div>
+          </article>
+
+          <article className="ds-triage-panel">
             <h2 style={{ marginBottom: 12 }}>
               展示端心跳
               <small>Display Client Liveness</small>
@@ -239,7 +265,7 @@ export function DeviceStatusContent({
               ))}
               <div className="mgmt-status">{viewModel.displayClientSummary.totalLabel}</div>
             </div>
-            <div className="mgmt-status-stack ds-status-stack">
+            <div className="ds-triage-list">
               {viewModel.displayClientSummary.rows.map((client) => (
                 <div key={client.socketId} className={`mgmt-status ${client.badgeTone}`}>
                   <strong>{client.pageLabel}</strong> · {client.playbackLabel} · {client.lastSeenLabel}
@@ -252,9 +278,9 @@ export function DeviceStatusContent({
                 <div className="mgmt-status">目前沒有展示端 heartbeat。</div>
               ) : null}
             </div>
-          </div>
+          </article>
 
-          <div className="ds-section">
+          <article className="ds-triage-panel">
             <h2 style={{ marginBottom: 12 }}>
               系統日誌
               <small>Recent Logs</small>
@@ -266,13 +292,37 @@ export function DeviceStatusContent({
             >
               {viewModel.logsSummary.statusTitle}
               <small style={{ display: "block", opacity: 0.72 }}>
-                {viewModel.logsSummary.fileCountLabel} · {viewModel.logsSummary.directoryLabel}
+                {viewModel.logsTriage.helper}
               </small>
             </div>
             <div className="mgmt-status" style={{ marginTop: 12 }}>
-              {viewModel.logsSummary.detail}
+              {viewModel.logsTriage.detail}
+              <small style={{ display: "block", opacity: 0.72 }}>
+                {viewModel.logsTriage.needsHostInvestigation ? "目前建議準備 host-level investigation。" : "目前可先在 app 內完成 triage。"}
+              </small>
             </div>
-          </div>
+          </article>
+        </div>
+
+        <div className="ds-section">
+          <h2 style={{ marginBottom: 12 }}>
+            裝置資訊
+            <small>Device Information</small>
+          </h2>
+          <dl>
+            {viewModel.systemRows.map((row) => (
+              <div key={row.label} className="contents">
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+            {viewModel.networkRows.map((row) => (
+              <div key={row.label} className="contents">
+                <dt>{row.label}</dt>
+                <dd className={row.value.includes("●") ? "is-good" : ""}>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
