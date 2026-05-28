@@ -10,3 +10,14 @@ test("circuit settings keeps readiness feedback inline instead of mounting an ov
   assert.match(circuitSettingsSource, /cs-readiness/);
   assert.doesNotMatch(circuitSettingsSource, /DisplayReadinessPanel/);
 });
+
+test("circuit settings keeps bulk table editing while replacing freeform icon authoring with bounded presentation controls", () => {
+  assert.match(circuitSettingsSource, /className="cs-select"/);
+  assert.match(circuitSettingsSource, /value=\{row\.icon \?\? ""\}/);
+  assert.match(circuitSettingsSource, /value=\{row\.unit \?\? ""\}/);
+  assert.match(circuitSettingsSource, /Display Impact/);
+  assert.match(circuitSettingsSource, /row\.slotImpactLabel/);
+  assert.match(circuitSettingsSource, /row\.rowRiskLabel/);
+  assert.match(circuitSettingsSource, /row\.thresholdSummaryLabel/);
+  assert.doesNotMatch(circuitSettingsSource, /placeholder="bolt"/);
+});

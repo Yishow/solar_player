@@ -52,6 +52,18 @@ function iconGlyph(icon: string | null | undefined) {
   return iconGlyphMap[icon] ?? "·";
 }
 
+function readinessReferenceLabel(
+  finding: DisplayReadinessReport["findings"][number],
+  row: ReturnType<typeof buildCircuitSettingsViewModel>["rows"][number] | undefined
+) {
+  const slotLabel = slotLabelMap[finding.requirementKey] ?? finding.requirementKey;
+  if (!row) {
+    return slotLabel;
+  }
+
+  return `${slotLabel} · ${row.nameZh ?? row.nameEn ?? "未命名迴路"}`;
+}
+
 export function CircuitSettingsContent({
   dirtyCount,
   handleAdd,
@@ -91,8 +103,14 @@ export function CircuitSettingsContent({
     : readinessLoading
       ? "正在計算 display slot 綁定 readiness..."
       : readinessFindings.length === 0
-        ? "所有 display slot 綁定正常，未發現 readiness finding。"
-        : `目前有 ${blockingReadinessCount} 項 blocking、${warningReadinessCount} 項 warning 的 display slot readiness finding。`;
+      ? "所有 display slot 綁定正常，未發現 readiness finding。"
+      : `目前有 ${blockingReadinessCount} 項 blocking、${warningReadinessCount} 項 warning 的 display slot readiness finding。`;
+  const rowById = new Map(viewModel.rows.map((row) => [String(row.id), row] as const));
+  const rowBySlot = new Map(
+    viewModel.rows
+      .filter((row) => row.displaySlot)
+      .map((row) => [row.displaySlot as string, row] as const)
+  );
 
   return (
     <div className="cs-page">
@@ -202,7 +220,13 @@ export function CircuitSettingsContent({
                   {finding.status === "blocking" ? "Blocking" : "Warning"}
                 </span>
                 <div className="cs-readiness-item__copy">
-                  <strong>{finding.requirementKey}</strong>
+                  <strong>
+                    {readinessReferenceLabel(
+                      finding,
+                      (finding.sourceId ? rowById.get(finding.sourceId.split(",")[0] ?? "") : undefined)
+                        ?? rowBySlot.get(finding.requirementKey)
+                    )}
+                  </strong>
                   <small>{finding.reason}</small>
                 </div>
               </div>
@@ -291,19 +315,29 @@ export function CircuitSettingsContent({
                         <div className="cs-icon-stack">
                           <div className="cs-icon-row">
                             <span className="cs-icon-glyph">{iconGlyph(row.icon)}</span>
-                            <input
-                              className="cs-input"
-                              placeholder="bolt"
+                            <select
+                              className="cs-select"
                               value={row.icon ?? ""}
                               onChange={(event) => handleFieldChange(row.id, "icon", event.target.value)}
-                            />
+                            >
+                              {row.iconOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
-                          <input
-                            className="cs-input"
-                            placeholder="kW"
+                          <select
+                            className="cs-select"
                             value={row.unit ?? ""}
                             onChange={(event) => handleFieldChange(row.id, "unit", event.target.value)}
-                          />
+                          >
+                            {row.unitOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </td>
                       <td className="col-topic">
@@ -371,6 +405,13 @@ export function CircuitSettingsContent({
                       </td>
                       <td className="col-display">
                         <div className="cs-display-stack">
+                          <div className="cs-impact-summary">
+                            <strong>Display Impact</strong>
+                            <small>{row.slotImpactLabel}</small>
+                            <span className={chipClass(row.rowRiskTone)}>{row.rowRiskLabel}</span>
+                            <small>{row.rowRiskDetail}</small>
+                            <small>{row.thresholdSummaryLabel}</small>
+                          </div>
                           <select
                             className="cs-input"
                             value={row.displaySlot ?? ""}

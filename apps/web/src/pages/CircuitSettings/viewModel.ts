@@ -1,4 +1,4 @@
-import type { CircuitConfig } from "@solar-display/shared";
+import type { CircuitConfig, DisplayReadinessReport } from "@solar-display/shared";
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 
@@ -15,7 +15,26 @@ type BuildCircuitSettingsViewModelArgs = {
   isReloading: boolean;
   isSaving: boolean;
   message: string;
+  readiness?: DisplayReadinessReport | null;
 };
+
+const circuitSlotLabelMap: Record<string, string> = {
+  ev: "EV",
+  hvac: "HVAC",
+  infrastructure: "Infrastructure",
+  lighting: "Lighting",
+  office: "Office",
+  production: "Production"
+};
+
+const boundedIconOptions = [
+  { label: "發電 / 一般", value: "bolt" },
+  { label: "車輛 / 充電", value: "car" },
+  { label: "空調 / 風扇", value: "fan" },
+  { label: "照明", value: "light" }
+] as const;
+
+const boundedUnitOptions = ["kW", "kWh", "%", "A", "V"] as const;
 
 function sortCircuits(circuits: CircuitConfig[]) {
   return circuits
@@ -107,6 +126,44 @@ function resolveValidationState(circuit: CircuitConfig) {
   };
 }
 
+function resolveThresholdSummary(circuit: CircuitConfig, isReady: boolean) {
+  if (!isReady) {
+    return "Threshold ranges 未完成或順序錯誤";
+  }
+
+  return `Normal ${formatRange(circuit.normalMin, circuit.normalMax)} · Attention ${formatRange(circuit.attentionMin, circuit.attentionMax)} · Warning ${formatRange(circuit.warningMin, circuit.warningMax)}`;
+}
+
+function resolveCircuitReadinessFinding(
+  circuit: CircuitConfig,
+  readiness: DisplayReadinessReport | null | undefined
+) {
+  return (
+    readiness?.findings.find((finding) => {
+      if (finding.sourceType !== "circuit-slot") {
+        return false;
+      }
+
+      if (finding.sourceId) {
+        return finding.sourceId.split(",").includes(String(circuit.id));
+      }
+
+      return circuit.displaySlot !== null && finding.requirementKey === circuit.displaySlot;
+    }) ?? null
+  );
+}
+
+function buildBoundedOptions(
+  currentValue: string | null | undefined,
+  options: readonly { label: string; value: string }[]
+) {
+  if (!currentValue || options.some((option) => option.value === currentValue)) {
+    return [...options];
+  }
+
+  return [...options, { label: `保留現值 (${currentValue})`, value: currentValue }];
+}
+
 export function buildCircuitSettingsViewModel({
   circuits,
   deletingId,
@@ -116,7 +173,8 @@ export function buildCircuitSettingsViewModel({
   isLoading,
   isReloading,
   isSaving,
-  message
+  message,
+  readiness
 }: BuildCircuitSettingsViewModelArgs) {
   const sortedCircuits = sortCircuits(circuits);
   const enabledCircuitCount = sortedCircuits.filter((circuit) => circuit.enabled).length;
@@ -148,6 +206,34 @@ export function buildCircuitSettingsViewModel({
     rows: sortedCircuits.map((circuit) => {
       const validation = resolveValidationState(circuit);
       const isDirty = dirtySet.has(circuit.id);
+      const readinessFinding = resolveCircuitReadinessFinding(circuit, readiness);
+      const thresholdReady = validation.label === "已設定";
+      const slotImpactLabel = circuit.displaySlot
+        ? `Factory Circuit slot · ${circuitSlotLabelMap[circuit.displaySlot] ?? circuit.displaySlot}`
+        : "尚未綁定 display slot";
+      const rowRisk = readinessFinding
+        ? {
+            detail: readinessFinding.reason,
+            label: readinessFinding.status === "blocking" ? "Blocking Readiness" : "Warning Readiness",
+            tone: readinessFinding.status === "blocking" ? ("danger" as ReferenceTone) : ("warning" as ReferenceTone)
+          }
+        : isDirty
+          ? {
+              detail: "此列仍有未儲存變更，發布前請再確認 slot 與 threshold。",
+              label: "Dirty Change",
+              tone: "accent" as ReferenceTone
+            }
+          : validation.tone === "success"
+            ? {
+                detail: "slot、topic 與 threshold 契約可直接供 display binding review 使用。",
+                label: "Display Ready",
+                tone: "success" as ReferenceTone
+              }
+            : {
+                detail: validation.detail,
+                label: "Needs Review",
+                tone: validation.tone
+              };
 
       return {
         ...circuit,
@@ -157,13 +243,24 @@ export function buildCircuitSettingsViewModel({
         dirtyTone: isDirty ? ("accent" as ReferenceTone) : ("muted" as ReferenceTone),
         iconGlyph: resolveIconGlyph(circuit.icon ?? null),
         iconLabel: circuit.icon ?? "未設定",
+        iconOptions: buildBoundedOptions(circuit.icon ?? null, boundedIconOptions),
         isDirty,
         normalRangeLabel: formatRange(circuit.normalMin, circuit.normalMax),
         orderLabel: circuit.displayOrder === null ? "--" : String(circuit.displayOrder),
+        readinessDetail: readinessFinding?.reason ?? null,
+        rowRiskDetail: rowRisk.detail,
+        rowRiskLabel: rowRisk.label,
+        rowRiskTone: rowRisk.tone,
+        slotImpactLabel,
         statusLabel: circuit.enabled ? "已發布" : "草稿",
         statusTone: (circuit.enabled ? "connected" : "disconnected") as CircuitRowTone,
+        thresholdSummaryLabel: resolveThresholdSummary(circuit, thresholdReady),
         topicLabel: circuit.mqttTopic ?? "未設定 topic",
         unitLabel: circuit.unit ?? "--",
+        unitOptions: buildBoundedOptions(
+          circuit.unit ?? null,
+          boundedUnitOptions.map((value) => ({ label: value, value }))
+        ),
         validationDetail: validation.detail,
         validationLabel: validation.label,
         validationTone: validation.tone,

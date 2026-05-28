@@ -257,9 +257,10 @@ export function CircuitSettings() {
         isLoading,
         isReloading,
         isSaving,
-        message
+        message,
+        readiness
       }),
-    [circuits, deletingId, dirtyIds, errorMessage, isAdding, isLoading, isReloading, isSaving, message]
+    [circuits, deletingId, dirtyIds, errorMessage, isAdding, isLoading, isReloading, isSaving, message, readiness]
   );
 
   return (
