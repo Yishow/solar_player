@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Outlet, useLoaderData, useLocation, useNavigate } from "react-router-dom";
 import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { AppFooterNav } from "../components/AppFooterNav";
@@ -15,6 +15,7 @@ import { usePageRotation } from "../hooks/usePageRotation";
 import { usePlaybackWatchdog } from "../hooks/usePlaybackWatchdog";
 import { useShellDecorations } from "../hooks/useShellDecorations";
 import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
+import { useDisplayTransition } from "../hooks/displayTransition";
 import { shouldRedirectToOffline } from "./offlineRouting";
 import type { ShellBootstrap } from "./shellBootstrap";
 
@@ -39,13 +40,29 @@ export function LayoutShell({
     reason: status.reason,
     isHydrated
   });
+  // 穩定 forwarder：usePageRotation 需要 onRouteChange，但過場 handler 需要 controller.settings，
+  // 兩者互為依賴。forwarder 讀 ref 打破循環，實際 handler 在 controller 建立後回填。
+  const routeChangeHandlerRef = useRef<(route: string) => void>(() => {});
+  const forwardRouteChange = useCallback((route: string) => {
+    routeChangeHandlerRef.current(route);
+  }, []);
   const controller = usePageRotation({
     currentPath: location.pathname,
-    onRouteChange: (route) => {
-      navigate(route, { replace: true });
-    },
+    onRouteChange: forwardRouteChange,
     routeRotationEnabled: routeMeta?.group === "playback"
   });
+  const navigateReplace = useCallback(
+    (route: string) => {
+      navigate(route, { replace: true });
+    },
+    [navigate]
+  );
+  const transition = useDisplayTransition({
+    navigate: navigateReplace,
+    transitionSpeed: controller.settings?.transitionSpeed,
+    transitionType: controller.settings?.transitionType
+  });
+  routeChangeHandlerRef.current = transition.onRouteChange;
   useDisplayClientHeartbeat({
     isIdle: controller.isIdle,
     isPlaying: controller.isPlaying,
@@ -117,9 +134,18 @@ export function LayoutShell({
         />
       }
     >
-      <PlaybackErrorBoundary>
-        <Outlet />
-      </PlaybackErrorBoundary>
+      <div
+        className="display-transition"
+        data-phase={transition.phase}
+        data-transition={transition.transitionMode}
+        key={location.pathname}
+        onAnimationEnd={transition.onInAnimationEnd}
+        style={transition.transitionVars}
+      >
+        <PlaybackErrorBoundary>
+          <Outlet />
+        </PlaybackErrorBoundary>
+      </div>
     </DisplayCanvas>
   );
 }

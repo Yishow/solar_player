@@ -4,6 +4,8 @@ import type {
   DisplayPageConfigEnvelope,
   DisplayPageFreeformObject,
   DisplayPageId,
+  DisplaySyncEvent,
+  DisplaySyncEventScope,
   FallbackPolicy,
   ManagementDraftSaveConflict
 } from "@solar-display/shared";
@@ -199,6 +201,17 @@ export function shouldHydrateDisplayPageSession(enabled: boolean, hasSession: bo
   return enabled && !hasSession;
 }
 
+export function shouldReloadDisplayPageConfigOnSync(input: {
+  enabled: boolean;
+  stage: ConfigStage;
+  dirty: boolean;
+  scope: DisplaySyncEventScope;
+}): boolean {
+  return (
+    input.enabled && input.stage === "live" && !input.dirty && input.scope === "display-pages"
+  );
+}
+
 export function shouldDeferDisplayPageRuntimeRender(args: {
   runtimeHydrationEnabled: boolean;
   isLoading: boolean;
@@ -368,7 +381,18 @@ export function useDisplayPageConfig<T>(
     [enabled, stage]
   );
 
-  useDisplaySyncRefresh(reload, displaySyncScopes);
+  const handleDisplaySync = useCallback(
+    (event: DisplaySyncEvent) => {
+      if (!shouldReloadDisplayPageConfigOnSync({ enabled, stage, dirty, scope: event.scope })) {
+        return;
+      }
+
+      void reload();
+    },
+    [dirty, enabled, reload, stage]
+  );
+
+  useDisplaySyncRefresh(handleDisplaySync, displaySyncScopes);
 
   const save = async () => {
     if (!enabled || stage !== "draft") {

@@ -196,3 +196,73 @@
 .animate-glow-pulse {
   animation: glowPulse 3s ease-in-out infinite;
 }
+
+@keyframes display-transition-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes display-transition-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes display-transition-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+@keyframes display-transition-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.display-transition {
+  height: 100%;
+  width: 100%;
+}
+
+.display-transition[data-phase="out"] {
+  animation: display-transition-out var(--display-transition-out-ms, 200ms)
+    var(--motion-transition-ease) forwards;
+}
+
+.display-transition[data-phase="in"] {
+  animation: display-transition-in var(--display-transition-in-ms, 250ms)
+    var(--motion-transition-ease) forwards;
+}
+
+.display-transition[data-transition="slide"][data-phase="out"] {
+  animation-name: display-transition-slide-out;
+}
+
+.display-transition[data-transition="slide"][data-phase="in"] {
+  animation-name: display-transition-slide-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .display-transition {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}

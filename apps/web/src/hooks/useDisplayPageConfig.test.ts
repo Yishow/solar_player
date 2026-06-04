@@ -16,7 +16,8 @@ import {
   resolveDisplayPageConfigForPage,
   resolveDisplayPageSaveConflictMessage,
   shouldDeferDisplayPageRuntimeRender,
-  shouldHydrateDisplayPageSession
+  shouldHydrateDisplayPageSession,
+  shouldReloadDisplayPageConfigOnSync
 } from "./useDisplayPageConfig";
 import { createDraftSession } from "./displayPageDraftSession";
 
@@ -387,6 +388,63 @@ test("live runtime pages defer first render until persisted config hydration com
     }),
     false
   );
+});
+
+test("live runtime pages reload page config when a relevant display-pages sync arrives", () => {
+  assert.equal(
+    shouldReloadDisplayPageConfigOnSync({
+      enabled: true,
+      stage: "live",
+      dirty: false,
+      scope: "display-pages"
+    }),
+    true
+  );
+});
+
+test("display page config sync reload is suppressed for dirty, draft, disabled, or unrelated scopes", () => {
+  // dirty live：保護未同步的本地狀態（理論上 live 不會 dirty，但仍防禦）
+  assert.equal(
+    shouldReloadDisplayPageConfigOnSync({
+      enabled: true,
+      stage: "live",
+      dirty: true,
+      scope: "display-pages"
+    }),
+    false
+  );
+  // draft：編輯器草稿不可被 socket 重載覆蓋
+  assert.equal(
+    shouldReloadDisplayPageConfigOnSync({
+      enabled: true,
+      stage: "draft",
+      dirty: false,
+      scope: "display-pages"
+    }),
+    false
+  );
+  // disabled：runtime hydration 關閉時不連動
+  assert.equal(
+    shouldReloadDisplayPageConfigOnSync({
+      enabled: false,
+      stage: "live",
+      dirty: false,
+      scope: "display-pages"
+    }),
+    false
+  );
+  // 非 config 變更的 scope 不應觸發 config reload（由各自的資料 runtime 處理）
+  for (const scope of ["images", "mqtt", "sustainability", "circuits"] as const) {
+    assert.equal(
+      shouldReloadDisplayPageConfigOnSync({
+        enabled: true,
+        stage: "live",
+        dirty: false,
+        scope
+      }),
+      false
+    );
+  }
 });
 
 test("resolveDisplayPageConfigStagePath targets the live publishing channel for runtime reads", () => {
