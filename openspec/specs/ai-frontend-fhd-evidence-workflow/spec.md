@@ -99,6 +99,21 @@ tests:
   - apps/web/src/pages/shared/displayPageRouteHost.test.ts
 -->
 
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-06-05
+code:
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Split FHD work by surface family and reviewable scope
 
@@ -193,6 +208,21 @@ tests:
   - apps/web/src/pages/shared/displayPageRouteHost.test.ts
 -->
 
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-06-05
+code:
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Record FHD exceptions as durable review artifacts
 
@@ -284,4 +314,19 @@ tests:
   - apps/server/src/mqtt/MqttClientService.test.ts
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
   - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+-->
+
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-06-05
+code:
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
 -->

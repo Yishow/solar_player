@@ -102,6 +102,21 @@ tests:
   - apps/web/src/pages/displayPageCardStyleConfig.test.ts
 -->
 
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-06-05
+code:
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-verify/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Keep human-facing entrypoints lightweight and navigable
 
@@ -199,6 +214,21 @@ tests:
   - apps/web/src/pages/displayPageCardStyleConfig.test.ts
 -->
 
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-06-05
+code:
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-verify/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Repo-local skills use the same workflow vocabulary as the entrypoints
 
@@ -293,4 +323,19 @@ tests:
   - apps/web/src/layouts/shellBootstrap.test.ts
   - apps/web/src/pages/displayPageChromeConfig.test.ts
   - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+-->
+
+<!-- @trace
+source: align-agent-and-doc-entrypoints-with-fhd-workflow
+updated: 2026-06-05
+code:
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-verify/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
 -->

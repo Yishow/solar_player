@@ -293,3 +293,18 @@ tests:
   - apps/web/src/hooks/useDisplayPageConfig.test.ts
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
 -->
+
+<!-- @trace
+source: add-display-launch-witness-gates
+updated: 2026-06-05
+code:
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-analyze/SKILL.md
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->

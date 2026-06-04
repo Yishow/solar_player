@@ -440,6 +440,21 @@ tests:
   - apps/web/src/layouts/shellBootstrap.test.ts
 -->
 
+<!-- @trace
+source: protect-fhd-visual-canonicals
+updated: 2026-06-05
+code:
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/hooks/displayTransition.ts
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Treat FHD witness pairs as the canonical comparison source
 
@@ -530,6 +545,21 @@ tests:
   - apps/web/src/pages/fhdWorkflowEntrypoints.test.ts
   - apps/web/src/components/DisplayPageLoadingState.test.tsx
   - apps/web/src/layouts/shellBootstrap.test.ts
+-->
+
+<!-- @trace
+source: protect-fhd-visual-canonicals
+updated: 2026-06-05
+code:
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/hooks/displayTransition.ts
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
 -->
 
 ---
@@ -624,6 +654,21 @@ tests:
   - apps/web/src/layouts/shellBootstrap.test.ts
 -->
 
+<!-- @trace
+source: protect-fhd-visual-canonicals
+updated: 2026-06-05
+code:
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/hooks/displayTransition.ts
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/layouts/LayoutShell.tsx
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+-->
+
 ---
 ### Requirement: Visual review checklist remains part of the AI-authored change workflow
 
@@ -716,4 +761,19 @@ tests:
   - apps/server/src/mqtt/MqttClientService.test.ts
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
   - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+-->
+
+<!-- @trace
+source: add-ai-frontend-fhd-evidence-workflow
+updated: 2026-06-05
+code:
+  - apps/web/src/styles/global.css
+  - .agents/skills/spectra-analyze/SKILL.md
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - .agents/skills/spectra-verify/SKILL.md
+tests:
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
 -->
