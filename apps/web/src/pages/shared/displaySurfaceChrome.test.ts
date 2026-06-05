@@ -27,6 +27,7 @@ test("shared display chrome css exposes hero typography, composable media overla
   assert.match(displaySurfaceChromeCss, /\.display-surface-media-overlay--right/);
   assert.match(displaySurfaceChromeCss, /backdrop-filter:\s*blur\(var\(--display-photo-effect-blur, 16px\)\)/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-leaf-ornament\s*\{/);
+  assert.match(displaySurfaceChromeCss, /\.display-surface-ring-ornament\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-line\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-ornament::before\s*\{/);
   assert.match(displaySurfaceChromeCss, /\.display-surface-gold-ornament::after\s*\{/);
@@ -91,7 +92,9 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
         "display-surface-leaf-ornament",
-        "display-surface-gold-line"
+        "display-surface-gold-line",
+        /buildDisplayPageMediaPresentation/,
+        /solarHeroMediaEffectResolverOptions/
       ],
       file: path.resolve(sharedDir, "../Solar/index.tsx")
     },
@@ -125,7 +128,9 @@ test("playback pages wire shared display chrome classes into hero, media, and or
         "display-surface-hero-title-emphasis",
         "display-surface-hero-subtitle",
         "display-surface-media-stage",
-        "display-surface-leaf-ornament"
+        "display-surface-leaf-ornament",
+        "display-surface-ring-ornament",
+        /sustainabilityHeroMediaEffectResolverOptions/
       ],
       file: path.resolve(sharedDir, "../Sustainability/index.tsx")
     }

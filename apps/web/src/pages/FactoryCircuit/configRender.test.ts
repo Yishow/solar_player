@@ -14,6 +14,7 @@ test("factory circuit runtime reads resolved display config for copy, status, no
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
   assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
   assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodeTreatments\[node\.key\]/);

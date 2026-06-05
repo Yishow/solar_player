@@ -8,7 +8,9 @@ import { createSolarDisplayPageSeedConfig } from "./Solar/displayPageConfig";
 import { createSustainabilityDisplayPageSeedConfig } from "./Sustainability/displayPageConfig";
 import {
   imagesMainStageMediaEffectResolverOptions,
-  overviewHeroMediaEffectResolverOptions
+  overviewHeroMediaEffectResolverOptions,
+  solarHeroMediaEffectResolverOptions,
+  sustainabilityHeroMediaEffectResolverOptions
 } from "./shared/displayPageMediaEffectConfig";
 
 test("all five display pages expose non-empty seed-backed editor config", () => {
@@ -66,6 +68,31 @@ test("legacy Overview and Images seed effects still resolve into canonical compo
   );
   assert.deepEqual(
     imagesLayers.map((layer) => `${layer.kind}:${layer.zone}`),
+    ["fade:left", "mist:left", "fade:bottom", "mist:bottom"]
+  );
+});
+
+test("Solar and Sustainability seed media treatments stay separate from media sources", () => {
+  const solar = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
+
+  assert.equal(solar.heroMedia.src, "/solar-hero.png");
+  assert.equal(solar.heroMedia.sourceMode, "seed-default");
+  assert.equal(sustainability.heroMedia.src, "/sustainability-hero.jpg");
+  assert.equal(sustainability.heroMedia.sourceMode, "seed-default");
+
+  assert.deepEqual(
+    resolveDisplayPageMediaEffects(
+      solar.heroMedia.effects,
+      solarHeroMediaEffectResolverOptions
+    ).layers.map((layer) => `${layer.kind}:${layer.zone}`),
+    ["fade:bottom", "mist:bottom"]
+  );
+  assert.deepEqual(
+    resolveDisplayPageMediaEffects(
+      sustainability.heroMedia.effects,
+      sustainabilityHeroMediaEffectResolverOptions
+    ).layers.map((layer) => `${layer.kind}:${layer.zone}`),
     ["fade:left", "mist:left", "fade:bottom", "mist:bottom"]
   );
 });

@@ -217,7 +217,7 @@ test("runtime page definitions keep supported pages on the shared schema-aware i
   }
 });
 
-test("page region schemas expose composable effect support matrices only on the rolled-out media surfaces", () => {
+test("page region schemas expose composable effect support matrices on renderer-backed media surfaces", () => {
   const overviewHeroRegion = resolvePageRegionSchemas("overview").find((region) => region.id === "overview-hero-media");
   const imagesStageRegion = resolvePageRegionSchemas("images").find((region) => region.id === "images-main-stage");
   const solarHeroRegion = resolvePageRegionSchemas("solar").find((region) => region.id === "solar-hero-media");
@@ -233,11 +233,11 @@ test("page region schemas expose composable effect support matrices only on the 
   );
   assert.equal(
     solarHeroRegion?.mediaEffectSurface?.status,
-    "unsupported"
+    "supported"
   );
   assert.equal(
     sustainabilityHeroRegion?.mediaEffectSurface?.status,
-    "unsupported"
+    "supported"
   );
   assert.deepEqual(
     overviewHeroRegion?.mediaEffectSurface?.support?.fade?.zones,
@@ -247,13 +247,13 @@ test("page region schemas expose composable effect support matrices only on the 
     imagesStageRegion?.mediaEffectSurface?.support?.blur?.zones,
     ["top", "bottom", "left", "right", "top-bottom", "left-right", "all-edges", "full-frame"]
   );
-  assert.match(
-    solarHeroRegion?.mediaEffectSurface?.reason ?? "",
-    /尚未/
+  assert.deepEqual(
+    solarHeroRegion?.mediaEffectSurface?.support?.fade?.zones,
+    ["top", "bottom", "left", "right", "top-bottom", "left-right", "all-edges"]
   );
-  assert.match(
-    sustainabilityHeroRegion?.mediaEffectSurface?.reason ?? "",
-    /尚未/
+  assert.deepEqual(
+    sustainabilityHeroRegion?.mediaEffectSurface?.support?.opacity?.zones,
+    ["full-frame"]
   );
 });
 

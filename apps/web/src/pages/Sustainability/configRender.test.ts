@@ -17,12 +17,18 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(sustainabilitySource, /createRingOrnamentChromeConfig\(resolvedConfig\.chrome\.ornaments\.ring\)/);
+  assert.match(sustainabilitySource, /ringOrnament\.overlap/);
+  assert.match(sustainabilitySource, /ringOrnament\.glowOpacity/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.fontSize/);
   assert.match(sustainabilitySource, /shouldRenderPeriodChips/);
   assert.match(sustainabilitySource, /viewModel\.periodOptions\.length > 1/);
   assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
-  assert.match(sustainabilitySource, /isReferenceHeroMedia/);
+  assert.match(
+    sustainabilitySource,
+    /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*sustainabilityHeroMediaEffectResolverOptions\s*\)/
+  );
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.cards/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
   assert.match(sustainabilitySource, /shouldRenderHighlightRail/);
@@ -45,6 +51,9 @@ test("sustainability display page seed config captures the current hero and high
   assert.equal(config.hero.eyebrow, "綠能驅動・永續未來");
   assert.deepEqual(config.hero.title, ["永續成果", "持續累積"]);
   assert.equal(config.heroMedia.src, "/sustainability-hero.jpg");
+  assert.equal(config.heroMedia.sourceMode, "seed-default");
+  assert.equal(config.chrome.ornaments.ring.overlap, 118);
+  assert.equal(config.chrome.ornaments.ring.opacity, 0.34);
   assert.equal(config.highlightRail.container.width, 470);
   assert.equal(config.highlightRail.cards.length, 2);
   assert.equal(config.highlightRail.cards[0]?.template, "household-equivalent");

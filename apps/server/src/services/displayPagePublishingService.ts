@@ -12,9 +12,14 @@ import type {
   ValidationResult
 } from "@solar-display/shared";
 import {
+  displayPageLocalizedMediaEffectZones,
+  displayPageMediaEffectBounds,
+  displayPageMediaEffectKinds,
+  displayPageMediaEffectZones,
   defaultFallbackPolicy,
   isDisplayPageCardRail,
   isDisplayPageCardRailTemplateKey,
+  isDisplayPageMediaBinding,
   normalizeDisplayPageFreeformObjects,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
@@ -52,6 +57,8 @@ type PublishHistoryRow = {
 type WriteStageConfigOptions = {
   baseVersion?: number;
 };
+
+type UnknownRecord = Record<string, unknown>;
 
 export class ManagementDraftSaveConflictError extends Error {
   readonly code = "management_draft_conflict";
@@ -283,6 +290,236 @@ function pushLayoutRect(layoutRects: LayoutRect[], regionId: string, rect: {
   });
 }
 
+function isPlainObject(value: unknown): value is UnknownRecord {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+type NumberBounds = { max?: number; min: number };
+
+const goldLineTreatmentBounds = {
+  opacity: { max: 1, min: 0 },
+  thickness: { min: 0 }
+} as const;
+
+const leafTreatmentBounds = {
+  opacity: { max: 1, min: 0 },
+  scale: { min: 0 }
+} as const;
+
+const ringTreatmentBounds = {
+  glowOpacity: { max: 0.6, min: 0 },
+  offsetX: { max: 360, min: -360 },
+  offsetY: { max: 240, min: -240 },
+  opacity: { max: 0.7, min: 0 },
+  overlap: { max: 280, min: 0 },
+  scale: { max: 1.8, min: 0.4 },
+  thickness: { max: 18, min: 1 },
+  zIndex: { max: 16, min: 0 }
+} as const;
+
+function pushTreatmentFinding(findings: ValidationFinding[], regionId: string, message: string) {
+  findings.push({
+    severity: "blocking",
+    code: "TREATMENT_INVALID_VALUE",
+    message,
+    regionId
+  });
+}
+
+function validateTreatmentNumber(
+  findings: ValidationFinding[],
+  regionId: string,
+  value: unknown,
+  bounds: NumberBounds
+) {
+  const max = bounds.max ?? Number.POSITIVE_INFINITY;
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= bounds.min &&
+    value <= max
+  ) {
+    return;
+  }
+
+  const message =
+    bounds.max === undefined
+      ? `${regionId} 必須大於或等於 ${bounds.min}`
+      : `${regionId} 必須介於 ${bounds.min} 和 ${bounds.max} 之間`;
+  pushTreatmentFinding(findings, regionId, message);
+}
+
+function validateNumberFields(
+  findings: ValidationFinding[],
+  regionId: string,
+  value: UnknownRecord,
+  boundsByKey: Record<string, NumberBounds>
+) {
+  for (const [key, bounds] of Object.entries(boundsByKey)) {
+    if (key in value) {
+      validateTreatmentNumber(findings, `${regionId}.${key}`, value[key], bounds);
+    }
+  }
+}
+
+function validateLegacyMediaEffectGroup(
+  findings: ValidationFinding[],
+  regionId: string,
+  value: unknown,
+  boundsByKey: Record<string, NumberBounds>
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  if (!isPlainObject(value)) {
+    pushTreatmentFinding(findings, regionId, `${regionId} 必須為 media effect 物件`);
+    return;
+  }
+
+  validateNumberFields(findings, regionId, value, boundsByKey);
+}
+
+function validateCanonicalMediaEffectLayer(
+  findings: ValidationFinding[],
+  regionId: string,
+  layer: unknown
+) {
+  if (!isPlainObject(layer)) {
+    pushTreatmentFinding(findings, regionId, `${regionId} 必須為 media effect layer 物件`);
+    return;
+  }
+
+  const { kind, zone } = layer;
+  if (!displayPageMediaEffectKinds.includes(kind as never)) {
+    pushTreatmentFinding(findings, `${regionId}.kind`, `${regionId}.kind 不支援此 media effect kind`);
+    return;
+  }
+
+  if (kind === "opacity") {
+    if (zone !== "full-frame") {
+      pushTreatmentFinding(findings, `${regionId}.zone`, `${regionId}.zone 僅支援 full-frame`);
+    }
+    validateNumberFields(findings, regionId, layer, { strength: displayPageMediaEffectBounds.opacityValue });
+    return;
+  }
+
+  const allowedZones =
+    kind === "blur" ? displayPageMediaEffectZones : displayPageLocalizedMediaEffectZones;
+  if (!allowedZones.includes(zone as never)) {
+    pushTreatmentFinding(findings, `${regionId}.zone`, `${regionId}.zone 不支援此 media effect zone`);
+  }
+
+  validateNumberFields(findings, regionId, layer, {
+    coverage: displayPageMediaEffectBounds.coverage,
+    feather: displayPageMediaEffectBounds.feather,
+    strength:
+      kind === "blur"
+        ? displayPageMediaEffectBounds.blurAmount
+        : displayPageMediaEffectBounds.strength,
+    ...(kind === "mist" ? { blur: displayPageMediaEffectBounds.blurAmount } : {})
+  });
+}
+
+function validateMediaTreatment(findings: ValidationFinding[], regionId: string, effects: unknown) {
+  if (effects === undefined) {
+    return;
+  }
+
+  if (!isPlainObject(effects)) {
+    pushTreatmentFinding(findings, regionId, `${regionId} 必須為 media effects 物件`);
+    return;
+  }
+
+  validateLegacyMediaEffectGroup(findings, `${regionId}.edgeFade`, effects.edgeFade, {
+    width: displayPageMediaEffectBounds.edgeFadeWidth
+  });
+  validateLegacyMediaEffectGroup(findings, `${regionId}.bottomFade`, effects.bottomFade, {
+    height: displayPageMediaEffectBounds.bottomFadeHeight
+  });
+  validateLegacyMediaEffectGroup(findings, `${regionId}.blur`, effects.blur, {
+    amount: displayPageMediaEffectBounds.blurAmount
+  });
+  validateLegacyMediaEffectGroup(findings, `${regionId}.opacity`, effects.opacity, {
+    value: displayPageMediaEffectBounds.opacityValue
+  });
+
+  if (isPlainObject(effects.edgeFade) && "direction" in effects.edgeFade) {
+    const direction = effects.edgeFade.direction;
+    if (direction !== "left" && direction !== "right") {
+      pushTreatmentFinding(
+        findings,
+        `${regionId}.edgeFade.direction`,
+        `${regionId}.edgeFade.direction 僅支援 left 或 right`
+      );
+    }
+  }
+
+  if ("layers" in effects) {
+    if (!Array.isArray(effects.layers)) {
+      pushTreatmentFinding(findings, `${regionId}.layers`, `${regionId}.layers 必須為陣列`);
+      return;
+    }
+
+    effects.layers.forEach((layer, index) => {
+      validateCanonicalMediaEffectLayer(findings, `${regionId}.layers[${index}]`, layer);
+    });
+  }
+}
+
+function validateOrnamentTreatments(findings: ValidationFinding[], regionId: string, ornaments: unknown) {
+  if (!isPlainObject(ornaments)) {
+    pushTreatmentFinding(findings, regionId, `${regionId} 必須為 ornaments 物件`);
+    return;
+  }
+
+  const ornamentBounds = {
+    goldLine: goldLineTreatmentBounds,
+    leaf: leafTreatmentBounds,
+    ring: ringTreatmentBounds
+  };
+
+  for (const [key, boundsByField] of Object.entries(ornamentBounds)) {
+    if (!(key in ornaments)) {
+      continue;
+    }
+
+    if (!isPlainObject(ornaments[key])) {
+      pushTreatmentFinding(findings, `${regionId}.${key}`, `${regionId}.${key} 必須為 ornament 物件`);
+      continue;
+    }
+
+    validateNumberFields(findings, `${regionId}.${key}`, ornaments[key], boundsByField);
+  }
+}
+
+function validateDisplayTreatments(
+  findings: ValidationFinding[],
+  value: unknown,
+  path = "root"
+) {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => validateDisplayTreatments(findings, item, `${path}[${index}]`));
+    return;
+  }
+
+  if (!isPlainObject(value)) {
+    return;
+  }
+
+  if (isDisplayPageMediaBinding(value)) {
+    validateMediaTreatment(findings, `${path}.effects`, value.effects);
+  }
+
+  if ("ornaments" in value) {
+    validateOrnamentTreatments(findings, `${path}.ornaments`, value.ornaments);
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    validateDisplayTreatments(findings, child, `${path}.${key}`);
+  }
+}
+
 function validateCardRailContent(
   findings: ValidationFinding[],
   regionId: string,
@@ -446,6 +683,8 @@ function validateConfigDraft(
       }))
     );
   }
+
+  validateDisplayTreatments(findings, regions);
 
   for (const [regionId, value] of Object.entries(regions)) {
     if (isDisplayPageCardRail(value)) {

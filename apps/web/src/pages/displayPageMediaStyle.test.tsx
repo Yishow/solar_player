@@ -6,11 +6,15 @@ import { createDisplayPageMediaEffects } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation, buildDisplayPageMediaStyle } from "./displayPageMediaStyle";
 import {
   imagesMainStageMediaEffectResolverOptions,
-  overviewHeroMediaEffectResolverOptions
+  overviewHeroMediaEffectResolverOptions,
+  solarHeroMediaEffectResolverOptions,
+  sustainabilityHeroMediaEffectResolverOptions
 } from "./shared/displayPageMediaEffectConfig";
 
 const overviewSource = readFileSync(path.join(import.meta.dirname, "Overview", "index.tsx"), "utf8");
 const imagesSource = readFileSync(path.join(import.meta.dirname, "Images", "index.tsx"), "utf8");
+const solarSource = readFileSync(path.join(import.meta.dirname, "Solar", "index.tsx"), "utf8");
+const sustainabilitySource = readFileSync(path.join(import.meta.dirname, "Sustainability", "index.tsx"), "utf8");
 
 test("display page media style uses align anchors for contain mode", () => {
   const style = buildDisplayPageMediaStyle({
@@ -165,7 +169,7 @@ test("display page media presentation drops unsupported canonical layers without
   });
 });
 
-test("overview and images runtime wire shared media presentation into hero and main stage media", () => {
+test("playback runtime wires shared media presentation into supported media treatment surfaces", () => {
   assert.match(
     overviewSource,
     /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*overviewHeroMediaEffectResolverOptions\s*\)/
@@ -174,4 +178,44 @@ test("overview and images runtime wire shared media presentation into hero and m
     imagesSource,
     /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.mainStage,\s*imagesMainStageMediaEffectResolverOptions\s*\)/
   );
+  assert.match(
+    solarSource,
+    /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*solarHeroMediaEffectResolverOptions\s*\)/
+  );
+  assert.match(
+    sustainabilitySource,
+    /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*sustainabilityHeroMediaEffectResolverOptions\s*\)/
+  );
+});
+
+test("new playback media treatment defaults resolve without mutating source placement fields", () => {
+  const solarPresentation = buildDisplayPageMediaPresentation(
+    {
+      alignX: 0.4,
+      alignY: 0.45,
+      effects: undefined,
+      fitMode: "cover",
+      focusX: 0.46,
+      focusY: 0.51,
+      src: "/solar-hero.png"
+    },
+    solarHeroMediaEffectResolverOptions
+  );
+  const sustainabilityPresentation = buildDisplayPageMediaPresentation(
+    {
+      alignX: 0.5,
+      alignY: 0.48,
+      effects: undefined,
+      fitMode: "cover",
+      focusX: 0.5,
+      focusY: 0.48,
+      src: "/sustainability-hero.png"
+    },
+    sustainabilityHeroMediaEffectResolverOptions
+  );
+
+  assert.equal(solarPresentation.mediaStyle.objectPosition, "46% 51%");
+  assert.equal(sustainabilityPresentation.mediaStyle.objectPosition, "50% 48%");
+  assert.equal(solarPresentation.overlayLayers.length > 0, true);
+  assert.equal(sustainabilityPresentation.overlayLayers.length > 0, true);
 });

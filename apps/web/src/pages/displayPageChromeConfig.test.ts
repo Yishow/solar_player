@@ -20,6 +20,7 @@ import {
   createSustainabilityDisplayPageSeedConfig,
   sustainabilityDisplayPageEditorRegions
 } from "./Sustainability/displayPageConfig";
+import { createRingOrnamentChromeConfig } from "./shared/displayPageChromeConfig";
 
 test("display page seed configs persist page chrome groups separately from card and media records", () => {
   const overview = createOverviewDisplayPageSeedConfig("/overview-hero.png");
@@ -34,6 +35,8 @@ test("display page seed configs persist page chrome groups separately from card 
   assert.equal(factory.chrome.modules.statusBlock.titleFontSize, 18);
   assert.equal(images.chrome.modules.counter.currentFontSize, 76);
   assert.equal(images.chrome.modules.arrows.buttonSize, 68);
+  assert.equal(sustainability.chrome.ornaments.ring.overlap, 118);
+  assert.equal(sustainability.chrome.ornaments.ring.zIndex, 7);
   assert.equal(sustainability.chrome.modules.periodChips.fontSize, 17);
   assert.equal(sustainability.chrome.modules.provenance.fontSize, 15);
 
@@ -49,6 +52,7 @@ test("display editor schemas expose chrome paths only for the page groups they s
   const factoryStatus = factoryCircuitDisplayPageEditorRegions.find((region) => region.id === "factory-status-block");
   const imagesCounter = imagesDisplayPageEditorRegions.find((region) => region.id === "images-counter");
   const imagesArrows = imagesDisplayPageEditorRegions.find((region) => region.id === "images-arrows-style");
+  const sustainabilityRing = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-ornament-ring");
   const sustainabilityChips = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-period-chips");
   const sustainabilityProvenance = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-provenance");
 
@@ -58,6 +62,7 @@ test("display editor schemas expose chrome paths only for the page groups they s
   assert.ok(factoryStatus);
   assert.ok(imagesCounter);
   assert.ok(imagesArrows);
+  assert.ok(sustainabilityRing);
   assert.ok(sustainabilityChips);
   assert.ok(sustainabilityProvenance);
 
@@ -86,6 +91,14 @@ test("display editor schemas expose chrome paths only for the page groups they s
     true
   );
   assert.equal(
+    sustainabilityRing.fields.some((field) => field.path.join(".") === "chrome.ornaments.ring.overlap"),
+    true
+  );
+  assert.equal(
+    sustainabilityRing.fields.some((field) => field.path.join(".") === "chrome.ornaments.ring.glowOpacity"),
+    true
+  );
+  assert.equal(
     sustainabilityChips.fields.some((field) => field.path.join(".") === "chrome.modules.periodChips.fontSize"),
     true
   );
@@ -105,5 +118,21 @@ test("display editor schemas expose chrome paths only for the page groups they s
       region.fields.some((field) => field.path.join(".").startsWith("chrome.modules.statusBlock"))
     ),
     false
+  );
+});
+
+test("ring ornament config falls back when persisted treatment values exceed readability bounds", () => {
+  assert.deepEqual(
+    createRingOrnamentChromeConfig({
+      glowOpacity: 1,
+      offsetX: 999,
+      offsetY: -999,
+      opacity: 0.92,
+      overlap: 999,
+      scale: 0.1,
+      thickness: 0,
+      zIndex: 99
+    }),
+    createRingOrnamentChromeConfig()
   );
 });

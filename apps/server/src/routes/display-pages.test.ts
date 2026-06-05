@@ -731,6 +731,107 @@ test("POST publish with negative dimensions is rejected", async () => {
   }
 });
 
+test("POST publish with invalid media treatment values is rejected", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "solar", {
+      heroMedia: {
+        effects: {
+          edgeFade: {
+            enabled: true,
+            width: 1.4
+          }
+        }
+      }
+    });
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/solar/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 422);
+    const body = publishRes.json() as {
+      validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "TREATMENT_INVALID_VALUE" &&
+          finding.regionId === "root.heroMedia.effects.edgeFade.width"
+      )
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST publish with invalid ornament treatment values is rejected", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "sustainability", {
+      chrome: {
+        ornaments: {
+          goldLine: {
+            thickness: -1
+          },
+          leaf: {
+            scale: -0.2
+          },
+          ring: {
+            opacity: 0.82,
+            overlap: 320
+          }
+        }
+      }
+    });
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 422);
+    const body = publishRes.json() as {
+      validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "TREATMENT_INVALID_VALUE" &&
+          finding.regionId === "root.chrome.ornaments.ring.opacity"
+      )
+    );
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "TREATMENT_INVALID_VALUE" &&
+          finding.regionId === "root.chrome.ornaments.ring.overlap"
+      )
+    );
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "TREATMENT_INVALID_VALUE" &&
+          finding.regionId === "root.chrome.ornaments.leaf.scale"
+      )
+    );
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "TREATMENT_INVALID_VALUE" &&
+          finding.regionId === "root.chrome.ornaments.goldLine.thickness"
+      )
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST publish blocks rail cards that overflow the parent rail bounds", async () => {
   const app = await buildApp();
 

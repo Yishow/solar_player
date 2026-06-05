@@ -20,14 +20,17 @@ import {
   buildLeafOrnamentFields,
   buildPeriodChipsChromeFields,
   buildProvenanceChromeFields,
+  buildRingOrnamentFields,
   createHeroTypographyConfig,
   createLeafOrnamentChromeConfig,
   createPeriodChipsChromeConfig,
   createProvenanceChromeConfig,
+  createRingOrnamentChromeConfig,
   type HeroTypographyConfig,
   type LeafOrnamentChromeConfig,
   type PeriodChipsChromeConfig,
-  type ProvenanceChromeConfig
+  type ProvenanceChromeConfig,
+  type RingOrnamentChromeConfig
 } from "../shared/displayPageChromeConfig";
 import {
   buildDisplayPageIconSourceFields,
@@ -35,7 +38,8 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
-  createUnsupportedDisplayPageMediaEffectSurface
+  createSupportedDisplayPageMediaEffectSurface,
+  sustainabilityHeroDefaultMediaEffects
 } from "../shared/displayPageMediaEffectConfig";
 import {
   sustainabilityHeroLayout,
@@ -64,6 +68,7 @@ export type SustainabilityDisplayPageConfig = {
     };
     ornaments: {
       leaf: LeafOrnamentChromeConfig;
+      ring: RingOrnamentChromeConfig;
     };
   };
   hero: {
@@ -163,7 +168,8 @@ export function createSustainabilityDisplayPageSeedConfig(
       ornaments: {
         leaf: createLeafOrnamentChromeConfig({
           opacity: 0.42
-        })
+        }),
+        ring: createRingOrnamentChromeConfig()
       }
     },
     hero: {
@@ -189,7 +195,8 @@ export function createSustainabilityDisplayPageSeedConfig(
       focusX: 0.5,
       focusY: 0.48,
       sourceMode: "seed-default",
-      src: heroSrc
+      src: heroSrc,
+      effects: sustainabilityHeroDefaultMediaEffects
     },
     highlightRail: {
       cards: [
@@ -343,10 +350,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       { constraints: { min: 0 }, fieldType: "number", id: "sustainability-hero-width", label: "Width", path: ["heroMedia", "width"] },
       { constraints: { min: 0 }, fieldType: "number", id: "sustainability-hero-height", label: "Height", path: ["heroMedia", "height"] }
     ],
-    mediaEffectSurface: createUnsupportedDisplayPageMediaEffectSurface(
-      ["heroMedia"],
-      "此頁面的主視覺素材尚未開放可組合媒體效果。"
-    ),
+    mediaEffectSurface: createSupportedDisplayPageMediaEffectSurface(["heroMedia"]),
     presetKey: "hero-media"
   },
   {
@@ -385,6 +389,16 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       path: ["chrome", "ornaments", "leaf"]
     }),
     presetKey: "sustainability-leaf"
+  },
+  {
+    id: "sustainability-ornament-ring",
+    label: "Sustainability Ring Ornament",
+    description: "調整 ring ornament、hero overlap 與 glow treatment。",
+    fields: buildRingOrnamentFields({
+      idPrefix: "sustainability",
+      path: ["chrome", "ornaments", "ring"]
+    }),
+    presetKey: "sustainability-ring"
   },
   {
     id: "sustainability-period-chips",

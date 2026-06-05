@@ -433,6 +433,8 @@ export function FactoryCircuit({
           left: `${552 + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
           opacity: Math.min(1, resolvedConfig.chrome.ornaments.leaf.opacity / seedConfig.chrome.ornaments.leaf.opacity),
           top: `${585 - CONTENT_TOP_OFFSET + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
+          transformOrigin: "center",
           width: "268px"
         }}
       />

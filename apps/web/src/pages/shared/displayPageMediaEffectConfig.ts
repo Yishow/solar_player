@@ -85,6 +85,35 @@ export const imagesMainStageMediaEffectResolverOptions: DisplayPageMediaEffectRe
   support: firstBatchDisplayPageMediaEffectSupport
 };
 
+export const solarHeroDefaultMediaEffects: DisplayPageMediaEffects = createDisplayPageMediaEffects({
+  bottomFade: {
+    enabled: true,
+    height: 0.46
+  }
+});
+
+export const solarHeroMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
+  defaults: solarHeroDefaultMediaEffects,
+  support: firstBatchDisplayPageMediaEffectSupport
+};
+
+export const sustainabilityHeroDefaultMediaEffects: DisplayPageMediaEffects = createDisplayPageMediaEffects({
+  bottomFade: {
+    enabled: true,
+    height: 0.46
+  },
+  edgeFade: {
+    direction: "left",
+    enabled: true,
+    width: 0.56
+  }
+});
+
+export const sustainabilityHeroMediaEffectResolverOptions: DisplayPageMediaEffectResolverOptions = {
+  defaults: sustainabilityHeroDefaultMediaEffects,
+  support: firstBatchDisplayPageMediaEffectSupport
+};
+
 export function buildDisplayPageMediaEffectFields(
   idPrefix: string,
   bindingPath: DisplayEditorPath

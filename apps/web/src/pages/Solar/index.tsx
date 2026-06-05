@@ -18,7 +18,8 @@ import {
   resolveFlowNodeTreatmentConfig
 } from "../shared/displayPageFlowTreatmentConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
-import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
+import { solarHeroMediaEffectResolverOptions } from "../shared/displayPageMediaEffectConfig";
 import { solarAssetRuntimeMap } from "./assets";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
@@ -193,6 +194,10 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
   });
   const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
+  const heroMediaPresentation = buildDisplayPageMediaPresentation(
+    resolvedConfig.heroMedia,
+    solarHeroMediaEffectResolverOptions
+  );
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
@@ -290,20 +295,29 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       </section>
 
       <figure
-        className="solar-hero-banner display-surface-media-stage display-surface-media-fade-bottom"
+        className={`solar-hero-banner display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,
           top: `${heroLayout.top}px`,
-          width: `${heroLayout.width}px`
+          width: `${heroLayout.width}px`,
+          ...heroMediaPresentation.stageStyle
         }}
       >
         <img
           alt={resolvedConfig.heroMedia.alt}
           className="solar-hero-image"
           src={heroMediaSource ?? undefined}
-          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
+          style={heroMediaPresentation.mediaStyle}
         />
+        {heroMediaPresentation.overlayLayers.map((layer) => (
+          <div
+            aria-hidden="true"
+            className={layer.className}
+            key={layer.id}
+            style={layer.style}
+          />
+        ))}
       </figure>
 
       {flowNodeOrder.map((flowItem, index) => {

@@ -6,6 +6,7 @@ import {
   type DisplayPageMetricHighlightCard,
   type DisplayPageMetricHighlightCardPayload
 } from "@solar-display/shared";
+import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
@@ -24,8 +25,10 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStoryRuntime";
 import { trendSeries } from "../../mocks/metrics";
-import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
+import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import { createRingOrnamentChromeConfig } from "../shared/displayPageChromeConfig";
+import { sustainabilityHeroMediaEffectResolverOptions } from "../shared/displayPageMediaEffectConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   resolveRuntimeFallbackBannerState,
@@ -140,7 +143,11 @@ export function Sustainability({
     usesRuntimeFallback: storyRuntime.usesFallback
   });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
-  const isReferenceHeroMedia = heroMediaSource === sustainabilityAssetMap.hero.src;
+  const heroMediaPresentation = buildDisplayPageMediaPresentation(
+    resolvedConfig.heroMedia,
+    sustainabilityHeroMediaEffectResolverOptions
+  );
+  const ringOrnament = createRingOrnamentChromeConfig(resolvedConfig.chrome.ornaments.ring);
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
@@ -209,6 +216,7 @@ export function Sustainability({
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
   const leafLayout = withContentOffset(sustainabilityLeafLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroMedia);
+  const ringSize = 286 * ringOrnament.scale;
   const shouldRenderPeriodChips = viewModel.periodOptions.length > 1;
   const shouldRenderHighlightRail = resolvedHighlightCards.some(
     (card) => card.kind === "metric-highlight" || card.payload.derivedStatus === "available"
@@ -331,23 +339,44 @@ export function Sustainability({
         }}
       />
 
+      <div
+        aria-hidden="true"
+        className="sustainability-ring-ornament display-surface-ring-ornament"
+        style={{
+          "--display-ring-glow-opacity": ringOrnament.glowOpacity,
+          "--display-ring-thickness": `${ringOrnament.thickness}px`,
+          height: `${ringSize}px`,
+          left: `${heroLayout.left - ringSize + ringOrnament.overlap + ringOrnament.offsetX}px`,
+          opacity: ringOrnament.opacity,
+          top: `${heroLayout.top + 52 + ringOrnament.offsetY}px`,
+          width: `${ringSize}px`,
+          zIndex: ringOrnament.zIndex
+        } as CSSProperties & Record<"--display-ring-glow-opacity" | "--display-ring-thickness", number | string>}
+      />
+
       <figure
-        className={[
-          "sustainability-hero display-surface-media-stage",
-          isReferenceHeroMedia ? "" : "display-surface-media-fade-left display-surface-media-fade-bottom"
-        ].join(" ").trim()}
+        className={`sustainability-hero display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
         style={{
           height: `${heroLayout.height}px`,
           left: `${heroLayout.left}px`,
           top: `${heroLayout.top}px`,
-          width: `${heroLayout.width}px`
+          width: `${heroLayout.width}px`,
+          ...heroMediaPresentation.stageStyle
         }}
       >
         <img
           alt={resolvedConfig.heroMedia.alt}
           src={heroMediaSource ?? undefined}
-          style={buildDisplayPageMediaStyle(resolvedConfig.heroMedia)}
+          style={heroMediaPresentation.mediaStyle}
         />
+        {heroMediaPresentation.overlayLayers.map((layer) => (
+          <div
+            aria-hidden="true"
+            className={layer.className}
+            key={layer.id}
+            style={layer.style}
+          />
+        ))}
       </figure>
 
       {shouldRenderHighlightRail ? (

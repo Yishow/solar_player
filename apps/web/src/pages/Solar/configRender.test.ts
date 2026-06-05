@@ -16,6 +16,10 @@ test("solar runtime reads resolved display config for hero, flow nodes, connecto
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.offsetX/);
   assert.match(solarSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
+  assert.match(
+    solarSource,
+    /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*solarHeroMediaEffectResolverOptions\s*\)/
+  );
   assert.match(solarSource, /resolvedConfig\.flowNodes\[flowItem\.key\]/);
   assert.match(solarSource, /resolvedConfig\.flowNodeTreatments\[flowItem\.key\]/);
   assert.match(solarSource, /resolvedConfig\.connectors\[connector\.key\]/);
@@ -29,6 +33,8 @@ test("solar display page seed config captures the current default hero and layou
   assert.equal(config.heroCopy.eyebrow, "綠能驅動・永續未來");
   assert.deepEqual(config.heroCopy.titleLines, ["太陽能驅動", "製造新能量"]);
   assert.equal(config.heroMedia.alt, "太陽能車棚與綠能展示場域");
+  assert.equal(config.heroMedia.sourceMode, "seed-default");
+  assert.ok(config.heroMedia.effects);
   assert.equal(config.flowNodes.solar.left, 795);
   assert.equal(config.connectors.inverterToFactory.width, 108);
   assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 9);

@@ -30,7 +30,8 @@ import {
   type FlowNodeTreatmentConfig
 } from "../shared/displayPageFlowTreatmentConfig";
 import {
-  createUnsupportedDisplayPageMediaEffectSurface
+  createSupportedDisplayPageMediaEffectSurface,
+  solarHeroDefaultMediaEffects
 } from "../shared/displayPageMediaEffectConfig";
 import {
   solarConnectorLayout,
@@ -167,7 +168,8 @@ export function createSolarDisplayPageSeedConfig(
       focusX: 0.5,
       focusY: 0.52,
       sourceMode: "seed-default",
-      src: heroSrc
+      src: heroSrc,
+      effects: solarHeroDefaultMediaEffects
     },
     iconSources: {
       flowNodes: {
@@ -291,10 +293,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "solar-hero-width", label: "Width", path: ["heroContainer", "width"] },
       { constraints: { min: 0 }, fieldType: "number", id: "solar-hero-height", label: "Height", path: ["heroContainer", "height"] }
     ],
-    mediaEffectSurface: createUnsupportedDisplayPageMediaEffectSurface(
-      ["heroMedia"],
-      "此頁面的主視覺素材尚未開放可組合媒體效果。"
-    ),
+    mediaEffectSurface: createSupportedDisplayPageMediaEffectSurface(["heroMedia"]),
     presetKey: "hero-media"
   },
   {

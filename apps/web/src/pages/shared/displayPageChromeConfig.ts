@@ -8,6 +8,12 @@ function resolveNonNegativeNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function resolveBoundedNumber(value: unknown, fallback: number, min: number, max: number) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : fallback;
+}
+
 function numberField(
   id: string,
   label: string,
@@ -200,6 +206,102 @@ export function buildLeafOrnamentFields({
     numberField(`${idPrefix}-leaf-offset-y`, "Leaf Offset Y", [...path, "offsetY"], { step: 1 }),
     numberField(`${idPrefix}-leaf-opacity`, "Leaf Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 }),
     numberField(`${idPrefix}-leaf-scale`, "Leaf Scale", [...path, "scale"], { min: 0, step: 0.05 })
+  ];
+}
+
+export type RingOrnamentChromeConfig = {
+  glowOpacity: number;
+  offsetX: number;
+  offsetY: number;
+  opacity: number;
+  overlap: number;
+  scale: number;
+  thickness: number;
+  zIndex: number;
+};
+
+const ringOrnamentBounds = {
+  glowOpacity: { max: 0.6, min: 0, step: 0.05 },
+  offsetX: { max: 360, min: -360, step: 1 },
+  offsetY: { max: 240, min: -240, step: 1 },
+  opacity: { max: 0.7, min: 0, step: 0.05 },
+  overlap: { max: 280, min: 0, step: 1 },
+  scale: { max: 1.8, min: 0.4, step: 0.05 },
+  thickness: { max: 18, min: 1, step: 1 },
+  zIndex: { max: 16, min: 0, step: 1 }
+} as const;
+
+export function createRingOrnamentChromeConfig(
+  overrides: Partial<Record<keyof RingOrnamentChromeConfig, unknown>> = {}
+): RingOrnamentChromeConfig {
+  return {
+    glowOpacity: resolveBoundedNumber(
+      overrides.glowOpacity,
+      0.24,
+      ringOrnamentBounds.glowOpacity.min,
+      ringOrnamentBounds.glowOpacity.max
+    ),
+    offsetX: resolveBoundedNumber(
+      overrides.offsetX,
+      0,
+      ringOrnamentBounds.offsetX.min,
+      ringOrnamentBounds.offsetX.max
+    ),
+    offsetY: resolveBoundedNumber(
+      overrides.offsetY,
+      0,
+      ringOrnamentBounds.offsetY.min,
+      ringOrnamentBounds.offsetY.max
+    ),
+    opacity: resolveBoundedNumber(
+      overrides.opacity,
+      0.34,
+      ringOrnamentBounds.opacity.min,
+      ringOrnamentBounds.opacity.max
+    ),
+    overlap: resolveBoundedNumber(
+      overrides.overlap,
+      118,
+      ringOrnamentBounds.overlap.min,
+      ringOrnamentBounds.overlap.max
+    ),
+    scale: resolveBoundedNumber(
+      overrides.scale,
+      1,
+      ringOrnamentBounds.scale.min,
+      ringOrnamentBounds.scale.max
+    ),
+    thickness: resolveBoundedNumber(
+      overrides.thickness,
+      4,
+      ringOrnamentBounds.thickness.min,
+      ringOrnamentBounds.thickness.max
+    ),
+    zIndex: resolveBoundedNumber(
+      overrides.zIndex,
+      7,
+      ringOrnamentBounds.zIndex.min,
+      ringOrnamentBounds.zIndex.max
+    )
+  };
+}
+
+export function buildRingOrnamentFields({
+  idPrefix,
+  path
+}: {
+  idPrefix: string;
+  path: DisplayEditorPath;
+}): DisplayEditorFieldSchema[] {
+  return [
+    numberField(`${idPrefix}-ring-opacity`, "Ring Opacity", [...path, "opacity"], ringOrnamentBounds.opacity),
+    numberField(`${idPrefix}-ring-scale`, "Ring Scale", [...path, "scale"], ringOrnamentBounds.scale),
+    numberField(`${idPrefix}-ring-overlap`, "Ring Overlap", [...path, "overlap"], ringOrnamentBounds.overlap),
+    numberField(`${idPrefix}-ring-thickness`, "Ring Thickness", [...path, "thickness"], ringOrnamentBounds.thickness),
+    numberField(`${idPrefix}-ring-glow-opacity`, "Ring Glow Opacity", [...path, "glowOpacity"], ringOrnamentBounds.glowOpacity),
+    numberField(`${idPrefix}-ring-offset-x`, "Ring Offset X", [...path, "offsetX"], ringOrnamentBounds.offsetX),
+    numberField(`${idPrefix}-ring-offset-y`, "Ring Offset Y", [...path, "offsetY"], ringOrnamentBounds.offsetY),
+    numberField(`${idPrefix}-ring-layer`, "Ring Layer", [...path, "zIndex"], ringOrnamentBounds.zIndex)
   ];
 }
 
