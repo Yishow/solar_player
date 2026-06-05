@@ -43,7 +43,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 - `apps/web/`：Vite + React 前端。
 - `packages/shared/`：server/web 共用型別與 playback 邏輯。
 - `deploy/`：目前部署腳本與 systemd service，代表 production 假設。
-- `docs/`：歷史提示詞、UI 參考、舊規格與輔助素材；可查，但不是主要真相來源。
+- `docs/reference/FHD/`：現行 FHD 視覺 witness 圖；判斷展示質感時看這裡，不要回到 prototype 猜。
 
 ## 正式流程：Spectra
 
@@ -59,26 +59,66 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 
-## FHD / Display Workflow 入口
+## FHD / Display Closeout 入口
 
-當 change 會碰 playback 頁面、shared display chrome、`/display-pages/editor`，或其他 FHD witness surface 時，先用同一套 workflow vocabulary 判斷 scope：
+當 change 會碰 playback 頁面、shared display chrome、`/display-pages/editor`，或其他 FHD surface 時，先把 scope 壓在現行產品與 FHD witness 上：
 
-- `witness batch`
-- `evidence bundle`
-- `visual canonicals`
-- `launch witness gates`
+1. 對照 `docs/reference/FHD/` 裡對應頁面的 PNG。
+2. 讀現行 route/component/config：`apps/web/src/pages/<Page>/`、`apps/web/src/pages/DisplayPagesEditor/`、`apps/web/src/pages/shared/`。
+3. 查對應 `openspec/specs/` 或 `openspec/changes/`，確認這次是 polish、runtime parity、fallback、publish refresh，還是工具鏈/asset pipeline。
+4. 用 targeted tests 與 browser/manual witness 驗證；結果寫在本次 change artifact 或回報，不要把 root docs 當成逐頁 QA ledger。
 
-入口索引在 `docs/reference-match/fhd-workflow-entrypoints.md`。
+Editor capability-first 原則：
 
-實際查閱順序：
+- 五個 playback 頁的 FHD closeout 都必須優先確認能否由 `/display-pages/editor` 維護。
+- 若 FHD 差距無法由 editor 表達，優先把它定義成 editor capability gap，補 shared schema、inspector control、draft/live persistence、preview/runtime renderer、seed fallback、validation/reset 與 targeted tests。
+- Page-local changes 只能用來承接 editor config 到 page-specific runtime primitive；不要用 page-local hardcode 繞過 editor。
 
-1. `docs/reference-match/playback-visual-canonicals.md`
-2. `docs/display-surface-visual-review-checklist.md`
-3. `docs/reference-match/fhd-surface-split-guide.md`
-4. `docs/reference-match/fhd-evidence-bundle-template.md`
-5. `docs/reference-match/display-launch-witness-matrix.md`
+AI-led execution 原則：
 
-`AGENTS.md` 只負責入口與 repo 規則，不在這裡複製完整 evidence workflow 或 launch witness gate 細節。
+- 本 repo 允許 AI 主導執行：主動盤點現況、拆 Spectra change、改程式、跑驗證、更新 handoff。
+- 產品意圖、FHD 品質門檻與 tradeoff 是否接受仍由使用者決定；AI 不可用「AI 主導」當成擴架構、跳過 witness、或省略驗證的理由。
+
+## 現行產品狀態與 FHD 100% 收斂目標
+
+現行產品已經在 root monorepo 內開發，不再處於 prototype 移植階段。後續目標是在不改動既有 React/Fastify/SQLite/MQTT/Spectra 架構的前提下，把已完成約 70-80% 的展示系統收斂到 `docs/reference/FHD/` 的可交付品質。
+
+現況判讀：
+
+- 14 條 route 都已經有 React implementation，主要缺口不是 prototype 移植，而是 FHD 品質收尾。
+- 尚未 launch-ready；五個 playback 頁仍需要新鮮 authoring/runtime/publish/fallback/handoff witness，而不是要重開架構。
+- 100% 的主要缺口是 FHD polish、editor capability、runtime parity、fallback/publish refresh、evidence bundle 與交接紀錄。
+
+Playback 五頁 closeout 方向：
+
+- `/overview`：hero photo fade、雙語 title/eyebrow/lead 的 line-height、底部五張 KPI 卡高度與間距。
+- `/solar`：connector 粗細、flow node 絕對座標、流程圖與 KPI row 的垂直節奏。
+- `/factory-circuit`：電路線條粗細、`DisplayLeafOrnament` opacity/scale、load panel 從屬性，避免變成管理表格。
+- `/images`：media stage 裁切比例、thumbnail strip 密度、caption card 字級與展示張力。
+- `/sustainability`：ring ornament 與 hero media 疊合、Trees/stat card 節奏、highlight rail 密度。
+
+防止 management-surface drift：
+
+- Playback 頁不可因共用 component 或 style cleanup 退回 settings-like glass cards、toolbar stack、table-first panels。
+- Flow/circuit/icon 類元素要維持 source-like visual language，不可被 generic management glyph 取代。
+- 不要用 page-local hardcode 繞過 editor；editor 不足時先擴充 editor capability。
+- 不要順手重寫 shell、route、API 或資料模型。
+
+100% 收斂順序：
+
+1. Baseline freeze：先用 browser/manual witness 跑五個 playback 頁，取得真實 pass/fail/blocker，不靠舊 checklist 推論。
+2. Editor capability pass：逐頁確認 FHD 差距能否由 `/display-pages/editor` 表達；不能表達時先規劃 editor schema/inspector/runtime 擴充。
+3. Playback closeout：依上方五頁方向逐頁處理 FHD 差距，並在本次 Spectra/change artifact 留下 protected attributes 與例外。
+4. Management closeout：檢查 `/trends`、settings、history、offline、slideshow preview、device status 的 FHD density 與互動回歸；每頁保留既有 API、draft、save/test/CRUD 行為。
+5. Tooling / assets：用 Spectra 另拆 change 評估 Playwright visual regression stack；若要補 asset pipeline，優先補四個非 Solar playback 頁的 manifest，不要一次混入 UI polish。
+6. Handoff：完成 Spectra validation/archive、留下測試與 witness 摘要，再提交小而可審的 changes。
+
+禁止事項：
+
+- 不要把 prototype HTML 當成新的 runtime 入口。
+- 不要為了 FHD polish 改掉 root monorepo、route shell、server API、SQLite/MQTT 架構。
+- 不要用 page-local hardcode 取代應該由 `/display-pages/editor` 維護的展示設定。
+- 不要把 task checkbox 全勾或單次 build 通過解讀為 100%；沒有 fresh witness、runtime parity 與 fallback/publish 驗證就不是完成。
 
 ## 目前真的存在的指令與測試入口
 
@@ -117,7 +157,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 - 不要發明 repo 目前沒有的 lint、formatter、CI、deploy 平台或測試流程，文件與指引只能描述現況。
 - 不要重新引入 `solar-display/` 路徑前綴、wrapper 目錄或雙重入口說法。
-- 不要把 `docs/` 的歷史文件改寫成正式規格來源，除非任務明確要求。
+- 不要把 prototype HTML、舊 prompt package 或 `docs/reference/kuozui-green-fhd-html-prototype/` 當成現行 source of truth；FHD closeout 以現行程式、OpenSpec/Spectra 與 `docs/reference/FHD/` 為準。
 - 不要隨手改動 `deploy/`、runtime 路徑、systemd 假設或 `.env.example`，除非本次任務直接涉及那些行為。
 
 ## 工作邊界
