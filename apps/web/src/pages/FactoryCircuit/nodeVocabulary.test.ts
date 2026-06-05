@@ -34,6 +34,8 @@ test("factory load rows and routing use shared display-family surface and token 
   assert.match(factorySource, /factory-routing-load-reference\.png/);
   assert.match(factorySource, /function FactoryCircuitRoutingReference/);
   assert.match(factoryCss, /\.factory-circuit-routing-reference\s*\{[\s\S]*position:\s*absolute;/);
+  assert.doesNotMatch(factorySource, /<table/);
+  assert.doesNotMatch(factorySource, /role="table"/);
   assert.doesNotMatch(factorySource, /className="routing-power-chain"/);
   assert.doesNotMatch(factorySource, /className="routing-load-tree"/);
   assert.doesNotMatch(factorySource, /d="M1258 330 H1306/);

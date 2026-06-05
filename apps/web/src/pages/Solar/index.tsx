@@ -11,6 +11,12 @@ import {
 } from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import {
+  buildFlowConnectorTreatmentStyle,
+  buildFlowNodeTreatmentStyle,
+  resolveFlowConnectorTreatmentConfig,
+  resolveFlowNodeTreatmentConfig
+} from "../shared/displayPageFlowTreatmentConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import { buildDisplayPageMediaStyle } from "../displayPageMediaStyle";
 import { solarAssetRuntimeMap } from "./assets";
@@ -303,6 +309,10 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       {flowNodeOrder.map((flowItem, index) => {
         const node = viewModel.flowNodes[index]!;
         const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
+        const nodeTreatment = resolveFlowNodeTreatmentConfig(
+          resolvedConfig.flowNodeTreatments[flowItem.key],
+          seedConfig.flowNodeTreatments[flowItem.key]
+        );
 
         return (
           <article
@@ -315,7 +325,8 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
               height: `${layout.height}px`,
               left: `${layout.left}px`,
               top: `${layout.top}px`,
-              width: `${layout.width}px`
+              width: `${layout.width}px`,
+              ...buildFlowNodeTreatmentStyle(nodeTreatment)
             }}
           >
             {renderDisplayPageIcon({
@@ -333,16 +344,21 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
 
       {connectorOrder.map((connector) => {
         const layout = withContentOffset(resolvedConfig.connectors[connector.key]);
+        const treatment = resolveFlowConnectorTreatmentConfig(
+          resolvedConfig.connectorTreatments[connector.key],
+          seedConfig.connectorTreatments[connector.key]
+        );
 
         return (
           <div
             key={connector.key}
             className={connector.className}
             style={{
-              height: `${layout.height}px`,
+              height: `${treatment.strokeWidth}px`,
               left: `${layout.left}px`,
-              top: `${layout.top}px`,
-              width: `${layout.width}px`
+              top: `${layout.top + (layout.height - treatment.strokeWidth) / 2}px`,
+              width: `${layout.width}px`,
+              ...buildFlowConnectorTreatmentStyle(treatment)
             }}
           />
         );

@@ -19,6 +19,14 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
+  buildFlowConnectorTreatmentFields,
+  buildFlowNodeTreatmentFields,
+  createFlowConnectorTreatmentConfig,
+  createFlowNodeTreatmentConfig,
+  type FlowConnectorTreatmentConfig,
+  type FlowNodeTreatmentConfig
+} from "../shared/displayPageFlowTreatmentConfig";
+import {
   factoryCircuitConnectorLayout,
   factoryCircuitCopyLayout,
   factoryCircuitKpiLayout,
@@ -35,6 +43,9 @@ export type FactoryCircuitDisplayRect = {
   width: number;
 };
 
+export type FactoryCircuitConnectorKey = "inverterToBoard" | "solarToInverter";
+export type FactoryCircuitNodeKey = "board" | "inverter" | "solar";
+
 export type FactoryCircuitDisplayPageConfig = {
   chrome: {
     heroTypography: HeroTypographyConfig;
@@ -46,7 +57,8 @@ export type FactoryCircuitDisplayPageConfig = {
       leaf: LeafOrnamentChromeConfig;
     };
   };
-  connectors: Record<"inverterToBoard" | "solarToInverter", FactoryCircuitDisplayRect>;
+  connectorTreatments: Record<FactoryCircuitConnectorKey, FlowConnectorTreatmentConfig>;
+  connectors: Record<FactoryCircuitConnectorKey, FactoryCircuitDisplayRect>;
   hero: {
     copyEnLines: [string, string, string, string];
     copyZhLines: [string, string, string];
@@ -60,7 +72,7 @@ export type FactoryCircuitDisplayPageConfig = {
       "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
       DisplayPageIconSource
     >;
-    nodes: Record<"board" | "inverter" | "solar", DisplayPageIconSource>;
+    nodes: Record<FactoryCircuitNodeKey, DisplayPageIconSource>;
   };
   kpiCards: Record<"flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower", FactoryCircuitDisplayRect>;
   loadPanel: FactoryCircuitDisplayRect;
@@ -68,7 +80,8 @@ export type FactoryCircuitDisplayPageConfig = {
     "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
     FactoryCircuitDisplayRect
   >;
-  nodes: Record<"board" | "inverter" | "solar", FactoryCircuitDisplayRect>;
+  nodeTreatments: Record<FactoryCircuitNodeKey, FlowNodeTreatmentConfig>;
+  nodes: Record<FactoryCircuitNodeKey, FactoryCircuitDisplayRect>;
   statusBlock: FactoryCircuitDisplayRect;
   textBlocks: {
     copy: FactoryCircuitDisplayRect;
@@ -93,6 +106,10 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
           opacity: 0.38
         })
       }
+    },
+    connectorTreatments: {
+      inverterToBoard: createFlowConnectorTreatmentConfig({ strokeWidth: 16, zIndex: 9 }),
+      solarToInverter: createFlowConnectorTreatmentConfig({ strokeWidth: 16, zIndex: 9 })
     },
     connectors: {
       inverterToBoard: { ...factoryCircuitConnectorLayout.inverterToBoard, height: 16 },
@@ -151,6 +168,11 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       office: { ...factoryCircuitLoadRowLayout[3] },
       ev: { ...factoryCircuitLoadRowLayout[4] },
       infrastructure: { ...factoryCircuitLoadRowLayout[5] }
+    },
+    nodeTreatments: {
+      board: createFlowNodeTreatmentConfig(),
+      inverter: createFlowNodeTreatmentConfig(),
+      solar: createFlowNodeTreatmentConfig()
     },
     nodes: {
       board: { ...factoryCircuitNodeLayout.board },
@@ -266,6 +288,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
         idPrefix: key,
         path: ["iconSources", "nodes", key]
       }),
+      ...buildFlowNodeTreatmentFields({
+        idPrefix: `factory-${key}`,
+        path: ["nodeTreatments", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["nodes", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["nodes", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["nodes", key, "width"] },
@@ -288,6 +314,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["connectors", key, "width"]
     },
     fields: [
+      ...buildFlowConnectorTreatmentFields({
+        idPrefix: `factory-${key}`,
+        path: ["connectorTreatments", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["connectors", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["connectors", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["connectors", key, "width"] }

@@ -26,6 +26,12 @@ import {
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
 import {
+  buildFlowConnectorTreatmentStyle,
+  buildFlowNodeTreatmentStyle,
+  resolveFlowConnectorTreatmentConfig,
+  resolveFlowNodeTreatmentConfig
+} from "../shared/displayPageFlowTreatmentConfig";
+import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
 } from "./displayPageConfig";
@@ -314,15 +320,21 @@ export function FactoryCircuit({
       resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
     );
     const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
+    const treatment = resolveFlowConnectorTreatmentConfig(
+      resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments],
+      seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments]
+    );
+    const referenceHeight = reference.height * (treatment.strokeWidth / seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments].strokeWidth);
 
     return {
       key: connectorKey,
       src: reference.src,
       style: {
-        height: `${reference.height}px`,
+        height: `${referenceHeight}px`,
         left: `${layout.left + reference.leftOffset}px`,
-        top: `${layout.top + reference.topOffset}px`,
-        width: `${reference.width}px`
+        top: `${layout.top + reference.topOffset - (referenceHeight - reference.height) / 2}px`,
+        width: `${reference.width}px`,
+        ...buildFlowConnectorTreatmentStyle(treatment)
       }
     };
   });
@@ -437,6 +449,10 @@ export function FactoryCircuit({
 
       {viewModel.flowNodes.map((node) => {
         const layout = withContentOffset(resolvedConfig.nodes[node.key]);
+        const nodeTreatment = resolveFlowNodeTreatmentConfig(
+          resolvedConfig.nodeTreatments[node.key],
+          seedConfig.nodeTreatments[node.key]
+        );
         return (
           <article
             key={node.label}
@@ -445,7 +461,8 @@ export function FactoryCircuit({
               height: `${layout.height}px`,
               left: `${layout.left}px`,
               top: `${layout.top}px`,
-              width: `${layout.width}px`
+              width: `${layout.width}px`,
+              ...buildFlowNodeTreatmentStyle(nodeTreatment)
             }}
           >
             <div className="display-node-icon">

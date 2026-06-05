@@ -13,6 +13,10 @@ import {
   overviewDisplayPageEditorRegions
 } from "../Overview/displayPageConfig";
 import {
+  createFactoryCircuitDisplayPageSeedConfig,
+  factoryCircuitDisplayPageEditorRegions
+} from "../FactoryCircuit/displayPageConfig";
+import {
   createSolarDisplayPageSeedConfig,
   solarDisplayPageEditorRegions
 } from "../Solar/displayPageConfig";
@@ -177,6 +181,77 @@ test("display editor inspector surfaces range, required, and select compatibilit
       )
     ),
     []
+  );
+});
+
+test("display editor exposes bounded flow treatment fields only for supported controls", () => {
+  const solarConfig = createSolarDisplayPageSeedConfig();
+  const [solarConnector] = resolveDisplayEditorRegions(
+    solarConfig,
+    solarDisplayPageEditorRegions.filter((region) => region.id === "solar-connector-solarToInverter"),
+    solarConfig
+  );
+  const factoryConfig = createFactoryCircuitDisplayPageSeedConfig();
+  const [factoryNode] = resolveDisplayEditorRegions(
+    factoryConfig,
+    factoryCircuitDisplayPageEditorRegions.filter((region) => region.id === "factory-node-inverter"),
+    factoryConfig
+  );
+
+  assert.ok(solarConnector);
+  assert.ok(factoryNode);
+
+  assert.deepEqual(
+    solarConnector.fields
+      .filter((field) => field.path.join(".").startsWith("connectorTreatments.solarToInverter"))
+      .map((field) => field.schema.id),
+    [
+      "solar-solarToInverter-connector-stroke-width",
+      "solar-solarToInverter-connector-opacity",
+      "solar-solarToInverter-connector-line-cap",
+      "solar-solarToInverter-connector-radius",
+      "solar-solarToInverter-connector-layer"
+    ]
+  );
+  assert.deepEqual(
+    factoryNode.fields
+      .filter((field) => field.path.join(".").startsWith("nodeTreatments.inverter"))
+      .map((field) => field.schema.id),
+    [
+      "factory-inverter-node-icon-scale",
+      "factory-inverter-node-icon-label-gap",
+      "factory-inverter-node-value-align"
+    ]
+  );
+  assert.equal(
+    solarConnector.fields.find((field) => field.schema.id === "solar-solarToInverter-connector-stroke-width")?.schema
+      .fieldType,
+    "number"
+  );
+  assert.deepEqual(
+    solarConnector.fields.find((field) => field.schema.id === "solar-solarToInverter-connector-stroke-width")?.schema,
+    {
+      constraints: { max: 32, min: 1 },
+      fieldType: "number",
+      group: "Flow Treatment",
+      id: "solar-solarToInverter-connector-stroke-width",
+      label: "Connector Stroke Width",
+      path: ["connectorTreatments", "solarToInverter", "strokeWidth"],
+      resettable: true,
+      step: 1,
+      unit: "px"
+    }
+  );
+  assert.deepEqual(
+    resolveDisplayEditorFieldIssues({
+      ...solarConnector.fields.find((field) => field.schema.id === "solar-solarToInverter-connector-stroke-width")!,
+      value: 0
+    }),
+    ["Connector Stroke 寬度必須大於或等於 1。"]
+  );
+  assert.equal(
+    solarConnector.fields.some((field) => field.schema.id.includes("dash")),
+    false
   );
 });
 

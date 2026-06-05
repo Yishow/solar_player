@@ -58,6 +58,9 @@ test("display editor regions reveal only the icon payload fields owned by the se
     [
       "solar-icon-source-mode",
       "solar-icon-glyph-name",
+      "factory-solar-node-icon-scale",
+      "factory-solar-node-icon-label-gap",
+      "factory-solar-node-value-align",
       "solar-left",
       "solar-top",
       "solar-width",

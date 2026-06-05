@@ -123,6 +123,7 @@
   left: 0;
   margin: 0;
   width: 100%;
+  text-align: var(--display-flow-node-value-align, center);
 }
 
 .factory-circuit-node-solar .display-node-icon {
@@ -130,6 +131,7 @@
   top: 29px;
   width: 128px;
   height: 116px;
+  transform: scale(var(--display-flow-node-icon-scale, 1));
 }
 
 .factory-circuit-node-inverter .display-node-icon {
@@ -137,6 +139,7 @@
   top: 41px;
   width: 94px;
   height: 106px;
+  transform: scale(var(--display-flow-node-icon-scale, 1));
 }
 
 .factory-circuit-node-board .display-node-icon {
@@ -144,24 +147,25 @@
   top: 59px;
   width: 110px;
   height: 142px;
+  transform: scale(var(--display-flow-node-icon-scale, 1));
 }
 
 .factory-circuit-node-solar .display-node-title,
 .factory-circuit-node-inverter .display-node-title {
-  top: 156px;
+  top: calc(156px + var(--display-flow-node-icon-label-gap, 0px));
 }
 
 .factory-circuit-node-solar .display-node-subtitle,
 .factory-circuit-node-inverter .display-node-subtitle {
-  top: 193px;
+  top: calc(193px + var(--display-flow-node-icon-label-gap, 0px));
 }
 
 .factory-circuit-node-board .display-node-title {
-  top: 216px;
+  top: calc(216px + var(--display-flow-node-icon-label-gap, 0px));
 }
 
 .factory-circuit-node-board .display-node-subtitle {
-  top: 255px;
+  top: calc(255px + var(--display-flow-node-icon-label-gap, 0px));
 }
 
 .factory-circuit-node-board {

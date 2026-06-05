@@ -63,7 +63,7 @@ test("solar runtime offsets canonical FHD coordinates by the current shell heade
 
 test("solar flow diagram keeps circular energy nodes and directional connectors", () => {
   assert.match(solarCss, /\.solar-flow-node\s*\{[\s\S]*?border-radius:\s*(?:50%|999px);/);
-  assert.match(solarCss, /\.solar-flow-node-co2 h3\s*\{[\s\S]*?top:\s*132px;/);
+  assert.match(solarCss, /\.solar-flow-node-co2 h3\s*\{[\s\S]*?top:\s*calc\(132px \+/);
   assert.match(solarCss, /\.solar-connector::after\s*\{/);
   assert.match(solarCss, /border-left:\s*18px solid currentColor;/);
   assert.match(solarCss, /\.solar-connector-l::before\s*\{/);
@@ -71,7 +71,7 @@ test("solar flow diagram keeps circular energy nodes and directional connectors"
 
 test("solar CO2 node keeps its title, footnote, and value separated inside the circle", () => {
   assert.match(solarCss, /\.solar-flow-node-co2 h3\s*\{[\s\S]*?line-height:\s*1\.08;/);
-  assert.match(solarCss, /\.solar-flow-node-co2 p\s*\{[\s\S]*?top:\s*166px;/);
+  assert.match(solarCss, /\.solar-flow-node-co2 p\s*\{[\s\S]*?top:\s*calc\(166px \+/);
   assert.match(solarCss, /\.solar-flow-node-co2 \.solar-flow-value\s*\{[\s\S]*?bottom:\s*8px;/);
 });
 

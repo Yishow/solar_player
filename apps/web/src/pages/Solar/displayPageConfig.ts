@@ -22,6 +22,14 @@ import {
   type DisplayPageIconSource
 } from "../shared/displayIconSourceConfig";
 import {
+  buildFlowConnectorTreatmentFields,
+  buildFlowNodeTreatmentFields,
+  createFlowConnectorTreatmentConfig,
+  createFlowNodeTreatmentConfig,
+  type FlowConnectorTreatmentConfig,
+  type FlowNodeTreatmentConfig
+} from "../shared/displayPageFlowTreatmentConfig";
+import {
   createUnsupportedDisplayPageMediaEffectSurface
 } from "../shared/displayPageMediaEffectConfig";
 import {
@@ -38,6 +46,9 @@ export type SolarDisplayRect = {
   width: number;
 };
 
+export type SolarConnectorKey = "inverterToCo2" | "inverterToFactory" | "solarToInverter";
+export type SolarFlowNodeKey = "co2" | "factory" | "inverter" | "solar";
+
 export type SolarDisplayPageConfig = {
   cardStyles: Record<
     "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2",
@@ -50,8 +61,10 @@ export type SolarDisplayPageConfig = {
       leaf: LeafOrnamentChromeConfig;
     };
   };
-  connectors: Record<"inverterToCo2" | "inverterToFactory" | "solarToInverter", SolarDisplayRect>;
-  flowNodes: Record<"co2" | "factory" | "inverter" | "solar", SolarDisplayRect>;
+  connectorTreatments: Record<SolarConnectorKey, FlowConnectorTreatmentConfig>;
+  connectors: Record<SolarConnectorKey, SolarDisplayRect>;
+  flowNodeTreatments: Record<SolarFlowNodeKey, FlowNodeTreatmentConfig>;
+  flowNodes: Record<SolarFlowNodeKey, SolarDisplayRect>;
   heroContainer: SolarDisplayRect;
   heroCopy: {
     eyebrow: string;
@@ -60,7 +73,7 @@ export type SolarDisplayPageConfig = {
   };
   heroMedia: DisplayPageMediaBinding;
   iconSources: {
-    flowNodes: Record<"co2" | "factory" | "inverter" | "solar", DisplayPageIconSource>;
+    flowNodes: Record<SolarFlowNodeKey, DisplayPageIconSource>;
     kpiCards: Record<
       "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2",
       DisplayPageIconSource
@@ -116,10 +129,21 @@ export function createSolarDisplayPageSeedConfig(
         })
       }
     },
+    connectorTreatments: {
+      inverterToCo2: createFlowConnectorTreatmentConfig({ strokeWidth: 5 }),
+      inverterToFactory: createFlowConnectorTreatmentConfig({ strokeWidth: 9 }),
+      solarToInverter: createFlowConnectorTreatmentConfig({ strokeWidth: 9 })
+    },
     connectors: {
       inverterToCo2: { ...solarConnectorLayout.inverterToCo2 },
       inverterToFactory: { ...solarConnectorLayout.inverterToFactory },
       solarToInverter: { ...solarConnectorLayout.solarToInverter }
+    },
+    flowNodeTreatments: {
+      co2: createFlowNodeTreatmentConfig(),
+      factory: createFlowNodeTreatmentConfig(),
+      inverter: createFlowNodeTreatmentConfig(),
+      solar: createFlowNodeTreatmentConfig()
     },
     flowNodes: {
       co2: { ...solarFlowNodeLayout.co2 },
@@ -313,6 +337,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         idPrefix: key,
         path: ["iconSources", "flowNodes", key]
       }),
+      ...buildFlowNodeTreatmentFields({
+        idPrefix: `solar-${key}`,
+        path: ["flowNodeTreatments", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["flowNodes", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["flowNodes", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["flowNodes", key, "width"] },
@@ -335,6 +363,10 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["connectors", key, "width"]
     },
     fields: [
+      ...buildFlowConnectorTreatmentFields({
+        idPrefix: `solar-${key}`,
+        path: ["connectorTreatments", key]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["connectors", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["connectors", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["connectors", key, "width"] },
