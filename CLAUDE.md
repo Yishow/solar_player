@@ -63,6 +63,8 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 3. 查對應 `openspec/specs/` 或 `openspec/changes/`，確認這次是 polish、runtime parity、fallback、publish refresh，還是工具鏈/asset pipeline。
 4. 用 targeted tests 與 browser/manual witness 驗證；結果寫在本次 change artifact 或回報，不要把 root docs 當成逐頁 QA ledger。
 
+FHD workflow vocabulary 以 `docs/reference-match/fhd-workflow-entrypoints.md` 為入口；agent-facing 文件要沿用同一組 `witness batch`、`evidence bundle`、`visual canonicals`、`launch witness gates` 語彙。
+
 Editor capability-first 原則：
 
 - 五個 playback 頁的 FHD closeout 都必須優先確認能否由 `/display-pages/editor` 維護。

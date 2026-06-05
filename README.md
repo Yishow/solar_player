@@ -130,6 +130,9 @@ Solar Display 已經是 root monorepo 內的正式產品，不再處於 prototyp
 - 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 - 已有明確 change 要實作時：從 repo 根目錄使用 `/spectra-apply <change-name>`
 - FHD 視覺 witness：`docs/reference/FHD/`
+- FHD workflow 入口：`docs/reference-match/fhd-workflow-entrypoints.md`
+- Playback visual canonicals：`docs/reference-match/playback-visual-canonicals.md`
+- Launch witness gates：`docs/reference-match/display-launch-witness-matrix.md`
 - 舊 HTML prototype：只作歷史背景，不是現行 runtime 或工作入口
 - MQTT 參考與其他補充文件：需要時再從 `docs/` 查找，不要優先於現行程式與 `openspec/`
 
