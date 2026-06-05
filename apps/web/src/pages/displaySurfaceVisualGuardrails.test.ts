@@ -14,6 +14,10 @@ const checklistDoc = readFileSync(
   path.join(repoRoot, "docs/display-surface-visual-review-checklist.md"),
   "utf8"
 );
+const referenceBoundaryDoc = readFileSync(
+  path.join(repoRoot, "docs/reference-match/fhd-reference-informed-closeout-boundaries.md"),
+  "utf8"
+);
 const playbackCanonicalsDoc = readFileSync(
   path.join(repoRoot, "docs/reference-match/playback-visual-canonicals.md"),
   "utf8"
@@ -95,6 +99,27 @@ test("display surface checklist covers the required review dimensions and docume
     const proposalSource = readFileSync(proposalPath, "utf8");
     assert.match(proposalSource, /docs\/display-surface-visual-review-checklist\.md/);
   }
+});
+
+test("display surface checklist reviews reference differences as scoped boundary decisions", () => {
+  for (const token of ["protected-product-choice", "reference-quality-target", "actual-gap"]) {
+    assert.match(checklistDoc, new RegExp(token));
+    assert.match(referenceBoundaryDoc, new RegExp(token));
+  }
+
+  assert.match(checklistDoc, /scoped boundary/i);
+  assert.match(checklistDoc, /header/i);
+  assert.match(checklistDoc, /footer/i);
+  assert.match(checklistDoc, /Gap Type/);
+  assert.match(checklistDoc, /Protected Attributes/);
+  assert.match(checklistDoc, /Reference Quality Cue/);
+  assert.match(checklistDoc, /Verification Gate/);
+  assert.match(checklistDoc, /management-surface drift/i);
+  assert.match(checklistDoc, /table-first|toolbar-first|settings-like/i);
+  assert.match(referenceBoundaryDoc, /page content/i);
+  assert.match(referenceBoundaryDoc, /Gap Type/);
+  assert.match(referenceBoundaryDoc, /Verification Gate/);
+  assert.match(referenceBoundaryDoc, /hero|KPI|flow|circuit|media stage|caption|ornament|highlight rail/i);
 });
 
 test("playback visual canonicals document names witness pairs and protected attributes for all five playback pages", () => {

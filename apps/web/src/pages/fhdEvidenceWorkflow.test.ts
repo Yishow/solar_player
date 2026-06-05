@@ -16,6 +16,10 @@ const evidenceBundleTemplate = readFileSync(
   path.join(repoRoot, "docs/reference-match/fhd-evidence-bundle-template.md"),
   "utf8"
 );
+const referenceBoundaryDoc = readFileSync(
+  path.join(repoRoot, "docs/reference-match/fhd-reference-informed-closeout-boundaries.md"),
+  "utf8"
+);
 const surfaceSplitGuide = readFileSync(
   path.join(repoRoot, "docs/reference-match/fhd-surface-split-guide.md"),
   "utf8"
@@ -55,6 +59,37 @@ test("evidence bundle template carries the shared workflow vocabulary for playba
   assert.match(evidenceBundleTemplate, /playback/i);
   assert.match(evidenceBundleTemplate, /management/i);
   assert.match(evidenceBundleTemplate, /editor/i);
+});
+
+test("evidence bundle template records reference-informed boundary decisions with bounded proof", () => {
+  for (const token of ["protected-product-choice", "reference-quality-target", "actual-gap"]) {
+    assert.match(referenceBoundaryDoc, new RegExp(token));
+    assert.match(evidenceBundleTemplate, new RegExp(token));
+  }
+
+  for (const field of [
+    "Surface",
+    "Classification",
+    "Current Product Choice",
+    "Reference Quality Cue",
+    "Gap Type",
+    "Protected Attributes",
+    "Implementation Consequence",
+    "Verification Gate",
+    "Witness Evidence",
+    "Accepted By",
+    "Revisit Trigger"
+  ]) {
+    assert.match(referenceBoundaryDoc, new RegExp(field));
+    assert.match(evidenceBundleTemplate, new RegExp(field));
+  }
+
+  assert.match(referenceBoundaryDoc, /header/i);
+  assert.match(referenceBoundaryDoc, /footer/i);
+  assert.match(evidenceBundleTemplate, /Accepted By.*empty|missing accepted-by|missing owner/i);
+  assert.match(evidenceBundleTemplate, /actual-gap.*Gap Type|Gap Type.*actual-gap/s);
+  assert.match(evidenceBundleTemplate, /actual-gap.*Verification Gate|Verification Gate.*actual-gap/s);
+  assert.match(evidenceBundleTemplate, /cannot waive|不得.*豁免/i);
 });
 
 test("surface split guide names the supported reviewable families and when to split a large diff", () => {

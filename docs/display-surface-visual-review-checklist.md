@@ -24,6 +24,23 @@
 
 `Live preview mode` 只能當輔助確認，不能取代 witness pair。
 
+## Reference-Informed Boundary Review
+
+每個重要 reference mismatch 都要先寫成 scoped boundary decision，再決定要保護、調質感、或拆 gap。不要把「跟 reference 不一樣」直接視為 fail，也不要把「目前覺得可以」直接視為整頁 pass。
+
+| Classification | Review meaning | Required fields |
+| --- | --- | --- |
+| `protected-product-choice` | 已被接受的產品選擇，例如 header/footer 高度、位置、資訊密度。只保護列出的 shell attribute。 | Surface, Protected Attributes, Witness Evidence, Accepted By, Revisit Trigger |
+| `reference-quality-target` | 參考圖提供質感方向，例如 hero hierarchy、KPI rhythm、flow language、media stage density、caption tension、ornament balance、highlight rail density。 | Surface, Reference Quality Cue, Implementation Consequence, Witness Evidence |
+| `actual-gap` | 仍會影響 launch readiness 的缺口，例如 editor capability、runtime parity、fallback、publish refresh、asset/content、handoff evidence。 | Surface, Gap Type, Implementation Consequence, Verification Gate, Witness Evidence, Revisit Trigger |
+
+Scoped boundary rule:
+
+- header/footer 可以被標成 `protected-product-choice`，但 Protected Attributes 必須只列 height、position、information density 等已接受 shell 屬性。
+- protected shell 不會覆蓋 page content；hero、KPI、flow、circuit、media stage、caption、ornament、highlight rail 都要另行分類。
+- `reference-quality-target` 不能被改成 table-first、toolbar-first、settings-like 的 management surface treatment。
+- `actual-gap` 不能靠 documented exception 或 protected shell choice 關閉。
+
 ## Required Review Dimensions
 
 - `Hero typography`
@@ -50,17 +67,19 @@
 ## Drift Checks
 
 - `management-surface drift`
-  - 不得把 playback hero、KPI、media、focus composition 改成 management board、table-first panel、toolbar stack。
+  - 不得把 playback hero、KPI、media、focus composition 改成 management board、table-first panel、toolbar-first stack、settings-like panel。
 - `Protected canonical status`
   - 每個受影響頁面都要記錄是 `preserved`、`changed intentionally`、或 `blocked by exception`。
+- `Reference-informed boundary`
+  - 每個重要 reference mismatch 都要記錄為 `protected-product-choice`、`reference-quality-target`、或 `actual-gap`，且不得用 shell protected choice 豁免 page content review。
 - `Documented exception`
   - 只有在 witness 無法直接沿用時才可例外，必須寫明受影響區塊、原因、替代做法。
 
 ## Review Record Template
 
-| Route | Witness pair checked | Protected canonical status | Preserved or changed | Documented exception |
-| --- | --- | --- | --- | --- |
-| `/example` | `FHD + prototype/spec` | `preserved` | `Hero hierarchy preserved; Card-family rhythm preserved` | `none` |
+| Route | Witness pair checked | Boundary classification | Protected canonical status | Preserved or changed | Documented exception |
+| --- | --- | --- | --- | --- | --- |
+| `/example` | `FHD + prototype/spec` | `reference-quality-target` | `preserved` | `Hero hierarchy preserved; Card-family rhythm preserved` | `none` |
 
 ## Shared Primitive Exceptions
 
@@ -77,5 +96,6 @@
 
 - reviewer 能指出這次變更依據哪個 witness pair
 - reviewer 能說出哪些 canonicals 被保留
+- reviewer 能指出每個重要 reference mismatch 的 scoped boundary classification
 - 若有偏離，review artifact 已經留下 `Documented exception`
 - playback 頁面沒有因 shared primitive reuse 發生 `management-surface drift`

@@ -330,3 +330,78 @@ tests:
   - apps/web/src/hooks/useDisplayPageConfig.test.ts
   - apps/web/src/hooks/displayTransition.test.ts
 -->
+
+---
+### Requirement: Record reference-informed boundary decisions in FHD evidence bundles
+
+The FHD evidence workflow SHALL require evidence bundles for FHD closeout work to record reference-informed boundary decisions for material reference differences. The evidence bundle SHALL include a boundary decision table with Surface, Classification, Current Product Choice, Reference Quality Cue, Gap Type, Protected Attributes, Implementation Consequence, Verification Gate, Witness Evidence, Accepted By, and Revisit Trigger fields.
+
+#### Scenario: Evidence separates protected shell choices from page polish targets
+
+- **WHEN** an AI-authored FHD closeout change affects shared display chrome and playback page content
+- **THEN** the evidence bundle records boundary decisions for material reference differences
+- **AND** accepted header or footer height, position, or information density can be classified as `protected-product-choice`
+- **AND** page content polish such as hero hierarchy, KPI rhythm, flow clarity, media density, caption tension, ornament balance, or highlight rail density remains separately classified as `reference-quality-target` or `actual-gap`
+
+##### Example: Required evidence fields for each classification
+
+| Classification | Required fields |
+| ----- | ----- |
+| `protected-product-choice` | Surface, Classification, Current Product Choice, Protected Attributes, Witness Evidence, Accepted By, Revisit Trigger |
+| `reference-quality-target` | Surface, Classification, Reference Quality Cue, Implementation Consequence, Witness Evidence |
+| `actual-gap` | Surface, Classification, Gap Type, Implementation Consequence, Verification Gate, Witness Evidence, Revisit Trigger |
+
+
+<!-- @trace
+source: define-fhd-reference-informed-closeout-boundaries
+updated: 2026-06-05
+code:
+  - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
+  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/display-surface-visual-review-checklist.md
+  - docs/fhd-witness/playback-closeout-matrix.md
+  - docs/goal.md
+tests:
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+-->
+
+---
+### Requirement: Treat incomplete boundary evidence as incomplete FHD evidence
+
+The FHD evidence workflow SHALL treat missing classification, missing protected attributes, missing witness evidence, or missing accepted-by owner for a protected product choice as incomplete evidence. The workflow SHALL also treat an `actual-gap` row with missing Gap Type, missing Verification Gate, missing Witness Evidence, or missing Revisit Trigger as incomplete evidence. Incomplete boundary evidence SHALL NOT be used to waive a visual guardrail or mark a launch witness gate as pass.
+
+#### Scenario: A protected choice without owner evidence does not waive review
+
+- **WHEN** an evidence bundle claims that a shared shell difference is accepted but omits the accepted-by owner or protected attributes
+- **THEN** the evidence bundle remains incomplete for FHD closeout review
+- **AND** an `actual-gap` row that omits Gap Type, Verification Gate, Witness Evidence, or Revisit Trigger also remains incomplete for launch closeout review
+- **AND** the difference cannot waive visual review until the missing evidence is recorded
+- **AND** the related launch witness gate remains fail or blocked when the missing evidence affects launch readiness
+
+##### Example: Missing accepted-by owner
+
+- **GIVEN** an evidence bundle row has Surface `Shared footer`, Classification `protected-product-choice`, Protected Attributes `height and bottom position`, and Accepted By empty
+- **WHEN** the reviewer evaluates the row
+- **THEN** the row is incomplete boundary evidence
+- **AND** the footer difference cannot be used to waive the visual guardrail until Accepted By is recorded
+
+<!-- @trace
+source: define-fhd-reference-informed-closeout-boundaries
+updated: 2026-06-05
+code:
+  - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
+  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - docs/reference-match/display-launch-witness-matrix.md
+  - docs/display-surface-visual-review-checklist.md
+  - docs/fhd-witness/playback-closeout-matrix.md
+  - docs/goal.md
+tests:
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+-->

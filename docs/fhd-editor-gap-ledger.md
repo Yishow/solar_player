@@ -17,6 +17,16 @@ This ledger audits the five playback pages against the current product code and 
 - `non-editor-runtime-gap`: The adjustment belongs to runtime data, assets, route behavior, witness tooling, or playback model governance rather than editor controls.
 - `accepted-difference`: The user explicitly accepts a difference from the FHD reference. No table rows currently use this classification because this change has no recorded human acceptance as of 2026-06-05.
 
+## Reference-Informed Closeout Boundary Overlay
+
+The editor capability classifications above answer whether `/display-pages/editor` can represent a visual adjustment. They do not decide whether every reference mismatch is a product gap. For FHD closeout, use the reference-informed boundary guide as a second overlay before value tuning:
+
+- `protected-product-choice`: Accepted shell choices, especially header/footer height, position, nav density, and information density, are boundary decisions rather than editor capability gaps. They protect only listed shell attributes and do not cover page content.
+- `reference-quality-target`: Page content still moves toward reference quality without pixel matching. Overview hero/KPI rhythm, Solar flow/KPI rhythm, Factory Circuit circuit/load hierarchy, Images media stage/caption/thumbnail density, and Sustainability ring/media/highlight rail rhythm stay in this bucket unless a concrete blocker is found.
+- `actual-gap`: Runtime evidence, fallback, publish refresh, production asset/content state, or missing editor capability remains actionable and verifiable. Existing `new-editor-capability` and `non-editor-runtime-gap` rows can map to this boundary classification when they block launch evidence.
+
+Accepted header/footer shell choices are not added as new editor capability rows because no new editor schema, inspector control, persistence path, preview renderer, or server validation is required to preserve them. If a future witness proves the shell itself wraps, overlaps page content, or loses 3-5m readability, create a new row with the actual editor/runtime owner instead of broadening the protected choice.
+
 ## Overview
 
 | Page | Route | FHD reference path | Surface | Current editor region id | Current editor field group | Code anchor or evidence path | Classification | Downstream owner | Next verification | Notes |

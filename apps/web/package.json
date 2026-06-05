@@ -9,7 +9,7 @@
     "fhd:witness": "node ../../scripts/capture-fhd-witness.mjs",
     "fhd:witness:dry-run": "node ../../scripts/capture-fhd-witness.mjs --dry-run",
     "pretest": "pnpm --filter @solar-display/shared build",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "node ./scripts/run-tests.mjs"
   },
   "dependencies": {
     "@solar-display/shared": "workspace:*",

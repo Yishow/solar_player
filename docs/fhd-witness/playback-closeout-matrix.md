@@ -16,6 +16,18 @@ Use `--run-id <id>` when a deterministic evidence folder is needed.
 | Images | images | `/images` | `docs/reference/FHD/04-4.Images (大).png` | `playback/images.png` | `/display-pages/editor?page=images` |
 | Sustainability | sustainability | `/sustainability` | `docs/reference/FHD/05-5.Sustainability (大).png` | `playback/sustainability.png` | `/display-pages/editor?page=sustainability` |
 
+## Reference-Informed Boundary Map
+
+Use the reference-informed closeout boundary rules to classify the follow-up after each witness capture. The capture output does not decide launch readiness; it supplies evidence for the boundary decision.
+
+| page | protected product choice example | reference quality target examples | actual gap examples |
+| --- | --- | --- | --- |
+| Overview | `protected-product-choice`: accepted shared header height and position. | `reference-quality-target`: hero photo fade, bilingual title rhythm, KPI row spacing. | `actual-gap`: missing fresh runtime/publish/fallback witness. |
+| Solar | `protected-product-choice`: accepted shared footer height and nav position. | `reference-quality-target`: connector thickness, flow node placement, source-like flow language, KPI row rhythm. | `actual-gap`: connector treatment only if existing editor controls cannot express witness needs. |
+| FactoryCircuit | `protected-product-choice`: accepted shared shell information density. | `reference-quality-target`: circuit line weight, ornament balance, load panel display hierarchy. | `actual-gap`: connector stroke or load-row rhythm capability only if witness proves current controls insufficient. |
+| Images | `protected-product-choice`: accepted shared header/footer position. | `reference-quality-target`: media stage crop, thumbnail strip density, caption display tension. | `actual-gap`: runtime playlist/fallback witness or production image-set governance. |
+| Sustainability | `protected-product-choice`: accepted shared footer position. | `reference-quality-target`: ring ornament integration, hero media overlap, tree/stat rhythm, highlight rail density. | `actual-gap`: ring/media treatment or hero media effects capability only if witness proves current controls insufficient. |
+
 Generated runs are written under `docs/fhd-witness/runs/<run-id>/`:
 
 - `playback/*.png` records the live playback route witness.

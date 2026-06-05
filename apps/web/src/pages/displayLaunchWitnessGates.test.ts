@@ -20,6 +20,10 @@ const witnessMatrixDoc = readFileSync(
   path.join(repoRoot, "docs/reference-match/display-launch-witness-matrix.md"),
   "utf8"
 );
+const closeoutMatrixDoc = readFileSync(
+  path.join(repoRoot, "docs/fhd-witness/playback-closeout-matrix.md"),
+  "utf8"
+);
 const verificationPackDoc = readFileSync(
   path.join(repoRoot, "docs/reference-match/display-launch-verification-pack.md"),
   "utf8"
@@ -64,6 +68,38 @@ test("launch witness matrix is the single page-by-page status ledger for all fiv
   assert.match(witnessMatrixDoc, /fallback/i);
   assert.match(witnessMatrixDoc, /handoff/i);
   assert.match(witnessMatrixDoc, /pass|fail|blocked/i);
+});
+
+test("launch witness matrix links boundary rationale without replacing blocked launch status", () => {
+  for (const token of ["protected-product-choice", "reference-quality-target", "actual-gap"]) {
+    assert.match(witnessMatrixDoc, new RegExp(token));
+    assert.match(closeoutMatrixDoc, new RegExp(token));
+  }
+
+  assert.match(witnessMatrixDoc, /boundary rationale/i);
+  assert.match(witnessMatrixDoc, /single authoritative launch status ledger/i);
+  assert.match(witnessMatrixDoc, /does not.*launch-ready|不.*launch-ready|不得.*launch-ready/i);
+
+  for (const route of [
+    "/overview",
+    "/solar",
+    "/factory-circuit",
+    "/images",
+    "/sustainability"
+  ]) {
+    const routePattern = new RegExp(`${route.replace("/", "\\/")}.*blocked`, "s");
+    assert.match(witnessMatrixDoc, routePattern);
+  }
+
+  for (const cue of [
+    "hero photo fade",
+    "connector thickness",
+    "circuit line weight",
+    "media stage crop",
+    "highlight rail density"
+  ]) {
+    assert.match(closeoutMatrixDoc, new RegExp(cue, "i"));
+  }
 });
 
 test("launch verification pack provides commands, manual checks, and matrix recording instructions", () => {

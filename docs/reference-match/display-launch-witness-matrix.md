@@ -12,15 +12,24 @@
 
 若沒有新鮮 witness，不要猜測；先標 `blocked` 並寫 blocker note。
 
+## Boundary Rationale Rule
+
+Reference-informed boundary decisions explain status rationale; they do not replace this matrix. This file remains the single authoritative launch status ledger.
+
+- `protected-product-choice` can explain why an accepted header/footer height, position, or information-density difference is not a visual fail for the listed Protected Attributes.
+- `reference-quality-target` records page content quality direction, such as hero rhythm, flow clarity, media density, circuit language, or highlight rail density.
+- `actual-gap` keeps the relevant gate `fail` or `blocked` until runtime, fallback, publish refresh, editor capability, asset/content, visual tuning, or handoff evidence passes.
+- A `protected-product-choice` does not make a page launch-ready by itself.
+
 ## Page-by-Page Matrix
 
-| Route | Authoring | Runtime parity | Publish refresh | Fallback | Handoff | Overall | Blocker notes |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `/overview` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
-| `/solar` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
-| `/factory-circuit` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
-| `/images` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `Images` 的 playlist/fallback witness 尚未重新確認。 |
-| `/sustainability` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | editor/runtime parity 與 fallback witness 尚未重新確認。 |
+| Route | Authoring | Runtime parity | Publish refresh | Fallback | Handoff | Overall | Boundary rationale | Blocker notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/overview` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | Accepted header/footer can be recorded as `protected-product-choice`; hero photo fade and KPI row rhythm remain `reference-quality-target`. | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
+| `/solar` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | Accepted footer/nav shell can be recorded as `protected-product-choice`; connector thickness, flow node placement, and KPI row rhythm remain `reference-quality-target`. | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
+| `/factory-circuit` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | Accepted shell density can be recorded as `protected-product-choice`; circuit line weight, ornament balance, and load panel hierarchy remain `reference-quality-target`. | 尚未依 `display-launch-verification-pack.md` 回填新鮮 witness。 |
+| `/images` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | Accepted header/footer can be recorded as `protected-product-choice`; runtime playlist/fallback witness remains `actual-gap` until verified. | `Images` 的 playlist/fallback witness 尚未重新確認。 |
+| `/sustainability` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | `blocked` | Accepted footer shell can be recorded as `protected-product-choice`; ring/media overlap and highlight rail density remain `reference-quality-target` until witness review. | editor/runtime parity 與 fallback witness 尚未重新確認。 |
 
 ## Gate Meanings
 
