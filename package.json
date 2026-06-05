@@ -7,6 +7,8 @@
     "dev:fix": "pnpm --filter @solar-display/server rebuild better-sqlite3 && pnpm dev",
     "dev:web": "pnpm exec concurrently -k -n shared,web \"pnpm --filter @solar-display/shared dev\" \"pnpm --filter @solar-display/web dev\"",
     "dev:server": "pnpm exec concurrently -k -n shared,server \"pnpm --filter @solar-display/shared dev\" \"pnpm --filter @solar-display/server dev\"",
+    "fhd:witness": "node scripts/capture-fhd-witness.mjs",
+    "fhd:witness:dry-run": "node scripts/capture-fhd-witness.mjs --dry-run",
     "build": "pnpm run build:shared && pnpm run build:web && pnpm run build:server",
     "test": "pnpm --filter @solar-display/server test && pnpm --filter @solar-display/web test",
     "build:shared": "pnpm --filter @solar-display/shared build",
@@ -16,6 +18,7 @@
     "db:seed": "pnpm --filter @solar-display/server db:seed"
   },
   "devDependencies": {
-    "concurrently": "latest"
+    "concurrently": "latest",
+    "playwright": "latest"
   }
 }

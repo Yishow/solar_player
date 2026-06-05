@@ -65,6 +65,8 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 FHD workflow vocabulary 以 `docs/reference-match/fhd-workflow-entrypoints.md` 為入口；agent-facing 文件要沿用同一組 `witness batch`、`evidence bundle`、`visual canonicals`、`launch witness gates` 語彙。
 
+AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` 與 `docs/fhd-witness/evidence-template.md` 為入口；從 root 執行 `pnpm run fhd:witness -- --base-url <url>`，只用 `docs/reference/FHD/` 對照五個 playback routes。這個 workflow 只收集 1920x1080 screenshot/evidence，不設定 pixel threshold gate；AI 負責 capture、gap notes、Spectra hygiene，人工仍負責 intentional difference 與 launch acceptance。
+
 Editor capability-first 原則：
 
 - 五個 playback 頁的 FHD closeout 都必須優先確認能否由 `/display-pages/editor` 維護。

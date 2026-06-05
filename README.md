@@ -46,6 +46,8 @@ Solar Display 已經是 root monorepo 內的正式產品，不再處於 prototyp
 
 本 repo 可以採 AI-led execution：AI 主動盤點現況、拆 Spectra change、改程式、跑驗證、更新交接。產品意圖、FHD 品質門檻與 tradeoff 是否接受仍由使用者決定；AI 主導不代表可以擴架構、跳過 witness、或省略驗證。
 
+AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` 與 `docs/fhd-witness/evidence-template.md` 為入口；從 root 執行 `pnpm run fhd:witness -- --base-url <url>`，只用 `docs/reference/FHD/` 對照五個 playback routes。這個 workflow 只收集 1920x1080 screenshot/evidence，不設定 pixel threshold gate；AI 負責 capture、gap notes、Spectra hygiene，人工仍負責 intentional difference 與 launch acceptance。
+
 建議收斂順序：
 
 1. Baseline freeze：用 browser/manual witness 跑五個 playback 頁，先取得真實 blocker。
@@ -130,6 +132,7 @@ Solar Display 已經是 root monorepo 內的正式產品，不再處於 prototyp
 - 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 - 已有明確 change 要實作時：從 repo 根目錄使用 `/spectra-apply <change-name>`
 - FHD 視覺 witness：`docs/reference/FHD/`
+- AI-led FHD witness capture：`docs/fhd-witness/playback-closeout-matrix.md`、`docs/fhd-witness/evidence-template.md`，使用 `pnpm run fhd:witness -- --base-url <url>`
 - FHD workflow 入口：`docs/reference-match/fhd-workflow-entrypoints.md`
 - Playback visual canonicals：`docs/reference-match/playback-visual-canonicals.md`
 - Launch witness gates：`docs/reference-match/display-launch-witness-matrix.md`

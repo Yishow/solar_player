@@ -27,3 +27,4 @@ uploads/brand/*
 .playwright-cli/
 .superpowers/
 graphify-out/
+docs/fhd-witness/runs/

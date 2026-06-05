@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "fhd:witness": "node ../../scripts/capture-fhd-witness.mjs",
+    "fhd:witness:dry-run": "node ../../scripts/capture-fhd-witness.mjs --dry-run",
     "pretest": "pnpm --filter @solar-display/shared build",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
