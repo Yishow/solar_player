@@ -832,6 +832,40 @@ test("POST publish with invalid ornament treatment values is rejected", async ()
   }
 });
 
+test("POST publish with invalid FHD rhythm values is rejected", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "factory-circuit", {
+      rhythm: {
+        factoryLoadRows: {
+          labelFontSize: 0
+        }
+      }
+    });
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/factory-circuit/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 422);
+    const body = publishRes.json() as {
+      validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> };
+    };
+    assert.equal(body.validation.canPublish, false);
+    assert.ok(
+      body.validation.findings.some(
+        (finding) =>
+          finding.code === "RHYTHM_INVALID_VALUE" &&
+          finding.regionId === "root.rhythm.factoryLoadRows.labelFontSize"
+      )
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST publish blocks rail cards that overflow the parent rail bounds", async () => {
   const app = await buildApp();
 

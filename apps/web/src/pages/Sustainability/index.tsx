@@ -28,6 +28,10 @@ import { trendSeries } from "../../mocks/metrics";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { createRingOrnamentChromeConfig } from "../shared/displayPageChromeConfig";
+import {
+  buildSustainabilityHighlightRhythmStyle,
+  resolveSustainabilityHighlightRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
 import { sustainabilityHeroMediaEffectResolverOptions } from "../shared/displayPageMediaEffectConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
@@ -132,7 +136,14 @@ export function Sustainability({
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = config ?? runtimeConfig.config;
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig: SustainabilityDisplayPageConfig = {
+    ...runtimeResolvedConfig,
+    rhythm: {
+      ...seedConfig.rhythm,
+      ...(runtimeResolvedConfig.rhythm ?? {})
+    }
+  };
   const viewModel = buildSustainabilityViewModel({
     selectedPeriod,
     story: storyRuntime.payload ?? undefined
@@ -216,6 +227,10 @@ export function Sustainability({
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
   const leafLayout = withContentOffset(sustainabilityLeafLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroMedia);
+  const highlightRhythm = resolveSustainabilityHighlightRhythmConfig(
+    resolvedConfig.rhythm.highlightRail,
+    seedConfig.rhythm.highlightRail
+  );
   const ringSize = 286 * ringOrnament.scale;
   const shouldRenderPeriodChips = viewModel.periodOptions.length > 1;
   const shouldRenderHighlightRail = resolvedHighlightCards.some(
@@ -383,6 +398,7 @@ export function Sustainability({
         <section
           className="sustainability-highlight-rail"
           style={{
+            ...buildSustainabilityHighlightRhythmStyle(highlightRhythm),
             height: `${resolvedConfig.highlightRail.container.height}px`,
             left: `${resolvedConfig.highlightRail.container.left}px`,
             top: `${resolvedConfig.highlightRail.container.top - CONTENT_TOP_OFFSET}px`,

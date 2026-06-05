@@ -42,6 +42,11 @@ import {
   sustainabilityHeroDefaultMediaEffects
 } from "../shared/displayPageMediaEffectConfig";
 import {
+  buildSustainabilityHighlightRhythmFields,
+  createSustainabilityHighlightRhythmConfig,
+  type SustainabilityHighlightRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
+import {
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityKpiLayout,
@@ -85,6 +90,9 @@ export type SustainabilityDisplayPageConfig = {
     statCards: Record<"esg" | "procure" | "trees", DisplayPageIconSource>;
   };
   kpiCards: Record<"annualSaving" | "totalCo2" | "totalGeneration", SustainabilityDisplayRect>;
+  rhythm: {
+    highlightRail: SustainabilityHighlightRhythmConfig;
+  };
   statCards: Record<"esg" | "procure" | "trees", SustainabilityDisplayRect>;
 };
 
@@ -244,6 +252,9 @@ export function createSustainabilityDisplayPageSeedConfig(
       totalCo2: { ...sustainabilityKpiLayout.totalCo2 },
       totalGeneration: { ...sustainabilityKpiLayout.totalGeneration }
     },
+    rhythm: {
+      highlightRail: createSustainabilityHighlightRhythmConfig()
+    },
     statCards: {
       esg: { ...sustainabilityStatLayout.esg },
       procure: { ...sustainabilityStatLayout.procure },
@@ -373,6 +384,10 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["highlightRail", "container", "width"]
     },
     fields: [
+      ...buildSustainabilityHighlightRhythmFields({
+        idPrefix: "sustainability",
+        path: ["rhythm", "highlightRail"]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: "highlight-left", label: "Left", path: ["highlightRail", "container", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "highlight-top", label: "Top", path: ["highlightRail", "container", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "highlight-width", label: "Width", path: ["highlightRail", "container", "width"] },

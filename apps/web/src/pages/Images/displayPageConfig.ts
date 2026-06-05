@@ -29,6 +29,11 @@ import {
   imagesMainStageDefaultMediaEffects
 } from "../shared/displayPageMediaEffectConfig";
 import {
+  buildImagesCaptionRhythmFields,
+  createImagesCaptionRhythmConfig,
+  type ImagesCaptionRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
+import {
   imagesArrowLayout,
   imagesCopyLayout,
   imagesInfoLayout,
@@ -70,6 +75,9 @@ export type ImagesDisplayPageConfig = {
   };
   infoPanel: ImagesDisplayRect;
   mainStage: ImagesDisplayRect & DisplayPageMediaBinding;
+  rhythm: {
+    imagesCaption: ImagesCaptionRhythmConfig;
+  };
   thumbnailSlots: Record<"thumb1" | "thumb2" | "thumb3" | "thumb4", ImagesDisplayRect>;
   textBlocks: {
     copy: {
@@ -163,6 +171,9 @@ export function createImagesDisplayPageSeedConfig(
       focusY: 0.52,
       sourceMode: "seed-default",
       src: mainStageSrc
+    },
+    rhythm: {
+      imagesCaption: createImagesCaptionRhythmConfig()
     },
     textBlocks: {
       copy: { ...imagesCopyLayout }
@@ -351,6 +362,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       ...buildDisplayCardStyleFields({
         idPrefix: "info-panel",
         path: ["cardStyles", "infoPanel"]
+      }),
+      ...buildImagesCaptionRhythmFields({
+        idPrefix: "images",
+        path: ["rhythm", "imagesCaption"]
       }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: "info-panel",

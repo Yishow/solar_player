@@ -19,6 +19,10 @@ import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
+  buildImagesCaptionRhythmStyle,
+  resolveImagesCaptionRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
+import {
   imagesMainStageMediaEffectResolverOptions
 } from "../shared/displayPageMediaEffectConfig";
 import {
@@ -111,7 +115,14 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = config ?? runtimeConfig.config;
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig: ImagesDisplayPageConfig = {
+    ...runtimeResolvedConfig,
+    rhythm: {
+      ...seedConfig.rhythm,
+      ...(runtimeResolvedConfig.rhythm ?? {})
+    }
+  };
   const mainStageSource = resolveDisplayPageMediaSource(
     resolvedConfig.mainStage,
     seedConfig.mainStage.src
@@ -148,6 +159,10 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const mainLayout = withContentOffset(resolvedConfig.mainStage);
   const infoLayout = withContentOffset(resolvedConfig.infoPanel);
   const infoCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.infoPanel);
+  const infoCaptionRhythm = resolveImagesCaptionRhythmConfig(
+    resolvedConfig.rhythm.imagesCaption,
+    seedConfig.rhythm.imagesCaption
+  );
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
   const activeMainStageSource = viewModel.active.assetSource ?? mainStageSource ?? undefined;
   const isReferenceHeroCrop = viewModel.active.assetSource === imagesAssetRuntimeMap.main;
@@ -313,6 +328,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           className="images-info-card"
           surface="info"
           style={{
+            ...buildImagesCaptionRhythmStyle(infoCaptionRhythm),
             height: `${infoLayout.height}px`,
             left: `${infoLayout.left}px`,
             top: `${infoLayout.top}px`,

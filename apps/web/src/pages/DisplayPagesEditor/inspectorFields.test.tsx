@@ -17,6 +17,10 @@ import {
   factoryCircuitDisplayPageEditorRegions
 } from "../FactoryCircuit/displayPageConfig";
 import {
+  createImagesDisplayPageSeedConfig,
+  imagesDisplayPageEditorRegions
+} from "../Images/displayPageConfig";
+import {
   createSolarDisplayPageSeedConfig,
   solarDisplayPageEditorRegions
 } from "../Solar/displayPageConfig";
@@ -252,6 +256,89 @@ test("display editor exposes bounded flow treatment fields only for supported co
   assert.equal(
     solarConnector.fields.some((field) => field.schema.id.includes("dash")),
     false
+  );
+});
+
+test("display editor exposes FHD rhythm fields only on supported typography rhythm surfaces", () => {
+  const factoryConfig = createFactoryCircuitDisplayPageSeedConfig();
+  const [factoryLoadPanel] = resolveDisplayEditorRegions(
+    factoryConfig,
+    factoryCircuitDisplayPageEditorRegions.filter((region) => region.id === "factory-load-panel"),
+    factoryConfig
+  );
+  const imagesConfig = createImagesDisplayPageSeedConfig();
+  const [imagesInfoPanel] = resolveDisplayEditorRegions(
+    imagesConfig,
+    imagesDisplayPageEditorRegions.filter((region) => region.id === "images-info-panel"),
+    imagesConfig
+  );
+  const sustainabilityConfig = createSustainabilityDisplayPageSeedConfig();
+  const [sustainabilityHighlightRail] = resolveDisplayEditorRegions(
+    sustainabilityConfig,
+    sustainabilityDisplayPageEditorRegions.filter((region) => region.id === "sustainability-highlight-rail"),
+    sustainabilityConfig
+  );
+
+  assert.ok(factoryLoadPanel);
+  assert.ok(imagesInfoPanel);
+  assert.ok(sustainabilityHighlightRail);
+
+  assert.deepEqual(
+    factoryLoadPanel.fields
+      .filter((field) => field.path.join(".").startsWith("rhythm.factoryLoadRows"))
+      .map((field) => field.schema.id),
+    [
+      "factory-load-row-label-font-size",
+      "factory-load-row-label-line-height",
+      "factory-load-row-value-font-size",
+      "factory-load-row-icon-text-gap",
+      "factory-load-row-copy-gap",
+      "factory-load-row-horizontal-padding"
+    ]
+  );
+  assert.deepEqual(
+    imagesInfoPanel.fields
+      .filter((field) => field.path.join(".").startsWith("rhythm.imagesCaption"))
+      .map((field) => field.schema.id),
+    [
+      "images-caption-body-font-size",
+      "images-caption-body-line-height",
+      "images-caption-body-margin-top",
+      "images-caption-meta-font-size",
+      "images-caption-meta-line-height"
+    ]
+  );
+  assert.deepEqual(
+    sustainabilityHighlightRail.fields
+      .filter((field) => field.path.join(".").startsWith("rhythm.highlightRail"))
+      .map((field) => field.schema.id),
+    [
+      "sustainability-highlight-card-padding-x",
+      "sustainability-highlight-card-padding-y",
+      "sustainability-highlight-value-font-size",
+      "sustainability-highlight-unit-font-size",
+      "sustainability-highlight-label-font-size",
+      "sustainability-highlight-label-margin-top"
+    ]
+  );
+  assert.equal(
+    overviewDisplayPageEditorRegions.some((region) =>
+      region.fields.some((field) => field.path.join(".").startsWith("rhythm.highlightRail"))
+    ),
+    false
+  );
+  assert.equal(
+    solarDisplayPageEditorRegions.some((region) =>
+      region.fields.some((field) => field.path.join(".").startsWith("rhythm.factoryLoadRows"))
+    ),
+    false
+  );
+  assert.deepEqual(
+    resolveDisplayEditorFieldIssues({
+      ...factoryLoadPanel.fields.find((field) => field.schema.id === "factory-load-row-label-font-size")!,
+      value: 0
+    }),
+    ["Load Row 標籤字級必須大於或等於 10。"]
   );
 });
 

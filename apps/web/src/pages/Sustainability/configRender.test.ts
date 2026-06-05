@@ -31,6 +31,8 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   );
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.cards/);
   assert.match(sustainabilitySource, /resolvedConfig\.highlightRail\.container/);
+  assert.match(sustainabilitySource, /resolvedConfig\.rhythm\.highlightRail/);
+  assert.match(sustainabilitySource, /buildSustainabilityHighlightRhythmStyle/);
   assert.match(sustainabilitySource, /shouldRenderHighlightRail/);
   assert.match(sustainabilitySource, /resolveDisplayPageCardRailCards/);
   assert.match(sustainabilitySource, /householdEquivalents/);
@@ -55,6 +57,8 @@ test("sustainability display page seed config captures the current hero and high
   assert.equal(config.chrome.ornaments.ring.overlap, 118);
   assert.equal(config.chrome.ornaments.ring.opacity, 0.34);
   assert.equal(config.highlightRail.container.width, 470);
+  assert.equal((config as any).rhythm?.highlightRail?.valueFontSize, 30);
+  assert.equal((config as any).rhythm?.highlightRail?.cardPaddingX, 16);
   assert.equal(config.highlightRail.cards.length, 2);
   assert.equal(config.highlightRail.cards[0]?.template, "household-equivalent");
   assert.equal(config.highlightRail.cards[0]?.contentSource.mode, "static");

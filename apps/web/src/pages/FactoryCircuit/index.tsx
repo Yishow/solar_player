@@ -32,6 +32,10 @@ import {
   resolveFlowNodeTreatmentConfig
 } from "../shared/displayPageFlowTreatmentConfig";
 import {
+  buildFactoryLoadRowRhythmStyle,
+  resolveFactoryLoadRowRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
+import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
 } from "./displayPageConfig";
@@ -295,7 +299,14 @@ export function FactoryCircuit({
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = config ?? runtimeConfig.config;
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig: FactoryCircuitDisplayPageConfig = {
+    ...runtimeResolvedConfig,
+    rhythm: {
+      ...seedConfig.rhythm,
+      ...(runtimeResolvedConfig.rhythm ?? {})
+    }
+  };
   const viewModel = buildFactoryCircuitViewModel({
     circuits,
     connectionState,
@@ -311,6 +322,10 @@ export function FactoryCircuit({
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
+  const loadRowRhythm = resolveFactoryLoadRowRhythmConfig(
+    resolvedConfig.rhythm.factoryLoadRows,
+    seedConfig.rhythm.factoryLoadRows
+  );
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
@@ -515,6 +530,7 @@ export function FactoryCircuit({
       <section
         className="factory-circuit-load-panel"
         style={{
+          ...buildFactoryLoadRowRhythmStyle(loadRowRhythm),
           height: `${resolvedConfig.loadPanel.height}px`,
           left: `${resolvedConfig.loadPanel.left}px`,
           top: `${resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET}px`,

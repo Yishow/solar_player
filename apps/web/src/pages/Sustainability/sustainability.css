@@ -99,7 +99,7 @@
   border-radius: 18px;
   background: var(--display-card-surface-soft);
   box-shadow: var(--display-shadow-soft);
-  padding: 14px 16px;
+  padding: var(--sustainability-highlight-card-padding, 14px 16px);
 }
 
 .sustainability-highlight-item-household {
@@ -107,13 +107,13 @@
   text-align: center;
 }
 
-.sustainability-household-eyebrow {
+.sustainability-highlight-item .sustainability-household-eyebrow {
   margin-top: 0;
 }
 
 .sustainability-highlight-item strong {
   color: #57774a;
-  font-size: 30px;
+  font-size: var(--sustainability-highlight-value-font-size, 30px);
   font-weight: 800;
   line-height: 1;
 }
@@ -122,13 +122,13 @@
   margin-top: 4px;
   color: #596455;
   font-family: var(--font-family-en);
-  font-size: 14px;
+  font-size: var(--sustainability-highlight-unit-font-size, 14px);
 }
 
 .sustainability-highlight-item small {
-  margin-top: 8px;
+  margin-top: var(--sustainability-highlight-label-margin-top, 8px);
   color: #677062;
-  font-size: 13px;
+  font-size: var(--sustainability-highlight-label-font-size, 13px);
   letter-spacing: 0.08em;
 }
 

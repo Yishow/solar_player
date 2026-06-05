@@ -27,6 +27,11 @@ import {
   type FlowNodeTreatmentConfig
 } from "../shared/displayPageFlowTreatmentConfig";
 import {
+  buildFactoryLoadRowRhythmFields,
+  createFactoryLoadRowRhythmConfig,
+  type FactoryLoadRowRhythmConfig
+} from "../shared/displayPageFhdRhythmConfig";
+import {
   factoryCircuitConnectorLayout,
   factoryCircuitCopyLayout,
   factoryCircuitKpiLayout,
@@ -82,6 +87,9 @@ export type FactoryCircuitDisplayPageConfig = {
   >;
   nodeTreatments: Record<FactoryCircuitNodeKey, FlowNodeTreatmentConfig>;
   nodes: Record<FactoryCircuitNodeKey, FactoryCircuitDisplayRect>;
+  rhythm: {
+    factoryLoadRows: FactoryLoadRowRhythmConfig;
+  };
   statusBlock: FactoryCircuitDisplayRect;
   textBlocks: {
     copy: FactoryCircuitDisplayRect;
@@ -178,6 +186,9 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       board: { ...factoryCircuitNodeLayout.board },
       inverter: { ...factoryCircuitNodeLayout.inverter },
       solar: { ...factoryCircuitNodeLayout.solar }
+    },
+    rhythm: {
+      factoryLoadRows: createFactoryLoadRowRhythmConfig()
     },
     statusBlock: { ...factoryCircuitStatusLayout, height: 126 },
     textBlocks: {
@@ -340,6 +351,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["loadPanel", "width"]
     },
     fields: [
+      ...buildFactoryLoadRowRhythmFields({
+        idPrefix: "factory",
+        path: ["rhythm", "factoryLoadRows"]
+      }),
       { constraints: { min: 0 }, fieldType: "number", id: "load-panel-left", label: "Left", path: ["loadPanel", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "load-panel-top", label: "Top", path: ["loadPanel", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "load-panel-width", label: "Width", path: ["loadPanel", "width"] },

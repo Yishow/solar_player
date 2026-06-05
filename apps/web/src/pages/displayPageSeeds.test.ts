@@ -96,3 +96,16 @@ test("Solar and Sustainability seed media treatments stay separate from media so
     ["fade:left", "mist:left", "fade:bottom", "mist:bottom"]
   );
 });
+
+test("FHD rhythm seed tokens stay separate from geometry, media, icon, and story data", () => {
+  const factoryCircuit = createFactoryCircuitDisplayPageSeedConfig();
+  const images = createImagesDisplayPageSeedConfig("/images-main.jpg");
+  const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
+
+  assert.equal(factoryCircuit.rhythm.factoryLoadRows.labelFontSize, 22);
+  assert.equal(factoryCircuit.rhythm.factoryLoadRows.valueFontSize, 31);
+  assert.equal(images.rhythm.imagesCaption.bodyLineHeight, 1.74);
+  assert.equal(images.rhythm.imagesCaption.metaFontSize, 18);
+  assert.equal(sustainability.rhythm.highlightRail.valueFontSize, 30);
+  assert.equal(sustainability.rhythm.highlightRail.cardPaddingX, 16);
+});

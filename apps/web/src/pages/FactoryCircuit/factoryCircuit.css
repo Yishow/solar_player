@@ -216,12 +216,12 @@
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--factory-load-row-icon-text-gap, 24px);
   border: 1px solid var(--display-card-border-soft);
   border-radius: 16px;
   background: var(--display-card-surface);
   box-shadow: var(--display-shadow-soft);
-  padding: 0 26px 0 25px;
+  padding: 0 var(--factory-load-row-horizontal-padding, 26px);
 }
 
 .factory-circuit-load-icon {
@@ -254,15 +254,15 @@
 .factory-circuit-load-copy {
   display: grid;
   min-width: 0;
-  gap: 6px;
+  gap: var(--factory-load-row-copy-gap, 6px);
 }
 
 .factory-circuit-load-copy strong {
   color: #344039;
-  font-size: 22px;
+  font-size: var(--factory-load-row-label-font-size, 22px);
   font-weight: 700;
   letter-spacing: 1px;
-  line-height: 1.15;
+  line-height: var(--factory-load-row-label-line-height, 1.15);
 }
 
 .factory-circuit-load-copy small {
@@ -298,7 +298,7 @@
   margin-left: auto;
   color: #557a43;
   font-family: var(--font-family-en);
-  font-size: 31px;
+  font-size: var(--factory-load-row-value-font-size, 31px);
   font-weight: 600;
   line-height: 1;
 }

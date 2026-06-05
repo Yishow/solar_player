@@ -317,10 +317,45 @@ const ringTreatmentBounds = {
   zIndex: { max: 16, min: 0 }
 } as const;
 
+const rhythmBoundsByGroup = {
+  factoryLoadRows: {
+    copyGap: { max: 24, min: 0 },
+    horizontalPadding: { max: 48, min: 0 },
+    iconTextGap: { max: 48, min: 0 },
+    labelFontSize: { max: 36, min: 10 },
+    labelLineHeight: { max: 2, min: 0.8 },
+    valueFontSize: { max: 56, min: 18 }
+  },
+  highlightRail: {
+    cardPaddingX: { max: 40, min: 0 },
+    cardPaddingY: { max: 40, min: 0 },
+    labelFontSize: { max: 24, min: 10 },
+    labelMarginTop: { max: 24, min: 0 },
+    unitFontSize: { max: 28, min: 10 },
+    valueFontSize: { max: 56, min: 16 }
+  },
+  imagesCaption: {
+    bodyFontSize: { max: 32, min: 10 },
+    bodyLineHeight: { max: 2.4, min: 0.8 },
+    bodyMarginTop: { max: 40, min: 0 },
+    metaFontSize: { max: 28, min: 10 },
+    metaLineHeight: { max: 2.4, min: 0.8 }
+  }
+} as const satisfies Record<string, Record<string, NumberBounds>>;
+
 function pushTreatmentFinding(findings: ValidationFinding[], regionId: string, message: string) {
   findings.push({
     severity: "blocking",
     code: "TREATMENT_INVALID_VALUE",
+    message,
+    regionId
+  });
+}
+
+function pushRhythmFinding(findings: ValidationFinding[], regionId: string, message: string) {
+  findings.push({
+    severity: "blocking",
+    code: "RHYTHM_INVALID_VALUE",
     message,
     regionId
   });
@@ -349,6 +384,29 @@ function validateTreatmentNumber(
   pushTreatmentFinding(findings, regionId, message);
 }
 
+function validateRhythmNumber(
+  findings: ValidationFinding[],
+  regionId: string,
+  value: unknown,
+  bounds: NumberBounds
+) {
+  const max = bounds.max ?? Number.POSITIVE_INFINITY;
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= bounds.min &&
+    value <= max
+  ) {
+    return;
+  }
+
+  const message =
+    bounds.max === undefined
+      ? `${regionId} 必須大於或等於 ${bounds.min}`
+      : `${regionId} 必須介於 ${bounds.min} 和 ${bounds.max} 之間`;
+  pushRhythmFinding(findings, regionId, message);
+}
+
 function validateNumberFields(
   findings: ValidationFinding[],
   regionId: string,
@@ -358,6 +416,19 @@ function validateNumberFields(
   for (const [key, bounds] of Object.entries(boundsByKey)) {
     if (key in value) {
       validateTreatmentNumber(findings, `${regionId}.${key}`, value[key], bounds);
+    }
+  }
+}
+
+function validateRhythmNumberFields(
+  findings: ValidationFinding[],
+  regionId: string,
+  value: UnknownRecord,
+  boundsByKey: Record<string, NumberBounds>
+) {
+  for (const [key, bounds] of Object.entries(boundsByKey)) {
+    if (key in value) {
+      validateRhythmNumber(findings, `${regionId}.${key}`, value[key], bounds);
     }
   }
 }
@@ -493,6 +564,26 @@ function validateOrnamentTreatments(findings: ValidationFinding[], regionId: str
   }
 }
 
+function validateDisplayRhythm(findings: ValidationFinding[], regionId: string, rhythm: unknown) {
+  if (!isPlainObject(rhythm)) {
+    pushRhythmFinding(findings, regionId, `${regionId} 必須為 rhythm 物件`);
+    return;
+  }
+
+  for (const [groupKey, boundsByField] of Object.entries(rhythmBoundsByGroup)) {
+    if (!(groupKey in rhythm)) {
+      continue;
+    }
+
+    if (!isPlainObject(rhythm[groupKey])) {
+      pushRhythmFinding(findings, `${regionId}.${groupKey}`, `${regionId}.${groupKey} 必須為 rhythm 物件`);
+      continue;
+    }
+
+    validateRhythmNumberFields(findings, `${regionId}.${groupKey}`, rhythm[groupKey], boundsByField);
+  }
+}
+
 function validateDisplayTreatments(
   findings: ValidationFinding[],
   value: unknown,
@@ -513,6 +604,10 @@ function validateDisplayTreatments(
 
   if ("ornaments" in value) {
     validateOrnamentTreatments(findings, `${path}.ornaments`, value.ornaments);
+  }
+
+  if ("rhythm" in value) {
+    validateDisplayRhythm(findings, `${path}.rhythm`, value.rhythm);
   }
 
   for (const [key, child] of Object.entries(value)) {
