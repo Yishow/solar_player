@@ -59,3 +59,4 @@ The 2026-06-05 reference-informed witness batch is classified in `docs/reference
 | --- | --- | --- | --- | --- |
 | 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/overview` | hero fade 放寬、KPI padding/value 微增（editor-backed）。詳見 `overview-solar-reference-quality-closeout.md` | 維持 `blocked`（fresh 視覺 witness 批次延 Phase 2；runtime/fallback/publish 未驗） |
 | 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/solar` | connector 加粗、KPI 等寬（editor-backed）。actual-gap：node/connector 飽和、gold/leaf 基底、hero framing 留 Phase 4 | 維持 `blocked`（同上） |
+| 2026-06-06 | `polish-factory-circuit-reference-quality-targets` | `/factory-circuit` | 本輪無 editor-backed 值可調（review 大致一致）；全部質感差距為 actual-gap：電路線寬（PNG→可調 SVG）、node 飽和、CSS 字級、leaf binding，留 Phase 4 | 維持 `blocked`（fresh 視覺 witness 延 Phase 2；runtime/fallback/publish 未驗） |
