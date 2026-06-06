@@ -92,10 +92,24 @@ function straightRoutePath(from: RoutingPoint, to: RoutingPoint): string {
   return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
 }
 
-// 結構化 comb：自配電盤水平送至接近負載的垂直 bus，再以短分支接到各負載，
-// 貼近 reference 的樹狀走線（共用垂直主幹 + 短支），圓角轉折較柔。
-function combRoutePath(from: RoutingPoint, to: RoutingPoint, busX: number): string {
-  return `M ${from.x} ${from.y} L ${busX} ${from.y} L ${busX} ${to.y} L ${to.x} ${to.y}`;
+// 忠實復刻 reference routing：自配電盤水平送至靠近配電盤的垂直主幹（bus），
+// 以「圓角」轉折（quarter-circle arc）分支向右接到各負載，末端為實心圓點。
+// 圓角是 reference 的關鍵質感；硬直角會顯廉價。
+function roundedCombPath(from: RoutingPoint, to: RoutingPoint, busX: number): string {
+  const radius = 12;
+  const dy = to.y - from.y;
+  if (Math.abs(dy) < radius * 2) {
+    return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  }
+  const dir = dy > 0 ? 1 : -1;
+  return [
+    `M ${from.x} ${from.y}`,
+    `L ${busX - radius} ${from.y}`,
+    `Q ${busX} ${from.y} ${busX} ${from.y + dir * radius}`,
+    `L ${busX} ${to.y - dir * radius}`,
+    `Q ${busX} ${to.y} ${busX + radius} ${to.y}`,
+    `L ${to.x} ${to.y}`
+  ].join(" ");
 }
 
 const kpiLayoutOrder = [
@@ -315,8 +329,8 @@ export function FactoryCircuit({
     const loadRow = withContentOffset(resolvedConfig.loadRows[loadRowKey]);
     return { anchor: rectLoadRowAnchor(loadRow), key: `boardTo-${loadRowKey}` };
   });
-  // 垂直 bus 放在接近負載處（負載 left − 30），形成共用主幹 + 短分支的 comb。
-  const loadBusX = Math.min(...loadBranches.map((branch) => branch.anchor.x)) - 30;
+  // 垂直 bus 緊鄰配電盤（board 右側 + 30），分支以圓角向右延伸至各負載，貼近 reference。
+  const loadBusX = boardRight.x + 30;
   const routingPaths = [
     {
       key: "solarToInverter",
@@ -331,7 +345,7 @@ export function FactoryCircuit({
     ...loadBranches.map((branch) => ({
       key: branch.key,
       treatment: inverterToBoardTreatment,
-      d: combRoutePath(boardRight, branch.anchor, loadBusX)
+      d: roundedCombPath(boardRight, branch.anchor, loadBusX)
     }))
   ];
 
@@ -494,6 +508,15 @@ export function FactoryCircuit({
             opacity={route.treatment.opacity}
             strokeLinecap={route.treatment.lineCap}
             strokeLinejoin="round"
+          />
+        ))}
+        {loadBranches.map((branch) => (
+          <circle
+            key={`dot-${branch.key}`}
+            cx={branch.anchor.x}
+            cy={branch.anchor.y}
+            r={4}
+            fill={inverterToBoardTreatment.strokeColor}
           />
         ))}
       </svg>
