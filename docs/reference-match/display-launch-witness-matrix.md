@@ -55,6 +55,8 @@ The 2026-06-05 reference-informed witness batch is classified in `docs/reference
 
 視覺 closeout 進度只記錄 `reference-quality-target` 的 config-level 調整，**不改任何 launch gate 狀態**。視覺改善 ≠ launch-ready；所有 gate 在取得 fresh runtime parity / publish refresh / fallback witness 前維持 `blocked`。
 
+> Phase 2 fresh 視覺 witness（run id `polish-pass-1`，2026-06-06，主 session 親自讀圖）已完成，五頁 config-backed 目標確認朝 reference 收斂；詳見 `fhd-playback-witness-polish-pass-1-2026-06-06.md`。本輪僅 visual/structure 證據，runtime/fallback/publish 未取得，五頁維持 `blocked`。
+
 | Date | Change | Route | Visual closeout result（config-level） | Launch status |
 | --- | --- | --- | --- | --- |
 | 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/overview` | hero fade 放寬、KPI padding/value 微增（editor-backed）。詳見 `overview-solar-reference-quality-closeout.md` | 維持 `blocked`（fresh 視覺 witness 批次延 Phase 2；runtime/fallback/publish 未驗） |
