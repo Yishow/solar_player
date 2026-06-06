@@ -39,8 +39,8 @@ test("factory circuit display page seed config captures the current default layo
   assert.equal(config.nodes.board.width, 182);
   assert.equal(config.nodes.board.height, 336);
   assert.equal(config.connectors.inverterToBoard.width, 74);
-  assert.equal(config.connectorTreatments.inverterToBoard.strokeWidth, 16);
-  assert.equal(config.connectorTreatments.inverterToBoard.strokeColor, "#4ade80");
+  assert.equal(config.connectorTreatments.inverterToBoard.strokeWidth, 3);
+  assert.equal(config.connectorTreatments.inverterToBoard.strokeColor, "#6f9b5a");
   assert.equal(config.nodeTreatments.board.iconScale, 1);
   assert.equal(config.nodeTreatments.board.valueAlign, "center");
   assert.equal((config as any).rhythm?.factoryLoadRows?.iconTextGap, 24);

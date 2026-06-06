@@ -92,8 +92,10 @@ function straightRoutePath(from: RoutingPoint, to: RoutingPoint): string {
   return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
 }
 
-function orthogonalRoutePath(from: RoutingPoint, to: RoutingPoint, busX: number): string {
-  return `M ${from.x} ${from.y} L ${busX} ${from.y} L ${busX} ${to.y} L ${to.x} ${to.y}`;
+// 平滑分支：自配電盤水平送出後彎向各負載，貼近 reference 的細緻 fan-out 樹狀走線。
+function smoothRoutePath(from: RoutingPoint, to: RoutingPoint): string {
+  const dx = Math.max((to.x - from.x) * 0.5, 36);
+  return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
 }
 
 const kpiLayoutOrder = [
@@ -309,7 +311,6 @@ export function FactoryCircuit({
     seedConfig.connectorTreatments.inverterToBoard
   );
   const boardRight = rectRightCenter(boardNode);
-  const loadBusX = boardRight.x + 70;
   const routingPaths = [
     {
       key: "solarToInverter",
@@ -326,7 +327,7 @@ export function FactoryCircuit({
       return {
         key: `boardTo-${loadRowKey}`,
         treatment: inverterToBoardTreatment,
-        d: orthogonalRoutePath(boardRight, rectLoadRowAnchor(loadRow), loadBusX)
+        d: smoothRoutePath(boardRight, rectLoadRowAnchor(loadRow))
       };
     })
   ];

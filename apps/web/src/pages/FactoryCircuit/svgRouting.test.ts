@@ -27,7 +27,7 @@ test("factory circuit SVG routing paths derive from node and load row config geo
   const seedConfig = createFactoryCircuitDisplayPageSeedConfig();
 
   assert.equal(Object.keys(seedConfig.loadRows).length, 6);
-  assert.equal(seedConfig.connectorTreatments.solarToInverter.strokeColor, "#4ade80");
+  assert.equal(seedConfig.connectorTreatments.solarToInverter.strokeColor, "#6f9b5a");
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\.solar/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\.inverter/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\.board/);
