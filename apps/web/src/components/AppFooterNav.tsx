@@ -1,13 +1,14 @@
 import React, { Fragment } from "react";
 import type { ShellDecorationObject } from "@solar-display/shared";
 import { Link, useLocation } from "react-router-dom";
-import { routeMetaList, routeMetaMap, type RouteMeta } from "../app/routeMeta";
+import { routeMetaList, routeMetaMap, type PlaybackRouteNavIcon, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { LeafOrnament } from "./LeafOrnament";
 import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 
 type FooterEntry = {
+  icon?: PlaybackRouteNavIcon;
   key: string;
   label: string;
   path: string;
@@ -51,13 +52,14 @@ function buildEntries(
   if (isPlayback) {
     const playbackTabs: FooterEntry[] =
       playbackNavigation?.entries.map((entry) => ({
+        icon: entry.icon,
         key: entry.key,
         label: entry.label,
         path: entry.path
       })) ??
       routeMetaList
         .filter((route): route is RouteMeta => route.group === "playback")
-        .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
+        .map((route) => ({ icon: route.navIcon, key: route.path, label: route.navLabel, path: route.path }));
 
     return {
       entries: playbackTabs,
@@ -134,7 +136,7 @@ export function AppFooterNav({
           {entries.map((entry, index) => {
             const active = index === activeIndex;
 
-            const baseClasses = "relative flex items-center font-en leading-none whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
+            const baseClasses = "relative flex items-center gap-[7px] font-en leading-none whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--shell-nav-active-ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--shell-footer-bg)] rounded-sm";
 
             const playbackClasses = active
               ? "font-semibold opacity-100"
@@ -172,7 +174,16 @@ export function AppFooterNav({
                       }}
                     />
                   )}
-                  {entry.label}
+                  {mode === "playback" && entry.icon && (
+                    <span
+                      aria-hidden="true"
+                      className="inline-flex h-[15px] w-[15px] items-center justify-center"
+                      data-shell-nav-icon={entry.icon}
+                    >
+                      <PlaybackNavIcon icon={entry.icon} />
+                    </span>
+                  )}
+                  <span>{entry.label}</span>
                 </Link>
               </Fragment>
             );
@@ -204,6 +215,57 @@ export function AppFooterNav({
       <ShellDecorationLayer mount="footer" objects={decorationObjects} plane="foreground" />
     </footer>
   );
+}
+
+function PlaybackNavIcon({ icon }: { icon: PlaybackRouteNavIcon }) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: 1.65
+  } as const;
+
+  switch (icon) {
+    case "solar":
+      return (
+        <svg aria-hidden="true" className="h-full w-full" viewBox="0 0 18 18">
+          <circle {...common} cx="9" cy="9" r="3.1" />
+          <path {...common} d="M9 1.7v2.1M9 14.2v2.1M1.7 9h2.1M14.2 9h2.1M3.8 3.8l1.5 1.5M12.7 12.7l1.5 1.5M14.2 3.8l-1.5 1.5M5.3 12.7l-1.5 1.5" />
+        </svg>
+      );
+    case "factory-circuit":
+      return (
+        <svg aria-hidden="true" className="h-full w-full" viewBox="0 0 18 18">
+          <path {...common} d="M2.5 13.5h13M4 13.5V7.8l3.4 2.1V7.8l3.4 2.1V5.1h3.2v8.4" />
+          <path {...common} d="M4.4 13.5V16M8.9 13.5V16M13.4 13.5V16" />
+        </svg>
+      );
+    case "images":
+      return (
+        <svg aria-hidden="true" className="h-full w-full" viewBox="0 0 18 18">
+          <rect {...common} height="11.5" rx="1.7" width="13.5" x="2.25" y="3.25" />
+          <path {...common} d="M4.2 12.7l3.1-3.1 2.1 2.1 1.4-1.4 3 2.4" />
+          <circle {...common} cx="12.4" cy="6.4" r="1" />
+        </svg>
+      );
+    case "sustainability":
+      return (
+        <svg aria-hidden="true" className="h-full w-full" viewBox="0 0 18 18">
+          <path {...common} d="M9.1 15.6c.2-3.2 1.3-5.7 3.7-7.7" />
+          <path {...common} d="M4.1 13.6c6.3.2 9.6-3.1 9.8-9.8-6.8.2-10 3.5-9.8 9.8Z" />
+        </svg>
+      );
+    case "overview":
+      return (
+        <svg aria-hidden="true" className="h-full w-full" viewBox="0 0 18 18">
+          <rect {...common} height="4.7" rx="1.1" width="4.7" x="2.8" y="3" />
+          <rect {...common} height="4.7" rx="1.1" width="4.7" x="10.5" y="3" />
+          <rect {...common} height="4.7" rx="1.1" width="4.7" x="2.8" y="10.3" />
+          <rect {...common} height="4.7" rx="1.1" width="4.7" x="10.5" y="10.3" />
+        </svg>
+      );
+  }
 }
 
 function FooterBranch() {

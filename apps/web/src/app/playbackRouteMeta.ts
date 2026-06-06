@@ -1,5 +1,5 @@
 import type { DisplayPageInstance } from "@solar-display/shared";
-import { routeMetaList, routeMetaMap, type RouteMeta } from "./routeMeta";
+import { routeMetaList, routeMetaMap, type PlaybackRouteNavIcon, type RouteMeta } from "./routeMeta";
 
 export type ResolvedPlaybackRouteMeta = RouteMeta & {
   matchedPath: string | null;
@@ -7,6 +7,7 @@ export type ResolvedPlaybackRouteMeta = RouteMeta & {
 };
 
 export type PlaybackFooterEntry = {
+  icon?: PlaybackRouteNavIcon;
   key: string;
   label: string;
   path: string;
@@ -82,6 +83,7 @@ export function resolvePlaybackRouteMeta(
 export function buildPlaybackFooterEntries(pages: DisplayPageInstance[]): PlaybackFooterEntry[] {
   if (pages.length === 0) {
     return staticPlaybackRouteMetaList.map((route) => ({
+      icon: route.navIcon,
       key: route.path,
       label: route.navLabel,
       path: route.path
@@ -91,6 +93,7 @@ export function buildPlaybackFooterEntries(pages: DisplayPageInstance[]): Playba
   return sortRegistryPages(pages)
     .filter((page) => page.enabled && page.archivedAt === null)
     .map((page) => ({
+      icon: resolveTemplateRouteMeta(page.templateKey).navIcon,
       key: page.pageKey,
       label: page.displayNameZh,
       path: page.route

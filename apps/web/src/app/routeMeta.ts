@@ -1,10 +1,12 @@
 import type { ShellDensity } from "../components/shellDensity";
 
 export type RouteGroup = "playback" | "management";
+export type PlaybackRouteNavIcon = "overview" | "solar" | "factory-circuit" | "images" | "sustainability";
 
 export type RouteMeta = {
   allowOfflineWhenDisconnected?: boolean;
   path: string;
+  navIcon?: PlaybackRouteNavIcon;
   navLabel: string;
   title: string;
   subtitle: string;
@@ -16,6 +18,7 @@ export type RouteMeta = {
 export const routeMetaList: RouteMeta[] = [
   {
     path: "/overview",
+    navIcon: "overview",
     navLabel: "總覽",
     title: "總覽頁",
     subtitle: "Overview",
@@ -26,6 +29,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: "/solar",
+    navIcon: "solar",
     navLabel: "太陽能",
     title: "太陽能發電",
     subtitle: "Solar Generation",
@@ -36,6 +40,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: "/factory-circuit",
+    navIcon: "factory-circuit",
     navLabel: "迴路",
     title: "工廠迴路",
     subtitle: "Factory Circuit",
@@ -46,6 +51,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: "/images",
+    navIcon: "images",
     navLabel: "圖庫",
     title: "展示圖像",
     subtitle: "Images",
@@ -56,6 +62,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: "/sustainability",
+    navIcon: "sustainability",
     navLabel: "永續",
     title: "永續成果",
     subtitle: "Sustainability",
