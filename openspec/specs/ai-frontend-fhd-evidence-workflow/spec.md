@@ -405,3 +405,79 @@ tests:
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
 -->
+
+---
+### Requirement: Store five-page boundary classification inside the evidence workflow
+
+The FHD evidence workflow SHALL store the five-page boundary classification as a durable evidence artifact before downstream playback polish changes are applied. The artifact SHALL identify its witness batch, affected routes, classification table, blockers, and follow-up changes.
+
+#### Scenario: Page closeout changes can cite one classification artifact
+
+- **WHEN** a downstream playback polish change starts
+- **THEN** it can cite the five-page boundary classification artifact for protected choices, quality targets, and actual gaps
+- **AND** it does not rely on chat-only notes for accepted reference differences
+
+##### Example: Overview/Solar polish cites one dated artifact
+
+| Downstream change | Cited artifact | Required cited tokens |
+| ----- | ----- | ----- |
+| `polish-overview-solar-reference-quality-targets` | `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md` | `protected-product-choice`, `reference-quality-target`, `actual-gap` |
+
+<!-- @trace
+source: capture-fhd-reference-informed-playback-witness-classifications
+updated: 2026-06-07
+code:
+  - apps/server/src/services/displaySeedAssetBootstrapService.ts
+  - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
+  - apps/web/src/pages/Images/displayPageConfig.ts
+  - data/server-runtime.lock.json
+  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/reference-match/images-reference-quality-closeout.md
+  - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - docs/reference-match/display-launch-witness-matrix.md
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/goal.md
+  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - apps/server/src/services/displaySeedAssetManifest.ts
+  - docs/fhd-editor-gap-ledger.md
+  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/scripts/run-tests.mjs
+  - docs/reference-match/fhd-evidence-bundle-template.md
+  - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - apps/web/src/components/DisplayCanvas.tsx
+  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - apps/web/src/pages/Solar/layout.ts
+  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - apps/web/package.json
+  - apps/web/src/hooks/displayTransition.ts
+  - apps/web/src/components/displayCanvasSurfaceStyle.ts
+  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/fhd-witness/playback-closeout-matrix.md
+  - apps/web/src/layouts/playbackRotationFreeze.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/web/src/pages/Images/layout.ts
+tests:
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/Images/layout.test.ts
+  - apps/web/src/pages/displayPageChromeConfig.test.ts
+  - apps/web/src/components/DisplayCanvas.test.ts
+  - apps/web/src/components/displayCanvasSurfaceStyle.test.ts
+  - apps/web/src/pages/Solar/layout.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/server/src/services/displaySeedAssetBootstrapService.test.ts
+  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
+  - apps/web/src/pages/FactoryCircuit/svgRouting.test.ts
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - apps/server/src/routes/image-playlist.test.ts
+  - apps/web/src/layouts/playbackRotationFreeze.test.ts
+  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+-->
