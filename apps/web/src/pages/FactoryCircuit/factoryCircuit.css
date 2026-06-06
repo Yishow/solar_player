@@ -54,17 +54,17 @@
 .factory-circuit-copy {
   z-index: 7;
   color: var(--display-copy-ink);
-  font-size: 21px;
-  line-height: 1.65;
-  letter-spacing: 1px;
+  font-size: var(--display-copy-font-size, 21px);
+  line-height: var(--display-copy-line-height, 1.65);
+  letter-spacing: var(--display-copy-letter-spacing, 1px);
 }
 
 .factory-circuit-copy-en {
-  margin-top: 18px;
+  margin-top: var(--display-copy-secondary-margin-top, 18px);
   color: var(--display-copy-muted);
   font-family: var(--font-family-en);
-  font-size: 18px;
-  line-height: 1.55;
+  font-size: var(--display-copy-secondary-font-size, 18px);
+  line-height: var(--display-copy-secondary-line-height, 1.55);
 }
 
 .factory-circuit-gold-line {

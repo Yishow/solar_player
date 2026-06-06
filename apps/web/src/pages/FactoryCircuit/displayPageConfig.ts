@@ -1,13 +1,21 @@
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
 import {
+  buildDisplayCardStyleFields,
+  createDisplayCardStyleConfig,
+  type DisplayCardStyleConfig
+} from "../shared/displayCardStyleConfig";
+import {
+  buildCopyTypographyFields,
   buildGoldLineFields,
   buildHeroTypographyFields,
   buildLeafOrnamentFields,
   buildStatusBlockChromeFields,
+  createCopyTypographyConfig,
   createGoldLineChromeConfig,
   createHeroTypographyConfig,
   createLeafOrnamentChromeConfig,
   createStatusBlockChromeConfig,
+  type CopyTypographyConfig,
   type GoldLineChromeConfig,
   type HeroTypographyConfig,
   type LeafOrnamentChromeConfig,
@@ -50,9 +58,12 @@ export type FactoryCircuitDisplayRect = {
 
 export type FactoryCircuitConnectorKey = "inverterToBoard" | "solarToInverter";
 export type FactoryCircuitNodeKey = "board" | "inverter" | "solar";
+export type FactoryCircuitKpiKey = "flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower";
 
 export type FactoryCircuitDisplayPageConfig = {
+  cardStyles: Record<FactoryCircuitKpiKey, DisplayCardStyleConfig>;
   chrome: {
+    copyTypography: CopyTypographyConfig;
     heroTypography: HeroTypographyConfig;
     modules: {
       statusBlock: StatusBlockChromeConfig;
@@ -72,14 +83,14 @@ export type FactoryCircuitDisplayPageConfig = {
     title: string;
   };
   iconSources: {
-    kpiCards: Record<"flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower", DisplayPageIconSource>;
+    kpiCards: Record<FactoryCircuitKpiKey, DisplayPageIconSource>;
     loadRows: Record<
       "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
       DisplayPageIconSource
     >;
     nodes: Record<FactoryCircuitNodeKey, DisplayPageIconSource>;
   };
-  kpiCards: Record<"flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower", FactoryCircuitDisplayRect>;
+  kpiCards: Record<FactoryCircuitKpiKey, FactoryCircuitDisplayRect>;
   loadPanel: FactoryCircuitDisplayRect;
   loadRows: Record<
     "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
@@ -96,9 +107,45 @@ export type FactoryCircuitDisplayPageConfig = {
   };
 };
 
+function createFactoryCircuitKpiCardStyle(
+  overrides: Partial<Record<keyof DisplayCardStyleConfig, unknown>> = {}
+) {
+  return createDisplayCardStyleConfig({
+    cornerRadius: 24,
+    footerPaddingTop: 18,
+    headerGap: 16,
+    iconBoxSize: 52,
+    subtitleFontSize: 12,
+    titleFontSize: 18,
+    unitFontSize: 16,
+    valueFontSize: 60,
+    valueMarginTop: 28,
+    ...overrides
+  });
+}
+
 export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDisplayPageConfig {
   return {
+    cardStyles: {
+      flow: createFactoryCircuitKpiCardStyle({
+        titleFontSize: 17,
+        unitFontSize: 18,
+        valueFontSize: 42
+      }),
+      peak: createFactoryCircuitKpiCardStyle(),
+      selfConsumption: createFactoryCircuitKpiCardStyle(),
+      solarShare: createFactoryCircuitKpiCardStyle(),
+      totalPower: createFactoryCircuitKpiCardStyle()
+    },
     chrome: {
+      copyTypography: createCopyTypographyConfig({
+        fontSize: 21,
+        letterSpacing: 1,
+        lineHeight: 1.65,
+        secondaryFontSize: 18,
+        secondaryLineHeight: 1.55,
+        secondaryMarginTop: 18
+      }),
       heroTypography: createHeroTypographyConfig({
         subtitleMarginTop: 20
       }),
@@ -111,7 +158,8 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
           opacity: 1
         }),
         leaf: createLeafOrnamentChromeConfig({
-          opacity: 0.38
+          opacity: 0.38,
+          rotationDeg: 0
         })
       }
     },
@@ -215,6 +263,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       ...buildHeroTypographyFields({
         idPrefix: "factory",
         path: ["chrome", "heroTypography"]
+      }),
+      ...buildCopyTypographyFields({
+        idPrefix: "factory",
+        path: ["chrome", "copyTypography"]
       }),
       { fieldType: "text", id: "factory-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "factory-title", label: "Title", path: ["hero", "title"] },
@@ -405,6 +457,10 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      ...buildDisplayCardStyleFields({
+        idPrefix: key,
+        path: ["cardStyles", key]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]

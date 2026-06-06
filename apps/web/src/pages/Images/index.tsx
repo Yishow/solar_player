@@ -19,6 +19,10 @@ import { useImagePlaylistRuntime } from "../../hooks/useImagePlaylistRuntime";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
+  buildCopyTypographyStyleVars,
+  createCopyTypographyConfig
+} from "../shared/displayPageChromeConfig";
+import {
   buildImagesCaptionRhythmStyle,
   resolveImagesCaptionRhythmConfig
 } from "../shared/displayPageFhdRhythmConfig";
@@ -116,8 +120,25 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   }
 
   const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
   const resolvedConfig: ImagesDisplayPageConfig = {
     ...runtimeResolvedConfig,
+    chrome: {
+      ...seedConfig.chrome,
+      ...runtimeChrome,
+      copyTypography: createCopyTypographyConfig({
+        ...seedConfig.chrome.copyTypography,
+        ...(runtimeChrome.copyTypography ?? {})
+      }),
+      modules: {
+        ...seedConfig.chrome.modules,
+        ...(runtimeChrome.modules ?? {})
+      },
+      ornaments: {
+        ...seedConfig.chrome.ornaments,
+        ...(runtimeChrome.ornaments ?? {})
+      }
+    },
     rhythm: {
       ...seedConfig.rhythm,
       ...(runtimeResolvedConfig.rhythm ?? {})
@@ -144,6 +165,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     usesRuntimeFallback: playlistRuntime.usesFallback
   });
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
   const visibleStart = Math.min(
@@ -220,6 +242,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       <p
         className="images-copy-block"
         style={{
+          ...copyTypographyVars,
           left: `${copyLayout.left}px`,
           top: `${copyLayout.top}px`,
           width: `${copyLayout.width}px`

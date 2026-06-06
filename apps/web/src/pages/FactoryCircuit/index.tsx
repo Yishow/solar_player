@@ -25,6 +25,12 @@ import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
+import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import {
+  buildCopyTypographyStyleVars,
+  createCopyTypographyConfig,
+  createLeafOrnamentChromeConfig
+} from "../shared/displayPageChromeConfig";
 import {
   buildFlowConnectorTreatmentStyle,
   buildFlowNodeTreatmentStyle,
@@ -300,8 +306,38 @@ export function FactoryCircuit({
   }
 
   const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+  const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
+  const runtimeCardStyles = runtimeResolvedConfig.cardStyles ?? {};
   const resolvedConfig: FactoryCircuitDisplayPageConfig = {
     ...runtimeResolvedConfig,
+    cardStyles: {
+      flow: { ...seedConfig.cardStyles.flow, ...(runtimeCardStyles.flow ?? {}) },
+      peak: { ...seedConfig.cardStyles.peak, ...(runtimeCardStyles.peak ?? {}) },
+      selfConsumption: { ...seedConfig.cardStyles.selfConsumption, ...(runtimeCardStyles.selfConsumption ?? {}) },
+      solarShare: { ...seedConfig.cardStyles.solarShare, ...(runtimeCardStyles.solarShare ?? {}) },
+      totalPower: { ...seedConfig.cardStyles.totalPower, ...(runtimeCardStyles.totalPower ?? {}) }
+    },
+    chrome: {
+      ...seedConfig.chrome,
+      ...runtimeChrome,
+      copyTypography: createCopyTypographyConfig({
+        ...seedConfig.chrome.copyTypography,
+        ...(runtimeChrome.copyTypography ?? {})
+      }),
+      modules: {
+        ...seedConfig.chrome.modules,
+        ...(runtimeChrome.modules ?? {})
+      },
+      ornaments: {
+        ...seedConfig.chrome.ornaments,
+        ...runtimeOrnaments,
+        leaf: createLeafOrnamentChromeConfig({
+          ...seedConfig.chrome.ornaments.leaf,
+          ...(runtimeOrnaments.leaf ?? {})
+        })
+      }
+    },
     rhythm: {
       ...seedConfig.rhythm,
       ...(runtimeResolvedConfig.rhythm ?? {})
@@ -320,6 +356,7 @@ export function FactoryCircuit({
     usesRuntimeFallback: factoryStoryRuntime.usesFallback
   });
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
   const loadRowRhythm = resolveFactoryLoadRowRhythmConfig(
@@ -401,6 +438,7 @@ export function FactoryCircuit({
       <p
         className="factory-circuit-copy"
         style={{
+          ...copyTypographyVars,
           left: `${copyLayout.left}px`,
           top: `${copyLayout.top}px`,
           width: `${copyLayout.width}px`
@@ -444,14 +482,15 @@ export function FactoryCircuit({
       <FactoryCircuitLeafWatermark
         className="factory-circuit-leaf-watermark display-surface-leaf-ornament"
         style={{
+          "--display-leaf-rotation": `${resolvedConfig.chrome.ornaments.leaf.rotationDeg}deg`,
           height: "148px",
           left: `${552 + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
-          opacity: Math.min(1, resolvedConfig.chrome.ornaments.leaf.opacity / seedConfig.chrome.ornaments.leaf.opacity),
+          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
           top: `${585 - CONTENT_TOP_OFFSET + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-          transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
+          transform: `rotate(${resolvedConfig.chrome.ornaments.leaf.rotationDeg}deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           transformOrigin: "center",
           width: "268px"
-        }}
+        } as CSSProperties & Record<"--display-leaf-rotation", string>}
       />
 
       <FactoryCircuitLeafVine
@@ -570,7 +609,9 @@ export function FactoryCircuit({
       </section>
 
       {viewModel.kpis.map((metric, index) => {
-        const layout = withContentOffset(resolvedConfig.kpiCards[kpiLayoutOrder[index]!]);
+        const kpiKey = kpiLayoutOrder[index]!;
+        const layout = withContentOffset(resolvedConfig.kpiCards[kpiKey]);
+        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[kpiKey]);
         const className =
           kpiLayoutOrder[index] === "flow" ? "factory-circuit-kpi-card factory-circuit-kpi-routing" : "factory-circuit-kpi-card";
 
@@ -578,6 +619,7 @@ export function FactoryCircuit({
           <DisplayCardFrame
             key={metric.label}
             surface="metric"
+            cardStyle={cardStyle}
             className={className}
             style={{
               height: `${layout.height}px`,
@@ -596,7 +638,7 @@ export function FactoryCircuit({
               subtitle={metric.helper}
               title={metric.label}
             />
-            <DisplayCardValueRow unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
             <DisplayCardFooter>
               <Sparkline className="factory-circuit-kpi-sparkline" values={trendSeries.map((value) => value - index * 1.5)} />
             </DisplayCardFooter>

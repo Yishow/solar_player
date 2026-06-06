@@ -3,6 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {
+  buildCopyTypographyFields,
+  buildCopyTypographyStyleVars,
+  buildDisplayGreenPaletteFields,
+  buildDisplayGreenPaletteStyleVars,
+  createCopyTypographyConfig,
+  createDisplayGreenPaletteConfig,
   createGoldLineChromeConfig,
   createHeroTypographyConfig,
   createLeafOrnamentChromeConfig
@@ -61,12 +67,82 @@ test("shared display chrome config defaults preserve the prototype rhythm and or
     offsetX: 0,
     offsetY: 0,
     opacity: 0.42,
+    rotationDeg: -30,
     scale: 1,
     source: {
       mode: "builtin",
       ornamentKey: "leaf"
     }
   });
+});
+
+test("shared display chrome config exposes copy typography palette and leaf rotation controls", () => {
+  assert.deepEqual(createCopyTypographyConfig(), {
+    fontSize: 18,
+    letterSpacing: 0,
+    lineHeight: 1.6,
+    secondaryFontSize: 16,
+    secondaryLineHeight: 1.55,
+    secondaryMarginTop: 16
+  });
+  assert.deepEqual(
+    buildCopyTypographyStyleVars(
+      createCopyTypographyConfig({
+        fontSize: 24,
+        letterSpacing: 0.4,
+        lineHeight: 1.72,
+        secondaryFontSize: 14,
+        secondaryLineHeight: 1.82,
+        secondaryMarginTop: 14
+      })
+    ),
+    {
+      "--display-copy-font-size": "24px",
+      "--display-copy-letter-spacing": "0.4px",
+      "--display-copy-line-height": 1.72,
+      "--display-copy-secondary-font-size": "14px",
+      "--display-copy-secondary-line-height": 1.82,
+      "--display-copy-secondary-margin-top": "14px"
+    }
+  );
+  assert.deepEqual(createDisplayGreenPaletteConfig(), {
+    accentColor: "#5b8046",
+    iconColor: "#6a8a50",
+    valueColor: "#57774a"
+  });
+  assert.deepEqual(
+    buildDisplayGreenPaletteStyleVars(
+      createDisplayGreenPaletteConfig({
+        accentColor: "not-a-color",
+        iconColor: "#123456",
+        valueColor: "rgb(10, 20, 30)"
+      })
+    ),
+    {
+      "--display-green-accent-color": "#5b8046",
+      "--display-green-icon-color": "#123456",
+      "--display-green-value-color": "rgb(10, 20, 30)"
+    }
+  );
+  assert.deepEqual(
+    buildCopyTypographyFields({ idPrefix: "copy", path: ["chrome", "copyTypography"] }).map((field) => field.id),
+    [
+      "copy-copy-font-size",
+      "copy-copy-line-height",
+      "copy-copy-letter-spacing",
+      "copy-copy-secondary-font-size",
+      "copy-copy-secondary-line-height",
+      "copy-copy-secondary-margin-top"
+    ]
+  );
+  assert.deepEqual(
+    buildDisplayGreenPaletteFields({ idPrefix: "sustainability", path: ["chrome", "palette"] }).map((field) => field.id),
+    [
+      "sustainability-green-value-color",
+      "sustainability-green-icon-color",
+      "sustainability-green-accent-color"
+    ]
+  );
 });
 
 test("playback pages wire shared display chrome classes into hero, media, and ornament regions", () => {

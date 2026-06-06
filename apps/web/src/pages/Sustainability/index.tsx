@@ -27,7 +27,14 @@ import { useSustainabilityStoryRuntime } from "../../hooks/useSustainabilityStor
 import { trendSeries } from "../../mocks/metrics";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
-import { createRingOrnamentChromeConfig } from "../shared/displayPageChromeConfig";
+import {
+  buildCopyTypographyStyleVars,
+  buildDisplayGreenPaletteStyleVars,
+  createCopyTypographyConfig,
+  createDisplayGreenPaletteConfig,
+  createLeafOrnamentChromeConfig,
+  createRingOrnamentChromeConfig
+} from "../shared/displayPageChromeConfig";
 import {
   buildSustainabilityHighlightRhythmStyle,
   resolveSustainabilityHighlightRhythmConfig
@@ -137,8 +144,38 @@ export function Sustainability({
   }
 
   const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+  const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
   const resolvedConfig: SustainabilityDisplayPageConfig = {
     ...runtimeResolvedConfig,
+    chrome: {
+      ...seedConfig.chrome,
+      ...runtimeChrome,
+      copyTypography: createCopyTypographyConfig({
+        ...seedConfig.chrome.copyTypography,
+        ...(runtimeChrome.copyTypography ?? {})
+      }),
+      modules: {
+        ...seedConfig.chrome.modules,
+        ...(runtimeChrome.modules ?? {})
+      },
+      ornaments: {
+        ...seedConfig.chrome.ornaments,
+        ...runtimeOrnaments,
+        leaf: createLeafOrnamentChromeConfig({
+          ...seedConfig.chrome.ornaments.leaf,
+          ...(runtimeOrnaments.leaf ?? {})
+        }),
+        ring: createRingOrnamentChromeConfig({
+          ...seedConfig.chrome.ornaments.ring,
+          ...(runtimeOrnaments.ring ?? {})
+        })
+      },
+      palette: createDisplayGreenPaletteConfig({
+        ...seedConfig.chrome.palette,
+        ...(runtimeChrome.palette ?? {})
+      })
+    },
     rhythm: {
       ...seedConfig.rhythm,
       ...(runtimeResolvedConfig.rhythm ?? {})
@@ -158,8 +195,10 @@ export function Sustainability({
     resolvedConfig.heroMedia,
     sustainabilityHeroMediaEffectResolverOptions
   );
-  const ringOrnament = createRingOrnamentChromeConfig(resolvedConfig.chrome.ornaments.ring);
+  const ringOrnament = resolvedConfig.chrome.ornaments.ring;
   const heroTypography = resolvedConfig.chrome.heroTypography;
+  const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
+  const paletteVars = buildDisplayGreenPaletteStyleVars(resolvedConfig.chrome.palette);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
   const metricHighlightCards = resolvedConfig.highlightRail.cards.filter(
@@ -238,7 +277,7 @@ export function Sustainability({
   );
 
   return (
-    <section className="sustainability-display-page">
+    <section className="sustainability-display-page" style={paletteVars}>
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="sustainability-title display-surface-hero-group"
@@ -305,8 +344,8 @@ export function Sustainability({
                 style={{
                   border: "1px solid rgba(91, 128, 70, 0.24)",
                   borderRadius: `${resolvedConfig.chrome.modules.periodChips.radius}px`,
-                  background: viewModel.selectedPeriod === period ? "#5b8046" : "rgba(255, 253, 247, 0.92)",
-                  color: viewModel.selectedPeriod === period ? "#fffdf8" : "#57774a",
+                  background: viewModel.selectedPeriod === period ? resolvedConfig.chrome.palette.accentColor : "rgba(255, 253, 247, 0.92)",
+                  color: viewModel.selectedPeriod === period ? "#fffdf8" : resolvedConfig.chrome.palette.valueColor,
                   fontSize: `${resolvedConfig.chrome.modules.periodChips.fontSize}px`,
                   fontWeight: 700,
                   padding: `${resolvedConfig.chrome.modules.periodChips.chipPaddingY}px ${resolvedConfig.chrome.modules.periodChips.chipPaddingX}px`
@@ -322,6 +361,7 @@ export function Sustainability({
       <div
         className="sustainability-copy"
         style={{
+          ...copyTypographyVars,
           left: `${copyLayout.left}px`,
           top: `${copyLayout.top}px`,
           width: `${copyLayout.width}px`
@@ -345,13 +385,14 @@ export function Sustainability({
         className="sustainability-leaf-watermark display-surface-leaf-ornament"
         config={resolvedConfig.chrome.ornaments.leaf}
         style={{
+          "--display-leaf-rotation": `${resolvedConfig.chrome.ornaments.leaf.rotationDeg}deg`,
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
           opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
           top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
           transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
-        }}
+        } as CSSProperties & Record<"--display-leaf-rotation", string>}
       />
 
       <div

@@ -56,10 +56,10 @@
 .images-copy-block {
   margin: 0;
   color: #686f69;
-  font-size: 24px;
+  font-size: var(--display-copy-font-size, 24px);
   font-weight: 500;
-  line-height: 1.72;
-  letter-spacing: 0.4px;
+  line-height: var(--display-copy-line-height, 1.72);
+  letter-spacing: var(--display-copy-letter-spacing, 0.4px);
 }
 
 .images-gold-ornament {

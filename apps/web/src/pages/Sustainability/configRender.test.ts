@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import type { DisplayPageHouseholdEquivalentCard } from "@solar-display/shared";
-import { createSustainabilityDisplayPageSeedConfig } from "./displayPageConfig";
+import { createSustainabilityDisplayPageSeedConfig, sustainabilityDisplayPageEditorRegions } from "./displayPageConfig";
 import { resolveHouseholdEquivalentRuntimePayload } from "./householdEquivalentRuntime";
 import { buildSustainabilityViewModel } from "./viewModel";
 
@@ -16,8 +16,15 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(sustainabilitySource, /buildCopyTypographyStyleVars\(resolvedConfig\.chrome\.copyTypography\)/);
+  assert.match(sustainabilitySource, /buildDisplayGreenPaletteStyleVars\(resolvedConfig\.chrome\.palette\)/);
+  assert.match(sustainabilitySource, /\.\.\.seedConfig\.chrome\.copyTypography/);
+  assert.match(sustainabilitySource, /\.\.\.seedConfig\.chrome\.ornaments\.leaf/);
+  assert.match(sustainabilitySource, /\.\.\.seedConfig\.chrome\.palette/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
-  assert.match(sustainabilitySource, /createRingOrnamentChromeConfig\(resolvedConfig\.chrome\.ornaments\.ring\)/);
+  assert.match(sustainabilitySource, /--display-leaf-rotation/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.rotationDeg/);
+  assert.match(sustainabilitySource, /ringOrnament = resolvedConfig\.chrome\.ornaments\.ring/);
   assert.match(sustainabilitySource, /ringOrnament\.overlap/);
   assert.match(sustainabilitySource, /ringOrnament\.glowOpacity/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
@@ -56,6 +63,12 @@ test("sustainability display page seed config captures the current hero and high
   assert.equal(config.heroMedia.sourceMode, "seed-default");
   assert.equal(config.chrome.ornaments.ring.overlap, 118);
   assert.equal(config.chrome.ornaments.ring.opacity, 0.34);
+  assert.equal(config.chrome.ornaments.leaf.rotationDeg, -28);
+  assert.equal(config.chrome.copyTypography.fontSize, 17);
+  assert.equal(config.chrome.copyTypography.secondaryFontSize, 14);
+  assert.equal(config.chrome.copyTypography.secondaryLineHeight, 1.82);
+  assert.equal(config.chrome.palette.valueColor, "#57774a");
+  assert.equal(config.chrome.palette.iconColor, "#6a8a50");
   assert.equal(config.highlightRail.container.width, 470);
   assert.equal((config as any).rhythm?.highlightRail?.valueFontSize, 30);
   assert.equal((config as any).rhythm?.highlightRail?.cardPaddingX, 16);
@@ -70,6 +83,18 @@ test("sustainability display page seed config captures the current hero and high
   );
   assert.equal(config.kpiCards.totalGeneration.width, 304);
   assert.equal(config.statCards.procure.left, 970);
+});
+
+test("sustainability editor exposes copy typography palette and leaf rotation fields", () => {
+  const heroRegion = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-hero-copy");
+  const leafRegion = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-ornament-leaf");
+
+  assert.ok(heroRegion);
+  assert.ok(leafRegion);
+  assert.ok(heroRegion.fields.some((field) => field.id === "sustainability-copy-secondary-font-size"));
+  assert.ok(heroRegion.fields.some((field) => field.id === "sustainability-green-value-color"));
+  assert.ok(heroRegion.fields.some((field) => field.id === "sustainability-green-icon-color"));
+  assert.ok(leafRegion.fields.some((field) => field.id === "sustainability-leaf-rotation"));
 });
 
 test("sustainability runtime resolves the shared story adapter and clears back to fallback data on request failure", () => {

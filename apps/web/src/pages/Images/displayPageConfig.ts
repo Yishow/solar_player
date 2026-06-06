@@ -8,14 +8,17 @@ import {
 import {
   buildArrowChromeFields,
   buildCounterChromeFields,
+  buildCopyTypographyFields,
   buildGoldLineFields,
   buildHeroTypographyFields,
   createArrowChromeConfig,
   createCounterChromeConfig,
+  createCopyTypographyConfig,
   createGoldLineChromeConfig,
   createHeroTypographyConfig,
   type ArrowChromeConfig,
   type CounterChromeConfig,
+  type CopyTypographyConfig,
   type GoldLineChromeConfig,
   type HeroTypographyConfig
 } from "../shared/displayPageChromeConfig";
@@ -53,6 +56,7 @@ export type ImagesDisplayPageConfig = {
   arrows: Record<"left" | "right", ImagesDisplayRect>;
   cardStyles: Record<"infoPanel", DisplayCardStyleConfig>;
   chrome: {
+    copyTypography: CopyTypographyConfig;
     heroTypography: HeroTypographyConfig;
     modules: {
       arrows: ArrowChromeConfig;
@@ -119,6 +123,11 @@ export function createImagesDisplayPageSeedConfig(
       })
     },
     chrome: {
+      copyTypography: createCopyTypographyConfig({
+        fontSize: 24,
+        letterSpacing: 0.4,
+        lineHeight: 1.72
+      }),
       heroTypography: createHeroTypographyConfig({
         eyebrowMarginBottom: 44,
         subtitleMarginTop: 20,
@@ -205,6 +214,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       ...buildHeroTypographyFields({
         idPrefix: "images",
         path: ["chrome", "heroTypography"]
+      }),
+      ...buildCopyTypographyFields({
+        idPrefix: "images",
+        path: ["chrome", "copyTypography"]
       }),
       { fieldType: "text", id: "images-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "images-title", label: "Title", path: ["hero", "title"] },

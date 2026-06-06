@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type {
   DisplayEditorFieldSchema,
   DisplayEditorNumberFieldSchema,
@@ -11,6 +12,21 @@ function resolveNonNegativeNumber(value: unknown, fallback: number) {
 function resolveBoundedNumber(value: unknown, fallback: number, min: number, max: number) {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
     ? value
+    : fallback;
+}
+
+function resolveFiniteNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function resolveCssColor(value: unknown, fallback: string) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|var\([^)]+\))$/.test(trimmed)
+    ? trimmed
     : fallback;
 }
 
@@ -88,6 +104,94 @@ export function buildHeroTypographyFields({
   ];
 }
 
+export type CopyTypographyConfig = {
+  fontSize: number;
+  letterSpacing: number;
+  lineHeight: number;
+  secondaryFontSize: number;
+  secondaryLineHeight: number;
+  secondaryMarginTop: number;
+};
+
+export function createCopyTypographyConfig(
+  overrides: Partial<Record<keyof CopyTypographyConfig, unknown>> = {}
+): CopyTypographyConfig {
+  return {
+    fontSize: resolveNonNegativeNumber(overrides.fontSize, 18),
+    letterSpacing: resolveFiniteNumber(overrides.letterSpacing, 0),
+    lineHeight: resolveNonNegativeNumber(overrides.lineHeight, 1.6),
+    secondaryFontSize: resolveNonNegativeNumber(overrides.secondaryFontSize, 16),
+    secondaryLineHeight: resolveNonNegativeNumber(overrides.secondaryLineHeight, 1.55),
+    secondaryMarginTop: resolveNonNegativeNumber(overrides.secondaryMarginTop, 16)
+  };
+}
+
+export function buildCopyTypographyStyleVars(config: CopyTypographyConfig): CSSProperties & Record<string, string | number> {
+  return {
+    "--display-copy-font-size": `${config.fontSize}px`,
+    "--display-copy-letter-spacing": `${config.letterSpacing}px`,
+    "--display-copy-line-height": config.lineHeight,
+    "--display-copy-secondary-font-size": `${config.secondaryFontSize}px`,
+    "--display-copy-secondary-line-height": config.secondaryLineHeight,
+    "--display-copy-secondary-margin-top": `${config.secondaryMarginTop}px`
+  };
+}
+
+export function buildCopyTypographyFields({
+  idPrefix,
+  path
+}: {
+  idPrefix: string;
+  path: DisplayEditorPath;
+}): DisplayEditorFieldSchema[] {
+  return [
+    numberField(`${idPrefix}-copy-font-size`, "Copy Font Size", [...path, "fontSize"], { min: 0 }),
+    numberField(`${idPrefix}-copy-line-height`, "Copy Line Height", [...path, "lineHeight"], { min: 0, step: 0.05 }),
+    numberField(`${idPrefix}-copy-letter-spacing`, "Copy Letter Spacing", [...path, "letterSpacing"], { step: 0.1 }),
+    numberField(`${idPrefix}-copy-secondary-font-size`, "Secondary Copy Font Size", [...path, "secondaryFontSize"], { min: 0 }),
+    numberField(`${idPrefix}-copy-secondary-line-height`, "Secondary Copy Line Height", [...path, "secondaryLineHeight"], { min: 0, step: 0.05 }),
+    numberField(`${idPrefix}-copy-secondary-margin-top`, "Secondary Copy Margin Top", [...path, "secondaryMarginTop"], { min: 0 })
+  ];
+}
+
+export type DisplayGreenPaletteConfig = {
+  accentColor: string;
+  iconColor: string;
+  valueColor: string;
+};
+
+export function createDisplayGreenPaletteConfig(
+  overrides: Partial<Record<keyof DisplayGreenPaletteConfig, unknown>> = {}
+): DisplayGreenPaletteConfig {
+  return {
+    accentColor: resolveCssColor(overrides.accentColor, "#5b8046"),
+    iconColor: resolveCssColor(overrides.iconColor, "#6a8a50"),
+    valueColor: resolveCssColor(overrides.valueColor, "#57774a")
+  };
+}
+
+export function buildDisplayGreenPaletteStyleVars(config: DisplayGreenPaletteConfig): CSSProperties & Record<string, string> {
+  return {
+    "--display-green-accent-color": config.accentColor,
+    "--display-green-icon-color": config.iconColor,
+    "--display-green-value-color": config.valueColor
+  };
+}
+
+export function buildDisplayGreenPaletteFields({
+  idPrefix,
+  path
+}: {
+  idPrefix: string;
+  path: DisplayEditorPath;
+}): DisplayEditorFieldSchema[] {
+  return [
+    { fieldType: "text", id: `${idPrefix}-green-value-color`, label: "Value Green", path: [...path, "valueColor"] },
+    { fieldType: "text", id: `${idPrefix}-green-icon-color`, label: "Icon Green", path: [...path, "iconColor"] },
+    { fieldType: "text", id: `${idPrefix}-green-accent-color`, label: "Accent Green", path: [...path, "accentColor"] }
+  ];
+}
+
 export type GoldLineChromeConfig = {
   offsetY: number;
   opacity: number;
@@ -125,6 +229,7 @@ export type LeafOrnamentChromeConfig = {
   offsetX: number;
   offsetY: number;
   opacity: number;
+  rotationDeg: number;
   scale: number;
   source: LeafOrnamentSource;
 };
@@ -161,6 +266,7 @@ export function createLeafOrnamentChromeConfig(
       typeof overrides.opacity === "number" && Number.isFinite(overrides.opacity) && overrides.opacity >= 0 && overrides.opacity <= 1
         ? overrides.opacity
         : 0.42,
+    rotationDeg: resolveFiniteNumber(overrides.rotationDeg, -30),
     scale: resolveNonNegativeNumber(overrides.scale, 1),
     source: isLeafOrnamentSource(overrides.source) ? overrides.source : { mode: "builtin", ornamentKey: "leaf" }
   };
@@ -205,6 +311,7 @@ export function buildLeafOrnamentFields({
     numberField(`${idPrefix}-leaf-offset-x`, "Leaf Offset X", [...path, "offsetX"], { step: 1 }),
     numberField(`${idPrefix}-leaf-offset-y`, "Leaf Offset Y", [...path, "offsetY"], { step: 1 }),
     numberField(`${idPrefix}-leaf-opacity`, "Leaf Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 }),
+    numberField(`${idPrefix}-leaf-rotation`, "Leaf Rotation", [...path, "rotationDeg"], { step: 1 }),
     numberField(`${idPrefix}-leaf-scale`, "Leaf Scale", [...path, "scale"], { min: 0, step: 0.05 })
   ];
 }

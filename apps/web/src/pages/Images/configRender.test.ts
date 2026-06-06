@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { createImagesDisplayPageSeedConfig } from "./displayPageConfig";
+import { createImagesDisplayPageSeedConfig, imagesDisplayPageEditorRegions } from "./displayPageConfig";
 
 const imagesSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 const imagesCss = readFileSync(path.join(import.meta.dirname, "images.css"), "utf8");
@@ -15,6 +15,8 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(imagesSource, /buildCopyTypographyStyleVars\(resolvedConfig\.chrome\.copyTypography\)/);
+  assert.match(imagesSource, /\.\.\.seedConfig\.chrome\.copyTypography/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.counter\.currentFontSize/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.counter\.progressThickness/);
@@ -85,7 +87,19 @@ test("images display page seed config captures the current default gallery layou
   assert.equal((config as any).rhythm?.imagesCaption?.bodyLineHeight, 1.74);
   assert.equal((config as any).rhythm?.imagesCaption?.metaFontSize, 18);
   assert.equal(config.chrome.heroTypography.eyebrowMarginBottom, 44);
+  assert.equal(config.chrome.copyTypography.fontSize, 24);
+  assert.equal(config.chrome.copyTypography.lineHeight, 1.72);
+  assert.equal(config.chrome.copyTypography.letterSpacing, 0.4);
   assert.equal(config.chrome.modules.arrows.buttonSize, 68);
   assert.equal(config.arrows.left.left, 545);
   assert.equal(config.thumbnailSlots.thumb3.left, 1206);
+});
+
+test("images editor exposes lead copy typography fields", () => {
+  const heroRegion = imagesDisplayPageEditorRegions.find((region) => region.id === "images-hero-copy");
+
+  assert.ok(heroRegion);
+  assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-font-size"));
+  assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-line-height"));
+  assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-letter-spacing"));
 });

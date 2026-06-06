@@ -52,8 +52,9 @@
 .sustainability-copy {
   z-index: 8;
   color: var(--display-copy-ink);
-  font-size: 17px;
-  line-height: 1.78;
+  font-size: var(--display-copy-font-size, 17px);
+  line-height: var(--display-copy-line-height, 1.78);
+  letter-spacing: var(--display-copy-letter-spacing, 0);
 }
 
 .sustainability-copy-line {
@@ -62,11 +63,11 @@
 
 .sustainability-copy-en {
   display: block;
-  margin-top: 14px;
+  margin-top: var(--display-copy-secondary-margin-top, 14px);
   color: var(--display-copy-muted);
   font-family: var(--font-family-en);
-  font-size: 14px;
-  line-height: 1.82;
+  font-size: var(--display-copy-secondary-font-size, 14px);
+  line-height: var(--display-copy-secondary-line-height, 1.82);
 }
 
 .sustainability-leaf-watermark {
@@ -112,7 +113,7 @@
 }
 
 .sustainability-highlight-item strong {
-  color: #57774a;
+  color: var(--display-green-value-color, #57774a);
   font-size: var(--sustainability-highlight-value-font-size, 30px);
   font-weight: 800;
   line-height: 1;
@@ -137,10 +138,10 @@
   z-index: 12;
   --display-card-title-color: #384039;
   --display-card-subtitle-color: #70766f;
-  --display-card-icon-color: #6a8a50;
+  --display-card-icon-color: var(--display-green-icon-color, #6a8a50);
   --display-card-subtitle-letter-spacing: 0.04em;
   --display-card-subtitle-transform: none;
-  --display-card-value-color: #57774a;
+  --display-card-value-color: var(--display-green-value-color, #57774a);
   --display-card-value-weight: 800;
   --display-card-value-line-height: 0.88;
   --display-card-unit-color: #566152;
@@ -152,7 +153,7 @@
 }
 
 .sustainability-card-icon {
-  color: #6a8a50;
+  color: var(--display-green-icon-color, #6a8a50);
 }
 
 .sustainability-sparkline,
@@ -172,12 +173,12 @@
 .sustainability-growth-note svg {
   width: 22px;
   height: 22px;
-  color: #7fa45c;
+  color: var(--display-green-accent-color, #7fa45c);
 }
 
 .sustainability-stat-value {
   text-align: center;
-  color: #57774a;
+  color: var(--display-green-value-color, #57774a);
   font-size: 66px;
   font-weight: 800;
   line-height: 0.88;
@@ -185,7 +186,7 @@
 
 .sustainability-stat-procure {
   text-align: center;
-  color: #57774a;
+  color: var(--display-green-value-color, #57774a);
   font-size: 42px;
   font-weight: 700;
   letter-spacing: 0.5px;

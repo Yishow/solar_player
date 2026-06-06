@@ -16,16 +16,22 @@ import {
   type DisplayCardStyleConfig
 } from "../shared/displayCardStyleConfig";
 import {
+  buildCopyTypographyFields,
+  buildDisplayGreenPaletteFields,
   buildHeroTypographyFields,
   buildLeafOrnamentFields,
   buildPeriodChipsChromeFields,
   buildProvenanceChromeFields,
   buildRingOrnamentFields,
+  createCopyTypographyConfig,
+  createDisplayGreenPaletteConfig,
   createHeroTypographyConfig,
   createLeafOrnamentChromeConfig,
   createPeriodChipsChromeConfig,
   createProvenanceChromeConfig,
   createRingOrnamentChromeConfig,
+  type CopyTypographyConfig,
+  type DisplayGreenPaletteConfig,
   type HeroTypographyConfig,
   type LeafOrnamentChromeConfig,
   type PeriodChipsChromeConfig,
@@ -66,6 +72,7 @@ export type SustainabilityDisplayPageConfig = {
     DisplayCardStyleConfig
   >;
   chrome: {
+    copyTypography: CopyTypographyConfig;
     heroTypography: HeroTypographyConfig;
     modules: {
       periodChips: PeriodChipsChromeConfig;
@@ -75,6 +82,7 @@ export type SustainabilityDisplayPageConfig = {
       leaf: LeafOrnamentChromeConfig;
       ring: RingOrnamentChromeConfig;
     };
+    palette: DisplayGreenPaletteConfig;
   };
   hero: {
     copyEnLines: [string, string, string];
@@ -166,6 +174,13 @@ export function createSustainabilityDisplayPageSeedConfig(
       })
     },
     chrome: {
+      copyTypography: createCopyTypographyConfig({
+        fontSize: 17,
+        lineHeight: 1.78,
+        secondaryFontSize: 14,
+        secondaryLineHeight: 1.82,
+        secondaryMarginTop: 14
+      }),
       heroTypography: createHeroTypographyConfig({
         subtitleMarginTop: 20
       }),
@@ -175,10 +190,12 @@ export function createSustainabilityDisplayPageSeedConfig(
       },
       ornaments: {
         leaf: createLeafOrnamentChromeConfig({
-          opacity: 0.42
+          opacity: 0.42,
+          rotationDeg: -28
         }),
         ring: createRingOrnamentChromeConfig({ glowOpacity: 0.16 })
-      }
+      },
+      palette: createDisplayGreenPaletteConfig()
     },
     hero: {
       copyEnLines: [
@@ -281,6 +298,14 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       ...buildHeroTypographyFields({
         idPrefix: "sustainability",
         path: ["chrome", "heroTypography"]
+      }),
+      ...buildCopyTypographyFields({
+        idPrefix: "sustainability",
+        path: ["chrome", "copyTypography"]
+      }),
+      ...buildDisplayGreenPaletteFields({
+        idPrefix: "sustainability",
+        path: ["chrome", "palette"]
       }),
       { fieldType: "text", id: "sustainability-eyebrow", label: "Eyebrow", path: ["hero", "eyebrow"] },
       { fieldType: "text", id: "sustainability-title-1", label: "Title Line 1", path: ["hero", "title", 0] },
