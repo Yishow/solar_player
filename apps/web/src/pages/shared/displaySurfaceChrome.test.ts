@@ -7,6 +7,8 @@ import {
   buildCopyTypographyStyleVars,
   buildDisplayGreenPaletteFields,
   buildDisplayGreenPaletteStyleVars,
+  buildGoldLineFields,
+  buildLeafOrnamentFields,
   createCopyTypographyConfig,
   createDisplayGreenPaletteConfig,
   createGoldLineChromeConfig,
@@ -59,11 +61,19 @@ test("shared display chrome config defaults preserve the prototype rhythm and or
     titleLineHeight: 1.15
   });
   assert.deepEqual(createGoldLineChromeConfig(), {
+    baseLeft: 0,
+    baseTop: 0,
+    baseWidth: 0,
     offsetY: 0,
     opacity: 0.82,
+    rotationDeg: 0,
     thickness: 1
   });
   assert.deepEqual(createLeafOrnamentChromeConfig(), {
+    baseHeight: 0,
+    baseLeft: 0,
+    baseTop: 0,
+    baseWidth: 0,
     offsetX: 0,
     offsetY: 0,
     opacity: 0.42,
@@ -74,6 +84,56 @@ test("shared display chrome config defaults preserve the prototype rhythm and or
       ornamentKey: "leaf"
     }
   });
+});
+
+test("shared display chrome config exposes ornament base geometry and gold line rotation controls", () => {
+  assert.deepEqual(createGoldLineChromeConfig({
+    baseLeft: 12,
+    baseTop: 340,
+    baseWidth: 960,
+    rotationDeg: -4
+  }), {
+    baseLeft: 12,
+    baseTop: 340,
+    baseWidth: 960,
+    offsetY: 0,
+    opacity: 0.82,
+    rotationDeg: -4,
+    thickness: 1
+  });
+  assert.deepEqual(createLeafOrnamentChromeConfig({
+    baseHeight: 96,
+    baseLeft: 520,
+    baseTop: 564,
+    baseWidth: 178
+  }).baseWidth, 178);
+  assert.deepEqual(
+    buildGoldLineFields({ idPrefix: "overview", path: ["chrome", "ornaments", "goldLine"] }).map((field) => field.id),
+    [
+      "overview-gold-line-thickness",
+      "overview-gold-line-offset-y",
+      "overview-gold-line-opacity"
+    ]
+  );
+  assert.ok(
+    buildGoldLineFields({
+      idPrefix: "solar",
+      includeBaseLayout: true,
+      includeRotation: true,
+      path: ["chrome", "ornaments", "goldLine"]
+    }).some((field) => field.id === "solar-gold-line-base-left")
+  );
+  assert.equal(
+    buildLeafOrnamentFields({ idPrefix: "overview", path: ["chrome", "ornaments", "leaf"] }).some((field) => field.id === "overview-leaf-base-left"),
+    false
+  );
+  assert.ok(
+    buildLeafOrnamentFields({
+      idPrefix: "solar",
+      includeBaseLayout: true,
+      path: ["chrome", "ornaments", "leaf"]
+    }).some((field) => field.id === "solar-leaf-base-width")
+  );
 });
 
 test("shared display chrome config exposes copy typography palette and leaf rotation controls", () => {

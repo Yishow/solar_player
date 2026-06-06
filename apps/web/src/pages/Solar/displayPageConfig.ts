@@ -123,10 +123,19 @@ export function createSolarDisplayPageSeedConfig(
       }),
       ornaments: {
         goldLine: createGoldLineChromeConfig({
-          opacity: 0.8
+          baseLeft: 0,
+          baseTop: 500,
+          baseWidth: 1075,
+          opacity: 0.8,
+          rotationDeg: -4
         }),
         leaf: createLeafOrnamentChromeConfig({
-          opacity: 0.36
+          baseHeight: 132,
+          baseLeft: 565,
+          baseTop: 330,
+          baseWidth: 190,
+          opacity: 0.36,
+          rotationDeg: -35
         })
       }
     },
@@ -302,6 +311,8 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     description: "調整 gold line chrome appearance。",
     fields: buildGoldLineFields({
       idPrefix: "solar",
+      includeBaseLayout: true,
+      includeRotation: true,
       path: ["chrome", "ornaments", "goldLine"]
     }),
     presetKey: "solar-gold-line"
@@ -312,6 +323,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     description: "調整 leaf ornament chrome appearance。",
     fields: buildLeafOrnamentFields({
       idPrefix: "solar",
+      includeBaseLayout: true,
       path: ["chrome", "ornaments", "leaf"]
     }),
     presetKey: "solar-leaf"

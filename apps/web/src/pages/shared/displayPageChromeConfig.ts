@@ -193,8 +193,12 @@ export function buildDisplayGreenPaletteFields({
 }
 
 export type GoldLineChromeConfig = {
+  baseLeft: number;
+  baseTop: number;
+  baseWidth: number;
   offsetY: number;
   opacity: number;
+  rotationDeg: number;
   thickness: number;
 };
 
@@ -202,30 +206,52 @@ export function createGoldLineChromeConfig(
   overrides: Partial<Record<keyof GoldLineChromeConfig, unknown>> = {}
 ): GoldLineChromeConfig {
   return {
+    baseLeft: resolveNonNegativeNumber(overrides.baseLeft, 0),
+    baseTop: resolveNonNegativeNumber(overrides.baseTop, 0),
+    baseWidth: resolveNonNegativeNumber(overrides.baseWidth, 0),
     offsetY: typeof overrides.offsetY === "number" && Number.isFinite(overrides.offsetY) ? overrides.offsetY : 0,
     opacity:
       typeof overrides.opacity === "number" && Number.isFinite(overrides.opacity) && overrides.opacity >= 0 && overrides.opacity <= 1
         ? overrides.opacity
         : 0.82,
+    rotationDeg: resolveFiniteNumber(overrides.rotationDeg, 0),
     thickness: resolveNonNegativeNumber(overrides.thickness, 1)
   };
 }
 
 export function buildGoldLineFields({
   idPrefix,
+  includeBaseLayout = false,
+  includeRotation = false,
   path
 }: {
   idPrefix: string;
+  includeBaseLayout?: boolean;
+  includeRotation?: boolean;
   path: DisplayEditorPath;
 }): DisplayEditorFieldSchema[] {
   return [
+    ...(includeBaseLayout
+      ? [
+          numberField(`${idPrefix}-gold-line-base-left`, "Gold Line Base Left", [...path, "baseLeft"], { min: 0 }),
+          numberField(`${idPrefix}-gold-line-base-top`, "Gold Line Base Top", [...path, "baseTop"], { min: 0 }),
+          numberField(`${idPrefix}-gold-line-base-width`, "Gold Line Base Width", [...path, "baseWidth"], { min: 0 })
+        ]
+      : []),
     numberField(`${idPrefix}-gold-line-thickness`, "Gold Line Thickness", [...path, "thickness"], { min: 0 }),
     numberField(`${idPrefix}-gold-line-offset-y`, "Gold Line Offset Y", [...path, "offsetY"], { step: 1 }),
-    numberField(`${idPrefix}-gold-line-opacity`, "Gold Line Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 })
+    numberField(`${idPrefix}-gold-line-opacity`, "Gold Line Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 }),
+    ...(includeRotation
+      ? [numberField(`${idPrefix}-gold-line-rotation`, "Gold Line Rotation", [...path, "rotationDeg"], { step: 1 })]
+      : [])
   ];
 }
 
 export type LeafOrnamentChromeConfig = {
+  baseHeight: number;
+  baseLeft: number;
+  baseTop: number;
+  baseWidth: number;
   offsetX: number;
   offsetY: number;
   opacity: number;
@@ -260,6 +286,10 @@ export function createLeafOrnamentChromeConfig(
   overrides: Partial<Record<keyof LeafOrnamentChromeConfig, unknown>> = {}
 ): LeafOrnamentChromeConfig {
   return {
+    baseHeight: resolveNonNegativeNumber(overrides.baseHeight, 0),
+    baseLeft: resolveNonNegativeNumber(overrides.baseLeft, 0),
+    baseTop: resolveNonNegativeNumber(overrides.baseTop, 0),
+    baseWidth: resolveNonNegativeNumber(overrides.baseWidth, 0),
     offsetX: typeof overrides.offsetX === "number" && Number.isFinite(overrides.offsetX) ? overrides.offsetX : 0,
     offsetY: typeof overrides.offsetY === "number" && Number.isFinite(overrides.offsetY) ? overrides.offsetY : 0,
     opacity:
@@ -274,9 +304,11 @@ export function createLeafOrnamentChromeConfig(
 
 export function buildLeafOrnamentFields({
   idPrefix,
+  includeBaseLayout = false,
   path
 }: {
   idPrefix: string;
+  includeBaseLayout?: boolean;
   path: DisplayEditorPath;
 }): DisplayEditorFieldSchema[] {
   const sourceModePath = [...path, "source", "mode"];
@@ -308,11 +340,78 @@ export function buildLeafOrnamentFields({
       path: [...path, "source", "fallbackSrc"],
       visibleWhen: { equals: "managed-asset", path: sourceModePath }
     },
+    ...(includeBaseLayout
+      ? [
+          numberField(`${idPrefix}-leaf-base-left`, "Leaf Base Left", [...path, "baseLeft"], { min: 0 }),
+          numberField(`${idPrefix}-leaf-base-top`, "Leaf Base Top", [...path, "baseTop"], { min: 0 }),
+          numberField(`${idPrefix}-leaf-base-width`, "Leaf Base Width", [...path, "baseWidth"], { min: 0 }),
+          numberField(`${idPrefix}-leaf-base-height`, "Leaf Base Height", [...path, "baseHeight"], { min: 0 })
+        ]
+      : []),
     numberField(`${idPrefix}-leaf-offset-x`, "Leaf Offset X", [...path, "offsetX"], { step: 1 }),
     numberField(`${idPrefix}-leaf-offset-y`, "Leaf Offset Y", [...path, "offsetY"], { step: 1 }),
     numberField(`${idPrefix}-leaf-opacity`, "Leaf Opacity", [...path, "opacity"], { min: 0, max: 1, step: 0.05 }),
     numberField(`${idPrefix}-leaf-rotation`, "Leaf Rotation", [...path, "rotationDeg"], { step: 1 }),
     numberField(`${idPrefix}-leaf-scale`, "Leaf Scale", [...path, "scale"], { min: 0, step: 0.05 })
+  ];
+}
+
+export type ImagesStageFrameShadow = "none" | "soft";
+
+export type ImagesStageFrameChromeConfig = {
+  fullBleed: boolean;
+  radius: number;
+  shadow: ImagesStageFrameShadow;
+  thumbnailRadius: number;
+};
+
+function resolveImagesStageFrameShadow(value: unknown, fallback: ImagesStageFrameShadow): ImagesStageFrameShadow {
+  return value === "none" || value === "soft" ? value : fallback;
+}
+
+export function createImagesStageFrameChromeConfig(
+  overrides: Partial<Record<keyof ImagesStageFrameChromeConfig, unknown>> = {}
+): ImagesStageFrameChromeConfig {
+  return {
+    fullBleed: typeof overrides.fullBleed === "boolean" ? overrides.fullBleed : true,
+    radius: resolveNonNegativeNumber(overrides.radius, 16),
+    shadow: resolveImagesStageFrameShadow(overrides.shadow, "soft"),
+    thumbnailRadius: resolveNonNegativeNumber(overrides.thumbnailRadius, 20)
+  };
+}
+
+export function buildImagesStageFrameFields({
+  idPrefix,
+  path
+}: {
+  idPrefix: string;
+  path: DisplayEditorPath;
+}): DisplayEditorFieldSchema[] {
+  return [
+    { fieldType: "toggle", id: `${idPrefix}-stage-full-bleed`, label: "Stage Full Bleed", path: [...path, "fullBleed"] },
+    numberField(`${idPrefix}-stage-radius`, "Stage Radius", [...path, "radius"], { min: 0 }),
+    {
+      fieldType: "select",
+      id: `${idPrefix}-stage-shadow`,
+      label: "Stage Shadow",
+      options: [
+        { label: "Soft", value: "soft" },
+        { label: "None", value: "none" }
+      ],
+      path: [...path, "shadow"]
+    }
+  ];
+}
+
+export function buildImagesThumbnailFrameFields({
+  idPrefix,
+  path
+}: {
+  idPrefix: string;
+  path: DisplayEditorPath;
+}): DisplayEditorFieldSchema[] {
+  return [
+    numberField(`${idPrefix}-thumbnail-radius`, "Thumbnail Radius", [...path, "thumbnailRadius"], { min: 0 })
   ];
 }
 

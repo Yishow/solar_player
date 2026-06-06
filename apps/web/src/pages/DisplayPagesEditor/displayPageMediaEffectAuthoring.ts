@@ -77,7 +77,7 @@ export function listSupportedEffectKinds(support: DisplayPageMediaEffectSupport)
 }
 
 function defaultZoneForKind(kind: DisplayPageMediaEffectKind, support: DisplayPageMediaEffectSupport) {
-  return support[kind]?.zones[0] ?? (kind === "opacity" ? "full-frame" : "top");
+  return support[kind]?.zones[0] ?? (kind === "opacity" || kind === "tone" ? "full-frame" : "top");
 }
 
 export function createDefaultDisplayPageMediaEffectLayer(
@@ -95,6 +95,9 @@ export function createDefaultDisplayPageMediaEffectLayer(
         ? { kind, strength: 8, zone }
         : { coverage: 0.28, feather: 0.42, kind, strength: 12, zone: zone as DisplayPageLocalizedMediaEffectZone };
     case "opacity":
+      return { kind: "opacity", strength: 0.9, zone: "full-frame" };
+    case "tone":
+      return { contrast: 1, kind: "tone", saturation: 1, zone: "full-frame" };
     default:
       return { kind: "opacity", strength: 0.9, zone: "full-frame" };
   }
@@ -184,6 +187,8 @@ export function updateDisplayPageMediaEffectLayerZone(
       case "blur":
         return { ...layer, zone };
       case "opacity":
+        return { ...layer, zone: "full-frame" as const };
+      case "tone":
       default:
         return { ...layer, zone: "full-frame" as const };
     }
@@ -235,6 +240,10 @@ export function resolveDisplayPageMediaEffectGuardrails(
     if (layer.kind === "blur" && layer.strength > 20) {
       messages.add("模糊強度過高，畫面可讀性可能快速下降。");
     }
+
+    if (layer.kind === "tone" && (layer.saturation > 1.6 || layer.contrast > 1.6)) {
+      messages.add("色調強度偏高，請確認主體細節與文字對比仍然可讀。");
+    }
   });
 
   const localizedZoneKeyCounts = new Map<string, number>();
@@ -264,6 +273,9 @@ function localizeKind(kind: DisplayPageMediaEffectKind) {
     case "mist":
       return "霧化";
     case "opacity":
+      return "透明度";
+    case "tone":
+      return "色調";
     default:
       return "透明度";
   }
@@ -310,7 +322,10 @@ export function resolveDisplayPageMediaEffectSummary(
       values.push(`羽化 ${Math.round(layer.feather * 100)}%`);
     }
 
-    if (layer.kind === "mist") {
+    if (layer.kind === "tone") {
+      values.push(`飽和 ${Math.round((layer.saturation ?? 1) * 100)}%`);
+      values.push(`對比 ${Math.round((layer.contrast ?? 1) * 100)}%`);
+    } else if (layer.kind === "mist") {
       values.push(`模糊 ${Math.round(layer.blur)}px`);
     } else if (layer.kind === "blur") {
       values.push(`強度 ${Math.round(layer.strength)}`);

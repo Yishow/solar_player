@@ -22,6 +22,10 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.counter\.progressThickness/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.arrows\.buttonSize/);
   assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.arrows\.borderRadius/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.stageFrame\.fullBleed/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.stageFrame\.radius/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.stageFrame\.shadow/);
+  assert.match(imagesSource, /resolvedConfig\.chrome\.modules\.stageFrame\.thumbnailRadius/);
   assert.match(imagesSource, /resolvedConfig\.hero\.copyLines/);
   assert.match(imagesSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(imagesSource, /resolvedConfig\.mainStage/);
@@ -47,10 +51,10 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
   assert.match(imagesSource, /src=\{thumbnail\.assetSource\}/);
   assert.doesNotMatch(imagesSource, /src=\{runtimeThumb/);
-  assert.match(imagesSource, /isReferenceHeroCrop/);
-  assert.match(imagesSource, /viewModel\.active\.assetSource === imagesAssetRuntimeMap\.main/);
-  assert.match(imagesSource, /!\s*isReferenceHeroCrop/);
-  assert.match(imagesSource, /images-main-stage-reference/);
+  assert.match(imagesSource, /const isStageFullBleed = resolvedConfig\.chrome\.modules\.stageFrame\.fullBleed/);
+  assert.doesNotMatch(imagesSource, /isReferenceHeroCrop/);
+  assert.doesNotMatch(imagesSource, /viewModel\.active\.assetSource === imagesAssetRuntimeMap\.main/);
+  assert.match(imagesSource, /!\s*isStageFullBleed/);
   assert.match(imagesSource, /images-grass-ornament/);
   assert.match(imagesSource, /imagesAssetRuntimeMap\.leftOrnament/);
   assert.doesNotMatch(imagesSource, /ImagesGrassOrnament/);
@@ -63,17 +67,18 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.doesNotMatch(imagesSource, /viewModel\.active\.infoPanel\.tags/);
 });
 
-test("images reference hero crop is rendered without secondary transform or overlays", () => {
+test("images stage full bleed is rendered from config without secondary transform or overlays", () => {
   assert.match(imagesCss, /\.images-main-stage img\s*\{[\s\S]*display:\s*block;/);
   assert.match(imagesCss, /@keyframes images-main-slide-in/);
   assert.match(imagesCss, /@keyframes images-progress-grow/);
   assert.match(imagesCss, /\.images-grass-ornament/);
   assert.match(imagesCss, /\.images-grass-ornament img/);
   assert.doesNotMatch(imagesCss, /\.images-grass-line/);
-  assert.match(imagesCss, /\.images-main-stage-reference\s*\{[\s\S]*border-radius:\s*0;/);
-  assert.match(imagesCss, /\.images-main-stage-reference\s*\{[\s\S]*box-shadow:\s*none;/);
+  assert.doesNotMatch(imagesCss, /\.images-main-stage-reference/);
+  assert.match(imagesCss, /border-radius:\s*var\(--images-stage-radius, 16px\)/);
+  assert.match(imagesCss, /box-shadow:\s*var\(--images-stage-shadow, var\(--display-shadow-soft\)\)/);
   assert.doesNotMatch(imagesCss, /translateX\(-76px\)\s*scale\(1\.14\)/);
-  assert.match(imagesSource, /isReferenceHeroCrop \? \[\] : mainStageMediaPresentation\.overlayLayers/);
+  assert.match(imagesSource, /isStageFullBleed \? \[\] : mainStageMediaPresentation\.overlayLayers/);
 });
 
 test("images display page seed config captures the current default gallery layout and hero contract", () => {
@@ -91,6 +96,10 @@ test("images display page seed config captures the current default gallery layou
   assert.equal(config.chrome.copyTypography.lineHeight, 1.72);
   assert.equal(config.chrome.copyTypography.letterSpacing, 0.4);
   assert.equal(config.chrome.modules.arrows.buttonSize, 68);
+  assert.equal(config.chrome.modules.stageFrame.fullBleed, true);
+  assert.equal(config.chrome.modules.stageFrame.radius, 16);
+  assert.equal(config.chrome.modules.stageFrame.shadow, "soft");
+  assert.equal(config.chrome.modules.stageFrame.thumbnailRadius, 20);
   assert.equal(config.arrows.left.left, 545);
   assert.equal(config.thumbnailSlots.thumb3.left, 1206);
 });
@@ -102,4 +111,16 @@ test("images editor exposes lead copy typography fields", () => {
   assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-font-size"));
   assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-line-height"));
   assert.ok(heroRegion.fields.some((field) => field.id === "images-copy-letter-spacing"));
+});
+
+test("images editor exposes stage and thumbnail framing fields", () => {
+  const stageRegion = imagesDisplayPageEditorRegions.find((region) => region.id === "images-main-stage");
+  const thumbRegion = imagesDisplayPageEditorRegions.find((region) => region.id === "images-thumb-thumb1");
+
+  assert.ok(stageRegion);
+  assert.ok(thumbRegion);
+  assert.ok(stageRegion.fields.some((field) => field.id === "images-stage-full-bleed"));
+  assert.ok(stageRegion.fields.some((field) => field.id === "images-stage-radius"));
+  assert.ok(stageRegion.fields.some((field) => field.id === "images-stage-shadow"));
+  assert.ok(thumbRegion.fields.some((field) => field.id === "thumb1-thumbnail-radius"));
 });

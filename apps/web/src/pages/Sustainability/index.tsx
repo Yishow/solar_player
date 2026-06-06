@@ -56,7 +56,6 @@ import {
   sustainabilityContentTopOffset,
   sustainabilityCopyLayout,
   sustainabilityKpiLayout,
-  sustainabilityLeafLayout,
   sustainabilityStatLayout,
   sustainabilityTitleLayout
 } from "./layout";
@@ -264,7 +263,12 @@ export function Sustainability({
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
-  const leafLayout = withContentOffset(sustainabilityLeafLayout);
+  const leafLayout = withContentOffset({
+    height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
+    left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
+    top: resolvedConfig.chrome.ornaments.leaf.baseTop,
+    width: resolvedConfig.chrome.ornaments.leaf.baseWidth
+  });
   const heroLayout = withContentOffset(resolvedConfig.heroMedia);
   const highlightRhythm = resolveSustainabilityHighlightRhythmConfig(
     resolvedConfig.rhythm.highlightRail,

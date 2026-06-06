@@ -17,6 +17,9 @@ const composableSupport: DisplayPageMediaEffectResolverOptions["support"] = {
   },
   opacity: {
     zones: ["full-frame"]
+  },
+  tone: {
+    zones: ["full-frame"]
   }
 };
 
@@ -122,6 +125,33 @@ test("shared media effect resolver drops unsupported canonical layers instead of
     [
       { kind: "fade", zone: "all-edges" },
       { kind: "opacity", zone: "full-frame" }
+    ]
+  );
+});
+
+test("shared media effect resolver supports full-frame tone saturation and contrast", () => {
+  const resolved = resolveDisplayPageMediaEffects(
+    {
+      layers: [
+        { contrast: 1.08, kind: "tone", saturation: 1.18, zone: "full-frame" },
+        { contrast: 2.4, kind: "tone", saturation: -1, zone: "full-frame" }
+      ]
+    },
+    {
+      support: composableSupport
+    }
+  );
+
+  assert.deepEqual(
+    resolved.layers.map((layer) => ({
+      contrast: "contrast" in layer ? layer.contrast : null,
+      kind: layer.kind,
+      saturation: "saturation" in layer ? layer.saturation : null,
+      zone: layer.zone
+    })),
+    [
+      { contrast: 1.08, kind: "tone", saturation: 1.18, zone: "full-frame" },
+      { contrast: 2, kind: "tone", saturation: 0, zone: "full-frame" }
     ]
   );
 });

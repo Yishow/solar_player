@@ -169,6 +169,30 @@ test("display page media presentation drops unsupported canonical layers without
   });
 });
 
+test("display page media presentation composes tone filters with blur and opacity", () => {
+  const presentation = buildDisplayPageMediaPresentation(
+    {
+      effects: {
+        layers: [
+          { kind: "blur", strength: 8, zone: "full-frame" },
+          { contrast: 1.08, kind: "tone", saturation: 1.18, zone: "full-frame" },
+          { kind: "opacity", strength: 0.82, zone: "full-frame" }
+        ]
+      },
+      fitMode: "cover",
+      src: "/tone-effects.png"
+    },
+    overviewHeroMediaEffectResolverOptions
+  );
+
+  assert.deepEqual(presentation.mediaStyle, {
+    filter: "blur(8px) saturate(1.18) contrast(1.08)",
+    objectFit: "cover",
+    objectPosition: "50% 50%",
+    opacity: 0.82
+  });
+});
+
 test("playback runtime wires shared media presentation into supported media treatment surfaces", () => {
   assert.match(
     overviewSource,

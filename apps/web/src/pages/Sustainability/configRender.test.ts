@@ -22,6 +22,10 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /\.\.\.seedConfig\.chrome\.ornaments\.leaf/);
   assert.match(sustainabilitySource, /\.\.\.seedConfig\.chrome\.palette/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseLeft/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseTop/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseWidth/);
+  assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseHeight/);
   assert.match(sustainabilitySource, /--display-leaf-rotation/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.ornaments\.leaf\.rotationDeg/);
   assert.match(sustainabilitySource, /ringOrnament = resolvedConfig\.chrome\.ornaments\.ring/);
@@ -64,6 +68,10 @@ test("sustainability display page seed config captures the current hero and high
   assert.equal(config.chrome.ornaments.ring.overlap, 118);
   assert.equal(config.chrome.ornaments.ring.opacity, 0.34);
   assert.equal(config.chrome.ornaments.leaf.rotationDeg, -28);
+  assert.equal(config.chrome.ornaments.leaf.baseLeft, 520);
+  assert.equal(config.chrome.ornaments.leaf.baseTop, 564);
+  assert.equal(config.chrome.ornaments.leaf.baseWidth, 178);
+  assert.equal(config.chrome.ornaments.leaf.baseHeight, 96);
   assert.equal(config.chrome.copyTypography.fontSize, 17);
   assert.equal(config.chrome.copyTypography.secondaryFontSize, 14);
   assert.equal(config.chrome.copyTypography.secondaryLineHeight, 1.82);
@@ -95,6 +103,18 @@ test("sustainability editor exposes copy typography palette and leaf rotation fi
   assert.ok(heroRegion.fields.some((field) => field.id === "sustainability-green-value-color"));
   assert.ok(heroRegion.fields.some((field) => field.id === "sustainability-green-icon-color"));
   assert.ok(leafRegion.fields.some((field) => field.id === "sustainability-leaf-rotation"));
+  assert.ok(leafRegion.fields.some((field) => field.id === "sustainability-leaf-base-left"));
+  assert.ok(leafRegion.fields.some((field) => field.id === "sustainability-leaf-base-width"));
+});
+
+test("sustainability editor keeps ring thickness and glow fields wired", () => {
+  const ringRegion = sustainabilityDisplayPageEditorRegions.find((region) => region.id === "sustainability-ornament-ring");
+
+  assert.ok(ringRegion);
+  assert.ok(ringRegion.fields.some((field) => field.id === "sustainability-ring-thickness"));
+  assert.ok(ringRegion.fields.some((field) => field.id === "sustainability-ring-glow-opacity"));
+  assert.match(sustainabilitySource, /--display-ring-thickness/);
+  assert.match(sustainabilitySource, /--display-ring-glow-opacity/);
 });
 
 test("sustainability runtime resolves the shared story adapter and clears back to fallback data on request failure", () => {

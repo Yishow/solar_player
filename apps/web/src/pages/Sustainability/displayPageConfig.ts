@@ -56,6 +56,7 @@ import {
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityKpiLayout,
+  sustainabilityLeafLayout,
   sustainabilityStatLayout
 } from "./layout";
 
@@ -190,6 +191,10 @@ export function createSustainabilityDisplayPageSeedConfig(
       },
       ornaments: {
         leaf: createLeafOrnamentChromeConfig({
+          baseHeight: sustainabilityLeafLayout.height,
+          baseLeft: sustainabilityLeafLayout.left,
+          baseTop: sustainabilityLeafLayout.top,
+          baseWidth: sustainabilityLeafLayout.width,
           opacity: 0.42,
           rotationDeg: -28
         }),
@@ -426,6 +431,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
     description: "調整 leaf ornament chrome appearance。",
     fields: buildLeafOrnamentFields({
       idPrefix: "sustainability",
+      includeBaseLayout: true,
       path: ["chrome", "ornaments", "leaf"]
     }),
     presetKey: "sustainability-leaf"

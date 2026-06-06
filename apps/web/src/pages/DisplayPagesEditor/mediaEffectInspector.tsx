@@ -45,6 +45,9 @@ function fieldLabel(layer: DisplayPageMediaEffectLayer) {
     case "mist":
       return "霧化強度";
     case "opacity":
+      return "透明度";
+    case "tone":
+      return "色調";
     default:
       return "透明度";
   }
@@ -330,26 +333,76 @@ export function DisplayPageMediaEffectInspector({
             </label>
           ) : null}
 
-          <label className="grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
-            {fieldLabel(layer)}
-            <input
-              className="rounded-[12px] border border-[var(--shell-divider)] px-3 py-2 text-[13px]"
-              step={layer.kind === "blur" ? "1" : "0.05"}
-              type="number"
-              value={layer.strength ?? ""}
-              onChange={(event) =>
-                onConfigChange((current) =>
-                  writeDisplayPageMediaEffectLayers(
-                    current,
-                    bindingState.bindingPath,
-                    layers.map((entry, layerIndex) =>
-                      layerIndex === index ? { ...entry, strength: Number(event.target.value) } : entry
+          {layer.kind !== "tone" ? (
+            <label className="grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
+              {fieldLabel(layer)}
+              <input
+                className="rounded-[12px] border border-[var(--shell-divider)] px-3 py-2 text-[13px]"
+                step={layer.kind === "blur" ? "1" : "0.05"}
+                type="number"
+                value={layer.strength ?? ""}
+                onChange={(event) =>
+                  onConfigChange((current) =>
+                    writeDisplayPageMediaEffectLayers(
+                      current,
+                      bindingState.bindingPath,
+                      layers.map((entry, layerIndex) =>
+                        layerIndex === index ? { ...entry, strength: Number(event.target.value) } : entry
+                      )
                     )
                   )
-                )
-              }
-            />
-          </label>
+                }
+              />
+            </label>
+          ) : null}
+
+          {layer.kind === "tone" ? (
+            <label className="grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
+              飽和度
+              <input
+                className="rounded-[12px] border border-[var(--shell-divider)] px-3 py-2 text-[13px]"
+                name="saturation"
+                step="0.05"
+                type="number"
+                value={layer.saturation ?? ""}
+                onChange={(event) =>
+                  onConfigChange((current) =>
+                    writeDisplayPageMediaEffectLayers(
+                      current,
+                      bindingState.bindingPath,
+                      layers.map((entry, layerIndex) =>
+                        layerIndex === index ? { ...entry, saturation: Number(event.target.value) } : entry
+                      )
+                    )
+                  )
+                }
+              />
+            </label>
+          ) : null}
+
+          {layer.kind === "tone" ? (
+            <label className="grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">
+              對比
+              <input
+                className="rounded-[12px] border border-[var(--shell-divider)] px-3 py-2 text-[13px]"
+                name="contrast"
+                step="0.05"
+                type="number"
+                value={layer.contrast ?? ""}
+                onChange={(event) =>
+                  onConfigChange((current) =>
+                    writeDisplayPageMediaEffectLayers(
+                      current,
+                      bindingState.bindingPath,
+                      layers.map((entry, layerIndex) =>
+                        layerIndex === index ? { ...entry, contrast: Number(event.target.value) } : entry
+                      )
+                    )
+                  )
+                }
+              />
+            </label>
+          ) : null}
 
           {"blur" in layer ? (
             <label className="grid gap-1 text-[12px] text-[var(--shell-copy-ink)]">

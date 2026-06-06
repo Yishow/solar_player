@@ -63,6 +63,14 @@ test("effect authoring helpers support add move remove and editable presets", ()
   );
 });
 
+test("effect authoring helpers support full-frame tone layers", () => {
+  const added = appendDisplayPageMediaEffectLayer([], firstBatchDisplayPageMediaEffectSupport, "tone");
+
+  assert.deepEqual(added, [
+    { contrast: 1, kind: "tone", saturation: 1, zone: "full-frame" }
+  ]);
+});
+
 test("effect authoring guardrails warn on extreme same-zone stacks", () => {
   const guardrails = resolveDisplayPageMediaEffectGuardrails(
     [
@@ -106,6 +114,56 @@ test("media effect inspector renders presets summaries and guardrails for suppor
   assert.match(html, /效果層 1/);
   assert.match(html, /效果層 2/);
   assert.doesNotMatch(html, /來源連接/);
+});
+
+test("media effect inspector renders tone saturation and contrast controls", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayPageMediaEffectInspector, {
+      availableRegions: [region("supported")],
+      config: {
+        heroMedia: {
+          effects: {
+            layers: [
+              { contrast: 1.08, kind: "tone", saturation: 1.18, zone: "full-frame" }
+            ]
+          }
+        }
+      },
+      onConfigChange: () => {},
+      selectedRegion: region("supported")
+    })
+  );
+
+  assert.match(html, /色調/);
+  assert.match(html, /飽和度/);
+  assert.match(html, /對比/);
+  assert.match(html, /saturation/);
+  assert.match(html, /contrast/);
+});
+
+test("media effect inspector renders controls and summaries for sparse tone layers", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DisplayPageMediaEffectInspector, {
+      availableRegions: [region("supported")],
+      config: {
+        heroMedia: {
+          effects: {
+            layers: [
+              { kind: "tone", zone: "full-frame" }
+            ]
+          }
+        }
+      },
+      onConfigChange: () => {},
+      selectedRegion: region("supported")
+    })
+  );
+
+  assert.match(html, /飽和度/);
+  assert.match(html, /對比/);
+  assert.match(html, /飽和 100%/);
+  assert.match(html, /對比 100%/);
+  assert.doesNotMatch(html, /NaN/);
 });
 
 test("media effect inspector explains unsupported surfaces explicitly", () => {

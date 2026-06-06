@@ -29,6 +29,9 @@ export const firstBatchDisplayPageMediaEffectSupport: DisplayPageMediaEffectSupp
   },
   opacity: {
     zones: ["full-frame"]
+  },
+  tone: {
+    zones: ["full-frame"]
   }
 };
 

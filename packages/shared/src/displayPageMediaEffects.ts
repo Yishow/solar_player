@@ -16,7 +16,7 @@ export const displayPageLocalizedMediaEffectZones = displayPageMediaEffectZones.
 export type DisplayPageMediaEffectZone = (typeof displayPageMediaEffectZones)[number];
 export type DisplayPageLocalizedMediaEffectZone = Exclude<DisplayPageMediaEffectZone, "full-frame">;
 
-export const displayPageMediaEffectKinds = ["fade", "mist", "blur", "opacity"] as const;
+export const displayPageMediaEffectKinds = ["fade", "mist", "blur", "opacity", "tone"] as const;
 
 export type DisplayPageMediaEffectKind = (typeof displayPageMediaEffectKinds)[number];
 
@@ -49,6 +49,16 @@ export const displayPageMediaEffectBounds = {
   opacityValue: {
     max: 1,
     min: 0.1,
+    step: 0.05
+  },
+  toneContrast: {
+    max: 2,
+    min: 0,
+    step: 0.05
+  },
+  toneSaturation: {
+    max: 2,
+    min: 0,
     step: 0.05
   },
   strength: {
@@ -98,11 +108,20 @@ export type DisplayPageMediaOpacityEffectLayer = {
   zone: "full-frame";
 };
 
+export type DisplayPageMediaToneEffectLayer = {
+  contrast?: number;
+  enabled?: boolean;
+  kind: "tone";
+  saturation?: number;
+  zone: "full-frame";
+};
+
 export type DisplayPageMediaEffectLayer =
   | DisplayPageMediaBlurEffectLayer
   | DisplayPageMediaFadeEffectLayer
   | DisplayPageMediaMistEffectLayer
-  | DisplayPageMediaOpacityEffectLayer;
+  | DisplayPageMediaOpacityEffectLayer
+  | DisplayPageMediaToneEffectLayer;
 
 export type DisplayPageResolvedMediaFadeEffectLayer = Omit<
   Required<DisplayPageMediaFadeEffectLayer>,
@@ -124,11 +143,17 @@ export type DisplayPageResolvedMediaOpacityEffectLayer = Omit<
   "enabled"
 > & { enabled: boolean };
 
+export type DisplayPageResolvedMediaToneEffectLayer = Omit<
+  Required<DisplayPageMediaToneEffectLayer>,
+  "enabled"
+> & { enabled: boolean };
+
 export type DisplayPageResolvedMediaEffectLayer =
   | DisplayPageResolvedMediaBlurEffectLayer
   | DisplayPageResolvedMediaFadeEffectLayer
   | DisplayPageResolvedMediaMistEffectLayer
-  | DisplayPageResolvedMediaOpacityEffectLayer;
+  | DisplayPageResolvedMediaOpacityEffectLayer
+  | DisplayPageResolvedMediaToneEffectLayer;
 
 export type DisplayPageMediaEffectSupportEntry<TZone extends DisplayPageMediaEffectZone = DisplayPageMediaEffectZone> = {
   zones: TZone[];
@@ -139,6 +164,7 @@ export type DisplayPageMediaEffectSupport = Partial<{
   fade: DisplayPageMediaEffectSupportEntry<DisplayPageLocalizedMediaEffectZone>;
   mist: DisplayPageMediaEffectSupportEntry<DisplayPageLocalizedMediaEffectZone>;
   opacity: DisplayPageMediaEffectSupportEntry<"full-frame">;
+  tone: DisplayPageMediaEffectSupportEntry<"full-frame">;
 }>;
 
 export type DisplayPageMediaEdgeFadeEffect = {
@@ -235,6 +261,9 @@ function normalizeSupport(
       : undefined,
     opacity: support?.opacity
       ? { zones: coerceSupportedZones(support.opacity, ["full-frame"]) }
+      : undefined,
+    tone: support?.tone
+      ? { zones: coerceSupportedZones(support.tone, ["full-frame"]) }
       : undefined
   };
 }
@@ -381,6 +410,33 @@ function resolveOpacityLayer(
   };
 }
 
+function resolveToneLayer(
+  layer: DisplayPageMediaToneEffectLayer,
+  support: DisplayPageMediaEffectSupport
+): DisplayPageResolvedMediaToneEffectLayer | null {
+  if (!resolveLayerSupport(layer, support)) {
+    return null;
+  }
+
+  return {
+    contrast: clampNumber(
+      layer.contrast,
+      displayPageMediaEffectBounds.toneContrast.min,
+      displayPageMediaEffectBounds.toneContrast.max,
+      1
+    ),
+    enabled: resolveEnabled(layer.enabled, true),
+    kind: "tone",
+    saturation: clampNumber(
+      layer.saturation,
+      displayPageMediaEffectBounds.toneSaturation.min,
+      displayPageMediaEffectBounds.toneSaturation.max,
+      1
+    ),
+    zone: "full-frame"
+  };
+}
+
 function resolveCanonicalLayer(
   layer: DisplayPageMediaEffectLayer,
   support: DisplayPageMediaEffectSupport
@@ -394,6 +450,8 @@ function resolveCanonicalLayer(
       return resolveBlurLayer(layer, support);
     case "opacity":
       return resolveOpacityLayer(layer, support);
+    case "tone":
+      return resolveToneLayer(layer, support);
     default:
       return null;
   }

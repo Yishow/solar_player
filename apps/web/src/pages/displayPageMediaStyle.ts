@@ -6,6 +6,7 @@ import {
   type DisplayPageResolvedMediaEffectLayer,
   type DisplayPageResolvedMediaBlurEffectLayer,
   type DisplayPageResolvedMediaOpacityEffectLayer,
+  type DisplayPageResolvedMediaToneEffectLayer,
   type DisplayPageResolvedMediaEffects
 } from "@solar-display/shared";
 import type { CSSProperties } from "react";
@@ -108,6 +109,7 @@ function buildFullFrameMediaStyle(
   mediaStyle: CSSProperties,
   effects: DisplayPageResolvedMediaEffects
 ) {
+  const filters: string[] = [];
   const fullFrameBlurAmount = effects.layers
     .filter((layer): layer is DisplayPageResolvedMediaBlurEffectLayer =>
       layer.kind === "blur" && layer.zone === "full-frame"
@@ -115,7 +117,18 @@ function buildFullFrameMediaStyle(
     .reduce((sum, layer) => sum + layer.strength, 0);
 
   if (fullFrameBlurAmount > 0) {
-    mediaStyle.filter = `blur(${Math.min(24, fullFrameBlurAmount)}px)`;
+    filters.push(`blur(${Math.min(24, fullFrameBlurAmount)}px)`);
+  }
+
+  effects.layers
+    .filter((layer): layer is DisplayPageResolvedMediaToneEffectLayer => layer.kind === "tone")
+    .forEach((layer) => {
+      filters.push(`saturate(${layer.saturation})`);
+      filters.push(`contrast(${layer.contrast})`);
+    });
+
+  if (filters.length > 0) {
+    mediaStyle.filter = filters.join(" ");
   }
 
   const fullFrameOpacityLayers = effects.layers.filter(

@@ -11,16 +11,20 @@ import {
   buildCopyTypographyFields,
   buildGoldLineFields,
   buildHeroTypographyFields,
+  buildImagesStageFrameFields,
+  buildImagesThumbnailFrameFields,
   createArrowChromeConfig,
   createCounterChromeConfig,
   createCopyTypographyConfig,
   createGoldLineChromeConfig,
   createHeroTypographyConfig,
+  createImagesStageFrameChromeConfig,
   type ArrowChromeConfig,
   type CounterChromeConfig,
   type CopyTypographyConfig,
   type GoldLineChromeConfig,
-  type HeroTypographyConfig
+  type HeroTypographyConfig,
+  type ImagesStageFrameChromeConfig
 } from "../shared/displayPageChromeConfig";
 import {
   buildDisplayPageIconSourceFields,
@@ -61,6 +65,7 @@ export type ImagesDisplayPageConfig = {
     modules: {
       arrows: ArrowChromeConfig;
       counter: CounterChromeConfig;
+      stageFrame: ImagesStageFrameChromeConfig;
     };
     ornaments: {
       goldLine: GoldLineChromeConfig;
@@ -140,7 +145,13 @@ export function createImagesDisplayPageSeedConfig(
           buttonSize: 68,
           fontSize: 42
         }),
-        counter: createCounterChromeConfig()
+        counter: createCounterChromeConfig(),
+        stageFrame: createImagesStageFrameChromeConfig({
+          fullBleed: true,
+          radius: 16,
+          shadow: "soft",
+          thumbnailRadius: 20
+        })
       },
       ornaments: {
         goldLine: createGoldLineChromeConfig({
@@ -295,6 +306,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["mainStage", "width"]
     },
     fields: [
+      ...buildImagesStageFrameFields({
+        idPrefix: "images",
+        path: ["chrome", "modules", "stageFrame"]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: "main-stage",
         path: ["iconSources", "mainStagePlaceholder"]
@@ -427,6 +442,10 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["thumbnailSlots", key, "width"]
     },
     fields: [
+      ...buildImagesThumbnailFrameFields({
+        idPrefix: key,
+        path: ["chrome", "modules", "stageFrame"]
+      }),
       ...buildDisplayPageIconSourceFields({
         idPrefix: key,
         path: ["iconSources", "thumbnailSlots", key]

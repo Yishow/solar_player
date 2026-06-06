@@ -129,13 +129,8 @@
 
 .images-main-stage {
   overflow: hidden;
-  border-radius: 16px;
-  box-shadow: var(--display-shadow-soft);
-}
-
-.images-main-stage-reference {
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: var(--images-stage-radius, 16px);
+  box-shadow: var(--images-stage-shadow, var(--display-shadow-soft));
 }
 
 .images-main-stage img {
@@ -270,7 +265,7 @@
 .images-thumb {
   overflow: hidden;
   border: 0;
-  border-radius: 18px;
+  border-radius: var(--images-thumb-radius, 18px);
   background: var(--display-card-surface-strong);
   box-shadow: var(--display-shadow-soft);
 }
@@ -278,6 +273,7 @@
 .images-thumb img {
   height: 100%;
   width: 100%;
+  border-radius: inherit;
   object-fit: cover;
 }
 

@@ -13,8 +13,19 @@ test("solar runtime reads resolved display config for hero, flow nodes, connecto
   assert.match(solarSource, /resolvedConfig\.chrome\.heroTypography\.subtitleMarginTop/);
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.baseLeft/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.baseTop/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.baseWidth/);
+  assert.match(solarSource, /--display-gold-line-rotation/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.rotationDeg/);
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseLeft/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseTop/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseWidth/);
+  assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.baseHeight/);
   assert.match(solarSource, /resolvedConfig\.chrome\.ornaments\.leaf\.offsetX/);
+  assert.match(solarSource, /\.\.\.seedConfig\.chrome\.ornaments\.goldLine/);
+  assert.match(solarSource, /\.\.\.seedConfig\.chrome\.ornaments\.leaf/);
   assert.match(solarSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(
     solarSource,
@@ -40,6 +51,14 @@ test("solar display page seed config captures the current default hero and layou
   assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 6);
   assert.equal(config.connectorTreatments.inverterToFactory.strokeWidth, 6);
   assert.equal(config.connectorTreatments.inverterToCo2.strokeWidth, 4);
+  assert.equal(config.chrome.ornaments.goldLine.baseLeft, 0);
+  assert.equal(config.chrome.ornaments.goldLine.baseTop, 500);
+  assert.equal(config.chrome.ornaments.goldLine.baseWidth, 1075);
+  assert.equal(config.chrome.ornaments.goldLine.rotationDeg, -4);
+  assert.equal(config.chrome.ornaments.leaf.baseLeft, 565);
+  assert.equal(config.chrome.ornaments.leaf.baseTop, 330);
+  assert.equal(config.chrome.ornaments.leaf.baseWidth, 190);
+  assert.equal(config.chrome.ornaments.leaf.baseHeight, 132);
   assert.ok(
     config.connectorTreatments.solarToInverter.strokeWidth >
       config.connectorTreatments.inverterToCo2.strokeWidth,

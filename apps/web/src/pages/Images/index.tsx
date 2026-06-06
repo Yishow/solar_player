@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
@@ -20,7 +20,8 @@ import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   buildCopyTypographyStyleVars,
-  createCopyTypographyConfig
+  createCopyTypographyConfig,
+  createImagesStageFrameChromeConfig
 } from "../shared/displayPageChromeConfig";
 import {
   buildImagesCaptionRhythmStyle,
@@ -132,7 +133,11 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       }),
       modules: {
         ...seedConfig.chrome.modules,
-        ...(runtimeChrome.modules ?? {})
+        ...(runtimeChrome.modules ?? {}),
+        stageFrame: createImagesStageFrameChromeConfig({
+          ...seedConfig.chrome.modules.stageFrame,
+          ...(runtimeChrome.modules?.stageFrame ?? {})
+        })
       },
       ornaments: {
         ...seedConfig.chrome.ornaments,
@@ -187,8 +192,13 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   );
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
   const activeMainStageSource = viewModel.active.assetSource ?? mainStageSource ?? undefined;
-  const isReferenceHeroCrop = viewModel.active.assetSource === imagesAssetRuntimeMap.main;
-  const mainStageOverlayLayers = isReferenceHeroCrop ? [] : mainStageMediaPresentation.overlayLayers;
+  const isStageFullBleed = resolvedConfig.chrome.modules.stageFrame.fullBleed;
+  const mainStageOverlayLayers = isStageFullBleed ? [] : mainStageMediaPresentation.overlayLayers;
+  const stageShadow =
+    isStageFullBleed || resolvedConfig.chrome.modules.stageFrame.shadow === "none"
+      ? "none"
+      : "var(--display-shadow-soft)";
+  const stageRadius = isStageFullBleed ? 0 : resolvedConfig.chrome.modules.stageFrame.radius;
 
   return (
     <section className="images-display-page">
@@ -303,16 +313,17 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
       <figure
         className={[
           "images-main-stage display-surface-media-stage",
-          isReferenceHeroCrop ? "images-main-stage-reference" : "",
           mainStageMediaPresentation.stageClassName
         ].filter(Boolean).join(" ")}
         style={{
           ...mainStageMediaPresentation.stageStyle,
+          "--images-stage-radius": `${stageRadius}px`,
+          "--images-stage-shadow": stageShadow,
           height: `${mainLayout.height}px`,
           left: `${mainLayout.left}px`,
           top: `${mainLayout.top}px`,
           width: `${mainLayout.width}px`
-        }}
+        } as CSSProperties & Record<"--images-stage-radius" | "--images-stage-shadow", string>}
       >
         {viewModel.active.assetSource ? (
           <img
@@ -345,7 +356,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         ))}
       </figure>
 
-      {!isReferenceHeroCrop ? (
+      {!isStageFullBleed ? (
         <DisplayCardFrame
           cardStyle={infoCardStyle}
           className="images-info-card"
@@ -426,11 +437,12 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
               thumbnail.isActive ? "images-thumb-active" : ""
             ].join(" ")}
             style={{
+              "--images-thumb-radius": `${resolvedConfig.chrome.modules.stageFrame.thumbnailRadius}px`,
               height: `${layout.height}px`,
               left: `${layout.left}px`,
               top: `${layout.top - CONTENT_TOP_OFFSET}px`,
               width: `${layout.width}px`
-            }}
+            } as CSSProperties & Record<"--images-thumb-radius", string>}
             onClick={() => autoplay.selectIndex(visibleStart + thumbIndex)}
             type="button"
           >

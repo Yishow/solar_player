@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
@@ -11,6 +11,10 @@ import {
 } from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import {
+  createGoldLineChromeConfig,
+  createLeafOrnamentChromeConfig
+} from "../shared/displayPageChromeConfig";
 import {
   buildFlowConnectorTreatmentStyle,
   buildFlowNodeTreatmentStyle,
@@ -181,7 +185,28 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = config ?? runtimeConfig.config;
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+  const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
+  const resolvedConfig: SolarDisplayPageConfig = {
+    ...runtimeResolvedConfig,
+    chrome: {
+      ...seedConfig.chrome,
+      ...runtimeChrome,
+      ornaments: {
+        ...seedConfig.chrome.ornaments,
+        ...runtimeOrnaments,
+        goldLine: createGoldLineChromeConfig({
+          ...seedConfig.chrome.ornaments.goldLine,
+          ...(runtimeOrnaments.goldLine ?? {})
+        }),
+        leaf: createLeafOrnamentChromeConfig({
+          ...seedConfig.chrome.ornaments.leaf,
+          ...(runtimeOrnaments.leaf ?? {})
+        })
+      }
+    }
+  };
   const viewModel = buildSolarViewModel({
     isSocketConnected,
     snapshot,
@@ -205,15 +230,15 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
   const titleLayout = withContentOffset(solarTitleLayout);
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const goldLineLayout = withContentOffset({
-    left: 0,
-    top: 500,
-    width: 1075
+    left: resolvedConfig.chrome.ornaments.goldLine.baseLeft,
+    top: resolvedConfig.chrome.ornaments.goldLine.baseTop,
+    width: resolvedConfig.chrome.ornaments.goldLine.baseWidth
   });
   const leafLayout = withContentOffset({
-    height: 132,
-    left: 565,
-    top: 330,
-    width: 190
+    height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
+    left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
+    top: resolvedConfig.chrome.ornaments.leaf.baseTop,
+    width: resolvedConfig.chrome.ornaments.leaf.baseWidth
   });
 
   return (
@@ -223,24 +248,26 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         className="solar-leaf-watermark display-surface-leaf-ornament"
         config={resolvedConfig.chrome.ornaments.leaf}
         style={{
+          "--display-leaf-rotation": `${resolvedConfig.chrome.ornaments.leaf.rotationDeg}deg`,
           height: `${leafLayout.height}px`,
           left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
           opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
           top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
           transform: `scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
           width: `${leafLayout.width}px`
-        }}
+        } as CSSProperties & Record<"--display-leaf-rotation", string>}
       />
 
       <div
         className="solar-gold-line display-surface-gold-line"
         style={{
+          "--display-gold-line-rotation": `${resolvedConfig.chrome.ornaments.goldLine.rotationDeg}deg`,
           height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
           left: `${goldLineLayout.left}px`,
           opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
           top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
           width: `${goldLineLayout.width}px`
-        }}
+        } as CSSProperties & Record<"--display-gold-line-rotation", string>}
       />
 
       <section
