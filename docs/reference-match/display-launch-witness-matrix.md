@@ -16,6 +16,8 @@
 
 Reference-informed boundary decisions explain status rationale; they do not replace this matrix. This file remains the single authoritative launch status ledger.
 
+The 2026-06-05 reference-informed witness batch is classified in `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md`. That batch supplies DOM-measured visual/structure boundary evidence only; it does not provide fresh runtime parity, publish refresh, or fallback witness, so every route below stays `blocked`.
+
 - `protected-product-choice` can explain why an accepted header/footer height, position, or information-density difference is not a visual fail for the listed Protected Attributes.
 - `reference-quality-target` records page content quality direction, such as hero rhythm, flow clarity, media density, circuit language, or highlight rail density.
 - `actual-gap` keeps the relevant gate `fail` or `blocked` until runtime, fallback, publish refresh, editor capability, asset/content, visual tuning, or handoff evidence passes.

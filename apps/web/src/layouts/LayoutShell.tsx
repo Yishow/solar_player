@@ -17,6 +17,7 @@ import { useShellDecorations } from "../hooks/useShellDecorations";
 import { useScreenWakeLock } from "../hooks/useScreenWakeLock";
 import { useDisplayTransition } from "../hooks/displayTransition";
 import { shouldRedirectToOffline } from "./offlineRouting";
+import { resolvePlaybackRotationEnabled } from "./playbackRotationFreeze";
 import type { ShellBootstrap } from "./shellBootstrap";
 
 export function LayoutShell({
@@ -49,7 +50,10 @@ export function LayoutShell({
   const controller = usePageRotation({
     currentPath: location.pathname,
     onRouteChange: forwardRouteChange,
-    routeRotationEnabled: routeMeta?.group === "playback"
+    routeRotationEnabled: resolvePlaybackRotationEnabled({
+      isPlaybackGroup: routeMeta?.group === "playback",
+      search: location.search
+    })
   });
   const navigateReplace = useCallback(
     (route: string) => {

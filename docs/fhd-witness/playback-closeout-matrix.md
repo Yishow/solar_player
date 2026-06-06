@@ -20,6 +20,8 @@ Use `--run-id <id>` when a deterministic evidence folder is needed.
 
 Use the reference-informed closeout boundary rules to classify the follow-up after each witness capture. The capture output does not decide launch readiness; it supplies evidence for the boundary decision.
 
+The latest reference-informed witness batch (run id `reference-informed-closeout`) is classified per page in `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md`, which carries the DOM-measured `reference-quality-target` and `actual-gap` rows consumed by the four page closeout changes.
+
 | page | protected product choice example | reference quality target examples | actual gap examples |
 | --- | --- | --- | --- |
 | Overview | `protected-product-choice`: accepted shared header height and position. | `reference-quality-target`: hero photo fade, bilingual title rhythm, KPI row spacing. | `actual-gap`: missing fresh runtime/publish/fallback witness. |

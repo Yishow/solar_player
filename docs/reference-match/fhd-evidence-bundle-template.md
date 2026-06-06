@@ -64,6 +64,8 @@
 | Page content surface | `reference-quality-target` | Current page remains product-owned. | Hero hierarchy, KPI rhythm, flow language, media stage density, ornament balance, caption tension, highlight rail density. | n/a | None. | Tune toward the named quality cue without changing protected shell attributes. | n/a | Page route/reference witness pair. | n/a | Revisit after page witness capture. |
 | Runtime or capability blocker | `actual-gap` | Current implementation cannot provide launch evidence or required authoring control. | Desired quality cue or launch behavior. | Runtime parity, editor capability, asset/content, fallback, publish refresh, visual tuning, or handoff evidence. | None. | Keep gate fail/blocked and link the follow-up task or change. | Named launch gate or verification step that must pass before the blocker can close. | Test, witness, or blocker evidence. | n/a | Revisit when verification gate passes. |
 
+The 2026-06-05 reference-informed batch fills this section per page in `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md` (run id `reference-informed-closeout`).
+
 Incomplete boundary evidence rules:
 
 - A `protected-product-choice` row with Accepted By empty, missing accepted-by, missing owner, missing Protected Attributes, or missing Witness Evidence cannot waive visual review.

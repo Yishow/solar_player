@@ -100,13 +100,19 @@ async function launchChromium(chromium) {
   }
 }
 
+function withFrozenAutoplay(routeUrl) {
+  // playback 頁會自動輪播；witness 用 ?autoplay=0 凍結單頁，否則五頁會截到同一輪播幀。
+  const separator = routeUrl.includes("?") ? "&" : "?";
+  return `${routeUrl}${separator}autoplay=0`;
+}
+
 async function capturePage({ page, baseUrl, runDir, target }) {
-  const absoluteUrl = joinUrl(baseUrl, target.routeUrl);
+  const absoluteUrl = joinUrl(baseUrl, withFrozenAutoplay(target.routeUrl));
   const absolutePath = path.join(runDir, target.screenshotFile);
 
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await page.goto(absoluteUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1_200);
   await page.screenshot({ path: absolutePath, fullPage: false });
 
   return {
