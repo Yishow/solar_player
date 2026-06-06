@@ -14,3 +14,8 @@ test("DisplayCanvas uses a single translated uniform scale with stage-bg letterb
   assert.match(displayCanvasSource, /backgroundColor: "var\(--stage-bg\)"/);
   assert.doesNotMatch(displayCanvasSource, /scale\(\$\{scale\.x}, \$\{scale\.y}\)/);
 });
+
+test("DisplayCanvas applies persisted brightness/orientation via the surface style helper", () => {
+  assert.match(displayCanvasSource, /resolveDisplayCanvasSurfaceStyle\(\{ brightness, orientation }\)/);
+  assert.match(displayCanvasSource, /\.\.\.surfaceStyle/);
+});

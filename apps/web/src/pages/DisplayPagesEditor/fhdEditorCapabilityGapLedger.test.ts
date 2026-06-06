@@ -94,12 +94,14 @@ test("FHD editor capability gap ledger keeps classifications and downstream owne
   for (const row of pageRows) {
     const cells = splitLedgerRow(row);
     assert.equal(cells.length, ledgerTableHeader.length);
-    assert.notEqual(cells[7], "");
-    assert.equal(classifications.includes(cells[7]), true);
-    if (cells[7] === "new-editor-capability") {
+    const classification = cells[7] ?? "";
+    const owner = cells[8] ?? "";
+    assert.notEqual(classification, "");
+    assert.equal(classifications.includes(classification), true);
+    if (classification === "new-editor-capability") {
       assert.ok(
-        downstreamChanges.includes(cells[8]) || cells[8].startsWith("new-change-required:"),
-        `Unexpected new editor capability owner: ${cells[8]}`
+        downstreamChanges.includes(owner) || owner.startsWith("new-change-required:"),
+        `Unexpected new editor capability owner: ${owner}`
       );
     }
   }

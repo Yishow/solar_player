@@ -19,12 +19,21 @@ function enableImageInSlideshow(assetId: number) {
     .run(assetId);
 }
 
+// seed 現在會內建 4-up demo slideshow 影像；這些 runtime playlist 測試只驗自己 seed 的資產，
+// 故隔離掉 display-seed 的 slideshow 成員，避免耦合 seed demo 內容數量。
+function clearSeedSlideshowMembership() {
+  getDatabase()
+    .prepare("UPDATE image_assets SET included_in_slideshow = 0 WHERE original_name LIKE 'display-seed:%'")
+    .run();
+}
+
 test("GET /api/image-playlist resolves a playable runtime playlist without creating governance rows", async () => {
   const first = seedManagedImageAsset("playlist-cover.png");
   const second = seedManagedImageAsset("playlist-gallery.png");
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     const response = await app.inject({
@@ -78,6 +87,7 @@ test("GET /api/image-playlist keeps runtime reads side-effect free even when no 
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     const response = await app.inject({
@@ -121,6 +131,7 @@ test("GET /api/image-playlist/governance keeps disabled rows visible for managem
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     await app.inject({
@@ -173,6 +184,7 @@ test("playlist entry updates do not mirror duration or enabled state back into l
   const asset = seedManagedImageAsset("playlist-ownership-audit.png");
   enableImageInSlideshow(asset.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     await app.inject({
@@ -217,6 +229,7 @@ test("POST /api/image-playlist/governance/bootstrap creates governable rows expl
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     const response = await app.inject({
@@ -248,6 +261,7 @@ test("PUT /api/image-playlist/:entryId clears nullable governance fields when nu
   const asset = seedManagedImageAsset("playlist-clearable.png");
   enableImageInSlideshow(asset.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     await app.inject({
@@ -307,6 +321,7 @@ test("playlist routes persist reordering, metadata, durations, and diagnosable f
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     await app.inject({
@@ -406,6 +421,7 @@ test("DELETE /api/images/:id removes disabled governance rows for the deleted as
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     await app.inject({
@@ -460,6 +476,7 @@ test("POST /api/image-playlist/governance/bootstrap assigns a fresh entry id aft
   enableImageInSlideshow(first.assetId);
   enableImageInSlideshow(second.assetId);
   const app = await buildApp();
+  clearSeedSlideshowMembership();
 
   try {
     const bootstrapResponse = await app.inject({

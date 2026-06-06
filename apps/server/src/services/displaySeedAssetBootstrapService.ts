@@ -56,7 +56,13 @@ export function bootstrapDisplaySeedAssets(options: BootstrapOptions = {}) {
       category, usage_scope, filename, original_name, title, description,
       mime_type, file_size, display_duration, display_order,
       included_in_slideshow, is_cover, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `);
+  // display-seed 資產的 slideshow 成員資格由 manifest 決定（seed-managed），確保 4-up 在
+  // 既有 DB 重新 seed 時也具決定性；不影響操作者上傳的非 seed 影像。
+  const setSeedSlideshowFlag = database.prepare(`
+    UPDATE image_assets SET included_in_slideshow = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE original_name = ? AND included_in_slideshow != ?
   `);
   const updateSeedAsset = database.prepare(`
     UPDATE image_assets SET
@@ -105,6 +111,7 @@ export function bootstrapDisplaySeedAssets(options: BootstrapOptions = {}) {
       const fileStat = statSync(targetPath);
       const seedOriginalName = `display-seed:${entry.key}`;
       const seedDescription = formatSeedDescription(entry);
+      const slideshowFlag = entry.includedInSlideshow ? 1 : 0;
       const existing = findExisting.get(seedOriginalName, entry.targetFilename) as ExistingSeedAssetRow | undefined;
 
       if (existing) {
@@ -117,6 +124,7 @@ export function bootstrapDisplaySeedAssets(options: BootstrapOptions = {}) {
           fileStat.size,
           existing.id
         );
+        setSeedSlideshowFlag.run(slideshowFlag, seedOriginalName, slideshowFlag);
         reused += 1;
         continue;
       }
@@ -131,7 +139,8 @@ export function bootstrapDisplaySeedAssets(options: BootstrapOptions = {}) {
         seedDescription,
         resolveMimeType(entry),
         fileStat.size,
-        nextOrder
+        nextOrder,
+        slideshowFlag
       );
       created += 1;
     }

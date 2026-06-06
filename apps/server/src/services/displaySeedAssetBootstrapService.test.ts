@@ -104,3 +104,45 @@ test("bootstrapDisplaySeedAssets is idempotent and preserves operator metadata a
   });
   assert.deepEqual(upload, { title: "Operator upload" });
 });
+
+test("bootstrapDisplaySeedAssets honors includedInSlideshow for playlist membership", () => {
+  const slideshowSource = join(sourceDir, "slideshow-seed.png");
+  writeFileSync(slideshowSource, Buffer.from("seed-image"));
+  const slideshowManifest = [
+    {
+      category: "object" as const,
+      includedInSlideshow: true,
+      key: "images.thumbnail.test-a",
+      sourcePath: slideshowSource,
+      targetFilename: "display-seed-test-a.png",
+      title: "Test A",
+      usageScope: "page-only" as const
+    },
+    {
+      category: "object" as const,
+      key: "images.thumbnail.test-b",
+      sourcePath: slideshowSource,
+      targetFilename: "display-seed-test-b.png",
+      title: "Test B",
+      usageScope: "page-only" as const
+    }
+  ];
+
+  bootstrapDisplaySeedAssets({ manifest: slideshowManifest });
+  const database = getDatabase();
+  const readFlag = (key: string) =>
+    (
+      database
+        .prepare("SELECT included_in_slideshow FROM image_assets WHERE original_name = ?")
+        .get(key) as { included_in_slideshow: number }
+    ).included_in_slideshow;
+
+  assert.equal(readFlag("display-seed:images.thumbnail.test-a"), 1);
+  assert.equal(readFlag("display-seed:images.thumbnail.test-b"), 0);
+});
+
+test("the display seed manifest marks at least four slideshow images for the 4-up strip", async () => {
+  const { displaySeedAssetManifest } = await import("./displaySeedAssetManifest.js");
+  const slideshow = displaySeedAssetManifest.filter((entry) => entry.includedInSlideshow);
+  assert.ok(slideshow.length >= 4, `expected >=4 slideshow seed images, got ${slideshow.length}`);
+});

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
+import type { PlaybackOrientation } from "@solar-display/shared";
 import { computeCanvasLayout } from "./displayCanvasLayout";
+import { resolveDisplayCanvasSurfaceStyle } from "./displayCanvasSurfaceStyle";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
@@ -21,18 +23,26 @@ function getViewportSize() {
 type DisplayCanvasProps = PropsWithChildren<{
   footer?: ReactNode;
   header?: ReactNode;
+  brightness?: number;
+  orientation?: PlaybackOrientation;
 }>;
 
-export function DisplayCanvas({ footer, header, children }: DisplayCanvasProps) {
+export function DisplayCanvas({ footer, header, children, brightness, orientation }: DisplayCanvasProps) {
+  const isPortrait = orientation === "portrait";
+  const measureViewport = () => {
+    const viewport = getViewportSize();
+    // portrait 旋轉後，內容沿實體螢幕長軸鋪排，故以對調的寬高計算 frame 縮放。
+    return isPortrait ? { height: viewport.width, width: viewport.height } : viewport;
+  };
   const [layout, setLayout] = useState(() => computeCanvasLayout(
-    getViewportSize(),
+    measureViewport(),
     { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
   ));
 
   useEffect(() => {
     const updateLayout = () => {
       setLayout(computeCanvasLayout(
-        getViewportSize(),
+        measureViewport(),
         { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
       ));
     };
@@ -45,14 +55,18 @@ export function DisplayCanvas({ footer, header, children }: DisplayCanvasProps) 
       window.removeEventListener("resize", updateLayout);
       window.visualViewport?.removeEventListener("resize", updateLayout);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPortrait]);
+
+  const surfaceStyle = resolveDisplayCanvasSurfaceStyle({ brightness, orientation });
 
   return (
     <div
       data-shell-primitive="display-canvas-viewport"
       className="shell-stage relative h-screen w-screen overflow-hidden text-neutral-900"
       style={{
-        backgroundColor: "var(--stage-bg)"
+        backgroundColor: "var(--stage-bg)",
+        ...surfaceStyle
       }}
     >
       <div

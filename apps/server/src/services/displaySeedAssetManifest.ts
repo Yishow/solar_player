@@ -3,6 +3,7 @@ import type { ManagedAssetCategory, ManagedAssetUsageScope } from "@solar-displa
 export type DisplaySeedAssetManifestEntry = {
   category: ManagedAssetCategory;
   description?: string;
+  includedInSlideshow?: boolean;
   key: string;
   mimeType?: string;
   sourcePath: string;
@@ -69,6 +70,7 @@ export const displaySeedAssetManifest: DisplaySeedAssetManifestEntry[] = [
   {
     category: "background",
     description: "Images 頁目前使用的主舞台圖。",
+    includedInSlideshow: true,
     key: "images.main-stage",
     sourcePath: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/images-main-ref.jpg",
     targetFilename: "display-seed-images-main-stage.jpg",
@@ -78,6 +80,7 @@ export const displaySeedAssetManifest: DisplaySeedAssetManifestEntry[] = [
   {
     category: "object",
     description: "Images 頁目前使用的 factory solar thumbnail。",
+    includedInSlideshow: true,
     key: "images.thumbnail.factory-solar",
     sourcePath: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-factory-solar.jpg",
     targetFilename: "display-seed-images-thumb-factory-solar.jpg",
@@ -87,6 +90,7 @@ export const displaySeedAssetManifest: DisplaySeedAssetManifestEntry[] = [
   {
     category: "object",
     description: "Images 頁目前使用的 green trees thumbnail。",
+    includedInSlideshow: true,
     key: "images.thumbnail.green-trees",
     sourcePath: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-green-trees.jpg",
     targetFilename: "display-seed-images-thumb-green-trees.jpg",
@@ -96,6 +100,7 @@ export const displaySeedAssetManifest: DisplaySeedAssetManifestEntry[] = [
   {
     category: "object",
     description: "Images 頁目前使用的 solar aerial thumbnail。",
+    includedInSlideshow: true,
     key: "images.thumbnail.solar-aerial",
     sourcePath: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-solar-aerial.jpg",
     targetFilename: "display-seed-images-thumb-solar-aerial.jpg",
@@ -105,6 +110,7 @@ export const displaySeedAssetManifest: DisplaySeedAssetManifestEntry[] = [
   {
     category: "object",
     description: "Images 頁目前使用的 showroom thumbnail。",
+    includedInSlideshow: true,
     key: "images.thumbnail.showroom",
     sourcePath: "docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-showroom.jpg",
     targetFilename: "display-seed-images-thumb-showroom.jpg",

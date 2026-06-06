@@ -118,6 +118,8 @@ export function LayoutShell({
 
   return (
     <DisplayCanvas
+      brightness={controller.settings?.brightness}
+      orientation={controller.settings?.orientation}
       header={
         <AppHeader
           brandView={brandView}

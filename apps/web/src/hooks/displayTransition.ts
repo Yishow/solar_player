@@ -38,7 +38,9 @@ export function resolveDisplayTransitionMode(
   transitionType: PlaybackTransitionType | undefined,
   prefersReducedMotion: boolean
 ): DisplayTransitionMode {
-  return shouldAnimateTransition(transitionType, prefersReducedMotion) ? transitionType : "none";
+  return shouldAnimateTransition(transitionType, prefersReducedMotion) && transitionType
+    ? transitionType
+    : "none";
 }
 
 /**
