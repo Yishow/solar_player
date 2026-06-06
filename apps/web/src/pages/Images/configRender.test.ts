@@ -80,7 +80,8 @@ test("images display page seed config captures the current default gallery layou
   assert.equal(config.hero.eyebrow, "綠能驅動・永續未來");
   assert.equal(config.hero.title, "綠能現場影像");
   assert.equal(config.mainStage.src, "/images-main.jpg");
-  assert.equal(config.infoPanel.width, 374);
+  assert.equal(config.infoPanel.width, 398);
+  assert.equal((config as any).rhythm?.imagesCaption?.bodyFontSize, 21);
   assert.equal((config as any).rhythm?.imagesCaption?.bodyLineHeight, 1.74);
   assert.equal((config as any).rhythm?.imagesCaption?.metaFontSize, 18);
   assert.equal(config.chrome.heroTypography.eyebrowMarginBottom, 44);

@@ -32,16 +32,16 @@ test("images layout centralizes title, media stage, and thumbnail geometry", () 
     width: 408
   });
   assert.deepEqual(imagesMainLayout, {
-    height: 622,
+    height: 642,
     left: 584,
     top: 148,
-    width: 1292
+    width: 1316
   });
   assert.deepEqual(imagesInfoLayout, {
     height: 376,
     left: 1470,
     top: 414,
-    width: 374
+    width: 398
   });
   assert.deepEqual(imagesThumbSize, {
     height: 132,

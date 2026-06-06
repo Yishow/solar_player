@@ -173,7 +173,7 @@ export function createImagesDisplayPageSeedConfig(
       src: mainStageSrc
     },
     rhythm: {
-      imagesCaption: createImagesCaptionRhythmConfig()
+      imagesCaption: createImagesCaptionRhythmConfig({ bodyFontSize: 21 })
     },
     textBlocks: {
       copy: { ...imagesCopyLayout }

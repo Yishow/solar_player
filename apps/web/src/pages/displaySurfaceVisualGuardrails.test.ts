@@ -220,7 +220,7 @@ test("display seed configs keep protected FHD geometry fixtures stable across th
   assert.deepEqual(overview.heroContainer, { height: 690, left: 540, top: 182, width: 1340 });
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(factory.statusBlock.width, 430);
-  assert.equal(images.infoPanel.width, 374);
+  assert.equal(images.infoPanel.width, 398);
   assert.equal(sustainability.statCards.esg.height, 232);
 });
 

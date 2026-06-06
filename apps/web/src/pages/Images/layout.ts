@@ -27,17 +27,17 @@ export const imagesCounterLayout = {
 } as const;
 
 export const imagesMainLayout = {
-  height: 622,
+  height: 642,
   left: 584,
   top: 148,
-  width: 1292
+  width: 1316
 } as const;
 
 export const imagesInfoLayout = {
   height: 376,
   left: 1470,
   top: 414,
-  width: 374
+  width: 398
 } as const;
 
 export const imagesArrowLayout = {
