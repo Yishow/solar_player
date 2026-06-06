@@ -180,16 +180,16 @@
   display: none;
 }
 
-.factory-circuit-routing-svg {
+.factory-circuit-routing {
   position: absolute;
   inset: 0;
   width: 1920px;
   height: 1080px;
   z-index: 9;
   pointer-events: none;
-  overflow: visible;
 }
 
+.factory-circuit-routing-reference,
 .factory-circuit-reference-icon {
   display: block;
   image-rendering: auto;
@@ -202,6 +202,10 @@
   max-height: 100%;
   max-width: none;
   width: 100%;
+}
+
+.factory-circuit-routing-reference {
+  position: absolute;
 }
 
 .factory-circuit-load-panel {

@@ -26,6 +26,7 @@ import {
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
 import {
+  buildFlowConnectorTreatmentStyle,
   buildFlowNodeTreatmentStyle,
   resolveFlowConnectorTreatmentConfig,
   resolveFlowNodeTreatmentConfig
@@ -66,50 +67,28 @@ const factoryLeafVineReferenceUrl = new URL(
   "./assets/factory-leaf-vine-reference.png",
   import.meta.url
 ).href;
+const factoryRoutingPvInverterReferenceUrl = new URL(
+  "./assets/factory-routing-pv-inverter-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingInverterBoardReferenceUrl = new URL(
+  "./assets/factory-routing-inverter-board-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingInverterDropReferenceUrl = new URL(
+  "./assets/factory-routing-inverter-drop-reference.png",
+  import.meta.url
+).href;
+const factoryRoutingLoadReferenceUrl = new URL(
+  "./assets/factory-routing-load-reference.png",
+  import.meta.url
+).href;
+
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
     top: layout.top - CONTENT_TOP_OFFSET
   };
-}
-
-type RoutingPoint = { x: number; y: number };
-type RoutingRect = { height: number; left: number; top: number; width: number };
-
-function rectRightCenter(rect: RoutingRect): RoutingPoint {
-  return { x: rect.left + rect.width, y: rect.top + rect.height / 2 };
-}
-
-function rectLeftCenter(rect: RoutingRect): RoutingPoint {
-  return { x: rect.left, y: rect.top + rect.height / 2 };
-}
-
-function rectLoadRowAnchor(rect: RoutingRect): RoutingPoint {
-  return { x: rect.left, y: rect.top + rect.height / 2 };
-}
-
-function straightRoutePath(from: RoutingPoint, to: RoutingPoint): string {
-  return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-}
-
-// 忠實復刻 reference routing：自配電盤水平送至靠近配電盤的垂直主幹（bus），
-// 以「圓角」轉折（quarter-circle arc）分支向右接到各負載，末端為實心圓點。
-// 圓角是 reference 的關鍵質感；硬直角會顯廉價。
-function roundedCombPath(from: RoutingPoint, to: RoutingPoint, busX: number): string {
-  const radius = 12;
-  const dy = to.y - from.y;
-  if (Math.abs(dy) < radius * 2) {
-    return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-  }
-  const dir = dy > 0 ? 1 : -1;
-  return [
-    `M ${from.x} ${from.y}`,
-    `L ${busX - radius} ${from.y}`,
-    `Q ${busX} ${from.y} ${busX} ${from.y + dir * radius}`,
-    `L ${busX} ${to.y - dir * radius}`,
-    `Q ${busX} ${to.y} ${busX + radius} ${to.y}`,
-    `L ${to.x} ${to.y}`
-  ].join(" ");
 }
 
 const kpiLayoutOrder = [
@@ -128,6 +107,23 @@ const loadRowOrder = [
   "ev",
   "infrastructure"
 ] as const;
+
+const powerConnectorReferenceByKey = {
+  inverterToBoard: {
+    height: 38,
+    leftOffset: -4,
+    src: factoryRoutingInverterBoardReferenceUrl,
+    topOffset: -26,
+    width: 80
+  },
+  solarToInverter: {
+    height: 38,
+    leftOffset: -8,
+    src: factoryRoutingPvInverterReferenceUrl,
+    topOffset: -26,
+    width: 66
+  }
+} as const;
 
 function FactoryCircuitLineLeaf({
   className,
@@ -180,6 +176,27 @@ function FactoryCircuitLeafVine({
       className={className}
       draggable={false}
       src={factoryLeafVineReferenceUrl}
+      style={style}
+    />
+  );
+}
+
+function FactoryCircuitRoutingReference({
+  className,
+  src,
+  style
+}: {
+  className: string;
+  src: string;
+  style: CSSProperties;
+}) {
+  return (
+    <img
+      alt=""
+      aria-hidden="true"
+      className={className}
+      draggable={false}
+      src={src}
       style={style}
     />
   );
@@ -313,41 +330,29 @@ export function FactoryCircuit({
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
-  const solarNode = withContentOffset(resolvedConfig.nodes.solar);
-  const inverterNode = withContentOffset(resolvedConfig.nodes.inverter);
-  const boardNode = withContentOffset(resolvedConfig.nodes.board);
-  const solarToInverterTreatment = resolveFlowConnectorTreatmentConfig(
-    resolvedConfig.connectorTreatments.solarToInverter,
-    seedConfig.connectorTreatments.solarToInverter
-  );
-  const inverterToBoardTreatment = resolveFlowConnectorTreatmentConfig(
-    resolvedConfig.connectorTreatments.inverterToBoard,
-    seedConfig.connectorTreatments.inverterToBoard
-  );
-  const boardRight = rectRightCenter(boardNode);
-  const loadBranches = loadRowOrder.map((loadRowKey) => {
-    const loadRow = withContentOffset(resolvedConfig.loadRows[loadRowKey]);
-    return { anchor: rectLoadRowAnchor(loadRow), key: `boardTo-${loadRowKey}` };
+  const powerConnectors = Object.keys(resolvedConfig.connectors).map((connectorKey) => {
+    const layout = withContentOffset(
+      resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
+    );
+    const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
+    const treatment = resolveFlowConnectorTreatmentConfig(
+      resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments],
+      seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments]
+    );
+    const referenceHeight = reference.height * (treatment.strokeWidth / seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments].strokeWidth);
+
+    return {
+      key: connectorKey,
+      src: reference.src,
+      style: {
+        height: `${referenceHeight}px`,
+        left: `${layout.left + reference.leftOffset}px`,
+        top: `${layout.top + reference.topOffset - (referenceHeight - reference.height) / 2}px`,
+        width: `${reference.width}px`,
+        ...buildFlowConnectorTreatmentStyle(treatment)
+      }
+    };
   });
-  // 垂直 bus 緊鄰配電盤（board 右側 + 30），分支以圓角向右延伸至各負載，貼近 reference。
-  const loadBusX = boardRight.x + 30;
-  const routingPaths = [
-    {
-      key: "solarToInverter",
-      treatment: solarToInverterTreatment,
-      d: straightRoutePath(rectRightCenter(solarNode), rectLeftCenter(inverterNode))
-    },
-    {
-      key: "inverterToBoard",
-      treatment: inverterToBoardTreatment,
-      d: straightRoutePath(rectRightCenter(inverterNode), rectLeftCenter(boardNode))
-    },
-    ...loadBranches.map((branch) => ({
-      key: branch.key,
-      treatment: inverterToBoardTreatment,
-      d: roundedCombPath(boardRight, branch.anchor, loadBusX)
-    }))
-  ];
 
   return (
     <section className="factory-circuit-display-page">
@@ -491,35 +496,36 @@ export function FactoryCircuit({
         );
       })}
 
-      <svg
-        aria-hidden="true"
-        className="factory-circuit-routing-svg"
-        viewBox="0 0 1920 1080"
-        preserveAspectRatio="none"
-      >
-        {routingPaths.map((route) => (
-          <path
-            key={route.key}
-            d={route.d}
-            data-route-key={route.key}
-            fill="none"
-            stroke={route.treatment.strokeColor}
-            strokeWidth={route.treatment.strokeWidth}
-            opacity={route.treatment.opacity}
-            strokeLinecap={route.treatment.lineCap}
-            strokeLinejoin="round"
+      <div aria-hidden="true" className="factory-circuit-routing">
+        {powerConnectors.map((connector) => (
+          <FactoryCircuitRoutingReference
+            key={connector.key}
+            className="factory-circuit-routing-reference"
+            src={connector.src}
+            style={connector.style}
           />
         ))}
-        {loadBranches.map((branch) => (
-          <circle
-            key={`dot-${branch.key}`}
-            cx={branch.anchor.x}
-            cy={branch.anchor.y}
-            r={4}
-            fill={inverterToBoardTreatment.strokeColor}
-          />
-        ))}
-      </svg>
+        <FactoryCircuitRoutingReference
+          className="factory-circuit-routing-reference"
+          src={factoryRoutingInverterDropReferenceUrl}
+          style={{
+            height: "188px",
+            left: "905px",
+            top: `${562 - CONTENT_TOP_OFFSET}px`,
+            width: "45px"
+          }}
+        />
+        <FactoryCircuitRoutingReference
+          className="factory-circuit-routing-reference"
+          src={factoryRoutingLoadReferenceUrl}
+          style={{
+            height: "526px",
+            left: "1254px",
+            top: `${150 - CONTENT_TOP_OFFSET}px`,
+            width: "140px"
+          }}
+        />
+      </div>
 
       <section
         className="factory-circuit-load-panel"

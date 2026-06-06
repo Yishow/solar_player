@@ -116,8 +116,8 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       }
     },
     connectorTreatments: {
-      inverterToBoard: createFlowConnectorTreatmentConfig({ strokeColor: "#527d3b", strokeWidth: 3, zIndex: 9 }),
-      solarToInverter: createFlowConnectorTreatmentConfig({ strokeColor: "#527d3b", strokeWidth: 3, zIndex: 9 })
+      inverterToBoard: createFlowConnectorTreatmentConfig({ strokeWidth: 16, zIndex: 9 }),
+      solarToInverter: createFlowConnectorTreatmentConfig({ strokeWidth: 16, zIndex: 9 })
     },
     connectors: {
       inverterToBoard: { ...factoryCircuitConnectorLayout.inverterToBoard, height: 16 },
