@@ -1,4 +1,5 @@
 import type {
+  DisplayReadinessFinding,
   MonitoringAlertTone,
   MonitoringBindingState,
   MonitoringFallbackStrategy,
@@ -43,6 +44,13 @@ type OverviewStorySummary = {
   freshnessState: MonitoringFreshnessState;
 };
 
+export type OverviewAlertItem = {
+  detail: string;
+  id: string;
+  title: string;
+  tone: Exclude<MonitoringAlertTone, "normal">;
+};
+
 type BuildOverviewViewModelArgs = {
   connectionState: SocketConnectionState["status"];
   isSocketConnected: boolean;
@@ -51,6 +59,7 @@ type BuildOverviewViewModelArgs = {
   snapshot: LiveMetricsSnapshot;
   storyOverview?: {
     metrics: Array<ResolvedMonitoringMetricBinding<string>>;
+    readinessFindings?: DisplayReadinessFinding[];
     summary: {
       alertTone: MonitoringAlertTone;
       bindingState: MonitoringBindingState;
@@ -147,6 +156,13 @@ const validMonitoringSourceClasses = new Set<MonitoringMetricSourceClass>([
   "derived-metric",
   "mqtt-live"
 ]);
+const overviewRequirementLabels: Record<string, string> = {
+  realTimePower: "即時發電功率",
+  todayCo2Reduction: "今日 CO₂ 減量",
+  todayGeneration: "今日發電量",
+  totalCo2Reduction: "累積 CO₂ 減量",
+  totalGeneration: "累積發電量"
+};
 
 function resolveSummaryStatus(connectionState: SocketConnectionState["status"]): OverviewStatus {
   if (connectionState === "connected") {
@@ -282,6 +298,53 @@ function isOverviewStorySummary(value: unknown): value is OverviewStorySummary {
   );
 }
 
+function isAlertTone(tone: MonitoringAlertTone): tone is Exclude<MonitoringAlertTone, "normal"> {
+  return tone === "danger" || tone === "warning";
+}
+
+function buildOverviewAlertItems(args: {
+  metrics: OverviewResolvedStoryMetric[];
+  readinessFindings: DisplayReadinessFinding[];
+  summaryState: OverviewStorySummary;
+}): OverviewAlertItem[] {
+  const metricAlerts = args.metrics.flatMap((metric) => {
+    if (!isAlertTone(metric.alertTone) || metric.fallbackReason === null) {
+      return [];
+    }
+
+    return [{
+      detail: metric.helper,
+      id: `metric-${metric.metricKey}`,
+      title: metric.label,
+      tone: metric.alertTone
+    }];
+  });
+  const readinessAlerts = args.readinessFindings
+    .filter((finding) => finding.pageId === "overview" && finding.status !== "ready")
+    .map((finding) => ({
+      detail: finding.reason,
+      id: `readiness-${finding.requirementKey}`,
+      title: overviewRequirementLabels[finding.requirementKey] ?? finding.requirementKey,
+      tone: finding.status === "blocking" ? "danger" as const : "warning" as const
+    }));
+
+  if (
+    metricAlerts.length === 0 &&
+    readinessAlerts.length === 0 &&
+    isAlertTone(args.summaryState.alertTone) &&
+    args.summaryState.fallbackReason !== null
+  ) {
+    return [{
+      detail: args.summaryState.fallbackReason,
+      id: `summary-${args.summaryState.fallbackReason}`,
+      title: "Overview runtime",
+      tone: args.summaryState.alertTone
+    }];
+  }
+
+  return [...metricAlerts, ...readinessAlerts];
+}
+
 export function buildOverviewViewModel({
   connectionState,
   isSocketConnected,
@@ -370,8 +433,14 @@ export function buildOverviewViewModel({
           )
         )
       );
+  const alerts = buildOverviewAlertItems({
+    metrics: storyMetrics,
+    readinessFindings: storyOverview?.readinessFindings ?? [],
+    summaryState
+  });
 
   return {
+    alerts,
     hero: {
       eyebrow: "綠能驅動・永續未來",
       subtitleLines: ["Driving a Better Future with", "Green Manufacturing"],

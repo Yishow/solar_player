@@ -1,4 +1,4 @@
-import type { DisplayCircuitSlotKey } from "./displayReadiness.js";
+import type { DisplayCircuitSlotKey, DisplayReadinessFinding } from "./displayReadiness.js";
 import type { MetricKey } from "./types.js";
 
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
@@ -113,8 +113,13 @@ export type SolarFlowStoryState = {
 
 export type DisplayStoryPageId = "overview" | "solar" | "factory-circuit";
 
+export type OverviewStoryMetric = ResolvedMonitoringMetricBinding<string> & {
+  trendSeries?: number[];
+};
+
 export type OverviewStoryPayload = {
-  metrics: Array<ResolvedMonitoringMetricBinding<string>>;
+  metrics: OverviewStoryMetric[];
+  readinessFindings: DisplayReadinessFinding[];
   summary: MonitoringSummaryState;
 };
 

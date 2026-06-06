@@ -113,6 +113,29 @@ function seedDisplayStoryFixture() {
     )
     .run("factoryInfrastructurePower", 35, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":35}');
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("selfConsumptionRatio");
+  database.prepare("DELETE FROM metric_snapshots").run();
+  for (const [generation, capturedAt] of [
+    [82, "2026-05-13T08:00:00.000Z"],
+    [95, "2026-05-13T09:00:00.000Z"],
+    [101, "2026-05-13T10:00:00.000Z"],
+    [108, "2026-05-13T11:00:00.000Z"]
+  ] as const) {
+    database
+      .prepare(
+        `
+          INSERT INTO metric_snapshots (
+            generation,
+            consumption,
+            self_consumption,
+            co2,
+            ratio,
+            efficiency,
+            captured_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+      .run(generation, null, null, null, null, null, capturedAt);
+  }
   database
     .prepare(
       "UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?"
@@ -155,6 +178,12 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
           metricKey: string;
           provenance: string;
           sourceClass: string;
+          trendSeries?: number[];
+        }>;
+        readinessFindings: Array<{
+          pageId: string;
+          requirementKey: string;
+          status: string;
         }>;
         summary: {
           alertTone: string;
@@ -181,6 +210,9 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
 
     assert.equal(body.overview.summary.bindingState, "bound");
     assert.equal(body.overview.summary.alertTone, "normal");
+    assert.ok(Array.isArray(body.overview.readinessFindings));
+    assert.equal(body.overview.readinessFindings.every((finding) => finding.pageId === "overview"), true);
+    assert.equal(body.overview.readinessFindings.every((finding) => finding.status !== "ready"), true);
     const totalGenerationMetric = body.overview.metrics.find(
       (metric) => metric.metricKey === "totalGeneration"
     );
@@ -188,6 +220,8 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.sourceClass, "cumulative-counter");
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
+    const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
+    assert.deepEqual(realTimePowerMetric?.trendSeries, [82, 95, 101, 108]);
 
     const selfConsumptionMetric = body.solar.kpis.find(
       (metric) => metric.metricKey === "selfConsumptionRatio"

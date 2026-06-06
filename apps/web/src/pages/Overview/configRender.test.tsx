@@ -81,6 +81,40 @@ test("overview KPI editor regions expose visibility toggles and proportional res
   }
 });
 
+test("overview dashboard widget regions default hidden and expose visibility toggles", () => {
+  const config = createOverviewDisplayPageSeedConfig();
+  const widgetRegions = overviewDisplayPageEditorRegions.filter((region) => region.id.startsWith("overview-widget-"));
+
+  assert.equal(config.dashboardWidgets.generationTrend.visible, false);
+  assert.equal(config.dashboardWidgets.alertNotifications.visible, false);
+  assert.equal(widgetRegions.length, 2);
+  for (const region of widgetRegions) {
+    const key = region.id.replace("overview-widget-", "");
+
+    assert.equal(region.geometry?.resizeMode, "proportional");
+    assert.ok(
+      region.fields.some((field) => {
+        return (
+          field.fieldType === "toggle" &&
+          field.id === `${key}-visible` &&
+          field.label === "顯示" &&
+          field.path.join(".") === `dashboardWidgets.${key}.visible`
+        );
+      }),
+      `${region.id} should expose a visible toggle`
+    );
+  }
+});
+
+test("overview runtime gates dashboard widgets through visibility config", () => {
+  assert.match(overviewSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.generationTrend\)/);
+  assert.match(overviewSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.alertNotifications\)/);
+  assert.match(overviewSource, /<GenerationTrendWidget/);
+  assert.match(overviewSource, /series=\{generationTrendSeries\}/);
+  assert.match(overviewSource, /<AlertNotificationsWidget/);
+  assert.match(overviewSource, /alerts=\{viewModel\.alerts\}/);
+});
+
 test("overview config treats KPI cards without visible as visible", () => {
   const seed = createOverviewDisplayPageSeedConfig();
   const { visible: _visible, ...legacyPowerCard } = seed.kpiCards.power;
@@ -95,6 +129,22 @@ test("overview config treats KPI cards without visible as visible", () => {
   const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
 
   assert.equal(resolved.kpiCards.power.visible, true);
+});
+
+test("overview config treats dashboard widgets without visible as hidden", () => {
+  const seed = createOverviewDisplayPageSeedConfig();
+  const { visible: _visible, ...legacyGenerationTrend } = seed.dashboardWidgets.generationTrend;
+  const persisted = {
+    ...seed,
+    dashboardWidgets: {
+      ...seed.dashboardWidgets,
+      generationTrend: legacyGenerationTrend
+    }
+  } as unknown as typeof seed;
+
+  const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
+
+  assert.equal(resolved.dashboardWidgets.generationTrend.visible, false);
 });
 
 test("overview runtime upgrades persisted legacy defaults without overriding custom edits", () => {

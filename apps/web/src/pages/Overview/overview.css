@@ -11,7 +11,8 @@
 .overview-hero-banner,
 .overview-leaf-watermark,
 .overview-gold-line,
-.overview-kpi-card {
+.overview-kpi-card,
+.overview-dashboard-widget {
   position: absolute;
 }
 
@@ -113,4 +114,75 @@
 .overview-kpi-sparkline {
   height: 56px;
   padding-inline: 10px;
+}
+
+.overview-dashboard-widget {
+  z-index: 11;
+  border: 1px solid rgba(98, 117, 78, 0.16);
+  background: rgba(255, 254, 250, 0.92);
+  box-shadow: 0 12px 26px rgba(63, 75, 55, 0.1);
+}
+
+.overview-widget-empty {
+  margin: 22px 0 0;
+  color: #687068;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.overview-widget-trend-sparkline {
+  height: 96px;
+  margin-top: 12px;
+}
+
+.overview-widget-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #525851;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.overview-alert-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-alert-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.overview-alert-tone {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(161, 105, 37, 0.12);
+  color: #7a4f18;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.overview-alert-tone-danger {
+  background: rgba(164, 46, 36, 0.12);
+  color: #8b261f;
+}
+
+.overview-alert-title {
+  margin: 0;
+  color: #2f3530;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.overview-alert-detail {
+  grid-column: 2;
+  margin: -4px 0 0;
+  color: #687068;
+  font-size: 13px;
+  line-height: 1.35;
 }

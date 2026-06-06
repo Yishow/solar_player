@@ -32,6 +32,7 @@ import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
   resolveOverviewModernDefaultConfig,
+  shouldRenderOverviewDashboardWidget,
   shouldRenderOverviewKpiCard,
   type OverviewDisplayPageConfig
 } from "./displayPageConfig";
@@ -42,6 +43,8 @@ import {
 import "../../components/displayPageCards.css";
 import "./overview.css";
 import { buildOverviewViewModel } from "./viewModel";
+import { AlertNotificationsWidget } from "./widgets/AlertNotificationsWidget";
+import { GenerationTrendWidget } from "./widgets/GenerationTrendWidget";
 
 const CONTENT_TOP_OFFSET = 146;
 
@@ -145,6 +148,10 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const heroLayout = withContentOffset(resolvedConfig.heroContainer);
   const leafLayout = withContentOffset(overviewLeafLayout);
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
+  const generationTrendLayout = withContentOffset(resolvedConfig.dashboardWidgets.generationTrend);
+  const alertNotificationsLayout = withContentOffset(resolvedConfig.dashboardWidgets.alertNotifications);
+  const generationTrendSeries =
+    viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [];
   return (
     <section className="overview-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
@@ -287,6 +294,28 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           </DisplayCardFrame>
         );
       })}
+      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend) ? (
+        <GenerationTrendWidget
+          series={generationTrendSeries}
+          style={{
+            height: `${generationTrendLayout.height}px`,
+            left: `${generationTrendLayout.left}px`,
+            top: `${generationTrendLayout.top}px`,
+            width: `${generationTrendLayout.width}px`
+          }}
+        />
+      ) : null}
+      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.alertNotifications) ? (
+        <AlertNotificationsWidget
+          alerts={viewModel.alerts}
+          style={{
+            height: `${alertNotificationsLayout.height}px`,
+            left: `${alertNotificationsLayout.left}px`,
+            top: `${alertNotificationsLayout.top}px`,
+            width: `${alertNotificationsLayout.width}px`
+          }}
+        />
+      ) : null}
       <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );

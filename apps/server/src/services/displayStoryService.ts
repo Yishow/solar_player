@@ -20,6 +20,7 @@ import {
   resolveSolarFlowState
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
 type StoryMetricKey =
@@ -40,6 +41,10 @@ type CircuitRow = {
   name_en: string | null;
   name_zh: string | null;
   warning_min: number | null;
+};
+
+type OverviewTrendRow = {
+  generation: number | null;
 };
 
 type OverviewMetricDefinition = MonitoringMetricBinding<StoryMetricKey> & {
@@ -595,20 +600,53 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
   };
 }
 
+function readOverviewGenerationTrendSeries() {
+  const rows = getDatabase()
+    .prepare(
+      `
+        SELECT generation
+        FROM (
+          SELECT generation, captured_at
+          FROM metric_snapshots
+          WHERE generation IS NOT NULL
+          ORDER BY captured_at DESC
+          LIMIT 24
+        )
+        ORDER BY captured_at ASC
+      `
+    )
+    .all() as OverviewTrendRow[];
+
+  return rows.flatMap((row) => typeof row.generation === "number" ? [row.generation] : []);
+}
+
 export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext()
 ): OverviewStoryPayload {
-  const overview = overviewMetrics.map((binding) =>
-    resolveMonitoringMetricBinding({
+  const trendSeries = readOverviewGenerationTrendSeries();
+  const overview = overviewMetrics.map((binding) => {
+    const resolved = resolveMonitoringMetricBinding({
       binding,
       isConnected: context.isConnected,
       now: context.snapshot.timestamp ?? undefined,
       reading: context.snapshot.metrics[binding.metricKey] ?? null
-    })
-  );
+    });
+
+    if (binding.metricKey === "realTimePower" && trendSeries.length > 0) {
+      return {
+        ...resolved,
+        trendSeries
+      };
+    }
+
+    return resolved;
+  });
 
   return {
     metrics: overview,
+    readinessFindings: readDisplayReadinessReport().findings.filter(
+      (finding) => finding.pageId === "overview" && finding.status !== "ready"
+    ),
     summary: resolveMonitoringSummaryState(overview)
   };
 }

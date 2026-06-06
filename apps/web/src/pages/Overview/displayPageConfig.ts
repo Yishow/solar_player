@@ -155,8 +155,18 @@ export type OverviewKpiCardConfig = OverviewDisplayRect & {
   visible: boolean;
 };
 
+export type OverviewDashboardWidgetKey = "alertNotifications" | "generationTrend";
+
+export type OverviewDashboardWidgetConfig = OverviewDisplayRect & {
+  visible: boolean;
+};
+
 export function shouldRenderOverviewKpiCard(card: OverviewDisplayRect & { visible?: boolean }) {
   return card.visible !== false;
+}
+
+export function shouldRenderOverviewDashboardWidget(widget: OverviewDisplayRect & { visible?: boolean }) {
+  return widget.visible === true;
 }
 
 export type OverviewDisplayPageConfig = {
@@ -179,6 +189,7 @@ export type OverviewDisplayPageConfig = {
   };
   heroCopyLayout: OverviewDisplayTextRect;
   heroMedia: DisplayPageMediaBinding;
+  dashboardWidgets: Record<OverviewDashboardWidgetKey, OverviewDashboardWidgetConfig>;
   iconSources: Record<
     "co2Today" | "co2Total" | "power" | "today" | "total",
     DisplayPageIconSource
@@ -253,6 +264,22 @@ export function createOverviewDisplayPageSeedConfig(
       sourceMode: "seed-default",
       src: heroSrc
     },
+    dashboardWidgets: {
+      alertNotifications: {
+        height: 220,
+        left: 1324,
+        top: 500,
+        visible: false,
+        width: 520
+      },
+      generationTrend: {
+        height: 220,
+        left: 784,
+        top: 500,
+        visible: false,
+        width: 520
+      }
+    },
     iconSources: {
       co2Today: createReferenceGlyphIconSource("co2"),
       co2Total: createReferenceGlyphIconSource("leaf"),
@@ -279,6 +306,22 @@ export function resolveOverviewModernDefaultConfig(
   config: OverviewDisplayPageConfig,
   seedConfig: OverviewDisplayPageConfig
 ): OverviewDisplayPageConfig {
+  const persistedDashboardWidgets = (
+    (config as Partial<OverviewDisplayPageConfig>).dashboardWidgets ?? {}
+  ) as Partial<Record<OverviewDashboardWidgetKey, Partial<OverviewDashboardWidgetConfig>>>;
+  const dashboardWidgets = Object.fromEntries(
+    Object.entries(seedConfig.dashboardWidgets).map(([key, seedWidget]) => {
+      const value = persistedDashboardWidgets[key as OverviewDashboardWidgetKey] ?? seedWidget;
+      return [
+        key,
+        {
+          ...seedWidget,
+          ...value,
+          visible: value.visible === true
+        }
+      ];
+    })
+  ) as OverviewDisplayPageConfig["dashboardWidgets"];
   const kpiCards = Object.fromEntries(
     Object.entries(config.kpiCards).map(([key, value]) => [
       key,
@@ -311,9 +354,25 @@ export function resolveOverviewModernDefaultConfig(
     heroCopyLayout: matchesRecord(config.heroCopyLayout, legacyOverviewHeroCopyLayout)
       ? { ...seedConfig.heroCopyLayout }
       : config.heroCopyLayout,
+    dashboardWidgets,
     kpiCards
   };
 }
+
+const overviewDashboardWidgetRegions = [
+  {
+    description: "調整發電趨勢 widget geometry 與顯示狀態。",
+    id: "overview-widget-generationTrend",
+    key: "generationTrend",
+    label: "Overview Widget Generation Trend"
+  },
+  {
+    description: "調整警示通知 widget geometry 與顯示狀態。",
+    id: "overview-widget-alertNotifications",
+    key: "alertNotifications",
+    label: "Overview Widget Alert Notifications"
+  }
+] as const;
 
 export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
   {
@@ -481,6 +540,30 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     }),
     presetKey: "overview-leaf"
   },
+  ...overviewDashboardWidgetRegions.map<DisplayEditorRegionSchema>(({ description, id, key, label }) => ({
+    id,
+    label,
+    description,
+    geometry: {
+      compatibilityKey: "overview-dashboard-widget-geometry",
+      heightPath: ["dashboardWidgets", key, "height"],
+      leftPath: ["dashboardWidgets", key, "left"],
+      minHeight: 120,
+      minWidth: 180,
+      resizeMode: "proportional",
+      topOffset: 146,
+      topPath: ["dashboardWidgets", key, "top"],
+      widthPath: ["dashboardWidgets", key, "width"]
+    },
+    fields: [
+      { fieldType: "toggle", id: `${key}-visible`, label: "顯示", path: ["dashboardWidgets", key, "visible"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["dashboardWidgets", key, "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["dashboardWidgets", key, "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["dashboardWidgets", key, "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["dashboardWidgets", key, "height"] }
+    ],
+    presetKey: "overview-dashboard-widget"
+  })),
   ...Object.keys(createOverviewDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
     id: `overview-kpi-${key}`,
     label: `Overview KPI ${key}`,

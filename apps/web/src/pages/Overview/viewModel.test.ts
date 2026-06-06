@@ -457,3 +457,98 @@ test("buildOverviewViewModel exposes runtime trendSeries from story metrics when
   ]);
   assert.equal(model.metrics.find((metric) => metric.metricKey === "todayGeneration")?.trendSeries, undefined);
 });
+
+test("buildOverviewViewModel exposes alert items from story metrics and readiness findings", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          alertTone: "warning",
+          fallbackReason: "metric-unavailable",
+          freshnessState: "fallback",
+          helper: "共享故事缺少今日發電量",
+          label: "故事版今日發電量",
+          metricKey: "todayGeneration",
+          unit: "kWh",
+          value: "--"
+        })
+      ],
+      readinessFindings: [
+        {
+          blocking: true,
+          pageId: "overview",
+          reason: "尚未綁定即時發電功率 MQTT topic",
+          requirementKey: "realTimePower",
+          sourceId: null,
+          sourceType: "mqtt-metric",
+          status: "blocking"
+        },
+        {
+          blocking: true,
+          pageId: "solar",
+          reason: "其他頁面 finding 不應出現在 Overview",
+          requirementKey: "todayGeneration",
+          sourceId: null,
+          sourceType: "mqtt-metric",
+          status: "blocking"
+        }
+      ],
+      summary: {
+        alertTone: "warning",
+        bindingState: "missing",
+        fallbackReason: "metric-unavailable",
+        freshnessState: "fallback"
+      }
+    }
+  });
+
+  assert.deepEqual(
+    model.alerts.map((alert) => ({
+      detail: alert.detail,
+      title: alert.title,
+      tone: alert.tone
+    })),
+    [
+      {
+        detail: "共享故事缺少今日發電量",
+        title: "故事版今日發電量",
+        tone: "warning"
+      },
+      {
+        detail: "尚未綁定即時發電功率 MQTT topic",
+        title: "即時發電功率",
+        tone: "danger"
+      }
+    ]
+  );
+});
+
+test("buildOverviewViewModel returns no alert items when runtime sources are normal", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          label: "故事版即時功率",
+          metricKey: "realTimePower",
+          unit: "kW",
+          value: "612"
+        })
+      ],
+      readinessFindings: [],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  assert.deepEqual(model.alerts, []);
+});
