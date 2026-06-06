@@ -37,9 +37,9 @@ test("solar display page seed config captures the current default hero and layou
   assert.ok(config.heroMedia.effects);
   assert.equal(config.flowNodes.solar.left, 795);
   assert.equal(config.connectors.inverterToFactory.width, 108);
-  assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 11);
-  assert.equal(config.connectorTreatments.inverterToFactory.strokeWidth, 11);
-  assert.equal(config.connectorTreatments.inverterToCo2.strokeWidth, 7);
+  assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 6);
+  assert.equal(config.connectorTreatments.inverterToFactory.strokeWidth, 6);
+  assert.equal(config.connectorTreatments.inverterToCo2.strokeWidth, 4);
   assert.ok(
     config.connectorTreatments.solarToInverter.strokeWidth >
       config.connectorTreatments.inverterToCo2.strokeWidth,

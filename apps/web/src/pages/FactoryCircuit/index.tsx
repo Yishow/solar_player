@@ -92,10 +92,10 @@ function straightRoutePath(from: RoutingPoint, to: RoutingPoint): string {
   return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
 }
 
-// 平滑分支：自配電盤水平送出後彎向各負載，貼近 reference 的細緻 fan-out 樹狀走線。
-function smoothRoutePath(from: RoutingPoint, to: RoutingPoint): string {
-  const dx = Math.max((to.x - from.x) * 0.5, 36);
-  return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
+// 結構化 comb：自配電盤水平送至接近負載的垂直 bus，再以短分支接到各負載，
+// 貼近 reference 的樹狀走線（共用垂直主幹 + 短支），圓角轉折較柔。
+function combRoutePath(from: RoutingPoint, to: RoutingPoint, busX: number): string {
+  return `M ${from.x} ${from.y} L ${busX} ${from.y} L ${busX} ${to.y} L ${to.x} ${to.y}`;
 }
 
 const kpiLayoutOrder = [
@@ -311,6 +311,12 @@ export function FactoryCircuit({
     seedConfig.connectorTreatments.inverterToBoard
   );
   const boardRight = rectRightCenter(boardNode);
+  const loadBranches = loadRowOrder.map((loadRowKey) => {
+    const loadRow = withContentOffset(resolvedConfig.loadRows[loadRowKey]);
+    return { anchor: rectLoadRowAnchor(loadRow), key: `boardTo-${loadRowKey}` };
+  });
+  // 垂直 bus 放在接近負載處（負載 left − 30），形成共用主幹 + 短分支的 comb。
+  const loadBusX = Math.min(...loadBranches.map((branch) => branch.anchor.x)) - 30;
   const routingPaths = [
     {
       key: "solarToInverter",
@@ -322,14 +328,11 @@ export function FactoryCircuit({
       treatment: inverterToBoardTreatment,
       d: straightRoutePath(rectRightCenter(inverterNode), rectLeftCenter(boardNode))
     },
-    ...loadRowOrder.map((loadRowKey) => {
-      const loadRow = withContentOffset(resolvedConfig.loadRows[loadRowKey]);
-      return {
-        key: `boardTo-${loadRowKey}`,
-        treatment: inverterToBoardTreatment,
-        d: smoothRoutePath(boardRight, rectLoadRowAnchor(loadRow))
-      };
-    })
+    ...loadBranches.map((branch) => ({
+      key: branch.key,
+      treatment: inverterToBoardTreatment,
+      d: combRoutePath(boardRight, branch.anchor, loadBusX)
+    }))
   ];
 
   return (
