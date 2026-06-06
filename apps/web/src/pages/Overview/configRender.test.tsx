@@ -5,6 +5,7 @@ import test from "node:test";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   createOverviewDisplayPageSeedConfig,
+  overviewDisplayPageEditorRegions,
   resolveOverviewModernDefaultConfig
 } from "./displayPageConfig";
 
@@ -53,6 +54,47 @@ test("overview display page seed config captures the current default hero contra
   assert.equal(fadeCoverage("bottom"), 0.55);
   assert.equal(config.heroMedia.alt, "國瑞汽車中廠綠能展示場域");
   assert.ok((config.heroMedia.src ?? "").length > 0);
+  for (const card of Object.values(config.kpiCards)) {
+    assert.equal(card.visible, true);
+  }
+});
+
+test("overview KPI editor regions expose visibility toggles and proportional resizing", () => {
+  const kpiRegions = overviewDisplayPageEditorRegions.filter((region) => region.id.startsWith("overview-kpi-"));
+
+  assert.equal(kpiRegions.length, 5);
+  for (const region of kpiRegions) {
+    const key = region.id.replace("overview-kpi-", "");
+
+    assert.equal(region.geometry?.resizeMode, "proportional");
+    assert.ok(
+      region.fields.some((field) => {
+        return (
+          field.fieldType === "toggle" &&
+          field.id === `${key}-visible` &&
+          field.label === "顯示" &&
+          field.path.join(".") === `kpiCards.${key}.visible`
+        );
+      }),
+      `${region.id} should expose a visible toggle`
+    );
+  }
+});
+
+test("overview config treats KPI cards without visible as visible", () => {
+  const seed = createOverviewDisplayPageSeedConfig();
+  const { visible: _visible, ...legacyPowerCard } = seed.kpiCards.power;
+  const persisted = {
+    ...seed,
+    kpiCards: {
+      ...seed.kpiCards,
+      power: legacyPowerCard
+    }
+  } as unknown as typeof seed;
+
+  const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
+
+  assert.equal(resolved.kpiCards.power.visible, true);
 });
 
 test("overview runtime upgrades persisted legacy defaults without overriding custom edits", () => {
@@ -102,7 +144,7 @@ test("overview runtime upgrades persisted legacy defaults without overriding cus
     }
   };
 
-  const upgraded = resolveOverviewModernDefaultConfig(legacy, seed);
+  const upgraded = resolveOverviewModernDefaultConfig(legacy as unknown as typeof seed, seed);
   assert.deepEqual(upgraded.heroCopyLayout, seed.heroCopyLayout);
   assert.deepEqual(upgraded.heroContainer, seed.heroContainer);
   assert.deepEqual(upgraded.kpiCards.power, seed.kpiCards.power);
@@ -118,5 +160,5 @@ test("overview runtime upgrades persisted legacy defaults without overriding cus
     }
   };
 
-  assert.deepEqual(resolveOverviewModernDefaultConfig(custom, seed).heroCopyLayout, custom.heroCopyLayout);
+  assert.deepEqual(resolveOverviewModernDefaultConfig(custom as unknown as typeof seed, seed).heroCopyLayout, custom.heroCopyLayout);
 });

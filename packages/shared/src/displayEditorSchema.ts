@@ -91,7 +91,7 @@ export type DisplayEditorRegionGeometrySchema = {
   maxWidth?: number;
   minHeight?: number;
   minWidth?: number;
-  resizeMode?: "both" | "horizontal" | "none" | "vertical";
+  resizeMode?: "both" | "horizontal" | "none" | "proportional" | "vertical";
   topOffset?: number;
   topPath: DisplayEditorPath;
   widthPath: DisplayEditorPath;

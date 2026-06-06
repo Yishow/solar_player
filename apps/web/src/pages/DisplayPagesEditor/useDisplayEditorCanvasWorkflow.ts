@@ -339,7 +339,8 @@ export function useDisplayEditorCanvasWorkflow({
               delta,
               constraint,
               snap,
-              activeInteraction.distanceLock
+              activeInteraction.distanceLock,
+              schema.resizeMode
             )
           : activeInteraction.type === "measure-x" || activeInteraction.type === "measure-y"
             ? applyMeasurementHandleDrag(

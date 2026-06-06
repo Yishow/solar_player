@@ -35,6 +35,7 @@ export type CanvasResizeHandle =
   | "se"
   | "sw"
   | "w";
+export type CanvasResizeMode = "both" | "horizontal" | "none" | "proportional" | "vertical";
 
 export type CanvasViewport = {
   offsetX: number;
@@ -112,6 +113,10 @@ function normalizeCanvasSpace(space: CanvasSpace, fallback: CanvasSpace): Canvas
     height: normalizeCanvasDimension(space.height, fallback.height),
     width: normalizeCanvasDimension(space.width, fallback.width)
   };
+}
+
+function clampDimension(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
 }
 
 export function resolveCanvasDesignMapping(canvas: CanvasSpace, design: CanvasSpace): CanvasDesignMapping {
@@ -205,7 +210,8 @@ export function applyCanvasResize(
   delta: CanvasDelta,
   constraint: CanvasRectConstraint,
   snap?: CanvasSnapOptions,
-  distanceLock?: CanvasDistanceLockSession | null
+  distanceLock?: CanvasDistanceLockSession | null,
+  resizeMode: CanvasResizeMode = "both"
 ): {
   boundaryClamped?: boolean;
   guides: CanvasGuide[];
@@ -233,7 +239,9 @@ export function applyCanvasResize(
     x: handle.includes("e") ? "resize-end" : handle.includes("w") ? "resize-start" : "none",
     y: handle.includes("s") ? "resize-end" : handle.includes("n") ? "resize-start" : "none"
   });
-  nextRect = clampCanvasRect(snapped.rect, constraint);
+  nextRect = resizeMode === "proportional"
+    ? resolveProportionalResizeRect(rect, handle, snapped.rect, constraint)
+    : clampCanvasRect(snapped.rect, constraint);
 
   return {
     boundaryClamped:
@@ -244,6 +252,64 @@ export function applyCanvasResize(
     guides: [...snapped.guides, ...resolveBoundaryGuides(nextRect, constraint)],
     rect: nextRect
   };
+}
+
+function resolveProportionalResizeRect(
+  startRect: CanvasRect,
+  handle: CanvasResizeHandle,
+  targetRect: CanvasRect,
+  constraint: CanvasRectConstraint
+) {
+  const ratio = startRect.width / startRect.height;
+
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return clampCanvasRect(targetRect, constraint);
+  }
+
+  const originLeft = constraint.originLeft ?? 0;
+  const originTop = constraint.originTop ?? 0;
+  const anchoredRight = startRect.left + startRect.width;
+  const anchoredBottom = startRect.top + startRect.height;
+  const maxWidth = handle.includes("w")
+    ? anchoredRight - originLeft
+    : originLeft + constraint.canvasWidth - startRect.left;
+  const maxHeight = handle.includes("n")
+    ? anchoredBottom - originTop
+    : originTop + constraint.canvasHeight - startRect.top;
+  const widthDelta = Math.abs(targetRect.width - startRect.width);
+  const heightDelta = Math.abs(targetRect.height - startRect.height);
+  const handleMovesWidth = handle.includes("e") || handle.includes("w");
+  const handleMovesHeight = handle.includes("n") || handle.includes("s");
+  const deriveFromWidth = handleMovesWidth && (!handleMovesHeight || widthDelta >= heightDelta);
+
+  let width = startRect.width;
+  let height = startRect.height;
+
+  if (deriveFromWidth) {
+    width = clampDimension(Math.round(targetRect.width), constraint.minWidth, maxWidth);
+    height = Math.round(width / ratio);
+    if (height < constraint.minHeight || height > maxHeight) {
+      height = clampDimension(height, constraint.minHeight, maxHeight);
+      width = clampDimension(Math.round(height * ratio), constraint.minWidth, maxWidth);
+    }
+  } else {
+    height = clampDimension(Math.round(targetRect.height), constraint.minHeight, maxHeight);
+    width = Math.round(height * ratio);
+    if (width < constraint.minWidth || width > maxWidth) {
+      width = clampDimension(width, constraint.minWidth, maxWidth);
+      height = clampDimension(Math.round(width / ratio), constraint.minHeight, maxHeight);
+    }
+  }
+
+  return clampCanvasRect(
+    {
+      height,
+      left: handle.includes("w") ? anchoredRight - width : startRect.left,
+      top: handle.includes("n") ? anchoredBottom - height : startRect.top,
+      width
+    },
+    constraint
+  );
 }
 
 export function applyCanvasNudge(

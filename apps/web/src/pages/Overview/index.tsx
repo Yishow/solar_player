@@ -32,6 +32,7 @@ import { overviewAssetRuntimeMap } from "./assets";
 import {
   createOverviewDisplayPageSeedConfig,
   resolveOverviewModernDefaultConfig,
+  shouldRenderOverviewKpiCard,
   type OverviewDisplayPageConfig
 } from "./displayPageConfig";
 import {
@@ -242,6 +243,10 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       </figure>
 
       {overviewCardOrder.map((cardItem, index) => {
+        if (!shouldRenderOverviewKpiCard(resolvedConfig.kpiCards[cardItem.key])) {
+          return null;
+        }
+
         const metric = viewModel.metrics[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);

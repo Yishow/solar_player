@@ -151,6 +151,14 @@ export type OverviewDisplayTextRect = {
   width: number;
 };
 
+export type OverviewKpiCardConfig = OverviewDisplayRect & {
+  visible: boolean;
+};
+
+export function shouldRenderOverviewKpiCard(card: OverviewDisplayRect & { visible?: boolean }) {
+  return card.visible !== false;
+}
+
 export type OverviewDisplayPageConfig = {
   cardStyles: Record<
     "co2Today" | "co2Total" | "power" | "summary" | "today" | "total",
@@ -175,7 +183,7 @@ export type OverviewDisplayPageConfig = {
     "co2Today" | "co2Total" | "power" | "today" | "total",
     DisplayPageIconSource
   >;
-  kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewDisplayRect>;
+  kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewKpiCardConfig>;
   summaryCard: OverviewDisplayTextRect;
 };
 
@@ -253,11 +261,11 @@ export function createOverviewDisplayPageSeedConfig(
       total: createReferenceGlyphIconSource("bars")
     },
     kpiCards: {
-      co2Today: { ...overviewKpiLayout.co2Today },
-      co2Total: { ...overviewKpiLayout.co2Total },
-      power: { ...overviewKpiLayout.power },
-      today: { ...overviewKpiLayout.today },
-      total: { ...overviewKpiLayout.total }
+      co2Today: { ...overviewKpiLayout.co2Today, visible: true },
+      co2Total: { ...overviewKpiLayout.co2Total, visible: true },
+      power: { ...overviewKpiLayout.power, visible: true },
+      today: { ...overviewKpiLayout.today, visible: true },
+      total: { ...overviewKpiLayout.total, visible: true }
     },
     summaryCard: {
       left: 88,
@@ -276,7 +284,7 @@ export function resolveOverviewModernDefaultConfig(
       key,
       matchesRecord(value, legacyOverviewKpiLayout[key as keyof typeof legacyOverviewKpiLayout])
         ? { ...seedConfig.kpiCards[key as keyof OverviewDisplayPageConfig["kpiCards"]] }
-        : value
+        : { ...value, visible: value.visible !== false }
     ])
   ) as OverviewDisplayPageConfig["kpiCards"];
   const cardStyles = Object.fromEntries(
@@ -483,7 +491,7 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["kpiCards", key, "left"],
       minHeight: 80,
       minWidth: 80,
-      resizeMode: "both",
+      resizeMode: "proportional",
       topOffset: 146,
       topPath: ["kpiCards", key, "top"],
       widthPath: ["kpiCards", key, "width"]
@@ -497,6 +505,7 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         idPrefix: key,
         path: ["iconSources", key]
       }),
+      { fieldType: "toggle", id: `${key}-visible`, label: "顯示", path: ["kpiCards", key, "visible"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

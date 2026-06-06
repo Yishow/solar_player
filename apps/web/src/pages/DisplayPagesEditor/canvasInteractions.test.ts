@@ -62,6 +62,78 @@ test("applyCanvasResize expands geometry from the south-east handle", () => {
   assert.equal(resized.rect.height, 198);
 });
 
+test("applyCanvasResize preserves aspect ratio for proportional resize mode", () => {
+  const resized = applyCanvasResize(
+    {
+      height: 220,
+      left: 40,
+      top: 614,
+      width: 352
+    },
+    "e",
+    { x: 88, y: 0 },
+    {
+      canvasHeight: 898,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 80
+    },
+    undefined,
+    null,
+    "proportional"
+  );
+
+  assert.equal(resized.rect.width, 440);
+  assert.ok(Math.abs(resized.rect.width / resized.rect.height - 352 / 220) < 0.01);
+});
+
+test("applyCanvasResize clamps the touched axis and derives the paired axis in proportional mode", () => {
+  const resized = applyCanvasResize(
+    {
+      height: 220,
+      left: 40,
+      top: 614,
+      width: 352
+    },
+    "e",
+    { x: -420, y: 0 },
+    {
+      canvasHeight: 898,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 176
+    },
+    undefined,
+    null,
+    "proportional"
+  );
+
+  assert.equal(resized.rect.width, 176);
+  assert.equal(resized.rect.height, 110);
+});
+
+test("applyCanvasResize keeps non-proportional resize behavior unchanged", () => {
+  const resized = applyCanvasResize(
+    {
+      height: 220,
+      left: 40,
+      top: 614,
+      width: 352
+    },
+    "e",
+    { x: 88, y: 0 },
+    {
+      canvasHeight: 898,
+      canvasWidth: 1920,
+      minHeight: 80,
+      minWidth: 80
+    }
+  );
+
+  assert.equal(resized.rect.width, 440);
+  assert.equal(resized.rect.height, 220);
+});
+
 test("clampCanvasRect keeps geometry inside the FHD editor bounds", () => {
   assert.deepEqual(
     clampCanvasRect(
