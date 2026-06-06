@@ -177,7 +177,7 @@ export function createSustainabilityDisplayPageSeedConfig(
         leaf: createLeafOrnamentChromeConfig({
           opacity: 0.42
         }),
-        ring: createRingOrnamentChromeConfig()
+        ring: createRingOrnamentChromeConfig({ glowOpacity: 0.16 })
       }
     },
     hero: {

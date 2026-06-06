@@ -37,6 +37,7 @@ test("display page seed configs persist page chrome groups separately from card 
   assert.equal(images.chrome.modules.arrows.buttonSize, 68);
   assert.equal(sustainability.chrome.ornaments.ring.overlap, 118);
   assert.equal(sustainability.chrome.ornaments.ring.zIndex, 7);
+  assert.equal(sustainability.chrome.ornaments.ring.glowOpacity, 0.16);
   assert.equal(sustainability.chrome.modules.periodChips.fontSize, 17);
   assert.equal(sustainability.chrome.modules.provenance.fontSize, 15);
 

@@ -48,5 +48,6 @@ The witness command captures evidence only. It does not make pixel thresholds a 
 | Solar | `polish-overview-solar-reference-quality-targets` (2026-06-06) | connector 加粗、KPI 等寬（editor-backed）。actual-gap：node/connector 飽和、gold/leaf 基底、hero framing | 延 Phase 2 batch（`solar.png` 待重截） |
 | FactoryCircuit | `polish-factory-circuit-reference-quality-targets` (2026-06-06) | 無 editor-backed 值可調；actual-gap：電路線寬（PNG）、node 飽和、CSS 字級、leaf binding | 延 Phase 2 batch（`factory-circuit.png` 待重截） |
 | Images | `polish-images-reference-quality-targets` (2026-06-06) | media stage 放大、info panel 加寬、caption 字級加大（editor-backed）。4-up thumbnail BLOCKED（需 Phase 3 seed） | 延 Phase 2 batch（`images.png` 待重截，4-up 待補資料） |
+| Sustainability | `polish-sustainability-reference-quality-targets` (2026-06-06) | ring glow 收斂 0.24→0.16（editor-backed）。actual-gap：hero 飽和/palette、copy-en 字級、stat padding、leaf rotation | 延 Phase 2 batch（`sustainability.png` 待重截） |
 
 Closeout 詳情記錄於各 change 的 reference-quality closeout 文件。視覺改善不改 launch status（launch witness matrix 維持 `blocked`）。
