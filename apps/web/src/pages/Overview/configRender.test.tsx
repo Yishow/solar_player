@@ -40,8 +40,17 @@ test("overview display page seed config captures the current default hero contra
   assert.deepEqual(config.heroCopy.titleLines, ["以綠色製造", "驅動美好生活"]);
   assert.deepEqual(config.heroCopyLayout, { left: 86, top: 210, width: 600 });
   assert.equal(config.chrome.heroTypography.titleFontSize, 82);
-  assert.equal(config.cardStyles.power.valueFontSize, 64);
+  assert.equal(config.cardStyles.power.valueFontSize, 68);
+  assert.equal(config.cardStyles.power.paddingTop, 22);
+  assert.equal(config.cardStyles.power.paddingBottom, 18);
   assert.equal(config.cardStyles.power.cornerRadius, 20);
+  const heroFadeLayers = config.heroMedia.effects?.layers ?? [];
+  const fadeCoverage = (zone: string) => {
+    const layer = heroFadeLayers.find((entry) => entry.kind === "fade" && entry.zone === zone);
+    return layer && "coverage" in layer ? layer.coverage : undefined;
+  };
+  assert.equal(fadeCoverage("left"), 0.62);
+  assert.equal(fadeCoverage("bottom"), 0.55);
   assert.equal(config.heroMedia.alt, "國瑞汽車中廠綠能展示場域");
   assert.ok((config.heroMedia.src ?? "").length > 0);
 });

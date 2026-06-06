@@ -37,8 +37,20 @@ test("solar display page seed config captures the current default hero and layou
   assert.ok(config.heroMedia.effects);
   assert.equal(config.flowNodes.solar.left, 795);
   assert.equal(config.connectors.inverterToFactory.width, 108);
-  assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 9);
+  assert.equal(config.connectorTreatments.solarToInverter.strokeWidth, 11);
+  assert.equal(config.connectorTreatments.inverterToFactory.strokeWidth, 11);
+  assert.equal(config.connectorTreatments.inverterToCo2.strokeWidth, 7);
+  assert.ok(
+    config.connectorTreatments.solarToInverter.strokeWidth >
+      config.connectorTreatments.inverterToCo2.strokeWidth,
+    "main connectors stay thicker than the CO2 connector"
+  );
   assert.equal(config.flowNodeTreatments.solar.iconScale, 1);
   assert.equal(config.flowNodeTreatments.solar.valueAlign, "center");
-  assert.equal(config.kpiCards.efficiency.width, 360);
+  const kpiWidths = Object.values(config.kpiCards).map((card) => card.width);
+  assert.ok(
+    kpiWidths.every((width) => width === kpiWidths[0]),
+    "all five KPI cards share an equal width"
+  );
+  assert.equal(config.kpiCards.efficiency.width, 350);
 });

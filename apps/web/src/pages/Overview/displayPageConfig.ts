@@ -32,15 +32,15 @@ const overviewMetricCardStyle = {
   footerPaddingTop: 12,
   headerGap: 14,
   iconBoxSize: 54,
-  paddingBottom: 16,
+  paddingBottom: 18,
   paddingLeft: 24,
   paddingRight: 24,
-  paddingTop: 20,
+  paddingTop: 22,
   subtitleFontSize: 13,
   titleFontSize: 18,
   unitFontSize: 18,
   unitPaddingBottom: 5,
-  valueFontSize: 64,
+  valueFontSize: 68,
   valueMarginTop: 20,
   valueRowAlign: "center"
 } as const;

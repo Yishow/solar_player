@@ -59,7 +59,7 @@ export const overviewHeroDefaultMediaEffects: DisplayPageMediaEffects = createDi
   edgeFade: {
     direction: "left",
     enabled: true,
-    width: 0.56
+    width: 0.62
   }
 });
 

@@ -131,9 +131,9 @@ export function createSolarDisplayPageSeedConfig(
       }
     },
     connectorTreatments: {
-      inverterToCo2: createFlowConnectorTreatmentConfig({ strokeWidth: 5 }),
-      inverterToFactory: createFlowConnectorTreatmentConfig({ strokeWidth: 9 }),
-      solarToInverter: createFlowConnectorTreatmentConfig({ strokeWidth: 9 })
+      inverterToCo2: createFlowConnectorTreatmentConfig({ strokeWidth: 7 }),
+      inverterToFactory: createFlowConnectorTreatmentConfig({ strokeWidth: 11 }),
+      solarToInverter: createFlowConnectorTreatmentConfig({ strokeWidth: 11 })
     },
     connectors: {
       inverterToCo2: { ...solarConnectorLayout.inverterToCo2 },

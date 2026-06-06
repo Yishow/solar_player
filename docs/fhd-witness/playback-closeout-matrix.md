@@ -20,7 +20,7 @@ Use `--run-id <id>` when a deterministic evidence folder is needed.
 
 Use the reference-informed closeout boundary rules to classify the follow-up after each witness capture. The capture output does not decide launch readiness; it supplies evidence for the boundary decision.
 
-The latest reference-informed witness batch (run id `reference-informed-closeout`) is classified per page in `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md`, which carries the DOM-measured `reference-quality-target` and `actual-gap` rows consumed by the four page closeout changes.
+The latest reference-informed witness batch (run id `reference-informed-closeout`) is classified per page in the boundary classification artifact, which carries the DOM-measured `reference-quality-target` and `actual-gap` rows consumed by the four page closeout changes.
 
 | page | protected product choice example | reference quality target examples | actual gap examples |
 | --- | --- | --- | --- |
@@ -39,3 +39,12 @@ Generated runs are written under `docs/fhd-witness/runs/<run-id>/`:
 Generated runs are local evidence artifacts and are ignored by git; copy the relevant paths into the Spectra handoff or review summary when closing a change.
 
 The witness command captures evidence only. It does not make pixel thresholds a CI gate, and it does not decide launch readiness. AI owns capture, evidence collation, Spectra task hygiene, and unresolved-gap reporting. Human review owns product intent, intentional differences, and final launch acceptance.
+
+## Closeout Status
+
+| page | closeout change | config-level result | fresh recapture |
+| --- | --- | --- | --- |
+| Overview | `polish-overview-solar-reference-quality-targets` (2026-06-06) | hero fade 放寬、KPI padding/value 微增（editor-backed）。actual-gap：無 | 延 Phase 2 batch（`overview.png` 待重截） |
+| Solar | `polish-overview-solar-reference-quality-targets` (2026-06-06) | connector 加粗、KPI 等寬（editor-backed）。actual-gap：node/connector 飽和、gold/leaf 基底、hero framing | 延 Phase 2 batch（`solar.png` 待重截） |
+
+Closeout 詳情記錄於各 change 的 reference-quality closeout 文件。視覺改善不改 launch status（launch witness matrix 維持 `blocked`）。

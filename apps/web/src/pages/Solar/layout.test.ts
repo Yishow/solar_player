@@ -43,7 +43,7 @@ test("solar layout centralizes main region geometry", () => {
   });
   assert.deepEqual(solarKpiLayout.totalCo2, {
     height: 220,
-    left: 1140,
+    left: 1150,
     top: 760,
     width: 350
   });

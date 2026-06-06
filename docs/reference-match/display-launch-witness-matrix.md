@@ -50,3 +50,12 @@ The 2026-06-05 reference-informed witness batch is classified in `docs/reference
 
 - 每次 rerun `display-launch-verification-pack.md`，都把 pass/fail/blocked 寫回這份 matrix。
 - supporting input 可來自 `docs/reference-match/all-pages-audit.md`、`docs/reference-match/all-pages-checklist.md`、editor/runtime targeted tests，但 launch status 只在這份 matrix 更新。
+
+## Closeout Progress Log
+
+視覺 closeout 進度只記錄 `reference-quality-target` 的 config-level 調整，**不改任何 launch gate 狀態**。視覺改善 ≠ launch-ready；所有 gate 在取得 fresh runtime parity / publish refresh / fallback witness 前維持 `blocked`。
+
+| Date | Change | Route | Visual closeout result（config-level） | Launch status |
+| --- | --- | --- | --- | --- |
+| 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/overview` | hero fade 放寬、KPI padding/value 微增（editor-backed）。詳見 `overview-solar-reference-quality-closeout.md` | 維持 `blocked`（fresh 視覺 witness 批次延 Phase 2；runtime/fallback/publish 未驗） |
+| 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/solar` | connector 加粗、KPI 等寬（editor-backed）。actual-gap：node/connector 飽和、gold/leaf 基底、hero framing 留 Phase 4 | 維持 `blocked`（同上） |

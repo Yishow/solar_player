@@ -65,31 +65,31 @@ export const solarConnectorLayout = {
 export const solarKpiLayout = {
   co2: {
     height: 220,
-    left: 794,
+    left: 784,
     top: 760,
-    width: 330
+    width: 350
   },
   efficiency: {
     height: 220,
-    left: 1506,
+    left: 1516,
     top: 760,
-    width: 360
+    width: 350
   },
   generation: {
     height: 220,
     left: 52,
     top: 760,
-    width: 380
+    width: 350
   },
   selfConsumption: {
     height: 220,
-    left: 448,
+    left: 418,
     top: 760,
-    width: 330
+    width: 350
   },
   totalCo2: {
     height: 220,
-    left: 1140,
+    left: 1150,
     top: 760,
     width: 350
   }
