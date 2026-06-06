@@ -18,8 +18,8 @@ test("factory circuit runtime reads resolved display config for copy, status, no
   assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.nodeTreatments\[node\.key\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.connectorTreatments\[connectorKey as keyof typeof resolvedConfig\.connectorTreatments\]/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.connectorTreatments\.solarToInverter/);
+  assert.match(factoryCircuitSource, /resolvedConfig\.connectorTreatments\.inverterToBoard/);
   assert.match(factoryCircuitSource, /resolvedConfig\.loadPanel/);
   assert.match(factoryCircuitSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
   assert.match(factoryCircuitSource, /resolvedConfig\.rhythm\.factoryLoadRows/);
@@ -40,6 +40,7 @@ test("factory circuit display page seed config captures the current default layo
   assert.equal(config.nodes.board.height, 336);
   assert.equal(config.connectors.inverterToBoard.width, 74);
   assert.equal(config.connectorTreatments.inverterToBoard.strokeWidth, 16);
+  assert.equal(config.connectorTreatments.inverterToBoard.strokeColor, "#4ade80");
   assert.equal(config.nodeTreatments.board.iconScale, 1);
   assert.equal(config.nodeTreatments.board.valueAlign, "center");
   assert.equal((config as any).rhythm?.factoryLoadRows?.iconTextGap, 24);

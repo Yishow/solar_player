@@ -7,6 +7,8 @@ export type FlowConnectorTreatmentConfig = {
   lineCap: FlowConnectorLineCap;
   opacity: number;
   radius: number;
+  // CSS color string used by SVG strokes and connector treatments; empty values fall back to seed/default.
+  strokeColor: string;
   strokeWidth: number;
   zIndex: number;
 };
@@ -48,6 +50,10 @@ function resolveLineCap(value: unknown, fallback: FlowConnectorLineCap): FlowCon
   return value === "butt" || value === "round" || value === "square" ? value : fallback;
 }
 
+function resolveCssColor(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
 function resolveValueAlign(value: unknown, fallback: FlowNodeValueAlign): FlowNodeValueAlign {
   return value === "center" || value === "left" || value === "right" ? value : fallback;
 }
@@ -59,6 +65,7 @@ export function createFlowConnectorTreatmentConfig(
     lineCap: resolveLineCap(overrides.lineCap, "round"),
     opacity: boundedNumber(overrides.opacity, 1, 0, 1),
     radius: boundedNumber(overrides.radius, 5, 0, 48),
+    strokeColor: resolveCssColor(overrides.strokeColor, "#4ade80"),
     strokeWidth: boundedNumber(overrides.strokeWidth, 9, 1, 32),
     zIndex: boundedNumber(overrides.zIndex, 10, 0, 30)
   };
@@ -75,6 +82,7 @@ export function resolveFlowConnectorTreatmentConfig(
     lineCap: resolveLineCap(source.lineCap, fallbackConfig.lineCap),
     opacity: boundedNumber(source.opacity, fallbackConfig.opacity, 0, 1),
     radius: boundedNumber(source.radius, fallbackConfig.radius, 0, 48),
+    strokeColor: resolveCssColor(source.strokeColor, fallbackConfig.strokeColor),
     strokeWidth: boundedNumber(source.strokeWidth, fallbackConfig.strokeWidth, 1, 32),
     zIndex: boundedNumber(source.zIndex, fallbackConfig.zIndex, 0, 30)
   };
@@ -147,6 +155,7 @@ export function buildFlowConnectorTreatmentFields({
     lineCap: true,
     opacity: true,
     radius: true,
+    strokeColor: true,
     strokeWidth: true,
     zIndex: true,
     ...support
@@ -162,6 +171,17 @@ export function buildFlowConnectorTreatmentFields({
       path: [...path, "strokeWidth"],
       unit: "px"
     }));
+  }
+  if (resolvedSupport.strokeColor) {
+    fields.push({
+      constraints: { required: true },
+      fieldType: "text",
+      group: "Flow Treatment",
+      id: `${idPrefix}-connector-stroke-color`,
+      label: "Connector Stroke Color",
+      path: [...path, "strokeColor"],
+      resettable: true
+    });
   }
   if (resolvedSupport.opacity) {
     fields.push(numberField({
@@ -267,6 +287,7 @@ export function buildFlowConnectorTreatmentStyle(
     opacity: treatment.opacity,
     zIndex: treatment.zIndex,
     ["--display-flow-connector-line-cap" as string]: treatment.lineCap,
+    ["--display-flow-connector-stroke-color" as string]: treatment.strokeColor,
     ["--display-flow-connector-stroke-width" as string]: `${treatment.strokeWidth}px`
   };
 }

@@ -24,6 +24,7 @@ test("flow treatment helpers create bounded seed-backed connector tokens and fie
     lineCap: "square",
     opacity: 0.62,
     radius: 8,
+    strokeColor: "#4ade80",
     strokeWidth: 12,
     zIndex: 14
   });
@@ -44,6 +45,7 @@ test("flow treatment helpers create bounded seed-backed connector tokens and fie
     }).map((field) => field.id),
     [
       "solar-solarToInverter-connector-stroke-width",
+      "solar-solarToInverter-connector-stroke-color",
       "solar-solarToInverter-connector-opacity",
       "solar-solarToInverter-connector-line-cap",
       "solar-solarToInverter-connector-radius",
@@ -55,6 +57,7 @@ test("flow treatment helpers create bounded seed-backed connector tokens and fie
     opacity: 0.62,
     zIndex: 14,
     "--display-flow-connector-line-cap": "square",
+    "--display-flow-connector-stroke-color": "#4ade80",
     "--display-flow-connector-stroke-width": "12px"
   });
   assert.deepEqual(
@@ -66,6 +69,7 @@ test("flow treatment helpers create bounded seed-backed connector tokens and fie
       lineCap: "butt",
       opacity: 0.7,
       radius: 4,
+      strokeColor: "#4ade80",
       strokeWidth: 16,
       zIndex: 9
     }

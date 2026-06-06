@@ -211,6 +211,7 @@ test("display editor exposes bounded flow treatment fields only for supported co
       .map((field) => field.schema.id),
     [
       "solar-solarToInverter-connector-stroke-width",
+      "solar-solarToInverter-connector-stroke-color",
       "solar-solarToInverter-connector-opacity",
       "solar-solarToInverter-connector-line-cap",
       "solar-solarToInverter-connector-radius",
@@ -244,6 +245,18 @@ test("display editor exposes bounded flow treatment fields only for supported co
       resettable: true,
       step: 1,
       unit: "px"
+    }
+  );
+  assert.deepEqual(
+    solarConnector.fields.find((field) => field.schema.id === "solar-solarToInverter-connector-stroke-color")?.schema,
+    {
+      constraints: { required: true },
+      fieldType: "text",
+      group: "Flow Treatment",
+      id: "solar-solarToInverter-connector-stroke-color",
+      label: "Connector Stroke Color",
+      path: ["connectorTreatments", "solarToInverter", "strokeColor"],
+      resettable: true
     }
   );
   assert.deepEqual(
