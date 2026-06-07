@@ -59,18 +59,17 @@ test("AlertNotificationsWidget renders an empty state when there are no alerts",
   assert.match(markup, /無警示/);
 });
 
-test("Overview density widgets default visible while alert notifications stay hidden", () => {
+test("Overview bottom density row exposes four widgets visible by default for the Better rhythm", () => {
   const seed = createOverviewDisplayPageSeedConfig();
   const { visible: _visible, ...legacyAlert } = seed.dashboardWidgets.alertNotifications;
 
-  assert.equal(seed.dashboardWidgets.generationTrend.visible, true);
   assert.equal(seed.dashboardWidgets.weather.visible, true);
   assert.equal(seed.dashboardWidgets.phasePower.visible, true);
-  assert.equal(seed.dashboardWidgets.alertNotifications.visible, false);
-  assert.equal(shouldRenderOverviewDashboardWidget(seed.dashboardWidgets.generationTrend), true);
+  assert.equal(seed.dashboardWidgets.generationTrend.visible, true);
+  assert.equal(seed.dashboardWidgets.alertNotifications.visible, true);
+  for (const key of ["weather", "phasePower", "generationTrend", "alertNotifications"] as const) {
+    assert.equal(shouldRenderOverviewDashboardWidget(seed.dashboardWidgets[key]), true);
+  }
+  // Density widgets without an explicit visible flag remain hidden until upgraded.
   assert.equal(shouldRenderOverviewDashboardWidget({ ...legacyAlert }), false);
-  assert.equal(
-    shouldRenderOverviewDashboardWidget({ ...seed.dashboardWidgets.alertNotifications, visible: true }),
-    true
-  );
 });

@@ -41,31 +41,31 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
   assert.deepEqual(overviewKpiLayout.power, {
     height: 188,
     left: 40,
-    top: 874,
+    top: 662,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.today, {
     height: 188,
     left: 412,
-    top: 874,
+    top: 662,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.total, {
     height: 188,
     left: 784,
-    top: 874,
+    top: 662,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.co2Today, {
     height: 188,
     left: 1156,
-    top: 874,
+    top: 662,
     width: 352
   });
   assert.deepEqual(overviewKpiLayout.co2Total, {
     height: 188,
     left: 1528,
-    top: 874,
+    top: 662,
     width: 352
   });
 
@@ -90,7 +90,7 @@ test("overview asset map keeps hero image page-local", () => {
   assert.match(overviewAssetMap.hero.src, /overview-hero-ref\.jpg$/);
 });
 
-test("overview hero, density widget row, and KPI row are non-overlapping vertical bands", () => {
+test("overview hero, KPI row, and density widget row are non-overlapping vertical bands in Better order", () => {
   const seed = createOverviewDisplayPageSeedConfig();
   const heroBottom = overviewHeroLayout.top + overviewHeroLayout.height;
 
@@ -112,10 +112,10 @@ test("overview hero, density widget row, and KPI row are non-overlapping vertica
   const kpiTop = Math.min(...kpiCards.map((card) => card.top));
   const kpiBottom = Math.max(...kpiCards.map((card) => card.top + card.height));
 
-  // Hero band ends before the density row begins.
-  assert.ok(heroBottom <= densityTop, `hero bottom ${heroBottom} <= density top ${densityTop}`);
-  // Density row ends before the KPI row begins.
-  assert.ok(densityBottom <= kpiTop, `density bottom ${densityBottom} <= kpi top ${kpiTop}`);
-  // KPI row fits within the 1080 canvas.
-  assert.ok(kpiBottom <= 1080, `kpi bottom ${kpiBottom} <= 1080`);
+  // Hero band ends before the KPI row begins.
+  assert.ok(heroBottom <= kpiTop, `hero bottom ${heroBottom} <= kpi top ${kpiTop}`);
+  // KPI row sits above the density widget row (Better order: hero → KPI → density).
+  assert.ok(kpiBottom <= densityTop, `kpi bottom ${kpiBottom} <= density top ${densityTop}`);
+  // Density row fits within the 1080 canvas.
+  assert.ok(densityBottom <= 1080, `density bottom ${densityBottom} <= 1080`);
 });

@@ -34,31 +34,31 @@ export const overviewKpiLayout = {
   co2Today: {
     height: 188,
     left: 1156,
-    top: 874,
+    top: 662,
     width: 352
   },
   co2Total: {
     height: 188,
     left: 1528,
-    top: 874,
+    top: 662,
     width: 352
   },
   power: {
     height: 188,
     left: 40,
-    top: 874,
+    top: 662,
     width: 352
   },
   today: {
     height: 188,
     left: 412,
-    top: 874,
+    top: 662,
     width: 352
   },
   total: {
     height: 188,
     left: 784,
-    top: 874,
+    top: 662,
     width: 352
   }
 } as const;

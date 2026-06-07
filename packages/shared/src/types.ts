@@ -22,7 +22,16 @@ export type MetricKey =
   | "factoryLightingPower"
   | "factoryOfficePower"
   | "factoryEvGreenPower"
-  | "factoryInfrastructurePower";
+  | "factoryInfrastructurePower"
+  | "phaseRVoltage"
+  | "phaseRCurrent"
+  | "phaseRPower"
+  | "phaseSVoltage"
+  | "phaseSCurrent"
+  | "phaseSPower"
+  | "phaseTVoltage"
+  | "phaseTCurrent"
+  | "phaseTPower";
 
 export interface MqttTopicMapping {
   id: number;

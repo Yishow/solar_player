@@ -199,6 +199,43 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
   assert.equal(model.summary.statusLabel, "共享故事資料同步中");
 });
 
+test("buildOverviewViewModel flows the realTimePower runtime trend series through without flattening to a constant", () => {
+  const runtimeTrend = [82, 95, 101, 108];
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          label: "故事版即時功率",
+          metricKey: "realTimePower",
+          trendSeries: runtimeTrend,
+          unit: "kW",
+          value: "612"
+        }),
+        createResolvedStoryMetric({ label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh", value: "3,842" })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  const realTimePowerCard = model.metrics.find((metric) => metric.metricKey === "realTimePower");
+  assert.ok(realTimePowerCard, "realTimePower card exists");
+  assert.deepEqual(realTimePowerCard.trendSeries, runtimeTrend);
+  const trend = realTimePowerCard.trendSeries ?? [];
+  assert.ok(trend.length > 1, "trend has multiple points");
+  assert.ok(
+    trend.some((value) => value !== trend[0]),
+    "trend series is not a single flat constant"
+  );
+});
+
 test("buildOverviewViewModel keeps display-story overview bindings when story summary is stale", () => {
   const model = buildOverviewViewModel({
     connectionState: "connected",

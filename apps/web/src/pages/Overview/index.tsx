@@ -30,6 +30,7 @@ import {
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
 import { overviewAssetRuntimeMap } from "./assets";
+import { pickOverviewBackground } from "./backgroundPool";
 import {
   createOverviewDisplayPageSeedConfig,
   resolveOverviewModernDefaultConfig,
@@ -105,7 +106,12 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const weatherSnapshot = useOverviewWeather(runtimeHydrationEnabled);
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(
-    () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
+    () =>
+      createOverviewDisplayPageSeedConfig(
+        overviewAssetRuntimeMap.hero,
+        undefined,
+        overviewAssetRuntimeMap.backgrounds
+      ),
     []
   );
   const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
@@ -115,6 +121,19 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const storyRuntime = useDisplayStoryRuntime("overview", {
     enabled: runtimeHydrationEnabled
   });
+
+  const resolvedConfig = resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig);
+  const backgroundPoolSources = resolvedConfig.backgroundPool.sources;
+  const backgroundPoolSignature = backgroundPoolSources
+    .map((source) => source.src ?? source.assetId ?? "")
+    .join("|");
+  const selectedBackground = useMemo(
+    () => pickOverviewBackground(backgroundPoolSources),
+    // Re-randomise only when the candidate pool changes; each rotation entry
+    // remounts the page (route host `key`), so mount = fresh random pick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [backgroundPoolSignature]
+  );
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -127,7 +146,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     return <DisplayPageLoadingState />;
   }
 
-  const resolvedConfig = resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig);
+  const backgroundSource = selectedBackground
+    ? resolveDisplayPageMediaSource(selectedBackground, selectedBackground.src ?? null)
+    : null;
   const viewModel = buildOverviewViewModel({
     connectionState,
     isSocketConnected,
@@ -242,8 +263,8 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         }}
       >
         <img
-          alt={resolvedConfig.heroMedia.alt}
-          src={heroMediaSource ?? undefined}
+          alt={selectedBackground?.alt ?? resolvedConfig.heroMedia.alt}
+          src={backgroundSource ?? heroMediaSource ?? undefined}
           style={heroMediaPresentation.mediaStyle}
         />
         {heroMediaPresentation.overlayLayers.map((layer) => (

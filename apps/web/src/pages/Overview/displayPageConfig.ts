@@ -188,6 +188,9 @@ export type OverviewDisplayPageConfig = {
       leaf: LeafOrnamentChromeConfig;
     };
   };
+  backgroundPool: {
+    sources: DisplayPageMediaBinding[];
+  };
   heroContainer: OverviewDisplayRect;
   heroCopy: {
     eyebrow: string;
@@ -207,9 +210,18 @@ export type OverviewDisplayPageConfig = {
 
 export function createOverviewDisplayPageSeedConfig(
   heroSrc = "/brand-logo.png",
-  heroAlt = "國瑞汽車中廠綠能展示場域"
+  heroAlt = "國瑞汽車中廠綠能展示場域",
+  backgroundSrcs: readonly string[] = []
 ): OverviewDisplayPageConfig {
   return {
+    backgroundPool: {
+      sources: backgroundSrcs.map((src, index) => ({
+        alt: `Overview 背景候選 ${index + 1}`,
+        fitMode: "cover",
+        sourceMode: "seed-default",
+        src
+      }))
+    },
     cardStyles: {
       co2Today: createDisplayCardStyleConfig(overviewMetricCardStyle),
       co2Total: createDisplayCardStyleConfig(overviewMetricCardStyle),
@@ -273,32 +285,32 @@ export function createOverviewDisplayPageSeedConfig(
     },
     dashboardWidgets: {
       alertNotifications: {
-        height: 220,
-        left: 1324,
-        top: 500,
-        visible: false,
-        width: 520
+        height: 196,
+        left: 1435,
+        top: 874,
+        visible: true,
+        width: 445
       },
       generationTrend: {
         height: 196,
-        left: 1116,
-        top: 662,
+        left: 970,
+        top: 874,
         visible: true,
-        width: 764
+        width: 445
       },
       phasePower: {
         height: 196,
-        left: 470,
-        top: 662,
+        left: 505,
+        top: 874,
         visible: true,
-        width: 624
+        width: 445
       },
       weather: {
         height: 196,
         left: 40,
-        top: 662,
+        top: 874,
         visible: true,
-        width: 408
+        width: 445
       }
     },
     iconSources: {
@@ -360,8 +372,14 @@ export function resolveOverviewModernDefaultConfig(
     ])
   ) as OverviewDisplayPageConfig["cardStyles"];
 
+  const persistedBackgroundPoolSources = (config as Partial<OverviewDisplayPageConfig>).backgroundPool?.sources;
+  const backgroundPool = Array.isArray(persistedBackgroundPoolSources)
+    ? { sources: persistedBackgroundPoolSources }
+    : seedConfig.backgroundPool;
+
   return {
     ...config,
+    backgroundPool,
     cardStyles,
     chrome: {
       ...config.chrome,
@@ -572,6 +590,32 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       path: ["chrome", "ornaments", "leaf"]
     }),
     presetKey: "overview-leaf"
+  },
+  {
+    id: "overview-background-pool",
+    label: "Overview Background Pool",
+    description: "管理 Overview 滿版背景候選圖池，可新增/移除候選並指定來源；輪播進入時隨機選一張，池空時回退 hero。",
+    fields: [
+      {
+        fieldType: "array",
+        id: "background-pool-sources",
+        itemFields: [
+          {
+            constraints: { required: true },
+            fieldType: "asset",
+            id: "src",
+            label: "Image Source",
+            path: ["src"],
+            placeholder: "/uploads/images/overview-bg.png"
+          },
+          { fieldType: "text", id: "alt", label: "Image Alt", path: ["alt"] }
+        ],
+        itemLabel: "Background Candidate",
+        label: "Background Candidates",
+        path: ["backgroundPool", "sources"]
+      }
+    ],
+    presetKey: "overview-background-pool"
   },
   ...overviewDashboardWidgetRegions.map<DisplayEditorRegionSchema>(({ description, id, key, label }) => ({
     id,

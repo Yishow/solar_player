@@ -43,8 +43,8 @@ test("overview display page seed config captures the current default hero contra
   assert.equal(config.chrome.heroTypography.titleFontSize, 92);
   assert.equal(config.cardStyles.power.valueFontSize, 58);
   assert.equal(config.cardStyles.power.paddingTop, 18);
-  assert.equal(config.cardStyles.power.paddingBottom, 18);
-  assert.equal(config.cardStyles.power.cornerRadius, 20);
+  assert.equal(config.cardStyles.power.paddingBottom, 16);
+  assert.equal(config.cardStyles.power.cornerRadius, 22);
   const heroFadeLayers = config.heroMedia.effects?.layers ?? [];
   const fadeCoverage = (zone: string) => {
     const layer = heroFadeLayers.find((entry) => entry.kind === "fade" && entry.zone === zone);
@@ -81,13 +81,13 @@ test("overview KPI editor regions expose visibility toggles and proportional res
   }
 });
 
-test("overview dashboard widget regions default hidden and expose visibility toggles", () => {
+test("overview dashboard widget regions default visible and expose visibility toggles", () => {
   const config = createOverviewDisplayPageSeedConfig();
   const widgetRegions = overviewDisplayPageEditorRegions.filter((region) => region.id.startsWith("overview-widget-"));
 
-  assert.equal(config.dashboardWidgets.generationTrend.visible, false);
-  assert.equal(config.dashboardWidgets.alertNotifications.visible, false);
-  assert.equal(widgetRegions.length, 2);
+  assert.equal(config.dashboardWidgets.generationTrend.visible, true);
+  assert.equal(config.dashboardWidgets.alertNotifications.visible, true);
+  assert.equal(widgetRegions.length, 4);
   for (const region of widgetRegions) {
     const key = region.id.replace("overview-widget-", "");
 
@@ -165,11 +165,16 @@ test("overview runtime upgrades persisted legacy defaults without overriding cus
     chrome: {
       ...seed.chrome,
       heroTypography: {
-        ...seed.chrome.heroTypography,
+        eyebrowFontSize: 26,
+        eyebrowLetterSpacing: 5,
         eyebrowMarginBottom: 20,
+        subtitleFontSize: 26,
+        subtitleLineHeight: 1.35,
         subtitleMarginTop: 30,
+        titleEmphasisWeight: 900,
         titleFontSize: 84,
-        titleLetterSpacing: 4
+        titleLetterSpacing: 4,
+        titleLineHeight: 1.15
       }
     },
     heroContainer: {

@@ -42,7 +42,16 @@ const defaultMetricOptions = [
   "factoryLightingPower",
   "factoryOfficePower",
   "factoryEvGreenPower",
-  "factoryInfrastructurePower"
+  "factoryInfrastructurePower",
+  "phaseRVoltage",
+  "phaseRCurrent",
+  "phaseRPower",
+  "phaseSVoltage",
+  "phaseSCurrent",
+  "phaseSPower",
+  "phaseTVoltage",
+  "phaseTCurrent",
+  "phaseTPower"
 ] as const;
 
 type MqttSettingsResponse = {

@@ -729,8 +729,17 @@ function renderField(
         {label}
         {items.map((item, index) => (
           <div key={`${displayEditorPathKey(field.path)}-${index}`} className="grid gap-3 rounded-[14px] bg-white p-3">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--shell-subtitle-ink)]">
-              {localizeDisplayEditorLabel(arraySchema.itemLabel)} {index + 1}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--shell-subtitle-ink)]">
+                {localizeDisplayEditorLabel(arraySchema.itemLabel)} {index + 1}
+              </span>
+              <button
+                type="button"
+                className="rounded-full border border-[var(--shell-divider)] px-2 py-1 text-[11px] font-semibold text-[var(--shell-copy-ink)]"
+                onClick={() => onChange(field.path, items.filter((_, itemIndex) => itemIndex !== index))}
+              >
+                {localizeDisplayEditorLabel("Remove")}
+              </button>
             </div>
             <div className="grid gap-3">
               {arraySchema.itemFields.map((itemField) =>
@@ -749,6 +758,13 @@ function renderField(
             </div>
           </div>
         ))}
+        <button
+          type="button"
+          className="justify-self-start rounded-full border border-[var(--shell-divider)] px-3 py-1.5 text-[12px] font-semibold text-[var(--shell-copy-ink)]"
+          onClick={() => onChange(field.path, [...items, {}])}
+        >
+          {localizeDisplayEditorLabel("Add")}
+        </button>
       </div>
     );
   }

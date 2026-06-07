@@ -39,3 +39,29 @@ test("mqtt settings computes broker topic and weather draft scopes before render
   );
   assert.match(mqttSettingsSource, /draftSections=\{draftSections\}/);
 });
+
+test("mqtt settings lists three-phase metric keys as creatable, manageable topic mappings", () => {
+  const optionsBlock = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const defaultMetricOptions = ["),
+    mqttSettingsSource.indexOf("] as const;", mqttSettingsSource.indexOf("const defaultMetricOptions = ["))
+  );
+
+  const threePhaseMetricKeys = [
+    "phaseRVoltage",
+    "phaseRCurrent",
+    "phaseRPower",
+    "phaseSVoltage",
+    "phaseSCurrent",
+    "phaseSPower",
+    "phaseTVoltage",
+    "phaseTCurrent",
+    "phaseTPower"
+  ];
+
+  for (const metricKey of threePhaseMetricKeys) {
+    assert.ok(
+      optionsBlock.includes(`"${metricKey}"`),
+      `expected ${metricKey} to be a creatable metric option`
+    );
+  }
+});

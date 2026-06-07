@@ -944,3 +944,84 @@ test("buildMqttSettingsViewModel exposes section draft guidance topic impact gro
     "請先選擇測站，才能確認 header 會顯示哪個站點。"
   );
 });
+
+const threePhaseMetricKeys = [
+  "phaseRVoltage",
+  "phaseRCurrent",
+  "phaseRPower",
+  "phaseSVoltage",
+  "phaseSCurrent",
+  "phaseSPower",
+  "phaseTVoltage",
+  "phaseTCurrent",
+  "phaseTPower"
+] as const;
+
+test("buildMqttSettingsViewModel resolves non-empty labels for three-phase metric keys", () => {
+  const model = buildMqttSettingsViewModel({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: {
+      metrics: {},
+      timestamp: null
+    },
+    message: "",
+    readiness: null,
+    settings: {
+      clientId: "kuozui-green-display-01",
+      dataMode: "mqtt",
+      host: "broker.internal",
+      messageTimeout: "30",
+      password: "****",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: "kuozui_display"
+    },
+    status: {
+      broker: "broker.internal:1883",
+      clientId: "kuozui-green-display-01",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-13T10:05:00.000Z"
+    },
+    topics: threePhaseMetricKeys.map((metricKey, index) => ({
+      enabled: true,
+      id: index + 1,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey,
+      quality: null,
+      rawPayload: null,
+      topic: `kuozui/plant/phase/${metricKey}`,
+      unit: "",
+      updatedAt: null,
+      valuePath: "$.value"
+    })),
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
+  });
+
+  for (const metricKey of threePhaseMetricKeys) {
+    const row = model.liveTopicRows.find((topic) => topic.metricKey === metricKey);
+    assert.ok(row, `expected a topic row for ${metricKey}`);
+    assert.notEqual(row?.metricLabelZh, "", `expected a non-empty zh label for ${metricKey}`);
+    assert.notEqual(row?.metricLabelEn, "", `expected a non-empty en label for ${metricKey}`);
+    assert.notEqual(
+      row?.metricLabelZh,
+      metricKey,
+      `expected a human-readable zh label for ${metricKey}, not the raw key`
+    );
+  }
+});
