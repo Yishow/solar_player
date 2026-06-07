@@ -24,7 +24,9 @@ export function GenerationTrendWidget({
       <DisplayCardHeader subtitle="Generation Trend" title="發電趨勢" />
       {hasSeries ? (
         <>
-          <Sparkline className="overview-widget-trend-sparkline" values={series} />
+          <div className="overview-trend-area">
+            <Sparkline className="overview-widget-trend-sparkline" values={series} />
+          </div>
           <DisplayCardFooter className="overview-widget-meta">
             <span>{formatTrendValue(series[0]!)}</span>
             <span>{formatTrendValue(series[series.length - 1]!)}</span>

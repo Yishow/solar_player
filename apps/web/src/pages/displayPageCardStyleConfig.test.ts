@@ -25,7 +25,7 @@ test("display page seed configs persist card style records separately from geome
   const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
 
   assert.equal(overview.cardStyles.summary.titleFontSize, 13);
-  assert.equal(overview.cardStyles.power.valueFontSize, 68);
+  assert.equal(overview.cardStyles.power.valueFontSize, 58);
   assert.equal(solar.cardStyles.generation.valueRowAlign, "center");
   assert.equal(images.cardStyles.infoPanel.titleFontSize, 28);
   assert.equal(sustainability.cardStyles.totalGeneration.valueFontSize, 66);
@@ -33,7 +33,7 @@ test("display page seed configs persist card style records separately from geome
 
   assert.equal(overview.summaryCard.width, 520);
   assert.equal(overview.kpiCards.power.width, 352);
-  assert.equal(overview.kpiCards.power.height, 232);
+  assert.equal(overview.kpiCards.power.height, 188);
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(images.infoPanel.width, 398);
   assert.equal(sustainability.statCards.esg.height, 232);
@@ -73,4 +73,32 @@ test("display card style configs normalize invalid tokens back to the shared bas
   assert.equal(resolved.paddingTop, 26);
   assert.equal(resolved.titleFontSize, 20);
   assert.equal(resolved.valueRowAlign, "start");
+});
+
+test("card surface tokens default to an opaque non-frosted baseline", () => {
+  const resolved = createDisplayCardStyleConfig();
+
+  // Defaults must keep existing pages visually unchanged: fully opaque, no blur.
+  assert.equal(resolved.surfaceOpacity, 1);
+  assert.equal(resolved.surfaceBlur, 0);
+  assert.equal(resolved.shadowStrength, 1);
+});
+
+test("card surface tokens accept frosted-glass overrides and clamp invalid values", () => {
+  const frosted = createDisplayCardStyleConfig({
+    shadowStrength: 1.4,
+    surfaceBlur: 16,
+    surfaceOpacity: 0.62
+  });
+  assert.equal(frosted.surfaceOpacity, 0.62);
+  assert.equal(frosted.surfaceBlur, 16);
+  assert.equal(frosted.shadowStrength, 1.4);
+
+  const invalid = createDisplayCardStyleConfig({
+    surfaceBlur: -4 as never,
+    surfaceOpacity: 5 as never
+  });
+  // Opacity clamps into 0..1, blur stays non-negative.
+  assert.equal(invalid.surfaceOpacity, 1);
+  assert.equal(invalid.surfaceBlur, 0);
 });

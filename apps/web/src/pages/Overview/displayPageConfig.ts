@@ -28,20 +28,23 @@ import {
 import { overviewHeroLayout, overviewKpiLayout } from "./layout";
 
 const overviewMetricCardStyle = {
-  cornerRadius: 20,
-  footerPaddingTop: 12,
-  headerGap: 14,
-  iconBoxSize: 54,
-  paddingBottom: 18,
-  paddingLeft: 24,
-  paddingRight: 24,
-  paddingTop: 22,
-  subtitleFontSize: 13,
-  titleFontSize: 18,
-  unitFontSize: 18,
-  unitPaddingBottom: 5,
-  valueFontSize: 68,
-  valueMarginTop: 20,
+  cornerRadius: 22,
+  footerPaddingTop: 10,
+  headerGap: 12,
+  iconBoxSize: 48,
+  paddingBottom: 16,
+  paddingLeft: 22,
+  paddingRight: 22,
+  paddingTop: 18,
+  shadowStrength: 1.3,
+  subtitleFontSize: 12,
+  surfaceBlur: 16,
+  surfaceOpacity: 0.66,
+  titleFontSize: 17,
+  unitFontSize: 17,
+  unitPaddingBottom: 6,
+  valueFontSize: 58,
+  valueMarginTop: 12,
   valueRowAlign: "center"
 } as const;
 
@@ -155,7 +158,11 @@ export type OverviewKpiCardConfig = OverviewDisplayRect & {
   visible: boolean;
 };
 
-export type OverviewDashboardWidgetKey = "alertNotifications" | "generationTrend";
+export type OverviewDashboardWidgetKey =
+  | "alertNotifications"
+  | "generationTrend"
+  | "phasePower"
+  | "weather";
 
 export type OverviewDashboardWidgetConfig = OverviewDisplayRect & {
   visible: boolean;
@@ -220,15 +227,15 @@ export function createOverviewDisplayPageSeedConfig(
     },
     chrome: {
       heroTypography: createHeroTypographyConfig({
-        eyebrowFontSize: 26,
-        eyebrowLetterSpacing: 5,
-        eyebrowMarginBottom: 18,
-        subtitleFontSize: 26,
-        subtitleLineHeight: 1.35,
-        subtitleMarginTop: 24,
+        eyebrowFontSize: 24,
+        eyebrowLetterSpacing: 6,
+        eyebrowMarginBottom: 22,
+        subtitleFontSize: 24,
+        subtitleLineHeight: 1.4,
+        subtitleMarginTop: 28,
         titleEmphasisWeight: 900,
-        titleFontSize: 82,
-        titleLetterSpacing: 3
+        titleFontSize: 92,
+        titleLetterSpacing: 4
       }),
       ornaments: {
         goldLine: createGoldLineChromeConfig({
@@ -250,8 +257,8 @@ export function createOverviewDisplayPageSeedConfig(
     },
     heroCopyLayout: {
       left: 86,
-      top: 210,
-      width: 600
+      top: 196,
+      width: 620
     },
     heroMedia: {
       alignX: 1,
@@ -273,11 +280,25 @@ export function createOverviewDisplayPageSeedConfig(
         width: 520
       },
       generationTrend: {
-        height: 220,
-        left: 784,
-        top: 500,
-        visible: false,
-        width: 520
+        height: 196,
+        left: 1116,
+        top: 662,
+        visible: true,
+        width: 764
+      },
+      phasePower: {
+        height: 196,
+        left: 470,
+        top: 662,
+        visible: true,
+        width: 624
+      },
+      weather: {
+        height: 196,
+        left: 40,
+        top: 662,
+        visible: true,
+        width: 408
       }
     },
     iconSources: {
@@ -360,6 +381,18 @@ export function resolveOverviewModernDefaultConfig(
 }
 
 const overviewDashboardWidgetRegions = [
+  {
+    description: "調整天氣卡 widget geometry 與顯示狀態。",
+    id: "overview-widget-weather",
+    key: "weather",
+    label: "Overview Widget Weather"
+  },
+  {
+    description: "調整三相電力表 widget geometry 與顯示狀態。",
+    id: "overview-widget-phasePower",
+    key: "phasePower",
+    label: "Overview Widget Phase Power"
+  },
   {
     description: "調整發電趨勢 widget geometry 與顯示狀態。",
     id: "overview-widget-generationTrend",

@@ -39,10 +39,10 @@ test("overview display page seed config captures the current default hero contra
 
   assert.equal(config.heroCopy.eyebrow, "綠能驅動・永續未來");
   assert.deepEqual(config.heroCopy.titleLines, ["以綠色製造", "驅動美好生活"]);
-  assert.deepEqual(config.heroCopyLayout, { left: 86, top: 210, width: 600 });
-  assert.equal(config.chrome.heroTypography.titleFontSize, 82);
-  assert.equal(config.cardStyles.power.valueFontSize, 68);
-  assert.equal(config.cardStyles.power.paddingTop, 22);
+  assert.deepEqual(config.heroCopyLayout, { left: 86, top: 196, width: 620 });
+  assert.equal(config.chrome.heroTypography.titleFontSize, 92);
+  assert.equal(config.cardStyles.power.valueFontSize, 58);
+  assert.equal(config.cardStyles.power.paddingTop, 18);
   assert.equal(config.cardStyles.power.paddingBottom, 18);
   assert.equal(config.cardStyles.power.cornerRadius, 20);
   const heroFadeLayers = config.heroMedia.effects?.layers ?? [];

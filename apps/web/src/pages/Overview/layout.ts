@@ -5,9 +5,9 @@ export const overviewTitleLayout = {
 } as const;
 
 export const overviewHeroLayout = {
-  height: 690,
+  height: 466,
   left: 540,
-  top: 182,
+  top: 176,
   width: 1340
 } as const;
 
@@ -32,33 +32,33 @@ export const overviewSummaryLayout = {
 
 export const overviewKpiLayout = {
   co2Today: {
-    height: 232,
+    height: 188,
     left: 1156,
-    top: 758,
+    top: 874,
     width: 352
   },
   co2Total: {
-    height: 232,
+    height: 188,
     left: 1528,
-    top: 758,
+    top: 874,
     width: 352
   },
   power: {
-    height: 232,
+    height: 188,
     left: 40,
-    top: 758,
+    top: 874,
     width: 352
   },
   today: {
-    height: 232,
+    height: 188,
     left: 412,
-    top: 758,
+    top: 874,
     width: 352
   },
   total: {
-    height: 232,
+    height: 188,
     left: 784,
-    top: 758,
+    top: 874,
     width: 352
   }
 } as const;

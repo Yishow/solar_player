@@ -29,7 +29,7 @@ test("display page seed configs persist page chrome groups separately from card 
   const images = createImagesDisplayPageSeedConfig("/images-main.jpg");
   const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
 
-  assert.equal(overview.chrome.heroTypography.titleFontSize, 82);
+  assert.equal(overview.chrome.heroTypography.titleFontSize, 92);
   assert.equal(overview.chrome.ornaments.goldLine.thickness, 1);
   assert.equal(solar.chrome.ornaments.leaf.scale, 1);
   assert.equal(factory.chrome.modules.statusBlock.titleFontSize, 18);
@@ -41,7 +41,7 @@ test("display page seed configs persist page chrome groups separately from card 
   assert.equal(sustainability.chrome.modules.periodChips.fontSize, 17);
   assert.equal(sustainability.chrome.modules.provenance.fontSize, 15);
 
-  assert.equal(overview.cardStyles.power.valueFontSize, 68);
+  assert.equal(overview.cardStyles.power.valueFontSize, 58);
   assert.equal(images.mainStage.src, "/images-main.jpg");
   assert.equal(factory.statusBlock.width, 430);
 });

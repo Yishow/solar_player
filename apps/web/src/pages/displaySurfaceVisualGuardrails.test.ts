@@ -216,8 +216,8 @@ test("display seed configs keep protected FHD geometry fixtures stable across th
   const images = createImagesDisplayPageSeedConfig("/images-main.jpg");
   const sustainability = createSustainabilityDisplayPageSeedConfig("/sustainability-hero.jpg");
 
-  assert.deepEqual(overview.heroCopyLayout, { left: 86, top: 210, width: 600 });
-  assert.deepEqual(overview.heroContainer, { height: 690, left: 540, top: 182, width: 1340 });
+  assert.deepEqual(overview.heroCopyLayout, { left: 86, top: 196, width: 620 });
+  assert.deepEqual(overview.heroContainer, { height: 466, left: 540, top: 176, width: 1340 });
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(factory.statusBlock.width, 430);
   assert.equal(images.infoPanel.width, 398);

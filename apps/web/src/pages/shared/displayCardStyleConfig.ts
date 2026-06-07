@@ -12,7 +12,10 @@ export type DisplayCardStyleConfig = {
   paddingLeft: number;
   paddingRight: number;
   paddingTop: number;
+  shadowStrength: number;
   subtitleFontSize: number;
+  surfaceBlur: number;
+  surfaceOpacity: number;
   titleFontSize: number;
   unitFontSize: number;
   unitPaddingBottom: number;
@@ -28,6 +31,12 @@ export const displayCardValueRowAlignOptions = [
 
 function resolveNonNegativeNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function resolveUnitInterval(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
+    ? value
+    : fallback;
 }
 
 function resolveValueRowAlign(value: unknown, fallback: DisplayCardValueRowAlign): DisplayCardValueRowAlign {
@@ -46,7 +55,10 @@ export function createDisplayCardStyleConfig(
     paddingLeft: resolveNonNegativeNumber(overrides.paddingLeft, 26),
     paddingRight: resolveNonNegativeNumber(overrides.paddingRight, 26),
     paddingTop: resolveNonNegativeNumber(overrides.paddingTop, 26),
+    shadowStrength: resolveNonNegativeNumber(overrides.shadowStrength, 1),
     subtitleFontSize: resolveNonNegativeNumber(overrides.subtitleFontSize, 14),
+    surfaceBlur: resolveNonNegativeNumber(overrides.surfaceBlur, 0),
+    surfaceOpacity: resolveUnitInterval(overrides.surfaceOpacity, 1),
     titleFontSize: resolveNonNegativeNumber(overrides.titleFontSize, 20),
     unitFontSize: resolveNonNegativeNumber(overrides.unitFontSize, 16),
     unitPaddingBottom: resolveNonNegativeNumber(overrides.unitPaddingBottom, 6),
@@ -63,7 +75,10 @@ export function buildDisplayCardStyleVars(cardStyle: DisplayCardStyleConfig): CS
     ["--display-card-icon-box-size" as string]: `${cardStyle.iconBoxSize}px`,
     ["--display-card-padding" as string]: `${cardStyle.paddingTop}px ${cardStyle.paddingRight}px ${cardStyle.paddingBottom}px ${cardStyle.paddingLeft}px`,
     ["--display-card-radius" as string]: `${cardStyle.cornerRadius}px`,
+    ["--display-card-shadow-strength" as string]: `${cardStyle.shadowStrength}`,
     ["--display-card-subtitle-size" as string]: `${cardStyle.subtitleFontSize}px`,
+    ["--display-card-surface-blur" as string]: `${cardStyle.surfaceBlur}px`,
+    ["--display-card-surface-opacity" as string]: `${cardStyle.surfaceOpacity}`,
     ["--display-card-title-size" as string]: `${cardStyle.titleFontSize}px`,
     ["--display-card-unit-padding-bottom" as string]: `${cardStyle.unitPaddingBottom}px`,
     ["--display-card-unit-size" as string]: `${cardStyle.unitFontSize}px`,
@@ -177,6 +192,29 @@ export function buildDisplayCardStyleFields({
       id: `${idPrefix}-card-unit-padding-bottom`,
       label: "Unit Padding Bottom",
       path: [...path, "unitPaddingBottom"]
+    },
+    {
+      constraints: { max: 1, min: 0 },
+      fieldType: "number",
+      id: `${idPrefix}-card-surface-opacity`,
+      label: "Surface Opacity",
+      path: [...path, "surfaceOpacity"],
+      step: 0.02
+    },
+    {
+      constraints: { min: 0 },
+      fieldType: "number",
+      id: `${idPrefix}-card-surface-blur`,
+      label: "Surface Blur",
+      path: [...path, "surfaceBlur"]
+    },
+    {
+      constraints: { min: 0 },
+      fieldType: "number",
+      id: `${idPrefix}-card-shadow-strength`,
+      label: "Shadow Strength",
+      path: [...path, "shadowStrength"],
+      step: 0.1
     },
     {
       fieldType: "select",

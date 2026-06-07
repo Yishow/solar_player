@@ -14,8 +14,104 @@ import {
   resolveMonitoringMetricBinding,
   resolveMonitoringSummaryState
 } from "@solar-display/shared";
+import type { WeatherCurrentSnapshot } from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+
+const DENSITY_VALUE_PLACEHOLDER = "--";
+
+type OverviewPhaseId = "R" | "S" | "T";
+
+export type OverviewPhaseRow = {
+  available: boolean;
+  current: string;
+  id: OverviewPhaseId;
+  power: string;
+  voltage: string;
+};
+
+const overviewPhaseIds: OverviewPhaseId[] = ["R", "S", "T"];
+
+export type OverviewWeatherViewModel = {
+  available: boolean;
+  condition: string;
+  humidity: string;
+  location: string;
+  observedAt: string;
+  temperature: string;
+};
+
+export type OverviewPhasePowerViewModel = {
+  available: boolean;
+  phases: OverviewPhaseRow[];
+};
+
+function readFiniteMetric(snapshot: LiveMetricsSnapshot, key: string): number | null {
+  const reading = snapshot.metrics[key];
+  if (!reading || typeof reading.value !== "number" || !Number.isFinite(reading.value)) {
+    return null;
+  }
+
+  return reading.value;
+}
+
+function formatPhaseValue(value: number | null, fractionDigits: number): string {
+  if (value === null) {
+    return DENSITY_VALUE_PLACEHOLDER;
+  }
+
+  return value.toFixed(fractionDigits);
+}
+
+function buildOverviewPhasePower(snapshot: LiveMetricsSnapshot) {
+  const phases = overviewPhaseIds.map<OverviewPhaseRow>((id) => {
+    const voltage = readFiniteMetric(snapshot, `phase${id}Voltage`);
+    const current = readFiniteMetric(snapshot, `phase${id}Current`);
+    const power = readFiniteMetric(snapshot, `phase${id}Power`);
+
+    return {
+      available: voltage !== null || current !== null || power !== null,
+      current: formatPhaseValue(current, 1),
+      id,
+      power: formatPhaseValue(power, 2),
+      voltage: formatPhaseValue(voltage, 1)
+    };
+  });
+
+  return {
+    available: phases.some((phase) => phase.available),
+    phases
+  };
+}
+
+function buildOverviewWeather(weatherSnapshot?: WeatherCurrentSnapshot) {
+  if (
+    weatherSnapshot === undefined ||
+    weatherSnapshot.fetchState !== "fresh" ||
+    weatherSnapshot.airTemperature === null
+  ) {
+    return {
+      available: false as const,
+      condition: DENSITY_VALUE_PLACEHOLDER,
+      humidity: DENSITY_VALUE_PLACEHOLDER,
+      location: "",
+      observedAt: "",
+      temperature: DENSITY_VALUE_PLACEHOLDER
+    };
+  }
+
+  return {
+    available: true as const,
+    condition: weatherSnapshot.weather ?? DENSITY_VALUE_PLACEHOLDER,
+    humidity:
+      weatherSnapshot.relativeHumidity === null
+        ? DENSITY_VALUE_PLACEHOLDER
+        : `${Math.round(weatherSnapshot.relativeHumidity)}%`,
+    location: weatherSnapshot.stationName ?? weatherSnapshot.countyName ?? "",
+    observedAt: weatherSnapshot.observationTime ?? "",
+    temperature: `${Math.round(weatherSnapshot.airTemperature)}°C`
+  };
+}
 
 type OverviewMetricKey =
   | "realTimePower"
@@ -68,6 +164,7 @@ type BuildOverviewViewModelArgs = {
     };
   };
   summaryMetricKeys?: OverviewMetricKey[];
+  weatherSnapshot?: WeatherCurrentSnapshot;
 };
 
 export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
@@ -352,7 +449,8 @@ export function buildOverviewViewModel({
   now,
   snapshot,
   storyOverview,
-  summaryMetricKeys
+  summaryMetricKeys,
+  weatherSnapshot
 }: BuildOverviewViewModelArgs) {
   const hasStoryOverview = storyOverview !== undefined;
   const storyMetrics = hasStoryOverview ? storyOverview.metrics.filter(isResolvedStoryMetric) : [];
@@ -447,6 +545,7 @@ export function buildOverviewViewModel({
       titleLines: ["以綠色製造", "驅動美好生活"]
     },
     metrics,
+    phasePower: buildOverviewPhasePower(snapshot),
     summary: {
       alertTone: summaryState.alertTone,
       fallbackReason: summaryState.fallbackReason,
@@ -456,6 +555,7 @@ export function buildOverviewViewModel({
         usesSharedStory: hasStoryOverview,
         summaryState
       })
-    }
+    },
+    weather: buildOverviewWeather(weatherSnapshot)
   };
 }

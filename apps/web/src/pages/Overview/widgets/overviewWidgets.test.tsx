@@ -59,16 +59,18 @@ test("AlertNotificationsWidget renders an empty state when there are no alerts",
   assert.match(markup, /無警示/);
 });
 
-test("Overview dashboard widget visibility defaults to hidden", () => {
+test("Overview density widgets default visible while alert notifications stay hidden", () => {
   const seed = createOverviewDisplayPageSeedConfig();
-  const { visible: _visible, ...legacyGenerationTrend } = seed.dashboardWidgets.generationTrend;
+  const { visible: _visible, ...legacyAlert } = seed.dashboardWidgets.alertNotifications;
 
-  assert.equal(seed.dashboardWidgets.generationTrend.visible, false);
+  assert.equal(seed.dashboardWidgets.generationTrend.visible, true);
+  assert.equal(seed.dashboardWidgets.weather.visible, true);
+  assert.equal(seed.dashboardWidgets.phasePower.visible, true);
   assert.equal(seed.dashboardWidgets.alertNotifications.visible, false);
-  assert.equal(shouldRenderOverviewDashboardWidget(seed.dashboardWidgets.generationTrend), false);
-  assert.equal(shouldRenderOverviewDashboardWidget({ ...legacyGenerationTrend }), false);
+  assert.equal(shouldRenderOverviewDashboardWidget(seed.dashboardWidgets.generationTrend), true);
+  assert.equal(shouldRenderOverviewDashboardWidget({ ...legacyAlert }), false);
   assert.equal(
-    shouldRenderOverviewDashboardWidget({ ...seed.dashboardWidgets.generationTrend, visible: true }),
+    shouldRenderOverviewDashboardWidget({ ...seed.dashboardWidgets.alertNotifications, visible: true }),
     true
   );
 });

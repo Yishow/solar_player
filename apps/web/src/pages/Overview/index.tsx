@@ -17,6 +17,7 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { useOverviewWeather } from "../../hooks/useOverviewWeather";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
@@ -45,6 +46,8 @@ import "./overview.css";
 import { buildOverviewViewModel } from "./viewModel";
 import { AlertNotificationsWidget } from "./widgets/AlertNotificationsWidget";
 import { GenerationTrendWidget } from "./widgets/GenerationTrendWidget";
+import { PhasePowerTableWidget } from "./widgets/PhasePowerTableWidget";
+import { WeatherCardWidget } from "./widgets/WeatherCardWidget";
 
 const CONTENT_TOP_OFFSET = 146;
 
@@ -99,6 +102,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   useBodyClass("page-hero-shell");
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
+  const weatherSnapshot = useOverviewWeather(runtimeHydrationEnabled);
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(
     () => createOverviewDisplayPageSeedConfig(overviewAssetRuntimeMap.hero),
@@ -128,7 +132,8 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     connectionState,
     isSocketConnected,
     snapshot,
-    storyOverview: storyRuntime.payload ?? undefined
+    storyOverview: storyRuntime.payload ?? undefined,
+    weatherSnapshot
   });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
@@ -150,6 +155,8 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const goldLineLayout = withContentOffset(overviewGoldLineLayout);
   const generationTrendLayout = withContentOffset(resolvedConfig.dashboardWidgets.generationTrend);
   const alertNotificationsLayout = withContentOffset(resolvedConfig.dashboardWidgets.alertNotifications);
+  const weatherLayout = withContentOffset(resolvedConfig.dashboardWidgets.weather);
+  const phasePowerLayout = withContentOffset(resolvedConfig.dashboardWidgets.phasePower);
   const generationTrendSeries =
     viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [];
   return (
@@ -294,6 +301,28 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           </DisplayCardFrame>
         );
       })}
+      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.weather) ? (
+        <WeatherCardWidget
+          weather={viewModel.weather}
+          style={{
+            height: `${weatherLayout.height}px`,
+            left: `${weatherLayout.left}px`,
+            top: `${weatherLayout.top}px`,
+            width: `${weatherLayout.width}px`
+          }}
+        />
+      ) : null}
+      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.phasePower) ? (
+        <PhasePowerTableWidget
+          phasePower={viewModel.phasePower}
+          style={{
+            height: `${phasePowerLayout.height}px`,
+            left: `${phasePowerLayout.left}px`,
+            top: `${phasePowerLayout.top}px`,
+            width: `${phasePowerLayout.width}px`
+          }}
+        />
+      ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend) ? (
         <GenerationTrendWidget
           series={generationTrendSeries}
