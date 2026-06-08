@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { ShellDecorationChannel, ShellDecorationObject } from "@solar-display/shared";
 import { defaultBrandView } from "../../hooks/useBrandAssets";
 import { AppFooterNav } from "../../components/AppFooterNav";
@@ -16,14 +16,17 @@ import {
 
 const PREVIEW_SCALE = 0.5;
 
-function resolveObjectPreviewFrame(object: ShellDecorationObject) {
+function resolveObjectPreviewFrame(
+  object: ShellDecorationObject,
+  frame: ShellDecorationObject["frame"] = object.frame
+) {
   const topOffset = object.mount === "footer" ? SHELL_CANVAS_SURFACE_HEIGHT - SHELL_CANVAS_FOOTER_HEIGHT : 0;
 
   return {
-    height: object.frame.height * PREVIEW_SCALE,
-    left: object.frame.left * PREVIEW_SCALE,
-    top: (topOffset + object.frame.top) * PREVIEW_SCALE,
-    width: object.frame.width * PREVIEW_SCALE
+    height: frame.height * PREVIEW_SCALE,
+    left: frame.left * PREVIEW_SCALE,
+    top: (topOffset + frame.top) * PREVIEW_SCALE,
+    width: frame.width * PREVIEW_SCALE
   };
 }
 
@@ -34,7 +37,7 @@ type ShellCanvasInteraction = {
   pointerY: number;
 };
 
-export function ShellDecorationPreviewCanvas({
+function ShellDecorationPreviewCanvasImpl({
   channel,
   onSelectObject,
   onUpdateObjectFrame,
@@ -46,12 +49,15 @@ export function ShellDecorationPreviewCanvas({
   selectedObjectId: string | null;
 }) {
   const interactionRef = useRef<ShellCanvasInteraction | null>(null);
+  const [dragFrame, setDragFrame] = useState<{ frame: ShellDecorationObject["frame"]; objectId: string } | null>(null);
   const allObjects = [...channel.headerObjects, ...channel.footerObjects];
+  const resolveActiveFrame = (object: ShellDecorationObject) =>
+    dragFrame?.objectId === object.id ? dragFrame.frame : object.frame;
   const selectedObject = selectedObjectId
     ? allObjects.find((object) => object.id === selectedObjectId) ?? null
     : null;
   const selectedMeasurements = selectedObject
-    ? resolveShellCanvasMeasurements(selectedObject.frame, selectedObject.mount)
+    ? resolveShellCanvasMeasurements(resolveActiveFrame(selectedObject), selectedObject.mount)
     : null;
 
   useEffect(() => {
@@ -68,11 +74,13 @@ export function ShellDecorationPreviewCanvas({
       const nextObject = interaction.handle
         ? applyShellCanvasResize(interaction.object, interaction.handle, delta)
         : applyShellCanvasDrag(interaction.object, delta);
+      setDragFrame({ frame: nextObject.frame, objectId: interaction.object.id });
       onUpdateObjectFrame(interaction.object.id, nextObject.frame);
     };
 
     const handlePointerUp = () => {
       interactionRef.current = null;
+      setDragFrame(null);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -147,7 +155,7 @@ export function ShellDecorationPreviewCanvas({
           aria-label={`Select ${object.id}`}
           data-shell-preview-object={object.id}
           className="absolute rounded-[10px] border border-transparent bg-transparent"
-          style={resolveObjectPreviewFrame(object)}
+          style={resolveObjectPreviewFrame(object, resolveActiveFrame(object))}
           onPointerDown={(event) => beginInteraction(event, object)}
         />
       ))}
@@ -155,7 +163,7 @@ export function ShellDecorationPreviewCanvas({
         <div
           data-shell-preview-selection={selectedObject.id}
           className="absolute rounded-[10px] border-2 border-[rgba(63,122,52,0.88)] bg-[rgba(95,140,80,0.08)]"
-          style={resolveObjectPreviewFrame(selectedObject)}
+          style={resolveObjectPreviewFrame(selectedObject, resolveActiveFrame(selectedObject))}
           onPointerDown={(event) => beginInteraction(event, selectedObject)}
         >
           {(["nw", "ne", "sw", "se"] as const).map((handle) => (
@@ -178,8 +186,8 @@ export function ShellDecorationPreviewCanvas({
           data-shell-measurement={selectedObject.id}
           className="pointer-events-none absolute rounded-full bg-[rgba(52,56,58,0.86)] px-3 py-1 text-[12px] font-semibold text-white"
           style={{
-            left: `${Math.max(8, resolveObjectPreviewFrame(selectedObject).left)}px`,
-            top: `${Math.max(8, resolveObjectPreviewFrame(selectedObject).top - 30)}px`
+            left: `${Math.max(8, resolveObjectPreviewFrame(selectedObject, resolveActiveFrame(selectedObject)).left)}px`,
+            top: `${Math.max(8, resolveObjectPreviewFrame(selectedObject, resolveActiveFrame(selectedObject)).top - 30)}px`
           }}
         >
           {selectedMeasurements.mount.toUpperCase()} · W {selectedMeasurements.width} · H {selectedMeasurements.height} · L {selectedMeasurements.left} · R {selectedMeasurements.right} · T {selectedMeasurements.top} · B {selectedMeasurements.bottom}
@@ -188,3 +196,5 @@ export function ShellDecorationPreviewCanvas({
     </div>
   );
 }
+
+export const ShellDecorationPreviewCanvas = React.memo(ShellDecorationPreviewCanvasImpl);

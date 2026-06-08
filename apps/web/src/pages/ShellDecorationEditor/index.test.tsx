@@ -33,6 +33,7 @@ const routeMetaSource = readFileSync(path.join(import.meta.dirname, "../../app/r
 const routerSource = readFileSync(path.join(import.meta.dirname, "../../app/router.tsx"), "utf8");
 const runtimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
 const editorSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const previewCanvasSource = readFileSync(path.join(import.meta.dirname, "previewCanvas.tsx"), "utf8");
 
 const initialDraft: ShellDecorationEnvelope = {
   footerObjects: [],
@@ -241,6 +242,17 @@ test("shell decoration editor workflow stays on shell draft services instead of 
   assert.match(editorSource, /publishShellDecorations/);
   assert.doesNotMatch(editorSource, /useDisplayPageConfig/);
   assert.doesNotMatch(editorSource, /publishDisplayPageDraft/);
+});
+
+test("shell decoration preview drag syncs frame updates during pointermove instead of waiting for pointerup", () => {
+  assert.match(
+    previewCanvasSource,
+    /const handlePointerMove = \(event: PointerEvent\) => \{[\s\S]*onUpdateObjectFrame\(interaction\.object\.id, nextObject\.frame\);/
+  );
+  assert.doesNotMatch(
+    previewCanvasSource,
+    /const handlePointerUp = \(\) => \{[\s\S]*onUpdateObjectFrame\(pending\.objectId, pending\.frame\);/
+  );
 });
 
 test("shell decoration editor only syncs parent workspace state after initial data hydration", () => {
