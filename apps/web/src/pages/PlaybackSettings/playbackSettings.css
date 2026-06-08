@@ -199,7 +199,7 @@
 .playback-settings-page .ps-bottom-cards {
   position: absolute;
   left: 50px;
-  top: 340px;
+  top: 378px;
   display: grid;
   grid-template-columns: repeat(5, 348px);
   gap: 18px;
