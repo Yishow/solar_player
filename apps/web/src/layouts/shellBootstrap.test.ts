@@ -41,6 +41,7 @@ const weatherContract: WeatherHeaderContract = {
   settings: {
     enabled: true,
     fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+    locationMode: "station",
     preset: "standard"
   }
 };

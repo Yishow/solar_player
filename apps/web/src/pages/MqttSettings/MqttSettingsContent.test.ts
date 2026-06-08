@@ -46,6 +46,7 @@ function createWeatherPreviewContract(overrides: Partial<WeatherHeaderContract> 
     settings: {
       enabled: true,
       fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+      locationMode: "station",
       preset: "standard"
     },
     ...overrides
@@ -462,6 +463,7 @@ test("mqtt settings content renders weather controls and preview inside the weat
         settings: {
           enabled: true,
           fieldKeys: ["weather", "airTemperature"],
+          locationMode: "station",
           preset: "compact"
         }
       }),
@@ -546,6 +548,7 @@ test("mqtt settings content exposes custom field controls and unavailable previe
         settings: {
           enabled: true,
           fieldKeys: ["weather", "dailyHigh"],
+          locationMode: "station",
           preset: "custom"
         }
       }),

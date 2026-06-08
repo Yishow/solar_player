@@ -276,6 +276,7 @@ test("current weather exposes only the safe header settings subset and stays neu
       settings: {
         enabled: false,
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        locationMode: "station",
         preset: "standard"
       }
     });
@@ -374,6 +375,7 @@ test("weather options filter stations by county and current weather returns a no
     assert.deepEqual(currentBody.settings, {
       enabled: true,
       fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+      locationMode: "station",
       preset: "standard"
     });
   } finally {
@@ -425,6 +427,7 @@ test("weather preview resolves pending station selections without mutating persi
       settings: {
         enabled: true,
         fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
         preset: "compact"
       }
     });
@@ -524,6 +527,7 @@ test("current weather reports an explicit unconfigured state when CWA auth is ab
       settings: {
         enabled: false,
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+        locationMode: "station",
         preset: "standard"
       }
     });

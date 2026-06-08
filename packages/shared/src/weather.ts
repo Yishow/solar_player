@@ -76,7 +76,7 @@ export type HeaderWeatherMeta = {
 
 export type WeatherHeaderContract = {
   current: WeatherCurrentSnapshot;
-  settings: Pick<WeatherSettings, "enabled" | "fieldKeys" | "preset">;
+  settings: Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset">;
 };
 
 export const DEFAULT_WEATHER_FIELD_KEYS: WeatherFieldKey[] = [

@@ -65,3 +65,23 @@ test("resolveHeaderWeatherMeta keeps ready metadata structured even when only th
   assert.equal(meta.primaryText, "台北 多雲 31°C");
   assert.equal(meta.secondaryText, "");
 });
+
+test("resolveHeaderWeatherMeta shows the station name when locating by station", () => {
+  const meta = resolveHeaderWeatherMeta({
+    current: createSnapshot({ countyName: "桃園市", stationName: "東眼山" }),
+    isHydrated: true,
+    settings: createSettings({ countyName: "桃園市", locationMode: "station" })
+  });
+
+  assert.equal(meta.primaryText, "東眼山 多雲 31°C");
+});
+
+test("resolveHeaderWeatherMeta shows the county name when locating by county", () => {
+  const meta = resolveHeaderWeatherMeta({
+    current: createSnapshot({ countyName: "桃園市", stationName: "東眼山" }),
+    isHydrated: true,
+    settings: createSettings({ countyName: "桃園市", locationMode: "county" })
+  });
+
+  assert.equal(meta.primaryText, "桃園市 多雲 31°C");
+});

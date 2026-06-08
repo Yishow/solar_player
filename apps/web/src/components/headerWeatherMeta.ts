@@ -5,7 +5,7 @@ import type {
   WeatherSettings
 } from "@solar-display/shared";
 
-type HeaderWeatherSettings = Pick<WeatherSettings, "enabled" | "fieldKeys" | "preset">;
+type HeaderWeatherSettings = Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset">;
 
 type ResolveHeaderWeatherMetaInput = {
   current: WeatherCurrentSnapshot | null;
@@ -72,9 +72,13 @@ function formatNumber(value: number | null, unit: string) {
   return `${normalized}${unit}`;
 }
 
-function buildPrimaryParts(snapshot: WeatherCurrentSnapshot) {
+function buildPrimaryParts(snapshot: WeatherCurrentSnapshot, settings: HeaderWeatherSettings) {
+  const locationLabel = settings.locationMode === "county"
+    ? normalizeText(snapshot.countyName) ?? normalizeText(snapshot.stationName)
+    : normalizeText(snapshot.stationName) ?? normalizeText(snapshot.countyName);
+
   return [
-    normalizeText(snapshot.stationName) ?? normalizeText(snapshot.countyName),
+    locationLabel,
     normalizeText(snapshot.weather),
     formatTemperature(snapshot.airTemperature)
   ].filter((part): part is string => Boolean(part));
@@ -136,7 +140,7 @@ export function resolveHeaderWeatherMeta(input: ResolveHeaderWeatherMetaInput): 
     return UNAVAILABLE_META;
   }
 
-  const primaryParts = buildPrimaryParts(input.current);
+  const primaryParts = buildPrimaryParts(input.current, input.settings);
   const secondaryParts = input.settings.fieldKeys
     .map((fieldKey) => formatSecondaryField(fieldKey, input.current!))
     .filter((part): part is string => Boolean(part));

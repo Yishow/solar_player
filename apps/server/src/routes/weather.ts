@@ -45,6 +45,7 @@ function buildPublicWeatherHeaderSettings(
   return {
     enabled: settings.enabled,
     fieldKeys: settings.fieldKeys,
+    locationMode: settings.locationMode,
     preset: settings.preset
   };
 }

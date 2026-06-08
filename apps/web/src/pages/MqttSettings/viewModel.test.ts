@@ -72,6 +72,7 @@ function createWeatherPreviewContract(overrides: Partial<WeatherHeaderContract> 
     settings: {
       enabled: true,
       fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
+      locationMode: "station",
       preset: "standard"
     },
     ...overrides
@@ -729,6 +730,7 @@ test("buildMqttSettingsViewModel models weather presets preview and custom-field
       settings: {
         enabled: true,
         fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
         preset: "compact"
       }
     }),
@@ -802,6 +804,7 @@ test("buildMqttSettingsViewModel surfaces weather preview fallback and custom fi
       settings: {
         enabled: true,
         fieldKeys: ["weather", "dailyHigh"],
+        locationMode: "station",
         preset: "custom"
       }
     }),

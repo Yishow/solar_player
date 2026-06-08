@@ -529,6 +529,7 @@ export function buildMqttSettingsViewModel({
     settings: {
       enabled: weatherSettings.enabled,
       fieldKeys: weatherSettings.fieldKeys,
+      locationMode: weatherSettings.locationMode,
       preset: weatherSettings.preset
     }
   });
