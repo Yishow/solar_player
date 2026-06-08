@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   IconAutoplay,
   IconCalendar,
@@ -43,29 +44,65 @@ export function SlideshowPreview() {
     settings,
   } = usePageRotation();
 
-  const viewModel = buildSlideshowPreviewViewModel({
-    countdown,
-    currentPage,
-    errorMessage,
-    isIdle,
-    isLoading,
-    isPlaying,
-    pages,
-    progress,
-    rotationPreview,
-    settings
-  });
+  const viewModel = useMemo(
+    () =>
+      buildSlideshowPreviewViewModel({
+        countdown,
+        currentPage,
+        errorMessage,
+        isIdle,
+        isLoading,
+        isPlaying,
+        pages,
+        progress,
+        rotationPreview,
+        settings
+      }),
+    [
+      countdown,
+      currentPage,
+      errorMessage,
+      isIdle,
+      isLoading,
+      isPlaying,
+      pages,
+      progress,
+      rotationPreview,
+      settings
+    ]
+  );
 
   // Center the active card at index 2 (third position) by rotating the queue.
-  const allCards = viewModel.queueCards;
-  const activeIdx = Math.max(0, allCards.findIndex((c) => c.isCurrent));
-  const visibleCards = allCards.length >= 5
-    ? (Array.from({ length: 5 }, (_, i) => {
-        const offset = i - 2; // positions: -2 -1 0 +1 +2 around active
-        return allCards[(activeIdx + offset + allCards.length) % allCards.length];
-      }).filter(Boolean) as typeof allCards)
-    : allCards;
-  const visibleOffsets = resolveSlideshowCardOffsets(visibleCards.length);
+  const visibleCards = useMemo(() => {
+    const allCards = viewModel.queueCards;
+    const activeIdx = Math.max(0, allCards.findIndex((c) => c.isCurrent));
+    return allCards.length >= 5
+      ? (Array.from({ length: 5 }, (_, i) => {
+          const offset = i - 2; // positions: -2 -1 0 +1 +2 around active
+          return allCards[(activeIdx + offset + allCards.length) % allCards.length];
+        }).filter(Boolean) as typeof allCards)
+      : allCards;
+  }, [viewModel]);
+  const visibleOffsets = useMemo(
+    () => resolveSlideshowCardOffsets(visibleCards.length),
+    [visibleCards]
+  );
+  // Stable narrowed card list so the memoized LiveSlideshowPreviewCards only
+  // re-renders when the visible cards actually change, not every rotation tick.
+  const previewCards = useMemo(
+    () =>
+      visibleCards.map((card) => ({
+        displayOrder: card.displayOrder,
+        id: card.id,
+        isCurrent: card.isCurrent,
+        labelEn: card.labelEn,
+        labelZh: card.labelZh,
+        pageKey: card.pageKey,
+        routeLabel: card.routeLabel,
+        statusLabel: card.statusLabel
+      })),
+    [visibleCards]
+  );
   const hasMultiplePages = pages.length > 1;
 
   return (
@@ -165,16 +202,7 @@ export function SlideshowPreview() {
         }}
       >
         <LiveSlideshowPreviewCards
-          cards={visibleCards.map((card) => ({
-            displayOrder: card.displayOrder,
-            id: card.id,
-            isCurrent: card.isCurrent,
-            labelEn: card.labelEn,
-            labelZh: card.labelZh,
-            pageKey: card.pageKey,
-            routeLabel: card.routeLabel,
-            statusLabel: card.statusLabel
-          }))}
+          cards={previewCards}
           definitions={livePreviewCatalog.definitions}
           offsets={visibleOffsets}
           states={livePreviewCatalog.states}

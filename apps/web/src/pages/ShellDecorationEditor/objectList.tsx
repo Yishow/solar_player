@@ -298,7 +298,7 @@ export function addShellDecorationObject(
   };
 }
 
-export function ShellDecorationObjectList({
+function ShellDecorationObjectListImpl({
   channel,
   onDelete,
   onDuplicate,
@@ -369,3 +369,5 @@ export function ShellDecorationObjectList({
     </div>
   );
 }
+
+export const ShellDecorationObjectList = React.memo(ShellDecorationObjectListImpl);

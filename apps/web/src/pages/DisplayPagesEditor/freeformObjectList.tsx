@@ -235,7 +235,7 @@ export function addDisplayPageObject(
   };
 }
 
-export function DisplayPageObjectList({
+function DisplayPageObjectListImpl({
   objects,
   onDelete,
   onDuplicate,
@@ -351,3 +351,5 @@ export function DisplayPageObjectList({
     </div>
   );
 }
+
+export const DisplayPageObjectList = React.memo(DisplayPageObjectListImpl);

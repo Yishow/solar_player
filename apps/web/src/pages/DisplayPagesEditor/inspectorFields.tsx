@@ -79,7 +79,7 @@ function localizeRegionAccessibilityLabel(label: string) {
   return localizeDisplayEditorLabel(label);
 }
 
-export function DisplayEditorCanvasOverlay({
+function DisplayEditorCanvasOverlayImpl({
   isInteractive,
   lockedRegionIds,
   onSelectTemporaryMeasureTarget,
@@ -383,6 +383,7 @@ export function DisplayEditorCanvasOverlay({
         const isSelected = selectedRegionIds.includes(region.id) || frame?.isSelected === true;
         const isLocked = lockedRegionIds.includes(region.id) || frame?.isLocked === true;
         const isVisible = frame?.visible ?? false;
+        const boxRect = frame?.rect ?? region.geometry;
         return (
           <div
             key={region.id}
@@ -397,10 +398,10 @@ export function DisplayEditorCanvasOverlay({
                     ? frameStyle.background
                     : "transparent",
               borderColor: isSelected ? "rgba(63, 122, 52, 0.9)" : isVisible ? frameStyle.borderColor : "transparent",
-              height: `${region.geometry.height}px`,
-              left: `${region.geometry.left}px`,
-              top: `${toShellY(region.geometry.top)}px`,
-              width: `${region.geometry.width}px`,
+              height: `${boxRect.height}px`,
+              left: `${boxRect.left}px`,
+              top: `${toShellY(boxRect.top)}px`,
+              width: `${boxRect.width}px`,
               zIndex: region.parentId ? (isSelected ? 65 : 55) : isSelected ? 60 : 45
             }}
             >
@@ -452,6 +453,8 @@ export function DisplayEditorCanvasOverlay({
     </>
   );
 }
+
+export const DisplayEditorCanvasOverlay = React.memo(DisplayEditorCanvasOverlayImpl);
 
 export function resolveDisplayEditorRegions(
   config: Record<string, unknown>,
@@ -672,7 +675,7 @@ function buildCardRailChildRegion(args: {
   };
 }
 
-export function DisplayEditorInspectorFields({
+function DisplayEditorInspectorFieldsImpl({
   fields,
   onChange,
   onOpenAssetLibrary,
@@ -689,6 +692,8 @@ export function DisplayEditorInspectorFields({
     </div>
   );
 }
+
+export const DisplayEditorInspectorFields = React.memo(DisplayEditorInspectorFieldsImpl);
 
 function renderField(
   field: ResolvedDisplayEditorField,

@@ -414,7 +414,11 @@ export function buildImageManagementViewModel(args: BuildImageManagementViewMode
     resolvedPlaylistEntries
   } = args;
   const sortedAssets = sortAssets(assets);
-  const selectedAsset = resolveSelectedImageManagementAsset(assets, selectedImageId);
+  // Reuse the already-sorted array for selection resolution instead of calling
+  // resolveSelectedImageManagementAsset (which re-sorts internally). The find +
+  // fallback logic is identical, so the resolved asset is bit-equivalent.
+  const selectedAsset =
+    sortedAssets.find((asset) => asset.id === selectedImageId) ?? sortedAssets[0] ?? null;
   const resolvedEntryMap = new Map(
     (resolvedPlaylistEntries ?? []).map((entry) => [entry.entryId, entry])
   );

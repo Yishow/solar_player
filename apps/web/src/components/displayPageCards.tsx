@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
   buildDisplayCardStyleVars,
@@ -17,7 +18,7 @@ function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
-export function DisplayCardFrame({
+export const DisplayCardFrame = memo(function DisplayCardFrame({
   cardStyle,
   children,
   className,
@@ -38,9 +39,9 @@ export function DisplayCardFrame({
       {children}
     </article>
   );
-}
+});
 
-export function DisplayCardHeader({
+export const DisplayCardHeader = memo(function DisplayCardHeader({
   icon,
   iconContainerClassName,
   subtitle,
@@ -62,9 +63,9 @@ export function DisplayCardHeader({
       </div>
     </div>
   );
-}
+});
 
-export function DisplayCardValueRow({
+export const DisplayCardValueRow = memo(function DisplayCardValueRow({
   align = "start",
   className,
   unit,
@@ -87,7 +88,7 @@ export function DisplayCardValueRow({
       {unit ? <span className="display-card-unit">{unit}</span> : null}
     </div>
   );
-}
+});
 
 export function DisplayCardFooter({
   children,

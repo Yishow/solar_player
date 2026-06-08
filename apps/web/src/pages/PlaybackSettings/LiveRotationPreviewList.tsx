@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewState,
@@ -26,7 +27,7 @@ function resolvePreviewState(
 
 const PLAYBACK_ROTATION_PREVIEW_SCALE = 101 / 1080;
 
-export function LiveRotationPreviewList({
+export const LiveRotationPreviewList = memo(function LiveRotationPreviewList({
   definitions,
   rows,
   states
@@ -67,4 +68,4 @@ export function LiveRotationPreviewList({
       })}
     </>
   );
-}
+});

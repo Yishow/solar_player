@@ -4,6 +4,7 @@ import type {
   ImageAsset
 } from "@solar-display/shared";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Switch, CustomSelect } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
@@ -131,20 +132,37 @@ export function ImageManagementContent({
   updateAssetField,
   updatePlaylistEntryField
 }: ImageManagementContentProps) {
-  const viewModel = buildImageManagementViewModel({
-    assetReferences,
-    assets,
-    errorMessage,
-    isDeleting,
-    isSaving,
-    isUploading,
-    message,
-    selectedImageId,
-    selectedPlaylistEntryId,
-    storageUsage,
-    playlistEntries,
-    resolvedPlaylistEntries
-  });
+  const viewModel = useMemo(
+    () =>
+      buildImageManagementViewModel({
+        assetReferences,
+        assets,
+        errorMessage,
+        isDeleting,
+        isSaving,
+        isUploading,
+        message,
+        selectedImageId,
+        selectedPlaylistEntryId,
+        storageUsage,
+        playlistEntries,
+        resolvedPlaylistEntries
+      }),
+    [
+      assetReferences,
+      assets,
+      errorMessage,
+      isDeleting,
+      isSaving,
+      isUploading,
+      message,
+      selectedImageId,
+      selectedPlaylistEntryId,
+      storageUsage,
+      playlistEntries,
+      resolvedPlaylistEntries
+    ]
+  );
   const statusVariant =
     viewModel.actionBanner.tone === "error"
       ? "is-error"

@@ -33,12 +33,12 @@ function createRegion({
       fields: [],
       geometry: geometry
         ? {
-            compatibilityKey: id,
-            heightPath: ["height"],
-            leftPath: ["left"],
-            topPath: ["top"],
-            widthPath: ["width"]
-          }
+          compatibilityKey: id,
+          heightPath: ["height"],
+          leftPath: ["left"],
+          topPath: ["top"],
+          widthPath: ["width"]
+        }
         : undefined,
       id,
       label
@@ -51,7 +51,7 @@ test("readStoredDisplayEditorOverlayPreset falls back to default on malformed st
   const storage = {
     getItem: () => "{bad json",
     removeItem: (key: string) => removed.push(key),
-    setItem: () => {}
+    setItem: () => { }
   };
 
   assert.equal(readStoredDisplayEditorOverlayPreset(storage), null);
@@ -63,7 +63,7 @@ test("writeStoredDisplayEditorOverlayPreset persists the current preset payload"
   let savedValue = "";
   const storage = {
     getItem: () => null,
-    removeItem: () => {},
+    removeItem: () => { },
     setItem: (key: string, value: string) => {
       savedKey = key;
       savedValue = value;

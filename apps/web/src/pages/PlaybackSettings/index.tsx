@@ -26,6 +26,7 @@ import {
 import { usePlaybackController } from "../../hooks/usePlaybackController";
 import "./playbackSettings.css";
 import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
+import { buildConfiguredRotationRows } from "../DisplayPagesEditor/rotationPreview";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
 import { LiveRotationPreviewList } from "./LiveRotationPreviewList";
 import { PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
@@ -186,21 +187,49 @@ export function PlaybackSettings() {
 
   useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES);
 
-  const viewModel = buildPlaybackSettingsViewModel({
-    errorMessage,
-    isSaving,
-    message,
-    pages,
-    runtimeCountdown: runtime.countdown,
-    runtimeCurrentPage: runtime.currentPage,
-    runtimeErrorMessage: runtime.errorMessage,
-    runtimeIsLoading: runtime.isLoading,
-    runtimeIsPlaying: runtime.isPlaying,
-    runtimeProgress: runtime.progress,
-    displayOpsSummary,
-    rotationPreview,
-    settings
-  });
+  const viewModel = useMemo(
+    () =>
+      buildPlaybackSettingsViewModel({
+        errorMessage,
+        isSaving,
+        message,
+        pages,
+        runtimeCountdown: runtime.countdown,
+        runtimeCurrentPage: runtime.currentPage,
+        runtimeErrorMessage: runtime.errorMessage,
+        runtimeIsLoading: runtime.isLoading,
+        runtimeIsPlaying: runtime.isPlaying,
+        runtimeProgress: runtime.progress,
+        displayOpsSummary,
+        rotationPreview,
+        settings
+      }),
+    [
+      errorMessage,
+      isSaving,
+      message,
+      pages,
+      runtime.countdown,
+      runtime.currentPage,
+      runtime.errorMessage,
+      runtime.isLoading,
+      runtime.isPlaying,
+      runtime.progress,
+      displayOpsSummary,
+      rotationPreview,
+      settings
+    ]
+  );
+
+  // Preview rows depend only on the form pages, never on the per-second runtime
+  // tick. Memoizing them separately keeps a stable reference so the memoized
+  // LiveRotationPreviewList does not re-render every second when only runtime
+  // values change. buildConfiguredRotationRows sorts internally, so the result
+  // is bit-equivalent to viewModel.configuredRotationRows.
+  const configuredRotationRows = useMemo(
+    () => buildConfiguredRotationRows(pages),
+    [pages]
+  );
 
   const statusVariant =
     viewModel.saveBanner.tone === "error"
@@ -294,7 +323,7 @@ export function PlaybackSettings() {
           <div className="ps-preview__list">
             <LiveRotationPreviewList
               definitions={livePreviewCatalog.definitions}
-              rows={viewModel.configuredRotationRows}
+              rows={configuredRotationRows}
               states={livePreviewCatalog.states}
             />
           </div>

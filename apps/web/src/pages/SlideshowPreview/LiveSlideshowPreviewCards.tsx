@@ -1,5 +1,6 @@
 import type { DisplayPageTemplateKey, PlaybackPage } from "@solar-display/shared";
 import { isDisplayPageTemplateKey } from "@solar-display/shared";
+import { memo } from "react";
 import {
   LiveDisplayPagePreview,
   type LiveDisplayPagePreviewState,
@@ -43,7 +44,7 @@ function resolvePreviewState(
   return resolveLiveDisplayPagePreviewState(pageKey, states);
 }
 
-export function LiveSlideshowPreviewCards({
+export const LiveSlideshowPreviewCards = memo(function LiveSlideshowPreviewCards({
   cards,
   definitions,
   offsets,
@@ -86,4 +87,4 @@ export function LiveSlideshowPreviewCards({
       })}
     </>
   );
-}
+});

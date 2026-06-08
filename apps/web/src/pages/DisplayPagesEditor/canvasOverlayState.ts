@@ -297,9 +297,9 @@ function resolvePageGuides(
     ];
     const centerGuides = showCenterLines
       ? [
-          { axis: "x" as const, canvasPosition: region.geometry.left + region.geometry.width / 2, kind: "center" as const },
-          { axis: "y" as const, canvasPosition: region.geometry.top + region.geometry.height / 2, kind: "center" as const }
-        ]
+        { axis: "x" as const, canvasPosition: region.geometry.left + region.geometry.width / 2, kind: "center" as const },
+        { axis: "y" as const, canvasPosition: region.geometry.top + region.geometry.height / 2, kind: "center" as const }
+      ]
       : [];
 
     for (const item of [...horizontalBoundaries, ...verticalBoundaries, ...centerGuides]) {
@@ -473,13 +473,13 @@ function resolveRelationalRulers(
     const labelPosition =
       measurement.axis === "x"
         ? {
-            x: measurement.midpoint.x,
-            y: labelPlacement === "before" ? measurement.midpoint.y - 14 : measurement.midpoint.y + 14
-          }
+          x: measurement.midpoint.x,
+          y: labelPlacement === "before" ? measurement.midpoint.y - 14 : measurement.midpoint.y + 14
+        }
         : {
-            x: labelPlacement === "before" ? measurement.midpoint.x - 14 : measurement.midpoint.x + 14,
-            y: measurement.midpoint.y
-          };
+          x: labelPlacement === "before" ? measurement.midpoint.x - 14 : measurement.midpoint.x + 14,
+          y: measurement.midpoint.y
+        };
 
     return {
       axis: measurement.axis,
@@ -560,17 +560,17 @@ export function resolveDisplayEditorOverlayState({
   return {
     activeInteraction: activeInteraction
       ? {
-          constraintRect: activeInteraction.constraintRect,
-          guides: activeInteraction.guides,
-          rect: activeInteraction.rect,
-          type: activeInteraction.type
-        }
+        constraintRect: activeInteraction.constraintRect,
+        guides: activeInteraction.guides,
+        rect: activeInteraction.rect,
+        type: activeInteraction.type
+      }
       : {
-          constraintRect: null,
-          guides: [],
-          rect: selectedRegion?.geometry ?? null,
-          type: "idle"
-        },
+        constraintRect: null,
+        guides: [],
+        rect: selectedRegion?.geometry ?? null,
+        type: "idle"
+      },
     axisTicks: resolveAxisTicks(designMapping, overlayPreset.showAxes),
     contentOffsetTop,
     designMapping,
@@ -609,10 +609,10 @@ export function resolveDisplayEditorOverlayState({
       selectionFeedbackLabel ?? (selectionBounds && activeSelectedRegionIds.length > 1 ? `已選 ${activeSelectedRegionIds.length} 區` : null),
     sessionDistanceLock: distanceLockSession
       ? {
-          axis: distanceLockSession.axis,
-          boundaryClamped: activeInteraction?.boundaryClamped === true,
-          distance: distanceLockSession.distance
-        }
+        axis: distanceLockSession.axis,
+        boundaryClamped: activeInteraction?.boundaryClamped === true,
+        distance: distanceLockSession.distance
+      }
       : null,
     shellBandGuides: resolveShellBandGuides({
       contentHeight: canvasHeight,

@@ -6,7 +6,7 @@ import type {
   ShellDecorationObject,
   ValidationResult
 } from "@solar-display/shared";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiRequestError, buildApiUrl, getImages } from "../../services/api";
 import {
   getShellDecorationDraft,
@@ -240,16 +240,19 @@ export function ShellDecorationEditor({
   const selectedObject = useMemo(() => findSelectedObject(channel, selectedObjectId), [channel, selectedObjectId]);
   const assetOptions = useMemo(() => resolveShellDecorationAssetOptions(images), [images]);
 
-  const applyChannel = (nextChannel: ShellDecorationChannel, nextSelectedObjectId = selectedObjectId) => {
-    setDraft((current) => ({
-      ...current,
-      footerObjects: nextChannel.footerObjects,
-      headerObjects: nextChannel.headerObjects
-    }));
-    setSelectedObjectId(nextSelectedObjectId);
-    setMessage("共用殼層草稿尚未儲存。");
-    setErrorMessage("");
-  };
+  const applyChannel = useCallback(
+    (nextChannel: ShellDecorationChannel, nextSelectedObjectId = selectedObjectId) => {
+      setDraft((current) => ({
+        ...current,
+        footerObjects: nextChannel.footerObjects,
+        headerObjects: nextChannel.headerObjects
+      }));
+      setSelectedObjectId(nextSelectedObjectId);
+      setMessage("共用殼層草稿尚未儲存。");
+      setErrorMessage("");
+    },
+    [selectedObjectId]
+  );
 
   const handleAddObject = () => {
     const next = addShellDecorationObject(channel, { mount: addMount, type: addType });
@@ -289,10 +292,51 @@ export function ShellDecorationEditor({
     }
   };
 
-  const handleDelete = (objectId: string) => {
-    const next = deleteShellDecorationObject(channel, objectId, selectedObjectId);
-    applyChannel(next.channel, next.selectedObjectId);
-  };
+  const handleDelete = useCallback(
+    (objectId: string) => {
+      const next = deleteShellDecorationObject(channel, objectId, selectedObjectId);
+      applyChannel(next.channel, next.selectedObjectId);
+    },
+    [applyChannel, channel, selectedObjectId]
+  );
+
+  const handleDuplicate = useCallback(
+    (objectId: string) => {
+      const next = duplicateShellDecorationObject(channel, objectId);
+      applyChannel(next.channel, next.selectedObjectId);
+    },
+    [applyChannel, channel]
+  );
+
+  const handleMoveBackward = useCallback(
+    (objectId: string) => applyChannel(moveShellDecorationObject(channel, objectId, "backward")),
+    [applyChannel, channel]
+  );
+
+  const handleMoveForward = useCallback(
+    (objectId: string) => applyChannel(moveShellDecorationObject(channel, objectId, "forward")),
+    [applyChannel, channel]
+  );
+
+  const handleToggleLocked = useCallback(
+    (objectId: string) => applyChannel(toggleShellDecorationObjectLocked(channel, objectId)),
+    [applyChannel, channel]
+  );
+
+  const handleToggleVisible = useCallback(
+    (objectId: string) => applyChannel(toggleShellDecorationObjectVisible(channel, objectId)),
+    [applyChannel, channel]
+  );
+
+  const handleUpdateObjectFrame = useCallback(
+    (objectId: string, frame: ShellDecorationObject["frame"]) => {
+      applyChannel(updateShellDecorationObject(channel, objectId, (object) => ({
+        ...object,
+        frame
+      })));
+    },
+    [applyChannel, channel]
+  );
 
   const updateSelectedObject = (updater: (object: ShellDecorationObject) => ShellDecorationObject) => {
     if (!selectedObjectId) {
@@ -329,15 +373,12 @@ export function ShellDecorationEditor({
           <ShellDecorationObjectList
             channel={channel}
             onDelete={handleDelete}
-            onDuplicate={(objectId) => {
-              const next = duplicateShellDecorationObject(channel, objectId);
-              applyChannel(next.channel, next.selectedObjectId);
-            }}
-            onMoveBackward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "backward"))}
-            onMoveForward={(objectId) => applyChannel(moveShellDecorationObject(channel, objectId, "forward"))}
+            onDuplicate={handleDuplicate}
+            onMoveBackward={handleMoveBackward}
+            onMoveForward={handleMoveForward}
             onSelect={setSelectedObjectId}
-            onToggleLocked={(objectId) => applyChannel(toggleShellDecorationObjectLocked(channel, objectId))}
-            onToggleVisible={(objectId) => applyChannel(toggleShellDecorationObjectVisible(channel, objectId))}
+            onToggleLocked={handleToggleLocked}
+            onToggleVisible={handleToggleVisible}
             selectedObjectId={selectedObjectId}
           />
         </div>
@@ -362,12 +403,7 @@ export function ShellDecorationEditor({
               channel={channel}
               selectedObjectId={selectedObjectId}
               onSelectObject={setSelectedObjectId}
-              onUpdateObjectFrame={(objectId, frame) => {
-                applyChannel(updateShellDecorationObject(channel, objectId, (object) => ({
-                  ...object,
-                  frame
-                })));
-              }}
+              onUpdateObjectFrame={handleUpdateObjectFrame}
             />
           ) : null}
         </div>

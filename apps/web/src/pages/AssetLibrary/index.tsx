@@ -1,5 +1,5 @@
 import type { DisplayOpsAssetReferenceSummary, ImageAsset } from "@solar-display/shared";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
 import { CustomSelect } from "../../components/management";
@@ -86,6 +86,56 @@ function formatReferenceKind(kind: string) {
       return kind;
   }
 }
+
+const AssetLibraryCard = memo(function AssetLibraryCard({
+  asset,
+  isSelected,
+  thumbnailDensity,
+  onSelect
+}: {
+  asset: ImageAsset;
+  isSelected: boolean;
+  thumbnailDensity: ThumbnailDensity;
+  onSelect: (id: number) => void;
+}) {
+  const previewSrc = resolveAssetPreviewSrc(asset);
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(asset.id)}
+      className={`rounded-[18px] border p-3 text-left ${
+        isSelected
+          ? "border-[var(--shell-title-ink)] bg-[rgba(82,91,66,0.08)]"
+          : "border-[var(--shell-divider)] bg-white"
+      }`}
+    >
+      <div className={`overflow-hidden rounded-[12px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] ${thumbnailDensity === "comfortable" ? "aspect-video" : "aspect-square"}`}>
+        {previewSrc ? (
+          <img src={previewSrc} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        ) : null}
+      </div>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[15px] font-semibold text-[var(--shell-title-ink)]">
+            {asset.title ?? asset.originalName ?? `素材 ${asset.id}`}
+          </div>
+          <div className="mt-1 text-[12px] text-[var(--shell-subtitle-ink)]">
+            {categoryLabels[normalizeAssetCategory(asset)]} · {usageScopeLabels[normalizeAssetUsageScope(asset)]}
+          </div>
+          {isSeedAsset(asset) ? (
+            <div className="mt-2 inline-flex rounded-full bg-[rgba(95,140,80,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]">
+              內建素材 · {asset.seedKey}
+            </div>
+          ) : null}
+        </div>
+        <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
+          #{asset.id}
+        </span>
+      </div>
+      <div className="mt-3 text-[13px] text-[var(--shell-copy-ink)]">{formatUsageSummary(asset)}</div>
+    </button>
+  );
+});
 
 export function AssetLibrary({
   contextLabel,
@@ -201,9 +251,13 @@ export function AssetLibrary({
     });
   }, [assets, query, selectedCategory]);
 
-  const selectedAsset = filteredAssets.find((asset) => asset.id === selectedAssetId)
-    ?? assets.find((asset) => asset.id === selectedAssetId)
-    ?? null;
+  const selectedAsset = useMemo(
+    () =>
+      filteredAssets.find((asset) => asset.id === selectedAssetId)
+        ?? assets.find((asset) => asset.id === selectedAssetId)
+        ?? null,
+    [filteredAssets, assets, selectedAssetId]
+  );
   const resolvedAssetReferences =
     initialReferences && initialReferences.assetId === selectedAssetId ? initialReferences : assetReferences;
   const selectedAssetPreviewSrc = selectedAsset ? resolveAssetPreviewSrc(selectedAsset) : null;
@@ -415,46 +469,15 @@ export function AssetLibrary({
         </div>
 
         <div className={`mt-4 grid gap-3 ${thumbnailDensity === "comfortable" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-2 xl:grid-cols-4"}`}>
-          {filteredAssets.map((asset) => {
-            const previewSrc = resolveAssetPreviewSrc(asset);
-            return (
-              <button
-                key={asset.id}
-                type="button"
-                onClick={() => setSelectedAssetId(asset.id)}
-                className={`rounded-[18px] border p-3 text-left ${
-                  asset.id === selectedAssetId
-                    ? "border-[var(--shell-title-ink)] bg-[rgba(82,91,66,0.08)]"
-                    : "border-[var(--shell-divider)] bg-white"
-                }`}
-              >
-                <div className={`overflow-hidden rounded-[12px] border border-[var(--shell-divider)] bg-[rgba(82,91,66,0.04)] ${thumbnailDensity === "comfortable" ? "aspect-video" : "aspect-square"}`}>
-                  {previewSrc ? (
-                    <img src={previewSrc} alt="" className="h-full w-full object-cover" />
-                  ) : null}
-                </div>
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[15px] font-semibold text-[var(--shell-title-ink)]">
-                      {asset.title ?? asset.originalName ?? `素材 ${asset.id}`}
-                    </div>
-                    <div className="mt-1 text-[12px] text-[var(--shell-subtitle-ink)]">
-                      {categoryLabels[normalizeAssetCategory(asset)]} · {usageScopeLabels[normalizeAssetUsageScope(asset)]}
-                    </div>
-                    {isSeedAsset(asset) ? (
-                      <div className="mt-2 inline-flex rounded-full bg-[rgba(95,140,80,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--shell-title-ink)]">
-                        內建素材 · {asset.seedKey}
-                      </div>
-                    ) : null}
-                  </div>
-                  <span className="rounded-full bg-[rgba(82,91,66,0.08)] px-3 py-1 text-[12px] font-semibold text-[var(--shell-copy-ink)]">
-                    #{asset.id}
-                  </span>
-                </div>
-                <div className="mt-3 text-[13px] text-[var(--shell-copy-ink)]">{formatUsageSummary(asset)}</div>
-              </button>
-            );
-          })}
+          {filteredAssets.map((asset) => (
+            <AssetLibraryCard
+              key={asset.id}
+              asset={asset}
+              isSelected={asset.id === selectedAssetId}
+              thumbnailDensity={thumbnailDensity}
+              onSelect={setSelectedAssetId}
+            />
+          ))}
         </div>
 
         {filteredAssets.length === 0 ? (
