@@ -45,47 +45,7 @@ function readLiveMetric(snapshot: LiveMetricsSnapshot, key: string) {
   return snapshot.metrics[key]?.value ?? null;
 }
 
-function buildChartPoints(
-  snapshots: EnergyTrendSnapshot[],
-  picker: (snapshot: EnergyTrendSnapshot) => number | null
-) {
-  return snapshots.map((snapshot) => ({
-    label: snapshot.capturedAt,
-    value: picker(snapshot)
-  }));
-}
-
-function sumMetric(snapshots: EnergyTrendSnapshot[], picker: (snapshot: EnergyTrendSnapshot) => number | null) {
-  const values = snapshots.map(picker).filter((value): value is number => value !== null);
-
-  if (values.length === 0) {
-    return null;
-  }
-
-  return values.reduce((sum, value) => sum + value, 0);
-}
-
-function averageMetric(snapshots: EnergyTrendSnapshot[], picker: (snapshot: EnergyTrendSnapshot) => number | null) {
-  const values = snapshots.map(picker).filter((value): value is number => value !== null);
-
-  if (values.length === 0) {
-    return null;
-  }
-
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function hasTrendSnapshotData(snapshots: EnergyTrendSnapshot[]) {
-  return snapshots.some(
-    (snapshot) =>
-      snapshot.co2 !== null ||
-      snapshot.consumption !== null ||
-      snapshot.efficiency !== null ||
-      snapshot.generation !== null ||
-      snapshot.ratio !== null ||
-      snapshot.selfConsumption !== null
-  );
-}
+type EnergyTrendChartPoint = { label: string; value: number | null };
 
 export function buildEnergyTrendViewModel({
   liveSnapshot,
@@ -93,24 +53,75 @@ export function buildEnergyTrendViewModel({
   range,
   snapshots
 }: BuildEnergyTrendViewModelArgs) {
+  // Single pass over snapshots: build every chart vector and aggregate at once
+  // instead of 5 independent traversals. Accumulation order matches the original
+  // filter+reduce (skip nulls, start from 0), so sums/averages are bit-equivalent;
+  // hasHistoryData mirrors the original `some(...)` boolean.
+  const generationPoints: EnergyTrendChartPoint[] = [];
+  const consumptionPoints: EnergyTrendChartPoint[] = [];
+  const ratioPoints: EnergyTrendChartPoint[] = [];
+  const co2Points: EnergyTrendChartPoint[] = [];
+  let generationSum = 0;
+  let generationCount = 0;
+  let consumptionSum = 0;
+  let consumptionCount = 0;
+  let ratioSum = 0;
+  let ratioCount = 0;
+  let co2Sum = 0;
+  let co2Count = 0;
+  let hasHistoryData = false;
+  for (const snapshot of snapshots) {
+    generationPoints.push({ label: snapshot.capturedAt, value: snapshot.generation });
+    consumptionPoints.push({ label: snapshot.capturedAt, value: snapshot.consumption });
+    ratioPoints.push({ label: snapshot.capturedAt, value: snapshot.ratio });
+    co2Points.push({ label: snapshot.capturedAt, value: snapshot.co2 });
+    if (snapshot.generation !== null) {
+      generationSum += snapshot.generation;
+      generationCount += 1;
+    }
+    if (snapshot.consumption !== null) {
+      consumptionSum += snapshot.consumption;
+      consumptionCount += 1;
+    }
+    if (snapshot.ratio !== null) {
+      ratioSum += snapshot.ratio;
+      ratioCount += 1;
+    }
+    if (snapshot.co2 !== null) {
+      co2Sum += snapshot.co2;
+      co2Count += 1;
+    }
+    if (
+      !hasHistoryData &&
+      (snapshot.co2 !== null ||
+        snapshot.consumption !== null ||
+        snapshot.efficiency !== null ||
+        snapshot.generation !== null ||
+        snapshot.ratio !== null ||
+        snapshot.selfConsumption !== null)
+    ) {
+      hasHistoryData = true;
+    }
+  }
+  const generationAggregate = generationCount === 0 ? null : generationSum;
+  const consumptionAggregate = consumptionCount === 0 ? null : consumptionSum;
+  const ratioAggregate = ratioCount === 0 ? null : ratioSum / ratioCount;
+  const co2Aggregate = co2Count === 0 ? null : co2Sum;
+
   const liveGenerationTotal = readLiveMetric(liveSnapshot, "todayGeneration");
   const liveConsumptionTotal = readLiveMetric(liveSnapshot, "consumptionEnergy");
   const liveRatioValue = readLiveMetric(liveSnapshot, "selfConsumptionRatio");
   const liveCo2Value = readLiveMetric(liveSnapshot, "todayCo2Reduction");
   const livePowerValue = readLiveMetric(liveSnapshot, "realTimePower");
-  const generationTotal = liveGenerationTotal ?? sumMetric(snapshots, (snapshot) => snapshot.generation);
-  const consumptionTotal =
-    liveConsumptionTotal ?? sumMetric(snapshots, (snapshot) => snapshot.consumption);
-  const ratioValue =
-    liveRatioValue ?? averageMetric(snapshots, (snapshot) => snapshot.ratio);
-  const co2Value =
-    liveCo2Value ?? sumMetric(snapshots, (snapshot) => snapshot.co2);
+  const generationTotal = liveGenerationTotal ?? generationAggregate;
+  const consumptionTotal = liveConsumptionTotal ?? consumptionAggregate;
+  const ratioValue = liveRatioValue ?? ratioAggregate;
+  const co2Value = liveCo2Value ?? co2Aggregate;
   const powerValue =
     livePowerValue ??
     (snapshots.length > 0 ? snapshots[snapshots.length - 1]?.generation ?? null : null);
   const hasLiveMetrics = [liveGenerationTotal, liveConsumptionTotal, liveRatioValue, liveCo2Value, livePowerValue]
     .some((value) => value !== null);
-  const hasHistoryData = hasTrendSnapshotData(snapshots);
   const liveSnapshotStale = hasLiveMetrics
     ? isMonitoringSourceStale(liveSnapshot.timestamp, {
         now,
@@ -158,7 +169,7 @@ export function buildEnergyTrendViewModel({
   return {
     cards: [
       {
-        chartPoints: buildChartPoints(snapshots, (snapshot) => snapshot.generation),
+        chartPoints: generationPoints,
         icon: "bolt",
         titleEn: "Power",
         titleZh: "發電功率",
@@ -166,7 +177,7 @@ export function buildEnergyTrendViewModel({
         valueLabel: formatValue(powerValue)
       },
       {
-        chartPoints: buildChartPoints(snapshots, (snapshot) => snapshot.generation),
+        chartPoints: generationPoints,
         icon: "sun",
         titleEn: "Energy",
         titleZh: "發電量",
@@ -174,7 +185,7 @@ export function buildEnergyTrendViewModel({
         valueLabel: formatValue(generationTotal)
       },
       {
-        chartPoints: buildChartPoints(snapshots, (snapshot) => snapshot.consumption),
+        chartPoints: consumptionPoints,
         icon: "plug",
         titleEn: "Consumption",
         titleZh: "用電量",
@@ -182,7 +193,7 @@ export function buildEnergyTrendViewModel({
         valueLabel: formatValue(consumptionTotal)
       },
       {
-        chartPoints: buildChartPoints(snapshots, (snapshot) => snapshot.ratio),
+        chartPoints: ratioPoints,
         icon: "refresh",
         titleEn: "Self-consumption",
         titleZh: "自發自用比例",
@@ -190,7 +201,7 @@ export function buildEnergyTrendViewModel({
         valueLabel: formatValue(ratioValue)
       },
       {
-        chartPoints: buildChartPoints(snapshots, (snapshot) => snapshot.co2),
+        chartPoints: co2Points,
         icon: "co2",
         titleEn: "CO2 Reduction",
         titleZh: "減碳量",

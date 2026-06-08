@@ -252,6 +252,11 @@
     var(--motion-transition-ease) forwards;
 }
 
+/* hold：fade-out 後、新頁尚未掛載的空檔，維持隱藏，避免舊頁在 loader 期間淡回造成閃爍。 */
+.display-transition[data-phase="hold"] {
+  opacity: 0;
+}
+
 .display-transition[data-transition="slide"][data-phase="out"] {
   animation-name: display-transition-slide-out;
 }

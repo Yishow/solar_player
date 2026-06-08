@@ -174,6 +174,113 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     enabled: runtimeHydrationEnabled
   });
 
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig = useMemo<SolarDisplayPageConfig>(() => {
+    const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+    const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
+    return {
+      ...runtimeResolvedConfig,
+      chrome: {
+        ...seedConfig.chrome,
+        ...runtimeChrome,
+        ornaments: {
+          ...seedConfig.chrome.ornaments,
+          ...runtimeOrnaments,
+          goldLine: createGoldLineChromeConfig({
+            ...seedConfig.chrome.ornaments.goldLine,
+            ...(runtimeOrnaments.goldLine ?? {})
+          }),
+          leaf: createLeafOrnamentChromeConfig({
+            ...seedConfig.chrome.ornaments.leaf,
+            ...(runtimeOrnaments.leaf ?? {})
+          })
+        }
+      }
+    };
+  }, [runtimeResolvedConfig, seedConfig]);
+  const solarStoryPayload = solarStoryRuntime.payload ?? undefined;
+  const viewModel = useMemo(
+    () =>
+      buildSolarViewModel({
+        isSocketConnected,
+        snapshot,
+        solarStory: solarStoryPayload
+      }),
+    [isSocketConnected, snapshot, solarStoryPayload]
+  );
+
+  const flowNodeItems = useMemo(
+    () =>
+      flowNodeOrder.map((flowItem) => {
+        const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
+        const nodeTreatment = resolveFlowNodeTreatmentConfig(
+          resolvedConfig.flowNodeTreatments[flowItem.key],
+          seedConfig.flowNodeTreatments[flowItem.key]
+        );
+        return {
+          className: [
+            "solar-flow-node",
+            flowItem.key === "co2" ? "solar-flow-node-co2" : ""
+          ].join(" "),
+          key: flowItem.key,
+          seedSource: seedConfig.iconSources.flowNodes[flowItem.key],
+          source: resolvedConfig.iconSources.flowNodes[flowItem.key],
+          style: {
+            height: `${layout.height}px`,
+            left: `${layout.left}px`,
+            top: `${layout.top}px`,
+            width: `${layout.width}px`,
+            ...buildFlowNodeTreatmentStyle(nodeTreatment)
+          }
+        };
+      }),
+    [resolvedConfig, seedConfig]
+  );
+
+  const connectorItems = useMemo(
+    () =>
+      connectorOrder.map((connector) => {
+        const layout = withContentOffset(resolvedConfig.connectors[connector.key]);
+        const treatment = resolveFlowConnectorTreatmentConfig(
+          resolvedConfig.connectorTreatments[connector.key],
+          seedConfig.connectorTreatments[connector.key]
+        );
+        return {
+          className: connector.className,
+          key: connector.key,
+          style: {
+            height: `${treatment.strokeWidth}px`,
+            left: `${layout.left}px`,
+            top: `${layout.top + (layout.height - treatment.strokeWidth) / 2}px`,
+            width: `${layout.width}px`,
+            ...buildFlowConnectorTreatmentStyle(treatment)
+          }
+        };
+      }),
+    [resolvedConfig, seedConfig]
+  );
+
+  const kpiCardItems = useMemo(
+    () =>
+      kpiCardOrder.map((cardItem) => ({
+        cardStyle: createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]),
+        englishLabel: cardItem.englishLabel,
+        key: cardItem.key,
+        seedSource: seedConfig.iconSources.kpiCards[cardItem.key],
+        source: resolvedConfig.iconSources.kpiCards[cardItem.key],
+        style: (() => {
+          const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
+          return {
+            height: `${layout.height}px`,
+            left: `${layout.left}px`,
+            top: `${layout.top}px`,
+            width: `${layout.width}px`
+          };
+        })()
+      })),
+    [resolvedConfig, seedConfig]
+  );
+
   if (
     shouldDeferDisplayPageRuntimeRender({
       runtimeHydrationEnabled,
@@ -185,33 +292,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     return <DisplayPageLoadingState />;
   }
 
-  const runtimeResolvedConfig = config ?? runtimeConfig.config;
-  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
-  const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
-  const resolvedConfig: SolarDisplayPageConfig = {
-    ...runtimeResolvedConfig,
-    chrome: {
-      ...seedConfig.chrome,
-      ...runtimeChrome,
-      ornaments: {
-        ...seedConfig.chrome.ornaments,
-        ...runtimeOrnaments,
-        goldLine: createGoldLineChromeConfig({
-          ...seedConfig.chrome.ornaments.goldLine,
-          ...(runtimeOrnaments.goldLine ?? {})
-        }),
-        leaf: createLeafOrnamentChromeConfig({
-          ...seedConfig.chrome.ornaments.leaf,
-          ...(runtimeOrnaments.leaf ?? {})
-        })
-      }
-    }
-  };
-  const viewModel = buildSolarViewModel({
-    isSocketConnected,
-    snapshot,
-    solarStory: solarStoryRuntime.payload ?? undefined
-  });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
     runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
@@ -347,34 +427,20 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         ))}
       </figure>
 
-      {flowNodeOrder.map((flowItem, index) => {
+      {flowNodeItems.map((item, index) => {
         const node = viewModel.flowNodes[index]!;
-        const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
-        const nodeTreatment = resolveFlowNodeTreatmentConfig(
-          resolvedConfig.flowNodeTreatments[flowItem.key],
-          seedConfig.flowNodeTreatments[flowItem.key]
-        );
 
         return (
           <article
-            key={node.label}
-            className={[
-              "solar-flow-node",
-              flowItem.key === "co2" ? "solar-flow-node-co2" : ""
-            ].join(" ")}
-            style={{
-              height: `${layout.height}px`,
-              left: `${layout.left}px`,
-              top: `${layout.top}px`,
-              width: `${layout.width}px`,
-              ...buildFlowNodeTreatmentStyle(nodeTreatment)
-            }}
+            key={item.key}
+            className={item.className}
+            style={item.style}
           >
             {renderDisplayPageIcon({
               alt: node.label,
               className: "solar-flow-icon",
-              seedSource: seedConfig.iconSources.flowNodes[flowItem.key],
-              source: resolvedConfig.iconSources.flowNodes[flowItem.key]
+              seedSource: item.seedSource,
+              source: item.source
             })}
             <h3>{node.label}</h3>
             <p>{node.footnote}</p>
@@ -383,57 +449,36 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         );
       })}
 
-      {connectorOrder.map((connector) => {
-        const layout = withContentOffset(resolvedConfig.connectors[connector.key]);
-        const treatment = resolveFlowConnectorTreatmentConfig(
-          resolvedConfig.connectorTreatments[connector.key],
-          seedConfig.connectorTreatments[connector.key]
-        );
+      {connectorItems.map((item) => (
+        <div
+          key={item.key}
+          className={item.className}
+          style={item.style}
+        />
+      ))}
 
-        return (
-          <div
-            key={connector.key}
-            className={connector.className}
-            style={{
-              height: `${treatment.strokeWidth}px`,
-              left: `${layout.left}px`,
-              top: `${layout.top + (layout.height - treatment.strokeWidth) / 2}px`,
-              width: `${layout.width}px`,
-              ...buildFlowConnectorTreatmentStyle(treatment)
-            }}
-          />
-        );
-      })}
-
-      {kpiCardOrder.map((cardItem, index) => {
+      {kpiCardItems.map((item, index) => {
         const metric = viewModel.kpis[index]!;
-        const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
-        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
 
         return (
           <DisplayCardFrame
-            cardStyle={cardStyle}
-            key={metric.label}
+            cardStyle={item.cardStyle}
+            key={item.key}
             className="solar-kpi-card"
             surface="metric"
-            style={{
-              height: `${layout.height}px`,
-              left: `${layout.left}px`,
-              top: `${layout.top}px`,
-              width: `${layout.width}px`
-            }}
+            style={item.style}
           >
             <DisplayCardHeader
               icon={renderDisplayPageIcon({
                 alt: metric.label,
                 className: "solar-kpi-icon",
-                seedSource: seedConfig.iconSources.kpiCards[cardItem.key],
-                source: resolvedConfig.iconSources.kpiCards[cardItem.key]
+                seedSource: item.seedSource,
+                source: item.source
               })}
-              subtitle={cardItem.englishLabel}
+              subtitle={item.englishLabel}
               title={metric.label}
             />
-            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow align={item.cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
             <DisplayCardFooter>
               <p className="solar-kpi-helper">{metric.helper}</p>
             </DisplayCardFooter>

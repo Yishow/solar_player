@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 type SparklineProps = {
   values: number[];
   className?: string;
@@ -17,7 +19,7 @@ function toPoints(values: number[]) {
     .join(" ");
 }
 
-export function Sparkline({ values, className }: SparklineProps) {
+export const Sparkline = memo(function Sparkline({ values, className }: SparklineProps) {
   const points = toPoints(values);
 
   return (
@@ -38,4 +40,4 @@ export function Sparkline({ values, className }: SparklineProps) {
       </svg>
     </div>
   );
-}
+});

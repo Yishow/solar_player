@@ -62,6 +62,7 @@ export function LayoutShell({
     [navigate]
   );
   const transition = useDisplayTransition({
+    currentPath: location.pathname,
     navigate: navigateReplace,
     transitionSpeed: controller.settings?.transitionSpeed,
     transitionType: controller.settings?.transitionType

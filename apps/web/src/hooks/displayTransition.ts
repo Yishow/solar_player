@@ -1,7 +1,7 @@
 import type { PlaybackTransitionType } from "@solar-display/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-export type DisplayTransitionPhase = "idle" | "out" | "in";
+export type DisplayTransitionPhase = "idle" | "out" | "hold" | "in";
 export type DisplayTransitionMode = "none" | "fade" | "slide";
 
 export type DisplayTransitionDurations = {
@@ -67,7 +67,16 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/**
+ * 只有在「已導向的 route」真正成為目前 route（loader 完成、新頁掛載）後，才允許進入 fade-in。
+ * 否則 fade-in 會落在仍掛著的舊頁上，造成舊頁淡回的閃爍。
+ */
+export function shouldEnterInPhase(navigatedRoute: string | null, currentPath: string): boolean {
+  return navigatedRoute !== null && navigatedRoute === currentPath;
+}
+
 type UseDisplayTransitionOptions = {
+  currentPath: string;
   navigate: (route: string) => void;
   transitionType: PlaybackTransitionType | undefined;
   transitionSpeed: number | undefined;
@@ -81,12 +90,14 @@ type UseDisplayTransitionOptions = {
  * 避免「transition 要 controller.settings、usePageRotation 要 onRouteChange」的循環依賴。
  */
 export function useDisplayTransition({
+  currentPath,
   navigate,
   transitionType,
   transitionSpeed
 }: UseDisplayTransitionOptions) {
   const [phase, setPhase] = useState<DisplayTransitionPhase>("idle");
   const pendingRouteRef = useRef<string | null>(null);
+  const navigatedRouteRef = useRef<string | null>(null);
   const outTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigateRef = useRef(navigate);
   const durations = resolveTransitionDurations(transitionSpeed ?? 0);
@@ -121,12 +132,22 @@ export function useDisplayTransition({
       pendingRouteRef.current = null;
 
       if (route !== null) {
+        navigatedRouteRef.current = route;
         navigateRef.current(route);
       }
 
-      setPhase("in");
+      // 先進 hold（opacity 0 隱藏），等新 route 真正掛載再淡入，避免 loader 期間舊頁淡回。
+      setPhase("hold");
     }, outMsRef.current);
   }, []);
+
+  // 導向的 route 成為目前 route（loader 完成、新頁掛載）後才播 fade-in。
+  useLayoutEffect(() => {
+    if (shouldEnterInPhase(navigatedRouteRef.current, currentPath)) {
+      navigatedRouteRef.current = null;
+      setPhase("in");
+    }
+  }, [currentPath]);
 
   const onInAnimationEnd = useCallback(() => {
     setPhase((current) => (current === "in" ? "idle" : current));

@@ -294,6 +294,89 @@ export function FactoryCircuit({
     enabled: runtimeHydrationEnabled
   });
 
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig = useMemo<FactoryCircuitDisplayPageConfig>(() => {
+    const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+    const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
+    const runtimeCardStyles = runtimeResolvedConfig.cardStyles ?? {};
+    return {
+      ...runtimeResolvedConfig,
+      cardStyles: {
+        flow: { ...seedConfig.cardStyles.flow, ...(runtimeCardStyles.flow ?? {}) },
+        peak: { ...seedConfig.cardStyles.peak, ...(runtimeCardStyles.peak ?? {}) },
+        selfConsumption: { ...seedConfig.cardStyles.selfConsumption, ...(runtimeCardStyles.selfConsumption ?? {}) },
+        solarShare: { ...seedConfig.cardStyles.solarShare, ...(runtimeCardStyles.solarShare ?? {}) },
+        totalPower: { ...seedConfig.cardStyles.totalPower, ...(runtimeCardStyles.totalPower ?? {}) }
+      },
+      chrome: {
+        ...seedConfig.chrome,
+        ...runtimeChrome,
+        copyTypography: createCopyTypographyConfig({
+          ...seedConfig.chrome.copyTypography,
+          ...(runtimeChrome.copyTypography ?? {})
+        }),
+        modules: {
+          ...seedConfig.chrome.modules,
+          ...(runtimeChrome.modules ?? {})
+        },
+        ornaments: {
+          ...seedConfig.chrome.ornaments,
+          ...runtimeOrnaments,
+          leaf: createLeafOrnamentChromeConfig({
+            ...seedConfig.chrome.ornaments.leaf,
+            ...(runtimeOrnaments.leaf ?? {})
+          })
+        }
+      },
+      rhythm: {
+        ...seedConfig.rhythm,
+        ...(runtimeResolvedConfig.rhythm ?? {})
+      }
+    };
+  }, [runtimeResolvedConfig, seedConfig]);
+  const viewModel = useMemo(
+    () =>
+      buildFactoryCircuitViewModel({
+        circuits,
+        connectionState,
+        loadState,
+        snapshot,
+        factoryCircuitStory: factoryStoryRuntime.payload ?? undefined
+      }),
+    [circuits, connectionState, loadState, snapshot, factoryStoryRuntime.payload]
+  );
+  const powerConnectors = useMemo(
+    () =>
+      Object.keys(resolvedConfig.connectors).map((connectorKey) => {
+        const layout = withContentOffset(
+          resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
+        );
+        const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
+        const treatment = resolveFlowConnectorTreatmentConfig(
+          resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments],
+          seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments]
+        );
+        const referenceHeight = reference.height * (treatment.strokeWidth / seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments].strokeWidth);
+
+        return {
+          key: connectorKey,
+          src: reference.src,
+          style: {
+            height: `${referenceHeight}px`,
+            left: `${layout.left + reference.leftOffset}px`,
+            top: `${layout.top + reference.topOffset - (referenceHeight - reference.height) / 2}px`,
+            width: `${reference.width}px`,
+            ...buildFlowConnectorTreatmentStyle(treatment)
+          }
+        };
+      }),
+    [resolvedConfig, seedConfig]
+  );
+  const kpiSparklineValues = useMemo(
+    () => viewModel.kpis.map((_, index) => trendSeries.map((value) => value - index * 1.5)),
+    [viewModel.kpis]
+  );
+
   if (
     shouldDeferDisplayPageRuntimeRender({
       runtimeHydrationEnabled,
@@ -305,51 +388,6 @@ export function FactoryCircuit({
     return <DisplayPageLoadingState />;
   }
 
-  const runtimeResolvedConfig = config ?? runtimeConfig.config;
-  const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
-  const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
-  const runtimeCardStyles = runtimeResolvedConfig.cardStyles ?? {};
-  const resolvedConfig: FactoryCircuitDisplayPageConfig = {
-    ...runtimeResolvedConfig,
-    cardStyles: {
-      flow: { ...seedConfig.cardStyles.flow, ...(runtimeCardStyles.flow ?? {}) },
-      peak: { ...seedConfig.cardStyles.peak, ...(runtimeCardStyles.peak ?? {}) },
-      selfConsumption: { ...seedConfig.cardStyles.selfConsumption, ...(runtimeCardStyles.selfConsumption ?? {}) },
-      solarShare: { ...seedConfig.cardStyles.solarShare, ...(runtimeCardStyles.solarShare ?? {}) },
-      totalPower: { ...seedConfig.cardStyles.totalPower, ...(runtimeCardStyles.totalPower ?? {}) }
-    },
-    chrome: {
-      ...seedConfig.chrome,
-      ...runtimeChrome,
-      copyTypography: createCopyTypographyConfig({
-        ...seedConfig.chrome.copyTypography,
-        ...(runtimeChrome.copyTypography ?? {})
-      }),
-      modules: {
-        ...seedConfig.chrome.modules,
-        ...(runtimeChrome.modules ?? {})
-      },
-      ornaments: {
-        ...seedConfig.chrome.ornaments,
-        ...runtimeOrnaments,
-        leaf: createLeafOrnamentChromeConfig({
-          ...seedConfig.chrome.ornaments.leaf,
-          ...(runtimeOrnaments.leaf ?? {})
-        })
-      }
-    },
-    rhythm: {
-      ...seedConfig.rhythm,
-      ...(runtimeResolvedConfig.rhythm ?? {})
-    }
-  };
-  const viewModel = buildFactoryCircuitViewModel({
-    circuits,
-    connectionState,
-    loadState,
-    snapshot,
-    factoryCircuitStory: factoryStoryRuntime.payload ?? undefined
-  });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
     runtimeErrorMessage: runtimeHydrationEnabled ? factoryStoryRuntime.errorMessage : "",
@@ -367,29 +405,6 @@ export function FactoryCircuit({
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
   const goldLayout = withContentOffset(factoryCircuitGoldLayout);
-  const powerConnectors = Object.keys(resolvedConfig.connectors).map((connectorKey) => {
-    const layout = withContentOffset(
-      resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
-    );
-    const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
-    const treatment = resolveFlowConnectorTreatmentConfig(
-      resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments],
-      seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments]
-    );
-    const referenceHeight = reference.height * (treatment.strokeWidth / seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments].strokeWidth);
-
-    return {
-      key: connectorKey,
-      src: reference.src,
-      style: {
-        height: `${referenceHeight}px`,
-        left: `${layout.left + reference.leftOffset}px`,
-        top: `${layout.top + reference.topOffset - (referenceHeight - reference.height) / 2}px`,
-        width: `${reference.width}px`,
-        ...buildFlowConnectorTreatmentStyle(treatment)
-      }
-    };
-  });
 
   return (
     <section className="factory-circuit-display-page">
@@ -640,7 +655,7 @@ export function FactoryCircuit({
             />
             <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
             <DisplayCardFooter>
-              <Sparkline className="factory-circuit-kpi-sparkline" values={trendSeries.map((value) => value - index * 1.5)} />
+              <Sparkline className="factory-circuit-kpi-sparkline" values={kpiSparklineValues[index]!} />
             </DisplayCardFooter>
           </DisplayCardFrame>
         );

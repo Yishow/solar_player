@@ -15,6 +15,8 @@ export type EnergyHistorySnapshot = {
   selfConsumption: number | null;
 };
 
+type EnergyHistoryLinePoint = { label: string; value: number | null };
+
 export type DailyEnergySummary = {
   co2Total: number | null;
   consumptionTotal: number | null;
@@ -295,6 +297,18 @@ export function buildEnergyHistoryViewModel({
               sourceRoleLabel: "History Summary + Trend Snapshot"
             });
 
+  // Single pass over snapshots to build all three chart-line vectors instead of
+  // three independent maps; emitted objects and order match the originals
+  // point-for-point.
+  const generationLinePoints: EnergyHistoryLinePoint[] = [];
+  const selfConsumptionLinePoints: EnergyHistoryLinePoint[] = [];
+  const consumptionLinePoints: EnergyHistoryLinePoint[] = [];
+  for (const snapshot of snapshots) {
+    generationLinePoints.push({ label: snapshot.capturedAt, value: snapshot.generation });
+    selfConsumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.selfConsumption });
+    consumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.consumption });
+  }
+
   return {
     bottomSummary: [
       {
@@ -327,28 +341,19 @@ export function buildEnergyHistoryViewModel({
         colorToken: "orange",
         key: "generation",
         label: "發電量 (kW)",
-        points: snapshots.map((snapshot) => ({
-          label: snapshot.capturedAt,
-          value: snapshot.generation
-        }))
+        points: generationLinePoints
       },
       {
         colorToken: "green",
         key: "selfConsumption",
         label: "自發自用 (kW)",
-        points: snapshots.map((snapshot) => ({
-          label: snapshot.capturedAt,
-          value: snapshot.selfConsumption
-        }))
+        points: selfConsumptionLinePoints
       },
       {
         colorToken: "blue",
         key: "consumption",
         label: "用電量 (kW)",
-        points: snapshots.map((snapshot) => ({
-          label: snapshot.capturedAt,
-          value: snapshot.consumption
-        }))
+        points: consumptionLinePoints
       }
     ],
     chartSubtitle: rangeHeading.subtitle,

@@ -121,7 +121,10 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     enabled: runtimeHydrationEnabled
   });
 
-  const resolvedConfig = resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig);
+  const resolvedConfig = useMemo(
+    () => resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig),
+    [config, runtimeConfig.config, seedConfig]
+  );
   const backgroundPoolSources = resolvedConfig.backgroundPool.sources;
   const backgroundPoolSignature = backgroundPoolSources
     .map((source) => source.src ?? source.assetId ?? "")
@@ -134,149 +137,172 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     [backgroundPoolSignature]
   );
 
-  if (
-    shouldDeferDisplayPageRuntimeRender({
-      runtimeHydrationEnabled,
-      isLoading: runtimeConfig.isLoading,
-      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
-      stage: runtimeStage
-    })
-  ) {
-    return <DisplayPageLoadingState />;
-  }
+  const storyOverviewPayload = storyRuntime.payload ?? undefined;
+  const viewModel = useMemo(
+    () =>
+      buildOverviewViewModel({
+        connectionState,
+        isSocketConnected,
+        snapshot,
+        storyOverview: storyOverviewPayload,
+        weatherSnapshot
+      }),
+    [connectionState, isSocketConnected, snapshot, storyOverviewPayload, weatherSnapshot]
+  );
 
-  const backgroundSource = selectedBackground
-    ? resolveDisplayPageMediaSource(selectedBackground, selectedBackground.src ?? null)
-    : null;
-  const viewModel = buildOverviewViewModel({
-    connectionState,
-    isSocketConnected,
-    snapshot,
-    storyOverview: storyRuntime.payload ?? undefined,
-    weatherSnapshot
-  });
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
-    usesRuntimeFallback: storyRuntime.usesFallback
-  });
-  const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
-  const heroMediaPresentation = buildDisplayPageMediaPresentation(
-    resolvedConfig.heroMedia,
-    overviewHeroMediaEffectResolverOptions
+  const backgroundSource = useMemo(
+    () =>
+      selectedBackground
+        ? resolveDisplayPageMediaSource(selectedBackground, selectedBackground.src ?? null)
+        : null,
+    [selectedBackground]
+  );
+  const heroMediaSource = useMemo(
+    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
+    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
+  );
+  const heroMediaPresentation = useMemo(
+    () =>
+      buildDisplayPageMediaPresentation(resolvedConfig.heroMedia, overviewHeroMediaEffectResolverOptions),
+    [resolvedConfig.heroMedia]
   );
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
 
-  const titleLayout = withContentOffset(resolvedConfig.heroCopyLayout);
-  const heroLayout = withContentOffset(resolvedConfig.heroContainer);
-  const leafLayout = withContentOffset(overviewLeafLayout);
-  const goldLineLayout = withContentOffset(overviewGoldLineLayout);
-  const generationTrendLayout = withContentOffset(resolvedConfig.dashboardWidgets.generationTrend);
-  const alertNotificationsLayout = withContentOffset(resolvedConfig.dashboardWidgets.alertNotifications);
-  const weatherLayout = withContentOffset(resolvedConfig.dashboardWidgets.weather);
-  const phasePowerLayout = withContentOffset(resolvedConfig.dashboardWidgets.phasePower);
-  const generationTrendSeries =
-    viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [];
-  return (
-    <section className="overview-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
-      <DisplayLeafOrnament
-        className="overview-leaf-watermark display-surface-leaf-ornament"
-        config={resolvedConfig.chrome.ornaments.leaf}
-        style={{
-          height: `${leafLayout.height}px`,
-          left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
-          opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
-          top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-          transform: `rotate(-15deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
-          width: `${leafLayout.width}px`
-        }}
-      />
+  const titleLayout = useMemo(() => withContentOffset(resolvedConfig.heroCopyLayout), [resolvedConfig.heroCopyLayout]);
+  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
+  const leafLayout = useMemo(() => withContentOffset(overviewLeafLayout), []);
+  const goldLineLayout = useMemo(() => withContentOffset(overviewGoldLineLayout), []);
+  const generationTrendLayout = useMemo(
+    () => withContentOffset(resolvedConfig.dashboardWidgets.generationTrend),
+    [resolvedConfig.dashboardWidgets.generationTrend]
+  );
+  const alertNotificationsLayout = useMemo(
+    () => withContentOffset(resolvedConfig.dashboardWidgets.alertNotifications),
+    [resolvedConfig.dashboardWidgets.alertNotifications]
+  );
+  const weatherLayout = useMemo(
+    () => withContentOffset(resolvedConfig.dashboardWidgets.weather),
+    [resolvedConfig.dashboardWidgets.weather]
+  );
+  const phasePowerLayout = useMemo(
+    () => withContentOffset(resolvedConfig.dashboardWidgets.phasePower),
+    [resolvedConfig.dashboardWidgets.phasePower]
+  );
+  const generationTrendSeries = useMemo(
+    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [],
+    [viewModel.metrics]
+  );
 
-      <div
-        className="overview-gold-line display-surface-gold-line"
-        style={{
-          height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
-          left: `${goldLineLayout.left}px`,
-          opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
-          top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
-          width: `${goldLineLayout.width}px`
-        }}
-      />
+  const leafOrnamentStyle = useMemo(
+    () => ({
+      height: `${leafLayout.height}px`,
+      left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+      opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
+      top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+      transform: `rotate(-15deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
+      width: `${leafLayout.width}px`
+    }),
+    [leafLayout, resolvedConfig.chrome.ornaments.leaf]
+  );
+  const goldLineStyle = useMemo(
+    () => ({
+      height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
+      left: `${goldLineLayout.left}px`,
+      opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+      top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
+      width: `${goldLineLayout.width}px`
+    }),
+    [goldLineLayout, resolvedConfig.chrome.ornaments.goldLine]
+  );
+  const titleGroupStyle = useMemo(
+    () => ({
+      left: `${titleLayout.left}px`,
+      top: `${titleLayout.top}px`,
+      width: `${titleLayout.width}px`
+    }),
+    [titleLayout]
+  );
+  const eyebrowStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.eyebrowFontSize}px`,
+      letterSpacing: `${heroTypography.eyebrowLetterSpacing}px`,
+      marginBottom: `${heroTypography.eyebrowMarginBottom}px`
+    }),
+    [heroTypography]
+  );
+  const titleStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.titleFontSize}px`,
+      fontWeight: heroTypography.titleEmphasisWeight,
+      letterSpacing: `${heroTypography.titleLetterSpacing}px`,
+      lineHeight: heroTypography.titleLineHeight
+    }),
+    [heroTypography]
+  );
+  const subtitleStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.subtitleFontSize}px`,
+      lineHeight: heroTypography.subtitleLineHeight,
+      marginTop: `${heroTypography.subtitleMarginTop}px`
+    }),
+    [heroTypography]
+  );
+  const heroBannerStyle = useMemo(
+    () => ({
+      ...heroMediaPresentation.stageStyle,
+      height: `${heroLayout.height}px`,
+      left: `${heroLayout.left}px`,
+      top: `${heroLayout.top}px`,
+      width: `${heroLayout.width}px`
+    }),
+    [heroMediaPresentation.stageStyle, heroLayout]
+  );
+  const weatherWidgetStyle = useMemo(
+    () => ({
+      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.weather),
+      height: `${weatherLayout.height}px`,
+      left: `${weatherLayout.left}px`,
+      top: `${weatherLayout.top}px`,
+      width: `${weatherLayout.width}px`
+    }),
+    [resolvedConfig.widgetStyles.weather, weatherLayout]
+  );
+  const phasePowerWidgetStyle = useMemo(
+    () => ({
+      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.phasePower),
+      height: `${phasePowerLayout.height}px`,
+      left: `${phasePowerLayout.left}px`,
+      top: `${phasePowerLayout.top}px`,
+      width: `${phasePowerLayout.width}px`
+    }),
+    [resolvedConfig.widgetStyles.phasePower, phasePowerLayout]
+  );
+  const generationTrendWidgetStyle = useMemo(
+    () => ({
+      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.generationTrend),
+      height: `${generationTrendLayout.height}px`,
+      left: `${generationTrendLayout.left}px`,
+      top: `${generationTrendLayout.top}px`,
+      width: `${generationTrendLayout.width}px`
+    }),
+    [resolvedConfig.widgetStyles.generationTrend, generationTrendLayout]
+  );
+  const alertNotificationsWidgetStyle = useMemo(
+    () => ({
+      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.alertNotifications),
+      height: `${alertNotificationsLayout.height}px`,
+      left: `${alertNotificationsLayout.left}px`,
+      top: `${alertNotificationsLayout.top}px`,
+      width: `${alertNotificationsLayout.width}px`
+    }),
+    [resolvedConfig.widgetStyles.alertNotifications, alertNotificationsLayout]
+  );
 
-      <section
-        className="overview-title-group display-surface-hero-group"
-        style={{
-          left: `${titleLayout.left}px`,
-          top: `${titleLayout.top}px`,
-          width: `${titleLayout.width}px`
-        }}
-      >
-        <p
-          className="overview-eyebrow display-surface-hero-eyebrow"
-          style={{
-            fontSize: `${resolvedConfig.chrome.heroTypography.eyebrowFontSize}px`,
-            letterSpacing: `${resolvedConfig.chrome.heroTypography.eyebrowLetterSpacing}px`,
-            marginBottom: `${resolvedConfig.chrome.heroTypography.eyebrowMarginBottom}px`
-          }}
-        >
-          {resolvedConfig.heroCopy.eyebrow}
-        </p>
-        <h2
-          className="overview-display-title display-surface-hero-title"
-          style={{
-            fontSize: `${resolvedConfig.chrome.heroTypography.titleFontSize}px`,
-            fontWeight: heroTypography.titleEmphasisWeight,
-            letterSpacing: `${resolvedConfig.chrome.heroTypography.titleLetterSpacing}px`,
-            lineHeight: resolvedConfig.chrome.heroTypography.titleLineHeight
-          }}
-        >
-          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[0])}
-          <br />
-          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[1])}
-        </h2>
-        <p
-          className="overview-hero-subtitle display-surface-hero-subtitle"
-          style={{
-            fontSize: `${resolvedConfig.chrome.heroTypography.subtitleFontSize}px`,
-            lineHeight: resolvedConfig.chrome.heroTypography.subtitleLineHeight,
-            marginTop: `${resolvedConfig.chrome.heroTypography.subtitleMarginTop}px`
-          }}
-        >
-          {resolvedConfig.heroCopy.subtitleLines[0]}
-          <br />
-          {resolvedConfig.heroCopy.subtitleLines[1]}
-        </p>
-      </section>
-
-      <figure
-        className={`overview-hero-banner display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
-        style={{
-          ...heroMediaPresentation.stageStyle,
-          height: `${heroLayout.height}px`,
-          left: `${heroLayout.left}px`,
-          top: `${heroLayout.top}px`,
-          width: `${heroLayout.width}px`
-        }}
-      >
-        <img
-          alt={selectedBackground?.alt ?? resolvedConfig.heroMedia.alt}
-          src={backgroundSource ?? heroMediaSource ?? undefined}
-          style={heroMediaPresentation.mediaStyle}
-        />
-        {heroMediaPresentation.overlayLayers.map((layer) => (
-          <span
-            key={layer.id}
-            aria-hidden="true"
-            className={layer.className}
-            style={layer.style}
-          />
-        ))}
-      </figure>
-
-      {overviewCardOrder.map((cardItem, index) => {
+  const kpiCards = useMemo(
+    () =>
+      overviewCardOrder.map((cardItem, index) => {
         if (!shouldRenderOverviewKpiCard(resolvedConfig.kpiCards[cardItem.key])) {
           return null;
         }
@@ -288,7 +314,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         return (
           <DisplayCardFrame
             cardStyle={cardStyle}
-            key={metric.label}
+            key={metric.metricKey}
             className="overview-kpi-card"
             surface="metric"
             style={{
@@ -316,54 +342,112 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
             <OverviewKpiFooter footer={resolvedConfig.kpiCards[cardItem.key]} metric={metric} />
           </DisplayCardFrame>
         );
-      })}
+      }),
+    [resolvedConfig, seedConfig.iconSources, viewModel.metrics]
+  );
+
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
+    usesRuntimeFallback: storyRuntime.usesFallback
+  });
+
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return <DisplayPageLoadingState />;
+  }
+
+  return (
+    <section className="overview-display-page">
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
+      <DisplayLeafOrnament
+        className="overview-leaf-watermark display-surface-leaf-ornament"
+        config={resolvedConfig.chrome.ornaments.leaf}
+        style={leafOrnamentStyle}
+      />
+
+      <div
+        className="overview-gold-line display-surface-gold-line"
+        style={goldLineStyle}
+      />
+
+      <section
+        className="overview-title-group display-surface-hero-group"
+        style={titleGroupStyle}
+      >
+        <p
+          className="overview-eyebrow display-surface-hero-eyebrow"
+          style={eyebrowStyle}
+        >
+          {resolvedConfig.heroCopy.eyebrow}
+        </p>
+        <h2
+          className="overview-display-title display-surface-hero-title"
+          style={titleStyle}
+        >
+          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[0])}
+          <br />
+          {renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[1])}
+        </h2>
+        <p
+          className="overview-hero-subtitle display-surface-hero-subtitle"
+          style={subtitleStyle}
+        >
+          {resolvedConfig.heroCopy.subtitleLines[0]}
+          <br />
+          {resolvedConfig.heroCopy.subtitleLines[1]}
+        </p>
+      </section>
+
+      <figure
+        className={`overview-hero-banner display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
+        style={heroBannerStyle}
+      >
+        <img
+          alt={selectedBackground?.alt ?? resolvedConfig.heroMedia.alt}
+          src={backgroundSource ?? heroMediaSource ?? undefined}
+          style={heroMediaPresentation.mediaStyle}
+        />
+        {heroMediaPresentation.overlayLayers.map((layer) => (
+          <span
+            key={layer.id}
+            aria-hidden="true"
+            className={layer.className}
+            style={layer.style}
+          />
+        ))}
+      </figure>
+
+      {kpiCards}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.weather) ? (
         <WeatherCardWidget
           weather={viewModel.weather}
-          style={{
-            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.weather),
-            height: `${weatherLayout.height}px`,
-            left: `${weatherLayout.left}px`,
-            top: `${weatherLayout.top}px`,
-            width: `${weatherLayout.width}px`
-          }}
+          style={weatherWidgetStyle}
         />
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.phasePower) ? (
         <PhasePowerTableWidget
           phasePower={viewModel.phasePower}
-          style={{
-            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.phasePower),
-            height: `${phasePowerLayout.height}px`,
-            left: `${phasePowerLayout.left}px`,
-            top: `${phasePowerLayout.top}px`,
-            width: `${phasePowerLayout.width}px`
-          }}
+          style={phasePowerWidgetStyle}
         />
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend) ? (
         <GenerationTrendWidget
           series={generationTrendSeries}
-          style={{
-            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.generationTrend),
-            height: `${generationTrendLayout.height}px`,
-            left: `${generationTrendLayout.left}px`,
-            top: `${generationTrendLayout.top}px`,
-            width: `${generationTrendLayout.width}px`
-          }}
+          style={generationTrendWidgetStyle}
         />
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.alertNotifications) ? (
         <AlertNotificationsWidget
           alerts={viewModel.alerts}
           alwaysShowThresholds={resolvedConfig.dashboardWidgets.alertNotifications.alwaysShowThresholds}
-          style={{
-            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.alertNotifications),
-            height: `${alertNotificationsLayout.height}px`,
-            left: `${alertNotificationsLayout.left}px`,
-            top: `${alertNotificationsLayout.top}px`,
-            width: `${alertNotificationsLayout.width}px`
-          }}
+          style={alertNotificationsWidgetStyle}
         />
       ) : null}
       <DisplayPageObjectLayer objects={freeformObjects} />
