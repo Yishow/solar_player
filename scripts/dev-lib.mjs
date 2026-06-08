@@ -56,13 +56,30 @@ export function resolveServerPort(dotEnv, inheritedEnv) {
   );
 }
 
+export function resolveWebPort(dotEnv, inheritedEnv) {
+  return (
+    parseInteger(dotEnv.VITE_PORT) ??
+    parseInteger(inheritedEnv.VITE_PORT) ??
+    DEFAULT_WEB_PORT
+  );
+}
+
 export function resolveDevPorts(dotEnv, inheritedEnv = process.env) {
   const serverPort = resolveServerPort(dotEnv, inheritedEnv);
+  const configuredWebPort = parseInteger(dotEnv.VITE_PORT) ?? parseInteger(inheritedEnv.VITE_PORT);
+
+  if (configuredWebPort === serverPort) {
+    throw new Error(
+      `[dev] VITE_PORT (${configuredWebPort}) must differ from backend PORT (${serverPort}).`
+    );
+  }
+
+  const webPort = configuredWebPort ?? (serverPort === DEFAULT_WEB_PORT ? DEFAULT_WEB_PORT + 1 : DEFAULT_WEB_PORT);
 
   return {
-    webPort: DEFAULT_WEB_PORT,
+    webPort,
     serverPort,
-    portsToFree: [DEFAULT_WEB_PORT]
+    portsToFree: [webPort]
   };
 }
 

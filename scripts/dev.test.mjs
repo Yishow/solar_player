@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -9,6 +11,8 @@ import {
   resolveServerPort,
   stripAnsi
 } from "./dev-lib.mjs";
+
+const devScriptSource = readFileSync(path.join(import.meta.dirname, "./dev.mjs"), "utf8");
 
 test("parseDotEnv ignores comments and trims quoted values", () => {
   const parsed = parseDotEnv(`
@@ -45,9 +49,9 @@ test("resolveDevPorts only frees the web port and leaves the server port guarded
   assert.deepEqual(
     resolveDevPorts({ PORT: "5173" }, { PORT: "3333" }),
     {
-      webPort: 5173,
+      webPort: 5174,
       serverPort: 5173,
-      portsToFree: [5173]
+      portsToFree: [5174]
     }
   );
 
@@ -57,6 +61,30 @@ test("resolveDevPorts only frees the web port and leaves the server port guarded
       webPort: 5173,
       serverPort: 3000,
       portsToFree: [5173]
+    }
+  );
+});
+
+test("dev launcher forwards the resolved web port into the web child environment", () => {
+  assert.match(devScriptSource, /VITE_PORT:\s*String\(webPort\)/);
+});
+
+test("resolveDevPorts allows VITE_PORT to override the default web port", () => {
+  assert.deepEqual(
+    resolveDevPorts({ VITE_PORT: "4267", PORT: "3000" }, { VITE_PORT: "4999", PORT: "3333" }),
+    {
+      webPort: 4267,
+      serverPort: 3000,
+      portsToFree: [4267]
+    }
+  );
+
+  assert.deepEqual(
+    resolveDevPorts({}, { VITE_PORT: "4999", PORT: "3333" }),
+    {
+      webPort: 4999,
+      serverPort: 3333,
+      portsToFree: [4999]
     }
   );
 });

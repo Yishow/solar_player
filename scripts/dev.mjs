@@ -277,7 +277,7 @@ async function main() {
   const projectRoot = process.cwd();
   const dotEnvPath = resolve(projectRoot, ".env");
   const dotEnv = existsSync(dotEnvPath) ? readDotEnvFile(dotEnvPath) : {};
-  const { portsToFree, serverPort } = resolveDevPorts(dotEnv, process.env);
+  const { portsToFree, serverPort, webPort } = resolveDevPorts(dotEnv, process.env);
 
   for (const port of portsToFree) {
     freePort(port);
@@ -311,7 +311,10 @@ async function main() {
     console.log(`[dev] server ready on tcp:${serverPort}; starting web`);
     webProcess = startLabeledProcess("pnpm", buildWebArgs(), {
       cwd: projectRoot,
-      env: process.env,
+      env: {
+        ...process.env,
+        VITE_PORT: String(webPort)
+      },
       label: "web"
     });
 
