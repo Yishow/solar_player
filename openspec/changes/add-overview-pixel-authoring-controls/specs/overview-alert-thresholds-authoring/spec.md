@@ -25,4 +25,3 @@ The system SHALL layout the humidity, wind speed, and rain amount sub-indicators
 - **GIVEN** trend data is available
 - **WHEN** the Generation Trend widget is rendered
 - **THEN** the trend line resolves to an area sparkline with gradient styling
-

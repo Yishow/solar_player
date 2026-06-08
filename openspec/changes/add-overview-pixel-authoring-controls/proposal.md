@@ -6,6 +6,7 @@
 
 - KPI 卡的內部樣式（icon 尺寸、label/subtitle/數值字級、卡片內距、內部對齊）**沿用既有 `cardStyles`（`DisplayCardStyleConfig`）**，該能力已可由 editor 編輯（`buildDisplayCardStyleFields` inspector + `buildDisplayCardStyleVars` runtime inline 變數 + region schema），本 change 不為 KPI 卡重造平行 config。
 - 為 4 個 density widget（weather/phasePower/generationTrend/alertNotifications）新增 `widgetStyles`（型別＝既有 `DisplayCardStyleConfig`），runtime 比照 KPI 卡以 `buildDisplayCardStyleVars` 套 inline 變數，補上目前缺少的 widget 內部樣式可調能力。
+- 將 Overview KPI footer 類型（sparkline / progress / text / co2-tree / none）與 Alert Notifications 的 `alwaysShowThresholds` 常駐規則可見性，併入同一個 Overview editor capability umbrella change；不再維持獨立的 active 小 change。
 - 擴充既有 `DisplayCardStyleConfig`：新增 `trendHeight`（sparkline/趨勢區高度，seed 56px，輸出 `--display-card-trend-height`）、`valueRowAlign` 擴為 `start|center|end`；為 additive，其他頁不傳則走 seed 預設、stylesheet 以 `var(--display-card-trend-height, 56px)` 帶現值 fallback，不在 stylesheet 寫死 Better 像素數值。
 - 不新增平行 `backgroundPlacement` config；改以既有 `heroContainer` 幾何、`heroMedia.alignX/alignY` 與 `heroMedia.effects` 作為背景照片 placement contract，並用 guard 測試確認這條 authoring/runtime 路徑完整可用。
 - 在 editor inspector（`apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx` 與 Overview region schema）新增對應欄位，沿用既有 typed inspector 與 region schema 模式，draft/live 可持久化。
@@ -35,6 +36,7 @@
 - Affected specs:
   - 新增 `overview-card-internal-style-authoring`
   - 新增 `overview-background-placement-authoring`
+  - 新增 `overview-alert-thresholds-authoring`
 - Affected code:
   - Modified:
     - packages/shared/src/displayPageConfig.ts
