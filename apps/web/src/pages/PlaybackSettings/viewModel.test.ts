@@ -248,6 +248,8 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
       code: "mqtt-mapping-missing" as const,
       expectedDestination: "MQTT Settings",
       expectedKind: "mqtt-mapping",
+      expectedDetail: "主因：總覽 缺少必要的 MQTT 對應 · 受影響頁面：總覽",
+      labelZh: "總覽",
       message: "overview 缺少必要的 MQTT mapping",
       pageId: "overview" as const
     },
@@ -255,6 +257,8 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
       code: "slot-binding-missing" as const,
       expectedDestination: "Circuit Settings",
       expectedKind: "slot-binding",
+      expectedDetail: "主因：太陽能 缺少必要的電路槽位綁定 · 受影響頁面：太陽能",
+      labelZh: "太陽能",
       message: "solar 缺少必要的 circuit slot 綁定",
       pageId: "solar" as const
     },
@@ -262,6 +266,8 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
       code: "stale-runtime" as const,
       expectedDestination: "Playback Settings",
       expectedKind: "runtime-readiness",
+      expectedDetail: "主因：圖庫 即時資料已逾時，暫時跳過輪播 · 受影響頁面：圖庫",
+      labelZh: "圖庫",
       message: "images runtime 已逾時，暫時跳過輪播",
       pageId: "images" as const
     },
@@ -269,6 +275,8 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
       code: "unpublished" as const,
       expectedDestination: "Display Pages Editor",
       expectedKind: "publish-state",
+      expectedDetail: "主因：工廠迴路 最新草稿尚未發布，因此未進入正式輪播 · 受影響頁面：工廠迴路",
+      labelZh: "工廠迴路",
       message: "factory-circuit 最新 draft 尚未發布，因此未進入正式輪播",
       pageId: "factory-circuit" as const
     }
@@ -307,7 +315,7 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
             draftPending: false,
             draftVersion: null,
             labelEn: testCase.pageId,
-            labelZh: testCase.pageId,
+            labelZh: testCase.labelZh,
             liveVersion: 6,
             pageId: testCase.pageId,
             publishState: testCase.code === "unpublished" ? "draft-only" : "live",
@@ -340,7 +348,61 @@ test("buildPlaybackSettingsViewModel maps dominant display faults into repair de
     assert.equal(model.triageSummary?.faultKind, testCase.expectedKind);
     assert.deepEqual(model.triageSummary?.affectedPages, [testCase.pageId]);
     assert.equal(model.displayOpsBanner.title, "1 個展示頁需處理");
-    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.message));
-    assert.match(model.displayOpsBanner.detail, new RegExp(testCase.pageId));
+    assert.equal(model.displayOpsBanner.detail, testCase.expectedDetail);
   }
+});
+
+test("buildPlaybackSettingsViewModel keeps default display operations copy fully localized", () => {
+  const model = buildPlaybackSettingsViewModel({
+    errorMessage: "",
+    isSaving: false,
+    message: "播放設定已同步。",
+    pages,
+    runtimeCountdown: 7,
+    runtimeCurrentPage: effectiveRotationPreview.playablePages[0] ?? null,
+    runtimeErrorMessage: "",
+    runtimeIsLoading: false,
+    runtimeIsPlaying: true,
+    runtimeProgress: 48,
+    rotationPreview: effectiveRotationPreview,
+    settings
+  });
+
+  assert.equal(model.displayOpsBanner.title, "展示作業已同步");
+  assert.equal(model.displayOpsBanner.detail, "輪播發布、略過狀態與草稿待發布情形會在這裡同步。");
+});
+
+test("buildPlaybackSettingsViewModel uses a localized global scope label when the root cause is not page-specific", () => {
+  const model = buildPlaybackSettingsViewModel({
+    errorMessage: "",
+    isSaving: false,
+    message: "播放設定已同步。",
+    pages,
+    displayOpsSummary: {
+      blockingIssues: [
+        {
+          code: "live-reference",
+          message: "Asset is still referenced by a live display surface",
+          severity: "blocking"
+        }
+      ],
+      draftCount: 0,
+      draftPending: false,
+      generatedAt: "2026-05-20T02:45:00.000Z",
+      lastPublishAt: "2026-05-20T01:30:00.000Z",
+      liveVersion: 6,
+      pages: [],
+      skipCount: 0
+    },
+    runtimeCountdown: 7,
+    runtimeCurrentPage: effectiveRotationPreview.playablePages[0] ?? null,
+    runtimeErrorMessage: "",
+    runtimeIsLoading: false,
+    runtimeIsPlaying: true,
+    runtimeProgress: 48,
+    rotationPreview: effectiveRotationPreview,
+    settings
+  });
+
+  assert.equal(model.displayOpsBanner.detail, "主因：素材仍被正式展示頁引用 · 受影響頁面：全域設定");
 });

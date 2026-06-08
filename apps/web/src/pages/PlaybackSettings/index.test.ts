@@ -24,10 +24,12 @@ test("playback settings renders rotation tiles from the shared live preview cata
   assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\)/);
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
   assert.match(playbackSettingsSource, /ps-preview__alert/);
+  assert.match(playbackSettingsSource, /ps-preview--with-alert/);
   assert.doesNotMatch(playbackSettingsSource, /slideOverview/);
   assert.doesNotMatch(playbackSettingsSource, /PAGE_THUMBNAILS/);
   assert.doesNotMatch(playbackSettingsSource, /viewModel\.skippedRotationRows\.length > 0/);
   assert.doesNotMatch(playbackSettingsSource, /viewModel\.pendingDraftRows\.length > 0/);
+  assert.doesNotMatch(playbackSettingsSource, /Configured Rotation Preview/);
   assert.match(playbackSettingsSource, /showPreviewAlert/);
 });
 
@@ -45,4 +47,10 @@ test("playback settings action row opts out of the absolute-position management 
   assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-actions \.mgmt-action/);
   assert.match(playbackSettingsCss, /position:\s*static/);
   assert.match(playbackSettingsCss, /top:\s*auto/);
+});
+
+test("playback settings reserves extra preview space when the alert banner is visible", () => {
+  assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert\s*\{/);
+  assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert\s*\{[\s\S]*height:\s*300px;/);
+  assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert \.ps-preview__list\s*\{/);
 });

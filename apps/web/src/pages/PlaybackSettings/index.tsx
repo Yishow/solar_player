@@ -342,9 +342,12 @@ export function PlaybackSettings() {
         />
       ) : null}
 
-      <OpsSurface className="ps-preview" family="preview">
+      <OpsSurface
+        className={`ps-preview${showPreviewAlert ? " ps-preview--with-alert" : ""}`}
+        family="preview"
+      >
           <OpsSurfaceTitle
-            caption="/ Configured Rotation Preview"
+            caption="目前設定的輪播預覽"
             className="ps-preview__title"
             title="目前配置輪播鏈"
           />

@@ -16,7 +16,7 @@ function resolvePreviewState(
 ) : LiveDisplayPagePreviewState {
   if (!templateKey) {
     return {
-      detail: "目前無法從輪播頁面資料解析對應的展示頁 template。",
+      detail: "目前無法從輪播頁面資料解析對應的展示頁版型。",
       status: "renderer-unavailable"
     };
   }

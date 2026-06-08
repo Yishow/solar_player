@@ -41,6 +41,35 @@ const weekdayLabelMap = new Map([
   [6, "六"]
 ]);
 
+const builtInPlaybackPageLabelMap = new Map([
+  ["overview", "總覽"],
+  ["solar", "太陽能"],
+  ["factory-circuit", "工廠迴路"],
+  ["images", "圖庫"],
+  ["sustainability", "永續"]
+]);
+
+const displayOpsTextReplacements = [
+  ["Asset is still referenced by a live display surface", "素材仍被正式展示頁引用"],
+  ["Asset is still referenced by live playlist usage", "素材仍被正式播放清單引用"],
+  ["Asset is still referenced by the live cover image", "素材仍被正式封面圖引用"],
+  ["live display surface", "正式展示頁"],
+  ["live playlist usage", "正式播放清單引用"],
+  ["live cover image", "正式封面圖"],
+  ["runtime playlist", "正式播放清單"],
+  ["缺少必要的 circuit slot 綁定", "缺少必要的電路槽位綁定"],
+  ["runtime 已逾時", "即時資料已逾時"],
+  ["最新 draft 尚未發布", "最新草稿尚未發布"],
+  ["MQTT mapping", "MQTT 對應"],
+  ["circuit slot 綁定", "電路槽位綁定"],
+  ["slot binding", "槽位綁定"],
+  ["draft", "草稿"],
+  ["runtime", "即時資料"],
+  ["global", "全域設定"],
+  ["Asset", "素材"],
+  ["asset", "素材"]
+] as const;
+
 function sortPlaybackPages(pages: PlaybackPage[]) {
   return pages
     .slice()
@@ -83,12 +112,55 @@ function formatStartPageLabel(settings: PlaybackSettings | null, pages: Playback
   return `${padOrder(matchedPage.displayOrder)}. ${matchedPage.labelZh}`;
 }
 
-function formatTriagePages(summary: DisplayFaultTriageSummary) {
-  return summary.affectedPages.length > 0 ? summary.affectedPages.join("、") : "global";
+function createPlaybackPageLabelMap(input: {
+  displayOpsSummary?: DisplayOpsSummary | null;
+  pages: PlaybackPage[];
+}) {
+  const pageLabels = new Map(builtInPlaybackPageLabelMap);
+
+  for (const page of input.pages) {
+    pageLabels.set(page.pageKey, page.labelZh);
+  }
+
+  for (const page of input.displayOpsSummary?.pages ?? []) {
+    pageLabels.set(page.pageId, page.labelZh);
+  }
+
+  return pageLabels;
 }
 
-function formatTriageDetail(summary: DisplayFaultTriageSummary) {
-  return `主因：${summary.dominantReason} · 受影響頁面：${formatTriagePages(summary)}`;
+function localizeDisplayOpsMessage(message: string, pageLabels: Map<string, string>) {
+  let localizedMessage = message;
+
+  for (const [pageId, labelZh] of pageLabels) {
+    localizedMessage = localizedMessage.replaceAll(pageId, labelZh);
+  }
+
+  for (const [searchValue, replaceValue] of displayOpsTextReplacements) {
+    localizedMessage = localizedMessage.replaceAll(searchValue, replaceValue);
+  }
+
+  return localizedMessage.replace(/\s{2,}/g, " ").trim();
+}
+
+function formatTriagePages(
+  summary: DisplayFaultTriageSummary,
+  pageLabels: Map<string, string>
+) {
+  if (summary.affectedPages.length === 0) {
+    return "全域設定";
+  }
+
+  return summary.affectedPages
+    .map((pageId) => pageLabels.get(pageId) ?? localizeDisplayOpsMessage(pageId, pageLabels))
+    .join("、");
+}
+
+function formatTriageDetail(
+  summary: DisplayFaultTriageSummary,
+  pageLabels: Map<string, string>
+) {
+  return `主因：${localizeDisplayOpsMessage(summary.dominantReason, pageLabels)} · 受影響頁面：${formatTriagePages(summary, pageLabels)}`;
 }
 
 function buildEffectiveRotationStatus(input: {
@@ -208,6 +280,7 @@ export function buildPlaybackSettingsViewModel({
   settings
 }: BuildPlaybackSettingsViewModelArgs) {
   const sortedPages = sortPlaybackPages(pages);
+  const playbackPageLabels = createPlaybackPageLabelMap({ displayOpsSummary, pages: sortedPages });
   const enabledCount = sortedPages.filter((page) => page.enabled).length;
   const totalDurationSeconds = sortedPages.reduce((sum, page) => sum + page.durationSeconds, 0);
   const scheduleEnabled = settings?.scheduleEnabled ?? false;
@@ -235,15 +308,16 @@ export function buildPlaybackSettingsViewModel({
     displayOpsBanner: {
       detail:
         triageSummary
-          ? formatTriageDetail(triageSummary)
+          ? formatTriageDetail(triageSummary, playbackPageLabels)
           : displayOpsSummary?.blockingIssues[0]?.message
-            ?? "rotation publish、skip 與 draft pending 狀態會在這裡同步。",
+            ? localizeDisplayOpsMessage(displayOpsSummary.blockingIssues[0].message, playbackPageLabels)
+            : "輪播發布、略過狀態與草稿待發布情形會在這裡同步。",
       title:
         triageSummary
           ? `${triageSummary.affectedPages.length} 個展示頁需處理`
           : displayOpsSummary?.draftPending
           ? `${displayOpsSummary.draftCount} 個展示頁待發布`
-          : "Display operations 已同步",
+          : "展示作業已同步",
       tone:
         displayOpsSummary?.blockingIssues.some((issue) => issue.severity === "blocking")
           ? ("error" as const)

@@ -23,7 +23,7 @@ export function buildLiveDisplayPagePreviewState(args: {
 }): LiveDisplayPagePreviewState {
   if (!args.definition?.renderPreview) {
     return {
-      detail: "目前沒有可用的 page preview renderer。",
+      detail: "目前沒有可用的展示頁預覽元件。",
       status: "renderer-unavailable"
     };
   }
@@ -37,7 +37,7 @@ export function buildLiveDisplayPagePreviewState(args: {
 
   if (!args.envelope?.publishedAt) {
     return {
-      detail: "此展示頁尚未發布到 live stage。",
+      detail: "此展示頁尚未發布到正式版。",
       status: "unpublished"
     };
   }

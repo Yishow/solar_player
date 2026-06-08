@@ -38,7 +38,7 @@ function resolveFallbackHeadline(status: LiveDisplayPagePreviewState["status"]) 
     case "loading":
       return "正在同步正式預覽";
     case "renderer-unavailable":
-      return "缺少預覽 renderer";
+      return "缺少預覽元件";
     case "runtime-unavailable":
       return "預覽資料暫時不可用";
     case "unpublished":

@@ -220,7 +220,7 @@ test("playback settings preview keeps renderer-unavailable fallback when a row h
 
   assert.match(playbackHtml, /自訂展示頁 live preview fallback/);
   assert.match(playbackHtml, /renderer-unavailable/);
-  assert.match(playbackHtml, /目前無法從輪播頁面資料解析對應的展示頁 template。/);
+  assert.match(playbackHtml, /目前無法從輪播頁面資料解析對應的展示頁版型。/);
 });
 
 test("playback settings and slideshow preview share one rotation status summary contract", () => {

@@ -3,6 +3,7 @@ import test from "node:test";
 import React from "react";
 import type { DisplayPageConfigEnvelope, DisplayPageInstance } from "@solar-display/shared";
 import {
+  buildLiveDisplayPagePreviewState,
   buildLiveDisplayPagePreviewStates,
   resolveLiveDisplayPagePreviewState
 } from "./liveDisplayPagePreviewState";
@@ -162,4 +163,20 @@ test("buildLiveDisplayPagePreviewStates keeps ready, unpublished, and asset-unav
   assert.equal(resolveLiveDisplayPagePreviewState("overview-2", states).status, "unpublished");
   assert.equal(resolveLiveDisplayPagePreviewState("overview-3", states).status, "asset-unavailable");
   assert.equal(resolveLiveDisplayPagePreviewState("overview-404", states).status, "loading");
+});
+
+test("buildLiveDisplayPagePreviewState uses localized fallback copy", () => {
+  const missingRenderer = buildLiveDisplayPagePreviewState({});
+  assert.equal(missingRenderer.status, "renderer-unavailable");
+  assert.equal(missingRenderer.detail, "目前沒有可用的展示頁預覽元件。");
+
+  const unpublished = buildLiveDisplayPagePreviewState({
+    definition: definitions[0],
+    envelope: {
+      ...createEnvelope("總覽主頁 Hero"),
+      publishedAt: null
+    }
+  });
+  assert.equal(unpublished.status, "unpublished");
+  assert.equal(unpublished.detail, "此展示頁尚未發布到正式版。");
 });
