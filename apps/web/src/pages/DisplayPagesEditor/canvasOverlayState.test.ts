@@ -192,3 +192,47 @@ test("resolveDisplayEditorOverlayState exposes shell band guides in shell coordi
     ]
   );
 });
+
+test("resolveDisplayEditorOverlayState uses the active interaction rect for selection bounds and relational rulers", () => {
+  const selectedRegion = createRegion({
+    geometry: { height: 100, left: 100, top: 100, width: 100 },
+    id: "overview-hero-media",
+    label: "Overview Hero Media"
+  });
+  const peerSelection = createRegion({
+    geometry: { height: 100, left: 300, top: 100, width: 100 },
+    id: "overview-hero-copy",
+    label: "Overview Hero Copy"
+  });
+  const measureTarget = createRegion({
+    geometry: { height: 100, left: 500, top: 100, width: 100 },
+    id: "overview-kpi-row",
+    label: "Overview KPI Row"
+  });
+
+  const state = resolveDisplayEditorOverlayState({
+    activeInteraction: {
+      constraintRect: { height: 898, left: 0, top: 0, width: 1920 },
+      guides: [],
+      rect: { height: 100, left: 200, top: 100, width: 100 },
+      regionId: selectedRegion.id,
+      type: "drag"
+    },
+    canvasHeight: 898,
+    canvasWidth: 1920,
+    lockedRegionIds: [],
+    measurementTargetRegion: measureTarget,
+    overlayPreset: defaultDisplayEditorOverlayPreset,
+    regions: [selectedRegion, peerSelection, measureTarget],
+    selectedRegion,
+    selectedRegionIds: [selectedRegion.id, peerSelection.id]
+  });
+
+  assert.deepEqual(state.selectionBounds, {
+    height: 100,
+    left: 200,
+    top: 100,
+    width: 200
+  });
+  assert.equal(state.relationalRulers.find((ruler) => ruler.axis === "x")?.distance, 200);
+});

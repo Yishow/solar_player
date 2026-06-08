@@ -435,6 +435,23 @@ function resolveMeasurement(
   };
 }
 
+function resolveEffectiveInteractionRegion(
+  region: ResolvedDisplayEditorRegion | null,
+  activeInteraction?: {
+    rect: CanvasRect;
+    regionId?: string;
+  } | null
+): ResolvedDisplayEditorRegion | null {
+  if (!region?.geometry || activeInteraction?.regionId !== region.id) {
+    return region;
+  }
+
+  return {
+    ...region,
+    geometry: activeInteraction.rect
+  };
+}
+
 function resolveRelationalRulers(
   selectedRegion: ResolvedDisplayEditorRegion | null,
   targetRegion: ResolvedDisplayEditorRegion | null,
@@ -500,6 +517,7 @@ export function resolveDisplayEditorOverlayState({
     constraintRect: CanvasRect;
     guides: CanvasGuide[];
     rect: CanvasRect;
+    regionId?: string;
     type: "drag" | "measure-x" | "measure-y" | "resize";
   } | null;
   canvasHeight: number;
@@ -526,9 +544,17 @@ export function resolveDisplayEditorOverlayState({
     designSpace
   );
   const activeSelectedRegionIds = selectedRegionIds ?? (selectedRegion ? [selectedRegion.id] : []);
+  const effectiveSelectedRegion = resolveEffectiveInteractionRegion(selectedRegion, activeInteraction);
+  const effectiveMeasurementTargetRegion = resolveEffectiveInteractionRegion(
+    measurementTargetRegion ?? null,
+    activeInteraction
+  );
   const selectedRects = regions
     .filter((region) => region.geometry && activeSelectedRegionIds.includes(region.id))
-    .map((region) => ({ id: region.id, rect: region.geometry! }));
+    .map((region) => ({
+      id: region.id,
+      rect: resolveEffectiveInteractionRegion(region, activeInteraction)?.geometry ?? region.geometry!
+    }));
   const selectionBounds = activeSelectedRegionIds.length > 1 ? resolveSelectionBounds(selectedRects) : null;
 
   return {
@@ -552,21 +578,32 @@ export function resolveDisplayEditorOverlayState({
     displayMode: overlayPreset.displayMode,
     frames: regions
       .filter((region) => Boolean(region.geometry))
-      .map((region) => ({
-        isLocked: lockedRegionIds.includes(region.id),
-        isSelected: activeSelectedRegionIds.includes(region.id),
-        label: overlayPreset.showRegionLabels ? region.label : null,
-        rect: region.geometry!,
-        regionId: region.id,
-        tone: selectedRegion?.id === region.id ? "primary" : "secondary",
-        visible:
-          overlayPreset.displayMode === "full-canvas" ||
-          activeSelectedRegionIds.includes(region.id)
-      })),
-    measurement: resolveMeasurement(selectedRegion, designMapping, activeInteraction?.rect),
+      .map((region) => {
+        const isActiveDragRegion =
+          activeInteraction != null &&
+          activeInteraction.regionId === region.id &&
+          (activeInteraction.type === "drag" || activeInteraction.type === "resize");
+
+        return {
+          isLocked: lockedRegionIds.includes(region.id),
+          isSelected: activeSelectedRegionIds.includes(region.id),
+          label: overlayPreset.showRegionLabels ? region.label : null,
+          rect: isActiveDragRegion ? activeInteraction.rect : region.geometry!,
+          regionId: region.id,
+          tone: selectedRegion?.id === region.id ? "primary" : "secondary",
+          visible:
+            overlayPreset.displayMode === "full-canvas" ||
+            activeSelectedRegionIds.includes(region.id)
+        };
+      }),
+    measurement: resolveMeasurement(effectiveSelectedRegion, designMapping),
     pageGuides: resolvePageGuides(regions, designMapping, overlayPreset.showCenterLines),
     preset: overlayPreset,
-    relationalRulers: resolveRelationalRulers(selectedRegion, measurementTargetRegion ?? null, designMapping),
+    relationalRulers: resolveRelationalRulers(
+      effectiveSelectedRegion,
+      effectiveMeasurementTargetRegion,
+      designMapping
+    ),
     selectionBounds,
     selectionLabel:
       selectionFeedbackLabel ?? (selectionBounds && activeSelectedRegionIds.length > 1 ? `已選 ${activeSelectedRegionIds.length} 區` : null),

@@ -147,6 +147,7 @@ type CanvasInteractionFeedback = {
   constraintRect: CanvasRect;
   guides: CanvasGuide[];
   rect: CanvasRect;
+  regionId: string;
   type: "drag" | "measure-x" | "measure-y" | "resize";
 };
 
@@ -197,6 +198,14 @@ export function useDisplayEditorCanvasWorkflow({
   viewportRef.current = viewport;
   const containerScaleRef = useRef(canvasContainerScale);
   containerScaleRef.current = canvasContainerScale;
+  const regionsRef = useRef(regions);
+  regionsRef.current = regions;
+  const overlayPresetRef = useRef(overlayPreset);
+  overlayPresetRef.current = overlayPreset;
+  const lockedRegionIdsRef = useRef(lockedRegionIds);
+  lockedRegionIdsRef.current = lockedRegionIds;
+  const pendingDragCommitRef = useRef<{ region: ResolvedDisplayEditorRegion; rect: CanvasRect } | null>(null);
+  const sessionSnapOptionsRef = useRef<CanvasSnapOptions | undefined>(undefined);
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
   const temporaryMeasureTargetRegion = useMemo(
     () => regions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
@@ -317,10 +326,16 @@ export function useDisplayEditorCanvasWorkflow({
     }
 
     const activeInteraction = canvasInteraction;
+    pendingDragCommitRef.current = null;
+    sessionSnapOptionsRef.current = resolveSnapOptions(
+      activeInteraction.regionId,
+      regionsRef.current,
+      overlayPresetRef.current
+    );
     const handlePointerMove = (event: PointerEvent) => {
-      const region = regions.find((item) => item.id === activeInteraction.regionId);
+      const region = regionsRef.current.find((item) => item.id === activeInteraction.regionId);
       const schema = region?.schema.geometry;
-      if (!region?.geometry || !schema || isRegionLocked(lockedRegionIds, region.id)) {
+      if (!region?.geometry || !schema || isRegionLocked(lockedRegionIdsRef.current, region.id)) {
         return;
       }
 
@@ -330,7 +345,7 @@ export function useDisplayEditorCanvasWorkflow({
         y: Math.round((event.clientY - activeInteraction.origin.y) / effectiveScale)
       };
       const constraint = resolveRegionConstraint(region);
-      const snap = resolveSnapOptions(region.id, regions, overlayPreset);
+      const snap = sessionSnapOptionsRef.current;
       const interactionResult =
         activeInteraction.type === "resize" && activeInteraction.handle
           ? applyCanvasResize(
@@ -356,18 +371,22 @@ export function useDisplayEditorCanvasWorkflow({
         constraintRect: constraintToRect(constraint),
         guides: interactionResult.guides,
         rect: interactionResult.rect,
+        regionId: region.id,
         type: activeInteraction.type
       });
 
-      applyConfigUpdate((current) => applyRegionRect(current, region, interactionResult.rect), {
-        recordHistory: false
-      });
+      pendingDragCommitRef.current = { rect: interactionResult.rect, region };
     };
 
     const handlePointerUp = () => {
-      applyConfigUpdate((current) => current, {
-        historyBase: activeInteraction.startConfig
-      });
+      const pendingCommit = pendingDragCommitRef.current;
+      pendingDragCommitRef.current = null;
+
+      if (pendingCommit) {
+        applyConfigUpdate((current) => applyRegionRect(current, pendingCommit.region, pendingCommit.rect), {
+          historyBase: activeInteraction.startConfig
+        });
+      }
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
       setDistanceLockArmed(false);
@@ -378,8 +397,9 @@ export function useDisplayEditorCanvasWorkflow({
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      sessionSnapOptionsRef.current = undefined;
     };
-  }, [applyConfigUpdate, canvasInteraction, lockedRegionIds, overlayPreset, regions]);
+  }, [applyConfigUpdate, canvasInteraction]);
 
   useEffect(() => {
     if (selectedRegionLocked && canvasInteraction) {
@@ -506,6 +526,7 @@ export function useDisplayEditorCanvasWorkflow({
         constraintRect: constraintToRect(constraint),
         guides: [],
         rect: region.geometry,
+        regionId: region.id,
         type
       });
       setDistanceLockArmed(false);
@@ -531,6 +552,7 @@ export function useDisplayEditorCanvasWorkflow({
         constraintRect: constraintToRect(constraint),
         guides: [],
         rect: selectedRegion.geometry,
+        regionId: selectedRegion.id,
         type: axis === "x" ? "measure-x" : "measure-y"
       });
     },
