@@ -17,6 +17,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import { getDisplayRotationPreview, getPlaybackSettings } from "../services/api";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
+import type { PlaybackRuntimeReloadOptions } from "./displaySyncPlaybackReload";
 
 type UsePlaybackControllerOptions = {
   currentPath?: string;
@@ -33,7 +34,7 @@ type PlaybackControllerState = {
   isPlaying: boolean;
   pages: PlaybackPage[];
   progress: number;
-  reload: () => Promise<void>;
+  reload: (options?: PlaybackRuntimeReloadOptions) => Promise<void>;
   rotationPreview: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
   nextPage: () => void;
@@ -78,7 +79,7 @@ export function usePlaybackController(
       ? Math.min(100, Math.max(0, ((currentDurationMs - runtime.countdownMs) / currentDurationMs) * 100))
       : 0;
 
-  const loadPlayback = async () => {
+  const loadPlayback = async (reloadOptions?: PlaybackRuntimeReloadOptions) => {
     setIsLoading(true);
 
     try {
@@ -94,6 +95,7 @@ export function usePlaybackController(
         nextPages: runtimePages,
         nowMs,
         previousPages: pagesRef.current,
+        resumeAutoplay: reloadOptions?.resumeAutoplay,
         settings: nextSettings
       });
 

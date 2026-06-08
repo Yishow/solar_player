@@ -31,9 +31,10 @@ function createDatabase(options?: {
   clientId?: string;
   generatedClientId?: string | null;
   reconnectInterval?: number;
+  systemSettings?: Record<string, string>;
   throwOnTopicLookup?: boolean;
 }) {
-  const systemSettings = new Map<string, string>();
+  const systemSettings = new Map<string, string>(Object.entries(options?.systemSettings ?? {}));
   if (options?.generatedClientId) {
     systemSettings.set("mqtt_generated_client_id", options.generatedClientId);
   }
@@ -255,6 +256,7 @@ test("MqttClientService keeps reconnecting status stable across close and offlin
     logger,
     socketService: {
       emitCircuitMetrics: () => undefined,
+      emitDisplaySync: () => undefined,
       emitLiveMetrics: () => undefined,
       emitMqttStatus: (status) => {
         emittedStatuses.push({
@@ -303,6 +305,7 @@ test("MqttClientService treats offline before reconnect as one stable reconnecti
     logger,
     socketService: {
       emitCircuitMetrics: () => undefined,
+      emitDisplaySync: () => undefined,
       emitLiveMetrics: () => undefined,
       emitMqttStatus: (status) => {
         emittedStatuses.push({
@@ -351,6 +354,7 @@ test("MqttClientService falls back to offline when reconnect interval disables r
     logger,
     socketService: {
       emitCircuitMetrics: () => undefined,
+      emitDisplaySync: () => undefined,
       emitLiveMetrics: () => undefined,
       emitMqttStatus: (status) => {
         emittedStatuses.push({
@@ -513,6 +517,46 @@ test("MqttClientService keeps a second local runtime in standby while the first 
 
   await standbyService.disconnect();
   await primaryService.disconnect();
+});
+
+test("MqttClientService takes over a live lease whose owner pid no longer exists", async () => {
+  const client = new FakeMqttClient();
+  let connectCalls = 0;
+  const logger = {
+    error: () => undefined,
+    info: () => undefined,
+    warn: () => undefined
+  };
+  const connectFn = ((brokerUrlOrOptions: string | IClientOptions, maybeOptions?: IClientOptions) => {
+    connectCalls += 1;
+    const _options = typeof brokerUrlOrOptions === "string" ? maybeOptions : brokerUrlOrOptions;
+    queueMicrotask(() => client.emit("connect"));
+    return client as unknown as MqttClient;
+  }) as ConnectFn;
+  const service = new MqttClientService({
+    connectFn,
+    database: createDatabase({
+      generatedClientId: "solar-display-locktest",
+      systemSettings: {
+        mqtt_runtime_lease: JSON.stringify({
+          acquiredAt: new Date(Date.now() - 5_000).toISOString(),
+          expiresAt: new Date(Date.now() + 10_000).toISOString(),
+          ownerToken: "dead-owner",
+          pid: 12345
+        })
+      }
+    }),
+    logger,
+    runtimeProcessAliveFn: () => false
+  });
+
+  await service.connect();
+
+  assert.equal(connectCalls, 1);
+  assert.equal(service.getStatus().connected, true);
+  assert.equal(service.getStatus().reason, "connected");
+
+  await service.disconnect();
 });
 
 test("MqttClientService testConnection uses an isolated probe client id", async () => {

@@ -52,6 +52,34 @@ test("burst relevant display sync events coalesce into one controlled reload", a
   coordinator.dispose();
 });
 
+test("mqtt display sync reloads do not force autoplay resume", async () => {
+  const reloadOptions: Array<{ resumeAutoplay?: boolean }> = [];
+  const coordinator = createDisplaySyncPlaybackReloadCoordinator({
+    debounceMs: 0,
+    reloadPlayback: async (options) => {
+      reloadOptions.push(options ?? {});
+    }
+  });
+
+  coordinator.notify({
+    ...baseEvent,
+    scope: "display-pages"
+  });
+  await coordinator.flush();
+
+  coordinator.notify({
+    ...baseEvent,
+    scope: "mqtt"
+  });
+  await coordinator.flush();
+
+  assert.deepEqual(reloadOptions, [
+    {},
+    {}
+  ]);
+  coordinator.dispose();
+});
+
 test("relevant display sync bursts during an in-flight reload trigger at most one follow-up cycle", async () => {
   let reloadCount = 0;
   const reloadResolvers: Array<() => void> = [];

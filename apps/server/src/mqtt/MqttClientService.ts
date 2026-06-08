@@ -1,6 +1,10 @@
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import {
+  resolveLiveMetricKeysForPage,
+  type DisplayPageTemplateKey
+} from "@solar-display/shared";
+import {
   connect,
   type IClientOptions,
   type MqttClient
@@ -31,6 +35,7 @@ type TopicMappingRecord = {
 };
 
 type ConnectFunction = typeof connect;
+type ProcessAliveFunction = (pid: number) => boolean;
 
 type TestConnectionInput = {
   host: string;
@@ -48,9 +53,11 @@ type MqttClientServiceOptions = {
   database?: Database.Database;
   generatedClientIdFn?: () => string;
   connectFn?: ConnectFunction;
+  runtimeProcessAliveFn?: ProcessAliveFunction;
   socketService?: Pick<
     SocketService,
     | "emitCircuitMetrics"
+    | "emitDisplaySync"
     | "emitLiveMetrics"
     | "emitMqttStatus"
     | "emitSystemError"
@@ -72,6 +79,34 @@ const GENERIC_RUNTIME_CLIENT_IDS = new Set(["", "solar-display", "solar-display-
 const RUNTIME_CLIENT_ID_PREFIX = "solar-display-";
 const GENERATED_CLIENT_ID_SETTING_KEY = "mqtt_generated_client_id";
 const MQTT_RUNTIME_LEASE_SETTING_KEY = "mqtt_runtime_lease";
+const playbackRuntimeMetricTemplateKeys: DisplayPageTemplateKey[] = [
+  "overview",
+  "solar",
+  "factory-circuit",
+  "sustainability"
+];
+
+function hasPlaybackRuntimeMetricsForTemplate(
+  snapshot: LiveMetricsSnapshot,
+  templateKey: DisplayPageTemplateKey
+) {
+  const requiredMetricKeys = resolveLiveMetricKeysForPage(templateKey);
+  return (
+    requiredMetricKeys.length > 0
+    && requiredMetricKeys.every((metricKey) => snapshot.metrics[metricKey] !== undefined)
+  );
+}
+
+function didPlaybackRuntimeAvailabilityChange(
+  previousSnapshot: LiveMetricsSnapshot,
+  nextSnapshot: LiveMetricsSnapshot
+) {
+  return playbackRuntimeMetricTemplateKeys.some(
+    (templateKey) =>
+      hasPlaybackRuntimeMetricsForTemplate(previousSnapshot, templateKey)
+      !== hasPlaybackRuntimeMetricsForTemplate(nextSnapshot, templateKey)
+  );
+}
 
 function waitForEvent(client: MqttClient, options: { timeoutMs: number }) {
   return new Promise<void>((resolve, reject) => {
@@ -161,11 +196,26 @@ function buildTestConnectionClientId(clientId: string) {
   return `${normalizedClientId.slice(0, maxBaseLength)}${TEST_CONNECTION_CLIENT_ID_SUFFIX}`;
 }
 
+function isProcessAlive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : null;
+    if (code === "EPERM") {
+      return true;
+    }
+
+    return false;
+  }
+}
+
 export class MqttClientService {
   private readonly database: Database.Database;
   private readonly logger: LoggerLike;
   private readonly connectFn: ConnectFunction;
   private readonly generatedClientIdFn: () => string;
+  private readonly runtimeProcessAliveFn: ProcessAliveFunction;
   private readonly socketService: MqttClientServiceOptions["socketService"];
   private readonly runtimeLeaseOwnerToken = `${process.pid}-${randomBytes(4).toString("hex")}`;
   private client: MqttClient | null = null;
@@ -191,6 +241,7 @@ export class MqttClientService {
     this.generatedClientIdFn =
       options.generatedClientIdFn
       ?? (() => `${RUNTIME_CLIENT_ID_PREFIX}${randomBytes(4).toString("hex")}`);
+    this.runtimeProcessAliveFn = options.runtimeProcessAliveFn ?? isProcessAlive;
     this.socketService = options.socketService;
   }
 
@@ -478,11 +529,17 @@ export class MqttClientService {
     const existingLease = this.readRuntimeLease();
     const existingExpiryMs =
       existingLease === null ? null : Date.parse(existingLease.expiresAt);
+    const existingOwnerIsAlive =
+      existingLease?.pid === null || (
+        typeof existingLease?.pid === "number"
+        && this.runtimeProcessAliveFn(existingLease.pid)
+      );
     const leaseIsActive =
       existingLease !== null
       && existingLease.ownerToken !== this.runtimeLeaseOwnerToken
       && existingExpiryMs !== null
-      && existingExpiryMs > nowMs;
+      && existingExpiryMs > nowMs
+      && existingOwnerIsAlive;
 
     if (leaseIsActive) {
       this.logger.warn(
@@ -728,6 +785,7 @@ export class MqttClientService {
       return;
     }
 
+    const previousSnapshot = readLiveMetricsSnapshot(this.database);
     const upsertLiveValue = this.database.prepare(`
       INSERT INTO live_metric_values (
         metric_key,
@@ -744,6 +802,7 @@ export class MqttClientService {
         quality = excluded.quality,
         raw_payload = excluded.raw_payload
     `);
+    let persistedMetricCount = 0;
 
     for (const mapping of mappings) {
       try {
@@ -758,6 +817,7 @@ export class MqttClientService {
           parsedPayload.quality ?? null,
           parsedPayload.raw
         );
+        persistedMetricCount += 1;
       } catch (error) {
         this.logger.warn(
           {
@@ -772,6 +832,16 @@ export class MqttClientService {
 
     const snapshot = readLiveMetricsSnapshot(this.database);
     this.socketService?.emitLiveMetrics(snapshot);
+    if (
+      persistedMetricCount > 0
+      && didPlaybackRuntimeAvailabilityChange(previousSnapshot, snapshot)
+    ) {
+      this.socketService?.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "mqtt-live-runtime-availability-updated",
+        scope: "mqtt"
+      });
+    }
 
     const circuitMetrics = this.buildCircuitMetricsSnapshot(snapshot, mappings.map((mapping) => mapping.metric_key));
     if (circuitMetrics !== null) {

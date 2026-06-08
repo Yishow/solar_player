@@ -11,9 +11,13 @@ export function shouldReloadPlaybackRuntimeForDisplaySync(scope: DisplaySyncEven
   return playbackRuntimeDisplaySyncScopes.has(scope);
 }
 
+export type PlaybackRuntimeReloadOptions = {
+  resumeAutoplay?: boolean;
+};
+
 type DisplaySyncPlaybackReloadCoordinatorOptions = {
   debounceMs?: number;
-  reloadPlayback: () => Promise<void>;
+  reloadPlayback: (options?: PlaybackRuntimeReloadOptions) => Promise<void>;
 };
 
 export function createDisplaySyncPlaybackReloadCoordinator({
@@ -24,13 +28,17 @@ export function createDisplaySyncPlaybackReloadCoordinator({
   let inFlightReload: Promise<void> | null = null;
   let disposed = false;
   let pendingRelevantEvent = false;
+  let pendingReloadOptions: PlaybackRuntimeReloadOptions = {};
 
   const runReload = async () => {
     if (disposed || inFlightReload) {
       return inFlightReload ?? Promise.resolve();
     }
 
-    const nextReload = reloadPlayback()
+    const reloadOptions = pendingReloadOptions;
+    pendingReloadOptions = {};
+
+    const nextReload = reloadPlayback(reloadOptions)
       .catch(() => {
         // The playback controller surfaces its own error state.
       })

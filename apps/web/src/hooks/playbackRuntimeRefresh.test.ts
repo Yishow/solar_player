@@ -98,3 +98,48 @@ test("reconcilePlaybackRuntimeAfterRefresh advances to the next playable page wh
   assert.equal(nextRuntime.countdownMs, 20_000);
   assert.equal(nextRuntime.isPlaying, true);
 });
+
+test("reconcilePlaybackRuntimeAfterRefresh can resume autoplay when a live runtime refresh requests it", () => {
+  const currentRuntime: PlaybackRuntime = {
+    currentIndex: 1,
+    countdownMs: 6_000,
+    isIdle: false,
+    isPlaying: false,
+    lastInteractionAt: 100
+  };
+
+  const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
+    currentPath: "/solar",
+    currentRuntime,
+    nextPages: previousPages,
+    previousPages,
+    resumeAutoplay: true,
+    settings,
+    nowMs: 2_000
+  });
+
+  assert.equal(nextRuntime.currentIndex, 1);
+  assert.equal(nextRuntime.isPlaying, true);
+});
+
+test("reconcilePlaybackRuntimeAfterRefresh preserves a stopped runtime when autoplay resume is not requested", () => {
+  const currentRuntime: PlaybackRuntime = {
+    currentIndex: 1,
+    countdownMs: 6_000,
+    isIdle: false,
+    isPlaying: false,
+    lastInteractionAt: 100
+  };
+
+  const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
+    currentPath: "/solar",
+    currentRuntime,
+    nextPages: previousPages,
+    previousPages,
+    settings,
+    nowMs: 2_000
+  });
+
+  assert.equal(nextRuntime.currentIndex, 1);
+  assert.equal(nextRuntime.isPlaying, false);
+});

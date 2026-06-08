@@ -16,6 +16,7 @@ type ReconcilePlaybackRuntimeAfterRefreshInput = {
   nextPages: PlaybackPage[];
   nowMs: number;
   previousPages: PlaybackPage[];
+  resumeAutoplay?: boolean;
   settings: PlaybackSettings;
 };
 
@@ -25,6 +26,7 @@ export function reconcilePlaybackRuntimeAfterRefresh({
   nextPages,
   nowMs,
   previousPages,
+  resumeAutoplay = false,
   settings
 }: ReconcilePlaybackRuntimeAfterRefreshInput): PlaybackRuntime {
   if (!currentRuntime) {
@@ -65,7 +67,7 @@ export function reconcilePlaybackRuntimeAfterRefresh({
   });
   const preservePlaying =
     !baselineRuntime.isIdle && isPlaybackAllowedBySchedule(settings, new Date(nowMs)) && settings.autoplay
-      ? currentRuntime.isPlaying
+      ? resumeAutoplay || currentRuntime.isPlaying
       : false;
 
   return {

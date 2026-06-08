@@ -287,6 +287,7 @@ test("GET /api/playback/pages resolves duplicate display pages from the registry
   seedDatabase();
 
   const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
       `
@@ -585,11 +586,12 @@ test("GET /api/display-pages/rotation-preview uses readiness findings as the dom
   }
 });
 
-test("GET /api/display-pages/rotation-preview skips only the live-data page whose required metric is stale", async () => {
+test("GET /api/display-pages/rotation-preview keeps a previously-seen live-data page in rotation when one metric turns stale", async () => {
   migrateDatabase();
   seedDatabase();
 
   const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
       `
@@ -642,12 +644,80 @@ test("GET /api/display-pages/rotation-preview skips only the live-data page whos
       true
     );
     assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "solar"),
+      true
+    );
+    assert.equal(body.preview.skippedPages.find((page) => page.pageKey === "solar"), undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview still skips a live-data page that has never received its full metric set", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key
+          WHEN 'overview' THEN 1
+          WHEN 'solar' THEN 1
+          WHEN 'images' THEN 0
+          ELSE 0
+        END
+      `
+    )
+    .run();
+
+  const freshTimestamp = new Date().toISOString();
+  for (const metricKey of [
+    "realTimePower",
+    "todayGeneration",
+    "totalGeneration",
+    "todayCo2Reduction",
+    "totalCo2Reduction",
+    "selfConsumptionRatio",
+    "selfConsumptionEnergy",
+    "consumptionEnergy"
+  ]) {
+    seedMetricReading(metricKey, freshTimestamp);
+  }
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "overview"),
+      true
+    );
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "solar"),
+      false
+    );
+    assert.equal(
       body.preview.skippedPages.find((page) => page.pageKey === "solar")?.skipReason,
       "stale-runtime"
     );
     assert.match(
       body.preview.skippedPages.find((page) => page.pageKey === "solar")?.detail ?? "",
-      /systemEfficiency/
+      /完整即時資料/
     );
   } finally {
     await app.close();

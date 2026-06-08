@@ -259,17 +259,17 @@ export const displayPageFallbackPolicyByTemplateKey: Record<DisplayPageTemplateK
   overview: {
     emptyContent: "hide",
     missingAsset: "show-seed",
-    staleData: "hide"
+    staleData: "show-placeholder"
   },
   solar: {
     emptyContent: "hide",
     missingAsset: "show-seed",
-    staleData: "hide"
+    staleData: "show-placeholder"
   },
   "factory-circuit": {
     emptyContent: "hide",
     missingAsset: "show-placeholder",
-    staleData: "hide"
+    staleData: "show-placeholder"
   },
   images: {
     emptyContent: "hide",
@@ -279,7 +279,7 @@ export const displayPageFallbackPolicyByTemplateKey: Record<DisplayPageTemplateK
   sustainability: {
     emptyContent: "hide",
     missingAsset: "show-seed",
-    staleData: "hide"
+    staleData: "show-placeholder"
   }
 };
 

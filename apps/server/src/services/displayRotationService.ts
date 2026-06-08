@@ -151,6 +151,7 @@ function resolveReadinessSkipReason(findings: DisplayReadinessFinding[]) {
 
 function resolveRuntimeDataCondition(args: {
   fallbackPolicy: FallbackPolicy;
+  hasAllRequiredMetrics: boolean;
   mqttStatus: MqttStatusLike;
   pageRequiresLiveData: boolean;
   pageFresh: boolean;
@@ -172,6 +173,13 @@ function resolveRuntimeDataCondition(args: {
 
   if (args.pageFresh) {
     return null;
+  }
+
+  if (!args.hasAllRequiredMetrics) {
+    return {
+      detail: "尚未收到此頁所需的完整即時資料",
+      skipReason: "stale-runtime"
+    };
   }
 
   return args.fallbackPolicy.staleData === "hide"
@@ -473,6 +481,8 @@ function buildPageConditions(
     );
     const pageRequiresLiveData =
       page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
+    const requiredMetricKeys =
+      page.templateKey === undefined ? [] : resolveLiveMetricKeysForPage(page.templateKey);
     const runtimeFreshness = page.templateKey === undefined
       ? {
           fresh: true,
@@ -483,8 +493,11 @@ function buildPageConditions(
           freshnessWindowMs: freshMetricsDeadlineMs,
           metrics: liveMetrics.metrics,
           nowMs: now.getTime(),
-          requiredMetricKeys: resolveLiveMetricKeysForPage(page.templateKey)
+          requiredMetricKeys
         });
+    const hasAllRequiredMetrics =
+      requiredMetricKeys.length === 0
+      || requiredMetricKeys.every((metricKey) => liveMetrics.metrics[metricKey] !== undefined);
     const readinessCondition =
       page.templateKey === undefined
         ? null
@@ -493,6 +506,7 @@ function buildPageConditions(
           );
     const runtimeDataCondition = resolveRuntimeDataCondition({
       fallbackPolicy,
+      hasAllRequiredMetrics,
       mqttStatus,
       pageFresh: runtimeFreshness.fresh,
       pageRequiresLiveData,
@@ -513,7 +527,7 @@ function buildPageConditions(
       (!pageRequiresLiveData ||
         runtimeFreshness.fresh ||
         mqttStatus.reason === "mock" ||
-        fallbackPolicy.staleData !== "hide");
+        (hasAllRequiredMetrics && fallbackPolicy.staleData !== "hide"));
 
     pageConditions[page.id] = {
       detail: dominantDetail,

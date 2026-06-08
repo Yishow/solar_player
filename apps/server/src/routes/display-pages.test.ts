@@ -333,12 +333,12 @@ test("GET /api/display-pages/:pageId/live exposes the shared fallback policy met
     assert.deepEqual(overviewBody.config.fallbackPolicy, {
       emptyContent: "hide",
       missingAsset: "show-seed",
-      staleData: "hide"
+      staleData: "show-placeholder"
     });
     assert.deepEqual(factoryBody.config.fallbackPolicy, {
       emptyContent: "hide",
       missingAsset: "show-placeholder",
-      staleData: "hide"
+      staleData: "show-placeholder"
     });
   } finally {
     await app.close();

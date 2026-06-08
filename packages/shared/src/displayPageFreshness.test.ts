@@ -19,7 +19,7 @@ test("resolveLiveMetricKeysForPage expands solar requirements into the live metr
   assert.deepEqual(resolveLiveMetricKeysForPage("images"), []);
 });
 
-test("evaluatePageRuntimeFreshness reports fresh only when every present required metric stays within the freshness window", () => {
+test("evaluatePageRuntimeFreshness reports fresh only when every required metric is present and within the freshness window", () => {
   const freshResult = evaluatePageRuntimeFreshness({
     freshnessWindowMs: 30_000,
     metrics: {
@@ -66,7 +66,11 @@ test("evaluatePageRuntimeFreshness reports fresh only when every present require
 
   const missingResult = evaluatePageRuntimeFreshness({
     freshnessWindowMs: 30_000,
-    metrics: {},
+    metrics: {
+      realTimePower: {
+        timestamp: "2026-05-23T00:00:20.000Z"
+      }
+    },
     nowMs: Date.parse("2026-05-23T00:00:30.000Z"),
     requiredMetricKeys: ["realTimePower", "todayGeneration"]
   });

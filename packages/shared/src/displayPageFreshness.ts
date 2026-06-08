@@ -42,7 +42,7 @@ export function evaluatePageRuntimeFreshness(input: {
     })
     .filter((metric): metric is { metricKey: string; timestamp: string } => metric !== null);
 
-  if (presentMetrics.length === 0) {
+  if (presentMetrics.length !== input.requiredMetricKeys.length) {
     return {
       fresh: false,
       stalestMetricKey: null,

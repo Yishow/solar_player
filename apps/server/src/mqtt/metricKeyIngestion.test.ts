@@ -4,6 +4,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+import {
+  resolveLiveMetricKeysForPage,
+  type DisplaySyncEvent
+} from "@solar-display/shared";
 import type { MqttClient } from "mqtt";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-ingest-test-"));
@@ -81,6 +85,69 @@ test("enabled topic mapping ingests under its metric_key without a metric_key wh
     const snapshot = readLiveMetricsSnapshot(database);
     assert.ok(snapshot.metrics.phaseRVoltage, "expected phaseRVoltage to be present in the live snapshot");
     assert.equal(snapshot.metrics.phaseRVoltage.value, 220.5);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("mapped MQTT live metrics publish playback sync only when runtime availability changes", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  const requiredMetricKeys = resolveLiveMetricKeysForPage("overview");
+  const insertTopicMapping = database.prepare(
+    `
+      INSERT INTO topic_mappings (
+        metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `
+  );
+  for (const metricKey of requiredMetricKeys) {
+    insertTopicMapping.run(metricKey, "kuozui/plant/overview/runtime", "kW", null, 1, 0, 2);
+  }
+
+  const client = new FakeMqttClient();
+  const displaySyncEvents: Array<Pick<DisplaySyncEvent, "reason" | "scope">> = [];
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    },
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitDisplaySync: (event) => {
+        displaySyncEvents.push(event);
+      },
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: () => undefined,
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "kuozui/plant/overview/runtime", Buffer.from(JSON.stringify({ value: 3842 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    client.emit("message", "kuozui/plant/overview/runtime", Buffer.from(JSON.stringify({ value: 4001 })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const snapshot = readLiveMetricsSnapshot(database);
+    assert.equal(snapshot.metrics.todayGeneration?.value, 4001);
+    assert.deepEqual(
+      displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
+      [{ reason: "mqtt-live-runtime-availability-updated", scope: "mqtt" }]
+    );
   } finally {
     await service.disconnect();
   }
