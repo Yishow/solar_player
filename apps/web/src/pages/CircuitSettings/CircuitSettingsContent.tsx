@@ -1,6 +1,6 @@
 import { displayCircuitSlotKeys, type CircuitConfig, type DisplayReadinessReport } from "@solar-display/shared";
 import type { ReactNode } from "react";
-import { Switch } from "../../components/management";
+import { Switch, CustomSelect } from "../../components/management";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 
 type CircuitSettingsContentProps = {
@@ -161,7 +161,7 @@ export function CircuitSettingsContent({
 
       {remoteSyncBanner}
 
-      <section className="settings-card cs-card">
+      <section className="settings-card mgmt-interactive-card cs-card">
         <div className="settings-card__title">
           廠區用電迴路
           <small>Factory Circuits · 共 {viewModel.summary.totalCircuitCount} 筆</small>
@@ -315,29 +315,17 @@ export function CircuitSettingsContent({
                         <div className="cs-icon-stack">
                           <div className="cs-icon-row">
                             <span className="cs-icon-glyph">{iconGlyph(row.icon)}</span>
-                            <select
-                              className="cs-select"
+                            <CustomSelect
                               value={row.icon ?? ""}
-                              onChange={(event) => handleFieldChange(row.id, "icon", event.target.value)}
-                            >
-                              {row.iconOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(value) => handleFieldChange(row.id, "icon", value)}
+                              options={row.iconOptions}
+                            />
                           </div>
-                          <select
-                            className="cs-select"
+                          <CustomSelect
                             value={row.unit ?? ""}
-                            onChange={(event) => handleFieldChange(row.id, "unit", event.target.value)}
-                          >
-                            {row.unitOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) => handleFieldChange(row.id, "unit", value)}
+                            options={row.unitOptions}
+                          />
                         </div>
                       </td>
                       <td className="col-topic">
@@ -406,24 +394,23 @@ export function CircuitSettingsContent({
                       <td className="col-display">
                         <div className="cs-display-stack">
                           <p className="cs-cell-caption">{row.slotImpactLabel}</p>
-                          <select
-                            className="cs-input"
+                          <CustomSelect
                             value={row.displaySlot ?? ""}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               handleFieldChange(
                                 row.id,
                                 "displaySlot",
-                                event.target.value === "" ? null : event.target.value
+                                value === "" ? null : value
                               )
                             }
-                          >
-                            <option value="">未綁定 slot</option>
-                            {displayCircuitSlotKeys.map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slotLabelMap[slot] ?? slot}
-                              </option>
-                            ))}
-                          </select>
+                            options={[
+                              { label: "未綁定 slot", value: "" },
+                              ...displayCircuitSlotKeys.map((slot) => ({
+                                label: slotLabelMap[slot] ?? slot,
+                                value: slot,
+                              })),
+                            ]}
+                          />
                           <div className="cs-toggle">
                             <Switch
                               ariaLabel={`${row.nameZh ?? "迴路"} 顯示`}

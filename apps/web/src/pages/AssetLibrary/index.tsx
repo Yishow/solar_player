@@ -2,6 +2,7 @@ import type { DisplayOpsAssetReferenceSummary, ImageAsset } from "@solar-display
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
+import { CustomSelect } from "../../components/management";
 import { WorkspaceActionBar, WorkspaceBoard, WorkspacePanel } from "../../components/workspaceSurface";
 import { useDisplayPageAssetHealth } from "../../hooks/useDisplayPageAssetHealth";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
@@ -350,27 +351,27 @@ export function AssetLibrary({
           </label>
           <label className="flex flex-col gap-1 text-[13px] text-[var(--shell-copy-ink)]">
             <span>上傳分類</span>
-            <select
+            <CustomSelect
               value={uploadCategory}
-              onChange={(event) => setUploadCategory(event.target.value as ManagedAssetCategory)}
-              className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-            >
-              <option value="background">背景</option>
-              <option value="object">物件</option>
-              <option value="icon">圖示</option>
-            </select>
+              onChange={(value) => setUploadCategory(value as ManagedAssetCategory)}
+              options={[
+                { label: "背景", value: "background" },
+                { label: "物件", value: "object" },
+                { label: "圖示", value: "icon" }
+              ]}
+            />
           </label>
           <label className="flex flex-col gap-1 text-[13px] text-[var(--shell-copy-ink)]">
             <span>使用範圍</span>
-            <select
+            <CustomSelect
               value={uploadUsageScope}
-              onChange={(event) => setUploadUsageScope(event.target.value as ManagedAssetUsageScope)}
-              className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2"
-            >
-              <option value="both">頁面 + 殼層</option>
-              <option value="page-only">僅頁面</option>
-              <option value="shell-only">僅殼層</option>
-            </select>
+              onChange={(value) => setUploadUsageScope(value as ManagedAssetUsageScope)}
+              options={[
+                { label: "頁面 + 殼層", value: "both" },
+                { label: "僅頁面", value: "page-only" },
+                { label: "僅殼層", value: "shell-only" }
+              ]}
+            />
           </label>
         </div>
 

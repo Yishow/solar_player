@@ -15,12 +15,12 @@
 .mqtt-settings-page .mqtt-save { left: 1590px; width: 250px; }
 
 /* card positioning (converged 3-card layout: mode | topic workspace | weather) */
-.mqtt-settings-page .mqtt-mode { left: 50px; top: 118px; width: 500px; height: 648px; }
+.mqtt-settings-page .mqtt-mode { left: 50px; top: 118px; width: 500px; height: 740px !important; }
 .mqtt-settings-page .mqtt-topic-workspace {
   left: 568px;
   top: 118px;
   width: 680px;
-  height: 648px;
+  height: 740px !important;
   display: flex;
   flex-direction: column;
 }
@@ -28,7 +28,7 @@
   left: 1266px;
   top: 118px;
   width: 600px;
-  height: 648px;
+  height: 740px !important;
   display: flex;
   flex-direction: column;
 }
@@ -194,21 +194,27 @@
   height: 38px;
   border: 1px solid rgba(93, 119, 69, 0.22);
   border-radius: 8px;
-  background: #fffdf8;
+  background: #fff;
   padding: 0 12px;
-  font: 400 15px/1 var(--font-family-en);
-  color: #4b504c;
+  font: 400 14px/1 var(--font-family-en);
+  color: #344039;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: all 0.2s ease;
+}
+
+.mqtt-settings-page .text-field input:hover:not(:disabled) {
+  border-color: rgba(93, 119, 69, 0.4);
+  background-color: #fbfbfa;
 }
 
 .mqtt-settings-page .text-field input:focus {
-  border-color: rgba(93, 119, 69, 0.55);
+  border-color: #5d7745;
   box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+  background-color: #fff;
 }
 
 .mqtt-settings-page .text-field input:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -253,21 +259,28 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  /* 增加縱向和橫向 padding 以便讓卡片 hover 位移與外溢的陰影有喘息空間，防止被容器遮擋裁剪 */
+  padding: 4px 8px 14px 8px;
 }
 
 .mqtt-settings-page .topic-workspace-row {
-  border: 1px solid rgba(92, 105, 79, 0.16);
-  border-radius: 12px;
   margin-top: 14px;
-  background: #fffdf8;
-  padding: 14px 16px;
-  display: grid;
-  gap: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .mqtt-settings-page .topic-workspace-row:first-child { margin-top: 0; }
 
 .mqtt-settings-page .topic-workspace-row__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px dashed rgba(92, 105, 79, 0.08);
+  padding-bottom: 10px;
+}
+
+.mqtt-settings-page .topic-workspace-row__metric-group {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -303,77 +316,165 @@
   color: #777;
 }
 
-.mqtt-settings-page .topic-workspace-row__runtime {
-  margin-left: auto;
+.mqtt-settings-page .topic-workspace-row__actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.mqtt-settings-page .topic-workspace-row__runtime b {
-  font: 700 22px/1 var(--font-family-en);
-  font-variant-numeric: tabular-nums;
-  color: #557a43;
-}
-.mqtt-settings-page .topic-workspace-row__runtime b small {
-  font-size: 12px;
-  font-weight: 400;
-  color: #555;
-  margin-left: 4px;
-}
 
-.mqtt-settings-page .topic-workspace-row__fields {
-  display: grid;
-  grid-template-columns: 1fr 120px;
-  gap: 8px;
-}
-.mqtt-settings-page .topic-workspace-row__fields input {
-  height: 34px;
-  border: 1px solid rgba(93, 119, 69, 0.22);
-  border-radius: 8px;
-  background: #fffdf8;
-  padding: 0 10px;
-  font: 400 13px/1 var(--font-family-en);
-  color: #4b504c;
-  outline: none;
-}
-.mqtt-settings-page .topic-workspace-row__fields input:focus {
-  border-color: rgba(93, 119, 69, 0.55);
-}
-
-.mqtt-settings-page .topic-workspace-row__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: 12px;
-  color: #777b75;
-}
-
-/* row controls + workspace actions */
-.mqtt-settings-page .map-row__controls {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.mqtt-settings-page .map-row__toggle {
-  font-size: 12px;
-  color: #5d655d;
+.mqtt-settings-page .topic-workspace-row .map-row__toggle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a544f;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.mqtt-settings-page .topic-workspace-row .map-row__toggle:hover {
+  background: rgba(92, 105, 79, 0.05);
 }
 
-.mqtt-settings-page .map-row__remove {
-  border: 0;
+.mqtt-settings-page .topic-workspace-row .map-row__toggle input[type="checkbox"] {
+  accent-color: #5c854b;
+  cursor: pointer;
+  margin: 0;
+}
+
+.mqtt-settings-page .topic-workspace-row .map-row__remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
   background: transparent;
-  color: var(--red);
+  color: #c14a4a;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.mqtt-settings-page .topic-workspace-row .map-row__remove:hover {
+  background: rgba(193, 74, 74, 0.08);
+  border-color: rgba(193, 74, 74, 0.15);
+}
+
+.mqtt-settings-page .topic-workspace-row .map-row__remove svg {
+  flex-shrink: 0;
+}
+
+.mqtt-settings-page .topic-workspace-row__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mqtt-settings-page .topic-workspace-row__fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 130px;
+  gap: 10px;
+}
+
+.mqtt-settings-page .input-group {
+  display: flex;
+  align-items: center;
+  background: #f8f9f6;
+  border: 1px solid rgba(93, 119, 69, 0.16);
+  border-radius: 8px;
+  padding-left: 10px;
+  height: 38px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.mqtt-settings-page .input-group:focus-within {
+  border-color: #5d7745;
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.10);
+  background-color: #fff;
+}
+
+.mqtt-settings-page .input-prefix {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8c968f;
+  margin-right: 6px;
+  user-select: none;
+}
+
+.mqtt-settings-page .input-group input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  height: 100%;
+  padding: 0 10px 0 2px;
+  font: 400 13px/1 var(--font-family-en);
+  color: #344039;
+  outline: none;
+}
+
+.mqtt-settings-page .topic-workspace-row__runtime {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 120px;
+  text-align: right;
+  border-left: 1px solid rgba(92, 105, 79, 0.08);
+  padding-left: 16px;
+}
+
+.mqtt-settings-page .runtime-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+}
+
+.mqtt-settings-page .runtime-value b {
+  font: 700 24px/1 var(--font-family-en);
+  font-variant-numeric: tabular-nums;
+  color: #3d5930;
+  letter-spacing: -0.02em;
+}
+
+.mqtt-settings-page .runtime-value small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #747c77;
+  margin-left: 3px;
+}
+
+.mqtt-settings-page .topic-workspace-row__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: #7d857f;
+  padding-top: 4px;
+}
+
+.mqtt-settings-page .meta-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mqtt-settings-page .meta-item + .meta-item::before {
+  content: "•";
+  margin-right: 10px;
+  color: #c0c7c2;
+  user-select: none;
+}
+
+.mqtt-settings-page .meta-item.coverage {
+  color: #5c854b;
+  font-weight: 500;
 }
 
 .mqtt-settings-page .map-actions {
@@ -440,20 +541,6 @@
   color: #5d655d;
 }
 
-.mqtt-settings-page .mqtt-weather-card__field select {
-  height: 38px;
-  border: 1px solid rgba(93, 119, 69, 0.22);
-  border-radius: 8px;
-  background: #fffdf8;
-  padding: 0 12px;
-  font: 400 15px/1 var(--font-family-en);
-  color: #4b504c;
-  outline: none;
-}
-
-.mqtt-settings-page .mqtt-weather-card__field select:focus {
-  border-color: rgba(93, 119, 69, 0.55);
-}
 
 .mqtt-settings-page .mqtt-weather-card__preset-group {
   display: grid;
@@ -527,3 +614,14 @@
   line-height: 1.55;
   text-align: center;
 }
+
+/* 遠端同步提示橫幅定位 - 浮動於 Header 標題與按鈕之間的空檔，高度 64px 不遮擋下方卡片 */
+.mqtt-settings-page .mgmt-remote-sync-banner {
+  position: absolute;
+  left: 450px;
+  top: 18px;
+  width: 850px;
+  z-index: 100;
+}
+
+

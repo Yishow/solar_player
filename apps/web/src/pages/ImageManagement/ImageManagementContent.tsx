@@ -5,7 +5,7 @@ import type {
 } from "@solar-display/shared";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
 import { Link } from "react-router-dom";
-import { Switch } from "../../components/management";
+import { Switch, CustomSelect } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import {
   formatAspectRatioChoice,
@@ -198,7 +198,7 @@ export function ImageManagementContent({
 
       {remoteSyncBanner}
 
-      <section className="settings-card im-card-library">
+      <section className="settings-card mgmt-interactive-card im-card-library">
         <div className="settings-card__title">
           輪播治理與素材交接
           <small>Governance &amp; Editor Handoff · {viewModel.summary.totalImages} 張</small>
@@ -287,7 +287,7 @@ export function ImageManagementContent({
         </div>
       </section>
 
-      <section className="settings-card im-card-editor">
+      <section className="settings-card mgmt-interactive-card im-card-editor">
         <div className="settings-card__title">圖片設定<small>Edit Panel</small></div>
         {viewModel.selection && selectedAsset ? (
           <>
@@ -402,13 +402,18 @@ export function ImageManagementContent({
 
                   <div className="im-form-row">
                     <label>Fallback 模式 <small>Fallback Mode</small></label>
-                    <select className="im-select" value={viewModel.selection.playlistFallbackMode ?? "display-placeholder"} disabled={isLoading || isDeleting} onChange={(event) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, {
-                      fallbackMode: event.target.value as "display-placeholder" | "skip" | "use-cover"
-                    })}>
-                      <option value="display-placeholder">display-placeholder</option>
-                      <option value="skip">skip</option>
-                      <option value="use-cover">use-cover</option>
-                    </select>
+                    <CustomSelect
+                      value={viewModel.selection.playlistFallbackMode ?? "display-placeholder"}
+                      disabled={isLoading || isDeleting}
+                      onChange={(value) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, {
+                        fallbackMode: value as "display-placeholder" | "skip" | "use-cover"
+                      })}
+                      options={[
+                        { label: "display-placeholder", value: "display-placeholder" },
+                        { label: "skip", value: "skip" },
+                        { label: "use-cover", value: "use-cover" }
+                      ]}
+                    />
                   </div>
 
                   <div className="im-toggle">
@@ -448,13 +453,18 @@ export function ImageManagementContent({
 
               <div className="im-form-row">
                 <label>長寬比 <small>Aspect Ratio</small></label>
-                <select className="im-select" value={aspectRatioChoice} disabled={isLoading || isDeleting} onChange={(event) => updateAssetField(viewModel.selection!.id, { aspectRatio: parseAspectRatioChoice(event.target.value, selectedAsset.aspectRatio) })}>
-                  <option value="auto">原始比例 Auto</option>
-                  <option value="16:9">16:9 (建議)</option>
-                  <option value="4:3">4:3</option>
-                  <option value="1:1">1:1</option>
-                  {aspectRatioChoice === "custom" ? <option value="custom">自訂比例 {formatAspectRatioLabel(selectedAsset.aspectRatio)}</option> : null}
-                </select>
+                <CustomSelect
+                  value={aspectRatioChoice}
+                  disabled={isLoading || isDeleting}
+                  onChange={(value) => updateAssetField(viewModel.selection!.id, { aspectRatio: parseAspectRatioChoice(value, selectedAsset.aspectRatio) })}
+                  options={[
+                    { label: "原始比例 Auto", value: "auto" },
+                    { label: "16:9 (建議)", value: "16:9" },
+                    { label: "4:3", value: "4:3" },
+                    { label: "1:1", value: "1:1" },
+                    ...(aspectRatioChoice === "custom" ? [{ label: `自訂比例 ${formatAspectRatioLabel(selectedAsset.aspectRatio)}`, value: "custom" }] : [])
+                  ]}
+                />
               </div>
 
               <div className="im-form-row">

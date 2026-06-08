@@ -95,7 +95,7 @@ export function DeviceStatusContent({
           width: deviceLayout.side.width
         }}
       >
-        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard mgmt-interactive-card">
           <span className="ds-status-card__label">
             裝置運作狀態
             <small>Device Operation Status</small>
@@ -109,7 +109,7 @@ export function DeviceStatusContent({
           </span>
         </article>
 
-        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard mgmt-interactive-card">
           <span className="ds-status-card__label">
             系統運行時間
             <small>Uptime</small>
@@ -118,7 +118,7 @@ export function DeviceStatusContent({
           <span className="ds-status-card__detail">服務啟動後累積時間</span>
         </article>
 
-        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard">
+        <article className="ds-status-card mgmt-surface mgmt-surface--status-dashboard mgmt-interactive-card">
           <span className="ds-status-card__label">
             展示營運摘要
             <small>Display Operations</small>
@@ -142,7 +142,7 @@ export function DeviceStatusContent({
       </aside>
 
       <section
-        className="ds-card ds-info mgmt-surface mgmt-surface--status-dashboard"
+        className="ds-card ds-info mgmt-surface mgmt-surface--status-dashboard mgmt-interactive-card"
         style={{
           height: deviceLayout.info.height,
           left: deviceLayout.info.left,
@@ -340,7 +340,7 @@ export function DeviceStatusContent({
       </figure>
 
       <section
-        className="ds-card ds-resource mgmt-surface mgmt-surface--status-dashboard"
+        className="ds-card ds-resource mgmt-surface mgmt-surface--status-dashboard mgmt-interactive-card"
         style={{
           height: deviceLayout.resource.height,
           left: deviceLayout.resource.left,
