@@ -48,6 +48,17 @@ const overviewMetricCardStyle = {
   valueRowAlign: "center"
 } as const;
 
+// Seed style for density widgets — matches the current `.overview-dashboard-widget`
+// padding (20px 24px) and border-radius (22px) so wiring these into editable vars
+// keeps the pre-change appearance.
+const overviewDensityWidgetStyle = {
+  cornerRadius: 22,
+  paddingBottom: 20,
+  paddingLeft: 24,
+  paddingRight: 24,
+  paddingTop: 20
+} as const;
+
 const legacyOverviewHeroCopyLayout = {
   left: 86,
   top: 172,
@@ -334,10 +345,10 @@ export function createOverviewDisplayPageSeedConfig(
       width: 520
     },
     widgetStyles: {
-      alertNotifications: createDisplayCardStyleConfig(),
-      generationTrend: createDisplayCardStyleConfig({ trendHeight: 110 }),
-      phasePower: createDisplayCardStyleConfig(),
-      weather: createDisplayCardStyleConfig()
+      alertNotifications: createDisplayCardStyleConfig(overviewDensityWidgetStyle),
+      generationTrend: createDisplayCardStyleConfig({ ...overviewDensityWidgetStyle, trendHeight: 110 }),
+      phasePower: createDisplayCardStyleConfig(overviewDensityWidgetStyle),
+      weather: createDisplayCardStyleConfig(overviewDensityWidgetStyle)
     }
   };
 }

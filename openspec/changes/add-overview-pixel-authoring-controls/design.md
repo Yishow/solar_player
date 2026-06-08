@@ -23,7 +23,7 @@
   2. **`trendHeightPx`（sparkline/趨勢區高度）**：`DisplayCardStyleConfig` 未含。新增 `trendHeight` 欄位（seed=現值 56px）、`buildDisplayCardStyleVars` 輸出 `--display-card-trend-height`、`buildDisplayCardStyleFields` 補對應 number 欄位；`GenerationTrendWidget` 趨勢區改以 `var(--display-card-trend-height, 56px)`。
   3. **`contentAlign` 的 `end`**：現有 `valueRowAlign` 僅 `start|center`。擴為 `start|center|end`（`DisplayCardValueRowAlign` 型別、`displayCardValueRowAlignOptions`、`resolveValueRowAlign`、`DisplayCardValueRow` 對齊樣式）。
   4. **背景版位（背景照片 placement）：已由既有 hero media 能力涵蓋，不新增 `backgroundPlacement`**。盤點後確認 design 原本「背景為 hardcode `.overview-page-background { inset: 0 }` 滿版」的前提已過時——change `align-overview-better-dashboard-closeout` 已提交的 hero 淡出帶 + background pool + media-effect 工作後，背景照片由定位的 `.overview-hero-banner`（`heroContainer` 幾何）渲染，且 placement 三維度皆已可由 editor 編輯：band 高度＝`heroContainer.height`（`overview-hero-media` region geometry）、object-position＝`heroMedia.alignX`/`heroMedia.alignY`（Align X/Y 欄位，runtime 經 `buildDisplayPageMediaPresentation` 套 inline object-position）、底緣淡出＝`heroMedia.effects`（`mediaEffectSurface`，seed 已含 bottom fade layer）。因此本 change 不再新增平行 `backgroundPlacement` config（會與 `heroContainer`/`heroMedia` 重複），改以 guard 測試（`backgroundPlacement.test.ts`）確認既有能力滿足 spec。
-- **消費機制：inline CSS 變數**。沿用既有 `buildDisplayCardStyleVars` 的 inline `--display-card-*` 變數模式；新增的 trend 高度與 backgroundPlacement 比照以 inline style／變數套用，stylesheet 改為 `var(--display-card-trend-height, 56px)` 等帶現值 fallback 的引用，不在 stylesheet 寫死 Better 像素值。
+- **消費機制：inline CSS 變數**。沿用既有 `buildDisplayCardStyleVars` 的 inline `--display-card-*` 變數模式；density widget 的 trend 高度、padding、radius 改為 `var(--display-card-*, <現值fallback>)` 引用（`.overview-dashboard-widget` 的 `padding`/`border-radius` 與 sparkline 高度），不在 stylesheet 寫死數值。density widget seed（`overviewDensityWidgetStyle`）的 padding=20/24、radius=22 對齊現行 `.overview-dashboard-widget`，確保 seed 等價。
 - **editor 欄位**：沿用既有 typed inspector field 與 region schema 模式（number/select），不新增自訂控制元件型別。
 - **seed 等價**：所有新欄位 seed 預設＝目前實際值（density widget cardStyle＝現行 widget 視覺、trendHeight=56px、背景 `inset:0` 等價於 heightPercent=100、fadeStartPercent=100 即無淡出），確保「未設定 draft 前畫面不變」。
 
@@ -65,6 +65,7 @@
 - [stylesheet 改為 var() 引用可能影響其他頁] → 只改 Overview-only class（`overview-*`）與 Overview 專屬卡片實例，shared `displayPageCards.css` 若需引用則一律帶現值 fallback，確保其他頁不變；以 `displaySurfaceVisualGuardrails.test.ts`／`style.test.ts` 守住。
 - [新增大量欄位使 inspector 過長] → 以 region 分群（每張卡/widget 一個內部樣式區塊），沿用既有摺疊式 region 呈現。
 - [seed 與現值不一致導致畫面跑掉] → 逐一以目前 CSS 實際值設 seed 預設，並加「seed 等價」render 測試。
+- [density widget 的自訂值顯示尚未全部接 cardStyle 變數] → 已接：header title/subtitle 字級、icon、padding、radius、trend 高度。**殘留限制**：weather 溫度、phase 表格、trend meta、alert 項等 widget-specific 值字級目前仍用各自 overview.css 字級，未綁 `--display-card-value-size`；故 `widgetStyles.*.valueFontSize` 對這些自訂內容暫不生效。屬 widget-specific 後續工作，是否補綁由使用者決定（不影響 KPI 卡與 seed 等價）。
 
 ## Migration Plan
 

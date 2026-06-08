@@ -17,6 +17,12 @@ test("seed config exposes density widget styles equivalent to the current appear
     // Header font sizes default to the current displayPageCards fallbacks.
     assert.equal(widgetStyle.titleFontSize, 20);
     assert.equal(widgetStyle.subtitleFontSize, 14);
+    // Padding/radius match the current `.overview-dashboard-widget` (20px 24px, radius 22).
+    assert.equal(widgetStyle.paddingTop, 20);
+    assert.equal(widgetStyle.paddingBottom, 20);
+    assert.equal(widgetStyle.paddingLeft, 24);
+    assert.equal(widgetStyle.paddingRight, 24);
+    assert.equal(widgetStyle.cornerRadius, 22);
   }
 
   // Generation trend keeps the current 110px density sparkline height.
