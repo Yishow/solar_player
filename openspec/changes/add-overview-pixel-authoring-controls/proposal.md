@@ -1,13 +1,13 @@
 ## Why
 
-要把 `/overview` 對齊 `docs/reference/Better/01.Overivew (大).png` 到像素級，必須能精準調整每張卡片的「內部排版」（icon 尺寸、label/數值字級、內距、sparkline 高度、內部對齊）以及「滿版背景照片」的尺寸/位置。但目前 `/display-pages/editor` 的 Overview inspector 只暴露每個元素的 Left/Top/Width/Height 外框與 hero 文案，card 內部排版與背景大小全寫死在 `overview.css`／`displayPageCards.css`（背景現為 hardcode 的 `.overview-page-background { inset: 0 }`）。依專案 editor-capability-first 原則，這是一個 editor capability gap：要做到像素級又不在 page CSS 寫死 Better 數值，必須先把這些旋鈕變成 editor 可調的 config，由 runtime 以 inline style／inline CSS 變數消費。
+要把 `/overview` 對齊 `docs/reference/Better/01.Overivew (大).png` 到像素級，必須能精準調整每張卡片的「內部排版」（icon 尺寸、label/數值字級、內距、sparkline 高度、內部對齊），並把背景照片的 band 高度、object-position 與底緣淡出明確落在既有的 hero media authoring contract。現況 `/display-pages/editor` 已有元素外框與 hero media controls，但 density widget 內部樣式仍大量寫死在 `overview.css`／`displayPageCards.css`。依專案 editor-capability-first 原則，這是一個 editor capability gap：要做到像素級又不在 page CSS 寫死 Better 數值，必須把這些旋鈕變成 editor 可調的 config，由 runtime 以 inline style／inline CSS 變數消費。
 
 ## What Changes
 
 - KPI 卡的內部樣式（icon 尺寸、label/subtitle/數值字級、卡片內距、內部對齊）**沿用既有 `cardStyles`（`DisplayCardStyleConfig`）**，該能力已可由 editor 編輯（`buildDisplayCardStyleFields` inspector + `buildDisplayCardStyleVars` runtime inline 變數 + region schema），本 change 不為 KPI 卡重造平行 config。
 - 為 4 個 density widget（weather/phasePower/generationTrend/alertNotifications）新增 `widgetStyles`（型別＝既有 `DisplayCardStyleConfig`），runtime 比照 KPI 卡以 `buildDisplayCardStyleVars` 套 inline 變數，補上目前缺少的 widget 內部樣式可調能力。
 - 擴充既有 `DisplayCardStyleConfig`：新增 `trendHeight`（sparkline/趨勢區高度，seed 56px，輸出 `--display-card-trend-height`）、`valueRowAlign` 擴為 `start|center|end`；為 additive，其他頁不傳則走 seed 預設、stylesheet 以 `var(--display-card-trend-height, 56px)` 帶現值 fallback，不在 stylesheet 寫死 Better 像素數值。
-- 為 Overview 滿版背景新增「尺寸/位置」config（band 高度、`object-position`、底緣淡出比例），runtime 以 inline style 套用，取代目前 hardcode 的 `.overview-page-background { inset: 0 }`；背景候選來源沿用既有 backgroundPool，不回退。
+- 不新增平行 `backgroundPlacement` config；改以既有 `heroContainer` 幾何、`heroMedia.alignX/alignY` 與 `heroMedia.effects` 作為背景照片 placement contract，並用 guard 測試確認這條 authoring/runtime 路徑完整可用。
 - 在 editor inspector（`apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx` 與 Overview region schema）新增對應欄位，沿用既有 typed inspector 與 region schema 模式，draft/live 可持久化。
 - 補 seed 預設值（與目前視覺等價，避免破壞現況）與測試（config 解析、inspector 欄位、runtime 套用、render）。
 
@@ -24,7 +24,7 @@
 ### New Capabilities
 
 - `overview-card-internal-style-authoring`: 定義 Overview KPI 卡與 density widget 的「內部樣式」config schema、其 editor inspector 欄位，以及 runtime 以 inline style／inline CSS 變數消費這些值的綁定契約與 seed 預設。
-- `overview-background-placement-authoring`: 定義 Overview 滿版背景的尺寸/位置 config（band 高度、object-position、底緣淡出）、其 editor inspector 欄位，以及 runtime 以 inline style 套用、取代 hardcode `inset: 0` 的綁定契約與 seed 預設。
+- `overview-background-placement-authoring`: 定義 Overview 背景照片 placement 的 authoring contract，沿用既有 `heroContainer` 幾何、`heroMedia.alignX/alignY` 與 `heroMedia.effects` 的 editor/runtime 綁定，而不是新增平行 config。
 
 ### Modified Capabilities
 

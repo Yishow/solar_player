@@ -23,10 +23,15 @@ test("seed config exposes density widget styles equivalent to the current appear
     assert.equal(widgetStyle.paddingLeft, 24);
     assert.equal(widgetStyle.paddingRight, 24);
     assert.equal(widgetStyle.cornerRadius, 22);
+    assert.equal(widgetStyle.surfaceBlur, 16);
+    assert.equal(widgetStyle.surfaceOpacity, 0.72);
   }
 
   // Generation trend keeps the current 110px density sparkline height.
   assert.equal(config.widgetStyles.generationTrend.trendHeight, 110);
+  assert.equal(config.widgetStyles.phasePower.valueRowAlign, "end");
+  assert.equal(config.widgetStyles.weather.valueMarginTop, 14);
+  assert.equal(config.widgetStyles.alertNotifications.valueMarginTop, 18);
 });
 
 test("resolveOverviewModernDefaultConfig falls back to seed widget styles when config omits widgetStyles", () => {
@@ -76,8 +81,8 @@ test("each density widget region exposes internal card-style fields including tr
     assert.equal(alignField.fieldType, "select");
     assert.ok(
       "options" in alignField &&
-        Array.isArray(alignField.options) &&
-        alignField.options.some((option) => option.value === "end"),
+      Array.isArray(alignField.options) &&
+      alignField.options.some((option) => option.value === "end"),
       `expected ${key} align field to offer end`
     );
   }

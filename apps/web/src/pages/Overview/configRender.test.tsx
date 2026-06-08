@@ -28,8 +28,9 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /DisplayCardFrame/);
   assert.match(overviewSource, /DisplayCardValueRow/);
   assert.match(overviewSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
-  assert.match(overviewSource, /metric\.trendSeries && metric\.trendSeries\.length > 0/);
-  assert.match(overviewSource, /Sparkline className=\"overview-kpi-sparkline\" values=\{metric\.trendSeries\}/);
+  assert.match(overviewSource, /<OverviewKpiFooter/);
+  assert.match(overviewSource, /footer=\{resolvedConfig\.kpiCards\[cardItem\.key\]\}/);
+  assert.match(overviewSource, /metric=\{metric\}/);
   assert.doesNotMatch(overviewSource, /import \{ trendSeries \} from \"\.\.\/\.\.\/mocks\/metrics\"/);
   assert.doesNotMatch(overviewSource, /Shared Story Summary/);
 });
@@ -113,6 +114,10 @@ test("overview runtime gates dashboard widgets through visibility config", () =>
   assert.match(overviewSource, /series=\{generationTrendSeries\}/);
   assert.match(overviewSource, /<AlertNotificationsWidget/);
   assert.match(overviewSource, /alerts=\{viewModel\.alerts\}/);
+  assert.match(
+    overviewSource,
+    /alwaysShowThresholds=\{resolvedConfig\.dashboardWidgets\.alertNotifications\.alwaysShowThresholds\}/
+  );
 });
 
 test("overview config treats KPI cards without visible as visible", () => {

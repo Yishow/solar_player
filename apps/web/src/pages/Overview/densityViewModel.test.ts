@@ -48,6 +48,8 @@ test("weather projection exposes display values when snapshot is fresh", () => {
   assert.equal(viewModel.weather.condition, "晴");
   assert.equal(viewModel.weather.temperature, "31°C");
   assert.equal(viewModel.weather.humidity, "68%");
+  assert.equal((viewModel.weather as typeof viewModel.weather & { windSpeed?: string }).windSpeed, "2.1 m/s");
+  assert.equal((viewModel.weather as typeof viewModel.weather & { precipitation?: string }).precipitation, "0 mm");
 });
 
 test("weather projection is unavailable when fetch state is not fresh", () => {

@@ -75,6 +75,10 @@ const pageSources = [
   "Images/index.tsx",
   "Sustainability/index.tsx"
 ].map((relativePath) => readFileSync(path.join(import.meta.dirname, relativePath), "utf8"));
+const overviewKpiFooterSource = readFileSync(
+  path.join(import.meta.dirname, "Overview/OverviewKpiFooter.tsx"),
+  "utf8"
+);
 
 test("display surface checklist covers the required review dimensions and documented exceptions", () => {
   assert.match(checklistDoc, /Hero typography/);
@@ -205,6 +209,14 @@ test("shared card primitives remain the expected display playback path where car
   for (const source of pageSources) {
     assert.match(source, /DisplayCardFrame/);
     assert.match(source, /DisplayCardHeader/);
+  }
+
+  assert.ok(
+    /DisplayCardFooter/.test(pageSources[0]!) || /DisplayCardFooter/.test(overviewKpiFooterSource),
+    "expected Overview surface to keep using DisplayCardFooter either in the page renderer or its footer primitive"
+  );
+
+  for (const source of pageSources.slice(1)) {
     assert.match(source, /DisplayCardFooter/);
   }
 });

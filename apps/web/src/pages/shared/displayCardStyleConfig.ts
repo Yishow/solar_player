@@ -45,6 +45,22 @@ function resolveValueRowAlign(value: unknown, fallback: DisplayCardValueRowAlign
   return value === "center" || value === "start" || value === "end" ? value : fallback;
 }
 
+function resolveTextAlign(value: DisplayCardValueRowAlign) {
+  if (value === "center") {
+    return "center";
+  }
+
+  return value === "end" ? "right" : "left";
+}
+
+function resolveFlexAlign(value: DisplayCardValueRowAlign) {
+  if (value === "center") {
+    return "center";
+  }
+
+  return value === "end" ? "flex-end" : "flex-start";
+}
+
 export function createDisplayCardStyleConfig(
   overrides: Partial<Record<keyof DisplayCardStyleConfig, unknown>> = {}
 ): DisplayCardStyleConfig {
@@ -72,8 +88,13 @@ export function createDisplayCardStyleConfig(
 }
 
 export function buildDisplayCardStyleVars(cardStyle: DisplayCardStyleConfig): CSSProperties {
+  const textAlign = resolveTextAlign(cardStyle.valueRowAlign);
+  const flexAlign = resolveFlexAlign(cardStyle.valueRowAlign);
+
   return {
     ["--display-card-footer-padding-top" as string]: `${cardStyle.footerPaddingTop}px`,
+    ["--display-card-flex-align" as string]: flexAlign,
+    ["--display-card-flex-justify" as string]: flexAlign,
     ["--display-card-header-gap" as string]: `${cardStyle.headerGap}px`,
     ["--display-card-icon-box-size" as string]: `${cardStyle.iconBoxSize}px`,
     ["--display-card-padding" as string]: `${cardStyle.paddingTop}px ${cardStyle.paddingRight}px ${cardStyle.paddingBottom}px ${cardStyle.paddingLeft}px`,
@@ -82,6 +103,7 @@ export function buildDisplayCardStyleVars(cardStyle: DisplayCardStyleConfig): CS
     ["--display-card-subtitle-size" as string]: `${cardStyle.subtitleFontSize}px`,
     ["--display-card-surface-blur" as string]: `${cardStyle.surfaceBlur}px`,
     ["--display-card-surface-opacity" as string]: `${cardStyle.surfaceOpacity}`,
+    ["--display-card-text-align" as string]: textAlign,
     ["--display-card-title-size" as string]: `${cardStyle.titleFontSize}px`,
     ["--display-card-trend-height" as string]: `${cardStyle.trendHeight}px`,
     ["--display-card-unit-padding-bottom" as string]: `${cardStyle.unitPaddingBottom}px`,

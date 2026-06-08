@@ -1,12 +1,12 @@
 ## Context
 
-`/overview` 要對齊 Better 到像素級，卻只有外框（Left/Top/Width/Height）可在 editor 調；card 內部排版與滿版背景大小寫死在 `apps/web/src/pages/Overview/overview.css`、`apps/web/src/components/displayPageCards.css`，背景為 hardcode 的 `.overview-page-background { inset: 0 }`。既有未提交工作已加入 backgroundPool 候選圖池與其 inspector array 欄位（須沿用、勿回退）。Overview 的 per-card 樣式目前透過 `createDisplayCardStyleConfig`（shared `displayCardStyleConfig`）與 `cardStyles` 持有；editor region/field 由 `apps/web/src/pages/Overview/displayPageConfig.ts` 的 region schema 與 `apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx` 渲染。
+`/overview` 要對齊 Better 到像素級，卻只有外框（Left/Top/Width/Height）與既有 hero media controls 可在 editor 調；density widget 內部排版仍大量寫死在 `apps/web/src/pages/Overview/overview.css`、`apps/web/src/components/displayPageCards.css`。既有工作已加入 backgroundPool 候選圖池，且背景照片目前實際上由定位的 `heroContainer` + `heroMedia.alignX/alignY` + `heroMedia.effects` 驅動，而不是獨立的 `backgroundPlacement` 物件。Overview 的 per-card 樣式目前透過 `createDisplayCardStyleConfig`（shared `displayCardStyleConfig`）與 `cardStyles` 持有；editor region/field 由 `apps/web/src/pages/Overview/displayPageConfig.ts` 的 region schema 與 `apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx` 渲染。
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- 把 Overview 卡片內部排版（icon 尺寸、中文 label 字級、英文 subtitle 字級、數值字級、卡片內距、sparkline/趨勢區高度、內部對齊）與滿版背景尺寸/位置變成 editor 可調 config。
+- 把 Overview 卡片內部排版（icon 尺寸、中文 label 字級、英文 subtitle 字級、數值字級、卡片內距、sparkline/趨勢區高度、內部對齊）變成 editor 可調 config，並把背景照片 placement 明確收斂到既有 hero media contract。
 - runtime 以 inline style／inline CSS 自訂屬性消費 config；stylesheet 只引用變數，不寫死 Better 數值。
 - seed 預設與「目前畫面」視覺等價：本 change 不改變現況外觀，只新增可調能力。
 
@@ -32,7 +32,7 @@
 **Behavior（可觀察結果）：**
 
 - `/display-pages/editor` 選 Overview 後，每張 KPI 卡與每個 density widget 的 inspector 出現「內部樣式」欄位：icon 尺寸、label 字級、subtitle 字級、數值字級、內距、sparkline/趨勢高度、內部對齊；改值並存 draft 後，`/overview`（draft 預覽）即時反映。
-- Overview 出現「背景版位」欄位：band 高度（百分比）、object-position X/Y、底緣淡出起點；改值套用到滿版背景的 inline style。
+- Overview 背景照片沿用既有 `overview-hero-media` region：band 高度由 `heroContainer.height` author、object-position 由 `heroMedia.alignX/alignY` author、底緣淡出由 `heroMedia.effects` author；改值後 draft 預覽即時反映。
 - 未設定任何新欄位時，`/overview` 外觀與本 change 前完全相同（seed 等價）。
 
 **Interface / data shape：**
@@ -40,13 +40,13 @@
 - KPI 卡內部樣式：沿用既有 `cardStyles[key]`（`DisplayCardStyleConfig`），不新增平行欄位。對應欄位：`iconBoxSize`、`titleFontSize`、`subtitleFontSize`、`valueFontSize`、`paddingTop/Right/Bottom/Left`、`valueRowAlign`。
 - density widget 內部樣式：Overview config 新增 `widgetStyles`（key＝weather/phasePower/generationTrend/alertNotifications），型別＝既有 `DisplayCardStyleConfig`，sed 等價現行 widget 視覺。
 - `DisplayCardStyleConfig` 擴充：新增 `trendHeight`（number，seed 56），`buildDisplayCardStyleVars` 輸出 `--display-card-trend-height`，`buildDisplayCardStyleFields` 補對應欄位；`valueRowAlign` 擴為 `start|center|end`。
-- Overview config 新增 `backgroundPlacement`：`heightPercent`（0–100，seed 100）、`objectPositionX`（0–1，seed 0.5）、`objectPositionY`（0–1，seed 0.5）、`fadeStartPercent`（0–100，seed 100＝無淡出）。
-- runtime 在 `apps/web/src/pages/Overview/index.tsx`：density widget 比照 KPI 卡以 `buildDisplayCardStyleVars(widgetStyles[key])` 套 inline 變數；背景以 inline style 套 `backgroundPlacement`（band 高度、object-position、底緣淡出遮罩），取代 hardcode 的 `.overview-page-background { inset: 0 }`。
+- 不新增 `backgroundPlacement` 物件；背景 placement 直接沿用既有 `heroContainer`、`heroMedia.alignX/alignY` 與 `heroMedia.effects`。
+- runtime 在 `apps/web/src/pages/Overview/index.tsx`：density widget 比照 KPI 卡以 `buildDisplayCardStyleVars(widgetStyles[key])` 套 inline 變數；背景則由既有 hero media presentation path 消費 `heroContainer` 與 `heroMedia`。
 
 **Failure modes：**
 
 - 缺欄位或非法值 → 套用 seed 預設（現況值），不丟例外、不出現空白卡。
-- `fadeStartPercent >= 100` → 不淡出（等價現況）；`heightPercent=100` → 滿版（等價現況 `inset:0`）。
+- hero media placement 欄位缺值或非法 → 回退既有 seed 的 `heroContainer` 幾何、`heroMedia.alignX/alignY` 與 bottom fade layers，不出現空白背景。
 
 **Acceptance criteria：**
 
@@ -65,7 +65,7 @@
 - [stylesheet 改為 var() 引用可能影響其他頁] → 只改 Overview-only class（`overview-*`）與 Overview 專屬卡片實例，shared `displayPageCards.css` 若需引用則一律帶現值 fallback，確保其他頁不變；以 `displaySurfaceVisualGuardrails.test.ts`／`style.test.ts` 守住。
 - [新增大量欄位使 inspector 過長] → 以 region 分群（每張卡/widget 一個內部樣式區塊），沿用既有摺疊式 region 呈現。
 - [seed 與現值不一致導致畫面跑掉] → 逐一以目前 CSS 實際值設 seed 預設，並加「seed 等價」render 測試。
-- [density widget 的自訂值顯示尚未全部接 cardStyle 變數] → 已接：header title/subtitle 字級、icon、padding、radius、trend 高度。**殘留限制**：weather 溫度、phase 表格、trend meta、alert 項等 widget-specific 值字級目前仍用各自 overview.css 字級，未綁 `--display-card-value-size`；故 `widgetStyles.*.valueFontSize` 對這些自訂內容暫不生效。屬 widget-specific 後續工作，是否補綁由使用者決定（不影響 KPI 卡與 seed 等價）。
+- [density widget 的自訂值顯示需要與 shared vars 同步] → widget shell 已消費 padding/radius/blur/opacity/shadow，widget-specific 內容也需消費 `--display-card-value-size`、`--display-card-text-align` 與 `--display-card-trend-height`；以 Overview widget tests 與 seed-style tests 守住，避免出現可編輯但無效的 inspector 欄位。
 
 ## Migration Plan
 

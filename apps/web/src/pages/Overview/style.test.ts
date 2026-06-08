@@ -26,3 +26,14 @@ test("overview cards use frosted-glass treatment scoped to overview only", () =>
   // The shared card base must NOT be touched with the frosted-glass treatment.
   assert.doesNotMatch(sharedCardCss, /backdrop-filter/);
 });
+
+test("generation trend keeps toolbar and footer alignment independent from valueRowAlign", () => {
+  assert.match(
+    overviewCss,
+    /\.overview-generation-trend-widget\s+\.overview-trend-toolbar\s*\{[\s\S]*?align-items:\s*flex-end;[\s\S]*?text-align:\s*right;/
+  );
+  assert.match(
+    overviewCss,
+    /\.overview-generation-trend-widget\s+\.overview-widget-meta\s*\{[\s\S]*?justify-content:\s*space-between;[\s\S]*?text-align:\s*left;/
+  );
+});

@@ -2,9 +2,7 @@ import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import { useMemo } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
-import { Sparkline } from "../../components/Sparkline";
 import {
-  DisplayCardFooter,
   DisplayCardFrame,
   DisplayCardHeader,
   DisplayCardValueRow
@@ -44,6 +42,7 @@ import {
 } from "./layout";
 import "../../components/displayPageCards.css";
 import "./overview.css";
+import { OverviewKpiFooter } from "./OverviewKpiFooter";
 import { buildOverviewViewModel } from "./viewModel";
 import { AlertNotificationsWidget } from "./widgets/AlertNotificationsWidget";
 import { GenerationTrendWidget } from "./widgets/GenerationTrendWidget";
@@ -314,11 +313,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
               title={metric.label}
             />
             <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
-            {metric.trendSeries && metric.trendSeries.length > 0 ? (
-              <DisplayCardFooter>
-                <Sparkline className="overview-kpi-sparkline" values={metric.trendSeries} />
-              </DisplayCardFooter>
-            ) : null}
+            <OverviewKpiFooter footer={resolvedConfig.kpiCards[cardItem.key]} metric={metric} />
           </DisplayCardFrame>
         );
       })}
@@ -361,6 +356,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.alertNotifications) ? (
         <AlertNotificationsWidget
           alerts={viewModel.alerts}
+          alwaysShowThresholds={resolvedConfig.dashboardWidgets.alertNotifications.alwaysShowThresholds}
           style={{
             ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.alertNotifications),
             height: `${alertNotificationsLayout.height}px`,

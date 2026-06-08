@@ -56,7 +56,10 @@ const overviewDensityWidgetStyle = {
   paddingBottom: 20,
   paddingLeft: 24,
   paddingRight: 24,
-  paddingTop: 20
+  paddingTop: 20,
+  shadowStrength: 1,
+  surfaceBlur: 16,
+  surfaceOpacity: 0.72
 } as const;
 
 const legacyOverviewHeroCopyLayout = {
@@ -165,7 +168,45 @@ export type OverviewDisplayTextRect = {
   width: number;
 };
 
+export type OverviewKpiFooterType = "co2-tree" | "none" | "progress" | "sparkline" | "text";
+
+const overviewKpiFooterTypeOptions = [
+  { label: "Sparkline", value: "sparkline" },
+  { label: "Progress", value: "progress" },
+  { label: "Text", value: "text" },
+  { label: "CO2 Tree", value: "co2-tree" },
+  { label: "None", value: "none" }
+] as const;
+
+function resolveOverviewKpiFooterType(
+  value: unknown,
+  fallback: OverviewKpiFooterType
+): OverviewKpiFooterType {
+  return value === "co2-tree" ||
+    value === "none" ||
+    value === "progress" ||
+    value === "sparkline" ||
+    value === "text"
+    ? value
+    : fallback;
+}
+
+function resolveOverviewFooterText(value: unknown, fallback: string | undefined) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function resolveOverviewTargetValue(value: unknown, fallback: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function resolveOverviewAlwaysShowThresholds(value: unknown, fallback: boolean | undefined) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
 export type OverviewKpiCardConfig = OverviewDisplayRect & {
+  footerText?: string;
+  footerType: OverviewKpiFooterType;
+  targetValue?: number;
   visible: boolean;
 };
 
@@ -176,6 +217,7 @@ export type OverviewDashboardWidgetKey =
   | "weather";
 
 export type OverviewDashboardWidgetConfig = OverviewDisplayRect & {
+  alwaysShowThresholds?: boolean;
   visible: boolean;
 };
 
@@ -297,6 +339,7 @@ export function createOverviewDisplayPageSeedConfig(
     },
     dashboardWidgets: {
       alertNotifications: {
+        alwaysShowThresholds: true,
         height: 196,
         left: 1435,
         top: 874,
@@ -333,11 +376,33 @@ export function createOverviewDisplayPageSeedConfig(
       total: createReferenceGlyphIconSource("bars")
     },
     kpiCards: {
-      co2Today: { ...overviewKpiLayout.co2Today, visible: true },
-      co2Total: { ...overviewKpiLayout.co2Total, visible: true },
-      power: { ...overviewKpiLayout.power, visible: true },
-      today: { ...overviewKpiLayout.today, visible: true },
-      total: { ...overviewKpiLayout.total, visible: true }
+      co2Today: {
+        ...overviewKpiLayout.co2Today,
+        footerType: "co2-tree",
+        visible: true
+      },
+      co2Total: {
+        ...overviewKpiLayout.co2Total,
+        footerType: "co2-tree",
+        visible: true
+      },
+      power: {
+        ...overviewKpiLayout.power,
+        footerType: "sparkline",
+        visible: true
+      },
+      today: {
+        ...overviewKpiLayout.today,
+        footerType: "progress",
+        targetValue: 5000,
+        visible: true
+      },
+      total: {
+        ...overviewKpiLayout.total,
+        footerText: "自建置起 2022 / 01 至今",
+        footerType: "text",
+        visible: true
+      }
     },
     summaryCard: {
       left: 88,
@@ -345,10 +410,27 @@ export function createOverviewDisplayPageSeedConfig(
       width: 520
     },
     widgetStyles: {
-      alertNotifications: createDisplayCardStyleConfig(overviewDensityWidgetStyle),
-      generationTrend: createDisplayCardStyleConfig({ ...overviewDensityWidgetStyle, trendHeight: 110 }),
-      phasePower: createDisplayCardStyleConfig(overviewDensityWidgetStyle),
-      weather: createDisplayCardStyleConfig(overviewDensityWidgetStyle)
+      alertNotifications: createDisplayCardStyleConfig({
+        ...overviewDensityWidgetStyle,
+        valueMarginTop: 18,
+        valueRowAlign: "start"
+      }),
+      generationTrend: createDisplayCardStyleConfig({
+        ...overviewDensityWidgetStyle,
+        trendHeight: 110,
+        valueRowAlign: "start"
+      }),
+      phasePower: createDisplayCardStyleConfig({
+        ...overviewDensityWidgetStyle,
+        valueMarginTop: 14,
+        valueRowAlign: "end"
+      }),
+      weather: createDisplayCardStyleConfig({
+        ...overviewDensityWidgetStyle,
+        valueFontSize: 58,
+        valueMarginTop: 14,
+        valueRowAlign: "start"
+      })
     }
   };
 }
@@ -357,29 +439,51 @@ export function resolveOverviewModernDefaultConfig(
   config: OverviewDisplayPageConfig,
   seedConfig: OverviewDisplayPageConfig
 ): OverviewDisplayPageConfig {
+  const persistedKpiCards = ((config as Partial<OverviewDisplayPageConfig>).kpiCards ?? {}) as Partial<
+    Record<keyof OverviewDisplayPageConfig["kpiCards"], Partial<OverviewKpiCardConfig>>
+  >;
   const persistedDashboardWidgets = (
     (config as Partial<OverviewDisplayPageConfig>).dashboardWidgets ?? {}
   ) as Partial<Record<OverviewDashboardWidgetKey, Partial<OverviewDashboardWidgetConfig>>>;
   const dashboardWidgets = Object.fromEntries(
     Object.entries(seedConfig.dashboardWidgets).map(([key, seedWidget]) => {
       const value = persistedDashboardWidgets[key as OverviewDashboardWidgetKey] ?? seedWidget;
+      const alwaysShowThresholds = resolveOverviewAlwaysShowThresholds(
+        value.alwaysShowThresholds,
+        seedWidget.alwaysShowThresholds
+      );
+
       return [
         key,
         {
           ...seedWidget,
           ...value,
+          ...(alwaysShowThresholds === undefined ? {} : { alwaysShowThresholds }),
           visible: value.visible === true
         }
       ];
     })
   ) as OverviewDisplayPageConfig["dashboardWidgets"];
   const kpiCards = Object.fromEntries(
-    Object.entries(config.kpiCards).map(([key, value]) => [
-      key,
-      matchesRecord(value, legacyOverviewKpiLayout[key as keyof typeof legacyOverviewKpiLayout])
-        ? { ...seedConfig.kpiCards[key as keyof OverviewDisplayPageConfig["kpiCards"]] }
-        : { ...value, visible: value.visible !== false }
-    ])
+    Object.entries(seedConfig.kpiCards).map(([key, seedCard]) => {
+      const value = persistedKpiCards[key as keyof OverviewDisplayPageConfig["kpiCards"]] ?? seedCard;
+      const footerText = resolveOverviewFooterText(value.footerText, seedCard.footerText);
+      const targetValue = resolveOverviewTargetValue(value.targetValue, seedCard.targetValue);
+
+      return [
+        key,
+        matchesRecord(value as Record<string, unknown>, legacyOverviewKpiLayout[key as keyof typeof legacyOverviewKpiLayout])
+          ? { ...seedCard }
+          : {
+            ...seedCard,
+            ...value,
+            ...(footerText === undefined ? {} : { footerText }),
+            footerType: resolveOverviewKpiFooterType(value.footerType, seedCard.footerType),
+            ...(targetValue === undefined ? {} : { targetValue }),
+            visible: value.visible !== false
+          }
+      ];
+    })
   ) as OverviewDisplayPageConfig["kpiCards"];
   const cardStyles = Object.fromEntries(
     Object.entries(config.cardStyles).map(([key, value]) => [
@@ -663,6 +767,14 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     },
     fields: [
       { fieldType: "toggle", id: `${key}-visible`, label: "顯示", path: ["dashboardWidgets", key, "visible"] },
+      ...(key === "alertNotifications"
+        ? [{
+          fieldType: "toggle" as const,
+          id: `${key}-always-show-thresholds`,
+          label: "常駐顯示門檻",
+          path: ["dashboardWidgets", key, "alwaysShowThresholds"]
+        }]
+        : []),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["dashboardWidgets", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["dashboardWidgets", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["dashboardWidgets", key, "width"] },
@@ -698,6 +810,37 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         idPrefix: key,
         path: ["iconSources", key]
       }),
+      {
+        fieldType: "select",
+        id: `${key}-footer-type`,
+        label: "頁尾類型",
+        options: overviewKpiFooterTypeOptions.map((option) => ({
+          label: option.label,
+          value: option.value
+        })),
+        path: ["kpiCards", key, "footerType"]
+      },
+      {
+        fieldType: "text",
+        id: `${key}-footer-text`,
+        label: "頁尾文字",
+        path: ["kpiCards", key, "footerText"],
+        visibleWhen: {
+          equals: "text",
+          path: ["kpiCards", key, "footerType"]
+        }
+      },
+      {
+        constraints: { min: 0 },
+        fieldType: "number",
+        id: `${key}-target-value`,
+        label: "目標值",
+        path: ["kpiCards", key, "targetValue"],
+        visibleWhen: {
+          equals: "progress",
+          path: ["kpiCards", key, "footerType"]
+        }
+      },
       { fieldType: "toggle", id: `${key}-visible`, label: "顯示", path: ["kpiCards", key, "visible"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },

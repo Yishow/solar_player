@@ -32,16 +32,33 @@ export function WeatherCardWidget({
       <DisplayCardHeader subtitle="Weather" title="天氣" />
       {weather.available ? (
         <div className="overview-weather-body">
-          <p className="overview-weather-temperature">{weather.temperature}</p>
-          <div className="overview-weather-meta">
-            <span className="overview-weather-condition">{weather.condition}</span>
-            <span className="overview-weather-humidity">濕度 {weather.humidity}</span>
-            {weather.location ? (
-              <span className="overview-weather-location">{weather.location}</span>
-            ) : null}
-            {observedLabel ? (
-              <span className="overview-weather-observed">{observedLabel} 觀測</span>
-            ) : null}
+          <div className="overview-weather-primary">
+            <p className="overview-weather-temperature">{weather.temperature}</p>
+            <div className="overview-weather-summary">
+              <span className="overview-weather-condition">{weather.condition}</span>
+              <div className="overview-weather-meta">
+                {weather.location ? (
+                  <span className="overview-weather-location">{weather.location}</span>
+                ) : null}
+                {observedLabel ? (
+                  <span className="overview-weather-observed">{observedLabel} 觀測</span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="overview-weather-indicators">
+            <div className="overview-weather-indicator">
+              <span className="overview-weather-indicator-label">濕度</span>
+              <span className="overview-weather-indicator-value">{weather.humidity}</span>
+            </div>
+            <div className="overview-weather-indicator">
+              <span className="overview-weather-indicator-label">風速</span>
+              <span className="overview-weather-indicator-value">{weather.windSpeed}</span>
+            </div>
+            <div className="overview-weather-indicator">
+              <span className="overview-weather-indicator-label">雨量</span>
+              <span className="overview-weather-indicator-value">{weather.precipitation}</span>
+            </div>
           </div>
         </div>
       ) : (

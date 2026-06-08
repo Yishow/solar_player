@@ -106,7 +106,7 @@ test("display editor inspector renders typed controls for text, number, toggle, 
   const html = renderToStaticMarkup(
     React.createElement(DisplayEditorInspectorFields, {
       fields,
-      onChange: () => {}
+      onChange: () => { }
     })
   );
 
@@ -371,7 +371,7 @@ test("display editor inspector renders validation feedback inline for invalid fi
           true
         )
       ],
-      onChange: () => {}
+      onChange: () => { }
     })
   );
 
@@ -396,10 +396,10 @@ test("display editor canvas overlay exposes localized accessibility labels for s
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -445,10 +445,10 @@ test("display editor canvas overlay renders full-canvas guides and region labels
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -499,10 +499,10 @@ test("display editor canvas overlay renders relational rulers without replacing 
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -551,10 +551,10 @@ test("display editor canvas overlay renders multi-select bounds and snap feedbac
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         activeInteraction: {
           boundaryClamped: false,
@@ -609,10 +609,10 @@ test("display editor canvas overlay falls back to alternate ruler label placemen
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -657,10 +657,10 @@ test("display editor canvas overlay keeps relational handles disabled when selec
     React.createElement(DisplayEditorCanvasOverlay, {
       isInteractive: true,
       lockedRegionIds: [],
-      onSelect: () => {},
-      onSelectTemporaryMeasureTarget: () => {},
-      onStartInteraction: () => {},
-      onStartMeasurementHandleDrag: () => {},
+      onSelect: () => { },
+      onSelectTemporaryMeasureTarget: () => { },
+      onStartInteraction: () => { },
+      onStartMeasurementHandleDrag: () => { },
       overlayState: resolveDisplayEditorOverlayState({
         canvasHeight: 934,
         canvasWidth: 1920,
@@ -905,7 +905,11 @@ test("display editor inspector resolves persisted card-style controls for eligib
       "Icon Box Size",
       "Footer Padding Top",
       "Value Margin Top",
+      "Trend Height",
       "Unit Padding Bottom",
+      "Surface Opacity",
+      "Surface Blur",
+      "Shadow Strength",
       "Value Row Align"
     ]
   );
@@ -1004,7 +1008,7 @@ test("display editor inspector renders household-equivalent template fields from
   const html = renderToStaticMarkup(
     React.createElement(DisplayEditorInspectorFields, {
       fields: cardRegion.fields,
-      onChange: () => {}
+      onChange: () => { }
     })
   );
 

@@ -16,6 +16,26 @@ import {
   resolveGeometryClipboardCompatibility
 } from "./displayEditorGeometry";
 
+function assertRectMatches(
+  actual: { height: number; left: number; top: number; width: number },
+  expected: { height: number; left: number; top: number; width: number }
+) {
+  assert.deepEqual(
+    {
+      height: actual.height,
+      left: actual.left,
+      top: actual.top,
+      width: actual.width
+    },
+    {
+      height: expected.height,
+      left: expected.left,
+      top: expected.top,
+      width: expected.width
+    }
+  );
+}
+
 test("geometry clipboard pastes copied KPI geometry into a compatible region", () => {
   const config = createOverviewDisplayPageSeedConfig("/hero.png");
   const regions = resolveDisplayEditorRegions(config, overviewDisplayPageEditorRegions, config);
@@ -26,9 +46,20 @@ test("geometry clipboard pastes copied KPI geometry into a compatible region", (
   assert.ok(target?.geometry);
 
   const clipboard = createGeometryClipboard(source!);
+  const originalFooter = {
+    footerText: config.kpiCards.total.footerText,
+    footerType: config.kpiCards.total.footerType
+  };
   const nextConfig = applyGeometryClipboard(config, target!, clipboard) as typeof config;
 
-  assert.deepEqual(nextConfig.kpiCards.total, config.kpiCards.power);
+  assertRectMatches(nextConfig.kpiCards.total, config.kpiCards.power);
+  assert.deepEqual(
+    {
+      footerText: nextConfig.kpiCards.total.footerText,
+      footerType: nextConfig.kpiCards.total.footerType
+    },
+    originalFooter
+  );
 });
 
 test("geometry clipboard blocks incompatible regions without mutating the draft", () => {
@@ -91,8 +122,28 @@ test("geometry clipboard batch paste updates compatible targets and reports inco
   const nextConfig = result.config as typeof config;
 
   assert.deepEqual(result.failedTargetIds, ["overview-hero-copy"]);
-  assert.deepEqual(nextConfig.kpiCards.total, config.kpiCards.power);
-  assert.deepEqual(nextConfig.kpiCards.today, config.kpiCards.power);
+  assertRectMatches(nextConfig.kpiCards.total, config.kpiCards.power);
+  assertRectMatches(nextConfig.kpiCards.today, config.kpiCards.power);
+  assert.deepEqual(
+    {
+      footerText: nextConfig.kpiCards.total.footerText,
+      footerType: nextConfig.kpiCards.total.footerType
+    },
+    {
+      footerText: config.kpiCards.total.footerText,
+      footerType: config.kpiCards.total.footerType
+    }
+  );
+  assert.deepEqual(
+    {
+      targetValue: nextConfig.kpiCards.today.targetValue,
+      footerType: nextConfig.kpiCards.today.footerType
+    },
+    {
+      targetValue: config.kpiCards.today.targetValue,
+      footerType: config.kpiCards.today.footerType
+    }
+  );
   assert.deepEqual(nextConfig.heroCopyLayout, config.heroCopyLayout);
 });
 
@@ -123,6 +174,26 @@ test("geometry clipboard batch paste stays inside one undoable draft history ste
   const redoneSession = redoDraftSession(undoneSession);
 
   assert.deepEqual(undoneSession.config, config);
-  assert.deepEqual(redoneSession.config.kpiCards.total, config.kpiCards.power);
-  assert.deepEqual(redoneSession.config.kpiCards.today, config.kpiCards.power);
+  assertRectMatches(redoneSession.config.kpiCards.total, config.kpiCards.power);
+  assertRectMatches(redoneSession.config.kpiCards.today, config.kpiCards.power);
+  assert.deepEqual(
+    {
+      footerText: redoneSession.config.kpiCards.total.footerText,
+      footerType: redoneSession.config.kpiCards.total.footerType
+    },
+    {
+      footerText: config.kpiCards.total.footerText,
+      footerType: config.kpiCards.total.footerType
+    }
+  );
+  assert.deepEqual(
+    {
+      targetValue: redoneSession.config.kpiCards.today.targetValue,
+      footerType: redoneSession.config.kpiCards.today.footerType
+    },
+    {
+      targetValue: config.kpiCards.today.targetValue,
+      footerType: config.kpiCards.today.footerType
+    }
+  );
 });

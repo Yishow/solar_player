@@ -38,7 +38,9 @@ export type OverviewWeatherViewModel = {
   humidity: string;
   location: string;
   observedAt: string;
+  precipitation: string;
   temperature: string;
+  windSpeed: string;
 };
 
 export type OverviewPhasePowerViewModel = {
@@ -96,9 +98,14 @@ function buildOverviewWeather(weatherSnapshot?: WeatherCurrentSnapshot) {
       humidity: DENSITY_VALUE_PLACEHOLDER,
       location: "",
       observedAt: "",
-      temperature: DENSITY_VALUE_PLACEHOLDER
+      precipitation: DENSITY_VALUE_PLACEHOLDER,
+      temperature: DENSITY_VALUE_PLACEHOLDER,
+      windSpeed: DENSITY_VALUE_PLACEHOLDER
     };
   }
+
+  const precipitation = weatherSnapshot.precipitation;
+  const windSpeed = weatherSnapshot.windSpeed;
 
   return {
     available: true as const,
@@ -109,7 +116,15 @@ function buildOverviewWeather(weatherSnapshot?: WeatherCurrentSnapshot) {
         : `${Math.round(weatherSnapshot.relativeHumidity)}%`,
     location: weatherSnapshot.stationName ?? weatherSnapshot.countyName ?? "",
     observedAt: weatherSnapshot.observationTime ?? "",
-    temperature: `${Math.round(weatherSnapshot.airTemperature)}°C`
+    precipitation:
+      typeof precipitation === "number" && Number.isFinite(precipitation)
+        ? `${Math.round(precipitation)} mm`
+        : DENSITY_VALUE_PLACEHOLDER,
+    temperature: `${Math.round(weatherSnapshot.airTemperature)}°C`,
+    windSpeed:
+      typeof windSpeed === "number" && Number.isFinite(windSpeed)
+        ? `${windSpeed.toFixed(1)} m/s`
+        : DENSITY_VALUE_PLACEHOLDER
   };
 }
 
@@ -518,19 +533,19 @@ export function buildOverviewViewModel({
     ? isOverviewStorySummary(storyOverview.summary)
       ? storyOverview.summary
       : resolveMonitoringSummaryState(
-          metrics.filter((metric) =>
-            (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
-              metric.metricKey as OverviewMetricKey
-            )
-          )
-        )
-    : resolveMonitoringSummaryState(
         metrics.filter((metric) =>
           (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
             metric.metricKey as OverviewMetricKey
           )
         )
-      );
+      )
+    : resolveMonitoringSummaryState(
+      metrics.filter((metric) =>
+        (summaryMetricKeys ?? resolvedMetricBindings.map((binding) => binding.metricKey)).includes(
+          metric.metricKey as OverviewMetricKey
+        )
+      )
+    );
   const alerts = buildOverviewAlertItems({
     metrics: storyMetrics,
     readinessFindings: storyOverview?.readinessFindings ?? [],

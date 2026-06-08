@@ -14,6 +14,9 @@ test("GenerationTrendWidget renders runtime trend series without mock values", (
   );
 
   assert.match(markup, /發電趨勢/);
+  assert.match(markup, /Today/);
+  assert.match(markup, /7D/);
+  assert.match(markup, /30D/);
   assert.match(markup, /82 kW/);
   assert.match(markup, /108 kW/);
   assert.match(markup, /overview-widget-trend-sparkline/);
