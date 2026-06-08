@@ -20,7 +20,7 @@ import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useOverviewWeather } from "../../hooks/useOverviewWeather";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
-import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
+import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   overviewHeroMediaEffectResolverOptions
@@ -326,6 +326,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <WeatherCardWidget
           weather={viewModel.weather}
           style={{
+            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.weather),
             height: `${weatherLayout.height}px`,
             left: `${weatherLayout.left}px`,
             top: `${weatherLayout.top}px`,
@@ -337,6 +338,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <PhasePowerTableWidget
           phasePower={viewModel.phasePower}
           style={{
+            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.phasePower),
             height: `${phasePowerLayout.height}px`,
             left: `${phasePowerLayout.left}px`,
             top: `${phasePowerLayout.top}px`,
@@ -348,6 +350,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <GenerationTrendWidget
           series={generationTrendSeries}
           style={{
+            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.generationTrend),
             height: `${generationTrendLayout.height}px`,
             left: `${generationTrendLayout.left}px`,
             top: `${generationTrendLayout.top}px`,
@@ -359,6 +362,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <AlertNotificationsWidget
           alerts={viewModel.alerts}
           style={{
+            ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.alertNotifications),
             height: `${alertNotificationsLayout.height}px`,
             left: `${alertNotificationsLayout.left}px`,
             top: `${alertNotificationsLayout.top}px`,

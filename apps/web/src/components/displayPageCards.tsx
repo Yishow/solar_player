@@ -5,7 +5,13 @@ import {
 } from "../pages/shared/displayCardStyleConfig";
 
 type DisplayCardSurface = "info" | "metric";
-type DisplayCardValueAlign = "center" | "start";
+type DisplayCardValueAlign = "center" | "end" | "start";
+
+const displayCardValueRowAlignClass: Record<DisplayCardValueAlign, string> = {
+  center: "display-card-value-row-center",
+  end: "display-card-value-row-end",
+  start: "display-card-value-row-start"
+};
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -73,7 +79,7 @@ export function DisplayCardValueRow({
     <div
       className={classNames(
         "display-card-value-row",
-        align === "center" ? "display-card-value-row-center" : "display-card-value-row-start",
+        displayCardValueRowAlignClass[align],
         className
       )}
     >

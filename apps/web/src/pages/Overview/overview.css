@@ -121,7 +121,7 @@
 }
 
 .overview-kpi-sparkline {
-  height: 56px;
+  height: var(--display-card-trend-height, 56px);
   padding-inline: 10px;
 }
 
@@ -158,7 +158,7 @@
 }
 
 .overview-widget-trend-sparkline {
-  height: 110px;
+  height: var(--display-card-trend-height, 110px);
 }
 
 .overview-weather-widget,

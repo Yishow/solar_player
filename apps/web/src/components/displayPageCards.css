@@ -88,6 +88,12 @@
   justify-content: flex-start;
 }
 
+.display-card-value-row-end {
+  justify-content: flex-end;
+  width: 100%;
+  text-align: right;
+}
+
 .display-card-value {
   color: var(--display-card-value-color, #274d27);
   font-size: var(--display-card-value-size, 54px);

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { DisplayEditorFieldSchema, DisplayEditorPath } from "../../../../../packages/shared/src/displayEditorSchema";
 
-export type DisplayCardValueRowAlign = "center" | "start";
+export type DisplayCardValueRowAlign = "center" | "end" | "start";
 
 export type DisplayCardStyleConfig = {
   cornerRadius: number;
@@ -17,6 +17,7 @@ export type DisplayCardStyleConfig = {
   surfaceBlur: number;
   surfaceOpacity: number;
   titleFontSize: number;
+  trendHeight: number;
   unitFontSize: number;
   unitPaddingBottom: number;
   valueFontSize: number;
@@ -26,7 +27,8 @@ export type DisplayCardStyleConfig = {
 
 export const displayCardValueRowAlignOptions = [
   { label: "Start", value: "start" },
-  { label: "Center", value: "center" }
+  { label: "Center", value: "center" },
+  { label: "End", value: "end" }
 ] as const;
 
 function resolveNonNegativeNumber(value: unknown, fallback: number) {
@@ -40,7 +42,7 @@ function resolveUnitInterval(value: unknown, fallback: number) {
 }
 
 function resolveValueRowAlign(value: unknown, fallback: DisplayCardValueRowAlign): DisplayCardValueRowAlign {
-  return value === "center" || value === "start" ? value : fallback;
+  return value === "center" || value === "start" || value === "end" ? value : fallback;
 }
 
 export function createDisplayCardStyleConfig(
@@ -60,6 +62,7 @@ export function createDisplayCardStyleConfig(
     surfaceBlur: resolveNonNegativeNumber(overrides.surfaceBlur, 0),
     surfaceOpacity: resolveUnitInterval(overrides.surfaceOpacity, 1),
     titleFontSize: resolveNonNegativeNumber(overrides.titleFontSize, 20),
+    trendHeight: resolveNonNegativeNumber(overrides.trendHeight, 56),
     unitFontSize: resolveNonNegativeNumber(overrides.unitFontSize, 16),
     unitPaddingBottom: resolveNonNegativeNumber(overrides.unitPaddingBottom, 6),
     valueFontSize: resolveNonNegativeNumber(overrides.valueFontSize, 54),
@@ -80,6 +83,7 @@ export function buildDisplayCardStyleVars(cardStyle: DisplayCardStyleConfig): CS
     ["--display-card-surface-blur" as string]: `${cardStyle.surfaceBlur}px`,
     ["--display-card-surface-opacity" as string]: `${cardStyle.surfaceOpacity}`,
     ["--display-card-title-size" as string]: `${cardStyle.titleFontSize}px`,
+    ["--display-card-trend-height" as string]: `${cardStyle.trendHeight}px`,
     ["--display-card-unit-padding-bottom" as string]: `${cardStyle.unitPaddingBottom}px`,
     ["--display-card-unit-size" as string]: `${cardStyle.unitFontSize}px`,
     ["--display-card-value-margin-top" as string]: `${cardStyle.valueMarginTop}px`,
@@ -185,6 +189,13 @@ export function buildDisplayCardStyleFields({
       id: `${idPrefix}-card-value-margin-top`,
       label: "Value Margin Top",
       path: [...path, "valueMarginTop"]
+    },
+    {
+      constraints: { min: 0 },
+      fieldType: "number",
+      id: `${idPrefix}-card-trend-height`,
+      label: "Trend Height",
+      path: [...path, "trendHeight"]
     },
     {
       constraints: { min: 0 },

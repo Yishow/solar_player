@@ -206,6 +206,7 @@ export type OverviewDisplayPageConfig = {
   >;
   kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewKpiCardConfig>;
   summaryCard: OverviewDisplayTextRect;
+  widgetStyles: Record<OverviewDashboardWidgetKey, DisplayCardStyleConfig>;
 };
 
 export function createOverviewDisplayPageSeedConfig(
@@ -331,6 +332,12 @@ export function createOverviewDisplayPageSeedConfig(
       left: 88,
       top: 430,
       width: 520
+    },
+    widgetStyles: {
+      alertNotifications: createDisplayCardStyleConfig(),
+      generationTrend: createDisplayCardStyleConfig({ trendHeight: 110 }),
+      phasePower: createDisplayCardStyleConfig(),
+      weather: createDisplayCardStyleConfig()
     }
   };
 }
@@ -377,10 +384,21 @@ export function resolveOverviewModernDefaultConfig(
     ? { sources: persistedBackgroundPoolSources }
     : seedConfig.backgroundPool;
 
+  const persistedWidgetStyles = ((config as Partial<OverviewDisplayPageConfig>).widgetStyles ?? {}) as Partial<
+    Record<OverviewDashboardWidgetKey, Partial<DisplayCardStyleConfig>>
+  >;
+  const widgetStyles = Object.fromEntries(
+    Object.entries(seedConfig.widgetStyles).map(([key, seedStyle]) => {
+      const value = persistedWidgetStyles[key as OverviewDashboardWidgetKey];
+      return [key, value ? createDisplayCardStyleConfig({ ...seedStyle, ...value }) : seedStyle];
+    })
+  ) as OverviewDisplayPageConfig["widgetStyles"];
+
   return {
     ...config,
     backgroundPool,
     cardStyles,
+    widgetStyles,
     chrome: {
       ...config.chrome,
       heroTypography: matchesRecord(config.chrome.heroTypography, legacyOverviewHeroTypography)
@@ -637,7 +655,11 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["dashboardWidgets", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["dashboardWidgets", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["dashboardWidgets", key, "width"] },
-      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["dashboardWidgets", key, "height"] }
+      { constraints: { min: 0 }, fieldType: "number", id: `${key}-height`, label: "Height", path: ["dashboardWidgets", key, "height"] },
+      ...buildDisplayCardStyleFields({
+        idPrefix: `${key}-widget`,
+        path: ["widgetStyles", key]
+      })
     ],
     presetKey: "overview-dashboard-widget"
   })),
