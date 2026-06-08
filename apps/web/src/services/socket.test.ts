@@ -18,14 +18,14 @@ test("resolveSocketOrigin maps loopback Vite dev ports back to the backend port"
   );
 });
 
-test("resolveSocketOrigin keeps non-loopback Vite dev hosts same-origin for proxy-backed remote sessions", () => {
+test("resolveSocketOrigin falls back to the backend origin when the HMR runtime marker is absent", () => {
   assert.equal(
     resolveSocketOrigin({
       hostname: "100.76.76.75",
       port: "5173",
       protocol: "http:"
     }),
-    "http://100.76.76.75:5173"
+    "http://100.76.76.75:3000"
   );
 });
 
@@ -35,8 +35,19 @@ test("resolveSocketOrigin maps a configured custom non-loopback Vite dev port to
       hostname: "100.76.76.75",
       port: "4173",
       protocol: "http:"
-    }, "4173"),
+    }, "4173", true),
     "http://100.76.76.75:4173"
+  );
+});
+
+test("resolveSocketOriginFromLocation sends preview traffic on Vite-like ports back to the backend origin", () => {
+  assert.equal(
+    resolveSocketOriginFromLocation({
+      hostname: "100.76.76.75",
+      port: "4173",
+      protocol: "http:"
+    }, "4173", false),
+    "http://100.76.76.75:3000"
   );
 });
 

@@ -7,6 +7,8 @@ export {
   OpsSurfaceTitle
 } from "./opsSurfacePrimitives";
 export { RotationOpsSummary } from "./rotationOpsSummary";
+export { CustomSelect } from "./CustomSelect";
+export type { CustomSelectOption, CustomSelectProps } from "./CustomSelect";
 
 export type SwitchProps = {
   on: boolean;

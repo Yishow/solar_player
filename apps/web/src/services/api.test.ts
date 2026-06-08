@@ -6,9 +6,11 @@ import {
   fetchDisplayStoryPage,
   isManagementAccessDeniedError,
   isManagementDraftConflictError,
+  isViteDevRuntime,
   fetchImagePlaylist,
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
+  getDeviceLogExportMetadata,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
   resolveBrowserApiOrigin,
@@ -40,7 +42,7 @@ test("buildApiUrl maps loopback Vite dev ports back to the backend port", () => 
   }
 });
 
-test("buildApiUrl keeps non-loopback Vite dev hosts same-origin so remote sessions can use the dev proxy", () => {
+test("buildApiUrl falls back to the backend origin when the HMR runtime marker is absent", () => {
   const originalWindow = globalThis.window;
 
   Object.defineProperty(globalThis, "window", {
@@ -55,13 +57,18 @@ test("buildApiUrl keeps non-loopback Vite dev hosts same-origin so remote sessio
   });
 
   try {
-    assert.equal(buildApiUrl("/api/images"), "http://100.76.76.75:5173/api/images");
+    assert.equal(buildApiUrl("/api/images"), "http://100.76.76.75:3000/api/images");
   } finally {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: originalWindow
     });
   }
+});
+
+test("isViteDevRuntime only trusts the HMR runtime marker", () => {
+  assert.equal(isViteDevRuntime({ hot: undefined }), false);
+  assert.equal(isViteDevRuntime({ hot: {} }), true);
 });
 
 test("resolveBrowserApiOrigin keeps configured custom non-loopback Vite dev ports same-origin", () => {
@@ -72,9 +79,25 @@ test("resolveBrowserApiOrigin keeps configured custom non-loopback Vite dev port
         port: "4173",
         protocol: "http:"
       },
-      "4173"
+      "4173",
+      true
     ),
     "http://100.76.76.75:4173"
+  );
+});
+
+test("resolveBrowserApiOrigin sends preview traffic on Vite-like ports back to the backend origin", () => {
+  assert.equal(
+    resolveBrowserApiOrigin(
+      {
+        hostname: "100.76.76.75",
+        port: "4173",
+        protocol: "http:"
+      },
+      "4173",
+      false
+    ),
+    "http://100.76.76.75:3000"
   );
 });
 
@@ -86,7 +109,8 @@ test("resolveBrowserApiOrigin maps a configured custom Vite loopback port back t
         port: "4173",
         protocol: "http:"
       },
-      "4173"
+      "4173",
+      true
     ),
     "http://localhost:3000"
   );
@@ -261,6 +285,46 @@ test("requestJson keeps caller headers while still using the normalized Headers 
 
     assert.equal(response.success, true);
     assert.equal(seenTraceId, "brand-review");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getDeviceLogExportMetadata reads directory and file names from the export metadata route", async () => {
+  const originalFetch = globalThis.fetch;
+  const seenUrls: string[] = [];
+
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    seenUrls.push(url);
+
+    if (url.includes("/api/device/logs/export")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            directory: "/var/log/solar-display",
+            files: ["player.log", "worker.log"]
+          },
+          success: true
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json"
+          },
+          status: 200
+        }
+      );
+    }
+
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  try {
+    const response = await getDeviceLogExportMetadata();
+
+    assert.deepEqual(seenUrls.map((url) => new URL(url).pathname + new URL(url).search), ["/api/device/logs/export"]);
+    assert.equal(response.directory, "/var/log/solar-display");
+    assert.deepEqual(response.files, ["player.log", "worker.log"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

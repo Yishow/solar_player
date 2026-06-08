@@ -6,7 +6,7 @@ import type {
 } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 import { routeMetaMap } from "../app/routeMeta";
-import { resolveBrowserApiOrigin } from "./api";
+import { isViteDevRuntime, resolveBrowserApiOrigin } from "./api";
 
 export type LiveMetricReading = {
   quality: string | null;
@@ -110,15 +110,19 @@ export function resolveSocketOrigin(locationLike?: {
     return "http://localhost:3000";
   }
 
-  return resolveSocketOriginFromLocation(locationLike ?? window.location, env?.VITE_PORT);
+  return resolveSocketOriginFromLocation(
+    locationLike ?? window.location,
+    env?.VITE_PORT,
+    isViteDevRuntime(import.meta)
+  );
 }
 
 export function resolveSocketOriginFromLocation(locationLike: {
   hostname: string;
   port: string;
   protocol: string;
-}, configuredVitePort?: string) {
-  return resolveBrowserApiOrigin(locationLike, configuredVitePort);
+}, configuredVitePort?: string, isViteDevServer = false) {
+  return resolveBrowserApiOrigin(locationLike, configuredVitePort, isViteDevServer);
 }
 
 export function resolveSocketSessionClass(pathname: string): ManagementSocketSessionClass {

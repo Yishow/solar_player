@@ -208,4 +208,12 @@
   /* Glow effects variables */
   --glow-brand: 0 0 6px rgba(245, 158, 11, 0.4);
   --glow-warning: 0 0 8px rgba(245, 158, 11, 0.8);
+
+  /* Interactive card tokens */
+  --mgmt-card-bg: linear-gradient(145deg, #ffffff, #fcfcf9);
+  --mgmt-card-border: rgba(92, 105, 79, 0.12);
+  --mgmt-card-shadow: 0 4px 12px rgba(92, 105, 79, 0.03);
+  --mgmt-card-hover-bg: linear-gradient(145deg, #ffffff, #fafaf6);
+  --mgmt-card-hover-border: rgba(92, 105, 79, 0.25);
+  --mgmt-card-hover-shadow: 0 8px 20px rgba(92, 105, 79, 0.08);
 }

@@ -13,7 +13,7 @@ test("remote sync banner exposes keep-editing and reload actions", () => {
   );
 
   assert.match(html, /遠端已有新資料/);
-  assert.match(html, /目前會保留你的本地編輯/);
+  assert.match(html, /目前保留你的本地編輯/);
   assert.match(html, /稍後再說/);
   assert.match(html, /重新同步/);
   assert.match(html, /Keep Editing/);

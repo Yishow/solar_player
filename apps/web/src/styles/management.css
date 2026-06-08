@@ -110,6 +110,23 @@
   position: relative;
 }
 
+/* === Interactive Management Cards === */
+.mgmt-interactive-card {
+  position: relative;
+  z-index: 1;
+  background: var(--mgmt-card-bg);
+  border: 1px solid var(--mgmt-card-border);
+  border-radius: 14px;
+  box-shadow: var(--mgmt-card-shadow);
+}
+
+/* 確保 settings-card 套用互動卡片時，不會被 mgmt-interactive-card 的 position: relative 覆蓋 */
+.settings-card.mgmt-interactive-card {
+  position: absolute;
+}
+
+
+
 .mgmt-surface--preview {
   --mgmt-surface-bg: var(--preview-surface-bg);
   --mgmt-surface-border: var(--preview-surface-border);
@@ -179,6 +196,57 @@
   line-height: 1.45;
   opacity: 0.88;
 }
+
+/* 遠端同步提示橫幅 (精緻水平版面) */
+.mgmt-remote-sync-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  height: 64px;
+  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+}
+
+.mgmt-remote-sync-banner__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.mgmt-remote-sync-banner__copy strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.mgmt-remote-sync-banner__copy small {
+  font-size: 12px;
+  line-height: 1.25;
+  opacity: 0.88;
+}
+
+.mgmt-remote-sync-banner .mgmt-action-row {
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.mgmt-remote-sync-banner .mgmt-action-row .mgmt-action {
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  gap: 1px;
+}
+
+.mgmt-remote-sync-banner .mgmt-action-row .mgmt-action small {
+  font-size: 9px;
+  margin-top: 1px;
+}
+
 
 .mgmt-stat-strip {
   display: flex;
@@ -449,4 +517,273 @@
   border-color: var(--surface-state-error-border);
   background: var(--surface-state-error-bg);
   color: var(--surface-state-error-ink);
+}
+
+/* === Shared Select Dropdown === */
+.mgmt-select,
+.cs-page .cs-select,
+.image-mgmt-page .im-select,
+.mqtt-settings-page .mqtt-weather-card__field select {
+  height: 38px;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235d7745' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding: 0 32px 0 12px;
+  font: 400 14px/1 var(--font-family-en);
+  color: #344039;
+  outline: none;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mgmt-select:hover,
+.cs-page .cs-select:hover,
+.image-mgmt-page .im-select:hover,
+.mqtt-settings-page .mqtt-weather-card__field select:hover {
+  border-color: rgba(93, 119, 69, 0.4);
+  background-color: #fbfbfa;
+}
+
+.mgmt-select:focus,
+.cs-page .cs-select:focus,
+.image-mgmt-page .im-select:focus,
+.mqtt-settings-page .mqtt-weather-card__field select:focus {
+  border-color: #5d7745;
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+  background-color: #fff;
+}
+
+.mgmt-select:disabled,
+.cs-page .cs-select:disabled,
+.image-mgmt-page .im-select:disabled,
+.mqtt-settings-page .mqtt-weather-card__field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* === Reusable Custom Select Dropdown === */
+.mgmt-select-container {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+}
+
+.mgmt-select-native {
+  width: 100%;
+  height: 38px;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background-color: #fff;
+  padding: 0 36px 0 12px;
+  font: 400 14px/1 var(--font-family-en);
+  color: #344039;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mgmt-select-native:hover:not(:disabled) {
+  border-color: rgba(93, 119, 69, 0.4);
+  background-color: #fbfbfa;
+}
+
+.mgmt-select-native:focus:not(:disabled) {
+  border-color: #5d7745;
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+  background-color: #fff;
+}
+
+.mgmt-select-native:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mgmt-select-trigger {
+  height: 38px;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background-color: #fff;
+  padding: 0 12px;
+  font: 400 14px/1 var(--font-family-en);
+  color: #344039;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mgmt-select-trigger:hover:not(:disabled) {
+  border-color: rgba(93, 119, 69, 0.4);
+  background-color: #fbfbfa;
+}
+
+.mgmt-select-trigger:focus:not(:disabled),
+.mgmt-select-trigger.is-active {
+  border-color: #5d7745;
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+  background-color: #fff;
+}
+
+.mgmt-select-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mgmt-select-trigger-arrow {
+  color: #888d86;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: auto;
+}
+
+.mgmt-select-native-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  margin-left: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.mgmt-select-native:focus+.mgmt-select-native-arrow {
+  color: #5d7745;
+}
+
+.mgmt-select-trigger.is-active .mgmt-select-trigger-arrow {
+  color: #5d7745;
+}
+
+.mgmt-select-popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(93, 119, 69, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(93, 119, 69, 0.12);
+  padding: 6px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform-origin: top center;
+  animation: mgmt-select-fade-in 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+@keyframes mgmt-select-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.mgmt-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2b332f;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mgmt-select-option:hover:not(.is-disabled) {
+  background: rgba(93, 119, 69, 0.08);
+  color: #344039;
+}
+
+.mgmt-select-option.is-selected {
+  font-weight: 600;
+  color: #344039;
+  background: rgba(93, 119, 69, 0.04);
+}
+
+.mgmt-select-option-check {
+  color: #5d7745;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.mgmt-select-option.is-disabled {
+  color: #888d86;
+  cursor: not-allowed;
+}
+
+.mgmt-select-option.is-disabled:hover {
+  background: rgba(136, 141, 134, 0.08);
+  color: #6b7069;
+}
+
+/* === Upward Positioning for Custom Dropdown === */
+.mgmt-select-popup.is-upward {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform-origin: bottom center;
+  animation: mgmt-select-fade-in-upward 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes mgmt-select-fade-in-upward {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* === Shared Input Fields === */
+.mgmt-input {
+  height: 38px;
+  border: 1px solid rgba(93, 119, 69, 0.22);
+  border-radius: 8px;
+  background-color: #fff;
+  padding: 0 12px;
+  font: 400 14px/1 var(--font-family-zh);
+  color: #344039;
+  outline: none;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.mgmt-input::placeholder {
+  color: #a0a59f;
+}
+
+.mgmt-input:hover:not(:disabled) {
+  border-color: rgba(93, 119, 69, 0.4);
+  background-color: #fbfbfa;
+}
+
+.mgmt-input:focus:not(:disabled) {
+  border-color: #5d7745;
+  box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
+  background-color: #fff;
+}
+
+.mgmt-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

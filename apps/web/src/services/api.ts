@@ -56,7 +56,13 @@ export function buildApiUrl(path: string) {
     return `http://localhost:3000${path}`;
   }
 
-  return `${resolveBrowserApiOrigin(window.location, env?.VITE_PORT)}${path}`;
+  return `${resolveBrowserApiOrigin(window.location, env?.VITE_PORT, isViteDevRuntime(import.meta))}${path}`;
+}
+
+export function isViteDevRuntime(metaLike: {
+  hot?: unknown;
+}) {
+  return Boolean(metaLike.hot);
 }
 
 function isLoopbackHostname(hostname: string) {
@@ -68,11 +74,11 @@ export function resolveBrowserApiOrigin(locationLike: {
   hostname: string;
   port: string;
   protocol: string;
-}, configuredVitePort?: string) {
+}, configuredVitePort?: string, isViteDevServer = false) {
   const resolvedVitePort = configuredVitePort?.trim() || "5173";
   const isViteDevPort = locationLike.port === resolvedVitePort || /^517\d*$/.test(locationLike.port);
 
-  if (isViteDevPort && !isLoopbackHostname(locationLike.hostname)) {
+  if (isViteDevPort && isViteDevServer && !isLoopbackHostname(locationLike.hostname)) {
     return `${locationLike.protocol}//${locationLike.hostname}:${locationLike.port}`;
   }
 
@@ -509,8 +515,14 @@ export type DeviceStatusResponseData = {
 };
 
 export type DeviceLogExportMetadata = {
-  directory: string;
+  directory: string | null;
   files: string[];
+};
+
+type DeviceLogListEntry = {
+  file: string;
+  modified: string;
+  size: number;
 };
 
 export async function getDeviceStatus() {
