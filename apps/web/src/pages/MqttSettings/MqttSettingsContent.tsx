@@ -5,6 +5,7 @@ import type {
   WeatherOptionsResponse,
   WeatherSettings
 } from "@solar-display/shared";
+import { memo, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import type {
@@ -83,24 +84,44 @@ function resolveCoverageChipClass(stateLabel: string) {
  *
  * @param props 元件屬性，包含 viewModel 所需資料與事件處理函式
  */
-export function MqttSettingsContent(props: MqttSettingsContentProps) {
-  const viewModel = buildMqttSettingsViewModel({
-    actionState: props.actionState,
-    errorMessage: props.errorMessage,
-    lastConnectionTest: props.lastConnectionTest,
-    liveMetricsConnectionState: props.liveMetricsConnectionState,
-    liveMetricsSnapshot: props.liveMetricsSnapshot,
-    message: props.message,
-    readiness: props.readiness,
-    settings: props.settings,
-    status: props.status,
-    topics: props.topics,
-    weatherOptions: props.weatherOptions,
-    weatherOptionsErrorMessage: props.weatherOptionsErrorMessage,
-    weatherPreviewContract: props.weatherPreviewContract,
-    weatherPreviewErrorMessage: props.weatherPreviewErrorMessage,
-    weatherSettings: props.weatherSettings
-  });
+function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
+  const viewModel = useMemo(
+    () =>
+      buildMqttSettingsViewModel({
+        actionState: props.actionState,
+        errorMessage: props.errorMessage,
+        lastConnectionTest: props.lastConnectionTest,
+        liveMetricsConnectionState: props.liveMetricsConnectionState,
+        liveMetricsSnapshot: props.liveMetricsSnapshot,
+        message: props.message,
+        readiness: props.readiness,
+        settings: props.settings,
+        status: props.status,
+        topics: props.topics,
+        weatherOptions: props.weatherOptions,
+        weatherOptionsErrorMessage: props.weatherOptionsErrorMessage,
+        weatherPreviewContract: props.weatherPreviewContract,
+        weatherPreviewErrorMessage: props.weatherPreviewErrorMessage,
+        weatherSettings: props.weatherSettings
+      }),
+    [
+      props.actionState,
+      props.errorMessage,
+      props.lastConnectionTest,
+      props.liveMetricsConnectionState,
+      props.liveMetricsSnapshot,
+      props.message,
+      props.readiness,
+      props.settings,
+      props.status,
+      props.topics,
+      props.weatherOptions,
+      props.weatherOptionsErrorMessage,
+      props.weatherPreviewContract,
+      props.weatherPreviewErrorMessage,
+      props.weatherSettings
+    ]
+  );
   const connStatusVariant = resolveConnStatus(viewModel.connection.statusTone);
 
   return (
@@ -318,3 +339,9 @@ export function MqttSettingsContent(props: MqttSettingsContentProps) {
     </div>
   );
 }
+
+/**
+ * 以 React.memo 包裝的 MQTT 設定主內容元件；
+ * 相同 props（由 index.tsx 穩定化的 handler 與狀態）下不重繪。
+ */
+export const MqttSettingsContent = memo(MqttSettingsContentImpl);

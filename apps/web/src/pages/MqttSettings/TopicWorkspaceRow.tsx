@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { buildMqttSettingsViewModel, TopicMapping } from "./viewModel";
 
 /**
@@ -22,39 +23,54 @@ export type TopicWorkspaceRowProps = {
 };
 
 /**
- * Topic 工作區的單一對照項目元件。
- * 提供即時數值顯示、Topic/Unit 欄位編輯，以及啟用與移除之控制項。
+ * 渲染帶有標籤的屬性輸入框，以消除重複 HTML 語義
  *
- * @param props 元件屬性，包含單一對照項目資料與其變更/移除事件
+ * @param props.rowId 所屬 topic row 的 id
+ * @param props.field 欄位名稱
+ * @param props.label 顯示的前綴標籤
+ * @param props.placeholder 輸入框佔位符
+ * @param props.value 欄位目前值
+ * @param props.handleTopicChange 欄位變更事件函式
  */
-export function TopicWorkspaceRow({
-  topic,
-  handleTopicChange,
-  removeTopicMapping
-}: TopicWorkspaceRowProps) {
-  /**
-   * 渲染帶有標籤的屬性輸入框，以消除重複 HTML 語義
-   *
-   * @param field 欄位名稱
-   * @param label 顯示的前綴標籤
-   * @param placeholder 輸入框佔位符
-   */
-  const renderInputGroup = (
-    field: "topic" | "unit",
-    label: string,
-    placeholder: string
-  ) => (
+function TopicInputGroup({
+  rowId,
+  field,
+  label,
+  placeholder,
+  value,
+  handleTopicChange
+}: {
+  rowId: number;
+  field: "topic" | "unit";
+  label: string;
+  placeholder: string;
+  value: string;
+  handleTopicChange: TopicWorkspaceRowProps["handleTopicChange"];
+}) {
+  return (
     <div className="input-group">
       <span className="input-prefix">{label}</span>
       <input
         type="text"
         placeholder={placeholder}
-        value={topic[field]}
-        onChange={(event) => handleTopicChange(topic.id, field, event.target.value)}
+        value={value}
+        onChange={(event) => handleTopicChange(rowId, field, event.target.value)}
       />
     </div>
   );
+}
 
+/**
+ * Topic 工作區的單一對照項目元件。
+ * 提供即時數值顯示、Topic/Unit 欄位編輯，以及啟用與移除之控制項。
+ *
+ * @param props 元件屬性，包含單一對照項目資料與其變更/移除事件
+ */
+function TopicWorkspaceRowImpl({
+  topic,
+  handleTopicChange,
+  removeTopicMapping
+}: TopicWorkspaceRowProps) {
   return (
     <div className="topic-workspace-row mgmt-interactive-card" data-mqtt-row="editable-topic-row">
       <div className="topic-workspace-row__header">
@@ -79,8 +95,22 @@ export function TopicWorkspaceRow({
 
       <div className="topic-workspace-row__body">
         <div className="topic-workspace-row__fields">
-          {renderInputGroup("topic", "Topic", "輸入 MQTT topic...")}
-          {renderInputGroup("unit", "Unit", "單位")}
+          <TopicInputGroup
+            rowId={topic.id}
+            field="topic"
+            label="Topic"
+            placeholder="輸入 MQTT topic..."
+            value={topic.topic}
+            handleTopicChange={handleTopicChange}
+          />
+          <TopicInputGroup
+            rowId={topic.id}
+            field="unit"
+            label="Unit"
+            placeholder="單位"
+            value={topic.unit}
+            handleTopicChange={handleTopicChange}
+          />
         </div>
 
         <div className="topic-workspace-row__runtime">
@@ -103,3 +133,9 @@ export function TopicWorkspaceRow({
     </div>
   );
 }
+
+/**
+ * 以 React.memo 包裝的 Topic 工作區單列元件；
+ * 相同 props（穩定 handler + 不變 row 資料）下不重繪。
+ */
+export const TopicWorkspaceRow = memo(TopicWorkspaceRowImpl);

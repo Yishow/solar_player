@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_WEATHER_SETTINGS,
   type WeatherFieldKey,
@@ -178,11 +178,11 @@ export function MqttSettings() {
     return [...optionSet];
   }, [topics]);
 
-  const markDirty = (nextMessage: string) => {
+  const markDirty = useCallback((nextMessage: string) => {
     setLastConnectionTest(null);
     setMessage(nextMessage);
     setErrorMessage("");
-  };
+  }, []);
 
   const loadSettings = async ({ propagateError = false }: { propagateError?: boolean } = {}) => {
     setActionState((current) => ({ ...current, isLoadingSettings: true }));
@@ -337,15 +337,15 @@ export function MqttSettings() {
     weatherSettings.stationId
   ]);
 
-  const handleSettingChange = <Key extends keyof MqttSettingsForm>(
+  const handleSettingChange = useCallback(<Key extends keyof MqttSettingsForm>(
     key: Key,
     value: MqttSettingsForm[Key]
   ) => {
     markDirty("Broker 設定已變更，尚未儲存。");
     setSettings((current) => ({ ...current, [key]: value }));
-  };
+  }, [markDirty]);
 
-  const handleTopicChange = <Key extends keyof TopicMapping>(
+  const handleTopicChange = useCallback(<Key extends keyof TopicMapping>(
     rowId: number,
     key: Key,
     value: TopicMapping[Key]
@@ -354,9 +354,9 @@ export function MqttSettings() {
     setTopics((current) =>
       current.map((topic) => (topic.id === rowId ? { ...topic, [key]: value } : topic))
     );
-  };
+  }, [markDirty]);
 
-  const handleWeatherSettingChange = <Key extends keyof WeatherSettings>(
+  const handleWeatherSettingChange = useCallback(<Key extends keyof WeatherSettings>(
     key: Key,
     value: WeatherSettings[Key]
   ) => {
@@ -364,14 +364,14 @@ export function MqttSettings() {
     setWeatherSettings((current) =>
       applyWeatherSettingChange(current, key, value, weatherOptions?.stations ?? [])
     );
-  };
+  }, [markDirty, weatherOptions]);
 
-  const toggleWeatherField = (fieldKey: WeatherFieldKey, enabled: boolean) => {
+  const toggleWeatherField = useCallback((fieldKey: WeatherFieldKey, enabled: boolean) => {
     markDirty("天氣顯示欄位已變更，尚未儲存。");
     setWeatherSettings((current) => toggleWeatherFieldKey(current, fieldKey, enabled));
-  };
+  }, [markDirty]);
 
-  const saveSettings = async () => {
+  const saveSettings = useCallback(async () => {
     setActionState((current) => ({ ...current, isSavingSettings: true }));
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt", {
@@ -394,9 +394,9 @@ export function MqttSettings() {
     } finally {
       setActionState((current) => ({ ...current, isSavingSettings: false }));
     }
-  };
+  }, [settings, weatherSettings, reloadReadiness]);
 
-  const testConnection = async () => {
+  const testConnection = useCallback(async () => {
     setActionState((current) => ({ ...current, isTestingConnection: true }));
     try {
       const response = await requestJson<{
@@ -417,9 +417,9 @@ export function MqttSettings() {
     } finally {
       setActionState((current) => ({ ...current, isTestingConnection: false }));
     }
-  };
+  }, [settings]);
 
-  const saveTopicMappings = async () => {
+  const saveTopicMappings = useCallback(async () => {
     setActionState((current) => ({ ...current, isSavingTopics: true }));
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics", {
@@ -446,9 +446,9 @@ export function MqttSettings() {
     } finally {
       setActionState((current) => ({ ...current, isSavingTopics: false }));
     }
-  };
+  }, [topics, reloadReadiness]);
 
-  const reloadTopics = async () => {
+  const reloadTopics = useCallback(async () => {
     setActionState((current) => ({ ...current, isReloadingTopics: true }));
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/reload", {
@@ -466,21 +466,21 @@ export function MqttSettings() {
     } finally {
       setActionState((current) => ({ ...current, isReloadingTopics: false }));
     }
-  };
+  }, [reloadReadiness]);
 
-  const addTopicMapping = () => {
+  const addTopicMapping = useCallback(() => {
     const nextMetricKey =
       metricOptions.find((option) => !topics.some((topic) => topic.metricKey === option)) ??
       metricOptions[0];
     if (!nextMetricKey) return;
     markDirty("已新增一筆 topic mapping，尚未儲存。");
     setTopics((current) => [...current, createEmptyMapping(nextMetricKey)]);
-  };
+  }, [metricOptions, topics, markDirty]);
 
-  const removeTopicMapping = (rowId: number) => {
+  const removeTopicMapping = useCallback((rowId: number) => {
     markDirty("已移除一筆 topic mapping，尚未儲存。");
     setTopics((current) => current.filter((topic) => topic.id !== rowId));
-  };
+  }, [markDirty]);
 
   const draftSections = useMemo(
     () => ({

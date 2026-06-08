@@ -8,8 +8,8 @@ const mqttSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf
 
 test("mqtt settings only marks broker settings synced after weather settings save succeeds", () => {
   const saveSettingsSource = mqttSettingsSource.slice(
-    mqttSettingsSource.indexOf("const saveSettings = async () => {"),
-    mqttSettingsSource.indexOf("const testConnection = async () => {")
+    mqttSettingsSource.indexOf("const saveSettings = useCallback(async () => {"),
+    mqttSettingsSource.indexOf("const testConnection = useCallback(async () => {")
   );
   const weatherSaveIndex = saveSettingsSource.indexOf(
     "const savedWeatherSettings = await updateWeatherSettings(weatherSettings);"

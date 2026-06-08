@@ -4,7 +4,9 @@ import path from "node:path";
 import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
-const circuitSettingsSource = fs.readFileSync(path.join(pageDir, "CircuitSettingsContent.tsx"), "utf8");
+const circuitSettingsSource =
+  fs.readFileSync(path.join(pageDir, "CircuitSettingsContent.tsx"), "utf8") +
+  fs.readFileSync(path.join(pageDir, "CircuitRow.tsx"), "utf8");
 
 test("circuit settings keeps readiness feedback inline instead of mounting an overlapping absolute card inside the table shell", () => {
   assert.match(circuitSettingsSource, /cs-readiness/);

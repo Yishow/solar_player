@@ -1,5 +1,5 @@
 import type { CircuitConfig } from "@solar-display/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import { useDisplaySyncDraftGuard } from "../../hooks/displaySyncDraftGuard";
 import { useDisplayReadiness } from "../../hooks/useDisplayReadiness";
@@ -117,7 +117,10 @@ export function CircuitSettings() {
     reload: reloadReadiness
   } = useDisplayReadiness();
 
-  const loadCircuits = async ({
+  const reloadReadinessRef = useRef(reloadReadiness);
+  reloadReadinessRef.current = reloadReadiness;
+
+  const loadCircuits = useCallback(async ({
     silent = false,
     propagateError = false
   }: {
@@ -148,19 +151,19 @@ export function CircuitSettings() {
         setIsLoading(false);
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadCircuits();
-  }, []);
+  }, [loadCircuits]);
 
-  const markDirty = (id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
+  const markDirty = useCallback((id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
     setDirtyIds((current) => (current.includes(id) ? current : [...current, id]));
     setMessage(nextMessage);
     setErrorMessage("");
-  };
+  }, []);
 
-  const handleFieldChange = <Key extends keyof CircuitConfig>(
+  const handleFieldChange = useCallback(<Key extends keyof CircuitConfig>(
     id: number,
     key: Key,
     value: CircuitConfig[Key]
@@ -169,9 +172,9 @@ export function CircuitSettings() {
     setCircuits((current) =>
       current.map((circuit) => (circuit.id === id ? { ...circuit, [key]: value } : circuit))
     );
-  };
+  }, [markDirty]);
 
-  const handleAdd = async () => {
+  const handleAdd = useCallback(async () => {
     setIsAdding(true);
     setErrorMessage("");
     try {
@@ -184,9 +187,9 @@ export function CircuitSettings() {
     } finally {
       setIsAdding(false);
     }
-  };
+  }, [circuits, reloadReadiness]);
 
-  const handleSaveAll = async () => {
+  const handleSaveAll = useCallback(async () => {
     if (dirtyIds.length === 0) {
       setMessage("目前沒有待儲存的變更。");
       setErrorMessage("");
@@ -218,9 +221,9 @@ export function CircuitSettings() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [circuits, dirtyIds, reloadReadiness]);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = useCallback(async (id: number) => {
     setDeletingId(id);
     setErrorMessage("");
     try {
@@ -228,13 +231,13 @@ export function CircuitSettings() {
       setCircuits((current) => current.filter((circuit) => circuit.id !== id));
       setDirtyIds((current) => current.filter((currentId) => currentId !== id));
       setMessage("已刪除迴路。");
-      await reloadReadiness();
+      await reloadReadinessRef.current();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "刪除迴路失敗。");
     } finally {
       setDeletingId(null);
     }
-  };
+  }, []);
 
   const syncDraftGuard = useDisplaySyncDraftGuard({
     isDirty: dirtyIds.length > 0,
