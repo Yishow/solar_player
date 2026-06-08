@@ -51,11 +51,10 @@ export function LiveRotationPreviewList({
                 />
               </div>
               <div className="ps-preview__label">
-                <span className="ps-badge-number">{index + 1}</span>
+                <span className="ps-badge-number">{(index + 1).toString().padStart(2, "0")}</span>
                 <div className="ps-preview__label-copy">
                   <strong>{page.labelEn}</strong>
                   <small>{page.instanceLabel}</small>
-                  <small>{page.durationLabel}</small>
                 </div>
                 <span className={`mgmt-chip ${page.stateTone === "warning" ? "is-warning" : page.stateTone === "accent" ? "is-accent" : "is-success"}`}>
                   {page.stateLabel}

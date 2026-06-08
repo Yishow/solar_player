@@ -33,15 +33,7 @@ test("playback settings renders rotation tiles from the shared live preview cata
   assert.match(playbackSettingsSource, /showPreviewAlert/);
 });
 
-test("playback settings wires add-page management through display page registry APIs", () => {
-  assert.match(playbackSettingsSource, /getDisplayPageRegistry\(\)/);
-  assert.match(playbackSettingsSource, /createDisplayPageRegistryPage\(/);
-  assert.match(playbackSettingsSource, /archiveDisplayPageRegistryPage\(/);
-  assert.match(playbackSettingsSource, /className="ps-add-btn"/);
-  assert.match(playbackSettingsSource, /disabled=\{registryActionDisabled\}/);
-  assert.match(playbackSettingsSource, /顯示頁面管理/);
-  assert.doesNotMatch(playbackSettingsSource, /title="目前僅支援既有頁面的啟用、排序與停留秒數調整。"/);
-});
+
 
 test("playback settings action row opts out of the absolute-position management button primitive", () => {
   assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-actions \.mgmt-action/);
