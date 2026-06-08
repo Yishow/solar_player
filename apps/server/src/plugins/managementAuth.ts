@@ -90,13 +90,16 @@ function matchesConfiguredOrigin(origin: string, trustedOrigins: string[]): bool
   return trustedOrigins.includes(origin);
 }
 
-function isSameHostOrigin(origin: string, requestHost: string | null): boolean {
+function isSameHostOrigin(
+  origin: string,
+  requestHost: string | null
+): boolean {
   if (!requestHost) {
     return false;
   }
 
   try {
-    return new URL(origin).host.toLowerCase() === requestHost.toLowerCase();
+    return new URL(origin).hostname.toLowerCase() === new URL(`http://${requestHost}`).hostname.toLowerCase();
   } catch {
     return false;
   }
@@ -165,11 +168,32 @@ export function isTrustedManagementCorsOrigin(
   return isLoopbackOrigin(normalizedOrigin) || matchesConfiguredOrigin(normalizedOrigin, trustedOrigins);
 }
 
+export function isTrustedManagementCorsRequest(
+  request: RequestLike,
+  trustedOrigins: string[]
+): boolean {
+  const origin = readHeaderValue(request.headers.origin);
+  if (!origin) {
+    return false;
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  return (
+    isLoopbackOrigin(normalizedOrigin)
+    || matchesConfiguredOrigin(normalizedOrigin, trustedOrigins)
+    || isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))
+  );
+}
+
 function classifyManagementRequest(
   request: RequestLike,
   trustedOrigins: string[],
   managementAccessToken: string | null
-) : ManagementAccessDecision {
+): ManagementAccessDecision {
   if (matchesHeaderAccessToken(request.headers, managementAccessToken)) {
     return {
       normalizedOrigin: null,
@@ -308,6 +332,41 @@ export function createManagementAccessControl(options: {
 export function createManagementCorsOriginDelegate(trustedOrigins: string[]) {
   return (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => {
     callback(null, isTrustedManagementCorsOrigin(origin, trustedOrigins));
+  };
+}
+
+export function createManagementCorsOptionsDelegate(trustedOrigins: string[]) {
+  return (
+    request: FastifyRequest,
+    callback: (
+      error: Error | null,
+      corsOptions?: {
+        methods: string[];
+        origin: boolean;
+      }
+    ) => void
+  ) => {
+    callback(null, {
+      methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+      origin: isTrustedManagementCorsRequest(
+        {
+          headers: request.headers,
+          ip: request.ip,
+          method: request.method,
+          url: request.url
+        },
+        trustedOrigins
+      )
+    });
+  };
+}
+
+export function createManagementCorsRequestGate(trustedOrigins: string[]) {
+  return (
+    request: RequestLike,
+    callback: (error: string | null | undefined, success: boolean) => void
+  ) => {
+    callback(null, isTrustedManagementCorsRequest(request, trustedOrigins));
   };
 }
 

@@ -38,13 +38,15 @@ import type {
 } from "@solar-display/shared";
 
 export function buildApiUrl(path: string) {
-  const configuredBaseUrl = (
+  const env = (
     import.meta as ImportMeta & {
       env?: {
         VITE_API_BASE_URL?: string;
+        VITE_PORT?: string;
       };
     }
-  ).env?.VITE_API_BASE_URL;
+  ).env;
+  const configuredBaseUrl = env?.VITE_API_BASE_URL;
 
   if (configuredBaseUrl) {
     return `${configuredBaseUrl}${path}`;
@@ -54,7 +56,7 @@ export function buildApiUrl(path: string) {
     return `http://localhost:3000${path}`;
   }
 
-  return `${resolveBrowserApiOrigin(window.location)}${path}`;
+  return `${resolveBrowserApiOrigin(window.location, env?.VITE_PORT)}${path}`;
 }
 
 function isLoopbackHostname(hostname: string) {
@@ -66,8 +68,9 @@ export function resolveBrowserApiOrigin(locationLike: {
   hostname: string;
   port: string;
   protocol: string;
-}) {
-  const isViteDevPort = /^517\d*$/.test(locationLike.port);
+}, configuredVitePort?: string) {
+  const resolvedVitePort = configuredVitePort?.trim() || "5173";
+  const isViteDevPort = locationLike.port === resolvedVitePort || /^517\d*$/.test(locationLike.port);
 
   if (isViteDevPort && !isLoopbackHostname(locationLike.hostname)) {
     return `${locationLike.protocol}//${locationLike.hostname}:${locationLike.port}`;
@@ -458,27 +461,27 @@ export async function persistImageManagementDraftTarget(
     ...(target.playlistEntry === null
       ? []
       : [
-          updateImagePlaylistEntry(target.playlistEntry.entryId, {
-            area: normalizeNullableImageManagementText(target.playlistEntry.area),
-            assetId: target.playlistEntry.assetId,
-            capturedAt: normalizeNullableImageManagementText(target.playlistEntry.capturedAt),
-            description: normalizeNullableImageManagementText(target.playlistEntry.description),
-            displayOrder: target.playlistEntry.displayOrder,
-            durationSeconds: target.playlistEntry.durationSeconds,
-            enabled: target.playlistEntry.enabled,
-            fallbackMode: target.playlistEntry.fallbackMode,
-            tags: target.playlistEntry.tags,
-            title: normalizeNullableImageManagementText(target.playlistEntry.title)
-          })
-        ])
+        updateImagePlaylistEntry(target.playlistEntry.entryId, {
+          area: normalizeNullableImageManagementText(target.playlistEntry.area),
+          assetId: target.playlistEntry.assetId,
+          capturedAt: normalizeNullableImageManagementText(target.playlistEntry.capturedAt),
+          description: normalizeNullableImageManagementText(target.playlistEntry.description),
+          displayOrder: target.playlistEntry.displayOrder,
+          durationSeconds: target.playlistEntry.durationSeconds,
+          enabled: target.playlistEntry.enabled,
+          fallbackMode: target.playlistEntry.fallbackMode,
+          tags: target.playlistEntry.tags,
+          title: normalizeNullableImageManagementText(target.playlistEntry.title)
+        })
+      ])
   ]);
 }
 
 export async function fetchSustainabilityStory(period?: SustainabilityPeriodKey) {
   const query = period
     ? `?${new URLSearchParams({
-        period
-      }).toString()}`
+      period
+    }).toString()}`
     : "";
   return requestJson<{ story: SustainabilityStory & { generatedAt: string; period: SustainabilityPeriodStory } }>(
     `/api/sustainability-story${query}`

@@ -11,6 +11,7 @@ import {
   fetchSustainabilityStory,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
+  resolveBrowserApiOrigin,
   updateDisplayPageConfig,
   requestJson
 } from "./api";
@@ -39,7 +40,7 @@ test("buildApiUrl maps loopback Vite dev ports back to the backend port", () => 
   }
 });
 
-test("buildApiUrl keeps non-loopback Vite dev hosts on the current origin so proxy rules can forward API traffic", () => {
+test("buildApiUrl keeps non-loopback Vite dev hosts same-origin so remote sessions can use the dev proxy", () => {
   const originalWindow = globalThis.window;
 
   Object.defineProperty(globalThis, "window", {
@@ -61,6 +62,34 @@ test("buildApiUrl keeps non-loopback Vite dev hosts on the current origin so pro
       value: originalWindow
     });
   }
+});
+
+test("resolveBrowserApiOrigin keeps configured custom non-loopback Vite dev ports same-origin", () => {
+  assert.equal(
+    resolveBrowserApiOrigin(
+      {
+        hostname: "100.76.76.75",
+        port: "4173",
+        protocol: "http:"
+      },
+      "4173"
+    ),
+    "http://100.76.76.75:4173"
+  );
+});
+
+test("resolveBrowserApiOrigin maps a configured custom Vite loopback port back to the backend port", () => {
+  assert.equal(
+    resolveBrowserApiOrigin(
+      {
+        hostname: "localhost",
+        port: "4173",
+        protocol: "http:"
+      },
+      "4173"
+    ),
+    "http://localhost:3000"
+  );
 });
 
 test("requestJson prefers JSON error messages over the raw serialized body", async () => {

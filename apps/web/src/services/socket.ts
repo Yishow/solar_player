@@ -92,13 +92,15 @@ export function resolveSocketOrigin(locationLike?: {
   port: string;
   protocol: string;
 }) {
-  const configuredBaseUrl = (
+  const env = (
     import.meta as ImportMeta & {
       env?: {
         VITE_API_BASE_URL?: string;
+        VITE_PORT?: string;
       };
     }
-  ).env?.VITE_API_BASE_URL;
+  ).env;
+  const configuredBaseUrl = env?.VITE_API_BASE_URL;
 
   if (configuredBaseUrl) {
     return new URL(configuredBaseUrl).origin;
@@ -108,7 +110,15 @@ export function resolveSocketOrigin(locationLike?: {
     return "http://localhost:3000";
   }
 
-  return resolveBrowserApiOrigin(locationLike ?? window.location);
+  return resolveSocketOriginFromLocation(locationLike ?? window.location, env?.VITE_PORT);
+}
+
+export function resolveSocketOriginFromLocation(locationLike: {
+  hostname: string;
+  port: string;
+  protocol: string;
+}, configuredVitePort?: string) {
+  return resolveBrowserApiOrigin(locationLike, configuredVitePort);
 }
 
 export function resolveSocketSessionClass(pathname: string): ManagementSocketSessionClass {

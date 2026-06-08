@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   emitClientHeartbeatViaClient,
+  resolveSocketOriginFromLocation,
   resolveSocketOrigin,
   resolveSocketSessionClass
 } from "./socket";
@@ -17,7 +18,7 @@ test("resolveSocketOrigin maps loopback Vite dev ports back to the backend port"
   );
 });
 
-test("resolveSocketOrigin keeps non-loopback Vite dev hosts on the current origin so socket proxying stays same-origin", () => {
+test("resolveSocketOrigin keeps non-loopback Vite dev hosts same-origin for proxy-backed remote sessions", () => {
   assert.equal(
     resolveSocketOrigin({
       hostname: "100.76.76.75",
@@ -25,6 +26,17 @@ test("resolveSocketOrigin keeps non-loopback Vite dev hosts on the current origi
       protocol: "http:"
     }),
     "http://100.76.76.75:5173"
+  );
+});
+
+test("resolveSocketOrigin maps a configured custom non-loopback Vite dev port to the same origin", () => {
+  assert.equal(
+    resolveSocketOriginFromLocation({
+      hostname: "100.76.76.75",
+      port: "4173",
+      protocol: "http:"
+    }, "4173"),
+    "http://100.76.76.75:4173"
   );
 });
 

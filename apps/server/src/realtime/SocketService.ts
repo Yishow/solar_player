@@ -1,4 +1,4 @@
-import type { Server as HttpServer } from "node:http";
+import type { IncomingMessage, Server as HttpServer } from "node:http";
 import { Server as SocketIoServer } from "socket.io";
 import {
   buildDisplayClientLivenessSnapshot,
@@ -54,6 +54,10 @@ export type SystemNotification = {
 };
 
 type SocketServiceOptions = {
+  allowRequest?: (
+    req: IncomingMessage,
+    fn: (err: string | null | undefined, success: boolean) => void
+  ) => void;
   classifySession?: (handshake: NonNullable<SocketClientLike["handshake"]>) => ManagementSocketSessionClass;
   corsOrigin?: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => void;
   getLiveMetricsSnapshot: () => LiveMetricsSnapshot;
@@ -117,8 +121,11 @@ export class SocketService {
     this.io =
       options.io ??
       new SocketIoServer(options.server, {
+        allowRequest: options.allowRequest,
         cors: {
-          origin: options.corsOrigin ?? ((_origin, callback) => callback(null, false))
+          origin: options.allowRequest
+            ? true
+            : options.corsOrigin ?? ((_origin, callback) => callback(null, false))
         },
         pingInterval: 25000,
         pingTimeout: 20000

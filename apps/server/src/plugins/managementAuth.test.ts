@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createManagementAccessControl } from "./managementAuth.js";
+import {
+  createManagementAccessControl,
+  isTrustedManagementCorsRequest
+} from "./managementAuth.js";
 
 test("trusted same-host and token callers satisfy management read gating", () => {
   const accessControl = createManagementAccessControl({
@@ -94,5 +97,35 @@ test("socket sessions stay playback-safe unless a trusted caller explicitly requ
       }
     }),
     "management-trusted"
+  );
+
+  assert.equal(
+    accessControl.classifySocketSession({
+      address: "198.51.100.24",
+      auth: {
+        sessionClass: "management-trusted"
+      },
+      headers: {
+        host: "100.76.76.75:3000",
+        origin: "http://100.76.76.75:4222"
+      }
+    }),
+    "management-trusted"
+  );
+});
+
+test("same-host cross-port browser requests are allowed by CORS gating", () => {
+  assert.equal(
+    isTrustedManagementCorsRequest(
+      {
+        headers: {
+          host: "100.76.76.75:3000",
+          origin: "http://100.76.76.75:4173"
+        },
+        ip: "100.76.76.75"
+      },
+      []
+    ),
+    true
   );
 });

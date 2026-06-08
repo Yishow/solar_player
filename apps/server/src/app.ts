@@ -14,6 +14,8 @@ import { MqttClientService } from "./mqtt/MqttClientService.js";
 import managementAuthPlugin, {
   createManagementAccessControl,
   createManagementCorsOriginDelegate,
+  createManagementCorsOptionsDelegate,
+  createManagementCorsRequestGate,
   parseManagementTrustedOrigins
 } from "./plugins/managementAuth.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
@@ -77,12 +79,15 @@ export async function buildApp() {
   const app = Fastify(createFastifyOptions());
   const trustedManagementOrigins = parseManagementTrustedOrigins(config.managementTrustedOrigins);
   const managementCorsOrigin = createManagementCorsOriginDelegate(trustedManagementOrigins);
+  const managementCorsOptions = createManagementCorsOptionsDelegate(trustedManagementOrigins);
+  const managementCorsRequestGate = createManagementCorsRequestGate(trustedManagementOrigins);
   const managementAccess = createManagementAccessControl({
     managementAccessToken: config.managementAccessToken,
     trustedOrigins: trustedManagementOrigins
   });
   let mqttClientService: MqttClientService | null = null;
   const socketService = new SocketService({
+    allowRequest: managementCorsRequestGate,
     classifySession: managementAccess.classifySocketSession,
     corsOrigin: managementCorsOrigin,
     getLiveMetricsSnapshot: () => readLiveMetricsSnapshot(),
@@ -107,8 +112,7 @@ export async function buildApp() {
   app.decorate("socketService", socketService);
 
   await app.register(cors, {
-    methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
-    origin: managementCorsOrigin
+    delegator: managementCorsOptions
   });
 
   await managementAuthPlugin(app, {

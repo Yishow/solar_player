@@ -165,6 +165,32 @@ test("OPTIONS /api/settings/mqtt preflight rejects unknown origins by default", 
   }
 });
 
+test("OPTIONS /api/settings/mqtt allows same-host cross-port preflight without an explicit trusted-origin entry", async () => {
+  migrateDatabase();
+  seedDatabase();
+  delete process.env.MANAGEMENT_TRUSTED_ORIGINS;
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/api/settings/mqtt",
+      headers: {
+        host: "100.76.76.75:3000",
+        origin: "http://100.76.76.75:4173",
+        "access-control-request-method": "PUT"
+      }
+    });
+
+    assert.equal(response.statusCode, 204);
+    assert.equal(response.headers["access-control-allow-origin"], "http://100.76.76.75:4173");
+    assert.match(response.headers["access-control-allow-methods"] ?? "", /\bPUT\b/);
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/settings/mqtt rejects untrusted origins and leaves persisted settings unchanged", async () => {
   migrateDatabase();
   seedDatabase();
@@ -555,8 +581,8 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
       clientId: "solar-display-player",
       connected: false,
       reason: "offline",
-        updatedAt: "2026-05-13T09:00:00.000Z"
-      }),
+      updatedAt: "2026-05-13T09:00:00.000Z"
+    }),
     io: fakeIo,
     logger: {
       error: () => undefined,
