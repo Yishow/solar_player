@@ -8,6 +8,7 @@ dist/
 !.env.example
 
 .DS_Store
+server-runtime.lock.json
 
 logs/
 apps/server/logs/
