@@ -127,7 +127,9 @@ function TopicWorkspaceRowImpl({
         <span className="meta-item">最後更新 {topic.lastUpdatedLabel}</span>
         <span className="meta-item">{topic.qualityLabel}</span>
         {topic.coverageStateLabel ? (
-          <span className="meta-item coverage">{topic.coverageStateLabel} · {topic.coverageDetail}</span>
+          <span className="meta-item coverage">
+            {topic.coverageDetail ? `${topic.coverageStateLabel} · ${topic.coverageDetail}` : topic.coverageStateLabel}
+          </span>
         ) : null}
       </div>
     </div>

@@ -345,7 +345,7 @@ export function PlaybackSettingsFormSections({
             <div className="ps-row-flex">
               <div className="ps-row-label">轉場效果 <small>Transition Effect</small></div>
               <CustomSelect
-                className="ps-dropdown-container"
+                className="ps-row-select"
                 disabled={formDisabled}
                 onChange={(nextValue) => updateSettingsField("transitionType", nextValue as PlaybackSettings["transitionType"])}
                 options={[
@@ -356,8 +356,8 @@ export function PlaybackSettingsFormSections({
                 value={settings?.transitionType ?? "fade"}
               />
             </div>
-            <div className="ps-stack">
-              <div className="ps-row-label">轉場速度 <small>Transition Speed</small></div>
+            <div className="ps-row-flex">
+              <div className="ps-row-label">轉場速度 (ms) <small>Transition Speed</small></div>
               <input
                 className="ps-stepper-input"
                 disabled={formDisabled || settings?.transitionType === "none"}
@@ -367,6 +367,22 @@ export function PlaybackSettingsFormSections({
                 value={String(transitionSpeed)}
                 onChange={(event) => {
                   updateSettingsField("transitionSpeed", Math.max(120, Number.parseInt(event.target.value, 10) || 120));
+                }}
+                style={{
+                  width: "130px",
+                  height: "38px",
+                  border: "1px solid rgba(93, 119, 69, 0.22)",
+                  borderRadius: "8px",
+                  backgroundColor: formDisabled || settings?.transitionType === "none" ? "#fbfbfa" : "#fff",
+                  opacity: formDisabled || settings?.transitionType === "none" ? 0.55 : 1,
+                  cursor: formDisabled || settings?.transitionType === "none" ? "not-allowed" : "text",
+                  padding: "0 12px",
+                  textAlign: "right",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  font: "400 14px/1 var(--font-family-en)",
+                  color: "#344039",
+                  transition: "all 0.2s ease"
                 }}
               />
             </div>

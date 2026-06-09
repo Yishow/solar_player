@@ -19,6 +19,8 @@ test("CustomSelect renders a native select element with options and disabled sta
 
     assert.match(markup, /class="[^"]*mgmt-select-container[^"]*demo-select[^"]*"/);
     assert.match(markup, /<select[^>]*(class="mgmt-select-native"|disabled="")[^>]*(class="mgmt-select-native"|disabled="")[^>]*>/);
-    assert.match(markup, /<option value="overview" selected="">Overview<\/option>/);
-    assert.match(markup, /<option value="">請選擇<\/option>/);
+  assert.match(markup, /tabindex="-1"/);
+  assert.match(markup, /aria-hidden="true"/);
+  assert.match(markup, /<option value="overview" selected="">Overview<\/option>/);
+  assert.match(markup, /<option value="">請選擇<\/option>/);
 });

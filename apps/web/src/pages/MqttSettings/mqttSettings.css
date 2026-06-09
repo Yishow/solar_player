@@ -453,16 +453,21 @@
 .mqtt-settings-page .topic-workspace-row__meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  flex-wrap: nowrap;
+  gap: 0 10px;
   font-size: 11px;
   color: #7d857f;
   padding-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .mqtt-settings-page .meta-item {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mqtt-settings-page .meta-item + .meta-item::before {

@@ -724,6 +724,7 @@
   gap: 8px;
   font-size: 15px;
   color: #4b504c;
+  flex-shrink: 0;
 }
 
 .playback-settings-page .ps-row-label small {

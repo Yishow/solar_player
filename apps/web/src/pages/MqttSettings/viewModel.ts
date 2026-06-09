@@ -307,7 +307,7 @@ function resolvePageLabel(pageId: string | null) {
 
 function buildTopicImpactGroups(args: {
   coverageRows: Array<{
-    detail: string;
+    detail: string | null;
     metricLabelZh: string;
     pageId: string | null;
     requirementKey: string;
@@ -490,7 +490,7 @@ export function buildMqttSettingsViewModel({
       }
 
       return {
-        detail: `最近收值 ${formatTimestamp(topic.lastReceivedAt)}`,
+        detail: null,
         metricLabelZh: metric.zh,
         pageId: finding.pageId,
         requirementKey: finding.requirementKey,
