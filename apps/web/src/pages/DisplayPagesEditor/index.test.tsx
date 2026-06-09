@@ -137,7 +137,7 @@ test("display page editor hides the page title block while edit mode is active",
 
   assert.doesNotMatch(html, /展示頁編輯/);
   assert.doesNotMatch(html, /切換五個展示頁畫布，並在同一頁完成區域選取、屬性調整與草稿發布。/);
-  assert.match(html, /data-shell-primitive="management-scaffold"[^>]*class="[^"]*gap-4[^"]*pt-4[^"]*pb-5[^"]*h-full/);
+  assert.match(html, /data-shell-primitive="management-scaffold"[^>]*class="[^"]*gap-4[^"]*pt-\[28px\][^"]*pb-5[^"]*h-full/);
   assert.doesNotMatch(html, /data-shell-primitive="management-scaffold"[^>]*class="[^"]*py-page-y/);
 });
 
@@ -236,6 +236,30 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.doesNotMatch(html, /區域預設/);
 });
 
+test("display page editor exposes overview family appearance controls in the inspector", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      {
+        initialEntries: ["/display-pages/editor?page=overview"]
+      },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-kpi-cards-appearance"
+        },
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(html, /KPI Cards Appearance/);
+  assert.match(html, /Surface Opacity/);
+  assert.match(html, /Surface Blur/);
+  assert.match(html, /Shadow Strength/);
+  assert.doesNotMatch(html, /Value Font Size/);
+});
+
 test("display page editor routes a visible hero container selection to the owning media effect inspector", () => {
   const html = renderToStaticMarkup(
     React.createElement(
@@ -259,7 +283,7 @@ test("display page editor routes a visible hero container selection to the ownin
   assert.match(html, /Overview Hero Media 目前使用可組合效果層/);
 });
 
-test("display page editor explains unsupported media effect surfaces in the inspector", () => {
+test("display page editor exposes composable media effects for sustainability hero surfaces", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -277,8 +301,9 @@ test("display page editor explains unsupported media effect surfaces in the insp
   );
 
   assert.match(html, /媒體效果/);
-  assert.match(html, /尚未開放可組合媒體效果/);
-  assert.doesNotMatch(html, /新增效果層/);
+  assert.match(html, /目前使用可組合效果層/);
+  assert.match(html, /新增效果層/);
+  assert.doesNotMatch(html, /尚未開放可組合媒體效果/);
 });
 
 test("display page editor exposes freeform object list and asset-backed inspector fields inside the existing editor", () => {

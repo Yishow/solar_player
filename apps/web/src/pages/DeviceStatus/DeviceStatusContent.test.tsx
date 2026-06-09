@@ -28,4 +28,8 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /目前沒有展示端 heartbeat/);
   assert.match(deviceStatusContentSource, /viewModel\.logsSummary\.statusTitle/);
   assert.match(deviceStatusContentSource, /Recent Logs/);
+  assert.match(deviceStatusContentSource, /handleKioskExit/);
+  assert.match(deviceStatusContentSource, /離開系統/);
+  assert.match(deviceStatusContentSource, /Solar Display Kiosk/);
+  assert.match(deviceStatusContentSource, /重新進入/);
 });

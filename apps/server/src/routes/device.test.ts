@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -300,5 +300,83 @@ test("unsupported device controls stay informational and point operators to the 
     assert.equal(clearCacheBody.result.executed, false);
   } finally {
     await app.close();
+  }
+});
+
+test("trusted kiosk exit requests invoke the fixed helper and return desktop re-entry guidance", async () => {
+  const helperPath = join(tempDir, "stop-solar-kiosk-test.sh");
+  const markerPath = join(tempDir, "stop-solar-kiosk.marker");
+  const previousHelperPath = process.env.KIOSK_EXIT_HELPER_PATH;
+
+  rmSync(markerPath, { force: true });
+  writeFileSync(helperPath, `#!/bin/sh\nprintf 'closed' > "${markerPath}"\n`, "utf8");
+  chmodSync(helperPath, 0o755);
+  process.env.KIOSK_EXIT_HELPER_PATH = helperPath;
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/device/kiosk-exit"
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(existsSync(markerPath), true);
+
+    const body = response.json() as {
+      data: {
+        executed: boolean;
+        launcherName: string;
+        reentryHint: string;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, true);
+    assert.equal(body.data.executed, true);
+    assert.equal(body.data.launcherName, "Solar Display Kiosk");
+    assert.match(body.data.reentryHint, /Solar Display Kiosk/);
+  } finally {
+    await app.close();
+    rmSync(helperPath, { force: true });
+    rmSync(markerPath, { force: true });
+    if (previousHelperPath === undefined) {
+      delete process.env.KIOSK_EXIT_HELPER_PATH;
+    } else {
+      process.env.KIOSK_EXIT_HELPER_PATH = previousHelperPath;
+    }
+  }
+});
+
+test("kiosk exit returns a safe unavailable envelope when the helper is missing", async () => {
+  const previousHelperPath = process.env.KIOSK_EXIT_HELPER_PATH;
+  process.env.KIOSK_EXIT_HELPER_PATH = join(tempDir, "missing-stop-solar-kiosk.sh");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/device/kiosk-exit"
+    });
+
+    assert.equal(response.statusCode, 503);
+    const body = response.json() as {
+      error: string;
+      success: boolean;
+      timestamp: string;
+    };
+
+    assert.equal(body.success, false);
+    assert.match(body.error, /Kiosk exit helper is unavailable/);
+    assert.equal(typeof body.timestamp, "string");
+  } finally {
+    await app.close();
+    if (previousHelperPath === undefined) {
+      delete process.env.KIOSK_EXIT_HELPER_PATH;
+    } else {
+      process.env.KIOSK_EXIT_HELPER_PATH = previousHelperPath;
+    }
   }
 });

@@ -5,6 +5,7 @@ import {
   getDeviceLogExportMetadata,
   getDeviceStatus,
   isManagementAccessDeniedError,
+  runDeviceKioskExit,
   runDeviceDisplayDiagnostic,
   type DeviceLogExportMetadata,
   type DeviceStatusResponseData
@@ -39,6 +40,7 @@ export function DeviceStatus() {
       minute: "2-digit",
       second: "2-digit"
     });
+  const kioskReentryHint = "回到桌面後點擊 Solar Display Kiosk 重新進入。";
 
   const loadStatus = async () => {
     setIsLoading(true);
@@ -138,6 +140,41 @@ export function DeviceStatus() {
     }
   };
 
+  const handleKioskExit = async () => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "確認離開展示系統？關閉後可從桌面點 Solar Display Kiosk 重新進入。"
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setActiveAction("kiosk-exit");
+    setActionFeedback({
+      detail: `正在關閉展示瀏覽器。${kioskReentryHint}`,
+      title: "正在離開系統",
+      tone: "loading"
+    });
+
+    try {
+      const result = await runDeviceKioskExit();
+      setActionFeedback({
+        detail: result.reentryHint,
+        title: "離開系統",
+        tone: "ready"
+      });
+    } catch (error) {
+      setActionFeedback({
+        detail: error instanceof Error ? error.message : "離開展示系統失敗。",
+        title: "離開系統失敗",
+        tone: "error"
+      });
+    } finally {
+      setActiveAction(null);
+    }
+  };
+
   const viewModel = useMemo(
     () =>
       buildDeviceStatusViewModel({
@@ -170,6 +207,7 @@ export function DeviceStatus() {
       displayOpsAccessDenied={displayOpsAccessDenied}
       displayOpsErrorMessage={displayOpsErrorMessage}
       handleDiagnostic={handleDiagnostic}
+      handleKioskExit={handleKioskExit}
       isLoading={isLoading}
       status={status}
       viewModel={viewModel}

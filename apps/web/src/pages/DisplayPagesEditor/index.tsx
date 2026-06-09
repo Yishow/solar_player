@@ -80,6 +80,10 @@ import {
 } from "./cardRailAuthoring";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import {
+  applyOverviewGroupStyleFieldUpdate,
+  resolveOverviewGroupStylePaths
+} from "../Overview/displayPageConfig";
+import {
   EDITOR_PREVIEW_CONTENT_TOP,
   EDITOR_PREVIEW_SHELL_HEIGHT,
   EDITOR_PREVIEW_SURFACE_HEIGHT,
@@ -415,9 +419,6 @@ export function DisplayPagesEditor({
     undo
   } = useDisplayPageConfig(selectedPage.id, seedConfig, { stage: "draft" });
 
-  const updatePath = (path: Array<number | string>, value: unknown) => {
-    setConfig((current) => setValueAtPath(current, path, value));
-  };
   const freeformObjects = useMemo(
     () => normalizeDisplayPageFreeformObjects((config as { freeformObjects?: unknown }).freeformObjects),
     [config]
@@ -449,6 +450,35 @@ export function DisplayPagesEditor({
       editableItems[0] ??
       null,
     [editableItems, resolvedSelectedRegionIds, selectedRegionId]
+  );
+  const updatePath = useCallback(
+    (path: Array<number | string>, value: unknown) => {
+      if (selectedPage.id === "overview") {
+        setConfig((current) =>
+          applyOverviewGroupStyleFieldUpdate(
+            current as typeof seedConfig,
+            selectedRegion?.id,
+            path,
+            value
+          )
+        );
+        return;
+      }
+
+      setConfig((current) => setValueAtPath(current, path, value));
+    },
+    [seedConfig, selectedPage.id, selectedRegion?.id, setConfig]
+  );
+  const handleResetField = useCallback(
+    (path: Array<number | string>) => {
+      if (selectedPage.id === "overview") {
+        resetPaths(resolveOverviewGroupStylePaths(selectedRegion?.id, path));
+        return;
+      }
+
+      resetPaths([path]);
+    },
+    [resetPaths, selectedPage.id, selectedRegion?.id]
   );
   const selectedRegions = useMemo(
     () => editableItems.filter((region) => resolvedSelectedRegionIds.includes(region.id) && region.geometry),
@@ -1735,7 +1765,7 @@ export function DisplayPagesEditor({
                 }
                 onChange={updatePath}
                 onOpenAssetLibrary={() => handleSelectWorkspace("assets", inspectorRegion?.id, "editor")}
-                onResetField={(path) => resetPaths([path])}
+                onResetField={handleResetField}
                 selectedRegion={inspectorRegion}
               />
             )}

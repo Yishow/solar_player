@@ -6,6 +6,10 @@ import {
   buildUnsupportedDeviceControlResult,
   readDeviceDisplayOpsSummary
 } from "../services/deviceDisplayOpsService.js";
+import {
+  KioskExitUnavailableError,
+  runDeviceKioskExit
+} from "../services/deviceKioskExitService.js";
 
 function getUptimeSeconds(): number {
   if (platform() === "linux") {
@@ -138,6 +142,31 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
       success: false,
       timestamp: new Date().toISOString()
     });
+  });
+
+  // POST /api/device/kiosk-exit
+  app.post("/api/device/kiosk-exit", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    try {
+      return {
+        success: true,
+        data: await runDeviceKioskExit()
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Kiosk exit helper failed.";
+      const statusCode = error instanceof KioskExitUnavailableError ? 503 : 500;
+      app.log.error({ err: error }, "device kiosk exit failed");
+      reply.code(statusCode);
+      return {
+        success: false,
+        error: message,
+        timestamp: new Date().toISOString()
+      };
+    }
   });
 
   // GET /api/device/logs

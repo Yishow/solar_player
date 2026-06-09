@@ -1,0 +1,19 @@
+## 1. Overview 群組外觀控制
+
+- [x] 1.1 Implement `Keep Overview quick controls as family-scoped authoring regions` so `Author family-scoped appearance controls for Overview card groups` is true in `/display-pages/editor?page=overview`: the editor shows `Overview KPI Cards Appearance` and `Overview Bottom Widgets Appearance`, and editing `Surface Opacity` / `Surface Blur` / `Shadow Strength` synchronizes the matching field to every targeted `cardStyles.*` or `widgetStyles.*` record in the current draft session; verify with `apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx`, `apps/web/src/pages/DisplayPagesEditor/index.test.tsx`, and `apps/web/src/pages/Overview/widgetStyles.test.ts`.
+- [x] 1.2 Implement `Author internal card style per Overview card and widget` compatibility after family sync so existing single-card and single-widget inspector fields still remain usable and saved values persist through the current draft/live flow after a family-level edit; verify with `apps/web/src/pages/Overview/displayPageConfig.test.ts`, `apps/web/src/pages/Overview/configRender.test.tsx`, and the affected DisplayPagesEditor tests.
+
+## 2. kiosk 離開控制
+
+- [x] 2.1 Implement `Route kiosk exit through a fixed server-side helper` so `Execute kiosk exit through a fixed host helper` and `Keep kiosk exit bounded to the known action contract` are satisfied: add `POST /api/device/kiosk-exit`, install `deploy/stop-solar-kiosk.sh`, execute only the fixed helper, and reject untrusted or arbitrary-command requests while proving the server-side failure modes stay truthful; verify with `apps/server/src/routes/device.test.ts` and `apps/web/src/services/api.test.ts`.
+- [x] 2.2 Implement `Keep kiosk exit visible on Device Status with explicit re-entry guidance` so `Present kiosk exit and re-entry guidance on Device Status` is true: `Device Status` renders `離開系統`, shows confirmation and success/failure feedback, and displays the `Solar Display Kiosk` desktop re-entry guidance without pretending exit succeeded on failure; verify with `apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx` and `apps/web/src/pages/DeviceStatus/viewModel.test.ts`.
+
+## 3. dev-only build 邊界
+
+- [x] 3.1 Implement `Keep react-grab devtools development-only at the module resolution boundary` so `Web production build excludes dev-only react-grab bootstrap` is true: production and test mode resolve the `react-grab` bootstrap to a noop module, while development keeps the real bootstrap path; verify with `apps/web/src/devtools/reactGrabBootstrapTarget.test.ts`.
+- [x] 3.2 Prove the production exclusion contract stays real after bundling so the implementation contract behavior, interface / data shape, failure modes, acceptance criteria, and scope boundaries cover `react-grab` too: run a production web build and confirm the emitted bundle does not contain `react-grab` or the real bootstrap module; verify with `pnpm --filter @solar-display/web build` plus a bundle grep/assertion over `apps/web/dist`.
+
+## 4. 驗證、review 與遠端實測
+
+- [x] 4.1 Run the affected web/server tests, review the full uncommitted diff for regressions, and confirm the implementation contract behavior, interface / data shape, failure modes, acceptance criteria, and scope boundaries are all satisfied without drifting into extra device controls, non-Overview group controls, or production devtools leakage; verify with `pnpm --filter @solar-display/web test`, `pnpm --filter @solar-display/server test`, and `spectra analyze add-overview-group-style-controls-and-kiosk-exit --json`.
+- [x] 4.2 Perform remote validation over SSH so the shipped kiosk flow proves `Trusted operator exits kiosk successfully`: from the remote host, confirm `/device-status` can exit Firefox kiosk and that the operator can re-enter from the desktop `Solar Display Kiosk` launcher; verify with remote command evidence plus a manual browser/kiosk assertion recorded in the final report.

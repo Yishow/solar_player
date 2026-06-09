@@ -15,7 +15,6 @@
     "@solar-display/shared": "workspace:*",
     "react": "latest",
     "react-dom": "latest",
-    "react-grab": "^0.1.37",
     "react-router-dom": "latest",
     "socket.io-client": "^4.8.3"
   },
@@ -26,6 +25,7 @@
     "@vitejs/plugin-react": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",
+    "react-grab": "^0.1.37",
     "tailwindcss": "^3.4.17",
     "tsx": "latest",
     "typescript": "latest",

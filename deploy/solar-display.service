@@ -9,14 +9,15 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-User=pi
+Type=exec
+User=kz
 WorkingDirectory=/opt/solar-display
 EnvironmentFile=-/opt/solar-display/.env
 Environment=NODE_ENV=production
 Environment=DATA_DIR=/opt/solar-display/data
 Environment=LOG_DIR=/opt/solar-display/logs
 Environment=PORT=3000
+SyslogIdentifier=solar-display
 ExecStart=/usr/bin/node apps/server/dist/server.js
 Restart=on-failure
 RestartSec=5

@@ -16,9 +16,9 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /resolvedConfig\.heroCopy\.titleLines\[0\]/);
   assert.match(overviewSource, /renderOverviewTitleLine\(resolvedConfig\.heroCopy\.titleLines\[0\]\)/);
   assert.match(overviewSource, /resolvedConfig\.heroCopyLayout/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.heroTypography\.subtitleMarginTop/);
+  assert.match(overviewSource, /heroTypography\.eyebrowFontSize/);
+  assert.match(overviewSource, /heroTypography\.titleFontSize/);
+  assert.match(overviewSource, /heroTypography\.subtitleMarginTop/);
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
@@ -61,7 +61,9 @@ test("overview display page seed config captures the current default hero contra
 });
 
 test("overview KPI editor regions expose visibility toggles and proportional resizing", () => {
-  const kpiRegions = overviewDisplayPageEditorRegions.filter((region) => region.id.startsWith("overview-kpi-"));
+  const kpiRegions = overviewDisplayPageEditorRegions.filter(
+    (region) => region.id.startsWith("overview-kpi-") && Boolean(region.geometry)
+  );
 
   assert.equal(kpiRegions.length, 5);
   for (const region of kpiRegions) {

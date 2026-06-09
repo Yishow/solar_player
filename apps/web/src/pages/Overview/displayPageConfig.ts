@@ -1,5 +1,6 @@
 import type { DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { setValueAtPath } from "../../hooks/displayPageConfigPaths";
 import {
   buildDisplayCardStyleFields,
   createDisplayCardStyleConfig,
@@ -61,6 +62,10 @@ const overviewDensityWidgetStyle = {
   surfaceBlur: 16,
   surfaceOpacity: 0.72
 } as const;
+
+const overviewKpiCardKeys = ["power", "today", "total", "co2Today", "co2Total"] as const;
+const overviewWidgetKeys = ["weather", "phasePower", "generationTrend", "alertNotifications"] as const;
+const overviewGroupAppearanceFieldNames = new Set(["shadowStrength", "surfaceBlur", "surfaceOpacity"]);
 
 const legacyOverviewHeroCopyLayout = {
   left: 86,
@@ -261,6 +266,45 @@ export type OverviewDisplayPageConfig = {
   summaryCard: OverviewDisplayTextRect;
   widgetStyles: Record<OverviewDashboardWidgetKey, DisplayCardStyleConfig>;
 };
+
+function buildOverviewGroupAppearanceFields(idPrefix: string, path: Array<number | string>) {
+  return buildDisplayCardStyleFields({ idPrefix, path }).filter((field) =>
+    overviewGroupAppearanceFieldNames.has(String(field.path[field.path.length - 1] ?? ""))
+  );
+}
+
+export function resolveOverviewGroupStylePaths(
+  regionId: string | null | undefined,
+  path: Array<number | string>
+) {
+  const fieldName = String(path[path.length - 1] ?? "");
+
+  if (!overviewGroupAppearanceFieldNames.has(fieldName)) {
+    return [path];
+  }
+
+  if (regionId === "overview-kpi-cards-appearance") {
+    return overviewKpiCardKeys.map((key) => ["cardStyles", key, fieldName] as Array<number | string>);
+  }
+
+  if (regionId === "overview-bottom-widgets-appearance") {
+    return overviewWidgetKeys.map((key) => ["widgetStyles", key, fieldName] as Array<number | string>);
+  }
+
+  return [path];
+}
+
+export function applyOverviewGroupStyleFieldUpdate<T extends Record<string, unknown>>(
+  config: T,
+  regionId: string | null | undefined,
+  path: Array<number | string>,
+  value: unknown
+) {
+  return resolveOverviewGroupStylePaths(regionId, path).reduce(
+    (nextConfig, nextPath) => setValueAtPath(nextConfig, nextPath, value),
+    config
+  );
+}
 
 export function createOverviewDisplayPageSeedConfig(
   heroSrc = "/brand-logo.png",
@@ -774,6 +818,20 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       }
     ],
     presetKey: "overview-background-pool"
+  },
+  {
+    id: "overview-kpi-cards-appearance",
+    label: "KPI Cards Appearance",
+    description: "同步調整五張 KPI card 的玻璃卡面外觀。",
+    fields: buildOverviewGroupAppearanceFields("overview-kpi-cards-appearance", ["cardStyles", "power"]),
+    presetKey: "overview-kpi-cards-appearance"
+  },
+  {
+    id: "overview-bottom-widgets-appearance",
+    label: "Bottom Widgets Appearance",
+    description: "同步調整底部四張 widget 的玻璃卡面外觀。",
+    fields: buildOverviewGroupAppearanceFields("overview-bottom-widgets-appearance", ["widgetStyles", "weather"]),
+    presetKey: "overview-bottom-widgets-appearance"
   },
   ...overviewDashboardWidgetRegions.map<DisplayEditorRegionSchema>(({ description, id, key, label }) => ({
     id,

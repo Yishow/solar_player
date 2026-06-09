@@ -11,6 +11,7 @@ import {
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
   getDeviceLogExportMetadata,
+  runDeviceKioskExit,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
   resolveBrowserApiOrigin,
@@ -329,6 +330,47 @@ test("getDeviceLogExportMetadata reads directory and file names from the export 
     assert.deepEqual(seenUrls.map((url) => new URL(url).pathname + new URL(url).search), ["/api/device/logs/export"]);
     assert.equal(response.directory, "/var/log/solar-display");
     assert.deepEqual(response.files, ["player.log", "worker.log"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("runDeviceKioskExit posts to the dedicated kiosk-exit route and returns re-entry guidance", async () => {
+  const originalFetch = globalThis.fetch;
+  const seenUrls: string[] = [];
+  const seenMethods: string[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    seenUrls.push(url);
+    seenMethods.push(String(init?.method ?? "GET"));
+
+    return new Response(
+      JSON.stringify({
+        data: {
+          executed: true,
+          launcherName: "Solar Display Kiosk",
+          reentryHint: "回到桌面後點擊 Solar Display Kiosk 重新進入。"
+        },
+        success: true
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const result = await runDeviceKioskExit();
+
+    assert.equal(result.executed, true);
+    assert.equal(result.launcherName, "Solar Display Kiosk");
+    assert.match(result.reentryHint, /Solar Display Kiosk/);
+    assert.ok(seenUrls.some((url) => url.includes("/api/device/kiosk-exit")));
+    assert.ok(seenMethods.includes("POST"));
   } finally {
     globalThis.fetch = originalFetch;
   }

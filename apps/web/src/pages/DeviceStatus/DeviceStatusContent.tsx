@@ -19,6 +19,7 @@ type DeviceStatusContentProps = {
   displayOpsAccessDenied: boolean;
   displayOpsErrorMessage: string;
   handleDiagnostic: (action: "export-summary" | "refresh-readiness", label: string) => Promise<void>;
+  handleKioskExit: () => Promise<void>;
   isLoading: boolean;
   status: DeviceRouteStatus | null;
   viewModel: ReturnType<typeof buildDeviceStatusViewModel>;
@@ -66,6 +67,7 @@ export function DeviceStatusContent({
   displayOpsAccessDenied,
   displayOpsErrorMessage,
   handleDiagnostic,
+  handleKioskExit,
   isLoading,
   status,
   viewModel
@@ -418,6 +420,15 @@ export function DeviceStatusContent({
             <small>{action.safeScope}</small>
           </button>
         ))}
+        <button
+          type="button"
+          className="ds-action"
+          disabled={activeAction !== null || displayOpsAccessDenied || Boolean(displayOpsErrorMessage) || isLoading}
+          onClick={() => void handleKioskExit()}
+        >
+          {activeAction === "kiosk-exit" ? "離開中..." : "離開系統"}
+          <small>回到桌面後點擊 Solar Display Kiosk 重新進入</small>
+        </button>
       </section>
 
       <div

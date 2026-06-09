@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyOverviewGroupStyleFieldUpdate,
   createOverviewDisplayPageSeedConfig,
   overviewDisplayPageEditorRegions,
   resolveOverviewModernDefaultConfig
 } from "./displayPageConfig";
 
 const widgetKeys = ["weather", "phasePower", "generationTrend", "alertNotifications"] as const;
+const kpiKeys = ["power", "today", "total", "co2Today", "co2Total"] as const;
 
 test("seed config exposes density widget styles equivalent to the current appearance", () => {
   const config = createOverviewDisplayPageSeedConfig();
@@ -86,4 +88,49 @@ test("each density widget region exposes internal card-style fields including tr
       `expected ${key} align field to offer end`
     );
   }
+});
+
+test("overview editor exposes family appearance regions for KPI cards and bottom widgets", () => {
+  const kpiRegion = overviewDisplayPageEditorRegions.find((entry) => entry.id === "overview-kpi-cards-appearance");
+  const widgetRegion = overviewDisplayPageEditorRegions.find((entry) => entry.id === "overview-bottom-widgets-appearance");
+
+  assert.ok(kpiRegion);
+  assert.ok(widgetRegion);
+  assert.deepEqual(
+    kpiRegion.fields.map((field) => field.label),
+    ["Surface Opacity", "Surface Blur", "Shadow Strength"]
+  );
+  assert.deepEqual(
+    widgetRegion.fields.map((field) => field.label),
+    ["Surface Opacity", "Surface Blur", "Shadow Strength"]
+  );
+  assert.equal(kpiRegion.fields[0]?.path.join("."), "cardStyles.power.surfaceOpacity");
+  assert.equal(widgetRegion.fields[0]?.path.join("."), "widgetStyles.weather.surfaceOpacity");
+});
+
+test("group appearance updates fan out to every overview card or widget in the matching family", () => {
+  const config = createOverviewDisplayPageSeedConfig();
+
+  const nextKpiConfig = applyOverviewGroupStyleFieldUpdate(
+    config,
+    "overview-kpi-cards-appearance",
+    ["cardStyles", "power", "surfaceOpacity"],
+    0.46
+  );
+  const nextWidgetConfig = applyOverviewGroupStyleFieldUpdate(
+    nextKpiConfig,
+    "overview-bottom-widgets-appearance",
+    ["widgetStyles", "weather", "surfaceBlur"],
+    22
+  );
+
+  for (const key of kpiKeys) {
+    assert.equal(nextWidgetConfig.cardStyles[key].surfaceOpacity, 0.46);
+  }
+
+  for (const key of widgetKeys) {
+    assert.equal(nextWidgetConfig.widgetStyles[key].surfaceBlur, 22);
+  }
+
+  assert.equal(nextWidgetConfig.widgetStyles.weather.surfaceOpacity, config.widgetStyles.weather.surfaceOpacity);
 });

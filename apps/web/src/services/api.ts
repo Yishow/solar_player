@@ -537,6 +537,12 @@ export type DeviceLogExportMetadata = {
   files: string[];
 };
 
+export type DeviceKioskExitResult = {
+  executed: boolean;
+  launcherName: string;
+  reentryHint: string;
+};
+
 type DeviceLogListEntry = {
   file: string;
   modified: string;
@@ -573,6 +579,19 @@ export async function runDeviceDisplayDiagnostic(action: "export-summary" | "ref
     body: JSON.stringify({ action }),
     method: "POST"
   });
+  return response.data;
+}
+
+export async function runDeviceKioskExit() {
+  const response = await requestJson<{
+    data: DeviceKioskExitResult;
+    success: boolean;
+  }>("/api/device/kiosk-exit", {
+    method: "POST"
+  });
+  if (!response.success) {
+    throw new Error("離開展示系統失敗。");
+  }
   return response.data;
 }
 
