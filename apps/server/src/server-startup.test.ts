@@ -202,3 +202,88 @@ test("startServer releases the backend runtime guard on close", async () => {
   await closeHook();
   assert.equal(released, 1);
 });
+
+function buildLifecycleApp(): {
+  app: Awaited<ReturnType<typeof import("./app.js").buildApp>>;
+  getCloseHook: () => (() => Promise<void> | void) | null;
+} {
+  let onCloseHook: (() => Promise<void> | void) | null = null;
+  const app = {
+    addHook: (_name: string, hook: () => Promise<void> | void) => {
+      onCloseHook = hook;
+    },
+    close: async () => undefined,
+    listen: async () => undefined,
+    log: {
+      error: () => undefined,
+      warn: () => undefined
+    },
+    mqttClientService: {
+      connect: async () => undefined
+    },
+    socketService: {
+      emitDisplaySync: () => undefined
+    }
+  } as unknown as Awaited<ReturnType<typeof import("./app.js").buildApp>>;
+
+  return { app, getCloseHook: () => onCloseHook };
+}
+
+const noopLifecycleFactories = {
+  createDailySummaryService: () => ({ start: () => undefined, stop: () => undefined }),
+  createMetricHistoryRetentionService: () => ({ start: () => undefined, stop: () => undefined }),
+  createMetricsAccumulatorService: () => ({
+    initialize: () => undefined,
+    start: () => undefined,
+    stop: () => undefined
+  }),
+  createSnapshotWriterService: () => ({ start: () => undefined, stop: () => undefined }),
+  migrateDatabase: () => undefined,
+  seedDatabase: () => undefined
+};
+
+test("startServer starts the mock metrics feed in mock mode and stops it on close", async () => {
+  const { app, getCloseHook } = buildLifecycleApp();
+  let started = 0;
+  let stopped = 0;
+
+  await startServer({
+    ...noopLifecycleFactories,
+    acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
+    buildApp: async () => app,
+    resolveDataMode: () => "mock",
+    createMockMetricsFeedService: () => ({
+      start: () => {
+        started += 1;
+      },
+      stop: () => {
+        stopped += 1;
+      }
+    })
+  });
+
+  assert.equal(started, 1);
+
+  const closeHook = getCloseHook();
+  assert.ok(closeHook);
+  await (closeHook as () => Promise<void> | void)();
+  assert.equal(stopped, 1);
+});
+
+test("startServer does not start the mock metrics feed outside mock mode", async () => {
+  const { app } = buildLifecycleApp();
+  let created = 0;
+
+  await startServer({
+    ...noopLifecycleFactories,
+    acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
+    buildApp: async () => app,
+    resolveDataMode: () => "mqtt",
+    createMockMetricsFeedService: () => {
+      created += 1;
+      return { start: () => undefined, stop: () => undefined };
+    }
+  });
+
+  assert.equal(created, 0);
+});

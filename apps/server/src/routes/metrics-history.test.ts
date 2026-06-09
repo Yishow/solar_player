@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { normalizeMetricSnapshotCapturedAt } from "../db/normalizeMetricSnapshotCapturedAt.js";
 import {
   buildApp,
   getDatabase
@@ -151,6 +152,64 @@ test("metrics history routes keep year and total boundaries distinct", async () 
     assert.equal(yearSummaryBody.summaries.length, 1);
     assert.equal(yearSummaryBody.summaries[0]?.date, `${currentYear}-05-10`);
     assert.equal(totalSummaryBody.summaries.length, 2);
+  } finally {
+    await app.close();
+  }
+});
+
+test("metrics history filters and sorts mixed timestamp formats chronologically", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(10, 9, 8, 7, 0.5, 91, "2026-06-08 23:30:00");
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(11, 10, 9, 8, 0.6, 92, "2026-06-09T00:15:00.000Z");
+  normalizeMetricSnapshotCapturedAt(database);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/metrics/history?range=total"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      snapshots: Array<{ capturedAt: string }>;
+    };
+
+    const normalize = (capturedAt: string) => new Date(capturedAt.replace(" ", "T")).toISOString();
+    assert.deepEqual(body.snapshots.map((snapshot) => snapshot.capturedAt), [
+      normalize("2026-06-08 23:30:00"),
+      "2026-06-09T00:15:00.000Z"
+    ]);
   } finally {
     await app.close();
   }

@@ -6,8 +6,10 @@ import {
   type MqttSettingsRow,
   shouldBootstrapStoredMqttSettings
 } from "../mqtt/settings-source.js";
+import { SOLAR_GENERATION_PROFILE_KW } from "../metrics/solarGenerationProfile.js";
 import { bootstrapDisplaySeedAssets } from "../services/displaySeedAssetBootstrapService.js";
 import { closeDatabaseConnection, getDatabase } from "./index.js";
+import { normalizeMetricSnapshotCapturedAt } from "./normalizeMetricSnapshotCapturedAt.js";
 
 const topicMappings = [
   { metricKey: "realTimePower", topic: "kuozui/plant/solar/power", unit: "kW" },
@@ -91,8 +93,18 @@ const playbackPages = [
   }
 ] as const;
 
+// Intraday solar generation *power* (kW) seeded into metric_snapshots.generation_power
+// so the Overview trend renders a realistic daily solar profile from runtime data
+// rather than mock content inside the widget. Shape comes from the shared
+// SOLAR_GENERATION_PROFILE_KW (steep morning ramp, early-afternoon peak, gentle
+// evening decline) so the seed history and the dev mock feed stay aligned.
+export function buildIntradayGenerationCurve(): number[] {
+  return [...SOLAR_GENERATION_PROFILE_KW];
+}
+
 export function seedDatabase() {
   const database = getDatabase();
+  normalizeMetricSnapshotCapturedAt(database);
 
   const upsertSetting = database.prepare(`
     INSERT INTO system_settings (key, value, updated_at)
@@ -323,6 +335,23 @@ export function seedDatabase() {
         orientation = excluded.orientation,
         updated_at = CURRENT_TIMESTAMP
     `).run(1, 1, 1, 0, "fade", 1000, 0, "08:00", "18:00", "1,2,3,4,5", 0, 300, 100, "landscape");
+
+    const snapshotCount = (
+      database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number }
+    ).count;
+
+    if (snapshotCount === 0) {
+      const insertSnapshot = database.prepare(
+        "INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)"
+      );
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+
+      buildIntradayGenerationCurve().forEach((generationPower, hour) => {
+        const capturedAt = new Date(dayStart.getTime() + hour * 60 * 60 * 1000);
+        insertSnapshot.run(generationPower, capturedAt.toISOString());
+      });
+    }
   })();
 
   bootstrapDisplaySeedAssets();

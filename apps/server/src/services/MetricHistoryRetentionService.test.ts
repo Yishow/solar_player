@@ -156,6 +156,60 @@ test("MetricHistoryRetentionService prunes only out-of-window snapshots and summ
   database.close();
 });
 
+test("MetricHistoryRetentionService compares mixed timestamp formats by actual time", () => {
+  const database = createDatabase();
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(1, 1, 1, 1, 0.5, 90, "2026-02-20 23:59:59");
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(2, 2, 2, 2, 0.5, 91, "2026-02-21T00:00:01.000Z");
+
+  const service = new MetricHistoryRetentionService({
+    database,
+    logger: {
+      warn: () => undefined
+    },
+    snapshotRetentionDays: 90,
+    summaryRetentionDays: 1_825,
+    vacuumEnabled: false
+  });
+
+  const result = service.sweep(new Date("2026-05-22T00:00:00.000Z"));
+  assert.equal(result.deletedSnapshots, 1);
+
+  const remainingSnapshots = database
+    .prepare("SELECT captured_at FROM metric_snapshots ORDER BY datetime(captured_at) ASC, captured_at ASC")
+    .all() as Array<{ captured_at: string }>;
+  assert.deepEqual(remainingSnapshots, [{ captured_at: "2026-02-21T00:00:01.000Z" }]);
+
+  database.close();
+});
+
 test("MetricHistoryRetentionService runs VACUUM only after a prune and only once per vacuum interval", () => {
   const database = createDatabase();
   seedHistoryRows(database);

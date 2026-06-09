@@ -21,6 +21,10 @@ import {
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
+import {
+  type HourlyGenerationTrendRow,
+  selectHourlyGenerationTrendProfile
+} from "./generationTrendSeries.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 
 type StoryMetricKey =
@@ -43,9 +47,6 @@ type CircuitRow = {
   warning_min: number | null;
 };
 
-type OverviewTrendRow = {
-  generation: number | null;
-};
 
 type OverviewMetricDefinition = MonitoringMetricBinding<StoryMetricKey> & {
   fallbackValue: string;
@@ -601,29 +602,30 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
 }
 
 function readOverviewGenerationTrendSeries() {
-  const rows = getDatabase()
+  const database = getDatabase();
+  // Pull a bounded recent window (≈ a day-plus at the 60s snapshot cadence) and
+  // let the hourly bucketing collapse it to one point per hour. Using a row limit
+  // instead of a wall-clock cutoff keeps the reader deterministic and avoids
+  // dropping points at day boundaries.
+  const rows = database
     .prepare(
       `
-        SELECT generation
-        FROM (
-          SELECT generation, captured_at
-          FROM metric_snapshots
-          WHERE generation IS NOT NULL
-          ORDER BY captured_at DESC
-          LIMIT 24
-        )
-        ORDER BY captured_at ASC
+        SELECT generation, generation_power, captured_at
+        FROM metric_snapshots
+        WHERE generation IS NOT NULL OR generation_power IS NOT NULL
+        ORDER BY captured_at DESC
+        LIMIT 2000
       `
     )
-    .all() as OverviewTrendRow[];
+    .all() as HourlyGenerationTrendRow[];
 
-  return rows.flatMap((row) => typeof row.generation === "number" ? [row.generation] : []);
+  return selectHourlyGenerationTrendProfile(rows);
 }
 
 export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext()
 ): OverviewStoryPayload {
-  const trendSeries = readOverviewGenerationTrendSeries();
+  const trendProfile = readOverviewGenerationTrendSeries();
   const overview = overviewMetrics.map((binding) => {
     const resolved = resolveMonitoringMetricBinding({
       binding,
@@ -632,10 +634,12 @@ export function readOverviewDisplayStory(
       reading: context.snapshot.metrics[binding.metricKey] ?? null
     });
 
-    if (binding.metricKey === "realTimePower" && trendSeries.length > 0) {
+    if (binding.metricKey === "realTimePower" && trendProfile.series.length > 0) {
       return {
         ...resolved,
-        trendSeries
+        trendHours: trendProfile.hours,
+        trendSeries: trendProfile.series,
+        trendUnit: trendProfile.unit
       };
     }
 

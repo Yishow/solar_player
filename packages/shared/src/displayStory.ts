@@ -114,7 +114,9 @@ export type SolarFlowStoryState = {
 export type DisplayStoryPageId = "overview" | "solar" | "factory-circuit";
 
 export type OverviewStoryMetric = ResolvedMonitoringMetricBinding<string> & {
+  trendHours?: number[];
   trendSeries?: number[];
+  trendUnit?: string;
 };
 
 export type OverviewStoryPayload = {

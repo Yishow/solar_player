@@ -1,6 +1,7 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
 import { getDatabase } from "../db/index.js";
+import { normalizeMetricSnapshotCapturedAt } from "../db/normalizeMetricSnapshotCapturedAt.js";
 import {
   DEFAULT_RETENTION_SWEEP_INTERVAL_MS,
   DEFAULT_RETENTION_VACUUM_INTERVAL_MS,
@@ -76,13 +77,14 @@ export class MetricHistoryRetentionService {
 
   sweep(now: Date) {
     try {
+      normalizeMetricSnapshotCapturedAt(this.database);
       const { snapshotCutoffIso, summaryCutoffDate } = resolveRetentionCutoffs(now, {
         snapshotRetentionDays: this.snapshotRetentionDays,
         summaryRetentionDays: this.summaryRetentionDays
       });
 
       const deletedSnapshots = this.database
-        .prepare("DELETE FROM metric_snapshots WHERE captured_at < ?")
+        .prepare("DELETE FROM metric_snapshots WHERE datetime(captured_at) < datetime(?)")
         .run(snapshotCutoffIso).changes;
       const deletedSummaries = this.database
         .prepare("DELETE FROM daily_energy_summaries WHERE date < ?")

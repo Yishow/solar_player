@@ -10,8 +10,10 @@ function createDatabase() {
   const database = new Database(":memory:");
   const migration001 = readFileSync(resolve(process.cwd(), "src/db/migrations/001_init.sql"), "utf8");
   const migration003 = readFileSync(resolve(process.cwd(), "src/db/migrations/003_history.sql"), "utf8");
+  const migration013 = readFileSync(resolve(process.cwd(), "src/db/migrations/013_generation_power.sql"), "utf8");
   database.exec(migration001);
   database.exec(migration003);
+  database.exec(migration013);
   return database;
 }
 
@@ -42,6 +44,12 @@ test("SnapshotWriterService emits monitoring-history invalidation when a new sna
 
   const rowCount = database.prepare("SELECT COUNT(*) as count FROM metric_snapshots").get() as { count: number };
   assert.equal(rowCount.count, 1);
+
+  const row = database
+    .prepare("SELECT generation, generation_power FROM metric_snapshots LIMIT 1")
+    .get() as { generation: number; generation_power: number };
+  assert.equal(row.generation, 12);
+  assert.equal(row.generation_power, 3);
   assert.deepEqual(
     emitted.map((payload) => ({ reason: payload.reason, scope: payload.scope })),
     [{ reason: "metric-snapshot-written", scope: "monitoring-history" }]

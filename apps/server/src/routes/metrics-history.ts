@@ -32,13 +32,6 @@ type CumulativeCounterRow = {
   total_value: number | null;
 };
 
-const snapshotRangeToClause: Record<Exclude<HistoryRange, "total">, string> = {
-  day: "captured_at >= datetime('now', 'start of day')",
-  month: "captured_at >= datetime('now', '-29 day')",
-  week: "captured_at >= datetime('now', '-6 day')",
-  year: "captured_at >= datetime('now', 'start of year')"
-};
-
 function isHistoryRange(value: string): value is HistoryRange {
   return value === "day" || value === "week" || value === "month" || value === "year" || value === "total";
 }
@@ -51,6 +44,27 @@ const dailySummaryRangeToClause: Record<Exclude<HistoryRange, "total">, string> 
 };
 
 const historyRangeError = "Invalid range. Expected day, week, month, year, or total.";
+
+function resolveSnapshotRangeCutoff(range: Exclude<HistoryRange, "total">): string {
+  const now = new Date();
+
+  if (range === "day") {
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    return startOfDay.toISOString();
+  }
+
+  if (range === "week") {
+    return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  if (range === "month") {
+    return new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  return startOfYear.toISOString();
+}
 
 const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/metrics/history", async (request, reply) => {
@@ -66,7 +80,8 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     }
 
     const database = getDatabase();
-    const filterClause = rangeParam === "total" ? "" : `WHERE ${snapshotRangeToClause[rangeParam]}`;
+    const snapshotCutoff = rangeParam === "total" ? null : resolveSnapshotRangeCutoff(rangeParam);
+    const filterClause = snapshotCutoff === null ? "" : "WHERE captured_at >= ?";
     const rows = database
       .prepare(
         `
@@ -83,7 +98,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
           ORDER BY captured_at ASC
         `
       )
-      .all() as MetricSnapshotRow[];
+      .all(...(snapshotCutoff === null ? [] : [snapshotCutoff])) as MetricSnapshotRow[];
 
     return {
       range: rangeParam,

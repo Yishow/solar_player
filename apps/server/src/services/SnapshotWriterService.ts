@@ -54,17 +54,19 @@ export class SnapshotWriterService {
         `
           INSERT INTO metric_snapshots (
             generation,
+            generation_power,
             consumption,
             self_consumption,
             co2,
             ratio,
             efficiency,
             captured_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
         snapshot.generation,
+        snapshot.generationPower,
         snapshot.consumption,
         snapshot.selfConsumption,
         snapshot.co2,

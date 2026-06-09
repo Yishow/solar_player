@@ -178,6 +178,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
           metricKey: string;
           provenance: string;
           sourceClass: string;
+          trendHours?: number[];
           trendSeries?: number[];
         }>;
         readinessFindings: Array<{
@@ -221,6 +222,12 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
+    assert.deepEqual(
+      realTimePowerMetric?.trendHours,
+      ["2026-05-13T08:00:00.000Z", "2026-05-13T09:00:00.000Z", "2026-05-13T10:00:00.000Z", "2026-05-13T11:00:00.000Z"].map(
+        (capturedAt) => new Date(capturedAt).getHours()
+      )
+    );
     assert.deepEqual(realTimePowerMetric?.trendSeries, [82, 95, 101, 108]);
 
     const selfConsumptionMetric = body.solar.kpis.find(
