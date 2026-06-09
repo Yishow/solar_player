@@ -28,14 +28,16 @@
   left: 50px;
   top: 118px;
   width: 1340px;
-  height: 704px;
+  height: 740px;
+  display: flex;
+  flex-direction: column;
 }
 
 .image-mgmt-page .im-card-editor {
   left: 1410px;
   top: 118px;
   width: 460px;
-  height: 704px;
+  height: 740px;
   display: flex;
   flex-direction: column;
 }
@@ -192,6 +194,7 @@
 /* thumb grid */
 .image-mgmt-page .im-grid-wrap {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   margin-right: -6px;
   padding-right: 6px;
@@ -314,6 +317,7 @@
 /* ===== editor panel ===== */
 .image-mgmt-page .im-editor-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   margin-right: -6px;
   padding-right: 6px;
@@ -699,5 +703,4 @@
   width: 820px;
   z-index: 100;
 }
-
 

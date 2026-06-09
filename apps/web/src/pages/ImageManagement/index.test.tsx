@@ -5,6 +5,7 @@ import test from "node:test";
 
 const imageManagementSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 const imageManagementContentSource = readFileSync(path.join(import.meta.dirname, "ImageManagementContent.tsx"), "utf8");
+const imageManagementCss = readFileSync(path.join(import.meta.dirname, "imageManagement.css"), "utf8");
 const apiSource = readFileSync(path.join(import.meta.dirname, "../../services/api.ts"), "utf8");
 
 test("image management persists playlist-facing metadata through the playlist runtime API", () => {
@@ -25,6 +26,15 @@ test("image management editor surfaces playlist runtime controls and server-driv
   assert.match(imageManagementContentSource, /playlistRuntimeStatus/);
   assert.match(imageManagementContentSource, /playlistFallbackMode/);
   assert.match(imageManagementContentSource, /playlistEntryRows/);
+  assert.match(imageManagementContentSource, /隨機播放/);
+  assert.match(imageManagementContentSource, /onTogglePlaylistShuffle/);
+  assert.match(imageManagementContentSource, /全部播放時間/);
+  assert.match(imageManagementContentSource, /onApplyPlaylistBulkDuration/);
+  assert.match(imageManagementSource, /setPlaylistBulkDurationSeconds\(resolveBulkPlaylistDurationInput\(nextPlaylistEntries\)\)/);
+  assert.match(imageManagementSource, /setPlaylistBulkDurationSeconds\(appliedDuration\)/);
+  assert.match(imageManagementContentSource, /event\.target\.value === "" \? "" : Number\(event\.target\.value\)/);
+  assert.match(imageManagementContentSource, /playlistBulkDurationSeconds === ""/);
+  assert.match(imageManagementSource, /updateAllImagePlaylistDurations\(\{ durationSeconds: appliedDuration \}\)/);
   assert.match(imageManagementContentSource, /handleSelectPlaylistEntry/);
   assert.match(imageManagementContentSource, /updatePlaylistEntryField/);
   assert.match(imageManagementContentSource, /Delete Blockers/);
@@ -55,4 +65,19 @@ test("image management save flow targets the authoritative draft session and res
   assert.match(imageManagementSource, /const saveTarget = buildImageManagementDraftSaveTarget\(/);
   assert.match(imageManagementSource, /await persistImageManagementDraftTarget\(saveTarget\)/);
   assert.match(imageManagementSource, /await syncImages\(saveTarget\.asset\.id\)/);
+});
+
+test("image management library and editor cards keep their own scroll containers", () => {
+  assert.match(
+    imageManagementCss,
+    /\.image-mgmt-page \.im-card-library\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/
+  );
+  assert.match(
+    imageManagementCss,
+    /\.image-mgmt-page \.im-grid-wrap\s*\{[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/
+  );
+  assert.match(
+    imageManagementCss,
+    /\.image-mgmt-page \.im-editor-body\s*\{[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/
+  );
 });

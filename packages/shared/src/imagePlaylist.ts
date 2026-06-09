@@ -44,6 +44,64 @@ export type ResolvedImagePlaylistEntry = ImagePlaylistEntryInput & {
   resolution: string;
 };
 
+export function resolveImagesPlaylistTotalDurationSeconds(
+  entries: Array<Pick<ResolvedImagePlaylistEntry, "durationSeconds" | "enabled" | "isPlayable">>
+) {
+  let totalDurationSeconds = 0;
+
+  for (const entry of entries) {
+    if (!entry.enabled || !entry.isPlayable) {
+      continue;
+    }
+
+    totalDurationSeconds += Math.max(1, Math.floor(entry.durationSeconds));
+  }
+
+  return totalDurationSeconds;
+}
+
+function createSeededRandom(seed: string) {
+  let state = 2166136261;
+  for (const character of seed) {
+    state ^= character.charCodeAt(0);
+    state = Math.imul(state, 16777619);
+  }
+
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function resolveImagesPlaybackOrder(
+  entries: Array<Pick<ResolvedImagePlaylistEntry, "displayOrder" | "enabled" | "entryId" | "isPlayable">>,
+  options: {
+    seed: string;
+    shuffle: boolean;
+  }
+) {
+  const playableEntries = entries
+    .filter((entry) => entry.enabled && entry.isPlayable)
+    .sort((left, right) => left.displayOrder - right.displayOrder || left.entryId.localeCompare(right.entryId));
+
+  if (!options.shuffle) {
+    return playableEntries.map((entry) => entry.entryId);
+  }
+
+  const shuffled = playableEntries.map((entry) => entry.entryId);
+  const random = createSeededRandom(options.seed);
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex]!, shuffled[index]!];
+  }
+
+  return shuffled;
+}
+
 function resolveAspectRatio(asset: ImagePlaylistAssetInput) {
   if (!asset.width || !asset.height || asset.height === 0) {
     return null;

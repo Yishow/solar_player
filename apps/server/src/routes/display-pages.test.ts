@@ -53,6 +53,57 @@ async function saveDraftConfig(
   });
 }
 
+function seedImagePlaylistEntry(input: {
+  durationSeconds: number;
+  enabled: boolean;
+  entryId: string;
+  fallbackMode?: "display-placeholder" | "skip";
+  order: number;
+}) {
+  getDatabase().exec(`
+    CREATE TABLE IF NOT EXISTS image_playlist_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entry_id TEXT NOT NULL UNIQUE,
+      asset_id INTEGER,
+      enabled BOOLEAN NOT NULL DEFAULT 1,
+      display_order INTEGER NOT NULL,
+      duration_seconds INTEGER NOT NULL DEFAULT 10,
+      title TEXT,
+      area TEXT,
+      captured_at TEXT,
+      tags_json TEXT,
+      description TEXT,
+      fallback_mode TEXT NOT NULL DEFAULT 'display-placeholder',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  getDatabase()
+    .prepare(
+      `
+        INSERT INTO image_playlist_entries (
+          entry_id,
+          asset_id,
+          enabled,
+          display_order,
+          duration_seconds,
+          title,
+          tags_json,
+          fallback_mode,
+          updated_at
+        ) VALUES (?, NULL, ?, ?, ?, ?, '[]', ?, CURRENT_TIMESTAMP)
+      `
+    )
+    .run(
+      input.entryId,
+      input.enabled ? 1 : 0,
+      input.order,
+      input.durationSeconds,
+      input.entryId,
+      input.fallbackMode ?? "display-placeholder"
+    );
+}
+
 test("GET /api/display-pages/:pageId/config returns an empty persisted config envelope by default", async () => {
   const app = await buildApp();
 
@@ -340,6 +391,87 @@ test("GET /api/display-pages/:pageId/live exposes the shared fallback policy met
       missingAsset: "show-placeholder",
       staleData: "show-placeholder"
     });
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview derives the images page duration from enabled playable playlist entries", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM image_assets").run();
+  database
+    .prepare("UPDATE display_page_registry SET duration_seconds = 5 WHERE page_key = 'images'")
+    .run();
+  seedImagePlaylistEntry({ durationSeconds: 10, enabled: true, entryId: "IMG-10", order: 1 });
+  seedImagePlaylistEntry({ durationSeconds: 15, enabled: true, entryId: "IMG-15", order: 2 });
+  seedImagePlaylistEntry({ durationSeconds: 5, enabled: true, entryId: "IMG-05", order: 3 });
+  seedImagePlaylistEntry({ durationSeconds: 20, enabled: false, entryId: "IMG-20", order: 4 });
+  seedImagePlaylistEntry({
+    durationSeconds: 99,
+    enabled: true,
+    entryId: "IMG-SKIP",
+    fallbackMode: "skip",
+    order: 5
+  });
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      preview: {
+        playablePages: Array<{ durationSeconds: number; pageKey: string }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.find((page) => page.pageKey === "images")?.durationSeconds,
+      30
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview keeps the images registry duration when the playlist has no playable entries", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM image_assets").run();
+  database
+    .prepare("UPDATE display_page_registry SET duration_seconds = 5 WHERE page_key = 'images'")
+    .run();
+  seedImagePlaylistEntry({ durationSeconds: 20, enabled: false, entryId: "IMG-20", order: 1 });
+  seedImagePlaylistEntry({
+    durationSeconds: 15,
+    enabled: true,
+    entryId: "IMG-SKIP",
+    fallbackMode: "skip",
+    order: 2
+  });
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      preview: {
+        playablePages: Array<{ durationSeconds: number; pageKey: string }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.find((page) => page.pageKey === "images")?.durationSeconds,
+      5
+    );
   } finally {
     await app.close();
   }

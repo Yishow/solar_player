@@ -45,6 +45,7 @@ import {
   imagesGrassLayout,
   imagesTitleLayout
 } from "./layout";
+import { resolveRuntimeMediaUrl } from "../shared/runtimeMediaUrl";
 import "../../components/displayPageCards.css";
 import "./images.css";
 import { buildImagesViewModel } from "./viewModel";
@@ -102,11 +103,15 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     runtimeHydrationEnabled
       ? playlistRuntime.payload?.activeEntry ?? null
       : resolveImagesReferenceEntry(requestedIndex);
+  const shuffleEnabled = runtimeHydrationEnabled
+    ? playlistRuntime.payload?.settings.shuffle ?? false
+    : false;
   const autoplay = useImagesAutoplay({
     activeEntry: playbackActiveEntry,
     entries: playbackEntries,
     requestedIndex,
-    setRequestedIndex
+    setRequestedIndex,
+    shuffle: shuffleEnabled
   });
 
   if (
@@ -191,7 +196,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     seedConfig.rhythm.imagesCaption
   );
   const titleTokens = splitImagesTitle(resolvedConfig.hero.title);
-  const activeMainStageSource = viewModel.active.assetSource ?? mainStageSource ?? undefined;
+  const activeMainStageSource = resolveRuntimeMediaUrl(viewModel.active.assetSource ?? mainStageSource);
   const isStageFullBleed = resolvedConfig.chrome.modules.stageFrame.fullBleed;
   const mainStageOverlayLayers = isStageFullBleed ? [] : mainStageMediaPresentation.overlayLayers;
   const stageShadow =
@@ -315,6 +320,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           "images-main-stage display-surface-media-stage",
           mainStageMediaPresentation.stageClassName
         ].filter(Boolean).join(" ")}
+        onClick={() => autoplay.next()}
         style={{
           ...mainStageMediaPresentation.stageStyle,
           "--images-stage-radius": `${stageRadius}px`,
@@ -447,7 +453,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             type="button"
           >
             {thumbnail.assetSource ? (
-              <img alt={thumbnail.infoPanel.title} src={thumbnail.assetSource} />
+              <img alt={thumbnail.infoPanel.title} src={resolveRuntimeMediaUrl(thumbnail.assetSource)} />
             ) : (
               <div className="images-thumb-placeholder">
                 {renderDisplayPageIcon({

@@ -4,7 +4,9 @@ import {
   readImagePlaylist,
   readImagePlaylistGovernanceSnapshot,
   reorderImagePlaylist,
-  updateImagePlaylistEntry
+  updateAllImagePlaylistDurations,
+  updateImagePlaylistEntry,
+  updateImagePlaylistSettings
 } from "../services/imagePlaylistService.js";
 
 type PlaylistEntryBody = Partial<{
@@ -29,6 +31,14 @@ type ReorderBody = {
   }>;
 };
 
+type PlaylistSettingsBody = {
+  shuffle?: unknown;
+};
+
+type PlaylistDurationAllBody = {
+  durationSeconds?: unknown;
+};
+
 const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: { activeIndex?: string } }>("/api/image-playlist", async (request) => ({
     playlist: readImagePlaylist(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0)
@@ -44,6 +54,32 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
       reason: "image-playlist-governance-bootstrapped",
+      scope: "images"
+    });
+    return { playlist };
+  });
+
+  app.put<{ Body: PlaylistSettingsBody }>("/api/image-playlist/settings", async (request) => {
+    updateImagePlaylistSettings({
+      shuffle: typeof request.body?.shuffle === "boolean" ? request.body.shuffle : undefined
+    });
+    const playlist = readImagePlaylist();
+    app.socketService.emitImagesUpdated({ action: "playlist-settings-updated", playlist });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "image-playlist-settings-updated",
+      scope: "images"
+    });
+    return { playlist };
+  });
+
+  app.put<{ Body: PlaylistDurationAllBody }>("/api/image-playlist/duration-all", async (request) => {
+    updateAllImagePlaylistDurations(Number(request.body?.durationSeconds));
+    const playlist = readImagePlaylist();
+    app.socketService.emitImagesUpdated({ action: "playlist-duration-all-updated", playlist });
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "image-playlist-duration-all-updated",
       scope: "images"
     });
     return { playlist };

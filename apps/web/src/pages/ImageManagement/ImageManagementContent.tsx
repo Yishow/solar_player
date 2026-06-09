@@ -50,8 +50,12 @@ type ImageManagementContentProps = {
   isDeleting: boolean;
   isLoading: boolean;
   isSaving: boolean;
+  isUpdatingPlaylistDurationAll: boolean;
+  isUpdatingPlaylistSettings: boolean;
   isUploading: boolean;
   message: string;
+  playlistBulkDurationSeconds: number | "";
+  playlistShuffle: boolean;
   playlistEntries: Array<{
     entryId: string;
     assetId: number | null;
@@ -72,6 +76,9 @@ type ImageManagementContentProps = {
   selectedPlaylistEntryId: string | null;
   handleSelectImage: (value: number) => void;
   handleSelectPlaylistEntry: (entryId: string) => void;
+  onApplyPlaylistBulkDuration: () => Promise<void>;
+  onPlaylistBulkDurationChange: (value: number | "") => void;
+  onTogglePlaylistShuffle: (nextShuffle: boolean) => Promise<void>;
   storageUsage: ImageStorageUsage;
   updateAssetField: (
     id: number,
@@ -118,8 +125,12 @@ export function ImageManagementContent({
   isDeleting,
   isLoading,
   isSaving,
+  isUpdatingPlaylistDurationAll,
+  isUpdatingPlaylistSettings,
   isUploading,
   message,
+  playlistBulkDurationSeconds,
+  playlistShuffle,
   playlistEntries,
   resolvedPlaylistEntries,
   remoteSyncBanner,
@@ -128,6 +139,9 @@ export function ImageManagementContent({
   selectedPlaylistEntryId,
   handleSelectImage,
   handleSelectPlaylistEntry,
+  onApplyPlaylistBulkDuration,
+  onPlaylistBulkDurationChange,
+  onTogglePlaylistShuffle,
   storageUsage,
   updateAssetField,
   updatePlaylistEntryField
@@ -253,6 +267,48 @@ export function ImageManagementContent({
             <span className="im-stat__label">封面圖片<small>Cover</small></span>
             <span className="im-stat__value" style={{ fontSize: 16, lineHeight: 1.2 }}>{viewModel.summary.coverLabel}</span>
             <span className="im-stat__hint">首頁焦點素材</span>
+          </div>
+        </div>
+
+        <div className="im-toggle">
+          <div className="im-toggle__label">
+            隨機播放
+            <small>{playlistShuffle ? "圖片輪播每輪會依隨機順序播放" : "圖片輪播依播放順序播放"}</small>
+          </div>
+          <Switch
+            ariaLabel="隨機播放"
+            disabled={isLoading || isUpdatingPlaylistSettings}
+            on={playlistShuffle}
+            onChange={(next) => void onTogglePlaylistShuffle(next)}
+          />
+        </div>
+
+        <div className="im-form-row">
+          <label>全部播放時間 <small>Set All Duration</small></label>
+          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
+            <input
+              className="im-input"
+              disabled={isLoading || isUpdatingPlaylistDurationAll}
+              min={1}
+              type="number"
+              value={playlistBulkDurationSeconds}
+              onChange={(event) => onPlaylistBulkDurationChange(
+                event.target.value === "" ? "" : Number(event.target.value)
+              )}
+            />
+            <button
+              type="button"
+              className="im-btn"
+              disabled={
+                isLoading
+                || isUpdatingPlaylistDurationAll
+                || playlistBulkDurationSeconds === ""
+                || playlistEntries.length === 0
+              }
+              onClick={() => void onApplyPlaylistBulkDuration()}
+            >
+              {isUpdatingPlaylistDurationAll ? "套用中..." : "套用全部"}
+            </button>
           </div>
         </div>
 

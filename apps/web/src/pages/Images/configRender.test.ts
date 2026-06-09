@@ -47,10 +47,10 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /activeIndex: autoplay\.activeIndex/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
+  assert.match(imagesSource, /<figure[\s\S]*onClick=\{\(\) => autoplay\.next\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
-  assert.match(imagesSource, /viewModel\.active\.assetSource \?\? mainStageSource \?\? undefined/);
-  assert.match(imagesSource, /src=\{thumbnail\.assetSource\}/);
-  assert.doesNotMatch(imagesSource, /src=\{runtimeThumb/);
+  assert.match(imagesSource, /resolveRuntimeMediaUrl\(viewModel\.active\.assetSource \?\? mainStageSource\)/);
+  assert.match(imagesSource, /src=\{resolveRuntimeMediaUrl\(thumbnail\.assetSource\)\}/);
   assert.match(imagesSource, /const isStageFullBleed = resolvedConfig\.chrome\.modules\.stageFrame\.fullBleed/);
   assert.doesNotMatch(imagesSource, /isReferenceHeroCrop/);
   assert.doesNotMatch(imagesSource, /viewModel\.active\.assetSource === imagesAssetRuntimeMap\.main/);

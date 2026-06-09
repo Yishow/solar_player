@@ -12,10 +12,12 @@ import {
   buildDisplayRotationPlan,
   evaluatePageRuntimeFreshness,
   evaluateDisplayRotation,
+  resolveImagesPlaylistTotalDurationSeconds,
   resolveLiveMetricKeysForPage,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readImagePlaylist } from "./imagePlaylistService.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
@@ -182,16 +184,7 @@ function resolveRuntimeDataCondition(args: {
     };
   }
 
-  return args.fallbackPolicy.staleData === "hide"
-    ? {
-        detail: args.stalestTimestamp
-          ? args.stalestMetricKey
-            ? `所需 metric ${args.stalestMetricKey} 最後時間 ${args.stalestTimestamp} 已超過 freshness window`
-            : `最後資料時間 ${args.stalestTimestamp} 已超過 freshness window`
-          : "尚未收到可用的即時資料",
-        skipReason: "stale-runtime"
-      }
-    : null;
+  return null;
 }
 
 function resolveAssetCondition(args: {
@@ -339,6 +332,12 @@ export function readPlaybackSettings() {
 export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
   const database = getDatabase();
   const current = readPlaybackSettingsRow();
+  const nextTransitionType =
+    body.transitionType === "fade" || body.transitionType === "slide" || body.transitionType === "none"
+      ? body.transitionType
+      : current.transition_type;
+  const requestedTransitionSpeed =
+    typeof body.transitionSpeed === "number" ? Math.max(0, body.transitionSpeed) : current.transition_speed;
   const nextSettings = {
     autoplay: body.autoplay ?? toBoolean(current.autoplay),
     brightness:
@@ -356,11 +355,10 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
     scheduleStart: body.scheduleStart === undefined ? current.schedule_start : body.scheduleStart,
     startPage: typeof body.startPage === "number" ? body.startPage : current.start_page,
     transitionSpeed:
-      typeof body.transitionSpeed === "number" ? Math.max(0, body.transitionSpeed) : current.transition_speed,
-    transitionType:
-      body.transitionType === "slide" || body.transitionType === "none"
-        ? body.transitionType
-        : current.transition_type
+      nextTransitionType === "none"
+        ? requestedTransitionSpeed
+        : Math.max(120, requestedTransitionSpeed),
+    transitionType: nextTransitionType
   };
 
   database
@@ -486,6 +484,7 @@ function buildPageConditions(
     const runtimeFreshness = page.templateKey === undefined
       ? {
           fresh: true,
+          hasRequiredData: true,
           stalestMetricKey: null,
           stalestTimestamp: null
         }
@@ -495,9 +494,6 @@ function buildPageConditions(
           nowMs: now.getTime(),
           requiredMetricKeys
         });
-    const hasAllRequiredMetrics =
-      requiredMetricKeys.length === 0
-      || requiredMetricKeys.every((metricKey) => liveMetrics.metrics[metricKey] !== undefined);
     const readinessCondition =
       page.templateKey === undefined
         ? null
@@ -506,7 +502,7 @@ function buildPageConditions(
           );
     const runtimeDataCondition = resolveRuntimeDataCondition({
       fallbackPolicy,
-      hasAllRequiredMetrics,
+      hasAllRequiredMetrics: runtimeFreshness.hasRequiredData,
       mqttStatus,
       pageFresh: runtimeFreshness.fresh,
       pageRequiresLiveData,
@@ -527,7 +523,7 @@ function buildPageConditions(
       (!pageRequiresLiveData ||
         runtimeFreshness.fresh ||
         mqttStatus.reason === "mock" ||
-        (hasAllRequiredMetrics && fallbackPolicy.staleData !== "hide"));
+        runtimeFreshness.hasRequiredData);
 
     pageConditions[page.id] = {
       detail: dominantDetail,
@@ -581,13 +577,33 @@ export function updateDisplayRotationPlan(pages: PlaybackPageUpdateInput[]) {
   return readDisplayRotationPlan();
 }
 
+function resolveRotationPages() {
+  const pages = readPlaybackPages();
+  const imagesDurationSeconds = resolveImagesPlaylistTotalDurationSeconds(
+    readImagePlaylist().entries
+  );
+
+  if (imagesDurationSeconds <= 0) {
+    return pages;
+  }
+
+  return pages.map((page) => (
+    page.templateKey === "images"
+      ? {
+          ...page,
+          durationSeconds: imagesDurationSeconds
+        }
+      : page
+  ));
+}
+
 export function readDisplayRotationPreview(options: {
   mqttStatus: MqttStatusLike;
   now?: Date;
 }): DisplayRotationPreview {
   const now = options.now ?? new Date();
   const settings = readPlaybackSettings();
-  const pages = readPlaybackPages();
+  const pages = resolveRotationPages();
 
   return evaluateDisplayRotation({
     fallbackRoute: "/offline",

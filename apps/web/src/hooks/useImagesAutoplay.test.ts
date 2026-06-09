@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import type { ResolvedImagePlaylistEntry } from "@solar-display/shared";
+import { resolveImagesPlaybackOrder, type ResolvedImagePlaylistEntry } from "@solar-display/shared";
 import {
   getImagesAutoplayDurationMs,
   getNextImagesAutoplayIndex,
+  resolveImagesAutoplayCycleStartIndex,
   resolveImagesAutoplayActiveIndex
 } from "./useImagesAutoplay";
 
@@ -72,6 +73,16 @@ test("images autoplay remaps to the resolved active slide identity and skips non
   assert.equal(getNextImagesAutoplayIndex(entries, 0, 1), 2);
 });
 
+test("images autoplay prefers the requested playable slide over stale runtime payload state", () => {
+  const entries = [
+    createEntry({ durationSeconds: 25, entryId: "IMG-01", isPlayable: true }),
+    createEntry({ durationSeconds: 10, entryId: "IMG-02", isPlayable: true }),
+    createEntry({ durationSeconds: 12, entryId: "IMG-03", isPlayable: true })
+  ];
+
+  assert.equal(resolveImagesAutoplayActiveIndex(entries, entries[0] ?? null, 2), 2);
+});
+
 test("images autoplay keeps fallback-active and single playable entries inside the same loop", () => {
   const loopEntries = [
     createEntry({ entryId: "IMG-01", isPlayable: true }),
@@ -98,5 +109,62 @@ test("images autoplay keeps fallback-active and single playable entries inside t
 test("images autoplay hook schedules timeout-based rotation from active entry duration", () => {
   assert.match(hookSource, /window\.setTimeout/);
   assert.match(hookSource, /getImagesAutoplayDurationMs\(activeEntry\)/);
-  assert.match(hookSource, /setRequestedIndex\(resolvedActiveIndex\)/);
+  assert.doesNotMatch(hookSource, /setRequestedIndex\(resolvedActiveIndex\)/);
+});
+
+test("images autoplay keeps shuffle disabled on the display-order path", () => {
+  const entries = [
+    createEntry({ displayOrder: 3, entryId: "IMG-03", isPlayable: true }),
+    createEntry({ displayOrder: 1, entryId: "IMG-01", isPlayable: true }),
+    createEntry({ displayOrder: 2, entryId: "IMG-02", isPlayable: true })
+  ];
+
+  assert.equal(getNextImagesAutoplayIndex(entries, 1, 1, { seed: "fixed-seed", shuffle: false }), 2);
+  assert.equal(getNextImagesAutoplayIndex(entries, 2, 1, { seed: "fixed-seed", shuffle: false }), 0);
+});
+
+test("images autoplay follows a seeded shuffled order once per cycle", () => {
+  const entries = [
+    createEntry({ displayOrder: 1, entryId: "IMG-01", isPlayable: true }),
+    createEntry({ displayOrder: 2, entryId: "IMG-02", isPlayable: true }),
+    createEntry({ displayOrder: 3, entryId: "IMG-03", isPlayable: true }),
+    createEntry({ displayOrder: 4, entryId: "IMG-04", isPlayable: true })
+  ];
+  const order = resolveImagesPlaybackOrder(entries, { seed: "fixed-seed", shuffle: true });
+  const visited = [order[0]!];
+  let currentIndex = entries.findIndex((entry) => entry.entryId === order[0]);
+
+  for (let step = 1; step < order.length; step += 1) {
+    currentIndex = getNextImagesAutoplayIndex(entries, currentIndex, 1, {
+      seed: "fixed-seed",
+      shuffle: true
+    });
+    visited.push(entries[currentIndex]!.entryId);
+  }
+
+  assert.deepEqual(visited, order);
+  assert.deepEqual([...visited].sort(), ["IMG-01", "IMG-02", "IMG-03", "IMG-04"]);
+});
+
+test("images autoplay aligns a shuffle cycle to the shuffled start entry", () => {
+  const entries = [
+    createEntry({ displayOrder: 1, entryId: "IMG-01", isPlayable: true }),
+    createEntry({ displayOrder: 2, entryId: "IMG-02", isPlayable: true }),
+    createEntry({ displayOrder: 3, entryId: "IMG-03", isPlayable: true }),
+    createEntry({ displayOrder: 4, entryId: "IMG-04", isPlayable: true })
+  ];
+  const seed = "fixed-seed";
+  const order = resolveImagesPlaybackOrder(entries, { seed, shuffle: true });
+  let currentIndex = resolveImagesAutoplayCycleStartIndex(entries, { seed, shuffle: true });
+  const visited = [entries[currentIndex]!.entryId];
+
+  for (let step = 1; step < order.length; step += 1) {
+    currentIndex = getNextImagesAutoplayIndex(entries, currentIndex, 1, {
+      seed,
+      shuffle: true
+    });
+    visited.push(entries[currentIndex]!.entryId);
+  }
+
+  assert.deepEqual(visited, order);
 });

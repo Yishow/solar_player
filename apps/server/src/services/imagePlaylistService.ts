@@ -38,6 +38,10 @@ type PlaylistRow = {
   title: string | null;
 };
 
+type PlaylistSettingsRow = {
+  shuffle: number;
+};
+
 type PlaylistUpdateInput = Partial<{
   area: string | null;
   assetId: number | null;
@@ -49,6 +53,10 @@ type PlaylistUpdateInput = Partial<{
   fallbackMode: ImagePlaylistFallbackMode;
   tags: string[];
   title: string | null;
+}>;
+
+type PlaylistSettingsUpdateInput = Partial<{
+  shuffle: boolean;
 }>;
 
 type ExistingPlaylistEntryRef = {
@@ -82,6 +90,79 @@ function ensurePlaylistTable() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+}
+
+function ensurePlaylistSettingsTable() {
+  getDatabase().exec(`
+    CREATE TABLE IF NOT EXISTS image_playlist_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      shuffle INTEGER NOT NULL DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT OR IGNORE INTO image_playlist_settings (id, shuffle, updated_at)
+    VALUES (1, 0, CURRENT_TIMESTAMP);
+  `);
+}
+
+function hasPlaylistSettingsTable() {
+  return Boolean(
+    getDatabase()
+      .prepare(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table' AND name = 'image_playlist_settings'
+        `
+      )
+      .get()
+  );
+}
+
+function readImagePlaylistSettings() {
+  if (!hasPlaylistSettingsTable()) {
+    return {
+      shuffle: false
+    };
+  }
+
+  const row = getDatabase()
+    .prepare(
+      `
+        SELECT shuffle
+        FROM image_playlist_settings
+        WHERE id = 1
+      `
+    )
+    .get() as PlaylistSettingsRow | undefined;
+
+  return {
+    shuffle: row?.shuffle === 1
+  };
+}
+
+export function updateImagePlaylistSettings(input: PlaylistSettingsUpdateInput) {
+  ensurePlaylistSettingsTable();
+
+  if (typeof input.shuffle !== "boolean") {
+    return readImagePlaylistSettings();
+  }
+
+  getDatabase()
+    .prepare(
+      `
+        UPDATE image_playlist_settings
+        SET shuffle = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `
+    )
+    .run(input.shuffle ? 1 : 0);
+
+  return readImagePlaylistSettings();
+}
+
+function normalizePlaylistDurationSeconds(value: number) {
+  return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
 }
 
 function hasPlaylistTable() {
@@ -394,7 +475,8 @@ function buildResolvedImagePlaylist(activeIndex = 0) {
     activeEntry: resolveActiveImagePlaylistEntry(entries, activeIndex),
     entries,
     generatedAt: new Date().toISOString(),
-    hasPlaylistRows: runtimeEntries.hasPlaylistRows
+    hasPlaylistRows: runtimeEntries.hasPlaylistRows,
+    settings: readImagePlaylistSettings()
   };
 }
 
@@ -415,7 +497,8 @@ export function readImagePlaylistGovernanceSnapshot() {
     entries,
     resolvedEntries,
     generatedAt: new Date().toISOString(),
-    hasPlaylistRows: entries.length > 0
+    hasPlaylistRows: entries.length > 0,
+    settings: readImagePlaylistSettings()
   };
 }
 
@@ -494,6 +577,19 @@ export function updateImagePlaylistEntry(entryId: string, input: PlaylistUpdateI
       input.fallbackMode ?? previousRow.fallback_mode,
       entryId
     );
+}
+
+export function updateAllImagePlaylistDurations(durationSeconds: number) {
+  ensureBootstrappedEntries();
+  getDatabase()
+    .prepare(
+      `
+        UPDATE image_playlist_entries
+        SET duration_seconds = ?,
+            updated_at = CURRENT_TIMESTAMP
+      `
+    )
+    .run(normalizePlaylistDurationSeconds(durationSeconds));
 }
 
 export function reorderImagePlaylist(entries: ReorderInput) {

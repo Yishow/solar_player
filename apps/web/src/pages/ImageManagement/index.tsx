@@ -17,6 +17,8 @@ import {
   type ImageStorageUsage,
   persistImageManagementDraftTarget,
   updateImageAsset,
+  updateAllImagePlaylistDurations,
+  updateImagePlaylistSettings,
   uploadImageAsset
 } from "../../services/api";
 import { ImageManagementContent } from "./ImageManagementContent";
@@ -65,6 +67,21 @@ function normalizeResolvedPlaylistEntry(
   };
 }
 
+function resolveBulkPlaylistDurationInput(entries: ImageManagementPlaylistEntry[]) {
+  if (entries.length === 0) {
+    return "" as const;
+  }
+
+  const [firstEntry] = entries;
+  if (!firstEntry) {
+    return "" as const;
+  }
+
+  return entries.every((entry) => entry.durationSeconds === firstEntry.durationSeconds)
+    ? firstEntry.durationSeconds
+    : "" as const;
+}
+
 export function ImageManagement() {
   const [assets, setAssets] = useState<ImageAsset[]>([]);
   const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>([]);
@@ -81,6 +98,10 @@ export function ImageManagement() {
   const [playlistEntries, setPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
   const [lastSyncedPlaylistEntries, setLastSyncedPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
   const [resolvedPlaylistEntries, setResolvedPlaylistEntries] = useState<ImageManagementResolvedPlaylistEntry[]>([]);
+  const [playlistShuffle, setPlaylistShuffle] = useState(false);
+  const [playlistBulkDurationSeconds, setPlaylistBulkDurationSeconds] = useState<number | "">("");
+  const [isUpdatingPlaylistDurationAll, setIsUpdatingPlaylistDurationAll] = useState(false);
+  const [isUpdatingPlaylistSettings, setIsUpdatingPlaylistSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
@@ -109,6 +130,8 @@ export function ImageManagement() {
     setPlaylistEntries(nextPlaylistEntries);
     setLastSyncedPlaylistEntries(nextPlaylistEntries);
     setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
+    setPlaylistShuffle(playlistRes.playlist.settings.shuffle);
+    setPlaylistBulkDurationSeconds(resolveBulkPlaylistDurationInput(nextPlaylistEntries));
     const nextSelectedAssetId =
       preferredImageId !== null && nextAssets.some((asset) => asset.id === preferredImageId)
         ? preferredImageId
@@ -144,6 +167,8 @@ export function ImageManagement() {
         setPlaylistEntries(nextPlaylistEntries);
         setLastSyncedPlaylistEntries(nextPlaylistEntries);
         setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
+        setPlaylistShuffle(playlistRes.playlist.settings.shuffle);
+        setPlaylistBulkDurationSeconds(resolveBulkPlaylistDurationInput(nextPlaylistEntries));
         const nextSelectedAssetId = nextAssets[0]?.id ?? null;
         setSelectedImageId(nextSelectedAssetId);
         setSelectedPlaylistEntryId(
@@ -347,6 +372,42 @@ export function ImageManagement() {
     }
   };
 
+  const handleTogglePlaylistShuffle = async (nextShuffle: boolean) => {
+    setIsUpdatingPlaylistSettings(true);
+    setErrorMessage("");
+    try {
+      const response = await updateImagePlaylistSettings({ shuffle: nextShuffle });
+      setPlaylistShuffle(response.playlist.settings.shuffle);
+      setMessage(response.playlist.settings.shuffle ? "圖片輪播已切換為隨機播放。" : "圖片輪播已切換為排序播放。");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "更新圖片輪播播放模式失敗。");
+    } finally {
+      setIsUpdatingPlaylistSettings(false);
+    }
+  };
+
+  const handleApplyPlaylistBulkDuration = async () => {
+    if (playlistBulkDurationSeconds === "") {
+      return;
+    }
+
+    const appliedDuration = Number.isFinite(playlistBulkDurationSeconds)
+      ? Math.max(1, Math.trunc(playlistBulkDurationSeconds))
+      : 1;
+    setIsUpdatingPlaylistDurationAll(true);
+    setErrorMessage("");
+    try {
+      await updateAllImagePlaylistDurations({ durationSeconds: appliedDuration });
+      await syncImages(selectedImageId);
+      setPlaylistBulkDurationSeconds(appliedDuration);
+      setMessage(`所有圖片輪播秒數已更新為 ${appliedDuration} 秒。`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "更新全部圖片輪播秒數失敗。");
+    } finally {
+      setIsUpdatingPlaylistDurationAll(false);
+    }
+  };
+
   const reloadImageManagement = async () => {
     await syncImages();
     await reloadAssetHealth();
@@ -400,9 +461,13 @@ export function ImageManagement() {
       isDeleting={isDeleting}
       isLoading={isLoading}
       isSaving={isSaving}
+      isUpdatingPlaylistDurationAll={isUpdatingPlaylistDurationAll}
+      isUpdatingPlaylistSettings={isUpdatingPlaylistSettings}
       isUploading={isUploading}
       message={message}
+      playlistBulkDurationSeconds={playlistBulkDurationSeconds}
       playlistEntries={playlistEntries}
+      playlistShuffle={playlistShuffle}
       resolvedPlaylistEntries={resolvedPlaylistEntries}
       remoteSyncBanner={
         syncDraftGuard.hasPendingRemoteChange ? (
@@ -417,6 +482,9 @@ export function ImageManagement() {
       selectedPlaylistEntryId={selectedPlaylistEntryId}
       handleSelectImage={handleSelectImage}
       storageUsage={storageUsage}
+      onApplyPlaylistBulkDuration={handleApplyPlaylistBulkDuration}
+      onPlaylistBulkDurationChange={setPlaylistBulkDurationSeconds}
+      onTogglePlaylistShuffle={handleTogglePlaylistShuffle}
       updateAssetField={updateAssetField}
       updatePlaylistEntryField={updatePlaylistEntryField}
     />

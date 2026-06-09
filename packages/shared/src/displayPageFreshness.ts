@@ -41,10 +41,12 @@ export function evaluatePageRuntimeFreshness(input: {
         : null;
     })
     .filter((metric): metric is { metricKey: string; timestamp: string } => metric !== null);
+  const hasRequiredData = presentMetrics.length === input.requiredMetricKeys.length;
 
-  if (presentMetrics.length !== input.requiredMetricKeys.length) {
+  if (!hasRequiredData) {
     return {
       fresh: false,
+      hasRequiredData,
       stalestMetricKey: null,
       stalestTimestamp: null
     };
@@ -83,6 +85,7 @@ export function evaluatePageRuntimeFreshness(input: {
   if (staleMetric === null) {
     return {
       fresh: true,
+      hasRequiredData,
       stalestMetricKey: null,
       stalestTimestamp: null
     };
@@ -90,6 +93,7 @@ export function evaluatePageRuntimeFreshness(input: {
 
   return {
     fresh: false,
+    hasRequiredData,
     stalestMetricKey: staleMetric.metricKey,
     stalestTimestamp: staleMetric.timestamp
   };

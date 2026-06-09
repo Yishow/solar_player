@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import {
   createPlaybackRuntime,
+  displayPageFallbackPolicyByTemplateKey,
   evaluateDisplayRotation,
   getEnabledPlaybackPages,
   getPlaybackPage,
@@ -417,6 +418,7 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
     assert.equal(updatedSettings.autoplay, false);
     assert.equal(updatedSettings.idleMode, "return-to-start");
     assert.deepEqual(updatedSettings.repeatDays, [1, 3, 5]);
+    assert.equal(updatedSettings.transitionType, "slide");
 
     const pagesUpdateResponse = await app.inject({
       method: "PUT",
@@ -442,6 +444,62 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
     assert.equal(emittedEvents.length, 2);
   } finally {
     app.socketService.emitPlaybackSettingsUpdated = originalEmit;
+    await app.close();
+  }
+});
+
+test("PUT /api/playback/settings can switch transition type back to fade", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const slideUpdateResponse = await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        transitionType: "slide"
+      } satisfies Partial<PlaybackSettings>
+    });
+
+    assert.equal(slideUpdateResponse.statusCode, 200);
+    assert.equal((slideUpdateResponse.json() as { settings: PlaybackSettings }).settings.transitionType, "slide");
+
+    const fadeUpdateResponse = await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        transitionType: "fade"
+      } satisfies Partial<PlaybackSettings>
+    });
+
+    assert.equal(fadeUpdateResponse.statusCode, 200);
+    assert.equal((fadeUpdateResponse.json() as { settings: PlaybackSettings }).settings.transitionType, "fade");
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/playback/settings clamps transition speed to the minimum playable duration", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        transitionSpeed: 0,
+        transitionType: "slide"
+      } satisfies Partial<PlaybackSettings>
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal((response.json() as { settings: PlaybackSettings }).settings.transitionSpeed, 120);
+  } finally {
     await app.close();
   }
 });
@@ -591,6 +649,8 @@ test("GET /api/display-pages/rotation-preview keeps a previously-seen live-data 
   seedDatabase();
 
   const database = getDatabase();
+  const originalSolarStaleDataPolicy = displayPageFallbackPolicyByTemplateKey.solar.staleData;
+  displayPageFallbackPolicyByTemplateKey.solar.staleData = "hide";
   database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
@@ -649,6 +709,7 @@ test("GET /api/display-pages/rotation-preview keeps a previously-seen live-data 
     );
     assert.equal(body.preview.skippedPages.find((page) => page.pageKey === "solar"), undefined);
   } finally {
+    displayPageFallbackPolicyByTemplateKey.solar.staleData = originalSolarStaleDataPolicy;
     await app.close();
   }
 });

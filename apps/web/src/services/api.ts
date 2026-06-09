@@ -36,6 +36,10 @@ import type {
   RuntimeMqttStatus,
   ValidationResult
 } from "@solar-display/shared";
+import {
+  buildRuntimeApiUrl,
+  resolveBrowserApiOrigin as resolveRuntimeBrowserApiOrigin
+} from "./runtimeOrigin";
 
 export function buildApiUrl(path: string) {
   const env = (
@@ -46,28 +50,21 @@ export function buildApiUrl(path: string) {
       };
     }
   ).env;
-  const configuredBaseUrl = env?.VITE_API_BASE_URL;
-
-  if (configuredBaseUrl) {
-    return `${configuredBaseUrl}${path}`;
-  }
-
-  if (typeof window === "undefined") {
-    return `http://localhost:3000${path}`;
-  }
-
-  return `${resolveBrowserApiOrigin(window.location, env?.VITE_PORT, isViteDevRuntime(import.meta))}${path}`;
+  return buildRuntimeApiUrl(path, {
+    apiBaseUrl: env?.VITE_API_BASE_URL,
+    configuredVitePort: env?.VITE_PORT,
+    isViteDevServer: isViteDevRuntime(import.meta),
+    location: typeof window === "undefined" ? undefined : window.location
+  });
 }
 
 export function isViteDevRuntime(metaLike: {
+  env?: {
+    DEV?: boolean;
+  };
   hot?: unknown;
 }) {
-  return Boolean(metaLike.hot);
-}
-
-function isLoopbackHostname(hostname: string) {
-  const normalizedHostname = hostname.toLowerCase();
-  return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1" || normalizedHostname === "::1";
+  return Boolean(metaLike.hot) || metaLike.env?.DEV === true;
 }
 
 export function resolveBrowserApiOrigin(locationLike: {
@@ -75,15 +72,7 @@ export function resolveBrowserApiOrigin(locationLike: {
   port: string;
   protocol: string;
 }, configuredVitePort?: string, isViteDevServer = false) {
-  const resolvedVitePort = configuredVitePort?.trim() || "5173";
-  const isViteDevPort = locationLike.port === resolvedVitePort || /^517\d*$/.test(locationLike.port);
-
-  if (isViteDevPort && isViteDevServer && !isLoopbackHostname(locationLike.hostname)) {
-    return `${locationLike.protocol}//${locationLike.hostname}:${locationLike.port}`;
-  }
-
-  const apiPort = isViteDevPort ? "3000" : locationLike.port || "3000";
-  return `${locationLike.protocol}//${locationLike.hostname}:${apiPort}`;
+  return resolveRuntimeBrowserApiOrigin(locationLike, configuredVitePort, isViteDevServer);
 }
 
 function extractErrorMessage(rawBody: string) {
@@ -382,6 +371,9 @@ export async function fetchImagePlaylist(activeIndex = 0) {
       entries: ResolvedImagePlaylistEntry[];
       generatedAt: string;
       hasPlaylistRows: boolean;
+      settings: {
+        shuffle: boolean;
+      };
     };
   }>(`/api/image-playlist?${query.toString()}`);
 }
@@ -393,6 +385,9 @@ export async function fetchImagePlaylistGovernance() {
       generatedAt: string;
       hasPlaylistRows: boolean;
       resolvedEntries: ResolvedImagePlaylistEntry[];
+      settings: {
+        shuffle: boolean;
+      };
     };
   }>("/api/image-playlist/governance");
 }
@@ -404,6 +399,9 @@ export async function bootstrapImagePlaylistGovernance() {
       generatedAt: string;
       hasPlaylistRows: boolean;
       resolvedEntries: ResolvedImagePlaylistEntry[];
+      settings: {
+        shuffle: boolean;
+      };
     };
   }>("/api/image-playlist/governance/bootstrap", {
     method: "POST"
@@ -453,6 +451,26 @@ export async function updateImagePlaylistEntry(entryId: string, data: Partial<{
     `/api/image-playlist/${entryId}`,
     { body: JSON.stringify(data), method: "PUT" }
   );
+}
+
+export async function updateImagePlaylistSettings(data: { shuffle: boolean }) {
+  return requestJson<{
+    playlist: {
+      settings: {
+        shuffle: boolean;
+      };
+    };
+  }>("/api/image-playlist/settings", {
+    body: JSON.stringify(data),
+    method: "PUT"
+  });
+}
+
+export async function updateAllImagePlaylistDurations(data: { durationSeconds: number }) {
+  return requestJson<{ playlist: unknown }>("/api/image-playlist/duration-all", {
+    body: JSON.stringify(data),
+    method: "PUT"
+  });
 }
 
 export async function persistImageManagementDraftTarget(

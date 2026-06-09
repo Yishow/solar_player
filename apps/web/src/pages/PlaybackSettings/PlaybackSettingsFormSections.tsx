@@ -162,6 +162,7 @@ export function PlaybackSettingsFormSections({
   const [isDraggable, setIsDraggable] = useState(false);
 
   const brightness = settings?.brightness ?? 100;
+  const transitionSpeed = settings?.transitionSpeed ?? 1000;
   const { startChanging: startBrightnessChange, stopChanging: stopBrightnessChange } = useLongPressStepper(
     brightness,
     (next) => updateSettingsField("brightness", next),
@@ -340,6 +341,34 @@ export function PlaybackSettingsFormSections({
             <div className="ps-row-flex">
               <div className="ps-row-label">循環播放 <small>Loop Mode</small></div>
               <Switch ariaLabel="循環播放" on={settings?.loop ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("loop", next)} />
+            </div>
+            <div className="ps-row-flex">
+              <div className="ps-row-label">轉場效果 <small>Transition Effect</small></div>
+              <CustomSelect
+                className="ps-dropdown-container"
+                disabled={formDisabled}
+                onChange={(nextValue) => updateSettingsField("transitionType", nextValue as PlaybackSettings["transitionType"])}
+                options={[
+                  { label: "淡入淡出 Fade", value: "fade" },
+                  { label: "滑動切換 Slide", value: "slide" },
+                  { label: "無轉場 None", value: "none" }
+                ]}
+                value={settings?.transitionType ?? "fade"}
+              />
+            </div>
+            <div className="ps-stack">
+              <div className="ps-row-label">轉場速度 <small>Transition Speed</small></div>
+              <input
+                className="ps-stepper-input"
+                disabled={formDisabled || settings?.transitionType === "none"}
+                min={120}
+                step={100}
+                type="number"
+                value={String(transitionSpeed)}
+                onChange={(event) => {
+                  updateSettingsField("transitionSpeed", Math.max(120, Number.parseInt(event.target.value, 10) || 120));
+                }}
+              />
             </div>
           </div>
         </section>

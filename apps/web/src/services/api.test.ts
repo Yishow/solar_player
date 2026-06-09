@@ -14,32 +14,35 @@ import {
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
   resolveBrowserApiOrigin,
+  updateAllImagePlaylistDurations,
   updateDisplayPageConfig,
+  updateImagePlaylistSettings,
   requestJson
 } from "./api";
+import { buildRuntimeApiUrl } from "./runtimeOrigin";
 
-test("buildApiUrl maps loopback Vite dev ports back to the backend port", () => {
-  const originalWindow = globalThis.window;
-
-  Object.defineProperty(globalThis, "window", {
-    configurable: true,
-    value: {
+test("buildRuntimeApiUrl keeps Vite dev browser requests same-origin", () => {
+  assert.equal(
+    buildRuntimeApiUrl("/api/images", {
+      configuredVitePort: "5177",
+      isViteDevServer: true,
       location: {
         hostname: "localhost",
         port: "5177",
         protocol: "http:"
       }
-    }
-  });
+    }),
+    "/api/images"
+  );
+});
 
-  try {
-    assert.equal(buildApiUrl("/api/images"), "http://localhost:3000/api/images");
-  } finally {
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: originalWindow
-    });
-  }
+test("buildRuntimeApiUrl keeps explicit API origin override consistent", () => {
+  assert.equal(
+    buildRuntimeApiUrl("/api/images", {
+      apiBaseUrl: "https://display-api.example.test"
+    }),
+    "https://display-api.example.test/api/images"
+  );
 });
 
 test("buildApiUrl falls back to the backend origin when the HMR runtime marker is absent", () => {
@@ -66,9 +69,10 @@ test("buildApiUrl falls back to the backend origin when the HMR runtime marker i
   }
 });
 
-test("isViteDevRuntime only trusts the HMR runtime marker", () => {
+test("isViteDevRuntime trusts Vite dev environment signals", () => {
   assert.equal(isViteDevRuntime({ hot: undefined }), false);
   assert.equal(isViteDevRuntime({ hot: {} }), true);
+  assert.equal(isViteDevRuntime({ env: { DEV: true } }), true);
 });
 
 test("resolveBrowserApiOrigin keeps configured custom non-loopback Vite dev ports same-origin", () => {
@@ -101,7 +105,7 @@ test("resolveBrowserApiOrigin sends preview traffic on Vite-like ports back to t
   );
 });
 
-test("resolveBrowserApiOrigin maps a configured custom Vite loopback port back to the backend port", () => {
+test("resolveBrowserApiOrigin keeps configured custom Vite dev ports same-origin on loopback", () => {
   assert.equal(
     resolveBrowserApiOrigin(
       {
@@ -112,7 +116,7 @@ test("resolveBrowserApiOrigin maps a configured custom Vite loopback port back t
       "4173",
       true
     ),
-    "http://localhost:3000"
+    "http://localhost:4173"
   );
 });
 
@@ -536,7 +540,8 @@ test("fetchImagePlaylistGovernance targets the raw governance snapshot endpoint"
         playlist: {
           entries: [],
           generatedAt: "2026-05-19T00:00:00.000Z",
-          hasPlaylistRows: false
+          hasPlaylistRows: false,
+          settings: { shuffle: false }
         }
       }),
       {
@@ -553,7 +558,85 @@ test("fetchImagePlaylistGovernance targets the raw governance snapshot endpoint"
 
     assert.equal(response.playlist.entries.length, 0);
     assert.equal(response.playlist.hasPlaylistRows, false);
+    assert.equal(response.playlist.settings.shuffle, false);
     assert.match(seenUrl, /\/api\/image-playlist\/governance$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("updateImagePlaylistSettings writes shuffle mode to the playlist settings endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenBody = "";
+  let seenMethod = "";
+  let seenUrl = "";
+
+  globalThis.fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenMethod = init?.method ?? "";
+    seenBody = String(init?.body ?? "");
+
+    return new Response(
+      JSON.stringify({
+        playlist: {
+          settings: {
+            shuffle: true
+          }
+        }
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const response = await updateImagePlaylistSettings({ shuffle: true });
+
+    assert.equal(response.playlist.settings.shuffle, true);
+    assert.equal(seenMethod, "PUT");
+    assert.match(seenUrl, /\/api\/image-playlist\/settings$/);
+    assert.deepEqual(JSON.parse(seenBody), { shuffle: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("updateAllImagePlaylistDurations writes the shared duration to the bulk endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenBody = "";
+  let seenMethod = "";
+  let seenUrl = "";
+
+  globalThis.fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenMethod = init?.method ?? "";
+    seenBody = String(init?.body ?? "");
+
+    return new Response(
+      JSON.stringify({
+        playlist: {
+          entries: []
+        }
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    await updateAllImagePlaylistDurations({ durationSeconds: 8 });
+
+    assert.equal(seenMethod, "PUT");
+    assert.match(seenUrl, /\/api\/image-playlist\/duration-all$/);
+    assert.deepEqual(JSON.parse(seenBody), { durationSeconds: 8 });
   } finally {
     globalThis.fetch = originalFetch;
   }

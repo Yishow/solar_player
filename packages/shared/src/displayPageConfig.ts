@@ -255,6 +255,8 @@ export const defaultFallbackPolicy: FallbackPolicy = {
   emptyContent: "hide"
 };
 
+// `staleData: "hide"` is reserved for never-had-data cold starts. Pages that
+// have prior readings but transient stale metrics stay playable with last-known values.
 export const displayPageFallbackPolicyByTemplateKey: Record<DisplayPageTemplateKey, FallbackPolicy> = {
   overview: {
     emptyContent: "hide",

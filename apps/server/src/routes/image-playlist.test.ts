@@ -54,6 +54,9 @@ test("GET /api/image-playlist resolves a playable runtime playlist without creat
           entryId: string;
         }>;
         hasPlaylistRows: boolean;
+        settings: {
+          shuffle: boolean;
+        };
       };
     };
     const playlistTableExists = Boolean(
@@ -67,6 +70,17 @@ test("GET /api/image-playlist resolves a playable runtime playlist without creat
         )
         .get()
     );
+    const playlistSettingsTableExists = Boolean(
+      getDatabase()
+        .prepare(
+          `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'image_playlist_settings'
+          `
+        )
+        .get()
+    );
 
     assert.equal(body.playlist.activeEntry?.entryId, "IMG-01");
     assert.equal(body.playlist.entries.length, 2);
@@ -75,7 +89,9 @@ test("GET /api/image-playlist resolves a playable runtime playlist without creat
     assert.equal(body.playlist.entries[0]?.displayOrder, 1);
     assert.equal(body.playlist.entries[0]?.enabled, true);
     assert.equal(body.playlist.entries[0]?.durationSeconds, 10);
+    assert.equal(body.playlist.settings.shuffle, false);
     assert.equal(playlistTableExists, false);
+    assert.equal(playlistSettingsTableExists, false);
   } finally {
     await app.close();
   }
@@ -115,12 +131,197 @@ test("GET /api/image-playlist keeps runtime reads side-effect free even when no 
         )
         .get()
     );
+    const playlistSettingsTableExists = Boolean(
+      getDatabase()
+        .prepare(
+          `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'image_playlist_settings'
+          `
+        )
+        .get()
+    );
 
     assert.notEqual(body.playlist.activeEntry, null);
     assert.equal(body.playlist.entries.length, 2);
     assert.equal(body.playlist.hasPlaylistRows, false);
     assert.equal(playlistTableExists, false);
+    assert.equal(playlistSettingsTableExists, false);
   } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/image-playlist/settings persists shuffle and notifies runtime surfaces", async () => {
+  const app = await buildApp();
+  const originalEmitImagesUpdated = app.socketService.emitImagesUpdated.bind(app.socketService);
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  const imageEvents: Array<{ action: string; playlist: { settings: { shuffle: boolean } } }> = [];
+  const syncEvents: Array<{ reason: string; scope: string }> = [];
+
+  app.socketService.emitImagesUpdated = (payload) => {
+    imageEvents.push(payload as { action: string; playlist: { settings: { shuffle: boolean } } });
+    originalEmitImagesUpdated(payload);
+  };
+  app.socketService.emitDisplaySync = (payload) => {
+    syncEvents.push(payload as { reason: string; scope: string });
+    originalEmitDisplaySync(payload);
+  };
+
+  try {
+    const updateResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        shuffle: true
+      },
+      url: "/api/image-playlist/settings"
+    });
+
+    assert.equal(updateResponse.statusCode, 200);
+    const updateBody = updateResponse.json() as {
+      playlist: {
+        settings: {
+          shuffle: boolean;
+        };
+      };
+    };
+    assert.equal(updateBody.playlist.settings.shuffle, true);
+
+    const readResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist"
+    });
+
+    assert.equal(readResponse.statusCode, 200);
+    const readBody = readResponse.json() as {
+      playlist: {
+        settings: {
+          shuffle: boolean;
+        };
+      };
+    };
+
+    assert.equal(readBody.playlist.settings.shuffle, true);
+    assert.equal(imageEvents.at(-1)?.action, "playlist-settings-updated");
+    assert.equal(imageEvents.at(-1)?.playlist.settings.shuffle, true);
+    assert.equal(syncEvents.at(-1)?.reason, "image-playlist-settings-updated");
+    assert.equal(syncEvents.at(-1)?.scope, "images");
+  } finally {
+    app.socketService.emitImagesUpdated = originalEmitImagesUpdated;
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
+    await app.close();
+  }
+});
+
+test("PUT /api/image-playlist/duration-all updates every duration without changing other fields", async () => {
+  const first = seedManagedImageAsset("playlist-bulk-first.png");
+  const second = seedManagedImageAsset("playlist-bulk-second.png");
+  const third = seedManagedImageAsset("playlist-bulk-third.png");
+  enableImageInSlideshow(first.assetId);
+  enableImageInSlideshow(second.assetId);
+  enableImageInSlideshow(third.assetId);
+  const app = await buildApp();
+  clearSeedSlideshowMembership();
+  const originalEmitImagesUpdated = app.socketService.emitImagesUpdated.bind(app.socketService);
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  const imageEvents: Array<{ action: string; playlist: { entries: Array<{ durationSeconds: number }> } }> = [];
+  const syncEvents: Array<{ reason: string; scope: string }> = [];
+
+  app.socketService.emitImagesUpdated = (payload) => {
+    imageEvents.push(payload as { action: string; playlist: { entries: Array<{ durationSeconds: number }> } });
+    originalEmitImagesUpdated(payload);
+  };
+  app.socketService.emitDisplaySync = (payload) => {
+    syncEvents.push(payload as { reason: string; scope: string });
+    originalEmitDisplaySync(payload);
+  };
+
+  try {
+    await app.inject({
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
+    });
+    await app.inject({
+      method: "PUT",
+      payload: {
+        durationSeconds: 15,
+        enabled: false,
+        tags: ["夜間"],
+        title: "第二張"
+      },
+      url: "/api/image-playlist/IMG-02"
+    });
+    await app.inject({
+      method: "PUT",
+      payload: {
+        durationSeconds: 5,
+        title: "第三張"
+      },
+      url: "/api/image-playlist/IMG-03"
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      payload: {
+        durationSeconds: 8
+      },
+      url: "/api/image-playlist/duration-all"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const governanceResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist/governance"
+    });
+    assert.equal(governanceResponse.statusCode, 200);
+    const governanceBody = governanceResponse.json() as {
+      playlist: {
+        entries: Array<{
+          tags: string[];
+          title: string | null;
+          displayOrder: number;
+          durationSeconds: number;
+          enabled: boolean;
+          entryId: string;
+        }>;
+      };
+    };
+
+    assert.deepEqual(governanceBody.playlist.entries.map((entry) => entry.durationSeconds), [8, 8, 8]);
+    assert.deepEqual(governanceBody.playlist.entries.map((entry) => entry.displayOrder), [1, 2, 3]);
+    assert.equal(governanceBody.playlist.entries[1]?.enabled, false);
+    assert.equal(governanceBody.playlist.entries[1]?.title, "第二張");
+    assert.deepEqual(governanceBody.playlist.entries[1]?.tags, ["夜間"]);
+    assert.equal(imageEvents.at(-1)?.action, "playlist-duration-all-updated");
+    assert.equal(syncEvents.at(-1)?.reason, "image-playlist-duration-all-updated");
+    assert.equal(syncEvents.at(-1)?.scope, "images");
+
+    const floorResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        durationSeconds: 0
+      },
+      url: "/api/image-playlist/duration-all"
+    });
+
+    assert.equal(floorResponse.statusCode, 200);
+    const floorGovernanceResponse = await app.inject({
+      method: "GET",
+      url: "/api/image-playlist/governance"
+    });
+    assert.equal(floorGovernanceResponse.statusCode, 200);
+    const floorGovernanceBody = floorGovernanceResponse.json() as {
+      playlist: {
+        entries: Array<{
+          durationSeconds: number;
+        }>;
+      };
+    };
+    assert.deepEqual(floorGovernanceBody.playlist.entries.map((entry) => entry.durationSeconds), [1, 1, 1]);
+  } finally {
+    app.socketService.emitImagesUpdated = originalEmitImagesUpdated;
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
     await app.close();
   }
 });
