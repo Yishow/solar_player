@@ -340,3 +340,115 @@ tests:
   - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
   - apps/web/src/pages/Overview/render.test.ts
 -->
+
+---
+### Requirement: Overview cards match the Better reference sample for icon chips and trend form
+
+The Overview display page SHALL treat `docs/reference/Better/01.Overivew (大).png` as a supplementary visual canonical for its KPI card icon chips and its generation trend widget form, while `docs/reference/FHD/` remains the page-level canonical for Overview. The Overview KPI card icon chips SHALL be capable of the per-card colored and rounded-square treatment shown in the Better sample, and the generation trend widget SHALL present the smooth curve with axis labels shown in the Better sample. This fidelity SHALL be expressed through Overview card-style authoring and runtime rendering rather than page-local hardcoded styles, and SHALL remain scoped to Overview-only classes so the shared card base and other playback pages are unchanged.
+
+#### Scenario: Overview icon chips reflect the Better sample treatment
+
+- **WHEN** `/overview` renders its KPI cards with the seed configuration aligned to the Better sample
+- **THEN** the KPI card icon chips render with the per-card colored, rounded-square treatment consistent with the Better sample
+
+#### Scenario: Overview trend widget reflects the Better sample form
+
+- **WHEN** `/overview` renders its generation trend widget with a runtime trend series
+- **THEN** the widget renders the smooth curve with axis labels consistent with the Better sample
+
+#### Scenario: Better fidelity stays scoped to Overview
+
+- **WHEN** the Better-aligned Overview card styling is applied
+- **THEN** the shared card component base and the other playback pages render unchanged
+
+##### Example: Shared base card stays untouched
+
+- **GIVEN** the Overview page publishes rounded-square icon chips and the full trend chart treatment
+- **WHEN** `/solar` or `/factory-circuit` renders shared cards
+- **THEN** those pages do not inherit the Overview icon-chip variables or chart styling
+- **AND** only Overview-specific classes carry the Better-aligned changes
+
+<!-- @trace
+source: align-overview-cards-to-better-reference
+updated: 2026-06-10
+code:
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/web/src/pages/ImageManagement/index.tsx
+  - apps/server/src/services/SnapshotWriterService.ts
+  - apps/server/src/routes/image-playlist.ts
+  - scripts/dev-lib.mjs
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/server/src/metrics/solarGenerationProfile.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/services/generationTrendSeries.ts
+  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - apps/web/src/hooks/useImagesAutoplay.ts
+  - .env.example
+  - packages/shared/src/imagePlaylist.ts
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/shared/runtimeMediaUrl.ts
+  - apps/web/vite.config.ts
+  - apps/server/src/server-startup.ts
+  - apps/server/src/services/displayRotationService.ts
+  - apps/server/src/services/imagePlaylistService.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/pages/PlaybackSettings/playbackSettings.css
+  - apps/web/src/components/management/CustomSelect.tsx
+  - apps/server/src/routes/metrics-history.ts
+  - apps/web/src/pages/ImageManagement/imageManagement.css
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/styles/management.css
+  - packages/shared/src/displayPageConfig.ts
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/services/runtimeOrigin.ts
+  - apps/web/src/pages/Overview/widgets/generationTrendChart.ts
+  - apps/web/src/pages/Overview/overview.css
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/web/src/components/Sparkline.tsx
+  - scripts/dev.test.mjs
+  - apps/web/src/pages/shared/displayCardStyleConfig.ts
+  - apps/server/src/services/MetricHistoryRetentionService.ts
+  - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
+  - apps/server/src/db/seed.ts
+  - apps/web/src/pages/Images/index.tsx
+  - apps/server/src/db/migrations/013_generation_power.sql
+  - apps/server/src/services/displayStoryService.ts
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/db/normalizeMetricSnapshotCapturedAt.ts
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
+  - apps/web/src/pages/Overview/widgets/GenerationTrendChartView.tsx
+tests:
+  - apps/web/src/hooks/useImagesAutoplay.test.ts
+  - apps/web/src/pages/Overview/widgets/generationTrendChart.test.ts
+  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/web/src/components/management/CustomSelect.test.tsx
+  - apps/server/src/plugins/managementAuth.test.ts
+  - packages/shared/src/imagePlaylist.test.ts
+  - apps/web/src/services/socket.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/server/src/routes/display-pages.test.ts
+  - apps/server/src/services/SnapshotWriterService.test.ts
+  - apps/web/src/pages/Overview/style.test.ts
+  - apps/web/src/viteProxy.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/image-playlist.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/pages/ImageManagement/index.test.tsx
+  - apps/server/src/metrics/solarGenerationProfile.test.ts
+  - apps/server/src/db/metricSnapshotsSeed.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/components/Sparkline.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/shared/runtimeMediaUrl.test.ts
+  - apps/web/src/pages/Overview/widgets/overviewWidgets.test.tsx
+  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
+  - apps/server/src/server-startup.test.ts
+  - apps/server/src/services/generationTrendSeries.test.ts
+  - apps/server/src/services/MetricHistoryRetentionService.test.ts
+-->
