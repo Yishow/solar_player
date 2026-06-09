@@ -114,7 +114,7 @@ test("socket sessions stay playback-safe unless a trusted caller explicitly requ
   );
 });
 
-test("same-host cross-port browser requests are allowed by CORS gating", () => {
+test("same-host cross-port browser requests stay trusted by CORS gating", () => {
   assert.equal(
     isTrustedManagementCorsRequest(
       {

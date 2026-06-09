@@ -79,7 +79,7 @@ export function resolveDevPorts(dotEnv, inheritedEnv = process.env) {
   return {
     webPort,
     serverPort,
-    portsToFree: [webPort]
+    portsToFree: Array.from(new Set([webPort, serverPort]))
   };
 }
 

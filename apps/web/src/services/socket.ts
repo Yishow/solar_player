@@ -6,7 +6,8 @@ import type {
 } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 import { routeMetaMap } from "../app/routeMeta";
-import { isViteDevRuntime, resolveBrowserApiOrigin } from "./api";
+import { isViteDevRuntime } from "./api";
+import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
 export type LiveMetricReading = {
   quality: string | null;
@@ -100,21 +101,12 @@ export function resolveSocketOrigin(locationLike?: {
       };
     }
   ).env;
-  const configuredBaseUrl = env?.VITE_API_BASE_URL;
-
-  if (configuredBaseUrl) {
-    return new URL(configuredBaseUrl).origin;
-  }
-
-  if (!locationLike && typeof window === "undefined") {
-    return "http://localhost:3000";
-  }
-
-  return resolveSocketOriginFromLocation(
-    locationLike ?? window.location,
-    env?.VITE_PORT,
-    isViteDevRuntime(import.meta)
-  );
+  return resolveRuntimeSocketOrigin({
+    apiBaseUrl: env?.VITE_API_BASE_URL,
+    configuredVitePort: env?.VITE_PORT,
+    isViteDevServer: isViteDevRuntime(import.meta),
+    location: locationLike ?? (typeof window === "undefined" ? undefined : window.location)
+  });
 }
 
 export function resolveSocketOriginFromLocation(locationLike: {
@@ -122,7 +114,11 @@ export function resolveSocketOriginFromLocation(locationLike: {
   port: string;
   protocol: string;
 }, configuredVitePort?: string, isViteDevServer = false) {
-  return resolveBrowserApiOrigin(locationLike, configuredVitePort, isViteDevServer);
+  return resolveRuntimeSocketOrigin({
+    configuredVitePort,
+    isViteDevServer,
+    location: locationLike
+  });
 }
 
 export function resolveSocketSessionClass(pathname: string): ManagementSocketSessionClass {

@@ -10,7 +10,9 @@ test("vite dev server proxies backend API, uploads, and socket traffic for same-
   assert.match(viteConfigSource, /"\/api"/);
   assert.match(viteConfigSource, /"\/socket\.io"/);
   assert.match(viteConfigSource, /"\/uploads"/);
+  assert.match(viteConfigSource, /readDotEnvFile/);
   assert.match(viteConfigSource, /resolveDevPorts\(/);
+  assert.doesNotMatch(viteConfigSource, /loadEnv/);
   assert.doesNotMatch(viteConfigSource, /target:\s*"http:\/\/127\.0\.0\.1:3000"/);
   assert.match(viteConfigSource, /ws:\s*true/);
   assert.doesNotMatch(viteConfigSource, /changeOrigin:\s*true/);

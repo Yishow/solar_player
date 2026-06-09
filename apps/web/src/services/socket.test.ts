@@ -6,6 +6,7 @@ import {
   resolveSocketOrigin,
   resolveSocketSessionClass
 } from "./socket";
+import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
 test("resolveSocketOrigin maps loopback Vite dev ports back to the backend port", () => {
   assert.equal(
@@ -29,7 +30,7 @@ test("resolveSocketOrigin falls back to the backend origin when the HMR runtime 
   );
 });
 
-test("resolveSocketOrigin maps a configured custom non-loopback Vite dev port to the same origin", () => {
+test("resolveSocketOrigin maps configured custom Vite dev ports to the same origin", () => {
   assert.equal(
     resolveSocketOriginFromLocation({
       hostname: "100.76.76.75",
@@ -37,6 +38,15 @@ test("resolveSocketOrigin maps a configured custom non-loopback Vite dev port to
       protocol: "http:"
     }, "4173", true),
     "http://100.76.76.75:4173"
+  );
+
+  assert.equal(
+    resolveSocketOriginFromLocation({
+      hostname: "localhost",
+      port: "4173",
+      protocol: "http:"
+    }, "4173", true),
+    "http://localhost:4173"
   );
 });
 
@@ -48,6 +58,15 @@ test("resolveSocketOriginFromLocation sends preview traffic on Vite-like ports b
       protocol: "http:"
     }, "4173", false),
     "http://100.76.76.75:3000"
+  );
+});
+
+test("resolveRuntimeSocketOrigin uses the explicit API origin override", () => {
+  assert.equal(
+    resolveRuntimeSocketOrigin({
+      apiBaseUrl: "https://display-api.example.test"
+    }),
+    "https://display-api.example.test"
   );
 });
 

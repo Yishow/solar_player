@@ -45,13 +45,13 @@ test("resolveServerPort falls back to inherited PORT when .env omits it", () => 
   );
 });
 
-test("resolveDevPorts only frees the web port and leaves the server port guarded", () => {
+test("resolveDevPorts frees both resolved listen ports before launch", () => {
   assert.deepEqual(
     resolveDevPorts({ PORT: "5173" }, { PORT: "3333" }),
     {
       webPort: 5174,
       serverPort: 5173,
-      portsToFree: [5174]
+      portsToFree: [5174, 5173]
     }
   );
 
@@ -60,8 +60,15 @@ test("resolveDevPorts only frees the web port and leaves the server port guarded
     {
       webPort: 5173,
       serverPort: 3000,
-      portsToFree: [5173]
+      portsToFree: [5173, 3000]
     }
+  );
+});
+
+test("resolveDevPorts rejects identical backend and web listen ports before launch", () => {
+  assert.throws(
+    () => resolveDevPorts({ PORT: "4173", VITE_PORT: "4173" }, {}),
+    /VITE_PORT \(4173\) must differ from backend PORT \(4173\)/
   );
 });
 
@@ -75,7 +82,7 @@ test("resolveDevPorts allows VITE_PORT to override the default web port", () => 
     {
       webPort: 4267,
       serverPort: 3000,
-      portsToFree: [4267]
+      portsToFree: [4267, 3000]
     }
   );
 
@@ -84,7 +91,7 @@ test("resolveDevPorts allows VITE_PORT to override the default web port", () => 
     {
       webPort: 4999,
       serverPort: 3333,
-      portsToFree: [4999]
+      portsToFree: [4999, 3333]
     }
   );
 });
