@@ -141,11 +141,15 @@ type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
 type OverviewMetricCard = {
   accentColor?: boolean;
   iconKey: OverviewMetricIconKey;
+  trendHours?: number[];
   trendSeries?: number[];
+  trendUnit?: string;
 } & MonitoringMetricBinding<OverviewMetricKey>;
 
 type OverviewResolvedStoryMetric = ResolvedMonitoringMetricBinding<string> & {
+  trendHours?: number[];
   trendSeries?: number[];
+  trendUnit?: string;
 };
 
 type OverviewStorySummary = {
@@ -169,7 +173,11 @@ type BuildOverviewViewModelArgs = {
   now?: string;
   snapshot: LiveMetricsSnapshot;
   storyOverview?: {
-    metrics: Array<ResolvedMonitoringMetricBinding<string>>;
+    metrics: Array<ResolvedMonitoringMetricBinding<string> & {
+      trendHours?: number[];
+      trendSeries?: number[];
+      trendUnit?: string;
+    }>;
     readinessFindings?: DisplayReadinessFinding[];
     summary: {
       alertTone: MonitoringAlertTone;
@@ -351,7 +359,13 @@ function resolveStoryMetricCards(
       metricKey: metricCard.metricKey,
       provenance: storyMetric.provenance,
       sourceClass: storyMetric.sourceClass,
+      trendHours:
+        Array.isArray(storyMetric.trendHours) &&
+        storyMetric.trendHours.every((value) => typeof value === "number" && Number.isFinite(value))
+          ? storyMetric.trendHours
+          : undefined,
       trendSeries: Array.isArray(storyMetric.trendSeries) ? storyMetric.trendSeries : undefined,
+      trendUnit: typeof storyMetric.trendUnit === "string" ? storyMetric.trendUnit : undefined,
       unit: storyMetric.unit,
       value: storyMetric.value
     };
@@ -363,7 +377,7 @@ function isResolvedStoryMetric(value: unknown): value is OverviewResolvedStoryMe
     return false;
   }
 
-  const candidate = value as Partial<ResolvedMonitoringMetricBinding<string>>;
+  const candidate = value as Partial<OverviewResolvedStoryMetric>;
   return (
     typeof candidate.alertTone === "string" &&
     validMonitoringAlertTones.has(candidate.alertTone as MonitoringAlertTone) &&
@@ -386,6 +400,11 @@ function isResolvedStoryMetric(value: unknown): value is OverviewResolvedStoryMe
     validMonitoringProvenances.has(candidate.provenance as MonitoringMetricProvenance) &&
     typeof candidate.sourceClass === "string" &&
     validMonitoringSourceClasses.has(candidate.sourceClass as MonitoringMetricSourceClass) &&
+    (candidate.trendHours === undefined || (
+      Array.isArray(candidate.trendHours) &&
+      candidate.trendHours.every((value: number) => typeof value === "number" && Number.isFinite(value))
+    )) &&
+    (candidate.trendUnit === undefined || typeof candidate.trendUnit === "string") &&
     Array.isArray(candidate.dependencyKeys)
   );
 }
@@ -491,7 +510,9 @@ export function buildOverviewViewModel({
         metricKey: metricCard.metricKey,
         provenance: metricCard.provenance,
         sourceClass: metricCard.sourceClass,
+        trendHours: metricCard.trendHours,
         trendSeries: metricCard.trendSeries,
+        trendUnit: metricCard.trendUnit,
         unit: metricCard.unit,
         value: metricCard.value
       };
@@ -524,7 +545,9 @@ export function buildOverviewViewModel({
       metricKey: resolved.metricKey,
       provenance: resolved.provenance,
       sourceClass: resolved.sourceClass,
+      trendHours: metricCard.trendHours,
       trendSeries: metricCard.trendSeries,
+      trendUnit: metricCard.trendUnit,
       unit: resolved.unit,
       value: resolved.value
     };

@@ -194,6 +194,14 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [],
     [viewModel.metrics]
   );
+  const generationTrendHours = useMemo(
+    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendHours,
+    [viewModel.metrics]
+  );
+  const generationTrendUnit = useMemo(
+    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendUnit,
+    [viewModel.metrics]
+  );
 
   const leafOrnamentStyle = useMemo(
     () => ({
@@ -331,10 +339,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
                 seedSource: seedConfig.iconSources[cardItem.key],
                 source: resolvedConfig.iconSources[cardItem.key]
               })}
-              iconContainerClassName={[
-                "overview-kpi-icon-shell",
-                metric.accentColor ? "overview-kpi-icon-accent" : ""
-              ].join(" ")}
+              iconContainerClassName="overview-kpi-icon-shell"
               subtitle={cardItem.englishLabel}
               title={metric.label}
             />
@@ -439,7 +444,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend) ? (
         <GenerationTrendWidget
+          hours={generationTrendHours}
           series={generationTrendSeries}
+          unit={generationTrendUnit}
           style={generationTrendWidgetStyle}
         />
       ) : null}

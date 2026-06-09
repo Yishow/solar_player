@@ -39,7 +39,7 @@ const overviewMetricCardStyle = {
   shadowStrength: 1.3,
   subtitleFontSize: 12,
   surfaceBlur: 16,
-  surfaceOpacity: 0.66,
+  surfaceOpacity: 0.8,
   titleFontSize: 17,
   unitFontSize: 17,
   unitPaddingBottom: 6,
@@ -277,9 +277,24 @@ export function createOverviewDisplayPageSeedConfig(
       }))
     },
     cardStyles: {
-      co2Today: createDisplayCardStyleConfig(overviewMetricCardStyle),
-      co2Total: createDisplayCardStyleConfig(overviewMetricCardStyle),
-      power: createDisplayCardStyleConfig(overviewMetricCardStyle),
+      co2Today: createDisplayCardStyleConfig({
+        ...overviewMetricCardStyle,
+        iconChipBackground: "#dcefe6",
+        iconChipForeground: "#3d8a66",
+        iconChipShape: "rounded-square"
+      }),
+      co2Total: createDisplayCardStyleConfig({
+        ...overviewMetricCardStyle,
+        iconChipBackground: "#f6e4d3",
+        iconChipForeground: "#b36a34",
+        iconChipShape: "rounded-square"
+      }),
+      power: createDisplayCardStyleConfig({
+        ...overviewMetricCardStyle,
+        iconChipBackground: "#e3efd9",
+        iconChipForeground: "#4c7a3c",
+        iconChipShape: "rounded-square"
+      }),
       summary: createDisplayCardStyleConfig({
         cornerRadius: 18,
         paddingBottom: 14,
@@ -288,8 +303,18 @@ export function createOverviewDisplayPageSeedConfig(
         paddingTop: 14,
         titleFontSize: 13
       }),
-      today: createDisplayCardStyleConfig(overviewMetricCardStyle),
-      total: createDisplayCardStyleConfig(overviewMetricCardStyle)
+      today: createDisplayCardStyleConfig({
+        ...overviewMetricCardStyle,
+        iconChipBackground: "#f7ecd2",
+        iconChipForeground: "#b07d22",
+        iconChipShape: "rounded-square"
+      }),
+      total: createDisplayCardStyleConfig({
+        ...overviewMetricCardStyle,
+        iconChipBackground: "#dde9f1",
+        iconChipForeground: "#3a6f86",
+        iconChipShape: "rounded-square"
+      })
     },
     chrome: {
       heroTypography: createHeroTypographyConfig({

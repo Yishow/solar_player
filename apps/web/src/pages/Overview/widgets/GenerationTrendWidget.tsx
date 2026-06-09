@@ -1,20 +1,16 @@
 import type { CSSProperties } from "react";
-import {
-  DisplayCardFooter,
-  DisplayCardFrame,
-  DisplayCardHeader
-} from "../../../components/displayPageCards";
-import { Sparkline } from "../../../components/Sparkline";
-
-function formatTrendValue(value: number) {
-  return `${Math.round(value).toLocaleString("zh-TW")} kW`;
-}
+import { DisplayCardFrame, DisplayCardHeader } from "../../../components/displayPageCards";
+import { GenerationTrendChart } from "./GenerationTrendChartView";
 
 export function GenerationTrendWidget({
+  hours,
   series,
+  unit,
   style
 }: {
+  hours?: number[];
   series: number[];
+  unit?: string;
   style?: CSSProperties;
 }) {
   const hasSeries = series.length > 0;
@@ -33,15 +29,9 @@ export function GenerationTrendWidget({
         </div>
       </div>
       {hasSeries ? (
-        <>
-          <div className="overview-trend-area">
-            <Sparkline className="overview-widget-trend-sparkline" values={series} />
-          </div>
-          <DisplayCardFooter className="overview-widget-meta">
-            <span>{formatTrendValue(series[0]!)}</span>
-            <span>{formatTrendValue(series[series.length - 1]!)}</span>
-          </DisplayCardFooter>
-        </>
+        <div className="overview-widget-trend-sparkline">
+          <GenerationTrendChart hours={hours} series={series} unit={unit} />
+        </div>
       ) : (
         <p className="overview-widget-empty">尚無發電趨勢資料</p>
       )}

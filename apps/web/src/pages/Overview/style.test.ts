@@ -27,6 +27,20 @@ test("overview cards use frosted-glass treatment scoped to overview only", () =>
   assert.doesNotMatch(sharedCardCss, /backdrop-filter/);
 });
 
+test("overview icon chip is driven by runtime variables rather than a hardcoded accent", () => {
+  // Chip background and shape come from the per-card runtime CSS variables.
+  assert.match(
+    overviewCss,
+    /\.overview-kpi-icon-shell\s*\{[\s\S]*?background:\s*var\(--display-card-icon-chip-bg/
+  );
+  assert.match(
+    overviewCss,
+    /\.overview-kpi-icon-shell\s*\{[\s\S]*?border-radius:\s*var\(--display-card-icon-chip-radius/
+  );
+  // The binary green/gold accent override is removed.
+  assert.doesNotMatch(overviewCss, /\.overview-kpi-icon-accent/);
+});
+
 test("generation trend keeps toolbar and footer alignment independent from valueRowAlign", () => {
   assert.match(
     overviewCss,

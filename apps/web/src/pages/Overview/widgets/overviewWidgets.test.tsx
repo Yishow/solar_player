@@ -10,14 +10,13 @@ import { GenerationTrendWidget } from "./GenerationTrendWidget";
 
 test("GenerationTrendWidget renders runtime trend series without mock values", () => {
   const markup = renderToStaticMarkup(
-    <GenerationTrendWidget series={[82, 95, 101, 108]} />
+    <GenerationTrendWidget series={[82, 95, 101, 108]} unit="kW" />
   );
 
   assert.match(markup, /發電趨勢/);
   assert.match(markup, /Today/);
   assert.match(markup, /7D/);
   assert.match(markup, /30D/);
-  assert.match(markup, /82 kW/);
   assert.match(markup, /108 kW/);
   assert.match(markup, /overview-widget-trend-sparkline/);
   assert.doesNotMatch(markup, /586/);

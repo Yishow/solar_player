@@ -33,7 +33,9 @@ function createResolvedStoryMetric(args: {
   metricKey: string;
   provenance?: "cumulative" | "derived" | "fallback" | "live";
   sourceClass?: "cumulative-counter" | "derived-metric" | "mqtt-live";
+  trendHours?: number[];
   trendSeries?: number[];
+  trendUnit?: string;
   unit: string;
   value?: string;
 }) {
@@ -49,7 +51,9 @@ function createResolvedStoryMetric(args: {
     metricKey: args.metricKey,
     provenance: args.provenance ?? "live",
     sourceClass: args.sourceClass ?? "mqtt-live",
+    trendHours: args.trendHours,
     trendSeries: args.trendSeries,
+    trendUnit: args.trendUnit,
     unit: args.unit,
     value: args.value ?? "--"
   };
@@ -210,7 +214,9 @@ test("buildOverviewViewModel flows the realTimePower runtime trend series throug
         createResolvedStoryMetric({
           label: "故事版即時功率",
           metricKey: "realTimePower",
+          trendHours: [8, 9, 10, 11],
           trendSeries: runtimeTrend,
+          trendUnit: "kW",
           unit: "kW",
           value: "612"
         }),
@@ -227,7 +233,9 @@ test("buildOverviewViewModel flows the realTimePower runtime trend series throug
 
   const realTimePowerCard = model.metrics.find((metric) => metric.metricKey === "realTimePower");
   assert.ok(realTimePowerCard, "realTimePower card exists");
+  assert.deepEqual(realTimePowerCard.trendHours, [8, 9, 10, 11]);
   assert.deepEqual(realTimePowerCard.trendSeries, runtimeTrend);
+  assert.equal(realTimePowerCard.trendUnit, "kW");
   const trend = realTimePowerCard.trendSeries ?? [];
   assert.ok(trend.length > 1, "trend has multiple points");
   assert.ok(
@@ -466,7 +474,9 @@ test("buildOverviewViewModel exposes runtime trendSeries from story metrics when
         createResolvedStoryMetric({
           label: "故事版即時功率",
           metricKey: "realTimePower",
+          trendHours: [8, 9, 10, 11],
           trendSeries: [82, 95, 101, 108],
+          trendUnit: "kWh",
           unit: "kW",
           value: "612"
         }),
@@ -492,6 +502,8 @@ test("buildOverviewViewModel exposes runtime trendSeries from story metrics when
     101,
     108
   ]);
+  assert.deepEqual(model.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendHours, [8, 9, 10, 11]);
+  assert.equal(model.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendUnit, "kWh");
   assert.equal(model.metrics.find((metric) => metric.metricKey === "todayGeneration")?.trendSeries, undefined);
 });
 

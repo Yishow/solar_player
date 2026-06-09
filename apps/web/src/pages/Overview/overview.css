@@ -103,14 +103,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  border: 1px solid rgba(99, 132, 78, 0.26);
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--display-emphasis-green);
-}
-
-.overview-kpi-icon-accent {
-  color: var(--display-emphasis-gold);
+  border-radius: var(--display-card-icon-chip-radius, 50%);
+  border: 1px solid rgba(99, 132, 78, 0.18);
+  background: var(--display-card-icon-chip-bg, rgba(255, 255, 255, 0.72));
+  color: var(--display-card-icon-chip-fg, var(--display-emphasis-green));
 }
 
 .overview-kpi-icon {
@@ -158,8 +154,9 @@
 
 .overview-kpi-progress-percent {
   color: var(--display-emphasis-green);
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .overview-kpi-progress-target {
@@ -244,6 +241,119 @@
 
 .overview-widget-trend-sparkline {
   height: var(--display-card-trend-height, 110px);
+  margin-top: 8px;
+}
+
+.overview-trend-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.overview-trend-chart-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding-left: 36px;
+}
+
+.overview-trend-yaxis {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 32px;
+}
+
+.overview-trend-yaxis-tick {
+  position: absolute;
+  right: 4px;
+  transform: translateY(-50%);
+  color: #9aa493;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.overview-trend-canvas {
+  position: absolute;
+  inset: 0 0 0 36px;
+}
+
+.overview-trend-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.overview-trend-gridline {
+  stroke: rgba(98, 117, 78, 0.18);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.overview-trend-area-path {
+  fill: url(#overview-trend-area-fill);
+  stroke: none;
+}
+
+.overview-trend-line-path {
+  stroke: #5e8747;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.overview-trend-points {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overview-trend-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(94, 135, 71, 0.55);
+}
+
+.overview-trend-peak-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #5e8747;
+  box-shadow: 0 0 0 4px rgba(94, 135, 71, 0.2);
+}
+
+.overview-trend-peak-value {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(94, 135, 71, 0.16);
+  color: #4c7a3c;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.overview-trend-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-left: 36px;
+  color: #8a9384;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .overview-weather-widget,

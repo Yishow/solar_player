@@ -3,11 +3,19 @@ import type { DisplayEditorFieldSchema, DisplayEditorPath } from "../../../../..
 
 export type DisplayCardValueRowAlign = "center" | "end" | "start";
 
+export type DisplayCardIconChipShape = "circle" | "rounded-square";
+
+const DEFAULT_ICON_CHIP_BACKGROUND = "rgba(255, 255, 255, 0.72)";
+const DEFAULT_ICON_CHIP_FOREGROUND = "var(--display-emphasis-green)";
+
 export type DisplayCardStyleConfig = {
   cornerRadius: number;
   footerPaddingTop: number;
   headerGap: number;
   iconBoxSize: number;
+  iconChipBackground: string;
+  iconChipForeground: string;
+  iconChipShape: DisplayCardIconChipShape;
   paddingBottom: number;
   paddingLeft: number;
   paddingRight: number;
@@ -45,6 +53,18 @@ function resolveValueRowAlign(value: unknown, fallback: DisplayCardValueRowAlign
   return value === "center" || value === "start" || value === "end" ? value : fallback;
 }
 
+function resolveIconChipShape(value: unknown, fallback: DisplayCardIconChipShape): DisplayCardIconChipShape {
+  return value === "circle" || value === "rounded-square" ? value : fallback;
+}
+
+function resolveIconChipColor(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function resolveIconChipRadius(shape: DisplayCardIconChipShape) {
+  return shape === "rounded-square" ? "30%" : "50%";
+}
+
 function resolveTextAlign(value: DisplayCardValueRowAlign) {
   if (value === "center") {
     return "center";
@@ -69,6 +89,9 @@ export function createDisplayCardStyleConfig(
     footerPaddingTop: resolveNonNegativeNumber(overrides.footerPaddingTop, 18),
     headerGap: resolveNonNegativeNumber(overrides.headerGap, 16),
     iconBoxSize: resolveNonNegativeNumber(overrides.iconBoxSize, 58),
+    iconChipBackground: resolveIconChipColor(overrides.iconChipBackground, DEFAULT_ICON_CHIP_BACKGROUND),
+    iconChipForeground: resolveIconChipColor(overrides.iconChipForeground, DEFAULT_ICON_CHIP_FOREGROUND),
+    iconChipShape: resolveIconChipShape(overrides.iconChipShape, "circle"),
     paddingBottom: resolveNonNegativeNumber(overrides.paddingBottom, 20),
     paddingLeft: resolveNonNegativeNumber(overrides.paddingLeft, 26),
     paddingRight: resolveNonNegativeNumber(overrides.paddingRight, 26),
@@ -97,6 +120,9 @@ export function buildDisplayCardStyleVars(cardStyle: DisplayCardStyleConfig): CS
     ["--display-card-flex-justify" as string]: flexAlign,
     ["--display-card-header-gap" as string]: `${cardStyle.headerGap}px`,
     ["--display-card-icon-box-size" as string]: `${cardStyle.iconBoxSize}px`,
+    ["--display-card-icon-chip-bg" as string]: cardStyle.iconChipBackground,
+    ["--display-card-icon-chip-fg" as string]: cardStyle.iconChipForeground,
+    ["--display-card-icon-chip-radius" as string]: resolveIconChipRadius(cardStyle.iconChipShape),
     ["--display-card-padding" as string]: `${cardStyle.paddingTop}px ${cardStyle.paddingRight}px ${cardStyle.paddingBottom}px ${cardStyle.paddingLeft}px`,
     ["--display-card-radius" as string]: `${cardStyle.cornerRadius}px`,
     ["--display-card-shadow-strength" as string]: `${cardStyle.shadowStrength}`,
@@ -197,6 +223,28 @@ export function buildDisplayCardStyleFields({
       id: `${idPrefix}-card-icon-box-size`,
       label: "Icon Box Size",
       path: [...path, "iconBoxSize"]
+    },
+    {
+      fieldType: "text",
+      id: `${idPrefix}-card-icon-chip-background`,
+      label: "Icon Chip Background",
+      path: [...path, "iconChipBackground"]
+    },
+    {
+      fieldType: "text",
+      id: `${idPrefix}-card-icon-chip-foreground`,
+      label: "Icon Chip Foreground",
+      path: [...path, "iconChipForeground"]
+    },
+    {
+      fieldType: "select",
+      id: `${idPrefix}-card-icon-chip-shape`,
+      label: "Icon Chip Shape",
+      options: [
+        { label: "Circle", value: "circle" },
+        { label: "Rounded Square", value: "rounded-square" }
+      ],
+      path: [...path, "iconChipShape"]
     },
     {
       constraints: { min: 0 },
