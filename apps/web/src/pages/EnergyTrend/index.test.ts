@@ -17,3 +17,9 @@ test("energy trend reloads history data through the monitoring-history runtime r
   assert.match(energyTrendSource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range\)/);
   assert.match(energyTrendSource, /refreshKey:\s*historyRefresh\.refreshKey/);
 });
+
+test("energy trend seeds route reentry from the last visible history payload", () => {
+  assert.match(energyTrendSource, /readCachedEnergyTrendHistoryPayload\(range\)/);
+  assert.match(energyTrendSource, /initialPayload:\s*readCachedEnergyTrendHistoryPayload\(range\)/);
+  assert.match(energyTrendSource, /rememberEnergyTrendHistoryPayload\(historyRuntime\.payload\)/);
+});

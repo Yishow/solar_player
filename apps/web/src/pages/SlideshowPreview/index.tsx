@@ -28,7 +28,6 @@ const summaryIcons = [
 ];
 
 export function SlideshowPreview() {
-  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog();
   const {
     countdown,
     currentPage,
@@ -43,6 +42,8 @@ export function SlideshowPreview() {
     rotationPreview,
     settings,
   } = usePageRotation();
+  const previewCatalogPageKeys = useMemo(() => pages.map((page) => page.pageKey), [pages]);
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({ fallbackPageKeys: previewCatalogPageKeys });
 
   const viewModel = useMemo(
     () =>

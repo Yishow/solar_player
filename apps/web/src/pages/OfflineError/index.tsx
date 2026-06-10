@@ -35,7 +35,7 @@ export function OfflineError() {
   const location = useLocation();
   const { lastUpdatedAt } = useLiveMetrics();
   const { summary: displayOpsSummary } = useDisplayOpsSummary();
-  const { status } = useMqttStatus();
+  const { status } = useMqttStatus(undefined, { bootstrap: false, connectSocket: false });
   const [retryCountdown, setRetryCountdown] = useState(RETRY_SECONDS);
 
   const returnTo = useMemo(() => {

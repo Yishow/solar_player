@@ -6,6 +6,7 @@ import React from "react";
 import type { DisplayPageConfigEnvelope, DisplayPageInstance } from "@solar-display/shared";
 import { loadLiveDisplayPagePreviewCatalog } from "./liveDisplayPagePreviewCatalogLoader";
 import type { LiveDisplayPagePreviewRegistryEntry } from "./liveDisplayPagePreviewRegistry";
+import { createConfigUnavailableLiveDisplayPagePreviewStates } from "./liveDisplayPagePreviewState";
 
 const previewCatalogSource = fs.readFileSync(
   path.join(import.meta.dirname, "useLiveDisplayPagePreviewCatalog.ts"),
@@ -89,4 +90,15 @@ test("live preview catalog loader emits loading states before final config state
   assert.equal(loadingStatus, "loading");
   assert.equal(catalog.loadingStates.overview?.status, "loading");
   assert.equal(catalog.states.overview?.status, "ready");
+});
+
+test("live preview catalog can represent registry failures without clearing slideshow cards", () => {
+  const states = createConfigUnavailableLiveDisplayPagePreviewStates(
+    ["overview", "solar"],
+    "registry unavailable"
+  );
+
+  assert.equal(states.overview?.status, "config-unavailable");
+  assert.equal(states.overview?.detail, "registry unavailable");
+  assert.equal(states.solar?.status, "config-unavailable");
 });

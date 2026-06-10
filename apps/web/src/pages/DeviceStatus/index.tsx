@@ -24,12 +24,14 @@ export function DeviceStatus() {
   const [logExport, setLogExport] = useState<DeviceLogExportMetadata | null>(null);
   const [logExportAccessDenied, setLogExportAccessDenied] = useState(false);
   const [logExportError, setLogExportError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [logExportLoading, setLogExportLoading] = useState(true);
   const [actionFeedback, setActionFeedback] = useState<DeviceActionFeedback>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const {
     accessDenied: displayOpsAccessDenied,
     errorMessage: displayOpsErrorMessage,
+    isLoading: displayOpsLoading,
     reload: reloadDisplayOpsSummary,
     summary: displayOpsSummary
   } = useDeviceDisplayOpsSummary();
@@ -42,73 +44,63 @@ export function DeviceStatus() {
     });
   const kioskReentryHint = "回到桌面後點擊 Solar Display Kiosk 重新進入。";
 
-  const loadStatus = async () => {
-    setIsLoading(true);
+  const loadDeviceStatus = async () => {
+    setStatusLoading(true);
     try {
-      const [statusResult, logExportResult] = await Promise.allSettled([
-        getDeviceStatus(),
-        getDeviceLogExportMetadata()
-      ]);
-
-      if (statusResult.status === "fulfilled") {
-        setStatus(statusResult.value);
-        setStatusAccessDenied(false);
-      } else if (isManagementAccessDeniedError(statusResult.reason)) {
+      setStatus(await getDeviceStatus());
+      setStatusAccessDenied(false);
+      setActionFeedback(null);
+    } catch (error) {
+      if (isManagementAccessDeniedError(error)) {
         setStatus(null);
         setStatusAccessDenied(true);
+        setActionFeedback({
+          detail: "此頁面僅對受信任的管理端開放。",
+          title: "存取受限",
+          tone: "error"
+        });
       } else {
-        throw statusResult.reason;
+        setStatus(null);
+        setStatusAccessDenied(false);
+        setActionFeedback({
+          detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
+          title: "同步失敗",
+          tone: "error"
+        });
       }
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
-      if (logExportResult.status === "fulfilled") {
-        setLogExport(logExportResult.value);
-        setLogExportAccessDenied(false);
-        setLogExportError("");
-      } else if (isManagementAccessDeniedError(logExportResult.reason)) {
-        setLogExport(null);
+  const loadLogExportMetadata = async () => {
+    setLogExportLoading(true);
+    try {
+      setLogExport(await getDeviceLogExportMetadata());
+      setLogExportAccessDenied(false);
+      setLogExportError("");
+    } catch (error) {
+      setLogExport(null);
+      if (isManagementAccessDeniedError(error)) {
         setLogExportAccessDenied(true);
         setLogExportError("");
       } else {
-        setLogExport(null);
         setLogExportAccessDenied(false);
-        setLogExportError(
-          logExportResult.reason instanceof Error
-            ? logExportResult.reason.message
-            : "裝置日誌目前不可用。"
-        );
+        setLogExportError(error instanceof Error ? error.message : "裝置日誌目前不可用。");
       }
-
-      setActionFeedback(
-        statusResult.status === "rejected" && isManagementAccessDeniedError(statusResult.reason)
-          ? {
-              detail: "此頁面僅對受信任的管理端開放。",
-              title: "存取受限",
-              tone: "error"
-            }
-          : null
-      );
-    } catch (error) {
-      setStatus(null);
-      setStatusAccessDenied(false);
-      setLogExport(null);
-      setLogExportAccessDenied(false);
-      setLogExportError("");
-      setActionFeedback({
-        detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
-        title: "同步失敗",
-        tone: "error"
-      });
     } finally {
-      setIsLoading(false);
+      setLogExportLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadStatus();
+    void loadDeviceStatus();
+    void loadLogExportMetadata();
   }, []);
 
   useDisplaySyncRefresh(() => {
-    void loadStatus();
+    void loadDeviceStatus();
+    void loadLogExportMetadata();
     void reloadDisplayOpsSummary();
   }, DEVICE_STATUS_DISPLAY_SYNC_SCOPES);
 
@@ -180,22 +172,26 @@ export function DeviceStatus() {
       buildDeviceStatusViewModel({
         actionFeedback,
         displayOpsAccessDenied,
+        displayOpsLoading,
         displayOpsSummary,
-        isLoading,
+        isLoading: statusLoading,
         logExport,
         logExportAccessDenied,
         logExportError,
+        logExportLoading,
         status,
         statusAccessDenied
       }),
     [
       actionFeedback,
       displayOpsAccessDenied,
+      displayOpsLoading,
       displayOpsSummary,
-      isLoading,
+      statusLoading,
       logExport,
       logExportAccessDenied,
       logExportError,
+      logExportLoading,
       status,
       statusAccessDenied
     ]
@@ -206,9 +202,10 @@ export function DeviceStatus() {
       activeAction={activeAction}
       displayOpsAccessDenied={displayOpsAccessDenied}
       displayOpsErrorMessage={displayOpsErrorMessage}
+      displayOpsLoading={displayOpsLoading}
       handleDiagnostic={handleDiagnostic}
       handleKioskExit={handleKioskExit}
-      isLoading={isLoading}
+      isLoading={statusLoading}
       status={status}
       viewModel={viewModel}
     />

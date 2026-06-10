@@ -10,7 +10,7 @@ const pageDir = path.resolve(import.meta.dirname);
 const slideshowPreviewSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
 
 test("slideshow preview renders cards from the shared live preview catalog instead of prototype asset maps", () => {
-  assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\)/);
+  assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\{\s*fallbackPageKeys:\s*previewCatalogPageKeys\s*\}\)/);
   assert.match(slideshowPreviewSource, /<LiveSlideshowPreviewCards/);
   assert.match(slideshowPreviewSource, /resolveSlideshowCardOffsets\(visibleCards\.length\)/);
   assert.match(slideshowPreviewSource, /pages\.length > 1/);
@@ -19,6 +19,16 @@ test("slideshow preview renders cards from the shared live preview catalog inste
   assert.doesNotMatch(slideshowPreviewSource, /viewModel\.skippedDebugRows/);
   assert.doesNotMatch(slideshowPreviewSource, /slideshowPreviewAssetRuntimeMap/);
   assert.doesNotMatch(slideshowPreviewSource, /<img alt=\{card\.labelZh\} src=\{asset\}/);
+});
+
+test("slideshow preview derives rotation shell before heavy live preview catalog state", () => {
+  const rotationIndex = slideshowPreviewSource.indexOf("usePageRotation()");
+  const catalogIndex = slideshowPreviewSource.indexOf("const livePreviewCatalog");
+
+  assert.ok(rotationIndex > -1);
+  assert.ok(catalogIndex > -1);
+  assert.ok(rotationIndex < catalogIndex);
+  assert.match(slideshowPreviewSource, /previewCatalogPageKeys/);
 });
 
 test("slideshow preview cards keep duplicate template instances bound to their own live preview state", () => {

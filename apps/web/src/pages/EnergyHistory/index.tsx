@@ -25,12 +25,6 @@ type CumulativeResponse = {
   counters: CumulativeCounter[];
 };
 
-type HistoryRuntimePayload = {
-  counters: CumulativeCounter[];
-  snapshots: EnergyHistorySnapshot[];
-  summaries: DailyEnergySummary[];
-};
-
 const METRIC_ICON_GLYPHS: Record<number, string> = {
   0: "☀",
   1: "↻",
@@ -110,29 +104,40 @@ function TrendChart({
 export function EnergyHistory() {
   const [range, setRange] = useState<EnergyHistoryRange>("day");
   const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
-  const historyRuntime = useRuntimeRefreshLifecycle<HistoryRuntimePayload>({
+  const historySnapshotsRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
     enabled: true,
-    load: async () => {
-      const [historyResponse, summaryResponse, cumulativeResponse] = await Promise.all([
-        requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
-        requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
-        requestJson<CumulativeResponse>("/api/metrics/cumulative")
-      ]);
-
-      return {
-        counters: cumulativeResponse.counters,
-        snapshots: historyResponse.snapshots,
-        summaries: summaryResponse.summaries
-      };
-    },
+    load: () => requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
     refreshKey: historyRefresh.refreshKey,
     shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
   });
-  const snapshots = historyRuntime.payload?.snapshots ?? [];
-  const summaries = historyRuntime.payload?.summaries ?? [];
-  const counters = historyRuntime.payload?.counters ?? [];
-  const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
-  const errorMessage = historyRuntime.errorMessage;
+  const dailySummariesRuntime = useRuntimeRefreshLifecycle<DailySummaryResponse>({
+    enabled: true,
+    load: () => requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
+    refreshKey: historyRefresh.refreshKey,
+    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
+  });
+  const cumulativeCountersRuntime = useRuntimeRefreshLifecycle<CumulativeResponse>({
+    enabled: true,
+    load: () => requestJson<CumulativeResponse>("/api/metrics/cumulative"),
+    refreshKey: historyRefresh.refreshKey,
+    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
+  });
+  const snapshots = historySnapshotsRuntime.payload?.snapshots ?? [];
+  const summaries = dailySummariesRuntime.payload?.summaries ?? [];
+  const counters = cumulativeCountersRuntime.payload?.counters ?? [];
+  const isLoading =
+    historySnapshotsRuntime.isLoading ||
+    historySnapshotsRuntime.isRefreshing ||
+    dailySummariesRuntime.isLoading ||
+    dailySummariesRuntime.isRefreshing ||
+    cumulativeCountersRuntime.isLoading ||
+    cumulativeCountersRuntime.isRefreshing;
+  const historySourceErrorMessage = [
+    historySnapshotsRuntime.errorMessage,
+    dailySummariesRuntime.errorMessage,
+    cumulativeCountersRuntime.errorMessage
+  ].filter(Boolean).join(" / ");
+  const errorMessage = historySourceErrorMessage;
 
   const viewModel = useMemo(
     () =>

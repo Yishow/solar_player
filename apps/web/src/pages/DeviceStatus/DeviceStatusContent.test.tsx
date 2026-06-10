@@ -33,3 +33,9 @@ test("device status content renders degraded display operations summary wiring",
   assert.match(deviceStatusContentSource, /Solar Display Kiosk/);
   assert.match(deviceStatusContentSource, /重新進入/);
 });
+
+test("device status content gates safe diagnostics on display ops loading separately", () => {
+  assert.match(deviceStatusContentSource, /displayOpsLoading/);
+  assert.match(deviceStatusContentSource, /displayOpsLoading \|\| displayOpsAccessDenied/);
+  assert.match(deviceStatusContentSource, /activeAction !== null \|\| displayOpsLoading/);
+});

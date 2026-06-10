@@ -29,11 +29,13 @@ export type DeviceActionFeedback = {
 type BuildDeviceStatusViewModelArgs = {
   actionFeedback: DeviceActionFeedback;
   displayOpsAccessDenied?: boolean;
+  displayOpsLoading?: boolean;
   displayOpsSummary?: DeviceDisplayOpsSummary | null;
   isLoading: boolean;
   logExport: DeviceLogExportMetadata | null;
   logExportAccessDenied?: boolean;
   logExportError: string;
+  logExportLoading?: boolean;
   now?: Date;
   status: DeviceRouteStatus | null;
   statusAccessDenied?: boolean;
@@ -252,11 +254,13 @@ const defaultSafeOpsGuidance: DeviceSafeOpsGuidance = {
 export function buildDeviceStatusViewModel({
   actionFeedback,
   displayOpsAccessDenied = false,
+  displayOpsLoading = false,
   displayOpsSummary,
   isLoading,
   logExport,
   logExportAccessDenied = false,
   logExportError,
+  logExportLoading = false,
   now = new Date(),
   status,
   statusAccessDenied = false
@@ -271,6 +275,8 @@ export function buildDeviceStatusViewModel({
   const displayStatusTitle =
     displayOpsAccessDenied
       ? "存取受限"
+      : displayOpsLoading && !displayOpsSummary
+        ? "同步中"
       : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
         ? "展示退化"
         : (displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0) > 0
@@ -279,6 +285,8 @@ export function buildDeviceStatusViewModel({
   const nextActionDetail =
     displayOpsAccessDenied
       ? "此頁面僅對受信任的管理端開放。"
+      : displayOpsLoading && !displayOpsSummary
+        ? "正在同步 display diagnostics 摘要。"
       : triageSummary
         ? formatTriageHelper(triageSummary)
         : diagnostics.length > 0
@@ -291,6 +299,13 @@ export function buildDeviceStatusViewModel({
         fileCountLabel: "--",
         statusTitle: "存取受限"
       }
+    : logExportLoading && logExport === null && !logExportError
+      ? {
+          detail: "正在同步裝置日誌 metadata。",
+          directoryLabel: "--",
+          fileCountLabel: "--",
+          statusTitle: "同步中"
+        }
     : logExportError
       ? {
           detail: logExportError,
@@ -403,6 +418,8 @@ export function buildDeviceStatusViewModel({
       helper:
         displayOpsAccessDenied
           ? "此頁面僅對受信任的管理端開放。"
+          : displayOpsLoading && !displayOpsSummary
+            ? "正在同步 display diagnostics 摘要。"
           : triageSummary
             ? formatTriageHelper(triageSummary)
             : displayOpsSummary?.alerts[0]?.message

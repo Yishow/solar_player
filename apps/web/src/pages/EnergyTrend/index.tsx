@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import { requestJson } from "../../services/api";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
@@ -16,6 +16,20 @@ type MetricsHistoryResponse = {
   range: "day" | "week" | "month" | "total";
   snapshots: EnergyTrendSnapshot[];
 };
+
+const energyTrendHistoryPayloadCache = new Map<EnergyTrendRange, MetricsHistoryResponse>();
+
+function readCachedEnergyTrendHistoryPayload(range: EnergyTrendRange) {
+  return energyTrendHistoryPayloadCache.get(range) ?? null;
+}
+
+function rememberEnergyTrendHistoryPayload(payload: MetricsHistoryResponse | null) {
+  if (!payload) {
+    return;
+  }
+
+  energyTrendHistoryPayloadCache.set(payload.range, payload);
+}
 
 const CARD_ICON_GLYPHS: Record<string, string> = {
   bolt: "⚡",
@@ -112,9 +126,13 @@ export function EnergyTrend() {
       requestJson<MetricsHistoryResponse>(
         `/api/metrics/history?range=${range}`
       ),
+    initialPayload: readCachedEnergyTrendHistoryPayload(range),
     refreshKey: historyRefresh.refreshKey,
     shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
   });
+  useEffect(() => {
+    rememberEnergyTrendHistoryPayload(historyRuntime.payload);
+  }, [historyRuntime.payload]);
   const snapshots = historyRuntime.payload?.snapshots ?? [];
   const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
   const errorMessage = historyRuntime.errorMessage;

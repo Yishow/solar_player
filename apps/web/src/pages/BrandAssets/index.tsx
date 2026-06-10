@@ -21,6 +21,15 @@ import { notifyBrandChanged } from "../../hooks/useBrandAssets";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { BRAND_ASSETS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import { CropDialog } from "./CropDialog";
+import {
+  fieldsEqual,
+  pickFields,
+  readCachedBrandProfiles,
+  rememberBrandProfiles,
+  resolveBrandAssetsRefreshModel,
+  resolveInitialBrandAssetsModel,
+  type DraftFields
+} from "./loadModel";
 import "./brandAssets.css";
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
@@ -28,16 +37,6 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const ASPECT_TOLERANCE = 0.12;
 
 type Feedback = { tone: "ok" | "error"; message: string } | null;
-
-type DraftFields = {
-  name: string;
-  brandNameZh: string;
-  brandNameEn: string;
-  productTitleZh: string;
-  productTitleEn: string;
-  sloganZh: string;
-  sloganEn: string;
-};
 
 type PendingAction =
   | {
@@ -57,22 +56,6 @@ const FIELD_LABELS: Record<keyof DraftFields, string> = {
   sloganZh: "標語（中文）",
   sloganEn: "標語（英文）"
 };
-
-function pickFields(profile: BrandProfile): DraftFields {
-  return {
-    name: profile.name,
-    brandNameZh: profile.brandNameZh,
-    brandNameEn: profile.brandNameEn,
-    productTitleZh: profile.productTitleZh,
-    productTitleEn: profile.productTitleEn,
-    sloganZh: profile.sloganZh,
-    sloganEn: profile.sloganEn
-  };
-}
-
-function fieldsEqual(a: DraftFields, b: DraftFields): boolean {
-  return (Object.keys(a) as Array<keyof DraftFields>).every((key) => a[key] === b[key]);
-}
 
 function formatBytes(value: number | null): string {
   if (!value || value <= 0) return "—";
@@ -96,9 +79,13 @@ function aspectWarning(width: number | null, height: number | null): string | nu
 }
 
 export function BrandAssets() {
-  const [profiles, setProfiles] = useState<BrandProfile[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<DraftFields | null>(null);
+  const initialModel = useMemo(
+    () => resolveInitialBrandAssetsModel(readCachedBrandProfiles()),
+    []
+  );
+  const [profiles, setProfiles] = useState<BrandProfile[]>(initialModel.profiles);
+  const [selectedId, setSelectedId] = useState<number | null>(initialModel.selectedId);
+  const [draft, setDraft] = useState<DraftFields | null>(initialModel.draft);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isConfirmingAction, setIsConfirmingAction] = useState(false);
@@ -115,6 +102,15 @@ export function BrandAssets() {
     if (!selected || !draft) return false;
     return !fieldsEqual(draft, pickFields(selected));
   }, [draft, selected]);
+  const selectedIdRef = useRef(selectedId);
+  const draftRef = useRef(draft);
+  const dirtyRef = useRef(dirty);
+  const pendingActionRef = useRef(pendingAction);
+
+  selectedIdRef.current = selectedId;
+  draftRef.current = draft;
+  dirtyRef.current = dirty;
+  pendingActionRef.current = pendingAction;
 
   const blocker = useBlocker(dirty);
   useEffect(() => {
@@ -136,22 +132,31 @@ export function BrandAssets() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  const syncProfiles = useCallback(async (preferredId?: number) => {
+  const syncProfiles = useCallback(async (
+    preferredId?: number,
+    options: { preserveLocalState?: boolean } = {}
+  ) => {
     const list = await getBrandProfiles();
-    setProfiles(list);
-    const chosen =
-      list.find((profile) => profile.id === preferredId) ??
-      list.find((profile) => profile.isActive) ??
-      list[0] ??
-      null;
-    setSelectedId(chosen?.id ?? null);
-    setDraft(chosen ? pickFields(chosen) : null);
-    return chosen;
+    rememberBrandProfiles(list);
+    const preserveLocalState = options.preserveLocalState ?? true;
+    const model = resolveBrandAssetsRefreshModel({
+      currentDraft: draftRef.current,
+      currentSelectedId: selectedIdRef.current,
+      dirty: preserveLocalState ? dirtyRef.current : false,
+      pendingAction: preserveLocalState ? pendingActionRef.current !== null : false,
+      preferredId,
+      profiles: list
+    });
+
+    setProfiles(model.profiles);
+    setSelectedId(model.selectedId);
+    setDraft(model.draft);
+    return model.selected;
   }, []);
 
   const resyncBrandProfiles = useCallback(async (preferredId?: number) => {
     try {
-      await syncProfiles(preferredId);
+      await syncProfiles(preferredId, { preserveLocalState: false });
       setFeedback({ tone: "ok", message: "品牌設定已同步。" });
     } catch (error) {
       const nextError = error instanceof Error ? error : new Error("重新同步品牌設定失敗");
@@ -168,7 +173,7 @@ export function BrandAssets() {
 
     const bootstrap = async () => {
       try {
-        await syncProfiles();
+        await syncProfiles(undefined, { preserveLocalState: true });
       } catch (error) {
         if (!active) {
           return;
@@ -242,7 +247,11 @@ export function BrandAssets() {
         }
       });
       const updated = await updateBrandProfile(selected.id, payload);
-      setProfiles((current) => current.map((profile) => (profile.id === updated.id ? updated : profile)));
+      setProfiles((current) => {
+        const nextProfiles = current.map((profile) => (profile.id === updated.id ? updated : profile));
+        rememberBrandProfiles(nextProfiles);
+        return nextProfiles;
+      });
       setDraft(pickFields(updated));
       setFeedback({ tone: "ok", message: "已儲存。" });
       syncDraftGuard.clearPendingRemoteChange();
@@ -337,9 +346,11 @@ export function BrandAssets() {
         width: width ?? undefined,
         height: height ?? undefined
       });
-      setProfiles((current) =>
-        current.map((profile) => (profile.id === updated.id ? updated : profile))
-      );
+      setProfiles((current) => {
+        const nextProfiles = current.map((profile) => (profile.id === updated.id ? updated : profile));
+        rememberBrandProfiles(nextProfiles);
+        return nextProfiles;
+      });
       setFeedback({ tone: "ok", message: "Logo 已更新。" });
       syncDraftGuard.clearPendingRemoteChange();
       if (updated.isActive) notifyBrandChanged();
@@ -378,9 +389,11 @@ export function BrandAssets() {
 
       if (pendingAction.kind === "remove-logo") {
         const updated = await deleteBrandLogo(selected.id);
-        setProfiles((current) =>
-          current.map((profile) => (profile.id === updated.id ? updated : profile))
-        );
+        setProfiles((current) => {
+          const nextProfiles = current.map((profile) => (profile.id === updated.id ? updated : profile));
+          rememberBrandProfiles(nextProfiles);
+          return nextProfiles;
+        });
         if (updated.isActive) notifyBrandChanged();
         setFeedback({ tone: "ok", message: "Logo 已移除。" });
       }

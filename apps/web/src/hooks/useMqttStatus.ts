@@ -40,6 +40,8 @@ export function resolveInitialMqttState(
 }
 
 type UseMqttStatusOptions = {
+  bootstrap?: boolean;
+  connectSocket?: boolean;
   enabled?: boolean;
 };
 
@@ -47,6 +49,8 @@ export function useMqttStatus(
   initialStatus?: MqttConnectionStatus | null,
   options: UseMqttStatusOptions = {}
 ) {
+  const bootstrap = options.bootstrap ?? true;
+  const connectSocket = options.connectSocket ?? true;
   const enabled = options.enabled ?? true;
   const [{ isHydrated, status }, setState] = useState(() => resolveInitialMqttState(initialStatus));
 
@@ -80,14 +84,18 @@ export function useMqttStatus(
       });
     });
 
-    getSocketClient();
-    void bootstrapStatus();
+    if (connectSocket) {
+      getSocketClient();
+    }
+    if (bootstrap) {
+      void bootstrapStatus();
+    }
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [enabled]);
+  }, [bootstrap, connectSocket, enabled]);
 
   return {
     isHydrated,

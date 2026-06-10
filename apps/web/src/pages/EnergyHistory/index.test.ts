@@ -29,3 +29,11 @@ test("energy history reloads all persisted history datasets through the monitori
   assert.match(energyHistorySource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range\)/);
   assert.match(energyHistorySource, /refreshKey:\s*historyRefresh\.refreshKey/);
 });
+
+test("energy history loads snapshots summaries and counters as independent staged sources", () => {
+  assert.doesNotMatch(energyHistorySource, /Promise\.all\(/);
+  assert.match(energyHistorySource, /historySnapshotsRuntime\s*=\s*useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /dailySummariesRuntime\s*=\s*useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /cumulativeCountersRuntime\s*=\s*useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /historySourceErrorMessage/);
+});

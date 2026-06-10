@@ -18,6 +18,7 @@ type DeviceStatusContentProps = {
   activeAction: string | null;
   displayOpsAccessDenied: boolean;
   displayOpsErrorMessage: string;
+  displayOpsLoading: boolean;
   handleDiagnostic: (action: "export-summary" | "refresh-readiness", label: string) => Promise<void>;
   handleKioskExit: () => Promise<void>;
   isLoading: boolean;
@@ -66,6 +67,7 @@ export function DeviceStatusContent({
   activeAction,
   displayOpsAccessDenied,
   displayOpsErrorMessage,
+  displayOpsLoading,
   handleDiagnostic,
   handleKioskExit,
   isLoading,
@@ -413,7 +415,7 @@ export function DeviceStatusContent({
             key={action.action}
             type="button"
             className="ds-action"
-            disabled={activeAction !== null || displayOpsAccessDenied || Boolean(displayOpsErrorMessage) || isLoading}
+            disabled={activeAction !== null || displayOpsLoading || displayOpsAccessDenied || Boolean(displayOpsErrorMessage)}
             onClick={() => void handleDiagnostic(action.action, action.label)}
           >
             {activeAction === action.action ? "執行中..." : action.label}
@@ -423,7 +425,7 @@ export function DeviceStatusContent({
         <button
           type="button"
           className="ds-action"
-          disabled={activeAction !== null || displayOpsAccessDenied || Boolean(displayOpsErrorMessage) || isLoading}
+          disabled={activeAction !== null || isLoading}
           onClick={() => void handleKioskExit()}
         >
           {activeAction === "kiosk-exit" ? "離開中..." : "離開系統"}

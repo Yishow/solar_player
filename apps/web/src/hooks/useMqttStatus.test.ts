@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import type { MqttConnectionStatus } from "../services/socket";
 import { loadRuntimeMqttStatus, resolveInitialMqttState } from "./useMqttStatus";
+
+const useMqttStatusSource = readFileSync(path.join(import.meta.dirname, "useMqttStatus.ts"), "utf8");
 
 test("loadRuntimeMqttStatus resolves the playback-safe mqtt bootstrap payload", async () => {
   const status = await loadRuntimeMqttStatus(async () => ({
@@ -55,4 +59,11 @@ test("resolveInitialMqttState keeps null bootstrap state from falling back to st
     reason: "unavailable",
     updatedAt: null
   } satisfies MqttConnectionStatus);
+});
+
+test("useMqttStatus can subscribe without bootstrap fetch or forced socket connect", () => {
+  assert.match(useMqttStatusSource, /bootstrap\?:\s*boolean/);
+  assert.match(useMqttStatusSource, /connectSocket\?:\s*boolean/);
+  assert.match(useMqttStatusSource, /if \(connectSocket\)/);
+  assert.match(useMqttStatusSource, /if \(bootstrap\)/);
 });

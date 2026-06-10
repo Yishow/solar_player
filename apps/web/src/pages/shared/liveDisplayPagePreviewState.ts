@@ -16,6 +16,24 @@ export function createLoadingLiveDisplayPagePreviewState(): LiveDisplayPagePrevi
   };
 }
 
+export function createConfigUnavailableLiveDisplayPagePreviewState(
+  detail: string
+): LiveDisplayPagePreviewState {
+  return {
+    detail,
+    status: "config-unavailable"
+  };
+}
+
+export function createConfigUnavailableLiveDisplayPagePreviewStates(
+  pageKeys: string[],
+  detail: string
+): LiveDisplayPagePreviewStates {
+  return Object.fromEntries(
+    pageKeys.map((pageKey) => [pageKey, createConfigUnavailableLiveDisplayPagePreviewState(detail)])
+  );
+}
+
 export function buildLiveDisplayPagePreviewState(args: {
   definition?: LiveDisplayPagePreviewRegistryEntry;
   envelope?: DisplayPageConfigEnvelope | null;
