@@ -39,8 +39,10 @@ export function useDisplayPagePublishingState(
   pageId: DisplayPageId,
   draftUpdatedAt: string | null | undefined,
   initialPublishingStateByPage: DisplayPagePublishingStateMap | undefined,
-  reloadDraft: () => Promise<void>
+  reloadDraft: () => Promise<void>,
+  options: { enabled?: boolean } = {}
 ) {
+  const enabled = options.enabled ?? true;
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishingError, setPublishingError] = useState("");
   const [publishingStateByPage, setPublishingStateByPage] = useState<DisplayPagePublishingStateMap>(
@@ -49,17 +51,28 @@ export function useDisplayPagePublishingState(
   const publishingState = publishingStateByPage[pageId];
   const blockingCount = countBlockingFindings(publishingState?.validation);
 
-  const refresh = async () => {
+  const refresh = async (refreshOptions: { force?: boolean; isActive?: () => boolean } = {}) => {
+    if (!enabled && !refreshOptions.force) {
+      return;
+    }
+
     const [validation, fallback] = await Promise.all([
       validateDisplayPageDraft(pageId),
       getDisplayPageFallbackStatus(pageId)
     ]);
+    if (refreshOptions.isActive && !refreshOptions.isActive()) {
+      return;
+    }
     setPublishingStateByPage((current) => ({ ...current, [pageId]: { fallback, validation } }));
   };
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let active = true;
-    void refresh()
+    void refresh({ isActive: () => active })
       .then(() => {
         if (active) setPublishingError("");
       })
@@ -69,7 +82,7 @@ export function useDisplayPagePublishingState(
     return () => {
       active = false;
     };
-  }, [draftUpdatedAt, pageId]);
+  }, [draftUpdatedAt, enabled, pageId]);
 
   const publish = async () => {
     setIsPublishing(true);
@@ -77,7 +90,7 @@ export function useDisplayPagePublishingState(
     try {
       await publishDisplayPageDraft(pageId);
       await reloadDraft();
-      await refresh();
+      await refresh({ force: true });
     } catch (error) {
       setPublishingError(error instanceof Error ? error.message : "發布草稿失敗。");
     } finally {
@@ -92,6 +105,6 @@ export function useDisplayPagePublishingState(
     publish,
     publishingError,
     publishingState,
-    refresh
+    refresh: () => refresh({ force: true })
   };
 }

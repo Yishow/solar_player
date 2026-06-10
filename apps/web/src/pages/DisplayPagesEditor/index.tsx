@@ -393,6 +393,7 @@ export function DisplayPagesEditor({
     initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
   );
   const editMode = controlledEditMode ?? internalEditMode;
+  const [rightTab, setRightTab] = useState<"health" | "inspector" | "publish" | "source">("inspector");
 
   const selectedPage = useMemo(
     () => resolvedPageDefinitions.find((page) => page.id === selectedPageId) ?? resolvedPageDefinitions[0]!,
@@ -419,17 +420,23 @@ export function DisplayPagesEditor({
     undo
   } = useDisplayPageConfig(selectedPage.id, seedConfig, { stage: "draft" });
 
+  const shouldResolveEditorRegions =
+    selectedWorkspace === "editor" ||
+    (selectedWorkspace === "assets" && assetReturnWorkspace === "editor" && Boolean(assetContextId));
   const freeformObjects = useMemo(
     () => normalizeDisplayPageFreeformObjects((config as { freeformObjects?: unknown }).freeformObjects),
     [config]
   );
   const editableRegions = useMemo(
-    () => resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.templateKey), seedConfig),
-    [config, seedConfig, selectedPage.templateKey]
+    () =>
+      shouldResolveEditorRegions
+        ? resolveDisplayEditorRegions(config, resolvePageRegionSchemas(selectedPage.templateKey), seedConfig)
+        : [],
+    [config, seedConfig, selectedPage.templateKey, shouldResolveEditorRegions]
   );
   const editableFreeformObjects = useMemo(
-    () => resolveDisplayPageFreeformObjectRegions(config, seedConfig),
-    [config, seedConfig]
+    () => (shouldResolveEditorRegions ? resolveDisplayPageFreeformObjectRegions(config, seedConfig) : []),
+    [config, seedConfig, shouldResolveEditorRegions]
   );
   const editableItems = useMemo(
     () => [...editableRegions, ...editableFreeformObjects],
@@ -500,6 +507,13 @@ export function DisplayPagesEditor({
         : null,
     [freeformObjects, selectedFreeformObjectRegion]
   );
+  const shouldLoadEditorAssetOptions = Boolean(
+    assetContextId ||
+    (selectedWorkspace === "editor" && selectedFreeformObject && selectedFreeformObject.type !== "line")
+  );
+  const shouldLoadAssetHealth = selectedWorkspace === "editor" && rightTab === "health";
+  const shouldLoadPublishingState = selectedWorkspace === "editor" && rightTab === "publish";
+  const shouldRenderPreviewContent = renderPreview && selectedWorkspace === "editor";
   const inspectorRegion = useMemo(
     () => resolveDisplayPageMediaEffectRegion(selectedRegion, editableItems) ?? selectedRegion,
     [editableItems, selectedRegion]
@@ -526,17 +540,18 @@ export function DisplayPagesEditor({
     selectedPage.id,
     lastLoadedEnvelope?.updatedAt,
     initialPublishingStateByPage,
-    reload
+    reload,
+    { enabled: shouldLoadPublishingState }
   );
   const {
     errorMessage: assetHealthErrorMessage,
     isLoading: isAssetHealthLoading,
     reload: reloadAssetHealth,
     report: assetHealthReport
-  } = useDisplayPageAssetHealth();
+  } = useDisplayPageAssetHealth({ enabled: shouldLoadAssetHealth });
 
   useEffect(() => {
-    if (initialImages) {
+    if (initialImages || !shouldLoadEditorAssetOptions) {
       return;
     }
 
@@ -562,7 +577,7 @@ export function DisplayPagesEditor({
     return () => {
       active = false;
     };
-  }, [initialImages]);
+  }, [initialImages, shouldLoadEditorAssetOptions]);
 
   useEffect(() => {
     setSelectedRegionId(null);
@@ -875,7 +890,7 @@ export function DisplayPagesEditor({
     undo
   });
   const previewContent = useMemo(() => {
-    if (!renderPreview || !selectedPage.renderPreview) {
+    if (!shouldRenderPreviewContent || !selectedPage.renderPreview) {
       return renderDisplayEditorFallback(selectedPage.label);
     }
 
@@ -883,7 +898,7 @@ export function DisplayPagesEditor({
       selectedPage.renderPreview as unknown as React.ComponentType<Record<string, unknown>>,
       config
     );
-  }, [config, renderPreview, selectedPage]);
+  }, [config, selectedPage, shouldRenderPreviewContent]);
 
   const overlayDesignSpace = overlayState.designSpace;
   const temporaryMeasureTargetRegion = useMemo(
@@ -896,7 +911,6 @@ export function DisplayPagesEditor({
   const distributeDisabled =
     multiSelectCount < 3 || selectedRegions.some((region) => isRegionLocked(lockedSelectionIds, region.id));
 
-  const [rightTab, setRightTab] = useState<"health" | "inspector" | "publish" | "source">("inspector");
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
   const previewRouteMeta = useMemo(
     () => resolvePlaybackRouteMeta(`/${selectedPage.id}`, []),

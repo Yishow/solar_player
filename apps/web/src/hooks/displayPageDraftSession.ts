@@ -4,11 +4,16 @@ import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPa
 
 export type DisplayPageDraftSession<T> = {
   config: T;
+  dirty: boolean;
   fallbackPolicy: FallbackPolicy;
   history: ReturnType<typeof createEditorHistory<T>>;
   lastLoadedConfig: T;
   lastLoadedEnvelope: DisplayPageConfigEnvelope | null;
 };
+
+export function isDraftConfigDirty<T>(config: T, lastLoadedConfig: T) {
+  return JSON.stringify(config) !== JSON.stringify(lastLoadedConfig);
+}
 
 export function createDraftSession<T>(
   config: T,
@@ -17,6 +22,7 @@ export function createDraftSession<T>(
 ): DisplayPageDraftSession<T> {
   return {
     config,
+    dirty: false,
     fallbackPolicy,
     history: createEditorHistory<T>(),
     lastLoadedConfig: deepClone(config),
@@ -38,6 +44,7 @@ export function applyDraftConfigUpdate<T>(
   return {
     ...session,
     config: nextConfig,
+    dirty: isDraftConfigDirty(nextConfig, session.lastLoadedConfig),
     history: nextHistory
   };
 }
@@ -60,6 +67,7 @@ export function undoDraftSession<T>(session: DisplayPageDraftSession<T>): Displa
   return {
     ...session,
     config: result.current,
+    dirty: isDraftConfigDirty(result.current, session.lastLoadedConfig),
     history: result.history
   };
 }
@@ -69,6 +77,7 @@ export function redoDraftSession<T>(session: DisplayPageDraftSession<T>): Displa
   return {
     ...session,
     config: result.current,
+    dirty: isDraftConfigDirty(result.current, session.lastLoadedConfig),
     history: result.history
   };
 }

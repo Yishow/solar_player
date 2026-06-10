@@ -23,7 +23,7 @@ import {
   isManagementDraftConflictError,
   updateDisplayPageConfig
 } from "../services/api";
-import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
+import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, isDraftConfigDirty, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
 import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
 export { getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
@@ -222,11 +222,51 @@ export function resolveCachedDisplayPageConfigSession<T>(
     return null;
   }
 
+  return createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope);
+}
+
+export function createDisplayPageConfigSessionFromEnvelope<T>(
+  seedConfig: T,
+  envelope: DisplayPageConfigEnvelope
+): DisplayPageDraftSession<T> & { lastLoadedEnvelope: DisplayPageConfigEnvelope } {
   const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
   return {
     ...createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)),
     lastLoadedEnvelope: envelope
   };
+}
+
+export function resolveInitialDisplayPageConfigSession<T>({
+  enabled,
+  initialEnvelope,
+  initialSession,
+  pageId,
+  seedConfig,
+  stage
+}: {
+  enabled: boolean;
+  initialEnvelope?: DisplayPageConfigEnvelope | null;
+  initialSession?: DisplayPageDraftSession<T> | null;
+  pageId: DisplayPageId;
+  seedConfig: T;
+  stage: ConfigStage;
+}): DisplayPageDraftSession<T> | null {
+  if (!enabled) {
+    return null;
+  }
+
+  if (
+    initialSession?.lastLoadedEnvelope?.pageId === pageId &&
+    initialSession.lastLoadedEnvelope.stage === stage
+  ) {
+    return initialSession;
+  }
+
+  if (initialEnvelope?.pageId === pageId && initialEnvelope.stage === stage) {
+    return createDisplayPageConfigSessionFromEnvelope(seedConfig, initialEnvelope);
+  }
+
+  return resolveCachedDisplayPageConfigSession(pageId, stage, seedConfig);
 }
 
 export function applyDisplayPageSaveConflict<T>(
@@ -235,10 +275,12 @@ export function applyDisplayPageSaveConflict<T>(
   latestEnvelope: DisplayPageConfigEnvelope,
   fallbackPolicy: FallbackPolicy
 ): DisplayPageDraftSession<T> {
+  const lastLoadedConfig = deepClone(latestConfig);
   return {
     ...session,
+    dirty: isDraftConfigDirty(session.config, lastLoadedConfig),
     fallbackPolicy,
-    lastLoadedConfig: deepClone(latestConfig),
+    lastLoadedConfig,
     lastLoadedEnvelope: latestEnvelope
   };
 }
@@ -284,8 +326,10 @@ function resolveLoadMessage(stage: ConfigStage, envelope: DisplayPageConfigEnvel
   return stage === "live" ? "目前使用 live seed fallback。" : "目前使用 seed fallback，可直接開始編輯。";
 }
 
-type UseDisplayPageConfigOptions = {
+type UseDisplayPageConfigOptions<T = unknown> = {
   enabled?: boolean;
+  initialEnvelope?: DisplayPageConfigEnvelope | null;
+  initialSession?: DisplayPageDraftSession<T> | null;
   stage?: ConfigStage;
 };
 
@@ -316,13 +360,18 @@ type UseDisplayPageConfigResult<T> = {
 export function useDisplayPageConfig<T>(
   pageId: DisplayPageId,
   seedConfig: T,
-  options: UseDisplayPageConfigOptions = {}
+  options: UseDisplayPageConfigOptions<T> = {}
 ): UseDisplayPageConfigResult<T> {
   const enabled = options.enabled ?? true;
   const stage = options.stage ?? "live";
-  const initialCachedSession = enabled
-    ? resolveCachedDisplayPageConfigSession(pageId, stage, seedConfig)
-    : null;
+  const initialCachedSession = resolveInitialDisplayPageConfigSession({
+    enabled,
+    initialEnvelope: options.initialEnvelope,
+    initialSession: options.initialSession,
+    pageId,
+    seedConfig,
+    stage
+  });
   const [sessions, setSessions] = useState<Record<string, DisplayPageDraftSession<T>>>(() =>
     initialCachedSession ? { [pageId]: initialCachedSession } : {}
   );
@@ -332,15 +381,11 @@ export function useDisplayPageConfig<T>(
   const [errorMessage, setErrorMessage] = useState("");
   const loadRequestIdRef = useRef(0);
   const currentSession = sessions[pageId];
+  const hasSession = Boolean(currentSession);
   const config = currentSession?.config ?? deepClone(seedConfig);
-  const lastLoadedConfig = currentSession?.lastLoadedConfig ?? deepClone(seedConfig);
   const lastLoadedEnvelope = currentSession?.lastLoadedEnvelope ?? null;
   const fallbackPolicy = currentSession?.fallbackPolicy ?? defaultFallbackPolicy;
-
-  const dirty = useMemo(
-    () => JSON.stringify(config) !== JSON.stringify(lastLoadedConfig),
-    [config, lastLoadedConfig]
-  );
+  const dirty = currentSession?.dirty ?? false;
 
   useEffect(() => {
     const requestId = loadRequestIdRef.current + 1;
@@ -357,7 +402,7 @@ export function useDisplayPageConfig<T>(
     let active = true;
     const isCurrentRequest = () => active && requestId === loadRequestIdRef.current;
 
-    if (!shouldHydrateDisplayPageSession(enabled, Boolean(sessions[pageId]))) {
+    if (!shouldHydrateDisplayPageSession(enabled, hasSession)) {
       setIsLoading(false);
       setMessage(dirty ? "保留未儲存草稿。" : "展示頁設定已同步。");
       setErrorMessage("");
@@ -408,7 +453,7 @@ export function useDisplayPageConfig<T>(
     return () => {
       active = false;
     };
-  }, [dirty, enabled, pageId, seedConfig, sessions, stage]);
+  }, [dirty, enabled, hasSession, pageId, seedConfig, stage]);
 
   const reload = useCallback(async () => {
     if (!enabled) {

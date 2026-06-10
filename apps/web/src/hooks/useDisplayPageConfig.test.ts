@@ -10,6 +10,7 @@ import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConf
 import {
   applyDisplayPageSaveConflict,
   clearDisplayPageConfigCache,
+  createDisplayPageConfigSessionFromEnvelope,
   loadDisplayPageConfigEnvelope,
   mergeDisplayPageConfig,
   primeDisplayPageConfigCache,
@@ -18,12 +19,19 @@ import {
   resolveDisplayPageConfigStagePath,
   resolveDisplayPageFallbackPolicy,
   resolveDisplayPageConfigForPage,
+  resolveInitialDisplayPageConfigSession,
   resolveDisplayPageSaveConflictMessage,
   shouldDeferDisplayPageRuntimeRender,
   shouldHydrateDisplayPageSession,
   shouldReloadDisplayPageConfigOnSync
 } from "./useDisplayPageConfig";
-import { createDraftSession } from "./displayPageDraftSession";
+import {
+  applyDraftConfigUpdate,
+  createDraftSession,
+  redoDraftSession,
+  resetDraftPaths,
+  undoDraftSession
+} from "./displayPageDraftSession";
 
 const configHookSource = readFileSync(
   path.join(import.meta.dirname, "useDisplayPageConfig.ts"),
@@ -345,6 +353,116 @@ test("display page config cache primes live route hydration before first render"
   assert.equal(session?.lastLoadedEnvelope, envelope);
 });
 
+test("display page config initial session can be resolved from a route-provided envelope", () => {
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: null,
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["route envelope", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "draft" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 9
+  };
+
+  const initialSession = resolveInitialDisplayPageConfigSession({
+    enabled: true,
+    initialEnvelope: envelope,
+    pageId: "solar-cache-test",
+    seedConfig,
+    stage: "draft"
+  });
+
+  assert.equal(initialSession?.config.heroCopy.titleLines[0], "route envelope");
+  assert.equal(initialSession?.dirty, false);
+  assert.equal(initialSession?.lastLoadedEnvelope, envelope);
+  assert.equal(
+    resolveInitialDisplayPageConfigSession({
+      enabled: false,
+      initialEnvelope: envelope,
+      pageId: "solar-cache-test",
+      seedConfig,
+      stage: "draft"
+    }),
+    null
+  );
+});
+
+test("display page config initial session prefers a matching session before cached or envelope data", () => {
+  clearDisplayPageConfigCache();
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const sessionEnvelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: null,
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["initial session", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "draft" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 10
+  };
+  const initialSession = createDisplayPageConfigSessionFromEnvelope(seedConfig, sessionEnvelope);
+
+  primeDisplayPageConfigCache("solar-cache-test", "draft", {
+    ...sessionEnvelope,
+    regions: {
+      heroCopy: {
+        titleLines: ["cached session", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    version: 11
+  });
+
+  const resolvedSession = resolveInitialDisplayPageConfigSession({
+    enabled: true,
+    initialSession,
+    pageId: "solar-cache-test",
+    seedConfig,
+    stage: "draft"
+  });
+
+  assert.equal(resolvedSession?.config.heroCopy.titleLines[0], "initial session");
+  assert.equal(resolvedSession?.lastLoadedEnvelope?.version, 10);
+});
+
+test("display page draft session dirty flag updates on edit reset undo and redo", () => {
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar" as const,
+    publishedAt: null,
+    publishedBy: null,
+    regions: {},
+    stage: "draft" as const,
+    updatedAt: "2026-05-20T09:00:00.000Z",
+    version: 4
+  };
+  const session = createDraftSession(seedConfig, envelope, defaultFallbackPolicy);
+  assert.equal(session.dirty, false);
+
+  const editedSession = applyDraftConfigUpdate(session, (current) => ({
+    ...current,
+    heroCopy: {
+      ...current.heroCopy,
+      titleLines: ["本地草稿標題", current.heroCopy.titleLines[1]] as [string, string]
+    }
+  }));
+
+  assert.equal(editedSession.dirty, true);
+  assert.equal(undoDraftSession(editedSession).dirty, false);
+  assert.equal(redoDraftSession(undoDraftSession(editedSession)).dirty, true);
+  assert.equal(resetDraftPaths(editedSession, seedConfig, [["heroCopy", "titleLines"]]).dirty, false);
+});
+
 test("display page config envelope loader reuses cached live envelopes without duplicate reads", async () => {
   clearDisplayPageConfigCache();
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
@@ -417,6 +535,12 @@ test("display page config hook ignores stale route hydration after a newer reloa
   assert.match(configHookSource, /const loadRequestIdRef = useRef\(0\)/);
   assert.match(configHookSource, /requestId !== loadRequestIdRef\.current/);
   assert.match(configHookSource, /requestId === loadRequestIdRef\.current/);
+});
+
+test("display page config hook reads session dirty state instead of stringifying config during render", () => {
+  assert.match(configHookSource, /const dirty = currentSession\?\.dirty \?\? false/);
+  assert.doesNotMatch(configHookSource, /JSON\.stringify\(config\)/);
+  assert.doesNotMatch(configHookSource, /JSON\.stringify\(lastLoadedConfig\)/);
 });
 
 test("display page runtime previews skip draft-session hydration when persistence is disabled", () => {
@@ -597,6 +721,7 @@ test("applyDisplayPageSaveConflict preserves local draft edits while rebasing on
   assert.equal(nextSession.config.heroCopy.titleLines[0], "本地草稿標題");
   assert.equal(nextSession.lastLoadedConfig.heroCopy.titleLines[0], "伺服器新版標題");
   assert.equal(nextSession.lastLoadedEnvelope?.version, 5);
+  assert.equal(nextSession.dirty, true);
 });
 
 test("resolveDisplayPageSaveConflictMessage gives the operator a reload-first conflict hint", () => {
