@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { defaultFallbackPolicy } from "@solar-display/shared";
 import { createImagesDisplayPageSeedConfig } from "../pages/Images/displayPageConfig";
@@ -7,6 +9,8 @@ import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainabili
 import { createSolarDisplayPageSeedConfig } from "../pages/Solar/displayPageConfig";
 import {
   applyDisplayPageSaveConflict,
+  clearDisplayPageConfigCache,
+  loadDisplayPageConfigEnvelope,
   mergeDisplayPageConfig,
   primeDisplayPageConfigCache,
   resolveCachedDisplayPageConfigSession,
@@ -20,6 +24,11 @@ import {
   shouldReloadDisplayPageConfigOnSync
 } from "./useDisplayPageConfig";
 import { createDraftSession } from "./displayPageDraftSession";
+
+const configHookSource = readFileSync(
+  path.join(import.meta.dirname, "useDisplayPageConfig.ts"),
+  "utf8"
+);
 
 test("mergeDisplayPageConfig preserves solar seed-backed regions outside partial overrides", () => {
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
@@ -311,6 +320,7 @@ test("resolveDisplayPageConfigForPage falls back to seed config while the next p
 });
 
 test("display page config cache primes live route hydration before first render", () => {
+  clearDisplayPageConfigCache();
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
   const envelope = {
     fallbackPolicy: defaultFallbackPolicy,
@@ -333,6 +343,80 @@ test("display page config cache primes live route hydration before first render"
 
   assert.equal(session?.config.heroCopy.titleLines[0], "預載太陽能");
   assert.equal(session?.lastLoadedEnvelope, envelope);
+});
+
+test("display page config envelope loader reuses cached live envelopes without duplicate reads", async () => {
+  clearDisplayPageConfigCache();
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: "2026-05-27T00:00:00.000Z",
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["共用太陽能", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "live" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 8
+  };
+  let readCount = 0;
+  const readConfig = async () => {
+    readCount += 1;
+    return envelope;
+  };
+
+  assert.equal(
+    (await loadDisplayPageConfigEnvelope("solar-cache-test", "live", { readConfig })).version,
+    8
+  );
+  assert.equal(
+    (await loadDisplayPageConfigEnvelope("solar-cache-test", "live", { readConfig })).version,
+    8
+  );
+  assert.equal(readCount, 1);
+
+  const session = resolveCachedDisplayPageConfigSession("solar-cache-test", "live", seedConfig);
+
+  assert.equal(session?.config.heroCopy.titleLines[0], "共用太陽能");
+});
+
+test("display page config envelope loader force reloads for display sync", async () => {
+  clearDisplayPageConfigCache();
+  let readCount = 0;
+  const readConfig = async () => {
+    readCount += 1;
+    return {
+      fallbackPolicy: defaultFallbackPolicy,
+      pageId: "overview",
+      publishedAt: "2026-05-27T00:00:00.000Z",
+      publishedBy: null,
+      regions: {
+        hero: {
+          titleLines: [readCount === 1 ? "初始總覽" : "同步總覽"]
+        }
+      },
+      stage: "live" as const,
+      updatedAt: "2026-05-27T00:00:00.000Z",
+      version: readCount
+    };
+  };
+
+  assert.equal((await loadDisplayPageConfigEnvelope("overview", "live", { readConfig })).version, 1);
+  assert.equal((await loadDisplayPageConfigEnvelope("overview", "live", { readConfig })).version, 1);
+  assert.equal(
+    (await loadDisplayPageConfigEnvelope("overview", "live", { force: true, readConfig })).version,
+    2
+  );
+  assert.equal(readCount, 2);
+});
+
+test("display page config hook ignores stale route hydration after a newer reload starts", () => {
+  assert.match(configHookSource, /const loadRequestIdRef = useRef\(0\)/);
+  assert.match(configHookSource, /requestId !== loadRequestIdRef\.current/);
+  assert.match(configHookSource, /requestId === loadRequestIdRef\.current/);
 });
 
 test("display page runtime previews skip draft-session hydration when persistence is disabled", () => {

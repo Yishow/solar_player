@@ -122,6 +122,15 @@ test("overview runtime gates dashboard widgets through visibility config", () =>
   );
 });
 
+test("overview runtime keeps story hydration staged behind visible config and live metrics", () => {
+  assert.match(overviewSource, /useLiveMetrics\(\)/);
+  assert.match(overviewSource, /useDisplayStoryRuntime\("overview",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
+  assert.match(overviewSource, /storyRuntime\.payload \?\? undefined/);
+  assert.match(overviewSource, /storyOverview: storyOverviewPayload/);
+  assert.match(overviewSource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
+  assert.match(overviewSource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
+});
+
 test("overview config treats KPI cards without visible as visible", () => {
   const seed = createOverviewDisplayPageSeedConfig();
   const { visible: _visible, ...legacyPowerCard } = seed.kpiCards.power;

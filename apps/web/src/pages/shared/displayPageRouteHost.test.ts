@@ -106,15 +106,14 @@ test("display page route host resolves duplicate route slugs to the correct regi
 });
 
 test("display page route host consumes refreshed registry snapshots after display-pages mutations", () => {
-  assert.match(registryHookSource, /useDisplaySyncRefresh\(load,\s*\["display-pages"\]\)/);
+  assert.match(registryHookSource, /useDisplaySyncRefresh\(reload,\s*\["display-pages"\]\)/);
   assert.match(routeHostSource, /resolveDisplayPageRouteInstance\(registry\.pages, location\.pathname\)/);
 });
 
 test("display page route navigation preloads live config before swapping runtime pages", () => {
   assert.match(routeHostSource, /export async function loadDisplayPageRoute/);
-  assert.match(routeHostSource, /getDisplayPageRegistry\(\)/);
-  assert.match(routeHostSource, /getDisplayPageConfig\(page\.pageKey,\s*"live"\)/);
-  assert.match(routeHostSource, /primeDisplayPageConfigCache\(page\.pageKey,\s*"live",\s*envelope\)/);
+  assert.match(routeHostSource, /loadDisplayPageRegistrySnapshot\(\)/);
+  assert.match(routeHostSource, /loadDisplayPageConfigEnvelope\(page\.pageKey,\s*"live"\)/);
   assert.match(routerSource, /loader:\s*loadDisplayPageRoute/);
 });
 
@@ -253,7 +252,7 @@ test("refreshed registry snapshots update playback route metadata and footer ord
 });
 
 test("registry-backed shell consumers converge through snapshot refresh without forcing a full browser reload", () => {
-  assert.match(registryHookSource, /useDisplaySyncRefresh\(load,\s*\["display-pages"\]\)/);
+  assert.match(registryHookSource, /useDisplaySyncRefresh\(reload,\s*\["display-pages"\]\)/);
   assert.doesNotMatch(routeHostSource, /window\.location\.reload|location\.reload/);
   assert.doesNotMatch(layoutShellSource, /window\.location\.reload|location\.reload/);
 });

@@ -73,3 +73,12 @@ test("solar display page seed config captures the current default hero and layou
   );
   assert.equal(config.kpiCards.efficiency.width, 350);
 });
+
+test("solar runtime keeps story hydration staged behind visible config and socket metrics", () => {
+  assert.match(solarSource, /useLiveMetrics\(\)/);
+  assert.match(solarSource, /useDisplayStoryRuntime\("solar",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
+  assert.match(solarSource, /solarStoryRuntime\.payload \?\? undefined/);
+  assert.match(solarSource, /solarStory: solarStoryPayload/);
+  assert.match(solarSource, /runtimeErrorMessage: runtimeHydrationEnabled \? solarStoryRuntime\.errorMessage : ""/);
+  assert.match(solarSource, /usesRuntimeFallback: solarStoryRuntime\.usesFallback/);
+});

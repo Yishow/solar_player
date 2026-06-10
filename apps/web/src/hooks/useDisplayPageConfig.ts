@@ -17,7 +17,7 @@ import {
   upgradeLegacyMetricHighlightRail
 } from "@solar-display/shared";
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDisplayPageConfig,
   isManagementDraftConflictError,
@@ -146,10 +146,17 @@ export function resolveDisplayPageFallbackPolicy(
 }
 
 const displayPageConfigCache = new Map<string, DisplayPageConfigEnvelope>();
+const pendingDisplayPageConfigRequests = new Map<string, Promise<DisplayPageConfigEnvelope>>();
+const displayPageConfigRequestSequences = new Map<string, number>();
 
 function resolveDisplayPageConfigCacheKey(pageId: DisplayPageId, stage: ConfigStage) {
   return `${stage}:${pageId}`;
 }
+
+type DisplayPageConfigEnvelopeLoaderOptions = {
+  force?: boolean;
+  readConfig?: (pageId: DisplayPageId, stage: ConfigStage) => Promise<DisplayPageConfigEnvelope>;
+};
 
 export function primeDisplayPageConfigCache(
   pageId: DisplayPageId,
@@ -157,6 +164,51 @@ export function primeDisplayPageConfigCache(
   envelope: DisplayPageConfigEnvelope
 ) {
   displayPageConfigCache.set(resolveDisplayPageConfigCacheKey(pageId, stage), envelope);
+}
+
+export function clearDisplayPageConfigCache() {
+  displayPageConfigCache.clear();
+  pendingDisplayPageConfigRequests.clear();
+  displayPageConfigRequestSequences.clear();
+}
+
+export async function loadDisplayPageConfigEnvelope(
+  pageId: DisplayPageId,
+  stage: ConfigStage,
+  options: DisplayPageConfigEnvelopeLoaderOptions = {}
+) {
+  const cacheKey = resolveDisplayPageConfigCacheKey(pageId, stage);
+  const cachedEnvelope = displayPageConfigCache.get(cacheKey);
+
+  if (!options.force && cachedEnvelope) {
+    return cachedEnvelope;
+  }
+
+  const pendingRequest = pendingDisplayPageConfigRequests.get(cacheKey);
+
+  if (!options.force && pendingRequest) {
+    return pendingRequest;
+  }
+
+  const requestSequence = (displayPageConfigRequestSequences.get(cacheKey) ?? 0) + 1;
+  displayPageConfigRequestSequences.set(cacheKey, requestSequence);
+
+  const request = (options.readConfig ?? getDisplayPageConfig)(pageId, stage)
+    .then((envelope) => {
+      if (displayPageConfigRequestSequences.get(cacheKey) === requestSequence) {
+        primeDisplayPageConfigCache(pageId, stage, envelope);
+      }
+
+      return envelope;
+    })
+    .finally(() => {
+      if (pendingDisplayPageConfigRequests.get(cacheKey) === request) {
+        pendingDisplayPageConfigRequests.delete(cacheKey);
+      }
+    });
+
+  pendingDisplayPageConfigRequests.set(cacheKey, request);
+  return request;
 }
 
 export function resolveCachedDisplayPageConfigSession<T>(
@@ -278,6 +330,7 @@ export function useDisplayPageConfig<T>(
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState(enabled ? "正在同步展示頁設定..." : "使用頁面預設設定。");
   const [errorMessage, setErrorMessage] = useState("");
+  const loadRequestIdRef = useRef(0);
   const currentSession = sessions[pageId];
   const config = currentSession?.config ?? deepClone(seedConfig);
   const lastLoadedConfig = currentSession?.lastLoadedConfig ?? deepClone(seedConfig);
@@ -290,6 +343,9 @@ export function useDisplayPageConfig<T>(
   );
 
   useEffect(() => {
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
+
     if (!enabled) {
       setIsLoading(false);
       setIsSaving(false);
@@ -299,6 +355,8 @@ export function useDisplayPageConfig<T>(
     }
 
     let active = true;
+    const isCurrentRequest = () => active && requestId === loadRequestIdRef.current;
+
     if (!shouldHydrateDisplayPageSession(enabled, Boolean(sessions[pageId]))) {
       setIsLoading(false);
       setMessage(dirty ? "保留未儲存草稿。" : "展示頁設定已同步。");
@@ -321,17 +379,16 @@ export function useDisplayPageConfig<T>(
       setErrorMessage("");
 
       try {
-        const envelope = await getDisplayPageConfig(pageId, stage);
-        if (!active) {
+        const envelope = await loadDisplayPageConfigEnvelope(pageId, stage);
+        if (!isCurrentRequest()) {
           return;
         }
 
         const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
-        primeDisplayPageConfigCache(pageId, stage, envelope);
         setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
         setMessage(resolveLoadMessage(stage, envelope));
       } catch (error) {
-        if (!active) {
+        if (!isCurrentRequest()) {
           return;
         }
 
@@ -340,7 +397,7 @@ export function useDisplayPageConfig<T>(
         setErrorMessage(error instanceof Error ? error.message : "載入展示頁設定失敗。");
         setMessage("使用 seed fallback。");
       } finally {
-        if (active) {
+        if (isCurrentRequest()) {
           setIsLoading(false);
         }
       }
@@ -358,21 +415,33 @@ export function useDisplayPageConfig<T>(
       return;
     }
 
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
+
     setIsLoading(true);
     setMessage("正在重新同步展示頁設定...");
     setErrorMessage("");
 
     try {
-      const envelope = await getDisplayPageConfig(pageId, stage);
+      const envelope = await loadDisplayPageConfigEnvelope(pageId, stage, { force: true });
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       const mergedConfig = mergeDisplayPageConfigEnvelope(seedConfig, envelope);
-      primeDisplayPageConfigCache(pageId, stage, envelope);
       setSessions((current) => ({ ...current, [pageId]: createDraftSession(mergedConfig, envelope, resolveDisplayPageFallbackPolicy(envelope)) }));
       setMessage(resolveLoadMessage(stage, envelope));
     } catch (error) {
+      if (requestId !== loadRequestIdRef.current) {
+        return;
+      }
+
       setErrorMessage(error instanceof Error ? error.message : "重新同步展示頁設定失敗。");
       setMessage("重新同步失敗，保留目前編輯狀態。");
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [enabled, pageId, seedConfig, stage]);
 

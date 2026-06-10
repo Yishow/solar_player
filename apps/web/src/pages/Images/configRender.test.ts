@@ -124,3 +124,17 @@ test("images editor exposes stage and thumbnail framing fields", () => {
   assert.ok(stageRegion.fields.some((field) => field.id === "images-stage-shadow"));
   assert.ok(thumbRegion.fields.some((field) => field.id === "thumb1-thumbnail-radius"));
 });
+
+test("images runtime keeps playlist hydration staged while preserving autoplay and controls", () => {
+  assert.match(imagesSource, /useImagePlaylistRuntime\(requestedIndex,\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
+  assert.match(imagesSource, /const runtimePlaylistEntries = playlistRuntime\.payload\?\.entries \?\? \[\]/);
+  assert.match(imagesSource, /const playbackEntries = runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
+  assert.match(imagesSource, /shuffleEnabled = runtimeHydrationEnabled/);
+  assert.match(imagesSource, /activeEntry: playbackActiveEntry/);
+  assert.match(imagesSource, /entries: playbackEntries/);
+  assert.match(imagesSource, /runtimeErrorMessage: runtimeHydrationEnabled \? playlistRuntime\.errorMessage : ""/);
+  assert.match(imagesSource, /usesRuntimeFallback: playlistRuntime\.usesFallback/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
+  assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
+});

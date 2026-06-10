@@ -4,7 +4,8 @@ import {
   createRuntimeRefreshState,
   markRuntimeRefreshLoading,
   resolveRuntimeRefreshFailure,
-  resolveRuntimeRefreshSuccess
+  resolveRuntimeRefreshSuccess,
+  shouldApplyRuntimeRefreshResult
 } from "./useRuntimeRefreshLifecycle";
 
 test("shared runtime lifecycle marks bootstrap loads consistently before first payload resolves", () => {
@@ -32,4 +33,20 @@ test("shared runtime lifecycle preserves the last payload and marks fallback on 
   assert.equal(failedState.isRefreshing, false);
   assert.equal(failedState.usesFallback, true);
   assert.equal(failedState.errorMessage, "runtime source failed");
+});
+
+test("shared runtime lifecycle starts from an initial payload without blocking first render", () => {
+  const initialState = createRuntimeRefreshState({ greeting: "cached" });
+  const loadingState = markRuntimeRefreshLoading(initialState);
+
+  assert.deepEqual(initialState.payload, { greeting: "cached" });
+  assert.equal(initialState.isLoading, false);
+  assert.equal(loadingState.isLoading, false);
+  assert.equal(loadingState.isRefreshing, true);
+  assert.deepEqual(loadingState.payload, { greeting: "cached" });
+});
+
+test("shared runtime lifecycle ignores stale request results", () => {
+  assert.equal(shouldApplyRuntimeRefreshResult(2, 2), true);
+  assert.equal(shouldApplyRuntimeRefreshResult(3, 2), false);
 });

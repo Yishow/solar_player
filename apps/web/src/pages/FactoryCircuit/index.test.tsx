@@ -24,3 +24,12 @@ test("factory circuit refresh failures preserve the last settled fallback rows i
   assert.match(factoryCircuitSource, /setLoadState\("error"\)/);
   assert.doesNotMatch(factoryCircuitSource, /setCircuits\(\[\]\)/);
 });
+
+test("factory circuit keeps circuit and story runtime outside the live-config defer guard", () => {
+  assert.match(factoryCircuitSource, /shouldDeferDisplayPageRuntimeRender\(\{\s*runtimeHydrationEnabled,\s*isLoading: runtimeConfig\.isLoading,\s*lastLoadedEnvelope: runtimeConfig\.lastLoadedEnvelope,\s*stage: runtimeStage\s*\}\)/s);
+  assert.doesNotMatch(factoryCircuitSource, /shouldDeferDisplayPageRuntimeRender\(\{[^}]*loadState/s);
+  assert.match(factoryCircuitSource, /const circuitDependencyKey = useMemo/);
+  assert.match(factoryCircuitSource, /dependencyKey: circuitDependencyKey/);
+  assert.match(factoryCircuitSource, /loadState,/);
+  assert.match(factoryCircuitSource, /factoryCircuitStory: factoryStoryRuntime\.payload \?\? undefined/);
+});

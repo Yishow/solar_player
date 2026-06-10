@@ -76,6 +76,8 @@ test("playback and management shells reuse one shared shell decoration runtime l
 });
 
 test("display page registry reload failures preserve the last-known-good playback snapshot", () => {
-  assert.match(registryHookSource, /setPages\(nextPages\.filter\(\(page\) => page\.enabled && page\.archivedAt === null\)\)/);
+  assert.match(registryHookSource, /function filterActiveDisplayPageRegistry\(pages: DisplayPageInstance\[\]\)/);
+  assert.match(registryHookSource, /page\.enabled && page\.archivedAt === null/);
+  assert.match(registryHookSource, /setPages\(nextPages\)/);
   assert.doesNotMatch(registryHookSource, /catch[\s\S]*setPages\(\[\]\)/);
 });

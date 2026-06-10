@@ -15,6 +15,7 @@ export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageId>(
   options?: {
     dependencyKey?: string | null;
     enabled?: boolean;
+    initialPayload?: DisplayStoryPayloadByPageId[PageKey] | null;
   }
 ) {
   const spec = resolveDisplayPageRuntimeRefreshSpec(pageKey, {
@@ -23,6 +24,7 @@ export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageId>(
 
   return useRuntimeRefreshLifecycle<DisplayStoryPayloadByPageId[PageKey]>({
     enabled: options?.enabled ?? true,
+    initialPayload: options?.initialPayload,
     load: () => loadDisplayStoryRuntimePayload(pageKey),
     refreshKey: spec.refreshKey,
     shouldRefresh: (event) => spec.refreshScopes.includes(event.scope)

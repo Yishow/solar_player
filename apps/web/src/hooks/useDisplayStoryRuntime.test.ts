@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { loadDisplayStoryRuntimePayload } from "./useDisplayStoryRuntime";
+
+const source = readFileSync(path.join(import.meta.dirname, "useDisplayStoryRuntime.ts"), "utf8");
 
 test("loadDisplayStoryRuntimePayload reads only the requested page payload from the page-scoped endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -51,4 +55,9 @@ test("loadDisplayStoryRuntimePayload reads only the requested page payload from 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("display story runtime hook accepts an optional initial payload for staged hydration", () => {
+  assert.match(source, /initialPayload\?: DisplayStoryPayloadByPageId\[PageKey\] \| null/);
+  assert.match(source, /initialPayload:\s*options\?\.initialPayload/);
 });

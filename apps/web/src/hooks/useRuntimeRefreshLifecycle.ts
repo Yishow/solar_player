@@ -67,8 +67,13 @@ export function resolveRuntimeRefreshFailure<T>(
   };
 }
 
+export function shouldApplyRuntimeRefreshResult(currentRequestId: number, requestId: number) {
+  return currentRequestId === requestId;
+}
+
 type UseRuntimeRefreshLifecycleOptions<T> = {
   enabled: boolean;
+  initialPayload?: T | null;
   load: () => Promise<T>;
   refreshKey: string;
   shouldRefresh: (event: DisplaySyncEvent) => boolean;
@@ -76,11 +81,14 @@ type UseRuntimeRefreshLifecycleOptions<T> = {
 
 export function useRuntimeRefreshLifecycle<T>({
   enabled,
+  initialPayload = null,
   load,
   refreshKey,
   shouldRefresh
 }: UseRuntimeRefreshLifecycleOptions<T>) {
-  const [state, setState] = useState<RuntimeRefreshState<T>>(() => createRuntimeRefreshState<T>());
+  const [state, setState] = useState<RuntimeRefreshState<T>>(() =>
+    createRuntimeRefreshState<T>(initialPayload)
+  );
   const loadRef = useRef(load);
   const requestIdRef = useRef(0);
   const shouldRefreshRef = useRef(shouldRefresh);
@@ -106,13 +114,13 @@ export function useRuntimeRefreshLifecycle<T>({
     try {
       const payload = await loadRef.current();
 
-      if (requestIdRef.current !== requestId) {
+      if (!shouldApplyRuntimeRefreshResult(requestIdRef.current, requestId)) {
         return;
       }
 
       setState((current) => resolveRuntimeRefreshSuccess(current, payload, new Date().toISOString()));
     } catch (error) {
-      if (requestIdRef.current !== requestId) {
+      if (!shouldApplyRuntimeRefreshResult(requestIdRef.current, requestId)) {
         return;
       }
 

@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
 import { Navigate, type LoaderFunctionArgs, useLocation } from "react-router-dom";
-import { primeDisplayPageConfigCache } from "../../hooks/useDisplayPageConfig";
-import { useDisplayPageRegistry } from "../../hooks/useDisplayPageRegistry";
-import { getDisplayPageConfig, getDisplayPageRegistry } from "../../services/api";
+import { loadDisplayPageConfigEnvelope } from "../../hooks/useDisplayPageConfig";
+import {
+  loadDisplayPageRegistrySnapshot,
+  useDisplayPageRegistry
+} from "../../hooks/useDisplayPageRegistry";
 import { runtimePageDefinitions } from "../DisplayPagesEditor/runtimePageDefinitions";
 import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
 import "./displayPageRouteHost.css";
@@ -19,15 +21,14 @@ export async function loadDisplayPageRoute({ params }: LoaderFunctionArgs) {
   }
 
   try {
-    const pages = await getDisplayPageRegistry();
+    const pages = await loadDisplayPageRegistrySnapshot();
     const page = resolveDisplayPageRouteInstance(pages, `/${routeSlug}`);
 
     if (!page) {
       return null;
     }
 
-    const envelope = await getDisplayPageConfig(page.pageKey, "live");
-    primeDisplayPageConfigCache(page.pageKey, "live", envelope);
+    await loadDisplayPageConfigEnvelope(page.pageKey, "live");
   } catch {
     return null;
   }
