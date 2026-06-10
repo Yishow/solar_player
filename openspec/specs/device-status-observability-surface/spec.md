@@ -318,3 +318,58 @@ tests:
   - apps/web/src/pages/EnergyTrend/layout.test.ts
   - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
 -->
+
+---
+### Requirement: Present kiosk exit and re-entry guidance on Device Status
+
+The system SHALL present a first-class kiosk exit action on `Device Status`, and the same surface SHALL explain how the operator re-enters the system after leaving the kiosk browser.
+
+#### Scenario: Operator prepares to leave the kiosk
+
+- **WHEN** the operator opens `Device Status`
+- **THEN** the page shows an explicit `離開系統` action in the device action area
+- **AND** the page shows re-entry guidance telling the operator to return from the desktop by clicking `Solar Display Kiosk`
+
+#### Scenario: Exit action is unavailable to an untrusted reader
+
+- **WHEN** the request context is not trusted for management access
+- **THEN** the page SHALL NOT claim that kiosk exit is available
+- **AND** it SHALL preserve the existing trusted-access boundary semantics for device operations
+
+<!-- @trace
+source: add-overview-group-style-controls-and-kiosk-exit
+updated: 2026-06-10
+code:
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/devtools/reactGrabBootstrapTarget.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - deploy/reset-db-settings.sh
+  - deploy/start-solar-kiosk.sh
+  - apps/web/package.json
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - scripts/deploy.test.mjs
+  - deploy/stop-solar-kiosk.sh
+  - apps/server/src/services/deviceKioskExitService.ts
+  - deploy/firefox-kiosk.desktop
+  - apps/web/src/main.tsx
+  - apps/server/src/routes/device.ts
+  - apps/web/src/devtools/reactGrabNoop.ts
+  - deploy.sh
+  - deploy/export-runtime-state.sh
+  - apps/web/tsconfig.json
+  - deploy/solar-display.service
+  - apps/web/src/devtools/reactGrabBootstrap.ts
+  - apps/web/src/services/api.ts
+  - deploy/install-kiosk.sh
+tests:
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/web/src/services/api.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/devtools/reactGrabBootstrapTarget.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/Overview/widgetStyles.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+-->

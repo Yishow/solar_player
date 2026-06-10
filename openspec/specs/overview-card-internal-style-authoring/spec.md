@@ -418,3 +418,58 @@ tests:
   - apps/server/src/services/generationTrendSeries.test.ts
   - apps/server/src/services/MetricHistoryRetentionService.test.ts
 -->
+
+---
+### Requirement: Author family-scoped appearance controls for Overview card groups
+
+The system SHALL expose, in the Overview editor, one family-scoped appearance region for KPI cards and one family-scoped appearance region for bottom widgets. Each region SHALL let the operator edit `surfaceOpacity`, `surfaceBlur`, and `shadowStrength`, and each edit SHALL synchronize the chosen value to every member style record in that family within the current draft session.
+
+#### Scenario: Operator edits KPI card family appearance
+
+- **WHEN** the operator changes a KPI family appearance field in `/display-pages/editor?page=overview`
+- **THEN** the draft session updates the same appearance field for `power`, `today`, `total`, `co2Today`, and `co2Total`
+- **AND** the existing per-card fields remain available for later fine tuning
+
+#### Scenario: Operator edits bottom widget family appearance
+
+- **WHEN** the operator changes a bottom widget family appearance field in `/display-pages/editor?page=overview`
+- **THEN** the draft session updates the same appearance field for `weather`, `phasePower`, `generationTrend`, and `alertNotifications`
+- **AND** saving the draft persists those synchronized widget style values through the existing draft/live config flow
+
+<!-- @trace
+source: add-overview-group-style-controls-and-kiosk-exit
+updated: 2026-06-10
+code:
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/devtools/reactGrabBootstrapTarget.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - deploy/reset-db-settings.sh
+  - deploy/start-solar-kiosk.sh
+  - apps/web/package.json
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - scripts/deploy.test.mjs
+  - deploy/stop-solar-kiosk.sh
+  - apps/server/src/services/deviceKioskExitService.ts
+  - deploy/firefox-kiosk.desktop
+  - apps/web/src/main.tsx
+  - apps/server/src/routes/device.ts
+  - apps/web/src/devtools/reactGrabNoop.ts
+  - deploy.sh
+  - deploy/export-runtime-state.sh
+  - apps/web/tsconfig.json
+  - deploy/solar-display.service
+  - apps/web/src/devtools/reactGrabBootstrap.ts
+  - apps/web/src/services/api.ts
+  - deploy/install-kiosk.sh
+tests:
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/web/src/services/api.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/devtools/reactGrabBootstrapTarget.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/Overview/widgetStyles.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+-->
