@@ -3,10 +3,14 @@ openspec/.vector-search.db*
 node_modules/
 dist/
 
+.kilo/
 .env
 .env.*
 !.env.example
 
+.antigravitycli/
+.codex/
+.claude/
 .DS_Store
 server-runtime.lock.json
 
