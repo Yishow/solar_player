@@ -65,3 +65,12 @@ test("mqtt settings lists three-phase metric keys as creatable, manageable topic
     );
   }
 });
+
+test("mqtt settings defers diagnostics polling and weather preview until persisted controls load", () => {
+  assert.match(mqttSettingsSource, /hasLoadedMqttEditableModel/);
+  assert.match(mqttSettingsSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
+  assert.match(mqttSettingsSource, /useLiveMetrics\(\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
+  assert.match(mqttSettingsSource, /useMqttStatus\(undefined,\s*\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
+  assert.match(mqttSettingsSource, /if \(!hasLoadedWeatherSettings\) \{/);
+  assert.match(mqttSettingsSource, /if \(!hasLoadedTopics\) \{/);
+});

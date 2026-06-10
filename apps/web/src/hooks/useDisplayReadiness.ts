@@ -10,13 +10,23 @@ type UseDisplayReadinessResult = {
   reload: () => Promise<void>;
 };
 
-export function useDisplayReadiness(): UseDisplayReadinessResult {
+type UseDisplayReadinessOptions = {
+  enabled?: boolean;
+};
+
+export function useDisplayReadiness(options: UseDisplayReadinessOptions = {}): UseDisplayReadinessResult {
+  const enabled = options.enabled ?? true;
   const [readiness, setReadiness] = useState<DisplayReadinessReport | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [accessDenied, setAccessDenied] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const load = async () => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setAccessDenied(false);
     setErrorMessage("");
@@ -36,8 +46,13 @@ export function useDisplayReadiness(): UseDisplayReadinessResult {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     void load();
-  }, []);
+  }, [enabled]);
 
   return {
     accessDenied,

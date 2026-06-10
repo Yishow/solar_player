@@ -21,6 +21,9 @@ import type { PlaybackRuntimeReloadOptions } from "./displaySyncPlaybackReload";
 
 type UsePlaybackControllerOptions = {
   currentPath?: string;
+  enabled?: boolean;
+  rotationPreview?: DisplayRotationPreview | null;
+  settings?: PlaybackSettings | null;
   tickMs?: number;
 };
 
@@ -45,18 +48,29 @@ type PlaybackControllerState = {
 export function usePlaybackController(
   options: UsePlaybackControllerOptions = {}
 ): PlaybackControllerState {
-  const [settings, setSettings] = useState<PlaybackSettings | null>(null);
-  const [pages, setPages] = useState<PlaybackPage[]>([]);
+  const enabled = options.enabled ?? true;
+  const [settings, setSettings] = useState<PlaybackSettings | null>(() => options.settings ?? null);
+  const [pages, setPages] = useState<PlaybackPage[]>(() => options.rotationPreview?.playablePages ?? []);
   const [runtime, setRuntime] = useState<PlaybackRuntime | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState("");
   const [fallbackRoute, setFallbackRoute] = useState<string | null>(null);
-  const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
+  const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(() => options.rotationPreview ?? null);
+  const providedSettingsRef = useRef<PlaybackSettings | null>(options.settings ?? null);
+  const providedRotationPreviewRef = useRef<DisplayRotationPreview | null>(options.rotationPreview ?? null);
   const settingsRef = useRef<PlaybackSettings | null>(null);
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
   const lastSyncedPathRef = useRef<string | undefined>(undefined);
   const tickMs = options.tickMs ?? 250;
+
+  useEffect(() => {
+    providedSettingsRef.current = options.settings ?? null;
+  }, [options.settings]);
+
+  useEffect(() => {
+    providedRotationPreviewRef.current = options.rotationPreview ?? null;
+  }, [options.rotationPreview]);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -80,12 +94,19 @@ export function usePlaybackController(
       : 0;
 
   const loadPlayback = async (reloadOptions?: PlaybackRuntimeReloadOptions) => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      const providedSettings = providedSettingsRef.current;
+      const providedRotationPreview = providedRotationPreviewRef.current;
       const [nextSettings, rotationPreview] = await Promise.all([
-        getPlaybackSettings(),
-        getDisplayRotationPreview()
+        providedSettings ? Promise.resolve(providedSettings) : getPlaybackSettings(),
+        providedRotationPreview ? Promise.resolve(providedRotationPreview) : getDisplayRotationPreview()
       ]);
       const runtimePages = rotationPreview.playablePages;
       const nowMs = Date.now();
@@ -116,8 +137,13 @@ export function usePlaybackController(
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     void loadPlayback();
-  }, []);
+  }, [enabled, options.rotationPreview, options.settings]);
 
   useEffect(() => {
     const nextRuntime = resolveRouteRuntimeSync({

@@ -110,12 +110,13 @@ export function CircuitSettings() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [message, setMessage] = useState("正在載入迴路設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const [hasLoadedCircuits, setHasLoadedCircuits] = useState(false);
   const {
     errorMessage: readinessErrorMessage,
     isLoading: readinessLoading,
     readiness,
     reload: reloadReadiness
-  } = useDisplayReadiness();
+  } = useDisplayReadiness({ enabled: hasLoadedCircuits });
 
   const reloadReadinessRef = useRef(reloadReadiness);
   reloadReadinessRef.current = reloadReadiness;
@@ -136,6 +137,7 @@ export function CircuitSettings() {
       const nextCircuits = await getCircuits();
       setCircuits(nextCircuits);
       setDirtyIds([]);
+      setHasLoadedCircuits(true);
       setMessage("迴路設定已同步。");
       setErrorMessage("");
     } catch (error) {

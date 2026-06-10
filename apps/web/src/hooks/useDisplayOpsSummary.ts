@@ -9,12 +9,22 @@ type UseDisplayOpsSummaryResult = {
   summary: DisplayOpsSummary | null;
 };
 
-export function useDisplayOpsSummary(): UseDisplayOpsSummaryResult {
+type UseDisplayOpsSummaryOptions = {
+  enabled?: boolean;
+};
+
+export function useDisplayOpsSummary(options: UseDisplayOpsSummaryOptions = {}): UseDisplayOpsSummaryResult {
+  const enabled = options.enabled ?? true;
   const [summary, setSummary] = useState<DisplayOpsSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState("");
 
   const load = async () => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage("");
     try {
@@ -27,8 +37,13 @@ export function useDisplayOpsSummary(): UseDisplayOpsSummaryResult {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     void load();
-  }, []);
+  }, [enabled]);
 
   return {
     errorMessage,

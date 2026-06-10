@@ -11,7 +11,8 @@ test("playback settings keeps save and resync actions wired to the playback APIs
   assert.match(playbackSettingsSource, /const handleSave = async \(\) => \{/);
   assert.match(playbackSettingsSource, /updatePlaybackSettings\(settings\)/);
   assert.match(playbackSettingsSource, /updatePlaybackPages\(/);
-  assert.match(playbackSettingsSource, /getDisplayRotationPreview\(\)/);
+  assert.match(playbackSettingsSource, /loadPlaybackDiagnosticsModel\(\)/);
+  assert.match(playbackSettingsSource, /setMessage\("播放設定已儲存。"\);[\s\S]*void refreshPlaybackDiagnostics\(\);[\s\S]*void reloadDisplayOpsSummary\(\);/);
   assert.match(playbackSettingsSource, /const resyncPlaybackConfig = async \(\) => \{/);
   assert.match(playbackSettingsSource, /className="mgmt-action ps-resync"/);
   assert.match(playbackSettingsSource, /className="mgmt-action primary ps-save"/);
@@ -21,7 +22,7 @@ test("playback settings keeps save and resync actions wired to the playback APIs
 });
 
 test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
-  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\)/);
+  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
   assert.match(playbackSettingsSource, /ps-preview__alert/);
   assert.match(playbackSettingsSource, /ps-preview--with-alert/);
@@ -45,4 +46,14 @@ test("playback settings reserves extra preview space when the alert banner is vi
   assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert\s*\{/);
   assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert\s*\{[\s\S]*height:\s*300px;/);
   assert.match(playbackSettingsCss, /\.playback-settings-page \.ps-preview--with-alert \.ps-preview__list\s*\{/);
+});
+
+test("playback settings renders editable model before deferred diagnostics", () => {
+  assert.match(playbackSettingsSource, /loadPlaybackEditableModel\(\)/);
+  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
+  assert.match(playbackSettingsSource, /useDisplayOpsSummary\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
+  assert.match(playbackSettingsSource, /enabled:\s*Boolean\(lastSyncedSettings && rotationPreview\)/);
+  assert.match(playbackSettingsSource, /settings:\s*lastSyncedSettings/);
+  assert.match(playbackSettingsSource, /rotationPreviewErrorMessage/);
+  assert.doesNotMatch(playbackSettingsSource, /const loadPlaybackConfig = async/);
 });

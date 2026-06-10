@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
+const circuitSettingsIndexSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
 const circuitSettingsSource =
   fs.readFileSync(path.join(pageDir, "CircuitSettingsContent.tsx"), "utf8") +
   fs.readFileSync(path.join(pageDir, "CircuitRow.tsx"), "utf8");
@@ -21,4 +22,10 @@ test("circuit settings keeps bulk table editing while replacing freeform icon au
   assert.match(circuitSettingsSource, /row\.thresholdSummaryLabel/);
   assert.doesNotMatch(circuitSettingsSource, /Display Impact/);
   assert.doesNotMatch(circuitSettingsSource, /placeholder="bolt"/);
+});
+
+test("circuit settings renders rows before deferred readiness diagnostics", () => {
+  assert.match(circuitSettingsIndexSource, /const \[hasLoadedCircuits, setHasLoadedCircuits\] = useState\(false\)/);
+  assert.match(circuitSettingsIndexSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedCircuits\s*\}\)/);
+  assert.match(circuitSettingsIndexSource, /setHasLoadedCircuits\(true\)/);
 });

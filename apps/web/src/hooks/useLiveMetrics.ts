@@ -22,13 +22,22 @@ function shouldReplaceSnapshot(current: LiveMetricsSnapshot, next: LiveMetricsSn
   return next.timestamp >= current.timestamp;
 }
 
-export function useLiveMetrics() {
+type UseLiveMetricsOptions = {
+  enabled?: boolean;
+};
+
+export function useLiveMetrics(options: UseLiveMetricsOptions = {}) {
+  const enabled = options.enabled ?? true;
   const [snapshot, setSnapshot] = useState<LiveMetricsSnapshot>(getCachedLiveMetrics());
   const [connectionState, setConnectionState] = useState<SocketConnectionState>(
     getSocketConnectionState()
   );
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let active = true;
 
     const loadInitialSnapshot = async () => {
@@ -59,7 +68,7 @@ export function useLiveMetrics() {
       unsubscribeMetrics();
       unsubscribeConnection();
     };
-  }, []);
+  }, [enabled]);
 
   return {
     connectionState: connectionState.status,

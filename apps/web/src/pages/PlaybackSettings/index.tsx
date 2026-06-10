@@ -12,9 +12,6 @@ import {
 import { useDisplayOpsSummary } from "../../hooks/useDisplayOpsSummary";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
-  getDisplayRotationPreview,
-  getPlaybackPages,
-  getPlaybackSettings,
   updatePlaybackPages,
   updatePlaybackSettings
 } from "../../services/api";
@@ -31,52 +28,55 @@ import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
 import { LiveRotationPreviewList } from "./LiveRotationPreviewList";
 import { PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import { useLiveDisplayPagePreviewCatalog } from "../shared/useLiveDisplayPagePreviewCatalog";
+import {
+  loadPlaybackDiagnosticsModel,
+  loadPlaybackEditableModel,
+  type PlaybackEditableModel
+} from "./loadModel";
 
 export function PlaybackSettings() {
-  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog();
   const [settings, setSettings] = useState<PlaybackSettings | null>(null);
   const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(null);
   const [pages, setPages] = useState<PlaybackPage[]>([]);
   const [lastSyncedPages, setLastSyncedPages] = useState<PlaybackPage[]>([]);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
+  const [rotationPreviewErrorMessage, setRotationPreviewErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const hasEditableModel = Boolean(lastSyncedSettings);
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({ enabled: hasEditableModel });
   const {
     errorMessage: displayOpsErrorMessage,
     reload: reloadDisplayOpsSummary,
     summary: displayOpsSummary
-  } = useDisplayOpsSummary();
+  } = useDisplayOpsSummary({ enabled: hasEditableModel });
   const runtime = usePlaybackController({
     currentPath: "/settings/playback",
+    enabled: Boolean(lastSyncedSettings && rotationPreview),
+    rotationPreview,
+    settings: lastSyncedSettings,
     tickMs: 1000
   });
 
-  const applyLoadedPlaybackConfig = (
-    nextSettings: PlaybackSettings,
-    nextPages: PlaybackPage[],
-    nextRotationPreview: DisplayRotationPreview
-  ) => {
-    setSettings(nextSettings);
-    setLastSyncedSettings(nextSettings);
-    setPages(nextPages);
-    setLastSyncedPages(nextPages);
-    setRotationPreview(nextRotationPreview);
+  const applyLoadedPlaybackEditableModel = (model: PlaybackEditableModel) => {
+    setSettings(model.settings);
+    setLastSyncedSettings(model.settings);
+    setPages(model.pages);
+    setLastSyncedPages(model.pages);
   };
 
-  const loadPlaybackConfig = async () => {
-    const [nextSettings, nextPages, nextRotationPreview] = await Promise.all([
-      getPlaybackSettings(),
-      getPlaybackPages(),
-      getDisplayRotationPreview()
-    ]);
-
-    return {
-      nextPages,
-      nextRotationPreview,
-      nextSettings
-    };
+  const refreshPlaybackDiagnostics = async (isActive: () => boolean = () => true) => {
+    try {
+      const { rotationPreview: nextRotationPreview } = await loadPlaybackDiagnosticsModel();
+      if (!isActive()) return;
+      setRotationPreview(nextRotationPreview);
+      setRotationPreviewErrorMessage("");
+    } catch (error) {
+      if (!isActive()) return;
+      setRotationPreviewErrorMessage(error instanceof Error ? error.message : "輪播診斷同步失敗。");
+    }
   };
 
   useEffect(() => {
@@ -84,15 +84,12 @@ export function PlaybackSettings() {
     const bootstrap = async () => {
       setIsLoading(true);
       try {
-        const {
-          nextPages,
-          nextRotationPreview,
-          nextSettings
-        } = await loadPlaybackConfig();
+        const model = await loadPlaybackEditableModel();
         if (!active) return;
-        applyLoadedPlaybackConfig(nextSettings, nextPages, nextRotationPreview);
+        applyLoadedPlaybackEditableModel(model);
         setMessage("播放設定已同步。");
         setErrorMessage("");
+        void refreshPlaybackDiagnostics(() => active);
       } catch (error) {
         if (!active) return;
         setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
@@ -134,15 +131,14 @@ export function PlaybackSettings() {
           }))
         )
       ]);
-      const nextRotationPreview = await getDisplayRotationPreview();
-      await reloadDisplayOpsSummary();
       setSettings(savedSettings);
       setLastSyncedSettings(savedSettings);
       setPages(savedPages);
       setLastSyncedPages(savedPages);
-      setRotationPreview(nextRotationPreview);
       setMessage("播放設定已儲存。");
       setErrorMessage("");
+      void refreshPlaybackDiagnostics();
+      void reloadDisplayOpsSummary();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存播放設定失敗。");
     } finally {
@@ -156,13 +152,10 @@ export function PlaybackSettings() {
     setIsSaving(false);
     setIsLoading(true);
     try {
-      const {
-        nextPages,
-        nextRotationPreview,
-        nextSettings
-      } = await loadPlaybackConfig();
-      await reloadDisplayOpsSummary();
-      applyLoadedPlaybackConfig(nextSettings, nextPages, nextRotationPreview);
+      const model = await loadPlaybackEditableModel();
+      applyLoadedPlaybackEditableModel(model);
+      void refreshPlaybackDiagnostics();
+      void reloadDisplayOpsSummary();
       setMessage("播放設定已同步。");
     } catch (error) {
       const nextError = error instanceof Error ? error : new Error("重新同步播放設定失敗。");
@@ -238,14 +231,14 @@ export function PlaybackSettings() {
         ? "is-saving"
         : "";
   const showSaveBanner = statusVariant !== "";
-  const previewAlertTone = displayOpsErrorMessage
+  const previewAlertTone = displayOpsErrorMessage || rotationPreviewErrorMessage
     ? "is-error"
     : viewModel.displayOpsBanner.tone === "error"
       ? "is-error"
       : viewModel.displayOpsBanner.tone === "warning"
         ? "is-warning"
         : "";
-  const showPreviewAlert = Boolean(displayOpsErrorMessage) || previewAlertTone !== "";
+  const showPreviewAlert = Boolean(displayOpsErrorMessage || rotationPreviewErrorMessage) || previewAlertTone !== "";
 
   const formDisabled = isLoading || !settings;
 
@@ -315,8 +308,12 @@ export function PlaybackSettings() {
           {showPreviewAlert ? (
             <OpsInfoBanner
               className="ps-preview__alert"
-              detail={displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
-              title={displayOpsErrorMessage || viewModel.displayOpsBanner.title}
+              detail={rotationPreviewErrorMessage || displayOpsErrorMessage || viewModel.displayOpsBanner.detail}
+              title={
+                rotationPreviewErrorMessage
+                  ? "輪播診斷同步失敗"
+                  : displayOpsErrorMessage || viewModel.displayOpsBanner.title
+              }
               tone={previewAlertTone === "is-error" ? "error" : "warning"}
             />
           ) : null}

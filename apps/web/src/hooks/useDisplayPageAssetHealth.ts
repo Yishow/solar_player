@@ -9,12 +9,24 @@ type UseDisplayPageAssetHealthResult = {
   report: DisplayPageAssetHealthReport | null;
 };
 
-export function useDisplayPageAssetHealth(): UseDisplayPageAssetHealthResult {
+type UseDisplayPageAssetHealthOptions = {
+  enabled?: boolean;
+};
+
+export function useDisplayPageAssetHealth(
+  options: UseDisplayPageAssetHealthOptions = {}
+): UseDisplayPageAssetHealthResult {
+  const enabled = options.enabled ?? true;
   const [report, setReport] = useState<DisplayPageAssetHealthReport | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState("");
 
   const load = async () => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage("");
 
@@ -29,8 +41,13 @@ export function useDisplayPageAssetHealth(): UseDisplayPageAssetHealthResult {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     void load();
-  }, []);
+  }, [enabled]);
 
   return {
     errorMessage,

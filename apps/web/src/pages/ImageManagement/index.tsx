@@ -11,9 +11,6 @@ import { useImageAssetReferences } from "../../hooks/useImageAssetReferences";
 import {
   bootstrapImagePlaylistGovernance,
   deleteImageAsset,
-  fetchImagePlaylistGovernance,
-  getImages,
-  getImageStorageUsage,
   type ImageStorageUsage,
   persistImageManagementDraftTarget,
   updateImageAsset,
@@ -29,58 +26,19 @@ import type {
 import {
   buildImageManagementDraftSaveTarget,
   hasSelectedImageManagementDraftChanges,
-  normalizeManagementPlaylistAssetId,
   resolveSelectedPlaylistEntry
 } from "./viewModel";
 import { IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
+import {
+  loadImageManagementModel,
+  type ImageManagementModel
+} from "./loadModel";
 
 const initialStorageUsage: ImageStorageUsage = {
   fileCount: 0,
   usedBytes: 0,
   usedMB: 0
 };
-
-function normalizeManagementPlaylistEntry(entry: Awaited<ReturnType<typeof fetchImagePlaylistGovernance>>["playlist"]["entries"][number]): ImageManagementPlaylistEntry {
-  return {
-    area: entry.area?.trim() ? entry.area : "",
-    assetId: normalizeManagementPlaylistAssetId(entry.assetId, entry.entryId),
-    capturedAt: entry.capturedAt?.trim() ? entry.capturedAt : "",
-    description: entry.description?.trim() ? entry.description : "",
-    displayOrder: entry.displayOrder,
-    durationSeconds: entry.durationSeconds,
-    enabled: entry.enabled,
-    entryId: entry.entryId,
-    fallbackMode: entry.fallbackMode,
-    tags: entry.tags,
-    title: entry.title?.trim() ? entry.title : ""
-  };
-}
-
-function normalizeResolvedPlaylistEntry(
-  entry: Awaited<ReturnType<typeof fetchImagePlaylistGovernance>>["playlist"]["resolvedEntries"][number]
-): ImageManagementResolvedPlaylistEntry {
-  return {
-    entryId: entry.entryId,
-    fallbackActive: entry.fallbackActive,
-    fallbackReason: entry.fallbackReason,
-    isPlayable: entry.isPlayable
-  };
-}
-
-function resolveBulkPlaylistDurationInput(entries: ImageManagementPlaylistEntry[]) {
-  if (entries.length === 0) {
-    return "" as const;
-  }
-
-  const [firstEntry] = entries;
-  if (!firstEntry) {
-    return "" as const;
-  }
-
-  return entries.every((entry) => entry.durationSeconds === firstEntry.durationSeconds)
-    ? firstEntry.durationSeconds
-    : "" as const;
-}
 
 export function ImageManagement() {
   const [assets, setAssets] = useState<ImageAsset[]>([]);
@@ -102,50 +60,41 @@ export function ImageManagement() {
   const [playlistBulkDurationSeconds, setPlaylistBulkDurationSeconds] = useState<number | "">("");
   const [isUpdatingPlaylistDurationAll, setIsUpdatingPlaylistDurationAll] = useState(false);
   const [isUpdatingPlaylistSettings, setIsUpdatingPlaylistSettings] = useState(false);
+  const [hasLoadedImageManagementModel, setHasLoadedImageManagementModel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
     isLoading: isAssetHealthLoading,
     reload: reloadAssetHealth,
     report: assetHealthReport
-  } = useDisplayPageAssetHealth();
+  } = useDisplayPageAssetHealth({ enabled: hasLoadedImageManagementModel });
   const {
     errorMessage: assetReferencesErrorMessage,
     isLoading: isAssetReferencesLoading,
     references: assetReferences,
     reload: reloadAssetReferences
-  } = useImageAssetReferences(selectedImageId);
+  } = useImageAssetReferences(selectedImageId, { enabled: hasLoadedImageManagementModel });
+
+  const applyImageManagementModel = (model: ImageManagementModel) => {
+    setAssets(model.assets);
+    setLastSyncedAssets(model.lastSyncedAssets);
+    setStorageUsage(model.storageUsage);
+    setPlaylistEntries(model.playlistEntries);
+    setLastSyncedPlaylistEntries(model.lastSyncedPlaylistEntries);
+    setResolvedPlaylistEntries(model.resolvedPlaylistEntries);
+    setPlaylistShuffle(model.playlistShuffle);
+    setPlaylistBulkDurationSeconds(model.playlistBulkDurationSeconds);
+    setSelectedImageId(model.selectedImageId);
+    setSelectedPlaylistEntryId(model.selectedPlaylistEntryId);
+    setHasLoadedImageManagementModel(true);
+  };
 
   const syncImages = async (preferredImageId: number | null = selectedImageId) => {
-    const [nextAssets, nextStorageUsage, playlistRes] = await Promise.all([
-      getImages(),
-      getImageStorageUsage(),
-      fetchImagePlaylistGovernance()
-    ]);
-    const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
-    const nextResolvedPlaylistEntries = playlistRes.playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry);
-    setAssets(nextAssets);
-    setLastSyncedAssets(nextAssets);
-    setStorageUsage(nextStorageUsage);
-    setPlaylistEntries(nextPlaylistEntries);
-    setLastSyncedPlaylistEntries(nextPlaylistEntries);
-    setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
-    setPlaylistShuffle(playlistRes.playlist.settings.shuffle);
-    setPlaylistBulkDurationSeconds(resolveBulkPlaylistDurationInput(nextPlaylistEntries));
-    const nextSelectedAssetId =
-      preferredImageId !== null && nextAssets.some((asset) => asset.id === preferredImageId)
-        ? preferredImageId
-        : nextAssets[0]?.id ?? null;
-    setSelectedImageId(nextSelectedAssetId);
-    setSelectedPlaylistEntryId((currentSelectedEntryId) =>
-      nextSelectedAssetId === null
-        ? null
-        : resolveSelectedPlaylistEntry(
-            nextPlaylistEntries,
-            nextSelectedAssetId,
-            currentSelectedEntryId
-          )?.entryId ?? null
-    );
+    const model = await loadImageManagementModel({}, {
+      currentSelectedEntryId: selectedPlaylistEntryId,
+      preferredImageId
+    });
+    applyImageManagementModel(model);
   };
 
   useEffect(() => {
@@ -153,29 +102,9 @@ export function ImageManagement() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [nextAssets, nextStorageUsage, playlistRes] = await Promise.all([
-          getImages(),
-          getImageStorageUsage(),
-          fetchImagePlaylistGovernance()
-        ]);
+        const model = await loadImageManagementModel();
         if (!active) return;
-        const nextPlaylistEntries = playlistRes.playlist.entries.map(normalizeManagementPlaylistEntry);
-        const nextResolvedPlaylistEntries = playlistRes.playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry);
-        setAssets(nextAssets);
-        setLastSyncedAssets(nextAssets);
-        setStorageUsage(nextStorageUsage);
-        setPlaylistEntries(nextPlaylistEntries);
-        setLastSyncedPlaylistEntries(nextPlaylistEntries);
-        setResolvedPlaylistEntries(nextResolvedPlaylistEntries);
-        setPlaylistShuffle(playlistRes.playlist.settings.shuffle);
-        setPlaylistBulkDurationSeconds(resolveBulkPlaylistDurationInput(nextPlaylistEntries));
-        const nextSelectedAssetId = nextAssets[0]?.id ?? null;
-        setSelectedImageId(nextSelectedAssetId);
-        setSelectedPlaylistEntryId(
-          nextSelectedAssetId === null
-            ? null
-            : resolveSelectedPlaylistEntry(nextPlaylistEntries, nextSelectedAssetId)?.entryId ?? null
-        );
+        applyImageManagementModel(model);
         setMessage("圖片庫已同步。");
         setErrorMessage("");
       } catch (error) {

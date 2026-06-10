@@ -5,6 +5,7 @@ import test from "node:test";
 
 const imageManagementSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 const imageManagementContentSource = readFileSync(path.join(import.meta.dirname, "ImageManagementContent.tsx"), "utf8");
+const imageManagementLoadModelSource = readFileSync(path.join(import.meta.dirname, "loadModel.ts"), "utf8");
 const imageManagementCss = readFileSync(path.join(import.meta.dirname, "imageManagement.css"), "utf8");
 const apiSource = readFileSync(path.join(import.meta.dirname, "../../services/api.ts"), "utf8");
 
@@ -14,7 +15,7 @@ test("image management persists playlist-facing metadata through the playlist ru
   assert.doesNotMatch(imageManagementSource, /shouldMirrorLegacyPlaybackState/);
   assert.doesNotMatch(imageManagementSource, /includedInSlideshow: effectiveIncludedInSlideshow/);
   assert.doesNotMatch(imageManagementSource, /displayDuration: selectedPlaylistEntry\?\.durationSeconds \?\? selectedAsset\.displayDuration/);
-  assert.match(imageManagementSource, /normalizeManagementPlaylistAssetId\(entry\.assetId, entry\.entryId\)/);
+  assert.match(imageManagementLoadModelSource, /normalizeManagementPlaylistAssetId\(entry\.assetId, entry\.entryId\)/);
   assert.match(apiSource, /updateImagePlaylistEntry\(target\.playlistEntry\.entryId/);
   assert.match(apiSource, /title: normalizeNullableImageManagementText\(target\.playlistEntry\.title\)/);
   assert.match(apiSource, /area: normalizeNullableImageManagementText\(target\.playlistEntry\.area\)/);
@@ -30,7 +31,7 @@ test("image management editor surfaces playlist runtime controls and server-driv
   assert.match(imageManagementContentSource, /onTogglePlaylistShuffle/);
   assert.match(imageManagementContentSource, /全部播放時間/);
   assert.match(imageManagementContentSource, /onApplyPlaylistBulkDuration/);
-  assert.match(imageManagementSource, /setPlaylistBulkDurationSeconds\(resolveBulkPlaylistDurationInput\(nextPlaylistEntries\)\)/);
+  assert.match(imageManagementLoadModelSource, /playlistBulkDurationSeconds:\s*resolveBulkPlaylistDurationInput\(playlistEntries\)/);
   assert.match(imageManagementSource, /setPlaylistBulkDurationSeconds\(appliedDuration\)/);
   assert.match(imageManagementContentSource, /event\.target\.value === "" \? "" : Number\(event\.target\.value\)/);
   assert.match(imageManagementContentSource, /playlistBulkDurationSeconds === ""/);
@@ -65,6 +66,15 @@ test("image management save flow targets the authoritative draft session and res
   assert.match(imageManagementSource, /const saveTarget = buildImageManagementDraftSaveTarget\(/);
   assert.match(imageManagementSource, /await persistImageManagementDraftTarget\(saveTarget\)/);
   assert.match(imageManagementSource, /await syncImages\(saveTarget\.asset\.id\)/);
+});
+
+test("image management loads the editable library model before deferred diagnostics", () => {
+  assert.match(imageManagementSource, /loadImageManagementModel\(\)/);
+  assert.match(imageManagementSource, /const applyImageManagementModel = \(model: ImageManagementModel\) => {/);
+  assert.match(imageManagementSource, /useDisplayPageAssetHealth\(\{\s*enabled:\s*hasLoadedImageManagementModel\s*\}\)/);
+  assert.match(imageManagementSource, /useImageAssetReferences\(selectedImageId,\s*\{\s*enabled:\s*hasLoadedImageManagementModel\s*\}\)/);
+  assert.doesNotMatch(imageManagementSource, /getImages\(\)/);
+  assert.doesNotMatch(imageManagementSource, /fetchImagePlaylistGovernance\(\)/);
 });
 
 test("image management library and editor cards keep their own scroll containers", () => {

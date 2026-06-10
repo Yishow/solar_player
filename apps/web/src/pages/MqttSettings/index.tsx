@@ -156,13 +156,17 @@ export function MqttSettings() {
     isSavingTopics: false,
     isTestingConnection: false
   });
+  const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(false);
+  const [hasLoadedTopics, setHasLoadedTopics] = useState(false);
+  const [hasLoadedWeatherSettings, setHasLoadedWeatherSettings] = useState(false);
+  const hasLoadedMqttEditableModel = hasLoadedMqttSettings && hasLoadedTopics && hasLoadedWeatherSettings;
   const {
     errorMessage: readinessErrorMessage,
     readiness,
     reload: reloadReadiness
-  } = useDisplayReadiness();
-  const { connectionState: liveMetricsConnectionState, snapshot: liveMetricsSnapshot } = useLiveMetrics();
-  const mqttStatusStream = useMqttStatus();
+  } = useDisplayReadiness({ enabled: hasLoadedMqttEditableModel });
+  const { connectionState: liveMetricsConnectionState, snapshot: liveMetricsSnapshot } = useLiveMetrics({ enabled: hasLoadedMqttEditableModel });
+  const mqttStatusStream = useMqttStatus(undefined, { enabled: hasLoadedMqttEditableModel });
 
   useEffect(() => {
     if (!mqttStatusStream.isHydrated) {
@@ -193,6 +197,7 @@ export function MqttSettings() {
       setLastSyncedSettings(nextSettings);
       setStatus(response.status);
       setLastConnectionTest(null);
+      setHasLoadedMqttSettings(true);
       setMessage("MQTT 設定已同步。");
       setErrorMessage("");
     } catch (error) {
@@ -221,6 +226,7 @@ export function MqttSettings() {
       setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
+      setHasLoadedTopics(true);
       if (!isPolling) {
         setLastConnectionTest(null);
         setMessage("Topic mappings 已同步。");
@@ -246,6 +252,7 @@ export function MqttSettings() {
       const nextWeatherSettings = await getWeatherSettings();
       setWeatherSettings(nextWeatherSettings);
       setLastSyncedWeatherSettings(nextWeatherSettings);
+      setHasLoadedWeatherSettings(true);
     } catch (error) {
       if (propagateError) {
         throw error instanceof Error ? error : new Error("載入天氣設定失敗。");
@@ -254,7 +261,6 @@ export function MqttSettings() {
   };
 
   useEffect(() => {
-    let active = true;
     const bootstrap = async () => {
       try {
         await Promise.all([
@@ -268,6 +274,14 @@ export function MqttSettings() {
     };
     void bootstrap();
 
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedTopics) {
+      return;
+    }
+
+    let active = true;
     const pollTimer = window.setInterval(() => {
       if (active) {
         void loadTopics({ isPolling: true });
@@ -278,9 +292,13 @@ export function MqttSettings() {
       active = false;
       window.clearInterval(pollTimer);
     };
-  }, []);
+  }, [hasLoadedTopics]);
 
   useEffect(() => {
+    if (!hasLoadedWeatherSettings) {
+      return;
+    }
+
     let active = true;
     void (async () => {
       try {
@@ -301,9 +319,13 @@ export function MqttSettings() {
     return () => {
       active = false;
     };
-  }, [weatherSettings.countyName]);
+  }, [hasLoadedWeatherSettings, weatherSettings.countyName]);
 
   useEffect(() => {
+    if (!hasLoadedWeatherSettings) {
+      return;
+    }
+
     let active = true;
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -331,6 +353,7 @@ export function MqttSettings() {
     // Preview only depends on the server-resolved location snapshot; field/preset
     // composition is applied locally in the view model.
   }, [
+    hasLoadedWeatherSettings,
     weatherSettings.enabled,
     weatherSettings.locationMode,
     weatherSettings.countyName,

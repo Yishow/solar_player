@@ -9,13 +9,21 @@ type UseImageAssetReferencesResult = {
   reload: () => Promise<void>;
 };
 
-export function useImageAssetReferences(assetId: number | null): UseImageAssetReferencesResult {
+type UseImageAssetReferencesOptions = {
+  enabled?: boolean;
+};
+
+export function useImageAssetReferences(
+  assetId: number | null,
+  options: UseImageAssetReferencesOptions = {}
+): UseImageAssetReferencesResult {
+  const enabled = options.enabled ?? true;
   const [references, setReferences] = useState<DisplayOpsAssetReferenceSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const load = async () => {
-    if (assetId === null) {
+    if (!enabled || assetId === null) {
       setReferences(null);
       setIsLoading(false);
       setErrorMessage("");
@@ -35,7 +43,7 @@ export function useImageAssetReferences(assetId: number | null): UseImageAssetRe
 
   useEffect(() => {
     void load();
-  }, [assetId]);
+  }, [assetId, enabled]);
 
   return {
     errorMessage,

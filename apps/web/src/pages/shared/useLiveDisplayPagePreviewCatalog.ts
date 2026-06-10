@@ -1,37 +1,45 @@
-import { useEffect, useMemo, useState } from "react";
-import { getDisplayPageConfig, getDisplayPageRegistry } from "../../services/api";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
   liveDisplayPagePreviewRegistry
 } from "./liveDisplayPagePreviewRegistry";
 import {
-  buildLiveDisplayPagePreviewStates,
-  createLoadingLiveDisplayPagePreviewState
-} from "./liveDisplayPagePreviewState";
-import type { LiveDisplayPagePreviewStates } from "./liveDisplayPagePreviewState";
+  loadLiveDisplayPagePreviewCatalog,
+  type LiveDisplayPagePreviewCatalog
+} from "./liveDisplayPagePreviewCatalogLoader";
 
-export type LiveDisplayPagePreviewCatalog = LiveDisplayPagePreviewStates;
+type UseLiveDisplayPagePreviewCatalogOptions = {
+  enabled?: boolean;
+};
 
-export function useLiveDisplayPagePreviewCatalog() {
+export function useLiveDisplayPagePreviewCatalog(
+  options: UseLiveDisplayPagePreviewCatalogOptions = {}
+) {
+  const enabled = options.enabled ?? true;
   const definitions = useMemo(() => liveDisplayPagePreviewRegistry, []);
   const [states, setStates] = useState<LiveDisplayPagePreviewCatalog>({});
+  const requestIdRef = useRef(0);
 
-  const load = async () => {
-    const registryPages = (await getDisplayPageRegistry()).filter(
-      (page) => page.enabled && page.archivedAt === null
-    );
+  const load = async (loadOptions: { force?: boolean } = {}) => {
+    if (!enabled) {
+      return;
+    }
 
-    setStates(
-      Object.fromEntries(
-        registryPages.map((page) => [page.pageKey, createLoadingLiveDisplayPagePreviewState()])
-      )
-    );
-
-    const nextStates = await buildLiveDisplayPagePreviewStates({
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const { states: nextStates } = await loadLiveDisplayPagePreviewCatalog({
       definitions,
-      pages: registryPages,
-      readLiveConfig: (pageKey) => getDisplayPageConfig(pageKey, "live")
+      force: loadOptions.force,
+      onLoadingStates: (loadingStates) => {
+        if (requestId === requestIdRef.current) {
+          setStates(loadingStates);
+        }
+      }
     });
+
+    if (requestId !== requestIdRef.current) {
+      return;
+    }
 
     setStates(nextStates);
   };
@@ -40,27 +48,22 @@ export function useLiveDisplayPagePreviewCatalog() {
     let active = true;
 
     const loadCatalog = async () => {
-      const registryPages = (await getDisplayPageRegistry()).filter(
-        (page) => page.enabled && page.archivedAt === null
-      );
-
-      if (!active) {
+      if (!enabled) {
         return;
       }
 
-      setStates(
-        Object.fromEntries(
-          registryPages.map((page) => [page.pageKey, createLoadingLiveDisplayPagePreviewState()])
-        )
-      );
-
-      const nextStates = await buildLiveDisplayPagePreviewStates({
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      const { states: nextStates } = await loadLiveDisplayPagePreviewCatalog({
         definitions,
-        pages: registryPages,
-        readLiveConfig: (pageKey) => getDisplayPageConfig(pageKey, "live")
+        onLoadingStates: (loadingStates) => {
+          if (active && requestId === requestIdRef.current) {
+            setStates(loadingStates);
+          }
+        }
       });
 
-      if (!active) {
+      if (!active || requestId !== requestIdRef.current) {
         return;
       }
 
@@ -72,9 +75,9 @@ export function useLiveDisplayPagePreviewCatalog() {
     return () => {
       active = false;
     };
-  }, [definitions]);
+  }, [definitions, enabled]);
 
-  useDisplaySyncRefresh(() => load(), ["display-pages"]);
+  useDisplaySyncRefresh(() => load({ force: true }), enabled ? ["display-pages"] : []);
 
   return {
     definitions,

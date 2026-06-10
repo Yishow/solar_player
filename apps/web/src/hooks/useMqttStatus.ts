@@ -39,10 +39,22 @@ export function resolveInitialMqttState(
   };
 }
 
-export function useMqttStatus(initialStatus?: MqttConnectionStatus | null) {
+type UseMqttStatusOptions = {
+  enabled?: boolean;
+};
+
+export function useMqttStatus(
+  initialStatus?: MqttConnectionStatus | null,
+  options: UseMqttStatusOptions = {}
+) {
+  const enabled = options.enabled ?? true;
   const [{ isHydrated, status }, setState] = useState(() => resolveInitialMqttState(initialStatus));
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let active = true;
 
     const bootstrapStatus = async () => {
@@ -75,7 +87,7 @@ export function useMqttStatus(initialStatus?: MqttConnectionStatus | null) {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [enabled]);
 
   return {
     isHydrated,
