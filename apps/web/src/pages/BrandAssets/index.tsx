@@ -198,8 +198,10 @@ export function BrandAssets() {
     return window.confirm("尚有未儲存的變更，繼續會丟棄目前修改，確定要繼續嗎？");
   }, [dirty]);
 
+  const hasProtectedBrandDraft = dirty || pendingAction !== null;
+
   const syncDraftGuard = useDisplaySyncDraftGuard({
-    isDirty: dirty,
+    isDirty: hasProtectedBrandDraft,
     relevantScopes: BRAND_ASSETS_DISPLAY_SYNC_SCOPES,
     reloadNow: () => resyncBrandProfiles(selectedId ?? undefined)
   });

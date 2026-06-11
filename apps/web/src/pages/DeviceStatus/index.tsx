@@ -18,6 +18,10 @@ import {
 import { DeviceStatusContent } from "./DeviceStatusContent";
 import { DEVICE_STATUS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 
+type DeviceStatusLoadOptions = {
+  preserveProtectedState?: boolean;
+};
+
 export function DeviceStatus() {
   const [status, setStatus] = useState<DeviceStatusResponseData | null>(null);
   const [statusAccessDenied, setStatusAccessDenied] = useState(false);
@@ -44,30 +48,35 @@ export function DeviceStatus() {
     });
   const kioskReentryHint = "回到桌面後點擊 Solar Display Kiosk 重新進入。";
 
-  const loadDeviceStatus = async () => {
+  const loadDeviceStatus = async ({ preserveProtectedState = false }: DeviceStatusLoadOptions = {}) => {
     setStatusLoading(true);
     try {
       setStatus(await getDeviceStatus());
       setStatusAccessDenied(false);
-      setActionFeedback(null);
-    } catch (error) {
-      if (isManagementAccessDeniedError(error)) {
-        setStatus(null);
-        setStatusAccessDenied(true);
-        setActionFeedback({
-          detail: "此頁面僅對受信任的管理端開放。",
-          title: "存取受限",
-          tone: "error"
-        });
-      } else {
-        setStatus(null);
-        setStatusAccessDenied(false);
-        setActionFeedback({
-          detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
-          title: "同步失敗",
-          tone: "error"
-        });
+      if (!preserveProtectedState) {
+        setActionFeedback(null);
       }
+    } catch (error) {
+      const nextFeedback: DeviceActionFeedback = isManagementAccessDeniedError(error)
+        ? {
+            detail: "此頁面僅對受信任的管理端開放。",
+            title: "存取受限",
+            tone: "error"
+          }
+        : {
+            detail: error instanceof Error ? error.message : "載入裝置狀態失敗。",
+            title: "同步失敗",
+            tone: "error"
+          };
+      if (!preserveProtectedState) {
+        setStatus(null);
+      }
+      if (isManagementAccessDeniedError(error)) {
+        setStatusAccessDenied(true);
+      } else {
+        setStatusAccessDenied(false);
+      }
+      setActionFeedback((current) => (preserveProtectedState && current ? current : nextFeedback));
     } finally {
       setStatusLoading(false);
     }
@@ -99,7 +108,7 @@ export function DeviceStatus() {
   }, []);
 
   useDisplaySyncRefresh(() => {
-    void loadDeviceStatus();
+    void loadDeviceStatus({ preserveProtectedState: true });
     void loadLogExportMetadata();
     void reloadDisplayOpsSummary();
   }, DEVICE_STATUS_DISPLAY_SYNC_SCOPES);

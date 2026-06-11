@@ -19,3 +19,11 @@ test("device status exposes display ops loading separately from host status load
   assert.match(deviceStatusSource, /displayOpsLoading=\{displayOpsLoading\}/);
   assert.match(deviceStatusSource, /isLoading=\{statusLoading\}/);
 });
+
+test("device status preserves protected safe-op feedback during background display sync", () => {
+  assert.match(deviceStatusSource, /type DeviceStatusLoadOptions = \{\s*preserveProtectedState\?: boolean;\s*\}/);
+  assert.match(deviceStatusSource, /loadDeviceStatus\s*=\s*async\s*\(\{\s*preserveProtectedState = false\s*\}: DeviceStatusLoadOptions = \{\}\)/);
+  assert.match(deviceStatusSource, /if \(!preserveProtectedState\) \{\s*setActionFeedback\(null\);\s*\}/);
+  assert.match(deviceStatusSource, /void loadDeviceStatus\(\{\s*preserveProtectedState: true\s*\}\)/);
+  assert.match(deviceStatusSource, /setActionFeedback\(\(current\) => \(preserveProtectedState && current \? current : nextFeedback\)\)/);
+});
