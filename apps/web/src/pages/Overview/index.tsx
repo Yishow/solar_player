@@ -308,48 +308,62 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     [resolvedConfig.widgetStyles.alertNotifications, alertNotificationsLayout]
   );
 
-  const kpiCards = useMemo(
+  const kpiCardShells = useMemo(
     () =>
       overviewCardOrder.map((cardItem, index) => {
         if (!shouldRenderOverviewKpiCard(resolvedConfig.kpiCards[cardItem.key])) {
           return null;
         }
 
-        const metric = viewModel.metrics[index]!;
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
 
-        return (
-          <DisplayCardFrame
-            cardStyle={cardStyle}
-            key={metric.metricKey}
-            className="overview-kpi-card"
-            surface="metric"
-            style={{
-              height: `${layout.height}px`,
-              left: `${layout.left}px`,
-              top: `${layout.top}px`,
-              width: `${layout.width}px`
-            }}
-          >
-            <DisplayCardHeader
-              icon={renderDisplayPageIcon({
-                alt: metric.label,
-                className: "overview-kpi-icon",
-                seedSource: seedConfig.iconSources[cardItem.key],
-                source: resolvedConfig.iconSources[cardItem.key]
-              })}
-              iconContainerClassName="overview-kpi-icon-shell"
-              subtitle={cardItem.englishLabel}
-              title={metric.label}
-            />
-            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
-            <OverviewKpiFooter footer={resolvedConfig.kpiCards[cardItem.key]} metric={metric} />
-          </DisplayCardFrame>
-        );
+        return {
+          cardItem,
+          cardStyle,
+          index,
+          style: {
+            height: `${layout.height}px`,
+            left: `${layout.left}px`,
+            top: `${layout.top}px`,
+            width: `${layout.width}px`
+          }
+        };
       }),
-    [resolvedConfig, seedConfig.iconSources, viewModel.metrics]
+    [resolvedConfig]
   );
+
+  const kpiCards = kpiCardShells.map((shell) => {
+    if (!shell) {
+      return null;
+    }
+
+    const metric = viewModel.metrics[shell.index]!;
+
+    return (
+      <DisplayCardFrame
+        cardStyle={shell.cardStyle}
+        key={metric.metricKey}
+        className="overview-kpi-card"
+        surface="metric"
+        style={shell.style}
+      >
+        <DisplayCardHeader
+          icon={renderDisplayPageIcon({
+            alt: metric.label,
+            className: "overview-kpi-icon",
+            seedSource: seedConfig.iconSources[shell.cardItem.key],
+            source: resolvedConfig.iconSources[shell.cardItem.key]
+          })}
+          iconContainerClassName="overview-kpi-icon-shell"
+          subtitle={shell.cardItem.englishLabel}
+          title={metric.label}
+        />
+        <DisplayCardValueRow align={shell.cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
+        <OverviewKpiFooter footer={resolvedConfig.kpiCards[shell.cardItem.key]} metric={metric} />
+      </DisplayCardFrame>
+    );
+  });
 
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",

@@ -11,8 +11,8 @@ test("overview runtime routes KPI icons through the shared icon resolver", () =>
   const source = readPageSource("Overview");
 
   assert.match(source, /renderDisplayPageIcon\(\{/);
-  assert.match(source, /resolvedConfig\.iconSources\[cardItem\.key\]/);
-  assert.match(source, /seedConfig\.iconSources\[cardItem\.key\]/);
+  assert.match(source, /resolvedConfig\.iconSources\[shell\.cardItem\.key\]/);
+  assert.match(source, /seedConfig\.iconSources\[shell\.cardItem\.key\]/);
 });
 
 test("solar runtime routes flow and KPI icons through the shared icon resolver", () => {

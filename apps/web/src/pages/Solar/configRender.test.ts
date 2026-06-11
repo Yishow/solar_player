@@ -6,6 +6,16 @@ import { createSolarDisplayPageSeedConfig } from "./displayPageConfig";
 
 const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
+function sourceBetween(start: string, end: string) {
+  const startIndex = solarSource.indexOf(start);
+  const endIndex = solarSource.indexOf(end, startIndex);
+
+  assert.ok(startIndex >= 0, `missing source start: ${start}`);
+  assert.ok(endIndex > startIndex, `missing source end: ${end}`);
+
+  return solarSource.slice(startIndex, endIndex);
+}
+
 test("solar runtime reads resolved display config for hero, flow nodes, connectors, and KPI cards", () => {
   assert.match(solarSource, /resolvedConfig\.heroCopy\.eyebrow/);
   assert.match(solarSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
@@ -36,6 +46,25 @@ test("solar runtime reads resolved display config for hero, flow nodes, connecto
   assert.match(solarSource, /resolvedConfig\.connectors\[connector\.key\]/);
   assert.match(solarSource, /resolvedConfig\.connectorTreatments\[connector\.key\]/);
   assert.match(solarSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
+});
+
+test("solar value-only refresh keeps static geometry output on config-only memo paths", () => {
+  const flowNodeSource = sourceBetween("const flowNodeItems = useMemo(", "const connectorItems = useMemo(");
+  const connectorSource = sourceBetween("const connectorItems = useMemo(", "const kpiCardItems = useMemo(");
+  const kpiSource = sourceBetween("const kpiCardItems = useMemo(", "if (");
+  const heroSource = sourceBetween("const solarTitleLine2 = useMemo(", "const heroTypography = resolvedConfig.chrome.heroTypography");
+
+  assert.match(flowNodeSource, /\[resolvedConfig,\s*seedConfig\]/);
+  assert.match(connectorSource, /\[resolvedConfig,\s*seedConfig\]/);
+  assert.match(kpiSource, /\[resolvedConfig,\s*seedConfig\]/);
+  assert.match(heroSource, /buildDisplayPageMediaPresentation/);
+  assert.match(heroSource, /resolveDisplayPageMediaSource/);
+  assert.doesNotMatch(flowNodeSource, /viewModel/);
+  assert.doesNotMatch(connectorSource, /viewModel/);
+  assert.doesNotMatch(kpiSource, /viewModel/);
+  assert.doesNotMatch(heroSource, /viewModel/);
+  assert.match(solarSource, /const node = viewModel\.flowNodes\[index\]!/);
+  assert.match(solarSource, /const metric = viewModel\.kpis\[index\]!/);
 });
 
 test("solar display page seed config captures the current default hero and layout contract", () => {

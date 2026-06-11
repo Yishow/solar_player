@@ -11,6 +11,16 @@ import {
 
 const overviewSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
+function sourceBetween(start: string, end: string) {
+  const startIndex = overviewSource.indexOf(start);
+  const endIndex = overviewSource.indexOf(end, startIndex);
+
+  assert.ok(startIndex >= 0, `missing source start: ${start}`);
+  assert.ok(endIndex > startIndex, `missing source end: ${end}`);
+
+  return overviewSource.slice(startIndex, endIndex);
+}
+
 test("overview runtime reads resolved display config for hero copy and hero media", () => {
   assert.match(overviewSource, /resolvedConfig\.heroCopy\.eyebrow/);
   assert.match(overviewSource, /resolvedConfig\.heroCopy\.titleLines\[0\]/);
@@ -29,10 +39,28 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /DisplayCardValueRow/);
   assert.match(overviewSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
   assert.match(overviewSource, /<OverviewKpiFooter/);
-  assert.match(overviewSource, /footer=\{resolvedConfig\.kpiCards\[cardItem\.key\]\}/);
+  assert.match(overviewSource, /footer=\{resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\}/);
   assert.match(overviewSource, /metric=\{metric\}/);
   assert.doesNotMatch(overviewSource, /import \{ trendSeries \} from \"\.\.\/\.\.\/mocks\/metrics\"/);
   assert.doesNotMatch(overviewSource, /Shared Story Summary/);
+});
+
+test("overview value-only refresh keeps KPI card shell output on the config-only path", () => {
+  const shellSource = sourceBetween(
+    "const kpiCardShells = useMemo(",
+    "const runtimeFallbackBanner = resolveRuntimeFallbackBannerState"
+  );
+
+  assert.match(shellSource, /const kpiCardShells = useMemo\(/);
+  assert.match(shellSource, /\[resolvedConfig\]/);
+  assert.match(shellSource, /style: \{/);
+  assert.match(shellSource, /createDisplayCardStyleConfig\(resolvedConfig\.cardStyles\[cardItem\.key\]\)/);
+  assert.match(shellSource, /const kpiCards = kpiCardShells\.map/);
+  assert.match(shellSource, /const metric = viewModel\.metrics\[shell\.index\]!/);
+  assert.doesNotMatch(
+    sourceBetween("const kpiCardShells = useMemo(", "const kpiCards = kpiCardShells.map"),
+    /viewModel/
+  );
 });
 
 test("overview display page seed config captures the current default hero contract", () => {

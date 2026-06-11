@@ -297,29 +297,47 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
     usesRuntimeFallback: solarStoryRuntime.usesFallback
   });
-  const solarTitleLine2 = splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]);
-  const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
-  const heroMediaPresentation = buildDisplayPageMediaPresentation(
-    resolvedConfig.heroMedia,
-    solarHeroMediaEffectResolverOptions
+  const solarTitleLine2 = useMemo(
+    () => splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]),
+    [resolvedConfig.heroCopy.titleLines]
+  );
+  const heroMediaSource = useMemo(
+    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
+    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
+  );
+  const heroMediaPresentation = useMemo(
+    () =>
+      buildDisplayPageMediaPresentation(
+        resolvedConfig.heroMedia,
+        solarHeroMediaEffectResolverOptions
+      ),
+    [resolvedConfig.heroMedia]
   );
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
 
-  const titleLayout = withContentOffset(solarTitleLayout);
-  const heroLayout = withContentOffset(resolvedConfig.heroContainer);
-  const goldLineLayout = withContentOffset({
-    left: resolvedConfig.chrome.ornaments.goldLine.baseLeft,
-    top: resolvedConfig.chrome.ornaments.goldLine.baseTop,
-    width: resolvedConfig.chrome.ornaments.goldLine.baseWidth
-  });
-  const leafLayout = withContentOffset({
-    height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
-    left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
-    top: resolvedConfig.chrome.ornaments.leaf.baseTop,
-    width: resolvedConfig.chrome.ornaments.leaf.baseWidth
-  });
+  const titleLayout = useMemo(() => withContentOffset(solarTitleLayout), []);
+  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
+  const goldLineLayout = useMemo(
+    () =>
+      withContentOffset({
+        left: resolvedConfig.chrome.ornaments.goldLine.baseLeft,
+        top: resolvedConfig.chrome.ornaments.goldLine.baseTop,
+        width: resolvedConfig.chrome.ornaments.goldLine.baseWidth
+      }),
+    [resolvedConfig.chrome.ornaments.goldLine]
+  );
+  const leafLayout = useMemo(
+    () =>
+      withContentOffset({
+        height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
+        left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
+        top: resolvedConfig.chrome.ornaments.leaf.baseTop,
+        width: resolvedConfig.chrome.ornaments.leaf.baseWidth
+      }),
+    [resolvedConfig.chrome.ornaments.leaf]
+  );
 
   return (
     <section className="solar-display-page">
