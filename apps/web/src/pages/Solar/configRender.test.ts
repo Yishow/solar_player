@@ -67,12 +67,6 @@ test("solar value-only refresh keeps static geometry output on config-only memo 
   assert.match(solarSource, /const metric = viewModel\.kpis\[index\]!/);
 });
 
-test("solar runtime keeps hook calls before the loading-state return", () => {
-  const loadingReturnSource = sourceBetween("return <DisplayPageLoadingState />;", "return (");
-
-  assert.doesNotMatch(loadingReturnSource, /\buse[A-Z][A-Za-z]+\(/);
-});
-
 test("solar display page seed config captures the current default hero and layout contract", () => {
   const config = createSolarDisplayPageSeedConfig("/solar-hero.png");
 

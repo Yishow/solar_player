@@ -34,10 +34,12 @@ test("live preview catalog loads page-instance state from the active registry in
 });
 
 test("live preview catalog request key ignores visible-window order churn", () => {
-  assert.equal(
-    resolvePreviewCatalogRequestKey(["solar", "overview", "solar"]),
-    resolvePreviewCatalogRequestKey(["overview", "solar"])
-  );
+  const baselineKey = resolvePreviewCatalogRequestKey(["solar", "overview", "solar"]);
+
+  assert.equal(baselineKey, resolvePreviewCatalogRequestKey(["overview", "solar"]));
+  assert.equal(baselineKey, resolvePreviewCatalogRequestKey(["solar", "overview"]));
+  assert.notEqual(baselineKey, resolvePreviewCatalogRequestKey(["overview", "images"]));
+  assert.notEqual(baselineKey, resolvePreviewCatalogRequestKey(["overview"]));
 });
 
 function createPage(overrides: Partial<DisplayPageInstance> = {}): DisplayPageInstance {
