@@ -43,7 +43,6 @@ export function SlideshowPreview() {
     settings,
   } = usePageRotation();
   const previewCatalogPageKeys = useMemo(() => pages.map((page) => page.pageKey), [pages]);
-  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({ fallbackPageKeys: previewCatalogPageKeys });
 
   const viewModel = useMemo(
     () =>
@@ -104,6 +103,14 @@ export function SlideshowPreview() {
       })),
     [visibleCards]
   );
+  const requestedPreviewPageKeys = useMemo(
+    () => previewCards.map((card) => card.pageKey),
+    [previewCards]
+  );
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({
+    fallbackPageKeys: previewCatalogPageKeys,
+    requestedPageKeys: requestedPreviewPageKeys
+  });
   const hasMultiplePages = pages.length > 1;
 
   return (

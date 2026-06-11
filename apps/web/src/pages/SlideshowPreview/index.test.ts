@@ -10,7 +10,9 @@ const pageDir = path.resolve(import.meta.dirname);
 const slideshowPreviewSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
 
 test("slideshow preview renders cards from the shared live preview catalog instead of prototype asset maps", () => {
-  assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\{\s*fallbackPageKeys:\s*previewCatalogPageKeys\s*\}\)/);
+  assert.match(slideshowPreviewSource, /requestedPreviewPageKeys/);
+  assert.match(slideshowPreviewSource, /previewCards\.map\(\(card\) => card\.pageKey\)/);
+  assert.match(slideshowPreviewSource, /useLiveDisplayPagePreviewCatalog\(\{\s*fallbackPageKeys:\s*previewCatalogPageKeys,\s*requestedPageKeys:\s*requestedPreviewPageKeys\s*\}\)/);
   assert.match(slideshowPreviewSource, /<LiveSlideshowPreviewCards/);
   assert.match(slideshowPreviewSource, /resolveSlideshowCardOffsets\(visibleCards\.length\)/);
   assert.match(slideshowPreviewSource, /pages\.length > 1/);

@@ -22,7 +22,9 @@ test("playback settings keeps save and resync actions wired to the playback APIs
 });
 
 test("playback settings renders rotation tiles from the shared live preview catalog instead of static thumbnails", () => {
-  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
+  assert.match(playbackSettingsSource, /requestedPreviewPageKeys/);
+  assert.match(playbackSettingsSource, /configuredRotationRows\.map\(\(row\) => row\.pageId\)/);
+  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel,\s*requestedPageKeys:\s*requestedPreviewPageKeys\s*\}\)/);
   assert.match(playbackSettingsSource, /<LiveRotationPreviewList/);
   assert.match(playbackSettingsSource, /ps-preview__alert/);
   assert.match(playbackSettingsSource, /ps-preview--with-alert/);
@@ -50,7 +52,7 @@ test("playback settings reserves extra preview space when the alert banner is vi
 
 test("playback settings renders editable model before deferred diagnostics", () => {
   assert.match(playbackSettingsSource, /loadPlaybackEditableModel\(\)/);
-  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
+  assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel,\s*requestedPageKeys:\s*requestedPreviewPageKeys\s*\}\)/);
   assert.match(playbackSettingsSource, /useDisplayOpsSummary\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
   assert.match(playbackSettingsSource, /enabled:\s*Boolean\(lastSyncedSettings && rotationPreview\)/);
   assert.match(playbackSettingsSource, /settings:\s*lastSyncedSettings/);

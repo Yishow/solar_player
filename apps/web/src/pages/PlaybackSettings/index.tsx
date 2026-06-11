@@ -46,7 +46,23 @@ export function PlaybackSettings() {
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
   const hasEditableModel = Boolean(lastSyncedSettings);
-  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({ enabled: hasEditableModel });
+  // Preview rows depend only on the form pages, never on the per-second runtime
+  // tick. Memoizing them separately keeps a stable reference so the memoized
+  // LiveRotationPreviewList does not re-render every second when only runtime
+  // values change. buildConfiguredRotationRows sorts internally, so the result
+  // is bit-equivalent to viewModel.configuredRotationRows.
+  const configuredRotationRows = useMemo(
+    () => buildConfiguredRotationRows(pages),
+    [pages]
+  );
+  const requestedPreviewPageKeys = useMemo(
+    () => configuredRotationRows.map((row) => row.pageId),
+    [configuredRotationRows]
+  );
+  const livePreviewCatalog = useLiveDisplayPagePreviewCatalog({
+    enabled: hasEditableModel,
+    requestedPageKeys: requestedPreviewPageKeys
+  });
   const {
     errorMessage: displayOpsErrorMessage,
     reload: reloadDisplayOpsSummary,
@@ -212,16 +228,6 @@ export function PlaybackSettings() {
       rotationPreview,
       settings
     ]
-  );
-
-  // Preview rows depend only on the form pages, never on the per-second runtime
-  // tick. Memoizing them separately keeps a stable reference so the memoized
-  // LiveRotationPreviewList does not re-render every second when only runtime
-  // values change. buildConfiguredRotationRows sorts internally, so the result
-  // is bit-equivalent to viewModel.configuredRotationRows.
-  const configuredRotationRows = useMemo(
-    () => buildConfiguredRotationRows(pages),
-    [pages]
   );
 
   const statusVariant =

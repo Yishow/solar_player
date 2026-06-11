@@ -10,9 +10,11 @@ import { createConfigUnavailableLiveDisplayPagePreviewStates } from "./liveDispl
 type UseLiveDisplayPagePreviewCatalogOptions = {
   enabled?: boolean;
   fallbackPageKeys?: string[];
+  requestedPageKeys?: string[];
 };
 
 const EMPTY_FALLBACK_PAGE_KEYS: string[] = [];
+const EMPTY_REQUESTED_PAGE_KEYS: string[] = [];
 
 export function useLiveDisplayPagePreviewCatalog(
   options: UseLiveDisplayPagePreviewCatalogOptions = {}
@@ -20,9 +22,17 @@ export function useLiveDisplayPagePreviewCatalog(
   const enabled = options.enabled ?? true;
   const fallbackPageKeys = options.fallbackPageKeys ?? EMPTY_FALLBACK_PAGE_KEYS;
   const fallbackPageKeysKey = fallbackPageKeys.join("|");
+  const requestedPageKeys = options.requestedPageKeys ?? EMPTY_REQUESTED_PAGE_KEYS;
+  const requestedPageKeysKey = requestedPageKeys.join("|");
   const definitions = useMemo(() => liveDisplayPagePreviewRegistry, []);
   const [states, setStates] = useState<LiveDisplayPagePreviewCatalog>({});
+  const statesRef = useRef<LiveDisplayPagePreviewCatalog>({});
   const requestIdRef = useRef(0);
+
+  const setCatalogStates = (nextStates: LiveDisplayPagePreviewCatalog) => {
+    statesRef.current = nextStates;
+    setStates(nextStates);
+  };
 
   const createFailureStates = (error: unknown) =>
     createConfigUnavailableLiveDisplayPagePreviewStates(
@@ -43,19 +53,26 @@ export function useLiveDisplayPagePreviewCatalog(
         force: loadOptions.force,
         onLoadingStates: (loadingStates) => {
           if (requestId === requestIdRef.current) {
-            setStates(loadingStates);
+            setCatalogStates(loadingStates);
           }
-        }
+        },
+        onResolvedStates: (nextStates) => {
+          if (requestId === requestIdRef.current) {
+            setCatalogStates(nextStates);
+          }
+        },
+        previousStates: statesRef.current,
+        requestedPageKeys
       });
 
       if (requestId !== requestIdRef.current) {
         return;
       }
 
-      setStates(nextStates);
+      setCatalogStates(nextStates);
     } catch (error) {
       if (requestId === requestIdRef.current) {
-        setStates(createFailureStates(error));
+        setCatalogStates(createFailureStates(error));
       }
     }
   };
@@ -75,19 +92,26 @@ export function useLiveDisplayPagePreviewCatalog(
           definitions,
           onLoadingStates: (loadingStates) => {
             if (active && requestId === requestIdRef.current) {
-              setStates(loadingStates);
+              setCatalogStates(loadingStates);
             }
-          }
+          },
+          onResolvedStates: (nextStates) => {
+            if (active && requestId === requestIdRef.current) {
+              setCatalogStates(nextStates);
+            }
+          },
+          previousStates: statesRef.current,
+          requestedPageKeys
         });
 
         if (!active || requestId !== requestIdRef.current) {
           return;
         }
 
-        setStates(nextStates);
+        setCatalogStates(nextStates);
       } catch (error) {
         if (active && requestId === requestIdRef.current) {
-          setStates(createFailureStates(error));
+          setCatalogStates(createFailureStates(error));
         }
       }
     };
@@ -97,7 +121,7 @@ export function useLiveDisplayPagePreviewCatalog(
     return () => {
       active = false;
     };
-  }, [definitions, enabled, fallbackPageKeysKey]);
+  }, [definitions, enabled, fallbackPageKeysKey, requestedPageKeysKey]);
 
   useDisplaySyncRefresh(() => load({ force: true }), enabled ? ["display-pages"] : []);
 
