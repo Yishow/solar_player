@@ -282,15 +282,18 @@ export function FactoryCircuit({
     },
     factoryCircuitRefreshSpec.fallbackRefreshScopes
   );
-  const circuitDependencyKey = useMemo(
-    () =>
-      circuits
+  const circuitsRuntimeSource = useMemo(
+    () => ({
+      circuits,
+      dependencyKey: circuits
         .map((circuit) => `${circuit.id}:${circuit.displaySlot ?? "na"}:${circuit.enabled ? "on" : "off"}`)
         .join("|"),
-    [circuits]
+      loadState
+    }),
+    [circuits, loadState]
   );
   const factoryStoryRuntime = useDisplayStoryRuntime("factory-circuit", {
-    dependencyKey: circuitDependencyKey,
+    dependencyKey: circuitsRuntimeSource.dependencyKey,
     enabled: runtimeHydrationEnabled
   });
 
@@ -337,13 +340,13 @@ export function FactoryCircuit({
   const viewModel = useMemo(
     () =>
       buildFactoryCircuitViewModel({
-        circuits,
+        circuits: circuitsRuntimeSource.circuits,
         connectionState,
-        loadState,
+        loadState: circuitsRuntimeSource.loadState,
         snapshot,
         factoryCircuitStory: factoryStoryRuntime.payload ?? undefined
       }),
-    [circuits, connectionState, loadState, snapshot, factoryStoryRuntime.payload]
+    [circuitsRuntimeSource, connectionState, snapshot, factoryStoryRuntime.payload]
   );
   const powerConnectors = useMemo(
     () =>
