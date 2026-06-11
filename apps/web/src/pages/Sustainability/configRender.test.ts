@@ -121,6 +121,11 @@ test("sustainability runtime resolves the shared story adapter and clears back t
   assert.match(sustainabilitySource, /useSustainabilityStoryRuntime\(selectedPeriod/);
   assert.match(sustainabilitySource, /enabled: runtimeHydrationEnabled/);
   assert.match(sustainabilitySource, /story:\s*storyRuntime\.payload \?\? undefined/);
+  assert.match(sustainabilitySource, /const viewModel = useMemo\(\s*\(\) =>\s*buildSustainabilityViewModel\(/);
+  assert.match(sustainabilitySource, /\[selectedPeriod,\s*storyRuntime\.payload\]/);
+  assert.match(sustainabilitySource, /const periodBoundContent = useMemo\(/);
+  assert.match(sustainabilitySource, /const resolvedHighlightCards = resolveDisplayPageCardRailCards/);
+  assert.match(sustainabilitySource, /\}, \[resolvedConfig\.highlightRail,\s*viewModel\]\)/);
   assert.match(sustainabilitySource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
   assert.match(sustainabilitySource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
   assert.match(sustainabilitySource, /shouldDeferDisplayPageRuntimeRender\(/);

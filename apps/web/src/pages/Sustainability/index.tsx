@@ -180,10 +180,14 @@ export function Sustainability({
       ...(runtimeResolvedConfig.rhythm ?? {})
     }
   };
-  const viewModel = buildSustainabilityViewModel({
-    selectedPeriod,
-    story: storyRuntime.payload ?? undefined
-  });
+  const viewModel = useMemo(
+    () =>
+      buildSustainabilityViewModel({
+        selectedPeriod,
+        story: storyRuntime.payload ?? undefined
+      }),
+    [selectedPeriod, storyRuntime.payload]
+  );
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
     runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
@@ -200,66 +204,75 @@ export function Sustainability({
   const paletteVars = buildDisplayGreenPaletteStyleVars(resolvedConfig.chrome.palette);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-  const metricHighlightCards = resolvedConfig.highlightRail.cards.filter(
-    (card): card is DisplayPageMetricHighlightCard => card.template === "metric-highlight"
-  );
-  const householdCards = resolvedConfig.highlightRail.cards.filter(
-    (card): card is DisplayPageHouseholdEquivalentCard => card.template === "household-equivalent"
-  );
-  const highlightContentByCardId = new Map<string, DisplayPageMetricHighlightCardPayload>();
-  const householdContentByCardId = new Map<string, DisplayPageHouseholdEquivalentCardPayload>();
-  metricHighlightCards.forEach((card, index) => {
-    const runtimeItem = viewModel.highlights[index];
-    const fallbackPayload = card.contentSource.payload;
-
-    highlightContentByCardId.set(card.id, {
-      label: runtimeItem?.label ?? fallbackPayload.label,
-      provenance: runtimeItem?.provenance ?? fallbackPayload.provenance,
-      unit: runtimeItem?.unit ?? fallbackPayload.unit,
-      value: runtimeItem?.value ?? fallbackPayload.value
-    });
-  });
-  householdCards.forEach((card) => {
-    householdContentByCardId.set(
-      card.id,
-      resolveHouseholdEquivalentRuntimePayload(card, viewModel.householdEquivalents)
+  const periodBoundContent = useMemo(() => {
+    const metricHighlightCards = resolvedConfig.highlightRail.cards.filter(
+      (card): card is DisplayPageMetricHighlightCard => card.template === "metric-highlight"
     );
-  });
-  const resolvedHighlightCards = resolveDisplayPageCardRailCards<
-    {
-      highlightContentByCardId: Map<string, DisplayPageMetricHighlightCardPayload>;
-      householdContentByCardId: Map<string, DisplayPageHouseholdEquivalentCardPayload>;
-    },
-    ResolvedHighlightCard
-  >(
-    resolvedConfig.highlightRail,
-    {
-      highlightContentByCardId,
-      householdContentByCardId
-    },
-    {
-      "household-equivalent": (card, context) => {
-        const payload = context.householdContentByCardId.get(card.id) ?? card.contentSource.payload;
+    const householdCards = resolvedConfig.highlightRail.cards.filter(
+      (card): card is DisplayPageHouseholdEquivalentCard => card.template === "household-equivalent"
+    );
+    const highlightContentByCardId = new Map<string, DisplayPageMetricHighlightCardPayload>();
+    const householdContentByCardId = new Map<string, DisplayPageHouseholdEquivalentCardPayload>();
+    metricHighlightCards.forEach((card, index) => {
+      const runtimeItem = viewModel.highlights[index];
+      const fallbackPayload = card.contentSource.payload;
 
-        return {
-          frame: card.frame,
-          id: card.id,
-          kind: "household-equivalent" as const,
-          payload
-        };
+      highlightContentByCardId.set(card.id, {
+        label: runtimeItem?.label ?? fallbackPayload.label,
+        provenance: runtimeItem?.provenance ?? fallbackPayload.provenance,
+        unit: runtimeItem?.unit ?? fallbackPayload.unit,
+        value: runtimeItem?.value ?? fallbackPayload.value
+      });
+    });
+    householdCards.forEach((card) => {
+      householdContentByCardId.set(
+        card.id,
+        resolveHouseholdEquivalentRuntimePayload(card, viewModel.householdEquivalents)
+      );
+    });
+    const resolvedHighlightCards = resolveDisplayPageCardRailCards<
+      {
+        highlightContentByCardId: Map<string, DisplayPageMetricHighlightCardPayload>;
+        householdContentByCardId: Map<string, DisplayPageHouseholdEquivalentCardPayload>;
       },
-      "metric-highlight": (card, context) => {
-        const payload = context.highlightContentByCardId.get(card.id) ?? card.contentSource.payload;
+      ResolvedHighlightCard
+    >(
+      resolvedConfig.highlightRail,
+      {
+        highlightContentByCardId,
+        householdContentByCardId
+      },
+      {
+        "household-equivalent": (card, context) => {
+          const payload = context.householdContentByCardId.get(card.id) ?? card.contentSource.payload;
 
-        return {
-          frame: card.frame,
-          id: card.id,
-          kind: "metric-highlight" as const,
-          payload
-        };
+          return {
+            frame: card.frame,
+            id: card.id,
+            kind: "household-equivalent" as const,
+            payload
+          };
+        },
+        "metric-highlight": (card, context) => {
+          const payload = context.highlightContentByCardId.get(card.id) ?? card.contentSource.payload;
+
+          return {
+            frame: card.frame,
+            id: card.id,
+            kind: "metric-highlight" as const,
+            payload
+          };
+        }
       }
-    }
-  );
+    );
+
+    return {
+      resolvedHighlightCards,
+      shouldRenderHighlightRail: resolvedHighlightCards.some(
+        (card) => card.kind === "metric-highlight" || card.payload.derivedStatus === "available"
+      )
+    };
+  }, [resolvedConfig.highlightRail, viewModel]);
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);
@@ -276,9 +289,6 @@ export function Sustainability({
   );
   const ringSize = 286 * ringOrnament.scale;
   const shouldRenderPeriodChips = viewModel.periodOptions.length > 1;
-  const shouldRenderHighlightRail = resolvedHighlightCards.some(
-    (card) => card.kind === "metric-highlight" || card.payload.derivedStatus === "available"
-  );
 
   return (
     <section className="sustainability-display-page" style={paletteVars}>
@@ -439,7 +449,7 @@ export function Sustainability({
         ))}
       </figure>
 
-      {shouldRenderHighlightRail ? (
+      {periodBoundContent.shouldRenderHighlightRail ? (
         <section
           className="sustainability-highlight-rail"
           style={{
@@ -450,7 +460,7 @@ export function Sustainability({
             width: `${resolvedConfig.highlightRail.container.width}px`
           }}
         >
-          {resolvedHighlightCards.map((card) => (
+          {periodBoundContent.resolvedHighlightCards.map((card) => (
             <article
               key={card.id}
               className={
