@@ -68,6 +68,26 @@ test("display page registry snapshot loader shares an in-flight request", async 
   assert.equal(getActiveDisplayPageRegistrySnapshot()?.[0]?.pageKey, "overview");
 });
 
+test("display page registry snapshot loader reuses a settled snapshot without a duplicate read", async () => {
+  clearDisplayPageRegistrySnapshot();
+  let readCount = 0;
+  const overview = createPage({
+    id: 1,
+    pageKey: "overview",
+    route: "/overview",
+    routeSlug: "overview",
+    templateKey: "overview"
+  });
+  const readRegistry = async () => {
+    readCount += 1;
+    return [overview];
+  };
+
+  assert.equal((await loadDisplayPageRegistrySnapshot({ readRegistry }))[0]?.pageKey, "overview");
+  assert.equal((await loadDisplayPageRegistrySnapshot({ readRegistry }))[0]?.pageKey, "overview");
+  assert.equal(readCount, 1);
+});
+
 test("display page registry snapshot loader force reloads after display sync invalidation", async () => {
   clearDisplayPageRegistrySnapshot();
   let readCount = 0;
@@ -102,6 +122,32 @@ test("display page registry snapshot loader force reloads after display sync inv
   assert.equal(getActiveDisplayPageRegistrySnapshot()?.[0]?.pageKey, "solar");
   assert.match(registryHookSource, /useDisplaySyncRefresh\(reload,\s*\["display-pages"\]\)/);
   assert.match(registryHookSource, /load\(\{\s*force:\s*true\s*\}\)/);
+});
+
+test("display page registry snapshot loader keeps the settled snapshot when a force reload fails", async () => {
+  clearDisplayPageRegistrySnapshot();
+  const overview = createPage({
+    id: 1,
+    pageKey: "overview",
+    route: "/overview",
+    routeSlug: "overview",
+    templateKey: "overview"
+  });
+
+  assert.equal(
+    (await loadDisplayPageRegistrySnapshot({ readRegistry: async () => [overview] }))[0]?.pageKey,
+    "overview"
+  );
+  await assert.rejects(
+    loadDisplayPageRegistrySnapshot({
+      force: true,
+      readRegistry: async () => {
+        throw new Error("registry unavailable");
+      }
+    }),
+    /registry unavailable/
+  );
+  assert.equal(getActiveDisplayPageRegistrySnapshot()?.[0]?.pageKey, "overview");
 });
 
 test("display page registry hook ignores stale loads after a newer sync reload starts", () => {

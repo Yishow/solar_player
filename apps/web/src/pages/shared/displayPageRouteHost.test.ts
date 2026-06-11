@@ -11,6 +11,10 @@ const registryHookSource = readFileSync(
   path.join(import.meta.dirname, "../../hooks/useDisplayPageRegistry.ts"),
   "utf8"
 );
+const configHookSource = readFileSync(
+  path.join(import.meta.dirname, "../../hooks/useDisplayPageConfig.ts"),
+  "utf8"
+);
 const layoutShellSource = readFileSync(path.join(import.meta.dirname, "../../layouts/LayoutShell.tsx"), "utf8");
 const routerSource = readFileSync(path.join(import.meta.dirname, "../../app/router.tsx"), "utf8");
 
@@ -115,6 +119,13 @@ test("display page route navigation preloads live config before swapping runtime
   assert.match(routeHostSource, /loadDisplayPageRegistrySnapshot\(\)/);
   assert.match(routeHostSource, /loadDisplayPageConfigEnvelope\(page\.pageKey,\s*"live"\)/);
   assert.match(routerSource, /loader:\s*loadDisplayPageRoute/);
+});
+
+test("display page route host uses the shared warm live config envelope path for first visible render", () => {
+  assert.doesNotMatch(routeHostSource, /getDisplayPageConfig\(/);
+  assert.match(routeHostSource, /loadDisplayPageConfigEnvelope\(page\.pageKey,\s*"live"\)/);
+  assert.match(configHookSource, /resolveCachedDisplayPageConfigSession\(pageId,\s*stage,\s*seedConfig\)/);
+  assert.match(configHookSource, /lastLoadedEnvelope === null/);
 });
 
 test("router loader routes provide silent hydrate fallbacks", () => {

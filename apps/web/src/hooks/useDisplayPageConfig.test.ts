@@ -501,6 +501,47 @@ test("display page config envelope loader reuses cached live envelopes without d
   assert.equal(session?.config.heroCopy.titleLines[0], "共用太陽能");
 });
 
+test("display page config envelope loader shares an in-flight live envelope request", async () => {
+  clearDisplayPageConfigCache();
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: "2026-05-27T00:00:00.000Z",
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["pending 太陽能", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "live" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 12
+  };
+  let readCount = 0;
+  let resolveRead: ((value: typeof envelope) => void) | null = null;
+  const readConfig = async () => {
+    readCount += 1;
+    return new Promise<typeof envelope>((resolve) => {
+      resolveRead = resolve;
+    });
+  };
+
+  const firstLoad = loadDisplayPageConfigEnvelope("solar-cache-test", "live", { readConfig });
+  const secondLoad = loadDisplayPageConfigEnvelope("solar-cache-test", "live", { readConfig });
+
+  assert.equal(readCount, 1);
+  const completeRead = resolveRead;
+  assert.ok(completeRead);
+  completeRead(envelope);
+
+  const [firstEnvelope, secondEnvelope] = await Promise.all([firstLoad, secondLoad]);
+
+  assert.equal(firstEnvelope.version, 12);
+  assert.equal(secondEnvelope.version, 12);
+  assert.equal(resolveCachedDisplayPageConfigSession("solar-cache-test", "live", seedConfig)?.lastLoadedEnvelope, envelope);
+});
+
 test("display page config envelope loader force reloads for display sync", async () => {
   clearDisplayPageConfigCache();
   let readCount = 0;
@@ -529,6 +570,77 @@ test("display page config envelope loader force reloads for display sync", async
     2
   );
   assert.equal(readCount, 2);
+});
+
+test("display page config envelope loader keeps the warm envelope when a force reload fails", async () => {
+  clearDisplayPageConfigCache();
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const envelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: "2026-05-27T00:00:00.000Z",
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["保留太陽能", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "live" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 13
+  };
+
+  assert.equal(
+    (await loadDisplayPageConfigEnvelope("solar-cache-test", "live", {
+      readConfig: async () => envelope
+    })).version,
+    13
+  );
+  await assert.rejects(
+    loadDisplayPageConfigEnvelope("solar-cache-test", "live", {
+      force: true,
+      readConfig: async () => {
+        throw new Error("live config unavailable");
+      }
+    }),
+    /live config unavailable/
+  );
+
+  const session = resolveCachedDisplayPageConfigSession("solar-cache-test", "live", seedConfig);
+
+  assert.equal(session?.lastLoadedEnvelope, envelope);
+  assert.equal(session?.config.heroCopy.titleLines[0], "保留太陽能");
+});
+
+test("live-stage warm config cache does not seed draft-stage sessions", () => {
+  clearDisplayPageConfigCache();
+  const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
+  const liveEnvelope = {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId: "solar-cache-test",
+    publishedAt: "2026-05-27T00:00:00.000Z",
+    publishedBy: null,
+    regions: {
+      heroCopy: {
+        titleLines: ["live only", seedConfig.heroCopy.titleLines[1]]
+      }
+    },
+    stage: "live" as const,
+    updatedAt: "2026-05-27T00:00:00.000Z",
+    version: 14
+  };
+
+  primeDisplayPageConfigCache("solar-cache-test", "live", liveEnvelope);
+
+  assert.equal(
+    resolveInitialDisplayPageConfigSession({
+      enabled: true,
+      pageId: "solar-cache-test",
+      seedConfig,
+      stage: "draft"
+    }),
+    null
+  );
 });
 
 test("display page config hook ignores stale route hydration after a newer reload starts", () => {
