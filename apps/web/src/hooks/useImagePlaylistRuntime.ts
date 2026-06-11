@@ -5,21 +5,18 @@ import { useRuntimeRefreshLifecycle } from "./useRuntimeRefreshLifecycle";
 type ImagePlaylistRuntimePayload = Awaited<ReturnType<typeof fetchImagePlaylist>>["playlist"];
 
 export function useImagePlaylistRuntime(
-  activeIndex: number,
   options?: {
     enabled?: boolean;
     initialPayload?: ImagePlaylistRuntimePayload | null;
   }
 ) {
-  const spec = resolveDisplayPageRuntimeRefreshSpec("images", {
-    activeIndex
-  });
+  const spec = resolveDisplayPageRuntimeRefreshSpec("images");
 
   return useRuntimeRefreshLifecycle<ImagePlaylistRuntimePayload>({
     enabled: options?.enabled ?? true,
     initialPayload: options?.initialPayload,
     load: async () => {
-      const response = await fetchImagePlaylist(activeIndex);
+      const response = await fetchImagePlaylist();
       return response.playlist;
     },
     refreshKey: spec.refreshKey,

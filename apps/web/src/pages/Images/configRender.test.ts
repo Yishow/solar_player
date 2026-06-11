@@ -39,7 +39,8 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
   assert.match(imagesSource, /const playbackActiveEntry =/);
   assert.match(imagesSource, /runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
-  assert.match(imagesSource, /runtimeHydrationEnabled\s*\?\s*playlistRuntime\.payload\?\.activeEntry \?\? null/);
+  assert.match(imagesSource, /resolveActiveImagePlaylistEntry\(playbackEntries,\s*autoplay\.activeIndex\)/);
+  assert.doesNotMatch(imagesSource, /playlistRuntime\.payload\?\.activeEntry/);
   assert.doesNotMatch(imagesSource, /runtimePlaylistEntries\.length > 0\s*\?/);
   assert.doesNotMatch(imagesSource, /imagesReferencePlaylistEntries\[Math\.min\(requestedIndex, imagesReferencePlaylistEntries\.length - 1\)\]/);
   assert.match(imagesSource, /imagesReferencePlaylistEntries/);
@@ -126,11 +127,13 @@ test("images editor exposes stage and thumbnail framing fields", () => {
 });
 
 test("images runtime keeps playlist hydration staged while preserving autoplay and controls", () => {
-  assert.match(imagesSource, /useImagePlaylistRuntime\(requestedIndex,\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
+  assert.match(imagesSource, /useImagePlaylistRuntime\(\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(imagesSource, /const runtimePlaylistEntries = playlistRuntime\.payload\?\.entries \?\? \[\]/);
   assert.match(imagesSource, /const playbackEntries = runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
+  assert.match(imagesSource, /const localRequestedActiveEntry = resolveActiveImagePlaylistEntry\(playbackEntries,\s*requestedIndex\)/);
+  assert.match(imagesSource, /const playbackActiveEntry = resolveActiveImagePlaylistEntry\(playbackEntries,\s*autoplay\.activeIndex\)/);
   assert.match(imagesSource, /shuffleEnabled = runtimeHydrationEnabled/);
-  assert.match(imagesSource, /activeEntry: playbackActiveEntry/);
+  assert.match(imagesSource, /activeEntry: localRequestedActiveEntry/);
   assert.match(imagesSource, /entries: playbackEntries/);
   assert.match(imagesSource, /runtimeErrorMessage: runtimeHydrationEnabled \? playlistRuntime\.errorMessage : ""/);
   assert.match(imagesSource, /usesRuntimeFallback: playlistRuntime\.usesFallback/);

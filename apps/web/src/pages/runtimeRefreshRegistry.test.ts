@@ -25,7 +25,7 @@ test("runtime refresh registry derives stable refresh keys from page-specific pa
   );
   assert.equal(
     resolveDisplayPageRuntimeRefreshSpec("images", { activeIndex: 3 }).refreshKey,
-    "images:3"
+    "images"
   );
   assert.equal(
     resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "quarter" }).refreshKey,

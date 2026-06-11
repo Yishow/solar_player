@@ -1,6 +1,9 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
-import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import {
+  resolveActiveImagePlaylistEntry,
+  resolveDisplayPageMediaSource
+} from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -75,12 +78,6 @@ function splitImagesTitle(title: string) {
   };
 }
 
-function resolveImagesReferenceEntry(index: number) {
-  return imagesReferencePlaylistEntries[
-    Math.min(index, imagesReferencePlaylistEntries.length - 1)
-  ] ?? null;
-}
-
 export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPageConfig; pageId?: string }) {
   useBodyClass("page-hero-shell");
   const runtimeHydrationEnabled = config === undefined;
@@ -94,25 +91,23 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     stage: runtimeStage
   });
   const [requestedIndex, setRequestedIndex] = useState(0);
-  const playlistRuntime = useImagePlaylistRuntime(requestedIndex, {
+  const playlistRuntime = useImagePlaylistRuntime({
     enabled: runtimeHydrationEnabled
   });
   const runtimePlaylistEntries = playlistRuntime.payload?.entries ?? [];
   const playbackEntries = runtimeHydrationEnabled ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
-  const playbackActiveEntry =
-    runtimeHydrationEnabled
-      ? playlistRuntime.payload?.activeEntry ?? null
-      : resolveImagesReferenceEntry(requestedIndex);
+  const localRequestedActiveEntry = resolveActiveImagePlaylistEntry(playbackEntries, requestedIndex);
   const shuffleEnabled = runtimeHydrationEnabled
     ? playlistRuntime.payload?.settings.shuffle ?? false
     : false;
   const autoplay = useImagesAutoplay({
-    activeEntry: playbackActiveEntry,
+    activeEntry: localRequestedActiveEntry,
     entries: playbackEntries,
     requestedIndex,
     setRequestedIndex,
     shuffle: shuffleEnabled
   });
+  const playbackActiveEntry = resolveActiveImagePlaylistEntry(playbackEntries, autoplay.activeIndex);
 
   if (
     shouldDeferDisplayPageRuntimeRender({

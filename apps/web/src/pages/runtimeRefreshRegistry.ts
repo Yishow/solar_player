@@ -34,7 +34,7 @@ const runtimeRefreshRegistry: Record<DisplayPageKey, RuntimeRefreshRegistryEntry
     sourceKind: "display-story"
   },
   images: {
-    refreshKey: (context) => `images:${context.activeIndex ?? 0}`,
+    refreshKey: () => "images",
     refreshScopes: ["display-pages", "images"],
     sourceKind: "image-playlist"
   },
