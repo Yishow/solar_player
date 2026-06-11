@@ -37,3 +37,13 @@ test("energy history loads snapshots summaries and counters as independent stage
   assert.match(energyHistorySource, /cumulativeCountersRuntime\s*=\s*useRuntimeRefreshLifecycle/);
   assert.match(energyHistorySource, /historySourceErrorMessage/);
 });
+
+test("energy history reuses the shared warm history payload without flattening source lanes", () => {
+  assert.match(energyHistorySource, /readCachedMonitoringHistoryPayload(?:<[^>]+>)?\(range\)/);
+  assert.match(energyHistorySource, /initialPayload:\s*cachedHistoryPayload/);
+  assert.match(energyHistorySource, /rememberMonitoringHistoryPayload\(historySnapshotsRuntime\.payload\)/);
+  assert.match(energyHistorySource, /resolveMonitoringHistoryPayloadForRange/);
+  assert.match(energyHistorySource, /const snapshots = historyPayload\?\.snapshots \?\? \[\]/);
+  assert.doesNotMatch(energyHistorySource, /dailySummariesRuntime[^;]+initialPayload/s);
+  assert.doesNotMatch(energyHistorySource, /cumulativeCountersRuntime[^;]+initialPayload/s);
+});

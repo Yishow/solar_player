@@ -4,6 +4,12 @@ import { requestJson } from "../../services/api";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
+import {
+  readCachedMonitoringHistoryPayload,
+  rememberMonitoringHistoryPayload,
+  resolveMonitoringHistoryPayloadForRange,
+  type MonitoringHistoryPayload
+} from "../shared/monitoringHistoryPayloadCache";
 import { energyTrendCardKeys, energyTrendLayout } from "./layout";
 import "./trend.css";
 import {
@@ -12,24 +18,7 @@ import {
   type EnergyTrendSnapshot
 } from "./viewModel";
 
-type MetricsHistoryResponse = {
-  range: "day" | "week" | "month" | "total";
-  snapshots: EnergyTrendSnapshot[];
-};
-
-const energyTrendHistoryPayloadCache = new Map<EnergyTrendRange, MetricsHistoryResponse>();
-
-function readCachedEnergyTrendHistoryPayload(range: EnergyTrendRange) {
-  return energyTrendHistoryPayloadCache.get(range) ?? null;
-}
-
-function rememberEnergyTrendHistoryPayload(payload: MetricsHistoryResponse | null) {
-  if (!payload) {
-    return;
-  }
-
-  energyTrendHistoryPayloadCache.set(payload.range, payload);
-}
+type MetricsHistoryResponse = MonitoringHistoryPayload<EnergyTrendSnapshot>;
 
 const CARD_ICON_GLYPHS: Record<string, string> = {
   bolt: "⚡",
@@ -120,20 +109,26 @@ export function EnergyTrend() {
   const { snapshot } = useLiveMetrics();
   const [range, setRange] = useState<EnergyTrendRange>("day");
   const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
+  const cachedHistoryPayload = readCachedMonitoringHistoryPayload<EnergyTrendSnapshot>(range);
   const historyRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
     enabled: true,
     load: () =>
       requestJson<MetricsHistoryResponse>(
         `/api/metrics/history?range=${range}`
       ),
-    initialPayload: readCachedEnergyTrendHistoryPayload(range),
+    initialPayload: cachedHistoryPayload,
     refreshKey: historyRefresh.refreshKey,
     shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
   });
   useEffect(() => {
-    rememberEnergyTrendHistoryPayload(historyRuntime.payload);
+    rememberMonitoringHistoryPayload(historyRuntime.payload);
   }, [historyRuntime.payload]);
-  const snapshots = historyRuntime.payload?.snapshots ?? [];
+  const historyPayload = resolveMonitoringHistoryPayloadForRange({
+    cachedPayload: cachedHistoryPayload,
+    range,
+    runtimePayload: historyRuntime.payload
+  });
+  const snapshots = historyPayload?.snapshots ?? [];
   const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
   const errorMessage = historyRuntime.errorMessage;
 

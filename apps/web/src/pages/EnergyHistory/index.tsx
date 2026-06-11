@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { requestJson } from "../../services/api";
 import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
+import {
+  readCachedMonitoringHistoryPayload,
+  rememberMonitoringHistoryPayload,
+  resolveMonitoringHistoryPayloadForRange,
+  type MonitoringHistoryPayload
+} from "../shared/monitoringHistoryPayloadCache";
 import { energyHistoryLayout, energyHistoryMetricCardKeys } from "./layout";
 import "./history.css";
 import {
@@ -12,10 +18,7 @@ import {
   type EnergyHistorySnapshot
 } from "./viewModel";
 
-type MetricsHistoryResponse = {
-  range: "day" | "week" | "month" | "year" | "total";
-  snapshots: EnergyHistorySnapshot[];
-};
+type MetricsHistoryResponse = MonitoringHistoryPayload<EnergyHistorySnapshot>;
 
 type DailySummaryResponse = {
   summaries: DailyEnergySummary[];
@@ -104,9 +107,11 @@ function TrendChart({
 export function EnergyHistory() {
   const [range, setRange] = useState<EnergyHistoryRange>("day");
   const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
+  const cachedHistoryPayload = readCachedMonitoringHistoryPayload<EnergyHistorySnapshot>(range);
   const historySnapshotsRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
     enabled: true,
     load: () => requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
+    initialPayload: cachedHistoryPayload,
     refreshKey: historyRefresh.refreshKey,
     shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
   });
@@ -122,7 +127,15 @@ export function EnergyHistory() {
     refreshKey: historyRefresh.refreshKey,
     shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
   });
-  const snapshots = historySnapshotsRuntime.payload?.snapshots ?? [];
+  useEffect(() => {
+    rememberMonitoringHistoryPayload(historySnapshotsRuntime.payload);
+  }, [historySnapshotsRuntime.payload]);
+  const historyPayload = resolveMonitoringHistoryPayloadForRange({
+    cachedPayload: cachedHistoryPayload,
+    range,
+    runtimePayload: historySnapshotsRuntime.payload
+  });
+  const snapshots = historyPayload?.snapshots ?? [];
   const summaries = dailySummariesRuntime.payload?.summaries ?? [];
   const counters = cumulativeCountersRuntime.payload?.counters ?? [];
   const isLoading =
