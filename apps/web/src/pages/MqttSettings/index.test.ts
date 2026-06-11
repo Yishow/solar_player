@@ -74,3 +74,17 @@ test("mqtt settings defers diagnostics polling and weather preview until persist
   assert.match(mqttSettingsSource, /if \(!hasLoadedWeatherSettings\) \{/);
   assert.match(mqttSettingsSource, /if \(!hasLoadedTopics\) \{/);
 });
+
+test("mqtt settings reuses one editable loader before deferred diagnostics refresh", () => {
+  assert.match(mqttSettingsSource, /loadEditableSettingsLane/);
+  assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics/);
+  assert.match(mqttSettingsSource, /const loadMqttEditableModel = async/);
+  assert.match(mqttSettingsSource, /await loadMqttEditableModel\(\{ propagateError: true, topicsAsPolling: true \}\)/);
+  assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
+
+  const reloadNowSource = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("reloadNow: async () => {"),
+    mqttSettingsSource.indexOf("useDisplaySyncRefresh", mqttSettingsSource.indexOf("reloadNow: async () => {"))
+  );
+  assert.doesNotMatch(reloadNowSource, /Promise\.all\(\[/);
+});

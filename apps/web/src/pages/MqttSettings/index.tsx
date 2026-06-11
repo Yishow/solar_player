@@ -27,6 +27,10 @@ import { MqttSettingsContent } from "./MqttSettingsContent";
 import { type ActionState, type ConnectionTestFeedback, type DataMode, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
+import {
+  loadEditableSettingsLane,
+  refreshDeferredSettingsDiagnostics
+} from "../shared/editableSettingsLoader";
 
 const defaultMetricOptions = [
   "realTimePower",
@@ -71,6 +75,11 @@ type MqttSettingsResponse = {
 type TopicMappingsResponse = {
   status: MqttStatus;
   topics: TopicMapping[];
+};
+
+type MqttEditableModelLoadOptions = {
+  propagateError?: boolean;
+  topicsAsPolling?: boolean;
 };
 
 const defaultFormState: MqttSettingsForm = {
@@ -260,14 +269,21 @@ export function MqttSettings() {
     }
   };
 
+  const loadMqttEditableModel = async ({
+    propagateError = false,
+    topicsAsPolling = false
+  }: MqttEditableModelLoadOptions = {}) => {
+    await loadEditableSettingsLane([
+      () => loadSettings({ propagateError }),
+      () => loadTopics({ isPolling: topicsAsPolling, propagateError }),
+      () => loadWeatherSettings({ propagateError })
+    ]);
+  };
+
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        await Promise.all([
-          loadSettings(),
-          loadTopics({ isPolling: false }),
-          loadWeatherSettings()
-        ]);
+        await loadMqttEditableModel();
       } catch {
         // individual loaders surface their own errors
       }
@@ -411,7 +427,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("MQTT broker 與天氣設定已儲存並重新連線。");
       setErrorMessage("");
-      await reloadReadiness();
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存設定失敗。");
     } finally {
@@ -463,7 +479,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("Topic mappings 已更新並重新載入訂閱。");
       setErrorMessage("");
-      await reloadReadiness();
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存 topic mappings 失敗。");
     } finally {
@@ -483,7 +499,7 @@ export function MqttSettings() {
       setLastConnectionTest(null);
       setMessage("MQTT 訂閱清單已重新載入。");
       setErrorMessage("");
-      await reloadReadiness();
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "重新載入 topic mappings 失敗。");
     } finally {
@@ -521,12 +537,8 @@ export function MqttSettings() {
     isDirty: isDirty,
     relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
-      await Promise.all([
-        loadSettings({ propagateError: true }),
-        loadTopics({ isPolling: true, propagateError: true }),
-        loadWeatherSettings({ propagateError: true }),
-        reloadReadiness()
-      ]);
+      await loadMqttEditableModel({ propagateError: true, topicsAsPolling: true });
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }
   });
 

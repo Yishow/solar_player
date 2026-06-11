@@ -9,6 +9,10 @@ import "./circuitSettings.css";
 import { CircuitSettingsContent } from "./CircuitSettingsContent";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 import { CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
+import {
+  loadEditableSettingsLane,
+  refreshDeferredSettingsDiagnostics
+} from "../shared/editableSettingsLoader";
 
 type CircuitListResponse = {
   success: boolean;
@@ -26,6 +30,11 @@ type CircuitDeleteResponse = {
   success: boolean;
   data?: { id: number };
   error?: string;
+};
+
+type CircuitEditableModelLoadOptions = {
+  propagateError?: boolean;
+  silent?: boolean;
 };
 
 function readCircuitOrThrow(response: CircuitMutationResponse, fallbackMessage: string) {
@@ -155,9 +164,18 @@ export function CircuitSettings() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadCircuits();
+  const loadCircuitEditableModel = useCallback(async ({
+    propagateError = false,
+    silent = false
+  }: CircuitEditableModelLoadOptions = {}) => {
+    await loadEditableSettingsLane([
+      () => loadCircuits({ propagateError, silent })
+    ]);
   }, [loadCircuits]);
+
+  useEffect(() => {
+    void loadCircuitEditableModel();
+  }, [loadCircuitEditableModel]);
 
   const markDirty = useCallback((id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
     setDirtyIds((current) => (current.includes(id) ? current : [...current, id]));
@@ -183,7 +201,7 @@ export function CircuitSettings() {
       const created = await createCircuit(buildNewCircuitDraft(circuits));
       setCircuits((current) => [...current, created]);
       setMessage("已新增迴路，請補齊欄位後按下儲存設定。");
-      await reloadReadiness();
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "新增迴路失敗。");
     } finally {
@@ -217,7 +235,7 @@ export function CircuitSettings() {
       );
       setDirtyIds([]);
       setMessage("迴路設定已儲存。");
-      await reloadReadiness();
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存迴路設定失敗。");
     } finally {
@@ -233,7 +251,7 @@ export function CircuitSettings() {
       setCircuits((current) => current.filter((circuit) => circuit.id !== id));
       setDirtyIds((current) => current.filter((currentId) => currentId !== id));
       setMessage("已刪除迴路。");
-      await reloadReadinessRef.current();
+      refreshDeferredSettingsDiagnostics([reloadReadinessRef.current]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "刪除迴路失敗。");
     } finally {
@@ -245,7 +263,8 @@ export function CircuitSettings() {
     isDirty: dirtyIds.length > 0,
     relevantScopes: CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
-      await Promise.all([loadCircuits({ propagateError: true, silent: true }), reloadReadiness()]);
+      await loadCircuitEditableModel({ propagateError: true, silent: true });
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }
   });
 
@@ -275,7 +294,7 @@ export function CircuitSettings() {
       handleDelete={handleDelete}
       handleFieldChange={handleFieldChange}
       isLoading={isLoading}
-      loadCircuits={loadCircuits}
+      loadCircuits={loadCircuitEditableModel}
       parseNumberInput={parseNumberInput}
       readiness={readiness}
       readinessErrorMessage={readinessErrorMessage}

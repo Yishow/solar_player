@@ -59,8 +59,8 @@ test("management surfaces keep clean summary reloads inside their display-sync a
   const brandAssetsSource = pageSources.find((page) => page.path === "BrandAssets/index.tsx")?.source ?? "";
 
   assert.match(playbackSettingsSource, /reloadDisplayOpsSummary\(\)/);
-  assert.match(mqttSettingsSource, /reloadReadiness\(\)/);
-  assert.match(circuitSettingsSource, /reloadReadiness\(\)/);
+  assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
+  assert.match(circuitSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
   assert.match(imageManagementSource, /reloadAssetHealth\(\)/);
   assert.match(imageManagementSource, /reloadAssetReferences\(\)/);
   assert.match(brandAssetsSource, /resyncBrandProfiles/);

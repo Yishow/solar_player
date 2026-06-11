@@ -29,3 +29,12 @@ test("circuit settings renders rows before deferred readiness diagnostics", () =
   assert.match(circuitSettingsIndexSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedCircuits\s*\}\)/);
   assert.match(circuitSettingsIndexSource, /setHasLoadedCircuits\(true\)/);
 });
+
+test("circuit settings reuses editable loader before deferred readiness refresh", () => {
+  assert.match(circuitSettingsIndexSource, /loadEditableSettingsLane/);
+  assert.match(circuitSettingsIndexSource, /refreshDeferredSettingsDiagnostics/);
+  assert.match(circuitSettingsIndexSource, /const loadCircuitEditableModel = useCallback/);
+  assert.match(circuitSettingsIndexSource, /loadCircuits=\{loadCircuitEditableModel\}/);
+  assert.match(circuitSettingsIndexSource, /await loadCircuitEditableModel\(\{ propagateError: true, silent: true \}\)/);
+  assert.match(circuitSettingsIndexSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
+});
