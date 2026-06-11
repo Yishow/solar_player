@@ -27,3 +27,7 @@ test("playback settings exposes transition type and speed controls", () => {
     assert.match(source, /\{ label: "滑動切換 Slide", value: "slide" \}/);
     assert.match(source, /\{ label: "無轉場 None", value: "none" \}/);
 });
+
+test("playback settings form sections are memoized for tick and preview isolation", () => {
+    assert.match(source, /export const PlaybackSettingsFormSections = memo\(function PlaybackSettingsFormSections/);
+});

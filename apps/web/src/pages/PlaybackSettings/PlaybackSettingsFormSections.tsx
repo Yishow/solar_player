@@ -2,8 +2,9 @@ import type {
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
-import { useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { CustomSelect, Switch } from "../../components/management";
+import type { PlaybackSettingsFormViewModel } from "./viewModel";
 
 // 自訂 Hook：處理按鈕的長按（Long Press）連續變更邏輯，支援觸控與滑鼠操作
 function useLongPressStepper(
@@ -139,16 +140,10 @@ type PlaybackSettingsFormSectionsProps = {
     direction: -1 | 1
   ) => PlaybackPage[];
   settings: PlaybackSettings | null;
-  viewModel: {
-    pageRows: Array<
-      PlaybackPage & {
-        canMoveUp: boolean;
-      }
-    >;
-  };
+  viewModel: PlaybackSettingsFormViewModel;
 };
 
-export function PlaybackSettingsFormSections({
+export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSections({
   formDisabled,
   markDirty,
   pages,
@@ -452,4 +447,4 @@ export function PlaybackSettingsFormSections({
       </div>
     </div>
   );
-}
+});

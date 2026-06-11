@@ -3,7 +3,7 @@ import type {
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
   hasDisplaySyncDraftChanges,
@@ -22,7 +22,11 @@ import {
 } from "../../components/management";
 import { usePlaybackController } from "../../hooks/usePlaybackController";
 import "./playbackSettings.css";
-import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
+import {
+  buildPlaybackSettingsFormViewModel,
+  buildPlaybackSettingsViewModel,
+  reorderPlaybackPages
+} from "./viewModel";
 import { buildConfiguredRotationRows } from "../DisplayPagesEditor/rotationPreview";
 import { PlaybackSettingsFormSections } from "./PlaybackSettingsFormSections";
 import { LiveRotationPreviewList } from "./LiveRotationPreviewList";
@@ -119,18 +123,18 @@ export function PlaybackSettings() {
     };
   }, []);
 
-  const markDirty = () => {
+  const markDirty = useCallback(() => {
     setMessage("設定已變更，尚未儲存。");
     setErrorMessage("");
-  };
+  }, []);
 
-  const updateSettingsField = <Key extends keyof PlaybackSettings>(
+  const updateSettingsField = useCallback(<Key extends keyof PlaybackSettings,>(
     key: Key,
     value: PlaybackSettings[Key]
   ) => {
     markDirty();
     setSettings((current) => (current ? { ...current, [key]: value } : current));
-  };
+  }, [markDirty]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -228,6 +232,10 @@ export function PlaybackSettings() {
       rotationPreview,
       settings
     ]
+  );
+  const formViewModel = useMemo(
+    () => buildPlaybackSettingsFormViewModel({ pages }),
+    [pages]
   );
 
   const statusVariant =
@@ -339,7 +347,7 @@ export function PlaybackSettings() {
         setPages={setPages}
         settings={settings}
         updateSettingsField={updateSettingsField}
-        viewModel={viewModel}
+        viewModel={formViewModel}
       />
     </div>
   );

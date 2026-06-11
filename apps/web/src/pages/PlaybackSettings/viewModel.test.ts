@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DisplayRotationPreview, PlaybackPage, PlaybackSettings } from "@solar-display/shared";
-import { buildPlaybackSettingsViewModel, reorderPlaybackPages } from "./viewModel";
+import {
+  buildPlaybackSettingsFormViewModel,
+  buildPlaybackSettingsViewModel,
+  reorderPlaybackPages
+} from "./viewModel";
 
 const settings: PlaybackSettings = {
   autoplay: true,
@@ -108,6 +112,25 @@ test("reorderPlaybackPages rewrites display order after moving a page upward", (
       { id: 1, displayOrder: 1 },
       { id: 3, displayOrder: 2 },
       { id: 2, displayOrder: 3 }
+    ]
+  );
+});
+
+test("buildPlaybackSettingsFormViewModel returns the editable page-row lane without runtime inputs", () => {
+  const model = buildPlaybackSettingsFormViewModel({ pages });
+
+  assert.deepEqual(
+    model.pageRows.map((page) => ({
+      canMoveDown: page.canMoveDown,
+      canMoveUp: page.canMoveUp,
+      id: page.id,
+      orderLabel: page.orderLabel,
+      statusLabel: page.statusLabel
+    })),
+    [
+      { canMoveDown: true, canMoveUp: false, id: 1, orderLabel: "01", statusLabel: "啟用中" },
+      { canMoveDown: true, canMoveUp: true, id: 2, orderLabel: "02", statusLabel: "啟用中" },
+      { canMoveDown: false, canMoveUp: true, id: 3, orderLabel: "03", statusLabel: "已停用" }
     ]
   );
 });

@@ -31,6 +31,18 @@ type BuildPlaybackSettingsViewModelArgs = {
   settings: PlaybackSettings | null;
 };
 
+export type PlaybackSettingsFormViewModel = {
+  pageRows: Array<
+    PlaybackPage & {
+      canMoveDown: boolean;
+      canMoveUp: boolean;
+      orderLabel: string;
+      statusLabel: string;
+      statusTone: ReferenceTone;
+    }
+  >;
+};
+
 const weekdayLabelMap = new Map([
   [0, "日"],
   [1, "一"],
@@ -264,6 +276,25 @@ export function reorderPlaybackPages(
   }));
 }
 
+export function buildPlaybackSettingsFormViewModel({
+  pages
+}: {
+  pages: PlaybackPage[];
+}): PlaybackSettingsFormViewModel {
+  const sortedPages = sortPlaybackPages(pages);
+
+  return {
+    pageRows: sortedPages.map((page, index) => ({
+      ...page,
+      canMoveDown: index < sortedPages.length - 1,
+      canMoveUp: index > 0,
+      orderLabel: padOrder(page.displayOrder),
+      statusLabel: page.enabled ? "啟用中" : "已停用",
+      statusTone: page.enabled ? ("success" as ReferenceTone) : ("muted" as ReferenceTone)
+    }))
+  };
+}
+
 export function buildPlaybackSettingsViewModel({
   errorMessage,
   isSaving,
@@ -290,16 +321,10 @@ export function buildPlaybackSettingsViewModel({
   const triageSummary =
     displayOpsSummary?.triageSummary
     ?? resolveDisplayFaultTriageSummaryFromDisplayOps(displayOpsSummary ?? null);
+  const formViewModel = buildPlaybackSettingsFormViewModel({ pages: sortedPages });
 
   return {
-    pageRows: sortedPages.map((page, index) => ({
-      ...page,
-      canMoveDown: index < sortedPages.length - 1,
-      canMoveUp: index > 0,
-      orderLabel: padOrder(page.displayOrder),
-      statusLabel: page.enabled ? "啟用中" : "已停用",
-      statusTone: page.enabled ? ("success" as ReferenceTone) : ("muted" as ReferenceTone)
-    })),
+    pageRows: formViewModel.pageRows,
     saveBanner: {
       detail: errorMessage || "調整後按下儲存，展示端會透過 socket 重新載入設定。",
       title: errorMessage ? "儲存失敗" : isSaving ? "正在儲存播放設定..." : message,

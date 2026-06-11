@@ -59,3 +59,14 @@ test("playback settings renders editable model before deferred diagnostics", () 
   assert.match(playbackSettingsSource, /rotationPreviewErrorMessage/);
   assert.doesNotMatch(playbackSettingsSource, /const loadPlaybackConfig = async/);
 });
+
+test("playback settings keeps editable form props isolated from runtime tick updates", () => {
+  assert.match(playbackSettingsSource, /buildPlaybackSettingsFormViewModel/);
+  assert.match(playbackSettingsSource, /const formViewModel = useMemo\(/);
+  assert.match(playbackSettingsSource, /buildPlaybackSettingsFormViewModel\(\{\s*pages\s*\}\)/);
+  assert.match(playbackSettingsSource, /\[pages\]/);
+  assert.match(playbackSettingsSource, /const markDirty = useCallback\(/);
+  assert.match(playbackSettingsSource, /const updateSettingsField = useCallback\(/);
+  assert.match(playbackSettingsSource, /viewModel=\{formViewModel\}/);
+  assert.doesNotMatch(playbackSettingsSource, /viewModel=\{viewModel\}/);
+});
