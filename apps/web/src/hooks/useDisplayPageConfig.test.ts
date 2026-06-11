@@ -539,7 +539,7 @@ test("display page config envelope loader shares an in-flight live envelope requ
   const secondLoad = loadDisplayPageConfigEnvelope("solar-cache-test", "live", { readConfig });
 
   assert.equal(readCount, 1);
-  const completeRead = resolveRead;
+  const completeRead = resolveRead as ((value: typeof envelope) => void) | null;
   assert.ok(completeRead);
   completeRead(envelope);
 

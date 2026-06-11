@@ -9,6 +9,16 @@ import { buildSustainabilityViewModel } from "./viewModel";
 
 const sustainabilitySource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
+function sourceBetween(start: string, end: string) {
+  const startIndex = sustainabilitySource.indexOf(start);
+  const endIndex = sustainabilitySource.indexOf(end, startIndex);
+
+  assert.ok(startIndex >= 0, `missing source start: ${start}`);
+  assert.ok(endIndex > startIndex, `missing source end: ${end}`);
+
+  return sustainabilitySource.slice(startIndex, endIndex);
+}
+
 test("sustainability runtime reads resolved display config for hero, hero media, highlight rail, and bottom cards", () => {
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.eyebrow/);
   assert.match(sustainabilitySource, /resolvedConfig\.hero\.title\[0\]/);
@@ -56,6 +66,12 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.doesNotMatch(sustainabilitySource, /資料來源：/);
   assert.doesNotMatch(sustainabilitySource, /同步狀態：/);
   assert.doesNotMatch(sustainabilitySource, /sourceClass/);
+});
+
+test("sustainability runtime keeps hook calls before the loading-state return", () => {
+  const loadingReturnSource = sourceBetween("return <DisplayPageLoadingState />;", "return (");
+
+  assert.doesNotMatch(loadingReturnSource, /\buse[A-Z][A-Za-z]+\(/);
 });
 
 test("sustainability display page seed config captures the current hero and highlight rail contract", () => {

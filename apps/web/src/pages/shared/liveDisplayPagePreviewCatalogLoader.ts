@@ -21,6 +21,10 @@ type LiveDisplayPagePreviewCatalogLoaderOptions = {
   requestedPageKeys?: string[];
 };
 
+export function resolvePreviewCatalogRequestKey(pageKeys: readonly string[]) {
+  return [...new Set(pageKeys)].sort().join("|");
+}
+
 export async function loadLiveDisplayPagePreviewCatalog({
   definitions,
   force = false,

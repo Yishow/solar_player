@@ -54,6 +54,11 @@ function isScopedPathDirty<T>(config: T, lastLoadedConfig: T, path: string) {
   return JSON.stringify(getValueAtPath(config, decodedPath)) !== JSON.stringify(getValueAtPath(lastLoadedConfig, decodedPath));
 }
 
+function hasScopedPathChange<T>(currentConfig: T, nextConfig: T, path: string) {
+  const decodedPath = decodeDirtyPath(path);
+  return JSON.stringify(getValueAtPath(currentConfig, decodedPath)) !== JSON.stringify(getValueAtPath(nextConfig, decodedPath));
+}
+
 function reconcileDirtyState<T>(
   config: T,
   lastLoadedConfig: T,
@@ -107,7 +112,11 @@ export function applyDraftConfigUpdate<T>(
   options?: ApplyDraftConfigUpdateOptions<T>
 ): DisplayPageDraftSession<T> {
   const nextConfig = typeof nextValue === "function" ? (nextValue as (current: T) => T)(session.config) : nextValue;
-  const shouldRecordOperation = options?.recordHistory !== false && nextConfig !== session.config;
+  const nextDirtyPathKeys = options?.dirtyPaths?.map(encodeDirtyPath) ?? [];
+  const hasScopedChange =
+    nextDirtyPathKeys.length === 0 ||
+    nextDirtyPathKeys.some((path) => hasScopedPathChange(session.config, nextConfig, path));
+  const shouldRecordOperation = options?.recordHistory !== false && nextConfig !== session.config && hasScopedChange;
   const nextHistory = shouldRecordOperation
     ? pushEditorHistory(session.history, options?.historyBase ?? session.config, nextConfig, { skipEqualityCheck: true })
     : session.history;
@@ -117,7 +126,6 @@ export function applyDraftConfigUpdate<T>(
         past: [...session.dirtyHistory.past, createDirtySnapshot(session)]
       }
     : session.dirtyHistory;
-  const nextDirtyPathKeys = options?.dirtyPaths?.map(encodeDirtyPath) ?? [];
   const hasUnscopedDirty = shouldRecordOperation && nextDirtyPathKeys.length === 0
     ? true
     : session.hasUnscopedDirty;

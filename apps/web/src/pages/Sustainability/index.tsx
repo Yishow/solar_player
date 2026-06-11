@@ -131,17 +131,6 @@ export function Sustainability({
     enabled: runtimeHydrationEnabled
   });
 
-  if (
-    shouldDeferDisplayPageRuntimeRender({
-      runtimeHydrationEnabled,
-      isLoading: runtimeConfig.isLoading,
-      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
-      stage: runtimeStage
-    })
-  ) {
-    return <DisplayPageLoadingState />;
-  }
-
   const runtimeResolvedConfig = config ?? runtimeConfig.config;
   const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
   const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
@@ -273,6 +262,17 @@ export function Sustainability({
       )
     };
   }, [resolvedConfig.highlightRail, viewModel]);
+
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return <DisplayPageLoadingState />;
+  }
 
   const titleLayout = withContentOffset(sustainabilityTitleLayout);
   const copyLayout = withContentOffset(sustainabilityCopyLayout);

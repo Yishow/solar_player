@@ -61,6 +61,32 @@ test("coarse editor operations restore dirty state through undo and redo history
   assert.equal(redone.dirty, true);
 });
 
+test("scoped no-op updates do not create undo history", () => {
+  const session = createDraftSession(
+    {
+      heroCopy: {
+        title: "baseline title"
+      }
+    },
+    null,
+    defaultFallbackPolicy
+  );
+  const noOp = applyDraftConfigUpdate(
+    session,
+    (current) => ({
+      ...current,
+      heroCopy: {
+        ...current.heroCopy,
+        title: "baseline title"
+      }
+    }),
+    { dirtyPaths: [["heroCopy", "title"]] }
+  );
+
+  assert.equal(noOp.dirty, false);
+  assert.equal(noOp.history.past.length, 0);
+});
+
 test("baseline rebase clears stale dirty history snapshots", () => {
   const session = applyDraftConfigUpdate(
     createDraftSession({ title: "baseline" }, null, defaultFallbackPolicy),

@@ -281,17 +281,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     [resolvedConfig, seedConfig]
   );
 
-  if (
-    shouldDeferDisplayPageRuntimeRender({
-      runtimeHydrationEnabled,
-      isLoading: runtimeConfig.isLoading,
-      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
-      stage: runtimeStage
-    })
-  ) {
-    return <DisplayPageLoadingState />;
-  }
-
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
     runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
@@ -338,6 +327,17 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       }),
     [resolvedConfig.chrome.ornaments.leaf]
   );
+
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return <DisplayPageLoadingState />;
+  }
 
   return (
     <section className="solar-display-page">

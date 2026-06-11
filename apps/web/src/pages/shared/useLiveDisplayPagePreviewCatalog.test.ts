@@ -4,7 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import React from "react";
 import type { DisplayPageConfigEnvelope, DisplayPageInstance } from "@solar-display/shared";
-import { loadLiveDisplayPagePreviewCatalog } from "./liveDisplayPagePreviewCatalogLoader";
+import {
+  loadLiveDisplayPagePreviewCatalog,
+  resolvePreviewCatalogRequestKey
+} from "./liveDisplayPagePreviewCatalogLoader";
 import type { LiveDisplayPagePreviewRegistryEntry } from "./liveDisplayPagePreviewRegistry";
 import { createConfigUnavailableLiveDisplayPagePreviewStates } from "./liveDisplayPagePreviewState";
 
@@ -22,8 +25,19 @@ test("live preview catalog loads page-instance state from the active registry in
   assert.match(previewCatalogLoaderSource, /loadDisplayPageRegistrySnapshot\(\{\s*force\s*\}\)/);
   assert.match(previewCatalogLoaderSource, /buildLiveDisplayPagePreviewStates\(/);
   assert.match(previewCatalogLoaderSource, /loadDisplayPageConfigEnvelope\(pageKey,\s*"live",\s*\{\s*force\s*\}\)/);
-  assert.match(previewCatalogSource, /useDisplaySyncRefresh\(\(\) => load\(\{\s*force:\s*true\s*\}\),\s*enabled \? \["display-pages"\] : \[\]\)/);
+  assert.match(previewCatalogSource, /useCallback\(\s*\(\) => load\(\{\s*force:\s*true\s*\}\)/);
+  assert.match(
+    previewCatalogSource,
+    /useDisplaySyncRefresh\(\s*handleDisplaySyncRefresh,\s*enabled \? displayPagePreviewSyncScopes : noDisplayPagePreviewSyncScopes\s*\)/
+  );
   assert.doesNotMatch(previewCatalogSource, /displayPageKeys\.map\(async \(pageKey\)/);
+});
+
+test("live preview catalog request key ignores visible-window order churn", () => {
+  assert.equal(
+    resolvePreviewCatalogRequestKey(["solar", "overview", "solar"]),
+    resolvePreviewCatalogRequestKey(["overview", "solar"])
+  );
 });
 
 function createPage(overrides: Partial<DisplayPageInstance> = {}): DisplayPageInstance {
