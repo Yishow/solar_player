@@ -23,14 +23,31 @@ test("slideshow preview renders cards from the shared live preview catalog inste
   assert.doesNotMatch(slideshowPreviewSource, /<img alt=\{card\.labelZh\} src=\{asset\}/);
 });
 
+test("slideshow preview requests only the visible card window before deferred cards", () => {
+  assert.match(slideshowPreviewSource, /const visibleCards = useMemo\(\(\) => \{/);
+  assert.match(slideshowPreviewSource, /const previewCards = useMemo\(/);
+  assert.match(slideshowPreviewSource, /visibleCards\.map\(\(card\) => \(\{/);
+  assert.match(slideshowPreviewSource, /const requestedPreviewPageKeys = useMemo\(/);
+  assert.match(slideshowPreviewSource, /previewCards\.map\(\(card\) => card\.pageKey\)/);
+  assert.match(slideshowPreviewSource, /fallbackPageKeys:\s*previewCatalogPageKeys/);
+  assert.doesNotMatch(slideshowPreviewSource, /requestedPageKeys:\s*previewCatalogPageKeys/);
+});
+
 test("slideshow preview derives rotation shell before heavy live preview catalog state", () => {
   const rotationIndex = slideshowPreviewSource.indexOf("usePageRotation()");
   const catalogIndex = slideshowPreviewSource.indexOf("const livePreviewCatalog");
+  const controlsIndex = slideshowPreviewSource.indexOf('className="sp-arrow prev"');
+  const summaryIndex = slideshowPreviewSource.indexOf('className="sp-summary"');
 
   assert.ok(rotationIndex > -1);
   assert.ok(catalogIndex > -1);
+  assert.ok(controlsIndex > -1);
+  assert.ok(summaryIndex > -1);
   assert.ok(rotationIndex < catalogIndex);
   assert.match(slideshowPreviewSource, /previewCatalogPageKeys/);
+  assert.match(slideshowPreviewSource, /onClick=\{prevPage\}/);
+  assert.match(slideshowPreviewSource, /onClick=\{nextPage\}/);
+  assert.doesNotMatch(slideshowPreviewSource, /disabled=\{[^}]*livePreviewCatalog/);
 });
 
 test("slideshow preview cards keep duplicate template instances bound to their own live preview state", () => {
@@ -136,4 +153,64 @@ test("slideshow preview keeps renderer-unavailable fallback when a card has no t
   assert.match(html, /renderer-unavailable/);
   assert.match(html, /展示頁暫不可用/);
   assert.doesNotMatch(html, /目前無法解析此輪播卡片對應的展示頁。/);
+});
+
+test("slideshow preview keeps ready cards visible when another preview card fails", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(LiveSlideshowPreviewCards, {
+      cards: [
+        {
+          displayOrder: 1,
+          id: 1,
+          isCurrent: true,
+          labelEn: "Overview",
+          labelZh: "總覽頁",
+          pageKey: "overview",
+          routeLabel: "/overview",
+          statusLabel: "輪播已啟用",
+          templateKey: "overview"
+        },
+        {
+          displayOrder: 2,
+          id: 2,
+          isCurrent: false,
+          labelEn: "Solar",
+          labelZh: "太陽能頁",
+          pageKey: "solar",
+          routeLabel: "/solar",
+          statusLabel: "輪播已啟用",
+          templateKey: "solar"
+        }
+      ],
+      definitions: [
+        {
+          id: "overview",
+          label: "Overview",
+          renderPreview: (config) => React.createElement("article", null, String(config.headline ?? ""))
+        },
+        {
+          id: "solar",
+          label: "Solar",
+          renderPreview: (config) => React.createElement("article", null, String(config.headline ?? ""))
+        }
+      ],
+      offsets: [308, 616],
+      states: {
+        overview: {
+          config: {
+            headline: "Overview stays ready"
+          },
+          status: "ready"
+        },
+        solar: {
+          detail: "Solar preview failed",
+          status: "config-unavailable"
+        }
+      }
+    })
+  );
+
+  assert.match(html, /Overview stays ready/);
+  assert.match(html, /config-unavailable/);
+  assert.match(html, /太陽能頁 live preview fallback/);
 });
