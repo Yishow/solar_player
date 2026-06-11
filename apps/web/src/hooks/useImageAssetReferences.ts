@@ -6,7 +6,7 @@ type UseImageAssetReferencesResult = {
   errorMessage: string;
   isLoading: boolean;
   references: DisplayOpsAssetReferenceSummary | null;
-  reload: () => Promise<void>;
+  reload: (nextAssetId?: number | null) => Promise<void>;
 };
 
 type UseImageAssetReferencesOptions = {
@@ -22,8 +22,8 @@ export function useImageAssetReferences(
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const load = async () => {
-    if (!enabled || assetId === null) {
+  const load = async (nextAssetId: number | null = assetId) => {
+    if (!enabled || nextAssetId === null) {
       setReferences(null);
       setIsLoading(false);
       setErrorMessage("");
@@ -33,7 +33,7 @@ export function useImageAssetReferences(
     setIsLoading(true);
     setErrorMessage("");
     try {
-      setReferences(await getImageAssetReferences(assetId));
+      setReferences(await getImageAssetReferences(nextAssetId));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "載入素材引用失敗。");
     } finally {

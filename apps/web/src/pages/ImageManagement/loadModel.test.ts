@@ -7,7 +7,9 @@ import type {
 } from "@solar-display/shared";
 import type { ImageStorageUsage } from "../../services/api";
 import {
+  loadImageManagementLibraryModel,
   loadImageManagementModel,
+  loadImageManagementPlaylistGovernanceModel,
   resolveBulkPlaylistDurationInput,
   resolveImageManagementModel
 } from "./loadModel";
@@ -105,6 +107,46 @@ test("loadImageManagementModel reads library, storage, and playlist governance t
   assert.equal(model.storageUsage, storageUsage);
   assert.equal(model.selectedImageId, 7);
   assert.equal(model.selectedPlaylistEntryId, "entry-7");
+  assert.equal(model.playlistShuffle, true);
+  assert.equal(model.playlistBulkDurationSeconds, 18);
+  assert.equal(model.resolvedPlaylistEntries[0]?.isPlayable, true);
+});
+
+test("loadImageManagementLibraryModel refreshes library and storage without reading governance", async () => {
+  let imageReads = 0;
+  let storageReads = 0;
+
+  const model = await loadImageManagementLibraryModel({
+    readImages: async () => {
+      imageReads += 1;
+      return [asset];
+    },
+    readStorageUsage: async () => {
+      storageReads += 1;
+      return storageUsage;
+    }
+  });
+
+  assert.equal(imageReads, 1);
+  assert.equal(storageReads, 1);
+  assert.deepEqual(model.assets, [asset]);
+  assert.equal(model.lastSyncedAssets, model.assets);
+  assert.equal(model.storageUsage, storageUsage);
+});
+
+test("loadImageManagementPlaylistGovernanceModel refreshes governance without reading library or storage", async () => {
+  let playlistReads = 0;
+
+  const model = await loadImageManagementPlaylistGovernanceModel({
+    readPlaylistGovernance: async () => {
+      playlistReads += 1;
+      return { playlist };
+    }
+  });
+
+  assert.equal(playlistReads, 1);
+  assert.equal(model.playlistEntries[0]?.entryId, "entry-7");
+  assert.equal(model.lastSyncedPlaylistEntries, model.playlistEntries);
   assert.equal(model.playlistShuffle, true);
   assert.equal(model.playlistBulkDurationSeconds, 18);
   assert.equal(model.resolvedPlaylistEntries[0]?.isPlayable, true);

@@ -43,6 +43,20 @@ export type ImageManagementModel = {
   storageUsage: ImageStorageUsage;
 };
 
+export type ImageManagementLibraryModel = Pick<
+  ImageManagementModel,
+  "assets" | "lastSyncedAssets" | "storageUsage"
+>;
+
+export type ImageManagementPlaylistGovernanceModel = Pick<
+  ImageManagementModel,
+  | "lastSyncedPlaylistEntries"
+  | "playlistBulkDurationSeconds"
+  | "playlistEntries"
+  | "playlistShuffle"
+  | "resolvedPlaylistEntries"
+>;
+
 export function normalizeManagementPlaylistEntry(
   entry: ImagePlaylistGovernance["entries"][number]
 ): ImageManagementPlaylistEntry {
@@ -94,8 +108,12 @@ export function resolveImageManagementModel({
   preferredImageId = null,
   storageUsage
 }: ResolveImageManagementModelInput): ImageManagementModel {
-  const playlistEntries = playlist.entries.map(normalizeManagementPlaylistEntry);
-  const resolvedPlaylistEntries = playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry);
+  const libraryModel = resolveImageManagementLibraryModel({
+    assets,
+    storageUsage
+  });
+  const playlistModel = resolveImageManagementPlaylistGovernanceModel(playlist);
+  const { playlistEntries } = playlistModel;
   const selectedImageId =
     preferredImageId !== null && assets.some((asset) => asset.id === preferredImageId)
       ? preferredImageId
@@ -110,17 +128,61 @@ export function resolveImageManagementModel({
         )?.entryId ?? null;
 
   return {
+    ...libraryModel,
+    ...playlistModel,
+    selectedImageId,
+    selectedPlaylistEntryId
+  };
+}
+
+export function resolveImageManagementLibraryModel({
+  assets,
+  storageUsage
+}: {
+  assets: ImageAsset[];
+  storageUsage: ImageStorageUsage;
+}): ImageManagementLibraryModel {
+  return {
     assets,
     lastSyncedAssets: assets,
+    storageUsage
+  };
+}
+
+export function resolveImageManagementPlaylistGovernanceModel(
+  playlist: ImagePlaylistGovernance
+): ImageManagementPlaylistGovernanceModel {
+  const playlistEntries = playlist.entries.map(normalizeManagementPlaylistEntry);
+
+  return {
     lastSyncedPlaylistEntries: playlistEntries,
     playlistBulkDurationSeconds: resolveBulkPlaylistDurationInput(playlistEntries),
     playlistEntries,
     playlistShuffle: playlist.settings.shuffle,
-    resolvedPlaylistEntries,
-    selectedImageId,
-    selectedPlaylistEntryId,
-    storageUsage
+    resolvedPlaylistEntries: playlist.resolvedEntries.map(normalizeResolvedPlaylistEntry)
   };
+}
+
+export async function loadImageManagementLibraryModel(
+  loaders: Pick<ImageManagementModelLoaders, "readImages" | "readStorageUsage"> = {}
+): Promise<ImageManagementLibraryModel> {
+  const [assets, storageUsage] = await Promise.all([
+    (loaders.readImages ?? getImages)(),
+    (loaders.readStorageUsage ?? getImageStorageUsage)()
+  ]);
+
+  return resolveImageManagementLibraryModel({
+    assets,
+    storageUsage
+  });
+}
+
+export async function loadImageManagementPlaylistGovernanceModel(
+  loaders: Pick<ImageManagementModelLoaders, "readPlaylistGovernance"> = {}
+): Promise<ImageManagementPlaylistGovernanceModel> {
+  const playlistResponse = await (loaders.readPlaylistGovernance ?? fetchImagePlaylistGovernance)();
+
+  return resolveImageManagementPlaylistGovernanceModel(playlistResponse.playlist);
 }
 
 export async function loadImageManagementModel(

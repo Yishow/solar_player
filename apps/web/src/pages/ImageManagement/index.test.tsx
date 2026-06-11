@@ -62,10 +62,30 @@ test("image management blocks cross-selection context switches when the current 
   assert.match(imageManagementContentSource, /onClick=\{\(\) => handleSelectImage\(asset\.id\)\}/);
 });
 
-test("image management save flow targets the authoritative draft session and resyncs that same image", () => {
+test("image management save flow targets the authoritative draft session without full cold bootstrap", () => {
   assert.match(imageManagementSource, /const saveTarget = buildImageManagementDraftSaveTarget\(/);
   assert.match(imageManagementSource, /await persistImageManagementDraftTarget\(saveTarget\)/);
-  assert.match(imageManagementSource, /await syncImages\(saveTarget\.asset\.id\)/);
+  assert.match(imageManagementSource, /setLastSyncedAssets\(assets\)/);
+  assert.match(imageManagementSource, /setLastSyncedPlaylistEntries\(playlistEntries\)/);
+  assert.match(imageManagementSource, /refreshImageManagementDiagnostics\(saveTarget\.asset\.id\)/);
+  assert.doesNotMatch(imageManagementSource, /await syncImages\(saveTarget\.asset\.id\)/);
+});
+
+test("image management mutation follow-ups use targeted refresh lanes", () => {
+  assert.match(imageManagementSource, /loadImageManagementLibraryModel/);
+  assert.match(imageManagementSource, /loadImageManagementPlaylistGovernanceModel/);
+  assert.match(imageManagementSource, /const refreshLibraryLane = async/);
+  assert.match(imageManagementSource, /const refreshPlaylistGovernanceLane = async/);
+  assert.match(imageManagementSource, /const refreshImageManagementDiagnostics = async \(assetId: number \| null = selectedImageId\)/);
+  assert.match(imageManagementSource, /reloadAssetReferences\(assetId\)/);
+  assert.match(imageManagementSource, /await refreshLibraryLane\(lastUploadedId\)/);
+  assert.match(imageManagementSource, /await refreshPlaylistGovernanceLane\(lastUploadedId\)/);
+  assert.match(imageManagementSource, /refreshImageManagementDiagnostics\(lastUploadedId\)/);
+  assert.match(imageManagementSource, /const updatedAsset = await updateImageAsset\(selectedImageId, \{ isCover: true \}\)/);
+  assert.match(imageManagementSource, /applyUpdatedImageAsset\(updatedAsset\)/);
+  assert.match(imageManagementSource, /await refreshPlaylistGovernanceLane\(selectedImageId\)/);
+  assert.doesNotMatch(imageManagementSource, /await syncImages\(lastUploadedId\)/);
+  assert.doesNotMatch(imageManagementSource, /await syncImages\(selectedImageId\)/);
 });
 
 test("image management loads the editable library model before deferred diagnostics", () => {

@@ -30,8 +30,13 @@ import {
 } from "./viewModel";
 import { IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import {
+  loadImageManagementLibraryModel,
   loadImageManagementModel,
-  type ImageManagementModel
+  loadImageManagementPlaylistGovernanceModel,
+  resolveImageManagementPlaylistGovernanceModel,
+  type ImageManagementLibraryModel,
+  type ImageManagementModel,
+  type ImageManagementPlaylistGovernanceModel
 } from "./loadModel";
 
 const initialStorageUsage: ImageStorageUsage = {
@@ -95,6 +100,83 @@ export function ImageManagement() {
       preferredImageId
     });
     applyImageManagementModel(model);
+  };
+
+  const applyLibraryModel = (
+    model: ImageManagementLibraryModel,
+    preferredImageId: number | null = selectedImageId
+  ) => {
+    const nextSelectedImageId =
+      preferredImageId !== null && model.assets.some((asset) => asset.id === preferredImageId)
+        ? preferredImageId
+        : model.assets[0]?.id ?? null;
+
+    setAssets(model.assets);
+    setLastSyncedAssets(model.lastSyncedAssets);
+    setStorageUsage(model.storageUsage);
+    setSelectedImageId(nextSelectedImageId);
+    setSelectedPlaylistEntryId(
+      nextSelectedImageId === null
+        ? null
+        : resolveSelectedPlaylistEntry(
+            playlistEntries,
+            nextSelectedImageId,
+            selectedPlaylistEntryId
+          )?.entryId ?? null
+    );
+  };
+
+  const applyPlaylistGovernanceModel = (
+    model: ImageManagementPlaylistGovernanceModel,
+    preferredImageId: number | null = selectedImageId
+  ) => {
+    setPlaylistEntries(model.playlistEntries);
+    setLastSyncedPlaylistEntries(model.lastSyncedPlaylistEntries);
+    setResolvedPlaylistEntries(model.resolvedPlaylistEntries);
+    setPlaylistShuffle(model.playlistShuffle);
+    setPlaylistBulkDurationSeconds(model.playlistBulkDurationSeconds);
+    setSelectedPlaylistEntryId(
+      preferredImageId === null
+        ? null
+        : resolveSelectedPlaylistEntry(
+            model.playlistEntries,
+            preferredImageId,
+            selectedPlaylistEntryId
+          )?.entryId ?? null
+    );
+  };
+
+  const applyUpdatedImageAsset = (updatedAsset: ImageAsset) => {
+    const mergeUpdatedAsset = (current: ImageAsset[]) =>
+      current.map((asset) => {
+        if (asset.id === updatedAsset.id) {
+          return updatedAsset;
+        }
+
+        return updatedAsset.isCover ? { ...asset, isCover: false } : asset;
+      });
+
+    setAssets(mergeUpdatedAsset);
+    setLastSyncedAssets(mergeUpdatedAsset);
+  };
+
+  const refreshLibraryLane = async (preferredImageId: number | null = selectedImageId) => {
+    const model = await loadImageManagementLibraryModel();
+    applyLibraryModel(model, preferredImageId);
+  };
+
+  const refreshPlaylistGovernanceLane = async (preferredImageId: number | null = selectedImageId) => {
+    const model = await loadImageManagementPlaylistGovernanceModel();
+    applyPlaylistGovernanceModel(model, preferredImageId);
+  };
+
+  const refreshImageManagementDiagnostics = async (assetId: number | null = selectedImageId) => {
+    const refreshResults = await Promise.allSettled([
+      reloadAssetHealth(),
+      reloadAssetReferences(assetId)
+    ]);
+
+    return refreshResults.some((result) => result.status === "rejected");
   };
 
   useEffect(() => {
@@ -211,10 +293,14 @@ export function ImageManagement() {
         const uploaded = await uploadImageAsset(file);
         lastUploadedId = uploaded.id;
       }
-      await syncImages(lastUploadedId);
-      await reloadAssetHealth();
-      await reloadAssetReferences();
-      setMessage(files.length === 1 ? "圖片已上傳。" : `已完成 ${files.length} 張圖片上傳。`);
+      await refreshLibraryLane(lastUploadedId);
+      await refreshPlaylistGovernanceLane(lastUploadedId);
+      const hasRefreshFailure = await refreshImageManagementDiagnostics(lastUploadedId);
+      setMessage(
+        hasRefreshFailure
+          ? "圖片已上傳，診斷資料將在下次同步時更新。"
+          : files.length === 1 ? "圖片已上傳。" : `已完成 ${files.length} 張圖片上傳。`
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "上傳圖片失敗。");
     } finally {
@@ -235,12 +321,12 @@ export function ImageManagement() {
     setErrorMessage("");
     try {
       await persistImageManagementDraftTarget(saveTarget);
-      await syncImages(saveTarget.asset.id);
-      const refreshResults = await Promise.allSettled([
-        reloadAssetHealth(),
-        reloadAssetReferences()
-      ]);
-      const hasRefreshFailure = refreshResults.some((result) => result.status === "rejected");
+      setLastSyncedAssets(assets);
+      setLastSyncedPlaylistEntries(playlistEntries);
+      if (saveTarget.playlistEntry !== null) {
+        await refreshPlaylistGovernanceLane(saveTarget.asset.id);
+      }
+      const hasRefreshFailure = await refreshImageManagementDiagnostics(saveTarget.asset.id);
       setMessage(
         hasRefreshFailure
           ? "圖片設定已儲存，診斷資料將在下次同步時更新。"
@@ -258,8 +344,8 @@ export function ImageManagement() {
     setIsSaving(true);
     setErrorMessage("");
     try {
-      await updateImageAsset(selectedImageId, { isCover: true });
-      await syncImages(selectedImageId);
+      const updatedAsset = await updateImageAsset(selectedImageId, { isCover: true });
+      applyUpdatedImageAsset(updatedAsset);
       await reloadAssetReferences();
       setMessage("已更新封面圖片。");
     } catch (error) {
@@ -290,8 +376,11 @@ export function ImageManagement() {
     setIsBootstrappingPlaylist(true);
     setErrorMessage("");
     try {
-      await bootstrapImagePlaylistGovernance();
-      await syncImages(selectedImageId);
+      const response = await bootstrapImagePlaylistGovernance();
+      applyPlaylistGovernanceModel(
+        resolveImageManagementPlaylistGovernanceModel(response.playlist),
+        selectedImageId
+      );
       await reloadAssetReferences();
       setMessage("已建立 playlist governance rows。");
     } catch (error) {
@@ -327,7 +416,7 @@ export function ImageManagement() {
     setErrorMessage("");
     try {
       await updateAllImagePlaylistDurations({ durationSeconds: appliedDuration });
-      await syncImages(selectedImageId);
+      await refreshPlaylistGovernanceLane(selectedImageId);
       setPlaylistBulkDurationSeconds(appliedDuration);
       setMessage(`所有圖片輪播秒數已更新為 ${appliedDuration} 秒。`);
     } catch (error) {
