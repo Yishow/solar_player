@@ -23,7 +23,7 @@ import {
   isManagementDraftConflictError,
   updateDisplayPageConfig
 } from "../services/api";
-import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, isDraftConfigDirty, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
+import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, rebaseDraftSessionBaseline, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
 import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
 export { getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
@@ -275,14 +275,7 @@ export function applyDisplayPageSaveConflict<T>(
   latestEnvelope: DisplayPageConfigEnvelope,
   fallbackPolicy: FallbackPolicy
 ): DisplayPageDraftSession<T> {
-  const lastLoadedConfig = deepClone(latestConfig);
-  return {
-    ...session,
-    dirty: isDraftConfigDirty(session.config, lastLoadedConfig),
-    fallbackPolicy,
-    lastLoadedConfig,
-    lastLoadedEnvelope: latestEnvelope
-  };
+  return rebaseDraftSessionBaseline(session, latestConfig, latestEnvelope, fallbackPolicy, { markDirty: true });
 }
 
 export function resolveDisplayPageSaveConflictMessage(
@@ -336,7 +329,7 @@ type UseDisplayPageConfigOptions<T = unknown> = {
 type UseDisplayPageConfigResult<T> = {
   applyConfigUpdate: (
     nextValue: SetStateAction<T>,
-    options?: { historyBase?: T; recordHistory?: boolean }
+    options?: { dirtyPaths?: Array<Array<number | string>>; historyBase?: T; recordHistory?: boolean }
   ) => void;
   canRedo: boolean;
   canUndo: boolean;
@@ -566,7 +559,10 @@ export function useDisplayPageConfig<T>(
       setIsSaving(false);
     }
   };
-  const applyConfigUpdate = (nextValue: SetStateAction<T>, options?: { recordHistory?: boolean }) => {
+  const applyConfigUpdate = (
+    nextValue: SetStateAction<T>,
+    options?: { dirtyPaths?: Array<Array<number | string>>; historyBase?: T; recordHistory?: boolean }
+  ) => {
     setSessions((current) => {
       const session = current[pageId] ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy);
 

@@ -17,9 +17,10 @@ export function createEditorHistory<T>(): EditorHistorySnapshot<T> {
 export function pushEditorHistory<T>(
   history: EditorHistorySnapshot<T>,
   current: T,
-  next: T
+  next: T,
+  options?: { skipEqualityCheck?: boolean }
 ): EditorHistorySnapshot<T> {
-  if (JSON.stringify(current) === JSON.stringify(next)) {
+  if (!options?.skipEqualityCheck && JSON.stringify(current) === JSON.stringify(next)) {
     return history;
   }
 

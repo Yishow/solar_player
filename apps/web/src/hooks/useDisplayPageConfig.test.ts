@@ -37,6 +37,14 @@ const configHookSource = readFileSync(
   path.join(import.meta.dirname, "useDisplayPageConfig.ts"),
   "utf8"
 );
+const draftSessionSource = readFileSync(
+  path.join(import.meta.dirname, "displayPageDraftSession.ts"),
+  "utf8"
+);
+const displayPagesEditorSource = readFileSync(
+  path.join(import.meta.dirname, "../pages/DisplayPagesEditor/index.tsx"),
+  "utf8"
+);
 
 test("mergeDisplayPageConfig preserves solar seed-backed regions outside partial overrides", () => {
   const seedConfig = createSolarDisplayPageSeedConfig("/solar-hero.png");
@@ -455,7 +463,7 @@ test("display page draft session dirty flag updates on edit reset undo and redo"
       ...current.heroCopy,
       titleLines: ["本地草稿標題", current.heroCopy.titleLines[1]] as [string, string]
     }
-  }));
+  }), { dirtyPaths: [["heroCopy", "titleLines"]] });
 
   assert.equal(editedSession.dirty, true);
   assert.equal(undoDraftSession(editedSession).dirty, false);
@@ -653,6 +661,13 @@ test("display page config hook reads session dirty state instead of stringifying
   assert.match(configHookSource, /const dirty = currentSession\?\.dirty \?\? false/);
   assert.doesNotMatch(configHookSource, /JSON\.stringify\(config\)/);
   assert.doesNotMatch(configHookSource, /JSON\.stringify\(lastLoadedConfig\)/);
+});
+
+test("display page draft session tracks scoped dirty operations instead of full-config serialization", () => {
+  assert.doesNotMatch(draftSessionSource, /JSON\.stringify\(config\) !== JSON\.stringify\(lastLoadedConfig\)/);
+  assert.doesNotMatch(draftSessionSource, /isDraftConfigDirty/);
+  assert.match(draftSessionSource, /dirtyPaths/);
+  assert.match(displayPagesEditorSource, /dirtyPaths:\s*\[path\]/);
 });
 
 test("display page runtime previews skip draft-session hydration when persistence is disabled", () => {

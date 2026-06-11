@@ -416,7 +416,6 @@ export function DisplayPagesEditor({
     resetPaths,
     reload,
     save,
-    setConfig,
     undo
   } = useDisplayPageConfig(selectedPage.id, seedConfig, { stage: "draft" });
 
@@ -461,20 +460,23 @@ export function DisplayPagesEditor({
   const updatePath = useCallback(
     (path: Array<number | string>, value: unknown) => {
       if (selectedPage.id === "overview") {
-        setConfig((current) =>
-          applyOverviewGroupStyleFieldUpdate(
-            current as typeof seedConfig,
-            selectedRegion?.id,
-            path,
-            value
-          )
+        const dirtyPaths = resolveOverviewGroupStylePaths(selectedRegion?.id, path);
+        applyConfigUpdate(
+          (current) =>
+            applyOverviewGroupStyleFieldUpdate(
+              current as typeof seedConfig,
+              selectedRegion?.id,
+              path,
+              value
+            ),
+          { dirtyPaths }
         );
         return;
       }
 
-      setConfig((current) => setValueAtPath(current, path, value));
+      applyConfigUpdate((current) => setValueAtPath(current, path, value), { dirtyPaths: [path] });
     },
-    [seedConfig, selectedPage.id, selectedRegion?.id, setConfig]
+    [applyConfigUpdate, seedConfig, selectedPage.id, selectedRegion?.id]
   );
   const handleResetField = useCallback(
     (path: Array<number | string>) => {

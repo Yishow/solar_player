@@ -4,10 +4,89 @@ import { defaultFallbackPolicy } from "@solar-display/shared";
 import {
   applyDraftConfigUpdate,
   createDraftSession,
+  rebaseDraftSessionBaseline,
   redoDraftSession,
   resetDraftPaths,
   undoDraftSession
 } from "./displayPageDraftSession";
+
+test("scoped dirty paths can be reconciled without marking unrelated fields clean", () => {
+  const seedConfig = {
+    heroCopy: {
+      lead: "baseline lead",
+      title: "baseline title"
+    }
+  };
+  const session = createDraftSession(seedConfig, null, defaultFallbackPolicy);
+  const titleEdited = applyDraftConfigUpdate(
+    session,
+    (current) => ({
+      ...current,
+      heroCopy: {
+        ...current.heroCopy,
+        title: "local title"
+      }
+    }),
+    { dirtyPaths: [["heroCopy", "title"]] }
+  );
+  const leadEdited = applyDraftConfigUpdate(
+    titleEdited,
+    (current) => ({
+      ...current,
+      heroCopy: {
+        ...current.heroCopy,
+        lead: "local lead"
+      }
+    }),
+    { dirtyPaths: [["heroCopy", "lead"]] }
+  );
+
+  const titleReset = resetDraftPaths(leadEdited, seedConfig, [["heroCopy", "title"]]);
+  const leadReset = resetDraftPaths(titleReset, seedConfig, [["heroCopy", "lead"]]);
+
+  assert.equal(titleEdited.dirty, true);
+  assert.equal(leadEdited.dirty, true);
+  assert.equal(titleReset.dirty, true);
+  assert.equal(leadReset.dirty, false);
+});
+
+test("coarse editor operations restore dirty state through undo and redo history", () => {
+  const session = createDraftSession({ left: 86, top: 172 }, null, defaultFallbackPolicy);
+  const moved = applyDraftConfigUpdate(session, (current) => ({ ...current, left: 110 }));
+  const undone = undoDraftSession(moved);
+  const redone = redoDraftSession(undone);
+
+  assert.equal(moved.dirty, true);
+  assert.equal(undone.dirty, false);
+  assert.equal(redone.dirty, true);
+});
+
+test("baseline rebase clears stale dirty history snapshots", () => {
+  const session = applyDraftConfigUpdate(
+    createDraftSession({ title: "baseline" }, null, defaultFallbackPolicy),
+    (current) => ({ ...current, title: "local" }),
+    { dirtyPaths: [["title"]] }
+  );
+  const rebased = rebaseDraftSessionBaseline(
+    session,
+    { title: "server" },
+    {
+      fallbackPolicy: defaultFallbackPolicy,
+      pageId: "overview",
+      publishedAt: null,
+      publishedBy: null,
+      regions: {},
+      stage: "draft",
+      updatedAt: "2026-06-11T00:00:00.000Z",
+      version: 2
+    },
+    defaultFallbackPolicy,
+    { markDirty: true }
+  );
+
+  assert.equal(rebased.dirty, true);
+  assert.equal(undoDraftSession(rebased).dirty, true);
+});
 
 test("resetDraftPaths restores only the requested field paths", () => {
   const seedConfig = {
