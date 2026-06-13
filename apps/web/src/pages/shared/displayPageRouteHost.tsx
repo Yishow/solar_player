@@ -7,6 +7,7 @@ import {
 } from "../../hooks/useDisplayPageRegistry";
 import { runtimePageDefinitions } from "../DisplayPagesEditor/runtimePageDefinitions";
 import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
+import { warmDisplayPageRoutePeerConfigs } from "./displayPageRouteWarmup";
 import "./displayPageRouteHost.css";
 
 const runtimePageDefinitionMap = new Map(
@@ -29,6 +30,7 @@ export async function loadDisplayPageRoute({ params }: LoaderFunctionArgs) {
     }
 
     await loadDisplayPageConfigEnvelope(page.pageKey, "live");
+    warmDisplayPageRoutePeerConfigs(page.pageKey, pages);
   } catch {
     return null;
   }

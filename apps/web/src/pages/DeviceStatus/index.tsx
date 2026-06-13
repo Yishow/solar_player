@@ -17,19 +17,34 @@ import {
 } from "./viewModel";
 import { DeviceStatusContent } from "./DeviceStatusContent";
 import { DEVICE_STATUS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
+import {
+  loadDeviceStatusModel,
+  readCachedDeviceStatusModel
+} from "./loadModel";
 
 type DeviceStatusLoadOptions = {
   preserveProtectedState?: boolean;
+  silent?: boolean;
 };
 
+export async function loadDeviceStatusRoute() {
+  try {
+    await loadDeviceStatusModel();
+  } catch {
+    // Component-level loaders preserve existing partial error states.
+  }
+  return null;
+}
+
 export function DeviceStatus() {
-  const [status, setStatus] = useState<DeviceStatusResponseData | null>(null);
+  const [initialDeviceStatusModel] = useState(() => readCachedDeviceStatusModel());
+  const [status, setStatus] = useState<DeviceStatusResponseData | null>(initialDeviceStatusModel?.status ?? null);
   const [statusAccessDenied, setStatusAccessDenied] = useState(false);
-  const [logExport, setLogExport] = useState<DeviceLogExportMetadata | null>(null);
+  const [logExport, setLogExport] = useState<DeviceLogExportMetadata | null>(initialDeviceStatusModel?.logExport ?? null);
   const [logExportAccessDenied, setLogExportAccessDenied] = useState(false);
   const [logExportError, setLogExportError] = useState("");
-  const [statusLoading, setStatusLoading] = useState(true);
-  const [logExportLoading, setLogExportLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(initialDeviceStatusModel === null);
+  const [logExportLoading, setLogExportLoading] = useState(initialDeviceStatusModel === null);
   const [actionFeedback, setActionFeedback] = useState<DeviceActionFeedback>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const {
@@ -38,7 +53,7 @@ export function DeviceStatus() {
     isLoading: displayOpsLoading,
     reload: reloadDisplayOpsSummary,
     summary: displayOpsSummary
-  } = useDeviceDisplayOpsSummary();
+  } = useDeviceDisplayOpsSummary(initialDeviceStatusModel?.displayOpsSummary);
 
   const formatGeneratedAt = (value: string) =>
     new Date(value).toLocaleTimeString("zh-TW", {
@@ -48,8 +63,13 @@ export function DeviceStatus() {
     });
   const kioskReentryHint = "回到桌面後點擊 Solar Display Kiosk 重新進入。";
 
-  const loadDeviceStatus = async ({ preserveProtectedState = false }: DeviceStatusLoadOptions = {}) => {
-    setStatusLoading(true);
+  const loadDeviceStatus = async ({
+    preserveProtectedState = false,
+    silent = false
+  }: DeviceStatusLoadOptions = {}) => {
+    if (!silent) {
+      setStatusLoading(true);
+    }
     try {
       setStatus(await getDeviceStatus());
       setStatusAccessDenied(false);
@@ -78,12 +98,16 @@ export function DeviceStatus() {
       }
       setActionFeedback((current) => (preserveProtectedState && current ? current : nextFeedback));
     } finally {
-      setStatusLoading(false);
+      if (!silent) {
+        setStatusLoading(false);
+      }
     }
   };
 
-  const loadLogExportMetadata = async () => {
-    setLogExportLoading(true);
+  const loadLogExportMetadata = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setLogExportLoading(true);
+    }
     try {
       setLogExport(await getDeviceLogExportMetadata());
       setLogExportAccessDenied(false);
@@ -98,14 +122,22 @@ export function DeviceStatus() {
         setLogExportError(error instanceof Error ? error.message : "裝置日誌目前不可用。");
       }
     } finally {
-      setLogExportLoading(false);
+      if (!silent) {
+        setLogExportLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    if (initialDeviceStatusModel) {
+      void loadDeviceStatus({ preserveProtectedState: true, silent: true });
+      void loadLogExportMetadata({ silent: true });
+      return;
+    }
+
     void loadDeviceStatus();
     void loadLogExportMetadata();
-  }, []);
+  }, [initialDeviceStatusModel]);
 
   useDisplaySyncRefresh(() => {
     void loadDeviceStatus({ preserveProtectedState: true });

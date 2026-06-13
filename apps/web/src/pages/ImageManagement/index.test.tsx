@@ -90,6 +90,13 @@ test("image management mutation follow-ups use targeted refresh lanes", () => {
 
 test("image management loads the editable library model before deferred diagnostics", () => {
   assert.match(imageManagementSource, /loadImageManagementModel\(\)/);
+  assert.match(imageManagementSource, /readCachedImageManagementModel\(\)/);
+  assert.match(imageManagementSource, /export async function loadImageManagementRoute\(\)/);
+  assert.match(imageManagementSource, /useState<ImageAsset\[\]>\(initialModel\?\.assets \?\? \[\]\)/);
+  assert.match(imageManagementSource, /useState<ImageManagementPlaylistEntry\[\]>\(initialModel\?\.playlistEntries \?\? \[\]\)/);
+  assert.match(imageManagementSource, /loadImageManagementModel\(\{\}, \{ force: initialModel !== null \}\)/);
+  assert.match(imageManagementLoadModelSource, /let cachedImageManagementModel: ImageManagementModel \| null = null/);
+  assert.match(imageManagementLoadModelSource, /if \(!options\.force && canUseCache && cachedImageManagementModel\)/);
   assert.match(imageManagementSource, /const applyImageManagementModel = \(model: ImageManagementModel\) => {/);
   assert.match(imageManagementSource, /useDisplayPageAssetHealth\(\{\s*enabled:\s*hasLoadedImageManagementModel\s*\}\)/);
   assert.match(imageManagementSource, /useImageAssetReferences\(selectedImageId,\s*\{\s*enabled:\s*hasLoadedImageManagementModel\s*\}\)/);

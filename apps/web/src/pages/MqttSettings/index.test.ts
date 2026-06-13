@@ -5,6 +5,7 @@ import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
 const mqttSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
+const mqttSettingsLoadModelSource = fs.readFileSync(path.join(pageDir, "loadModel.ts"), "utf8");
 
 test("mqtt settings only marks broker settings synced after weather settings save succeeds", () => {
   const saveSettingsSource = mqttSettingsSource.slice(
@@ -78,6 +79,14 @@ test("mqtt settings defers diagnostics polling and weather preview until persist
 test("mqtt settings reuses one editable loader before deferred diagnostics refresh", () => {
   assert.match(mqttSettingsSource, /loadEditableSettingsLane/);
   assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics/);
+  assert.match(mqttSettingsSource, /readCachedMqttEditableModel\(\)/);
+  assert.match(mqttSettingsSource, /export async function loadMqttSettingsRoute\(\)/);
+  assert.match(mqttSettingsSource, /const applyMqttEditableModel = \(model: MqttEditableModel\) => {/);
+  assert.match(mqttSettingsSource, /useState<MqttSettingsForm>\(initialEditableModel\?\.settings \?\? defaultMqttFormState\)/);
+  assert.match(mqttSettingsSource, /await loadMqttEditableModel\(\{ force: initialEditableModel !== null \}\)/);
+  assert.match(mqttSettingsSource, /loadCachedMqttEditableModel\(\{ force \}\)/);
+  assert.match(mqttSettingsLoadModelSource, /let cachedMqttEditableModel: MqttEditableModel \| null = null/);
+  assert.match(mqttSettingsLoadModelSource, /if \(!options\.force && cachedMqttEditableModel\)/);
   assert.match(mqttSettingsSource, /const loadMqttEditableModel = async/);
   assert.match(mqttSettingsSource, /await loadMqttEditableModel\(\{ propagateError: true, topicsAsPolling: true \}\)/);
   assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);

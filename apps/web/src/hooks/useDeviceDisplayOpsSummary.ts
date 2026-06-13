@@ -13,14 +13,17 @@ type UseDeviceDisplayOpsSummaryResult = {
   summary: DeviceDisplayOpsSummary | null;
 };
 
-export function useDeviceDisplayOpsSummary(): UseDeviceDisplayOpsSummaryResult {
-  const [summary, setSummary] = useState<DeviceDisplayOpsSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function useDeviceDisplayOpsSummary(initialSummary?: DeviceDisplayOpsSummary): UseDeviceDisplayOpsSummaryResult {
+  const hasInitialSummary = initialSummary !== undefined;
+  const [summary, setSummary] = useState<DeviceDisplayOpsSummary | null>(initialSummary ?? null);
+  const [isLoading, setIsLoading] = useState(!hasInitialSummary);
   const [accessDenied, setAccessDenied] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const load = async () => {
-    setIsLoading(true);
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     setAccessDenied(false);
     setErrorMessage("");
     try {
@@ -34,13 +37,20 @@ export function useDeviceDisplayOpsSummary(): UseDeviceDisplayOpsSummaryResult {
         setErrorMessage(error instanceof Error ? error.message : "載入 display diagnostics 失敗。");
       }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    if (hasInitialSummary) {
+      void load({ silent: true });
+      return;
+    }
+
     void load();
-  }, []);
+  }, [hasInitialSummary]);
 
   return {
     accessDenied,

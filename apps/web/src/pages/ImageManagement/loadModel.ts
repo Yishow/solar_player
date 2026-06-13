@@ -22,6 +22,12 @@ type ImageManagementModelLoaders = {
   readStorageUsage?: () => Promise<ImageStorageUsage>;
 };
 
+type ImageManagementModelLoadOptions = {
+  currentSelectedEntryId?: string | null;
+  force?: boolean;
+  preferredImageId?: number | null;
+};
+
 type ResolveImageManagementModelInput = {
   assets: ImageAsset[];
   currentSelectedEntryId?: string | null;
@@ -42,6 +48,16 @@ export type ImageManagementModel = {
   selectedPlaylistEntryId: string | null;
   storageUsage: ImageStorageUsage;
 };
+
+let cachedImageManagementModel: ImageManagementModel | null = null;
+
+export function readCachedImageManagementModel() {
+  return cachedImageManagementModel;
+}
+
+export function rememberImageManagementModel(model: ImageManagementModel) {
+  cachedImageManagementModel = model;
+}
 
 export type ImageManagementLibraryModel = Pick<
   ImageManagementModel,
@@ -187,22 +203,37 @@ export async function loadImageManagementPlaylistGovernanceModel(
 
 export async function loadImageManagementModel(
   loaders: ImageManagementModelLoaders = {},
-  options: {
-    currentSelectedEntryId?: string | null;
-    preferredImageId?: number | null;
-  } = {}
+  options: ImageManagementModelLoadOptions = {}
 ): Promise<ImageManagementModel> {
+  const hasSelectionOverride =
+    options.currentSelectedEntryId !== undefined || options.preferredImageId !== undefined;
+  const canUseCache =
+    !hasSelectionOverride &&
+    !loaders.readImages &&
+    !loaders.readStorageUsage &&
+    !loaders.readPlaylistGovernance;
+
+  if (!options.force && canUseCache && cachedImageManagementModel) {
+    return cachedImageManagementModel;
+  }
+
   const [assets, storageUsage, playlistResponse] = await Promise.all([
     (loaders.readImages ?? getImages)(),
     (loaders.readStorageUsage ?? getImageStorageUsage)(),
     (loaders.readPlaylistGovernance ?? fetchImagePlaylistGovernance)()
   ]);
 
-  return resolveImageManagementModel({
+  const model = resolveImageManagementModel({
     assets,
     currentSelectedEntryId: options.currentSelectedEntryId,
     playlist: playlistResponse.playlist,
     preferredImageId: options.preferredImageId,
     storageUsage
   });
+
+  if (canUseCache) {
+    rememberImageManagementModel(model);
+  }
+
+  return model;
 }

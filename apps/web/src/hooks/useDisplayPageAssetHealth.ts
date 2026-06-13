@@ -11,14 +11,16 @@ type UseDisplayPageAssetHealthResult = {
 
 type UseDisplayPageAssetHealthOptions = {
   enabled?: boolean;
+  initialReport?: DisplayPageAssetHealthReport | null;
 };
 
 export function useDisplayPageAssetHealth(
   options: UseDisplayPageAssetHealthOptions = {}
 ): UseDisplayPageAssetHealthResult {
   const enabled = options.enabled ?? true;
-  const [report, setReport] = useState<DisplayPageAssetHealthReport | null>(null);
-  const [isLoading, setIsLoading] = useState(enabled);
+  const hasInitialReport = options.initialReport !== undefined;
+  const [report, setReport] = useState<DisplayPageAssetHealthReport | null>(options.initialReport ?? null);
+  const [isLoading, setIsLoading] = useState(enabled && !hasInitialReport);
   const [errorMessage, setErrorMessage] = useState("");
 
   const load = async () => {
@@ -46,8 +48,12 @@ export function useDisplayPageAssetHealth(
       return;
     }
 
+    if (hasInitialReport) {
+      return;
+    }
+
     void load();
-  }, [enabled]);
+  }, [enabled, hasInitialReport]);
 
   return {
     errorMessage,

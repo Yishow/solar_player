@@ -21,6 +21,15 @@ test("display editor route entry defers image list loading until asset options a
   assert.match(editorSource, /initialAssets=\{initialImages \? images : undefined\}/);
 });
 
+test("display editor route preloads workspace assets and shell data for deep links", () => {
+  assert.match(runtimeSource, /loadImageManagementModel\(\)/);
+  assert.match(runtimeSource, /readCachedImageManagementModel\(\)\?\.assets/);
+  assert.match(runtimeSource, /loadShellDecorationEditorData\(\)/);
+  assert.match(runtimeSource, /initialImages=\{initialImages\}/);
+  assert.match(runtimeSource, /initialShellDecorationDraft=\{initialShellDecorationData\?\.draft\}/);
+  assert.match(runtimeSource, /initialShellDecorationImages=\{initialShellDecorationData\?\.images\}/);
+});
+
 test("display editor diagnostics and publishing hooks are gated by active right tab", () => {
   assert.match(editorSource, /const shouldLoadAssetHealth = selectedWorkspace === "editor" && rightTab === "health"/);
   assert.match(editorSource, /const shouldLoadPublishingState = selectedWorkspace === "editor" && rightTab === "publish"/);

@@ -33,6 +33,7 @@ import {
   loadImageManagementLibraryModel,
   loadImageManagementModel,
   loadImageManagementPlaylistGovernanceModel,
+  readCachedImageManagementModel,
   resolveImageManagementPlaylistGovernanceModel,
   type ImageManagementLibraryModel,
   type ImageManagementModel,
@@ -45,27 +46,37 @@ const initialStorageUsage: ImageStorageUsage = {
   usedMB: 0
 };
 
+export async function loadImageManagementRoute() {
+  try {
+    await loadImageManagementModel();
+  } catch {
+    // Keep the route reachable; the page surfaces the load failure.
+  }
+  return null;
+}
+
 export function ImageManagement() {
-  const [assets, setAssets] = useState<ImageAsset[]>([]);
-  const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>([]);
-  const [storageUsage, setStorageUsage] = useState<ImageStorageUsage>(initialStorageUsage);
-  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
-  const [selectedPlaylistEntryId, setSelectedPlaylistEntryId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const initialModel = useMemo(() => readCachedImageManagementModel(), []);
+  const [assets, setAssets] = useState<ImageAsset[]>(initialModel?.assets ?? []);
+  const [lastSyncedAssets, setLastSyncedAssets] = useState<ImageAsset[]>(initialModel?.lastSyncedAssets ?? []);
+  const [storageUsage, setStorageUsage] = useState<ImageStorageUsage>(initialModel?.storageUsage ?? initialStorageUsage);
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(initialModel?.selectedImageId ?? null);
+  const [selectedPlaylistEntryId, setSelectedPlaylistEntryId] = useState<string | null>(initialModel?.selectedPlaylistEntryId ?? null);
+  const [isLoading, setIsLoading] = useState(initialModel === null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isBootstrappingPlaylist, setIsBootstrappingPlaylist] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState("正在同步圖片庫...");
   const [errorMessage, setErrorMessage] = useState("");
-  const [playlistEntries, setPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
-  const [lastSyncedPlaylistEntries, setLastSyncedPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>([]);
-  const [resolvedPlaylistEntries, setResolvedPlaylistEntries] = useState<ImageManagementResolvedPlaylistEntry[]>([]);
-  const [playlistShuffle, setPlaylistShuffle] = useState(false);
-  const [playlistBulkDurationSeconds, setPlaylistBulkDurationSeconds] = useState<number | "">("");
+  const [playlistEntries, setPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>(initialModel?.playlistEntries ?? []);
+  const [lastSyncedPlaylistEntries, setLastSyncedPlaylistEntries] = useState<ImageManagementPlaylistEntry[]>(initialModel?.lastSyncedPlaylistEntries ?? []);
+  const [resolvedPlaylistEntries, setResolvedPlaylistEntries] = useState<ImageManagementResolvedPlaylistEntry[]>(initialModel?.resolvedPlaylistEntries ?? []);
+  const [playlistShuffle, setPlaylistShuffle] = useState(initialModel?.playlistShuffle ?? false);
+  const [playlistBulkDurationSeconds, setPlaylistBulkDurationSeconds] = useState<number | "">(initialModel?.playlistBulkDurationSeconds ?? "");
   const [isUpdatingPlaylistDurationAll, setIsUpdatingPlaylistDurationAll] = useState(false);
   const [isUpdatingPlaylistSettings, setIsUpdatingPlaylistSettings] = useState(false);
-  const [hasLoadedImageManagementModel, setHasLoadedImageManagementModel] = useState(false);
+  const [hasLoadedImageManagementModel, setHasLoadedImageManagementModel] = useState(initialModel !== null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     errorMessage: assetHealthErrorMessage,
@@ -97,6 +108,7 @@ export function ImageManagement() {
   const syncImages = async (preferredImageId: number | null = selectedImageId) => {
     const model = await loadImageManagementModel({}, {
       currentSelectedEntryId: selectedPlaylistEntryId,
+      force: true,
       preferredImageId
     });
     applyImageManagementModel(model);
@@ -182,9 +194,11 @@ export function ImageManagement() {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      setIsLoading(true);
+      if (!initialModel) {
+        setIsLoading(true);
+      }
       try {
-        const model = await loadImageManagementModel();
+        const model = await loadImageManagementModel({}, { force: initialModel !== null });
         if (!active) return;
         applyImageManagementModel(model);
         setMessage("圖片庫已同步。");
@@ -193,14 +207,14 @@ export function ImageManagement() {
         if (!active) return;
         setErrorMessage(error instanceof Error ? error.message : "載入圖片管理頁失敗。");
       } finally {
-        if (active) setIsLoading(false);
+        if (active && !initialModel) setIsLoading(false);
       }
     };
     void load();
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialModel]);
 
   const markDirty = () => {
     setMessage("圖片設定已變更，尚未儲存。");

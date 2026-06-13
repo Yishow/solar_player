@@ -7,18 +7,17 @@ import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { requestJson } from "../../services/api";
 import "./circuitSettings.css";
 import { CircuitSettingsContent } from "./CircuitSettingsContent";
+import {
+  loadCircuitEditableModel as loadCircuitSettingsEditableModel,
+  readCachedCircuitEditableModel,
+  type CircuitEditableModel
+} from "./loadModel";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 import { CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import {
   loadEditableSettingsLane,
   refreshDeferredSettingsDiagnostics
 } from "../shared/editableSettingsLoader";
-
-type CircuitListResponse = {
-  success: boolean;
-  data: CircuitConfig[];
-  error?: string;
-};
 
 type CircuitMutationResponse = {
   success: boolean;
@@ -33,21 +32,23 @@ type CircuitDeleteResponse = {
 };
 
 type CircuitEditableModelLoadOptions = {
+  force?: boolean;
   propagateError?: boolean;
   silent?: boolean;
 };
 
+export async function loadCircuitSettingsRoute() {
+  try {
+    await loadCircuitSettingsEditableModel();
+  } catch {
+    // Keep the route reachable; the page surfaces the load failure.
+  }
+  return null;
+}
+
 function readCircuitOrThrow(response: CircuitMutationResponse, fallbackMessage: string) {
   if (!response.success || !response.data) {
     throw new Error(response.error ?? fallbackMessage);
-  }
-  return response.data;
-}
-
-async function getCircuits() {
-  const response = await requestJson<CircuitListResponse>("/api/circuits");
-  if (!response.success) {
-    throw new Error(response.error ?? "載入迴路設定失敗。");
   }
   return response.data;
 }
@@ -110,16 +111,17 @@ function parseNumberInput(value: string, fallback = 0) {
 }
 
 export function CircuitSettings() {
-  const [circuits, setCircuits] = useState<CircuitConfig[]>([]);
+  const initialEditableModel = useMemo(() => readCachedCircuitEditableModel(), []);
+  const [circuits, setCircuits] = useState<CircuitConfig[]>(initialEditableModel?.circuits ?? []);
   const [dirtyIds, setDirtyIds] = useState<number[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(initialEditableModel === null);
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [message, setMessage] = useState("正在載入迴路設定...");
   const [errorMessage, setErrorMessage] = useState("");
-  const [hasLoadedCircuits, setHasLoadedCircuits] = useState(false);
+  const [hasLoadedCircuits, setHasLoadedCircuits] = useState(initialEditableModel !== null);
   const {
     errorMessage: readinessErrorMessage,
     isLoading: readinessLoading,
@@ -130,10 +132,17 @@ export function CircuitSettings() {
   const reloadReadinessRef = useRef(reloadReadiness);
   reloadReadinessRef.current = reloadReadiness;
 
+  const applyCircuitEditableModel = (model: CircuitEditableModel) => {
+    setCircuits(model.circuits);
+    setHasLoadedCircuits(true);
+  };
+
   const loadCircuits = useCallback(async ({
+    force = true,
     silent = false,
     propagateError = false
   }: {
+    force?: boolean;
     silent?: boolean;
     propagateError?: boolean;
   } = {}) => {
@@ -143,10 +152,9 @@ export function CircuitSettings() {
       setIsLoading(true);
     }
     try {
-      const nextCircuits = await getCircuits();
-      setCircuits(nextCircuits);
+      const model = await loadCircuitSettingsEditableModel({}, { force });
+      applyCircuitEditableModel(model);
       setDirtyIds([]);
-      setHasLoadedCircuits(true);
       setMessage("迴路設定已同步。");
       setErrorMessage("");
     } catch (error) {
@@ -165,17 +173,21 @@ export function CircuitSettings() {
   }, []);
 
   const loadCircuitEditableModel = useCallback(async ({
+    force = true,
     propagateError = false,
     silent = false
   }: CircuitEditableModelLoadOptions = {}) => {
     await loadEditableSettingsLane([
-      () => loadCircuits({ propagateError, silent })
+      () => loadCircuits({ force, propagateError, silent })
     ]);
   }, [loadCircuits]);
 
   useEffect(() => {
-    void loadCircuitEditableModel();
-  }, [loadCircuitEditableModel]);
+    void loadCircuitEditableModel({
+      force: initialEditableModel !== null,
+      silent: initialEditableModel !== null
+    });
+  }, [initialEditableModel, loadCircuitEditableModel]);
 
   const markDirty = useCallback((id: number, nextMessage = "迴路設定已變更，尚未儲存。") => {
     setDirtyIds((current) => (current.includes(id) ? current : [...current, id]));
@@ -263,7 +275,7 @@ export function CircuitSettings() {
     isDirty: dirtyIds.length > 0,
     relevantScopes: CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
-      await loadCircuitEditableModel({ propagateError: true, silent: true });
+      await loadCircuitEditableModel({ force: true, propagateError: true, silent: true });
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }
   });

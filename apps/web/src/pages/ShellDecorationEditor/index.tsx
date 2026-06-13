@@ -165,7 +165,11 @@ export function ShellDecorationEditor({
   const [isLoading, setIsLoading] = useState(initialDraft === undefined || initialImages === undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [message, setMessage] = useState("正在同步共用殼層草稿...");
+  const [message, setMessage] = useState(
+    initialDraft !== undefined && initialImages !== undefined
+      ? "共用殼層草稿已同步。"
+      : "正在同步共用殼層草稿..."
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [publishValidation, setPublishValidation] = useState<ValidationResult | null>(null);
   const [addMount, setAddMount] = useState<ShellDecorationMount>("header");

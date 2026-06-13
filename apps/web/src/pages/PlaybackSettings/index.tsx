@@ -35,17 +35,28 @@ import { useLiveDisplayPagePreviewCatalog } from "../shared/useLiveDisplayPagePr
 import {
   loadPlaybackDiagnosticsModel,
   loadPlaybackEditableModel,
+  readCachedPlaybackEditableModel,
   type PlaybackEditableModel
 } from "./loadModel";
 
+export async function loadPlaybackSettingsRoute() {
+  try {
+    await loadPlaybackEditableModel();
+  } catch {
+    // Keep the route reachable; the page surfaces the load failure.
+  }
+  return null;
+}
+
 export function PlaybackSettings() {
-  const [settings, setSettings] = useState<PlaybackSettings | null>(null);
-  const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(null);
-  const [pages, setPages] = useState<PlaybackPage[]>([]);
-  const [lastSyncedPages, setLastSyncedPages] = useState<PlaybackPage[]>([]);
+  const initialEditableModel = useMemo(() => readCachedPlaybackEditableModel(), []);
+  const [settings, setSettings] = useState<PlaybackSettings | null>(initialEditableModel?.settings ?? null);
+  const [lastSyncedSettings, setLastSyncedSettings] = useState<PlaybackSettings | null>(initialEditableModel?.settings ?? null);
+  const [pages, setPages] = useState<PlaybackPage[]>(initialEditableModel?.pages ?? []);
+  const [lastSyncedPages, setLastSyncedPages] = useState<PlaybackPage[]>(initialEditableModel?.pages ?? []);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(null);
   const [rotationPreviewErrorMessage, setRotationPreviewErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(initialEditableModel === null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
@@ -102,9 +113,11 @@ export function PlaybackSettings() {
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
-      setIsLoading(true);
+      if (!initialEditableModel) {
+        setIsLoading(true);
+      }
       try {
-        const model = await loadPlaybackEditableModel();
+        const model = await loadPlaybackEditableModel({}, { force: initialEditableModel !== null });
         if (!active) return;
         applyLoadedPlaybackEditableModel(model);
         setMessage("播放設定已同步。");
@@ -114,14 +127,14 @@ export function PlaybackSettings() {
         if (!active) return;
         setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
       } finally {
-        if (active) setIsLoading(false);
+        if (active && !initialEditableModel) setIsLoading(false);
       }
     };
     void bootstrap();
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialEditableModel]);
 
   const markDirty = useCallback(() => {
     setMessage("設定已變更，尚未儲存。");
@@ -172,7 +185,7 @@ export function PlaybackSettings() {
     setIsSaving(false);
     setIsLoading(true);
     try {
-      const model = await loadPlaybackEditableModel();
+      const model = await loadPlaybackEditableModel({}, { force: true });
       applyLoadedPlaybackEditableModel(model);
       void refreshPlaybackDiagnostics();
       void reloadDisplayOpsSummary();

@@ -224,6 +224,8 @@ test("shell decoration editor can render inside an integrated editor workspace",
   assert.match(html, /圖層順序/);
   assert.match(html, /移到最下層/);
   assert.match(html, /移到最上層/);
+  assert.match(html, /共用殼層草稿已同步。/);
+  assert.doesNotMatch(html, /正在同步共用殼層草稿/);
   assert.match(html, /儲存殼層草稿/);
   assert.match(html, /發布殼層正式版/);
 });

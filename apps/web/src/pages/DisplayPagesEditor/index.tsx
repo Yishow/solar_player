@@ -2,6 +2,7 @@ import {
   normalizeDisplayPageFreeformObjects,
   type DisplayPageFreeformObject,
   type DisplayPageCardRailTemplateKey,
+  type DisplayPageAssetHealthReport,
   type ImageAsset,
   type DisplayPageTemplateKey,
   type ShellDecorationEnvelope
@@ -318,6 +319,7 @@ export function DisplayPagesEditor({
   editMode: controlledEditMode,
   initialEditorState,
   initialImages,
+  initialAssetHealthReport,
   initialShellDecorationDraft,
   initialShellDecorationImages,
   onEditModeChange,
@@ -333,6 +335,7 @@ export function DisplayPagesEditor({
     selectedRegionIds?: string[];
   };
   initialImages?: ImageAsset[];
+  initialAssetHealthReport?: DisplayPageAssetHealthReport | null;
   initialShellDecorationDraft?: ShellDecorationEnvelope;
   initialShellDecorationImages?: ImageAsset[];
   initialPublishingStateByPage?: DisplayPagePublishingStateMap;
@@ -1259,6 +1262,7 @@ export function DisplayPagesEditor({
           <AssetLibrary
             embedded
             initialAssets={initialImages ? images : undefined}
+            initialAssetHealthReport={initialAssetHealthReport}
             contextLabel={assetWorkspaceContextLabel ?? undefined}
             onApplySelection={assetWorkspaceContextLabel ? handleApplyAssetSelectionAndReturn : undefined}
             onAssetsChange={(nextAssets) => {

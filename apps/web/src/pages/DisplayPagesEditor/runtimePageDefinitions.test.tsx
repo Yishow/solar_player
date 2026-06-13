@@ -192,6 +192,12 @@ test("runtime page definitions rebuild from a refreshed registry snapshot after 
   );
 });
 
+test("display pages editor route primes registry and selected draft config before mount", () => {
+  assert.match(editorRuntimeSource, /export async function loadDisplayPagesEditorRoute/);
+  assert.match(editorRuntimeSource, /loadDisplayPageRegistrySnapshot\(\)/);
+  assert.match(editorRuntimeSource, /loadDisplayPageConfigEnvelope\(selectedPage\.id as DisplayPageId,\s*"draft"\)/);
+});
+
 test("runtime page definitions keep supported pages on the shared schema-aware inspector contract", () => {
   assert.match(runtimeDefinitionsSource, /overviewRuntimePageDefinition/);
   assert.match(runtimeDefinitionsSource, /solarRuntimePageDefinition/);

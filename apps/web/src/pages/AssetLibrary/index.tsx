@@ -1,4 +1,8 @@
-import type { DisplayOpsAssetReferenceSummary, ImageAsset } from "@solar-display/shared";
+import type {
+  DisplayOpsAssetReferenceSummary,
+  DisplayPageAssetHealthReport,
+  ImageAsset
+} from "@solar-display/shared";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
@@ -25,6 +29,7 @@ type AssetLibraryProps = {
   contextLabel?: string;
   embedded?: boolean;
   initialAssets?: ImageAsset[];
+  initialAssetHealthReport?: DisplayPageAssetHealthReport | null;
   initialReferences?: DisplayOpsAssetReferenceSummary;
   onApplySelection?: (asset: ImageAsset) => void;
   onAssetsChange?: (assets: ImageAsset[]) => void;
@@ -141,6 +146,7 @@ export function AssetLibrary({
   contextLabel,
   embedded = false,
   initialAssets,
+  initialAssetHealthReport,
   initialReferences,
   onApplySelection,
   onAssetsChange,
@@ -151,7 +157,7 @@ export function AssetLibrary({
   const [isLoading, setIsLoading] = useState(initialAssets === undefined);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [message, setMessage] = useState("正在同步資產庫...");
+  const [message, setMessage] = useState(initialAssets === undefined ? "正在同步資產庫..." : "資產庫已同步。");
   const [errorMessage, setErrorMessage] = useState("");
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory>("all");
@@ -165,7 +171,7 @@ export function AssetLibrary({
     isLoading: isAssetHealthLoading,
     reload: reloadAssetHealth,
     report: assetHealthReport
-  } = useDisplayPageAssetHealth();
+  } = useDisplayPageAssetHealth({ initialReport: initialAssetHealthReport });
   const {
     errorMessage: assetReferencesErrorMessage,
     isLoading: isAssetReferencesLoading,

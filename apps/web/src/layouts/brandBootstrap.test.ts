@@ -30,6 +30,24 @@ test("router wires a shell bootstrap loader into both playback and management sh
   assert.doesNotMatch(routerSource, /loader:\s*loadRuntimeBrandView/);
 });
 
+test("router preloads settings editable models before mounting settings pages", () => {
+  assert.match(routerSource, /import \{ PlaybackSettings, loadPlaybackSettingsRoute \}/);
+  assert.match(routerSource, /import \{ ImageManagement, loadImageManagementRoute \}/);
+  assert.match(routerSource, /import \{ MqttSettings, loadMqttSettingsRoute \}/);
+  assert.match(routerSource, /import \{ CircuitSettings, loadCircuitSettingsRoute \}/);
+  assert.match(routerSource, /path:\s*"settings\/playback",\s*loader:\s*loadPlaybackSettingsRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<PlaybackSettings \/>/s);
+  assert.match(routerSource, /path:\s*"settings\/images",\s*loader:\s*loadImageManagementRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<ImageManagement \/>/s);
+  assert.match(routerSource, /path:\s*"settings\/mqtt",\s*loader:\s*loadMqttSettingsRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<MqttSettings \/>/s);
+  assert.match(routerSource, /path:\s*"settings\/circuits",\s*loader:\s*loadCircuitSettingsRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<CircuitSettings \/>/s);
+});
+
+test("router preloads status and editor models before mounting those pages", () => {
+  assert.match(routerSource, /import \{ DeviceStatus, loadDeviceStatusRoute \}/);
+  assert.match(routerSource, /import \{ DisplayPagesEditorRoute, loadDisplayPagesEditorRoute \}/);
+  assert.match(routerSource, /path:\s*"device-status",\s*loader:\s*loadDeviceStatusRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<DeviceStatus \/>/s);
+  assert.match(routerSource, /path:\s*"display-pages\/editor",\s*loader:\s*loadDisplayPagesEditorRoute,\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<DisplayPagesEditorRoute \/>/s);
+});
+
 test("index.html seeds the browser title from cached brand state instead of a stale hardcoded brand", () => {
   assert.match(indexHtmlSource, /solar-display:brand-view/);
   assert.doesNotMatch(indexHtmlSource, /<title>國瑞汽車中廠綠能展示播放器<\/title>/);

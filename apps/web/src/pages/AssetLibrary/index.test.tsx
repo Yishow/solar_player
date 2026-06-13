@@ -118,6 +118,8 @@ test("asset library exposes a dedicated management surface with category tabs an
   assert.match(html, /Draft 1/);
   assert.match(html, /內建素材/);
   assert.match(html, /overview\.hero/);
+  assert.match(html, /資產庫已同步。/);
+  assert.doesNotMatch(html, /正在同步資產庫/);
   assert.doesNotMatch(html, /輪播治理/);
 });
 

@@ -29,7 +29,8 @@ test("display pages editor support panel refresh failures preserve warm state la
   assert.match(publishingSource, /setPublishingStateByPage\(\(current\) => \(\{ \.\.\.current, \[pageId\]: \{ fallback, validation \} \}\)\)/);
   assert.match(publishingSource, /catch\(\(error\) => \{\s*\n\s*if \(active\) setPublishingError/);
   assert.doesNotMatch(publishingSource, /catch\(\(error\) => \{[\s\S]*setPublishingStateByPage\(\{\}\)/);
-  assert.match(assetHealthSource, /const \[report, setReport\] = useState<DisplayPageAssetHealthReport \| null>\(null\)/);
+  assert.match(assetHealthSource, /const \[report, setReport\] = useState<DisplayPageAssetHealthReport \| null>\(options\.initialReport \?\? null\)/);
+  assert.match(assetHealthSource, /const hasInitialReport = options\.initialReport !== undefined/);
   assert.match(assetHealthSource, /setReport\(nextReport\)/);
   assert.match(assetHealthSource, /catch \(error\) \{\s*\n\s*setErrorMessage/);
   assert.doesNotMatch(assetHealthSource, /catch \(error\) \{[\s\S]*setReport\(null\)/);

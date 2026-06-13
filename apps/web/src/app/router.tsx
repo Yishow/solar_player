@@ -3,15 +3,15 @@ import { LayoutShellRoute } from "../layouts/LayoutShell";
 import { ManagementShellRoute } from "../layouts/ManagementShell";
 import { loadShellBootstrap } from "../layouts/shellBootstrap";
 import { BrandAssets } from "../pages/BrandAssets";
-import { CircuitSettings } from "../pages/CircuitSettings";
-import { DeviceStatus } from "../pages/DeviceStatus";
-import { DisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
+import { CircuitSettings, loadCircuitSettingsRoute } from "../pages/CircuitSettings";
+import { DeviceStatus, loadDeviceStatusRoute } from "../pages/DeviceStatus";
+import { DisplayPagesEditorRoute, loadDisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
 import { EnergyHistory } from "../pages/EnergyHistory";
 import { EnergyTrend } from "../pages/EnergyTrend";
-import { ImageManagement } from "../pages/ImageManagement";
-import { MqttSettings } from "../pages/MqttSettings";
+import { ImageManagement, loadImageManagementRoute } from "../pages/ImageManagement";
+import { MqttSettings, loadMqttSettingsRoute } from "../pages/MqttSettings";
 import { OfflineError } from "../pages/OfflineError";
-import { PlaybackSettings } from "../pages/PlaybackSettings";
+import { PlaybackSettings, loadPlaybackSettingsRoute } from "../pages/PlaybackSettings";
 import { SlideshowPreview } from "../pages/SlideshowPreview";
 import { DisplayPageRouteHost, loadDisplayPageRoute } from "../pages/shared/displayPageRouteHost";
 
@@ -49,6 +49,8 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/playback",
+        loader: loadPlaybackSettingsRoute,
+        hydrateFallbackElement: <></>,
         element: <PlaybackSettings />
       },
       {
@@ -57,14 +59,20 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/images",
+        loader: loadImageManagementRoute,
+        hydrateFallbackElement: <></>,
         element: <ImageManagement />
       },
       {
         path: "settings/mqtt",
+        loader: loadMqttSettingsRoute,
+        hydrateFallbackElement: <></>,
         element: <MqttSettings />
       },
       {
         path: "settings/circuits",
+        loader: loadCircuitSettingsRoute,
+        hydrateFallbackElement: <></>,
         element: <CircuitSettings />
       },
       {
@@ -81,12 +89,16 @@ export const router = createBrowserRouter([
       },
       {
         path: "device-status",
+        loader: loadDeviceStatusRoute,
+        hydrateFallbackElement: <></>,
         element: <DeviceStatus />
       }
     ]
   },
   {
     path: "display-pages/editor",
+    loader: loadDisplayPagesEditorRoute,
+    hydrateFallbackElement: <></>,
     element: <DisplayPagesEditorRoute />
   },
   {

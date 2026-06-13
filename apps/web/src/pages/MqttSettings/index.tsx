@@ -24,13 +24,23 @@ import {
 } from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
-import { type ActionState, type ConnectionTestFeedback, type DataMode, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
+import { type ActionState, type ConnectionTestFeedback, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import {
   loadEditableSettingsLane,
   refreshDeferredSettingsDiagnostics
 } from "../shared/editableSettingsLoader";
+import {
+  defaultMqttFormState,
+  defaultMqttStatus,
+  loadMqttEditableModel as loadCachedMqttEditableModel,
+  readCachedMqttEditableModel,
+  toFormState,
+  type MqttEditableModel,
+  type MqttSettingsResponse,
+  type TopicMappingsResponse
+} from "./loadModel";
 
 const defaultMetricOptions = [
   "realTimePower",
@@ -58,53 +68,11 @@ const defaultMetricOptions = [
   "phaseTPower"
 ] as const;
 
-type MqttSettingsResponse = {
-  settings: {
-    dataMode: DataMode;
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    clientId: string;
-    reconnectInterval: number;
-    messageTimeout: number;
-  };
-  status: MqttStatus;
-};
-
-type TopicMappingsResponse = {
-  status: MqttStatus;
-  topics: TopicMapping[];
-};
-
 type MqttEditableModelLoadOptions = {
+  force?: boolean;
   propagateError?: boolean;
   topicsAsPolling?: boolean;
 };
-
-const defaultFormState: MqttSettingsForm = {
-  clientId: "solar-display-player",
-  dataMode: "mqtt",
-  host: "localhost",
-  messageTimeout: "30",
-  password: "",
-  port: "1883",
-  reconnectInterval: "5000",
-  username: ""
-};
-
-function toFormState(settings: MqttSettingsResponse["settings"]): MqttSettingsForm {
-  return {
-    clientId: settings.clientId,
-    dataMode: settings.dataMode,
-    host: settings.host,
-    messageTimeout: String(settings.messageTimeout),
-    password: settings.password,
-    port: String(settings.port),
-    reconnectInterval: String(settings.reconnectInterval),
-    username: settings.username
-  };
-}
 
 function buildSettingsPayload(settings: MqttSettingsForm) {
   return {
@@ -135,21 +103,25 @@ function createEmptyMapping(metricKey: string): TopicMapping {
   };
 }
 
+export async function loadMqttSettingsRoute() {
+  try {
+    await loadCachedMqttEditableModel();
+  } catch {
+    // Keep the route reachable; the page surfaces the load failure.
+  }
+  return null;
+}
+
 export function MqttSettings() {
-  const [settings, setSettings] = useState<MqttSettingsForm>(defaultFormState);
-  const [lastSyncedSettings, setLastSyncedSettings] = useState<MqttSettingsForm>(defaultFormState);
-  const [status, setStatus] = useState<MqttStatus>({
-    broker: "",
-    clientId: "",
-    connected: false,
-    reason: null,
-    updatedAt: null
-  });
-  const [topics, setTopics] = useState<TopicMapping[]>([]);
-  const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>([]);
-  const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(DEFAULT_WEATHER_SETTINGS);
+  const initialEditableModel = useMemo(() => readCachedMqttEditableModel(), []);
+  const [settings, setSettings] = useState<MqttSettingsForm>(initialEditableModel?.settings ?? defaultMqttFormState);
+  const [lastSyncedSettings, setLastSyncedSettings] = useState<MqttSettingsForm>(initialEditableModel?.settings ?? defaultMqttFormState);
+  const [status, setStatus] = useState<MqttStatus>(initialEditableModel?.status ?? defaultMqttStatus);
+  const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
+  const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
+  const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
-    useState<WeatherSettings>(DEFAULT_WEATHER_SETTINGS);
+    useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [weatherOptions, setWeatherOptions] = useState<WeatherOptionsResponse | null>(null);
   const [weatherOptionsErrorMessage, setWeatherOptionsErrorMessage] = useState("");
   const [weatherPreviewContract, setWeatherPreviewContract] = useState<WeatherHeaderContract | null>(null);
@@ -158,16 +130,16 @@ export function MqttSettings() {
   const [message, setMessage] = useState("正在載入 MQTT 設定...");
   const [errorMessage, setErrorMessage] = useState("");
   const [actionState, setActionState] = useState<ActionState>({
-    isLoadingSettings: true,
-    isLoadingTopics: true,
+    isLoadingSettings: initialEditableModel === null,
+    isLoadingTopics: initialEditableModel === null,
     isReloadingTopics: false,
     isSavingSettings: false,
     isSavingTopics: false,
     isTestingConnection: false
   });
-  const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(false);
-  const [hasLoadedTopics, setHasLoadedTopics] = useState(false);
-  const [hasLoadedWeatherSettings, setHasLoadedWeatherSettings] = useState(false);
+  const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(initialEditableModel !== null);
+  const [hasLoadedTopics, setHasLoadedTopics] = useState(initialEditableModel !== null);
+  const [hasLoadedWeatherSettings, setHasLoadedWeatherSettings] = useState(initialEditableModel !== null);
   const hasLoadedMqttEditableModel = hasLoadedMqttSettings && hasLoadedTopics && hasLoadedWeatherSettings;
   const {
     errorMessage: readinessErrorMessage,
@@ -190,6 +162,27 @@ export function MqttSettings() {
     topics.forEach((topic) => optionSet.add(topic.metricKey));
     return [...optionSet];
   }, [topics]);
+
+  const applyMqttEditableModel = (model: MqttEditableModel) => {
+    setSettings(model.settings);
+    setLastSyncedSettings(model.settings);
+    setStatus(model.status);
+    setTopics(model.topics);
+    setLastSyncedTopics(model.topics);
+    setWeatherSettings(model.weatherSettings);
+    setLastSyncedWeatherSettings(model.weatherSettings);
+    setHasLoadedMqttSettings(true);
+    setHasLoadedTopics(true);
+    setHasLoadedWeatherSettings(true);
+    setLastConnectionTest(null);
+    setMessage("MQTT 設定已同步。");
+    setErrorMessage("");
+    setActionState((current) => ({
+      ...current,
+      isLoadingSettings: false,
+      isLoadingTopics: false
+    }));
+  };
 
   const markDirty = useCallback((nextMessage: string) => {
     setLastConnectionTest(null);
@@ -270,27 +263,46 @@ export function MqttSettings() {
   };
 
   const loadMqttEditableModel = async ({
+    force = false,
     propagateError = false,
     topicsAsPolling = false
   }: MqttEditableModelLoadOptions = {}) => {
-    await loadEditableSettingsLane([
-      () => loadSettings({ propagateError }),
-      () => loadTopics({ isPolling: topicsAsPolling, propagateError }),
-      () => loadWeatherSettings({ propagateError })
-    ]);
+    if (topicsAsPolling) {
+      await loadEditableSettingsLane([
+        () => loadSettings({ propagateError }),
+        () => loadTopics({ isPolling: true, propagateError }),
+        () => loadWeatherSettings({ propagateError })
+      ]);
+      return;
+    }
+
+    try {
+      const model = await loadCachedMqttEditableModel({ force });
+      applyMqttEditableModel(model);
+    } catch (error) {
+      if (propagateError) {
+        throw error instanceof Error ? error : new Error("載入 MQTT 設定失敗。");
+      }
+      setErrorMessage(error instanceof Error ? error.message : "載入 MQTT 設定失敗。");
+      setActionState((current) => ({
+        ...current,
+        isLoadingSettings: false,
+        isLoadingTopics: false
+      }));
+    }
   };
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        await loadMqttEditableModel();
+        await loadMqttEditableModel({ force: initialEditableModel !== null });
       } catch {
         // individual loaders surface their own errors
       }
     };
     void bootstrap();
 
-  }, []);
+  }, [initialEditableModel]);
 
   useEffect(() => {
     if (!hasLoadedTopics) {

@@ -5,6 +5,7 @@ import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
 const playbackSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
+const playbackSettingsLoadModelSource = fs.readFileSync(path.join(pageDir, "loadModel.ts"), "utf8");
 const playbackSettingsCss = fs.readFileSync(path.join(pageDir, "playbackSettings.css"), "utf8");
 
 test("playback settings keeps save and resync actions wired to the playback APIs", () => {
@@ -52,6 +53,13 @@ test("playback settings reserves extra preview space when the alert banner is vi
 
 test("playback settings renders editable model before deferred diagnostics", () => {
   assert.match(playbackSettingsSource, /loadPlaybackEditableModel\(\)/);
+  assert.match(playbackSettingsSource, /readCachedPlaybackEditableModel\(\)/);
+  assert.match(playbackSettingsSource, /export async function loadPlaybackSettingsRoute\(\)/);
+  assert.match(playbackSettingsSource, /useState<PlaybackSettings \| null>\(initialEditableModel\?\.settings \?\? null\)/);
+  assert.match(playbackSettingsSource, /useState<PlaybackPage\[\]>\(initialEditableModel\?\.pages \?\? \[\]\)/);
+  assert.match(playbackSettingsSource, /loadPlaybackEditableModel\(\{\}, \{ force: initialEditableModel !== null \}\)/);
+  assert.match(playbackSettingsLoadModelSource, /let cachedPlaybackEditableModel: PlaybackEditableModel \| null = null/);
+  assert.match(playbackSettingsLoadModelSource, /if \(!options\.force && canUseCache && cachedPlaybackEditableModel\)/);
   assert.match(playbackSettingsSource, /useLiveDisplayPagePreviewCatalog\(\{\s*enabled:\s*hasEditableModel,\s*requestedPageKeys:\s*requestedPreviewPageKeys\s*\}\)/);
   assert.match(playbackSettingsSource, /useDisplayOpsSummary\(\{\s*enabled:\s*hasEditableModel\s*\}\)/);
   assert.match(playbackSettingsSource, /enabled:\s*Boolean\(lastSyncedSettings && rotationPreview\)/);

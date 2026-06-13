@@ -5,6 +5,7 @@ import test from "node:test";
 import type { DisplayPageInstance } from "@solar-display/shared";
 import { buildPlaybackFooterEntries, resolvePlaybackRouteMeta } from "../../app/playbackRouteMeta";
 import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
+import { resolveDisplayPageRoutePeerConfigKeys } from "./displayPageRouteWarmup";
 
 const routeHostSource = readFileSync(path.join(import.meta.dirname, "displayPageRouteHost.tsx"), "utf8");
 const registryHookSource = readFileSync(
@@ -17,6 +18,7 @@ const configHookSource = readFileSync(
 );
 const layoutShellSource = readFileSync(path.join(import.meta.dirname, "../../layouts/LayoutShell.tsx"), "utf8");
 const routerSource = readFileSync(path.join(import.meta.dirname, "../../app/router.tsx"), "utf8");
+const routeWarmupSource = readFileSync(path.join(import.meta.dirname, "displayPageRouteWarmup.ts"), "utf8");
 
 function createPage(
   overrides: Partial<DisplayPageInstance> & Pick<DisplayPageInstance, "id" | "pageKey" | "route" | "routeSlug" | "templateKey">
@@ -118,7 +120,44 @@ test("display page route navigation preloads live config before swapping runtime
   assert.match(routeHostSource, /export async function loadDisplayPageRoute/);
   assert.match(routeHostSource, /loadDisplayPageRegistrySnapshot\(\)/);
   assert.match(routeHostSource, /loadDisplayPageConfigEnvelope\(page\.pageKey,\s*"live"\)/);
+  assert.match(routeHostSource, /warmDisplayPageRoutePeerConfigs\(page\.pageKey,\s*pages\)/);
+  assert.match(routeWarmupSource, /void Promise\.all/);
   assert.match(routerSource, /loader:\s*loadDisplayPageRoute/);
+});
+
+test("display page route navigation warms peer live configs without replaying the current page", () => {
+  const pages: DisplayPageInstance[] = [
+    createPage({
+      id: 1,
+      pageKey: "overview",
+      route: "/overview",
+      routeSlug: "overview",
+      templateKey: "overview"
+    }),
+    createPage({
+      id: 2,
+      pageKey: "solar",
+      route: "/solar",
+      routeSlug: "solar",
+      templateKey: "solar"
+    }),
+    createPage({
+      id: 3,
+      pageKey: "overview",
+      route: "/overview-copy",
+      routeSlug: "overview-copy",
+      templateKey: "overview"
+    }),
+    createPage({
+      id: 4,
+      pageKey: "images",
+      route: "/images",
+      routeSlug: "images",
+      templateKey: "images"
+    })
+  ];
+
+  assert.deepEqual(resolveDisplayPageRoutePeerConfigKeys("overview", pages), ["solar", "images"]);
 });
 
 test("display page route host uses the shared warm live config envelope path for first visible render", () => {
