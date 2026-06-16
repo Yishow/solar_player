@@ -1,6 +1,10 @@
 import React, { Fragment } from "react";
 import type { ShellDecorationObject } from "@solar-display/shared";
 import { Link, useLocation } from "react-router-dom";
+import {
+  getConfiguredHiddenManagementRoutePaths,
+  isManagementRouteHidden
+} from "../app/managementRouteVisibility";
 import { routeMetaList, routeMetaMap, type PlaybackRouteNavIcon, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
@@ -23,6 +27,7 @@ const hiddenManagementFooterPaths = new Set([
 
 const managementFooterOrder = [
   "/settings/playback",
+  "/settings/data-source",
   "/settings/mqtt",
   "/settings/images",
   "/settings/circuits",
@@ -68,10 +73,13 @@ function buildEntries(
     };
   }
 
+  const configuredHiddenManagementPaths = getConfiguredHiddenManagementRoutePaths();
   const managementTabs: FooterEntry[] = managementFooterOrder
     .map((path) => routeMetaMap.get(path))
     .filter((route): route is RouteMeta => {
-      return route !== undefined && !hiddenManagementFooterPaths.has(route.path);
+      return route !== undefined &&
+        !hiddenManagementFooterPaths.has(route.path) &&
+        !isManagementRouteHidden(route.path, configuredHiddenManagementPaths);
     })
     .map((route) => ({ key: route.path, label: route.navLabel, path: route.path }));
 

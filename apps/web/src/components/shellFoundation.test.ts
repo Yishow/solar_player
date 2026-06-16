@@ -442,12 +442,11 @@ test("settings footer keeps overview return plus settings-related routes only", 
   const expectedOrder = [
     "回總覽",
     "播放設定",
+    "資料來源",
     "MQTT",
     "圖片管理",
     "迴路設定",
     "裝置狀態",
-    "趨勢",
-    "歷史",
     "品牌",
     "展示編輯",
     "預覽"
@@ -473,6 +472,8 @@ test("settings footer keeps overview return plus settings-related routes only", 
   assert.doesNotMatch(footerHtml, /<path d="M9 18l6-6-6-6"/);
   assert.doesNotMatch(footerHtml, />資產庫</);
   assert.doesNotMatch(footerHtml, />殼層裝飾</);
+  assert.doesNotMatch(footerHtml, />趨勢</);
+  assert.doesNotMatch(footerHtml, />歷史</);
   assert.doesNotMatch(footerHtml, />太陽能</);
   assert.doesNotMatch(footerHtml, />永續</);
   assert.doesNotMatch(footerHtml, />進入設定</);

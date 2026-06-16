@@ -4,6 +4,7 @@ import {
   bootstrapImagePlaylistGovernance,
   buildApiUrl,
   fetchDisplayStoryPage,
+  getDataSourceOverview,
   isManagementAccessDeniedError,
   isManagementDraftConflictError,
   isViteDevRuntime,
@@ -179,6 +180,34 @@ test("requestJson surfaces explicit management denied envelopes as typed access-
         throw error;
       }
     }, /Management access denied/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getDataSourceOverview requests the read-only diagnostics endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = async (input) => {
+    requestedUrls.push(String(input));
+    return new Response(
+      JSON.stringify({
+        generatedAt: "2026-06-16T00:00:00.000Z",
+        warnings: []
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    await getDataSourceOverview();
+    assert.equal(requestedUrls[0], buildApiUrl("/api/data-source/overview"));
   } finally {
     globalThis.fetch = originalFetch;
   }

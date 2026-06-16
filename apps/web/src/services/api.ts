@@ -543,6 +543,72 @@ export type DeviceKioskExitResult = {
   reentryHint: string;
 };
 
+export type DataSourceOverviewResponse = {
+  generatedAt: string;
+  runtimeStorage: {
+    status: "ready";
+    dataDir: string;
+    databasePath: string;
+    uploadsDir: string;
+    brandUploadsDir: string;
+  };
+  sqlite: {
+    status: "ready" | "degraded" | "unavailable";
+    databasePath: string;
+    tableCounts: Record<string, number>;
+  };
+  uploads: {
+    status: "ready" | "degraded" | "unavailable";
+    imageUploads: {
+      status: "ready" | "degraded" | "unavailable";
+      dir: string;
+      fileCount: number;
+      totalBytes: number;
+    };
+    brandUploads: {
+      status: "ready" | "degraded" | "unavailable";
+      dir: string;
+      fileCount: number;
+      totalBytes: number;
+    };
+  };
+  mqtt: {
+    status: "ready";
+    dataMode: "mqtt" | "mock";
+    host: string;
+    port: number;
+    username: "configured" | "missing";
+    password: "configured" | "missing";
+  };
+  weather: {
+    status: "ready";
+    cwaAuthorization: "configured" | "missing";
+    openDataUrl: string;
+    requestTimeoutMs: number;
+  };
+  retention: {
+    status: "ready";
+    metricSnapshotRetentionDays: number;
+    dailySummaryRetentionDays: number;
+    vacuumEnabled: boolean;
+  };
+  browserLocalCache: {
+    status: "browser-managed";
+    description: string;
+  };
+  relatedRoutes: Array<{
+    category: "mqtt" | "uploads" | "playback" | "device";
+    label: string;
+    path: string;
+  }>;
+  recommendations: Array<{
+    description: string;
+    status: "recommended";
+    title: string;
+  }>;
+  warnings: string[];
+};
+
 type DeviceLogListEntry = {
   file: string;
   modified: string;
@@ -558,6 +624,10 @@ export async function getDeviceStatus() {
     throw new Error("載入裝置狀態失敗。");
   }
   return response.data;
+}
+
+export async function getDataSourceOverview() {
+  return requestJson<DataSourceOverviewResponse>("/api/data-source/overview");
 }
 
 export async function getDeviceLogExportMetadata() {
