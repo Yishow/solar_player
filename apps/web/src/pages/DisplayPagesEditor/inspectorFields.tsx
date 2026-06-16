@@ -822,7 +822,7 @@ function renderFieldInput(
   if (isSelectFieldSchema(field.schema)) {
     return (
       <select
-        className="rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none focus:border-[var(--shell-divider-strong)]"
+        className="w-full min-w-0 truncate rounded-[14px] border border-[var(--shell-divider)] bg-white px-3 py-2 text-[14px] text-[var(--shell-title-ink)] outline-none focus:border-[var(--shell-divider-strong)]"
         value={String(field.value ?? "")}
         onChange={(event) => onChange(field.path, event.target.value)}
       >

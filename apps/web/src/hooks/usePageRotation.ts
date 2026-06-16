@@ -39,8 +39,7 @@ export function usePageRotation(options: UsePageRotationOptions = {}) {
 
   useEffect(() => {
     if (previousControllerRouteRef.current === undefined) {
-      previousControllerRouteRef.current = controller.currentPage?.route;
-      return;
+      previousControllerRouteRef.current = options.currentPath;
     }
 
     const nextRoute = resolvePlaybackRouteNavigation({

@@ -206,6 +206,8 @@ export function useDisplayEditorCanvasWorkflow({
   lockedRegionIdsRef.current = lockedRegionIds;
   const pendingDragCommitRef = useRef<{ region: ResolvedDisplayEditorRegion; rect: CanvasRect } | null>(null);
   const sessionSnapOptionsRef = useRef<CanvasSnapOptions | undefined>(undefined);
+  const applyConfigUpdateRef = useRef(applyConfigUpdate);
+  applyConfigUpdateRef.current = applyConfigUpdate;
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
   const temporaryMeasureTargetRegion = useMemo(
     () => regions.find((region) => region.id === temporaryMeasureTargetRegionId) ?? null,
@@ -383,7 +385,7 @@ export function useDisplayEditorCanvasWorkflow({
       pendingDragCommitRef.current = null;
 
       if (pendingCommit) {
-        applyConfigUpdate((current) => applyRegionRect(current, pendingCommit.region, pendingCommit.rect), {
+        applyConfigUpdateRef.current((current) => applyRegionRect(current, pendingCommit.region, pendingCommit.rect), {
           historyBase: activeInteraction.startConfig
         });
       }
@@ -399,7 +401,7 @@ export function useDisplayEditorCanvasWorkflow({
       window.removeEventListener("pointerup", handlePointerUp);
       sessionSnapOptionsRef.current = undefined;
     };
-  }, [applyConfigUpdate, canvasInteraction]);
+  }, [canvasInteraction]);
 
   useEffect(() => {
     if (selectedRegionLocked && canvasInteraction) {

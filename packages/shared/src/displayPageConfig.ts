@@ -51,7 +51,7 @@ export type ValidationResult = {
   canPublish: boolean;
 };
 
-export const displayPageMediaFitModes = ["contain", "cover"] as const;
+export const displayPageMediaFitModes = ["contain", "cover", "fill"] as const;
 
 export type DisplayPageMediaFitMode = (typeof displayPageMediaFitModes)[number];
 

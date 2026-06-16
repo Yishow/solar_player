@@ -44,7 +44,7 @@ test("incompatible region presets are blocked before overwriting the draft", () 
   const config = createOverviewDisplayPageSeedConfig("/hero.png");
   const regions = resolveDisplayEditorRegions(config, overviewDisplayPageEditorRegions, config);
   const source = regions.find((region) => region.id === "overview-hero-copy");
-  const target = regions.find((region) => region.id === "overview-hero-container");
+  const target = regions.find((region) => region.id === "overview-hero-media");
 
   assert.ok(source);
   assert.ok(target);

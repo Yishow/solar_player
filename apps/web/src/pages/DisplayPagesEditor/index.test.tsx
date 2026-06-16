@@ -260,7 +260,7 @@ test("display page editor exposes overview family appearance controls in the ins
   assert.doesNotMatch(html, /Value Font Size/);
 });
 
-test("display page editor routes a visible hero container selection to the owning media effect inspector", () => {
+test("display page editor routes a visible hero media selection to the owning media effect inspector", () => {
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -270,7 +270,7 @@ test("display page editor routes a visible hero container selection to the ownin
       React.createElement(DisplayPagesEditor, {
         initialEditorState: {
           editMode: true,
-          selectedRegionId: "overview-hero-container"
+          selectedRegionId: "overview-hero-media"
         },
         renderPreview: false
       })

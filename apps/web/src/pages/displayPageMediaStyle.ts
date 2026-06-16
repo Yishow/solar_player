@@ -20,7 +20,10 @@ type DisplayPageMediaOverlayLayer = {
 };
 
 function normalizeFitMode(fitMode?: DisplayPageMediaBinding["fitMode"]) {
-  return fitMode === "contain" ? "contain" : "cover";
+  if (fitMode === "contain" || fitMode === "fill") {
+    return fitMode;
+  }
+  return "cover";
 }
 
 function normalizeAnchor(value: number | undefined) {

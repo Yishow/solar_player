@@ -714,14 +714,19 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         label: "Fit Mode",
         options: [
           { label: "Contain", value: "contain" },
-          { label: "Cover", value: "cover" }
+          { label: "Cover", value: "cover" },
+          { label: "Fill", value: "fill" }
         ],
         path: ["heroMedia", "fitMode"]
       },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-x", label: "Focus X", path: ["heroMedia", "focusX"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-focus-y", label: "Focus Y", path: ["heroMedia", "focusY"], step: 0.05 },
       { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-x", label: "Align X", path: ["heroMedia", "alignX"], step: 0.05 },
-      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 }
+      { constraints: { max: 1, min: 0 }, fieldType: "number", id: "hero-align-y", label: "Align Y", path: ["heroMedia", "alignY"], step: 0.05 },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-left", label: "Left", path: ["heroContainer", "left"] },
+      { constraints: { min: 146 }, fieldType: "number", id: "hero-top", label: "Top", path: ["heroContainer", "top"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-width", label: "Width", path: ["heroContainer", "width"] },
+      { constraints: { min: 0 }, fieldType: "number", id: "hero-height", label: "Height", path: ["heroContainer", "height"] }
     ],
     mediaEffectSurface: createSupportedDisplayPageMediaEffectSurface(["heroMedia"]),
     presetKey: "hero-media"
@@ -749,29 +754,6 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       { constraints: { min: 0 }, fieldType: "number", id: "summary-width", label: "Width", path: ["summaryCard", "width"] }
     ],
     presetKey: "overview-summary"
-  },
-  {
-    id: "overview-hero-container",
-    label: "Overview Hero Container",
-    description: "調整 hero 畫布容器幾何。",
-    geometry: {
-      compatibilityKey: "hero-container-geometry",
-      heightPath: ["heroContainer", "height"],
-      leftPath: ["heroContainer", "left"],
-      minHeight: 120,
-      minWidth: 120,
-      resizeMode: "both",
-      topOffset: 146,
-      topPath: ["heroContainer", "top"],
-      widthPath: ["heroContainer", "width"]
-    },
-    fields: [
-      { constraints: { min: 0 }, fieldType: "number", id: "hero-left", label: "Left", path: ["heroContainer", "left"] },
-      { constraints: { min: 146 }, fieldType: "number", id: "hero-top", label: "Top", path: ["heroContainer", "top"] },
-      { constraints: { min: 0 }, fieldType: "number", id: "hero-width", label: "Width", path: ["heroContainer", "width"] },
-      { constraints: { min: 0 }, fieldType: "number", id: "hero-height", label: "Height", path: ["heroContainer", "height"] }
-    ],
-    presetKey: "hero-container"
   },
   {
     id: "overview-ornament-gold-line",
