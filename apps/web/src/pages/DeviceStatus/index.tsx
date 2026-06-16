@@ -193,8 +193,8 @@ export function DeviceStatus() {
     try {
       const result = await runDeviceKioskExit();
       setActionFeedback({
-        detail: result.reentryHint,
-        title: "離開系統",
+        detail: `已送出離開指令。${result.reentryHint}`,
+        title: "已送出離開指令",
         tone: "ready"
       });
     } catch (error) {

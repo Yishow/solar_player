@@ -538,7 +538,7 @@ export type DeviceLogExportMetadata = {
 };
 
 export type DeviceKioskExitResult = {
-  executed: boolean;
+  scheduled: boolean;
   launcherName: string;
   reentryHint: string;
 };

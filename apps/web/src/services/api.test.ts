@@ -377,7 +377,7 @@ test("runDeviceKioskExit posts to the dedicated kiosk-exit route and returns re-
     return new Response(
       JSON.stringify({
         data: {
-          executed: true,
+          scheduled: true,
           launcherName: "Solar Display Kiosk",
           reentryHint: "回到桌面後點擊 Solar Display Kiosk 重新進入。"
         },
@@ -395,7 +395,7 @@ test("runDeviceKioskExit posts to the dedicated kiosk-exit route and returns re-
   try {
     const result = await runDeviceKioskExit();
 
-    assert.equal(result.executed, true);
+    assert.equal(result.scheduled, true);
     assert.equal(result.launcherName, "Solar Display Kiosk");
     assert.match(result.reentryHint, /Solar Display Kiosk/);
     assert.ok(seenUrls.some((url) => url.includes("/api/device/kiosk-exit")));
