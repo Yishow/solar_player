@@ -120,7 +120,10 @@ function readTableCounts(): Record<string, number> {
 
   return Object.fromEntries(
     tables.map(({ name }) => {
-      const row = database.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).get() as { count: number };
+      // Identifiers cannot be parameterized; escape embedded double quotes so a table
+      // name containing `"` cannot break out of the quoted identifier.
+      const quotedName = name.replace(/"/g, '""');
+      const row = database.prepare(`SELECT COUNT(*) AS count FROM "${quotedName}"`).get() as { count: number };
       return [name, row.count];
     })
   );
