@@ -2,7 +2,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/data/solar-display}"
-KIOSK_USER="${KIOSK_USER:-kz}"
+KIOSK_USER="${KIOSK_USER:-pi}"
 APPLY_READONLY_ROOT="${APPLY_READONLY_ROOT:-0}"
 OVERLAYROOT_MODE="${OVERLAYROOT_MODE:-tmpfs:recurse=0}"
 
@@ -55,7 +55,8 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 if ! command -v update-initramfs >/dev/null 2>&1 || ! command -v overlayroot-chroot >/dev/null 2>&1; then
-  fail "overlayroot is not installed. Install it first, for example: sudo apt-get install -y overlayroot"
+  apt-get update
+  apt-get install -y overlayroot
 fi
 
 if [[ -f /etc/overlayroot.local.conf ]]; then

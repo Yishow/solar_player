@@ -10,13 +10,14 @@ Wants=network-online.target
 
 [Service]
 Type=exec
-User=kz
+User=pi
 WorkingDirectory=/data/solar-display
 EnvironmentFile=-/data/solar-display/.env
 Environment=NODE_ENV=production
 Environment=DATA_DIR=/data/solar-display/data
 Environment=LOG_DIR=/data/solar-display/logs
 Environment=PORT=3000
+Environment=KIOSK_USER=pi
 SyslogIdentifier=solar-display
 ExecStart=/usr/bin/node apps/server/dist/server.js
 Restart=on-failure

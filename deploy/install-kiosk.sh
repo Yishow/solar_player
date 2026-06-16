@@ -8,7 +8,7 @@ fi
 
 BUNDLE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALL_DIR="${INSTALL_DIR:-/data/solar-display}"
-KIOSK_USER="${KIOSK_USER:-kz}"
+KIOSK_USER="${KIOSK_USER:-pi}"
 KIOSK_GROUP="${KIOSK_GROUP:-${KIOSK_USER}}"
 KIOSK_HOME="${KIOSK_HOME:-/home/${KIOSK_USER}}"
 KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
@@ -19,8 +19,10 @@ GDM_CUSTOM_CONF="${GDM_CUSTOM_CONF:-/etc/gdm3/custom.conf}"
 SYSTEMD_UNIT_PATH="/etc/systemd/system/solar-display.service"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
 LAUNCHER_NAME="Solar Display Kiosk.desktop"
+READONLY_ENABLE_LAUNCHER_NAME="Enable Read Only System.desktop"
+READONLY_DISABLE_LAUNCHER_NAME="Temporarily Disable Read Only System.desktop"
 DEFAULT_AUTOLOGIN_ENABLE_LINE="AutomaticLoginEnable=True"
-DEFAULT_AUTOLOGIN_USER_LINE="AutomaticLogin=kz"
+DEFAULT_AUTOLOGIN_USER_LINE="AutomaticLogin=pi"
 NVM_SH_PATH="${NVM_SH_PATH:-${KIOSK_HOME}/.nvm/nvm.sh}"
 NODE_BIN="${NODE_BIN:-}"
 PNPM_BIN="${PNPM_BIN:-}"
@@ -127,6 +129,7 @@ sed \
   -e "s#^EnvironmentFile=.*#EnvironmentFile=-${INSTALL_DIR}/.env#" \
   -e "s#^Environment=DATA_DIR=.*#Environment=DATA_DIR=${INSTALL_DIR}/data#" \
   -e "s#^Environment=LOG_DIR=.*#Environment=LOG_DIR=${INSTALL_DIR}/logs#" \
+  -e "s#^Environment=KIOSK_USER=.*#Environment=KIOSK_USER=${KIOSK_USER}#" \
   -e "s#^ExecStart=.*#ExecStart=${NODE_BIN} apps/server/dist/server.js#" \
   -e "s#^ReadWritePaths=.*#ReadWritePaths=${INSTALL_DIR}/data ${INSTALL_DIR}/logs ${INSTALL_DIR}/uploads/images ${INSTALL_DIR}/uploads/brand#" \
   "${BUNDLE_ROOT}/deploy/solar-display.service" > "${SYSTEMD_UNIT_PATH}"
@@ -146,6 +149,12 @@ install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
 install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${BUNDLE_ROOT}/deploy/stop-solar-kiosk.sh" \
   "${KIOSK_BIN_DIR}/stop-solar-kiosk.sh"
+install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
+  "${BUNDLE_ROOT}/deploy/readonly-system-enable.sh" \
+  "${KIOSK_BIN_DIR}/readonly-system-enable.sh"
+install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
+  "${BUNDLE_ROOT}/deploy/readonly-system-disable.sh" \
+  "${KIOSK_BIN_DIR}/readonly-system-disable.sh"
 rendered_launcher="$(mktemp)"
 sed \
   -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/start-solar-kiosk.sh#" \
@@ -158,10 +167,28 @@ install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"
 rm -f "${rendered_launcher}"
 chmod +x "${KIOSK_DESKTOP_DIR}/Solar Display Kiosk.desktop"
+rendered_readonly_enable="$(mktemp)"
+sed \
+  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/readonly-system-enable.sh#" \
+  "${BUNDLE_ROOT}/deploy/enable-readonly-system.desktop" > "${rendered_readonly_enable}"
+install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
+  "${rendered_readonly_enable}" \
+  "${KIOSK_DESKTOP_DIR}/${READONLY_ENABLE_LAUNCHER_NAME}"
+rm -f "${rendered_readonly_enable}"
+rendered_readonly_disable="$(mktemp)"
+sed \
+  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/readonly-system-disable.sh#" \
+  "${BUNDLE_ROOT}/deploy/disable-readonly-system.desktop" > "${rendered_readonly_disable}"
+install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
+  "${rendered_readonly_disable}" \
+  "${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}"
+rm -f "${rendered_readonly_disable}"
 if command -v gio >/dev/null 2>&1; then
   if ! su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1; then
     echo "Warning: unable to set GNOME trusted metadata for ${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}" >&2
   fi
+  su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_ENABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
+  su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
 fi
 
 echo "[5/6] Configuring GDM autologin..."
@@ -171,7 +198,7 @@ fi
 cp "${GDM_CUSTOM_CONF}" "${GDM_CUSTOM_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 # Defaults this installer enforces on Ubuntu 24.04:
 #   AutomaticLoginEnable=True
-#   AutomaticLogin=kz
+#   AutomaticLogin=pi
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLoginEnable True
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLogin "${KIOSK_USER}"
 
@@ -188,3 +215,5 @@ echo "Resolved pnpm: ${PNPM_BIN}"
 echo "Autologin config: ${GDM_CUSTOM_CONF}"
 echo "Firefox autostart: ${KIOSK_AUTOSTART_DIR}/firefox-kiosk.desktop"
 echo "Desktop launcher: ${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"
+echo "Readonly enable launcher: ${KIOSK_DESKTOP_DIR}/${READONLY_ENABLE_LAUNCHER_NAME}"
+echo "Readonly disable launcher: ${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}"

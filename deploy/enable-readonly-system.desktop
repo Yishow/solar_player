@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Enable Read Only System
+Comment=Validate and enable read-only root protection
+Exec=/home/pi/bin/readonly-system-enable.sh
+Terminal=true
+Categories=System;

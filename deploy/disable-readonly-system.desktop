@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Temporarily Disable Read Only System
+Comment=Disable read-only root protection until it is enabled again
+Exec=/home/pi/bin/readonly-system-disable.sh
+Terminal=true
+Categories=System;

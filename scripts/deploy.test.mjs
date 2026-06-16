@@ -9,6 +9,14 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const deployScriptPath = path.join(repoRoot, "deploy.sh");
 const exportScriptPath = path.join(repoRoot, "deploy/export-runtime-state.sh");
 const resetDbScriptPath = path.join(repoRoot, "deploy/reset-db-settings.sh");
+const raspiDeployScriptPath = path.join(repoRoot, "scripts/raspi-onekey-deploy.sh");
+const prepareUserDataScriptPath = path.join(repoRoot, "scripts/prepare-raspi-user-data.sh");
+const prepareUserDataPs1Path = path.join(repoRoot, "scripts/prepare-raspi-user-data.ps1");
+const connectRdpPs1Path = path.join(repoRoot, "scripts/connect-raspi-rdp.ps1");
+const raspiBootstrapScriptPath = path.join(repoRoot, "deploy/raspi-bootstrap.sh");
+const lightweightDesktopScriptPath = path.join(repoRoot, "deploy/configure-lightweight-desktop.sh");
+const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
+const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 
 function makeFixtureProject() {
   const projectDir = mkdtempSync(path.join(tmpdir(), "solar-display-deploy-test-"));
@@ -23,6 +31,7 @@ function makeFixtureProject() {
   mkdirSync(path.join(projectDir, "docs"), { recursive: true });
   mkdirSync(path.join(projectDir, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean"), { recursive: true });
   mkdirSync(path.join(projectDir, "node_modules/fake-package"), { recursive: true });
+  mkdirSync(path.join(projectDir, "scripts"), { recursive: true });
   mkdirSync(path.join(projectDir, "uploads/images"), { recursive: true });
   mkdirSync(path.join(projectDir, "uploads/brand"), { recursive: true });
 
@@ -45,11 +54,20 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/reset-db-settings.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/start-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/stop-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/verify-kiosk-install.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/firefox-kiosk.desktop"), "[Desktop Entry]\n");
+  writeFileSync(path.join(projectDir, "deploy/enable-readonly-system.desktop"), "[Desktop Entry]\n");
+  writeFileSync(path.join(projectDir, "deploy/disable-readonly-system.desktop"), "[Desktop Entry]\n");
+  writeFileSync(path.join(projectDir, "scripts/raspi-onekey-deploy.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "scripts/prepare-raspi-user-data.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "scripts/prepare-raspi-user-data.ps1"), "Write-Host 'prepare'\n");
   writeFileSync(path.join(projectDir, "docs/openapi.yaml"), "openapi: 3.0.0\n");
   writeFileSync(path.join(projectDir, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-bg.png"), "seed-image\n");
   writeFileSync(path.join(projectDir, "node_modules/fake-package/index.js"), "module.exports = {};\n");
@@ -84,11 +102,11 @@ test("deploy.sh shows two deployment menu options", () => {
   assert.match(source, /2\.\s*Build offline deploy bundle/i);
 });
 
-test("deploy service defaults to the Ubuntu kiosk account and exec startup", () => {
+test("deploy service defaults to the Raspberry Pi kiosk account and exec startup", () => {
   const source = readFileSync(path.join(repoRoot, "deploy/solar-display.service"), "utf8");
 
   assert.match(source, /^Type=exec$/m);
-  assert.match(source, /^User=kz$/m);
+  assert.match(source, /^User=pi$/m);
   assert.match(source, /^WorkingDirectory=\/data\/solar-display$/m);
   assert.match(source, /^EnvironmentFile=-\/data\/solar-display\/\.env$/m);
   assert.match(source, /^Environment=DATA_DIR=\/data\/solar-display\/data$/m);
@@ -102,7 +120,7 @@ test("kiosk installer configures gdm autologin and points operators to logs", ()
 
   assert.match(source, /\/etc\/gdm3\/custom\.conf/);
   assert.match(source, /AutomaticLoginEnable=True/);
-  assert.match(source, /AutomaticLogin=kz/);
+  assert.match(source, /AutomaticLogin=pi/);
   assert.match(source, /NODE_BIN=/);
   assert.match(source, /\.nvm\/nvm\.sh/);
   assert.match(source, /journalctl -u solar-display/);
@@ -126,6 +144,441 @@ test("bundle install script can source nvm before running pnpm install", () => {
   assert.match(source, /NVM_DIR/);
   assert.match(source, /source_nvm/);
   assert.match(source, /pnpm install --prod --frozen-lockfile/);
+});
+
+test("raspi one-key deploy dry-run reports target and skips destructive stages", () => {
+  const result = spawnSync("bash", [
+    raspiDeployScriptPath,
+    "kz@192.168.31.39",
+    "--mode",
+    "update",
+    "--mqtt-host",
+    "192.168.31.62",
+    "--desktop",
+    "xfce-xrdp",
+    "--rdp-auth",
+    "passwordless",
+    "--rdp-password",
+    "kz",
+    "--dry-run"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Target: kz@192\.168\.31\.39/);
+  assert.match(result.stdout, /Mode: update/);
+  assert.match(result.stdout, /Install dir: \/data\/solar-display/);
+  assert.match(result.stdout, /MQTT host: 192\.168\.31\.62/);
+  assert.match(result.stdout, /Desktop: xfce-xrdp/);
+  assert.match(result.stdout, /RDP auth: passwordless/);
+  assert.match(result.stdout, /Kiosk user: kz/);
+  assert.match(result.stdout, /Readonly root: dry-run/);
+  assert.doesNotMatch(result.stdout, /\b(parted|mkfs|resize2fs|sfdisk)\b/);
+});
+
+test("raspi one-key deploy supports non-interactive sudo and data creation confirmation", () => {
+  const source = readFileSync(raspiDeployScriptPath, "utf8");
+
+  assert.match(source, /SUDO_PASSWORD="\$\{SUDO_PASSWORD:-\$\{SSH_PASSWORD:-\}\}"/);
+  assert.match(source, /--sudo-password/);
+  assert.match(source, /DATA_SIZE_GB="10"/);
+  assert.match(source, /DATA_SIZE_GB_EXPLICIT=0/);
+  assert.match(source, /MQTT_HOST_EXPLICIT=0/);
+  assert.match(source, /\/boot\/firmware\/solar-deploy\.env/);
+  assert.match(source, /Loaded first-boot deploy env/);
+  assert.match(source, /--data-size-gb/);
+  assert.match(source, /sudo -S env CONFIRM_CREATE_DATA=CREATE-DATA/);
+});
+
+test("windows rdp helper stores TERMSRV credentials before launching mstsc", () => {
+  const source = readFileSync(connectRdpPs1Path, "utf8");
+
+  assert.match(source, /\[string\]\$HostName = "192\.168\.31\.40"/);
+  assert.match(source, /\[string\]\$User = "kz"/);
+  assert.match(source, /cmdkey\.exe/);
+  assert.match(source, /TERMSRV\/\$HostName/);
+  assert.match(source, /mstsc\.exe/);
+  assert.match(source, /prompt for credentials:i:0/);
+  assert.doesNotMatch(source, /sudo/);
+});
+
+test("raspi user-data shell helper interactive defaults to pi user", () => {
+  const bootDir = mkdtempSync(path.join(tmpdir(), "solar-display-system-boot-"));
+
+  try {
+    writeFileSync(path.join(bootDir, "user-data"), "#cloud-config\nhostname: old\n");
+
+    const result = spawnSync("bash", [prepareUserDataScriptPath], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      input: [
+        bootDir,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "YES",
+        ""
+      ].join("\n")
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Solar Player Raspberry Pi user-data setup/);
+    assert.match(result.stdout, /User pi will have sudo/);
+
+    const userData = readFileSync(path.join(bootDir, "user-data"), "utf8");
+    assert.match(userData, /^hostname: raspberry5$/m);
+    assert.match(userData, /^growpart:$/m);
+    assert.match(userData, /^  mode: off$/m);
+    assert.match(userData, /^resize_rootfs: false$/m);
+    assert.match(userData, /^  - name: pi$/m);
+    assert.match(userData, /- \{name: pi, password: "pi", type: text\}/);
+    assert.match(userData, /- \{name: root, password: "kzroot", type: text\}/);
+    assert.match(userData, /^package_upgrade: false$/m);
+    assert.match(userData, /^  - openssh-server$/m);
+    assert.match(userData, /\/etc\/growroot-disabled/);
+    assert.match(userData, /PermitRootLogin no/);
+
+    const deployEnv = readFileSync(path.join(bootDir, "solar-deploy.env"), "utf8");
+    assert.match(deployEnv, /^DATA_SIZE_GB=10$/m);
+    assert.match(deployEnv, /^KIOSK_USER=pi$/m);
+    assert.match(deployEnv, /^MQTT_HOST=192\.168\.31\.62$/m);
+
+    const firstLoginTools = path.join(bootDir, "solar-first-login-tools.sh");
+    assert.equal(existsSync(firstLoginTools), true);
+    assert.equal(isExecutable(firstLoginTools), true);
+    const firstLoginToolsSource = readFileSync(firstLoginTools, "utf8");
+    assert.match(firstLoginToolsSource, /apt-get install -y/);
+    assert.match(firstLoginToolsSource, /language-pack-zh-hant/);
+    assert.match(firstLoginToolsSource, /language-pack-gnome-zh-hant/);
+    assert.match(firstLoginToolsSource, /fonts-noto-cjk/);
+    assert.match(firstLoginToolsSource, /im-config/);
+    assert.match(firstLoginToolsSource, /net-tools/);
+    assert.match(firstLoginToolsSource, /fcitx5/);
+    assert.match(firstLoginToolsSource, /fcitx5-table-boshiamy/);
+    assert.match(firstLoginToolsSource, /locale-gen zh_TW\.UTF-8/);
+    assert.match(firstLoginToolsSource, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
+    assert.match(firstLoginToolsSource, /mosquitto-clients/);
+    assert.match(firstLoginToolsSource, /nvm-sh\/nvm/);
+  } finally {
+    rmSync(bootDir, { recursive: true, force: true });
+  }
+});
+
+test("raspi user-data shell helper writes ssh sudo root su cloud-init config", () => {
+  const bootDir = mkdtempSync(path.join(tmpdir(), "solar-display-system-boot-"));
+
+  try {
+    writeFileSync(path.join(bootDir, "user-data"), "#cloud-config\nhostname: old\n");
+
+    const result = spawnSync("bash", [
+      prepareUserDataScriptPath,
+      "--boot-path",
+      bootDir,
+      "--hostname",
+      "raspberry5",
+      "--user",
+      "kz",
+      "--password",
+      "kz",
+      "--root-password",
+      "kzroot",
+      "--data-size-gb",
+      "12",
+      "--mqtt-host",
+      "mqtt.local"
+    ], {
+      cwd: repoRoot,
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(existsSync(path.join(bootDir, "user-data.before-solar-player")), true);
+
+    const userData = readFileSync(path.join(bootDir, "user-data"), "utf8");
+    assert.match(userData, /^#cloud-config$/m);
+    assert.match(userData, /^hostname: raspberry5$/m);
+    assert.match(userData, /^ssh_pwauth: true$/m);
+    assert.match(userData, /^growpart:$/m);
+    assert.match(userData, /^  mode: off$/m);
+    assert.match(userData, /^resize_rootfs: false$/m);
+    assert.match(userData, /groups: \[adm, cdrom, dip, lxd, sudo\]/);
+    assert.match(userData, /sudo: \["ALL=\(ALL\) ALL"\]/);
+    assert.match(userData, /- \{name: kz, password: "kz", type: text\}/);
+    assert.match(userData, /- \{name: root, password: "kzroot", type: text\}/);
+    assert.match(userData, /^  - openssh-server$/m);
+    assert.match(userData, /^  - sudo$/m);
+    assert.match(userData, /\/etc\/growroot-disabled/);
+    assert.match(userData, /systemctl enable --now ssh/);
+    assert.doesNotMatch(userData, /PermitRootLogin yes/);
+
+    const deployEnv = readFileSync(path.join(bootDir, "solar-deploy.env"), "utf8");
+    assert.match(deployEnv, /^DATA_SIZE_GB=12$/m);
+    assert.match(deployEnv, /^KIOSK_USER=kz$/m);
+    assert.match(deployEnv, /^MQTT_HOST=mqtt\.local$/m);
+
+    const firstLoginTools = readFileSync(path.join(bootDir, "solar-first-login-tools.sh"), "utf8");
+    assert.match(firstLoginTools, /^KIOSK_USER="\$\{KIOSK_USER:-kz\}"$/m);
+    assert.match(firstLoginTools, /language-pack-zh-hant/);
+    assert.match(firstLoginTools, /language-pack-gnome-zh-hant/);
+    assert.match(firstLoginTools, /fonts-noto-cjk/);
+    assert.match(firstLoginTools, /im-config/);
+    assert.match(firstLoginTools, /fcitx5/);
+    assert.match(firstLoginTools, /fcitx5-table-boshiamy/);
+    assert.match(firstLoginTools, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
+    assert.match(firstLoginTools, /curl -fsSL https:\/\/raw\.githubusercontent\.com\/nvm-sh\/nvm/);
+    assert.doesNotMatch(firstLoginTools, /NOPASSWD/);
+  } finally {
+    rmSync(bootDir, { recursive: true, force: true });
+  }
+});
+
+test("raspi user-data powershell helper contains matching cloud-init contract", () => {
+  const source = readFileSync(prepareUserDataPs1Path, "utf8");
+
+  assert.match(source, /\[string\]\$User = "pi"/);
+  assert.match(source, /\[string\]\$Password = "pi"/);
+  assert.match(source, /system-boot/);
+  assert.match(source, /#cloud-config/);
+  assert.match(source, /ssh_pwauth: true/);
+  assert.match(source, /growpart:/);
+  assert.match(source, /mode: off/);
+  assert.match(source, /resize_rootfs: false/);
+  assert.match(source, /openssh-server/);
+  assert.match(source, /language-pack-zh-hant/);
+  assert.match(source, /fonts-noto-cjk/);
+  assert.match(source, /im-config/);
+  assert.match(source, /fcitx5-table-boshiamy/);
+  assert.match(source, /\/etc\/growroot-disabled/);
+  assert.match(source, /chpasswd:/);
+  assert.match(source, /root:/);
+  assert.match(source, /systemctl enable --now ssh/);
+  assert.match(source, /\[string\]\$DataSizeGb = "10"/);
+  assert.match(source, /\[string\]\$MqttHost = "192\.168\.31\.62"/);
+  assert.match(source, /solar-deploy\.env/);
+  assert.match(source, /DATA_SIZE_GB=\$DataSizeGb/);
+  assert.match(source, /solar-first-login-tools\.sh/);
+  assert.match(source, /net-tools/);
+  assert.match(source, /mosquitto-clients/);
+  assert.match(source, /nvm-sh\/nvm/);
+  assert.doesNotMatch(source, /PermitRootLogin yes/);
+});
+
+test("raspi bootstrap dry-run rejects root-full layout without data mount", () => {
+  const result = spawnSync("bash", [
+    raspiBootstrapScriptPath,
+    "--mode",
+    "init",
+    "--dry-run",
+    "--disk-fixture",
+    "root-full-no-data"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /online root shrink is not supported/);
+  assert.doesNotMatch(result.stdout + result.stderr, /\bresize2fs\b.*\b-M\b/);
+});
+
+test("raspi bootstrap dry-run can reuse existing writable data mount", () => {
+  const result = spawnSync("bash", [
+    raspiBootstrapScriptPath,
+    "--mode",
+    "init",
+    "--dry-run",
+    "--skip-host-preflight",
+    "--disk-fixture",
+    "writable-data"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /OK: existing writable \/data mount can be reused/);
+  assert.doesNotMatch(result.stdout, /\b(mkfs|parted|sfdisk)\b/);
+});
+
+test("raspi bootstrap confirms online root partition resize after explicit data creation opt-in", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+
+  assert.match(source, /CONFIRM_CREATE_DATA/);
+  assert.match(source, /DATA_SIZE_GB="10"/);
+  assert.match(source, /disk_size_bytes="\$\(blockdev --getsize64 "\$\{disk_dev\}"\)"/);
+  assert.match(source, /parted ---pretend-input-tty/);
+  assert.match(source, /resizepart "\$\{root_part_num\}" "\$\{root_end\}"/);
+  assert.match(source, /root_end_sector="\$\(parted -m "\$\{disk_dev\}" unit s print/);
+  assert.match(source, /data_start_sector=\$\(\(root_end_sector \+ 1\)\)/);
+  assert.match(source, /mkpart primary ext4 "\$\{data_start_sector\}s" 100%/);
+});
+
+test("raspi bootstrap creates mqtt env only when target env is missing", () => {
+  const projectDir = makeFixtureProject();
+  const installDir = path.join(projectDir, "install");
+
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/raspi-bootstrap.sh"),
+      readFileSync(raspiBootstrapScriptPath, "utf8")
+    );
+    chmodSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), 0o755);
+    mkdirSync(installDir, { recursive: true });
+    writeFileSync(path.join(installDir, ".env.example"), "MQTT_BROKER_HOST=localhost\n");
+
+    const createResult = spawnSync("bash", [
+      "deploy/raspi-bootstrap.sh",
+      "--mode",
+      "update",
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--configure-env-only",
+      "--install-dir",
+      installDir,
+      "--mqtt-host",
+      "192.168.31.62"
+    ], {
+      cwd: projectDir,
+      encoding: "utf8"
+    });
+
+    assert.equal(createResult.status, 0, createResult.stderr || createResult.stdout);
+    assert.match(readFileSync(path.join(installDir, ".env"), "utf8"), /^MQTT_BROKER_HOST=192\.168\.31\.62$/m);
+    assert.match(createResult.stdout, /Created target \.env/);
+
+    writeFileSync(path.join(installDir, ".env"), "MQTT_BROKER_HOST=existing\n");
+    const preserveResult = spawnSync("bash", [
+      "deploy/raspi-bootstrap.sh",
+      "--mode",
+      "update",
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--configure-env-only",
+      "--install-dir",
+      installDir,
+      "--mqtt-host",
+      "192.168.31.62"
+    ], {
+      cwd: projectDir,
+      encoding: "utf8"
+    });
+
+    assert.equal(preserveResult.status, 0, preserveResult.stderr || preserveResult.stdout);
+    assert.equal(readFileSync(path.join(installDir, ".env"), "utf8"), "MQTT_BROKER_HOST=existing\n");
+    assert.match(preserveResult.stdout, /MQTT defaults were not overwritten/);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("lightweight desktop helper configures xfce lightdm xrdp firefox without weakening ssh or sudo", () => {
+  const source = readFileSync(lightweightDesktopScriptPath, "utf8");
+  const result = spawnSync("bash", [
+    lightweightDesktopScriptPath,
+    "--user",
+    "kz",
+    "--desktop",
+    "xfce-xrdp",
+    "--rdp-auth",
+    "passwordless",
+    "--rdp-password",
+    "kz",
+    "--dry-run"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(source, /xfce4/);
+  assert.match(source, /lightdm/);
+  assert.match(source, /xrdp/);
+  assert.match(source, /xorgxrdp/);
+  assert.match(source, /xserver-xorg-input-libinput/);
+  assert.match(source, /network-manager-gnome/);
+  assert.match(source, /policykit-1-gnome/);
+  assert.match(source, /firefox/);
+  assert.match(source, /im-config/);
+  assert.match(source, /fcitx5/);
+  assert.match(source, /fcitx5-table-boshiamy/);
+  assert.match(source, /autologin-user=/);
+  assert.match(source, /startxfce4/);
+  assert.match(source, /\.xprofile/);
+  assert.match(source, /GTK_IM_MODULE=fcitx/);
+  assert.match(source, /QT_IM_MODULE=fcitx/);
+  assert.match(source, /XMODIFIERS=@im=fcitx/);
+  assert.match(source, /\/etc\/environment\.d\/90-solar-fcitx\.conf/);
+  assert.match(source, /fcitx5 -d/);
+  assert.match(source, /\.xinputrc/);
+  assert.match(source, /run_im fcitx5/);
+  assert.match(source, /DefaultIM=keyboard-us/);
+  assert.match(source, /Name=boshiamy/);
+  assert.match(source, /Name=chewing/);
+  assert.match(source, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
+  assert.match(source, /\/etc\/NetworkManager\/conf\.d\/10-solar-managed\.conf/);
+  assert.match(source, /managed=true/);
+  assert.match(source, /\/etc\/netplan\/90-solar-network-manager\.yaml/);
+  assert.match(source, /renderer: NetworkManager/);
+  assert.match(source, /\.cache\/sessions/);
+  assert.match(source, /\.config\/xfce4-session/);
+  assert.match(source, /XDG_CONFIG_DIRS="\/etc\/xdg"/);
+  assert.match(source, /dbus-run-session -- startxfce4/);
+  assert.match(source, /99-solar-raspi-kms\.conf/);
+  assert.match(source, /Option "kmsdev" "\/dev\/dri\/card1"/);
+  assert.match(source, /Option "AutoAddGPU" "off"/);
+  assert.match(source, /\/etc\/X11\/xrdp\/xorg\.conf\.d/);
+  assert.match(source, /param=-configdir/);
+  assert.match(source, /param=\/etc\/X11\/xrdp\/xorg\.conf\.d/);
+  assert.match(result.stdout, /RDP auth: passwordless/);
+  assert.doesNotMatch(source, /NOPASSWD/);
+  assert.doesNotMatch(source, /PasswordAuthentication no/);
+});
+
+test("lightweight desktop helper fails closed for passwordless rdp without a password source", () => {
+  const result = spawnSync("bash", [
+    lightweightDesktopScriptPath,
+    "--user",
+    "kz",
+    "--desktop",
+    "xfce-xrdp",
+    "--rdp-auth",
+    "passwordless",
+    "--dry-run"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /RDP passwordless requires --rdp-password or RDP_PASSWORD/);
+});
+
+test("readonly desktop launchers call fixed helpers and require sudo", () => {
+  const enableDesktop = readFileSync(path.join(repoRoot, "deploy/enable-readonly-system.desktop"), "utf8");
+  const disableDesktop = readFileSync(path.join(repoRoot, "deploy/disable-readonly-system.desktop"), "utf8");
+  const enableHelper = readFileSync(readonlyEnableScriptPath, "utf8");
+  const disableHelper = readFileSync(readonlyDisableScriptPath, "utf8");
+
+  assert.match(enableDesktop, /Name=Enable Read Only System/);
+  assert.match(enableDesktop, /Exec=.*readonly-system-enable\.sh/);
+  assert.match(disableDesktop, /Name=Temporarily Disable Read Only System/);
+  assert.match(disableDesktop, /Exec=.*readonly-system-disable\.sh/);
+  assert.match(enableHelper, /sudo/);
+  assert.match(enableHelper, /KIOSK_USER="\$\{KIOSK_USER:-\$\(id -un\)\}"/);
+  assert.match(enableHelper, /KIOSK_USER="\$\{KIOSK_USER\}"/);
+  assert.match(enableHelper, /enable-readonly-root\.sh/);
+  assert.match(disableHelper, /sudo/);
+  assert.match(disableHelper, /overlayroot-chroot/);
+  assert.doesNotMatch(enableDesktop + disableDesktop, /sh -c/);
 });
 
 test("runtime export script archives data uploads and .env from the install root", () => {
@@ -305,7 +758,7 @@ test("read-only hardening helper applies overlayroot through a local config", ()
   const source = readFileSync(path.join(repoRoot, "deploy/enable-readonly-root.sh"), "utf8");
 
   assert.match(source, /OVERLAYROOT_MODE="\$\{OVERLAYROOT_MODE:-tmpfs:recurse=0\}"/);
-  assert.match(source, /overlayroot is not installed/);
+  assert.match(source, /apt-get install -y overlayroot/);
   assert.match(source, /\/etc\/overlayroot\.local\.conf/);
   assert.match(source, /printf 'overlayroot="%s"\\n'/);
   assert.match(source, /update-initramfs -u/);
@@ -354,13 +807,18 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
     );
     chmodSync(sudoPath, 0o755);
 
-    const result = spawnSync("bash", ["deploy/verify-kiosk-install.sh"], {
+    const result = spawnSync("bash", [
+      "deploy/verify-kiosk-install.sh",
+      "--install-dir",
+      installDir,
+      "--kiosk-user",
+      "kz",
+      "--kiosk-home",
+      kioskHome
+    ], {
       cwd: projectDir,
       env: {
         ...process.env,
-        INSTALL_DIR: installDir,
-        KIOSK_HOME: kioskHome,
-        KIOSK_USER: "kz",
         PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`
       },
       encoding: "utf8"
@@ -402,19 +860,34 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/firefox-kiosk.desktop")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-system.desktop")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-readonly-system.desktop")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/raspi-onekey-deploy.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.ps1")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "scripts/raspi-onekey-deploy.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "scripts/prepare-raspi-user-data.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "node_modules")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/.DS_Store")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);
@@ -440,17 +913,30 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/raspi-onekey-deploy.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.ps1")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "scripts/raspi-onekey-deploy.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "scripts/prepare-raspi-user-data.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "node_modules/fake-package/index.js")), true);
     assert.equal(existsSync(path.join(bundleRoot, "apps/.DS_Store")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);

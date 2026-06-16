@@ -48,19 +48,35 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/export-runtime-state.sh" "${target_root}/deploy/export-runtime-state.sh"
   cp "${PROJECT_DIR}/deploy/reset-db-settings.sh" "${target_root}/deploy/reset-db-settings.sh"
   cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
+  cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
+  cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
+  cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
+  cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/start-solar-kiosk.sh" "${target_root}/deploy/start-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/stop-solar-kiosk.sh" "${target_root}/deploy/stop-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/verify-kiosk-install.sh" "${target_root}/deploy/verify-kiosk-install.sh"
   cp "${PROJECT_DIR}/deploy/firefox-kiosk.desktop" "${target_root}/deploy/firefox-kiosk.desktop"
+  cp "${PROJECT_DIR}/deploy/enable-readonly-system.desktop" "${target_root}/deploy/enable-readonly-system.desktop"
+  cp "${PROJECT_DIR}/deploy/disable-readonly-system.desktop" "${target_root}/deploy/disable-readonly-system.desktop"
+  mkdir -p "${target_root}/scripts"
+  cp "${PROJECT_DIR}/scripts/raspi-onekey-deploy.sh" "${target_root}/scripts/raspi-onekey-deploy.sh"
+  cp "${PROJECT_DIR}/scripts/prepare-raspi-user-data.sh" "${target_root}/scripts/prepare-raspi-user-data.sh"
+  cp "${PROJECT_DIR}/scripts/prepare-raspi-user-data.ps1" "${target_root}/scripts/prepare-raspi-user-data.ps1"
   chmod +x \
     "${target_root}/deploy/export-runtime-state.sh" \
     "${target_root}/deploy/reset-db-settings.sh" \
     "${target_root}/deploy/enable-readonly-root.sh" \
+    "${target_root}/deploy/raspi-bootstrap.sh" \
+    "${target_root}/deploy/configure-lightweight-desktop.sh" \
+    "${target_root}/deploy/readonly-system-enable.sh" \
+    "${target_root}/deploy/readonly-system-disable.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
     "${target_root}/deploy/start-solar-kiosk.sh" \
     "${target_root}/deploy/stop-solar-kiosk.sh" \
-    "${target_root}/deploy/verify-kiosk-install.sh"
+    "${target_root}/deploy/verify-kiosk-install.sh" \
+    "${target_root}/scripts/raspi-onekey-deploy.sh" \
+    "${target_root}/scripts/prepare-raspi-user-data.sh"
   cp "${PROJECT_DIR}/package.json" "${target_root}/package.json"
   cp "${PROJECT_DIR}/pnpm-lock.yaml" "${target_root}/pnpm-lock.yaml"
   cp "${PROJECT_DIR}/pnpm-workspace.yaml" "${target_root}/pnpm-workspace.yaml"
@@ -110,6 +126,9 @@ Solar Display ${mode} deploy bundle
 6. Reset DB settings only: ./deploy/reset-db-settings.sh
 7. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
 8. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
+9. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
+10. Prepare Raspberry Pi system-boot user-data before first boot:
+    ./scripts/prepare-raspi-user-data.sh --boot-path /Volumes/system-boot
 
 Notes:
 - Offline bundles must be deployed to a machine with the same OS/CPU family used to build this bundle.
@@ -192,11 +211,20 @@ validate_inputs() {
   require_path "deploy/export-runtime-state.sh"
   require_path "deploy/reset-db-settings.sh"
   require_path "deploy/enable-readonly-root.sh"
+  require_path "deploy/raspi-bootstrap.sh"
+  require_path "deploy/configure-lightweight-desktop.sh"
+  require_path "deploy/readonly-system-enable.sh"
+  require_path "deploy/readonly-system-disable.sh"
   require_path "deploy/install-kiosk.sh"
   require_path "deploy/start-solar-kiosk.sh"
   require_path "deploy/stop-solar-kiosk.sh"
   require_path "deploy/verify-kiosk-install.sh"
   require_path "deploy/firefox-kiosk.desktop"
+  require_path "deploy/enable-readonly-system.desktop"
+  require_path "deploy/disable-readonly-system.desktop"
+  require_path "scripts/raspi-onekey-deploy.sh"
+  require_path "scripts/prepare-raspi-user-data.sh"
+  require_path "scripts/prepare-raspi-user-data.ps1"
   require_path "package.json"
   require_path "pnpm-lock.yaml"
   require_path "pnpm-workspace.yaml"

@@ -3,6 +3,6 @@ Type=Application
 Name=Solar Display Kiosk
 Comment=Launch Solar Display in Firefox kiosk mode
 TryExec=firefox
-Exec=/home/kz/bin/start-solar-kiosk.sh
+Exec=/home/pi/bin/start-solar-kiosk.sh
 X-GNOME-Autostart-enabled=true
 Terminal=false

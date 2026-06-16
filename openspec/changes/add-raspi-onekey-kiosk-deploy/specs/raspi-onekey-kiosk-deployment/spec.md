@@ -6,15 +6,62 @@ The system SHALL provide a local deployment command that targets a Raspberry Pi 
 
 #### Scenario: Operator starts an update deployment
 
-- **WHEN** an operator runs the Raspberry Pi deployment entrypoint with a target such as `kz@192.168.31.39` in update mode
+- **WHEN** an operator runs the Raspberry Pi deployment entrypoint with a target such as `pi@<pi-ip>` or `kz@192.168.31.39` in update mode
 - **THEN** the command verifies SSH reachability and sudo access before uploading files
 - **AND** it prints the target, mode, install directory, bundle type, MQTT host setting, and readonly-root setting before making target changes
+- **AND** it prints the kiosk user derived from the SSH target or explicit override before making target changes
 
 #### Scenario: Dry run reports planned stages without target changes
 
 - **WHEN** an operator runs the deployment entrypoint with dry-run enabled
 - **THEN** the command prints the local and remote stages that would run
 - **AND** it does not upload a bundle, install packages, restart services, edit partitions, or enable readonly root
+
+### Requirement: Prepare first-boot user-data with an interactive menu
+
+The system SHALL provide macOS/Linux and Windows helpers that prepare Ubuntu Raspberry Pi `system-boot/user-data` without requiring the operator to remember cloud-init YAML.
+
+#### Scenario: Interactive defaults create a pi sudo SSH user
+
+- **WHEN** an operator runs the user-data helper without arguments
+- **THEN** the helper prompts for the boot path, hostname, Linux user, user password, root password, timezone, package upgrade choice, and final confirmation
+- **AND** accepting defaults writes cloud-init for user `pi`, password `pi`, sudo group membership, `openssh-server`, `sudo`, `avahi-daemon`, SSH password auth enabled, first-boot root auto-grow disabled, and root SSH login disabled
+
+#### Scenario: Root auto-grow is disabled before first boot
+
+- **WHEN** the helper writes `user-data` for a fresh production card
+- **THEN** the generated cloud-init disables `growpart` and root filesystem resize
+- **AND** it writes a growroot-disabled marker so the card keeps free space for `/data` creation during init deploy
+
+#### Scenario: Existing user-data is backed up
+
+- **WHEN** the target boot partition already contains `user-data`
+- **THEN** the helper copies it to `user-data.before-solar-player` before writing the Solar Player cloud-init file
+
+#### Scenario: Project-specific user can be explicit
+
+- **WHEN** an operator passes a user such as `kz`
+- **THEN** the helper writes that user into cloud-init instead of the generic `pi` default
+
+#### Scenario: Interactive helper records data partition size
+
+- **WHEN** an operator runs the user-data helper without arguments
+- **THEN** the helper prompts for the target `/data` partition size
+- **AND** accepting defaults writes a boot-partition deploy environment file with `DATA_SIZE_GB=10`
+- **AND** entering another positive integer writes that value instead
+
+#### Scenario: Init deploy reads first-boot deploy environment
+
+- **WHEN** init deployment runs after the user-data helper wrote `/boot/firmware/solar-deploy.env`
+- **THEN** the deployment entrypoint reads `DATA_SIZE_GB` and `MQTT_HOST` from that file when the operator did not pass explicit CLI values
+- **AND** explicit `--data-size-gb` or `--mqtt-host` values take precedence over the boot-partition deploy environment
+
+#### Scenario: First-login maintenance tools script is written
+
+- **WHEN** an operator accepts the first-login tools option
+- **THEN** the helper writes an executable `solar-first-login-tools.sh` script to the boot partition
+- **AND** the script installs minimum maintenance tools and nvm for the selected kiosk user
+- **AND** the script is safe to rerun without changing SSH or sudo authentication policy
 
 ### Requirement: Keep daily update deployments non-destructive
 
@@ -42,6 +89,12 @@ The system SHALL gate new-card disk initialization behind explicit layout detect
 - **THEN** the bootstrap prints the detected disk name, total disk size, partition list, filesystem labels, mountpoints, root partition size, and `/data` mount status
 - **AND** it presents root-size and `/data` layout choices before performing disk changes
 
+#### Scenario: Data partition defaults to ten GiB
+
+- **WHEN** init mode creates `/data` on a fresh card without an explicit root-size override
+- **THEN** it allocates `/data` as 10GiB
+- **AND** it expands root to use the remaining leading disk space
+
 #### Scenario: Existing writable data mount is reused
 
 - **WHEN** init mode detects an existing writable `/data` mount
@@ -62,7 +115,7 @@ The system SHALL install and verify the runtime prerequisites for the Solar Disp
 
 - **WHEN** bootstrap runs on Ubuntu 24.04 arm64 with sudo access
 - **THEN** it accepts the host as a supported target
-- **AND** it verifies or installs the required runtime pieces for Node, pnpm, the Solar Display service, kiosk launcher helpers, and desktop re-entry launcher
+- **AND** it verifies or installs the required runtime pieces for Node, pnpm, Firefox, the Solar Display service, kiosk launcher helpers, and desktop re-entry launcher
 
 #### Scenario: Unsupported host is rejected
 
@@ -74,11 +127,12 @@ The system SHALL install and verify the runtime prerequisites for the Solar Disp
 
 The system SHALL support lightweight remote desktop setup with XFCE and xrdp, and RDP passwordless access SHALL NOT disable SSH password authentication or sudo password prompts.
 
-#### Scenario: XFCE xrdp desktop is installed
+#### Scenario: XFCE xrdp desktop Firefox browser and lightdm autologin are installed
 
 - **WHEN** bootstrap runs with desktop mode set to `xfce-xrdp`
-- **THEN** it verifies or installs XFCE, xrdp, xorgxrdp, and the kiosk user's XFCE session file
+- **THEN** it verifies or installs XFCE, lightdm, xrdp, xorgxrdp, Firefox, and the kiosk user's XFCE session file
 - **AND** it enables the xrdp service for remote desktop access
+- **AND** it configures lightdm to autologin the kiosk user for the local desktop
 
 #### Scenario: RDP passwordless is limited to the kiosk desktop
 
