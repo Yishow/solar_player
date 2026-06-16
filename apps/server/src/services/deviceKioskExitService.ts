@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
 const DEFAULT_EXIT_DELAY_MS = 750;
 
 export const KIOSK_LAUNCHER_NAME = "Solar Display Kiosk";
@@ -17,7 +15,7 @@ export class KioskExitUnavailableError extends Error {
 }
 
 function resolveKioskExitHelperCandidates() {
-  const kioskUser = process.env.KIOSK_USER?.trim() || "kz";
+  const kioskUser = process.env.KIOSK_USER?.trim() || "pi";
   const explicitHelperPath = process.env.KIOSK_EXIT_HELPER_PATH?.trim();
   const installedHelperPath = `/home/${kioskUser}/bin/stop-solar-kiosk.sh`;
   const bundledHelperPath = join(process.cwd(), "deploy", "stop-solar-kiosk.sh");
@@ -55,17 +53,10 @@ function readExitDelayMs() {
 
 function buildKioskExitResult() {
   return {
-    executed: true,
+    scheduled: true,
     launcherName: KIOSK_LAUNCHER_NAME,
     reentryHint: KIOSK_REENTRY_HINT
   };
-}
-
-export async function runDeviceKioskExit() {
-  const helperPath = resolveRunnableKioskExitHelperPath();
-  await execFileAsync(helperPath);
-
-  return buildKioskExitResult();
 }
 
 export function scheduleDeviceKioskExit(options: { onError?: (error: Error) => void } = {}) {

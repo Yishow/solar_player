@@ -311,7 +311,7 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
   const previousExitDelayMs = process.env.KIOSK_EXIT_DELAY_MS;
 
   rmSync(markerPath, { force: true });
-  writeFileSync(helperPath, `#!/bin/sh\nsleep 0.2\nprintf 'closed' > "${markerPath}"\n`, "utf8");
+  writeFileSync(helperPath, `#!/bin/sh\nsleep 0.5\nprintf 'closed' > "${markerPath}"\n`, "utf8");
   chmodSync(helperPath, 0o755);
   process.env.KIOSK_EXIT_HELPER_PATH = helperPath;
   process.env.KIOSK_EXIT_DELAY_MS = "0";
@@ -328,11 +328,11 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
 
     assert.equal(response.statusCode, 200);
     assert.equal(existsSync(markerPath), false);
-    assert.ok(elapsedMs < 200, `expected response before kiosk helper finishes, got ${elapsedMs}ms`);
+    assert.ok(elapsedMs < 400, `expected response before kiosk helper finishes, got ${elapsedMs}ms`);
 
     const body = response.json() as {
       data: {
-        executed: boolean;
+        scheduled: boolean;
         launcherName: string;
         reentryHint: string;
       };
@@ -340,7 +340,7 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
     };
 
     assert.equal(body.success, true);
-    assert.equal(body.data.executed, true);
+    assert.equal(body.data.scheduled, true);
     assert.equal(body.data.launcherName, "Solar Display Kiosk");
     assert.match(body.data.reentryHint, /Solar Display Kiosk/);
     await delay(1500);
