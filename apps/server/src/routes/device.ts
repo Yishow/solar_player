@@ -8,7 +8,7 @@ import {
 } from "../services/deviceDisplayOpsService.js";
 import {
   KioskExitUnavailableError,
-  runDeviceKioskExit
+  scheduleDeviceKioskExit
 } from "../services/deviceKioskExitService.js";
 
 function getUptimeSeconds(): number {
@@ -153,7 +153,9 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     try {
       return {
         success: true,
-        data: await runDeviceKioskExit()
+        data: scheduleDeviceKioskExit({
+          onError: (error) => app.log.error({ err: error }, "device kiosk exit helper failed")
+        })
       };
     } catch (error) {
       const message =

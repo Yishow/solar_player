@@ -47,16 +47,20 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/solar-display.service" "${target_root}/deploy/solar-display.service"
   cp "${PROJECT_DIR}/deploy/export-runtime-state.sh" "${target_root}/deploy/export-runtime-state.sh"
   cp "${PROJECT_DIR}/deploy/reset-db-settings.sh" "${target_root}/deploy/reset-db-settings.sh"
+  cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/start-solar-kiosk.sh" "${target_root}/deploy/start-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/stop-solar-kiosk.sh" "${target_root}/deploy/stop-solar-kiosk.sh"
+  cp "${PROJECT_DIR}/deploy/verify-kiosk-install.sh" "${target_root}/deploy/verify-kiosk-install.sh"
   cp "${PROJECT_DIR}/deploy/firefox-kiosk.desktop" "${target_root}/deploy/firefox-kiosk.desktop"
   chmod +x \
     "${target_root}/deploy/export-runtime-state.sh" \
     "${target_root}/deploy/reset-db-settings.sh" \
+    "${target_root}/deploy/enable-readonly-root.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
     "${target_root}/deploy/start-solar-kiosk.sh" \
-    "${target_root}/deploy/stop-solar-kiosk.sh"
+    "${target_root}/deploy/stop-solar-kiosk.sh" \
+    "${target_root}/deploy/verify-kiosk-install.sh"
   cp "${PROJECT_DIR}/package.json" "${target_root}/package.json"
   cp "${PROJECT_DIR}/pnpm-lock.yaml" "${target_root}/pnpm-lock.yaml"
   cp "${PROJECT_DIR}/pnpm-workspace.yaml" "${target_root}/pnpm-workspace.yaml"
@@ -104,6 +108,8 @@ Solar Display ${mode} deploy bundle
 4. On Ubuntu 24.04 kiosk devices, run sudo ./deploy/install-kiosk.sh to enable server autostart, kz autologin, and Firefox kiosk launch.
 5. To move live settings/content to another machine, run ./deploy/export-runtime-state.sh and copy the generated tarball.
 6. Reset DB settings only: ./deploy/reset-db-settings.sh
+7. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
+8. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
 
 Notes:
 - Offline bundles must be deployed to a machine with the same OS/CPU family used to build this bundle.
@@ -185,9 +191,11 @@ validate_inputs() {
   require_path "deploy/solar-display.service"
   require_path "deploy/export-runtime-state.sh"
   require_path "deploy/reset-db-settings.sh"
+  require_path "deploy/enable-readonly-root.sh"
   require_path "deploy/install-kiosk.sh"
   require_path "deploy/start-solar-kiosk.sh"
   require_path "deploy/stop-solar-kiosk.sh"
+  require_path "deploy/verify-kiosk-install.sh"
   require_path "deploy/firefox-kiosk.desktop"
   require_path "package.json"
   require_path "pnpm-lock.yaml"

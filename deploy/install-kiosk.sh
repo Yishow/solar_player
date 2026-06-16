@@ -7,16 +7,18 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 BUNDLE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-INSTALL_DIR="${INSTALL_DIR:-${BUNDLE_ROOT}}"
+INSTALL_DIR="${INSTALL_DIR:-/data/solar-display}"
 KIOSK_USER="${KIOSK_USER:-kz}"
 KIOSK_GROUP="${KIOSK_GROUP:-${KIOSK_USER}}"
 KIOSK_HOME="${KIOSK_HOME:-/home/${KIOSK_USER}}"
 KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
 KIOSK_AUTOSTART_DIR="${KIOSK_HOME}/.config/autostart"
+KIOSK_DESKTOP_DIR="${KIOSK_HOME}/Desktop"
 KIOSK_STATE_DIR="${KIOSK_HOME}/.local/state/solar-display"
 GDM_CUSTOM_CONF="${GDM_CUSTOM_CONF:-/etc/gdm3/custom.conf}"
 SYSTEMD_UNIT_PATH="/etc/systemd/system/solar-display.service"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
+LAUNCHER_NAME="Solar Display Kiosk.desktop"
 DEFAULT_AUTOLOGIN_ENABLE_LINE="AutomaticLoginEnable=True"
 DEFAULT_AUTOLOGIN_USER_LINE="AutomaticLogin=kz"
 NVM_SH_PATH="${NVM_SH_PATH:-${KIOSK_HOME}/.nvm/nvm.sh}"
@@ -136,6 +138,7 @@ systemctl restart solar-display
 echo "[4/6] Installing kiosk launcher..."
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_BIN_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_AUTOSTART_DIR}"
+ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_DESKTOP_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_STATE_DIR}"
 install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${BUNDLE_ROOT}/deploy/start-solar-kiosk.sh" \
@@ -143,9 +146,23 @@ install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
 install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${BUNDLE_ROOT}/deploy/stop-solar-kiosk.sh" \
   "${KIOSK_BIN_DIR}/stop-solar-kiosk.sh"
+rendered_launcher="$(mktemp)"
+sed \
+  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/start-solar-kiosk.sh#" \
+  "${BUNDLE_ROOT}/deploy/firefox-kiosk.desktop" > "${rendered_launcher}"
 install -m 644 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${BUNDLE_ROOT}/deploy/firefox-kiosk.desktop" \
+  "${rendered_launcher}" \
   "${KIOSK_AUTOSTART_DIR}/firefox-kiosk.desktop"
+install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
+  "${rendered_launcher}" \
+  "${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"
+rm -f "${rendered_launcher}"
+chmod +x "${KIOSK_DESKTOP_DIR}/Solar Display Kiosk.desktop"
+if command -v gio >/dev/null 2>&1; then
+  if ! su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1; then
+    echo "Warning: unable to set GNOME trusted metadata for ${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}" >&2
+  fi
+fi
 
 echo "[5/6] Configuring GDM autologin..."
 if [[ ! -f "${GDM_CUSTOM_CONF}" ]]; then
@@ -170,3 +187,4 @@ echo "Resolved node: ${NODE_BIN}"
 echo "Resolved pnpm: ${PNPM_BIN}"
 echo "Autologin config: ${GDM_CUSTOM_CONF}"
 echo "Firefox autostart: ${KIOSK_AUTOSTART_DIR}/firefox-kiosk.desktop"
+echo "Desktop launcher: ${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"

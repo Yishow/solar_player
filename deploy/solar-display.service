@@ -11,11 +11,11 @@ Wants=network-online.target
 [Service]
 Type=exec
 User=kz
-WorkingDirectory=/opt/solar-display
-EnvironmentFile=-/opt/solar-display/.env
+WorkingDirectory=/data/solar-display
+EnvironmentFile=-/data/solar-display/.env
 Environment=NODE_ENV=production
-Environment=DATA_DIR=/opt/solar-display/data
-Environment=LOG_DIR=/opt/solar-display/logs
+Environment=DATA_DIR=/data/solar-display/data
+Environment=LOG_DIR=/data/solar-display/logs
 Environment=PORT=3000
 SyslogIdentifier=solar-display
 ExecStart=/usr/bin/node apps/server/dist/server.js
@@ -27,7 +27,7 @@ StandardError=journal
 # Security
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/opt/solar-display/data /opt/solar-display/logs /opt/solar-display/uploads/images /opt/solar-display/uploads/brand
+ReadWritePaths=/data/solar-display/data /data/solar-display/logs /data/solar-display/uploads/images /data/solar-display/uploads/brand
 
 [Install]
 WantedBy=multi-user.target

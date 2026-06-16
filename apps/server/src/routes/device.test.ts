@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   buildApp,
   tempDir
@@ -307,22 +308,27 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
   const helperPath = join(tempDir, "stop-solar-kiosk-test.sh");
   const markerPath = join(tempDir, "stop-solar-kiosk.marker");
   const previousHelperPath = process.env.KIOSK_EXIT_HELPER_PATH;
+  const previousExitDelayMs = process.env.KIOSK_EXIT_DELAY_MS;
 
   rmSync(markerPath, { force: true });
-  writeFileSync(helperPath, `#!/bin/sh\nprintf 'closed' > "${markerPath}"\n`, "utf8");
+  writeFileSync(helperPath, `#!/bin/sh\nsleep 0.2\nprintf 'closed' > "${markerPath}"\n`, "utf8");
   chmodSync(helperPath, 0o755);
   process.env.KIOSK_EXIT_HELPER_PATH = helperPath;
+  process.env.KIOSK_EXIT_DELAY_MS = "0";
 
   const app = await buildApp();
 
   try {
+    const startedAt = Date.now();
     const response = await app.inject({
       method: "POST",
       url: "/api/device/kiosk-exit"
     });
+    const elapsedMs = Date.now() - startedAt;
 
     assert.equal(response.statusCode, 200);
-    assert.equal(existsSync(markerPath), true);
+    assert.equal(existsSync(markerPath), false);
+    assert.ok(elapsedMs < 200, `expected response before kiosk helper finishes, got ${elapsedMs}ms`);
 
     const body = response.json() as {
       data: {
@@ -337,6 +343,8 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
     assert.equal(body.data.executed, true);
     assert.equal(body.data.launcherName, "Solar Display Kiosk");
     assert.match(body.data.reentryHint, /Solar Display Kiosk/);
+    await delay(1500);
+    assert.equal(existsSync(markerPath), true);
   } finally {
     await app.close();
     rmSync(helperPath, { force: true });
@@ -345,6 +353,11 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
       delete process.env.KIOSK_EXIT_HELPER_PATH;
     } else {
       process.env.KIOSK_EXIT_HELPER_PATH = previousHelperPath;
+    }
+    if (previousExitDelayMs === undefined) {
+      delete process.env.KIOSK_EXIT_DELAY_MS;
+    } else {
+      process.env.KIOSK_EXIT_DELAY_MS = previousExitDelayMs;
     }
   }
 });

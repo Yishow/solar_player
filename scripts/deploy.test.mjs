@@ -44,9 +44,11 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/solar-display.service"), "[Service]\n");
   writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/reset-db-settings.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/start-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/stop-solar-kiosk.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/verify-kiosk-install.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/firefox-kiosk.desktop"), "[Desktop Entry]\n");
   writeFileSync(path.join(projectDir, "docs/openapi.yaml"), "openapi: 3.0.0\n");
   writeFileSync(path.join(projectDir, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-bg.png"), "seed-image\n");
@@ -87,8 +89,12 @@ test("deploy service defaults to the Ubuntu kiosk account and exec startup", () 
 
   assert.match(source, /^Type=exec$/m);
   assert.match(source, /^User=kz$/m);
-  assert.match(source, /^WorkingDirectory=\/opt\/solar-display$/m);
+  assert.match(source, /^WorkingDirectory=\/data\/solar-display$/m);
+  assert.match(source, /^EnvironmentFile=-\/data\/solar-display\/\.env$/m);
+  assert.match(source, /^Environment=DATA_DIR=\/data\/solar-display\/data$/m);
+  assert.match(source, /^Environment=LOG_DIR=\/data\/solar-display\/logs$/m);
   assert.match(source, /^ExecStart=\/usr\/bin\/node apps\/server\/dist\/server\.js$/m);
+  assert.match(source, /^ReadWritePaths=\/data\/solar-display\/data \/data\/solar-display\/logs \/data\/solar-display\/uploads\/images \/data\/solar-display\/uploads\/brand$/m);
 });
 
 test("kiosk installer configures gdm autologin and points operators to logs", () => {
@@ -101,6 +107,17 @@ test("kiosk installer configures gdm autologin and points operators to logs", ()
   assert.match(source, /\.nvm\/nvm\.sh/);
   assert.match(source, /journalctl -u solar-display/);
   assert.match(source, /kiosk-launcher\.log/);
+});
+
+test("kiosk installer installs both autostart and desktop launchers for the kiosk user", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/install-kiosk.sh"), "utf8");
+
+  assert.match(source, /KIOSK_DESKTOP_DIR="\$\{KIOSK_HOME\}\/Desktop"/);
+  assert.match(source, /Solar Display Kiosk\.desktop/);
+  assert.match(source, /\$\{KIOSK_AUTOSTART_DIR\}\/firefox-kiosk\.desktop/);
+  assert.match(source, /\$\{KIOSK_DESKTOP_DIR\}\/Solar Display Kiosk\.desktop/);
+  assert.match(source, /chmod \+x "\$\{KIOSK_DESKTOP_DIR\}\/Solar Display Kiosk\.desktop"/);
+  assert.match(source, /metadata::trusted true/);
 });
 
 test("bundle install script can source nvm before running pnpm install", () => {
@@ -240,6 +257,15 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   assert.match(source, /http:\/\/127\.0\.0\.1:3000\/health/);
   assert.match(source, /firefox -kiosk -private-window/);
   assert.match(source, /kiosk-launcher\.log/);
+  assert.match(source, /metadata::trusted true/);
+  assert.match(source, /KIOSK_START_DELAY:-5/);
+  assert.match(source, /resolve_graphical_environment\(\)/);
+  assert.match(source, /export XDG_RUNTIME_DIR="\/run\/user\/\$\(id -u\)"/);
+  assert.match(source, /export DBUS_SESSION_BUS_ADDRESS="unix:path=\$\{XDG_RUNTIME_DIR\}\/bus"/);
+  assert.match(source, /export DISPLAY=":0"/);
+  assert.match(source, /SESSION_KEY="\$\{XDG_SESSION_ID:-\$\{WAYLAND_DISPLAY:-\$\{DISPLAY:-default\}\}\}"/);
+  assert.match(source, /FIREFOX_PID_FILE="\$\{LOG_DIR\}\/firefox-\$\{SESSION_KEY\}\.pid"/);
+  assert.match(source, /firefox already running for this session/);
 });
 
 test("deploy bundle includes the db reset helper", () => {
@@ -247,6 +273,105 @@ test("deploy bundle includes the db reset helper", () => {
 
   assert.match(source, /deploy\/reset-db-settings\.sh/);
   assert.match(source, /Reset DB settings only: \.\/deploy\/reset-db-settings\.sh/);
+});
+
+test("read-only hardening helper fails closed when runtime path is missing", () => {
+  const projectDir = makeFixtureProject();
+
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/enable-readonly-root.sh"),
+      readFileSync(path.join(repoRoot, "deploy/enable-readonly-root.sh"), "utf8")
+    );
+    chmodSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), 0o755);
+
+    const result = spawnSync("bash", ["deploy/enable-readonly-root.sh"], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: path.join(projectDir, "missing-runtime")
+      },
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Runtime install directory is missing/);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("read-only hardening helper applies overlayroot through a local config", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/enable-readonly-root.sh"), "utf8");
+
+  assert.match(source, /OVERLAYROOT_MODE="\$\{OVERLAYROOT_MODE:-tmpfs:recurse=0\}"/);
+  assert.match(source, /overlayroot is not installed/);
+  assert.match(source, /\/etc\/overlayroot\.local\.conf/);
+  assert.match(source, /printf 'overlayroot="%s"\\n'/);
+  assert.match(source, /update-initramfs -u/);
+});
+
+test("kiosk verification helper fails when the desktop re-entry launcher is missing", () => {
+  const projectDir = makeFixtureProject();
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const kioskHome = path.join(projectDir, "home", "kz");
+  const installDir = path.join(projectDir, "data-install");
+
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/verify-kiosk-install.sh"),
+      readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8")
+    );
+    chmodSync(path.join(projectDir, "deploy/verify-kiosk-install.sh"), 0o755);
+    mkdirSync(path.join(kioskHome, ".config/autostart"), { recursive: true });
+    mkdirSync(fakeBinDir);
+    for (const runtimePath of [
+      "data",
+      "logs",
+      "uploads/images",
+      "uploads/brand"
+    ]) {
+      mkdirSync(path.join(installDir, runtimePath), { recursive: true });
+    }
+    writeFileSync(path.join(kioskHome, ".config/autostart/firefox-kiosk.desktop"), "[Desktop Entry]\n");
+
+    for (const command of ["systemctl", "curl"]) {
+      const commandPath = path.join(fakeBinDir, command);
+      writeFileSync(commandPath, "#!/bin/bash\nexit 0\n");
+      chmodSync(commandPath, 0o755);
+    }
+    const sudoPath = path.join(fakeBinDir, "sudo");
+    writeFileSync(
+      sudoPath,
+      [
+        "#!/bin/bash",
+        "if [[ \"$1\" == \"-u\" ]]; then",
+        "  shift 2",
+        "fi",
+        "exec \"$@\"",
+        ""
+      ].join("\n")
+    );
+    chmodSync(sudoPath, 0o755);
+
+    const result = spawnSync("bash", ["deploy/verify-kiosk-install.sh"], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: installDir,
+        KIOSK_HOME: kioskHome,
+        KIOSK_USER: "kz",
+        PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`
+      },
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /desktop re-entry launcher exists/);
+    assert.match(result.stderr, /Device Status re-entry guidance is not backed/);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
 });
 
 test("deploy.sh online bundle includes runtime files without node_modules", () => {
@@ -276,16 +401,20 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/solar-display.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/firefox-kiosk.desktop")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "node_modules")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/.DS_Store")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);
@@ -310,14 +439,18 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "apps/web/src/assets/playback/slide-overview.jpg")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "node_modules/fake-package/index.js")), true);
     assert.equal(existsSync(path.join(bundleRoot, "apps/.DS_Store")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);

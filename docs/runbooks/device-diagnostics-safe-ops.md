@@ -41,8 +41,40 @@ systemctl restart solar-display
 ```
 
 - 這個指令對應目前 repo 內的 [deploy/solar-display.service](/Users/yishow/prj/solar_player/deploy/solar-display.service)。
-- service 目前假設 `WorkingDirectory=/opt/solar-display`，並由 systemd 管理啟動、重啟與寫入目錄。
+- service 目前假設 `WorkingDirectory=/data/solar-display`，並由 systemd 管理啟動、重啟與寫入目錄。
 - 若環境沒有 systemd，請交由該環境的主機層維運流程處理；app 內不會假裝已執行 reboot。
+
+### Raspberry Pi kiosk verification
+
+安裝到 data volume 時，先把 bundle 放在 `/data/solar-display`，再執行：
+
+```bash
+sudo INSTALL_DIR=/data/solar-display KIOSK_USER=kz ./deploy/install-kiosk.sh
+sudo INSTALL_DIR=/data/solar-display KIOSK_USER=kz ./deploy/verify-kiosk-install.sh
+```
+
+`verify-kiosk-install.sh` 會檢查 `solar-display` service、`/health`、autostart launcher、桌面 `Solar Display Kiosk` launcher，以及 `data` / `logs` / `uploads` 是否都在 `/data/solar-display` 下。
+
+Device Status 的 kiosk exit 只會呼叫固定的 `stop-solar-kiosk.sh` helper。離開 Firefox kiosk 後，桌面應能看到 `Solar Display Kiosk` launcher，點擊後會呼叫同一套固定的 `start-solar-kiosk.sh` helper 回到 kiosk。
+
+### Read-only root hardening
+
+只有在 verification 通過後才執行 read-only root hardening dry-run：
+
+```bash
+sudo INSTALL_DIR=/data/solar-display KIOSK_USER=kz ./deploy/enable-readonly-root.sh
+```
+
+若 `/data/solar-display` 不存在，或 `kz` 無法寫入 `data`、`logs`、`uploads/images`、`uploads/brand`，腳本會在修改 root filesystem 前停止。Ubuntu kiosk 可先安裝 `overlayroot`，再套用 tmpfs overlay root，保留 `/data` 為可寫資料分割區：
+
+```bash
+sudo apt-get install -y overlayroot
+sudo APPLY_READONLY_ROOT=1 INSTALL_DIR=/data/solar-display KIOSK_USER=kz ./deploy/enable-readonly-root.sh
+sudo reboot
+sudo INSTALL_DIR=/data/solar-display KIOSK_USER=kz ./deploy/verify-kiosk-install.sh
+```
+
+預設 `OVERLAYROOT_MODE=tmpfs:recurse=0`，讓 root 寫入落在 RAM overlay，並讓 `/data` 上的 SQLite、uploads 與 logs 維持永久寫入。套用後必須 reboot 並重新執行 `verify-kiosk-install.sh`。
 
 ## 不支援的危險操作
 

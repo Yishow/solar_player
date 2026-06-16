@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
+const DEFAULT_EXIT_DELAY_MS = 750;
 
 export const KIOSK_LAUNCHER_NAME = "Solar Display Kiosk";
 export const KIOSK_REENTRY_HINT = `回到桌面後點擊 ${KIOSK_LAUNCHER_NAME} 重新進入。`;
@@ -47,13 +48,35 @@ function resolveRunnableKioskExitHelperPath() {
   );
 }
 
-export async function runDeviceKioskExit() {
-  const helperPath = resolveRunnableKioskExitHelperPath();
-  await execFileAsync(helperPath);
+function readExitDelayMs() {
+  const parsed = Number.parseInt(process.env.KIOSK_EXIT_DELAY_MS ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_EXIT_DELAY_MS;
+}
 
+function buildKioskExitResult() {
   return {
     executed: true,
     launcherName: KIOSK_LAUNCHER_NAME,
     reentryHint: KIOSK_REENTRY_HINT
   };
+}
+
+export async function runDeviceKioskExit() {
+  const helperPath = resolveRunnableKioskExitHelperPath();
+  await execFileAsync(helperPath);
+
+  return buildKioskExitResult();
+}
+
+export function scheduleDeviceKioskExit(options: { onError?: (error: Error) => void } = {}) {
+  const helperPath = resolveRunnableKioskExitHelperPath();
+  setTimeout(() => {
+    execFile(helperPath, (error) => {
+      if (error) {
+        options.onError?.(error);
+      }
+    });
+  }, readExitDelayMs());
+
+  return buildKioskExitResult();
 }
