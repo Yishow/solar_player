@@ -46,6 +46,10 @@ resolve_graphical_environment() {
   if [[ -z "${DISPLAY:-}" ]]; then
     export DISPLAY=":0"
   fi
+
+  export GTK_IM_MODULE="${GTK_IM_MODULE:-fcitx}"
+  export QT_IM_MODULE="${QT_IM_MODULE:-fcitx}"
+  export XMODIFIERS="${XMODIFIERS:-@im=fcitx}"
 }
 
 log "launcher start: url=${KIOSK_URL}"

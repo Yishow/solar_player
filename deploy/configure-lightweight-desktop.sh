@@ -36,7 +36,7 @@ if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
 fi
 
 echo "Desktop: xfce-xrdp"
-echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy"
+echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy"
 echo "RDP auth: ${RDP_AUTH}"
 echo "Security: SSH password authentication and sudo password prompts are not disabled"
 
@@ -50,7 +50,7 @@ id "${KIOSK_USER}" >/dev/null 2>&1 || fail "User not found: ${KIOSK_USER}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy
+apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy
 
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}"
@@ -79,6 +79,14 @@ Name=Fcitx 5
 Exec=fcitx5 -d
 OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true
+EOF
+cat > "${kiosk_home}/.config/autostart/light-locker.desktop" <<'EOF'
+[Desktop Entry]
+Hidden=true
+EOF
+cat > "${kiosk_home}/.config/autostart/xscreensaver.desktop" <<'EOF'
+[Desktop Entry]
+Hidden=true
 EOF
 cat > "${kiosk_home}/.config/fcitx5/profile" <<'EOF'
 [Groups/0]
@@ -113,7 +121,7 @@ Language=zh_TW.UTF-8
 Session=xfce
 EOF
 chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xsession"
-chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xprofile" "${kiosk_home}/.xinputrc" "${kiosk_home}/.dmrc" "${kiosk_home}/.config/autostart/fcitx5.desktop" "${kiosk_home}/.config/fcitx5/profile" "${kiosk_home}/.config/fcitx5/config"
+chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xprofile" "${kiosk_home}/.xinputrc" "${kiosk_home}/.dmrc" "${kiosk_home}/.config/autostart/fcitx5.desktop" "${kiosk_home}/.config/autostart/light-locker.desktop" "${kiosk_home}/.config/autostart/xscreensaver.desktop" "${kiosk_home}/.config/fcitx5/profile" "${kiosk_home}/.config/fcitx5/config"
 chmod 755 "${kiosk_home}/.xsession"
 grep -q '^zh_TW.UTF-8 UTF-8$' /etc/locale.gen || echo 'zh_TW.UTF-8 UTF-8' >> /etc/locale.gen
 locale-gen zh_TW.UTF-8
@@ -131,6 +139,19 @@ install -d -m 755 /etc/NetworkManager/conf.d
 cat > /etc/NetworkManager/conf.d/10-solar-managed.conf <<'EOF'
 [ifupdown]
 managed=true
+EOF
+
+install -d -m 755 /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-solar-networkmanager.rules <<EOF
+polkit.addRule(function(action, subject) {
+    if (subject.user === "${KIOSK_USER}" && (
+        action.id === "org.freedesktop.NetworkManager.network-control" ||
+        action.id === "org.freedesktop.NetworkManager.settings.modify.system" ||
+        action.id === "org.freedesktop.NetworkManager.enable-disable-wifi"
+    )) {
+        return polkit.Result.YES;
+    }
+});
 EOF
 
 cat > /etc/netplan/90-solar-network-manager.yaml <<'EOF'

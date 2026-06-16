@@ -59,8 +59,8 @@ Do not boot the card once before running the user-data helper. If Ubuntu grows r
 
 ## Current Target
 
-- Current maintenance target over Tailscale: `kz@100.99.99.2`
-- Last verified LAN target on the same card: `kz@192.168.31.40` on 2026-06-16
+- Current maintenance target over Tailscale: `kz@100.99.99.3`
+- Last verified LAN target on the same card: `kz@192.168.31.159` on 2026-06-17
 - SSH password: `kz`
 - sudo password: `kz`
 - Generic fresh-card default user: `pi`
@@ -72,15 +72,17 @@ Do not boot the card once before running the user-data helper. If Ubuntu grows r
   - `/dev/mmcblk0p2`: lower root, about 47.5G
   - `/dev/mmcblk0p3`: `/data`, 10G ext4
 
-Post-reboot readonly verification passed on 2026-06-16:
+Post-reboot readonly verification passed on 2026-06-17 for `100.99.99.3`:
 
 - `/` source is `overlayroot`
-- `/media/root-ro` is `/dev/mmcblk0p2` mounted `ro`
-- `/media/root-rw` is tmpfs
+- `/` is mounted as overlay with `lowerdir=/media/root-ro` and `upperdir=/media/root-rw/overlay`
 - `/data` is `/dev/mmcblk0p3` mounted `rw,noatime`
-- `solar-display`, `xrdp`, and `lightdm` are active
-- `http://192.168.31.40:3000/health` is reachable from the development machine
-- TCP `192.168.31.40:3389` is reachable from the development machine
+- `solar-display`, `xrdp`, `xrdp-sesman`, and `lightdm` are active
+- `/data/solar-display/logs` remains writable after readonly reboot
+- `sudo env KIOSK_USER=kz /data/solar-display/deploy/verify-kiosk-install.sh` passes
+- `http://100.99.99.3:3000/health` is reachable from the development machine
+- `http://100.99.99.3:3000/api/playback/pages` reports all five pages `playable` with `skipCount: 0`
+- agent-browser opened `/overview`, `/solar`, `/factory-circuit`, `/images`, and `/sustainability` successfully
 
 Additional desktop repair completed on 2026-06-16 after a reboot exposed HDMI/RDP issues:
 
@@ -94,15 +96,15 @@ Additional desktop repair completed on 2026-06-16 after a reboot exposed HDMI/RD
 - Persistence: the same files/cache cleanup were also written through `overlayroot-chroot`, so the current readonly card should keep the repair after reboot.
 - Script fix: `deploy/configure-lightweight-desktop.sh` now writes the robust `.xsession`, clears stale XFCE session cache, installs the Raspberry Pi KMS Xorg config, installs `xserver-xorg-input-libinput` for the local LightDM seat, and injects the xrdp-only `-configdir /etc/X11/xrdp/xorg.conf.d` guard into `sesman.ini` for future installs. `scripts/deploy.test.mjs` includes regression coverage for this xrdp configdir path.
 - Post-repair service/process check: `lightdm`, `xrdp`, `xrdp-sesman`, and `solar-display` were active; XFCE spawned `xfwm4`, `xfsettingsd`, `xfce4-panel`, and `xfdesktop`.
-- Not yet repeated after this repair: a second reboot witness. Reboot once and recheck HDMI/RDP before treating the desktop repair as fully post-reboot verified.
+- Repeated after this repair on 2026-06-17: readonly reboot witness passed; `lightdm`, `xrdp`, `xrdp-sesman`, `solar-display`, and the Firefox kiosk process were active.
 
 ## Current MQTT Blocker
 
-The Pi is configured for `MQTT_BROKER=192.168.31.62` and `MQTT_DATA_MODE=mqtt`.
+The Pi keeps `MQTT_BROKER=192.168.31.62`, but the live maintenance target is currently stored in mock mode because the broker is unreachable.
 
 As of the 2026-06-16 post-reboot check:
 
-- Pi runtime status reports broker `192.168.31.62:1883` and `connected: false`
+- Pi runtime status reports broker `192.168.31.62:1883`, `connected: false`, and `reason: "mock"` after the 2026-06-17 readonly reboot
 - Pi-to-broker TCP test to `192.168.31.62:1883` fails
 - Development-machine TCP test to `192.168.31.62:1883` also times out
 - SSH to `192.168.31.62:22` times out
@@ -115,6 +117,7 @@ As of 2026-06-17, the live maintenance target was switched to `mock` mode so the
 
 - Runtime status reports `reason: "mock"`
 - All five playback pages are `playable`
+- The `mock` mode was saved through the management API on the Pi, not only by editing `.env`; changing `.env` after the first seed does not override an existing `mqtt_settings` row
 - `apps/server/src/services/MockMetricsFeedService.ts` now writes a full 14-metric mock dataset, not only `realTimePower`
 - The mock feed is intentionally active only in `mock` mode; switching back to `mqtt` mode restores the real broker dependency
 - The mock feed follows a day/night solar curve, so `todayGeneration`, `todayCo2Reduction`, and related daylight metrics will read `0.0` overnight rather than showing fake daytime output
@@ -196,7 +199,7 @@ The script installs `locales`, `language-pack-zh-hant`, `language-pack-gnome-zh-
 
 The first-login tools also append `zh_TW.UTF-8 UTF-8` to `/etc/locale.gen`, run `locale-gen zh_TW.UTF-8`, and call `update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh`, so the next boot uses Traditional Chinese by default.
 
-The desktop helper also installs `network-manager-gnome`, `policykit-1-gnome`, `im-config`, `fcitx5`, and `fcitx5-table-boshiamy`, writes `~/.xprofile` with `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, and `XMODIFIERS=@im=fcitx`, writes `~/.xinputrc` with `run_im fcitx5`, seeds `~/.config/fcitx5/profile` so the kiosk user starts with `keyboard-us`, `boshiamy`, and `chewing` in the default group, and writes `/etc/NetworkManager/conf.d/10-solar-managed.conf` plus `/etc/netplan/90-solar-network-manager.yaml` so Wi-Fi can be managed from the desktop after the next reboot.
+The desktop helper also installs `network-manager-gnome`, `policykit-1-gnome`, `im-config`, `fcitx5`, and `fcitx5-table-boshiamy`, writes `~/.xprofile` with `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, and `XMODIFIERS=@im=fcitx`, writes `~/.xinputrc` with `run_im fcitx5`, seeds `~/.config/fcitx5/profile` so the kiosk user starts with `keyboard-us`, `boshiamy`, and `chewing` in the default group, writes `~/.config/autostart/light-locker.desktop` plus `~/.config/autostart/xscreensaver.desktop` with `Hidden=true` so the kiosk session does not fall back to the LightDM greeter after inactivity, writes `/etc/NetworkManager/conf.d/10-solar-managed.conf` plus `/etc/netplan/90-solar-network-manager.yaml` so Wi-Fi can be managed from the desktop after the next reboot, and writes `/etc/polkit-1/rules.d/49-solar-networkmanager.rules` so the kiosk user can switch Wi-Fi and modify saved NetworkManager connections without repeated admin-auth prompts.
 
 They write this cloud-init shape:
 
@@ -315,7 +318,7 @@ Primary local entry:
 scripts/raspi-onekey-deploy.sh pi@<pi-ip>
 ```
 
-The one-key deploy script derives the kiosk Linux user from the SSH target. Use `pi@<ip>` for new generic cards. Use `kz@192.168.31.40` only for the current project installed card, or pass `--kiosk-user <user>` explicitly.
+The one-key deploy script derives the kiosk Linux user from the SSH target. Use `pi@<ip>` for new generic cards. Use `kz@100.99.99.3` only for the current project installed card, or pass `--kiosk-user <user>` explicitly.
 
 Normal update:
 
@@ -365,17 +368,34 @@ Installed stack:
 - xrdp
 - xorgxrdp
 - Firefox
+- xdg-utils
 - xfce4-terminal
 
 Login policy:
 
 - Local desktop autologin: enabled for the kiosk user, default `pi`
 - RDP desktop entry: xrdp can autorun the kiosk session after the RDP client supplies valid credentials
+- Windows credential prompt: if you still see an RDP password prompt after the Pi-side `SolarKiosk` autorun fix, that prompt is from the Windows client credential cache, not the Pi login screen
 - Windows no-prompt RDP: use `scripts/connect-raspi-rdp.ps1` once to store `TERMSRV/<pi-ip>` credentials in Windows Credential Manager
 - SSH: password required
 - sudo: password required
 
 Firefox is the main kiosk browser.
+
+Manual desktop polish is available without rerunning the full deploy flow:
+
+```bash
+sudo deploy/apply-desktop-theme.sh --user kz
+```
+
+The script installs a balanced XFCE theme profile:
+
+- GTK / xfwm theme: `Arc-Darker`
+- icon theme: `Papirus-Dark`
+- cursor theme: `DMZ-White`
+- UI fonts: `Noto Sans CJK TC` + `Noto Sans Mono`
+
+It only touches desktop appearance files under the kiosk user's home directory plus the required theme/font packages. It does not modify xrdp, NetworkManager, polkit, autologin, or kiosk startup behavior.
 
 Raspberry Pi 5 desktop hardening included in `deploy/configure-lightweight-desktop.sh`:
 
@@ -386,13 +406,19 @@ Raspberry Pi 5 desktop hardening included in `deploy/configure-lightweight-deskt
 On the current installed card, from Windows PowerShell:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 192.168.31.40 -User kz -Password kz
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 192.168.31.159 -User kz -Password kz
+```
+
+For the current Tailscale maintenance target:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 100.99.99.3 -User kz -Password kz
 ```
 
 If Windows saved a wrong credential, clear it first:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 192.168.31.40 -DeleteCredential
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 100.99.99.3 -DeleteCredential
 ```
 
 ## Desktop Launchers
@@ -413,26 +439,26 @@ Local:
 
 ```bash
 node scripts/deploy.test.mjs
-bash -n scripts/raspi-onekey-deploy.sh deploy/raspi-bootstrap.sh deploy/configure-lightweight-desktop.sh deploy/install-kiosk.sh deploy/enable-readonly-root.sh deploy/verify-kiosk-install.sh deploy/readonly-system-enable.sh deploy/readonly-system-disable.sh
+bash -n scripts/raspi-onekey-deploy.sh deploy/raspi-bootstrap.sh deploy/configure-lightweight-desktop.sh deploy/apply-desktop-theme.sh deploy/install-kiosk.sh deploy/enable-readonly-root.sh deploy/verify-kiosk-install.sh deploy/readonly-system-enable.sh deploy/readonly-system-disable.sh
 spectra validate add-raspi-onekey-kiosk-deploy
 ```
 
 Remote disk check:
 
 ```bash
-ssh kz@192.168.31.40 'findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /; findmnt /data || true; lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS'
+ssh kz@100.99.99.3 'findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /; findmnt /data || true; lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS'
 ```
 
 Remote kiosk check after deployment:
 
 ```bash
-ssh pi@<pi-ip> 'curl -fsS http://127.0.0.1:3000/health && sudo /data/solar-display/deploy/verify-kiosk-install.sh --kiosk-user pi'
+ssh pi@<pi-ip> 'curl -fsS http://127.0.0.1:3000/health && sudo env KIOSK_USER=pi /data/solar-display/deploy/verify-kiosk-install.sh'
 ```
 
 Readonly check after reboot:
 
 ```bash
-ssh pi@<pi-ip> 'findmnt /; findmnt /data; sudo /data/solar-display/deploy/verify-kiosk-install.sh --kiosk-user pi'
+ssh pi@<pi-ip> 'findmnt /; findmnt /data; sudo env KIOSK_USER=pi /data/solar-display/deploy/verify-kiosk-install.sh'
 ```
 
 Expected:
@@ -455,8 +481,8 @@ add-raspi-onekey-kiosk-deploy
 
 Current progress at the time this file was written:
 
-- final Pi manual witness with real `/data`, readonly apply, reboot, and post-reboot verification completed on `kz@192.168.31.40`
-- later HDMI/RDP repair was applied and persisted through `overlayroot-chroot`; second reboot witness after that repair is still pending
+- final Pi manual witness with real `/data`, readonly apply, reboot, and post-reboot verification completed on `kz@100.99.99.3`
+- HDMI/RDP repair was verified after the 2026-06-17 readonly reboot
 - remaining external issue: MQTT broker `192.168.31.62:1883` is unreachable from both the Pi and development machine
 
 ## Related Files

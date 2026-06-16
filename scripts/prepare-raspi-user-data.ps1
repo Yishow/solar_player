@@ -108,63 +108,71 @@ if ($PackageUpgrade) {
   $upgradeValue = "true"
 }
 
-$userData = @"
-#cloud-config
-hostname: $Hostname
-manage_etc_hosts: true
-timezone: $Timezone
-ssh_pwauth: true
-growpart:
-  mode: off
-resize_rootfs: false
-
-users:
-  - name: $User
-    groups: [adm, cdrom, dip, lxd, sudo]
-    sudo: ["ALL=(ALL) ALL"]
-    shell: /bin/bash
-    lock_passwd: false
-
-chpasswd:
-  expire: false
-  users:
-    - {name: $User, password: "$Password", type: text}
-    - {name: root, password: "$RootPassword", type: text}
-
-package_update: true
-package_upgrade: $upgradeValue
-packages:
-  - sudo
-  - openssh-server
-  - avahi-daemon
-
-write_files:
-  - path: /etc/growroot-disabled
-    permissions: "0644"
-    owner: root:root
-    content: |
-      disabled by Solar Player first-boot setup; /data is created by raspi-onekey-deploy.sh
-  - path: /etc/ssh/sshd_config.d/99-solar-player.conf
-    permissions: "0644"
-    owner: root:root
-    content: |
-      PasswordAuthentication yes
-      KbdInteractiveAuthentication yes
-      PermitRootLogin no
-
-runcmd:
-  - systemctl enable --now ssh
-  - systemctl enable --now avahi-daemon
-"@
+$userDataTemplate = [string[]](
+  "#cloud-config",
+  "hostname: __HOSTNAME__",
+  "manage_etc_hosts: true",
+  "timezone: __TIMEZONE__",
+  "ssh_pwauth: true",
+  "growpart:",
+  "  mode: off",
+  "resize_rootfs: false",
+  "",
+  "users:",
+  "  - name: __USER__",
+  "    groups: [adm, cdrom, dip, lxd, sudo]",
+  "    sudo:",
+  "      - ALL=(ALL) ALL",
+  "    shell: /bin/bash",
+  "    lock_passwd: false",
+  "",
+  "chpasswd:",
+  "  expire: false",
+  "  users:",
+  "    - {name: __USER__, password: '__PASSWORD__', type: text}",
+  "    - {name: root, password: '__ROOT_PASSWORD__', type: text}",
+  "",
+  "package_update: true",
+  "package_upgrade: __PACKAGE_UPGRADE__",
+  "packages:",
+  "  - sudo",
+  "  - openssh-server",
+  "  - avahi-daemon",
+  "",
+  "write_files:",
+  "  - path: /etc/growroot-disabled",
+  "    permissions: '0644'",
+  "    owner: root:root",
+  "    content: |",
+  "      disabled by Solar Player first-boot setup; /data is created by raspi-onekey-deploy.sh",
+  "  - path: /etc/ssh/sshd_config.d/99-solar-player.conf",
+  "    permissions: '0644'",
+  "    owner: root:root",
+  "    content: |",
+  "      PasswordAuthentication yes",
+  "      KbdInteractiveAuthentication yes",
+  "      PermitRootLogin no",
+  "",
+  "runcmd:",
+  "  - systemctl enable --now ssh",
+  "  - systemctl enable --now avahi-daemon"
+)
+$userData = ($userDataTemplate -join "`n").
+  Replace("__HOSTNAME__", $Hostname).
+  Replace("__TIMEZONE__", $Timezone).
+  Replace("__USER__", $User).
+  Replace("__PASSWORD__", $Password).
+  Replace("__ROOT_PASSWORD__", $RootPassword).
+  Replace("__PACKAGE_UPGRADE__", $upgradeValue)
 
 Set-Content -Path $userDataPath -Value $userData -Encoding UTF8NoBOM
 
 $deployEnvPath = Join-Path $BootPath "solar-deploy.env"
-$deployEnv = @"
-DATA_SIZE_GB=$DataSizeGb
-KIOSK_USER=$User
-MQTT_HOST=$MqttHost
-"@
+$deployEnv = @(
+  "DATA_SIZE_GB=$DataSizeGb"
+  "KIOSK_USER=$User"
+  "MQTT_HOST=$MqttHost"
+) -join "`n"
 Set-Content -Path $deployEnvPath -Value $deployEnv -Encoding UTF8NoBOM
 
 if (-not $SkipFirstLoginTools) {
@@ -174,68 +182,68 @@ if (-not $SkipFirstLoginTools) {
   }
 
   $firstLoginToolsPath = Join-Path $BootPath "solar-first-login-tools.sh"
-  $firstLoginToolsTemplate = @'
-#!/bin/bash
-set -euo pipefail
-
-KIOSK_USER="${KIOSK_USER:-__KIOSK_USER__}"
-INSTALL_NVM="${INSTALL_NVM:-__INSTALL_NVM__}"
-NVM_VERSION="${NVM_VERSION:-v0.40.3}"
-
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "Please run as root: sudo bash /boot/firmware/solar-first-login-tools.sh" >&2
-  exit 1
-fi
-
-id "${KIOSK_USER}" >/dev/null 2>&1 || {
-  echo "User not found: ${KIOSK_USER}" >&2
-  exit 1
-}
-
-export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y \
-  locales \
-  net-tools \
-  curl \
-  ca-certificates \
-  language-pack-zh-hant \
-  language-pack-gnome-zh-hant \
-  fonts-noto-cjk \
-  im-config \
-  fcitx5 \
-  fcitx5-table-boshiamy \
-  git \
-  vim \
-  htop \
-  tmux \
-  rsync \
-  parted \
-  e2fsprogs \
-  ufw \
-  avahi-utils \
-  mosquitto-clients
-
-grep -q '^zh_TW.UTF-8 UTF-8$' /etc/locale.gen || echo 'zh_TW.UTF-8 UTF-8' >> /etc/locale.gen
-locale-gen zh_TW.UTF-8
-update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh
-
-if [[ "${INSTALL_NVM}" == "true" ]]; then
-  sudo -u "${KIOSK_USER}" bash -lc "
-    set -euo pipefail
-    export NVM_DIR=\"\${HOME}/.nvm\"
-    if [[ ! -s \"\${NVM_DIR}/nvm.sh\" ]]; then
-      curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh | bash
-    fi
-    . \"\${NVM_DIR}/nvm.sh\"
-    nvm --version
-  "
-fi
-
-echo "First-login maintenance tools installed for ${KIOSK_USER}."
-echo "SSH password auth and sudo password policy were not changed."
-'@
-  $firstLoginTools = $firstLoginToolsTemplate.Replace("__KIOSK_USER__", $User).Replace("__INSTALL_NVM__", $installNvmValue)
+  $firstLoginToolsTemplate = [string[]](
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "",
+    "KIOSK_USER=`"${KIOSK_USER:-__KIOSK_USER__}`"",
+    "INSTALL_NVM=`"${INSTALL_NVM:-__INSTALL_NVM__}`"",
+    "NVM_VERSION=`"${NVM_VERSION:-v0.40.3}`"",
+    "",
+    "if [[ `"${EUID}`" -ne 0 ]]; then",
+    "  echo `"Please run as root: sudo bash /boot/firmware/solar-first-login-tools.sh`" >&2",
+    "  exit 1",
+    "fi",
+    "",
+    "id `"${KIOSK_USER}`" >/dev/null 2>&1 || {",
+    "  echo `"User not found: ${KIOSK_USER}`" >&2",
+    "  exit 1",
+    "}",
+    "",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update",
+    "apt-get install -y \",
+    "  locales \",
+    "  net-tools \",
+    "  curl \",
+    "  ca-certificates \",
+    "  language-pack-zh-hant \",
+    "  language-pack-gnome-zh-hant \",
+    "  fonts-noto-cjk \",
+    "  im-config \",
+    "  fcitx5 \",
+    "  fcitx5-table-boshiamy \",
+    "  git \",
+    "  vim \",
+    "  htop \",
+    "  tmux \",
+    "  rsync \",
+    "  parted \",
+    "  e2fsprogs \",
+    "  ufw \",
+    "  avahi-utils \",
+    "  mosquitto-clients",
+    "",
+    "grep -q '^zh_TW.UTF-8 UTF-8$' /etc/locale.gen || echo 'zh_TW.UTF-8 UTF-8' >> /etc/locale.gen",
+    "locale-gen zh_TW.UTF-8",
+    "update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh",
+    "",
+    "if [[ `"${INSTALL_NVM}`" == `"true`" ]]; then",
+    "  sudo -u `"${KIOSK_USER}`" bash -lc `"",
+    "    set -euo pipefail",
+    "    export NVM_DIR=\`"`"\${HOME}/.nvm\`"`"",
+    "    if [[ ! -s \`"`"\${NVM_DIR}/nvm.sh\`"`" ]]; then",
+    "      curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh | bash",
+    "    fi",
+    "    . \`"`"\${NVM_DIR}/nvm.sh\`"`"",
+    "    nvm --version",
+    "  `"",
+    "fi",
+    "",
+    "echo `"First-login maintenance tools installed for ${KIOSK_USER}.`"",
+    "echo `"SSH password auth and sudo password policy were not changed.`""
+  )
+  $firstLoginTools = ($firstLoginToolsTemplate -join "`n").Replace("__KIOSK_USER__", $User).Replace("__INSTALL_NVM__", $installNvmValue)
   Set-Content -Path $firstLoginToolsPath -Value $firstLoginTools -Encoding UTF8NoBOM
 }
 

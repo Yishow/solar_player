@@ -50,6 +50,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
   cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
+  cp "${PROJECT_DIR}/deploy/apply-desktop-theme.sh" "${target_root}/deploy/apply-desktop-theme.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
@@ -69,6 +70,7 @@ copy_required_tree() {
     "${target_root}/deploy/enable-readonly-root.sh" \
     "${target_root}/deploy/raspi-bootstrap.sh" \
     "${target_root}/deploy/configure-lightweight-desktop.sh" \
+    "${target_root}/deploy/apply-desktop-theme.sh" \
     "${target_root}/deploy/readonly-system-enable.sh" \
     "${target_root}/deploy/readonly-system-disable.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
@@ -213,6 +215,7 @@ validate_inputs() {
   require_path "deploy/enable-readonly-root.sh"
   require_path "deploy/raspi-bootstrap.sh"
   require_path "deploy/configure-lightweight-desktop.sh"
+  require_path "deploy/apply-desktop-theme.sh"
   require_path "deploy/readonly-system-enable.sh"
   require_path "deploy/readonly-system-disable.sh"
   require_path "deploy/install-kiosk.sh"

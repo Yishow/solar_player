@@ -172,7 +172,7 @@ create_data_partition() {
   resize2fs "${root_dev}"
   root_end_sector="$(parted -m "${disk_dev}" unit s print | awk -F: -v part="${root_part_num}" '$1 == part { gsub(/s$/, "", $3); print $3 }')"
   [[ -n "${root_end_sector}" ]] || fail "Unable to resolve root partition end sector after resize"
-  data_start_sector=$((root_end_sector + 1))
+  data_start_sector=$(( ((root_end_sector + 2048) / 2048) * 2048 ))
   parted -s "${disk_dev}" unit s mkpart primary ext4 "${data_start_sector}s" 100%
   partprobe "${disk_dev}" || true
   udevadm settle || true

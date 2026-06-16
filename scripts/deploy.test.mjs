@@ -15,6 +15,7 @@ const prepareUserDataPs1Path = path.join(repoRoot, "scripts/prepare-raspi-user-d
 const connectRdpPs1Path = path.join(repoRoot, "scripts/connect-raspi-rdp.ps1");
 const raspiBootstrapScriptPath = path.join(repoRoot, "deploy/raspi-bootstrap.sh");
 const lightweightDesktopScriptPath = path.join(repoRoot, "deploy/configure-lightweight-desktop.sh");
+const desktopThemeScriptPath = path.join(repoRoot, "deploy/apply-desktop-theme.sh");
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 
@@ -56,6 +57,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/apply-desktop-theme.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
@@ -344,6 +346,8 @@ test("raspi user-data shell helper writes ssh sudo root su cloud-init config", (
 test("raspi user-data powershell helper contains matching cloud-init contract", () => {
   const source = readFileSync(prepareUserDataPs1Path, "utf8");
 
+  assert.doesNotMatch(source, /@"/);
+  assert.doesNotMatch(source, /@'/);
   assert.match(source, /\[string\]\$User = "pi"/);
   assert.match(source, /\[string\]\$Password = "pi"/);
   assert.match(source, /system-boot/);
@@ -418,7 +422,7 @@ test("raspi bootstrap confirms online root partition resize after explicit data 
   assert.match(source, /parted ---pretend-input-tty/);
   assert.match(source, /resizepart "\$\{root_part_num\}" "\$\{root_end\}"/);
   assert.match(source, /root_end_sector="\$\(parted -m "\$\{disk_dev\}" unit s print/);
-  assert.match(source, /data_start_sector=\$\(\(root_end_sector \+ 1\)\)/);
+  assert.match(source, /data_start_sector=\$\(\( \(\(root_end_sector \+ 2048\) \/ 2048\) \* 2048 \)\)/);
   assert.match(source, /mkpart primary ext4 "\$\{data_start_sector\}s" 100%/);
 });
 
@@ -507,6 +511,7 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /network-manager-gnome/);
   assert.match(source, /policykit-1-gnome/);
   assert.match(source, /firefox/);
+  assert.match(source, /xdg-utils/);
   assert.match(source, /im-config/);
   assert.match(source, /fcitx5/);
   assert.match(source, /fcitx5-table-boshiamy/);
@@ -518,6 +523,9 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /XMODIFIERS=@im=fcitx/);
   assert.match(source, /\/etc\/environment\.d\/90-solar-fcitx\.conf/);
   assert.match(source, /fcitx5 -d/);
+  assert.match(source, /light-locker\.desktop/);
+  assert.match(source, /xscreensaver\.desktop/);
+  assert.match(source, /Hidden=true/);
   assert.match(source, /\.xinputrc/);
   assert.match(source, /run_im fcitx5/);
   assert.match(source, /DefaultIM=keyboard-us/);
@@ -528,6 +536,10 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /managed=true/);
   assert.match(source, /\/etc\/netplan\/90-solar-network-manager\.yaml/);
   assert.match(source, /renderer: NetworkManager/);
+  assert.match(source, /\/etc\/polkit-1\/rules\.d\/49-solar-networkmanager\.rules/);
+  assert.match(source, /org\.freedesktop\.NetworkManager\.network-control/);
+  assert.match(source, /org\.freedesktop\.NetworkManager\.settings\.modify\.system/);
+  assert.match(source, /org\.freedesktop\.NetworkManager\.enable-disable-wifi/);
   assert.match(source, /\.cache\/sessions/);
   assert.match(source, /\.config\/xfce4-session/);
   assert.match(source, /XDG_CONFIG_DIRS="\/etc\/xdg"/);
@@ -560,6 +572,40 @@ test("lightweight desktop helper fails closed for passwordless rdp without a pas
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /RDP passwordless requires --rdp-password or RDP_PASSWORD/);
+});
+
+test("desktop theme helper installs a balanced xfce theme profile without touching auth flows", () => {
+  const source = readFileSync(desktopThemeScriptPath, "utf8");
+  const result = spawnSync("bash", [
+    desktopThemeScriptPath,
+    "--user",
+    "kz",
+    "--dry-run"
+  ], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Theme profile: balanced-xfce/);
+  assert.match(source, /arc-theme/);
+  assert.match(source, /papirus-icon-theme/);
+  assert.match(source, /dmz-cursor-theme/);
+  assert.match(source, /fonts-noto-core/);
+  assert.match(source, /fonts-noto-cjk/);
+  assert.match(source, /fonts-noto-mono/);
+  assert.match(source, /fonts-noto-color-emoji/);
+  assert.match(source, /Arc-Darker/);
+  assert.match(source, /Papirus-Dark/);
+  assert.match(source, /DMZ-White/);
+  assert.match(source, /Noto Sans CJK TC 11/);
+  assert.match(source, /Noto Sans Mono 11/);
+  assert.match(source, /\.config\/gtk-3\.0\/settings\.ini/);
+  assert.match(source, /xfce-perchannel-xml\/xsettings\.xml/);
+  assert.match(source, /xfce-perchannel-xml\/xfwm4\.xml/);
+  assert.doesNotMatch(source, /xrdp/);
+  assert.doesNotMatch(source, /NetworkManager/);
+  assert.doesNotMatch(source, /polkit/);
 });
 
 test("readonly desktop launchers call fixed helpers and require sudo", () => {
@@ -716,6 +762,9 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   assert.match(source, /export XDG_RUNTIME_DIR="\/run\/user\/\$\(id -u\)"/);
   assert.match(source, /export DBUS_SESSION_BUS_ADDRESS="unix:path=\$\{XDG_RUNTIME_DIR\}\/bus"/);
   assert.match(source, /export DISPLAY=":0"/);
+  assert.match(source, /export GTK_IM_MODULE="\$\{GTK_IM_MODULE:-fcitx\}"/);
+  assert.match(source, /export QT_IM_MODULE="\$\{QT_IM_MODULE:-fcitx\}"/);
+  assert.match(source, /export XMODIFIERS="\$\{XMODIFIERS:-@im=fcitx\}"/);
   assert.match(source, /SESSION_KEY="\$\{XDG_SESSION_ID:-\$\{WAYLAND_DISPLAY:-\$\{DISPLAY:-default\}\}\}"/);
   assert.match(source, /FIREFOX_PID_FILE="\$\{LOG_DIR\}\/firefox-\$\{SESSION_KEY\}\.pid"/);
   assert.match(source, /firefox already running for this session/);
@@ -862,6 +911,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -880,6 +930,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -915,6 +966,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -929,6 +981,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
