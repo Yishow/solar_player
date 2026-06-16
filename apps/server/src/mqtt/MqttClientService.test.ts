@@ -29,6 +29,7 @@ class FakeMqttClient extends EventEmitter {
 
 function createDatabase(options?: {
   clientId?: string;
+  dataMode?: "mqtt" | "mock";
   generatedClientId?: string | null;
   reconnectInterval?: number;
   systemSettings?: Record<string, string>;
@@ -67,7 +68,7 @@ function createDatabase(options?: {
             broker_host: "192.168.31.62",
             broker_port: 1883,
             client_id: options?.clientId ?? "solar-display",
-            data_mode: "mqtt",
+            data_mode: options?.dataMode ?? "mqtt",
             message_timeout: 1,
             password: "",
             reconnect_interval: options?.reconnectInterval ?? 5000,
@@ -128,6 +129,35 @@ test("MqttClientService handles subscribe failures from client connect events wi
     process.off("unhandledRejection", onUnhandledRejection);
     await service.disconnect();
   }
+});
+
+test("MqttClientService keeps mock status when a previous MQTT client closes late", async () => {
+  const client = new FakeMqttClient();
+  const databaseOptions: { dataMode: "mqtt" | "mock" } = { dataMode: "mqtt" };
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase(databaseOptions),
+    logger: {
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    }
+  });
+
+  await service.connect();
+  assert.equal(service.getStatus().reason, "connected");
+
+  databaseOptions.dataMode = "mock";
+  await service.connect();
+  assert.equal(service.getStatus().reason, "mock");
+
+  client.emit("close");
+  assert.equal(service.getStatus().reason, "mock");
+
+  await service.disconnect();
 });
 
 test("MqttClientService handles message processing failures without unhandled rejections", async () => {

@@ -882,6 +882,14 @@ export class MqttClientService {
   }
 
   private setDisconnectedClientStatus(client: MqttClient) {
+    if (this.mockMode) {
+      this.setStatus({
+        connected: false,
+        reason: "mock"
+      });
+      return;
+    }
+
     this.setStatus({
       connected: false,
       reason: this.client === client && this.reconnectsEnabled ? "reconnecting" : "offline"
