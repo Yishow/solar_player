@@ -60,7 +60,7 @@ Do not boot the card once before running the user-data helper. If Ubuntu grows r
 ## Current Target
 
 - Current maintenance target over Tailscale: `kz@100.99.99.3`
-- Last verified LAN target on the same card: `kz@192.168.31.159` on 2026-06-17
+- Last verified LAN targets on the same card: wired `kz@192.168.31.157`, Wi-Fi `kz@192.168.31.159` on 2026-06-17
 - SSH password: `kz`
 - sudo password: `kz`
 - Generic fresh-card default user: `pi`
@@ -83,6 +83,38 @@ Post-reboot readonly verification passed on 2026-06-17 for `100.99.99.3`:
 - `http://100.99.99.3:3000/health` is reachable from the development machine
 - `http://100.99.99.3:3000/api/playback/pages` reports all five pages `playable` with `skipCount: 0`
 - agent-browser opened `/overview`, `/solar`, `/factory-circuit`, `/images`, and `/sustainability` successfully
+
+Current maintenance state after the 2026-06-17 apt maintenance window:
+
+- Readonly root is currently disabled for maintenance: `/` is `/dev/mmcblk0p2 ext4 rw,relatime`, and `/etc/overlayroot.local.conf` contains `overlayroot=n`.
+- `apt update` and `apt upgrade -y` completed; `apt-get -s upgrade` reports `0 upgraded, 0 newly installed, 0 to remove`, and `/var/run/reboot-required` is absent after the final reboot.
+- Wi-Fi is restored: `wlan0` connects to `netplan-wlan0-AX3600` at `192.168.31.159`.
+- Tailscale is restored: `tailscale0` exposes `100.99.99.3`, and SSH is reachable over Tailscale.
+- Firefox snap Traditional Chinese font fallback is repaired: snap-local `fc-match sans:lang=zh-tw` resolves to `Noto Sans CJK TC`, and the kiosk Firefox profile has `font.name*.zh-TW` preferences in `user.js`.
+- Playback service remains healthy: `http://127.0.0.1:3000/health` returns `{"status":"ok"}`, and `/api/playback/pages` responds.
+- No failed systemd units were present in the final verification.
+
+Important root cause from this maintenance window:
+
+- `cloud-initramfs-copymods` can mount `/usr/lib/modules` as a `copymods` tmpfs. If kernel modules are installed while that tmpfs is active, `modprobe` can work until reboot, but the real root filesystem still lacks the new modules.
+- The visible symptom was `WIFI-HW missing`, no `wlan0`, and `tailscaled` failing because `brcmfmac`, `ip_tables`, `nf_tables`, and related modules were not visible after reboot.
+- The durable fix is to run `sudo KIOSK_USER=<user> ./deploy/repair-kiosk-system.sh` after apt/kernel maintenance and before the reboot verification. The script syncs live `/usr/lib/modules/<kernel>` back to the underlying root when `copymods` is active, and it also repairs Firefox snap CJK font visibility.
+
+Recommended apt maintenance sequence for this card:
+
+```bash
+sudo ./deploy/readonly-system-disable.sh
+sudo reboot
+
+sudo apt update
+sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
+sudo KIOSK_USER=kz ./deploy/repair-kiosk-system.sh
+sudo reboot
+
+sudo KIOSK_USER=kz ./deploy/verify-kiosk-install.sh
+```
+
+Only re-enable readonly root after the verification script passes and the display has been visually checked.
 
 Additional desktop repair completed on 2026-06-16 after a reboot exposed HDMI/RDP issues:
 

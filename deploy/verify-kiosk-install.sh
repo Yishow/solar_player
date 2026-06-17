@@ -50,8 +50,46 @@ path_under_install_dir() {
   [[ "${path}" == "${INSTALL_DIR}"/* ]]
 }
 
+modules_not_hidden_by_copymods() {
+  if ! findmnt /usr/lib/modules >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local source fstype
+  source="$(findmnt -no SOURCE /usr/lib/modules)"
+  fstype="$(findmnt -no FSTYPE /usr/lib/modules)"
+  [[ "${source}" != "copymods" && "${fstype}" != "tmpfs" ]]
+}
+
+firefox_snap_uses_noto_cjk() {
+  command -v snap >/dev/null 2>&1 || return 0
+  snap list firefox >/dev/null 2>&1 || return 0
+
+  local uid
+  uid="$(id -u "${KIOSK_USER}")"
+  sudo -u "${KIOSK_USER}" XDG_RUNTIME_DIR="/run/user/${uid}" snap run --shell firefox -c 'fc-match sans:lang=zh-tw' | grep -q 'Noto Sans CJK TC'
+}
+
+wifi_connected_when_present() {
+  command -v nmcli >/dev/null 2>&1 || return 0
+  if ! nmcli -t -f TYPE device status | grep -qx 'wifi'; then
+    return 0
+  fi
+
+  nmcli -t -f TYPE,STATE device status | grep -qx 'wifi:connected'
+}
+
+tailscale_active_when_installed() {
+  command -v tailscale >/dev/null 2>&1 || return 0
+  systemctl is-active --quiet tailscaled
+}
+
 check "solar-display service is active" systemctl is-active --quiet solar-display
 check "health endpoint responds: ${KIOSK_HEALTH_URL}" health_ready
+check "kernel modules are not hidden by cloud-initramfs-copymods tmpfs" modules_not_hidden_by_copymods
+check "Firefox snap resolves Traditional Chinese to Noto Sans CJK TC when installed" firefox_snap_uses_noto_cjk
+check "Wi-Fi is connected when a Wi-Fi device is present" wifi_connected_when_present
+check "tailscaled is active when Tailscale is installed" tailscale_active_when_installed
 check "autostart launcher exists: ${AUTOSTART_LAUNCHER}" test -f "${AUTOSTART_LAUNCHER}"
 check "desktop re-entry launcher exists: ${DESKTOP_LAUNCHER}" test -f "${DESKTOP_LAUNCHER}"
 check "desktop re-entry launcher is executable: ${DESKTOP_LAUNCHER}" test -x "${DESKTOP_LAUNCHER}"

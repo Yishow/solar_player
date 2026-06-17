@@ -16,6 +16,7 @@ const connectRdpPs1Path = path.join(repoRoot, "scripts/connect-raspi-rdp.ps1");
 const raspiBootstrapScriptPath = path.join(repoRoot, "deploy/raspi-bootstrap.sh");
 const lightweightDesktopScriptPath = path.join(repoRoot, "deploy/configure-lightweight-desktop.sh");
 const desktopThemeScriptPath = path.join(repoRoot, "deploy/apply-desktop-theme.sh");
+const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-system.sh");
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 
@@ -58,6 +59,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/apply-desktop-theme.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/repair-kiosk-system.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
@@ -510,6 +512,8 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /xserver-xorg-input-libinput/);
   assert.match(source, /network-manager-gnome/);
   assert.match(source, /policykit-1-gnome/);
+  assert.match(source, /fonts-noto-cjk/);
+  assert.match(source, /fonts-noto-core/);
   assert.match(source, /firefox/);
   assert.match(source, /xdg-utils/);
   assert.match(source, /im-config/);
@@ -532,6 +536,9 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /Name=boshiamy/);
   assert.match(source, /Name=chewing/);
   assert.match(source, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
+  assert.match(source, /NotoSansCJK-Regular\.ttc/);
+  assert.match(source, /Noto Sans CJK TC 10/);
+  assert.match(source, /fc-cache -f/);
   assert.match(source, /\/etc\/NetworkManager\/conf\.d\/10-solar-managed\.conf/);
   assert.match(source, /managed=true/);
   assert.match(source, /\/etc\/netplan\/90-solar-network-manager\.yaml/);
@@ -553,6 +560,23 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(result.stdout, /RDP auth: passwordless/);
   assert.doesNotMatch(source, /NOPASSWD/);
   assert.doesNotMatch(source, /PasswordAuthentication no/);
+});
+
+test("repair kiosk system helper persists copymods modules and Firefox snap CJK fonts", () => {
+  const source = readFileSync(repairKioskSystemScriptPath, "utf8");
+
+  assert.match(source, /REPAIR_FIREFOX_FONTS/);
+  assert.match(source, /REPAIR_COPYMODS_MODULES/);
+  assert.match(source, /NotoSansCJK-Regular\.ttc/);
+  assert.match(source, /snap run --shell firefox/);
+  assert.match(source, /font\.name-list\.sans-serif\.zh-TW/);
+  assert.match(source, /if \[\[ -n "\$\{snap_data_dir\}" \]\]/);
+  assert.match(source, /findmnt \/usr\/lib\/modules/);
+  assert.match(source, /Missing rsync/);
+  assert.match(source, /source.*copymods/);
+  assert.match(source, /disable readonly root and reboot before repairing copymods modules/);
+  assert.match(source, /rsync -a --delete "\/usr\/lib\/modules\/\$\{kernel\}\//);
+  assert.match(source, /depmod -b "\$\{mount_dir\}" "\$\{kernel\}"/);
 });
 
 test("lightweight desktop helper fails closed for passwordless rdp without a password source", () => {
@@ -881,6 +905,19 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
   }
 });
 
+test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8");
+
+  assert.match(source, /modules_not_hidden_by_copymods/);
+  assert.match(source, /Firefox snap resolves Traditional Chinese to Noto Sans CJK TC/);
+  assert.match(source, /Wi-Fi is connected when a Wi-Fi device is present/);
+  assert.match(source, /tailscaled is active when Tailscale is installed/);
+  assert.match(source, /snap run --shell firefox/);
+  assert.match(source, /fc-match sans:lang=zh-tw/);
+  assert.match(source, /findmnt -no SOURCE \/usr\/lib\/modules/);
+  assert.match(source, /nmcli -t -f TYPE,STATE device status/);
+});
+
 test("deploy.sh online bundle includes runtime files without node_modules", () => {
   const projectDir = makeFixtureProject();
 
@@ -912,6 +949,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -931,6 +969,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -967,6 +1006,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
@@ -982,6 +1022,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);

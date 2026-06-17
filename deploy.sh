@@ -51,6 +51,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
   cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
   cp "${PROJECT_DIR}/deploy/apply-desktop-theme.sh" "${target_root}/deploy/apply-desktop-theme.sh"
+  cp "${PROJECT_DIR}/deploy/repair-kiosk-system.sh" "${target_root}/deploy/repair-kiosk-system.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
@@ -71,6 +72,7 @@ copy_required_tree() {
     "${target_root}/deploy/raspi-bootstrap.sh" \
     "${target_root}/deploy/configure-lightweight-desktop.sh" \
     "${target_root}/deploy/apply-desktop-theme.sh" \
+    "${target_root}/deploy/repair-kiosk-system.sh" \
     "${target_root}/deploy/readonly-system-enable.sh" \
     "${target_root}/deploy/readonly-system-disable.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
@@ -124,12 +126,13 @@ Solar Display ${mode} deploy bundle
 2. Copy .env.example to .env and adjust values if needed.
 3. ${install_step}
 4. On Ubuntu 24.04 kiosk devices, run sudo ./deploy/install-kiosk.sh to enable server autostart, kz autologin, and Firefox kiosk launch.
-5. To move live settings/content to another machine, run ./deploy/export-runtime-state.sh and copy the generated tarball.
-6. Reset DB settings only: ./deploy/reset-db-settings.sh
-7. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
-8. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
-9. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
-10. Prepare Raspberry Pi system-boot user-data before first boot:
+5. After apt maintenance or Firefox font changes, run sudo KIOSK_USER=<user> ./deploy/repair-kiosk-system.sh.
+6. To move live settings/content to another machine, run ./deploy/export-runtime-state.sh and copy the generated tarball.
+7. Reset DB settings only: ./deploy/reset-db-settings.sh
+8. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
+9. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
+10. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
+11. Prepare Raspberry Pi system-boot user-data before first boot:
     ./scripts/prepare-raspi-user-data.sh --boot-path /Volumes/system-boot
 
 Notes:
@@ -216,6 +219,7 @@ validate_inputs() {
   require_path "deploy/raspi-bootstrap.sh"
   require_path "deploy/configure-lightweight-desktop.sh"
   require_path "deploy/apply-desktop-theme.sh"
+  require_path "deploy/repair-kiosk-system.sh"
   require_path "deploy/readonly-system-enable.sh"
   require_path "deploy/readonly-system-disable.sh"
   require_path "deploy/install-kiosk.sh"

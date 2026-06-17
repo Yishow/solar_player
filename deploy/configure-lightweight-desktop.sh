@@ -36,7 +36,7 @@ if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
 fi
 
 echo "Desktop: xfce-xrdp"
-echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy"
+echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-table-boshiamy"
 echo "RDP auth: ${RDP_AUTH}"
 echo "Security: SSH password authentication and sudo password prompts are not disabled"
 
@@ -50,12 +50,12 @@ id "${KIOSK_USER}" >/dev/null 2>&1 || fail "User not found: ${KIOSK_USER}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome im-config fcitx5 fcitx5-table-boshiamy
+apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-table-boshiamy
 
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}"
 rm -rf "${kiosk_home}/.cache/sessions" "${kiosk_home}/.config/xfce4-session"
-install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}/.cache" "${kiosk_home}/.config" "${kiosk_home}/.config/fcitx5" "${kiosk_home}/.config/autostart"
+install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}/.cache" "${kiosk_home}/.config" "${kiosk_home}/.config/fcitx5" "${kiosk_home}/.config/autostart" "${kiosk_home}/.local/share/fonts/noto-cjk"
 cat > "${kiosk_home}/.xsession" <<'EOF'
 #!/bin/sh
 export XDG_CONFIG_DIRS="/etc/xdg"
@@ -127,6 +127,19 @@ grep -q '^zh_TW.UTF-8 UTF-8$' /etc/locale.gen || echo 'zh_TW.UTF-8 UTF-8' >> /et
 locale-gen zh_TW.UTF-8
 update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh
 sudo -u "${KIOSK_USER}" im-config -n fcitx5 >/dev/null 2>&1 || true
+for font in \
+  /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
+  /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc \
+  /usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc; do
+  if [[ -f "${font}" ]]; then
+    install -m 0644 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${font}" "${kiosk_home}/.local/share/fonts/noto-cjk/"
+  fi
+done
+sudo -u "${KIOSK_USER}" fc-cache -f "${kiosk_home}/.local/share/fonts" >/dev/null 2>&1 || true
+if command -v xfconf-query >/dev/null 2>&1; then
+  sudo -u "${KIOSK_USER}" DISPLAY=:0 XAUTHORITY="${kiosk_home}/.Xauthority" xfconf-query -c xsettings -n -t string -p /Gtk/FontName -s "Noto Sans CJK TC 10" >/dev/null 2>&1 || true
+  sudo -u "${KIOSK_USER}" DISPLAY=:0 XAUTHORITY="${kiosk_home}/.Xauthority" xfconf-query -c xsettings -n -t string -p /Gtk/MonospaceFontName -s "Noto Sans Mono CJK TC 10" >/dev/null 2>&1 || true
+fi
 
 install -d -m 755 /etc/environment.d
 cat > /etc/environment.d/90-solar-fcitx.conf <<'EOF'
