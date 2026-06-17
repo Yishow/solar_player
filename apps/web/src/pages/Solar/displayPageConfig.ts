@@ -35,6 +35,7 @@ import {
 } from "../shared/displayPageMediaEffectConfig";
 import {
   solarConnectorLayout,
+  solarContentTopOffset,
   solarFlowNodeLayout,
   solarHeroLayout,
   solarKpiLayout
@@ -215,7 +216,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["heroContainer", "left"],
       minWidth: 180,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: solarContentTopOffset,
       topPath: ["heroContainer", "top"],
       widthPath: ["heroContainer", "width"]
     },
@@ -243,7 +244,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 120,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: solarContentTopOffset,
       topPath: ["heroContainer", "top"],
       widthPath: ["heroContainer", "width"]
     },
@@ -339,7 +340,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 64,
       minWidth: 64,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: solarContentTopOffset,
       topPath: ["flowNodes", key, "top"],
       widthPath: ["flowNodes", key, "width"]
     },
@@ -369,7 +370,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["connectors", key, "left"],
       minWidth: 24,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: solarContentTopOffset,
       topPath: ["connectors", key, "top"],
       widthPath: ["connectors", key, "width"]
     },
@@ -396,7 +397,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 80,
       minWidth: 80,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: solarContentTopOffset,
       topPath: ["kpiCards", key, "top"],
       widthPath: ["kpiCards", key, "width"]
     },

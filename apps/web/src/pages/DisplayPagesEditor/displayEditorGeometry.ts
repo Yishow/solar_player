@@ -24,16 +24,16 @@ export function applyRegionRect(
     return nextConfig;
   }
 
-  if (region.nodeType === "card-rail-card" && region.cardPath && region.geometryConstraint) {
+  if (region.nodeType === "card-rail-card" && region.cardPath && region.geometryOrigin) {
     let nextConfig = setValueAtPath(
       config,
       [...region.cardPath, "frame", "left"],
-      nextRect.left - region.geometryConstraint.left
+      nextRect.left - region.geometryOrigin.left
     );
     nextConfig = setValueAtPath(
       nextConfig,
       [...region.cardPath, "frame", "top"],
-      nextRect.top - region.geometryConstraint.top
+      nextRect.top - region.geometryOrigin.top
     );
     nextConfig = setValueAtPath(nextConfig, [...region.cardPath, "frame", "width"], nextRect.width);
     nextConfig = setValueAtPath(nextConfig, [...region.cardPath, "frame", "height"], nextRect.height);

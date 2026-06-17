@@ -52,6 +52,7 @@ export type ResolvedDisplayEditorRegion = {
   freeformObjectType?: DisplayPageFreeformObject["type"];
   geometry?: ResolvedDisplayEditorRect;
   geometryConstraint?: ResolvedDisplayEditorRect;
+  geometryOrigin?: ResolvedDisplayEditorRect;
   id: string;
   label: string;
   nodeType: "card-rail-card" | "freeform-object" | "region";
@@ -660,7 +661,7 @@ function buildCardRailChildRegion(args: {
       top: args.parentGeometry.top + args.card.frame.top,
       width: args.card.frame.width
     },
-    geometryConstraint: args.parentGeometry,
+    geometryOrigin: args.parentGeometry,
     id: `${args.parentRegion.id}/${args.card.id}`,
     label: resolveCardRailCardLabel(args.card),
     nodeType: "card-rail-card",

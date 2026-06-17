@@ -53,6 +53,7 @@ import {
   type SustainabilityHighlightRhythmConfig
 } from "../shared/displayPageFhdRhythmConfig";
 import {
+  sustainabilityContentTopOffset,
   sustainabilityHeroLayout,
   sustainabilityHighlightRailLayout,
   sustainabilityKpiLayout,
@@ -295,7 +296,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       leftPath: ["heroMedia", "left"],
       minWidth: 180,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: sustainabilityContentTopOffset,
       topPath: ["heroMedia", "top"],
       widthPath: ["heroMedia", "width"]
     },
@@ -332,7 +333,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 120,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: sustainabilityContentTopOffset,
       topPath: ["heroMedia", "top"],
       widthPath: ["heroMedia", "width"]
     },
@@ -409,7 +410,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 64,
       minWidth: 160,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: sustainabilityContentTopOffset,
       topPath: ["highlightRail", "container", "top"],
       widthPath: ["highlightRail", "container", "width"]
     },
@@ -477,7 +478,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 80,
       minWidth: 80,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: sustainabilityContentTopOffset,
       topPath: ["kpiCards", key, "top"],
       widthPath: ["kpiCards", key, "width"]
     },
@@ -508,7 +509,7 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 80,
       minWidth: 80,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: sustainabilityContentTopOffset,
       topPath: ["statCards", key, "top"],
       widthPath: ["statCards", key, "width"]
     },

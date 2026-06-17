@@ -33,8 +33,7 @@ test("sustainability runtime reads resolved display config for hero, hero media,
   assert.match(sustainabilitySource, /ringOrnament\.glowOpacity/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.chipGap/);
   assert.match(sustainabilitySource, /resolvedConfig\.chrome\.modules\.periodChips\.fontSize/);
-  assert.match(sustainabilitySource, /shouldRenderPeriodChips/);
-  assert.match(sustainabilitySource, /viewModel\.periodOptions\.length > 1/);
+  assert.match(sustainabilitySource, /const shouldRenderPeriodChips = false/);
   assert.match(sustainabilitySource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
   assert.match(
     sustainabilitySource,

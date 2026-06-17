@@ -42,6 +42,7 @@ import {
 } from "../shared/displayPageFhdRhythmConfig";
 import {
   imagesArrowLayout,
+  imagesContentTopOffset,
   imagesCopyLayout,
   imagesInfoLayout,
   imagesMainLayout,
@@ -217,7 +218,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["textBlocks", "copy", "left"],
       minWidth: 180,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["textBlocks", "copy", "top"],
       widthPath: ["textBlocks", "copy", "width"]
     },
@@ -249,7 +250,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["textBlocks", "copy", "left"],
       minWidth: 120,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["textBlocks", "copy", "top"],
       widthPath: ["textBlocks", "copy", "width"]
     },
@@ -301,7 +302,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 120,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["mainStage", "top"],
       widthPath: ["mainStage", "width"]
     },
@@ -382,7 +383,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 120,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["infoPanel", "top"],
       widthPath: ["infoPanel", "width"]
     },
@@ -416,7 +417,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       leftPath: ["arrows", key, "left"],
       minWidth: 32,
       resizeMode: "none",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["arrows", key, "top"],
       widthPath: ["arrows", key, "width"]
     },
@@ -437,7 +438,7 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       minHeight: 80,
       minWidth: 80,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: imagesContentTopOffset,
       topPath: ["thumbnailSlots", key, "top"],
       widthPath: ["thumbnailSlots", key, "width"]
     },

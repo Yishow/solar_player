@@ -8,10 +8,15 @@ import {
 } from "../../hooks/displayPageDraftSession";
 import { defaultFallbackPolicy } from "@solar-display/shared";
 import { createOverviewDisplayPageSeedConfig, overviewDisplayPageEditorRegions } from "../Overview/displayPageConfig";
+import {
+  createSustainabilityDisplayPageSeedConfig,
+  sustainabilityDisplayPageEditorRegions
+} from "../Sustainability/displayPageConfig";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
 import {
   applyGeometryClipboard,
   applyGeometryClipboardBatch,
+  applyRegionRect,
   createGeometryClipboard,
   resolveGeometryClipboardCompatibility
 } from "./displayEditorGeometry";
@@ -196,4 +201,32 @@ test("geometry clipboard batch paste stays inside one undoable draft history ste
       footerType: config.kpiCards.today.footerType
     }
   );
+});
+
+test("highlight rail cards can move across the whole page instead of being locked to the rail container", () => {
+  const config = createSustainabilityDisplayPageSeedConfig();
+  const regions = resolveDisplayEditorRegions(
+    config,
+    sustainabilityDisplayPageEditorRegions,
+    config
+  );
+  const card = regions.find((region) => region.id.endsWith("/household-today"));
+
+  assert.ok(card?.geometry, "household-today card region resolves");
+  assert.equal(card!.nodeType, "card-rail-card");
+  // The card must not be constrained to the rail container, so canvas dragging
+  // falls back to the full surface boundary and the card can move anywhere.
+  assert.equal(card!.geometryConstraint, undefined);
+  assert.ok(card!.geometryOrigin, "card keeps the rail container as its relative origin");
+
+  const origin = card!.geometryOrigin!;
+  // Drop the card far outside the rail container's bounds.
+  const nextRect = { height: 108, left: 1500, top: 760, width: 229 };
+  const nextConfig = applyRegionRect(config, card!, nextRect) as typeof config;
+  const movedCard = nextConfig.highlightRail.cards.find((entry) => entry.id === "household-today");
+
+  // Frame stays relative to the container origin (geometryOrigin), letting the
+  // card sit anywhere on the page while runtime keeps container-relative coords.
+  assert.equal(movedCard!.frame.left, nextRect.left - origin.left);
+  assert.equal(movedCard!.frame.top, nextRect.top - origin.top);
 });

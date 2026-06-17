@@ -41,6 +41,7 @@ import {
 } from "../shared/displayPageFhdRhythmConfig";
 import {
   factoryCircuitConnectorLayout,
+  factoryCircuitContentTopOffset,
   factoryCircuitCopyLayout,
   factoryCircuitKpiLayout,
   factoryCircuitLoadPanelLayout,
@@ -255,7 +256,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       leftPath: ["textBlocks", "copy", "left"],
       minWidth: 180,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["textBlocks", "copy", "top"],
       widthPath: ["textBlocks", "copy", "width"]
     },
@@ -287,7 +288,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       leftPath: ["textBlocks", "copy", "left"],
       minWidth: 120,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["textBlocks", "copy", "top"],
       widthPath: ["textBlocks", "copy", "width"]
     },
@@ -342,7 +343,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 64,
       minWidth: 64,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["nodes", key, "top"],
       widthPath: ["nodes", key, "width"]
     },
@@ -372,7 +373,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       leftPath: ["connectors", key, "left"],
       minWidth: 24,
       resizeMode: "horizontal",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["connectors", key, "top"],
       widthPath: ["connectors", key, "width"]
     },
@@ -398,7 +399,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 120,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["loadPanel", "top"],
       widthPath: ["loadPanel", "width"]
     },
@@ -425,7 +426,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 32,
       minWidth: 120,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["loadRows", key, "top"],
       widthPath: ["loadRows", key, "width"]
     },
@@ -452,7 +453,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
       minHeight: 80,
       minWidth: 80,
       resizeMode: "both",
-      topOffset: 146,
+      topOffset: factoryCircuitContentTopOffset,
       topPath: ["kpiCards", key, "top"],
       widthPath: ["kpiCards", key, "width"]
     },

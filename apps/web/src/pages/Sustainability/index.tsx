@@ -288,7 +288,7 @@ export function Sustainability({
     seedConfig.rhythm.highlightRail
   );
   const ringSize = 286 * ringOrnament.scale;
-  const shouldRenderPeriodChips = viewModel.periodOptions.length > 1;
+  const shouldRenderPeriodChips = false;
 
   return (
     <section className="sustainability-display-page" style={paletteVars}>
