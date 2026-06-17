@@ -36,7 +36,7 @@ if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
 fi
 
 echo "Desktop: xfce-xrdp"
-echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-table-boshiamy"
+echo "Packages: xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-chewing fcitx5-table-boshiamy"
 echo "RDP auth: ${RDP_AUTH}"
 echo "Security: SSH password authentication and sudo password prompts are not disabled"
 
@@ -50,7 +50,7 @@ id "${KIOSK_USER}" >/dev/null 2>&1 || fail "User not found: ${KIOSK_USER}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-table-boshiamy
+apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-x11 firefox xdg-utils xfce4-terminal network-manager-gnome policykit-1-gnome fonts-noto-cjk fonts-noto-core im-config fcitx5 fcitx5-chewing fcitx5-table-boshiamy
 
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}"

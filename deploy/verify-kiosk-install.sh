@@ -84,6 +84,14 @@ tailscale_active_when_installed() {
   systemctl is-active --quiet tailscaled
 }
 
+fcitx_chewing_configured_when_fcitx_is_installed() {
+  command -v fcitx5 >/dev/null 2>&1 || return 0
+
+  dpkg-query -W -f='${Status}' fcitx5-chewing 2>/dev/null | grep -q 'install ok installed' &&
+    test -f /usr/share/fcitx5/inputmethod/chewing.conf &&
+    grep -q '^Name=chewing$' "${KIOSK_HOME}/.config/fcitx5/profile"
+}
+
 display_sleep_autostart_configured() {
   test -x "${KIOSK_HOME}/.local/bin/solar-disable-display-sleep.sh" &&
     test -f "${KIOSK_HOME}/.config/autostart/solar-disable-display-sleep.desktop" &&
@@ -107,6 +115,7 @@ check "kernel modules are not hidden by cloud-initramfs-copymods tmpfs" modules_
 check "Firefox snap resolves Traditional Chinese to Noto Sans CJK TC when installed" firefox_snap_uses_noto_cjk
 check "Wi-Fi is connected when a Wi-Fi device is present" wifi_connected_when_present
 check "tailscaled is active when Tailscale is installed" tailscale_active_when_installed
+check "Fcitx5 Chewing is installed and present in the kiosk profile when Fcitx5 is installed" fcitx_chewing_configured_when_fcitx_is_installed
 check "display sleep disable autostart is configured" display_sleep_autostart_configured
 check "display sleep is disabled when X display is available" display_sleep_disabled_when_x_available
 check "autostart launcher exists: ${AUTOSTART_LAUNCHER}" test -f "${AUTOSTART_LAUNCHER}"

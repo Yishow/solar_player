@@ -212,6 +212,7 @@ if (-not $SkipFirstLoginTools) {
     "  fonts-noto-cjk \",
     "  im-config \",
     "  fcitx5 \",
+    "  fcitx5-chewing \",
     "  fcitx5-table-boshiamy \",
     "  git \",
     "  vim \",

@@ -267,6 +267,7 @@ test("raspi user-data shell helper interactive defaults to pi user", () => {
     assert.match(firstLoginToolsSource, /im-config/);
     assert.match(firstLoginToolsSource, /net-tools/);
     assert.match(firstLoginToolsSource, /fcitx5/);
+    assert.match(firstLoginToolsSource, /fcitx5-chewing/);
     assert.match(firstLoginToolsSource, /fcitx5-table-boshiamy/);
     assert.match(firstLoginToolsSource, /locale-gen zh_TW\.UTF-8/);
     assert.match(firstLoginToolsSource, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
@@ -336,6 +337,7 @@ test("raspi user-data shell helper writes ssh sudo root su cloud-init config", (
     assert.match(firstLoginTools, /fonts-noto-cjk/);
     assert.match(firstLoginTools, /im-config/);
     assert.match(firstLoginTools, /fcitx5/);
+    assert.match(firstLoginTools, /fcitx5-chewing/);
     assert.match(firstLoginTools, /fcitx5-table-boshiamy/);
     assert.match(firstLoginTools, /update-locale LANG=zh_TW\.UTF-8 LANGUAGE=zh_TW:zh/);
     assert.match(firstLoginTools, /curl -fsSL https:\/\/raw\.githubusercontent\.com\/nvm-sh\/nvm/);
@@ -362,6 +364,7 @@ test("raspi user-data powershell helper contains matching cloud-init contract", 
   assert.match(source, /language-pack-zh-hant/);
   assert.match(source, /fonts-noto-cjk/);
   assert.match(source, /im-config/);
+  assert.match(source, /fcitx5-chewing/);
   assert.match(source, /fcitx5-table-boshiamy/);
   assert.match(source, /\/etc\/growroot-disabled/);
   assert.match(source, /chpasswd:/);
@@ -518,6 +521,7 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /xdg-utils/);
   assert.match(source, /im-config/);
   assert.match(source, /fcitx5/);
+  assert.match(source, /fcitx5-chewing/);
   assert.match(source, /fcitx5-table-boshiamy/);
   assert.match(source, /autologin-user=/);
   assert.match(source, /startxfce4/);
@@ -927,6 +931,9 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /tailscaled is active when Tailscale is installed/);
   assert.match(source, /display sleep disable autostart is configured/);
   assert.match(source, /display sleep is disabled when X display is available/);
+  assert.match(source, /Fcitx5 Chewing is installed and present in the kiosk profile/);
+  assert.match(source, /fcitx5-chewing/);
+  assert.match(source, /Name=chewing/);
   assert.match(source, /solar-disable-display-sleep\.desktop/);
   assert.match(source, /DPMS is Disabled/);
   assert.match(source, /snap run --shell firefox/);
