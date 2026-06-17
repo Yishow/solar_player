@@ -84,12 +84,31 @@ tailscale_active_when_installed() {
   systemctl is-active --quiet tailscaled
 }
 
+display_sleep_autostart_configured() {
+  test -x "${KIOSK_HOME}/.local/bin/solar-disable-display-sleep.sh" &&
+    test -f "${KIOSK_HOME}/.config/autostart/solar-disable-display-sleep.desktop" &&
+    test -f "${KIOSK_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml"
+}
+
+display_sleep_disabled_when_x_available() {
+  command -v xset >/dev/null 2>&1 || return 0
+  [[ -S /tmp/.X11-unix/X0 ]] || return 0
+
+  local uid output
+  uid="$(id -u "${KIOSK_USER}")"
+  output="$(sudo -u "${KIOSK_USER}" DISPLAY=:0 XDG_RUNTIME_DIR="/run/user/${uid}" xset q 2>/dev/null)" || return 1
+
+  grep -q 'timeout:  0' <<< "${output}" && grep -q 'DPMS is Disabled' <<< "${output}"
+}
+
 check "solar-display service is active" systemctl is-active --quiet solar-display
 check "health endpoint responds: ${KIOSK_HEALTH_URL}" health_ready
 check "kernel modules are not hidden by cloud-initramfs-copymods tmpfs" modules_not_hidden_by_copymods
 check "Firefox snap resolves Traditional Chinese to Noto Sans CJK TC when installed" firefox_snap_uses_noto_cjk
 check "Wi-Fi is connected when a Wi-Fi device is present" wifi_connected_when_present
 check "tailscaled is active when Tailscale is installed" tailscale_active_when_installed
+check "display sleep disable autostart is configured" display_sleep_autostart_configured
+check "display sleep is disabled when X display is available" display_sleep_disabled_when_x_available
 check "autostart launcher exists: ${AUTOSTART_LAUNCHER}" test -f "${AUTOSTART_LAUNCHER}"
 check "desktop re-entry launcher exists: ${DESKTOP_LAUNCHER}" test -f "${DESKTOP_LAUNCHER}"
 check "desktop re-entry launcher is executable: ${DESKTOP_LAUNCHER}" test -x "${DESKTOP_LAUNCHER}"

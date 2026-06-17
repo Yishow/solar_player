@@ -529,6 +529,15 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /fcitx5 -d/);
   assert.match(source, /light-locker\.desktop/);
   assert.match(source, /xscreensaver\.desktop/);
+  assert.match(source, /solar-disable-display-sleep\.desktop/);
+  assert.match(source, /solar-disable-display-sleep\.sh/);
+  assert.match(source, /xset s off/);
+  assert.match(source, /xset s noblank/);
+  assert.match(source, /xset -dpms/);
+  assert.match(source, /xfce4-power-manager\.xml/);
+  assert.match(source, /dpms-enabled/);
+  assert.match(source, /blank-on-ac/);
+  assert.match(source, /presentation-mode/);
   assert.match(source, /Hidden=true/);
   assert.match(source, /\.xinputrc/);
   assert.match(source, /run_im fcitx5/);
@@ -788,6 +797,10 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   assert.match(source, /export DISPLAY=":0"/);
   assert.match(source, /export GTK_IM_MODULE="\$\{GTK_IM_MODULE:-fcitx\}"/);
   assert.match(source, /export QT_IM_MODULE="\$\{QT_IM_MODULE:-fcitx\}"/);
+  assert.match(source, /disable_display_sleep\(\)/);
+  assert.match(source, /xset s off/);
+  assert.match(source, /xset s noblank/);
+  assert.match(source, /xset -dpms/);
   assert.match(source, /export XMODIFIERS="\$\{XMODIFIERS:-@im=fcitx\}"/);
   assert.match(source, /SESSION_KEY="\$\{XDG_SESSION_ID:-\$\{WAYLAND_DISPLAY:-\$\{DISPLAY:-default\}\}\}"/);
   assert.match(source, /FIREFOX_PID_FILE="\$\{LOG_DIR\}\/firefox-\$\{SESSION_KEY\}\.pid"/);
@@ -912,6 +925,10 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /Firefox snap resolves Traditional Chinese to Noto Sans CJK TC/);
   assert.match(source, /Wi-Fi is connected when a Wi-Fi device is present/);
   assert.match(source, /tailscaled is active when Tailscale is installed/);
+  assert.match(source, /display sleep disable autostart is configured/);
+  assert.match(source, /display sleep is disabled when X display is available/);
+  assert.match(source, /solar-disable-display-sleep\.desktop/);
+  assert.match(source, /DPMS is Disabled/);
   assert.match(source, /snap run --shell firefox/);
   assert.match(source, /fc-match sans:lang=zh-tw/);
   assert.match(source, /findmnt -no SOURCE \/usr\/lib\/modules/);

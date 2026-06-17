@@ -52,8 +52,19 @@ resolve_graphical_environment() {
   export XMODIFIERS="${XMODIFIERS:-@im=fcitx}"
 }
 
+disable_display_sleep() {
+  if ! command -v xset >/dev/null 2>&1; then
+    return
+  fi
+
+  xset s off >/dev/null 2>&1 || true
+  xset s noblank >/dev/null 2>&1 || true
+  xset -dpms >/dev/null 2>&1 || true
+}
+
 log "launcher start: url=${KIOSK_URL}"
 resolve_graphical_environment
+disable_display_sleep
 trust_desktop_launcher
 
 SESSION_KEY="${XDG_SESSION_ID:-${WAYLAND_DISPLAY:-${DISPLAY:-default}}}"

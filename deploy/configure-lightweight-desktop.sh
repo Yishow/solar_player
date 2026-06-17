@@ -55,7 +55,7 @@ apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput dbus-
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}"
 rm -rf "${kiosk_home}/.cache/sessions" "${kiosk_home}/.config/xfce4-session"
-install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}/.cache" "${kiosk_home}/.config" "${kiosk_home}/.config/fcitx5" "${kiosk_home}/.config/autostart" "${kiosk_home}/.local/share/fonts/noto-cjk"
+install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}/.cache" "${kiosk_home}/.config" "${kiosk_home}/.config/fcitx5" "${kiosk_home}/.config/autostart" "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml" "${kiosk_home}/.local/bin" "${kiosk_home}/.local/share/fonts/noto-cjk"
 cat > "${kiosk_home}/.xsession" <<'EOF'
 #!/bin/sh
 export XDG_CONFIG_DIRS="/etc/xdg"
@@ -87,6 +87,48 @@ EOF
 cat > "${kiosk_home}/.config/autostart/xscreensaver.desktop" <<'EOF'
 [Desktop Entry]
 Hidden=true
+EOF
+cat > "${kiosk_home}/.local/bin/solar-disable-display-sleep.sh" <<'EOF'
+#!/bin/sh
+if command -v xset >/dev/null 2>&1; then
+  xset s off >/dev/null 2>&1 || true
+  xset s noblank >/dev/null 2>&1 || true
+  xset -dpms >/dev/null 2>&1 || true
+fi
+
+if command -v xfconf-query >/dev/null 2>&1; then
+  xfconf-query -c xfce4-power-manager -n -t bool -p /xfce4-power-manager/dpms-enabled -s false >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/blank-on-ac -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/blank-on-battery -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/dpms-on-ac-off -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/dpms-on-ac-sleep -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/dpms-on-battery-off -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t int -p /xfce4-power-manager/dpms-on-battery-sleep -s 0 >/dev/null 2>&1 || true
+  xfconf-query -c xfce4-power-manager -n -t bool -p /xfce4-power-manager/presentation-mode -s true >/dev/null 2>&1 || true
+fi
+EOF
+cat > "${kiosk_home}/.config/autostart/solar-disable-display-sleep.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Solar Disable Display Sleep
+Exec=${kiosk_home}/.local/bin/solar-disable-display-sleep.sh
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+EOF
+cat > "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-power-manager" version="1.0">
+  <property name="xfce4-power-manager" type="empty">
+    <property name="dpms-enabled" type="bool" value="false"/>
+    <property name="blank-on-ac" type="int" value="0"/>
+    <property name="blank-on-battery" type="int" value="0"/>
+    <property name="dpms-on-ac-off" type="int" value="0"/>
+    <property name="dpms-on-ac-sleep" type="int" value="0"/>
+    <property name="dpms-on-battery-off" type="int" value="0"/>
+    <property name="dpms-on-battery-sleep" type="int" value="0"/>
+    <property name="presentation-mode" type="bool" value="true"/>
+  </property>
+</channel>
 EOF
 cat > "${kiosk_home}/.config/fcitx5/profile" <<'EOF'
 [Groups/0]
@@ -121,8 +163,8 @@ Language=zh_TW.UTF-8
 Session=xfce
 EOF
 chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xsession"
-chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xprofile" "${kiosk_home}/.xinputrc" "${kiosk_home}/.dmrc" "${kiosk_home}/.config/autostart/fcitx5.desktop" "${kiosk_home}/.config/autostart/light-locker.desktop" "${kiosk_home}/.config/autostart/xscreensaver.desktop" "${kiosk_home}/.config/fcitx5/profile" "${kiosk_home}/.config/fcitx5/config"
-chmod 755 "${kiosk_home}/.xsession"
+chown "${KIOSK_USER}:${KIOSK_USER}" "${kiosk_home}/.xprofile" "${kiosk_home}/.xinputrc" "${kiosk_home}/.dmrc" "${kiosk_home}/.config/autostart/fcitx5.desktop" "${kiosk_home}/.config/autostart/light-locker.desktop" "${kiosk_home}/.config/autostart/xscreensaver.desktop" "${kiosk_home}/.config/autostart/solar-disable-display-sleep.desktop" "${kiosk_home}/.config/fcitx5/profile" "${kiosk_home}/.config/fcitx5/config" "${kiosk_home}/.local/bin/solar-disable-display-sleep.sh" "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml"
+chmod 755 "${kiosk_home}/.xsession" "${kiosk_home}/.local/bin/solar-disable-display-sleep.sh"
 grep -q '^zh_TW.UTF-8 UTF-8$' /etc/locale.gen || echo 'zh_TW.UTF-8 UTF-8' >> /etc/locale.gen
 locale-gen zh_TW.UTF-8
 update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh
