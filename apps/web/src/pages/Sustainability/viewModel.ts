@@ -67,7 +67,7 @@ function formatFixed(value: number | null, digits: number) {
 }
 
 function formatInteger(value: number | null) {
-  return value === null ? "--" : value.toLocaleString("zh-TW");
+  return value === null ? "--" : Math.round(value).toLocaleString("zh-TW");
 }
 
 function buildDerivedHighlights(

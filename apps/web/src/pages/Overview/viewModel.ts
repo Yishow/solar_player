@@ -16,9 +16,24 @@ import {
 } from "@solar-display/shared";
 import type { WeatherCurrentSnapshot } from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
+import { mockWeatherSnapshot } from "../../mocks/weather";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 
 const DENSITY_VALUE_PLACEHOLDER = "--";
+
+// In mock data mode the backend streams demo generation metrics but the weather
+// route stays unconfigured, so fall back to a demo weather snapshot to keep the
+// card populated. Real snapshots always win when available.
+export function resolveOverviewWeatherSnapshot(
+  weatherSnapshot: WeatherCurrentSnapshot | undefined,
+  isMockDataMode: boolean
+): WeatherCurrentSnapshot | undefined {
+  if (weatherSnapshot && weatherSnapshot.fetchState === "fresh" && weatherSnapshot.airTemperature !== null) {
+    return weatherSnapshot;
+  }
+
+  return isMockDataMode ? mockWeatherSnapshot : weatherSnapshot;
+}
 
 type OverviewPhaseId = "R" | "S" | "T";
 

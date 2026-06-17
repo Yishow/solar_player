@@ -239,6 +239,19 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   assert.equal(model.comparison.delta, "+4.2%");
 });
 
+test("buildSustainabilityViewModel rounds the total CO₂ reduction to a whole number", () => {
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "month",
+    story: periodStory
+  });
+
+  // accumulatedCarbonReductionTons is 38.4 for the month period; the CO₂ big
+  // number and the derived highlight must drop the decimal.
+  assert.equal(model.bigNumbers[1]?.value, "38");
+  const co2Highlight = model.highlights.find((highlight) => highlight.label === "累積減碳");
+  assert.equal(co2Highlight?.value, "38");
+});
+
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 

@@ -15,6 +15,7 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { useOverviewWeather } from "../../hooks/useOverviewWeather";
 import { resolveDisplayPageMediaSource } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
@@ -43,7 +44,7 @@ import {
 import "../../components/displayPageCards.css";
 import "./overview.css";
 import { OverviewKpiFooter } from "./OverviewKpiFooter";
-import { buildOverviewViewModel } from "./viewModel";
+import { buildOverviewViewModel, resolveOverviewWeatherSnapshot } from "./viewModel";
 import { AlertNotificationsWidget } from "./widgets/AlertNotificationsWidget";
 import { GenerationTrendWidget } from "./widgets/GenerationTrendWidget";
 import { PhasePowerTableWidget } from "./widgets/PhasePowerTableWidget";
@@ -103,6 +104,11 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
   const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
   const weatherSnapshot = useOverviewWeather(runtimeHydrationEnabled);
+  const { status: mqttStatus } = useMqttStatus(undefined, { enabled: runtimeHydrationEnabled });
+  const resolvedWeatherSnapshot = resolveOverviewWeatherSnapshot(
+    weatherSnapshot,
+    runtimeHydrationEnabled && mqttStatus.reason === "mock"
+  );
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(
     () =>
@@ -145,9 +151,9 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         isSocketConnected,
         snapshot,
         storyOverview: storyOverviewPayload,
-        weatherSnapshot
+        weatherSnapshot: resolvedWeatherSnapshot
       }),
-    [connectionState, isSocketConnected, snapshot, storyOverviewPayload, weatherSnapshot]
+    [connectionState, isSocketConnected, snapshot, storyOverviewPayload, resolvedWeatherSnapshot]
   );
 
   const backgroundSource = useMemo(

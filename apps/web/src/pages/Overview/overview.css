@@ -240,7 +240,8 @@
 }
 
 .overview-widget-trend-sparkline {
-  height: var(--display-card-trend-height, 110px);
+  flex: 1;
+  min-height: var(--display-card-trend-height, 110px);
   margin-top: 8px;
 }
 
@@ -357,7 +358,8 @@
 }
 
 .overview-weather-widget,
-.overview-phase-power-widget {
+.overview-phase-power-widget,
+.overview-generation-trend-widget {
   display: flex;
   flex-direction: column;
 }

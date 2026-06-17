@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { WeatherCurrentSnapshot } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../../services/socket";
-import { buildOverviewViewModel } from "./viewModel";
+import { buildOverviewViewModel, resolveOverviewWeatherSnapshot } from "./viewModel";
+import { mockWeatherSnapshot } from "../../mocks/weather";
 
 const baseArgs = {
   connectionState: "connected" as const,
@@ -69,6 +70,23 @@ test("weather projection is unavailable when no weather snapshot is provided", (
   });
 
   assert.equal(viewModel.weather.available, false);
+});
+
+test("resolveOverviewWeatherSnapshot keeps the real snapshot when it is fresh", () => {
+  assert.equal(resolveOverviewWeatherSnapshot(freshWeather, true), freshWeather);
+  assert.equal(resolveOverviewWeatherSnapshot(freshWeather, false), freshWeather);
+});
+
+test("resolveOverviewWeatherSnapshot falls back to the demo snapshot in mock data mode", () => {
+  assert.equal(resolveOverviewWeatherSnapshot(undefined, true), mockWeatherSnapshot);
+  assert.equal(
+    resolveOverviewWeatherSnapshot({ ...freshWeather, fetchState: "unconfigured" }, true),
+    mockWeatherSnapshot
+  );
+});
+
+test("resolveOverviewWeatherSnapshot leaves the empty state untouched outside mock mode", () => {
+  assert.equal(resolveOverviewWeatherSnapshot(undefined, false), undefined);
 });
 
 test("phase power projection reads R/S/T voltage current power from metric channel", () => {
