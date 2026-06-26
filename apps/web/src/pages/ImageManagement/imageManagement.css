@@ -22,25 +22,16 @@
 }
 
 /* card positioning — editor extends settings-card with flex column */
-.image-mgmt-page .im-card-library {
+.image-mgmt-page .im-card-full {
   left: 50px;
   top: 118px;
-  width: 1340px;
+  width: 1820px;
   height: 740px;
   display: flex;
   flex-direction: column;
 }
 
-.image-mgmt-page .im-card-editor {
-  left: 1410px;
-  top: 118px;
-  width: 460px;
-  height: 740px;
-  display: flex;
-  flex-direction: column;
-}
-
-.image-mgmt-page .im-card-library .settings-card__title {
+.image-mgmt-page .im-card-full .settings-card__title {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -129,6 +120,15 @@
   color: #677067;
 }
 
+/* main layout - dual column flex */
+.image-mgmt-page .im-main-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 24px;
+  margin-top: 16px;
+}
+
 /* thumb grid */
 .image-mgmt-page .im-grid-wrap {
   flex: 1;
@@ -140,8 +140,82 @@
 
 .image-mgmt-page .im-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+/* right sidebar drawer */
+.image-mgmt-page .im-sidebar {
+  width: 500px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(92, 105, 79, 0.16);
+  padding-left: 24px;
+}
+
+.image-mgmt-page .im-sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.image-mgmt-page .im-sidebar-back {
+  margin-bottom: 8px;
+}
+
+.image-mgmt-page .im-back-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 120ms ease;
+}
+
+.image-mgmt-page .im-back-btn:hover {
+  color: #3b5a2f;
+  transform: translateX(-2px);
+}
+
+.image-mgmt-page .im-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(92, 105, 79, 0.16);
+  margin-bottom: 16px;
+}
+
+.image-mgmt-page .im-sidebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #344039;
+}
+
+.image-mgmt-page .im-sidebar-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(92, 105, 79, 0.1);
+  color: #5c694f;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.image-mgmt-page .im-sidebar-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(92, 105, 79, 0.16);
 }
 
 .image-mgmt-page .im-thumb {
