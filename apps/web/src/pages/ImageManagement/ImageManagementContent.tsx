@@ -218,97 +218,96 @@ export function ImageManagementContent({
         <small>Upload</small>
       </button>
 
-      <div className={`mgmt-status im-status ${statusVariant}`} role="status">
-        {viewModel.actionBanner.title}
-        {viewModel.actionBanner.detail ? (
-          <>
-            <br />
-            <span style={{ opacity: 0.75 }}>{viewModel.actionBanner.detail}</span>
-          </>
-        ) : null}
-      </div>
-
       {remoteSyncBanner}
 
       <section className="settings-card mgmt-interactive-card im-card-library">
         <div className="settings-card__title">
-          輪播治理與素材交接
-          <small>Governance &amp; Editor Handoff · {viewModel.summary.totalImages} 張</small>
-        </div>
-
-        <div className="im-handoff">
-          <div className="im-handoff__copy">
-            <strong>素材替換、版面配置與批次整理請前往展示頁編輯器資產工作區。</strong>
-            <small>這裡保留 playlist runtime、素材健康、封面與引用治理；要換圖或整理版面，請到 editor workspace。</small>
-          </div>
-          <Link className="im-handoff__link" to="/display-pages/editor?workspace=assets">
-            前往展示頁編輯器
-            <small>Asset Workspace</small>
+          <span>
+            輪播治理與素材交接
+            <small>Governance &amp; Editor Handoff · {viewModel.summary.totalImages} 張</small>
+          </span>
+          <Link className="im-title-handoff-link" to="/display-pages/editor?workspace=assets">
+            前往編輯器 <small>Asset Workspace →</small>
           </Link>
         </div>
 
-        <div className="im-stats">
-          <div className="im-stat">
-            <span className="im-stat__label">總圖片數<small>Total</small></span>
-            <span className="im-stat__value">{viewModel.summary.totalImages}</span>
-            <span className="im-stat__hint">已上傳檔案</span>
+        <div className={`mgmt-status im-status ${statusVariant}`} role="status">
+          {viewModel.actionBanner.title}
+          {viewModel.actionBanner.detail ? (
+            <>
+              <br />
+              <span style={{ opacity: 0.75 }}>{viewModel.actionBanner.detail}</span>
+            </>
+          ) : null}
+        </div>
+
+        <div className="im-stats mgmt-stat-strip">
+          <div className="mgmt-stat">
+            <span className="mgmt-stat__label">總圖片數<small>Total</small></span>
+            <span className="mgmt-stat__value">{viewModel.summary.totalImages}</span>
+            <span className="mgmt-stat__hint">已上傳檔案</span>
           </div>
-          <div className="im-stat">
-            <span className="im-stat__label">輪播張數<small>Slideshow</small></span>
-            <span className="im-stat__value">{viewModel.summary.slideshowCount}</span>
-            <span className="im-stat__hint">已納入展示</span>
+          <div className="mgmt-stat">
+            <span className="mgmt-stat__label">輪播張數<small>Slideshow</small></span>
+            <span className="mgmt-stat__value">{viewModel.summary.slideshowCount}</span>
+            <span className="mgmt-stat__hint">已納入展示</span>
           </div>
-          <div className="im-stat">
-            <span className="im-stat__label">已用空間<small>Used Space</small></span>
-            <span className={`im-stat__value ${viewModel.summary.usagePercent >= 80 ? "is-warning" : ""}`}>{viewModel.summary.usagePercent}%</span>
-            <span className="im-stat__hint">{viewModel.summary.usedSpaceLabel}</span>
+          <div className="mgmt-stat">
+            <span className="mgmt-stat__label">已用空間<small>Used Space</small></span>
+            <span className={`mgmt-stat__value ${viewModel.summary.usagePercent >= 80 ? "is-warning" : ""}`}>{viewModel.summary.usagePercent}%</span>
+            <span className="mgmt-stat__hint">{viewModel.summary.usedSpaceLabel}</span>
           </div>
-          <div className="im-stat">
-            <span className="im-stat__label">封面圖片<small>Cover</small></span>
-            <span className="im-stat__value" style={{ fontSize: 16, lineHeight: 1.2 }}>{viewModel.summary.coverLabel}</span>
-            <span className="im-stat__hint">首頁焦點素材</span>
+          <div className="mgmt-stat">
+            <span className="mgmt-stat__label">封面圖片<small>Cover</small></span>
+            <span className="mgmt-stat__value" style={{ fontSize: 16, lineHeight: 1.2 }}>{viewModel.summary.coverLabel}</span>
+            <span className="mgmt-stat__hint">首頁焦點素材</span>
           </div>
         </div>
 
-        <div className="im-toggle">
-          <div className="im-toggle__label">
-            隨機播放
-            <small>{playlistShuffle ? "圖片輪播每輪會依隨機順序播放" : "圖片輪播依播放順序播放"}</small>
-          </div>
-          <Switch
-            ariaLabel="隨機播放"
-            disabled={isLoading || isUpdatingPlaylistSettings}
-            on={playlistShuffle}
-            onChange={(next) => void onTogglePlaylistShuffle(next)}
-          />
-        </div>
-
-        <div className="im-form-row">
-          <label>全部播放時間 <small>Set All Duration</small></label>
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
-            <input
-              className="im-input"
-              disabled={isLoading || isUpdatingPlaylistDurationAll}
-              min={1}
-              type="number"
-              value={playlistBulkDurationSeconds}
-              onChange={(event) => onPlaylistBulkDurationChange(
-                event.target.value === "" ? "" : Number(event.target.value)
-              )}
+        <div className="im-controls-row">
+          <div className="im-toggle">
+            <div className="im-toggle__label">
+              隨機播放
+              <small>{playlistShuffle ? "隨機順序播放" : "依播放順序播放"}</small>
+            </div>
+            <Switch
+              ariaLabel="隨機播放"
+              disabled={isLoading || isUpdatingPlaylistSettings}
+              on={playlistShuffle}
+              onChange={(next) => void onTogglePlaylistShuffle(next)}
             />
-            <button
-              type="button"
-              className="im-btn"
-              disabled={
-                isLoading
-                || isUpdatingPlaylistDurationAll
-                || playlistBulkDurationSeconds === ""
-                || playlistEntries.length === 0
-              }
-              onClick={() => void onApplyPlaylistBulkDuration()}
-            >
-              {isUpdatingPlaylistDurationAll ? "套用中..." : "套用全部"}
-            </button>
+          </div>
+
+          <div className="im-duration-bulk">
+            <div className="im-duration-bulk__label">
+              全部播放時間
+              <small>Set All Duration</small>
+            </div>
+            <div className="im-inline-apply">
+              <input
+                className="im-input"
+                disabled={isLoading || isUpdatingPlaylistDurationAll}
+                min={1}
+                type="number"
+                value={playlistBulkDurationSeconds}
+                onChange={(event) => onPlaylistBulkDurationChange(
+                  event.target.value === "" ? "" : Number(event.target.value)
+                )}
+              />
+              <button
+                type="button"
+                className="im-btn"
+                disabled={
+                  isLoading
+                  || isUpdatingPlaylistDurationAll
+                  || playlistBulkDurationSeconds === ""
+                  || playlistEntries.length === 0
+                }
+                onClick={() => void onApplyPlaylistBulkDuration()}
+              >
+                {isUpdatingPlaylistDurationAll ? "套用中..." : "套用"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -317,19 +316,6 @@ export function ImageManagementContent({
           isLoading={isAssetHealthLoading}
           report={assetHealthReport}
         />
-
-        <div className="im-uploader" role="button" tabIndex={0} onClick={() => fileInputRef.current?.click()} onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            fileInputRef.current?.click();
-          }
-        }}>
-          <span className="im-uploader__icon">＋</span>
-          <div className="im-uploader__copy">
-            <strong>{isUploading ? "正在上傳圖片..." : "拖曳或點擊上傳展示圖片"}</strong>
-            <small>支援 JPG / PNG / WEBP，單檔上限 10 MB，可多選依序上傳</small>
-          </div>
-        </div>
 
         <div className="im-grid-wrap">
           {viewModel.emptyState ? (

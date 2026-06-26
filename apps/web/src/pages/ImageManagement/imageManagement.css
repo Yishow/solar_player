@@ -17,10 +17,8 @@
 
 /* status bar positioning */
 .image-mgmt-page .im-status {
-  position: absolute;
-  right: 50px;
-  top: 92px;
-  width: 495px;
+  margin-bottom: 16px;
+  text-align: left;
 }
 
 /* card positioning — editor extends settings-card with flex column */
@@ -42,104 +40,44 @@
   flex-direction: column;
 }
 
-.image-mgmt-page .im-handoff {
+.image-mgmt-page .im-card-library .settings-card__title {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(92, 105, 79, 0.18);
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(246, 250, 240, 0.96), rgba(255, 252, 245, 0.98));
-}
-
-.image-mgmt-page .im-handoff__copy {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.image-mgmt-page .im-handoff__copy strong {
-  font-size: 15px;
-  color: #2d3e2f;
-}
-
-.image-mgmt-page .im-handoff__copy small {
-  color: #677067;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.image-mgmt-page .im-handoff__link {
-  display: inline-flex;
-  flex: 0 0 auto;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-width: 188px;
-  min-height: 64px;
-  padding: 10px 18px;
-  border-radius: 12px;
-  background: var(--green);
-  color: #fffdf8;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  width: 100%;
 }
 
-.image-mgmt-page .im-handoff__link small {
-  margin-top: 4px;
-  font: 400 11px/1 var(--font-family-en);
-  color: rgba(255, 253, 248, 0.78);
-}
-
-/* inline stats strip */
-.image-mgmt-page .im-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.image-mgmt-page .im-stat {
-  padding: 12px 14px;
-  border: 1px solid rgba(92, 105, 79, 0.18);
-  border-radius: 12px;
-  background: #fffdf8;
-}
-
-.image-mgmt-page .im-stat__label {
-  display: block;
-  font-size: 12px;
-  color: #6e756d;
-  letter-spacing: 0.04em;
-}
-
-.image-mgmt-page .im-stat__label small {
-  display: block;
-  margin-top: 2px;
-  font: 400 10px/1.1 var(--font-family-en);
-  color: #909590;
-}
-
-.image-mgmt-page .im-stat__value {
-  display: block;
-  margin-top: 8px;
-  font: 700 24px/1 var(--font-family-en);
+.image-mgmt-page .im-title-handoff-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--green);
+  text-decoration: none;
+  border: 1px solid rgba(92, 105, 79, 0.22);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(247, 251, 240, 0.85);
+  transition: all 120ms ease;
+  line-height: 1;
 }
 
-.image-mgmt-page .im-stat__value.is-warning { color: #c9881a; }
+.image-mgmt-page .im-title-handoff-link:hover {
+  background: rgba(232, 244, 220, 0.95);
+  border-color: rgba(92, 105, 79, 0.45);
+  transform: translateY(-1px);
+}
 
-.image-mgmt-page .im-stat__hint {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  color: #888d86;
+.image-mgmt-page .im-title-handoff-link small {
+  font: 400 11px var(--font-family-en);
+  color: #677067;
+  margin-top: 0;
+  display: inline;
+}
+
+.image-mgmt-page .im-stats {
+  margin-bottom: 12px;
 }
 
 /* upload zone */
@@ -492,6 +430,58 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.image-mgmt-page .im-controls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.image-mgmt-page .im-duration-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(93, 119, 69, 0.18);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.image-mgmt-page .im-duration-bulk__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #344039;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.image-mgmt-page .im-duration-bulk__label small {
+  font-weight: 400;
+  font-size: 11px;
+  color: #777b75;
+}
+
+.image-mgmt-page .im-inline-apply {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.image-mgmt-page .im-inline-apply .im-input {
+  width: 70px;
+  height: 36px;
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.image-mgmt-page .im-inline-apply .im-btn {
+  height: 36px;
+  padding: 0 12px;
+  flex: 0 0 auto;
 }
 
 .image-mgmt-page .im-toggle {
