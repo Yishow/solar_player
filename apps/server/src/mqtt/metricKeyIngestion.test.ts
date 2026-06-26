@@ -14,7 +14,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "solar-display-ingest-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ MqttClientService }, { migrateDatabase }, { seedDatabase }, { getDatabase }, { readLiveMetricsSnapshot }] =
+const [{ MqttClientService }, { migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, { readLiveMetricsSnapshot }] =
   await Promise.all([
     import("./MqttClientService.js"),
     import("../db/migrate.js"),
@@ -24,6 +24,7 @@ const [{ MqttClientService }, { migrateDatabase }, { seedDatabase }, { getDataba
   ]);
 
 after(() => {
+  closeDatabaseConnection();
   rmSync(tempDir, { force: true, recursive: true });
 });
 

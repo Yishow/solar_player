@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_WEATHER_SETTINGS,
   type WeatherFieldKey,
@@ -35,6 +35,7 @@ import {
   defaultMqttFormState,
   defaultMqttStatus,
   loadMqttEditableModel as loadCachedMqttEditableModel,
+  mergePolledTopicMappings,
   readCachedMqttEditableModel,
   toFormState,
   type MqttEditableModel,
@@ -119,6 +120,7 @@ export function MqttSettings() {
   const [status, setStatus] = useState<MqttStatus>(initialEditableModel?.status ?? defaultMqttStatus);
   const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
+  const lastSyncedTopicsRef = useRef(lastSyncedTopics);
   const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
     useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
@@ -157,6 +159,10 @@ export function MqttSettings() {
     setStatus(mqttStatusStream.status);
   }, [mqttStatusStream.isHydrated, mqttStatusStream.status]);
 
+  useEffect(() => {
+    lastSyncedTopicsRef.current = lastSyncedTopics;
+  }, [lastSyncedTopics]);
+
   const metricOptions = useMemo(() => {
     const optionSet = new Set<string>(defaultMetricOptions);
     topics.forEach((topic) => optionSet.add(topic.metricKey));
@@ -169,6 +175,7 @@ export function MqttSettings() {
     setStatus(model.status);
     setTopics(model.topics);
     setLastSyncedTopics(model.topics);
+    lastSyncedTopicsRef.current = model.topics;
     setWeatherSettings(model.weatherSettings);
     setLastSyncedWeatherSettings(model.weatherSettings);
     setHasLoadedMqttSettings(true);
@@ -226,8 +233,13 @@ export function MqttSettings() {
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics");
       setStatus(response.status);
-      setTopics(response.topics);
+      if (isPolling) {
+        setTopics((current) => mergePolledTopicMappings(current, lastSyncedTopicsRef.current, response.topics));
+      } else {
+        setTopics(response.topics);
+      }
       setLastSyncedTopics(response.topics);
+      lastSyncedTopicsRef.current = response.topics;
       setHasLoadedTopics(true);
       if (!isPolling) {
         setLastConnectionTest(null);
@@ -488,6 +500,7 @@ export function MqttSettings() {
       setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
+      lastSyncedTopicsRef.current = response.topics;
       setLastConnectionTest(null);
       setMessage("Topic mappings 已更新並重新載入訂閱。");
       setErrorMessage("");
@@ -508,6 +521,7 @@ export function MqttSettings() {
       setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
+      lastSyncedTopicsRef.current = response.topics;
       setLastConnectionTest(null);
       setMessage("MQTT 訂閱清單已重新載入。");
       setErrorMessage("");

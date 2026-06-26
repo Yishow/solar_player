@@ -1,8 +1,45 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const DEFAULT_WEB_PORT = 5173;
 const DEFAULT_SERVER_PORT = 3000;
+const DEFAULT_DEV_BACKEND_HOST = "localhost";
 const sharedWatchStatusPattern = /Found (?<count>\d+) errors?\. Watching for file changes\./u;
+
+function commandFailureMessage(result, fallback) {
+  const stderr = result.stderr == null ? "" : String(result.stderr).trim();
+  const errorMessage = result.error == null ? "" : String(result.error.message ?? result.error).trim();
+
+  return stderr || errorMessage || fallback;
+}
+
+function parseWindowsNetstatPids(output, port) {
+  const requestedPortSuffix = `:${port}`;
+  const pids = new Set();
+
+  for (const rawLine of output.split(/\r?\n/u)) {
+    const parts = rawLine.trim().split(/\s+/u);
+
+    if (parts.length < 5) {
+      continue;
+    }
+
+    const [protocol, localAddress, , state, pid] = parts;
+
+    if (
+      protocol?.toUpperCase() !== "TCP" ||
+      state?.toUpperCase() !== "LISTENING" ||
+      !localAddress?.endsWith(requestedPortSuffix) ||
+      !/^\d+$/u.test(pid)
+    ) {
+      continue;
+    }
+
+    pids.add(pid);
+  }
+
+  return Array.from(pids);
+}
 
 function parseInteger(value) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -81,6 +118,69 @@ export function resolveDevPorts(dotEnv, inheritedEnv = process.env) {
     serverPort,
     portsToFree: Array.from(new Set([webPort, serverPort]))
   };
+}
+
+export function resolvePnpmCommand(platform = process.platform) {
+  return platform === "win32" ? "cmd.exe" : "pnpm";
+}
+
+export function resolveDevBackendHost() {
+  return DEFAULT_DEV_BACKEND_HOST;
+}
+
+export function buildPnpmSpawnArgs(args, platform = process.platform) {
+  return platform === "win32" ? ["/d", "/s", "/c", "pnpm", ...args] : args;
+}
+
+export function listPidsOnPort(port, { platform = process.platform, runCommand = spawnSync } = {}) {
+  if (platform === "win32") {
+    const result = runCommand("netstat", ["-ano", "-p", "tcp"], {
+      encoding: "utf8"
+    });
+
+    if (result.error || result.status !== 0) {
+      throw new Error(commandFailureMessage(result, `Failed to inspect port ${port}`));
+    }
+
+    return parseWindowsNetstatPids(result.stdout ?? "", port);
+  }
+
+  const result = runCommand("lsof", ["-ti", `tcp:${port}`], {
+    encoding: "utf8"
+  });
+
+  if (result.error || (result.status !== 0 && result.status !== 1)) {
+    throw new Error(commandFailureMessage(result, `Failed to inspect port ${port}`));
+  }
+
+  return (result.stdout ?? "")
+    .split(/\s+/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+export function signalPids(pids, signal, { platform = process.platform, runCommand = spawnSync } = {}) {
+  if (pids.length === 0) {
+    return;
+  }
+
+  const normalizedSignal = signal.toUpperCase().replace(/^SIG/u, "");
+  const command = platform === "win32" ? "taskkill" : "kill";
+  const args =
+    platform === "win32"
+      ? [
+          ...pids.flatMap((pid) => ["/PID", pid]),
+          "/T",
+          "/F"
+        ]
+      : [`-${normalizedSignal}`, ...pids];
+  const result = runCommand(command, args, {
+    encoding: "utf8"
+  });
+
+  if (result.error || result.status !== 0) {
+    throw new Error(commandFailureMessage(result, `Failed to send ${signal}`));
+  }
 }
 
 export function stripAnsi(value) {

@@ -12,7 +12,7 @@ process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 process.env.UPLOADS_DIR = uploadsDir;
 process.env.BRAND_UPLOADS_DIR = brandUploadsDir;
 
-const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }, { buildDataSourceOverview }] = await Promise.all([
+const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, { buildDataSourceOverview }] = await Promise.all([
   import("../app.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
@@ -21,6 +21,7 @@ const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }, { b
 ]);
 
 after(() => {
+  closeDatabaseConnection();
   rmSync(tempDir, { force: true, recursive: true });
   delete process.env.CWA_AUTHORIZATION;
   delete process.env.MANAGEMENT_ACCESS_TOKEN;

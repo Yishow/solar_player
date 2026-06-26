@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { readDotEnvFile, resolveDevPorts } from "../../scripts/dev-lib.mjs";
+import { readDotEnvFile, resolveDevBackendHost, resolveDevPorts } from "../../scripts/dev-lib.mjs";
 import {
   REACT_GRAB_BOOTSTRAP_ALIAS,
   resolveReactGrabBootstrapTarget
@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
   const dotEnvPath = resolve(repoRoot, ".env");
   const dotEnv = existsSync(dotEnvPath) ? readDotEnvFile(dotEnvPath) : {};
   const { serverPort, webPort } = resolveDevPorts(dotEnv, process.env);
-  const proxyTarget = `http://127.0.0.1:${serverPort}`;
+  const proxyTarget = `http://${resolveDevBackendHost()}:${serverPort}`;
 
   return {
     envDir: repoRoot,

@@ -78,9 +78,6 @@ importers:
       react-dom:
         specifier: latest
         version: 19.2.6(react@19.2.6)
-      react-grab:
-        specifier: ^0.1.37
-        version: 0.1.37(react@19.2.6)
       react-router-dom:
         specifier: latest
         version: 7.15.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -106,6 +103,9 @@ importers:
       postcss:
         specifier: latest
         version: 8.5.14
+      react-grab:
+        specifier: ^0.1.37
+        version: 0.1.37(react@19.2.6)
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(tsx@4.21.0)(yaml@2.9.0)

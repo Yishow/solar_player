@@ -305,13 +305,24 @@ test("unsupported device controls stay informational and point operators to the 
 });
 
 test("trusted kiosk exit requests invoke the fixed helper and return desktop re-entry guidance", async () => {
-  const helperPath = join(tempDir, "stop-solar-kiosk-test.sh");
+  const helperDir = join(
+    tempDir,
+    process.platform === "win32" ? "helper scripts" : "helper-scripts"
+  );
+  const helperPath = join(
+    helperDir,
+    process.platform === "win32" ? "stop-solar-kiosk-test.cmd" : "stop-solar-kiosk-test.sh"
+  );
   const markerPath = join(tempDir, "stop-solar-kiosk.marker");
   const previousHelperPath = process.env.KIOSK_EXIT_HELPER_PATH;
   const previousExitDelayMs = process.env.KIOSK_EXIT_DELAY_MS;
 
   rmSync(markerPath, { force: true });
-  writeFileSync(helperPath, `#!/bin/sh\nsleep 0.5\nprintf 'closed' > "${markerPath}"\n`, "utf8");
+  mkdirSync(helperDir, { recursive: true });
+  const helperSource = process.platform === "win32"
+    ? `@echo off\r\nping 127.0.0.1 -n 2 > nul\r\necho closed>"${markerPath}"\r\n`
+    : `#!/bin/sh\nsleep 0.5\nprintf 'closed' > "${markerPath}"\n`;
+  writeFileSync(helperPath, helperSource, "utf8");
   chmodSync(helperPath, 0o755);
   process.env.KIOSK_EXIT_HELPER_PATH = helperPath;
   process.env.KIOSK_EXIT_DELAY_MS = "0";
@@ -348,6 +359,7 @@ test("trusted kiosk exit requests invoke the fixed helper and return desktop re-
   } finally {
     await app.close();
     rmSync(helperPath, { force: true });
+    rmSync(helperDir, { force: true, recursive: true });
     rmSync(markerPath, { force: true });
     if (previousHelperPath === undefined) {
       delete process.env.KIOSK_EXIT_HELPER_PATH;

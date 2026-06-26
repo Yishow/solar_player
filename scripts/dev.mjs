@@ -1,47 +1,23 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import net from "node:net";
 import { resolve } from "node:path";
 
 import {
+  buildPnpmSpawnArgs,
   isSharedWatchReadyLine,
+  listPidsOnPort,
   parseSharedWatchStatusLine,
   readDotEnvFile,
-  resolveDevPorts
+  resolveDevBackendHost,
+  resolveDevPorts,
+  resolvePnpmCommand,
+  signalPids
 } from "./dev-lib.mjs";
 
 const SHARED_READY_TIMEOUT_MS = 30_000;
 const SERVER_READY_TIMEOUT_MS = 30_000;
 const SERVER_READY_POLL_INTERVAL_MS = 200;
-
-function listPidsOnPort(port) {
-  const result = spawnSync("lsof", ["-ti", `tcp:${port}`], {
-    encoding: "utf8"
-  });
-
-  if (result.status !== 0 && result.status !== 1) {
-    throw new Error(result.stderr.trim() || `Failed to inspect port ${port}`);
-  }
-
-  return result.stdout
-    .split(/\s+/u)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function signalPids(pids, signal) {
-  if (pids.length === 0) {
-    return;
-  }
-
-  const result = spawnSync("kill", [`-${signal}`, ...pids], {
-    encoding: "utf8"
-  });
-
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `Failed to send ${signal}`);
-  }
-}
 
 function wait(milliseconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
@@ -119,15 +95,28 @@ function terminateChild(child, signal = "SIGTERM") {
     return;
   }
 
+  if (process.platform === "win32" && child.pid) {
+    try {
+      signalPids([String(child.pid)], signal);
+      return;
+    } catch {
+      // Fall back to Node's direct process kill when taskkill cannot inspect the process tree.
+    }
+  }
+
   child.kill(signal);
 }
 
 async function startSharedWatcher(projectRoot) {
-  const child = spawn("pnpm", ["--filter", "@solar-display/shared", "dev"], {
-    cwd: projectRoot,
-    env: process.env,
-    stdio: ["inherit", "pipe", "pipe"]
-  });
+  const child = spawn(
+    resolvePnpmCommand(),
+    buildPnpmSpawnArgs(["--filter", "@solar-display/shared", "dev"]),
+    {
+      cwd: projectRoot,
+      env: process.env,
+      stdio: ["inherit", "pipe", "pipe"]
+    }
+  );
 
   return await new Promise((resolvePromise, rejectPromise) => {
     let ready = false;
@@ -205,7 +194,7 @@ function startLabeledProcess(command, args, { cwd, env, label }) {
   return child;
 }
 
-function isPortOpen(port, host = "127.0.0.1") {
+function isPortOpen(port, host = resolveDevBackendHost()) {
   return new Promise((resolvePromise) => {
     const socket = net.createConnection({ host, port });
 
@@ -237,7 +226,7 @@ async function waitForPortOpen(port, timeoutMs) {
 }
 
 async function startServer(projectRoot, serverPort) {
-  const child = startLabeledProcess("pnpm", buildServerArgs(), {
+  const child = startLabeledProcess(resolvePnpmCommand(), buildPnpmSpawnArgs(buildServerArgs()), {
     cwd: projectRoot,
     env: {
       ...process.env,
@@ -309,7 +298,7 @@ async function main() {
     console.log("[dev] shared watch ready; starting server");
     serverProcess = await startServer(projectRoot, serverPort);
     console.log(`[dev] server ready on tcp:${serverPort}; starting web`);
-    webProcess = startLabeledProcess("pnpm", buildWebArgs(), {
+    webProcess = startLabeledProcess(resolvePnpmCommand(), buildPnpmSpawnArgs(buildWebArgs()), {
       cwd: projectRoot,
       env: {
         ...process.env,

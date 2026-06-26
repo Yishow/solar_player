@@ -35,8 +35,15 @@ copy_required_tree() {
 
   mkdir -p "${target_root}"
 
-  cp -R "${PROJECT_DIR}/apps" "${target_root}/"
-  cp -R "${PROJECT_DIR}/packages" "${target_root}/"
+  mkdir -p "${target_root}/apps/server" "${target_root}/apps/web" "${target_root}/packages/shared"
+  cp -R "${PROJECT_DIR}/apps/server/dist" "${target_root}/apps/server/dist"
+  cp -R "${PROJECT_DIR}/apps/server/src" "${target_root}/apps/server/src"
+  cp "${PROJECT_DIR}/apps/server/package.json" "${target_root}/apps/server/package.json"
+  cp -R "${PROJECT_DIR}/apps/web/dist" "${target_root}/apps/web/dist"
+  cp -R "${PROJECT_DIR}/apps/web/src" "${target_root}/apps/web/src"
+  cp "${PROJECT_DIR}/apps/web/package.json" "${target_root}/apps/web/package.json"
+  cp -R "${PROJECT_DIR}/packages/shared/dist" "${target_root}/packages/shared/dist"
+  cp "${PROJECT_DIR}/packages/shared/package.json" "${target_root}/packages/shared/package.json"
   mkdir -p "${target_root}/docs"
   cp "${PROJECT_DIR}/docs/openapi.yaml" "${target_root}/docs/openapi.yaml"
   mkdir -p "${target_root}/docs/reference/kuozui-green-fhd-html-prototype"
@@ -50,6 +57,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
   cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
+  cp "${PROJECT_DIR}/deploy/disable-display-sleep.sh" "${target_root}/deploy/disable-display-sleep.sh"
   cp "${PROJECT_DIR}/deploy/apply-desktop-theme.sh" "${target_root}/deploy/apply-desktop-theme.sh"
   cp "${PROJECT_DIR}/deploy/repair-kiosk-system.sh" "${target_root}/deploy/repair-kiosk-system.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
@@ -71,6 +79,7 @@ copy_required_tree() {
     "${target_root}/deploy/enable-readonly-root.sh" \
     "${target_root}/deploy/raspi-bootstrap.sh" \
     "${target_root}/deploy/configure-lightweight-desktop.sh" \
+    "${target_root}/deploy/disable-display-sleep.sh" \
     "${target_root}/deploy/apply-desktop-theme.sh" \
     "${target_root}/deploy/repair-kiosk-system.sh" \
     "${target_root}/deploy/readonly-system-enable.sh" \
@@ -130,9 +139,10 @@ Solar Display ${mode} deploy bundle
 6. To move live settings/content to another machine, run ./deploy/export-runtime-state.sh and copy the generated tarball.
 7. Reset DB settings only: ./deploy/reset-db-settings.sh
 8. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
-9. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
-10. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
-11. Prepare Raspberry Pi system-boot user-data before first boot:
+9. Reapply no-sleep/no-screensaver only: sudo ./deploy/disable-display-sleep.sh --user <user>
+10. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
+11. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
+12. Prepare Raspberry Pi system-boot user-data before first boot:
     ./scripts/prepare-raspi-user-data.sh --boot-path /Volumes/system-boot
 
 Notes:
@@ -218,6 +228,7 @@ validate_inputs() {
   require_path "deploy/enable-readonly-root.sh"
   require_path "deploy/raspi-bootstrap.sh"
   require_path "deploy/configure-lightweight-desktop.sh"
+  require_path "deploy/disable-display-sleep.sh"
   require_path "deploy/apply-desktop-theme.sh"
   require_path "deploy/repair-kiosk-system.sh"
   require_path "deploy/readonly-system-enable.sh"

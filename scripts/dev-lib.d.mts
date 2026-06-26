@@ -21,6 +21,39 @@ export function resolveDevPorts(
   portsToFree: number[];
 };
 
+export function resolvePnpmCommand(platform?: NodeJS.Platform): string;
+
+export function resolveDevBackendHost(): string;
+
+export function buildPnpmSpawnArgs(args: string[], platform?: NodeJS.Platform): string[];
+
+export function listPidsOnPort(
+  port: number,
+  options?: {
+    platform?: NodeJS.Platform;
+    runCommand?: (...args: unknown[]) => {
+      error?: Error;
+      status: number | null;
+      stderr?: unknown;
+      stdout?: unknown;
+    };
+  }
+): string[];
+
+export function signalPids(
+  pids: string[],
+  signal: string,
+  options?: {
+    platform?: NodeJS.Platform;
+    runCommand?: (...args: unknown[]) => {
+      error?: Error;
+      status: number | null;
+      stderr?: unknown;
+      stdout?: unknown;
+    };
+  }
+): void;
+
 export function stripAnsi(value: string): string;
 
 export function parseSharedWatchStatusLine(value: string): number | null;

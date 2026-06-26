@@ -97,3 +97,19 @@ test("mqtt settings reuses one editable loader before deferred diagnostics refre
   );
   assert.doesNotMatch(reloadNowSource, /Promise\.all\(\[/);
 });
+
+test("mqtt settings polling merges runtime topic snapshots without overwriting local drafts", () => {
+  assert.match(mqttSettingsSource, /lastSyncedTopicsRef/);
+  assert.match(mqttSettingsSource, /mergePolledTopicMappings/);
+
+  const loadTopicsSource = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const loadTopics = async"),
+    mqttSettingsSource.indexOf("const loadWeatherSettings = async")
+  );
+
+  assert.match(
+    loadTopicsSource,
+    /setTopics\(\(current\)\s*=>\s*mergePolledTopicMappings\(current,\s*lastSyncedTopicsRef\.current,\s*response\.topics\)\)/
+  );
+  assert.match(loadTopicsSource, /lastSyncedTopicsRef\.current\s*=\s*response\.topics/);
+});

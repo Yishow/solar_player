@@ -5,10 +5,15 @@ import test from "node:test";
 
 import {
   isSharedWatchReadyLine,
+  listPidsOnPort,
   parseSharedWatchStatusLine,
   parseDotEnv,
+  buildPnpmSpawnArgs,
+  resolveDevBackendHost,
   resolveDevPorts,
+  resolvePnpmCommand,
   resolveServerPort,
+  signalPids,
   stripAnsi
 } from "./dev-lib.mjs";
 
@@ -96,6 +101,24 @@ test("resolveDevPorts allows VITE_PORT to override the default web port", () => 
   );
 });
 
+test("resolvePnpmCommand and buildPnpmSpawnArgs wrap pnpm through cmd.exe only on Windows", () => {
+  const args = ["--filter", "@solar-display/server", "dev"];
+
+  assert.equal(resolvePnpmCommand("win32"), "cmd.exe");
+  assert.deepEqual(buildPnpmSpawnArgs(args, "win32"), ["/d", "/s", "/c", "pnpm", ...args]);
+
+  assert.equal(resolvePnpmCommand("darwin"), "pnpm");
+  assert.deepEqual(buildPnpmSpawnArgs(args, "darwin"), args);
+
+  assert.equal(resolvePnpmCommand("linux"), "pnpm");
+  assert.deepEqual(buildPnpmSpawnArgs(args, "linux"), args);
+});
+
+test("resolveDevBackendHost avoids hardcoding 127.0.0.1 for Windows proxy and readiness checks", () => {
+  assert.equal(resolveDevBackendHost(), "localhost");
+  assert.doesNotMatch(devScriptSource, /host = "127\.0\.0\.1"/);
+});
+
 test("stripAnsi removes terminal color escape sequences", () => {
   assert.equal(
     stripAnsi("\u001B[0m[shared]\u001B[0m 2:05:50 AM - Found 0 errors. Watching for file changes."),
@@ -129,4 +152,92 @@ test("isSharedWatchReadyLine only accepts the successful shared watch ready mess
     isSharedWatchReadyLine("2:05:50 AM - Found 1 error. Watching for file changes."),
     false
   );
+});
+
+test("listPidsOnPort inspects Windows TCP listeners with netstat", () => {
+  const calls = [];
+  const pids = listPidsOnPort(3000, {
+    platform: "win32",
+    runCommand(command, args, options) {
+      calls.push({ command, args, options });
+      return {
+        status: 0,
+        stdout: `
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       1234
+  TCP    [::]:3000              [::]:0                 LISTENING       5678
+  TCP    127.0.0.1:30001        0.0.0.0:0              LISTENING       9999
+  TCP    127.0.0.1:3000         127.0.0.1:52000        ESTABLISHED     4321
+`
+      };
+    }
+  });
+
+  assert.deepEqual(pids, ["1234", "5678"]);
+  assert.deepEqual(calls, [
+    {
+      command: "netstat",
+      args: ["-ano", "-p", "tcp"],
+      options: { encoding: "utf8" }
+    }
+  ]);
+});
+
+test("listPidsOnPort keeps using lsof on macOS and Linux", () => {
+  const calls = [];
+  const pids = listPidsOnPort(5173, {
+    platform: "darwin",
+    runCommand(command, args, options) {
+      calls.push({ command, args, options });
+      return {
+        status: 0,
+        stdout: "111\n222\n"
+      };
+    }
+  });
+
+  assert.deepEqual(pids, ["111", "222"]);
+  assert.deepEqual(calls, [
+    {
+      command: "lsof",
+      args: ["-ti", "tcp:5173"],
+      options: { encoding: "utf8" }
+    }
+  ]);
+});
+
+test("signalPids uses forceful taskkill on Windows and kill elsewhere", () => {
+  const windowsCalls = [];
+  signalPids(["1234", "5678"], "TERM", {
+    platform: "win32",
+    runCommand(command, args, options) {
+      windowsCalls.push({ command, args, options });
+      return { status: 0, stdout: "" };
+    }
+  });
+
+  assert.deepEqual(windowsCalls, [
+    {
+      command: "taskkill",
+      args: ["/PID", "1234", "/PID", "5678", "/T", "/F"],
+      options: { encoding: "utf8" }
+    }
+  ]);
+
+  const unixCalls = [];
+  signalPids(["1234"], "TERM", {
+    platform: "linux",
+    runCommand(command, args, options) {
+      unixCalls.push({ command, args, options });
+      return { status: 0, stdout: "" };
+    }
+  });
+
+  assert.deepEqual(unixCalls, [
+    {
+      command: "kill",
+      args: ["-TERM", "1234"],
+      options: { encoding: "utf8" }
+    }
+  ]);
 });

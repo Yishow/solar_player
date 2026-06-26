@@ -1,6 +1,6 @@
-import { execFile } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 
 const DEFAULT_EXIT_DELAY_MS = 750;
 
@@ -59,14 +59,65 @@ function buildKioskExitResult() {
   };
 }
 
+function resolveKioskExitInvocation(helperPath: string) {
+  const extension = extname(helperPath).toLowerCase();
+
+  if (process.platform !== "win32") {
+    return {
+      args: [] as string[],
+      file: helperPath,
+      kind: "execFile" as const
+    };
+  }
+
+  if (extension === ".ps1") {
+    return {
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", helperPath],
+      file: "powershell.exe",
+      kind: "execFile" as const
+    };
+  }
+
+  if (extension === ".cmd" || extension === ".bat") {
+    return {
+      command: `"${helperPath}"`,
+      kind: "exec" as const
+    };
+  }
+
+  return {
+    args: [] as string[],
+    file: helperPath,
+    kind: "execFile" as const
+  };
+}
+
 export function scheduleDeviceKioskExit(options: { onError?: (error: Error) => void } = {}) {
   const helperPath = resolveRunnableKioskExitHelperPath();
+  const invocation = resolveKioskExitInvocation(helperPath);
   setTimeout(() => {
-    execFile(helperPath, (error) => {
-      if (error) {
-        options.onError?.(error);
+    try {
+      if (invocation.kind === "exec") {
+        exec(invocation.command, (error) => {
+          if (error) {
+            options.onError?.(error);
+          }
+        });
+        return;
       }
-    });
+
+      execFile(invocation.file, invocation.args, (error) => {
+        if (error) {
+          options.onError?.(error);
+        }
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        options.onError?.(error);
+      } else {
+        options.onError?.(new Error(String(error)));
+      }
+    }
   }, readExitDelayMs());
 
   return buildKioskExitResult();

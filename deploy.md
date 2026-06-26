@@ -1,6 +1,6 @@
 # Solar Player Raspberry Pi 5 Deploy Notes
 
-Last updated: 2026-06-17
+Last updated: 2026-06-26
 
 This file is the handoff entry for the Raspberry Pi 5 kiosk deployment work. Read this first before continuing deployment discussion or running scripts.
 
@@ -59,7 +59,7 @@ Do not boot the card once before running the user-data helper. If Ubuntu grows r
 
 ## Current Target
 
-- Current maintenance target over Tailscale: `kz@100.99.99.3`
+- Current maintenance target over Tailscale: `kz@100.99.99.2`
 - Last verified LAN targets on the same card: wired `kz@192.168.31.157`, Wi-Fi `kz@192.168.31.159` on 2026-06-17
 - SSH password: `kz`
 - sudo password: `kz`
@@ -231,7 +231,29 @@ The script installs `locales`, `language-pack-zh-hant`, `language-pack-gnome-zh-
 
 The first-login tools also append `zh_TW.UTF-8 UTF-8` to `/etc/locale.gen`, run `locale-gen zh_TW.UTF-8`, and call `update-locale LANG=zh_TW.UTF-8 LANGUAGE=zh_TW:zh`, so the next boot uses Traditional Chinese by default.
 
-The desktop helper also installs `network-manager-gnome`, `policykit-1-gnome`, `im-config`, `fcitx5`, `fcitx5-chewing`, and `fcitx5-table-boshiamy`, writes `~/.xprofile` with `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, and `XMODIFIERS=@im=fcitx`, writes `~/.xinputrc` with `run_im fcitx5`, seeds `~/.config/fcitx5/profile` so the kiosk user starts with `keyboard-us`, `boshiamy`, and `chewing` in the default group, writes `~/.config/autostart/light-locker.desktop` plus `~/.config/autostart/xscreensaver.desktop` with `Hidden=true` so the kiosk session does not fall back to the LightDM greeter after inactivity, writes `~/.config/autostart/solar-disable-display-sleep.desktop`, `~/.local/bin/solar-disable-display-sleep.sh`, and `~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml` so X11 screen blanking, DPMS, and XFCE display sleep stay disabled for the kiosk user, writes `/etc/NetworkManager/conf.d/10-solar-managed.conf` plus `/etc/netplan/90-solar-network-manager.yaml` so Wi-Fi can be managed from the desktop after the next reboot, and writes `/etc/polkit-1/rules.d/49-solar-networkmanager.rules` so the kiosk user can switch Wi-Fi and modify saved NetworkManager connections without repeated admin-auth prompts.
+The desktop helper also installs `network-manager-gnome`, `policykit-1-gnome`, `im-config`, `fcitx5`, `fcitx5-chewing`, and `fcitx5-table-boshiamy`, writes `~/.xprofile` with `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, and `XMODIFIERS=@im=fcitx`, writes `~/.xinputrc` with `run_im fcitx5`, seeds `~/.config/fcitx5/profile` so the kiosk user starts with `keyboard-us`, `boshiamy`, and `chewing` in the default group, calls `deploy/disable-display-sleep.sh` so system sleep, X11 screen blanking, DPMS, screensaver, and XFCE display sleep stay disabled for the kiosk user, writes `/etc/NetworkManager/conf.d/10-solar-managed.conf` plus `/etc/netplan/90-solar-network-manager.yaml` so Wi-Fi can be managed from the desktop after the next reboot, and writes `/etc/polkit-1/rules.d/49-solar-networkmanager.rules` so the kiosk user can switch Wi-Fi and modify saved NetworkManager connections without repeated admin-auth prompts.
+
+## RPi5 No-Sleep And Screen Saver Disablement
+
+For a kiosk display, the Raspberry Pi 5 must not enter system sleep, blank the HDMI screen, or fall back to a screen saver. New deployments apply this through `deploy/configure-lightweight-desktop.sh`, which delegates the sleep/display portion to:
+
+```bash
+sudo /data/solar-display/deploy/disable-display-sleep.sh --user kz
+```
+
+The helper is idempotent and can be run by itself after app-only updates or manual desktop maintenance. It installs missing `x11-xserver-utils`, `xfconf`, and `xfce4-power-manager`; masks `sleep.target`, `suspend.target`, `hibernate.target`, and `hybrid-sleep.target`; writes `/etc/systemd/logind.conf.d/99-solar-no-sleep.conf`; writes the kiosk user's `solar-disable-display-sleep.sh` autostart; disables `light-locker` and `xscreensaver`; and immediately applies `xset dpms force on`, `xset s reset`, `xset s off`, `xset s noblank`, and `xset -dpms` to `DISPLAY=:0` when the local X session exists.
+
+If readonly root is already active, temporarily disable readonly root and reboot before rerunning this helper so `/etc/systemd` and the kiosk user's home directory changes persist.
+
+Verify the no-sleep state with:
+
+```bash
+systemctl is-enabled sleep.target suspend.target hibernate.target hybrid-sleep.target
+DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/$(id -u kz) xset q
+sudo /data/solar-display/deploy/verify-kiosk-install.sh --kiosk-user kz
+```
+
+Expected signals are all four systemd targets reporting `masked`, `Screen Saver` showing `timeout: 0`, and `DPMS is Disabled`. `verify-kiosk-install.sh` checks both the system sleep mask and the kiosk user's autostart/X display state.
 
 They write this cloud-init shape:
 

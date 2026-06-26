@@ -15,10 +15,14 @@ const prepareUserDataPs1Path = path.join(repoRoot, "scripts/prepare-raspi-user-d
 const connectRdpPs1Path = path.join(repoRoot, "scripts/connect-raspi-rdp.ps1");
 const raspiBootstrapScriptPath = path.join(repoRoot, "deploy/raspi-bootstrap.sh");
 const lightweightDesktopScriptPath = path.join(repoRoot, "deploy/configure-lightweight-desktop.sh");
+const displaySleepScriptPath = path.join(repoRoot, "deploy/disable-display-sleep.sh");
 const desktopThemeScriptPath = path.join(repoRoot, "deploy/apply-desktop-theme.sh");
 const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-system.sh");
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
+const bashCommand = process.platform === "win32"
+  ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
+  : "bash";
 
 function makeFixtureProject() {
   const projectDir = mkdtempSync(path.join(tmpdir(), "solar-display-deploy-test-"));
@@ -58,6 +62,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/disable-display-sleep.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/apply-desktop-theme.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/repair-kiosk-system.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
@@ -84,18 +89,141 @@ function makeFixtureProject() {
 }
 
 function runDeploy(projectDir, choice) {
-  return spawnSync("bash", ["./deploy.sh"], {
+  return spawnSync(bashCommand, ["-lc", "DEPLOY_BUILD_CMD=':' ./deploy.sh"], {
     cwd: projectDir,
-    env: {
-      ...process.env,
-      DEPLOY_CHOICE: String(choice),
-      DEPLOY_BUILD_CMD: ":"
-    },
+    input: `${choice}\n`,
     encoding: "utf8"
   });
 }
 
+function toBashScriptPath(cwd, scriptPath) {
+  if (!path.isAbsolute(scriptPath)) {
+    return scriptPath.split(path.sep).join("/");
+  }
+
+  const relativePath = path.relative(cwd, scriptPath).split(path.sep).join("/");
+  return relativePath.length > 0 ? relativePath : ".";
+}
+
+function toBashPathValue(filePath) {
+  if (!path.win32.isAbsolute(filePath)) {
+    return filePath.split(path.sep).join("/");
+  }
+
+  const normalizedPath = filePath.replace(/\\/gu, "/");
+  const driveLetter = normalizedPath.slice(0, 1).toLowerCase();
+  const remainder = normalizedPath.slice(2);
+
+  return `/mnt/${driveLetter}${remainder.startsWith("/") ? remainder : `/${remainder}`}`;
+}
+
+function buildBashEnv(env, { pathKeys = [], prependPathDirs = [] } = {}) {
+  if (!env) {
+    return env;
+  }
+
+  const nextEnv = { ...env };
+
+  pathKeys.forEach((key) => {
+    if (typeof nextEnv[key] === "string") {
+      nextEnv[key] = toBashPathValue(nextEnv[key]);
+    }
+  });
+
+  if (prependPathDirs.length > 0) {
+    nextEnv.PATH = `${prependPathDirs.map((value) => toBashPathValue(value)).join(":")}` +
+      ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+  }
+
+  return nextEnv;
+}
+
+function quoteForBash(value) {
+  return `'${String(value).replace(/'/gu, `"'"'`)}'`;
+}
+
+function markBashExecutable(filePath) {
+  if (process.platform !== "win32") {
+    chmodSync(filePath, 0o755);
+    return;
+  }
+
+  const result = spawnSync(bashCommand, ["-lc", `chmod 755 ${quoteForBash(toBashPathValue(filePath))}`], {
+    encoding: "utf8"
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `Failed to chmod ${filePath}`);
+  }
+}
+
+function sleepMs(durationMs) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, durationMs);
+}
+
+function removeTempDir(dirPath) {
+  const transientErrorCodes = new Set(["EBUSY", "ENOTEMPTY", "EPERM"]);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      rmSync(dirPath, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const errorCode = error instanceof Error ? error.code : undefined;
+
+      if (!transientErrorCodes.has(errorCode ?? "")) {
+        throw error;
+      }
+
+      sleepMs(50 * (attempt + 1));
+    }
+  }
+
+  rmSync(dirPath, { recursive: true, force: true });
+}
+
+function runBashScript(scriptPath, args = [], options = {}) {
+  const cwd = options.cwd ?? repoRoot;
+  const {
+    bashPathKeys = [],
+    bashPrependPathDirs = [],
+    env,
+    ...spawnOptions
+  } = options;
+
+  return spawnSync(bashCommand, [toBashScriptPath(cwd, scriptPath), ...args.map((value) => toBashPathValue(value))], {
+    ...spawnOptions,
+    cwd,
+    env: buildBashEnv(env, {
+      pathKeys: bashPathKeys,
+      prependPathDirs: bashPrependPathDirs
+    })
+  });
+}
+
+function waitForPathExists(filePath, timeoutMs = 1_000) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (existsSync(filePath)) {
+      return true;
+    }
+
+    sleepMs(50);
+  }
+
+  return existsSync(filePath);
+}
+
 function isExecutable(filePath) {
+  if (process.platform === "win32") {
+    const result = spawnSync(bashCommand, ["-lc", `test -x ${quoteForBash(toBashPathValue(filePath))}`], {
+      encoding: "utf8"
+    });
+
+    return result.status === 0;
+  }
+
   return (statSync(filePath).mode & 0o111) !== 0;
 }
 
@@ -151,24 +279,27 @@ test("bundle install script can source nvm before running pnpm install", () => {
 });
 
 test("raspi one-key deploy dry-run reports target and skips destructive stages", () => {
-  const result = spawnSync("bash", [
+  const result = runBashScript(
     raspiDeployScriptPath,
-    "kz@192.168.31.39",
-    "--mode",
-    "update",
-    "--mqtt-host",
-    "192.168.31.62",
-    "--desktop",
-    "xfce-xrdp",
-    "--rdp-auth",
-    "passwordless",
-    "--rdp-password",
-    "kz",
-    "--dry-run"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "kz@192.168.31.39",
+      "--mode",
+      "update",
+      "--mqtt-host",
+      "192.168.31.62",
+      "--desktop",
+      "xfce-xrdp",
+      "--rdp-auth",
+      "passwordless",
+      "--rdp-password",
+      "kz",
+      "--dry-run"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /Target: kz@192\.168\.31\.39/);
@@ -214,11 +345,10 @@ test("raspi user-data shell helper interactive defaults to pi user", () => {
   try {
     writeFileSync(path.join(bootDir, "user-data"), "#cloud-config\nhostname: old\n");
 
-    const result = spawnSync("bash", [prepareUserDataScriptPath], {
+    const result = runBashScript(prepareUserDataScriptPath, ["--interactive", "--boot-path", bootDir], {
       cwd: repoRoot,
       encoding: "utf8",
       input: [
-        bootDir,
         "",
         "",
         "",
@@ -229,6 +359,8 @@ test("raspi user-data shell helper interactive defaults to pi user", () => {
         "",
         "",
         "",
+        "",
+        "YES",
         "YES",
         ""
       ].join("\n")
@@ -274,7 +406,7 @@ test("raspi user-data shell helper interactive defaults to pi user", () => {
     assert.match(firstLoginToolsSource, /mosquitto-clients/);
     assert.match(firstLoginToolsSource, /nvm-sh\/nvm/);
   } finally {
-    rmSync(bootDir, { recursive: true, force: true });
+    removeTempDir(bootDir);
   }
 });
 
@@ -284,26 +416,29 @@ test("raspi user-data shell helper writes ssh sudo root su cloud-init config", (
   try {
     writeFileSync(path.join(bootDir, "user-data"), "#cloud-config\nhostname: old\n");
 
-    const result = spawnSync("bash", [
+    const result = runBashScript(
       prepareUserDataScriptPath,
-      "--boot-path",
-      bootDir,
-      "--hostname",
-      "raspberry5",
-      "--user",
-      "kz",
-      "--password",
-      "kz",
-      "--root-password",
-      "kzroot",
-      "--data-size-gb",
-      "12",
-      "--mqtt-host",
-      "mqtt.local"
-    ], {
-      cwd: repoRoot,
-      encoding: "utf8"
-    });
+      [
+        "--boot-path",
+        bootDir,
+        "--hostname",
+        "raspberry5",
+        "--user",
+        "kz",
+        "--password",
+        "kz",
+        "--root-password",
+        "kzroot",
+        "--data-size-gb",
+        "12",
+        "--mqtt-host",
+        "mqtt.local"
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8"
+      }
+    );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(existsSync(path.join(bootDir, "user-data.before-solar-player")), true);
@@ -343,7 +478,7 @@ test("raspi user-data shell helper writes ssh sudo root su cloud-init config", (
     assert.match(firstLoginTools, /curl -fsSL https:\/\/raw\.githubusercontent\.com\/nvm-sh\/nvm/);
     assert.doesNotMatch(firstLoginTools, /NOPASSWD/);
   } finally {
-    rmSync(bootDir, { recursive: true, force: true });
+    removeTempDir(bootDir);
   }
 });
 
@@ -382,17 +517,20 @@ test("raspi user-data powershell helper contains matching cloud-init contract", 
 });
 
 test("raspi bootstrap dry-run rejects root-full layout without data mount", () => {
-  const result = spawnSync("bash", [
+  const result = runBashScript(
     raspiBootstrapScriptPath,
-    "--mode",
-    "init",
-    "--dry-run",
-    "--disk-fixture",
-    "root-full-no-data"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "--mode",
+      "init",
+      "--dry-run",
+      "--disk-fixture",
+      "root-full-no-data"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /online root shrink is not supported/);
@@ -400,18 +538,21 @@ test("raspi bootstrap dry-run rejects root-full layout without data mount", () =
 });
 
 test("raspi bootstrap dry-run can reuse existing writable data mount", () => {
-  const result = spawnSync("bash", [
+  const result = runBashScript(
     raspiBootstrapScriptPath,
-    "--mode",
-    "init",
-    "--dry-run",
-    "--skip-host-preflight",
-    "--disk-fixture",
-    "writable-data"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "--mode",
+      "init",
+      "--dry-run",
+      "--skip-host-preflight",
+      "--disk-fixture",
+      "writable-data"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /OK: existing writable \/data mount can be reused/);
@@ -440,12 +581,11 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
       path.join(projectDir, "deploy/raspi-bootstrap.sh"),
       readFileSync(raspiBootstrapScriptPath, "utf8")
     );
-    chmodSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), 0o755);
+    markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
     mkdirSync(installDir, { recursive: true });
     writeFileSync(path.join(installDir, ".env.example"), "MQTT_BROKER_HOST=localhost\n");
 
-    const createResult = spawnSync("bash", [
-      "deploy/raspi-bootstrap.sh",
+    const createResult = runBashScript("deploy/raspi-bootstrap.sh", [
       "--mode",
       "update",
       "--skip-host-preflight",
@@ -465,8 +605,7 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
     assert.match(createResult.stdout, /Created target \.env/);
 
     writeFileSync(path.join(installDir, ".env"), "MQTT_BROKER_HOST=existing\n");
-    const preserveResult = spawnSync("bash", [
-      "deploy/raspi-bootstrap.sh",
+    const preserveResult = runBashScript("deploy/raspi-bootstrap.sh", [
       "--mode",
       "update",
       "--skip-host-preflight",
@@ -485,27 +624,31 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
     assert.equal(readFileSync(path.join(installDir, ".env"), "utf8"), "MQTT_BROKER_HOST=existing\n");
     assert.match(preserveResult.stdout, /MQTT defaults were not overwritten/);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
 test("lightweight desktop helper configures xfce lightdm xrdp firefox without weakening ssh or sudo", () => {
   const source = readFileSync(lightweightDesktopScriptPath, "utf8");
-  const result = spawnSync("bash", [
+  const displaySleepSource = readFileSync(displaySleepScriptPath, "utf8");
+  const result = runBashScript(
     lightweightDesktopScriptPath,
-    "--user",
-    "kz",
-    "--desktop",
-    "xfce-xrdp",
-    "--rdp-auth",
-    "passwordless",
-    "--rdp-password",
-    "kz",
-    "--dry-run"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "--user",
+      "kz",
+      "--desktop",
+      "xfce-xrdp",
+      "--rdp-auth",
+      "passwordless",
+      "--rdp-password",
+      "kz",
+      "--dry-run"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(source, /xfce4/);
@@ -531,18 +674,19 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.match(source, /XMODIFIERS=@im=fcitx/);
   assert.match(source, /\/etc\/environment\.d\/90-solar-fcitx\.conf/);
   assert.match(source, /fcitx5 -d/);
-  assert.match(source, /light-locker\.desktop/);
-  assert.match(source, /xscreensaver\.desktop/);
-  assert.match(source, /solar-disable-display-sleep\.desktop/);
-  assert.match(source, /solar-disable-display-sleep\.sh/);
-  assert.match(source, /xset s off/);
-  assert.match(source, /xset s noblank/);
-  assert.match(source, /xset -dpms/);
-  assert.match(source, /xfce4-power-manager\.xml/);
-  assert.match(source, /dpms-enabled/);
-  assert.match(source, /blank-on-ac/);
-  assert.match(source, /presentation-mode/);
-  assert.match(source, /Hidden=true/);
+  assert.match(source, /disable-display-sleep\.sh/);
+  assert.match(displaySleepSource, /light-locker\.desktop/);
+  assert.match(displaySleepSource, /xscreensaver\.desktop/);
+  assert.match(displaySleepSource, /solar-disable-display-sleep\.desktop/);
+  assert.match(displaySleepSource, /solar-disable-display-sleep\.sh/);
+  assert.match(displaySleepSource, /xset s off/);
+  assert.match(displaySleepSource, /xset s noblank/);
+  assert.match(displaySleepSource, /xset -dpms/);
+  assert.match(displaySleepSource, /xfce4-power-manager\.xml/);
+  assert.match(displaySleepSource, /dpms-enabled/);
+  assert.match(displaySleepSource, /blank-on-ac/);
+  assert.match(displaySleepSource, /presentation-mode/);
+  assert.match(displaySleepSource, /Hidden=true/);
   assert.match(source, /\.xinputrc/);
   assert.match(source, /run_im fcitx5/);
   assert.match(source, /DefaultIM=keyboard-us/);
@@ -593,35 +737,70 @@ test("repair kiosk system helper persists copymods modules and Firefox snap CJK 
 });
 
 test("lightweight desktop helper fails closed for passwordless rdp without a password source", () => {
-  const result = spawnSync("bash", [
+  const result = runBashScript(
     lightweightDesktopScriptPath,
-    "--user",
-    "kz",
-    "--desktop",
-    "xfce-xrdp",
-    "--rdp-auth",
-    "passwordless",
-    "--dry-run"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "--user",
+      "kz",
+      "--desktop",
+      "xfce-xrdp",
+      "--rdp-auth",
+      "passwordless",
+      "--dry-run"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /RDP passwordless requires --rdp-password or RDP_PASSWORD/);
 });
 
+test("display sleep helper disables system sleep and X blanking without touching RDP auth", () => {
+  const source = readFileSync(displaySleepScriptPath, "utf8");
+
+  assert.match(source, /systemctl mask sleep\.target suspend\.target hibernate\.target hybrid-sleep\.target/);
+  assert.match(source, /99-solar-no-sleep\.conf/);
+  assert.match(source, /IdleAction=ignore/);
+  assert.match(source, /x11-xserver-utils/);
+  assert.match(source, /xfce4-power-manager/);
+  assert.match(source, /solar-disable-display-sleep\.desktop/);
+  assert.match(source, /light-locker\.desktop/);
+  assert.match(source, /xscreensaver\.desktop/);
+  assert.match(source, /xset dpms force on/);
+  assert.match(source, /xset s reset/);
+  assert.match(source, /xset s off/);
+  assert.match(source, /xset s noblank/);
+  assert.match(source, /xset -dpms/);
+  assert.match(source, /DPMS is Disabled/);
+  assert.doesNotMatch(source, /RDP_AUTH/);
+  assert.doesNotMatch(source, /passwordless/);
+  assert.doesNotMatch(source, /xrdp/);
+});
+
+test("lightweight desktop helper delegates display sleep setup to the standalone helper", () => {
+  const source = readFileSync(lightweightDesktopScriptPath, "utf8");
+
+  assert.match(source, /SCRIPT_DIR=.*dirname "\$0"/);
+  assert.match(source, /\$\{SCRIPT_DIR\}\/disable-display-sleep\.sh"\s+--user "\$\{KIOSK_USER\}"/);
+});
+
 test("desktop theme helper installs a balanced xfce theme profile without touching auth flows", () => {
   const source = readFileSync(desktopThemeScriptPath, "utf8");
-  const result = spawnSync("bash", [
+  const result = runBashScript(
     desktopThemeScriptPath,
-    "--user",
-    "kz",
-    "--dry-run"
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8"
-  });
+    [
+      "--user",
+      "kz",
+      "--dry-run"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /Theme profile: balanced-xfce/);
@@ -671,21 +850,27 @@ test("runtime export script archives data uploads and .env from the install root
   try {
     writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
 
-    const result = spawnSync("bash", ["deploy/export-runtime-state.sh"], {
-      cwd: projectDir,
-      env: {
-        ...process.env,
-        INSTALL_DIR: projectDir,
-        EXPORT_OUTPUT_DIR: outputDir,
-        EXPORT_TIMESTAMP: "20260610-030000"
-      },
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      bashCommand,
+      [
+        "-lc",
+        [
+          `INSTALL_DIR=${quoteForBash(toBashPathValue(projectDir))}`,
+          `EXPORT_OUTPUT_DIR=${quoteForBash(toBashPathValue(outputDir))}`,
+          "EXPORT_TIMESTAMP='20260610-030000'",
+          "bash deploy/export-runtime-state.sh"
+        ].join(" ")
+      ],
+      {
+        cwd: projectDir,
+        encoding: "utf8"
+      }
+    );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
 
     const archivePath = path.join(outputDir, "solar-display-runtime-20260610-030000.tar.gz");
-    assert.equal(existsSync(archivePath), true);
+    assert.equal(waitForPathExists(archivePath), true);
 
     const listing = spawnSync("tar", ["-tzf", archivePath], {
       cwd: projectDir,
@@ -699,7 +884,7 @@ test("runtime export script archives data uploads and .env from the install root
     assert.match(listing.stdout, /^uploads\/brand\/logo\.png$/m);
     assert.match(listing.stdout, /^\.env$/m);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -711,12 +896,13 @@ test("reset db settings script removes sqlite state without touching uploads", (
     writeFileSync(path.join(projectDir, "data/solar-display.sqlite-wal"), "wal\n");
     writeFileSync(path.join(projectDir, "data/solar-display.sqlite-shm"), "shm\n");
 
-    const result = spawnSync("bash", ["deploy/reset-db-settings.sh"], {
+    const result = runBashScript("deploy/reset-db-settings.sh", [], {
       cwd: projectDir,
       env: {
         ...process.env,
         INSTALL_DIR: projectDir
       },
+      bashPathKeys: ["INSTALL_DIR"],
       encoding: "utf8"
     });
 
@@ -727,7 +913,7 @@ test("reset db settings script removes sqlite state without touching uploads", (
     assert.equal(existsSync(path.join(projectDir, "uploads/images/hero.png")), true);
     assert.equal(existsSync(path.join(projectDir, "uploads/brand/logo.png")), true);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -748,7 +934,7 @@ test("reset db settings script restarts an active service when sqlite removal fa
       [
         "#!/bin/bash",
         "set -euo pipefail",
-        `LOG_PATH=${JSON.stringify(systemctlLog)}`,
+        `LOG_PATH=${JSON.stringify(toBashPathValue(systemctlLog))}`,
         'case "$1" in',
         "  is-active)",
         "    exit 0",
@@ -765,25 +951,32 @@ test("reset db settings script restarts an active service when sqlite removal fa
         ""
       ].join("\n")
     );
-    chmodSync(systemctlPath, 0o755);
+    markBashExecutable(systemctlPath);
 
-    const result = spawnSync("bash", ["deploy/reset-db-settings.sh"], {
-      cwd: projectDir,
-      env: {
-        ...process.env,
-        INSTALL_DIR: projectDir,
-        PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`
-      },
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      bashCommand,
+      [
+        "-lc",
+        [
+          `PATH=${quoteForBash(`${toBashPathValue(fakeBinDir)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`)}`,
+          `INSTALL_DIR=${quoteForBash(toBashPathValue(projectDir))}`,
+          "bash deploy/reset-db-settings.sh"
+        ].join(" ")
+      ],
+      {
+        cwd: projectDir,
+        encoding: "utf8"
+      }
+    );
 
     assert.notEqual(result.status, 0);
 
+    assert.equal(waitForPathExists(systemctlLog), true);
     const log = readFileSync(systemctlLog, "utf8");
     assert.match(log, /^stop solar-display$/m);
     assert.match(log, /^start solar-display$/m);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -826,21 +1019,22 @@ test("read-only hardening helper fails closed when runtime path is missing", () 
       path.join(projectDir, "deploy/enable-readonly-root.sh"),
       readFileSync(path.join(repoRoot, "deploy/enable-readonly-root.sh"), "utf8")
     );
-    chmodSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), 0o755);
+    markBashExecutable(path.join(projectDir, "deploy/enable-readonly-root.sh"));
 
-    const result = spawnSync("bash", ["deploy/enable-readonly-root.sh"], {
+    const result = runBashScript("deploy/enable-readonly-root.sh", [], {
       cwd: projectDir,
       env: {
         ...process.env,
         INSTALL_DIR: path.join(projectDir, "missing-runtime")
       },
+      bashPathKeys: ["INSTALL_DIR"],
       encoding: "utf8"
     });
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Runtime install directory is missing/);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -865,7 +1059,7 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
       path.join(projectDir, "deploy/verify-kiosk-install.sh"),
       readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8")
     );
-    chmodSync(path.join(projectDir, "deploy/verify-kiosk-install.sh"), 0o755);
+    markBashExecutable(path.join(projectDir, "deploy/verify-kiosk-install.sh"));
     mkdirSync(path.join(kioskHome, ".config/autostart"), { recursive: true });
     mkdirSync(fakeBinDir);
     for (const runtimePath of [
@@ -881,7 +1075,7 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
     for (const command of ["systemctl", "curl"]) {
       const commandPath = path.join(fakeBinDir, command);
       writeFileSync(commandPath, "#!/bin/bash\nexit 0\n");
-      chmodSync(commandPath, 0o755);
+      markBashExecutable(commandPath);
     }
     const sudoPath = path.join(fakeBinDir, "sudo");
     writeFileSync(
@@ -895,10 +1089,9 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
         ""
       ].join("\n")
     );
-    chmodSync(sudoPath, 0o755);
+    markBashExecutable(sudoPath);
 
-    const result = spawnSync("bash", [
-      "deploy/verify-kiosk-install.sh",
+    const result = runBashScript("deploy/verify-kiosk-install.sh", [
       "--install-dir",
       installDir,
       "--kiosk-user",
@@ -907,10 +1100,7 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
       kioskHome
     ], {
       cwd: projectDir,
-      env: {
-        ...process.env,
-        PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH}`
-      },
+      bashPrependPathDirs: [fakeBinDir],
       encoding: "utf8"
     });
 
@@ -918,7 +1108,7 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
     assert.match(result.stderr, /desktop re-entry launcher exists/);
     assert.match(result.stderr, /Device Status re-entry guidance is not backed/);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -931,6 +1121,10 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /tailscaled is active when Tailscale is installed/);
   assert.match(source, /display sleep disable autostart is configured/);
   assert.match(source, /display sleep is disabled when X display is available/);
+  assert.match(source, /system sleep targets are masked/);
+  assert.match(source, /system_sleep_targets_masked/);
+  assert.match(source, /sleep\.target suspend\.target hibernate\.target hybrid-sleep\.target/);
+  assert.match(source, /99-solar-no-sleep\.conf/);
   assert.match(source, /Fcitx5 Chewing is installed and present in the kiosk profile/);
   assert.match(source, /fcitx5-chewing/);
   assert.match(source, /Name=chewing/);
@@ -972,6 +1166,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
@@ -992,6 +1187,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
@@ -1007,7 +1203,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js.map")), false);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });
 
@@ -1029,6 +1225,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
@@ -1045,6 +1242,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
@@ -1059,6 +1257,6 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "apps/.DS_Store")), false);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/dist/server.test.js")), false);
   } finally {
-    rmSync(projectDir, { recursive: true, force: true });
+    removeTempDir(projectDir);
   }
 });

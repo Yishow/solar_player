@@ -97,6 +97,8 @@ Current 2026-06-16 production-card check: `kz@192.168.31.40` has `MQTT_BROKER=19
 - `lightdm`
 - `xrdp`
 - `xorgxrdp`
+- `x11-xserver-utils`
+- `xfce4-power-manager`
 - `dbus-x11`
 - `firefox`
 - `xfce4-terminal`
@@ -108,6 +110,25 @@ The desktop helper also writes a Raspberry Pi KMS Xorg config and a robust `.xse
 - `/etc/X11/xorg.conf.d/99-solar-raspi-kms.conf` pins local Xorg to `/dev/dri/card1`, avoiding the Pi 5 framebuffer fallback error seen as HDMI blinking cursor.
 - The kiosk user's `.xsession` runs `dbus-run-session -- startxfce4` with explicit XFCE config/data paths.
 - Stale `~/.cache/sessions` and `~/.config/xfce4-session` are removed so old XFCE state does not trigger failsafe session on RDP.
+- `deploy/disable-display-sleep.sh` masks `sleep.target`, `suspend.target`, `hibernate.target`, and `hybrid-sleep.target`, writes `/etc/systemd/logind.conf.d/99-solar-no-sleep.conf`, disables `light-locker` and `xscreensaver`, and installs the kiosk user's XFCE autostart script for `xset s off`, `xset s noblank`, and `xset -dpms`.
+
+To reapply only the no-sleep/no-screensaver settings after maintenance:
+
+```bash
+sudo /data/solar-display/deploy/disable-display-sleep.sh --user kz
+```
+
+If readonly root is already active, temporarily disable readonly root and reboot before rerunning this helper so `/etc/systemd` and the kiosk user's home directory changes persist.
+
+Verify with:
+
+```bash
+systemctl is-enabled sleep.target suspend.target hibernate.target hybrid-sleep.target
+DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/$(id -u kz) xset q
+sudo /data/solar-display/deploy/verify-kiosk-install.sh --kiosk-user kz
+```
+
+Expected state: all four systemd targets are `masked`, the X screen saver timeout is `0`, and `DPMS is Disabled`.
 
 RDP passwordless mode is for controlled company LAN use. xrdp `autorun` still requires the RDP client to provide valid credentials before it enters the kiosk session, so Windows no-prompt access is handled by saving `TERMSRV/<pi-ip>` credentials on the Windows PC:
 

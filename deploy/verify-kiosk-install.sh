@@ -98,6 +98,17 @@ display_sleep_autostart_configured() {
     test -f "${KIOSK_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml"
 }
 
+system_sleep_targets_masked() {
+  local target
+
+  test -f /etc/systemd/logind.conf.d/99-solar-no-sleep.conf || return 1
+  grep -q '^IdleAction=ignore$' /etc/systemd/logind.conf.d/99-solar-no-sleep.conf || return 1
+
+  for target in sleep.target suspend.target hibernate.target hybrid-sleep.target; do
+    [[ "$(systemctl is-enabled "${target}" 2>/dev/null || true)" == "masked" ]] || return 1
+  done
+}
+
 display_sleep_disabled_when_x_available() {
   command -v xset >/dev/null 2>&1 || return 0
   [[ -S /tmp/.X11-unix/X0 ]] || return 0
@@ -117,6 +128,7 @@ check "Wi-Fi is connected when a Wi-Fi device is present" wifi_connected_when_pr
 check "tailscaled is active when Tailscale is installed" tailscale_active_when_installed
 check "Fcitx5 Chewing is installed and present in the kiosk profile when Fcitx5 is installed" fcitx_chewing_configured_when_fcitx_is_installed
 check "display sleep disable autostart is configured" display_sleep_autostart_configured
+check "system sleep targets are masked" system_sleep_targets_masked
 check "display sleep is disabled when X display is available" display_sleep_disabled_when_x_available
 check "autostart launcher exists: ${AUTOSTART_LAUNCHER}" test -f "${AUTOSTART_LAUNCHER}"
 check "desktop re-entry launcher exists: ${DESKTOP_LAUNCHER}" test -f "${DESKTOP_LAUNCHER}"
