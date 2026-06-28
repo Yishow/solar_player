@@ -237,7 +237,7 @@ function resolveTopicRuntime(
     quality,
     runtimeLabel,
     runtimeTone,
-    unit
+    runtimeUnit: unit
   };
 }
 
@@ -748,7 +748,7 @@ export function buildMqttSettingsViewModel({
         runtimeTone: topic.runtimeTone,
         runtimeLabel: topic.runtimeLabel,
         topicLabel: topic.topic || "未設定 topic",
-        unitLabel: topic.unit,
+        unitLabel: topic.runtimeUnit,
         valueLabel: formatValue(topic.lastValue)
       };
     }),

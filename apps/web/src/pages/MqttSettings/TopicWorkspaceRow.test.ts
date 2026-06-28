@@ -10,6 +10,7 @@ const baseMockTopic: TopicWorkspaceRowModel = {
   metricKey: "realTimePower",
   topic: "kuozui/plant/solar/power",
   unit: "kW",
+  runtimeUnit: "kW",
   valuePath: "$.power",
   enabled: true,
   updatedAt: "2026-05-23T09:28:00.000Z",
@@ -51,6 +52,27 @@ test("TopicWorkspaceRow renders correctly with metrics, fields, and values", () 
   assert.match(html, /最後收值 2026\/5\/23 17:29:00/);
   assert.match(html, /最後更新 2026\/5\/23 17:28:00/);
   assert.match(html, /Quality: good/);
+});
+
+test("TopicWorkspaceRow binds the Unit input to the editable draft unit, not the runtime unit", () => {
+  const topicWithRuntimeOverride: TopicWorkspaceRowModel = {
+    ...baseMockTopic,
+    unit: "MW",
+    runtimeUnit: "kW"
+  };
+
+  const html = renderToStaticMarkup(
+    React.createElement(TopicWorkspaceRow, {
+      topic: topicWithRuntimeOverride,
+      handleTopicChange: () => undefined,
+      removeTopicMapping: () => undefined
+    })
+  );
+
+  // 編輯框綁定可編輯草稿值，避免 live runtime unit 覆蓋使用者輸入
+  assert.match(html, /value="MW"/);
+  // runtime 顯示區仍呈現 live unit
+  assert.match(html, /<small>kW<\/small>/);
 });
 
 test("TopicWorkspaceRow renders coverage information when present", () => {

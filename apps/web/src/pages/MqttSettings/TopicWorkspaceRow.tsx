@@ -117,7 +117,7 @@ function TopicWorkspaceRowImpl({
           <span className={`mgmt-chip ${topic.runtimeTone === "connected" ? "is-success" : topic.runtimeTone === "connecting" ? "is-warning" : "is-danger"}`}>{topic.runtimeLabel}</span>
           <span className="runtime-value">
             <b>{topic.valueLabel}</b>
-            <small>{topic.unit || "--"}</small>
+            <small>{topic.runtimeUnit || "--"}</small>
           </span>
         </div>
       </div>
