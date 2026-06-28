@@ -9,6 +9,8 @@ const baseMockTopic: TopicWorkspaceRowModel = {
   id: 42,
   metricKey: "realTimePower",
   topic: "kuozui/plant/solar/power",
+  nameZh: "一號廠輸出",
+  nameEn: "Plant A Output",
   unit: "kW",
   runtimeUnit: "kW",
   valuePath: "$.power",
@@ -52,6 +54,38 @@ test("TopicWorkspaceRow renders correctly with metrics, fields, and values", () 
   assert.match(html, /最後收值 2026\/5\/23 17:29:00/);
   assert.match(html, /最後更新 2026\/5\/23 17:28:00/);
   assert.match(html, /Quality: good/);
+});
+
+test("TopicWorkspaceRow renders editable custom name fields bound to their values", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(TopicWorkspaceRow, {
+      topic: baseMockTopic,
+      handleTopicChange: () => undefined,
+      removeTopicMapping: () => undefined
+    })
+  );
+
+  assert.match(html, /value="一號廠輸出"/);
+  assert.match(html, /value="Plant A Output"/);
+});
+
+test("TopicWorkspaceRow renders empty custom name fields when names are unset", () => {
+  const topicWithoutNames: TopicWorkspaceRowModel = {
+    ...baseMockTopic,
+    nameZh: null,
+    nameEn: null
+  };
+
+  const html = renderToStaticMarkup(
+    React.createElement(TopicWorkspaceRow, {
+      topic: topicWithoutNames,
+      handleTopicChange: () => undefined,
+      removeTopicMapping: () => undefined
+    })
+  );
+
+  // Bold display still falls back to the built-in default label.
+  assert.match(html, /即時發電功率/);
 });
 
 test("TopicWorkspaceRow binds the Unit input to the editable draft unit, not the runtime unit", () => {

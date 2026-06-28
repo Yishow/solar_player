@@ -45,6 +45,28 @@ const snapshot: LiveMetricsSnapshot = {
   timestamp: "2026-05-13T10:00:00.000Z"
 };
 
+test("buildSolarViewModel surfaces the custom topic name via the story KPI label and falls back without a story", () => {
+  const withStory = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot,
+    solarStory: {
+      kpis: [
+        { metricKey: "todayGeneration", label: "今日產出", unit: "kWh", value: "3,842", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "selfConsumptionRatio", label: "自用", unit: "%", value: "78", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "todayCo2Reduction", label: "減碳", unit: "t", value: "1.9", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "totalCo2Reduction", label: "累積減碳", unit: "t", value: "9,842", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "systemEfficiency", label: "效率", unit: "%", value: "96", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } }
+      ],
+      story: { flowState: { state: "healthy", reason: null, label: "運作正常" } }
+    }
+  });
+
+  assert.equal(withStory.kpis[0]?.label, "今日產出");
+
+  const withoutStory = buildSolarViewModel({ isSocketConnected: true, snapshot });
+  assert.equal(withoutStory.kpis[0]?.label, "今日發電量");
+});
+
 test("buildSolarViewModel centralizes flow nodes and KPI display fields", () => {
   const model = buildSolarViewModel({
     isSocketConnected: true,

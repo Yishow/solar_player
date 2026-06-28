@@ -59,6 +59,37 @@ function createResolvedStoryMetric(args: {
   };
 }
 
+test("buildOverviewViewModel surfaces the custom topic name delivered via the story label and falls back without a story", () => {
+  const withStory = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({ label: "即時輸出", metricKey: "realTimePower", unit: "kW", value: "612" })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  const storyCard = withStory.metrics.find((metric) => metric.metricKey === "realTimePower");
+  assert.equal(storyCard?.label, "即時輸出");
+
+  const withoutStory = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot
+  });
+
+  const fallbackCard = withoutStory.metrics.find((metric) => metric.metricKey === "realTimePower");
+  assert.equal(fallbackCard?.label, "即時發電功率");
+});
+
 test("buildOverviewViewModel prefers live metrics when socket data is available", () => {
   const model = buildOverviewViewModel({
     connectionState: "connected",

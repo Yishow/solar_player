@@ -145,6 +145,8 @@ test("buildMqttSettingsViewModel centralizes broker status and topic runtime map
         lastReceivedAt: "2026-05-13T10:05:00.000Z",
         lastValue: 586.2,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: "good",
         rawPayload: "{\"value\":586.2}",
         topic: "kuozui/plant/solar/power",
@@ -158,6 +160,8 @@ test("buildMqttSettingsViewModel centralizes broker status and topic runtime map
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "todayGeneration",
+        nameZh: null,
+        nameEn: null,
         quality: null,
         rawPayload: null,
         topic: "kuozui/plant/solar/today_energy",
@@ -358,6 +362,8 @@ test("buildMqttSettingsViewModel prefers streamed live metric updates over stale
         lastReceivedAt: "2026-05-20T10:05:00.000Z",
         lastValue: 586.2,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: "good",
         rawPayload: "{\"value\":586.2}",
         topic: "kuozui/plant/solar/power",
@@ -431,6 +437,8 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: null,
         rawPayload: null,
         topic: "kuozui/plant/solar/power",
@@ -507,6 +515,8 @@ test("buildMqttSettingsViewModel marks polled topic rows as fallback when stream
         lastReceivedAt: "2026-05-23T09:29:00.000Z",
         lastValue: 580.1,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: "good",
         rawPayload: "{\"value\":580.1}",
         topic: "kuozui/plant/solar/power",
@@ -589,6 +599,8 @@ test("buildMqttSettingsViewModel merges editable topic rows with runtime and cov
         lastReceivedAt: "2026-05-23T09:29:00.000Z",
         lastValue: 580.1,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: "good",
         rawPayload: "{\"value\":580.1}",
         topic: "kuozui/plant/solar/power",
@@ -610,6 +622,96 @@ test("buildMqttSettingsViewModel merges editable topic rows with runtime and cov
   assert.match(model.topicWorkspaceRows[0]?.lastReceivedLabel ?? "", /2026/);
   assert.equal(model.topicWorkspaceSummary.runtimeStatusLabel, "即時串流中");
   assert.equal(model.topicWorkspaceSummary.coverageCount, 1);
+});
+
+test("buildMqttSettingsViewModel prefers custom topic names and falls back to defaults when empty", () => {
+  const baseArgs = {
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "disconnected" as const,
+    liveMetricsSnapshot: null,
+    message: "",
+    readiness: createReadinessReport([]),
+    settings: {
+      clientId: "kuozui-green-display-01",
+      dataMode: "mqtt" as const,
+      host: "broker.internal",
+      messageTimeout: "30",
+      password: "****",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: "kuozui_display"
+    },
+    status: {
+      broker: "broker.internal:1883",
+      clientId: "kuozui-green-display-01",
+      connected: false,
+      reason: null,
+      updatedAt: null
+    },
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
+  };
+
+  const namedModel = buildMqttSettingsViewModel({
+    ...baseArgs,
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "realTimePower",
+        nameZh: "一號廠輸出",
+        nameEn: "Plant A Output",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.equal(namedModel.topicWorkspaceRows[0]?.metricLabelZh, "一號廠輸出");
+  assert.equal(namedModel.topicWorkspaceRows[0]?.metricLabelEn, "Plant A Output");
+  assert.equal(namedModel.topicWorkspaceRows[0]?.nameZh, "一號廠輸出");
+
+  const fallbackModel = buildMqttSettingsViewModel({
+    ...baseArgs,
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.equal(fallbackModel.topicWorkspaceRows[0]?.metricLabelZh, "即時發電功率");
+  assert.equal(fallbackModel.topicWorkspaceRows[0]?.metricLabelEn, "Real-time Power");
 });
 
 test("buildMqttSettingsViewModel explains the unconfigured CWA weather source instead of failing silently", () => {
@@ -891,6 +993,8 @@ test("buildMqttSettingsViewModel exposes section draft guidance topic impact gro
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "realTimePower",
+        nameZh: null,
+        nameEn: null,
         quality: null,
         rawPayload: null,
         topic: "kuozui/plant/solar/power",
@@ -904,6 +1008,8 @@ test("buildMqttSettingsViewModel exposes section draft guidance topic impact gro
         lastReceivedAt: "2026-05-23T06:19:00.000Z",
         lastValue: 1280,
         metricKey: "factoryProductionPower",
+        nameZh: null,
+        nameEn: null,
         quality: "good",
         rawPayload: "{\"value\":1280}",
         topic: "kuozui/factory/production/power",
@@ -1002,6 +1108,8 @@ test("buildMqttSettingsViewModel resolves non-empty labels for three-phase metri
       lastReceivedAt: null,
       lastValue: null,
       metricKey,
+      nameZh: null,
+      nameEn: null,
       quality: null,
       rawPayload: null,
       topic: `kuozui/plant/phase/${metricKey}`,

@@ -7,6 +7,16 @@ const pageDir = path.resolve(import.meta.dirname);
 const mqttSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
 const mqttSettingsLoadModelSource = fs.readFileSync(path.join(pageDir, "loadModel.ts"), "utf8");
 
+test("mqtt settings includes custom display names in the topics save payload", () => {
+  const saveTopicsSource = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const saveTopicMappings = useCallback(async () => {"),
+    mqttSettingsSource.indexOf("method: \"PUT\"", mqttSettingsSource.indexOf("const saveTopicMappings = useCallback(async () => {"))
+  );
+
+  assert.match(saveTopicsSource, /nameZh:\s*topic\.nameZh/);
+  assert.match(saveTopicsSource, /nameEn:\s*topic\.nameEn/);
+});
+
 test("mqtt settings only marks broker settings synced after weather settings save succeeds", () => {
   const saveSettingsSource = mqttSettingsSource.slice(
     mqttSettingsSource.indexOf("const saveSettings = useCallback(async () => {"),

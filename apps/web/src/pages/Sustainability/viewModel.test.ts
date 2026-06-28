@@ -252,6 +252,16 @@ test("buildSustainabilityViewModel rounds the total CO₂ reduction to a whole n
   assert.equal(co2Highlight?.value, "38");
 });
 
+test("buildSustainabilityViewModel labels are fixed built-ins with no metric_key topic-name binding", () => {
+  // Scope boundary for mqtt-topic-custom-display-names: Sustainability cards are
+  // driven by an aggregate SustainabilityStoryInput (period big numbers), not by
+  // per-metric_key live readings, so topic custom names do not apply here.
+  const model = buildSustainabilityViewModel({});
+
+  assert.equal(model.bigNumbers[0]?.label, "累積發電量");
+  assert.equal(model.bigNumbers[1]?.label, "累積 CO₂ 減量");
+});
+
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 

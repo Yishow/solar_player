@@ -116,6 +116,143 @@ test("GET /api/settings/mqtt/topics exposes broker status alongside topic and re
   }
 });
 
+test("GET /api/settings/mqtt/topics exposes custom display names per mapping", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare("UPDATE topic_mappings SET name_zh = ?, name_en = ? WHERE metric_key = ?")
+    .run("即時輸出", "Live Output", "realTimePower");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/mqtt/topics"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      topics: Array<{ metricKey: string; nameZh: string | null; nameEn: string | null }>;
+    };
+
+    const named = body.topics.find((topic) => topic.metricKey === "realTimePower");
+    assert.equal(named?.nameZh, "即時輸出");
+    assert.equal(named?.nameEn, "Live Output");
+
+    const unnamed = body.topics.find((topic) => topic.nameZh === null);
+    assert.equal(unnamed?.nameEn, null);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics persists custom names and preserves them when omitted", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+
+    const writeResponse = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "realTimePower",
+            topic: "solar/power/realtime",
+            nameZh: "一號廠輸出",
+            nameEn: "Plant A Output"
+          },
+          {
+            metricKey: "todayGeneration",
+            topic: "solar/energy/today"
+          }
+        ]
+      }
+    });
+
+    assert.equal(writeResponse.statusCode, 200);
+
+    const stored = getDatabase()
+      .prepare("SELECT name_zh, name_en FROM topic_mappings WHERE metric_key = ?")
+      .get("realTimePower") as { name_zh: string | null; name_en: string | null };
+    assert.equal(stored.name_zh, "一號廠輸出");
+    assert.equal(stored.name_en, "Plant A Output");
+
+    // Re-save without name fields: existing names must be preserved.
+    const preserveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "realTimePower",
+            topic: "solar/power/realtime"
+          }
+        ]
+      }
+    });
+
+    assert.equal(preserveResponse.statusCode, 200);
+
+    const preserved = getDatabase()
+      .prepare("SELECT name_zh, name_en FROM topic_mappings WHERE metric_key = ?")
+      .get("realTimePower") as { name_zh: string | null; name_en: string | null };
+    assert.equal(preserved.name_zh, "一號廠輸出");
+    assert.equal(preserved.name_en, "Plant A Output");
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics clears a name when an empty string is sent", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database
+    .prepare("UPDATE topic_mappings SET name_zh = ?, name_en = ? WHERE metric_key = ?")
+    .run("待清除", "To Clear", "realTimePower");
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "realTimePower",
+            topic: "solar/power/realtime",
+            nameZh: "",
+            nameEn: ""
+          }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const stored = getDatabase()
+      .prepare("SELECT name_zh, name_en FROM topic_mappings WHERE metric_key = ?")
+      .get("realTimePower") as { name_zh: string | null; name_en: string | null };
+    assert.equal(stored.name_zh, null);
+    assert.equal(stored.name_en, null);
+  } finally {
+    await app.close();
+  }
+});
+
 test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves", async () => {
   migrateDatabase();
   seedDatabase();

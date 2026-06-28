@@ -95,6 +95,8 @@ function createEmptyMapping(metricKey: string): TopicMapping {
     lastReceivedAt: null,
     lastValue: null,
     metricKey,
+    nameZh: null,
+    nameEn: null,
     quality: null,
     rawPayload: null,
     topic: "",
@@ -490,6 +492,8 @@ export function MqttSettings() {
           topics: topics.map((topic) => ({
             enabled: topic.enabled,
             metricKey: topic.metricKey,
+            nameZh: topic.nameZh?.trim() ?? "",
+            nameEn: topic.nameEn?.trim() ?? "",
             topic: topic.topic.trim(),
             unit: topic.unit.trim(),
             valuePath: topic.valuePath.trim()

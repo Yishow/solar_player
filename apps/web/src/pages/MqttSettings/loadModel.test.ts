@@ -11,6 +11,8 @@ function buildTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping 
     lastReceivedAt: "2026-06-26T07:00:00.000Z",
     lastValue: 100,
     metricKey: "realTimePower",
+    nameZh: null,
+    nameEn: null,
     quality: "good",
     rawPayload: '{"value":100}',
     topic: "kuozui/plant/solar/power",
@@ -20,6 +22,22 @@ function buildTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping 
     ...overrides
   };
 }
+
+test("mergePolledTopicMappings preserves a locally edited custom name as a draft", () => {
+  const synced = buildTopicMapping();
+  const currentDraft = buildTopicMapping({ nameZh: "一號廠輸出", nameEn: "Plant A Output" });
+  const polled = buildTopicMapping({
+    lastReceivedAt: "2026-06-26T07:05:00.000Z",
+    lastValue: 123.4
+  });
+
+  const merged = mergePolledTopicMappings([currentDraft], [synced], [polled]);
+
+  assert.equal(merged[0]?.nameZh, "一號廠輸出");
+  assert.equal(merged[0]?.nameEn, "Plant A Output");
+  // Runtime fields still refresh from the polled snapshot.
+  assert.equal(merged[0]?.lastValue, 123.4);
+});
 
 test("mergePolledTopicMappings preserves local editable topic drafts while refreshing runtime fields", () => {
   const synced = buildTopicMapping();

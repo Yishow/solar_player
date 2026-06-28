@@ -170,16 +170,54 @@ const slotOrder: DisplayCircuitSlotKey[] = [
   "infrastructure"
 ];
 
+type TopicDisplayName = {
+  nameEn: string | null;
+  nameZh: string | null;
+};
+
 type DisplayStorySourceContext = {
   circuits: CircuitRow[];
   flowState: ReturnType<typeof resolveSolarFlowState>;
   generatedAt: string;
   isConnected: boolean;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
+  topicNames: Map<string, TopicDisplayName>;
 };
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
+}
+
+/**
+ * 讀取 topic_mappings 的自訂中英文名稱,以 metric_key 為鍵,
+ * 供 playback story label 解析使用。空字串視同未設定(null)。
+ */
+function readTopicDisplayNames(): Map<string, TopicDisplayName> {
+  const rows = getDatabase()
+    .prepare("SELECT metric_key, name_zh, name_en FROM topic_mappings")
+    .all() as Array<{ metric_key: string; name_zh: string | null; name_en: string | null }>;
+
+  return new Map(
+    rows.map((row) => [
+      row.metric_key,
+      {
+        nameEn: row.name_en?.trim() || null,
+        nameZh: row.name_zh?.trim() || null
+      }
+    ])
+  );
+}
+
+/**
+ * 以 topic 自訂名稱(中文優先,其次英文)覆寫預設 label;皆未設定時回傳預設。
+ */
+function resolveTopicLabel(
+  topicNames: Map<string, TopicDisplayName>,
+  metricKey: string,
+  defaultLabel: string
+) {
+  const custom = topicNames.get(metricKey);
+  return custom?.nameZh ?? custom?.nameEn ?? defaultLabel;
 }
 
 function readCircuits() {
@@ -597,7 +635,8 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
     }),
     generatedAt: new Date().toISOString(),
     isConnected,
-    snapshot
+    snapshot,
+    topicNames: readTopicDisplayNames()
   };
 }
 
@@ -627,12 +666,15 @@ export function readOverviewDisplayStory(
 ): OverviewStoryPayload {
   const trendProfile = readOverviewGenerationTrendSeries();
   const overview = overviewMetrics.map((binding) => {
-    const resolved = resolveMonitoringMetricBinding({
-      binding,
-      isConnected: context.isConnected,
-      now: context.snapshot.timestamp ?? undefined,
-      reading: context.snapshot.metrics[binding.metricKey] ?? null
-    });
+    const resolved = {
+      ...resolveMonitoringMetricBinding({
+        binding,
+        isConnected: context.isConnected,
+        now: context.snapshot.timestamp ?? undefined,
+        reading: context.snapshot.metrics[binding.metricKey] ?? null
+      }),
+      label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label)
+    };
 
     if (binding.metricKey === "realTimePower" && trendProfile.series.length > 0) {
       return {
@@ -668,6 +710,7 @@ export function readSolarDisplayStory(
       });
       return {
         ...resolved,
+        label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: context.isConnected
@@ -698,6 +741,12 @@ export function readFactoryCircuitDisplayStory(
     const circuit = matches.length === 1 ? matches[0]! : null;
     const metricKey = slotMetricMap[slotKey];
     const reading = metricKey ? context.snapshot.metrics[metricKey] ?? null : null;
+    // Name priority: topic custom name → circuit config name → slot key default.
+    const slotLabel = resolveTopicLabel(
+      context.topicNames,
+      metricKey,
+      circuit?.name_zh ?? circuit?.name_en ?? slotKey
+    );
     const state =
       binding.bindingState !== "bound"
         ? ({
@@ -710,7 +759,7 @@ export function readFactoryCircuitDisplayStory(
             const readingState = resolveFactoryMetricBinding({
               dependencyKeys: [metricKey],
               isConnected: context.isConnected,
-              label: circuit?.name_zh ?? circuit?.name_en ?? slotKey,
+              label: slotLabel,
               metricKey,
               now: context.snapshot.timestamp ?? undefined,
               reading,
@@ -744,7 +793,7 @@ export function readFactoryCircuitDisplayStory(
     return {
       ...state,
       circuitId: circuit?.id ?? null,
-      label: circuit?.name_zh ?? circuit?.name_en ?? slotKey,
+      label: slotLabel,
       livePowerKw:
         state.bindingState === "bound" &&
         state.freshnessState === "fresh" &&

@@ -37,6 +37,8 @@ export interface MqttTopicMapping {
   id: number;
   metricKey: string;
   topic: string;
+  nameZh: string | null;
+  nameEn: string | null;
   unit: string | null;
   valuePath: string | null;
   multiplier: number;

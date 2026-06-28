@@ -299,6 +299,36 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
   assert.equal(model.summary.statusLabel, "迴路資料已同步");
 });
 
+test("buildFactoryCircuitViewModel surfaces the custom topic name via the story slot label", () => {
+  const baseSlot = { bindingState: "bound" as const, fallbackReason: null, freshnessState: "fresh" as const, alertTone: "normal" as const, livePowerKw: 100 };
+  const model = buildFactoryCircuitViewModel({
+    circuits: [],
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot,
+    factoryCircuitStory: {
+      kpis: [
+        { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "目前廠區總用電", metricKey: "totalPower", provenance: "live", sourceClass: "slot-aggregate", unit: "kW", value: "920" },
+        { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "太陽能供應占比", metricKey: "solarShare", provenance: "derived", sourceClass: "derived-metric", unit: "%", value: "40" },
+        { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "今日自發自用電量", metricKey: "selfConsumption", provenance: "live", sourceClass: "mqtt-live", unit: "kWh", value: "2,430" },
+        { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "尖峰負載", metricKey: "peak", provenance: "live", sourceClass: "mqtt-live", unit: "kW", value: "640" },
+        { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "目前綠電流向", metricKey: "flow", provenance: "live", sourceClass: "mqtt-live", unit: "kW", value: "368" }
+      ],
+      slots: [
+        { ...baseSlot, slotKey: "production", label: "一號產線", livePowerKw: 520, circuitId: 1 },
+        { ...baseSlot, slotKey: "hvac", label: "空調", circuitId: 2 },
+        { ...baseSlot, slotKey: "lighting", label: "照明", circuitId: 3 },
+        { ...baseSlot, slotKey: "office", label: "辦公", circuitId: 4 },
+        { ...baseSlot, slotKey: "ev", label: "充電", circuitId: 5 },
+        { ...baseSlot, slotKey: "infrastructure", label: "基礎", circuitId: 6 }
+      ],
+      summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
+    }
+  });
+
+  assert.equal(model.loadRows[0]?.labelZh, "一號產線");
+});
+
 test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitStory has too few slots", () => {
   const runtimes = buildFactoryCircuitRuntimes(circuitConfigs);
   const model = buildFactoryCircuitViewModel({

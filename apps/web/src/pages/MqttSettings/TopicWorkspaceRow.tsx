@@ -41,10 +41,10 @@ function TopicInputGroup({
   handleTopicChange
 }: {
   rowId: number;
-  field: "topic" | "unit";
+  field: "topic" | "unit" | "nameZh" | "nameEn";
   label: string;
   placeholder: string;
-  value: string;
+  value: string | null;
   handleTopicChange: TopicWorkspaceRowProps["handleTopicChange"];
 }) {
   return (
@@ -53,7 +53,7 @@ function TopicInputGroup({
       <input
         type="text"
         placeholder={placeholder}
-        value={value}
+        value={value ?? ""}
         onChange={(event) => handleTopicChange(rowId, field, event.target.value)}
       />
     </div>
@@ -91,6 +91,25 @@ function TopicWorkspaceRowImpl({
             移除
           </button>
         </div>
+      </div>
+
+      <div className="topic-workspace-row__names">
+        <TopicInputGroup
+          rowId={topic.id}
+          field="nameZh"
+          label="名稱"
+          placeholder="自訂中文名稱..."
+          value={topic.nameZh}
+          handleTopicChange={handleTopicChange}
+        />
+        <TopicInputGroup
+          rowId={topic.id}
+          field="nameEn"
+          label="Name"
+          placeholder="Custom English name..."
+          value={topic.nameEn}
+          handleTopicChange={handleTopicChange}
+        />
       </div>
 
       <div className="topic-workspace-row__body">

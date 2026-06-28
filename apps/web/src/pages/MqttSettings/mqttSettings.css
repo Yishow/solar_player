@@ -374,6 +374,13 @@
   gap: 16px;
 }
 
+.mqtt-settings-page .topic-workspace-row__names {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .mqtt-settings-page .topic-workspace-row__fields {
   flex: 1;
   display: grid;

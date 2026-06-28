@@ -37,6 +37,8 @@ export type TopicMapping = {
   id: number;
   metricKey: string;
   topic: string;
+  nameZh: string | null;
+  nameEn: string | null;
   unit: string;
   valuePath: string;
   enabled: boolean;
@@ -427,8 +429,8 @@ export function buildMqttSettingsViewModel({
       enabledLabel: topic.enabled ? "ON" : "OFF",
       lastReceivedLabel: formatTimestamp(runtimeTopic.lastReceivedAt),
       metricIcon: metric.icon,
-      metricLabelEn: metric.en,
-      metricLabelZh: metric.zh
+      metricLabelEn: topic.nameEn ?? metric.en,
+      metricLabelZh: topic.nameZh ?? metric.zh
     };
   });
   const enabledTopics = mappedTopics.filter((topic) => topic.enabled);

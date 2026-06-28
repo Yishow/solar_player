@@ -19,6 +19,8 @@ type TopicMappingResponse = {
   id: number;
   metricKey: string;
   topic: string;
+  nameZh: string | null;
+  nameEn: string | null;
   unit: string;
   valuePath: string;
   enabled: boolean;
@@ -35,6 +37,8 @@ type TestConnectionBody = SettingsBody;
 type TopicMappingInput = {
   metricKey: string;
   topic: string;
+  nameZh?: string;
+  nameEn?: string;
   unit?: string;
   valuePath?: string;
   enabled?: boolean;
@@ -45,11 +49,25 @@ type ExistingTopicMappingRow = {
   decimal_places: number | null;
   metric_key: string;
   multiplier: number | null;
+  name_en: string | null;
+  name_zh: string | null;
   offset: number | null;
 };
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
+}
+
+/**
+ * 解析 topic 自訂名稱:input 未帶(undefined)時保留既有值;
+ * 帶空字串視為清除(NULL);帶非空字串則去除前後空白後存入。
+ */
+function resolveCustomName(input: string | undefined, existing: string | null) {
+  if (input === undefined) {
+    return existing;
+  }
+
+  return input.trim() || null;
 }
 
 function getSettingsRow() {
@@ -122,6 +140,8 @@ function readTopicMappings() {
           topic_mappings.id,
           topic_mappings.metric_key,
           topic_mappings.topic,
+          topic_mappings.name_zh,
+          topic_mappings.name_en,
           topic_mappings.unit,
           topic_mappings.value_path,
           topic_mappings.enabled,
@@ -140,6 +160,8 @@ function readTopicMappings() {
     id: number;
     metric_key: string;
     topic: string;
+    name_zh: string | null;
+    name_en: string | null;
     unit: string | null;
     value_path: string | null;
     enabled: number;
@@ -158,6 +180,8 @@ function serializeTopicMappings(): TopicMappingResponse[] {
     lastReceivedAt: mapping.last_received_at,
     lastValue: mapping.last_value,
     metricKey: mapping.metric_key,
+    nameEn: mapping.name_en,
+    nameZh: mapping.name_zh,
     quality: mapping.quality,
     rawPayload: mapping.raw_payload,
     topic: mapping.topic,
@@ -284,6 +308,8 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
                 multiplier,
                 offset,
                 decimal_places,
+                name_zh,
+                name_en,
                 created_at
               FROM topic_mappings
             `
@@ -299,6 +325,8 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         INSERT INTO topic_mappings (
           metric_key,
           topic,
+          name_zh,
+          name_en,
           unit,
           value_path,
           multiplier,
@@ -307,7 +335,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           enabled,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `);
 
       for (const topic of topics) {
@@ -315,6 +343,8 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         insertMapping.run(
           topic.metricKey,
           topic.topic,
+          resolveCustomName(topic.nameZh, existingMapping?.name_zh ?? null),
+          resolveCustomName(topic.nameEn, existingMapping?.name_en ?? null),
           topic.unit?.trim() || null,
           topic.valuePath?.trim() || null,
           existingMapping?.multiplier ?? 1,

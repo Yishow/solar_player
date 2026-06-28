@@ -8,6 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 import { displayPageTemplateKeys, type DisplayPageInstance, type DisplayPageTemplateKey } from "@solar-display/shared";
 import { DisplayPagesEditor } from "./index";
 import { resolveDisplayEditorRegions } from "./inspectorFields";
+import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
 import { createOverviewDisplayPageSeedConfig } from "../Overview/displayPageConfig";
@@ -269,7 +270,9 @@ test("schema-backed media placement regions resolve fit, focus, and align defaul
     sustainabilitySeed
   ).find((region) => region.id === "sustainability-hero-media");
 
-  for (const [region, expectedFields] of [
+  const regionFieldExpectations: Array<
+    [ResolvedDisplayEditorRegion | undefined, Array<[string, unknown]>]
+  > = [
     [
       overviewHeroRegion,
       [
@@ -310,10 +313,13 @@ test("schema-backed media placement regions resolve fit, focus, and align defaul
         ["sustainability-hero-align-y", sustainabilitySeed.heroMedia.alignY]
       ]
     ]
-  ] as const) {
+  ];
+
+  for (const [region, expectedFields] of regionFieldExpectations) {
     assert.ok(region);
+    const resolvedRegion: ResolvedDisplayEditorRegion = region;
     for (const [fieldId, expectedValue] of expectedFields) {
-      const field = region.fields.find((entry) => entry.id === fieldId);
+      const field = resolvedRegion.fields.find((entry) => entry.schema.id === fieldId);
       assert.ok(field, `missing field ${fieldId}`);
       assert.equal(field.value, expectedValue, `unexpected default for ${fieldId}`);
     }
