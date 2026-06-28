@@ -118,7 +118,7 @@ test("page scaffold remains the management witness contract", () => {
   assert.match(html, /data-shell-density="management"/);
   assert.match(html, /data-shell-primitive="management-scaffold"/);
   assert.match(html, /data-shell-primitive="title-block"/);
-  assert.match(html, /data-shell-primitive="page-number-pill"/);
+  assert.doesNotMatch(html, /data-shell-primitive="page-number-pill"/);
   assert.match(html, /min-h-full/);
   assert.doesNotMatch(html, /class="grid gap-6"/);
 });

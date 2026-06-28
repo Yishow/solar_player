@@ -1,8 +1,7 @@
 import React from "react";
 import type { PropsWithChildren } from "react";
-import { routeMetaList, routeMetaMap } from "../../app/routeMeta";
+import { routeMetaMap } from "../../app/routeMeta";
 import { PageContainer } from "../../components/PageContainer";
-import { PageNumberPill } from "../../components/PageNumberPill";
 
 type PageScaffoldProps = PropsWithChildren<{
   path: string;
@@ -23,7 +22,6 @@ export function PageScaffold({ path, description, children }: PageScaffoldProps)
       title={routeMeta.title}
       subtitle={routeMeta.subtitle}
       description={description}
-      aside={<PageNumberPill current={routeMeta.order} total={routeMetaList.length} />}
     >
       {children}
     </PageContainer>
