@@ -204,7 +204,6 @@ code:
   - .hermes/codex_goal2.md
   - .superpowers/brainstorm/4903-1779123645/content/waiting-1.html
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/pageRegionSchemas.ts
   - packages/shared/src/displayRotation.ts
   - apps/server/src/db/seed.ts

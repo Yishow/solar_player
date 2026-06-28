@@ -59,7 +59,6 @@ code:
   - apps/server/src/routes/playback.ts
   - apps/web/src/layouts/offlineRouting.ts
   - apps/web/src/pages/DisplayPagesEditor/fallbackPageDefinitions.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - packages/shared/src/deviceDisplayOps.ts
   - .hermes/codex_goal2.md
   - apps/web/src/hooks/useImageAssetReferences.ts
@@ -273,7 +272,6 @@ code:
   - apps/server/src/routes/playback.ts
   - apps/web/src/layouts/offlineRouting.ts
   - apps/web/src/pages/DisplayPagesEditor/fallbackPageDefinitions.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - packages/shared/src/deviceDisplayOps.ts
   - .hermes/codex_goal2.md
   - apps/web/src/hooks/useImageAssetReferences.ts

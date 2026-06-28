@@ -160,7 +160,6 @@ code:
   - .hermes/codex_goal1_change2_remaining.md
   - .hermes/codex_prompt_goal1_change1.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - .superpowers/brainstorm/4903-1779123645/content/editor-layouts.html
   - .superpowers/brainstorm/4903-1779123645/state/server-stopped
   - apps/web/src/hooks/useDisplayEditor.ts
@@ -374,7 +373,6 @@ code:
   - .hermes/codex_goal1_change2_remaining.md
   - .hermes/codex_prompt_goal1_change1.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - .superpowers/brainstorm/4903-1779123645/content/editor-layouts.html
   - .superpowers/brainstorm/4903-1779123645/state/server-stopped
   - apps/web/src/hooks/useDisplayEditor.ts

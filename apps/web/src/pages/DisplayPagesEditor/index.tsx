@@ -94,10 +94,7 @@ import {
   useDisplayEditorCanvasWorkflow
 } from "./useDisplayEditorCanvasWorkflow";
 
-type DisplayEditorField = { id: string; label: string; onChange: (value: string) => void; step?: number; type: "number" | "text"; value: number | string };
 type DisplayEditorWorkspace = "assets" | "editor" | "shell";
-type DisplayEditorRect = { height?: number; left: number; top: number; width: number };
-export type DisplayEditorRegion = { description?: string; fields: DisplayEditorField[]; id: string; label: string; rect?: DisplayEditorRect };
 export type DisplayEditorPageDefinition = {
   createSeedConfig: () => Record<string, unknown>;
   id: string;

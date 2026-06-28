@@ -225,7 +225,6 @@ code:
   - apps/web/src/hooks/useDeviceDisplayOpsSummary.ts
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/Images/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
   - apps/web/src/hooks/usePageRotation.ts
   - packages/shared/src/sustainabilityStory.ts

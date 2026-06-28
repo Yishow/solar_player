@@ -171,7 +171,6 @@ code:
   - apps/web/src/components/SectionTitle.tsx
   - .superpowers/brainstorm/4903-1779123645/state/server.pid
   - apps/web/src/pages/displayPageMediaStyle.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/hooks/displayPageConfigPaths.ts
   - apps/server/src/routes/images.ts
   - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts

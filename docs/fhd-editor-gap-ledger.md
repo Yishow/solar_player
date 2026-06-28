@@ -8,7 +8,7 @@ This ledger audits the five playback pages against the current product code and 
 - `apps/web/src/pages/DisplayPagesEditor/pageRegionSchemas.ts:9-14` maps the five playback template keys to `overviewDisplayPageEditorRegions`, `solarDisplayPageEditorRegions`, `factoryCircuitDisplayPageEditorRegions`, `imagesDisplayPageEditorRegions`, and `sustainabilityDisplayPageEditorRegions`.
 - Current shared schema support is in `packages/shared/src/displayEditorSchema.ts:1-119`: text, number, toggle, select, asset, array, visibleWhen, constraints, geometry, card-rail child source, mediaEffectSurface, and presetKey.
 - Shared card style fields are in `apps/web/src/pages/shared/displayCardStyleConfig.ts:75-192`; shared chrome fields are in `apps/web/src/pages/shared/displayPageChromeConfig.ts:64-381`; shared media-effect fields are in `apps/web/src/pages/shared/displayPageMediaEffectConfig.ts:20-193`.
-- `buildOverviewRegions`, `buildSolarRegions`, `buildFactoryCircuitRegions`, `buildImagesRegions`, and `buildSustainabilityRegions` appear only as local preview helper functions in `apps/web/src/pages/DisplayPagesEditor/runtime*.tsx`. They are imported through `runtimePageDefinitions.tsx` for runtime page definitions, and current editor inspection uses the schema exports above rather than any `buildEditableRegions` contract.
+- Editor inspection resolves editable regions solely from the `*DisplayPageEditorRegions` schema exports above; `apps/web/src/pages/DisplayPagesEditor/runtime*.tsx` now contributes only each page's `*RuntimePageDefinition` (`renderPage`, `renderPreview`, `createSeedConfig`, `templateKey`) and no longer holds any local region-builder helper or `buildEditableRegions` contract.
 
 ## Classification Rules
 

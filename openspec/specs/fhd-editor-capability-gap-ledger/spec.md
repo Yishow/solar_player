@@ -222,7 +222,7 @@ The ledger SHALL be grounded in current repo sources and SHALL avoid deprecated 
 - **GIVEN** the contributor audits editor coverage
 - **WHEN** they choose code anchors for the ledger
 - **THEN** they SHALL use `DisplayPagesEditor`, `pageRegionSchemasByTemplate`, and each page's `*DisplayPageEditorRegions` as the active editor-region source
-- **AND** they SHALL NOT treat unused local `build*Regions` helpers in `runtime*.tsx` as authoritative unless implementation proves they are wired into the editor
+- **AND** the ledger and its governance test SHALL NOT require any `build*Regions` helper text, because those unused local helpers have been removed from `runtime*.tsx`
 
 #### Scenario: Ledger does not depend on reference-match
 
@@ -233,64 +233,20 @@ The ledger SHALL be grounded in current repo sources and SHALL avoid deprecated 
 
 
 <!-- @trace
-source: audit-display-pages-fhd-editor-capability-gaps
-updated: 2026-06-05
+source: remove-legacy-display-editor-region-builders
+updated: 2026-06-28
 code:
-  - docs/reference-match/display-launch-witness-matrix.md
-  - apps/server/src/services/displayPagePublishingService.ts
-  - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
-  - apps/web/src/pages/Images/images.css
-  - apps/web/package.json
-  - AGENTS.md
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/pages/Solar/solar.css
-  - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
-  - CLAUDE.md
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - apps/web/src/pages/shared/displaySurfaceChrome.css
-  - package.json
-  - scripts/capture-fhd-witness.mjs
-  - docs/reference-match/fhd-evidence-bundle-template.md
-  - apps/web/src/pages/Images/displayPageConfig.ts
-  - docs/fhd-witness/playback-closeout-matrix.md
-  - scripts/fhd-witness-config.mjs
-  - docs/fhd-witness/evidence-template.md
-  - README.md
-  - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/pages/Sustainability/index.tsx
-  - data/server-runtime.lock.json
-  - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - apps/web/src/pages/Solar/displayPageConfig.ts
-  - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
   - docs/fhd-editor-gap-ledger.md
-  - apps/web/src/pages/Sustainability/sustainability.css
-  - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - .vscode/tasks.json
 tests:
-  - apps/web/src/pages/fhdWitnessTooling.test.ts
-  - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
-  - apps/web/src/pages/Solar/layout.test.ts
-  - apps/web/src/pages/displayPageIconSourceMode.test.ts
-  - apps/web/src/pages/displayPageSeeds.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
-  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
-  - apps/web/src/pages/displayLaunchWitnessGates.test.ts
-  - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
-  - apps/web/src/pages/displayPageMediaStyle.test.tsx
-  - apps/web/src/pages/displayPageChromeConfig.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
 -->
 
 ---

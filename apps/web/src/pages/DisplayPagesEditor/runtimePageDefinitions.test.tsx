@@ -7,9 +7,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { displayPageTemplateKeys, type DisplayPageInstance, type DisplayPageTemplateKey } from "@solar-display/shared";
 import { DisplayPagesEditor } from "./index";
-import { mediaPlacementFields } from "./runtimeFieldBuilders";
+import { resolveDisplayEditorRegions } from "./inspectorFields";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { buildRegistryPageDefinitions } from "./registryPageDefinitions";
+import { createOverviewDisplayPageSeedConfig } from "../Overview/displayPageConfig";
+import { createSolarDisplayPageSeedConfig } from "../Solar/displayPageConfig";
+import { createImagesDisplayPageSeedConfig } from "../Images/displayPageConfig";
+import { createSustainabilityDisplayPageSeedConfig } from "../Sustainability/displayPageConfig";
 
 const editorRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
 const runtimeDefinitionsSource = readFileSync(
@@ -17,31 +21,6 @@ const runtimeDefinitionsSource = readFileSync(
   "utf8"
 );
 const displayEditorIndexSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
-
-test("media placement field builder exposes fit, focus, and align controls for editor regions", () => {
-  const fields = mediaPlacementFields(
-    "images-stage",
-    ["mainStage"],
-    {
-      alt: "Stage image",
-      src: "/images-stage.jpg"
-    },
-    () => {}
-  );
-
-  assert.deepEqual(
-    fields.map((field) => field.id),
-    [
-      "images-stage-fit-mode",
-      "images-stage-focus-x",
-      "images-stage-focus-y",
-      "images-stage-align-x",
-      "images-stage-align-y"
-    ]
-  );
-  assert.equal(fields[0]?.value, "cover");
-  assert.equal(fields[1]?.value, 0.5);
-});
 
 test("runtime page definitions expand registry-backed duplicate instances into independent editor tabs", () => {
   const registryPages: DisplayPageInstance[] = [
@@ -261,6 +240,84 @@ test("page region schemas expose composable effect support matrices on renderer-
     sustainabilityHeroRegion?.mediaEffectSurface?.support?.opacity?.zones,
     ["full-frame"]
   );
+});
+
+test("schema-backed media placement regions resolve fit, focus, and align defaults from seed config", () => {
+  const overviewSeed = createOverviewDisplayPageSeedConfig();
+  const solarSeed = createSolarDisplayPageSeedConfig();
+  const imagesSeed = createImagesDisplayPageSeedConfig();
+  const sustainabilitySeed = createSustainabilityDisplayPageSeedConfig();
+
+  const overviewHeroRegion = resolveDisplayEditorRegions(
+    overviewSeed,
+    resolvePageRegionSchemas("overview"),
+    overviewSeed
+  ).find((region) => region.id === "overview-hero-media");
+  const solarHeroRegion = resolveDisplayEditorRegions(
+    solarSeed,
+    resolvePageRegionSchemas("solar"),
+    solarSeed
+  ).find((region) => region.id === "solar-hero-media");
+  const imagesStageRegion = resolveDisplayEditorRegions(
+    imagesSeed,
+    resolvePageRegionSchemas("images"),
+    imagesSeed
+  ).find((region) => region.id === "images-main-stage");
+  const sustainabilityHeroRegion = resolveDisplayEditorRegions(
+    sustainabilitySeed,
+    resolvePageRegionSchemas("sustainability"),
+    sustainabilitySeed
+  ).find((region) => region.id === "sustainability-hero-media");
+
+  for (const [region, expectedFields] of [
+    [
+      overviewHeroRegion,
+      [
+        ["hero-fit-mode", overviewSeed.heroMedia.fitMode],
+        ["hero-focus-x", overviewSeed.heroMedia.focusX],
+        ["hero-focus-y", overviewSeed.heroMedia.focusY],
+        ["hero-align-x", overviewSeed.heroMedia.alignX],
+        ["hero-align-y", overviewSeed.heroMedia.alignY]
+      ]
+    ],
+    [
+      solarHeroRegion,
+      [
+        ["solar-hero-fit-mode", solarSeed.heroMedia.fitMode],
+        ["solar-hero-focus-x", solarSeed.heroMedia.focusX],
+        ["solar-hero-focus-y", solarSeed.heroMedia.focusY],
+        ["solar-hero-align-x", solarSeed.heroMedia.alignX],
+        ["solar-hero-align-y", solarSeed.heroMedia.alignY]
+      ]
+    ],
+    [
+      imagesStageRegion,
+      [
+        ["images-stage-fit-mode", imagesSeed.mainStage.fitMode],
+        ["images-stage-focus-x", imagesSeed.mainStage.focusX],
+        ["images-stage-focus-y", imagesSeed.mainStage.focusY],
+        ["images-stage-align-x", imagesSeed.mainStage.alignX],
+        ["images-stage-align-y", imagesSeed.mainStage.alignY]
+      ]
+    ],
+    [
+      sustainabilityHeroRegion,
+      [
+        ["sustainability-hero-fit-mode", sustainabilitySeed.heroMedia.fitMode],
+        ["sustainability-hero-focus-x", sustainabilitySeed.heroMedia.focusX],
+        ["sustainability-hero-focus-y", sustainabilitySeed.heroMedia.focusY],
+        ["sustainability-hero-align-x", sustainabilitySeed.heroMedia.alignX],
+        ["sustainability-hero-align-y", sustainabilitySeed.heroMedia.alignY]
+      ]
+    ]
+  ] as const) {
+    assert.ok(region);
+    for (const [fieldId, expectedValue] of expectedFields) {
+      const field = region.fields.find((entry) => entry.id === fieldId);
+      assert.ok(field, `missing field ${fieldId}`);
+      assert.equal(field.value, expectedValue, `unexpected default for ${fieldId}`);
+    }
+  }
 });
 
 test("display page editor no longer falls back to the phase-only inspector message for supported runtime pages", () => {

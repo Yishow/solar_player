@@ -184,7 +184,6 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/DisplayPagesEditor/index.tsx
   - .hermes/codex_goal1_change2.md
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.ts
   - apps/web/src/components/AppHeader.tsx

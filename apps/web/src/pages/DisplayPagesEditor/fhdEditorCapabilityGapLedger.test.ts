@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { displayPageTemplateKeys } from "@solar-display/shared";
@@ -30,6 +30,7 @@ const downstreamChanges = [
   "add-display-editor-fhd-flow-connector-controls",
   "add-ai-led-fhd-witness-tooling"
 ];
+const specsRoot = path.join(repoRoot, "openspec/specs");
 
 const deprecatedReferenceWorkflow = ["docs", "reference-match", ""].join("/");
 const ledgerTableHeader = [
@@ -52,6 +53,16 @@ function splitLedgerRow(row: string) {
     .slice(1, -1)
     .split("|")
     .map((cell) => cell.trim());
+}
+
+function listSpecMarkdownFiles(dirPath: string): string[] {
+  return readdirSync(dirPath, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      return listSpecMarkdownFiles(entryPath);
+    }
+    return entry.name === "spec.md" ? [entryPath] : [];
+  });
 }
 
 test("FHD editor capability gap ledger exists and references the five playback witnesses", () => {
@@ -135,10 +146,19 @@ test("FHD editor capability gap ledger records current editor source model", () 
     assert.match(pageRegionSchemaSource, new RegExp(sourceName));
     assert.match(markdown, new RegExp(sourceName));
   }
+});
 
-  assert.match(markdown, /buildOverviewRegions/);
-  assert.match(markdown, /buildSolarRegions/);
-  assert.match(markdown, /buildFactoryCircuitRegions/);
-  assert.match(markdown, /buildImagesRegions/);
-  assert.match(markdown, /buildSustainabilityRegions/);
+test("live openspec specs do not reference removed runtime field builder anchors", () => {
+  const specMarkdownFiles = listSpecMarkdownFiles(specsRoot);
+
+  assert.ok(specMarkdownFiles.length > 0);
+
+  for (const specPath of specMarkdownFiles) {
+    const markdown = readFileSync(specPath, "utf8");
+    assert.equal(
+      markdown.includes("apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts"),
+      false,
+      `unexpected removed runtimeFieldBuilders anchor in ${path.relative(repoRoot, specPath)}`
+    );
+  }
 });

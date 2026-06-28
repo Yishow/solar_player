@@ -139,7 +139,6 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/routes/display-pages-asset-governance-health.test-suite.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
   - .hermes/plan_publish_safety.md
   - apps/server/src/routes/display-ops.ts
@@ -346,7 +345,6 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/routes/display-pages-asset-governance-health.test-suite.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
   - .hermes/plan_publish_safety.md
   - apps/server/src/routes/display-ops.ts
