@@ -1,0 +1,549 @@
+# management-route-visibility-env Specification
+
+## Purpose
+
+TBD - created by archiving change 'add-management-route-visibility-env'. Update Purpose after archive.
+
+## Requirements
+
+### Requirement: Hide configured management routes from navigation
+
+The system SHALL read `VITE_HIDDEN_MANAGEMENT_ROUTES` as a comma-separated list of management route paths and SHALL omit matching management routes from operator navigation.
+
+#### Scenario: Trends and History are hidden by default
+
+- **WHEN** the web bundle is built with `VITE_HIDDEN_MANAGEMENT_ROUTES=/trends,/history`
+- **THEN** management navigation SHALL NOT include `趨勢`
+- **AND** management navigation SHALL NOT include `歷史`
+- **AND** other visible management routes SHALL remain available
+
+#### Scenario: Hidden route input includes spaces and repeated commas
+
+- **WHEN** `VITE_HIDDEN_MANAGEMENT_ROUTES` contains spaces, empty segments, or repeated commas
+- **THEN** the route visibility resolver SHALL ignore empty segments
+- **AND** it SHALL match trimmed absolute paths exactly
+
+
+<!-- @trace
+source: add-management-route-visibility-env
+updated: 2026-06-29
+code:
+  - apps/web/src/app/managementRouteVisibility.ts
+  - apps/web/src/components/PageNumberPill.tsx
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/app.ts
+  - apps/web/src/mocks/weather.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
+  - deploy/enable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
+  - docs/README.md
+  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/displayPageMediaStyle.ts
+  - deploy/repair-kiosk-system.sh
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - deploy/start-solar-kiosk.sh
+  - deploy/readonly-system-disable.sh
+  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
+  - apps/web/src/pages/MqttSettings/loadModel.ts
+  - apps/server/src/db/migrations/015_calculation_settings.sql
+  - apps/web/src/services/api.ts
+  - deploy/install-kiosk.sh
+  - packages/shared/src/displayPageConfig.ts
+  - apps/server/src/db/migrations/014_topic_display_names.sql
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/services/calculationSettingsService.ts
+  - docs/runbooks/device-diagnostics-safe-ops.md
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/server/src/plugins/managementAuth.ts
+  - apps/server/src/services/deviceKioskExitService.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy/configure-lightweight-desktop.sh
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardStatusField.ts
+  - packages/shared/src/householdEquivalence.ts
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - deploy/solar-display.service
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/server/src/env.ts
+  - apps/web/vite.config.ts
+  - README.md
+  - deploy.sh
+  - scripts/dev-lib.mjs
+  - packages/shared/src/displayPageCardRail.ts
+  - deploy/enable-readonly-root.sh
+  - apps/server/src/mqtt/MqttClientService.ts
+  - deploy/readonly-system-enable.sh
+  - deploy/verify-kiosk-install.sh
+  - apps/web/src/pages/Images/displayPageConfig.ts
+  - apps/server/src/db/migrations/016_co2_display_preference.sql
+  - docs/fhd-editor-gap-ledger.md
+  - scripts/prepare-raspi-user-data.sh
+  - scripts/dev.test.mjs
+  - apps/web/src/hooks/usePageRotation.ts
+  - deploy/apply-desktop-theme.sh
+  - apps/web/src/pages/Overview/overview.css
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
+  - deploy/disable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - scripts/dev.mjs
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - scripts/raspi-onekey-deploy.sh
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - scripts/prepare-raspi-user-data.ps1
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.ts
+  - scripts/connect-raspi-rdp.ps1
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/src/pages/shared/PageScaffold.tsx
+  - apps/web/scripts/run-tests.test.mjs
+  - scripts/dev-lib.d.mts
+  - scripts/deploy.test.mjs
+  - apps/web/scripts/run-tests.mjs
+  - .env.example
+  - apps/server/src/services/generationTrendSeries.ts
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/server/src/db/seed.ts
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - deploy.md
+  - apps/server/src/routes/calculation-settings.ts
+  - docs/runbooks/sustainability-calculation-settings.md
+  - packages/shared/src/types.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.ts
+  - deploy/raspi-bootstrap.sh
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/server/src/routes/data-source.ts
+  - deploy/firefox-kiosk.desktop
+  - apps/web/src/pages/ImageManagement/imageManagement.css
+  - deploy/disable-display-sleep.sh
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/routes/device.ts
+tests:
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/pages/Overview/densityViewModel.test.ts
+  - apps/server/src/db/migrations/calculationSettings.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - packages/shared/src/displayPageCardRail.test.ts
+  - apps/web/src/viteProxy.test.ts
+  - apps/web/src/pages/MqttSettings/loadModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/calculationSettingsService.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - packages/shared/src/displayStory.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/db/migrations/topicDisplayNames.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/server/src/services/generationTrendSeries.test.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/app/managementRouteVisibility.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
+  - apps/web/src/pages/DataSourceSettings/index.test.tsx
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/web/src/app/router.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/web/src/pages/Solar/cardFamily.test.ts
+  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.test.ts
+-->
+
+---
+### Requirement: Redirect direct access to hidden management routes
+
+The system SHALL redirect direct access to hidden management routes before mounting the hidden page component or loading its page-specific runtime data.
+
+#### Scenario: Operator opens a hidden monitoring route directly
+
+- **WHEN** `/trends` is hidden and the operator navigates directly to `/trends`
+- **THEN** the router SHALL redirect to a visible safe route
+- **AND** the Energy Trend page SHALL NOT mount for that navigation
+
+#### Scenario: All configured hidden routes are management routes
+
+- **WHEN** a configured hidden route does not match a known management route
+- **THEN** the resolver SHALL ignore that entry
+- **AND** playback routes SHALL NOT be hidden through this management-only setting
+
+
+<!-- @trace
+source: add-management-route-visibility-env
+updated: 2026-06-29
+code:
+  - apps/web/src/app/managementRouteVisibility.ts
+  - apps/web/src/components/PageNumberPill.tsx
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/app.ts
+  - apps/web/src/mocks/weather.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
+  - deploy/enable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
+  - docs/README.md
+  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/displayPageMediaStyle.ts
+  - deploy/repair-kiosk-system.sh
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - deploy/start-solar-kiosk.sh
+  - deploy/readonly-system-disable.sh
+  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
+  - apps/web/src/pages/MqttSettings/loadModel.ts
+  - apps/server/src/db/migrations/015_calculation_settings.sql
+  - apps/web/src/services/api.ts
+  - deploy/install-kiosk.sh
+  - packages/shared/src/displayPageConfig.ts
+  - apps/server/src/db/migrations/014_topic_display_names.sql
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/services/calculationSettingsService.ts
+  - docs/runbooks/device-diagnostics-safe-ops.md
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/server/src/plugins/managementAuth.ts
+  - apps/server/src/services/deviceKioskExitService.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy/configure-lightweight-desktop.sh
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardStatusField.ts
+  - packages/shared/src/householdEquivalence.ts
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - deploy/solar-display.service
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/server/src/env.ts
+  - apps/web/vite.config.ts
+  - README.md
+  - deploy.sh
+  - scripts/dev-lib.mjs
+  - packages/shared/src/displayPageCardRail.ts
+  - deploy/enable-readonly-root.sh
+  - apps/server/src/mqtt/MqttClientService.ts
+  - deploy/readonly-system-enable.sh
+  - deploy/verify-kiosk-install.sh
+  - apps/web/src/pages/Images/displayPageConfig.ts
+  - apps/server/src/db/migrations/016_co2_display_preference.sql
+  - docs/fhd-editor-gap-ledger.md
+  - scripts/prepare-raspi-user-data.sh
+  - scripts/dev.test.mjs
+  - apps/web/src/hooks/usePageRotation.ts
+  - deploy/apply-desktop-theme.sh
+  - apps/web/src/pages/Overview/overview.css
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
+  - deploy/disable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - scripts/dev.mjs
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - scripts/raspi-onekey-deploy.sh
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - scripts/prepare-raspi-user-data.ps1
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.ts
+  - scripts/connect-raspi-rdp.ps1
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/src/pages/shared/PageScaffold.tsx
+  - apps/web/scripts/run-tests.test.mjs
+  - scripts/dev-lib.d.mts
+  - scripts/deploy.test.mjs
+  - apps/web/scripts/run-tests.mjs
+  - .env.example
+  - apps/server/src/services/generationTrendSeries.ts
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/server/src/db/seed.ts
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - deploy.md
+  - apps/server/src/routes/calculation-settings.ts
+  - docs/runbooks/sustainability-calculation-settings.md
+  - packages/shared/src/types.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.ts
+  - deploy/raspi-bootstrap.sh
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/server/src/routes/data-source.ts
+  - deploy/firefox-kiosk.desktop
+  - apps/web/src/pages/ImageManagement/imageManagement.css
+  - deploy/disable-display-sleep.sh
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/routes/device.ts
+tests:
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/pages/Overview/densityViewModel.test.ts
+  - apps/server/src/db/migrations/calculationSettings.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - packages/shared/src/displayPageCardRail.test.ts
+  - apps/web/src/viteProxy.test.ts
+  - apps/web/src/pages/MqttSettings/loadModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/calculationSettingsService.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - packages/shared/src/displayStory.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/db/migrations/topicDisplayNames.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/server/src/services/generationTrendSeries.test.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/app/managementRouteVisibility.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
+  - apps/web/src/pages/DataSourceSettings/index.test.tsx
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/web/src/app/router.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/web/src/pages/Solar/cardFamily.test.ts
+  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.test.ts
+-->
+
+---
+### Requirement: Keep playback page enablement independent
+
+The system SHALL keep `VITE_HIDDEN_MANAGEMENT_ROUTES` independent from playback page enablement and display page rotation settings.
+
+#### Scenario: Playback pages remain visible while monitoring routes are hidden
+
+- **WHEN** `/trends` and `/history` are hidden through the environment setting
+- **THEN** `/overview`, `/solar`, `/factory-circuit`, `/images`, and `/sustainability` SHALL remain governed by the existing playback registry and playback settings
+- **AND** the management route visibility setting SHALL NOT mutate `playback_pages.enabled`
+
+<!-- @trace
+source: add-management-route-visibility-env
+updated: 2026-06-29
+code:
+  - apps/web/src/app/managementRouteVisibility.ts
+  - apps/web/src/components/PageNumberPill.tsx
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/app.ts
+  - apps/web/src/mocks/weather.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
+  - deploy/enable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
+  - docs/README.md
+  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
+  - apps/web/src/pages/displayPageMediaStyle.ts
+  - deploy/repair-kiosk-system.sh
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - deploy/start-solar-kiosk.sh
+  - deploy/readonly-system-disable.sh
+  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
+  - apps/web/src/pages/MqttSettings/loadModel.ts
+  - apps/server/src/db/migrations/015_calculation_settings.sql
+  - apps/web/src/services/api.ts
+  - deploy/install-kiosk.sh
+  - packages/shared/src/displayPageConfig.ts
+  - apps/server/src/db/migrations/014_topic_display_names.sql
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/services/calculationSettingsService.ts
+  - docs/runbooks/device-diagnostics-safe-ops.md
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/server/src/plugins/managementAuth.ts
+  - apps/server/src/services/deviceKioskExitService.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy/configure-lightweight-desktop.sh
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardStatusField.ts
+  - packages/shared/src/householdEquivalence.ts
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - deploy/solar-display.service
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/server/src/env.ts
+  - apps/web/vite.config.ts
+  - README.md
+  - deploy.sh
+  - scripts/dev-lib.mjs
+  - packages/shared/src/displayPageCardRail.ts
+  - deploy/enable-readonly-root.sh
+  - apps/server/src/mqtt/MqttClientService.ts
+  - deploy/readonly-system-enable.sh
+  - deploy/verify-kiosk-install.sh
+  - apps/web/src/pages/Images/displayPageConfig.ts
+  - apps/server/src/db/migrations/016_co2_display_preference.sql
+  - docs/fhd-editor-gap-ledger.md
+  - scripts/prepare-raspi-user-data.sh
+  - scripts/dev.test.mjs
+  - apps/web/src/hooks/usePageRotation.ts
+  - deploy/apply-desktop-theme.sh
+  - apps/web/src/pages/Overview/overview.css
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
+  - deploy/disable-readonly-system.desktop
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - scripts/dev.mjs
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - scripts/raspi-onekey-deploy.sh
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - scripts/prepare-raspi-user-data.ps1
+  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.ts
+  - scripts/connect-raspi-rdp.ps1
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/pages/Sustainability/displayPageConfig.ts
+  - apps/web/src/pages/shared/PageScaffold.tsx
+  - apps/web/scripts/run-tests.test.mjs
+  - scripts/dev-lib.d.mts
+  - scripts/deploy.test.mjs
+  - apps/web/scripts/run-tests.mjs
+  - .env.example
+  - apps/server/src/services/generationTrendSeries.ts
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/server/src/db/seed.ts
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - deploy.md
+  - apps/server/src/routes/calculation-settings.ts
+  - docs/runbooks/sustainability-calculation-settings.md
+  - packages/shared/src/types.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.ts
+  - deploy/raspi-bootstrap.sh
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/server/src/routes/data-source.ts
+  - deploy/firefox-kiosk.desktop
+  - apps/web/src/pages/ImageManagement/imageManagement.css
+  - deploy/disable-display-sleep.sh
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/routes/device.ts
+tests:
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/pages/Overview/densityViewModel.test.ts
+  - apps/server/src/db/migrations/calculationSettings.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
+  - packages/shared/src/displayPageCardRail.test.ts
+  - apps/web/src/viteProxy.test.ts
+  - apps/web/src/pages/MqttSettings/loadModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/calculationSettingsService.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - packages/shared/src/displayStory.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/db/migrations/topicDisplayNames.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/server/src/services/generationTrendSeries.test.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/app/managementRouteVisibility.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
+  - apps/web/src/pages/DataSourceSettings/index.test.tsx
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/web/src/app/router.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/web/src/pages/Solar/cardFamily.test.ts
+  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.test.ts
+-->
