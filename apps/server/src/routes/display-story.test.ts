@@ -5,8 +5,14 @@ import {
   getDatabase
 } from "./display-pages-asset-governance.test-support.js";
 
+function toLocalDateKey(date: Date) {
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function seedDisplayStoryFixture() {
   const database = getDatabase();
+  const today = toLocalDateKey(new Date());
   database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
@@ -15,7 +21,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("realTimePower", 586.2, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":586.2}');
+    .run("realTimePower", 586.2, "kW", `${today}T09:00:00.000Z`, "good", '{"value":586.2}');
   database
     .prepare(
       `
@@ -23,7 +29,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("todayGeneration", 3842, "kWh", "2026-05-13T09:00:00.000Z", "good", '{"value":3842}');
+    .run("todayGeneration", 3842, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":3842}');
   database
     .prepare(
       `
@@ -31,7 +37,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("totalGeneration", 18642, "GWh", "2026-05-13T09:00:00.000Z", "good", '{"value":18642}');
+    .run("totalGeneration", 18642, "GWh", `${today}T09:00:00.000Z`, "good", '{"value":18642}');
   database
     .prepare(
       `
@@ -39,7 +45,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("todayCo2Reduction", 1.94, "t", "2026-05-13T09:00:00.000Z", "good", '{"value":1.94}');
+    .run("todayCo2Reduction", 1.94, "t", `${today}T09:00:00.000Z`, "good", '{"value":1.94}');
   database
     .prepare(
       `
@@ -47,7 +53,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("totalCo2Reduction", 9842, "t", "2026-05-13T09:00:00.000Z", "good", '{"value":9842}');
+    .run("totalCo2Reduction", 9842, "t", `${today}T09:00:00.000Z`, "good", '{"value":9842}');
   database
     .prepare(
       `
@@ -55,7 +61,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("systemEfficiency", 88.6, "%", "2026-05-13T09:00:00.000Z", "good", '{"value":88.6}');
+    .run("systemEfficiency", 88.6, "%", `${today}T09:00:00.000Z`, "good", '{"value":88.6}');
   database
     .prepare(
       `
@@ -63,7 +69,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("selfConsumptionEnergy", 30, "kWh", "2026-05-13T09:00:00.000Z", "good", '{"value":30}');
+    .run("selfConsumptionEnergy", 30, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":30}');
   database
     .prepare(
       `
@@ -71,7 +77,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("consumptionEnergy", 40, "kWh", "2026-05-13T09:00:00.000Z", "good", '{"value":40}');
+    .run("consumptionEnergy", 40, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":40}');
   database
     .prepare(
       `
@@ -79,7 +85,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryProductionPower", 790, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":790}');
+    .run("factoryProductionPower", 790, "kW", `${today}T09:00:00.000Z`, "good", '{"value":790}');
   database
     .prepare(
       `
@@ -87,7 +93,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryLightingPower", 120, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":120}');
+    .run("factoryLightingPower", 120, "kW", `${today}T09:00:00.000Z`, "good", '{"value":120}');
   database
     .prepare(
       `
@@ -95,7 +101,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryOfficePower", 90, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":90}');
+    .run("factoryOfficePower", 90, "kW", `${today}T09:00:00.000Z`, "good", '{"value":90}');
   database
     .prepare(
       `
@@ -103,7 +109,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryEvGreenPower", 45, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":45}');
+    .run("factoryEvGreenPower", 45, "kW", `${today}T09:00:00.000Z`, "good", '{"value":45}');
   database
     .prepare(
       `
@@ -111,14 +117,14 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryInfrastructurePower", 35, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":35}');
+    .run("factoryInfrastructurePower", 35, "kW", `${today}T09:00:00.000Z`, "good", '{"value":35}');
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("selfConsumptionRatio");
   database.prepare("DELETE FROM metric_snapshots").run();
   for (const [generation, capturedAt] of [
-    [82, "2026-05-13T08:00:00.000Z"],
-    [95, "2026-05-13T09:00:00.000Z"],
-    [101, "2026-05-13T10:00:00.000Z"],
-    [108, "2026-05-13T11:00:00.000Z"]
+    [82, `${today}T08:00:00.000Z`],
+    [95, `${today}T09:00:00.000Z`],
+    [101, `${today}T10:00:00.000Z`],
+    [108, `${today}T11:00:00.000Z`]
   ] as const) {
     database
       .prepare(
@@ -141,10 +147,12 @@ function seedDisplayStoryFixture() {
       "UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?"
     )
     .run("factory/power/hvac");
+
+  return { today };
 }
 
 test("GET /api/display-story exposes monitoring semantics for overview, solar, and factory slots", async () => {
-  seedDisplayStoryFixture();
+  const { today } = seedDisplayStoryFixture();
 
   const app = await buildApp();
 
@@ -222,12 +230,10 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
-    assert.deepEqual(
-      realTimePowerMetric?.trendHours,
-      ["2026-05-13T08:00:00.000Z", "2026-05-13T09:00:00.000Z", "2026-05-13T10:00:00.000Z", "2026-05-13T11:00:00.000Z"].map(
-        (capturedAt) => new Date(capturedAt).getHours()
-      )
+    const expectedTrendHours = ["08", "09", "10", "11"].map((hour) =>
+      new Date(`${today}T${hour}:00:00.000Z`).getHours()
     );
+    assert.deepEqual(realTimePowerMetric?.trendHours, expectedTrendHours);
     assert.deepEqual(realTimePowerMetric?.trendSeries, [82, 95, 101, 108]);
 
     const selfConsumptionMetric = body.solar.kpis.find(
@@ -314,6 +320,43 @@ test("GET /api/display-story/:pageId returns only the requested page payload wra
     assert.equal("overview" in body, false);
     assert.equal("solar" in body, false);
     assert.equal("factoryCircuit" in body, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story/factory-circuit exposes bilingual slot labels for playback", async () => {
+  seedDisplayStoryFixture();
+  getDatabase()
+    .prepare("UPDATE topic_mappings SET name_zh = ?, name_en = ? WHERE metric_key = ?")
+    .run("一號產線", "Line 1", "factoryProductionPower");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      pageId: string;
+      payload: {
+        slots: Array<{
+          label: string;
+          labelEn?: string;
+          labelZh?: string;
+          slotKey: string;
+        }>;
+      };
+    };
+
+    assert.equal(body.pageId, "factory-circuit");
+    const productionSlot = body.payload.slots.find((slot) => slot.slotKey === "production");
+    assert.equal(productionSlot?.label, "一號產線");
+    assert.equal(productionSlot?.labelZh, "一號產線");
+    assert.equal(productionSlot?.labelEn, "Line 1");
   } finally {
     await app.close();
   }

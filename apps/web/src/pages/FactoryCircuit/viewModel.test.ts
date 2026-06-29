@@ -315,18 +315,19 @@ test("buildFactoryCircuitViewModel surfaces the custom topic name via the story 
         { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "目前綠電流向", metricKey: "flow", provenance: "live", sourceClass: "mqtt-live", unit: "kW", value: "368" }
       ],
       slots: [
-        { ...baseSlot, slotKey: "production", label: "一號產線", livePowerKw: 520, circuitId: 1 },
-        { ...baseSlot, slotKey: "hvac", label: "空調", circuitId: 2 },
-        { ...baseSlot, slotKey: "lighting", label: "照明", circuitId: 3 },
-        { ...baseSlot, slotKey: "office", label: "辦公", circuitId: 4 },
-        { ...baseSlot, slotKey: "ev", label: "充電", circuitId: 5 },
-        { ...baseSlot, slotKey: "infrastructure", label: "基礎", circuitId: 6 }
+        { ...baseSlot, slotKey: "production", label: "一號產線", labelZh: "一號產線", labelEn: "Line 1", livePowerKw: 520, circuitId: 1 },
+        { ...baseSlot, slotKey: "hvac", label: "空調", labelZh: "空調", labelEn: "HVAC", circuitId: 2 },
+        { ...baseSlot, slotKey: "lighting", label: "照明", labelZh: "照明", labelEn: "Lighting", circuitId: 3 },
+        { ...baseSlot, slotKey: "office", label: "辦公", labelZh: "辦公", labelEn: "Office", circuitId: 4 },
+        { ...baseSlot, slotKey: "ev", label: "充電", labelZh: "充電", labelEn: "EV", circuitId: 5 },
+        { ...baseSlot, slotKey: "infrastructure", label: "基礎", labelZh: "基礎", labelEn: "Infrastructure", circuitId: 6 }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
     }
   });
 
   assert.equal(model.loadRows[0]?.labelZh, "一號產線");
+  assert.equal(model.loadRows[0]?.labelEn, "Line 1");
 });
 
 test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitStory has too few slots", () => {

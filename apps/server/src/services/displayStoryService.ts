@@ -162,6 +162,15 @@ const slotMetricMap: Record<DisplayCircuitSlotKey, string> = {
   production: "factoryProductionPower"
 };
 
+const slotDefaultLabels: Record<DisplayCircuitSlotKey, { en: string; zh: string }> = {
+  ev: { en: "EV / Green Facility", zh: "充電設備 / 綠能設施" },
+  hvac: { en: "HVAC & Environment", zh: "空調與環境設備" },
+  infrastructure: { en: "Infrastructure", zh: "其他基礎設施" },
+  lighting: { en: "Lighting", zh: "照明系統" },
+  office: { en: "Office & Common Area", zh: "辦公與公共區域" },
+  production: { en: "Production Line", zh: "生產線用電" }
+};
+
 const slotOrder: DisplayCircuitSlotKey[] = [
   "production",
   "hvac",
@@ -308,6 +317,20 @@ function resolveTopicLabel(
 ) {
   const custom = topicNames.get(metricKey);
   return custom?.nameZh ?? custom?.nameEn ?? defaultLabel;
+}
+
+function resolveTopicDisplayLabels(args: {
+  topicNames: Map<string, TopicDisplayName>;
+  metricKey: string;
+  defaultZh: string;
+  defaultEn: string;
+}) {
+  const custom = args.topicNames.get(args.metricKey);
+
+  return {
+    labelEn: custom?.nameEn ?? args.defaultEn,
+    labelZh: custom?.nameZh ?? args.defaultZh
+  };
 }
 
 function readCircuits() {
@@ -858,12 +881,15 @@ export function readFactoryCircuitDisplayStory(
     const circuit = matches.length === 1 ? matches[0]! : null;
     const metricKey = slotMetricMap[slotKey];
     const reading = metricKey ? context.snapshot.metrics[metricKey] ?? null : null;
-    // Name priority: topic custom name → circuit config name → slot key default.
-    const slotLabel = resolveTopicLabel(
-      context.topicNames,
+    const slotDefaults = slotDefaultLabels[slotKey];
+    const slotLabels = resolveTopicDisplayLabels({
+      topicNames: context.topicNames,
       metricKey,
-      circuit?.name_zh ?? circuit?.name_en ?? slotKey
-    );
+      defaultEn: circuit?.name_en ?? slotDefaults.en,
+      defaultZh: circuit?.name_zh ?? slotDefaults.zh
+    });
+    // Name priority: topic custom name → circuit config name → slot key default.
+    const slotLabel = slotLabels.labelZh || slotLabels.labelEn;
     const state =
       binding.bindingState !== "bound"
         ? ({
@@ -911,6 +937,8 @@ export function readFactoryCircuitDisplayStory(
       ...state,
       circuitId: circuit?.id ?? null,
       label: slotLabel,
+      labelEn: slotLabels.labelEn,
+      labelZh: slotLabels.labelZh,
       livePowerKw:
         state.bindingState === "bound" &&
         state.freshnessState === "fresh" &&

@@ -66,6 +66,16 @@ test("factory circuit slot prefers topic name over circuit config name", () => {
   assert.equal(slot?.label, "一號產線");
 });
 
+test("factory circuit slot preserves the custom english topic name for playback", () => {
+  setTopicName("factoryProductionPower", "一號產線", "Line 1");
+
+  const story = storyService.readFactoryCircuitDisplayStory();
+  const slot = story.slots.find((entry) => entry.slotKey === "production");
+
+  assert.equal(slot?.labelZh, "一號產線");
+  assert.equal(slot?.labelEn, "Line 1");
+});
+
 test("factory circuit slot uses circuit config name when topic name is empty", () => {
   setTopicName("factoryProductionPower", null, null);
 

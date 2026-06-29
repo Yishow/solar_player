@@ -83,6 +83,8 @@ export type FactoryCircuitKpiKey =
 export type FactoryCircuitStorySlot = MonitoringStoryState & {
   circuitId: number | null;
   label: string;
+  labelEn?: string;
+  labelZh?: string;
   livePowerKw: number | null;
   slotKey: DisplayCircuitSlotKey;
 };
