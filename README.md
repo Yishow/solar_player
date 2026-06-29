@@ -123,6 +123,7 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 ## 維運 Runbook
 
 - 裝置診斷安全操作與 host-level escalation：`docs/runbooks/device-diagnostics-safe-ops.md`
+- 永續換算係數設定與播放頁數字影響：`docs/runbooks/sustainability-calculation-settings.md`
 - 目前 app 內只支援 safe diagnostics；若需主機層處置，請依 runbook 使用 `systemctl restart solar-display`
 
 ## Spectra 與文件導覽

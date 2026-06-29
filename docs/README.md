@@ -6,6 +6,7 @@
 
 - `openapi.yaml` — 目前 server 使用的 OpenAPI 規格檔。
 - `runbooks/device-diagnostics-safe-ops.md` — `Device Status` safe diagnostics、host-level restart 與 unsupported controls 的維運 runbook。
+- `runbooks/sustainability-calculation-settings.md` — `/settings/data-source` 換算係數入口、五個預設值與播放頁影響的維運 runbook。
 - `archive/prompt-pack/` — 舊的 root README 與 Phase 1–10 提示詞／工作流文件。
 - `archive/solar-display/` — `solar-display/` 子目錄時期留下的歷史 README。
 - `reference/solar_complete_spec_md/` — UI 規格、分頁提示詞與設計 token 參考。
@@ -20,4 +21,5 @@
 - 想依照正式變更流程提案、實作與封存：請看 root `AGENTS.md`、`CLAUDE.md` 與 `openspec/`。
 - 想處理 FHD / display workflow 入口：先看 `reference-match/fhd-workflow-entrypoints.md`，再進入 `playback-visual-canonicals.md`、`fhd-evidence-bundle-template.md`、`display-launch-witness-matrix.md`。
 - 想處理 `Device Status`、安全 diagnostics 與 host-level restart 邊界：先看 `runbooks/device-diagnostics-safe-ops.md`。
+- 想調整 `/settings/data-source` 的換算係數，或確認它會影響哪些播放頁數字：先看 `runbooks/sustainability-calculation-settings.md`。
 - 想查歷史提示詞、UI 參考稿、prototype 或 MQTT 補充素材：從這個目錄往下找對應子目錄。
