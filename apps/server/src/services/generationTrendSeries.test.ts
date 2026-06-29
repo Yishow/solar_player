@@ -154,3 +154,32 @@ test("hourly trend buckets the same instant by local hour regardless of UTC vs l
 
   assert.equal(series.length, 1, "same instant must collapse into a single local-hour bucket");
 });
+
+test("hourly trend returns an empty profile when the current local day has no snapshots yet", () => {
+  const profile = selectHourlyGenerationTrendProfile(
+    [
+      { generation: null, generation_power: 1800, captured_at: "2026-06-09 08:00:00" },
+      { generation: null, generation_power: 3200, captured_at: "2026-06-09 09:00:00" }
+    ],
+    { now: new Date("2026-06-10T10:00:00.000Z") }
+  );
+
+  assert.deepEqual(profile.hours, []);
+  assert.deepEqual(profile.series, []);
+  assert.equal(profile.unit, "kW");
+});
+
+test("hourly trend keeps only current-day rows even when newer prior-day history exists nearby", () => {
+  const profile = selectHourlyGenerationTrendProfile(
+    [
+      { generation: null, generation_power: 1800, captured_at: "2026-06-09 23:50:00" },
+      { generation: null, generation_power: 600, captured_at: "2026-06-10 06:10:00" },
+      { generation: null, generation_power: 2400, captured_at: "2026-06-10 09:20:00" }
+    ],
+    { now: new Date("2026-06-10T12:00:00.000Z") }
+  );
+
+  assert.deepEqual(profile.hours, [6, 9]);
+  assert.deepEqual(profile.series, [600, 2400]);
+  assert.equal(profile.unit, "kW");
+});

@@ -31,6 +31,10 @@ export type HourlyGenerationTrendProfile = {
   unit: "kW" | "kWh";
 };
 
+type SelectHourlyGenerationTrendProfileOptions = {
+  now?: Date;
+};
+
 // Parse a captured_at into a Date using the *local* clock. The seed writes
 // "YYYY-MM-DD HH:MM:SS" (local wall-clock, no zone) and the snapshot writer
 // writes ISO "YYYY-MM-DDTHH:MM:SS.sssZ" (UTC). Replacing the space with "T"
@@ -59,7 +63,8 @@ export function selectHourlyGenerationTrendSeries(rows: HourlyGenerationTrendRow
 }
 
 export function selectHourlyGenerationTrendProfile(
-  rows: HourlyGenerationTrendRow[]
+  rows: HourlyGenerationTrendRow[],
+  options: SelectHourlyGenerationTrendProfileOptions = {}
 ): HourlyGenerationTrendProfile {
   const parsedRows: Array<{ date: Date; row: HourlyGenerationTrendRow }> = [];
   let latestDate: Date | null = null;
@@ -76,11 +81,10 @@ export function selectHourlyGenerationTrendProfile(
     }
   }
 
-  if (!latestDate) {
+  if (parsedRows.length === 0) {
     return { hours: [], series: [], unit: "kW" };
   }
-
-  const latestDay = localDayKey(latestDate);
+  const targetDay = localDayKey(options.now ?? latestDate ?? new Date());
   const latestByHour = new Map<
     string,
     {
@@ -93,7 +97,7 @@ export function selectHourlyGenerationTrendProfile(
   >();
 
   for (const { date, row } of parsedRows) {
-    if (localDayKey(date) !== latestDay) {
+    if (localDayKey(date) !== targetDay) {
       continue;
     }
 
@@ -139,6 +143,10 @@ export function selectHourlyGenerationTrendProfile(
       ? [{ hour: entry.hour, value: entry.generation }]
       : []
   );
+
+  if (powerEntries.length === 0 && cumulativeEntries.length === 0) {
+    return { hours: [], series: [], unit: "kW" };
+  }
 
   if (powerEntries.length > 0 && powerEntries.length >= cumulativeEntries.length) {
     return {

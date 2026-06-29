@@ -34,6 +34,24 @@ test("trusted same-host and token callers satisfy management read gating", () =>
   );
 });
 
+test("same-host browser reads stay trusted when referer matches but Origin is absent", () => {
+  const accessControl = createManagementAccessControl({
+    managementAccessToken: "secret-token",
+    trustedOrigins: ["https://ops.example"]
+  });
+
+  assert.equal(
+    accessControl.isTrustedManagementRequestLike({
+      headers: {
+        host: "100.99.99.2:3000",
+        referer: "http://100.99.99.2:3000/settings/mqtt"
+      },
+      ip: "100.99.99.50"
+    }),
+    true
+  );
+});
+
 test("untrusted remote caller fails management read gating", () => {
   const accessControl = createManagementAccessControl({
     managementAccessToken: "secret-token",

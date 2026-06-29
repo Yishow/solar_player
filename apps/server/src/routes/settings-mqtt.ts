@@ -259,7 +259,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         .run(next.dataMode);
     })();
 
-    await app.mqttClientService.connect();
+    void app.mqttClientService.connect().catch(() => undefined);
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
       reason: "mqtt-settings-updated",

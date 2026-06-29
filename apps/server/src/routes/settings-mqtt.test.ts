@@ -399,6 +399,43 @@ test("PUT /api/settings/mqtt allows trusted local operator origins", async () =>
   }
 });
 
+test("PUT /api/settings/mqtt persists trusted changes even when broker reconnect fails", async () => {
+  migrateDatabase();
+  seedDatabase();
+  process.env.MANAGEMENT_TRUSTED_ORIGINS = "http://127.0.0.1:5177";
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.connect = async () => {
+      throw new Error("MQTT connection timeout");
+    };
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt",
+      headers: {
+        origin: "http://127.0.0.1:5177"
+      },
+      payload: {
+        host: "trusted-broker",
+        port: 2883
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const row = getDatabase()
+      .prepare("SELECT broker_host, broker_port FROM mqtt_settings LIMIT 1")
+      .get() as { broker_host: string; broker_port: number };
+
+    assert.equal(row.broker_host, "trusted-broker");
+    assert.equal(row.broker_port, 2883);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/metrics/live returns the latest live metrics snapshot", async () => {
   migrateDatabase();
   seedDatabase();

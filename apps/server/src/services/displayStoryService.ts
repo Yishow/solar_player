@@ -790,7 +790,7 @@ function readOverviewGenerationTrendSeries() {
     )
     .all() as HourlyGenerationTrendRow[];
 
-  return selectHourlyGenerationTrendProfile(rows);
+  return selectHourlyGenerationTrendProfile(rows, { now: new Date() });
 }
 
 export function readOverviewDisplayStory(

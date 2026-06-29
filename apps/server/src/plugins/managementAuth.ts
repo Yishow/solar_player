@@ -26,7 +26,14 @@ type SocketHandshakeLike = {
 
 type ManagementAccessDecision = {
   normalizedOrigin: string | null;
-  reason: "access-token" | "loopback-origin" | "loopback-remote" | "same-host-origin" | "trusted-origin" | "untrusted";
+  reason:
+    | "access-token"
+    | "loopback-origin"
+    | "loopback-remote"
+    | "same-host-origin"
+    | "same-host-referer"
+    | "trusted-origin"
+    | "untrusted";
   trusted: boolean;
 };
 
@@ -103,6 +110,23 @@ function isSameHostOrigin(
   } catch {
     return false;
   }
+}
+
+function isSameHostReferer(
+  headers: IncomingHttpHeaders,
+  requestHost: string | null
+) {
+  const referer = readHeaderValue(headers.referer);
+  if (!referer) {
+    return false;
+  }
+
+  const normalizedRefererOrigin = normalizeOrigin(referer);
+  if (!normalizedRefererOrigin) {
+    return false;
+  }
+
+  return isSameHostOrigin(normalizedRefererOrigin, requestHost);
 }
 
 function matchesHeaderAccessToken(
@@ -205,6 +229,14 @@ function classifyManagementRequest(
   const origin = readHeaderValue(request.headers.origin);
 
   if (!origin) {
+    if (isSameHostReferer(request.headers, readHeaderValue(request.headers.host))) {
+      return {
+        normalizedOrigin: null,
+        reason: "same-host-referer",
+        trusted: true
+      };
+    }
+
     const trusted = isLoopbackRemoteAddress(request.ip);
     return {
       normalizedOrigin: null,

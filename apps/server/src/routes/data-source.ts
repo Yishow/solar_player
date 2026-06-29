@@ -41,6 +41,13 @@ type DataSourceOverview = {
     username: SecretStatus;
     password: SecretStatus;
   };
+  monitoring: {
+    anomalyMessages: string[];
+    hasCurrentDaySnapshots: boolean;
+    latestSnapshotAt: string | null;
+    latestSnapshotDate: string | null;
+    localDate: string;
+  };
   weather: {
     status: "ready";
     cwaAuthorization: SecretStatus;
@@ -71,6 +78,7 @@ type DataSourceOverview = {
 };
 
 type BuildDataSourceOverviewDeps = {
+  now?: () => Date;
   readTableCounts?: () => Record<string, number>;
   summarizeDirectory?: (dir: string) => Omit<DirectorySummary, "dir">;
 };
@@ -170,7 +178,117 @@ function combineUploadStatus(imageStatus: SectionStatus, brandStatus: SectionSta
   return "degraded";
 }
 
+type MonitoringSnapshotDiagnosticRow = {
+  captured_at: string;
+  generation: number | null;
+  generation_power: number | null;
+};
+
+function parseCapturedAt(capturedAt: string) {
+  return new Date(capturedAt.replace(" ", "T"));
+}
+
+function toLocalDateKey(date: Date) {
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toLocalTimeLabel(date: Date) {
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function readMonitoringDiagnostics(now: Date) {
+  const rows = getDatabase()
+    .prepare(
+      `
+        SELECT captured_at, generation, generation_power
+        FROM metric_snapshots
+        WHERE generation IS NOT NULL OR generation_power IS NOT NULL
+        ORDER BY captured_at DESC
+        LIMIT 2000
+      `
+    )
+    .all() as MonitoringSnapshotDiagnosticRow[];
+
+  const localDate = toLocalDateKey(now);
+  const parsedRows = rows.flatMap((row) => {
+    const parsedAt = parseCapturedAt(row.captured_at);
+    return Number.isNaN(parsedAt.getTime())
+      ? []
+      : [{ capturedAt: row.captured_at, date: parsedAt, generationPower: row.generation_power }];
+  });
+
+  const latestRow = parsedRows.reduce<typeof parsedRows[number] | null>((latest, row) => {
+    if (!latest || row.date.getTime() > latest.date.getTime()) {
+      return row;
+    }
+
+    return latest;
+  }, null);
+  const latestSnapshotDate = latestRow ? toLocalDateKey(latestRow.date) : null;
+  const hasCurrentDaySnapshots = parsedRows.some((row) => toLocalDateKey(row.date) === localDate);
+  const anomalyMessages: string[] = [];
+
+  if (!hasCurrentDaySnapshots && latestSnapshotDate) {
+    anomalyMessages.push(`尚無今日 snapshot，最新資料停留在 ${latestSnapshotDate}。`);
+  }
+
+  const suspiciousRow = parsedRows.find((row) => {
+    if (typeof row.generationPower !== "number" || row.generationPower <= 100) {
+      return false;
+    }
+
+    const hour = row.date.getHours();
+    return hour < 4 || hour >= 20;
+  });
+
+  if (suspiciousRow) {
+    const generationPower = suspiciousRow.generationPower;
+    anomalyMessages.push(
+      `偵測到 ${toLocalTimeLabel(suspiciousRow.date)} 夜間高發電 snapshot（約 ${Math.round(generationPower ?? 0)} kW），請檢查系統時間。`
+    );
+  }
+
+  return {
+    anomalyMessages,
+    hasCurrentDaySnapshots,
+    latestSnapshotAt: latestRow?.capturedAt ?? null,
+    latestSnapshotDate,
+    localDate
+  };
+}
+
+function deleteTodayTrendSnapshots(now: Date) {
+  const localDate = toLocalDateKey(now);
+  const rows = getDatabase()
+    .prepare("SELECT id, captured_at FROM metric_snapshots")
+    .all() as Array<{ captured_at: string; id: number }>;
+  const rowIds = rows.flatMap((row) => {
+    const parsedAt = parseCapturedAt(row.captured_at);
+    if (Number.isNaN(parsedAt.getTime()) || toLocalDateKey(parsedAt) !== localDate) {
+      return [];
+    }
+
+    return [row.id];
+  });
+
+  const deleteStatement = getDatabase().prepare("DELETE FROM metric_snapshots WHERE id = ?");
+  const runDelete = getDatabase().transaction((ids: number[]) => {
+    for (const rowId of ids) {
+      deleteStatement.run(rowId);
+    }
+  });
+  runDelete(rowIds);
+
+  return {
+    deletedSnapshots: rowIds.length,
+    resetDate: localDate
+  };
+}
+
 export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}): DataSourceOverview {
+  const now = deps.now?.() ?? new Date();
   const warnings: string[] = [];
   const tableCountsReader = deps.readTableCounts ?? readTableCounts;
   const directorySummarizer = deps.summarizeDirectory ?? summarizeDirectory;
@@ -199,6 +317,7 @@ export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}):
   const imageUploads = summarizeUploadDir("uploads/images", config.uploadsDir);
   const brandUploads = summarizeUploadDir("uploads/brand", config.brandUploadsDir);
   const mqttSettings = resolveMqttSettings(process.env, readMqttSettingsRow());
+  const monitoring = readMonitoringDiagnostics(now);
 
   return {
     browserLocalCache: {
@@ -214,6 +333,7 @@ export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}):
       status: "ready",
       username: toSecretStatus(mqttSettings.username)
     },
+    monitoring,
     recommendations: [
       {
         description: "Package SQLite, uploads, and runtime settings into an operator-downloadable archive.",
@@ -282,6 +402,28 @@ const dataSourceRoute: FastifyPluginAsync = async (app) => {
     }
 
     return buildDataSourceOverview();
+  });
+
+  app.post("/api/data-source/reset-today-trend", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    const result = deleteTodayTrendSnapshots(new Date());
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "today-trend-reset",
+      scope: "monitoring-history"
+    });
+
+    reply.send({
+      data: {
+        deletedSnapshots: result.deletedSnapshots,
+        resetAt: new Date().toISOString(),
+        resetDate: result.resetDate
+      },
+      success: true
+    });
   });
 };
 
