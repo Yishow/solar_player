@@ -19,6 +19,14 @@ export type CalculationSettings = {
   treeEquivalentFactor: number;
 };
 
+type CalculationSettingsBooleanKey = "co2AutoConvertSmallToKg";
+type CalculationSettingsNumberKey =
+  | "carbonEmissionFactor"
+  | "estimatedTariffPerKwh"
+  | "householdDailyUsageKwh"
+  | "householdMonthlyUsageKwh"
+  | "treeEquivalentFactor";
+
 export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
   carbonEmissionFactor: 0.495,
   co2AutoConvertSmallToKg: false,
@@ -60,7 +68,7 @@ function normalizeBoolean(value: unknown, fieldName: keyof CalculationSettings) 
 
 function resolveStoredNumber(
   value: number | null | undefined,
-  fallback: keyof typeof DEFAULT_CALCULATION_SETTINGS
+  fallback: CalculationSettingsNumberKey
 ) {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
@@ -69,7 +77,7 @@ function resolveStoredNumber(
 
 function resolveStoredBoolean(
   value: number | null | undefined,
-  fallback: keyof typeof DEFAULT_CALCULATION_SETTINGS
+  fallback: CalculationSettingsBooleanKey
 ) {
   if (value === 0 || value === 1) {
     return value === 1;
