@@ -4,6 +4,7 @@ import {
   deriveHouseholdEquivalenceCard
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
 
 type DailySummaryRow = {
@@ -23,6 +24,23 @@ type ReadHouseholdEquivalenceCardsOptions = {
 
 function toDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function normalizeUnit(unit: string | null | undefined) {
+  return unit?.trim().toLowerCase() ?? "";
+}
+
+function normalizeEnergyToKwh(value: number, unit: string | null | undefined) {
+  switch (normalizeUnit(unit)) {
+    case "gwh":
+      return value * 1_000_000;
+    case "mwh":
+      return value * 1_000;
+    case "wh":
+      return value / 1_000;
+    default:
+      return value;
+  }
 }
 
 export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceCardsOptions = {}) {
@@ -55,6 +73,23 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
       `
     )
     .get() as CounterRow | undefined;
+  const liveSelfConsumption = readLiveMetricsSnapshot(database).metrics.selfConsumptionEnergy;
+  const cumulativeSelfConsumptionValue =
+    typeof cumulativeSelfConsumption?.total_value === "number"
+      ? cumulativeSelfConsumption.total_value
+      : typeof liveSelfConsumption?.value === "number"
+        ? normalizeEnergyToKwh(liveSelfConsumption.value, liveSelfConsumption.unit)
+        : null;
+  const cumulativeSelfConsumptionUpdatedAt =
+    cumulativeSelfConsumption?.last_updated ??
+    liveSelfConsumption?.timestamp ??
+    null;
+  const cumulativeSelfConsumptionSource =
+    typeof cumulativeSelfConsumption?.total_value === "number"
+      ? "cumulative-self-consumption"
+      : typeof liveSelfConsumption?.value === "number"
+        ? "live-self-consumption-fallback"
+        : "cumulative-self-consumption";
 
   return {
     cumulative: deriveHouseholdEquivalenceCard({
@@ -63,13 +98,13 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
       cardKey: "cumulative",
       provenance: {
         label: "累積自發自用量",
-        source: "cumulative-self-consumption",
+        source: cumulativeSelfConsumptionSource,
         sourceClass: "derived-metric",
         syncState:
-          typeof cumulativeSelfConsumption?.total_value === "number" ? "fresh" : "missing",
-        updatedAt: cumulativeSelfConsumption?.last_updated ?? null
+          cumulativeSelfConsumptionValue !== null ? "fresh" : "missing",
+        updatedAt: cumulativeSelfConsumptionUpdatedAt
       },
-      selfConsumptionKwh: cumulativeSelfConsumption?.total_value ?? null
+      selfConsumptionKwh: cumulativeSelfConsumptionValue
     }),
     today: deriveHouseholdEquivalenceCard({
       basisSourceLabel: "今日自發自用量",

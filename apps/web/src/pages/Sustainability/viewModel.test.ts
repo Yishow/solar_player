@@ -349,6 +349,54 @@ test("buildSustainabilityViewModel marks missing editorial and aggregate data ex
   assert.equal(model.householdEquivalents.cumulative.derivedStatus, "unavailable");
 });
 
+test("buildSustainabilityViewModel replaces placeholder editorial modules from runtime defaults with reference fallback content", () => {
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "lifetime",
+    story: {
+      availablePeriods: ["lifetime"],
+      modules: [
+        {
+          description: "內容整理中",
+          id: "procurement-default",
+          title: "綠色採購敘事",
+          type: "project-outcome"
+        },
+        {
+          description: "內容整理中",
+          id: "esg-default",
+          title: "ESG 行動摘要",
+          type: "esg-summary"
+        }
+      ],
+      periods: {
+        lifetime: {
+          bigNumbers: {
+            annualEnergySavingPercent: 12.4,
+            accumulatedCarbonReductionTons: 9842,
+            accumulatedGenerationGwh: 18.6,
+            plantedTreeEquivalent: 25600
+          },
+          highlights: [],
+          provenance: {
+            label: "累積資料",
+            source: "cumulative-counters",
+            sourceClass: "runtime-aggregate",
+            syncState: "fresh",
+            updatedAt: "2026-05-13T10:00:00.000Z"
+          }
+        }
+      },
+      selectedPeriod: "lifetime"
+    }
+  });
+
+  assert.equal(model.esgCards[0] && "value" in model.esgCards[0] ? model.esgCards[0].value : null, "NT$ 60M+");
+  assert.deepEqual(
+    model.esgCards[1] && "items" in model.esgCards[1] ? model.esgCards[1].items : [],
+    ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"]
+  );
+});
+
 test("buildSustainabilityViewModel keeps four compatibility highlight slots when explicit runtime highlights are absent", () => {
   const model = buildSustainabilityViewModel({
     selectedPeriod: "year",

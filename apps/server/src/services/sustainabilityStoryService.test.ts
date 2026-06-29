@@ -172,3 +172,84 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence from
     "generation-tree-equivalent"
   );
 });
+
+test("readSustainabilityStory falls back to live metrics when cumulative counters have not flushed yet", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES
+          ('totalGeneration', 18600000, 'kWh', ?, 'good', '{}'),
+          ('consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
+          ('selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          carbon_emission_factor = 0.5,
+          tree_equivalent_factor = 3
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  const story = readSustainabilityStory("lifetime");
+
+  assert.equal(story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
+  assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
+  assert.equal(story.period.bigNumbers.annualEnergySavingPercent, 70);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+  assert.equal(
+    story.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
+    timestamp
+  );
+  assert.equal(
+    story.period.bigNumberProvenance.accumulatedGenerationGwh.sourceClass,
+    "runtime-aggregate"
+  );
+});
+
+test("readSustainabilityStory normalizes GWh live metrics before deriving sustainability big numbers", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES
+          ('totalGeneration', 18.6, 'GWh', ?, 'good', '{}'),
+          ('consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
+          ('selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          carbon_emission_factor = 0.5,
+          tree_equivalent_factor = 3
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  const story = readSustainabilityStory("lifetime");
+
+  assert.equal(story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
+  assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+});

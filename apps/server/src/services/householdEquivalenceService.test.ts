@@ -178,6 +178,49 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
   assert.equal(cards.today.provenance?.updatedAt, `${latestAvailable}T00:00:00.000Z`);
 });
 
+test("readHouseholdEquivalenceCards falls back to live self-consumption when the cumulative counter has not flushed yet", () => {
+  const database = getDatabase();
+  const today = "2026-05-21";
+
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total,
+          peak_generation,
+          peak_generation_time,
+          peak_consumption,
+          peak_consumption_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('selfConsumptionEnergy', 4.2, 'MWh', ?, 'good', '{}')
+      `
+    )
+    .run(`${today}T10:00:00.000Z`);
+
+  const cards = readHouseholdEquivalenceCards({
+    now: new Date(`${today}T12:00:00.000Z`)
+  });
+
+  assert.equal(cards.cumulative.derivedStatus, "available");
+  assert.equal(cards.cumulative.householdCountDisplay, "35");
+  assert.equal(cards.cumulative.provenance?.source, "live-self-consumption-fallback");
+  assert.equal(cards.cumulative.provenance?.updatedAt, `${today}T10:00:00.000Z`);
+});
+
 test("readHouseholdEquivalenceCards uses configured household usage and tariff coefficients in the profile", () => {
   const database = getDatabase();
   const today = "2026-05-21";

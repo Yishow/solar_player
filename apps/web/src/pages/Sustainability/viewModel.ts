@@ -101,6 +101,50 @@ function buildDerivedHighlights(
   ];
 }
 
+function isPlaceholderModule(
+  module:
+    | ReturnType<typeof normalizeSustainabilityStory>["modules"][number]
+    | undefined
+) {
+  return module !== undefined && module.bullets.length === 0 && module.description === "內容整理中";
+}
+
+function buildReferenceFallbackModuleCard(args: {
+  iconKey: "esg-doc" | "procure";
+  label: string;
+  subtitle: string;
+}) {
+  if (args.iconKey === "procure") {
+    return {
+      iconKey: args.iconKey,
+      label: args.label,
+      provenance: {
+        label: args.label,
+        source: "reference-display-default",
+        sourceClass: "manual-module",
+        syncState: "fresh",
+        updatedAt: null
+      } satisfies SustainabilityProvenance,
+      subtitle: args.subtitle,
+      value: "NT$ 60M+"
+    };
+  }
+
+  return {
+    iconKey: args.iconKey,
+    items: ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"],
+    label: args.label,
+    provenance: {
+      label: args.label,
+      source: "reference-display-default",
+      sourceClass: "manual-module",
+      syncState: "fresh",
+      updatedAt: null
+    } satisfies SustainabilityProvenance,
+    subtitle: args.subtitle
+  };
+}
+
 function buildModuleCard(
   module:
     | ReturnType<typeof normalizeSustainabilityStory>["modules"][number]
@@ -112,22 +156,14 @@ function buildModuleCard(
     subtitle: string;
   }
 ) {
-  if (!module) {
-    if (args.allowReferenceFallback && args.iconKey === "procure") {
-      return {
-        iconKey: args.iconKey,
-        label: args.label,
-        provenance: buildMissingProvenance(args.label),
-        subtitle: args.subtitle,
-        value: "NT$ 60M+"
-      };
+  if (!module || isPlaceholderModule(module)) {
+    if (args.allowReferenceFallback || isPlaceholderModule(module)) {
+      return buildReferenceFallbackModuleCard(args);
     }
 
     return {
       iconKey: args.iconKey,
-      items: args.allowReferenceFallback && args.iconKey === "esg-doc"
-        ? ["推動再生能源使用", "落實節能減碳行動", "強化供應鏈永續管理"]
-        : ["模組未提供"],
+      items: ["模組未提供"],
       label: args.label,
       provenance: buildMissingProvenance(args.label),
       subtitle: args.subtitle

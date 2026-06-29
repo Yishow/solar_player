@@ -11,6 +11,7 @@ import {
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
 import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
 
@@ -31,8 +32,44 @@ type CounterSnapshot = {
 
 type CounterMap = Map<string, CounterSnapshot>;
 
+const liveMetricCounterFallbackMap: Record<CounterMetricKey, string> = {
+  co2: "totalCo2Reduction",
+  consumption: "consumptionEnergy",
+  generation: "totalGeneration",
+  selfConsumption: "selfConsumptionEnergy"
+};
+
 function roundTo(value: number, digits: number) {
   return Number(value.toFixed(digits));
+}
+
+function normalizeUnit(unit: string | null | undefined) {
+  return unit?.trim().toLowerCase() ?? "";
+}
+
+function normalizeEnergyToKwh(value: number, unit: string | null | undefined) {
+  switch (normalizeUnit(unit)) {
+    case "gwh":
+      return value * 1_000_000;
+    case "mwh":
+      return value * 1_000;
+    case "wh":
+      return value / 1_000;
+    default:
+      return value;
+  }
+}
+
+function resolveLiveMetricCounterFallbackValue(
+  counterKey: CounterMetricKey,
+  value: number,
+  unit: string | null | undefined
+) {
+  if (counterKey === "generation") {
+    return normalizeEnergyToKwh(value, unit);
+  }
+
+  return value;
 }
 
 function defaultStory(): SustainabilityStoryInput {
@@ -88,8 +125,7 @@ function readCounterSnapshots() {
       `
     )
     .all() as CounterRow[];
-
-  return new Map(
+  const counterMap = new Map(
     rows.map((row) => [
       row.metric_key,
       {
@@ -98,6 +134,25 @@ function readCounterSnapshots() {
       } satisfies CounterSnapshot
     ])
   ) satisfies CounterMap;
+  const liveMetricsSnapshot = readLiveMetricsSnapshot();
+
+  for (const [counterKey, liveMetricKey] of Object.entries(liveMetricCounterFallbackMap)) {
+    if (counterMap.has(counterKey)) {
+      continue;
+    }
+
+    const reading = liveMetricsSnapshot.metrics[liveMetricKey];
+    if (typeof reading?.value !== "number") {
+      continue;
+    }
+
+    counterMap.set(counterKey, {
+      updatedAt: reading.timestamp,
+      value: resolveLiveMetricCounterFallbackValue(counterKey as CounterMetricKey, reading.value, reading.unit)
+    });
+  }
+
+  return counterMap;
 }
 
 function buildPeriodDefaults(period: SustainabilityPeriodKey) {
