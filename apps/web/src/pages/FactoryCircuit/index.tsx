@@ -572,16 +572,38 @@ export function FactoryCircuit({
             width: "45px"
           }}
         />
-        <FactoryCircuitRoutingReference
+        <svg
           className="factory-circuit-routing-reference"
-          src={factoryRoutingLoadReferenceUrl}
           style={{
             height: "526px",
             left: "1254px",
             top: `${150 - CONTENT_TOP_OFFSET}px`,
             width: "140px"
           }}
-        />
+          viewBox="0 0 140 526"
+        >
+          {/* 6 條平滑分岔線，採用單一主幹 + 垂直總線骨架，防止線條重疊 */}
+          <path
+            d="M 4 304 H 40 M 40 54 V 497 M 40 54 Q 40 38 56 38 H 138 M 40 149 Q 40 133 56 133 H 138 M 40 244 Q 40 228 56 228 H 138 M 40 307 Q 40 323 56 323 H 138 M 40 402 Q 40 418 56 418 H 138 M 40 497 Q 40 513 56 513 H 138"
+            fill="none"
+            stroke="#527d3b"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ opacity: 0.95 }}
+          />
+
+          {/* 配電盤端統一輸出圓點 */}
+          <circle cx={4} cy={304} r={5} fill="#527d3b" />
+
+          {/* 負載端 6 個接收圓點 */}
+          <circle cx={138} cy={38} r={5} fill="#527d3b" />
+          <circle cx={138} cy={133} r={5} fill="#527d3b" />
+          <circle cx={138} cy={228} r={5} fill="#527d3b" />
+          <circle cx={138} cy={323} r={5} fill="#527d3b" />
+          <circle cx={138} cy={418} r={5} fill="#527d3b" />
+          <circle cx={138} cy={513} r={5} fill="#527d3b" />
+        </svg>
       </div>
 
       <section
