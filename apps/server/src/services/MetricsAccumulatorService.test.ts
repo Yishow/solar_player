@@ -162,3 +162,44 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
 
   database.close();
 });
+
+test("MetricsAccumulatorService normalizes energy totals to kWh before persisting cumulative counters", () => {
+  const database = createDatabase();
+  const timestamp = "2026-06-29T08:50:57.000Z";
+
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["totalGeneration", 419.41, "mWh"],
+          ["consumptionEnergy", 12.5, "MWh"],
+          ["selfConsumptionEnergy", 2.0, "kWh"]
+        ],
+        timestamp
+      )
+  });
+
+  service.initialize();
+  service.processAt(new Date(timestamp));
+  service.flush(true);
+
+  const persistedRows = database
+    .prepare(
+      `
+        SELECT metric_key, total_value
+        FROM cumulative_counters
+        ORDER BY metric_key ASC
+      `
+    )
+    .all() as Array<{ metric_key: string; total_value: number }>;
+
+  assert.deepEqual(persistedRows, [
+    { metric_key: "co2", total_value: 209705 },
+    { metric_key: "consumption", total_value: 12500 },
+    { metric_key: "generation", total_value: 419410 },
+    { metric_key: "selfConsumption", total_value: 2 }
+  ]);
+
+  database.close();
+});

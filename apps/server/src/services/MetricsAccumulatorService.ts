@@ -72,6 +72,32 @@ function readMetricValue(snapshot: LiveMetricsSnapshot, metricKey: string) {
   return isFiniteNumber(value) ? value : null;
 }
 
+function normalizeUnit(unit: string | null | undefined) {
+  return unit?.trim().toLowerCase() ?? "";
+}
+
+function normalizeEnergyToKwh(value: number, unit: string | null | undefined) {
+  switch (normalizeUnit(unit)) {
+    case "gwh":
+      return value * 1_000_000;
+    case "mwh":
+      return value * 1_000;
+    case "wh":
+      return value / 1_000;
+    default:
+      return value;
+  }
+}
+
+function readEnergyMetricValue(snapshot: LiveMetricsSnapshot, metricKey: string) {
+  const reading = snapshot.metrics[metricKey];
+  if (!isFiniteNumber(reading?.value)) {
+    return null;
+  }
+
+  return normalizeEnergyToKwh(reading.value, reading.unit);
+}
+
 function sumConsumptionPower(snapshot: LiveMetricsSnapshot) {
   return Object.entries(snapshot.metrics)
     .filter(([metricKey, reading]) => metricKey.startsWith("factory") && reading.unit === "kW")
@@ -182,10 +208,10 @@ export class MetricsAccumulatorService {
     const observedTimestamp = snapshot.timestamp ?? now.toISOString();
     const observedAtMs = parseTimestamp(observedTimestamp) ?? now.getTime();
 
-    const totalGeneration = readMetricValue(snapshot, "totalGeneration");
+    const totalGeneration = readEnergyMetricValue(snapshot, "totalGeneration");
     const generationPower = readMetricValue(snapshot, "realTimePower");
-    const consumption = readMetricValue(snapshot, "consumptionEnergy");
-    const selfConsumption = readMetricValue(snapshot, "selfConsumptionEnergy");
+    const consumption = readEnergyMetricValue(snapshot, "consumptionEnergy");
+    const selfConsumption = readEnergyMetricValue(snapshot, "selfConsumptionEnergy");
     const explicitCo2 = readMetricValue(snapshot, "totalCo2Reduction");
 
     if (isFiniteNumber(totalGeneration)) {
