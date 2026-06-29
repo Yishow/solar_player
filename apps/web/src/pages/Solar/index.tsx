@@ -1,6 +1,10 @@
 import { useMemo, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
-import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import {
+  displayPageCardConfiguringLabel,
+  resolveDisplayPageCardStatus,
+  resolveDisplayPageMediaSource
+} from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -268,6 +272,8 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         key: cardItem.key,
         seedSource: seedConfig.iconSources.kpiCards[cardItem.key],
         source: resolvedConfig.iconSources.kpiCards[cardItem.key],
+        status: resolveDisplayPageCardStatus(resolvedConfig.kpiCardStates?.[cardItem.key]),
+        visible: resolvedConfig.kpiCardStates?.[cardItem.key]?.visible !== false,
         style: (() => {
           const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
           return {
@@ -476,7 +482,12 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       ))}
 
       {kpiCardItems.map((item, index) => {
+        if (!item.visible) {
+          return null;
+        }
+
         const metric = viewModel.kpis[index]!;
+        const isConfiguring = item.status === "configuring";
 
         return (
           <DisplayCardFrame
@@ -496,7 +507,11 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
               subtitle={item.englishLabel}
               title={metric.label}
             />
-            <DisplayCardValueRow align={item.cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow
+              align={item.cardStyle.valueRowAlign}
+              unit={isConfiguring ? "" : metric.unit}
+              value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
+            />
             <DisplayCardFooter>
               <p className="solar-kpi-helper">{metric.helper}</p>
             </DisplayCardFooter>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { resolveDisplayPageCardStatus } from "@solar-display/shared";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   createOverviewDisplayPageSeedConfig,
@@ -85,6 +86,7 @@ test("overview display page seed config captures the current default hero contra
   assert.ok((config.heroMedia.src ?? "").length > 0);
   for (const card of Object.values(config.kpiCards)) {
     assert.equal(card.visible, true);
+    assert.equal(resolveDisplayPageCardStatus(card), "normal");
   }
 });
 
@@ -110,6 +112,47 @@ test("overview KPI editor regions expose visibility toggles and proportional res
       `${region.id} should expose a visible toggle`
     );
   }
+});
+
+test("overview KPI editor regions expose a configuring status select", () => {
+  const kpiRegions = overviewDisplayPageEditorRegions.filter(
+    (region) => region.id.startsWith("overview-kpi-") && Boolean(region.geometry)
+  );
+
+  assert.equal(kpiRegions.length, 5);
+  for (const region of kpiRegions) {
+    const key = region.id.replace("overview-kpi-", "");
+    const statusField = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(statusField, `${region.id} should expose a status select`);
+    assert.equal(statusField?.fieldType, "select");
+    assert.equal(statusField?.path.join("."), `kpiCards.${key}.status`);
+    assert.deepEqual(
+      statusField && "options" in statusField ? statusField.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("overview config preserves a configuring KPI status through resolution", () => {
+  const seed = createOverviewDisplayPageSeedConfig();
+  const persisted = {
+    ...seed,
+    kpiCards: {
+      ...seed.kpiCards,
+      power: { ...seed.kpiCards.power, status: "configuring" }
+    }
+  } as unknown as typeof seed;
+
+  const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
+
+  assert.equal(resolveDisplayPageCardStatus(resolved.kpiCards.power), "configuring");
+  assert.equal(resolveDisplayPageCardStatus(resolved.kpiCards.total), "normal");
+});
+
+test("overview runtime replaces the value with the configuring placeholder", () => {
+  assert.match(overviewSource, /resolveDisplayPageCardStatus\(resolvedConfig\.kpiCards\[cardItem\.key\]\)/);
+  assert.match(overviewSource, /displayPageCardConfiguringLabel/);
 });
 
 test("overview dashboard widget regions default visible and expose visibility toggles", () => {

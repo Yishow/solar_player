@@ -1,6 +1,7 @@
 import type {
   DisplayPageCardRail,
   DisplayPageCardRailFrame,
+  DisplayPageCardStatus,
   DisplayPageHouseholdEquivalentCardPayload,
   DisplayPageMediaBinding
 } from "@solar-display/shared";
@@ -10,6 +11,7 @@ import {
   createUnavailableHouseholdEquivalenceCard
 } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
   createDisplayCardStyleConfig,
@@ -100,10 +102,18 @@ export type SustainabilityDisplayPageConfig = {
     statCards: Record<"esg" | "procure" | "trees", DisplayPageIconSource>;
   };
   kpiCards: Record<"annualSaving" | "totalCo2" | "totalGeneration", SustainabilityDisplayRect>;
+  kpiCardStates: Record<
+    "annualSaving" | "totalCo2" | "totalGeneration",
+    { status?: DisplayPageCardStatus; visible?: boolean }
+  >;
   rhythm: {
     highlightRail: SustainabilityHighlightRhythmConfig;
   };
   statCards: Record<"esg" | "procure" | "trees", SustainabilityDisplayRect>;
+  statCardStates: Record<
+    "esg" | "procure" | "trees",
+    { status?: DisplayPageCardStatus; visible?: boolean }
+  >;
 };
 
 export function createSustainabilityDisplayPageSeedConfig(
@@ -275,6 +285,11 @@ export function createSustainabilityDisplayPageSeedConfig(
       totalCo2: { ...sustainabilityKpiLayout.totalCo2 },
       totalGeneration: { ...sustainabilityKpiLayout.totalGeneration }
     },
+    kpiCardStates: {
+      annualSaving: {},
+      totalCo2: {},
+      totalGeneration: {}
+    },
     rhythm: {
       highlightRail: createSustainabilityHighlightRhythmConfig()
     },
@@ -282,6 +297,11 @@ export function createSustainabilityDisplayPageSeedConfig(
       esg: { ...sustainabilityStatLayout.esg },
       procure: { ...sustainabilityStatLayout.procure },
       trees: { ...sustainabilityStatLayout.trees }
+    },
+    statCardStates: {
+      esg: {},
+      procure: {},
+      trees: {}
     }
   };
 }
@@ -491,6 +511,8 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]
       }),
+      buildCardVisibilityField(`${key}-visible`, ["kpiCardStates", key, "visible"]),
+      buildCardStatusField(`${key}-status`, ["kpiCardStates", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },
@@ -522,6 +544,8 @@ export const sustainabilityDisplayPageEditorRegions: DisplayEditorRegionSchema[]
         idPrefix: key,
         path: ["iconSources", "statCards", key]
       }),
+      buildCardVisibilityField(`${key}-visible`, ["statCardStates", key, "visible"]),
+      buildCardStatusField(`${key}-status`, ["statCardStates", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["statCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["statCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["statCards", key, "width"] },

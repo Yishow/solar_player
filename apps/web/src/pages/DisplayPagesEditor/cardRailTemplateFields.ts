@@ -7,6 +7,7 @@ import type {
   DisplayPageCardRailCard,
   DisplayPageCardRailTemplateKey
 } from "@solar-display/shared";
+import { buildCardStatusField, buildCardVisibilityField } from "./cardStatusField";
 
 function numberField(
   id: string,
@@ -79,6 +80,10 @@ export function buildCardRailCardFields(
   cardPath: DisplayEditorPath
 ): DisplayEditorFieldSchema[] {
   const contentPath = [...cardPath, "contentSource", "payload"];
+  const stateFields = [
+    buildCardVisibilityField("card-visible", [...cardPath, "visible"]),
+    buildCardStatusField("card-status", [...cardPath, "status"])
+  ];
   const geometryFields = [
     numberField("card-frame-left", "Card Left", [...cardPath, "frame", "left"]),
     numberField("card-frame-top", "Card Top", [...cardPath, "frame", "top"]),
@@ -99,6 +104,7 @@ export function buildCardRailCardFields(
       textField("card-supporting-line", "Supporting Line", [...contentPath, "supportingLine"], true),
       textField("card-disclaimer", "Disclaimer", [...contentPath, "disclaimer"], true),
       textField("card-basis-source-label", "Basis Source Label", [...contentPath, "basisSourceLabel"], true),
+      ...stateFields,
       ...geometryFields
     ];
   }
@@ -107,6 +113,7 @@ export function buildCardRailCardFields(
     textField("card-label", "Label", [...contentPath, "label"], true),
     textField("card-value", "Value", [...contentPath, "value"], true),
     textField("card-unit", "Unit", [...contentPath, "unit"], true),
+    ...stateFields,
     ...geometryFields
   ];
 }

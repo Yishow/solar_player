@@ -6,7 +6,7 @@ import test from "node:test";
 const factorySource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 const factoryCss = readFileSync(path.join(import.meta.dirname, "factoryCircuit.css"), "utf8");
 
-test("factory KPI cards use the shared display card family without changing metric binding", () => {
+test("factory KPI cards use the shared display card family while honoring configuring placeholder", () => {
   assert.match(factorySource, /DisplayCardFrame/);
   assert.match(factorySource, /DisplayCardHeader/);
   assert.match(factorySource, /DisplayCardValueRow/);
@@ -14,7 +14,12 @@ test("factory KPI cards use the shared display card family without changing metr
   assert.match(factorySource, /renderDisplayPageIcon\(\{/);
   assert.match(factorySource, /seedSource: seedConfig\.iconSources\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
   assert.match(factorySource, /source: resolvedConfig\.iconSources\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
-  assert.match(factorySource, /<DisplayCardValueRow[^>]+value=\{metric\.value\}/);
+  assert.match(factorySource, /resolvedConfig\.kpiCardStates/);
+  assert.match(factorySource, /displayPageCardConfiguringLabel/);
+  assert.match(
+    factorySource,
+    /<DisplayCardValueRow[^>]+value=\{isConfiguring \? displayPageCardConfiguringLabel : metric\.value\}/
+  );
   assert.match(factorySource, /<DisplayCardFooter>/);
   assert.doesNotMatch(factorySource, /factory-circuit-kpi-head/);
   assert.doesNotMatch(factorySource, /factory-circuit-kpi-value/);

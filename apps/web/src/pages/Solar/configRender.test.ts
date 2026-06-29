@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { createSolarDisplayPageSeedConfig } from "./displayPageConfig";
+import { createSolarDisplayPageSeedConfig, solarDisplayPageEditorRegions } from "./displayPageConfig";
 
 const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
@@ -110,4 +110,45 @@ test("solar runtime keeps story hydration staged behind visible config and socke
   assert.match(solarSource, /solarStory: solarStoryPayload/);
   assert.match(solarSource, /runtimeErrorMessage: runtimeHydrationEnabled \? solarStoryRuntime\.errorMessage : ""/);
   assert.match(solarSource, /usesRuntimeFallback: solarStoryRuntime\.usesFallback/);
+});
+
+test("solar KPI editor regions expose visibility toggle and configuring status select", () => {
+  const kpiRegions = solarDisplayPageEditorRegions.filter((region) => region.id.startsWith("solar-kpi-"));
+
+  assert.equal(kpiRegions.length, 5);
+  for (const region of kpiRegions) {
+    const key = region.id.replace("solar-kpi-", "");
+    const visible = region.fields.find((field) => field.id === `${key}-visible`);
+    const status = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(visible, `${region.id} should expose a visible toggle`);
+    assert.equal(visible?.fieldType, "toggle");
+    assert.equal(visible?.path.join("."), `kpiCardStates.${key}.visible`);
+
+    assert.ok(status, `${region.id} should expose a status select`);
+    assert.equal(status?.fieldType, "select");
+    assert.equal(status?.path.join("."), `kpiCardStates.${key}.status`);
+    assert.deepEqual(
+      status && "options" in status ? status.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("solar seed config provides KPI card state entries that default to normal and visible", () => {
+  const config = createSolarDisplayPageSeedConfig();
+  assert.deepEqual(
+    Object.keys(config.kpiCardStates).sort(),
+    Object.keys(config.kpiCards).sort()
+  );
+  for (const state of Object.values(config.kpiCardStates)) {
+    assert.notEqual(state.status, "configuring");
+    assert.notEqual(state.visible, false);
+  }
+});
+
+test("solar runtime applies card visibility and configuring placeholder", () => {
+  assert.match(solarSource, /resolvedConfig\.kpiCardStates/);
+  assert.match(solarSource, /resolveDisplayPageCardStatus/);
+  assert.match(solarSource, /displayPageCardConfiguringLabel/);
 });

@@ -141,3 +141,35 @@ test("images runtime keeps playlist hydration staged while preserving autoplay a
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
 });
+
+test("images info panel editor region exposes visibility toggle and configuring status select", () => {
+  const region = imagesDisplayPageEditorRegions.find((entry) => entry.id === "images-info-panel");
+  assert.ok(region, "expected an images-info-panel region");
+
+  const visible = region!.fields.find((field) => field.id === "images-info-visible");
+  const status = region!.fields.find((field) => field.id === "images-info-status");
+
+  assert.ok(visible, "info panel should expose a visible toggle");
+  assert.equal(visible?.fieldType, "toggle");
+  assert.equal(visible?.path.join("."), "infoPanel.visible");
+
+  assert.ok(status, "info panel should expose a status select");
+  assert.equal(status?.fieldType, "select");
+  assert.equal(status?.path.join("."), "infoPanel.status");
+  assert.deepEqual(
+    status && "options" in status ? status.options.map((option) => option.value) : [],
+    ["normal", "configuring"]
+  );
+});
+
+test("images runtime applies info card visibility and configuring placeholder", () => {
+  assert.match(imagesSource, /resolveDisplayPageCardStatus\(resolvedConfig\.infoPanel\)/);
+  assert.match(imagesSource, /displayPageCardConfiguringLabel/);
+  assert.match(imagesSource, /resolvedConfig\.infoPanel\.visible/);
+});
+
+test("images seed config info panel defaults to normal and visible", () => {
+  const config = createImagesDisplayPageSeedConfig();
+  assert.notEqual(config.infoPanel.status, "configuring");
+  assert.notEqual(config.infoPanel.visible, false);
+});

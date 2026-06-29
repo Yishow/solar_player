@@ -1,5 +1,6 @@
-import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type { DisplayPageCardStatus, DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
   createDisplayCardStyleConfig,
@@ -50,6 +51,12 @@ export type SolarDisplayRect = {
 
 export type SolarConnectorKey = "inverterToCo2" | "inverterToFactory" | "solarToInverter";
 export type SolarFlowNodeKey = "co2" | "factory" | "inverter" | "solar";
+export type SolarKpiKey = "co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2";
+
+export type SolarKpiCardState = {
+  status?: DisplayPageCardStatus;
+  visible?: boolean;
+};
 
 export type SolarDisplayPageConfig = {
   cardStyles: Record<
@@ -82,6 +89,7 @@ export type SolarDisplayPageConfig = {
     >;
   };
   kpiCards: Record<"co2" | "efficiency" | "generation" | "selfConsumption" | "totalCo2", SolarDisplayRect>;
+  kpiCardStates: Record<SolarKpiKey, SolarKpiCardState>;
 };
 
 export type SolarIconAssetSources = {
@@ -202,6 +210,13 @@ export function createSolarDisplayPageSeedConfig(
       generation: { ...solarKpiLayout.generation },
       selfConsumption: { ...solarKpiLayout.selfConsumption },
       totalCo2: { ...solarKpiLayout.totalCo2 }
+    },
+    kpiCardStates: {
+      co2: {},
+      efficiency: {},
+      generation: {},
+      selfConsumption: {},
+      totalCo2: {}
     }
   };
 }
@@ -410,6 +425,8 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]
       }),
+      buildCardVisibilityField(`${key}-visible`, ["kpiCardStates", key, "visible"]),
+      buildCardStatusField(`${key}-status`, ["kpiCardStates", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

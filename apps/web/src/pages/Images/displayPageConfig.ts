@@ -1,5 +1,6 @@
-import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type { DisplayPageCardStatus, DisplayPageMediaBinding } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
   createDisplayCardStyleConfig,
@@ -83,7 +84,10 @@ export type ImagesDisplayPageConfig = {
     mainStagePlaceholder: DisplayPageIconSource;
     thumbnailSlots: Record<"thumb1" | "thumb2" | "thumb3" | "thumb4", DisplayPageIconSource>;
   };
-  infoPanel: ImagesDisplayRect;
+  infoPanel: ImagesDisplayRect & {
+    status?: DisplayPageCardStatus;
+    visible?: boolean;
+  };
   mainStage: ImagesDisplayRect & DisplayPageMediaBinding;
   rhythm: {
     imagesCaption: ImagesCaptionRhythmConfig;
@@ -400,6 +404,8 @@ export const imagesDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         idPrefix: "info-panel",
         path: ["iconSources", "infoPanel"]
       }),
+      buildCardVisibilityField("images-info-visible", ["infoPanel", "visible"]),
+      buildCardStatusField("images-info-status", ["infoPanel", "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: "images-info-left", label: "Left", path: ["infoPanel", "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: "images-info-top", label: "Top", path: ["infoPanel", "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: "images-info-width", label: "Width", path: ["infoPanel", "width"] },

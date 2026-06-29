@@ -79,3 +79,87 @@ test("factory circuit editor exposes copy typography leaf rotation and KPI card 
   assert.ok(kpiRegion.fields.some((field) => field.id === "totalPower-card-title-font-size"));
   assert.ok(kpiRegion.fields.some((field) => field.id === "totalPower-card-value-font-size"));
 });
+
+test("factory load row editor regions expose visibility toggle and configuring status select", () => {
+  const loadRowRegions = factoryCircuitDisplayPageEditorRegions.filter((region) =>
+    region.id.startsWith("factory-load-row-")
+  );
+
+  assert.equal(loadRowRegions.length, 6);
+  for (const region of loadRowRegions) {
+    const key = region.id.replace("factory-load-row-", "");
+    const visible = region.fields.find((field) => field.id === `${key}-visible`);
+    const status = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(visible, `${region.id} should expose a visible toggle`);
+    assert.equal(visible?.path.join("."), `loadRowStates.${key}.visible`);
+
+    assert.ok(status, `${region.id} should expose a status select`);
+    assert.equal(status?.fieldType, "select");
+    assert.equal(status?.path.join("."), `loadRowStates.${key}.status`);
+    assert.deepEqual(
+      status && "options" in status ? status.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("factory seed config provides load row state entries that default to normal and visible", () => {
+  const config = createFactoryCircuitDisplayPageSeedConfig();
+  assert.deepEqual(
+    Object.keys(config.loadRowStates).sort(),
+    Object.keys(config.loadRows).sort()
+  );
+  for (const state of Object.values(config.loadRowStates)) {
+    assert.notEqual(state.status, "configuring");
+    assert.notEqual(state.visible, false);
+  }
+});
+
+test("factory runtime applies load row visibility and configuring placeholder", () => {
+  assert.match(factoryCircuitSource, /resolvedConfig\.loadRowStates/);
+  assert.match(factoryCircuitSource, /resolveDisplayPageCardStatus/);
+  assert.match(factoryCircuitSource, /displayPageCardConfiguringLabel/);
+});
+
+test("factory KPI editor regions expose visibility toggle and configuring status select", () => {
+  const kpiRegions = factoryCircuitDisplayPageEditorRegions.filter((region) =>
+    region.id.startsWith("factory-kpi-")
+  );
+
+  assert.equal(kpiRegions.length, 5);
+  for (const region of kpiRegions) {
+    const key = region.id.replace("factory-kpi-", "");
+    const visible = region.fields.find((field) => field.id === `${key}-visible`);
+    const status = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(visible, `${region.id} should expose a visible toggle`);
+    assert.equal(visible?.path.join("."), `kpiCardStates.${key}.visible`);
+
+    assert.ok(status, `${region.id} should expose a status select`);
+    assert.equal(status?.fieldType, "select");
+    assert.equal(status?.path.join("."), `kpiCardStates.${key}.status`);
+    assert.deepEqual(
+      status && "options" in status ? status.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("factory seed config provides KPI card state entries that default to normal and visible", () => {
+  const config = createFactoryCircuitDisplayPageSeedConfig();
+  assert.deepEqual(
+    Object.keys(config.kpiCardStates).sort(),
+    Object.keys(config.kpiCards).sort()
+  );
+  for (const state of Object.values(config.kpiCardStates)) {
+    assert.notEqual(state.status, "configuring");
+    assert.notEqual(state.visible, false);
+  }
+});
+
+test("factory runtime applies KPI card visibility and configuring placeholder", () => {
+  assert.match(factoryCircuitSource, /resolvedConfig\.kpiCardStates/);
+  assert.match(factoryCircuitSource, /resolveDisplayPageCardStatus/);
+  assert.match(factoryCircuitSource, /displayPageCardConfiguringLabel/);
+});

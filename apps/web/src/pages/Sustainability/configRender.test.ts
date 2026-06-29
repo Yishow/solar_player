@@ -221,3 +221,91 @@ test("sustainability runtime resolves duplicated household cards by basis metada
   assert.equal(resolved.householdCountDisplay, "35");
   assert.equal(resolved.provenance.source, "cumulative-self-consumption");
 });
+
+test("sustainability KPI editor regions expose visibility toggle and configuring status select", () => {
+  const kpiRegions = sustainabilityDisplayPageEditorRegions.filter((region) =>
+    region.id.startsWith("sustainability-kpi-")
+  );
+
+  assert.equal(kpiRegions.length, 3);
+  for (const region of kpiRegions) {
+    const key = region.id.replace("sustainability-kpi-", "");
+    const visible = region.fields.find((field) => field.id === `${key}-visible`);
+    const status = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(visible, `${region.id} should expose a visible toggle`);
+    assert.equal(visible?.path.join("."), `kpiCardStates.${key}.visible`);
+
+    assert.ok(status, `${region.id} should expose a status select`);
+    assert.equal(status?.fieldType, "select");
+    assert.equal(status?.path.join("."), `kpiCardStates.${key}.status`);
+    assert.deepEqual(
+      status && "options" in status ? status.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("sustainability seed config provides KPI card state entries that default to normal and visible", () => {
+  const config = createSustainabilityDisplayPageSeedConfig();
+  assert.deepEqual(
+    Object.keys(config.kpiCardStates).sort(),
+    Object.keys(config.kpiCards).sort()
+  );
+  for (const state of Object.values(config.kpiCardStates)) {
+    assert.notEqual(state.status, "configuring");
+    assert.notEqual(state.visible, false);
+  }
+  for (const card of config.highlightRail.cards) {
+    assert.notEqual(card.status, "configuring");
+    assert.equal(card.visible, true);
+  }
+});
+
+test("sustainability runtime applies big-number and card rail configuring placeholder", () => {
+  assert.match(sustainabilitySource, /resolvedConfig\.kpiCardStates/);
+  assert.match(sustainabilitySource, /resolveDisplayPageCardStatus/);
+  assert.match(sustainabilitySource, /displayPageCardConfiguringLabel/);
+});
+
+test("sustainability stat editor regions expose visibility toggle and configuring status select", () => {
+  const statRegions = sustainabilityDisplayPageEditorRegions.filter((region) =>
+    region.id.startsWith("sustainability-stat-")
+  );
+
+  assert.equal(statRegions.length, 3);
+  for (const region of statRegions) {
+    const key = region.id.replace("sustainability-stat-", "");
+    const visible = region.fields.find((field) => field.id === `${key}-visible`);
+    const status = region.fields.find((field) => field.id === `${key}-status`);
+
+    assert.ok(visible, `${region.id} should expose a visible toggle`);
+    assert.equal(visible?.path.join("."), `statCardStates.${key}.visible`);
+
+    assert.ok(status, `${region.id} should expose a status select`);
+    assert.equal(status?.fieldType, "select");
+    assert.equal(status?.path.join("."), `statCardStates.${key}.status`);
+    assert.deepEqual(
+      status && "options" in status ? status.options.map((option) => option.value) : [],
+      ["normal", "configuring"]
+    );
+  }
+});
+
+test("sustainability seed config provides stat card state entries that default to normal and visible", () => {
+  const config = createSustainabilityDisplayPageSeedConfig();
+  assert.deepEqual(
+    Object.keys(config.statCardStates).sort(),
+    Object.keys(config.statCards).sort()
+  );
+  for (const state of Object.values(config.statCardStates)) {
+    assert.notEqual(state.status, "configuring");
+    assert.notEqual(state.visible, false);
+  }
+});
+
+test("sustainability runtime applies stat card visibility and configuring placeholder", () => {
+  assert.match(sustainabilitySource, /resolvedConfig\.statCardStates/);
+  assert.match(sustainabilitySource, /resolveDisplayPageCardStatus/);
+  assert.match(sustainabilitySource, /displayPageCardConfiguringLabel/);
+});

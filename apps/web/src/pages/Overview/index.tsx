@@ -17,7 +17,11 @@ import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { useOverviewWeather } from "../../hooks/useOverviewWeather";
-import { resolveDisplayPageMediaSource } from "@solar-display/shared";
+import {
+  displayPageCardConfiguringLabel,
+  resolveDisplayPageCardStatus,
+  resolveDisplayPageMediaSource
+} from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
@@ -323,11 +327,13 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
 
         const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
+        const status = resolveDisplayPageCardStatus(resolvedConfig.kpiCards[cardItem.key]);
 
         return {
           cardItem,
           cardStyle,
           index,
+          status,
           style: {
             height: `${layout.height}px`,
             left: `${layout.left}px`,
@@ -345,6 +351,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     }
 
     const metric = viewModel.metrics[shell.index]!;
+    const isConfiguring = shell.status === "configuring";
 
     return (
       <DisplayCardFrame
@@ -365,7 +372,11 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
           subtitle={shell.cardItem.englishLabel}
           title={metric.label}
         />
-        <DisplayCardValueRow align={shell.cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
+        <DisplayCardValueRow
+          align={shell.cardStyle.valueRowAlign}
+          unit={isConfiguring ? "" : metric.unit}
+          value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
+        />
         <OverviewKpiFooter footer={resolvedConfig.kpiCards[shell.cardItem.key]} metric={metric} />
       </DisplayCardFrame>
     );

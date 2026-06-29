@@ -1,8 +1,11 @@
 import type { DisplayPageFreeformObject, SustainabilityPeriodKey } from "@solar-display/shared";
 import {
+  displayPageCardConfiguringLabel,
   type DisplayPageHouseholdEquivalentCard,
   type DisplayPageHouseholdEquivalentCardPayload,
+  resolveDisplayPageCardStatus,
   resolveDisplayPageMediaSource,
+  type DisplayPageCardStatus,
   type DisplayPageMetricHighlightCard,
   type DisplayPageMetricHighlightCardPayload
 } from "@solar-display/shared";
@@ -100,12 +103,14 @@ type ResolvedHighlightCard =
       id: string;
       kind: "metric-highlight";
       payload: DisplayPageMetricHighlightCardPayload;
+      status: DisplayPageCardStatus;
     }
   | {
       frame: DisplayPageHouseholdEquivalentCard["frame"];
       id: string;
       kind: "household-equivalent";
       payload: DisplayPageHouseholdEquivalentCardPayload;
+      status: DisplayPageCardStatus;
     };
 
 export function Sustainability({
@@ -239,7 +244,8 @@ export function Sustainability({
             frame: card.frame,
             id: card.id,
             kind: "household-equivalent" as const,
-            payload
+            payload,
+            status: resolveDisplayPageCardStatus(card)
           };
         },
         "metric-highlight": (card, context) => {
@@ -249,7 +255,8 @@ export function Sustainability({
             frame: card.frame,
             id: card.id,
             kind: "metric-highlight" as const,
-            payload
+            payload,
+            status: resolveDisplayPageCardStatus(card)
           };
         }
       }
@@ -478,13 +485,21 @@ export function Sustainability({
               {card.kind === "household-equivalent" ? (
                 <>
                   <small className="sustainability-household-eyebrow">{card.payload.eyebrow}</small>
-                  <strong>{card.payload.householdCountDisplay}</strong>
+                  <strong>
+                    {card.status === "configuring"
+                      ? displayPageCardConfiguringLabel
+                      : card.payload.householdCountDisplay}
+                  </strong>
                   <span>{card.payload.householdLabel}</span>
                   <small>{card.payload.supportingLine}</small>
                 </>
               ) : (
                 <>
-                  <strong>{card.payload.value}</strong>
+                  <strong>
+                    {card.status === "configuring"
+                      ? displayPageCardConfiguringLabel
+                      : card.payload.value}
+                  </strong>
                   <span>{card.payload.unit}</span>
                   <small>{card.payload.label}</small>
                 </>
@@ -496,8 +511,14 @@ export function Sustainability({
 
       {viewModel.bigNumbers.map((item, index) => {
         const cardKey = sustainabilityKpiOrder[index]!;
+        const cardState = resolvedConfig.kpiCardStates?.[cardKey];
+        if (cardState?.visible === false) {
+          return null;
+        }
+
         const layout = withContentOffset(resolvedConfig.kpiCards[cardKey]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardKey]);
+        const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
 
         return (
           <DisplayCardFrame
@@ -523,7 +544,11 @@ export function Sustainability({
               subtitle={item.helper}
               title={item.label}
             />
-            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={item.unit} value={item.value} />
+            <DisplayCardValueRow
+              align={cardStyle.valueRowAlign}
+              unit={isConfiguring ? "" : item.unit}
+              value={isConfiguring ? displayPageCardConfiguringLabel : item.value}
+            />
             {index === 2 ? (
               <DisplayCardFooter className="sustainability-card-footer">
                 <div className="sustainability-growth-note">
@@ -544,8 +569,14 @@ export function Sustainability({
 
       {viewModel.esgCards.map((card, index) => {
         const cardKey = sustainabilityStatOrder[index]!;
+        const cardState = resolvedConfig.statCardStates?.[cardKey];
+        if (cardState?.visible === false) {
+          return null;
+        }
+
         const layout = withContentOffset(resolvedConfig.statCards[cardKey]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardKey]);
+        const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
 
         return (
           <DisplayCardFrame
@@ -571,7 +602,13 @@ export function Sustainability({
               subtitle={card.subtitle}
               title={card.label}
             />
-            {"value" in card ? (
+            {isConfiguring ? (
+              <DisplayCardValueRow
+                align={cardStyle.valueRowAlign}
+                unit=""
+                value={displayPageCardConfiguringLabel}
+              />
+            ) : "value" in card ? (
               <>
                 {index === 0 ? (
                   <DisplayCardFooter className="sustainability-card-footer">

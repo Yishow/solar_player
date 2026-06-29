@@ -1,5 +1,7 @@
-import type { DisplayPageMediaBinding } from "@solar-display/shared";
+import type { DisplayPageCardStatus, DisplayPageMediaBinding } from "@solar-display/shared";
+import { resolveDisplayPageCardStatus } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { buildCardStatusField } from "../DisplayPagesEditor/cardStatusField";
 import { setValueAtPath } from "../../hooks/displayPageConfigPaths";
 import {
   buildDisplayCardStyleFields,
@@ -211,6 +213,7 @@ function resolveOverviewAlwaysShowThresholds(value: unknown, fallback: boolean |
 export type OverviewKpiCardConfig = OverviewDisplayRect & {
   footerText?: string;
   footerType: OverviewKpiFooterType;
+  status?: DisplayPageCardStatus;
   targetValue?: number;
   visible: boolean;
 };
@@ -539,16 +542,20 @@ export function resolveOverviewModernDefaultConfig(
       const footerText = resolveOverviewFooterText(value.footerText, seedCard.footerText);
       const targetValue = resolveOverviewTargetValue(value.targetValue, seedCard.targetValue);
 
+      const status = resolveDisplayPageCardStatus(value as { status?: DisplayPageCardStatus });
+      const statusPatch = status === "configuring" ? { status } : {};
+
       return [
         key,
         matchesRecord(value as Record<string, unknown>, legacyOverviewKpiLayout[key as keyof typeof legacyOverviewKpiLayout])
-          ? { ...seedCard }
+          ? { ...seedCard, ...statusPatch }
           : {
             ...seedCard,
             ...value,
             ...(footerText === undefined ? {} : { footerText }),
             footerType: resolveOverviewKpiFooterType(value.footerType, seedCard.footerType),
             ...(targetValue === undefined ? {} : { targetValue }),
+            ...statusPatch,
             visible: value.visible !== false
           }
       ];
@@ -907,6 +914,7 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
         }
       },
       { fieldType: "toggle", id: `${key}-visible`, label: "顯示", path: ["kpiCards", key, "visible"] },
+      buildCardStatusField(`${key}-status`, ["kpiCards", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

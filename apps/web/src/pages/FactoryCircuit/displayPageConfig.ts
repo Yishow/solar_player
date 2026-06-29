@@ -1,4 +1,6 @@
+import type { DisplayPageCardStatus } from "@solar-display/shared";
 import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
   createDisplayCardStyleConfig,
@@ -60,6 +62,18 @@ export type FactoryCircuitDisplayRect = {
 export type FactoryCircuitConnectorKey = "inverterToBoard" | "solarToInverter";
 export type FactoryCircuitNodeKey = "board" | "inverter" | "solar";
 export type FactoryCircuitKpiKey = "flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower";
+export type FactoryCircuitLoadSlotKey =
+  | "ev"
+  | "hvac"
+  | "infrastructure"
+  | "lighting"
+  | "office"
+  | "production";
+
+export type FactoryCircuitLoadRowState = {
+  status?: DisplayPageCardStatus;
+  visible?: boolean;
+};
 
 export type FactoryCircuitDisplayPageConfig = {
   cardStyles: Record<FactoryCircuitKpiKey, DisplayCardStyleConfig>;
@@ -92,11 +106,13 @@ export type FactoryCircuitDisplayPageConfig = {
     nodes: Record<FactoryCircuitNodeKey, DisplayPageIconSource>;
   };
   kpiCards: Record<FactoryCircuitKpiKey, FactoryCircuitDisplayRect>;
+  kpiCardStates: Record<FactoryCircuitKpiKey, FactoryCircuitLoadRowState>;
   loadPanel: FactoryCircuitDisplayRect;
   loadRows: Record<
     "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
     FactoryCircuitDisplayRect
   >;
+  loadRowStates: Record<FactoryCircuitLoadSlotKey, FactoryCircuitLoadRowState>;
   nodeTreatments: Record<FactoryCircuitNodeKey, FlowNodeTreatmentConfig>;
   nodes: Record<FactoryCircuitNodeKey, FactoryCircuitDisplayRect>;
   rhythm: {
@@ -217,6 +233,13 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       solarShare: { ...factoryCircuitKpiLayout.solarShare },
       totalPower: { ...factoryCircuitKpiLayout.totalPower }
     },
+    kpiCardStates: {
+      flow: {},
+      peak: {},
+      selfConsumption: {},
+      solarShare: {},
+      totalPower: {}
+    },
     loadPanel: { ...factoryCircuitLoadPanelLayout },
     loadRows: {
       production: { ...factoryCircuitLoadRowLayout[0] },
@@ -225,6 +248,14 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
       office: { ...factoryCircuitLoadRowLayout[3] },
       ev: { ...factoryCircuitLoadRowLayout[4] },
       infrastructure: { ...factoryCircuitLoadRowLayout[5] }
+    },
+    loadRowStates: {
+      production: {},
+      hvac: {},
+      lighting: {},
+      office: {},
+      ev: {},
+      infrastructure: {}
     },
     nodeTreatments: {
       board: createFlowNodeTreatmentConfig(),
@@ -435,6 +466,8 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
         idPrefix: key,
         path: ["iconSources", "loadRows", key]
       }),
+      buildCardVisibilityField(`${key}-visible`, ["loadRowStates", key, "visible"]),
+      buildCardStatusField(`${key}-status`, ["loadRowStates", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["loadRows", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["loadRows", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["loadRows", key, "width"] },
@@ -466,6 +499,8 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
         idPrefix: key,
         path: ["iconSources", "kpiCards", key]
       }),
+      buildCardVisibilityField(`${key}-visible`, ["kpiCardStates", key, "visible"]),
+      buildCardStatusField(`${key}-status`, ["kpiCardStates", key, "status"]),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["kpiCards", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["kpiCards", key, "top"] },
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-width`, label: "Width", path: ["kpiCards", key, "width"] },

@@ -9,6 +9,30 @@ export const displayPageCardRailTemplateKeys = [
 
 export type DisplayPageCardRailTemplateKey = (typeof displayPageCardRailTemplateKeys)[number];
 
+export const displayPageCardStatuses = ["normal", "configuring"] as const;
+
+export type DisplayPageCardStatus = (typeof displayPageCardStatuses)[number];
+
+/** 卡片處於 `configuring` 狀態時,數值位置顯示的佔位文字。 */
+export const displayPageCardConfiguringLabel = "設置中";
+
+export function isDisplayPageCardStatus(value: unknown): value is DisplayPageCardStatus {
+  return (
+    typeof value === "string" &&
+    (displayPageCardStatuses as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * 解析卡片顯示狀態。缺欄位、null 或任何非 `configuring` 值皆視為 `normal`,
+ * 讓舊 draft(無 status)與未知值都安全回落為正常顯示。
+ */
+export function resolveDisplayPageCardStatus(
+  card: { status?: DisplayPageCardStatus | null } | null | undefined
+): DisplayPageCardStatus {
+  return card?.status === "configuring" ? "configuring" : "normal";
+}
+
 export type DisplayPageCardRailFrame = {
   height: number;
   left: number;
@@ -34,6 +58,7 @@ type DisplayPageCardRailCardBase = {
   displayOrder: number;
   frame: DisplayPageCardRailFrame;
   id: string;
+  status?: DisplayPageCardStatus;
   stylePreset?: string | null;
   visible: boolean;
 };
@@ -153,6 +178,7 @@ export function isDisplayPageCardRail(value: unknown): value is DisplayPageCardR
       typeof card.template === "string" &&
       typeof card.visible === "boolean" &&
       typeof card.displayOrder === "number" &&
+      (card.status === undefined || isDisplayPageCardStatus(card.status)) &&
       isDisplayPageCardRailFrame(card.frame) &&
       isPlainObject(card.contentSource) &&
       card.contentSource.mode === "static"

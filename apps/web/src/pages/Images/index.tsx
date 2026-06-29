@@ -1,7 +1,9 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import {
+  displayPageCardConfiguringLabel,
   resolveActiveImagePlaylistEntry,
+  resolveDisplayPageCardStatus,
   resolveDisplayPageMediaSource
 } from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
@@ -186,6 +188,8 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const mainLayout = withContentOffset(resolvedConfig.mainStage);
   const infoLayout = withContentOffset(resolvedConfig.infoPanel);
   const infoCardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles.infoPanel);
+  const infoCardVisible = resolvedConfig.infoPanel.visible !== false;
+  const infoCardConfiguring = resolveDisplayPageCardStatus(resolvedConfig.infoPanel) === "configuring";
   const infoCaptionRhythm = resolveImagesCaptionRhythmConfig(
     resolvedConfig.rhythm.imagesCaption,
     seedConfig.rhythm.imagesCaption
@@ -357,7 +361,7 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
         ))}
       </figure>
 
-      {!isStageFullBleed ? (
+      {!isStageFullBleed && infoCardVisible ? (
         <DisplayCardFrame
           cardStyle={infoCardStyle}
           className="images-info-card"
@@ -381,7 +385,9 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             title={viewModel.active.infoPanel.title}
           />
           <p className="images-info-card-body">
-            {viewModel.active.infoPanel.description}
+            {infoCardConfiguring
+              ? displayPageCardConfiguringLabel
+              : viewModel.active.infoPanel.description}
           </p>
           <DisplayCardFooter>
             <small className="images-info-card-meta">

@@ -1,4 +1,5 @@
 import type { CircuitConfig, DisplayPageFreeformObject } from "@solar-display/shared";
+import { displayPageCardConfiguringLabel, resolveDisplayPageCardStatus } from "@solar-display/shared";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
@@ -617,7 +618,13 @@ export function FactoryCircuit({
         }}
       >
         {viewModel.loadRows.map((row, index) => {
+          const cardState = resolvedConfig.loadRowStates?.[loadRowOrder[index]!];
+          if (cardState?.visible === false) {
+            return null;
+          }
+
           const layout = withContentOffset(resolvedConfig.loadRows[loadRowOrder[index]!]);
+          const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
           return (
             <article
               key={`${row.labelZh}-${index}`}
@@ -642,7 +649,13 @@ export function FactoryCircuit({
                 <small>{row.labelEn}</small>
                 <span className={`factory-circuit-load-state tone-${row.statusTone}`}>{row.statusLabel}</span>
               </div>
-              <b>{row.isEmpty ? `${row.fallbackSharePercent}%` : `${row.sharePercent}%`}</b>
+              <b>
+                {isConfiguring
+                  ? displayPageCardConfiguringLabel
+                  : row.isEmpty
+                    ? `${row.fallbackSharePercent}%`
+                    : `${row.sharePercent}%`}
+              </b>
             </article>
           );
         })}
@@ -650,8 +663,14 @@ export function FactoryCircuit({
 
       {viewModel.kpis.map((metric, index) => {
         const kpiKey = kpiLayoutOrder[index]!;
+        const cardState = resolvedConfig.kpiCardStates?.[kpiKey];
+        if (cardState?.visible === false) {
+          return null;
+        }
+
         const layout = withContentOffset(resolvedConfig.kpiCards[kpiKey]);
         const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[kpiKey]);
+        const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
         const className =
           kpiLayoutOrder[index] === "flow" ? "factory-circuit-kpi-card factory-circuit-kpi-routing" : "factory-circuit-kpi-card";
 
@@ -678,7 +697,9 @@ export function FactoryCircuit({
               subtitle={metric.helper}
               title={metric.label}
             />
-            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={metric.unit} value={metric.value} />
+            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={isConfiguring ? "" : metric.unit}
+              value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
+            />
             <DisplayCardFooter>
               <Sparkline className="factory-circuit-kpi-sparkline" values={kpiSparklineValues[index]!} />
             </DisplayCardFooter>
