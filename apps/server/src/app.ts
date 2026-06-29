@@ -25,6 +25,7 @@ import metricsHistoryRoute from "./routes/metrics-history.js";
 import playbackRoute from "./routes/playback.js";
 import imagesRoute from "./routes/images.js";
 import brandRoute from "./routes/brand.js";
+import calculationSettingsRoute from "./routes/calculation-settings.js";
 import circuitsRoute from "./routes/circuits.js";
 import dataSourceRoute from "./routes/data-source.js";
 import deviceRoute from "./routes/device.js";
@@ -144,6 +145,7 @@ export async function buildApp() {
   await app.register(playbackRoute);
   await app.register(imagesRoute);
   await app.register(brandRoute);
+  await app.register(calculationSettingsRoute);
   await app.register(circuitsRoute);
   await app.register(dataSourceRoute);
   await app.register(deviceRoute);

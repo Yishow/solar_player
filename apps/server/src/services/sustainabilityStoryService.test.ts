@@ -1,10 +1,30 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { after, beforeEach } from "node:test";
 import {
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod,
   type SustainabilityStoryInput
 } from "@solar-display/shared";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-sustainability-story-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+const databasePath = process.env.DATABASE_PATH;
+
+const [
+  { closeDatabaseConnection, getDatabase },
+  { migrateDatabase },
+  { seedDatabase },
+  { readSustainabilityStory }
+] = await Promise.all([
+  import("../db/index.js"),
+  import("../db/migrate.js"),
+  import("../db/seed.js"),
+  import("./sustainabilityStoryService.js")
+]);
 
 const story: SustainabilityStoryInput = {
   availablePeriods: ["month", "quarter", "year", "lifetime"],
@@ -95,4 +115,60 @@ test("sustainability story preserves readable module fallbacks when optional con
 
   assert.deepEqual(normalized.modules[0]?.bullets, ["推動再生能源使用", "強化供應鏈永續管理"]);
   assert.match(normalized.modules[0]?.description ?? "", /內容整理中/);
+});
+
+beforeEach(() => {
+  closeDatabaseConnection();
+  rmSync(databasePath, { force: true });
+  rmSync(`${databasePath}-shm`, { force: true });
+  rmSync(`${databasePath}-wal`, { force: true });
+  migrateDatabase();
+  seedDatabase();
+});
+
+after(() => {
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
+});
+
+test("readSustainabilityStory derives carbon reduction and tree equivalence from configured coefficients", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 2000, ?, 0),
+          ('consumption', 1000, ?, 0),
+          ('selfConsumption', 600, ?, 0)
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          carbon_emission_factor = 0.5,
+          tree_equivalent_factor = 3
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  const story = readSustainabilityStory("lifetime");
+
+  assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 1);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 3);
+  assert.equal(
+    story.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
+    "generation-carbon-reduction"
+  );
+  assert.equal(
+    story.period.bigNumberProvenance.plantedTreeEquivalent.source,
+    "generation-tree-equivalent"
+  );
 });

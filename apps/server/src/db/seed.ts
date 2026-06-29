@@ -175,6 +175,26 @@ export function seedDatabase() {
     )
   `);
 
+  const upsertCalculationSettings = database.prepare(`
+    INSERT INTO calculation_settings (
+      id,
+      carbon_emission_factor,
+      tree_equivalent_factor,
+      household_daily_usage_kwh,
+      household_monthly_usage_kwh,
+      estimated_tariff_per_kwh,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      carbon_emission_factor = excluded.carbon_emission_factor,
+      tree_equivalent_factor = excluded.tree_equivalent_factor,
+      household_daily_usage_kwh = excluded.household_daily_usage_kwh,
+      household_monthly_usage_kwh = excluded.household_monthly_usage_kwh,
+      estimated_tariff_per_kwh = excluded.estimated_tariff_per_kwh,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+
   const insertDisplayPageRegistryInstance = database.prepare(`
     INSERT INTO display_page_registry (
       page_key,
@@ -198,6 +218,7 @@ export function seedDatabase() {
   database.transaction(() => {
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
+    upsertCalculationSettings.run(1, 0.495, 2.6, 4, 120, 5);
 
     const existingMqttSettings = database
       .prepare(

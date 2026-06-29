@@ -66,15 +66,52 @@ function resolveCardCopy(cardKey: HouseholdEquivalenceCardKey) {
   };
 }
 
+function formatProfileNumber(value: number) {
+  return Number.isInteger(value)
+    ? value.toLocaleString("zh-TW")
+    : value.toLocaleString("zh-TW", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0
+    });
+}
+
+function buildHouseholdEquivalenceDisclaimer(args: {
+  averageDailyUsageKwh: number;
+  averageMonthlyUsageKwh: number;
+  estimatedTariffPerKwh: number;
+}) {
+  return `依四口之家平均每日 ${formatProfileNumber(args.averageDailyUsageKwh)} kWh / 每月 ${formatProfileNumber(args.averageMonthlyUsageKwh)} kWh、每度電 ${formatProfileNumber(args.estimatedTariffPerKwh)} 元估算`;
+}
+
+export function createHouseholdEquivalenceCalcProfile(
+  overrides: Partial<HouseholdEquivalenceCalcProfile> | null = null
+) {
+  const resolved = {
+    averageDailyUsageKwh: 4,
+    averageMonthlyUsageKwh: 120,
+    estimatedTariffPerKwh: 5,
+    householdLabel: "戶4口之家",
+    id: "default-four-person",
+    label: "預設四口之家",
+    ...(overrides ?? {})
+  };
+
+  return {
+    ...resolved,
+    disclaimer:
+      overrides?.disclaimer ??
+      buildHouseholdEquivalenceDisclaimer({
+        averageDailyUsageKwh: resolved.averageDailyUsageKwh,
+        averageMonthlyUsageKwh: resolved.averageMonthlyUsageKwh,
+        estimatedTariffPerKwh: resolved.estimatedTariffPerKwh
+      })
+  } satisfies HouseholdEquivalenceCalcProfile;
+}
+
 function resolveCalcProfile(
   calcProfile?: Partial<HouseholdEquivalenceCalcProfile> | null
 ) {
-  const defaults = createDefaultHouseholdEquivalenceCalcProfile();
-
-  return {
-    ...defaults,
-    ...(calcProfile ?? {})
-  } satisfies HouseholdEquivalenceCalcProfile;
+  return createHouseholdEquivalenceCalcProfile(calcProfile);
 }
 
 function roundHouseholdCount(value: number) {
@@ -82,15 +119,7 @@ function roundHouseholdCount(value: number) {
 }
 
 export function createDefaultHouseholdEquivalenceCalcProfile(): HouseholdEquivalenceCalcProfile {
-  return {
-    averageDailyUsageKwh: 4,
-    averageMonthlyUsageKwh: 120,
-    disclaimer: "依四口之家平均用電與估算電價換算",
-    estimatedTariffPerKwh: 5,
-    householdLabel: "戶4口之家",
-    id: "default-four-person",
-    label: "預設四口之家"
-  };
+  return createHouseholdEquivalenceCalcProfile();
 }
 
 export function createUnavailableHouseholdEquivalenceCard(

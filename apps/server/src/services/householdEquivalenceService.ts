@@ -1,9 +1,10 @@
 import type Database from "better-sqlite3";
 import {
-  createDefaultHouseholdEquivalenceCalcProfile,
+  createHouseholdEquivalenceCalcProfile,
   deriveHouseholdEquivalenceCard
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readCalculationSettings } from "./calculationSettingsService.js";
 
 type DailySummaryRow = {
   date: string;
@@ -28,7 +29,12 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
   const database = options.database ?? getDatabase();
   const now = options.now ?? new Date();
   const todayDate = toDateKey(now);
-  const calcProfile = createDefaultHouseholdEquivalenceCalcProfile();
+  const calculationSettings = readCalculationSettings(database);
+  const calcProfile = createHouseholdEquivalenceCalcProfile({
+    averageDailyUsageKwh: calculationSettings.householdDailyUsageKwh,
+    averageMonthlyUsageKwh: calculationSettings.householdMonthlyUsageKwh,
+    estimatedTariffPerKwh: calculationSettings.estimatedTariffPerKwh
+  });
   const dailySummary = database
     .prepare(
       `

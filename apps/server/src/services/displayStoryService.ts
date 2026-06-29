@@ -20,6 +20,7 @@ import {
   resolveSolarFlowState
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import {
   type HourlyGenerationTrendRow,
@@ -176,6 +177,7 @@ type TopicDisplayName = {
 };
 
 type DisplayStorySourceContext = {
+  calculationSettings: CalculationSettings;
   circuits: CircuitRow[];
   flowState: ReturnType<typeof resolveSolarFlowState>;
   generatedAt: string;
@@ -186,6 +188,94 @@ type DisplayStorySourceContext = {
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
+}
+
+function roundTo(value: number, digits: number) {
+  return Number(value.toFixed(digits));
+}
+
+function normalizeGenerationKwh(value: number, unit: string | null) {
+  if (unit === "GWh") {
+    return value * 1_000_000;
+  }
+
+  if (unit === "MWh") {
+    return value * 1_000;
+  }
+
+  return value;
+}
+
+function readCumulativeCounter(metricKey: string) {
+  return getDatabase()
+    .prepare(
+      `
+        SELECT total_value, last_updated
+        FROM cumulative_counters
+        WHERE metric_key = ?
+      `
+    )
+    .get(metricKey) as { last_updated: string | null; total_value: number | null } | undefined;
+}
+
+function buildDerivedCarbonReductionReading(
+  generationReading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null,
+  carbonEmissionFactor: number
+) {
+  if (!generationReading || !Number.isFinite(generationReading.value)) {
+    return null;
+  }
+
+  return {
+    quality: generationReading.quality,
+    timestamp: generationReading.timestamp,
+    unit: "t",
+    value: roundTo(
+      normalizeGenerationKwh(generationReading.value, generationReading.unit) * carbonEmissionFactor / 1000,
+      3
+    )
+  };
+}
+
+function buildCumulativeGenerationReading(
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>
+) {
+  const cumulativeGeneration = readCumulativeCounter("generation");
+
+  if (
+    typeof cumulativeGeneration?.total_value === "number"
+    && cumulativeGeneration.last_updated
+  ) {
+    return {
+      quality: null,
+      timestamp: cumulativeGeneration.last_updated,
+      unit: "kWh",
+      value: cumulativeGeneration.total_value
+    };
+  }
+
+  return snapshot.metrics.totalGeneration ?? null;
+}
+
+function resolveStoryMetricReading(
+  metricKey: StoryMetricKey,
+  context: DisplayStorySourceContext
+) {
+  if (metricKey === "todayCo2Reduction") {
+    return buildDerivedCarbonReductionReading(
+      context.snapshot.metrics.todayGeneration ?? null,
+      context.calculationSettings.carbonEmissionFactor
+    );
+  }
+
+  if (metricKey === "totalCo2Reduction") {
+    return buildDerivedCarbonReductionReading(
+      buildCumulativeGenerationReading(context.snapshot),
+      context.calculationSettings.carbonEmissionFactor
+    );
+  }
+
+  return context.snapshot.metrics[metricKey] ?? null;
 }
 
 /**
@@ -278,6 +368,7 @@ function resolveCircuitState(args: {
 
 function resolveSolarKpiBinding(args: {
   binding: MonitoringMetricBinding<StoryMetricKey>;
+  calculationSettings: CalculationSettings;
   isConnected: boolean;
   now?: string;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
@@ -287,7 +378,18 @@ function resolveSolarKpiBinding(args: {
       binding: args.binding,
       isConnected: args.isConnected,
       now: args.now,
-      reading: args.snapshot.metrics[args.binding.metricKey] ?? null
+      reading:
+        args.binding.metricKey === "todayCo2Reduction"
+          ? buildDerivedCarbonReductionReading(
+            args.snapshot.metrics.todayGeneration ?? null,
+            args.calculationSettings.carbonEmissionFactor
+          )
+          : args.binding.metricKey === "totalCo2Reduction"
+            ? buildDerivedCarbonReductionReading(
+              buildCumulativeGenerationReading(args.snapshot),
+              args.calculationSettings.carbonEmissionFactor
+            )
+            : args.snapshot.metrics[args.binding.metricKey] ?? null
     });
   }
 
@@ -627,6 +729,7 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
   const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
 
   return {
+    calculationSettings: readCalculationSettings(),
     circuits: readCircuits().filter((circuit) => toBoolean(circuit.enabled)),
     flowState: resolveSolarFlowState({
       efficiencyPercent: isConnected ? efficiency : null,
@@ -666,12 +769,13 @@ export function readOverviewDisplayStory(
 ): OverviewStoryPayload {
   const trendProfile = readOverviewGenerationTrendSeries();
   const overview = overviewMetrics.map((binding) => {
+    const reading = resolveStoryMetricReading(binding.metricKey, context);
     const resolved = {
       ...resolveMonitoringMetricBinding({
         binding,
         isConnected: context.isConnected,
         now: context.snapshot.timestamp ?? undefined,
-        reading: context.snapshot.metrics[binding.metricKey] ?? null
+        reading
       }),
       label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label)
     };
@@ -704,18 +808,31 @@ export function readSolarDisplayStory(
     kpis: solarKpis.map((binding) => {
       const resolved = resolveSolarKpiBinding({
         binding,
+        calculationSettings: context.calculationSettings,
         isConnected: context.isConnected,
         now: context.snapshot.timestamp ?? undefined,
         snapshot: context.snapshot
       });
+      const comparisonActualValue =
+        binding.metricKey === "todayCo2Reduction"
+          ? buildDerivedCarbonReductionReading(
+            context.snapshot.metrics.todayGeneration ?? null,
+            context.calculationSettings.carbonEmissionFactor
+          )?.value ?? null
+          : binding.metricKey === "totalCo2Reduction"
+            ? buildDerivedCarbonReductionReading(
+              buildCumulativeGenerationReading(context.snapshot),
+              context.calculationSettings.carbonEmissionFactor
+            )?.value ?? null
+            : context.isConnected
+              ? context.snapshot.metrics[binding.metricKey]?.value ?? null
+              : null;
       return {
         ...resolved,
         label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
-          actualValue: context.isConnected
-            ? context.snapshot.metrics[binding.metricKey]?.value ?? null
-            : null,
+          actualValue: comparisonActualValue,
           target: solarTargets[binding.metricKey]
         })
       };

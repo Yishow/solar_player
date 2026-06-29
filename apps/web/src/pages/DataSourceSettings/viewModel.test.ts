@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildDataSourceSettingsViewModel,
+  createCalculationSettingsForm,
+  type CalculationSettings,
   type DataSourceOverviewResponse
 } from "./viewModel";
 
@@ -95,8 +97,24 @@ function createOverview(overrides: Partial<DataSourceOverviewResponse> = {}): Da
   };
 }
 
+function createCalculationSettings(
+  overrides: Partial<CalculationSettings> = {}
+): CalculationSettings {
+  return {
+    carbonEmissionFactor: 0.495,
+    estimatedTariffPerKwh: 5,
+    householdDailyUsageKwh: 4,
+    householdMonthlyUsageKwh: 120,
+    treeEquivalentFactor: 2.6,
+    ...overrides
+  };
+}
+
 test("buildDataSourceSettingsViewModel exposes ready source categories without secrets", () => {
   const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings(),
+    calculationSettingsDraft: createCalculationSettingsForm(createCalculationSettings()),
+    calculationSettingsState: "ready",
     overview: createOverview(),
     state: "ready"
   });
@@ -114,6 +132,9 @@ test("buildDataSourceSettingsViewModel exposes ready source categories without s
 
 test("buildDataSourceSettingsViewModel keeps degraded diagnostics visible", () => {
   const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings(),
+    calculationSettingsDraft: createCalculationSettingsForm(createCalculationSettings()),
+    calculationSettingsState: "ready",
     overview: createOverview({
       sqlite: {
         databasePath: "/data/solar-display/data/solar-display.sqlite",
@@ -132,6 +153,9 @@ test("buildDataSourceSettingsViewModel keeps degraded diagnostics visible", () =
 
 test("buildDataSourceSettingsViewModel turns API failure into a degraded page state", () => {
   const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: null,
+    calculationSettingsDraft: createCalculationSettingsForm(null),
+    calculationSettingsState: "loading",
     errorMessage: "Management access denied",
     overview: null,
     state: "error"
@@ -144,6 +168,9 @@ test("buildDataSourceSettingsViewModel turns API failure into a degraded page st
 
 test("buildDataSourceSettingsViewModel exposes related route actions as read-only navigation", () => {
   const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings(),
+    calculationSettingsDraft: createCalculationSettingsForm(createCalculationSettings()),
+    calculationSettingsState: "ready",
     overview: createOverview(),
     state: "ready"
   });
@@ -161,6 +188,9 @@ test("buildDataSourceSettingsViewModel exposes related route actions as read-onl
 
 test("buildDataSourceSettingsViewModel presents recommendations without active connector controls", () => {
   const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings(),
+    calculationSettingsDraft: createCalculationSettingsForm(createCalculationSettings()),
+    calculationSettingsState: "ready",
     overview: createOverview(),
     state: "ready"
   });
@@ -177,4 +207,78 @@ test("buildDataSourceSettingsViewModel presents recommendations without active c
     viewModel.recommendations.some((recommendation) => (recommendation.kind as string) === "active-control"),
     false
   );
+});
+
+test("buildDataSourceSettingsViewModel exposes synchronized calculation coefficients as a disabled save card", () => {
+  const settings = createCalculationSettings();
+  const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: settings,
+    calculationSettingsDraft: createCalculationSettingsForm(settings),
+    calculationSettingsState: "ready",
+    overview: createOverview(),
+    state: "ready"
+  });
+
+  assert.equal(viewModel.calculationSettingsCard.banner.title, "換算係數已同步");
+  assert.equal(viewModel.calculationSettingsCard.saveDisabled, true);
+  assert.deepEqual(
+    viewModel.calculationSettingsCard.fields.map((field) => [field.key, field.value]),
+    [
+      ["carbonEmissionFactor", "0.495"],
+      ["treeEquivalentFactor", "2.6"],
+      ["householdDailyUsageKwh", "4"],
+      ["householdMonthlyUsageKwh", "120"],
+      ["estimatedTariffPerKwh", "5"]
+    ]
+  );
+});
+
+test("buildDataSourceSettingsViewModel marks edited calculation coefficients dirty and saveable", () => {
+  const settings = createCalculationSettings();
+  const draft = createCalculationSettingsForm(settings);
+  draft.carbonEmissionFactor = "0.61";
+
+  const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: settings,
+    calculationSettingsDraft: draft,
+    calculationSettingsState: "ready",
+    overview: createOverview(),
+    state: "ready"
+  });
+
+  assert.equal(viewModel.calculationSettingsCard.banner.tone, "warning");
+  assert.equal(viewModel.calculationSettingsCard.banner.title, "有未儲存的換算係數變更");
+  assert.equal(viewModel.calculationSettingsCard.saveDisabled, false);
+});
+
+test("buildDataSourceSettingsViewModel surfaces calculation coefficient save progress and completion feedback", () => {
+  const settings = createCalculationSettings();
+  const draft = createCalculationSettingsForm(settings);
+  draft.estimatedTariffPerKwh = "6.2";
+
+  const savingModel = buildDataSourceSettingsViewModel({
+    calculationSettings: settings,
+    calculationSettingsDraft: draft,
+    calculationSettingsState: "saving",
+    overview: createOverview(),
+    state: "ready"
+  });
+  const successModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings({
+      estimatedTariffPerKwh: 6.2
+    }),
+    calculationSettingsDraft: createCalculationSettingsForm(
+      createCalculationSettings({
+        estimatedTariffPerKwh: 6.2
+      })
+    ),
+    calculationSettingsState: "success",
+    overview: createOverview(),
+    state: "ready"
+  });
+
+  assert.equal(savingModel.calculationSettingsCard.saveButtonLabel, "儲存中...");
+  assert.equal(savingModel.calculationSettingsCard.saveDisabled, true);
+  assert.equal(successModel.calculationSettingsCard.banner.title, "換算係數已儲存");
+  assert.equal(successModel.calculationSettingsCard.saveDisabled, true);
 });

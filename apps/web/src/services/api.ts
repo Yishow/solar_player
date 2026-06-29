@@ -609,6 +609,31 @@ export type DataSourceOverviewResponse = {
   warnings: string[];
 };
 
+export type CalculationSettings = {
+  carbonEmissionFactor: number;
+  estimatedTariffPerKwh: number;
+  householdDailyUsageKwh: number;
+  householdMonthlyUsageKwh: number;
+  treeEquivalentFactor: number;
+};
+
+export async function getCalculationSettings() {
+  const response = await requestJson<{
+    settings: CalculationSettings;
+  }>("/api/calculation-settings");
+  return response.settings;
+}
+
+export async function updateCalculationSettings(settings: CalculationSettings) {
+  const response = await requestJson<{
+    settings: CalculationSettings;
+  }>("/api/calculation-settings", {
+    body: JSON.stringify(settings),
+    method: "PUT"
+  });
+  return response.settings;
+}
+
 type DeviceLogListEntry = {
   file: string;
   modified: string;

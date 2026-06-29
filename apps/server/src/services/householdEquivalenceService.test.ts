@@ -177,3 +177,63 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
   assert.equal(cards.today.derivedStatus, "available");
   assert.equal(cards.today.provenance?.updatedAt, `${latestAvailable}T00:00:00.000Z`);
 });
+
+test("readHouseholdEquivalenceCards uses configured household usage and tariff coefficients in the profile", () => {
+  const database = getDatabase();
+  const today = "2026-05-21";
+
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          household_daily_usage_kwh = 6,
+          household_monthly_usage_kwh = 210,
+          estimated_tariff_per_kwh = 6.5
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total,
+          peak_generation,
+          peak_generation_time,
+          peak_consumption,
+          peak_consumption_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+      `
+    )
+    .run();
+
+  const cards = readHouseholdEquivalenceCards({
+    now: new Date(`${today}T12:00:00.000Z`)
+  });
+
+  assert.equal(cards.today.householdCountDisplay, "12");
+  assert.equal(cards.cumulative.householdCountDisplay, "20");
+  assert.equal(cards.today.calcProfile?.averageDailyUsageKwh, 6);
+  assert.equal(cards.cumulative.calcProfile?.averageMonthlyUsageKwh, 210);
+  assert.equal(cards.today.calcProfile?.estimatedTariffPerKwh, 6.5);
+  assert.match(cards.today.disclaimer, /6(\.0)? kWh/);
+  assert.match(cards.cumulative.disclaimer, /210(\.0)? kWh/);
+  assert.match(cards.today.disclaimer, /6\.5/);
+});

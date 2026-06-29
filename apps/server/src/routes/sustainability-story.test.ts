@@ -207,7 +207,7 @@ test("PUT /api/sustainability-story persists editorial modules without overridin
 
     assert.equal(body.story.selectedPeriod, "year");
     assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
-    assert.equal(body.story.period.bigNumbers.accumulatedCarbonReductionTons, 9842);
+    assert.equal(body.story.period.bigNumbers.accumulatedCarbonReductionTons, 9207);
     assert.equal(body.story.modules[0]?.type, "project-outcome");
     assert.match(body.story.modules[0]?.description ?? "", /綠色採購/);
     assert.equal(body.story.modules[0]?.provenance.sourceClass, "manual-module");

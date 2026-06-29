@@ -11,10 +11,10 @@ import {
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readCalculationSettings } from "./calculationSettingsService.js";
 import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
 
 const settingKey = "sustainability_story";
-const treeEquivalentFactor = 2.6;
 
 type CounterMetricKey = "co2" | "consumption" | "generation" | "selfConsumption";
 
@@ -226,9 +226,13 @@ function readCounter(counterMap: CounterMap, metricKey: CounterMetricKey) {
 
 function buildBigNumbers(counterMap: CounterMap) {
   const generation = readCounter(counterMap, "generation");
-  const co2 = readCounter(counterMap, "co2");
   const consumption = readCounter(counterMap, "consumption");
   const selfConsumption = readCounter(counterMap, "selfConsumption");
+  const calculationSettings = readCalculationSettings();
+  const accumulatedCarbonReductionTons =
+    typeof generation.value === "number"
+      ? roundTo((generation.value * calculationSettings.carbonEmissionFactor) / 1000, 3)
+      : null;
 
   const annualEnergySavingPercent =
     typeof selfConsumption.value === "number" &&
@@ -237,11 +241,13 @@ function buildBigNumbers(counterMap: CounterMap) {
       ? roundTo((selfConsumption.value / consumption.value) * 100, 1)
       : null;
   const plantedTreeEquivalent =
-    typeof co2.value === "number" ? Math.round(co2.value * treeEquivalentFactor) : null;
+    accumulatedCarbonReductionTons === null
+      ? null
+      : Math.round(accumulatedCarbonReductionTons * calculationSettings.treeEquivalentFactor);
 
   return {
     values: {
-      accumulatedCarbonReductionTons: co2.value,
+      accumulatedCarbonReductionTons,
       accumulatedGenerationGwh:
         typeof generation.value === "number"
           ? roundTo(generation.value / 1_000_000, 1)
@@ -252,9 +258,9 @@ function buildBigNumbers(counterMap: CounterMap) {
     provenance: {
       accumulatedCarbonReductionTons: buildCounterProvenance(
         "累積減碳",
-        "cumulative-counters",
-        "runtime-aggregate",
-        [co2]
+        "generation-carbon-reduction",
+        "derived-metric",
+        [generation]
       ),
       accumulatedGenerationGwh: buildCounterProvenance(
         "累積發電",
@@ -270,9 +276,9 @@ function buildBigNumbers(counterMap: CounterMap) {
       ),
       plantedTreeEquivalent: buildCounterProvenance(
         "植樹等效",
-        "co2-tree-equivalent",
+        "generation-tree-equivalent",
         "derived-metric",
-        [co2]
+        [generation]
       )
     }
   };

@@ -1,0 +1,122 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { after, beforeEach } from "node:test";
+import { formatMonitoringValue } from "@solar-display/shared";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-carbon-reduction-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+const databasePath = process.env.DATABASE_PATH;
+
+const [
+  { closeDatabaseConnection, getDatabase },
+  { migrateDatabase },
+  { seedDatabase },
+  { readOverviewDisplayStory, readSolarDisplayStory }
+] = await Promise.all([
+  import("../db/index.js"),
+  import("../db/migrate.js"),
+  import("../db/seed.js"),
+  import("./displayStoryService.js")
+]);
+
+function removeDatabaseFiles() {
+  if (!databasePath) {
+    return;
+  }
+
+  rmSync(databasePath, { force: true });
+  rmSync(`${databasePath}-shm`, { force: true });
+  rmSync(`${databasePath}-wal`, { force: true });
+}
+
+beforeEach(() => {
+  closeDatabaseConnection();
+  removeDatabaseFiles();
+  migrateDatabase();
+  seedDatabase();
+});
+
+after(() => {
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
+});
+
+test("overview and solar carbon cards derive the same values from generation and the configured factor", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET carbon_emission_factor = 0.5
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES
+          ('realTimePower', 512, 'kW', ?, 'good', '{}'),
+          ('todayGeneration', 990, 'kWh', ?, 'good', '{}')
+      `
+    )
+    .run(timestamp, timestamp);
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 2000, ?, 0)
+      `
+    )
+    .run(timestamp);
+
+  const overview = readOverviewDisplayStory();
+  const solar = readSolarDisplayStory();
+  const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
+  const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
+  const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
+  const solarTotalCarbon = solar.kpis.find((metric) => metric.metricKey === "totalCo2Reduction");
+
+  assert.equal(overviewTodayCarbon?.value, formatMonitoringValue(0.495, "t"));
+  assert.equal(overviewTotalCarbon?.value, formatMonitoringValue(1, "t"));
+  assert.equal(solarTodayCarbon?.value, formatMonitoringValue(0.495, "t"));
+  assert.equal(solarTotalCarbon?.value, formatMonitoringValue(1, "t"));
+});
+
+test("overview and solar carbon cards fail closed when the generation basis is unavailable", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('realTimePower', 512, 'kW', ?, 'good', '{}')
+      `
+    )
+    .run(timestamp);
+
+  const overview = readOverviewDisplayStory();
+  const solar = readSolarDisplayStory();
+  const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
+  const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
+  const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
+  const solarTotalCarbon = solar.kpis.find((metric) => metric.metricKey === "totalCo2Reduction");
+
+  assert.equal(overviewTodayCarbon?.value, "--");
+  assert.equal(overviewTotalCarbon?.value, "--");
+  assert.equal(solarTodayCarbon?.value, "--");
+  assert.equal(solarTotalCarbon?.value, "--");
+});
