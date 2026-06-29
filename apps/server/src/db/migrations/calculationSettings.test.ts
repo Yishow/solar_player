@@ -50,7 +50,8 @@ test("012_calculation_settings creates the singleton coefficient table with the 
     "household_monthly_usage_kwh",
     "estimated_tariff_per_kwh",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "co2_auto_convert_small_to_kg"
   ]);
 });
 
@@ -65,6 +66,7 @@ test("seedDatabase bootstraps the singleton calculation settings row with recomm
           id,
           carbon_emission_factor,
           tree_equivalent_factor,
+          co2_auto_convert_small_to_kg,
           household_daily_usage_kwh,
           household_monthly_usage_kwh,
           estimated_tariff_per_kwh
@@ -75,6 +77,7 @@ test("seedDatabase bootstraps the singleton calculation settings row with recomm
     .get() as
     | {
         carbon_emission_factor: number;
+        co2_auto_convert_small_to_kg: number;
         estimated_tariff_per_kwh: number;
         household_daily_usage_kwh: number;
         household_monthly_usage_kwh: number;
@@ -87,6 +90,7 @@ test("seedDatabase bootstraps the singleton calculation settings row with recomm
     id: 1,
     carbon_emission_factor: 0.495,
     tree_equivalent_factor: 2.6,
+    co2_auto_convert_small_to_kg: 0,
     household_daily_usage_kwh: 4,
     household_monthly_usage_kwh: 120,
     estimated_tariff_per_kwh: 5

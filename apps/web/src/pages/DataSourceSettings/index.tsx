@@ -9,6 +9,7 @@ import {
 import {
   getCalculationSettings,
   getDataSourceOverview,
+  resetTodayTrend,
   updateCalculationSettings,
   type CalculationSettings,
   type DataSourceOverviewResponse
@@ -26,6 +27,7 @@ let cachedCalculationSettings: CalculationSettings | null = null;
 let cachedCalculationSettingsErrorMessage = "";
 
 type CalculationSettingsActionState = "loading" | "ready" | "saving" | "success" | "error";
+type MonitoringResetActionState = "ready" | "resetting" | "success" | "error";
 
 const emptyCalculationSettingsForm = createCalculationSettingsForm(null);
 
@@ -34,6 +36,7 @@ function buildCalculationSettingsPayload(
 ): CalculationSettings {
   return {
     carbonEmissionFactor: Number(draft.carbonEmissionFactor),
+    co2AutoConvertSmallToKg: draft.co2AutoConvertSmallToKg,
     estimatedTariffPerKwh: Number(draft.estimatedTariffPerKwh),
     householdDailyUsageKwh: Number(draft.householdDailyUsageKwh),
     householdMonthlyUsageKwh: Number(draft.householdMonthlyUsageKwh),
@@ -81,6 +84,9 @@ export function DataSourceSettings() {
           ? "error"
           : "loading"
     );
+  const [monitoringResetActionState, setMonitoringResetActionState] =
+    useState<MonitoringResetActionState>("ready");
+  const [monitoringResetErrorMessage, setMonitoringResetErrorMessage] = useState("");
 
   useEffect(() => {
     if (cachedDataSourceOverview !== null || cachedDataSourceErrorMessage) {
@@ -160,6 +166,8 @@ export function DataSourceSettings() {
       calculationSettingsErrorMessage,
       calculationSettingsState: calculationSettingsActionState,
       errorMessage,
+      monitoringResetErrorMessage,
+      monitoringResetState: monitoringResetActionState,
       overview,
       state: isLoading ? "loading" : errorMessage && !overview ? "error" : "ready"
     }),
@@ -170,6 +178,8 @@ export function DataSourceSettings() {
       calculationSettingsErrorMessage,
       errorMessage,
       isLoading,
+      monitoringResetActionState,
+      monitoringResetErrorMessage,
       overview
     ]
   );
@@ -203,6 +213,26 @@ export function DataSourceSettings() {
       setCalculationSettingsActionState("error");
       setCalculationSettingsErrorMessage(
         error instanceof Error ? error.message : "換算係數儲存失敗。"
+      );
+    }
+  };
+
+  const runResetTodayTrend = async () => {
+    setMonitoringResetActionState("resetting");
+    setMonitoringResetErrorMessage("");
+
+    try {
+      await resetTodayTrend();
+      const nextOverview = await getDataSourceOverview();
+      cachedDataSourceOverview = nextOverview;
+      cachedDataSourceErrorMessage = "";
+      setOverview(nextOverview);
+      setErrorMessage("");
+      setMonitoringResetActionState("success");
+    } catch (error) {
+      setMonitoringResetActionState("error");
+      setMonitoringResetErrorMessage(
+        error instanceof Error ? error.message : "今日曲線重設失敗。"
       );
     }
   };
@@ -252,6 +282,25 @@ export function DataSourceSettings() {
               </label>
             ))}
           </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {viewModel.calculationSettingsCard.toggles.map((toggle) => (
+              <label
+                className="flex items-start gap-3 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-white shadow-[0_24px_60px_rgba(15,23,42,0.2)]"
+                key={toggle.key}
+              >
+                <input
+                  checked={toggle.checked}
+                  className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-900 text-emerald-400"
+                  type="checkbox"
+                  onChange={(event) => handleCalculationSettingChange(toggle.key, event.target.checked)}
+                />
+                <span className="block">
+                  <span className="block text-sm font-semibold">{toggle.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-400">{toggle.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           <OpsActionRow className="mt-4">
             <button
               type="button"
@@ -261,6 +310,47 @@ export function DataSourceSettings() {
             >
               {viewModel.calculationSettingsCard.saveButtonLabel}
               <small>Save Coefficients</small>
+            </button>
+          </OpsActionRow>
+        </OpsSurface>
+
+        <OpsSurface family="operations">
+          <OpsSurfaceTitle
+            caption="當前日 snapshot 診斷與只清今日曲線的維運入口"
+            title="今日曲線維運"
+          />
+          <OpsInfoBanner
+            className="mt-4"
+            detail={viewModel.monitoringCard.banner.detail}
+            title={viewModel.monitoringCard.banner.title}
+            tone={viewModel.monitoringCard.banner.tone}
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {viewModel.monitoringCard.metrics.map((metric) => (
+              <span className="mgmt-chip" key={metric}>{metric}</span>
+            ))}
+          </div>
+          {viewModel.monitoringCard.anomalies.length > 0 ? (
+            <div className="mt-4 grid gap-3">
+              {viewModel.monitoringCard.anomalies.map((anomaly) => (
+                <OpsInfoBanner
+                  key={anomaly}
+                  detail={anomaly}
+                  title="時間異常提示"
+                  tone="warning"
+                />
+              ))}
+            </div>
+          ) : null}
+          <OpsActionRow className="mt-4">
+            <button
+              type="button"
+              className="mgmt-action"
+              disabled={viewModel.monitoringCard.resetButtonDisabled}
+              onClick={() => void runResetTodayTrend()}
+            >
+              {viewModel.monitoringCard.resetButtonLabel}
+              <small>Reset Today Trend</small>
             </button>
           </OpsActionRow>
         </OpsSurface>

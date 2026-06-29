@@ -580,6 +580,13 @@ export type DataSourceOverviewResponse = {
     username: "configured" | "missing";
     password: "configured" | "missing";
   };
+  monitoring: {
+    anomalyMessages: string[];
+    hasCurrentDaySnapshots: boolean;
+    latestSnapshotAt: string | null;
+    latestSnapshotDate: string | null;
+    localDate: string;
+  };
   weather: {
     status: "ready";
     cwaAuthorization: "configured" | "missing";
@@ -611,6 +618,7 @@ export type DataSourceOverviewResponse = {
 
 export type CalculationSettings = {
   carbonEmissionFactor: number;
+  co2AutoConvertSmallToKg: boolean;
   estimatedTariffPerKwh: number;
   householdDailyUsageKwh: number;
   householdMonthlyUsageKwh: number;
@@ -653,6 +661,20 @@ export async function getDeviceStatus() {
 
 export async function getDataSourceOverview() {
   return requestJson<DataSourceOverviewResponse>("/api/data-source/overview");
+}
+
+export async function resetTodayTrend() {
+  const response = await requestJson<{
+    data: {
+      deletedSnapshots: number;
+      resetAt: string;
+      resetDate: string;
+    };
+    success: boolean;
+  }>("/api/data-source/reset-today-trend", {
+    method: "POST"
+  });
+  return response.data;
 }
 
 export async function getDeviceLogExportMetadata() {

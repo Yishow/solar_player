@@ -3,6 +3,7 @@ import { getDatabase } from "../db/index.js";
 
 type CalculationSettingsRow = {
   carbon_emission_factor: number | null;
+  co2_auto_convert_small_to_kg: number | null;
   estimated_tariff_per_kwh: number | null;
   household_daily_usage_kwh: number | null;
   household_monthly_usage_kwh: number | null;
@@ -11,6 +12,7 @@ type CalculationSettingsRow = {
 
 export type CalculationSettings = {
   carbonEmissionFactor: number;
+  co2AutoConvertSmallToKg: boolean;
   estimatedTariffPerKwh: number;
   householdDailyUsageKwh: number;
   householdMonthlyUsageKwh: number;
@@ -19,6 +21,7 @@ export type CalculationSettings = {
 
 export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
   carbonEmissionFactor: 0.495,
+  co2AutoConvertSmallToKg: false,
   estimatedTariffPerKwh: 5,
   householdDailyUsageKwh: 4,
   householdMonthlyUsageKwh: 120,
@@ -45,6 +48,16 @@ function normalizePositiveNumber(value: unknown, fieldName: keyof CalculationSet
   return value;
 }
 
+function normalizeBoolean(value: unknown, fieldName: keyof CalculationSettings) {
+  if (typeof value !== "boolean") {
+    throw new CalculationSettingsValidationError(
+      `Calculation ${fieldName} must be a boolean`
+    );
+  }
+
+  return value;
+}
+
 function resolveStoredNumber(
   value: number | null | undefined,
   fallback: keyof typeof DEFAULT_CALCULATION_SETTINGS
@@ -52,6 +65,17 @@ function resolveStoredNumber(
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : DEFAULT_CALCULATION_SETTINGS[fallback];
+}
+
+function resolveStoredBoolean(
+  value: number | null | undefined,
+  fallback: keyof typeof DEFAULT_CALCULATION_SETTINGS
+) {
+  if (value === 0 || value === 1) {
+    return value === 1;
+  }
+
+  return DEFAULT_CALCULATION_SETTINGS[fallback];
 }
 
 function serializeCalculationSettings(
@@ -63,6 +87,10 @@ function serializeCalculationSettings(
 
   return {
     carbonEmissionFactor: resolveStoredNumber(row.carbon_emission_factor, "carbonEmissionFactor"),
+    co2AutoConvertSmallToKg: resolveStoredBoolean(
+      row.co2_auto_convert_small_to_kg,
+      "co2AutoConvertSmallToKg"
+    ),
     estimatedTariffPerKwh: resolveStoredNumber(
       row.estimated_tariff_per_kwh,
       "estimatedTariffPerKwh"
@@ -89,6 +117,7 @@ function readRow(database: Database.Database) {
         SELECT
           carbon_emission_factor,
           tree_equivalent_factor,
+          co2_auto_convert_small_to_kg,
           household_daily_usage_kwh,
           household_monthly_usage_kwh,
           estimated_tariff_per_kwh
@@ -110,6 +139,10 @@ export function normalizeCalculationSettingsInput(
     carbonEmissionFactor: normalizePositiveNumber(
       input.carbonEmissionFactor,
       "carbonEmissionFactor"
+    ),
+    co2AutoConvertSmallToKg: normalizeBoolean(
+      input.co2AutoConvertSmallToKg,
+      "co2AutoConvertSmallToKg"
     ),
     estimatedTariffPerKwh: normalizePositiveNumber(
       input.estimatedTariffPerKwh,
@@ -143,15 +176,17 @@ export function saveCalculationSettings(
           id,
           carbon_emission_factor,
           tree_equivalent_factor,
+          co2_auto_convert_small_to_kg,
           household_daily_usage_kwh,
           household_monthly_usage_kwh,
           estimated_tariff_per_kwh,
           created_at,
           updated_at
-        ) VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           carbon_emission_factor = excluded.carbon_emission_factor,
           tree_equivalent_factor = excluded.tree_equivalent_factor,
+          co2_auto_convert_small_to_kg = excluded.co2_auto_convert_small_to_kg,
           household_daily_usage_kwh = excluded.household_daily_usage_kwh,
           household_monthly_usage_kwh = excluded.household_monthly_usage_kwh,
           estimated_tariff_per_kwh = excluded.estimated_tariff_per_kwh,
@@ -161,6 +196,7 @@ export function saveCalculationSettings(
     .run(
       normalized.carbonEmissionFactor,
       normalized.treeEquivalentFactor,
+      normalized.co2AutoConvertSmallToKg ? 1 : 0,
       normalized.householdDailyUsageKwh,
       normalized.householdMonthlyUsageKwh,
       normalized.estimatedTariffPerKwh

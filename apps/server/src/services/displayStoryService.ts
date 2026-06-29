@@ -399,6 +399,12 @@ function resolveSolarKpiBinding(args: {
   if (args.binding.metricKey !== "selfConsumptionRatio") {
     return resolveMonitoringMetricBinding({
       binding: args.binding,
+      displayValueOptions: {
+        preferKilogramsForSubTonCo2:
+          args.calculationSettings.co2AutoConvertSmallToKg &&
+          (args.binding.metricKey === "todayCo2Reduction" ||
+            args.binding.metricKey === "totalCo2Reduction")
+      },
       isConnected: args.isConnected,
       now: args.now,
       reading:
@@ -796,6 +802,12 @@ export function readOverviewDisplayStory(
     const resolved = {
       ...resolveMonitoringMetricBinding({
         binding,
+        displayValueOptions: {
+          preferKilogramsForSubTonCo2:
+            context.calculationSettings.co2AutoConvertSmallToKg &&
+            (binding.metricKey === "todayCo2Reduction" ||
+              binding.metricKey === "totalCo2Reduction")
+        },
         isConnected: context.isConnected,
         now: context.snapshot.timestamp ?? undefined,
         reading

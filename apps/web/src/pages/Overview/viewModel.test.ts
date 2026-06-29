@@ -234,6 +234,33 @@ test("buildOverviewViewModel prefers display-story overview bindings when story 
   assert.equal(model.summary.statusLabel, "共享故事資料同步中");
 });
 
+test("buildOverviewViewModel preserves kilogram CO2 display units provided by the shared story", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({ label: "故事版即時功率", metricKey: "realTimePower", unit: "kW", value: "612" }),
+        createResolvedStoryMetric({ label: "故事版今日發電量", metricKey: "todayGeneration", unit: "kWh", value: "3,842" }),
+        createResolvedStoryMetric({ label: "故事版累積發電量", metricKey: "totalGeneration", unit: "MWh", value: "18.6" }),
+        createResolvedStoryMetric({ label: "故事版今日減碳", metricKey: "todayCo2Reduction", unit: "kg", value: "11.8" }),
+        createResolvedStoryMetric({ label: "故事版累積減碳", metricKey: "totalCo2Reduction", unit: "t", value: "1.2" })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  const todayCo2 = model.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
+  assert.equal(todayCo2?.unit, "kg");
+  assert.equal(todayCo2?.value, "11.8");
+});
+
 test("buildOverviewViewModel flows the realTimePower runtime trend series through without flattening to a constant", () => {
   const runtimeTrend = [82, 95, 101, 108];
   const model = buildOverviewViewModel({

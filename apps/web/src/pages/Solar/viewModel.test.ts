@@ -247,6 +247,27 @@ test("buildSolarViewModel uses solar story KPIs and keeps live power fallback wh
   assert.equal(model.flowNodes[0]?.value, "586 kW");
 });
 
+test("buildSolarViewModel preserves kilogram CO2 display units provided by the shared story", () => {
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot,
+    solarStory: {
+      kpis: [
+        { metricKey: "todayGeneration", label: "今日產出", unit: "kWh", value: "3,842", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "selfConsumptionRatio", label: "自用", unit: "%", value: "78", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "todayCo2Reduction", label: "減碳", unit: "kg", value: "11.8", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "totalCo2Reduction", label: "累積減碳", unit: "t", value: "9,842", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } },
+        { metricKey: "systemEfficiency", label: "效率", unit: "%", value: "96", comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" } }
+      ],
+      story: { flowState: { state: "healthy", reason: null, label: "運作正常" } }
+    }
+  });
+
+  assert.equal(model.kpis[2]?.unit, "kg");
+  assert.equal(model.kpis[2]?.value, "11.8");
+  assert.equal(model.flowNodes[3]?.value, "11.8 kg");
+});
+
 test("buildSolarViewModel falls back to socket when solarStory has too few KPIs", () => {
   const model = buildSolarViewModel({
     isSocketConnected: true,

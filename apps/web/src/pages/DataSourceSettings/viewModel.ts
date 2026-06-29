@@ -5,9 +5,11 @@ export type { CalculationSettings, DataSourceOverviewResponse };
 type ViewState = "loading" | "ready" | "error";
 type SectionTone = "ready" | "warning" | "error";
 type CalculationSettingsState = "loading" | "ready" | "saving" | "success" | "error";
+type MonitoringResetState = "ready" | "resetting" | "success" | "error";
 
 export type CalculationSettingsForm = {
   carbonEmissionFactor: string;
+  co2AutoConvertSmallToKg: boolean;
   estimatedTariffPerKwh: string;
   householdDailyUsageKwh: string;
   householdMonthlyUsageKwh: string;
@@ -28,13 +30,35 @@ export type DataSourceSettingsViewModel = {
     };
     fields: Array<{
       description: string;
-      key: keyof CalculationSettingsForm;
+      key:
+        | "carbonEmissionFactor"
+        | "estimatedTariffPerKwh"
+        | "householdDailyUsageKwh"
+        | "householdMonthlyUsageKwh"
+        | "treeEquivalentFactor";
       label: string;
       unit: string;
       value: string;
     }>;
+    toggles: Array<{
+      checked: boolean;
+      description: string;
+      key: "co2AutoConvertSmallToKg";
+      label: string;
+    }>;
     saveButtonLabel: string;
     saveDisabled: boolean;
+  };
+  monitoringCard: {
+    anomalies: string[];
+    banner: {
+      detail: string;
+      title: string;
+      tone: SectionTone;
+    };
+    metrics: string[];
+    resetButtonDisabled: boolean;
+    resetButtonLabel: string;
   };
   recommendations: Array<{
     description: string;
@@ -61,6 +85,8 @@ type BuildDataSourceSettingsViewModelArgs = {
   calculationSettingsErrorMessage?: string;
   calculationSettingsState: CalculationSettingsState;
   errorMessage?: string;
+  monitoringResetErrorMessage?: string;
+  monitoringResetState?: MonitoringResetState;
   overview: DataSourceOverviewResponse | null;
   state: ViewState;
 };
@@ -104,6 +130,7 @@ export function createCalculationSettingsForm(
   if (!settings) {
     return {
       carbonEmissionFactor: "",
+      co2AutoConvertSmallToKg: false,
       estimatedTariffPerKwh: "",
       householdDailyUsageKwh: "",
       householdMonthlyUsageKwh: "",
@@ -113,6 +140,7 @@ export function createCalculationSettingsForm(
 
   return {
     carbonEmissionFactor: String(settings.carbonEmissionFactor),
+    co2AutoConvertSmallToKg: settings.co2AutoConvertSmallToKg,
     estimatedTariffPerKwh: String(settings.estimatedTariffPerKwh),
     householdDailyUsageKwh: String(settings.householdDailyUsageKwh),
     householdMonthlyUsageKwh: String(settings.householdMonthlyUsageKwh),
@@ -126,6 +154,7 @@ function areCalculationSettingsFormsEqual(
 ) {
   return (
     left.carbonEmissionFactor === right.carbonEmissionFactor
+    && left.co2AutoConvertSmallToKg === right.co2AutoConvertSmallToKg
     && left.estimatedTariffPerKwh === right.estimatedTariffPerKwh
     && left.householdDailyUsageKwh === right.householdDailyUsageKwh
     && left.householdMonthlyUsageKwh === right.householdMonthlyUsageKwh
@@ -179,6 +208,14 @@ function buildCalculationSettingsCard(
       value: draft.estimatedTariffPerKwh
     }
   ];
+  const toggles: DataSourceSettingsViewModel["calculationSettingsCard"]["toggles"] = [
+    {
+      checked: draft.co2AutoConvertSmallToKg,
+      description: "啟用後，顯示用 CO2 數值若小於 1 t 會改以 kg 呈現，不影響計算公式。",
+      key: "co2AutoConvertSmallToKg",
+      label: "小於 1 t 自動顯示為 kg"
+    }
+  ];
 
   if (!isLoaded && settingsState === "error") {
     return {
@@ -188,6 +225,7 @@ function buildCalculationSettingsCard(
         tone: "error" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存換算係數",
       saveDisabled: true
     };
@@ -201,6 +239,7 @@ function buildCalculationSettingsCard(
         tone: "ready" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存換算係數",
       saveDisabled: true
     };
@@ -214,6 +253,7 @@ function buildCalculationSettingsCard(
         tone: "warning" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存中...",
       saveDisabled: true
     };
@@ -227,6 +267,7 @@ function buildCalculationSettingsCard(
         tone: "error" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存換算係數",
       saveDisabled: false
     };
@@ -240,6 +281,7 @@ function buildCalculationSettingsCard(
         tone: "ready" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存換算係數",
       saveDisabled: true
     };
@@ -253,6 +295,7 @@ function buildCalculationSettingsCard(
         tone: "warning" as const
       },
       fields,
+      toggles,
       saveButtonLabel: "儲存換算係數",
       saveDisabled: false
     };
@@ -265,8 +308,94 @@ function buildCalculationSettingsCard(
       tone: "ready" as const
     },
     fields,
+    toggles,
     saveButtonLabel: "儲存換算係數",
     saveDisabled: true
+  };
+}
+
+function buildMonitoringCard(
+  overview: DataSourceOverviewResponse | null,
+  resetState: MonitoringResetState,
+  resetErrorMessage = ""
+) {
+  if (!overview) {
+    return {
+      anomalies: [],
+      banner: {
+        detail: "需先取得資料來源診斷後才能進行今日曲線維運。",
+        title: "今日曲線維運待命",
+        tone: "ready" as const
+      },
+      metrics: [],
+      resetButtonDisabled: true,
+      resetButtonLabel: "重設今日曲線"
+    };
+  }
+
+  const { monitoring } = overview;
+  const metrics = [
+    `目前日期 ${monitoring.localDate}`,
+    `最新 snapshot ${monitoring.latestSnapshotDate ?? "無"}`
+  ];
+  const hasAnomalies = monitoring.anomalyMessages.length > 0;
+
+  if (resetState === "resetting") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: "系統正在清除今日 metric_snapshots，完成後會重新整理資料來源診斷。",
+        title: "今日曲線重設中",
+        tone: "warning" as const
+      },
+      metrics,
+      resetButtonDisabled: true,
+      resetButtonLabel: "重設中..."
+    };
+  }
+
+  if (resetState === "error") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: resetErrorMessage || "今日曲線重設失敗。",
+        title: "今日曲線未重設",
+        tone: "error" as const
+      },
+      metrics,
+      resetButtonDisabled: false,
+      resetButtonLabel: "重設今日曲線"
+    };
+  }
+
+  if (resetState === "success") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: "今日曲線已重設；後續 snapshot 會重新建立今天的趨勢。",
+        title: "今日曲線已重設",
+        tone: "ready" as const
+      },
+      metrics,
+      resetButtonDisabled: false,
+      resetButtonLabel: "再次重設今日曲線"
+    };
+  }
+
+  return {
+    anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: hasAnomalies
+          ? monitoring.anomalyMessages.join("；")
+          : monitoring.hasCurrentDaySnapshots
+            ? "今日 snapshot 正常存在，Overview 曲線會隨新資料更新。"
+            : "今日尚無 snapshot；Overview 曲線會先維持空狀態。",
+        title: hasAnomalies ? "今日曲線需要維運注意" : "今日曲線診斷正常",
+        tone: (hasAnomalies ? "warning" : "ready") as SectionTone
+      },
+    metrics,
+    resetButtonDisabled: false,
+    resetButtonLabel: "重設今日曲線"
   };
 }
 
@@ -276,6 +405,8 @@ export function buildDataSourceSettingsViewModel({
   calculationSettingsErrorMessage = "",
   calculationSettingsState,
   errorMessage = "",
+  monitoringResetErrorMessage = "",
+  monitoringResetState = "ready",
   overview,
   state
 }: BuildDataSourceSettingsViewModelArgs): DataSourceSettingsViewModel {
@@ -292,6 +423,7 @@ export function buildDataSourceSettingsViewModel({
         calculationSettingsState,
         calculationSettingsErrorMessage
       ),
+      monitoringCard: buildMonitoringCard(null, monitoringResetState, monitoringResetErrorMessage),
       recommendations: [],
       relatedActions: [],
       sections: []
@@ -311,6 +443,7 @@ export function buildDataSourceSettingsViewModel({
         calculationSettingsState,
         calculationSettingsErrorMessage
       ),
+      monitoringCard: buildMonitoringCard(null, monitoringResetState, monitoringResetErrorMessage),
       recommendations: [],
       relatedActions: [],
       sections: []
@@ -333,6 +466,7 @@ export function buildDataSourceSettingsViewModel({
       calculationSettingsState,
       calculationSettingsErrorMessage
     ),
+    monitoringCard: buildMonitoringCard(overview, monitoringResetState, monitoringResetErrorMessage),
     recommendations: overview.recommendations.map((recommendation) => ({
       description: recommendation.description,
       kind: "recommendation",

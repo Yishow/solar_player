@@ -22,6 +22,13 @@ function createOverview(overrides: Partial<DataSourceOverviewResponse> = {}): Da
       status: "ready",
       username: "configured"
     },
+    monitoring: {
+      anomalyMessages: [],
+      hasCurrentDaySnapshots: true,
+      latestSnapshotAt: "2026-06-16T09:00:00.000Z",
+      latestSnapshotDate: "2026-06-16",
+      localDate: "2026-06-16"
+    },
     recommendations: [
       {
         description: "Export archive",
@@ -102,6 +109,7 @@ function createCalculationSettings(
 ): CalculationSettings {
   return {
     carbonEmissionFactor: 0.495,
+    co2AutoConvertSmallToKg: false,
     estimatedTariffPerKwh: 5,
     householdDailyUsageKwh: 4,
     householdMonthlyUsageKwh: 120,
@@ -149,6 +157,31 @@ test("buildDataSourceSettingsViewModel keeps degraded diagnostics visible", () =
   assert.equal(viewModel.banner.tone, "warning");
   assert.match(viewModel.banner.detail, /database locked/);
   assert.equal(viewModel.sections.find((section) => section.title === "Runtime SQLite")?.tone, "warning");
+});
+
+test("buildDataSourceSettingsViewModel surfaces monitoring anomalies and reset action state", () => {
+  const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: createCalculationSettings(),
+    calculationSettingsDraft: createCalculationSettingsForm(createCalculationSettings()),
+    calculationSettingsState: "ready",
+    overview: createOverview({
+      monitoring: {
+        anomalyMessages: ["尚無今日 snapshot，最新資料停留在 2026-06-15。", "偵測到 02:00 夜間高發電 snapshot。"],
+        hasCurrentDaySnapshots: false,
+        latestSnapshotAt: "2026-06-15T02:00:00.000Z",
+        latestSnapshotDate: "2026-06-15",
+        localDate: "2026-06-16"
+      }
+    }),
+    state: "ready"
+  });
+
+  assert.equal(viewModel.monitoringCard.banner.tone, "warning");
+  assert.equal(viewModel.monitoringCard.banner.title, "今日曲線需要維運注意");
+  assert.equal(viewModel.monitoringCard.metrics.includes("目前日期 2026-06-16"), true);
+  assert.equal(viewModel.monitoringCard.metrics.includes("最新 snapshot 2026-06-15"), true);
+  assert.equal(viewModel.monitoringCard.anomalies.length, 2);
+  assert.equal(viewModel.monitoringCard.resetButtonDisabled, false);
 });
 
 test("buildDataSourceSettingsViewModel turns API failure into a degraded page state", () => {
@@ -231,6 +264,10 @@ test("buildDataSourceSettingsViewModel exposes synchronized calculation coeffici
       ["estimatedTariffPerKwh", "5"]
     ]
   );
+  assert.deepEqual(
+    viewModel.calculationSettingsCard.toggles.map((toggle) => [toggle.key, toggle.checked]),
+    [["co2AutoConvertSmallToKg", false]]
+  );
 });
 
 test("buildDataSourceSettingsViewModel marks edited calculation coefficients dirty and saveable", () => {
@@ -249,6 +286,27 @@ test("buildDataSourceSettingsViewModel marks edited calculation coefficients dir
   assert.equal(viewModel.calculationSettingsCard.banner.tone, "warning");
   assert.equal(viewModel.calculationSettingsCard.banner.title, "有未儲存的換算係數變更");
   assert.equal(viewModel.calculationSettingsCard.saveDisabled, false);
+});
+
+test("buildDataSourceSettingsViewModel marks the CO2 display preference toggle dirty and saveable", () => {
+  const settings = createCalculationSettings();
+  const draft = createCalculationSettingsForm(settings);
+  draft.co2AutoConvertSmallToKg = true;
+
+  const viewModel = buildDataSourceSettingsViewModel({
+    calculationSettings: settings,
+    calculationSettingsDraft: draft,
+    calculationSettingsState: "ready",
+    overview: createOverview(),
+    state: "ready"
+  });
+
+  assert.equal(viewModel.calculationSettingsCard.banner.tone, "warning");
+  assert.equal(viewModel.calculationSettingsCard.saveDisabled, false);
+  assert.deepEqual(
+    viewModel.calculationSettingsCard.toggles.map((toggle) => [toggle.key, toggle.checked]),
+    [["co2AutoConvertSmallToKg", true]]
+  );
 });
 
 test("buildDataSourceSettingsViewModel surfaces calculation coefficient save progress and completion feedback", () => {

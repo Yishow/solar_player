@@ -59,6 +59,7 @@ test("readCalculationSettings falls back to recommended defaults when the single
 test("saveCalculationSettings persists positive coefficients and survives a reload", () => {
   saveCalculationSettings({
     carbonEmissionFactor: 0.6,
+    co2AutoConvertSmallToKg: true,
     estimatedTariffPerKwh: 6.5,
     householdDailyUsageKwh: 5,
     householdMonthlyUsageKwh: 150,
@@ -69,6 +70,7 @@ test("saveCalculationSettings persists positive coefficients and survives a relo
 
   assert.deepEqual(readCalculationSettings(), {
     carbonEmissionFactor: 0.6,
+    co2AutoConvertSmallToKg: true,
     estimatedTariffPerKwh: 6.5,
     householdDailyUsageKwh: 5,
     householdMonthlyUsageKwh: 150,
@@ -86,6 +88,23 @@ test("saveCalculationSettings rejects non-positive coefficients without overwrit
     (error: unknown) => {
       assert.ok(error instanceof CalculationSettingsValidationError);
       assert.equal(error.message, "Calculation carbonEmissionFactor must be a positive number");
+      return true;
+    }
+  );
+
+  assert.deepEqual(readCalculationSettings(), DEFAULT_CALCULATION_SETTINGS);
+});
+
+test("saveCalculationSettings rejects a non-boolean CO2 display preference without overwriting the stored row", () => {
+  assert.throws(
+    () =>
+      saveCalculationSettings({
+        ...DEFAULT_CALCULATION_SETTINGS,
+        co2AutoConvertSmallToKg: "yes" as never
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof CalculationSettingsValidationError);
+      assert.equal(error.message, "Calculation co2AutoConvertSmallToKg must be a boolean");
       return true;
     }
   );

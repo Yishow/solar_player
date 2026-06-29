@@ -157,6 +157,10 @@ export type DisplayStoryPagePayload<PageId extends DisplayStoryPageId = DisplayS
   payload: DisplayStoryPayloadByPageId[PageId];
 };
 
+export type MonitoringDisplayValueOptions = {
+  preferKilogramsForSubTonCo2?: boolean;
+};
+
 const defaultStaleAfterMs = 15 * 60 * 1000;
 
 export function formatMonitoringValue(value: number, unit: string | null) {
@@ -166,6 +170,29 @@ export function formatMonitoringValue(value: number, unit: string | null) {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits === 0 ? 0 : 1
   });
+}
+
+export function formatMonitoringDisplayValue(
+  value: number,
+  unit: string | null,
+  options: MonitoringDisplayValueOptions = {}
+) {
+  if (
+    options.preferKilogramsForSubTonCo2 &&
+    unit === "t" &&
+    value !== 0 &&
+    Math.abs(value) < 1
+  ) {
+    return {
+      unit: "kg",
+      value: formatMonitoringValue(value * 1000, "kg")
+    };
+  }
+
+  return {
+    unit,
+    value: formatMonitoringValue(value, unit)
+  };
 }
 
 function resolveFreshnessState(args: {
@@ -232,6 +259,7 @@ function resolveFreshnessState(args: {
 
 export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   binding: MonitoringMetricBinding<TMetric>;
+  displayValueOptions?: MonitoringDisplayValueOptions;
   isConnected: boolean;
   now?: string;
   reading: MonitoringMetricReading | null;
@@ -261,6 +289,12 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
     } satisfies ResolvedMonitoringMetricBinding<TMetric>;
   }
 
+  const displayValue = formatMonitoringDisplayValue(
+    args.reading.value,
+    args.reading.unit ?? args.binding.unit,
+    args.displayValueOptions
+  );
+
   return {
     ...state,
     dependencyKeys,
@@ -275,8 +309,8 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
           ? "aggregate"
           : "live",
     sourceClass,
-    unit: args.reading.unit ?? args.binding.unit,
-    value: formatMonitoringValue(args.reading.value, args.reading.unit ?? args.binding.unit)
+    unit: displayValue.unit ?? args.binding.unit,
+    value: displayValue.value
   } satisfies ResolvedMonitoringMetricBinding<TMetric>;
 }
 
