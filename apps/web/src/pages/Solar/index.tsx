@@ -480,28 +480,21 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         {(() => {
           const connectorKey = "solarToInverter";
           const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
-          const treatment = resolveFlowConnectorTreatmentConfig(
-            resolvedConfig.connectorTreatments[connectorKey],
-            seedConfig.connectorTreatments[connectorKey]
-          );
-          const topPos = layout.top + (layout.height - treatment.strokeWidth) / 2;
-          const strokeWidth = treatment.strokeWidth;
           return (
             <svg
               style={{
                 position: "absolute",
                 left: `${layout.left}px`,
-                top: `${topPos - 15 + strokeWidth / 2}px`,
-                width: `${layout.width + 18}px`,
-                height: "30px",
+                top: `${layout.top - 8}px`,
+                width: `${layout.width}px`,
+                height: "16px",
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width + 18} 30`}
+              viewBox={`0 0 ${layout.width} 16`}
             >
-              <line x1={0} y1={15} x2={layout.width} y2={15} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={strokeWidth} strokeLinecap="round" />
-              <line x1={0} y1={15} x2={layout.width} y2={15} stroke="#527d3b" strokeWidth={strokeWidth} strokeLinecap="round" className="solar-flow-line" />
-              <polygon points={`${layout.width},${15 - 11} ${layout.width + 16},15 ${layout.width},${15 + 11}`} fill="#527d3b" />
+              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line" />
             </svg>
           );
         })()}
@@ -510,28 +503,21 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         {(() => {
           const connectorKey = "inverterToFactory";
           const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
-          const treatment = resolveFlowConnectorTreatmentConfig(
-            resolvedConfig.connectorTreatments[connectorKey],
-            seedConfig.connectorTreatments[connectorKey]
-          );
-          const topPos = layout.top + (layout.height - treatment.strokeWidth) / 2;
-          const strokeWidth = treatment.strokeWidth;
           return (
             <svg
               style={{
                 position: "absolute",
                 left: `${layout.left}px`,
-                top: `${topPos - 15 + strokeWidth / 2}px`,
-                width: `${layout.width + 18}px`,
-                height: "30px",
+                top: `${layout.top - 8}px`,
+                width: `${layout.width}px`,
+                height: "16px",
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width + 18} 30`}
+              viewBox={`0 0 ${layout.width} 16`}
             >
-              <line x1={0} y1={15} x2={layout.width} y2={15} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={strokeWidth} strokeLinecap="round" />
-              <line x1={0} y1={15} x2={layout.width} y2={15} stroke="#527d3b" strokeWidth={strokeWidth} strokeLinecap="round" className="solar-flow-line" />
-              <polygon points={`${layout.width},${15 - 11} ${layout.width + 16},15 ${layout.width},${15 + 11}`} fill="#527d3b" />
+              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line" />
             </svg>
           );
         })()}
@@ -540,11 +526,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         {(() => {
           const connectorKey = "inverterToCo2";
           const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
-          const treatment = resolveFlowConnectorTreatmentConfig(
-            resolvedConfig.connectorTreatments[connectorKey],
-            seedConfig.connectorTreatments[connectorKey]
-          );
-          const strokeWidth = treatment.strokeWidth;
           const vHeight = 170;
           const topPos = layout.top - vHeight;
           return (
@@ -553,31 +534,30 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
                 position: "absolute",
                 left: `${layout.left}px`,
                 top: `${topPos}px`,
-                width: `${layout.width + 18}px`,
-                height: `${vHeight + 15}px`,
+                width: `${layout.width}px`,
+                height: `${vHeight + 8}px`,
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width + 18} ${vHeight + 15}`}
+              viewBox={`0 0 ${layout.width} ${vHeight + 8}`}
             >
               <path
-                d={`M ${strokeWidth / 2} 0 V ${vHeight} H ${layout.width}`}
+                d={`M 1.25 0 V ${vHeight} H ${layout.width}`}
                 fill="none"
                 stroke="rgba(234, 161, 30, 0.25)"
-                strokeWidth={strokeWidth}
+                strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
-                d={`M ${strokeWidth / 2} 0 V ${vHeight} H ${layout.width}`}
+                d={`M 1.25 0 V ${vHeight} H ${layout.width}`}
                 fill="none"
                 stroke="#eaa11e"
-                strokeWidth={strokeWidth}
+                strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="solar-flow-line-orange"
               />
-              <polygon points={`${layout.width},${vHeight - 11} ${layout.width + 16},${vHeight} ${layout.width},${vHeight + 11}`} fill="#eaa11e" />
             </svg>
           );
         })()}
