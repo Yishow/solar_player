@@ -40,6 +40,11 @@ test("FHD witness mapping covers the five playback routes with FHD reference ima
         referenceImage: "docs/reference/FHD/03-3.Factory Circuit (大).png"
       },
       {
+        pageName: "FactoryCircuitGuanyin",
+        routeUrl: "/factory-circuit-guanyin",
+        referenceImage: "docs/reference/FHD/03-3.Factory Circuit (大).png"
+      },
+      {
         pageName: "Images",
         routeUrl: "/images",
         referenceImage: "docs/reference/FHD/04-4.Images (大).png"
@@ -82,6 +87,11 @@ test("FHD witness config exposes editor preview states and accepted implementati
         pageName: "FactoryCircuit",
         routeUrl: "/display-pages/editor?page=factory-circuit",
         screenshotFile: "editor/factory-circuit-editor.png"
+      },
+      {
+        pageName: "FactoryCircuitGuanyin",
+        routeUrl: "/display-pages/editor?page=factory-circuit-guanyin",
+        screenshotFile: "editor/factory-circuit-guanyin-editor.png"
       },
       {
         pageName: "Images",

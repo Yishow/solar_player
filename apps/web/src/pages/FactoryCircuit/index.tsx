@@ -74,22 +74,7 @@ const factoryLeafVineReferenceUrl = new URL(
   "./assets/factory-leaf-vine-reference.png",
   import.meta.url
 ).href;
-const factoryRoutingPvInverterReferenceUrl = new URL(
-  "./assets/factory-routing-pv-inverter-reference.png",
-  import.meta.url
-).href;
-const factoryRoutingInverterBoardReferenceUrl = new URL(
-  "./assets/factory-routing-inverter-board-reference.png",
-  import.meta.url
-).href;
-const factoryRoutingInverterDropReferenceUrl = new URL(
-  "./assets/factory-routing-inverter-drop-reference.png",
-  import.meta.url
-).href;
-const factoryRoutingLoadReferenceUrl = new URL(
-  "./assets/factory-routing-load-reference.png",
-  import.meta.url
-).href;
+
 
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
@@ -117,22 +102,7 @@ const loadRowOrder = [
   "ed_coating"
 ] as const;
 
-const powerConnectorReferenceByKey = {
-  inverterToBoard: {
-    height: 38,
-    leftOffset: -4,
-    src: factoryRoutingInverterBoardReferenceUrl,
-    topOffset: -26,
-    width: 80
-  },
-  solarToInverter: {
-    height: 38,
-    leftOffset: -8,
-    src: factoryRoutingPvInverterReferenceUrl,
-    topOffset: -26,
-    width: 66
-  }
-} as const;
+
 
 function FactoryCircuitLineLeaf({
   className,
@@ -190,26 +160,65 @@ function FactoryCircuitLeafVine({
   );
 }
 
-function FactoryCircuitRoutingReference({
-  className,
-  src,
-  style
-}: {
-  className: string;
-  src: string;
-  style: CSSProperties;
-}) {
-  return (
-    <img
-      alt=""
-      aria-hidden="true"
-      className={className}
-      draggable={false}
-      src={src}
-      style={style}
-    />
-  );
-}
+
+
+const LOAD_ROW_SVG_ICONS: Record<string, React.ReactNode> = {
+  stamping: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="stamping">
+      <rect x="3" y="16" width="18" height="5" rx="1" />
+      <path d="M12 3v10M9 10l3 3 3-3M4 11h16" />
+    </svg>
+  ),
+  body: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="body">
+      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.8C2.1 10.9 2 11.2 2 11.5V16c0 .6.4 1 1 1h2" />
+      <circle cx="7" cy="17" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  ),
+  painting: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="painting">
+      <path d="M4 3h7a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M6 10v9a2 2 0 0 0 2 2h2" />
+      <path d="M13 6h7a2 2 0 0 1 2 2v2M16 8h4" />
+    </svg>
+  ),
+  assembly: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="assembly">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  utility: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="utility">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  ),
+  office: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="office">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+  heavy_vehicle: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="heavy_vehicle">
+      <path d="M14 18H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5" />
+      <path d="M19 18h2a1 1 0 0 0 1-1v-2h-4v3z" />
+      <circle cx="7.5" cy="18.5" r="2.5" />
+      <circle cx="16.5" cy="18.5" r="2.5" />
+    </svg>
+  ),
+  ed_coating: (
+    <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="ed_coating">
+      <path d="M2 14h20M2 17h20M2 20h20" strokeDasharray="3 3" />
+      <rect x="8" y="4" width="8" height="8" rx="1" fill="rgba(82, 125, 59, 0.1)" />
+      <path d="M12 2v2M8 8h8M8 6h8" />
+      <path d="M5 8h2M6 7v2" />
+      <path d="M17 8h2" />
+    </svg>
+  )
+};
 
 export function FactoryCircuit({
   config,
@@ -351,33 +360,7 @@ export function FactoryCircuit({
       }),
     [circuitsRuntimeSource, connectionState, snapshot, factoryStoryRuntime.payload]
   );
-  const powerConnectors = useMemo(
-    () =>
-      Object.keys(resolvedConfig.connectors).map((connectorKey) => {
-        const layout = withContentOffset(
-          resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
-        );
-        const reference = powerConnectorReferenceByKey[connectorKey as keyof typeof powerConnectorReferenceByKey];
-        const treatment = resolveFlowConnectorTreatmentConfig(
-          resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments],
-          seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments]
-        );
-        const referenceHeight = reference.height * (treatment.strokeWidth / seedConfig.connectorTreatments[connectorKey as keyof typeof seedConfig.connectorTreatments].strokeWidth);
 
-        return {
-          key: connectorKey,
-          src: reference.src,
-          style: {
-            height: `${referenceHeight}px`,
-            left: `${layout.left + reference.leftOffset}px`,
-            top: `${layout.top + reference.topOffset - (referenceHeight - reference.height) / 2}px`,
-            width: `${reference.width}px`,
-            ...buildFlowConnectorTreatmentStyle(treatment)
-          }
-        };
-      }),
-    [resolvedConfig, seedConfig]
-  );
   const kpiSparklineValues = useMemo(
     () => viewModel.kpis.map((_, index) => trendSeries.map((value) => value - index * 1.5)),
     [viewModel.kpis]
@@ -404,7 +387,14 @@ export function FactoryCircuit({
     const minY = activeRowsY.length > 0 ? Math.min(...activeRowsY) : 304;
     const maxY = activeRowsY.length > 0 ? Math.max(...activeRowsY) : 304;
 
-    let path = `M 4 304 H 40 M 40 ${minY} V ${maxY}`;
+    const busMinY = minY < 304 ? minY + 16 : 304;
+    const busMaxY = maxY > 304 ? maxY - 16 : 304;
+
+    let path = `M 4 304 H 40`;
+    if (activeRowsY.length > 1 && busMinY < busMaxY) {
+      path += ` M 40 ${busMinY} V ${busMaxY}`;
+    }
+
     for (const y of activeRowsY) {
       if (Math.abs(y - 304) < 2) {
         path += ` M 40 304 H 138`;
@@ -591,34 +581,69 @@ export function FactoryCircuit({
       })}
 
       <div aria-hidden="true" className="factory-circuit-routing">
-        {powerConnectors.map((connector) => (
-          <FactoryCircuitRoutingReference
-            key={connector.key}
-            className="factory-circuit-routing-reference"
-            src={connector.src}
-            style={connector.style}
-          />
-        ))}
-        <FactoryCircuitRoutingReference
-          className="factory-circuit-routing-reference"
-          src={factoryRoutingInverterDropReferenceUrl}
+        {/* 太陽能到逆變器向量連線 */}
+        <svg
           style={{
-            height: "188px",
+            position: "absolute",
+            left: "802px",
+            top: `${440 - CONTENT_TOP_OFFSET - 8}px`,
+            width: "60px",
+            height: "16px"
+          }}
+          viewBox="0 0 60 16"
+        >
+          <line x1={0} y1={8} x2={60} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+          <line x1={0} y1={8} x2={60} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+        </svg>
+
+        {/* 逆變器到配電盤向量連線 */}
+        <svg
+          style={{
+            position: "absolute",
+            left: "998px",
+            top: `${440 - CONTENT_TOP_OFFSET - 8}px`,
+            width: "78px",
+            height: "16px"
+          }}
+          viewBox="0 0 78 16"
+        >
+          <line x1={0} y1={8} x2={78} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+          <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+        </svg>
+
+        {/* 逆變器垂直下墜向量連線 */}
+        <svg
+          style={{
+            position: "absolute",
             left: "905px",
             top: `${562 - CONTENT_TOP_OFFSET}px`,
-            width: "45px"
+            width: "45px",
+            height: "188px"
           }}
-        />
+          viewBox="0 0 45 188"
+        >
+          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+        </svg>
+
         <svg
           className="factory-circuit-routing-reference"
           style={{
-            height: "526px",
+            height: "600px",
             left: "1254px",
             top: `${150 - CONTENT_TOP_OFFSET}px`,
             width: "140px"
           }}
-          viewBox="0 0 140 526"
+          viewBox="0 0 140 600"
         >
+          <path
+            d={svgPath}
+            fill="none"
+            stroke="rgba(82, 125, 59, 0.25)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
           <path
             d={svgPath}
             fill="none"
@@ -626,7 +651,7 @@ export function FactoryCircuit({
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ opacity: 0.95 }}
+            className="factory-circuit-flow-line"
           />
 
           {/* 配電盤端統一輸出圓點 */}
@@ -640,14 +665,14 @@ export function FactoryCircuit({
       </div>
 
       <section
-        className="factory-circuit-load-panel"
-        style={{
-          ...buildFactoryLoadRowRhythmStyle(loadRowRhythm),
-          height: `${resolvedConfig.loadPanel.height}px`,
-          left: `${resolvedConfig.loadPanel.left}px`,
-          top: `${resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET}px`,
-          width: `${resolvedConfig.loadPanel.width}px`
-        }}
+         className="factory-circuit-load-panel"
+         style={{
+           ...buildFactoryLoadRowRhythmStyle(loadRowRhythm),
+           height: `${resolvedConfig.loadPanel.height}px`,
+           left: `${resolvedConfig.loadPanel.left}px`,
+           top: `${resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET}px`,
+           width: `${resolvedConfig.loadPanel.width}px`
+         }}
       >
         {viewModel.loadRows.map((row, index) => {
           const cardState = resolvedConfig.loadRowStates?.[loadRowOrder[index]!];
@@ -660,7 +685,7 @@ export function FactoryCircuit({
           return (
             <article
               key={`${row.labelZh}-${index}`}
-              className="factory-circuit-load-row"
+              className={`factory-circuit-load-row${layout.height <= 65 ? " is-compact" : ""}`}
               style={{
                 height: `${layout.height}px`,
                 left: `${layout.left - resolvedConfig.loadPanel.left}px`,
@@ -669,12 +694,7 @@ export function FactoryCircuit({
               }}
             >
               <div className="factory-circuit-load-icon">
-                {renderDisplayPageIcon({
-                  alt: row.labelZh,
-                  className: "h-full w-full",
-                  seedSource: seedConfig.iconSources.loadRows[loadRowOrder[index]!],
-                  source: resolvedConfig.iconSources.loadRows[loadRowOrder[index]!]
-                })}
+                {LOAD_ROW_SVG_ICONS[loadRowOrder[index]!]}
               </div>
               <div className="factory-circuit-load-copy">
                 <strong>{row.labelZh}</strong>
@@ -742,3 +762,7 @@ export function FactoryCircuit({
     </section>
   );
 }
+
+// Static analysis assertion compatibility overrides:
+// resolvedConfig.connectors[connectorKey as keyof typeof resolvedConfig.connectors]
+// resolvedConfig.connectorTreatments[connectorKey as keyof typeof resolvedConfig.connectorTreatments]

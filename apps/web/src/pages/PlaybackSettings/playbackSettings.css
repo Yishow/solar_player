@@ -278,6 +278,34 @@
   padding-right: 4px;
 }
 
+.playback-settings-page .ps-card-order .ps-card-content,
+.playback-settings-page .ps-card-duration .ps-card-content {
+  height: calc(100% - 78px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.playback-settings-page .ps-card-order .ps-card-content::-webkit-scrollbar,
+.playback-settings-page .ps-card-duration .ps-card-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.playback-settings-page .ps-card-order .ps-card-content::-webkit-scrollbar-track,
+.playback-settings-page .ps-card-duration .ps-card-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.playback-settings-page .ps-card-order .ps-card-content::-webkit-scrollbar-thumb,
+.playback-settings-page .ps-card-duration .ps-card-content::-webkit-scrollbar-thumb {
+  background: rgba(93, 119, 69, 0.22);
+  border-radius: 3px;
+}
+
+.playback-settings-page .ps-card-order .ps-card-content::-webkit-scrollbar-thumb:hover,
+.playback-settings-page .ps-card-duration .ps-card-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(93, 119, 69, 0.38);
+}
+
 .playback-settings-page .settings-card__title {
   display: flex;
   align-items: flex-start;

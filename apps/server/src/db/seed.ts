@@ -245,6 +245,8 @@ export function seedDatabase() {
     database.prepare("DELETE FROM topic_mappings").run();
     database.prepare("DELETE FROM circuit_configs").run();
     database.prepare("DELETE FROM display_page_registry").run();
+    database.prepare("DELETE FROM display_page_configs").run();
+    database.prepare("DELETE FROM display_page_stage_configs").run();
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
     upsertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5);
@@ -350,6 +352,44 @@ export function seedDatabase() {
         page.pageKey
       );
     }
+
+    const guanyinConfigJson = JSON.stringify({
+      loadRowStates: {
+        stamping: { visible: true },
+        body: { visible: true },
+        painting: { visible: true },
+        assembly: { visible: true },
+        utility: { visible: true },
+        office: { visible: true },
+        heavy_vehicle: { visible: true },
+        ed_coating: { visible: true }
+      },
+      loadRows: {
+        stamping: { height: 65, left: 1392, top: 146, width: 470 },
+        body: { height: 65, left: 1392, top: 220, width: 470 },
+        painting: { height: 65, left: 1392, top: 294, width: 470 },
+        assembly: { height: 65, left: 1392, top: 368, width: 470 },
+        utility: { height: 65, left: 1392, top: 442, width: 470 },
+        office: { height: 65, left: 1392, top: 516, width: 470 },
+        heavy_vehicle: { height: 65, left: 1392, top: 590, width: 470 },
+        ed_coating: { height: 65, left: 1392, top: 664, width: 470 }
+      }
+    });
+
+    database.prepare(`
+      INSERT INTO display_page_configs (page_key, config_json, updated_at)
+      VALUES ('factory-circuit-guanyin', ?, CURRENT_TIMESTAMP)
+    `).run(guanyinConfigJson);
+
+    database.prepare(`
+      INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
+      VALUES ('factory-circuit-guanyin', 'draft', ?, 1, CURRENT_TIMESTAMP, NULL, NULL)
+    `).run(guanyinConfigJson);
+
+    database.prepare(`
+      INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
+      VALUES ('factory-circuit-guanyin', 'live', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'system')
+    `).run(guanyinConfigJson);
 
     database.prepare(`
       INSERT INTO playback_settings (
