@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { resolveHeaderWeatherMeta } from "../components/headerWeatherMeta";
 import { getHeaderWeatherContract } from "../services/api";
 import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
+import { setupWeatherPolling } from "./weatherPolling.js";
 
 const HEADER_WEATHER_SYNC_SCOPES: readonly DisplaySyncEventScope[] = ["weather"];
 
@@ -29,6 +30,12 @@ export function useHeaderWeatherMeta(initialContract?: WeatherHeaderContract | n
   useEffect(() => {
     void refreshWeather();
   }, [refreshWeather]);
+
+  useEffect(() => {
+    const enabled = contract?.settings?.enabled ?? false;
+    const intervalMinutes = contract?.settings?.updateIntervalMinutes ?? 30;
+    return setupWeatherPolling(enabled, intervalMinutes, refreshWeather);
+  }, [refreshWeather, contract?.settings?.updateIntervalMinutes, contract?.settings?.enabled]);
 
   // Re-pull the persisted contract whenever weather settings are saved so the
   // shell header reflects the new selection without a manual reload.

@@ -46,7 +46,8 @@ function buildPublicWeatherHeaderSettings(
     enabled: settings.enabled,
     fieldKeys: settings.fieldKeys,
     locationMode: settings.locationMode,
-    preset: settings.preset
+    preset: settings.preset,
+    updateIntervalMinutes: settings.updateIntervalMinutes
   };
 }
 
@@ -150,6 +151,24 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
 
   app.get("/api/weather/current", async () => {
     const settings = readWeatherSettings();
+    const current = settings.enabled
+      ? await getWeatherService().getCurrentWeather(settings)
+      : buildNeutralCurrentWeatherSnapshot("unconfigured");
+
+    return {
+      current,
+      settings: buildPublicWeatherHeaderSettings(settings)
+    };
+  });
+
+  app.post("/api/weather/refresh", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    const settings = readWeatherSettings();
+    getWeatherService().clearCache();
+
     const current = settings.enabled
       ? await getWeatherService().getCurrentWeather(settings)
       : buildNeutralCurrentWeatherSnapshot("unconfigured");

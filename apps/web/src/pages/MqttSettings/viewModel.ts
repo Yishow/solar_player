@@ -56,6 +56,7 @@ export type ActionState = {
   isSavingTopics: boolean;
   isTestingConnection: boolean;
   isReloadingTopics: boolean;
+  isRefreshingWeather?: boolean;
 };
 
 export type ConnectionTestFeedback = {
@@ -532,7 +533,8 @@ export function buildMqttSettingsViewModel({
       enabled: weatherSettings.enabled,
       fieldKeys: weatherSettings.fieldKeys,
       locationMode: weatherSettings.locationMode,
-      preset: weatherSettings.preset
+      preset: weatherSettings.preset,
+      updateIntervalMinutes: weatherSettings.updateIntervalMinutes
     }
   });
   const customFieldOptions = weatherSettings.preset === "custom"
@@ -614,7 +616,9 @@ export function buildMqttSettingsViewModel({
       saveSettingsDisabled: actionState.isSavingSettings,
       saveSettingsLabel: actionState.isSavingSettings ? "Saving..." : "Save settings",
       testConnectionDisabled: actionState.isTestingConnection,
-      testConnectionLabel: actionState.isTestingConnection ? "Testing..." : "Test connection"
+      testConnectionLabel: actionState.isTestingConnection ? "Testing..." : "Test connection",
+      refreshWeatherDisabled: actionState.isRefreshingWeather || !weatherSettings.enabled,
+      refreshWeatherLabel: actionState.isRefreshingWeather ? "Refreshing..." : "立即更新"
     },
     brokerFields: [
       {

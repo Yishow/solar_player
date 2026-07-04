@@ -10,6 +10,7 @@ type ConnectFn = typeof import("mqtt").connect;
 class FakeMqttClient extends EventEmitter {
   connected = true;
   subscribeError: Error | null = null;
+  published: Array<{ topic: string; payload: string }> = [];
 
   subscribe(_topics: string[], callback: (error?: Error | null) => void) {
     queueMicrotask(() => callback(this.subscribeError));
@@ -18,6 +19,12 @@ class FakeMqttClient extends EventEmitter {
 
   unsubscribe(_topics: string[], callback: (error?: Error | null) => void) {
     queueMicrotask(() => callback(null));
+    return this;
+  }
+
+  publish(topic: string, payload: string, callback?: (error?: Error | null) => void) {
+    this.published.push({ topic, payload });
+    queueMicrotask(() => callback?.(null));
     return this;
   }
 
@@ -623,4 +630,35 @@ test("MqttClientService testConnection uses an isolated probe client id", async 
 
   assert.equal(result.connected, true);
   assert.equal(seenClientId, "solar-display-ab1-probe");
+});
+
+test("MqttClientService publish forwards payload to the mqtt client when connected", async () => {
+  let clientInstance: FakeMqttClient | null = null;
+
+  const connectFn = ((_url: string, _options?: IClientOptions) => {
+    clientInstance = new FakeMqttClient();
+    queueMicrotask(() => clientInstance?.emit("connect"));
+    return clientInstance as unknown as MqttClient;
+  }) as typeof import("mqtt").connect;
+
+  const database = createDatabase();
+  const service = new MqttClientService({
+    connectFn,
+    database: database as unknown as Database.Database,
+    logger: {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {}
+    }
+  });
+
+  await service.connect();
+  service.publish("test/topic", JSON.stringify({ value: 123 }));
+
+  const client = clientInstance as any;
+  assert.ok(client);
+  assert.equal(client.published.length, 1);
+  assert.equal(client.published[0].topic, "test/topic");
+  assert.equal(JSON.parse(client.published[0].payload).value, 123);
 });

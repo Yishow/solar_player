@@ -11,6 +11,7 @@ import { closeDatabaseConnection } from "./db/index.js";
 import { createLoggerOptions } from "./logger.js";
 import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
+import { getWeatherService } from "./services/weatherService.js";
 import managementAuthPlugin, {
   createManagementAccessControl,
   createManagementCorsOriginDelegate,
@@ -107,6 +108,10 @@ export async function buildApp() {
   mqttClientService = new MqttClientService({
     logger: app.log,
     socketService
+  });
+
+  getWeatherService().setMqttPublisher((topic, payload) => {
+    mqttClientService?.publish(topic, payload);
   });
 
   app.decorate("managementAccess", managementAccess);

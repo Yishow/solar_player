@@ -8,57 +8,45 @@ TBD - created by archiving change 'reorganize-mqtt-settings-topic-and-weather-ma
 
 ### Requirement: Configure weather settings from MQTT Settings
 
-The system SHALL allow operators to configure header weather behavior directly from `MQTT Settings`.
+The system SHALL allow operators to configure header weather behavior and update interval directly from `MQTT Settings`.
 
 #### Scenario: Operator edits weather behavior in the management page
 
 - **WHEN** an operator opens `MQTT Settings`
-- **THEN** the page SHALL provide controls for enabling weather, selecting a location mode, choosing a county or station, selecting a preset, and editing custom field choices
+- **THEN** the page SHALL provide controls for enabling weather, selecting a location mode, choosing a county or station, selecting a preset, choosing an update interval (10 minutes, 30 minutes, 1 hour, 3 hours, 6 hours, 12 hours, or manual), and editing custom field choices
 - **AND** the operator SHALL NOT need to navigate to a separate management route to perform those weather-setting tasks
 
 
 <!-- @trace
-source: reorganize-mqtt-settings-topic-and-weather-management
-updated: 2026-05-24
+source: optimize-mqtt-weather-interval-and-caching
+updated: 2026-07-05
 code:
-  - apps/web/src/pages/managementDisplaySyncScopes.ts
-  - apps/server/src/services/weatherService.ts
-  - apps/web/src/layouts/ManagementShell.tsx
-  - apps/server/src/services/cwaWeatherClient.ts
-  - apps/server/src/routes/weather.ts
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - apps/web/src/layouts/LayoutShell.tsx
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - packages/shared/src/displayOps.ts
-  - apps/web/src/components/AppHeader.tsx
-  - .env.example
-  - packages/shared/src/weather.ts
-  - apps/server/src/db/migrations/010_weather_settings.sql
-  - apps/web/src/components/headerWeatherMeta.ts
-  - apps/web/src/services/api.ts
-  - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
-  - apps/web/src/pages/MqttSettings/layout.ts
-  - apps/server/src/services/weatherSettingsService.ts
-  - packages/shared/src/index.ts
-  - apps/web/src/hooks/useHeaderWeatherMeta.ts
-  - apps/server/src/config.ts
   - apps/server/src/app.ts
+  - apps/server/src/services/weatherService.ts
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - packages/shared/src/weather.ts
+  - apps/web/src/components/headerWeatherMeta.ts
+  - apps/server/src/services/weatherSettingsService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/hooks/weatherPolling.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/web/src/hooks/useOverviewWeather.ts
   - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - AGENTS.md
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/styles/management.css
+  - apps/server/src/routes/weather.ts
+  - apps/server/src/db/migrations/017_weather_update_interval.sql
 tests:
+  - apps/server/src/services/weatherService.test.ts
+  - apps/server/src/db/migrations/weatherUpdateInterval.test.ts
+  - apps/web/src/hooks/weatherHooks.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/server/src/routes/weather.test.ts
   - apps/web/src/pages/MqttSettings/viewModel.test.ts
   - apps/web/src/components/headerWeatherMeta.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/server/src/services/weatherService.test.ts
   - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/server/src/services/cwaWeatherClient.test.ts
-  - apps/web/src/components/AppHeader.test.ts
-  - apps/server/src/routes/weather.test.ts
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.test.ts
-  - apps/server/src/services/weatherSettingsService.test.ts
-  - apps/web/src/layouts/LayoutShell.test.ts
-  - apps/web/src/pages/managementDisplaySync.test.ts
 -->
 
 ---
@@ -207,4 +195,97 @@ tests:
   - apps/server/src/plugins/managementAuth.test.ts
   - apps/server/src/routes/settings-mqtt.test.ts
   - apps/server/src/services/generationTrendSeries.test.ts
+-->
+
+---
+### Requirement: Support manual weather refresh
+
+The system SHALL allow operators to manually trigger a weather refresh from MQTT Settings.
+
+#### Scenario: Operator triggers manual refresh
+
+- **WHEN** the operator clicks the "Refresh Now" button
+- **THEN** the system SHALL clear the server cache and request fresh weather data from CWA API
+- **AND** the page SHALL display the refreshed preview or feedback immediately
+
+
+<!-- @trace
+source: optimize-mqtt-weather-interval-and-caching
+updated: 2026-07-05
+code:
+  - apps/server/src/app.ts
+  - apps/server/src/services/weatherService.ts
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - packages/shared/src/weather.ts
+  - apps/web/src/components/headerWeatherMeta.ts
+  - apps/server/src/services/weatherSettingsService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/hooks/weatherPolling.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/web/src/hooks/useOverviewWeather.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/styles/management.css
+  - apps/server/src/routes/weather.ts
+  - apps/server/src/db/migrations/017_weather_update_interval.sql
+tests:
+  - apps/server/src/services/weatherService.test.ts
+  - apps/server/src/db/migrations/weatherUpdateInterval.test.ts
+  - apps/web/src/hooks/weatherHooks.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/components/headerWeatherMeta.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/MqttSettings/weatherFieldPresets.test.ts
+-->
+
+---
+### Requirement: Support server-side weather caching and MQTT broadcast
+
+The server SHALL cache CWA weather data based on the configured update interval and broadcast successfully fetched weather to the local MQTT broker.
+
+#### Scenario: Server returns cached weather data
+
+- **WHEN** a client requests current weather data within the configured update interval
+- **THEN** the server SHALL return the cached weather snapshot
+- **AND** it SHALL NOT send a new API request to the CWA service
+
+#### Scenario: Server broadcasts weather to local broker
+
+- **WHEN** the server successfully fetches new weather data from the CWA API
+- **THEN** the server SHALL publish the weather snapshot JSON to the local MQTT broker on the topic `solar/weather/current`
+- **AND** the payload SHALL conform to the standard WeatherCurrentSnapshot schema
+
+<!-- @trace
+source: optimize-mqtt-weather-interval-and-caching
+updated: 2026-07-05
+code:
+  - apps/server/src/app.ts
+  - apps/server/src/services/weatherService.ts
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - packages/shared/src/weather.ts
+  - apps/web/src/components/headerWeatherMeta.ts
+  - apps/server/src/services/weatherSettingsService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/hooks/weatherPolling.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/web/src/hooks/useOverviewWeather.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/styles/management.css
+  - apps/server/src/routes/weather.ts
+  - apps/server/src/db/migrations/017_weather_update_interval.sql
+tests:
+  - apps/server/src/services/weatherService.test.ts
+  - apps/server/src/db/migrations/weatherUpdateInterval.test.ts
+  - apps/web/src/hooks/weatherHooks.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/components/headerWeatherMeta.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/MqttSettings/weatherFieldPresets.test.ts
 -->

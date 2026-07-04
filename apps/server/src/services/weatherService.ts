@@ -50,6 +50,9 @@ export class WeatherService {
   private readonly client: WeatherClientLike;
   private readonly now: () => Date;
   private lastSuccessfulSnapshot: WeatherCurrentSnapshot | null = null;
+  private cachedSnapshot: WeatherCurrentSnapshot | null = null;
+  private cacheExpiredAt: Date | null = null;
+  private mqttPublish: ((topic: string, payload: string) => void) | null = null;
 
   constructor(options: WeatherServiceOptions = {}) {
     this.authorizationConfigured = options.authorizationConfigured ?? Boolean(config.cwaAuthorization);
@@ -61,9 +64,26 @@ export class WeatherService {
     this.now = options.now ?? (() => new Date());
   }
 
+  setMqttPublisher(publishFn: (topic: string, payload: string) => void) {
+    this.mqttPublish = publishFn;
+  }
+
+  clearCache() {
+    this.cacheExpiredAt = null;
+  }
+
   async getCurrentWeather(settings: WeatherSettings): Promise<WeatherCurrentSnapshot> {
     if (!this.authorizationConfigured) {
       return buildEmptySnapshot("unconfigured");
+    }
+
+    const nowTime = this.now();
+    if (
+      this.cachedSnapshot
+      && this.cacheExpiredAt
+      && nowTime < this.cacheExpiredAt
+    ) {
+      return this.cachedSnapshot;
     }
 
     try {
@@ -76,17 +96,34 @@ export class WeatherService {
         fetchState: "fresh",
         staleAt: null
       };
+      this.cachedSnapshot = this.lastSuccessfulSnapshot;
+
+      const intervalMinutes = settings.updateIntervalMinutes > 0 ? settings.updateIntervalMinutes : 30;
+      this.cacheExpiredAt = new Date(nowTime.getTime() + intervalMinutes * 60 * 1000);
+
+      if (this.mqttPublish) {
+        try {
+          this.mqttPublish("solar/weather/current", JSON.stringify(this.lastSuccessfulSnapshot));
+        } catch {
+          // Keep CWA logic resilient to MQTT broadcast failures
+        }
+      }
+
       return this.lastSuccessfulSnapshot;
     } catch {
       if (!this.lastSuccessfulSnapshot) {
         return buildEmptySnapshot("unavailable");
       }
 
-      return {
+      this.cachedSnapshot = {
         ...this.lastSuccessfulSnapshot,
         fetchState: "stale",
-        staleAt: this.now().toISOString()
+        staleAt: nowTime.toISOString()
       };
+
+      this.cacheExpiredAt = new Date(nowTime.getTime() + 5 * 60 * 1000);
+
+      return this.cachedSnapshot;
     }
   }
 

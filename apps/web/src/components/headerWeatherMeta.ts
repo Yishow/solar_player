@@ -5,12 +5,15 @@ import type {
   WeatherSettings
 } from "@solar-display/shared";
 
-type HeaderWeatherSettings = Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset">;
+type HeaderWeatherSettings = Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset"> & {
+  updateIntervalMinutes?: number;
+};
 
 type ResolveHeaderWeatherMetaInput = {
   current: WeatherCurrentSnapshot | null;
   isHydrated: boolean;
   settings?: HeaderWeatherSettings | null;
+  now?: Date;
 };
 
 const LOADING_META: HeaderWeatherMeta = {
@@ -145,7 +148,17 @@ export function resolveHeaderWeatherMeta(input: ResolveHeaderWeatherMetaInput): 
     .map((fieldKey) => formatSecondaryField(fieldKey, input.current!))
     .filter((part): part is string => Boolean(part));
 
-  const isStale = input.current.fetchState === "stale";
+  const intervalMinutes = input.settings.updateIntervalMinutes ?? 30;
+  let isStale = input.current.fetchState === "stale";
+
+  if (!isStale && input.current.updatedAt && intervalMinutes > 0) {
+    const updatedTime = new Date(input.current.updatedAt);
+    const referenceTime = input.now ?? new Date();
+    if (referenceTime.getTime() - updatedTime.getTime() > 2 * intervalMinutes * 60 * 1000) {
+      isStale = true;
+    }
+  }
+
   if (isStale) {
     secondaryParts.push("資料延遲");
   }

@@ -16,6 +16,7 @@ type WeatherSettingsRow = {
   location_mode: string;
   preset: string;
   station_id: string | null;
+  update_interval_minutes: number;
 };
 
 export class WeatherSettingsValidationError extends Error {
@@ -65,13 +66,19 @@ export function normalizeWeatherSettingsInput(input: Partial<WeatherSettings>): 
     throw new WeatherSettingsValidationError("Weather preset is invalid");
   }
 
+  const updateIntervalMinutes =
+    typeof input.updateIntervalMinutes === "number"
+      ? input.updateIntervalMinutes
+      : DEFAULT_WEATHER_SETTINGS.updateIntervalMinutes;
+
   return {
     countyName: normalizeNullableText(input.countyName),
     enabled: input.enabled === true,
     fieldKeys: normalizeFieldKeys(input.fieldKeys),
     locationMode,
     preset,
-    stationId: normalizeNullableText(input.stationId)
+    stationId: normalizeNullableText(input.stationId),
+    updateIntervalMinutes
   };
 }
 
@@ -100,7 +107,8 @@ function serializeWeatherSettings(row: WeatherSettingsRow | undefined): WeatherS
       ? row.location_mode
       : DEFAULT_WEATHER_SETTINGS.locationMode,
     preset: isWeatherFieldPreset(row.preset) ? row.preset : DEFAULT_WEATHER_SETTINGS.preset,
-    stationId: row.station_id
+    stationId: row.station_id,
+    updateIntervalMinutes: row.update_interval_minutes ?? DEFAULT_WEATHER_SETTINGS.updateIntervalMinutes
   };
 }
 
@@ -114,7 +122,8 @@ function readRow(database: Database.Database) {
           county_name,
           station_id,
           preset,
-          field_keys_json
+          field_keys_json,
+          update_interval_minutes
         FROM weather_settings
         WHERE id = 1
       `
@@ -143,8 +152,9 @@ export function saveWeatherSettings(
           station_id,
           preset,
           field_keys_json,
+          update_interval_minutes,
           updated_at
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           enabled = excluded.enabled,
           location_mode = excluded.location_mode,
@@ -152,6 +162,7 @@ export function saveWeatherSettings(
           station_id = excluded.station_id,
           preset = excluded.preset,
           field_keys_json = excluded.field_keys_json,
+          update_interval_minutes = excluded.update_interval_minutes,
           updated_at = CURRENT_TIMESTAMP
       `
     )
@@ -161,7 +172,8 @@ export function saveWeatherSettings(
       normalized.countyName,
       normalized.stationId,
       normalized.preset,
-      JSON.stringify(normalized.fieldKeys)
+      JSON.stringify(normalized.fieldKeys),
+      normalized.updateIntervalMinutes
     );
 
   return normalized;

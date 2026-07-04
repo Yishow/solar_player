@@ -63,6 +63,7 @@ type MqttSettingsContentProps = {
   weatherPreviewContract: WeatherHeaderContract | null;
   weatherPreviewErrorMessage: string;
   weatherSettings: WeatherSettings;
+  refreshWeather: () => Promise<void>;
 };
 
 function resolveConnStatus(statusTone: "connected" | "connecting" | "disconnected") {
@@ -247,6 +248,23 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
           </label>
 
           <label className="text-field mqtt-weather-card__field">
+            <span className="field-label">更新頻率</span>
+            <CustomSelect
+              value={String(props.weatherSettings.updateIntervalMinutes ?? 30)}
+              onChange={(value) => props.handleWeatherSettingChange("updateIntervalMinutes", Number(value))}
+              options={[
+                { label: "10 分鐘", value: "10" },
+                { label: "30 分鐘", value: "30" },
+                { label: "1 小時", value: "60" },
+                { label: "3 小時", value: "180" },
+                { label: "6 小時", value: "360" },
+                { label: "12 小時", value: "720" },
+                { label: "手動更新", value: "0" }
+              ]}
+            />
+          </label>
+
+          <label className="text-field mqtt-weather-card__field">
             <span className="field-label">縣市</span>
             <CustomSelect
               value={props.weatherSettings.countyName ?? ""}
@@ -325,7 +343,18 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
         ) : null}
 
         <div className="mqtt-weather-card__preview">
-          <strong>Header Preview</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <strong>Header Preview</strong>
+            <button
+              type="button"
+              className="mgmt-action mqtt-weather-card__refresh-btn"
+              style={{ padding: "4px 12px", fontSize: 12, height: "auto", minHeight: "auto", margin: 0 }}
+              disabled={viewModel.actions.refreshWeatherDisabled}
+              onClick={() => void props.refreshWeather()}
+            >
+              {viewModel.actions.refreshWeatherLabel}
+            </button>
+          </div>
           <p>{viewModel.weatherCard.preview.primaryText}</p>
           {viewModel.weatherCard.preview.secondaryText ? (
             <small>{viewModel.weatherCard.preview.secondaryText}</small>

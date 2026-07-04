@@ -139,7 +139,8 @@ export function MqttSettings() {
     isReloadingTopics: false,
     isSavingSettings: false,
     isSavingTopics: false,
-    isTestingConnection: false
+    isTestingConnection: false,
+    isRefreshingWeather: false
   });
   const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(initialEditableModel !== null);
   const [hasLoadedTopics, setHasLoadedTopics] = useState(initialEditableModel !== null);
@@ -461,6 +462,23 @@ export function MqttSettings() {
     }
   }, [settings, weatherSettings, reloadReadiness]);
 
+  const refreshWeather = useCallback(async () => {
+    setActionState((current) => ({ ...current, isRefreshingWeather: true }));
+    try {
+      const response = await requestJson<WeatherHeaderContract>("/api/weather/refresh", {
+        method: "POST"
+      });
+      setWeatherPreviewContract(response);
+      setWeatherPreviewErrorMessage("");
+      setMessage("天氣資訊已立即更新。");
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "手動更新天氣失敗。");
+    } finally {
+      setActionState((current) => ({ ...current, isRefreshingWeather: false }));
+    }
+  }, []);
+
   const testConnection = useCallback(async () => {
     setActionState((current) => ({ ...current, isTestingConnection: true }));
     try {
@@ -611,6 +629,7 @@ export function MqttSettings() {
       weatherPreviewContract={weatherPreviewContract}
       weatherPreviewErrorMessage={weatherPreviewErrorMessage}
       weatherSettings={weatherSettings}
+      refreshWeather={refreshWeather}
     />
   );
 }

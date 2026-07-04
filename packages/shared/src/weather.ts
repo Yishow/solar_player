@@ -32,6 +32,7 @@ export type WeatherSettings = {
   locationMode: WeatherLocationMode;
   preset: WeatherFieldPreset;
   stationId: string | null;
+  updateIntervalMinutes: number;
 };
 
 export type WeatherStationOption = {
@@ -76,7 +77,9 @@ export type HeaderWeatherMeta = {
 
 export type WeatherHeaderContract = {
   current: WeatherCurrentSnapshot;
-  settings: Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset">;
+  settings: Pick<WeatherSettings, "enabled" | "fieldKeys" | "locationMode" | "preset"> & {
+    updateIntervalMinutes?: number;
+  };
 };
 
 export const DEFAULT_WEATHER_FIELD_KEYS: WeatherFieldKey[] = [
@@ -92,7 +95,8 @@ export const DEFAULT_WEATHER_SETTINGS: WeatherSettings = {
   fieldKeys: DEFAULT_WEATHER_FIELD_KEYS,
   locationMode: "station",
   preset: "standard",
-  stationId: null
+  stationId: null,
+  updateIntervalMinutes: 30
 };
 
 export function isWeatherFieldKey(value: string): value is WeatherFieldKey {

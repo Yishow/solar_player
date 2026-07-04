@@ -9,7 +9,8 @@ const settings: WeatherSettings = {
   fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
   locationMode: "station",
   preset: "standard",
-  stationId: "C0I080"
+  stationId: "C0I080",
+  updateIntervalMinutes: 30
 };
 
 const baseSnapshot = {
@@ -35,6 +36,7 @@ const baseSnapshot = {
 test("WeatherService returns stale cached weather when the upstream fetch later fails", async () => {
   let callCount = 0;
   const timestamps = [
+    new Date("2026-05-23T06:20:00.000Z"),
     new Date("2026-05-23T06:25:00.000Z")
   ];
   const service = new WeatherService({
@@ -66,6 +68,7 @@ test("WeatherService returns stale cached weather when the upstream fetch later 
   });
 
   const fresh = await service.getCurrentWeather(settings);
+  service.clearCache();
   const stale = await service.getCurrentWeather(settings);
 
   assert.equal(fresh.fetchState, "fresh");
@@ -97,4 +100,58 @@ test("WeatherService exposes an explicit unconfigured state when CWA authorizati
   assert.equal(current.fetchState, "unconfigured");
   assert.equal(current.stationName, null);
   assert.equal(current.updatedAt, null);
+});
+
+test("WeatherService caches weather data and returns cached data without calling CWA client again within the interval", async () => {
+  let callCount = 0;
+  const service = new WeatherService({
+    authorizationConfigured: true,
+    client: {
+      readCurrentWeather: async () => {
+        callCount += 1;
+        return baseSnapshot;
+      },
+      readOptions: async () => {
+        throw new Error("not used");
+      }
+    },
+    now: () => new Date("2026-05-23T06:25:00.000Z")
+  });
+
+  const settingsWithCache: WeatherSettings = {
+    ...settings,
+    updateIntervalMinutes: 10
+  };
+
+  const first = await service.getCurrentWeather(settingsWithCache);
+  const second = await service.getCurrentWeather(settingsWithCache);
+
+  assert.equal(callCount, 1);
+  assert.deepEqual(first, second);
+});
+
+test("WeatherService broadcasts weather snapshot to MQTT topic upon successful fetch", async () => {
+  let publishedTopic: string | null = null;
+  let publishedPayload: string | null = null;
+
+  const service = new WeatherService({
+    authorizationConfigured: true,
+    client: {
+      readCurrentWeather: async () => baseSnapshot,
+      readOptions: async () => {
+        throw new Error("not used");
+      }
+    },
+    now: () => new Date("2026-05-23T06:25:00.000Z")
+  });
+
+  service.setMqttPublisher((topic, payload) => {
+    publishedTopic = topic;
+    publishedPayload = payload;
+  });
+
+  await service.getCurrentWeather(settings);
+
+  assert.equal(publishedTopic, "solar/weather/current");
+  assert.equal(JSON.parse(publishedPayload!).stationId, "C0I080");
 });

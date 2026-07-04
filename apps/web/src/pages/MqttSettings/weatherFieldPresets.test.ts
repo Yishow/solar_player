@@ -22,6 +22,7 @@ function createWeatherSettings(overrides: Partial<WeatherSettings> = {}): Weathe
     locationMode: "station",
     preset: "custom",
     stationId: "C0I080",
+    updateIntervalMinutes: 30,
     ...overrides
   };
 }

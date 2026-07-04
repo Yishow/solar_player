@@ -11,6 +11,7 @@ function createSettings(overrides: Partial<WeatherSettings> = {}): WeatherSettin
     locationMode: "station",
     preset: "standard",
     stationId: "C0I080",
+    updateIntervalMinutes: 0,
     ...overrides
   };
 }
@@ -84,4 +85,20 @@ test("resolveHeaderWeatherMeta shows the county name when locating by county", (
   });
 
   assert.equal(meta.primaryText, "桃園市 多雲 31°C");
+});
+
+test("resolveHeaderWeatherMeta outputs stale state when snapshot updatedAt age exceeds 2 * updateIntervalMinutes", () => {
+  const meta = resolveHeaderWeatherMeta({
+    current: createSnapshot({
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    }),
+    isHydrated: true,
+    settings: createSettings({
+      updateIntervalMinutes: 10
+    }),
+    now: new Date("2026-05-23T06:45:00.000Z")
+  });
+
+  assert.equal(meta.state, "stale");
+  assert.match(meta.secondaryText, /資料延遲/);
 });

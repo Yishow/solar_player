@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import type { WeatherCurrentSnapshot } from "@solar-display/shared";
+import { useCallback, useEffect, useState } from "react";
+import type { WeatherCurrentSnapshot, WeatherHeaderContract } from "@solar-display/shared";
 import { getHeaderWeatherContract } from "../services/api";
+import { setupWeatherPolling } from "./weatherPolling.js";
 
 /**
  * Fetches the current weather snapshot for Overview density widgets.
@@ -8,34 +9,27 @@ import { getHeaderWeatherContract } from "../services/api";
  * silently instead of breaking the playback surface.
  */
 export function useOverviewWeather(enabled: boolean): WeatherCurrentSnapshot | undefined {
-  const [snapshot, setSnapshot] = useState<WeatherCurrentSnapshot | undefined>(undefined);
+  const [contract, setContract] = useState<WeatherHeaderContract | null>(null);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
+  const load = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const nextContract = await getHeaderWeatherContract();
+      setContract(nextContract);
+    } catch {
+      setContract(null);
     }
-
-    let active = true;
-
-    const load = async () => {
-      try {
-        const contract = await getHeaderWeatherContract();
-        if (active) {
-          setSnapshot(contract.current);
-        }
-      } catch {
-        if (active) {
-          setSnapshot(undefined);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
   }, [enabled]);
 
-  return snapshot;
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    const intervalMinutes = contract?.settings?.updateIntervalMinutes ?? 30;
+    const isEnabled = enabled && (contract?.settings?.enabled ?? false);
+    return setupWeatherPolling(isEnabled, intervalMinutes, load);
+  }, [enabled, load, contract?.settings?.updateIntervalMinutes, contract?.settings?.enabled]);
+
+  return contract?.current ?? undefined;
 }

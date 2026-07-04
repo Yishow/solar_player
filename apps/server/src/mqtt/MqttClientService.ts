@@ -387,6 +387,28 @@ export class MqttClientService {
     };
   }
 
+  publish(topic: string, payload: string) {
+    if (this.mockMode) {
+      this.logger.debug?.({ topic, payload }, "MQTT mock publish");
+      return;
+    }
+    if (!this.client || !this.status.connected) {
+      this.logger.warn(
+        { broker: this.status.broker, clientId: this.status.clientId, topic },
+        "Cannot publish, MQTT client not connected"
+      );
+      return;
+    }
+    this.client.publish(topic, payload, (error) => {
+      if (error) {
+        this.logger.error(
+          { broker: this.status.broker, clientId: this.status.clientId, error, topic },
+          "MQTT publish failed"
+        );
+      }
+    });
+  }
+
   private readSettings() {
     const row = this.database
       .prepare(

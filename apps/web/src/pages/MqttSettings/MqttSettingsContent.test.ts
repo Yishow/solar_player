@@ -13,6 +13,7 @@ function createWeatherSettings(overrides: Partial<WeatherSettings> = {}): Weathe
     locationMode: "station",
     preset: "standard",
     stationId: "C0I080",
+    updateIntervalMinutes: 30,
     ...overrides
   };
 }
@@ -47,10 +48,62 @@ function createWeatherPreviewContract(overrides: Partial<WeatherHeaderContract> 
       enabled: true,
       fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
       locationMode: "station",
-      preset: "standard"
+      preset: "standard",
+      updateIntervalMinutes: 30
     },
     ...overrides
   };
+}
+
+function renderContent(overrides: Partial<React.ComponentProps<typeof MqttSettingsContent>> = {}) {
+  const defaultProps: React.ComponentProps<typeof MqttSettingsContent> = {
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false,
+      isRefreshingWeather: false
+    },
+    addTopicMapping: () => undefined,
+    errorMessage: "",
+    handleSettingChange: () => undefined,
+    handleTopicChange: () => undefined,
+    handleWeatherSettingChange: () => undefined,
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected",
+    liveMetricsSnapshot: { metrics: {}, timestamp: null },
+    message: "",
+    readiness: null,
+    readinessErrorMessage: "",
+    reloadTopics: async () => undefined,
+    remoteSyncBanner: null,
+    removeTopicMapping: () => undefined,
+    saveSettings: async () => undefined,
+    saveTopicMappings: async () => undefined,
+    settings: {
+      clientId: "",
+      dataMode: "mqtt",
+      host: "",
+      messageTimeout: "",
+      password: "",
+      port: "",
+      reconnectInterval: "",
+      username: ""
+    },
+    status: { broker: "", clientId: "", connected: false, reason: null, updatedAt: null },
+    testConnection: async () => undefined,
+    toggleWeatherField: () => undefined,
+    topics: [],
+    weatherOptions: null,
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: null,
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings(),
+    refreshWeather: async () => undefined
+  };
+  return renderToStaticMarkup(React.createElement(MqttSettingsContent, { ...defaultProps, ...overrides }));
 }
 
 function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): WeatherOptionsResponse {
@@ -197,7 +250,8 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
       weatherOptionsErrorMessage: "",
       weatherPreviewContract: createWeatherPreviewContract(),
       weatherPreviewErrorMessage: "",
-      weatherSettings: createWeatherSettings()
+      weatherSettings: createWeatherSettings(),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -312,7 +366,8 @@ test("mqtt settings content merges topic editing, runtime, and coverage into one
       weatherOptionsErrorMessage: "",
       weatherPreviewContract: createWeatherPreviewContract(),
       weatherPreviewErrorMessage: "",
-      weatherSettings: createWeatherSettings()
+      weatherSettings: createWeatherSettings(),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -394,7 +449,8 @@ test("mqtt settings content keeps editable rows readable when streaming falls ba
       weatherOptionsErrorMessage: "",
       weatherPreviewContract: createWeatherPreviewContract(),
       weatherPreviewErrorMessage: "",
-      weatherSettings: createWeatherSettings()
+      weatherSettings: createWeatherSettings(),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -481,7 +537,8 @@ test("mqtt settings content renders weather controls and preview inside the weat
         fieldKeys: ["weather", "airTemperature"],
         preset: "compact",
         stationId: "C0I090"
-      })
+      }),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -565,7 +622,8 @@ test("mqtt settings content exposes custom field controls and unavailable previe
         fieldKeys: ["weather", "dailyHigh"],
         preset: "custom",
         stationId: null
-      })
+      }),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -636,7 +694,8 @@ test("mqtt settings content surfaces a setup notice when the CWA weather source 
         current: createWeatherCurrent({ fetchState: "unconfigured" })
       }),
       weatherPreviewErrorMessage: "",
-      weatherSettings: createWeatherSettings({ enabled: true })
+      weatherSettings: createWeatherSettings({ enabled: true }),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -772,7 +831,8 @@ test("mqtt settings content keeps draft state in status feedback without renderi
       weatherPreviewErrorMessage: "",
       weatherSettings: createWeatherSettings({
         stationId: null
-      })
+      }),
+      refreshWeather: async () => undefined
     })
   );
 
@@ -783,4 +843,62 @@ test("mqtt settings content keeps draft state in status feedback without renderi
   assert.doesNotMatch(html, /Display Impact Summary/);
   assert.doesNotMatch(html, /Overview · 今日發電量/);
   assert.doesNotMatch(html, /Header Contract 草稿待儲存/);
+});
+
+test("mqtt settings content renders update interval select and refresh button", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MqttSettingsContent, {
+      actionState: {
+        isLoadingSettings: false,
+        isLoadingTopics: false,
+        isReloadingTopics: false,
+        isSavingSettings: false,
+        isSavingTopics: false,
+        isTestingConnection: false,
+        isRefreshingWeather: false
+      },
+      addTopicMapping: () => undefined,
+      errorMessage: "",
+      handleSettingChange: () => undefined,
+      handleTopicChange: () => undefined,
+      handleWeatherSettingChange: () => undefined,
+      lastConnectionTest: null,
+      liveMetricsConnectionState: "connected",
+      liveMetricsSnapshot: { metrics: {}, timestamp: null },
+      message: "",
+      readiness: null,
+      readinessErrorMessage: "",
+      reloadTopics: async () => undefined,
+      remoteSyncBanner: null,
+      removeTopicMapping: () => undefined,
+      saveSettings: async () => undefined,
+      saveTopicMappings: async () => undefined,
+      settings: {
+        clientId: "",
+        dataMode: "mqtt",
+        host: "",
+        messageTimeout: "",
+        password: "",
+        port: "",
+        reconnectInterval: "",
+        username: ""
+      },
+      status: { broker: "", clientId: "", connected: false, reason: null, updatedAt: null },
+      testConnection: async () => undefined,
+      toggleWeatherField: () => undefined,
+      topics: [],
+      weatherOptions: createWeatherOptions(),
+      weatherOptionsErrorMessage: "",
+      weatherPreviewContract: createWeatherPreviewContract(),
+      weatherPreviewErrorMessage: "",
+      weatherSettings: createWeatherSettings({
+        updateIntervalMinutes: 60
+      }),
+      refreshWeather: async () => undefined
+    })
+  );
+
+  assert.match(html, /更新頻率/);
+  assert.match(html, /立即更新/);
+  assert.match(html, /value="60"/);
 });

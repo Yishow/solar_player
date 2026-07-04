@@ -170,7 +170,8 @@ test("weather settings persist through the API and emit weather-scoped display s
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
         preset: "standard",
-        stationId: "C0I080"
+        stationId: "C0I080",
+        updateIntervalMinutes: 30
       }
     });
 
@@ -187,7 +188,8 @@ test("weather settings persist through the API and emit weather-scoped display s
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
         preset: "standard",
-        stationId: "C0I080"
+        stationId: "C0I080",
+        updateIntervalMinutes: 30
       }
     });
 
@@ -277,7 +279,8 @@ test("current weather exposes only the safe header settings subset and stays neu
         enabled: false,
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
-        preset: "standard"
+        preset: "standard",
+        updateIntervalMinutes: 30
       }
     });
   } finally {
@@ -376,7 +379,8 @@ test("weather options filter stations by county and current weather returns a no
       enabled: true,
       fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
       locationMode: "station",
-      preset: "standard"
+      preset: "standard",
+      updateIntervalMinutes: 30
     });
   } finally {
     await app.close();
@@ -428,7 +432,8 @@ test("weather preview resolves pending station selections without mutating persi
         enabled: true,
         fieldKeys: ["weather", "airTemperature"],
         locationMode: "station",
-        preset: "compact"
+        preset: "compact",
+        updateIntervalMinutes: 30
       }
     });
 
@@ -444,7 +449,8 @@ test("weather preview resolves pending station selections without mutating persi
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
         preset: "standard",
-        stationId: null
+        stationId: null,
+        updateIntervalMinutes: 30
       }
     });
   } finally {
@@ -486,7 +492,8 @@ test("invalid weather station selections are rejected before persistence mutates
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
         preset: "standard",
-        stationId: null
+        stationId: null,
+        updateIntervalMinutes: 30
       }
     });
   } finally {
@@ -528,9 +535,49 @@ test("current weather reports an explicit unconfigured state when CWA auth is ab
         enabled: false,
         fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
         locationMode: "station",
-        preset: "standard"
+        preset: "standard",
+        updateIntervalMinutes: 30
       }
     });
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/weather/refresh clears weather cache and fetches fresh weather", async () => {
+  process.env.CWA_AUTHORIZATION = "test-token";
+  installFetchStub(sampleDataset);
+
+  const app = await buildApp();
+
+  try {
+    await app.inject({
+      method: "PUT",
+      payload: {
+        countyName: "臺北市",
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
+        preset: "compact",
+        stationId: "C0I080",
+        updateIntervalMinutes: 10
+      },
+      url: "/api/weather/settings"
+    });
+
+    const firstCall = await app.inject({
+      method: "GET",
+      url: "/api/weather/current"
+    });
+    assert.equal(firstCall.statusCode, 200);
+
+    const refreshCall = await app.inject({
+      method: "POST",
+      url: "/api/weather/refresh"
+    });
+    assert.equal(refreshCall.statusCode, 200);
+    assert.equal(refreshCall.json<{ current: { fetchState: string } }>().current.fetchState, "fresh");
+    assert.equal(refreshCall.json<{ settings: { updateIntervalMinutes: number } }>().settings.updateIntervalMinutes, 10);
   } finally {
     await app.close();
   }
