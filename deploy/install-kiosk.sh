@@ -15,6 +15,7 @@ KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
 KIOSK_AUTOSTART_DIR="${KIOSK_HOME}/.config/autostart"
 KIOSK_DESKTOP_DIR="${KIOSK_HOME}/Desktop"
 KIOSK_STATE_DIR="${KIOSK_HOME}/.local/state/solar-display"
+KIOSK_DISPLAY_OUTPUT="${KIOSK_DISPLAY_OUTPUT:-}"
 GDM_CUSTOM_CONF="${GDM_CUSTOM_CONF:-/etc/gdm3/custom.conf}"
 SYSTEMD_UNIT_PATH="/etc/systemd/system/solar-display.service"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
@@ -156,8 +157,12 @@ install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${BUNDLE_ROOT}/deploy/readonly-system-disable.sh" \
   "${KIOSK_BIN_DIR}/readonly-system-disable.sh"
 rendered_launcher="$(mktemp)"
+launcher_exec="${KIOSK_BIN_DIR}/start-solar-kiosk.sh"
+if [[ -n "${KIOSK_DISPLAY_OUTPUT}" ]]; then
+  launcher_exec="env KIOSK_DISPLAY_OUTPUT=${KIOSK_DISPLAY_OUTPUT} ${launcher_exec}"
+fi
 sed \
-  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/start-solar-kiosk.sh#" \
+  -e "s#^Exec=.*#Exec=${launcher_exec}#" \
   "${BUNDLE_ROOT}/deploy/firefox-kiosk.desktop" > "${rendered_launcher}"
 install -m 644 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${rendered_launcher}" \

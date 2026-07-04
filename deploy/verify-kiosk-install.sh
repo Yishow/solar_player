@@ -148,7 +148,11 @@ for path in \
   check "runtime path writable by ${KIOSK_USER}: ${path}" sudo -u "${KIOSK_USER}" test -w "${path}"
 done
 
-if ! grep -q "Exec=${KIOSK_HOME}/bin/start-solar-kiosk.sh" "${DESKTOP_LAUNCHER}" 2>/dev/null; then
+launcher_exec_line="$(grep '^Exec=' "${DESKTOP_LAUNCHER}" 2>/dev/null || true)"
+if [[
+  "${launcher_exec_line}" != "Exec=${KIOSK_HOME}/bin/start-solar-kiosk.sh"
+  && "${launcher_exec_line}" != "Exec=env KIOSK_DISPLAY_OUTPUT="*" ${KIOSK_HOME}/bin/start-solar-kiosk.sh"
+]]; then
   echo "FAIL: Device Status re-entry guidance is not backed by the desktop launcher start helper: ${DESKTOP_LAUNCHER}" >&2
   failures=$((failures + 1))
 else

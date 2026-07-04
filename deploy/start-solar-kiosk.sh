@@ -8,6 +8,7 @@ LOG_FILE="${LOG_DIR}/kiosk-launcher.log"
 WAIT_SECONDS="${KIOSK_WAIT_SECONDS:-120}"
 START_DELAY_SECONDS="${KIOSK_START_DELAY:-5}"
 DESKTOP_LAUNCHER="${KIOSK_DESKTOP_LAUNCHER:-$HOME/Desktop/Solar Display Kiosk.desktop}"
+KIOSK_DISPLAY_OUTPUT="${KIOSK_DISPLAY_OUTPUT:-}"
 
 mkdir -p "${LOG_DIR}"
 
@@ -62,8 +63,69 @@ disable_display_sleep() {
   xset -dpms >/dev/null 2>&1 || true
 }
 
+lock_fhd_resolution() {
+  if ! command -v xrandr >/dev/null 2>&1; then
+    return
+  fi
+
+  local xrandr_output connected_output current_mode requested_output
+  xrandr_output="$(xrandr --query 2>/dev/null || true)"
+  requested_output="${KIOSK_DISPLAY_OUTPUT:-}"
+
+  if [[ -n "${requested_output}" ]]; then
+    connected_output="${requested_output}"
+  else
+    connected_output="$(printf '%s\n' "${xrandr_output}" | awk '$2 == "connected" && $3 == "primary" { print $1; exit }')"
+    if [[ -z "${connected_output}" ]]; then
+      connected_output="$(printf '%s\n' "${xrandr_output}" | awk '$2 == "connected" { print $1; exit }')"
+    fi
+  fi
+
+  [[ -n "${connected_output}" ]] || return
+
+  if ! printf '%s\n' "${xrandr_output}" | awk -v output="${connected_output}" '
+    $1 == output && $2 == "connected" { found = 1; exit }
+    END { exit found ? 0 : 1 }
+  '; then
+    log "display output ${connected_output} is not connected; leaving current mode"
+    return
+  fi
+
+  xrandr --output "${connected_output}" --primary >/dev/null 2>&1 || true
+
+  if ! printf '%s\n' "${xrandr_output}" | awk -v output="${connected_output}" '
+    $1 == output && $2 == "connected" { in_output = 1; next }
+    in_output && $1 !~ /^[0-9]/ { exit }
+    in_output && $1 == "1920x1080" { found = 1; exit }
+    END { exit found ? 0 : 1 }
+  '; then
+    log "display output ${connected_output} does not advertise 1920x1080; leaving current mode"
+    return
+  fi
+
+  current_mode="$(printf '%s\n' "${xrandr_output}" | awk -v output="${connected_output}" '
+    $1 == output && $2 == "connected" { in_output = 1; next }
+    in_output && $1 !~ /^[0-9]/ { exit }
+    in_output && $0 ~ /\*/ { print $1; exit }
+  ')"
+
+  if [[ "${current_mode}" == "1920x1080" ]]; then
+    log "display output ${connected_output} already locked at 1920x1080"
+    return
+  fi
+
+  if xrandr --output "${connected_output}" --mode 1920x1080 --rate 60 >/dev/null 2>&1 || \
+    xrandr --output "${connected_output}" --mode 1920x1080 >/dev/null 2>&1; then
+    log "locked ${connected_output} to 1920x1080"
+    return
+  fi
+
+  log "failed to lock ${connected_output} to 1920x1080"
+}
+
 log "launcher start: url=${KIOSK_URL}"
 resolve_graphical_environment
+lock_fhd_resolution
 disable_display_sleep
 trust_desktop_launcher
 

@@ -263,9 +263,12 @@ test("kiosk installer installs both autostart and desktop launchers for the kios
   const source = readFileSync(path.join(repoRoot, "deploy/install-kiosk.sh"), "utf8");
 
   assert.match(source, /KIOSK_DESKTOP_DIR="\$\{KIOSK_HOME\}\/Desktop"/);
+  assert.match(source, /KIOSK_DISPLAY_OUTPUT="\$\{KIOSK_DISPLAY_OUTPUT:-\}"/);
   assert.match(source, /Solar Display Kiosk\.desktop/);
   assert.match(source, /\$\{KIOSK_AUTOSTART_DIR\}\/firefox-kiosk\.desktop/);
   assert.match(source, /\$\{KIOSK_DESKTOP_DIR\}\/Solar Display Kiosk\.desktop/);
+  assert.match(source, /launcher_exec="\$\{KIOSK_BIN_DIR\}\/start-solar-kiosk\.sh"/);
+  assert.match(source, /env KIOSK_DISPLAY_OUTPUT=/);
   assert.match(source, /chmod \+x "\$\{KIOSK_DESKTOP_DIR\}\/Solar Display Kiosk\.desktop"/);
   assert.match(source, /metadata::trusted true/);
 });
@@ -984,6 +987,7 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   const source = readFileSync(path.join(repoRoot, "deploy/start-solar-kiosk.sh"), "utf8");
 
   assert.match(source, /http:\/\/127\.0\.0\.1:3000\/health/);
+  assert.match(source, /KIOSK_DISPLAY_OUTPUT="\$\{KIOSK_DISPLAY_OUTPUT:-\}"/);
   assert.match(source, /firefox -kiosk -private-window/);
   assert.match(source, /kiosk-launcher\.log/);
   assert.match(source, /metadata::trusted true/);
@@ -994,6 +998,12 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   assert.match(source, /export DISPLAY=":0"/);
   assert.match(source, /export GTK_IM_MODULE="\$\{GTK_IM_MODULE:-fcitx\}"/);
   assert.match(source, /export QT_IM_MODULE="\$\{QT_IM_MODULE:-fcitx\}"/);
+  assert.match(source, /lock_fhd_resolution\(\)/);
+  assert.match(source, /requested_output="\$\{KIOSK_DISPLAY_OUTPUT:-\}"/);
+  assert.match(source, /\$2 == "connected" && \$3 == "primary"/);
+  assert.match(source, /xrandr --output "\$\{connected_output\}" --primary/);
+  assert.match(source, /xrandr --output "\$\{connected_output\}" --mode 1920x1080 --rate 60/);
+  assert.match(source, /locked \$\{connected_output\} to 1920x1080/);
   assert.match(source, /disable_display_sleep\(\)/);
   assert.match(source, /xset s off/);
   assert.match(source, /xset s noblank/);
@@ -1116,6 +1126,8 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   const source = readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8");
 
   assert.match(source, /modules_not_hidden_by_copymods/);
+  assert.match(source, /launcher_exec_line="\$\(grep '\^Exec=' "\$\{DESKTOP_LAUNCHER\}" 2>\/dev\/null \|\| true\)"/);
+  assert.match(source, /Exec=env KIOSK_DISPLAY_OUTPUT=/);
   assert.match(source, /Firefox snap resolves Traditional Chinese to Noto Sans CJK TC/);
   assert.match(source, /Wi-Fi is connected when a Wi-Fi device is present/);
   assert.match(source, /tailscaled is active when Tailscale is installed/);
