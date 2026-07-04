@@ -621,10 +621,10 @@ const overviewDashboardWidgetRegions = [
     label: "Overview Widget Weather"
   },
   {
-    description: "調整三相電力表 widget geometry 與顯示狀態。",
+    description: "調整月用量曲線 widget geometry 與顯示狀態。",
     id: "overview-widget-phasePower",
     key: "phasePower",
-    label: "Overview Widget Phase Power"
+    label: "Overview Widget Monthly Consumption"
   },
   {
     description: "調整發電趨勢 widget geometry 與顯示狀態。",

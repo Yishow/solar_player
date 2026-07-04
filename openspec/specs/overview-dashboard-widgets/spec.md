@@ -208,12 +208,13 @@ tests:
 ---
 ### Requirement: Overview generation trend widget renders a full data-visualisation chart
 
-The Overview generation trend widget SHALL render its runtime trend series as a full data-visualisation chart that fills the trend card plot area, matching the Better reference sample. The chart SHALL include: a smooth filled area curve (a smoothed path rather than angular straight segments) with a layered gradient fill; a vertical (value) axis with at least two scale labels and corresponding horizontal gridlines; horizontal (time) axis labels; per-sample data points; and a marked peak. The widget SHALL preserve the existing runtime-only data rule: it SHALL render only from runtime-provided trend data and SHALL render an empty state when no runtime trend data is available.
+The Overview generation trend widget SHALL render its runtime trend series as a full data-visualisation chart that fills the trend card plot area, matching the Better reference sample. The chart SHALL include: a smooth filled area curve (a smoothed path rather than angular straight segments) with a layered gradient fill; a vertical (value) axis with at least two scale labels and corresponding horizontal gridlines; horizontal (time) axis labels; per-sample data points; and a marked peak. The widget toolbar SHALL NOT render Today, 7D, or 30D time range tabs, and SHALL render only the refresh interval indicator. The widget SHALL preserve the existing runtime-only data rule: it SHALL render only from runtime-provided trend data and SHALL render an empty state when no runtime trend data is available.
 
 #### Scenario: Trend widget renders a smooth filled chart for runtime series
 
 - **WHEN** the Overview generation trend widget is enabled and the view model provides a non-empty trend series
 - **THEN** the widget renders a smoothed curve with a gradient-filled area that fills the card plot area
+- **AND** the widget toolbar does not render Today, 7D, or 30D tabs
 
 ##### Example: Runtime series fills the plot area
 
@@ -221,6 +222,7 @@ The Overview generation trend widget SHALL render its runtime trend series as a 
 - **WHEN** the generation trend widget renders
 - **THEN** the chart shows a smooth filled curve spanning the full plot width
 - **AND** the filled area reaches down to the chart baseline rather than rendering as a thin sparkline only
+- **AND** the widget toolbar does not contain Today, 7D, or 30D tabs
 
 #### Scenario: Trend widget shows value-axis scale and gridlines
 
@@ -272,86 +274,13 @@ The Overview generation trend widget SHALL render its runtime trend series as a 
 - **AND** the full chart treatment stays scoped to the generation trend widget
 
 <!-- @trace
-source: align-overview-cards-to-better-reference
-updated: 2026-06-10
+source: refine-overview-widgets
+updated: 2026-07-05
 code:
-  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/web/src/pages/ImageManagement/index.tsx
-  - apps/server/src/services/SnapshotWriterService.ts
-  - apps/server/src/routes/image-playlist.ts
-  - scripts/dev-lib.mjs
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/server/src/metrics/solarGenerationProfile.ts
-  - apps/web/src/services/api.ts
-  - apps/server/src/services/generationTrendSeries.ts
-  - docs/reference-match/settings-images-layout-refactor-plan.md
-  - apps/web/src/hooks/useImagesAutoplay.ts
-  - .env.example
-  - packages/shared/src/imagePlaylist.ts
-  - apps/web/src/services/socket.ts
-  - apps/web/src/pages/shared/runtimeMediaUrl.ts
-  - apps/web/vite.config.ts
-  - apps/server/src/server-startup.ts
-  - apps/server/src/services/displayRotationService.ts
-  - apps/server/src/services/imagePlaylistService.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/PlaybackSettings/playbackSettings.css
-  - apps/web/src/components/management/CustomSelect.tsx
-  - apps/server/src/routes/metrics-history.ts
-  - apps/web/src/pages/ImageManagement/imageManagement.css
-  - packages/shared/src/displayPageFreshness.ts
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - apps/web/src/styles/management.css
-  - packages/shared/src/displayPageConfig.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - apps/web/src/pages/Overview/viewModel.ts
-  - apps/web/src/services/runtimeOrigin.ts
-  - apps/web/src/pages/Overview/widgets/generationTrendChart.ts
-  - apps/web/src/pages/Overview/overview.css
-  - apps/server/src/services/MockMetricsFeedService.ts
-  - apps/web/src/components/Sparkline.tsx
-  - scripts/dev.test.mjs
-  - apps/web/src/pages/shared/displayCardStyleConfig.ts
-  - apps/server/src/services/MetricHistoryRetentionService.ts
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
-  - apps/server/src/db/seed.ts
-  - apps/web/src/pages/Images/index.tsx
-  - apps/server/src/db/migrations/013_generation_power.sql
-  - apps/server/src/services/displayStoryService.ts
-  - packages/shared/src/displayStory.ts
-  - apps/server/src/db/normalizeMetricSnapshotCapturedAt.ts
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
-  - apps/web/src/pages/Overview/widgets/GenerationTrendChartView.tsx
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
 tests:
-  - apps/web/src/hooks/useImagesAutoplay.test.ts
-  - apps/web/src/pages/Overview/widgets/generationTrendChart.test.ts
-  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.test.ts
-  - apps/server/src/routes/metrics-history.test.ts
-  - apps/web/src/components/management/CustomSelect.test.tsx
-  - apps/server/src/plugins/managementAuth.test.ts
-  - packages/shared/src/imagePlaylist.test.ts
-  - apps/web/src/services/socket.test.ts
-  - packages/shared/src/displayPageFreshness.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/server/src/services/SnapshotWriterService.test.ts
-  - apps/web/src/pages/Overview/style.test.ts
-  - apps/web/src/viteProxy.test.ts
-  - apps/server/src/routes/display-story.test.ts
-  - apps/server/src/routes/image-playlist.test.ts
-  - apps/server/src/services/MockMetricsFeedService.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/server/src/routes/playback.test.ts
-  - apps/web/src/pages/ImageManagement/index.test.tsx
-  - apps/server/src/metrics/solarGenerationProfile.test.ts
-  - apps/server/src/db/metricSnapshotsSeed.test.ts
-  - apps/web/src/services/api.test.ts
-  - apps/web/src/components/Sparkline.test.ts
-  - apps/web/src/pages/Overview/viewModel.test.ts
-  - apps/web/src/pages/shared/runtimeMediaUrl.test.ts
   - apps/web/src/pages/Overview/widgets/overviewWidgets.test.tsx
-  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
-  - apps/server/src/server-startup.test.ts
-  - apps/server/src/services/generationTrendSeries.test.ts
-  - apps/server/src/services/MetricHistoryRetentionService.test.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
 -->

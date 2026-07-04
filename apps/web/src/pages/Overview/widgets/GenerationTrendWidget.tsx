@@ -20,11 +20,6 @@ export function GenerationTrendWidget({
       <div className="overview-trend-header-row">
         <DisplayCardHeader subtitle="Generation Trend" title="發電趨勢" />
         <div className="overview-trend-toolbar">
-          <div className="overview-trend-tabs">
-            <span className="overview-trend-tab overview-trend-tab-active">Today</span>
-            <span className="overview-trend-tab">7D</span>
-            <span className="overview-trend-tab">30D</span>
-          </div>
           <span className="overview-trend-refresh">15s 更新</span>
         </div>
       </div>
