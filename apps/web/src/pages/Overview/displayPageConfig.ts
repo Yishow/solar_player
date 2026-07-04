@@ -414,30 +414,30 @@ export function createOverviewDisplayPageSeedConfig(
     dashboardWidgets: {
       alertNotifications: {
         alwaysShowThresholds: true,
-        height: 196,
+        height: 210,
         left: 1435,
-        top: 874,
+        top: 800,
         visible: true,
         width: 445
       },
       generationTrend: {
-        height: 196,
+        height: 210,
         left: 970,
-        top: 874,
+        top: 800,
         visible: true,
         width: 445
       },
       phasePower: {
-        height: 196,
+        height: 210,
         left: 505,
-        top: 874,
+        top: 800,
         visible: true,
         width: 445
       },
       weather: {
-        height: 196,
+        height: 210,
         left: 40,
-        top: 874,
+        top: 800,
         visible: true,
         width: 445
       }
@@ -452,27 +452,37 @@ export function createOverviewDisplayPageSeedConfig(
     kpiCards: {
       co2Today: {
         ...overviewKpiLayout.co2Today,
+        top: 590,
+        height: 188,
         footerType: "co2-tree",
         visible: true
       },
       co2Total: {
         ...overviewKpiLayout.co2Total,
+        top: 590,
+        height: 188,
         footerType: "co2-tree",
         visible: true
       },
       power: {
         ...overviewKpiLayout.power,
+        top: 590,
+        height: 188,
         footerType: "sparkline",
         visible: true
       },
       today: {
         ...overviewKpiLayout.today,
+        top: 590,
+        height: 188,
         footerType: "progress",
         targetValue: 5000,
         visible: true
       },
       total: {
         ...overviewKpiLayout.total,
+        top: 590,
+        height: 188,
         footerText: "自建置起 2022 / 01 至今",
         footerType: "text",
         visible: true

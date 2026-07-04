@@ -240,13 +240,12 @@ export function seedDatabase() {
       SELECT 1 FROM display_page_registry WHERE page_key = ?
     )
   `);
-
   database.transaction(() => {
     database.prepare("DELETE FROM topic_mappings").run();
     database.prepare("DELETE FROM circuit_configs").run();
     database.prepare("DELETE FROM display_page_registry").run();
-    database.prepare("DELETE FROM display_page_configs").run();
-    database.prepare("DELETE FROM display_page_stage_configs").run();
+    database.prepare("DELETE FROM display_page_configs WHERE page_key = 'factory-circuit-guanyin'").run();
+    database.prepare("DELETE FROM display_page_stage_configs WHERE page_key = 'factory-circuit-guanyin'").run();
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
     upsertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5);
