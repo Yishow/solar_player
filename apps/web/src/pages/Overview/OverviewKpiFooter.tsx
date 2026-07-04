@@ -2,7 +2,7 @@ import { Sparkline } from "../../components/Sparkline";
 import { DisplayCardFooter } from "../../components/displayPageCards";
 import type { OverviewKpiCardConfig } from "./displayPageConfig";
 
-const co2TreeEquivalentFactor = 2.6;
+const co2TreeEquivalentFactor = 6.25;
 
 type OverviewKpiFooterMetric = {
     trendSeries?: number[];
@@ -43,7 +43,7 @@ export function OverviewKpiFooter({
                 <DisplayCardFooter className="overview-kpi-footer overview-kpi-footer-tree">
                     <span aria-hidden="true" className="overview-kpi-footer-tree-dot" />
                     <span className="overview-kpi-footer-tree-text">
-                        相當於種植 {treeEquivalent === null ? "--" : treeEquivalent.toLocaleString("zh-TW")} 棵樹
+                        約種植 {treeEquivalent === null ? "--" : treeEquivalent.toLocaleString("zh-TW")} 棵樹（1棵樹20年，平均吸收160kg co2）
                     </span>
                 </DisplayCardFooter>
             );
