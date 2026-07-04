@@ -224,37 +224,35 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
       </section>
 
       <section className="settings-card mgmt-interactive-card mqtt-weather-card" data-mqtt-section="weather-card">
-        <div className="settings-card__title" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
-          <div>
-            天氣設定
-            <small>Weather Settings</small>
-          </div>
-          <button
-            type="button"
-            className="mqtt-weather-card__refresh-btn"
-            style={{
-              position: "static",
-              padding: "6px 14px",
-              fontSize: "13px",
-              fontWeight: 600,
-              height: "32px",
-              borderRadius: "8px",
-              border: "1px solid var(--surface-state-accent-border, rgba(92, 105, 79, 0.2))",
-              background: "var(--ops-surface-bg, #fffdf8)",
-              color: "var(--surface-state-accent-ink, #5c694f)",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-              transition: "all 0.2s ease"
-            }}
-            disabled={viewModel.actions.refreshWeatherDisabled}
-            onClick={() => void props.refreshWeather()}
-          >
-            {viewModel.actions.refreshWeatherLabel}
-          </button>
-        </div>
+        <div className="settings-card__title">天氣設定<small>Weather Settings</small></div>
+        <button
+          type="button"
+          className="mqtt-weather-card__refresh-btn"
+          style={{
+            position: "absolute",
+            top: "22px",
+            right: "22px",
+            padding: "6px 14px",
+            fontSize: "13px",
+            fontWeight: 600,
+            height: "32px",
+            borderRadius: "8px",
+            border: "1px solid var(--surface-state-accent-border, rgba(92, 105, 79, 0.2))",
+            background: "var(--ops-surface-bg, #fffdf8)",
+            color: "var(--surface-state-accent-ink, #5c694f)",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+            transition: "all 0.2s ease",
+            zIndex: 10
+          }}
+          disabled={viewModel.actions.refreshWeatherDisabled}
+          onClick={() => void props.refreshWeather()}
+        >
+          {viewModel.actions.refreshWeatherLabel}
+        </button>
         {viewModel.weatherCard.configFeedback ? (
           <div className="mgmt-status mqtt-weather-card__config-notice">{viewModel.weatherCard.configFeedback}</div>
         ) : null}
