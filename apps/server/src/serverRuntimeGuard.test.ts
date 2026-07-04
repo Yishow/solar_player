@@ -61,3 +61,65 @@ test("acquireServerRuntimeGuard clears a stale backend lock", () => {
     rmSync(dataDir, { force: true, recursive: true });
   }
 });
+
+test("acquireServerRuntimeGuard clears a lock left by a previous boot even when the pid was reused", () => {
+  const dataDir = mkdtempSync(join(tmpdir(), "solar-display-runtime-guard-"));
+  const lockPath = join(dataDir, "server-runtime.lock.json");
+
+  try {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bootSessionId: "previous-boot",
+        createdAt: "2026-06-29T17:43:00.000Z",
+        pid: process.pid,
+        token: "previous-boot-lock"
+      })
+    );
+
+    const release = acquireServerRuntimeGuard({
+      bootSessionId: () => "current-boot",
+      dataDir,
+      pid: 67890,
+      token: "fresh-lock"
+    });
+
+    release();
+  } finally {
+    rmSync(dataDir, { force: true, recursive: true });
+  }
+});
+
+test("acquireServerRuntimeGuard keeps blocking when a live lock predates the current wall clock boot estimate", () => {
+  const dataDir = mkdtempSync(join(tmpdir(), "solar-display-runtime-guard-"));
+  const lockPath = join(dataDir, "server-runtime.lock.json");
+
+  try {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bootSessionId: "current-boot",
+        createdAt: "2026-06-29T17:43:00.000Z",
+        pid: process.pid,
+        token: "live-lock"
+      })
+    );
+
+    assert.throws(
+      () =>
+        acquireServerRuntimeGuard({
+          bootSessionId: () => "current-boot",
+          dataDir,
+          pid: 67890,
+          token: "fresh-lock"
+        }),
+      (error: unknown) =>
+        error instanceof Error
+        && error.message.includes("Another solar-display backend is already running")
+        && error.message.includes(`pid ${process.pid}`)
+        && error.message.includes(lockPath)
+    );
+  } finally {
+    rmSync(dataDir, { force: true, recursive: true });
+  }
+});

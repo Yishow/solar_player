@@ -1,13 +1,16 @@
+import { execFileSync } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 type RuntimeLockPayload = {
+  bootSessionId?: string;
   createdAt: string;
   pid: number;
   token: string;
 };
 
 export type ServerRuntimeGuardOptions = {
+  bootSessionId?: () => string | null;
   dataDir: string;
   now?: () => Date;
   pid?: number;
@@ -45,6 +48,7 @@ function readLockPayload(lockPath: string): RuntimeLockPayload | null {
     }
 
     return {
+      bootSessionId: typeof payload.bootSessionId === "string" ? payload.bootSessionId : undefined,
       createdAt: payload.createdAt,
       pid: payload.pid,
       token: payload.token
@@ -64,14 +68,51 @@ function writeLockPayload(lockPath: string, payload: RuntimeLockPayload) {
   }
 }
 
+function resolveBootSessionId() {
+  if (process.platform === "linux") {
+    try {
+      const bootId = readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
+      return bootId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (process.platform === "darwin") {
+    try {
+      const bootSessionId = execFileSync("sysctl", ["-n", "kern.bootsessionuuid"], {
+        encoding: "utf8"
+      }).trim();
+      return bootSessionId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function lockComesFromDifferentBoot(
+  activePayload: RuntimeLockPayload,
+  currentBootSessionId: string | null
+) {
+  return Boolean(
+    currentBootSessionId
+    && activePayload.bootSessionId
+    && activePayload.bootSessionId !== currentBootSessionId
+  );
+}
+
 export function acquireServerRuntimeGuard(options: ServerRuntimeGuardOptions) {
   mkdirSync(options.dataDir, { recursive: true });
 
   const lockPath = buildLockPath(options.dataDir);
+  const bootSessionId = (options.bootSessionId ?? resolveBootSessionId)();
   const pid = options.pid ?? process.pid;
   const token = options.token ?? `${pid}-${Math.random().toString(16).slice(2, 10)}`;
   const now = options.now ?? (() => new Date());
   const payload: RuntimeLockPayload = {
+    ...(bootSessionId ? { bootSessionId } : {}),
     createdAt: now().toISOString(),
     pid,
     token
@@ -96,7 +137,11 @@ export function acquireServerRuntimeGuard(options: ServerRuntimeGuardOptions) {
       }
 
       const activePayload = readLockPayload(lockPath);
-      if (!activePayload || !isProcessAlive(activePayload.pid)) {
+      if (
+        !activePayload
+        || !isProcessAlive(activePayload.pid)
+        || lockComesFromDifferentBoot(activePayload, bootSessionId)
+      ) {
         rmSync(lockPath, { force: true });
         continue;
       }
