@@ -184,7 +184,7 @@
   flex-direction: row;
   align-items: center;
   color: #5b7949;
-  font-size: 14px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.35;
@@ -218,6 +218,7 @@
 
 .overview-kpi-footer-tree-text {
   display: block;
+  white-space: nowrap;
 }
 
 .overview-dashboard-widget {

@@ -30,7 +30,7 @@ test("overview KPI footer renders configured text and ecological tree equivalent
     );
 
     assert.match(textMarkup, /自建置起 2022 \/ 01 至今/);
-    assert.match(treeMarkup, /約種植 78 棵樹（1棵樹20年，平均吸收160kg co2）/);
+    assert.match(treeMarkup, new RegExp("約種植 78 棵樹（1棵樹20年，平均吸收160kg CO<sub>2</sub>）"));
 });
 
 test("overview KPI footer preserves sparkline mode and supports none mode", () => {

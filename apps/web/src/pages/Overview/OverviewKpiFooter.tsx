@@ -43,7 +43,7 @@ export function OverviewKpiFooter({
                 <DisplayCardFooter className="overview-kpi-footer overview-kpi-footer-tree">
                     <span aria-hidden="true" className="overview-kpi-footer-tree-dot" />
                     <span className="overview-kpi-footer-tree-text">
-                        約種植 {treeEquivalent === null ? "--" : treeEquivalent.toLocaleString("zh-TW")} 棵樹（1棵樹20年，平均吸收160kg co2）
+                        約種植 {treeEquivalent === null ? "--" : treeEquivalent.toLocaleString("zh-TW")} 棵樹（1棵樹20年，平均吸收160kg CO<sub>2</sub>）
                     </span>
                 </DisplayCardFooter>
             );
