@@ -23,16 +23,23 @@ test("WeatherCardWidget renders weather values when available", () => {
   );
 
   assert.match(markup, /天氣/);
-  assert.match(markup, /31°C/);
+  assert.match(markup, /31/);
+  assert.match(markup, /°C/);
   assert.match(markup, /68%/);
   assert.match(markup, /晴/);
   assert.match(markup, /風速/);
   assert.match(markup, /2.1 m\/s/);
   assert.match(markup, /雨量/);
   assert.match(markup, /0 mm/);
+
+  // Condition badge and live meta line
+  assert.match(markup, /overview-weather-condition-badge/);
+  assert.match(markup, /overview-weather-meta-line/);
+  assert.match(markup, /overview-weather-live-dot/);
+  assert.match(markup, /豐原/);
 });
 
-test("WeatherCardWidget renders fallback message and no null when unavailable", () => {
+test("WeatherCardWidget renders skeleton loader and no null when unavailable", () => {
   const markup = renderToStaticMarkup(
     <WeatherCardWidget
       weather={{
@@ -48,7 +55,7 @@ test("WeatherCardWidget renders fallback message and no null when unavailable", 
     />
   );
 
-  assert.match(markup, /天氣資料/);
+  assert.match(markup, /overview-weather-skeleton/);
   assert.doesNotMatch(markup, /null/);
   assert.doesNotMatch(markup, /undefined/);
 });

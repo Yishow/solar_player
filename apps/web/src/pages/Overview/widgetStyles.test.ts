@@ -32,7 +32,7 @@ test("seed config exposes density widget styles equivalent to the current appear
   // Generation trend keeps the current 110px density sparkline height.
   assert.equal(config.widgetStyles.generationTrend.trendHeight, 110);
   assert.equal(config.widgetStyles.phasePower.valueRowAlign, "end");
-  assert.equal(config.widgetStyles.weather.valueMarginTop, 14);
+  assert.equal(config.widgetStyles.weather.valueMarginTop, 10);
   assert.equal(config.widgetStyles.alertNotifications.valueMarginTop, 18);
 });
 

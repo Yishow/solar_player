@@ -499,8 +499,8 @@ export function createOverviewDisplayPageSeedConfig(
       }),
       weather: createDisplayCardStyleConfig({
         ...overviewDensityWidgetStyle,
-        valueFontSize: 58,
-        valueMarginTop: 14,
+        valueFontSize: 44,
+        valueMarginTop: 10,
         valueRowAlign: "start"
       })
     }

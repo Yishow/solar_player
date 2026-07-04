@@ -33,7 +33,7 @@ test("display page seed configs persist card style records separately from geome
 
   assert.equal(overview.summaryCard.width, 520);
   assert.equal(overview.kpiCards.power.width, 352);
-  assert.equal(overview.kpiCards.power.height, 188);
+  assert.equal(overview.kpiCards.power.height, 180);
   assert.equal(solar.kpiCards.generation.height, 220);
   assert.equal(images.infoPanel.width, 398);
   assert.equal(sustainability.statCards.esg.height, 232);
