@@ -37,7 +37,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
   - deploy/enable-readonly-system.desktop
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - docs/README.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/displayPageMediaStyle.ts
@@ -220,7 +219,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
   - deploy/enable-readonly-system.desktop
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - docs/README.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/displayPageMediaStyle.ts
@@ -396,7 +394,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
   - deploy/enable-readonly-system.desktop
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - docs/README.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/displayPageMediaStyle.ts

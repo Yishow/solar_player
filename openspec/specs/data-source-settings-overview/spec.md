@@ -128,7 +128,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - scripts/dev.mjs
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - deploy/disable-readonly-system.desktop
   - deploy/firefox-kiosk.desktop
   - deploy/apply-desktop-theme.sh
@@ -311,7 +310,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - scripts/dev.mjs
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - deploy/disable-readonly-system.desktop
   - deploy/firefox-kiosk.desktop
   - deploy/apply-desktop-theme.sh
@@ -488,7 +486,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - scripts/dev.mjs
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - deploy/disable-readonly-system.desktop
   - deploy/firefox-kiosk.desktop
   - deploy/apply-desktop-theme.sh
@@ -664,7 +661,6 @@ code:
   - apps/web/src/pages/Overview/viewModel.ts
   - scripts/dev.mjs
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - deploy/disable-readonly-system.desktop
   - deploy/firefox-kiosk.desktop
   - deploy/apply-desktop-theme.sh

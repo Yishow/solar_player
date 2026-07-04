@@ -108,7 +108,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -321,7 +320,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -504,7 +502,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -699,7 +696,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -882,7 +878,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -1073,7 +1068,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -1256,7 +1250,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -1445,7 +1438,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts
@@ -1636,7 +1628,6 @@ code:
   - apps/web/scripts/run-tests.test.mjs
   - apps/server/src/routes/settings-mqtt.ts
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/server/src/services/displayStoryService.ts

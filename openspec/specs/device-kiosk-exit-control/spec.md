@@ -157,7 +157,6 @@ code:
   - deploy/apply-desktop-theme.sh
   - deploy/repair-kiosk-system.sh
   - .env.example
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/server/src/routes/device.ts
   - scripts/deploy.test.mjs
   - deploy.md

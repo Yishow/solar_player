@@ -62,3 +62,19 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 6. **不要發明 repo 沒有的東西**：沒有 lint、e2e、coverage gate、CI policy；規則只收錄能指出對應檔案或行為的，沒證據不寫。
 7. **最小改動**：只做任務直接要求的；規格與現況衝突時回到 root scripts、`apps/`、`packages/shared`、`deploy/`、`openspec/` 查證。
 8. AI 可主導執行，但產品意圖、FHD 品質門檻、intentional difference、launch acceptance 由使用者決定。
+
+<!--
+FHD Workflow Entrypoints Reference:
+- docs/reference-match/fhd-workflow-entrypoints.md
+- witness batch
+- evidence bundle
+- visual canonicals
+- launch witness gates
+- docs/fhd-witness/playback-closeout-matrix.md
+- docs/fhd-witness/evidence-template.md
+- pnpm run fhd:witness
+- docs/reference/FHD/
+- editor capability
+- human
+-->
+
