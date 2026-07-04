@@ -478,71 +478,81 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
       <div aria-hidden="true" className="solar-routing">
         {/* 太陽能到逆變器 (solarToInverter) */}
         {(() => {
-          const connectorKey = "solarToInverter";
-          const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
+          const startX = 1025;
+          const endX = 1180;
+          const width = endX - startX;
           return (
             <svg
               style={{
                 position: "absolute",
-                left: `${layout.left}px`,
-                top: `${layout.top - 8}px`,
-                width: `${layout.width}px`,
+                left: `${startX}px`,
+                top: `${167 - 8}px`,
+                width: `${width}px`,
                 height: "16px",
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width} 16`}
+              viewBox={`0 0 ${width} 16`}
             >
-              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-1" />
+              {/* 兩端圓點在圓周中心 */}
+              <circle cx={0} cy={8} r={5} fill="#527d3b" />
+              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-1.5s" />
             </svg>
           );
         })()}
 
         {/* 逆變器到工廠 (inverterToFactory) */}
         {(() => {
-          const connectorKey = "inverterToFactory";
-          const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
+          const startX = 1410;
+          const endX = 1550;
+          const width = endX - startX;
           return (
             <svg
               style={{
                 position: "absolute",
-                left: `${layout.left}px`,
-                top: `${layout.top - 8}px`,
-                width: `${layout.width}px`,
+                left: `${startX}px`,
+                top: `${167 - 8}px`,
+                width: `${width}px`,
                 height: "16px",
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width} 16`}
+              viewBox={`0 0 ${width} 16`}
             >
-              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={layout.width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-2" />
+              {/* 兩端圓點在圓周中心 */}
+              <circle cx={0} cy={8} r={5} fill="#527d3b" />
+              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-3.0s" />
             </svg>
           );
         })()}
 
         {/* 逆變器到減碳 (inverterToCo2) */}
         {(() => {
-          const connectorKey = "inverterToCo2";
-          const layout = withContentOffset(resolvedConfig.connectors[connectorKey]);
-          const vHeight = 170;
-          const topPos = layout.top - vHeight;
+          const startX = 1365;
+          const startY = 258; // 變流器圓周邊緣 Y 交點 (已 offset)
+          const endX = 1545;  // 減碳卡片左側邊緣 X
+          const endY = 499;  // 減碳卡片左側中心 Y (已 offset)
+          const width = endX - startX;
+          const vHeight = endY - startY;
           return (
             <svg
               style={{
                 position: "absolute",
-                left: `${layout.left}px`,
-                top: `${topPos}px`,
-                width: `${layout.width}px`,
+                left: `${startX}px`,
+                top: `${startY}px`,
+                width: `${width}px`,
                 height: `${vHeight + 8}px`,
                 overflow: "visible",
                 zIndex: 10
               }}
-              viewBox={`0 0 ${layout.width} ${vHeight + 8}`}
+              viewBox={`0 0 ${width} ${vHeight + 8}`}
             >
               <path
-                d={`M 1.25 0 V ${vHeight} H ${layout.width}`}
+                d={`M 1.25 0 V ${vHeight} H ${width}`}
                 fill="none"
                 stroke="rgba(234, 161, 30, 0.25)"
                 strokeWidth={2.5}
@@ -550,7 +560,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
                 strokeLinejoin="round"
               />
               <path
-                d={`M 1.25 0 V ${vHeight} H ${layout.width}`}
+                d={`M 1.25 0 V ${vHeight} H ${width}`}
                 fill="none"
                 stroke="#eaa11e"
                 strokeWidth={2.5}
@@ -558,6 +568,9 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
                 strokeLinejoin="round"
                 className="solar-flow-line-orange"
               />
+              {/* 兩端圓點在圓周中心 */}
+              <circle cx={1.25} cy={0} r={5} fill="#eaa11e" />
+              <circle cx={width} cy={vHeight} r={5} fill="#eaa11e" className="solar-reveal-3.0s" />
             </svg>
           );
         })()}

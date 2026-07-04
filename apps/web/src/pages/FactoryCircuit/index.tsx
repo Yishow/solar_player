@@ -593,7 +593,7 @@ export function FactoryCircuit({
           viewBox="0 0 60 16"
         >
           <line x1={0} y1={8} x2={60} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={0} y1={8} x2={60} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+          <line x1={0} y1={8} x2={60} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-60" />
         </svg>
 
         {/* 逆變器到配電盤向量連線 */}
@@ -608,7 +608,7 @@ export function FactoryCircuit({
           viewBox="0 0 78 16"
         >
           <line x1={0} y1={8} x2={78} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+          <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-78" />
         </svg>
 
         {/* 逆變器垂直下墜向量連線 */}
@@ -623,7 +623,7 @@ export function FactoryCircuit({
           viewBox="0 0 45 188"
         >
           <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="factory-circuit-flow-line" />
+          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-188" />
         </svg>
 
         <svg
@@ -644,15 +644,36 @@ export function FactoryCircuit({
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <path
-            d={svgPath}
-            fill="none"
-            stroke="#527d3b"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="factory-circuit-flow-line"
-          />
+          {/* 流動粒子線：為每個 active row 渲染一條單一連續 path */}
+          {activeRowsY.map((y, idx) => {
+            const isCenter = Math.abs(y - 304) < 2;
+            const pathD = isCenter
+              ? "M 4 304 H 138"
+              : y < 304
+              ? `M 4 304 H 40 V ${y + 16} Q 40 ${y} 56 ${y} H 138`
+              : `M 4 304 H 40 V ${y - 16} Q 40 ${y} 56 ${y} H 138`;
+
+            const pathLength = isCenter ? 134 : Math.abs(y - 304) + 127.1;
+            const duration = 1.5; // 統一為 1.5 秒，確保所有粒子同時抵達各自的終點
+
+            return (
+              <path
+                key={idx}
+                d={pathD}
+                fill="none"
+                stroke="#527d3b"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: `24 ${pathLength - 24}`,
+                  animation: `factory-energy-flow-generic ${duration}s linear infinite`,
+                  "--fc-offset-target": `-${pathLength}px` as any,
+                  filter: "drop-shadow(0 0 2px rgba(82, 125, 59, 0.6)) drop-shadow(0 0 4px rgba(82, 125, 59, 0.4))",
+                }}
+              />
+            );
+          })}
 
           {/* 配電盤端統一輸出圓點 */}
           <circle cx={4} cy={304} r={5} fill="#527d3b" />
