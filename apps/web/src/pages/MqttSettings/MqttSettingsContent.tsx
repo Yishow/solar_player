@@ -224,7 +224,21 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
       </section>
 
       <section className="settings-card mgmt-interactive-card mqtt-weather-card" data-mqtt-section="weather-card">
-        <div className="settings-card__title">天氣設定<small>Weather Settings</small></div>
+        <div className="settings-card__title" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+          <div>
+            天氣設定
+            <small>Weather Settings</small>
+          </div>
+          <button
+            type="button"
+            className="mgmt-action mqtt-weather-card__refresh-btn"
+            style={{ padding: "6px 14px", fontSize: 13, height: "auto", minHeight: "auto", margin: 0 }}
+            disabled={viewModel.actions.refreshWeatherDisabled}
+            onClick={() => void props.refreshWeather()}
+          >
+            {viewModel.actions.refreshWeatherLabel}
+          </button>
+        </div>
         {viewModel.weatherCard.configFeedback ? (
           <div className="mgmt-status mqtt-weather-card__config-notice">{viewModel.weatherCard.configFeedback}</div>
         ) : null}
@@ -343,17 +357,8 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
         ) : null}
 
         <div className="mqtt-weather-card__preview">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ marginBottom: 8 }}>
             <strong>Header Preview</strong>
-            <button
-              type="button"
-              className="mgmt-action mqtt-weather-card__refresh-btn"
-              style={{ padding: "4px 12px", fontSize: 12, height: "auto", minHeight: "auto", margin: 0 }}
-              disabled={viewModel.actions.refreshWeatherDisabled}
-              onClick={() => void props.refreshWeather()}
-            >
-              {viewModel.actions.refreshWeatherLabel}
-            </button>
           </div>
           <p>{viewModel.weatherCard.preview.primaryText}</p>
           {viewModel.weatherCard.preview.secondaryText ? (
