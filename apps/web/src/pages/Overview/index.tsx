@@ -532,6 +532,8 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         <WeatherCardWidget
           weather={viewModel.weather}
           style={weatherWidgetStyle}
+          themeMode={resolvedConfig.weatherThemeMode}
+          manualTheme={resolvedConfig.weatherManualTheme}
         />
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.phasePower) ? (

@@ -268,6 +268,8 @@ export type OverviewDisplayPageConfig = {
   kpiCards: Record<"co2Today" | "co2Total" | "power" | "today" | "total", OverviewKpiCardConfig>;
   summaryCard: OverviewDisplayTextRect;
   widgetStyles: Record<OverviewDashboardWidgetKey, DisplayCardStyleConfig>;
+  weatherThemeMode?: "auto" | "manual";
+  weatherManualTheme?: "weather-sunny" | "weather-rainy" | "weather-cloudy" | "weather-stormy" | "weather-snowy" | "weather-foggy" | "";
 };
 
 function buildOverviewGroupAppearanceFields(idPrefix: string, path: Array<number | string>) {
@@ -503,7 +505,9 @@ export function createOverviewDisplayPageSeedConfig(
         valueMarginTop: 10,
         valueRowAlign: "start"
       })
-    }
+    },
+    weatherThemeMode: "auto",
+    weatherManualTheme: ""
   };
 }
 
@@ -590,6 +594,8 @@ export function resolveOverviewModernDefaultConfig(
     backgroundPool,
     cardStyles,
     widgetStyles,
+    weatherThemeMode: config.weatherThemeMode === "manual" ? "manual" : "auto",
+    weatherManualTheme: config.weatherManualTheme ?? "",
     chrome: {
       ...config.chrome,
       heroTypography: matchesRecord(config.chrome.heroTypography, legacyOverviewHeroTypography)
@@ -846,6 +852,39 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
           label: "常駐顯示門檻",
           path: ["dashboardWidgets", key, "alwaysShowThresholds"]
         }]
+        : []),
+      ...(key === "weather"
+        ? [
+            {
+              fieldType: "select" as const,
+              id: `${key}-theme-mode`,
+              label: "天氣卡主題模式",
+              options: [
+                { label: "自動氣候感應", value: "auto" },
+                { label: "手動指定主題", value: "manual" }
+              ],
+              path: ["weatherThemeMode"]
+            },
+            {
+              fieldType: "select" as const,
+              id: `${key}-manual-theme`,
+              label: "手動天氣主題",
+              options: [
+                { label: "預設自然綠", value: "" },
+                { label: "晴天 (Sunny)", value: "weather-sunny" },
+                { label: "雨天 (Rainy)", value: "weather-rainy" },
+                { label: "多雲/陰天 (Cloudy)", value: "weather-cloudy" },
+                { label: "雷雨/暴雨 (Stormy)", value: "weather-stormy" },
+                { label: "雪天/冰雹 (Snowy)", value: "weather-snowy" },
+                { label: "霧天/霧霾 (Foggy)", value: "weather-foggy" }
+              ],
+              path: ["weatherManualTheme"],
+              visibleWhen: {
+                equals: "manual",
+                path: ["weatherThemeMode"]
+              }
+            }
+          ]
         : []),
       { constraints: { min: 0 }, fieldType: "number", id: `${key}-left`, label: "Left", path: ["dashboardWidgets", key, "left"] },
       { constraints: { min: 146 }, fieldType: "number", id: `${key}-top`, label: "Top", path: ["dashboardWidgets", key, "top"] },
