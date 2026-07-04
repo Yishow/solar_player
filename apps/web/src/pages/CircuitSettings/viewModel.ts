@@ -19,12 +19,14 @@ type BuildCircuitSettingsViewModelArgs = {
 };
 
 const circuitSlotLabelMap: Record<string, string> = {
-  ev: "EV",
-  hvac: "HVAC",
-  infrastructure: "Infrastructure",
-  lighting: "Lighting",
-  office: "Office",
-  production: "Production"
+  stamping: "沖壓工程 (Stamping)",
+  body: "車身工程 (Body)",
+  painting: "塗裝工程 (Painting)",
+  assembly: "裝配工程 (Assembly)",
+  utility: "原動力 (Utility)",
+  office: "事務系 (Office)",
+  heavy_vehicle: "大車工程 (Heavy Vehicle)",
+  ed_coating: "ED電著 (ED Coating)"
 };
 
 const boundedIconOptions = [

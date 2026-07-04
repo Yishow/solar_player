@@ -9,13 +9,13 @@ test("buildCircuitSettingsViewModel maps prototype table fields and summary coun
         attentionMax: 90,
         attentionMin: 70,
         displayOrder: 2,
-        displaySlot: "hvac",
+        displaySlot: "body",
         enabled: true,
         icon: "fan",
         id: 12,
-        mqttTopic: "factory/power/hvac",
-        nameEn: "HVAC & Environment",
-        nameZh: "空調與環境設備",
+        mqttTopic: "factory/power/body",
+        nameEn: "Body Shop",
+        nameZh: "車身工程",
         normalMax: 70,
         normalMin: 0,
         ratedCapacity: 320,
@@ -96,13 +96,13 @@ test("buildCircuitSettingsViewModel exposes row-level slot impact readiness risk
         attentionMax: 90,
         attentionMin: 70,
         displayOrder: 1,
-        displaySlot: "hvac",
+        displaySlot: "body",
         enabled: true,
         icon: "fan",
         id: 12,
-        mqttTopic: "factory/power/hvac",
-        nameEn: "HVAC & Environment",
-        nameZh: "空調與環境設備",
+        mqttTopic: "factory/power/body",
+        nameEn: "Body Shop",
+        nameZh: "車身工程",
         normalMax: 70,
         normalMin: 0,
         ratedCapacity: 320,
@@ -142,8 +142,8 @@ test("buildCircuitSettingsViewModel exposes row-level slot impact readiness risk
         {
           blocking: true,
           pageId: "factory-circuit",
-          reason: "slot conflict: hvac is claimed by multiple circuits",
-          requirementKey: "hvac",
+          reason: "slot conflict: body is claimed by multiple circuits",
+          requirementKey: "body",
           sourceId: "12,18",
           sourceType: "circuit-slot",
           status: "blocking"
@@ -167,7 +167,7 @@ test("buildCircuitSettingsViewModel exposes row-level slot impact readiness risk
     }
   });
 
-  assert.equal(model.rows[0]?.slotImpactLabel, "Factory Circuit slot · HVAC");
+  assert.equal(model.rows[0]?.slotImpactLabel, "Factory Circuit slot · 車身工程 (Body)");
   assert.equal(model.rows[0]?.rowRiskLabel, "Blocking Readiness");
   assert.match(model.rows[0]?.rowRiskDetail ?? "", /slot conflict/);
   assert.equal(

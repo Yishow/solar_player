@@ -20,56 +20,72 @@ const topicMappings = [
   { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption", unit: "kWh" },
   { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption", unit: "kWh" },
   { metricKey: "systemEfficiency", topic: "kuozui/plant/solar/efficiency", unit: "%" },
-  { metricKey: "factoryProductionPower", topic: "factory/power/production", unit: "kW" },
-  { metricKey: "factoryHvacPower", topic: "factory/power/hvac", unit: "kW" },
-  { metricKey: "factoryLightingPower", topic: "factory/power/lighting", unit: "kW" },
+  { metricKey: "factoryStampingPower", topic: "factory/power/stamping", unit: "kW" },
+  { metricKey: "factoryBodyPower", topic: "factory/power/body", unit: "kW" },
+  { metricKey: "factoryPaintingPower", topic: "factory/power/painting", unit: "kW" },
+  { metricKey: "factoryAssemblyPower", topic: "factory/power/assembly", unit: "kW" },
+  { metricKey: "factoryUtilityPower", topic: "factory/power/utility", unit: "kW" },
   { metricKey: "factoryOfficePower", topic: "factory/power/office", unit: "kW" },
-  { metricKey: "factoryEvGreenPower", topic: "factory/power/ev_green", unit: "kW" },
-  { metricKey: "factoryInfrastructurePower", topic: "factory/power/infrastructure", unit: "kW" }
+  { metricKey: "factoryHeavyVehiclePower", topic: "factory/power/heavy_vehicle", unit: "kW" },
+  { metricKey: "factoryEdCoatingPower", topic: "factory/power/ed_coating", unit: "kW" }
 ] as const;
 
 const circuitConfigs = [
   {
-    nameZh: "生產線用電",
-    nameEn: "Production Line",
+    nameZh: "沖壓工程",
+    nameEn: "Stamping Shop",
     icon: "factory",
-    mqttTopic: "factory/power/production",
+    mqttTopic: "factory/power/stamping",
     ratedCapacity: 850
   },
   {
-    nameZh: "空調與環境設備",
-    nameEn: "HVAC & Environment",
+    nameZh: "車身工程",
+    nameEn: "Body Shop",
     icon: "wind",
-    mqttTopic: "factory/power/hvac",
+    mqttTopic: "factory/power/body",
     ratedCapacity: 620
   },
   {
-    nameZh: "照明系統",
-    nameEn: "Lighting",
+    nameZh: "塗裝工程",
+    nameEn: "Painting Shop",
     icon: "lightbulb",
-    mqttTopic: "factory/power/lighting",
+    mqttTopic: "factory/power/painting",
     ratedCapacity: 180
   },
   {
-    nameZh: "辦公與公共區域",
-    nameEn: "Office & Common Area",
+    nameZh: "裝配工程",
+    nameEn: "Assembly Shop",
     icon: "building-2",
-    mqttTopic: "factory/power/office",
+    mqttTopic: "factory/power/assembly",
     ratedCapacity: 240
   },
   {
-    nameZh: "充電設備/綠能設施",
-    nameEn: "Charging & Green Facilities",
+    nameZh: "原動力",
+    nameEn: "Utility & Powerhouse",
     icon: "battery-charging",
-    mqttTopic: "factory/power/ev_green",
+    mqttTopic: "factory/power/utility",
     ratedCapacity: 320
   },
   {
-    nameZh: "其他基礎設施",
-    nameEn: "Infrastructure",
+    nameZh: "事務系",
+    nameEn: "Office & Administration",
     icon: "settings-2",
-    mqttTopic: "factory/power/infrastructure",
+    mqttTopic: "factory/power/office",
     ratedCapacity: 200
+  },
+  {
+    nameZh: "大車工程",
+    nameEn: "Heavy Vehicle Line",
+    icon: "car",
+    mqttTopic: "factory/power/heavy_vehicle",
+    ratedCapacity: 400
+  },
+  {
+    nameZh: "ED電著",
+    nameEn: "ED Coating Line",
+    icon: "refresh",
+    mqttTopic: "factory/power/ed_coating",
+    ratedCapacity: 300
   }
 ] as const;
 
@@ -79,17 +95,25 @@ const playbackPages = [
   {
     pageKey: "factory-circuit",
     route: "/factory-circuit",
-    labelZh: "廠區迴路",
-    labelEn: "Factory Circuit",
+    labelZh: "中壢廠區用電迴路",
+    labelEn: "Factory Circuit (Jungli)",
     displayOrder: 3
   },
-  { pageKey: "images", route: "/images", labelZh: "綠能影像", labelEn: "Images", displayOrder: 4 },
+  {
+    pageKey: "factory-circuit-guanyin",
+    templateKey: "factory-circuit",
+    route: "/factory-circuit-guanyin",
+    labelZh: "觀音廠區用電迴路",
+    labelEn: "Factory Circuit (Guanyin)",
+    displayOrder: 4
+  },
+  { pageKey: "images", route: "/images", labelZh: "綠能影像", labelEn: "Images", displayOrder: 5 },
   {
     pageKey: "sustainability",
     route: "/sustainability",
     labelZh: "永續成果",
     labelEn: "Sustainability",
-    displayOrder: 5
+    displayOrder: 6
   }
 ] as const;
 
@@ -218,6 +242,9 @@ export function seedDatabase() {
   `);
 
   database.transaction(() => {
+    database.prepare("DELETE FROM topic_mappings").run();
+    database.prepare("DELETE FROM circuit_configs").run();
+    database.prepare("DELETE FROM display_page_registry").run();
     upsertSetting.run("co2_factor", "0.494");
     upsertSetting.run("data_mode", "mqtt");
     upsertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5);
@@ -289,7 +316,7 @@ export function seedDatabase() {
         circuitConfig.icon,
         "kW",
         circuitConfig.mqttTopic,
-        ["production", "hvac", "lighting", "office", "ev", "infrastructure"][index],
+        ["stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"][index],
         circuitConfig.ratedCapacity,
         0,
         circuitConfig.ratedCapacity * 0.7,
@@ -315,7 +342,7 @@ export function seedDatabase() {
 
       insertDisplayPageRegistryInstance.run(
         page.pageKey,
-        page.pageKey,
+        (page as any).templateKey ?? page.pageKey,
         page.route.replace(/^\//, ""),
         page.labelZh,
         page.labelEn,

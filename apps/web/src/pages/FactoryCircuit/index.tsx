@@ -107,12 +107,14 @@ const kpiLayoutOrder = [
 ] as const;
 
 const loadRowOrder = [
-  "production",
-  "hvac",
-  "lighting",
+  "stamping",
+  "body",
+  "painting",
+  "assembly",
+  "utility",
   "office",
-  "ev",
-  "infrastructure"
+  "heavy_vehicle",
+  "ed_coating"
 ] as const;
 
 const powerConnectorReferenceByKey = {
@@ -381,6 +383,40 @@ export function FactoryCircuit({
     [viewModel.kpis]
   );
 
+  const activeRowsY = useMemo(() => {
+    return loadRowOrder
+      .map((key) => {
+        const cardState = resolvedConfig.loadRowStates?.[key];
+        if (cardState?.visible === false) {
+          return null;
+        }
+        const layout = resolvedConfig.loadRows[key];
+        if (!layout) {
+          return null;
+        }
+        const relativeTop = layout.top - CONTENT_TOP_OFFSET - (150 - CONTENT_TOP_OFFSET);
+        return relativeTop + layout.height / 2;
+      })
+      .filter((y): y is number => y !== null);
+  }, [resolvedConfig.loadRowStates, resolvedConfig.loadRows]);
+
+  const { svgPath } = useMemo(() => {
+    const minY = activeRowsY.length > 0 ? Math.min(...activeRowsY) : 304;
+    const maxY = activeRowsY.length > 0 ? Math.max(...activeRowsY) : 304;
+
+    let path = `M 4 304 H 40 M 40 ${minY} V ${maxY}`;
+    for (const y of activeRowsY) {
+      if (Math.abs(y - 304) < 2) {
+        path += ` M 40 304 H 138`;
+      } else if (y < 304) {
+        path += ` M 40 ${y + 16} Q 40 ${y} 56 ${y} H 138`;
+      } else {
+        path += ` M 40 ${y - 16} Q 40 ${y} 56 ${y} H 138`;
+      }
+    }
+    return { svgPath: path };
+  }, [activeRowsY]);
+
   if (
     shouldDeferDisplayPageRuntimeRender({
       runtimeHydrationEnabled,
@@ -583,9 +619,8 @@ export function FactoryCircuit({
           }}
           viewBox="0 0 140 526"
         >
-          {/* 6 條平滑分岔線，採用單一主幹 + 垂直總線骨架，防止線條重疊 */}
           <path
-            d="M 4 304 H 40 M 40 54 V 497 M 40 54 Q 40 38 56 38 H 138 M 40 149 Q 40 133 56 133 H 138 M 40 244 Q 40 228 56 228 H 138 M 40 307 Q 40 323 56 323 H 138 M 40 402 Q 40 418 56 418 H 138 M 40 497 Q 40 513 56 513 H 138"
+            d={svgPath}
             fill="none"
             stroke="#527d3b"
             strokeWidth={2.5}
@@ -597,13 +632,10 @@ export function FactoryCircuit({
           {/* 配電盤端統一輸出圓點 */}
           <circle cx={4} cy={304} r={5} fill="#527d3b" />
 
-          {/* 負載端 6 個接收圓點 */}
-          <circle cx={138} cy={38} r={5} fill="#527d3b" />
-          <circle cx={138} cy={133} r={5} fill="#527d3b" />
-          <circle cx={138} cy={228} r={5} fill="#527d3b" />
-          <circle cx={138} cy={323} r={5} fill="#527d3b" />
-          <circle cx={138} cy={418} r={5} fill="#527d3b" />
-          <circle cx={138} cy={513} r={5} fill="#527d3b" />
+          {/* 負載端動態接收圓點 */}
+          {activeRowsY.map((y, idx) => (
+            <circle key={idx} cx={138} cy={y} r={5} fill="#527d3b" />
+          ))}
         </svg>
       </div>
 

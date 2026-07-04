@@ -45,12 +45,14 @@ type BuildFactoryCircuitViewModelArgs = {
 };
 
 const slotDefinitions: CircuitSlotDefinition[] = [
-  { defaultEn: "Production Line", defaultZh: "生產線用電", iconKey: "production-line", key: "production", sharePercent: 45 },
-  { defaultEn: "HVAC & Environment", defaultZh: "空調與環境設備", iconKey: "hvac", key: "hvac", sharePercent: 20 },
-  { defaultEn: "Lighting", defaultZh: "照明系統", iconKey: "lighting", key: "lighting", sharePercent: 10 },
-  { defaultEn: "Office & Common Area", defaultZh: "辦公與公共區域", iconKey: "office", key: "office", sharePercent: 10 },
-  { defaultEn: "EV / Green Facility", defaultZh: "充電設備 / 綠能設施", iconKey: "ev", key: "ev", sharePercent: 10 },
-  { defaultEn: "Infrastructure", defaultZh: "其他基礎設施", iconKey: "infrastructure", key: "infrastructure", sharePercent: 5 }
+  { defaultEn: "Stamping Shop", defaultZh: "沖壓工程", iconKey: "production-line", key: "stamping", sharePercent: 25 },
+  { defaultEn: "Body Shop", defaultZh: "車身工程", iconKey: "hvac", key: "body", sharePercent: 20 },
+  { defaultEn: "Painting Shop", defaultZh: "塗裝工程", iconKey: "lighting", key: "painting", sharePercent: 15 },
+  { defaultEn: "Assembly Shop", defaultZh: "裝配工程", iconKey: "office", key: "assembly", sharePercent: 15 },
+  { defaultEn: "Utility & Powerhouse", defaultZh: "原動力", iconKey: "ev", key: "utility", sharePercent: 10 },
+  { defaultEn: "Office & Administration", defaultZh: "事務系", iconKey: "infrastructure", key: "office", sharePercent: 5 },
+  { defaultEn: "Heavy Vehicle Line", defaultZh: "大車工程", iconKey: "production-line", key: "heavy_vehicle", sharePercent: 5 },
+  { defaultEn: "ED Coating Line", defaultZh: "ED電著", iconKey: "infrastructure", key: "ed_coating", sharePercent: 5 }
 ];
 
 const kpiIcons: Record<FactoryCircuitKpiKey, FactoryCircuitIconKey> = {

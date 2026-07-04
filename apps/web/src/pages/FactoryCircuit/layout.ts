@@ -76,7 +76,7 @@ export const factoryCircuitLoadPanelLayout = {
   width: 470
 } as const;
 
-export const factoryCircuitLoadRowLayout = [
+export const factoryCircuitJungliLoadRows = [
   {
     height: 84,
     left: 1392,
@@ -111,6 +111,69 @@ export const factoryCircuitLoadRowLayout = [
     height: 84,
     left: 1392,
     top: 621,
+    width: 470
+  },
+  {
+    height: 84,
+    left: 1392,
+    top: 716,
+    width: 470
+  },
+  {
+    height: 84,
+    left: 1392,
+    top: 811,
+    width: 470
+  }
+] as const;
+
+export const factoryCircuitGuanyinLoadRows = [
+  {
+    height: 65,
+    left: 1392,
+    top: 146,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 220,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 294,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 368,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 442,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 516,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 590,
+    width: 470
+  },
+  {
+    height: 65,
+    left: 1392,
+    top: 664,
     width: 470
   }
 ] as const;

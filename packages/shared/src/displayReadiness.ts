@@ -1,12 +1,14 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
 
 export const displayCircuitSlotKeys = [
-  "production",
-  "hvac",
-  "lighting",
+  "stamping",
+  "body",
+  "painting",
+  "assembly",
+  "utility",
   "office",
-  "ev",
-  "infrastructure"
+  "heavy_vehicle",
+  "ed_coating"
 ] as const;
 
 export type DisplayCircuitSlotKey = (typeof displayCircuitSlotKeys)[number];
@@ -74,12 +76,14 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "systemEfficiency", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryProductionPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryHvacPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryLightingPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryStampingPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryBodyPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryPaintingPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryAssemblyPower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryUtilityPower", sourceType: "mqtt-metric" },
   { pageId: "factory-circuit", requirementKey: "factoryOfficePower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryEvGreenPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryInfrastructurePower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryHeavyVehiclePower", sourceType: "mqtt-metric" },
+  { pageId: "factory-circuit", requirementKey: "factoryEdCoatingPower", sourceType: "mqtt-metric" },
   {
     pageId: "sustainability",
     requirementKey: "accumulatedGenerationGwh",

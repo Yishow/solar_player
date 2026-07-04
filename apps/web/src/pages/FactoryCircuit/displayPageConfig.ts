@@ -47,7 +47,8 @@ import {
   factoryCircuitCopyLayout,
   factoryCircuitKpiLayout,
   factoryCircuitLoadPanelLayout,
-  factoryCircuitLoadRowLayout,
+  factoryCircuitJungliLoadRows,
+  factoryCircuitGuanyinLoadRows,
   factoryCircuitNodeLayout,
   factoryCircuitStatusLayout
 } from "./layout";
@@ -63,12 +64,14 @@ export type FactoryCircuitConnectorKey = "inverterToBoard" | "solarToInverter";
 export type FactoryCircuitNodeKey = "board" | "inverter" | "solar";
 export type FactoryCircuitKpiKey = "flow" | "peak" | "selfConsumption" | "solarShare" | "totalPower";
 export type FactoryCircuitLoadSlotKey =
-  | "ev"
-  | "hvac"
-  | "infrastructure"
-  | "lighting"
+  | "stamping"
+  | "body"
+  | "painting"
+  | "assembly"
+  | "utility"
   | "office"
-  | "production";
+  | "heavy_vehicle"
+  | "ed_coating";
 
 export type FactoryCircuitLoadRowState = {
   status?: DisplayPageCardStatus;
@@ -100,7 +103,14 @@ export type FactoryCircuitDisplayPageConfig = {
   iconSources: {
     kpiCards: Record<FactoryCircuitKpiKey, DisplayPageIconSource>;
     loadRows: Record<
-      "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
+      | "stamping"
+      | "body"
+      | "painting"
+      | "assembly"
+      | "utility"
+      | "office"
+      | "heavy_vehicle"
+      | "ed_coating",
       DisplayPageIconSource
     >;
     nodes: Record<FactoryCircuitNodeKey, DisplayPageIconSource>;
@@ -109,7 +119,14 @@ export type FactoryCircuitDisplayPageConfig = {
   kpiCardStates: Record<FactoryCircuitKpiKey, FactoryCircuitLoadRowState>;
   loadPanel: FactoryCircuitDisplayRect;
   loadRows: Record<
-    "ev" | "hvac" | "infrastructure" | "lighting" | "office" | "production",
+    | "stamping"
+    | "body"
+    | "painting"
+    | "assembly"
+    | "utility"
+    | "office"
+    | "heavy_vehicle"
+    | "ed_coating",
     FactoryCircuitDisplayRect
   >;
   loadRowStates: Record<FactoryCircuitLoadSlotKey, FactoryCircuitLoadRowState>;
@@ -213,12 +230,14 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
         totalPower: createPageIconKeySource("factory-circuit", "bolt")
       },
       loadRows: {
-        ev: createPageIconKeySource("factory-circuit", "ev"),
-        hvac: createPageIconKeySource("factory-circuit", "hvac"),
-        infrastructure: createPageIconKeySource("factory-circuit", "infrastructure"),
-        lighting: createPageIconKeySource("factory-circuit", "lighting"),
-        office: createPageIconKeySource("factory-circuit", "office"),
-        production: createPageIconKeySource("factory-circuit", "production-line")
+        stamping: createPageIconKeySource("factory-circuit", "factory"),
+        body: createPageIconKeySource("factory-circuit", "wind"),
+        painting: createPageIconKeySource("factory-circuit", "lightbulb"),
+        assembly: createPageIconKeySource("factory-circuit", "building-2"),
+        utility: createPageIconKeySource("factory-circuit", "battery-charging"),
+        office: createPageIconKeySource("factory-circuit", "settings-2"),
+        heavy_vehicle: createPageIconKeySource("factory-circuit", "car"),
+        ed_coating: createPageIconKeySource("factory-circuit", "refresh")
       },
       nodes: {
         board: createPageIconKeySource("factory-circuit", "switchboard"),
@@ -242,20 +261,24 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
     },
     loadPanel: { ...factoryCircuitLoadPanelLayout },
     loadRows: {
-      production: { ...factoryCircuitLoadRowLayout[0] },
-      hvac: { ...factoryCircuitLoadRowLayout[1] },
-      lighting: { ...factoryCircuitLoadRowLayout[2] },
-      office: { ...factoryCircuitLoadRowLayout[3] },
-      ev: { ...factoryCircuitLoadRowLayout[4] },
-      infrastructure: { ...factoryCircuitLoadRowLayout[5] }
+      stamping: { ...factoryCircuitJungliLoadRows[0] },
+      body: { ...factoryCircuitJungliLoadRows[1] },
+      painting: { ...factoryCircuitJungliLoadRows[2] },
+      assembly: { ...factoryCircuitJungliLoadRows[3] },
+      utility: { ...factoryCircuitJungliLoadRows[4] },
+      office: { ...factoryCircuitJungliLoadRows[5] },
+      heavy_vehicle: { ...factoryCircuitJungliLoadRows[6] },
+      ed_coating: { ...factoryCircuitJungliLoadRows[7] }
     },
     loadRowStates: {
-      production: {},
-      hvac: {},
-      lighting: {},
+      stamping: {},
+      body: {},
+      painting: {},
+      assembly: {},
+      utility: {},
       office: {},
-      ev: {},
-      infrastructure: {}
+      heavy_vehicle: { visible: false },
+      ed_coating: { visible: false }
     },
     nodeTreatments: {
       board: createFlowNodeTreatmentConfig(),

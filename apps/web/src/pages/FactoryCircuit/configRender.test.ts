@@ -57,7 +57,7 @@ test("factory circuit display page seed config captures the current default layo
   assert.equal(config.cardStyles.flow.valueFontSize, 42);
   assert.equal((config as any).rhythm?.factoryLoadRows?.iconTextGap, 24);
   assert.equal((config as any).rhythm?.factoryLoadRows?.labelFontSize, 22);
-  assert.equal(config.loadRows.production.height, 84);
+  assert.equal(config.loadRows.stamping.height, 84);
   assert.equal(config.kpiCards.totalPower.left, 32);
   assert.deepEqual(config.iconSources.kpiCards.solarShare, {
     iconKey: "pie",
@@ -85,7 +85,7 @@ test("factory load row editor regions expose visibility toggle and configuring s
     region.id.startsWith("factory-load-row-")
   );
 
-  assert.equal(loadRowRegions.length, 6);
+  assert.equal(loadRowRegions.length, 8);
   for (const region of loadRowRegions) {
     const key = region.id.replace("factory-load-row-", "");
     const visible = region.fields.find((field) => field.id === `${key}-visible`);
@@ -110,9 +110,13 @@ test("factory seed config provides load row state entries that default to normal
     Object.keys(config.loadRowStates).sort(),
     Object.keys(config.loadRows).sort()
   );
-  for (const state of Object.values(config.loadRowStates)) {
+  for (const [key, state] of Object.entries(config.loadRowStates)) {
     assert.notEqual(state.status, "configuring");
-    assert.notEqual(state.visible, false);
+    if (key === "heavy_vehicle" || key === "ed_coating") {
+      assert.equal(state.visible, false);
+    } else {
+      assert.notEqual(state.visible, false);
+    }
   }
 });
 

@@ -30,13 +30,13 @@ const circuitConfigs: CircuitConfig[] = [
     attentionMax: 620,
     attentionMin: 434,
     displayOrder: 2,
-    displaySlot: "hvac",
+    displaySlot: "body",
     enabled: true,
     icon: "wind",
     id: 2,
-    mqttTopic: "factory/power/hvac",
-    nameEn: "HVAC & Environment",
-    nameZh: "空調與環境設備",
+    mqttTopic: "factory/power/body",
+    nameEn: "Body Shop",
+    nameZh: "車身工程",
     normalMax: 434,
     normalMin: 0,
     ratedCapacity: 620,
@@ -48,13 +48,13 @@ const circuitConfigs: CircuitConfig[] = [
     attentionMax: 850,
     attentionMin: 595,
     displayOrder: 1,
-    displaySlot: "production",
+    displaySlot: "stamping",
     enabled: true,
     icon: "factory",
     id: 1,
-    mqttTopic: "factory/power/production",
-    nameEn: "Production Line",
-    nameZh: "生產線用電",
+    mqttTopic: "factory/power/stamping",
+    nameEn: "Stamping Shop",
+    nameZh: "沖壓工程",
     normalMax: 595,
     normalMin: 0,
     ratedCapacity: 850,
@@ -66,13 +66,13 @@ const circuitConfigs: CircuitConfig[] = [
     attentionMax: 180,
     attentionMin: 126,
     displayOrder: 3,
-    displaySlot: "lighting",
+    displaySlot: "painting",
     enabled: false,
     icon: "lightbulb",
     id: 3,
-    mqttTopic: "factory/power/lighting",
-    nameEn: "Lighting",
-    nameZh: "照明系統",
+    mqttTopic: "factory/power/painting",
+    nameEn: "Painting Shop",
+    nameZh: "塗裝工程",
     normalMax: 126,
     normalMin: 0,
     ratedCapacity: 180,
@@ -86,13 +86,13 @@ test("buildFactoryCircuitRuntimes orders enabled circuits into prototype slot or
   const runtimes = buildFactoryCircuitRuntimes(circuitConfigs);
 
   assert.equal(runtimes.length, 2);
-  assert.equal(runtimes[0]?.nameZh, "生產線用電");
-  assert.equal(runtimes[1]?.nameZh, "空調與環境設備");
+  assert.equal(runtimes[0]?.nameZh, "沖壓工程");
+  assert.equal(runtimes[1]?.nameZh, "車身工程");
   assert.equal(runtimes[0]?.livePowerKw, null);
   assert.equal(runtimes[1]?.livePowerKw, null);
 });
 
-test("buildFactoryCircuitViewModel centralizes threshold mapping by power and keeps six load rows", () => {
+test("buildFactoryCircuitViewModel centralizes threshold mapping by power and keeps eight load rows", () => {
   const runtimes = buildFactoryCircuitRuntimes(circuitConfigs).map((circuit) =>
     circuit.id === 1
       ? { ...circuit, livePowerKw: 790 }
@@ -107,7 +107,7 @@ test("buildFactoryCircuitViewModel centralizes threshold mapping by power and ke
     snapshot
   });
 
-  assert.equal(model.loadRows.length, 6);
+  assert.equal(model.loadRows.length, 8);
   assert.equal(model.loadRows[0]?.statusLabel, "警告");
   assert.equal(model.loadRows[0]?.statusTone, "danger");
   assert.equal(model.loadRows[0]?.iconKey, "production-line");
@@ -134,7 +134,7 @@ test("buildFactoryCircuitViewModel keeps the full prototype structure for empty 
   });
 
   assert.equal(model.emptyState?.title, "目前沒有可播放的迴路資料");
-  assert.equal(model.loadRows.length, 6);
+  assert.equal(model.loadRows.length, 8);
   assert.equal(model.loadRows.every((row) => row.isEmpty), true);
   assert.equal(model.loadRows[0]?.statusLabel, "未接入");
   assert.equal(model.kpis[0]?.value, "--");
@@ -197,7 +197,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         {
           alertTone: "warning",
           bindingState: "missing",
-          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          dependencyKeys: ["stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"],
           fallbackReason: "missing-slot-binding",
           fallbackStrategy: "placeholder",
           freshnessState: "fallback",
@@ -212,7 +212,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         {
           alertTone: "warning",
           bindingState: "missing",
-          dependencyKeys: ["realTimePower", "production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          dependencyKeys: ["realTimePower", "stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"],
           fallbackReason: "missing-slot-binding",
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: "fallback",
@@ -242,7 +242,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         {
           alertTone: "warning",
           bindingState: "missing",
-          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          dependencyKeys: ["stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"],
           fallbackReason: "missing-slot-binding",
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: "fallback",
@@ -257,7 +257,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         {
           alertTone: "warning",
           bindingState: "missing",
-          dependencyKeys: ["production", "hvac", "lighting", "office", "ev", "infrastructure"],
+          dependencyKeys: ["stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"],
           fallbackReason: "missing-slot-binding",
           fallbackStrategy: "placeholder",
           freshnessState: "fallback",
@@ -271,24 +271,26 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         }
       ],
       slots: [
-        { slotKey: "production", label: "故事版生產線", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 },
-        { slotKey: "hvac", label: "故事版空調", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "warning", livePowerKw: 310, circuitId: 2 },
-        { slotKey: "lighting", label: "故事版照明", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
-        { slotKey: "office", label: "故事版辦公區", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 90, circuitId: 4 },
-        { slotKey: "ev", label: "故事版充電站", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 45, circuitId: 5 },
-        { slotKey: "infrastructure", label: "故事版基礎設施", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 35, circuitId: 6 }
+        { slotKey: "stamping", label: "故事版沖壓", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 },
+        { slotKey: "body", label: "故事版車身", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "warning", livePowerKw: 310, circuitId: 2 },
+        { slotKey: "painting", label: "故事版塗裝", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
+        { slotKey: "assembly", label: "故事版裝配", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 90, circuitId: 4 },
+        { slotKey: "utility", label: "故事版原動力", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 45, circuitId: 5 },
+        { slotKey: "office", label: "故事版事務系", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 35, circuitId: 6 },
+        { slotKey: "heavy_vehicle", label: "故事版大車", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
+        { slotKey: "ed_coating", label: "故事版ED電著", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
     }
   });
 
-  assert.equal(model.loadRows.length, 6);
-  assert.equal(model.loadRows[0]?.labelZh, "故事版生產線");
-  assert.equal(model.loadRows[0]?.labelEn, "Production Line");
+  assert.equal(model.loadRows.length, 8);
+  assert.equal(model.loadRows[0]?.labelZh, "故事版沖壓");
+  assert.equal(model.loadRows[0]?.labelEn, "Stamping Shop");
   assert.equal(model.loadRows[0]?.livePowerKw, 520);
   assert.equal(model.loadRows[0]?.statusLabel, "正常");
   assert.equal(model.loadRows[2]?.isEmpty, true);
-  assert.equal(model.loadRows[2]?.labelEn, "Lighting");
+  assert.equal(model.loadRows[2]?.labelEn, "Painting Shop");
   assert.equal(model.loadRows[2]?.statusLabel, "未綁定");
   assert.equal(model.loadRows[2]?.livePowerKw, null);
   assert.equal(model.kpis[0]?.value, "--");
@@ -315,12 +317,14 @@ test("buildFactoryCircuitViewModel surfaces the custom topic name via the story 
         { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "目前綠電流向", metricKey: "flow", provenance: "live", sourceClass: "mqtt-live", unit: "kW", value: "368" }
       ],
       slots: [
-        { ...baseSlot, slotKey: "production", label: "一號產線", labelZh: "一號產線", labelEn: "Line 1", livePowerKw: 520, circuitId: 1 },
-        { ...baseSlot, slotKey: "hvac", label: "空調", labelZh: "空調", labelEn: "HVAC", circuitId: 2 },
-        { ...baseSlot, slotKey: "lighting", label: "照明", labelZh: "照明", labelEn: "Lighting", circuitId: 3 },
-        { ...baseSlot, slotKey: "office", label: "辦公", labelZh: "辦公", labelEn: "Office", circuitId: 4 },
-        { ...baseSlot, slotKey: "ev", label: "充電", labelZh: "充電", labelEn: "EV", circuitId: 5 },
-        { ...baseSlot, slotKey: "infrastructure", label: "基礎", labelZh: "基礎", labelEn: "Infrastructure", circuitId: 6 }
+        { ...baseSlot, slotKey: "stamping", label: "一號產線", labelZh: "一號產線", labelEn: "Line 1", livePowerKw: 520, circuitId: 1 },
+        { ...baseSlot, slotKey: "body", label: "車身", labelZh: "車身", labelEn: "Body", circuitId: 2 },
+        { ...baseSlot, slotKey: "painting", label: "塗裝", labelZh: "塗裝", labelEn: "Painting", circuitId: 3 },
+        { ...baseSlot, slotKey: "assembly", label: "裝配", labelZh: "裝配", labelEn: "Assembly", circuitId: 4 },
+        { ...baseSlot, slotKey: "utility", label: "原動力", labelZh: "原動力", labelEn: "Utility", circuitId: 5 },
+        { ...baseSlot, slotKey: "office", label: "事務系", labelZh: "事務系", labelEn: "Office", circuitId: 6 },
+        { ...baseSlot, slotKey: "heavy_vehicle", label: "大車", labelZh: "大車", labelEn: "Heavy Vehicle", circuitId: 7 },
+        { ...baseSlot, slotKey: "ed_coating", label: "ED電著", labelZh: "ED電著", labelEn: "ED Coating", circuitId: 8 }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
     }
@@ -340,13 +344,13 @@ test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitSto
     factoryCircuitStory: {
       kpis: [],
       slots: [
-        { slotKey: "production", label: "單一", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 }
+        { slotKey: "stamping", label: "單一", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
     }
   });
 
-  assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
+  assert.equal(model.loadRows[0]?.labelZh, "沖壓工程");
   assert.equal(model.summary.statusLabel, "部分迴路尚未回報即時功率");
 });
 
@@ -366,9 +370,9 @@ test("buildFactoryCircuitViewModel keeps the last settled fallback rows visible 
   });
 
   assert.equal(model.emptyState, null);
-  assert.equal(model.loadRows[0]?.labelZh, "生產線用電");
+  assert.equal(model.loadRows[0]?.labelZh, "沖壓工程");
   assert.equal(model.loadRows[0]?.isEmpty, false);
   assert.equal(model.loadRows[0]?.livePowerKw, 520);
-  assert.equal(model.loadRows[1]?.labelZh, "空調與環境設備");
+  assert.equal(model.loadRows[1]?.labelZh, "車身工程");
   assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
 });

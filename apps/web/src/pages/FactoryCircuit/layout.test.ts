@@ -5,7 +5,7 @@ import {
   factoryCircuitContentTopOffset,
   factoryCircuitKpiLayout,
   factoryCircuitLayoutMeta,
-  factoryCircuitLoadRowLayout,
+  factoryCircuitJungliLoadRows,
   factoryCircuitNodeLayout,
   factoryCircuitTitleLayout
 } from "./layout";
@@ -28,7 +28,7 @@ test("factory circuit layout centralizes the reference geometry for the playback
     top: 440,
     width: 74
   });
-  assert.deepEqual(factoryCircuitLoadRowLayout[0], {
+  assert.deepEqual(factoryCircuitJungliLoadRows[0], {
     height: 84,
     left: 1392,
     top: 146,

@@ -154,30 +154,36 @@ const solarTargets: Partial<Record<StoryMetricKey, SolarComparisonTarget>> = {
 };
 
 const slotMetricMap: Record<DisplayCircuitSlotKey, string> = {
-  ev: "factoryEvGreenPower",
-  hvac: "factoryHvacPower",
-  infrastructure: "factoryInfrastructurePower",
-  lighting: "factoryLightingPower",
+  stamping: "factoryStampingPower",
+  body: "factoryBodyPower",
+  painting: "factoryPaintingPower",
+  assembly: "factoryAssemblyPower",
+  utility: "factoryUtilityPower",
   office: "factoryOfficePower",
-  production: "factoryProductionPower"
+  heavy_vehicle: "factoryHeavyVehiclePower",
+  ed_coating: "factoryEdCoatingPower"
 };
 
 const slotDefaultLabels: Record<DisplayCircuitSlotKey, { en: string; zh: string }> = {
-  ev: { en: "EV / Green Facility", zh: "充電設備 / 綠能設施" },
-  hvac: { en: "HVAC & Environment", zh: "空調與環境設備" },
-  infrastructure: { en: "Infrastructure", zh: "其他基礎設施" },
-  lighting: { en: "Lighting", zh: "照明系統" },
-  office: { en: "Office & Common Area", zh: "辦公與公共區域" },
-  production: { en: "Production Line", zh: "生產線用電" }
+  stamping: { en: "Stamping Shop", zh: "沖壓工程" },
+  body: { en: "Body Shop", zh: "車身工程" },
+  painting: { en: "Painting Shop", zh: "塗裝工程" },
+  assembly: { en: "Assembly Shop", zh: "裝配工程" },
+  utility: { en: "Utility & Powerhouse", zh: "原動力" },
+  office: { en: "Office & Administration", zh: "事務系" },
+  heavy_vehicle: { en: "Heavy Vehicle Line", zh: "大車工程" },
+  ed_coating: { en: "ED Coating Line", zh: "ED電著" }
 };
 
 const slotOrder: DisplayCircuitSlotKey[] = [
-  "production",
-  "hvac",
-  "lighting",
+  "stamping",
+  "body",
+  "painting",
+  "assembly",
+  "utility",
   "office",
-  "ev",
-  "infrastructure"
+  "heavy_vehicle",
+  "ed_coating"
 ];
 
 type TopicDisplayName = {

@@ -82,14 +82,22 @@ test("database migration and seed bootstrap the first five supported display pag
     },
     {
       display_order: 3,
-      label_en: "Factory Circuit",
-      label_zh: "廠區迴路",
+      label_en: "Factory Circuit (Jungli)",
+      label_zh: "中壢廠區用電迴路",
       page_key: "factory-circuit",
       route_slug: "factory-circuit",
       template_key: "factory-circuit"
     },
     {
       display_order: 4,
+      label_en: "Factory Circuit (Guanyin)",
+      label_zh: "觀音廠區用電迴路",
+      page_key: "factory-circuit-guanyin",
+      route_slug: "factory-circuit-guanyin",
+      template_key: "factory-circuit"
+    },
+    {
+      display_order: 5,
       label_en: "Images",
       label_zh: "綠能影像",
       page_key: "images",
@@ -97,7 +105,7 @@ test("database migration and seed bootstrap the first five supported display pag
       template_key: "images"
     },
     {
-      display_order: 5,
+      display_order: 6,
       label_en: "Sustainability",
       label_zh: "永續成果",
       page_key: "sustainability",

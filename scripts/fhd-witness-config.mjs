@@ -26,6 +26,13 @@ export const fhdPlaybackRoutes = Object.freeze([
     screenshotFile: "playback/factory-circuit.png"
   }),
   Object.freeze({
+    routeKey: "factory-circuit-guanyin",
+    pageName: "FactoryCircuitGuanyin",
+    routeUrl: "/factory-circuit-guanyin",
+    referenceImage: "docs/reference/FHD/03-3.Factory Circuit (大).png",
+    screenshotFile: "playback/factory-circuit-guanyin.png"
+  }),
+  Object.freeze({
     routeKey: "images",
     pageName: "Images",
     routeUrl: "/images",
