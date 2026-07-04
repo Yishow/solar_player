@@ -346,12 +346,12 @@
 
 @keyframes factory-flow-dash {
   to {
-    stroke-dashoffset: -20;
+    stroke-dashoffset: -28;
   }
 }
 
 .factory-circuit-flow-line {
   stroke-dasharray: 8 6;
-  animation: factory-flow-dash 1.5s linear infinite;
+  animation: factory-flow-dash 2s linear infinite;
   filter: drop-shadow(0 0 3px rgba(82, 125, 59, 0.7));
 }

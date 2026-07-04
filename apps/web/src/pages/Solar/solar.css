@@ -181,3 +181,28 @@
   font-size: 14px;
   line-height: 1.55;
 }
+
+@keyframes solar-flow-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.solar-flow-line {
+  stroke-dasharray: 8 6;
+  animation: solar-flow-dash 2s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(82, 125, 59, 0.7));
+}
+
+.solar-flow-line-orange {
+  stroke-dasharray: 8 6;
+  animation: solar-flow-dash 2s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(234, 161, 30, 0.7));
+}
+
+.solar-routing {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
