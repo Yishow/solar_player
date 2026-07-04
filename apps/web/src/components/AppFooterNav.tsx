@@ -133,7 +133,7 @@ export function AppFooterNav({
       >
         <div className="flex items-center justify-center w-[32px] h-[32px]">
           {mode === "playback" ? (
-            <RotatingSolarGauge />
+            <GeometricSunBadge />
           ) : (
             <LeafOrnament variant="footer-mini" />
           )}
@@ -165,7 +165,7 @@ export function AppFooterNav({
                   to={entry.path}
                   aria-current={active ? "page" : undefined}
                   className={`${baseClasses} ${mode === "playback" ? playbackClasses : managementClasses} ${
-                    active && mode === "playback" ? "animate-glow-active" : ""
+                    active && mode === "playback" ? "animate-pulse-opacity" : ""
                   }`}
                   style={{
                     color: active
@@ -226,7 +226,7 @@ export function AppFooterNav({
             </div>
           </div>
           {mode === "playback" ? (
-            <DynamicDataWave />
+            <EnergyPulseLine />
           ) : (
             <FooterBranch />
           )}
@@ -321,7 +321,7 @@ function NavDivider({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function RotatingSolarGauge() {
+export function GeometricSunBadge() {
   return (
     <svg
       width="32"
@@ -329,75 +329,45 @@ export function RotatingSolarGauge() {
       viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 relative z-10"
+      className="shrink-0 relative z-10 select-none"
       aria-hidden="true"
     >
-      <circle
-        cx="16"
-        cy="16"
-        r="12"
+      <path
+        d="M16 8 L22 14 L22 18 L16 24 L10 18 L10 14 Z"
         stroke="var(--shell-branch-stroke, #9aa05e)"
         strokeWidth="1.2"
-        strokeDasharray="4 3"
-        className="animate-spin-slow"
+        fill="rgba(154, 160, 94, 0.08)"
       />
-      <circle
-        cx="16"
-        cy="16"
-        r="3.5"
-        fill="var(--shell-nav-active-ink, #789467)"
-        className="animate-pulse-soft"
-        style={{
-          filter: "drop-shadow(0 0 4px var(--shell-nav-active-ink, #789467))"
-        }}
+      <path
+        d="M16 4 L16 7 M16 25 L16 28 M4 16 L7 16 M25 16 L28 16 M7.5 7.5 L9.5 9.5 M22.5 22.5 L24.5 24.5 M24.5 7.5 L22.5 9.5 M9.5 22.5 L7.5 24.5"
+        stroke="var(--shell-nav-active-ink, #789467)"
+        strokeWidth="1.2"
+        strokeLinecap="round"
       />
     </svg>
   );
 }
 
-export function DynamicDataWave() {
+export function EnergyPulseLine() {
   return (
     <div 
-      className="flex flex-col items-end gap-[4px] relative z-10 shrink-0 select-none pointer-events-none"
+      className="relative z-10 shrink-0 select-none pointer-events-none w-[120px] h-[20px] flex items-center justify-start overflow-hidden"
       style={{ transform: "translateY(-4px)" }}
     >
-      <svg
-        width="140"
-        height="20"
-        viewBox="0 0 140 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="opacity-90"
-        aria-hidden="true"
-      >
-        <path
-          d="M0 10 Q 17.5 2, 35 10 T 70 10 T 105 10 T 140 10"
-          stroke="var(--shell-branch-stroke, #9aa05e)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          style={{
-            filter: "drop-shadow(0 1px 2px rgba(154, 160, 94, 0.4))"
-          }}
-        />
-        <path
-          d="M0 10 Q 17.5 18, 35 10 T 70 10 T 105 10 T 140 10"
-          stroke="var(--shell-nav-active-ink, #789467)"
-          strokeWidth="0.85"
-          strokeLinecap="round"
-          className="opacity-45"
-        />
-      </svg>
       <div 
-        className="font-en text-[9px] font-bold tracking-[0.2em] opacity-75"
+        className="w-full h-px opacity-40"
+        style={{ backgroundColor: "var(--shell-branch-stroke, #9aa05e)" }}
+      />
+      <div 
+        className="absolute top-[8px] w-[4px] h-[4px] rounded-full animate-pulse-slide"
         style={{ 
-          color: "var(--shell-slogan-soft-ink, #789467)",
-          marginRight: "2px"
+          backgroundColor: "var(--shell-nav-active-ink, #789467)",
+          boxShadow: "0 0 8px 2px var(--shell-nav-active-ink, #789467)"
         }}
-      >
-        SYS ACTIVE // RPI-5
-      </div>
+      />
     </div>
   );
 }
+
 
 

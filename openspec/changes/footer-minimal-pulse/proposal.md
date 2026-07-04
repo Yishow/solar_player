@@ -4,9 +4,9 @@
 
 ## What Changes
 
-- 將 Playback 模式下 Footer 左側之迷你葉子 (`LeafOrnament`) 替換為以緩慢旋轉幾何刻度環與發光 LIVE 狀態燈構成的「太陽能發電核心」幾何儀表。
-- 將 Playback 模式下 Footer 右側之搖擺樹枝 (`FooterBranch`) 替換為一組微幅波動的幾何「動態數據波線 (Data Wave)」與運作狀態字樣（例如 `SYS ACTIVE // RPI-5`）。
-- 優化導航圖標：加粗 Playback Footer 導航圖標線條，並為 Active 項目之圖標與文字加上亮綠與金色的雙色調搭配，以及微弱的霓虹發光 (Glow) 效果。
+- 將 Playback 模式下 Footer 左側之迷你葉子 (`LeafOrnament`) 替換為以極簡幾何切面構成的「幾何折線太陽」圖章。
+- 將 Playback 模式下 Footer 右側之搖擺樹枝 (`FooterBranch`) 替換為一條帶有動態發光粒子滑過的「能量脈衝線 (Energy Pulse)」。
+- 優化導航圖標：加粗 Playback Footer 導航圖標線條，且在 Active 時變為亮綠色與金色底線，並具備優雅的呼吸燈式明暗（發光）明滅變化。
 - 所有的視覺美化優化僅在 Playback 模式下生效，不影響 Management 模式的簡潔配置。
 
 ## Non-Goals (optional)
@@ -18,7 +18,7 @@
 
 ### New Capabilities
 
-- `display-playback-footer-refinement`: 定義 Playback 播放頁面 Footer 的科技儀表視覺裝飾物、圖標加粗、雙色調亮色及呼吸發光動態。
+- `display-playback-footer-refinement-pulse`: 定義 Playback 播放頁面 Footer 的極簡幾何太陽圖章、能量脈衝線裝飾物、圖標加粗與呼吸燈明滅變化。
 
 ### Modified Capabilities
 
@@ -26,7 +26,7 @@
 
 ## Impact
 
-- Affected specs: `display-playback-footer-refinement`
+- Affected specs: `display-playback-footer-refinement-pulse`
 - Affected code:
   - Modified:
     - `apps/web/src/components/AppFooterNav.tsx`
