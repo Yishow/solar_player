@@ -5,6 +5,7 @@ type StatusBadgeProps = {
   density?: ShellDensity;
   status: "connected" | "disconnected" | "connecting";
   label?: string;
+  style?: React.CSSProperties;
 };
 
 const badgeStyleMap = {
@@ -25,9 +26,10 @@ const badgeStyleMap = {
 export function StatusBadge({
   density = "management",
   status,
-  label
+  label,
+  style
 }: StatusBadgeProps) {
-  const style = badgeStyleMap[status];
+  const badgeStyle = badgeStyleMap[status];
 
   return (
     <span
@@ -35,11 +37,12 @@ export function StatusBadge({
       data-shell-primitive="status-pill"
       className="inline-flex h-[44px] w-auto items-center justify-center gap-[12px] font-en text-[18px] font-medium"
       style={{
-        color: "var(--shell-meta-weather-ink)"
+        color: "var(--shell-meta-weather-ink)",
+        ...style
       }}
     >
-      <WifiGlyph color={style.accent} />
-      <span>{label ?? style.text}</span>
+      <WifiGlyph color={badgeStyle.accent} />
+      <span>{label ?? badgeStyle.text}</span>
     </span>
   );
 }

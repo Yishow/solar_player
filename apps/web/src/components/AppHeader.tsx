@@ -72,19 +72,41 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
     <div className="flex items-center gap-x-[40px]">
       <div
         className="font-en text-[50px] font-bold leading-none tracking-[0.1em] tabular-nums"
-        style={{ color: "var(--ink-strong)" }}
+        style={{
+          color: "var(--ink-strong)",
+          filter: "drop-shadow(var(--glow-brand))"
+        }}
       >
         {timeLabel}
       </div>
 
       <div
         className="font-en text-[18px] font-medium leading-[1.3]"
-        style={{ color: "var(--shell-meta-date-ink)" }}
+        style={{ color: "var(--shell-kicker-muted)" }}
       >
         <div>{dateLabel}</div>
         <div>{weekdayLabel}</div>
       </div>
     </div>
+  );
+}
+
+function renderHeaderTitleLine(line: string) {
+  const emphasisText = "綠能";
+  const emphasisIndex = line.indexOf(emphasisText);
+
+  if (emphasisIndex === -1) {
+    return line;
+  }
+
+  return (
+    <>
+      {line.slice(0, emphasisIndex)}
+      <em className="not-italic" style={{ color: "var(--display-emphasis-green)" }}>
+        {emphasisText}
+      </em>
+      {line.slice(emphasisIndex + emphasisText.length)}
+    </>
   );
 }
 
@@ -126,13 +148,19 @@ export function AppHeader({ brandView = defaultBrandView, decorationObjects, met
           <div className="leading-none">
             <div
               className="text-[35px] font-extrabold tracking-[0.11em]"
-              style={{ color: "var(--ink-strong)" }}
+              style={{
+                color: "var(--ink-strong)",
+                textShadow: "0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12)"
+              }}
             >
               {brandView.brandNameZh}
             </div>
             <div
               className="mt-[10px] font-en text-[15px] font-bold tracking-[0.34em]"
-              style={{ color: "var(--ink-strong)" }}
+              style={{
+                color: "var(--ink-strong)",
+                textShadow: "0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12)"
+              }}
             >
               {brandView.brandNameEn}
             </div>
@@ -143,17 +171,24 @@ export function AppHeader({ brandView = defaultBrandView, decorationObjects, met
         <div className="leading-none">
           <div
             className="text-[22px] font-semibold tracking-[0.32em]"
-            style={{ color: "var(--ink-strong)" }}
+            style={{
+              color: "var(--ink-strong)",
+              textShadow: "0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12)"
+            }}
           >
-            {brandView.productTitleZh}
+            {renderHeaderTitleLine(brandView.productTitleZh)}
           </div>
           <div
             className="mt-[14px] font-en text-[15px] font-medium tracking-[0.14em]"
-            style={{ color: "var(--shell-kicker-muted)" }}
+            style={{
+              color: "var(--shell-kicker-muted)",
+              textShadow: "0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12)"
+            }}
           >
             {brandView.productTitleEn}
           </div>
         </div>
+
 
         {/* Right meta cluster */}
         <div className="ml-auto flex items-center gap-x-[40px]">
@@ -165,7 +200,10 @@ export function AppHeader({ brandView = defaultBrandView, decorationObjects, met
             className={`flex max-w-[220px] w-auto shrink min-w-0 items-center gap-[12px] ${
               weatherMeta.state === "stale" ? "opacity-75" : ""
             }`}
-            style={{ color: "var(--shell-meta-weather-ink)" }}
+            style={{
+              color: "var(--shell-meta-weather-ink)",
+              textShadow: "0 1px 3px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05)"
+            }}
           >
             <WeatherGlyph />
             {weatherMeta.state === "stale" ? (
@@ -192,6 +230,9 @@ export function AppHeader({ brandView = defaultBrandView, decorationObjects, met
           <StatusBadge
             status={statusMeta.status}
             label={statusMeta.statusLabel}
+            style={{
+              textShadow: "0 1px 3px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05)"
+            }}
           />
         </div>
       </div>
@@ -211,6 +252,7 @@ function WeatherGlyph() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      className="animate-header-weather-spin-pulse"
       style={{ filter: "drop-shadow(var(--glow-brand))" }}
       aria-hidden="true"
     >

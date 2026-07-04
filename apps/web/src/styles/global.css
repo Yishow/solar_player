@@ -102,9 +102,9 @@
     transform-origin: bottom;
     background: linear-gradient(
       -90deg,
-      rgba(90, 90, 78, 0.45) 0%,
-      rgba(90, 90, 78, 0.45) 80%,
-      rgba(90, 90, 78, 0) 100%
+      var(--display-ornament-gold-strong) 0%,
+      var(--display-ornament-gold-soft) 80%,
+      transparent 100%
     );
   }
 
@@ -308,5 +308,24 @@
 .animate-pulse-opacity {
   animation: pulse-opacity 3s ease-in-out infinite;
 }
+
+@keyframes headerWeatherSpinPulse {
+  0% {
+    transform: rotate(0deg) scale(0.96);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: rotate(360deg) scale(0.96);
+  }
+}
+
+.animate-header-weather-spin-pulse {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: headerWeatherSpinPulse 28s linear infinite;
+}
+
 
 
