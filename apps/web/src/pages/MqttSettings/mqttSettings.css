@@ -31,6 +31,7 @@
   height: 740px !important;
   display: flex;
   flex-direction: column;
+  overflow: visible;
 }
 
 .mqtt-settings-page .mqtt-runtime-summary {
@@ -532,7 +533,7 @@
   display: grid;
   gap: 14px;
   margin-top: 4px;
-  overflow-y: auto;
+  overflow: visible;
   padding-right: 4px;
 }
 
