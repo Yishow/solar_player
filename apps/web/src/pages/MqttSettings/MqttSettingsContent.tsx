@@ -231,8 +231,24 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
           </div>
           <button
             type="button"
-            className="mgmt-action mqtt-weather-card__refresh-btn"
-            style={{ padding: "6px 14px", fontSize: 13, height: "auto", minHeight: "auto", margin: 0 }}
+            className="mqtt-weather-card__refresh-btn"
+            style={{
+              position: "static",
+              padding: "6px 14px",
+              fontSize: "13px",
+              fontWeight: 600,
+              height: "32px",
+              borderRadius: "8px",
+              border: "1px solid var(--surface-state-accent-border, rgba(92, 105, 79, 0.2))",
+              background: "var(--ops-surface-bg, #fffdf8)",
+              color: "var(--surface-state-accent-ink, #5c694f)",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+              transition: "all 0.2s ease"
+            }}
             disabled={viewModel.actions.refreshWeatherDisabled}
             onClick={() => void props.refreshWeather()}
           >
