@@ -1,5 +1,5 @@
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -176,6 +176,51 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       buildDisplayPageMediaPresentation(resolvedConfig.heroMedia, overviewHeroMediaEffectResolverOptions),
     [resolvedConfig.heroMedia]
   );
+
+  const activeBackgroundSrc = backgroundSource ?? heroMediaSource ?? undefined;
+  const [bgTransition, setBgTransition] = useState<{
+    current: string | undefined;
+    prev: string | undefined;
+    fadeCurrent: boolean;
+  }>({
+    current: activeBackgroundSrc,
+    prev: undefined,
+    fadeCurrent: false
+  });
+
+  useEffect(() => {
+    if (activeBackgroundSrc !== bgTransition.current) {
+      setBgTransition((prev) => ({
+        current: activeBackgroundSrc,
+        prev: prev.current,
+        fadeCurrent: true
+      }));
+    }
+  }, [activeBackgroundSrc, bgTransition.current]);
+
+  useEffect(() => {
+    if (bgTransition.fadeCurrent) {
+      const frame = requestAnimationFrame(() => {
+        setBgTransition((prev) => ({
+          ...prev,
+          fadeCurrent: false
+        }));
+      });
+
+      const timer = setTimeout(() => {
+        setBgTransition((prev) => ({
+          ...prev,
+          prev: undefined
+        }));
+      }, 1000);
+
+      return () => {
+        cancelAnimationFrame(frame);
+        clearTimeout(timer);
+      };
+    }
+  }, [bgTransition.fadeCurrent]);
+
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
@@ -217,11 +262,11 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     () => ({
       height: `${leafLayout.height}px`,
       left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
-      opacity: resolvedConfig.chrome.ornaments.leaf.opacity,
       top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-      transform: `rotate(-15deg) scale(${resolvedConfig.chrome.ornaments.leaf.scale})`,
-      width: `${leafLayout.width}px`
-    }),
+      width: `${leafLayout.width}px`,
+      "--display-leaf-opacity": resolvedConfig.chrome.ornaments.leaf.opacity,
+      "--display-leaf-scale": resolvedConfig.chrome.ornaments.leaf.scale
+    } as React.CSSProperties),
     [leafLayout, resolvedConfig.chrome.ornaments.leaf]
   );
   const goldLineStyle = useMemo(
@@ -445,17 +490,39 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         className={`overview-hero-banner display-surface-media-stage${heroMediaPresentation.stageClassName ? ` ${heroMediaPresentation.stageClassName}` : ""}`}
         style={heroBannerStyle}
       >
+        {bgTransition.prev && (
+          <img
+            alt=""
+            src={bgTransition.prev}
+            style={{
+              ...heroMediaPresentation.mediaStyle,
+              position: "absolute",
+              inset: 0,
+              zIndex: 1
+            }}
+          />
+        )}
         <img
           alt={selectedBackground?.alt ?? resolvedConfig.heroMedia.alt}
-          src={backgroundSource ?? heroMediaSource ?? undefined}
-          style={heroMediaPresentation.mediaStyle}
+          src={bgTransition.current}
+          style={{
+            ...heroMediaPresentation.mediaStyle,
+            opacity: bgTransition.fadeCurrent ? 0 : 1,
+            transition: bgTransition.fadeCurrent ? "none" : "opacity 1000ms ease-in-out",
+            position: "absolute",
+            inset: 0,
+            zIndex: 2
+          }}
         />
         {heroMediaPresentation.overlayLayers.map((layer) => (
           <span
             key={layer.id}
             aria-hidden="true"
             className={layer.className}
-            style={layer.style}
+            style={{
+              ...layer.style,
+              zIndex: 3
+            }}
           />
         ))}
       </figure>

@@ -21,36 +21,7 @@
   --display-subtitle-ink: var(--display-copy-muted);
 }
 
-.overview-title-group .overview-eyebrow {
-  margin: 0 0 18px;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 5px;
-  text-align: left;
-}
 
-.overview-title-group .overview-display-title {
-  margin: 0;
-  font-size: 82px;
-  font-weight: 900;
-  line-height: 1.15;
-  letter-spacing: 3px;
-  text-align: left;
-}
-
-.overview-title-group .overview-display-title em {
-  color: var(--display-emphasis-green);
-  font-style: normal;
-}
-
-.overview-title-group .overview-hero-subtitle {
-  margin: 24px 0 0;
-  font-family: var(--font-family-en);
-  font-size: 26px;
-  line-height: 1.35;
-  font-weight: 500;
-  text-align: left;
-}
 
 .overview-hero-banner {
   z-index: 5;
@@ -66,15 +37,43 @@
 }
 
 .overview-leaf-watermark {
-  opacity: 0.44;
-  transform: rotate(-15deg) scale(1.5);
+  z-index: 6;
+  opacity: var(--display-leaf-opacity, 0.58) !important;
+  transform: rotate(-15deg) scale(var(--display-leaf-scale, 1.5));
   --display-leaf-rotation: -12deg;
+  filter: drop-shadow(0 4px 16px rgba(104, 130, 66, 0.22)) !important;
+  animation: overviewLeafFloat 16s ease-in-out infinite alternate;
+}
+
+/* 樹葉現已改為 1:1 實體圖渲染，停用全站 CSS 擬元素 */
+.overview-leaf-watermark::before,
+.overview-leaf-watermark::after {
+  content: none !important;
 }
 
 .overview-gold-line {
-  height: 1px;
-  opacity: 0.78;
-  --display-gold-line-rotation: -3deg;
+  z-index: 6;
+  height: 1px !important;
+  opacity: 0.8 !important;
+  --display-gold-line-rotation: -4deg;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(218, 177, 77, 0.55) 30%,
+    rgba(218, 177, 77, 0.55) 70%,
+    transparent 100%
+  ) !important;
+}
+
+@keyframes overviewLeafFloat {
+  0% {
+    transform: rotate(-15deg) scale(var(--display-leaf-scale, 1.5));
+    opacity: calc(var(--display-leaf-opacity, 0.58) * 0.9) !important;
+  }
+  100% {
+    transform: rotate(-11deg) scale(calc(var(--display-leaf-scale, 1.5) * 1.05));
+    opacity: calc(var(--display-leaf-opacity, 0.58) * 1.1) !important;
+  }
 }
 
 .overview-kpi-card {

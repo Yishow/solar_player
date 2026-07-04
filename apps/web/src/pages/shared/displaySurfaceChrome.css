@@ -5,36 +5,40 @@
 .display-surface-hero-eyebrow {
   margin: 0 0 18px;
   color: var(--display-eyebrow-green);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 9px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 5px;
   text-align: left;
+  text-shadow: 0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12);
 }
 
 .display-surface-hero-title {
   margin: 0;
   color: var(--display-title-ink);
-  font-size: 80px;
-  font-weight: 800;
+  font-size: 82px;
+  font-weight: 900;
   line-height: 1.15;
-  letter-spacing: 6px;
+  letter-spacing: 3px;
   text-align: left;
+  text-shadow: 0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12);
 }
 
+.display-surface-hero-title em,
 .display-surface-hero-title-emphasis {
-  color: var(--display-title-emphasis-color, var(--display-emphasis-green));
+  color: var(--display-emphasis-green);
   font-style: normal;
-  font-weight: var(--display-title-emphasis-weight, inherit);
+  text-shadow: 0 4px 24px var(--display-text-shadow-black-18), 0 0 16px var(--display-text-shadow-green-25);
 }
 
 .display-surface-hero-subtitle {
-  margin: 20px 0 0;
+  margin: 24px 0 0;
   color: var(--display-subtitle-ink);
   font-family: var(--font-family-en);
   font-size: 26px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.35;
   text-align: left;
+  text-shadow: 0 4px 24px var(--display-text-shadow-black-18), 0 2px 8px var(--display-text-shadow-black-12);
 }
 
 .display-surface-media-stage {

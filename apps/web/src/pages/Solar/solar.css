@@ -21,39 +21,7 @@
   z-index: 8;
 }
 
-.solar-eyebrow {
-  margin: 0 0 18px;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 9px;
-}
 
-.solar-display-title {
-  margin: 0;
-  font-size: 80px;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: 6px;
-}
-
-.solar-display-title em {
-  font-style: normal;
-}
-
-.solar-subtitle {
-  margin: 20px 0 0;
-  color: var(--display-copy-muted);
-  font-size: 22px;
-  line-height: 1.45;
-}
-
-.solar-subtitle span {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--font-family-en);
-  font-size: 22px;
-  line-height: 1.25;
-}
 
 .solar-leaf-watermark {
   opacity: 0.36;

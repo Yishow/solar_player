@@ -23,10 +23,10 @@ test("overview layout centralizes reference hero and KPI geometry", () => {
     width: 1340
   });
   assert.deepEqual(overviewLeafLayout, {
-    height: 150,
-    left: 430,
-    top: 558,
-    width: 264
+    height: 168,
+    left: 450,
+    top: 410,
+    width: 296
   });
   assert.deepEqual(overviewGoldLineLayout, {
     left: 12,

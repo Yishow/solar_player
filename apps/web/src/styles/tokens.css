@@ -38,6 +38,9 @@
   --display-ornament-gold-strong: rgba(218, 177, 77, 0.92);
   --display-ornament-gold-soft: rgba(218, 177, 77, 0.36);
   --display-shadow-soft: 0 12px 28px rgba(59, 54, 40, 0.1);
+  --display-text-shadow-black-18: rgba(0, 0, 0, 0.18);
+  --display-text-shadow-black-12: rgba(0, 0, 0, 0.12);
+  --display-text-shadow-green-25: rgba(99, 138, 78, 0.25);
   /* Global shell and brand tokens remain the cross-surface baseline */
   --shell-stage-gradient:
     radial-gradient(circle at 78% 12%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 34%),
@@ -58,6 +61,7 @@
   --shell-nav-rest-ink: #70756f;
   --shell-nav-active-ink: #3f7a34;
   --shell-nav-underline: #4d7d42;
+  --shell-nav-underline-gold: #d4af37;
   --shell-meta-date-ink: #555b5b;
   --shell-meta-weather-ink: #575f58;
   --shell-kicker-bg: #e7efe0;

@@ -26,7 +26,7 @@ test("overview applies density widget internal styles via inline card style vars
 
 test("overview feeds the rotated background pick into the hero banner", () => {
   // The rotated pick drives the hero image, falling back to the hero asset when the pool is empty.
-  assert.match(overviewSource, /src=\{backgroundSource \?\? heroMediaSource \?\? undefined\}/);
+  assert.match(overviewSource, /src=\{bgTransition\.current\}/);
   // The background pick is memoised against the pool signature (mount = fresh pick).
   assert.match(overviewSource, /pickOverviewBackground\(backgroundPoolSources\)/);
   assert.match(overviewSource, /\[backgroundPoolSignature\]/);

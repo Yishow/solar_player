@@ -12,10 +12,10 @@ export const overviewHeroLayout = {
 } as const;
 
 export const overviewLeafLayout = {
-  height: 150,
-  left: 430,
-  top: 558,
-  width: 264
+  height: 168,
+  left: 450,
+  top: 410,
+  width: 296
 } as const;
 
 export const overviewGoldLineLayout = {

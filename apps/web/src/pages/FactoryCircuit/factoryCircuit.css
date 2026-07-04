@@ -24,32 +24,7 @@
   z-index: 8;
 }
 
-.factory-circuit-eyebrow {
-  margin: 0 0 18px;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 9px;
-}
 
-.factory-circuit-display-title {
-  margin: 0;
-  font-size: 80px;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: 6px;
-}
-
-.factory-circuit-display-title em {
-  color: var(--display-emphasis-green);
-  font-style: normal;
-}
-
-.factory-circuit-subtitle {
-  margin: 20px 0 0;
-  font-family: var(--font-family-en);
-  font-size: 26px;
-  line-height: 1.4;
-}
 
 .factory-circuit-copy {
   z-index: 7;

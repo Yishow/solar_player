@@ -24,34 +24,7 @@
   --display-subtitle-ink: #727773;
 }
 
-.images-title-group .images-eyebrow {
-  margin: 0 0 18px;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: 9px;
-  color: #527a43;
-}
 
-.images-title-group .images-display-title {
-  margin: 0;
-  font-size: 80px;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: 6px;
-  color: #34383a;
-}
-
-.images-title-group .images-display-title em {
-  font-style: normal;
-}
-
-.images-title-group .images-hero-subtitle {
-  margin: 20px 0 0;
-  font-family: var(--font-family-en);
-  font-size: 26px;
-  line-height: 1.4;
-  color: #747a76;
-}
 
 .images-copy-block {
   margin: 0;

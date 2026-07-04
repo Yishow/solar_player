@@ -8,7 +8,6 @@ import {
 import { routeMetaList, routeMetaMap, type PlaybackRouteNavIcon, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
-import { LeafOrnament } from "./LeafOrnament";
 import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 
 type FooterEntry = {
@@ -132,11 +131,7 @@ export function AppFooterNav({
         style={{ zIndex: SHELL_CHROME_CONTENT_Z_INDEX }}
       >
         <div className="flex items-center justify-center w-[32px] h-[32px]">
-          {mode === "playback" ? (
-            <GeometricSunBadge />
-          ) : (
-            <LeafOrnament variant="footer-mini" />
-          )}
+          <GeometricSunBadge />
         </div>
 
         <nav
@@ -165,13 +160,13 @@ export function AppFooterNav({
                   to={entry.path}
                   aria-current={active ? "page" : undefined}
                   className={`${baseClasses} ${mode === "playback" ? playbackClasses : managementClasses} ${
-                    active && mode === "playback" ? "animate-pulse-opacity" : ""
+                    active ? "animate-pulse-opacity" : ""
                   }`}
                   style={{
                     color: active
                       ? "var(--shell-nav-active-ink)"
                       : "var(--shell-nav-rest-ink)",
-                    textShadow: active && mode === "playback" ? undefined : "none",
+                    textShadow: active ? undefined : "none",
                     fontSize: `${navItemFontSize}px`,
                     letterSpacing: active && mode === "management" ? "0.06em" : navItemTracking,
                     paddingLeft: `${navItemPaddingX}px`,
@@ -181,22 +176,20 @@ export function AppFooterNav({
                   {active && (
                     <span
                       aria-hidden="true"
-                      className={`absolute bottom-[12px] h-[2px] rounded-full ${
-                        mode === "playback" ? "bg-[#d4af37]" : "bg-[var(--shell-nav-active-ink)]"
-                      }`}
+                      className="absolute bottom-[12px] h-[2px] rounded-full bg-[var(--shell-nav-underline-gold)]"
                       style={{
                         left: `${activeUnderlineInset}px`,
                         right: `${activeUnderlineInset}px`
                       }}
                     />
                   )}
-                  {mode === "playback" && entry.icon && (
+                  {entry.icon && (
                     <span
                       aria-hidden="true"
                       className="inline-flex h-[15px] w-[15px] items-center justify-center"
                       data-shell-nav-icon={entry.icon}
                     >
-                      <PlaybackNavIcon icon={entry.icon} strokeWidth={mode === "playback" ? 2.0 : 1.65} />
+                      <PlaybackNavIcon icon={entry.icon} strokeWidth={2.0} />
                     </span>
                   )}
                   <span>{entry.label}</span>
@@ -225,11 +218,7 @@ export function AppFooterNav({
               {brandView.sloganEn}
             </div>
           </div>
-          {mode === "playback" ? (
-            <EnergyPulseLine />
-          ) : (
-            <FooterBranch />
-          )}
+          <EnergyPulseLine />
         </div>
       </div>
       <ShellDecorationLayer mount="footer" objects={decorationObjects} plane="foreground" />
