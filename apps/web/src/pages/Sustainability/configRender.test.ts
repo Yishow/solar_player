@@ -211,7 +211,12 @@ test("sustainability runtime resolves duplicated household cards by basis metada
     }
   });
 
-  duplicatedCard.id = "household-cumulative-copy-1";
+  duplicatedCard.id = "household-runtime-copy-1";
+  duplicatedCard.contentSource.payload.basisSourceLabel = "自訂敘事";
+  duplicatedCard.contentSource.payload.provenance = {
+    ...duplicatedCard.contentSource.payload.provenance,
+    source: "cumulative-self-consumption"
+  };
 
   const resolved = resolveHouseholdEquivalentRuntimePayload(
     duplicatedCard,

@@ -264,6 +264,11 @@ test("buildDataSourceSettingsViewModel exposes synchronized calculation coeffici
       ["estimatedTariffPerKwh", "5"]
     ]
   );
+  const fieldDescriptions = Object.fromEntries(
+    viewModel.calculationSettingsCard.fields.map((field) => [field.key, field.description])
+  );
+  assert.equal(fieldDescriptions.householdDailyUsageKwh, "今日自發自用量換算四口之家戶數的每日基準。");
+  assert.equal(fieldDescriptions.householdMonthlyUsageKwh, "累積自發自用量換算四口之家戶數的每月基準。");
   assert.deepEqual(
     viewModel.calculationSettingsCard.toggles.map((toggle) => [toggle.key, toggle.checked]),
     [["co2AutoConvertSmallToKg", false]]

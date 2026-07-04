@@ -73,6 +73,10 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
           bigNumbers: {
             accumulatedGenerationGwh: number;
           };
+          highlights: Array<{
+            unit: string;
+            value: string;
+          }>;
           comparison: {
             fallbackReason: string | null;
             label: string;
@@ -90,6 +94,8 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     assert.equal(body.story.selectedPeriod, "year");
     assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
     assert.equal(body.story.period.bigNumberProvenance.accumulatedGenerationGwh.sourceClass, "runtime-aggregate");
+    assert.equal(body.story.period.highlights[0]?.unit, "MWh");
+    assert.equal(body.story.period.highlights[0]?.value, "18,600.0");
     assert.equal(body.story.period.comparison.state, "unavailable");
     assert.equal(body.story.period.comparison.fallbackReason, "comparison-baseline-missing");
     assert.match(body.story.period.comparison.label, /未提供|無法/);

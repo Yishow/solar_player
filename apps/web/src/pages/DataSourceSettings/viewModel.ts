@@ -31,11 +31,11 @@ export type DataSourceSettingsViewModel = {
     fields: Array<{
       description: string;
       key:
-        | "carbonEmissionFactor"
-        | "estimatedTariffPerKwh"
-        | "householdDailyUsageKwh"
-        | "householdMonthlyUsageKwh"
-        | "treeEquivalentFactor";
+      | "carbonEmissionFactor"
+      | "estimatedTariffPerKwh"
+      | "householdDailyUsageKwh"
+      | "householdMonthlyUsageKwh"
+      | "treeEquivalentFactor";
       label: string;
       unit: string;
       value: string;
@@ -384,15 +384,15 @@ function buildMonitoringCard(
 
   return {
     anomalies: monitoring.anomalyMessages,
-      banner: {
-        detail: hasAnomalies
-          ? monitoring.anomalyMessages.join("；")
-          : monitoring.hasCurrentDaySnapshots
-            ? "今日 snapshot 正常存在，Overview 曲線會隨新資料更新。"
-            : "今日尚無 snapshot；Overview 曲線會先維持空狀態。",
-        title: hasAnomalies ? "今日曲線需要維運注意" : "今日曲線診斷正常",
-        tone: (hasAnomalies ? "warning" : "ready") as SectionTone
-      },
+    banner: {
+      detail: hasAnomalies
+        ? monitoring.anomalyMessages.join("；")
+        : monitoring.hasCurrentDaySnapshots
+          ? "今日 snapshot 正常存在，Overview 曲線會隨新資料更新。"
+          : "今日尚無 snapshot；Overview 曲線會先維持空狀態。",
+      title: hasAnomalies ? "今日曲線需要維運注意" : "今日曲線診斷正常",
+      tone: (hasAnomalies ? "warning" : "ready") as SectionTone
+    },
     metrics,
     resetButtonDisabled: false,
     resetButtonLabel: "重設今日曲線"

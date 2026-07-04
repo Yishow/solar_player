@@ -60,6 +60,15 @@ function normalizeEnergyToKwh(value: number, unit: string | null | undefined) {
   }
 }
 
+function formatGenerationMwh(valueGwh: number | null, digits: number) {
+  return valueGwh === null
+    ? "--"
+    : (valueGwh * 1_000).toLocaleString("zh-TW", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    });
+}
+
 function resolveLiveMetricCounterFallbackValue(
   counterKey: CounterMetricKey,
   value: number,
@@ -291,8 +300,8 @@ function buildBigNumbers(counterMap: CounterMap) {
 
   const annualEnergySavingPercent =
     typeof selfConsumption.value === "number" &&
-    typeof consumption.value === "number" &&
-    consumption.value > 0
+      typeof consumption.value === "number" &&
+      consumption.value > 0
       ? roundTo((selfConsumption.value / consumption.value) * 100, 1)
       : null;
   const plantedTreeEquivalent =
@@ -305,7 +314,7 @@ function buildBigNumbers(counterMap: CounterMap) {
       accumulatedCarbonReductionTons,
       accumulatedGenerationGwh:
         typeof generation.value === "number"
-          ? roundTo(generation.value / 1_000_000, 1)
+          ? roundTo(generation.value / 1_000_000, 6)
           : null,
       annualEnergySavingPercent,
       plantedTreeEquivalent
@@ -357,11 +366,8 @@ function buildDerivedHighlights(
     {
       label: `${prefix}發電`,
       provenance: provenance.accumulatedGenerationGwh,
-      unit: "GWh",
-      value:
-        bigNumbers.accumulatedGenerationGwh === null
-          ? "--"
-          : bigNumbers.accumulatedGenerationGwh.toFixed(1)
+      unit: "MWh",
+      value: formatGenerationMwh(bigNumbers.accumulatedGenerationGwh, 1)
     },
     {
       label: `${prefix}減碳`,
@@ -406,12 +412,12 @@ function mergePeriod(
   const mergedProvenance = mergeProvenance(
     anyRuntimeValuePresent
       ? {
-          ...periodDefaults.provenance,
-          updatedAt:
-            Object.values(derived.provenance)
-              .map((item) => item.updatedAt)
-              .find((value) => value !== null) ?? null
-        }
+        ...periodDefaults.provenance,
+        updatedAt:
+          Object.values(derived.provenance)
+            .map((item) => item.updatedAt)
+            .find((value) => value !== null) ?? null
+      }
       : buildMissingProvenance(periodDefaults.provenance.label),
     inputPeriod?.provenance
   );
@@ -439,15 +445,15 @@ function mergePeriod(
     comparison:
       inputPeriod?.comparison?.state === "available"
         ? {
-            delta: inputPeriod.comparison.delta ?? null,
-            fallbackReason: inputPeriod.comparison.fallbackReason ?? null,
-            label: inputPeriod.comparison.label?.trim() || "比較資料已同步",
-            state: "available"
-          }
+          delta: inputPeriod.comparison.delta ?? null,
+          fallbackReason: inputPeriod.comparison.fallbackReason ?? null,
+          label: inputPeriod.comparison.label?.trim() || "比較資料已同步",
+          state: "available"
+        }
         : {
-            ...periodDefaults.comparison,
-            ...inputPeriod?.comparison
-          },
+          ...periodDefaults.comparison,
+          ...inputPeriod?.comparison
+        },
     highlights:
       inputPeriod?.highlights.length
         ? inputPeriod.highlights

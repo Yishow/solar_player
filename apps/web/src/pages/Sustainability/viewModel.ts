@@ -66,6 +66,15 @@ function formatFixed(value: number | null, digits: number) {
   return value === null ? "--" : value.toFixed(digits);
 }
 
+function formatGenerationMwh(valueGwh: number | null, digits: number) {
+  return valueGwh === null
+    ? "--"
+    : (valueGwh * 1_000).toLocaleString("zh-TW", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    });
+}
+
 function formatInteger(value: number | null) {
   return value === null ? "--" : Math.round(value).toLocaleString("zh-TW");
 }
@@ -77,8 +86,8 @@ function buildDerivedHighlights(
     {
       label: "累積發電",
       provenance: period.bigNumberProvenance.accumulatedGenerationGwh,
-      unit: "GWh",
-      value: formatFixed(period.bigNumbers.accumulatedGenerationGwh, 1)
+      unit: "MWh",
+      value: formatGenerationMwh(period.bigNumbers.accumulatedGenerationGwh, 1)
     },
     {
       label: "累積減碳",
@@ -198,8 +207,8 @@ export function buildSustainabilityViewModel({
         iconKey: "bars" as const,
         label: "累積發電量",
         provenance: resolved.period.bigNumberProvenance.accumulatedGenerationGwh,
-        unit: "GWh",
-        value: formatFixed(resolved.period.bigNumbers.accumulatedGenerationGwh, 1)
+        unit: "MWh",
+        value: formatGenerationMwh(resolved.period.bigNumbers.accumulatedGenerationGwh, 1)
       },
       {
         helper: "Total CO₂ Reduction",

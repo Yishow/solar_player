@@ -121,8 +121,8 @@ const periodStory: SustainabilityStoryInput = {
             syncState: "fresh",
             updatedAt: "2026-05-13T10:00:00.000Z"
           },
-          unit: "GWh",
-          value: "18.6"
+          unit: "MWh",
+          value: "18,600.0"
         }
       ],
       provenance: {
@@ -229,7 +229,7 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   });
 
   assert.equal(model.selectedPeriod, "quarter");
-  assert.equal(model.bigNumbers[0]?.value, "4.8");
+  assert.equal(model.bigNumbers[0]?.value, "4,800.0");
   assert.equal(model.highlights[0]?.label, "本季減碳");
   assert.equal(model.highlights[0]?.value, "312");
   assert.equal(model.provenance.label, "季報");
@@ -265,7 +265,7 @@ test("buildSustainabilityViewModel labels are fixed built-ins with no metric_key
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 
-  assert.equal(model.bigNumbers[0]?.value, "18.6");
+  assert.equal(model.bigNumbers[0]?.value, "18,600.0");
   assert.equal(model.bigNumbers[1]?.value, "9,842");
   assert.equal(model.bigNumbers[2]?.value, "12.4");
   assert.equal(model.comparison.state, "available");
@@ -409,6 +409,6 @@ test("buildSustainabilityViewModel keeps four compatibility highlight slots when
   );
   assert.deepEqual(
     model.highlights.map((item) => item.unit),
-    ["GWh", "tCO₂e", "%", "株"]
+    ["MWh", "tCO₂e", "%", "株"]
   );
 });

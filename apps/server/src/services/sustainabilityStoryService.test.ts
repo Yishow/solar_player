@@ -208,6 +208,8 @@ test("readSustainabilityStory falls back to live metrics when cumulative counter
   assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
   assert.equal(story.period.bigNumbers.annualEnergySavingPercent, 70);
   assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+  assert.equal(story.period.highlights[0]?.unit, "MWh");
+  assert.equal(story.period.highlights[0]?.value, "18,600.0");
   assert.equal(
     story.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
     timestamp
@@ -252,4 +254,30 @@ test("readSustainabilityStory normalizes GWh live metrics before deriving sustai
   assert.equal(story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
   assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
   assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+  assert.equal(story.period.highlights[0]?.unit, "MWh");
+  assert.equal(story.period.highlights[0]?.value, "18,600.0");
+});
+
+test("readSustainabilityStory preserves sub-0.1 GWh precision when formatting MWh highlights", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 18654321, ?, 0),
+          ('consumption', 6000, ?, 0),
+          ('selfConsumption', 4200, ?, 0)
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+
+  const story = readSustainabilityStory("lifetime");
+
+  assert.ok(Math.abs((story.period.bigNumbers.accumulatedGenerationGwh ?? 0) - 18.654321) < 0.000001);
+  assert.equal(story.period.highlights[0]?.unit, "MWh");
+  assert.equal(story.period.highlights[0]?.value, "18,654.3");
 });
