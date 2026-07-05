@@ -11,15 +11,16 @@ import {
 } from "./displayPageConfig";
 
 const overviewSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const overviewRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtimeContent.tsx"), "utf8");
 
-function sourceBetween(start: string, end: string) {
-  const startIndex = overviewSource.indexOf(start);
-  const endIndex = overviewSource.indexOf(end, startIndex);
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex);
 
   assert.ok(startIndex >= 0, `missing source start: ${start}`);
   assert.ok(endIndex > startIndex, `missing source end: ${end}`);
 
-  return overviewSource.slice(startIndex, endIndex);
+  return source.slice(startIndex, endIndex);
 }
 
 test("overview runtime reads resolved display config for hero copy and hero media", () => {
@@ -35,33 +36,31 @@ test("overview runtime reads resolved display config for hero copy and hero medi
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
   assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
   assert.match(overviewSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
-  assert.match(overviewSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
-  assert.match(overviewSource, /DisplayCardFrame/);
-  assert.match(overviewSource, /DisplayCardValueRow/);
-  assert.match(overviewSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
-  assert.match(overviewSource, /<OverviewKpiFooter/);
-  assert.match(overviewSource, /footer=\{resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\}/);
-  assert.match(overviewSource, /metric=\{metric\}/);
+  assert.match(overviewRuntimeSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
+  assert.match(overviewRuntimeSource, /DisplayCardFrame/);
+  assert.match(overviewRuntimeSource, /DisplayCardValueRow/);
+  assert.match(overviewRuntimeSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
+  assert.match(overviewRuntimeSource, /<OverviewKpiFooter/);
+  assert.match(overviewRuntimeSource, /footer=\{resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\}/);
+  assert.match(overviewRuntimeSource, /metric=\{metric\}/);
   assert.doesNotMatch(overviewSource, /import \{ trendSeries \} from \"\.\.\/\.\.\/mocks\/metrics\"/);
   assert.doesNotMatch(overviewSource, /Shared Story Summary/);
 });
 
 test("overview value-only refresh keeps KPI card shell output on the config-only path", () => {
   const shellSource = sourceBetween(
+    overviewRuntimeSource,
     "const kpiCardShells = useMemo(",
-    "const runtimeFallbackBanner = resolveRuntimeFallbackBannerState"
+    "{kpiCardShells.map((shell) => {"
   );
 
   assert.match(shellSource, /const kpiCardShells = useMemo\(/);
   assert.match(shellSource, /\[resolvedConfig\]/);
   assert.match(shellSource, /style: \{/);
   assert.match(shellSource, /createDisplayCardStyleConfig\(resolvedConfig\.cardStyles\[cardItem\.key\]\)/);
-  assert.match(shellSource, /const kpiCards = kpiCardShells\.map/);
-  assert.match(shellSource, /const metric = viewModel\.metrics\[shell\.index\]!/);
-  assert.doesNotMatch(
-    sourceBetween("const kpiCardShells = useMemo(", "const kpiCards = kpiCardShells.map"),
-    /viewModel/
-  );
+  assert.match(overviewRuntimeSource, /\{kpiCardShells\.map\(\(shell\) => \{/);
+  assert.match(overviewRuntimeSource, /const metric = viewModel\.metrics\[shell\.index\]!/);
+  assert.doesNotMatch(shellSource, /viewModel/);
 });
 
 test("overview display page seed config captures the current default hero contract", () => {
@@ -151,8 +150,8 @@ test("overview config preserves a configuring KPI status through resolution", ()
 });
 
 test("overview runtime replaces the value with the configuring placeholder", () => {
-  assert.match(overviewSource, /resolveDisplayPageCardStatus\(resolvedConfig\.kpiCards\[cardItem\.key\]\)/);
-  assert.match(overviewSource, /displayPageCardConfiguringLabel/);
+  assert.match(overviewRuntimeSource, /resolveDisplayPageCardStatus\(resolvedConfig\.kpiCards\[cardItem\.key\]\)/);
+  assert.match(overviewRuntimeSource, /displayPageCardConfiguringLabel/);
 });
 
 test("overview dashboard widget regions default visible and expose visibility toggles", () => {
@@ -181,23 +180,25 @@ test("overview dashboard widget regions default visible and expose visibility to
 });
 
 test("overview runtime gates dashboard widgets through visibility config", () => {
-  assert.match(overviewSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.generationTrend\)/);
-  assert.match(overviewSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.alertNotifications\)/);
-  assert.match(overviewSource, /<GenerationTrendWidget/);
-  assert.match(overviewSource, /series=\{generationTrendSeries\}/);
-  assert.match(overviewSource, /<AlertNotificationsWidget/);
-  assert.match(overviewSource, /alerts=\{viewModel\.alerts\}/);
+  assert.match(overviewRuntimeSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.generationTrend\)/);
+  assert.match(overviewRuntimeSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.alertNotifications\)/);
+  assert.match(overviewRuntimeSource, /<GenerationTrendWidget/);
+  assert.match(overviewRuntimeSource, /series=\{generationTrendSeries\}/);
+  assert.match(overviewRuntimeSource, /<AlertNotificationsWidget/);
+  assert.match(overviewRuntimeSource, /alerts=\{viewModel\.alerts\}/);
   assert.match(
-    overviewSource,
+    overviewRuntimeSource,
     /alwaysShowThresholds=\{resolvedConfig\.dashboardWidgets\.alertNotifications\.alwaysShowThresholds\}/
   );
 });
 
 test("overview runtime keeps story hydration staged behind visible config and live metrics", () => {
-  assert.match(overviewSource, /useLiveMetrics\(\)/);
+  assert.match(overviewRuntimeSource, /useLiveMetricsSelector\(/);
   assert.match(overviewSource, /useDisplayStoryRuntime\("overview",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(overviewSource, /storyRuntime\.payload \?\? undefined/);
-  assert.match(overviewSource, /storyOverview: storyOverviewPayload/);
+  assert.match(overviewRuntimeSource, /storyOverview: storyOverviewPayload/);
+  assert.match(overviewRuntimeSource, /connectionState: overviewRuntimeSelection\.connectionState/);
+  assert.match(overviewRuntimeSource, /isSocketConnected: overviewRuntimeSelection\.isSocketConnected/);
   assert.match(overviewSource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
   assert.match(overviewSource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
 });

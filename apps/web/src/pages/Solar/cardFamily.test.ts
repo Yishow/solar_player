@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const solarSource = readFileSync(path.join(import.meta.dirname, "runtimeContent.tsx"), "utf8");
 
 test("solar KPI cards use the shared display card family", () => {
   assert.match(solarSource, /DisplayCardFrame/);

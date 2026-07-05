@@ -1,79 +1,93 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { requestJson } from "../services/api";
 import {
-  getCachedLiveMetrics,
   getSocketClient,
-  getSocketConnectionState,
-  subscribeConnectionState,
-  subscribeSocketEvent,
-  type LiveMetricsSnapshot,
-  type SocketConnectionState
+  type LiveMetricsSnapshot
 } from "../services/socket";
+import {
+  replaceLiveMetricsSnapshot,
+  useLiveMetricsStoreSelector,
+  type LiveMetricsStoreState
+} from "./liveMetricsStore";
 
-function shouldReplaceSnapshot(current: LiveMetricsSnapshot, next: LiveMetricsSnapshot) {
-  if (current.timestamp === null) {
-    return true;
-  }
-
-  if (next.timestamp === null) {
-    return false;
-  }
-
-  return next.timestamp >= current.timestamp;
-}
-
-type UseLiveMetricsOptions = {
+export type UseLiveMetricsOptions = {
   enabled?: boolean;
 };
 
-export function useLiveMetrics(options: UseLiveMetricsOptions = {}) {
-  const enabled = options.enabled ?? true;
-  const [snapshot, setSnapshot] = useState<LiveMetricsSnapshot>(getCachedLiveMetrics());
-  const [connectionState, setConnectionState] = useState<SocketConnectionState>(
-    getSocketConnectionState()
+export type LiveMetricsSelection = {
+  connectionState: LiveMetricsStoreState["connectionState"]["status"];
+  isSocketConnected: boolean;
+  lastUpdatedAt: LiveMetricsSnapshot["timestamp"];
+  snapshot: LiveMetricsSnapshot;
+};
+
+let initialSnapshotRequest: Promise<void> | null = null;
+
+export function selectLiveMetricsSelection(state: LiveMetricsStoreState): LiveMetricsSelection {
+  return {
+    connectionState: state.connectionState.status,
+    isSocketConnected: state.connectionState.status === "connected",
+    lastUpdatedAt: state.snapshot.timestamp,
+    snapshot: state.snapshot
+  };
+}
+
+export function isLiveMetricsSelectionEqual(
+  current: LiveMetricsSelection,
+  next: LiveMetricsSelection
+) {
+  return (
+    current.connectionState === next.connectionState
+    && current.isSocketConnected === next.isSocketConnected
+    && current.lastUpdatedAt === next.lastUpdatedAt
+    && current.snapshot === next.snapshot
   );
+}
+
+export async function loadInitialLiveMetricsSnapshot(
+  loadSnapshot: () => Promise<LiveMetricsSnapshot> = () => requestJson<LiveMetricsSnapshot>("/api/metrics/live")
+) {
+  const response = await loadSnapshot();
+  replaceLiveMetricsSnapshot(response);
+}
+
+function ensureLiveMetricsRuntime() {
+  getSocketClient();
+
+  if (initialSnapshotRequest !== null) {
+    return;
+  }
+
+  initialSnapshotRequest = loadInitialLiveMetricsSnapshot()
+    .catch(() => {
+      // WebSocket reconnect already handles recovery; failed bootstrap should not break rendering.
+    })
+    .finally(() => {
+      initialSnapshotRequest = null;
+    });
+}
+
+export function useLiveMetricsSelector<T>(
+  selector: (state: LiveMetricsStoreState) => T,
+  isEqual: (current: T, next: T) => boolean = Object.is,
+  options: UseLiveMetricsOptions = {}
+) {
+  const enabled = options.enabled ?? true;
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
-
-    let active = true;
-
-    const loadInitialSnapshot = async () => {
-      try {
-        const response = await requestJson<LiveMetricsSnapshot>("/api/metrics/live");
-        if (!active) {
-          return;
-        }
-
-        setSnapshot((current) => (shouldReplaceSnapshot(current, response) ? response : current));
-      } catch {
-        // WebSocket reconnect already handles recovery; failed bootstrap should not break rendering.
-      }
-    };
-
-    const unsubscribeMetrics = subscribeSocketEvent("liveMetrics:update", (nextSnapshot) => {
-      setSnapshot(nextSnapshot);
-    });
-    const unsubscribeConnection = subscribeConnectionState((nextState) => {
-      setConnectionState(nextState);
-    });
-
-    getSocketClient();
-    void loadInitialSnapshot();
-
-    return () => {
-      active = false;
-      unsubscribeMetrics();
-      unsubscribeConnection();
-    };
+    ensureLiveMetricsRuntime();
   }, [enabled]);
 
-  return {
-    connectionState: connectionState.status,
-    isSocketConnected: connectionState.status === "connected",
-    lastUpdatedAt: snapshot.timestamp,
-    snapshot
-  };
+  return useLiveMetricsStoreSelector(selector, isEqual, enabled);
+}
+
+export function useLiveMetrics(options: UseLiveMetricsOptions = {}) {
+  return useLiveMetricsSelector(
+    selectLiveMetricsSelection,
+    isLiveMetricsSelectionEqual,
+    options
+  );
 }

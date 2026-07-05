@@ -27,7 +27,7 @@ test("shared monitoring story model keeps fallback diagnostics inspectable", () 
 test("shared monitoring slot binding preserves missing-slot diagnostics", () => {
   const binding = resolveMonitoringSlotBinding({
     circuitId: null,
-    slotKey: "production"
+    slotKey: "stamping"
   });
 
   assert.equal(binding.bindingState, "missing");

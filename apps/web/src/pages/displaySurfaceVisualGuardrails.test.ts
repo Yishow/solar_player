@@ -75,6 +75,11 @@ const pageSources = [
   "Images/index.tsx",
   "Sustainability/index.tsx"
 ].map((relativePath) => readFileSync(path.join(import.meta.dirname, relativePath), "utf8"));
+const splitRuntimeSources = [
+  readFileSync(path.join(import.meta.dirname, "Overview/runtimeContent.tsx"), "utf8"),
+  readFileSync(path.join(import.meta.dirname, "Solar/runtimeContent.tsx"), "utf8"),
+  readFileSync(path.join(import.meta.dirname, "FactoryCircuit/runtimeContent.tsx"), "utf8")
+];
 const overviewKpiFooterSource = readFileSync(
   path.join(import.meta.dirname, "Overview/OverviewKpiFooter.tsx"),
   "utf8"
@@ -206,18 +211,26 @@ test("runtime preview definitions expose renderers and seed configs for all five
 });
 
 test("shared card primitives remain the expected display playback path where card families already exist", () => {
-  for (const source of pageSources) {
-    assert.match(source, /DisplayCardFrame/);
-    assert.match(source, /DisplayCardHeader/);
+  const cardRenderSources = [
+    [pageSources[0]!, splitRuntimeSources[0]!, overviewKpiFooterSource],
+    [pageSources[1]!, splitRuntimeSources[1]!],
+    [pageSources[2]!, splitRuntimeSources[2]!],
+    [pageSources[3]!],
+    [pageSources[4]!]
+  ];
+
+  for (const sources of cardRenderSources) {
+    assert.ok(sources.some((source) => /DisplayCardFrame/.test(source)));
+    assert.ok(sources.some((source) => /DisplayCardHeader/.test(source)));
   }
 
   assert.ok(
-    /DisplayCardFooter/.test(pageSources[0]!) || /DisplayCardFooter/.test(overviewKpiFooterSource),
+    cardRenderSources[0]!.some((source) => /DisplayCardFooter/.test(source)),
     "expected Overview surface to keep using DisplayCardFooter either in the page renderer or its footer primitive"
   );
 
-  for (const source of pageSources.slice(1)) {
-    assert.match(source, /DisplayCardFooter/);
+  for (const sources of cardRenderSources.slice(1)) {
+    assert.ok(sources.some((source) => /DisplayCardFooter/.test(source)));
   }
 });
 

@@ -230,14 +230,14 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
         totalPower: createPageIconKeySource("factory-circuit", "bolt")
       },
       loadRows: {
-        stamping: createPageIconKeySource("factory-circuit", "factory"),
-        body: createPageIconKeySource("factory-circuit", "wind"),
-        painting: createPageIconKeySource("factory-circuit", "lightbulb"),
-        assembly: createPageIconKeySource("factory-circuit", "building-2"),
-        utility: createPageIconKeySource("factory-circuit", "battery-charging"),
-        office: createPageIconKeySource("factory-circuit", "settings-2"),
-        heavy_vehicle: createPageIconKeySource("factory-circuit", "car"),
-        ed_coating: createPageIconKeySource("factory-circuit", "refresh")
+        stamping: createPageIconKeySource("factory-circuit", "production-line"),
+        body: createPageIconKeySource("factory-circuit", "infrastructure"),
+        painting: createPageIconKeySource("factory-circuit", "lighting"),
+        assembly: createPageIconKeySource("factory-circuit", "production-line"),
+        utility: createPageIconKeySource("factory-circuit", "bolt"),
+        office: createPageIconKeySource("factory-circuit", "office"),
+        heavy_vehicle: createPageIconKeySource("factory-circuit", "ev"),
+        ed_coating: createPageIconKeySource("factory-circuit", "trend")
       },
       nodes: {
         board: createPageIconKeySource("factory-circuit", "switchboard"),

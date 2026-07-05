@@ -1,10 +1,4 @@
-# playback-overview-solar-value-refresh-isolation Specification
-
-## Purpose
-
-TBD - created by archiving change 'playback-overview-solar-value-refresh-isolation'. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Overview and Solar keep static subtree output stable during value-only refresh
 
@@ -34,41 +28,3 @@ The system SHALL keep static layout, hero media, ornament, connector, and card-s
 - **WHEN** Solar receives new live values or story payload while its config and icon sources stay unchanged
 - **THEN** the page updates only the value-bearing subtree that depends on the changed runtime inputs
 - **AND** the connector, flow-node geometry, and hero shell remain equivalent to the pre-refresh render
-
-<!-- @trace
-source: optimize-playback-live-metrics-subscriptions
-updated: 2026-07-05
-code:
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - apps/web/src/services/socket.ts
-  - apps/web/src/pages/Overview/runtimeContent.tsx
-  - apps/web/src/pages/Solar/runtimeContent.tsx
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
-  - apps/web/src/hooks/liveMetricsStore.ts
-  - apps/web/src/hooks/useLiveMetrics.ts
-tests:
-  - apps/web/src/pages/Solar/cardFamily.test.ts
-  - apps/web/src/pages/FactoryCircuit/index.test.tsx
-  - apps/web/src/hooks/liveMetricsStore.test.ts
-  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
-  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
-  - apps/web/src/pages/displayPageIconRendering.test.ts
-  - apps/web/src/components/AppHeader.test.ts
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/web/src/pages/runtimeConfigHydration.test.ts
-  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
-  - apps/web/src/pages/Overview/cardVisibility.test.ts
-  - apps/web/src/pages/FactoryCircuit/runtimeIsolation.test.tsx
-  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/pages/Overview/layout.test.ts
-  - apps/web/src/pages/Overview/render.test.ts
-  - apps/server/src/services/displayStoryTopicNames.test.ts
-  - apps/web/src/pages/Solar/runtimeIsolation.test.tsx
--->

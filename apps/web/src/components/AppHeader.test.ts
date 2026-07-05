@@ -88,7 +88,9 @@ test("AppHeader emphasizes '綠能' and clock contains drop-shadow glow", () => 
           brandNameZh: "國瑞汽車",
           brandNameEn: "KUOZUI MOTOR",
           productTitleZh: "綠能展示系統",
-          productTitleEn: "Green Energy Display System"
+          productTitleEn: "Green Energy Display System",
+          sloganZh: "永續驅動未來",
+          sloganEn: "Driving a Sustainable Future"
         }
       })
     )
@@ -131,5 +133,4 @@ test("AppHeader optimizes weather spin animation, clock meta color, and right cl
   assert.match(headerHtml, /data-shell-primitive="header-weather"[^>]*style="[^"]*text-shadow:0 1px 3px rgba\(0,\s*0,\s*0,\s*0\.12\),\s*0 2px 8px rgba\(0,\s*0,\s*0,\s*0\.05\)/);
   assert.match(headerHtml, /data-shell-primitive="status-pill"[^>]*style="[^"]*text-shadow:0 1px 3px rgba\(0,\s*0,\s*0,\s*0\.12\),\s*0 2px 8px rgba\(0,\s*0,\s*0,\s*0\.05\)/);
 });
-
 

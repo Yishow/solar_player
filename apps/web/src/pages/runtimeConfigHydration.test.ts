@@ -12,11 +12,11 @@ const runtimePages = [
   "Images"
 ] as const;
 
-const viewModelBuilders = {
-  FactoryCircuit: "buildFactoryCircuitViewModel",
+const runtimeEntryMarkers = {
+  FactoryCircuit: "FactoryCircuitRuntimeContent",
   Images: "buildImagesViewModel",
-  Overview: "buildOverviewViewModel",
-  Solar: "buildSolarViewModel",
+  Overview: "OverviewRuntimeContent",
+  Solar: "SolarRuntimeContent",
   Sustainability: "buildSustainabilityViewModel"
 } as const;
 
@@ -24,10 +24,10 @@ test("live runtime display pages defer first paint until persisted config hydrat
   for (const pageName of runtimePages) {
     const source = readFileSync(path.join(import.meta.dirname, pageName, "index.tsx"), "utf8");
     const guardIndex = source.indexOf("shouldDeferDisplayPageRuntimeRender");
-    const viewModelIndex = source.indexOf(viewModelBuilders[pageName]);
+    const runtimeEntryIndex = source.indexOf(runtimeEntryMarkers[pageName]);
     const guardSlice =
-      guardIndex !== -1 && viewModelIndex !== -1
-        ? source.slice(guardIndex, viewModelIndex)
+      guardIndex !== -1 && runtimeEntryIndex !== -1
+        ? source.slice(guardIndex, runtimeEntryIndex)
         : "";
 
     assert.match(source, /shouldDeferDisplayPageRuntimeRender/, `${pageName} should use runtime render defer guard`);
@@ -35,7 +35,10 @@ test("live runtime display pages defer first paint until persisted config hydrat
     assert.match(source, /RuntimeConfigFallbackBanner/, `${pageName} should surface runtime hydration fallback warnings`);
     assert.match(source, /DisplayPageLoadingState/, `${pageName} should render the shared loading state during cold hydration`);
     assert.doesNotMatch(guardSlice, /return null;/, `${pageName} should not render blank content during the defer window`);
-    assert.ok(guardIndex !== -1 && viewModelIndex !== -1 && guardIndex < viewModelIndex, `${pageName} should defer before building its runtime view model`);
+    assert.ok(
+      guardIndex !== -1 && runtimeEntryIndex !== -1 && guardIndex < runtimeEntryIndex,
+      `${pageName} should defer before entering its runtime content path`
+    );
   }
 });
 

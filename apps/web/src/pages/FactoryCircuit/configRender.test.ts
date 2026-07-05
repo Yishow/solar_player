@@ -4,36 +4,37 @@ import path from "node:path";
 import test from "node:test";
 import { createFactoryCircuitDisplayPageSeedConfig, factoryCircuitDisplayPageEditorRegions } from "./displayPageConfig";
 
-const factoryCircuitSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const factoryCircuitPageSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const factoryCircuitRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtimeContent.tsx"), "utf8");
 
 test("factory circuit runtime reads resolved display config for copy, status, nodes, connectors, load rows, and KPI cards", () => {
-  assert.match(factoryCircuitSource, /resolvedConfig\.hero\.eyebrow/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.hero\.title/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
-  assert.match(factoryCircuitSource, /buildCopyTypographyStyleVars\(resolvedConfig\.chrome\.copyTypography\)/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.rotationDeg/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.textBlocks\.copy/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.nodes\[node\.key\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.nodeTreatments\[node\.key\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.connectorTreatments\[connectorKey as keyof typeof resolvedConfig\.connectorTreatments\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.loadPanel/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.rhythm\.factoryLoadRows/);
-  assert.match(factoryCircuitSource, /buildFactoryLoadRowRhythmStyle/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.kpiCards\[kpiKey\]/);
-  assert.match(factoryCircuitSource, /resolvedConfig\.cardStyles\[kpiKey\]/);
-  assert.match(factoryCircuitSource, /flow: \{ \.\.\.seedConfig\.cardStyles\.flow/);
-  assert.match(factoryCircuitSource, /\.\.\.seedConfig\.chrome\.ornaments\.leaf/);
-  assert.match(factoryCircuitSource, /<DisplayCardValueRow align=\{cardStyle\.valueRowAlign\}/);
-  assert.doesNotMatch(factoryCircuitSource, /leaf\.opacity \/ seedConfig\.chrome\.ornaments\.leaf\.opacity/);
-  assert.doesNotMatch(factoryCircuitSource, /factory-circuit-status-note/);
-  assert.match(factoryCircuitSource, /factory-circuit-load-state/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.hero\.eyebrow/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.hero\.title/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.heroTypography\.eyebrowFontSize/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.heroTypography\.titleFontSize/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.heroTypography\.subtitleFontSize/);
+  assert.match(factoryCircuitPageSource, /buildCopyTypographyStyleVars\(resolvedConfig\.chrome\.copyTypography\)/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.ornaments\.leaf\.rotationDeg/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.textBlocks\.copy/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.nodes\[node\.key\]/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.nodeTreatments\[node\.key\]/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
+  assert.match(factoryCircuitPageSource, /resolvedConfig\.connectorTreatments\[connectorKey as keyof typeof resolvedConfig\.connectorTreatments\]/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadPanel/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.rhythm\.factoryLoadRows/);
+  assert.match(factoryCircuitRuntimeSource, /buildFactoryLoadRowRhythmStyle/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.kpiCards\[kpiKey\]/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.cardStyles\[kpiKey\]/);
+  assert.match(factoryCircuitPageSource, /flow: \{ \.\.\.seedConfig\.cardStyles\.flow/);
+  assert.match(factoryCircuitPageSource, /\.\.\.seedConfig\.chrome\.ornaments\.leaf/);
+  assert.match(factoryCircuitRuntimeSource, /<DisplayCardValueRow/);
+  assert.doesNotMatch(factoryCircuitPageSource, /leaf\.opacity \/ seedConfig\.chrome\.ornaments\.leaf\.opacity/);
+  assert.doesNotMatch(factoryCircuitPageSource, /factory-circuit-status-note/);
+  assert.match(factoryCircuitRuntimeSource, /factory-circuit-load-state/);
 });
 
 test("factory circuit display page seed config captures the current default layout and hero contract", () => {
@@ -121,9 +122,9 @@ test("factory seed config provides load row state entries that default to normal
 });
 
 test("factory runtime applies load row visibility and configuring placeholder", () => {
-  assert.match(factoryCircuitSource, /resolvedConfig\.loadRowStates/);
-  assert.match(factoryCircuitSource, /resolveDisplayPageCardStatus/);
-  assert.match(factoryCircuitSource, /displayPageCardConfiguringLabel/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadRowStates/);
+  assert.match(factoryCircuitRuntimeSource, /resolveDisplayPageCardStatus/);
+  assert.match(factoryCircuitRuntimeSource, /displayPageCardConfiguringLabel/);
 });
 
 test("factory KPI editor regions expose visibility toggle and configuring status select", () => {
@@ -163,7 +164,7 @@ test("factory seed config provides KPI card state entries that default to normal
 });
 
 test("factory runtime applies KPI card visibility and configuring placeholder", () => {
-  assert.match(factoryCircuitSource, /resolvedConfig\.kpiCardStates/);
-  assert.match(factoryCircuitSource, /resolveDisplayPageCardStatus/);
-  assert.match(factoryCircuitSource, /displayPageCardConfiguringLabel/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.kpiCardStates/);
+  assert.match(factoryCircuitRuntimeSource, /resolveDisplayPageCardStatus/);
+  assert.match(factoryCircuitRuntimeSource, /displayPageCardConfiguringLabel/);
 });

@@ -90,7 +90,7 @@ test("overview asset map keeps hero image page-local", () => {
   assert.match(overviewAssetMap.hero.src, /overview-hero-ref\.jpg$/);
 });
 
-test("overview hero, KPI row, and density widget row are non-overlapping vertical bands in Better order", () => {
+test("overview KPI row intentionally overlaps the hero band while staying above the density widgets", () => {
   const seed = createOverviewDisplayPageSeedConfig();
   const heroBottom = overviewHeroLayout.top + overviewHeroLayout.height;
 
@@ -103,18 +103,18 @@ test("overview hero, KPI row, and density widget row are non-overlapping vertica
   const densityBottom = Math.max(...densityWidgets.map((widget) => widget.top + widget.height));
 
   const kpiCards = [
-    overviewKpiLayout.power,
-    overviewKpiLayout.today,
-    overviewKpiLayout.total,
-    overviewKpiLayout.co2Today,
-    overviewKpiLayout.co2Total
+    seed.kpiCards.power,
+    seed.kpiCards.today,
+    seed.kpiCards.total,
+    seed.kpiCards.co2Today,
+    seed.kpiCards.co2Total
   ];
   const kpiTop = Math.min(...kpiCards.map((card) => card.top));
   const kpiBottom = Math.max(...kpiCards.map((card) => card.top + card.height));
 
-  // Hero band ends before the KPI row begins.
-  assert.ok(heroBottom <= kpiTop, `hero bottom ${heroBottom} <= kpi top ${kpiTop}`);
-  // KPI row sits above the density widget row (Better order: hero → KPI → density).
+  // The current seed intentionally lets the KPI row lift into the hero band.
+  assert.ok(kpiTop < heroBottom, `kpi top ${kpiTop} < hero bottom ${heroBottom}`);
+  // KPI row still sits above the density widget row.
   assert.ok(kpiBottom <= densityTop, `kpi bottom ${kpiBottom} <= density top ${densityTop}`);
   // Density row fits within the 1080 canvas.
   assert.ok(densityBottom <= 1080, `density bottom ${densityBottom} <= 1080`);

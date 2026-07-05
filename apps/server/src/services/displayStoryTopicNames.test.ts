@@ -58,36 +58,36 @@ test("solar story uses custom topic name as label when set", () => {
 });
 
 test("factory circuit slot prefers topic name over circuit config name", () => {
-  setTopicName("factoryProductionPower", "一號產線", "Line 1");
+  setTopicName("factoryStampingPower", "一號產線", "Line 1");
 
   const story = storyService.readFactoryCircuitDisplayStory();
-  const slot = story.slots.find((entry) => entry.slotKey === "production");
+  const slot = story.slots.find((entry) => entry.slotKey === "stamping");
 
   assert.equal(slot?.label, "一號產線");
 });
 
 test("factory circuit slot preserves the custom english topic name for playback", () => {
-  setTopicName("factoryProductionPower", "一號產線", "Line 1");
+  setTopicName("factoryStampingPower", "一號產線", "Line 1");
 
   const story = storyService.readFactoryCircuitDisplayStory();
-  const slot = story.slots.find((entry) => entry.slotKey === "production");
+  const slot = story.slots.find((entry) => entry.slotKey === "stamping");
 
   assert.equal(slot?.labelZh, "一號產線");
   assert.equal(slot?.labelEn, "Line 1");
 });
 
 test("factory circuit slot uses circuit config name when topic name is empty", () => {
-  setTopicName("factoryProductionPower", null, null);
+  setTopicName("factoryStampingPower", null, null);
 
   const circuitName = (
     getDatabase()
       .prepare("SELECT name_zh FROM circuit_configs WHERE display_slot = ?")
-      .get("production") as { name_zh: string | null } | undefined
+      .get("stamping") as { name_zh: string | null } | undefined
   )?.name_zh;
 
   const story = storyService.readFactoryCircuitDisplayStory();
-  const slot = story.slots.find((entry) => entry.slotKey === "production");
+  const slot = story.slots.find((entry) => entry.slotKey === "stamping");
 
   // Without a topic name, the label should come from circuit config (or slot default).
-  assert.equal(slot?.label, circuitName ?? "production");
+  assert.equal(slot?.label, circuitName ?? "沖壓工程");
 });

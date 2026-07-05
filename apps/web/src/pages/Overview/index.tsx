@@ -1,12 +1,6 @@
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
-import { useMemo, useState, useEffect } from "react";
+import { memo, useMemo, useState, useEffect, type CSSProperties } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
-import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
-import {
-  DisplayCardFrame,
-  DisplayCardHeader,
-  DisplayCardValueRow
-} from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
@@ -14,16 +8,12 @@ import {
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
-import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import { useOverviewWeather } from "../../hooks/useOverviewWeather";
 import {
-  displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus,
   resolveDisplayPageMediaSource
 } from "@solar-display/shared";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
-import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   overviewHeroMediaEffectResolverOptions
@@ -37,8 +27,6 @@ import { pickOverviewBackground } from "./backgroundPool";
 import {
   createOverviewDisplayPageSeedConfig,
   resolveOverviewModernDefaultConfig,
-  shouldRenderOverviewDashboardWidget,
-  shouldRenderOverviewKpiCard,
   type OverviewDisplayPageConfig
 } from "./displayPageConfig";
 import {
@@ -47,12 +35,8 @@ import {
 } from "./layout";
 import "../../components/displayPageCards.css";
 import "./overview.css";
-import { OverviewKpiFooter } from "./OverviewKpiFooter";
-import { buildOverviewViewModel, resolveOverviewWeatherSnapshot } from "./viewModel";
-import { AlertNotificationsWidget } from "./widgets/AlertNotificationsWidget";
-import { GenerationTrendWidget } from "./widgets/GenerationTrendWidget";
-import { PhasePowerTableWidget } from "./widgets/PhasePowerTableWidget";
-import { WeatherCardWidget } from "./widgets/WeatherCardWidget";
+import { resolveOverviewWeatherSnapshot } from "./viewModel";
+import { OverviewRuntimeContent } from "./runtimeContent";
 
 const CONTENT_TOP_OFFSET = 146;
 
@@ -103,350 +87,67 @@ function renderOverviewTitleLine(line: string) {
   );
 }
 
-export function Overview({ config, pageId = "overview" }: { config?: OverviewDisplayPageConfig; pageId?: string }) {
-  useBodyClass("page-hero-shell");
-  const { connectionState, isSocketConnected, snapshot } = useLiveMetrics();
-  const runtimeHydrationEnabled = config === undefined;
-  const weatherSnapshot = useOverviewWeather(runtimeHydrationEnabled);
-  const { status: mqttStatus } = useMqttStatus(undefined, { enabled: runtimeHydrationEnabled });
-  const resolvedWeatherSnapshot = resolveOverviewWeatherSnapshot(
-    weatherSnapshot,
-    runtimeHydrationEnabled && mqttStatus.reason === "mock"
-  );
-  const runtimeStage = "live" as const;
-  const seedConfig = useMemo(
-    () =>
-      createOverviewDisplayPageSeedConfig(
-        overviewAssetRuntimeMap.hero,
-        undefined,
-        overviewAssetRuntimeMap.backgrounds
-      ),
-    []
-  );
-  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
-    enabled: runtimeHydrationEnabled,
-    stage: runtimeStage
-  });
-  const storyRuntime = useDisplayStoryRuntime("overview", {
-    enabled: runtimeHydrationEnabled
-  });
-
-  const resolvedConfig = useMemo(
-    () => resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig),
-    [config, runtimeConfig.config, seedConfig]
-  );
-  const backgroundPoolSources = resolvedConfig.backgroundPool.sources;
-  const backgroundPoolSignature = backgroundPoolSources
-    .map((source) => source.src ?? source.assetId ?? "")
-    .join("|");
-  const selectedBackground = useMemo(
-    () => pickOverviewBackground(backgroundPoolSources),
-    // Re-randomise only when the candidate pool changes; each rotation entry
-    // remounts the page (route host `key`), so mount = fresh random pick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [backgroundPoolSignature]
-  );
-
-  const storyOverviewPayload = storyRuntime.payload ?? undefined;
-  const viewModel = useMemo(
-    () =>
-      buildOverviewViewModel({
-        connectionState,
-        isSocketConnected,
-        snapshot,
-        storyOverview: storyOverviewPayload,
-        weatherSnapshot: resolvedWeatherSnapshot
-      }),
-    [connectionState, isSocketConnected, snapshot, storyOverviewPayload, resolvedWeatherSnapshot]
-  );
-
-  const backgroundSource = useMemo(
-    () =>
-      selectedBackground
-        ? resolveDisplayPageMediaSource(selectedBackground, selectedBackground.src ?? null)
-        : null,
-    [selectedBackground]
-  );
-  const heroMediaSource = useMemo(
-    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
-    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
-  );
-  const heroMediaPresentation = useMemo(
-    () =>
-      buildDisplayPageMediaPresentation(resolvedConfig.heroMedia, overviewHeroMediaEffectResolverOptions),
-    [resolvedConfig.heroMedia]
-  );
-
-  const activeBackgroundSrc = backgroundSource ?? heroMediaSource ?? undefined;
-  const [bgTransition, setBgTransition] = useState<{
+const OverviewStaticShell = memo(function OverviewStaticShell({
+  bgTransition,
+  freeformObjects,
+  goldLineStyle,
+  heroBannerStyle,
+  heroMediaPresentation,
+  leafOrnamentStyle,
+  resolvedConfig,
+  selectedBackground,
+  subtitleStyle,
+  titleGroupStyle,
+  titleStyle,
+  eyebrowStyle
+}: {
+  bgTransition: {
     current: string | undefined;
     prev: string | undefined;
     fadeCurrent: boolean;
-  }>({
-    current: activeBackgroundSrc,
-    prev: undefined,
-    fadeCurrent: false
-  });
-
-  useEffect(() => {
-    if (activeBackgroundSrc !== bgTransition.current) {
-      setBgTransition((prev) => ({
-        current: activeBackgroundSrc,
-        prev: prev.current,
-        fadeCurrent: true
-      }));
-    }
-  }, [activeBackgroundSrc, bgTransition.current]);
-
-  useEffect(() => {
-    if (bgTransition.fadeCurrent) {
-      const frame = requestAnimationFrame(() => {
-        setBgTransition((prev) => ({
-          ...prev,
-          fadeCurrent: false
-        }));
-      });
-
-      const timer = setTimeout(() => {
-        setBgTransition((prev) => ({
-          ...prev,
-          prev: undefined
-        }));
-      }, 1000);
-
-      return () => {
-        cancelAnimationFrame(frame);
-        clearTimeout(timer);
-      };
-    }
-  }, [bgTransition.fadeCurrent]);
-
-  const heroTypography = resolvedConfig.chrome.heroTypography;
-  const freeformObjects =
-    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-
-  const titleLayout = useMemo(() => withContentOffset(resolvedConfig.heroCopyLayout), [resolvedConfig.heroCopyLayout]);
-  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
-  const leafLayout = useMemo(() => withContentOffset(overviewLeafLayout), []);
-  const goldLineLayout = useMemo(() => withContentOffset(overviewGoldLineLayout), []);
-  const generationTrendLayout = useMemo(
-    () => withContentOffset(resolvedConfig.dashboardWidgets.generationTrend),
-    [resolvedConfig.dashboardWidgets.generationTrend]
-  );
-  const alertNotificationsLayout = useMemo(
-    () => withContentOffset(resolvedConfig.dashboardWidgets.alertNotifications),
-    [resolvedConfig.dashboardWidgets.alertNotifications]
-  );
-  const weatherLayout = useMemo(
-    () => withContentOffset(resolvedConfig.dashboardWidgets.weather),
-    [resolvedConfig.dashboardWidgets.weather]
-  );
-  const phasePowerLayout = useMemo(
-    () => withContentOffset(resolvedConfig.dashboardWidgets.phasePower),
-    [resolvedConfig.dashboardWidgets.phasePower]
-  );
-  const generationTrendSeries = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [],
-    [viewModel.metrics]
-  );
-  const generationTrendHours = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendHours,
-    [viewModel.metrics]
-  );
-  const generationTrendUnit = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendUnit,
-    [viewModel.metrics]
-  );
-
-  const leafOrnamentStyle = useMemo(
-    () => ({
-      height: `${leafLayout.height}px`,
-      left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
-      top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
-      width: `${leafLayout.width}px`,
-      "--display-leaf-opacity": resolvedConfig.chrome.ornaments.leaf.opacity,
-      "--display-leaf-scale": resolvedConfig.chrome.ornaments.leaf.scale
-    } as React.CSSProperties),
-    [leafLayout, resolvedConfig.chrome.ornaments.leaf]
-  );
-  const goldLineStyle = useMemo(
-    () => ({
-      height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
-      left: `${goldLineLayout.left}px`,
-      opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
-      top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
-      width: `${goldLineLayout.width}px`
-    }),
-    [goldLineLayout, resolvedConfig.chrome.ornaments.goldLine]
-  );
-  const titleGroupStyle = useMemo(
-    () => ({
-      left: `${titleLayout.left}px`,
-      top: `${titleLayout.top}px`,
-      width: `${titleLayout.width}px`
-    }),
-    [titleLayout]
-  );
-  const eyebrowStyle = useMemo(
-    () => ({
-      fontSize: `${heroTypography.eyebrowFontSize}px`,
-      letterSpacing: `${heroTypography.eyebrowLetterSpacing}px`,
-      marginBottom: `${heroTypography.eyebrowMarginBottom}px`
-    }),
-    [heroTypography]
-  );
-  const titleStyle = useMemo(
-    () => ({
-      fontSize: `${heroTypography.titleFontSize}px`,
-      fontWeight: heroTypography.titleEmphasisWeight,
-      letterSpacing: `${heroTypography.titleLetterSpacing}px`,
-      lineHeight: heroTypography.titleLineHeight
-    }),
-    [heroTypography]
-  );
-  const subtitleStyle = useMemo(
-    () => ({
-      fontSize: `${heroTypography.subtitleFontSize}px`,
-      lineHeight: heroTypography.subtitleLineHeight,
-      marginTop: `${heroTypography.subtitleMarginTop}px`
-    }),
-    [heroTypography]
-  );
-  const heroBannerStyle = useMemo(
-    () => ({
-      ...heroMediaPresentation.stageStyle,
-      height: `${heroLayout.height}px`,
-      left: `${heroLayout.left}px`,
-      top: `${heroLayout.top}px`,
-      width: `${heroLayout.width}px`
-    }),
-    [heroMediaPresentation.stageStyle, heroLayout]
-  );
-  const weatherWidgetStyle = useMemo(
-    () => ({
-      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.weather),
-      height: `${weatherLayout.height}px`,
-      left: `${weatherLayout.left}px`,
-      top: `${weatherLayout.top}px`,
-      width: `${weatherLayout.width}px`
-    }),
-    [resolvedConfig.widgetStyles.weather, weatherLayout]
-  );
-  const phasePowerWidgetStyle = useMemo(
-    () => ({
-      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.phasePower),
-      height: `${phasePowerLayout.height}px`,
-      left: `${phasePowerLayout.left}px`,
-      top: `${phasePowerLayout.top}px`,
-      width: `${phasePowerLayout.width}px`
-    }),
-    [resolvedConfig.widgetStyles.phasePower, phasePowerLayout]
-  );
-  const generationTrendWidgetStyle = useMemo(
-    () => ({
-      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.generationTrend),
-      height: `${generationTrendLayout.height}px`,
-      left: `${generationTrendLayout.left}px`,
-      top: `${generationTrendLayout.top}px`,
-      width: `${generationTrendLayout.width}px`
-    }),
-    [resolvedConfig.widgetStyles.generationTrend, generationTrendLayout]
-  );
-  const alertNotificationsWidgetStyle = useMemo(
-    () => ({
-      ...buildDisplayCardStyleVars(resolvedConfig.widgetStyles.alertNotifications),
-      height: `${alertNotificationsLayout.height}px`,
-      left: `${alertNotificationsLayout.left}px`,
-      top: `${alertNotificationsLayout.top}px`,
-      width: `${alertNotificationsLayout.width}px`
-    }),
-    [resolvedConfig.widgetStyles.alertNotifications, alertNotificationsLayout]
-  );
-
-  const kpiCardShells = useMemo(
-    () =>
-      overviewCardOrder.map((cardItem, index) => {
-        if (!shouldRenderOverviewKpiCard(resolvedConfig.kpiCards[cardItem.key])) {
-          return null;
-        }
-
-        const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
-        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]);
-        const status = resolveDisplayPageCardStatus(resolvedConfig.kpiCards[cardItem.key]);
-
-        return {
-          cardItem,
-          cardStyle,
-          index,
-          status,
-          style: {
-            height: `${layout.height}px`,
-            left: `${layout.left}px`,
-            top: `${layout.top}px`,
-            width: `${layout.width}px`
-          }
-        };
-      }),
-    [resolvedConfig]
-  );
-
-  const kpiCards = kpiCardShells.map((shell) => {
-    if (!shell) {
-      return null;
-    }
-
-    const metric = viewModel.metrics[shell.index]!;
-    const isConfiguring = shell.status === "configuring";
-
-    return (
-      <DisplayCardFrame
-        cardStyle={shell.cardStyle}
-        key={metric.metricKey}
-        className="overview-kpi-card"
-        surface="metric"
-        style={shell.style}
-      >
-        <DisplayCardHeader
-          icon={renderDisplayPageIcon({
-            alt: metric.label,
-            className: "overview-kpi-icon",
-            seedSource: seedConfig.iconSources[shell.cardItem.key],
-            source: resolvedConfig.iconSources[shell.cardItem.key]
-          })}
-          iconContainerClassName="overview-kpi-icon-shell"
-          subtitle={shell.cardItem.englishLabel}
-          title={metric.label}
-        />
-        <DisplayCardValueRow
-          align={shell.cardStyle.valueRowAlign}
-          unit={isConfiguring ? "" : metric.unit}
-          value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
-        />
-        <OverviewKpiFooter footer={resolvedConfig.kpiCards[shell.cardItem.key]} metric={metric} />
-      </DisplayCardFrame>
-    );
-  });
-
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
-    usesRuntimeFallback: storyRuntime.usesFallback
-  });
-
-  if (
-    shouldDeferDisplayPageRuntimeRender({
-      runtimeHydrationEnabled,
-      isLoading: runtimeConfig.isLoading,
-      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
-      stage: runtimeStage
-    })
-  ) {
-    return <DisplayPageLoadingState />;
-  }
-
+  };
+  freeformObjects: DisplayPageFreeformObject[];
+  goldLineStyle: {
+    height: string;
+    left: string;
+    opacity: number;
+    top: string;
+    width: string;
+  };
+  heroBannerStyle: {
+    height: string;
+    left: string;
+    top: string;
+    width: string;
+  };
+  heroMediaPresentation: ReturnType<typeof buildDisplayPageMediaPresentation>;
+  leafOrnamentStyle: CSSProperties;
+  resolvedConfig: OverviewDisplayPageConfig;
+  selectedBackground: ReturnType<typeof pickOverviewBackground> | undefined;
+  subtitleStyle: {
+    fontSize: string;
+    lineHeight: number;
+    marginTop: string;
+  };
+  titleGroupStyle: {
+    left: string;
+    top: string;
+    width: string;
+  };
+  titleStyle: {
+    fontSize: string;
+    fontWeight: number;
+    letterSpacing: string;
+    lineHeight: number;
+  };
+  eyebrowStyle: {
+    fontSize: string;
+    letterSpacing: string;
+    marginBottom: string;
+  };
+}) {
   return (
-    <section className="overview-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
+    <>
       <DisplayLeafOrnament
         className="overview-leaf-watermark display-surface-leaf-ornament"
         config={resolvedConfig.chrome.ornaments.leaf}
@@ -527,37 +228,229 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         ))}
       </figure>
 
-      {kpiCards}
-      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.weather) ? (
-        <WeatherCardWidget
-          weather={viewModel.weather}
-          style={weatherWidgetStyle}
-          themeMode={resolvedConfig.weatherThemeMode}
-          manualTheme={resolvedConfig.weatherManualTheme}
-        />
-      ) : null}
-      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.phasePower) ? (
-        <PhasePowerTableWidget
-          phasePower={viewModel.phasePower}
-          style={phasePowerWidgetStyle}
-        />
-      ) : null}
-      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend) ? (
-        <GenerationTrendWidget
-          hours={generationTrendHours}
-          series={generationTrendSeries}
-          unit={generationTrendUnit}
-          style={generationTrendWidgetStyle}
-        />
-      ) : null}
-      {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.alertNotifications) ? (
-        <AlertNotificationsWidget
-          alerts={viewModel.alerts}
-          alwaysShowThresholds={resolvedConfig.dashboardWidgets.alertNotifications.alwaysShowThresholds}
-          style={alertNotificationsWidgetStyle}
-        />
-      ) : null}
       <DisplayPageObjectLayer objects={freeformObjects} />
+    </>
+  );
+});
+
+export function Overview({ config, pageId = "overview" }: { config?: OverviewDisplayPageConfig; pageId?: string }) {
+  useBodyClass("page-hero-shell");
+  const runtimeHydrationEnabled = config === undefined;
+  const weatherSnapshot = useOverviewWeather(runtimeHydrationEnabled);
+  const { status: mqttStatus } = useMqttStatus(undefined, { enabled: runtimeHydrationEnabled });
+  const resolvedWeatherSnapshot = resolveOverviewWeatherSnapshot(
+    weatherSnapshot,
+    runtimeHydrationEnabled && mqttStatus.reason === "mock"
+  );
+  const runtimeStage = "live" as const;
+  const seedConfig = useMemo(
+    () =>
+      createOverviewDisplayPageSeedConfig(
+        overviewAssetRuntimeMap.hero,
+        undefined,
+        overviewAssetRuntimeMap.backgrounds
+      ),
+    []
+  );
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
+  });
+  const storyRuntime = useDisplayStoryRuntime("overview", {
+    enabled: runtimeHydrationEnabled
+  });
+
+  const resolvedConfig = useMemo(
+    () => resolveOverviewModernDefaultConfig(config ?? runtimeConfig.config, seedConfig),
+    [config, runtimeConfig.config, seedConfig]
+  );
+  const backgroundPoolSources = resolvedConfig.backgroundPool.sources;
+  const backgroundPoolSignature = backgroundPoolSources
+    .map((source) => source.src ?? source.assetId ?? "")
+    .join("|");
+  const selectedBackground = useMemo(
+    () => pickOverviewBackground(backgroundPoolSources),
+    // Re-randomise only when the candidate pool changes; each rotation entry
+    // remounts the page (route host `key`), so mount = fresh random pick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [backgroundPoolSignature]
+  );
+
+  const storyOverviewPayload = storyRuntime.payload ?? undefined;
+  const backgroundSource = useMemo(
+    () =>
+      selectedBackground
+        ? resolveDisplayPageMediaSource(selectedBackground, selectedBackground.src ?? null)
+        : null,
+    [selectedBackground]
+  );
+  const heroMediaSource = useMemo(
+    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
+    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
+  );
+  const heroMediaPresentation = useMemo(
+    () =>
+      buildDisplayPageMediaPresentation(resolvedConfig.heroMedia, overviewHeroMediaEffectResolverOptions),
+    [resolvedConfig.heroMedia]
+  );
+
+  const activeBackgroundSrc = backgroundSource ?? heroMediaSource ?? undefined;
+  const [bgTransition, setBgTransition] = useState<{
+    current: string | undefined;
+    prev: string | undefined;
+    fadeCurrent: boolean;
+  }>({
+    current: activeBackgroundSrc,
+    prev: undefined,
+    fadeCurrent: false
+  });
+
+  useEffect(() => {
+    if (activeBackgroundSrc !== bgTransition.current) {
+      setBgTransition((prev) => ({
+        current: activeBackgroundSrc,
+        prev: prev.current,
+        fadeCurrent: true
+      }));
+    }
+  }, [activeBackgroundSrc, bgTransition.current]);
+
+  useEffect(() => {
+    if (bgTransition.fadeCurrent) {
+      const frame = requestAnimationFrame(() => {
+        setBgTransition((prev) => ({
+          ...prev,
+          fadeCurrent: false
+        }));
+      });
+
+      const timer = setTimeout(() => {
+        setBgTransition((prev) => ({
+          ...prev,
+          prev: undefined
+        }));
+      }, 1000);
+
+      return () => {
+        cancelAnimationFrame(frame);
+        clearTimeout(timer);
+      };
+    }
+  }, [bgTransition.fadeCurrent]);
+
+  const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
+
+  const titleLayout = useMemo(() => withContentOffset(resolvedConfig.heroCopyLayout), [resolvedConfig.heroCopyLayout]);
+  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
+  const leafLayout = useMemo(() => withContentOffset(overviewLeafLayout), []);
+  const goldLineLayout = useMemo(() => withContentOffset(overviewGoldLineLayout), []);
+
+  const leafOrnamentStyle = useMemo(
+    () => ({
+      height: `${leafLayout.height}px`,
+      left: `${leafLayout.left + resolvedConfig.chrome.ornaments.leaf.offsetX}px`,
+      top: `${leafLayout.top + resolvedConfig.chrome.ornaments.leaf.offsetY}px`,
+      width: `${leafLayout.width}px`,
+      "--display-leaf-opacity": resolvedConfig.chrome.ornaments.leaf.opacity,
+      "--display-leaf-scale": resolvedConfig.chrome.ornaments.leaf.scale
+    } as CSSProperties),
+    [leafLayout, resolvedConfig.chrome.ornaments.leaf]
+  );
+  const goldLineStyle = useMemo(
+    () => ({
+      height: `${resolvedConfig.chrome.ornaments.goldLine.thickness}px`,
+      left: `${goldLineLayout.left}px`,
+      opacity: resolvedConfig.chrome.ornaments.goldLine.opacity,
+      top: `${goldLineLayout.top + resolvedConfig.chrome.ornaments.goldLine.offsetY}px`,
+      width: `${goldLineLayout.width}px`
+    }),
+    [goldLineLayout, resolvedConfig.chrome.ornaments.goldLine]
+  );
+  const titleGroupStyle = useMemo(
+    () => ({
+      left: `${titleLayout.left}px`,
+      top: `${titleLayout.top}px`,
+      width: `${titleLayout.width}px`
+    }),
+    [titleLayout]
+  );
+  const eyebrowStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.eyebrowFontSize}px`,
+      letterSpacing: `${heroTypography.eyebrowLetterSpacing}px`,
+      marginBottom: `${heroTypography.eyebrowMarginBottom}px`
+    }),
+    [heroTypography]
+  );
+  const titleStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.titleFontSize}px`,
+      fontWeight: heroTypography.titleEmphasisWeight,
+      letterSpacing: `${heroTypography.titleLetterSpacing}px`,
+      lineHeight: heroTypography.titleLineHeight
+    }),
+    [heroTypography]
+  );
+  const subtitleStyle = useMemo(
+    () => ({
+      fontSize: `${heroTypography.subtitleFontSize}px`,
+      lineHeight: heroTypography.subtitleLineHeight,
+      marginTop: `${heroTypography.subtitleMarginTop}px`
+    }),
+    [heroTypography]
+  );
+  const heroBannerStyle = useMemo(
+    () => ({
+      ...heroMediaPresentation.stageStyle,
+      height: `${heroLayout.height}px`,
+      left: `${heroLayout.left}px`,
+      top: `${heroLayout.top}px`,
+      width: `${heroLayout.width}px`
+    }),
+    [heroMediaPresentation.stageStyle, heroLayout]
+  );
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
+    usesRuntimeFallback: storyRuntime.usesFallback
+  });
+
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return <DisplayPageLoadingState />;
+  }
+
+  return (
+    <section className="overview-display-page">
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
+      <OverviewStaticShell
+        bgTransition={bgTransition}
+        freeformObjects={freeformObjects}
+        goldLineStyle={goldLineStyle}
+        heroBannerStyle={heroBannerStyle}
+        heroMediaPresentation={heroMediaPresentation}
+        leafOrnamentStyle={leafOrnamentStyle}
+        resolvedConfig={resolvedConfig}
+        selectedBackground={selectedBackground}
+        subtitleStyle={subtitleStyle}
+        titleGroupStyle={titleGroupStyle}
+        titleStyle={titleStyle}
+        eyebrowStyle={eyebrowStyle}
+      />
+      <OverviewRuntimeContent
+        resolvedConfig={resolvedConfig}
+        resolvedWeatherSnapshot={resolvedWeatherSnapshot}
+        seedConfig={seedConfig}
+        storyOverviewPayload={storyOverviewPayload}
+      />
     </section>
   );
 }

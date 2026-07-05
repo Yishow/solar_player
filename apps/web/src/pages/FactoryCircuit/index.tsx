@@ -1,17 +1,9 @@
 import type { CircuitConfig, DisplayPageFreeformObject } from "@solar-display/shared";
-import { displayPageCardConfiguringLabel, resolveDisplayPageCardStatus } from "@solar-display/shared";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
-import {
-  DisplayCardFooter,
-  DisplayCardFrame,
-  DisplayCardHeader,
-  DisplayCardValueRow
-} from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
-import { Sparkline } from "../../components/Sparkline";
 import { useBodyClass } from "../../hooks/useBodyClass";
 import {
   shouldDeferDisplayPageRuntimeRender,
@@ -19,14 +11,11 @@ import {
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
-import { useLiveMetrics } from "../../hooks/useLiveMetrics";
-import { trendSeries } from "../../mocks/metrics";
 import { requestJson } from "../../services/api";
 import {
   resolveRuntimeFallbackBannerState,
   RuntimeConfigFallbackBanner
 } from "../runtimeConfigHydration";
-import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   buildCopyTypographyStyleVars,
   createCopyTypographyConfig,
@@ -38,10 +27,6 @@ import {
   resolveFlowConnectorTreatmentConfig,
   resolveFlowNodeTreatmentConfig
 } from "../shared/displayPageFlowTreatmentConfig";
-import {
-  buildFactoryLoadRowRhythmStyle,
-  resolveFactoryLoadRowRhythmConfig
-} from "../shared/displayPageFhdRhythmConfig";
 import {
   createFactoryCircuitDisplayPageSeedConfig,
   type FactoryCircuitDisplayPageConfig
@@ -56,10 +41,10 @@ import "../../components/displayPageCards.css";
 import "./factoryCircuit.css";
 import {
   buildFactoryCircuitRuntimes,
-  buildFactoryCircuitViewModel,
   type FactoryCircuitLoadState,
   type FactoryCircuitRuntime
 } from "./viewModel";
+import { FactoryCircuitRuntimeContent } from "./runtimeContent";
 
 const CONTENT_TOP_OFFSET = factoryCircuitContentTopOffset;
 const factoryLineLeafReferenceUrl = new URL(
@@ -83,14 +68,6 @@ function withContentOffset<T extends { top: number }>(layout: T) {
   };
 }
 
-const kpiLayoutOrder = [
-  "totalPower",
-  "solarShare",
-  "selfConsumption",
-  "peak",
-  "flow"
-] as const;
-
 const loadRowOrder = [
   "stamping",
   "body",
@@ -100,6 +77,12 @@ const loadRowOrder = [
   "office",
   "heavy_vehicle",
   "ed_coating"
+] as const;
+
+const factoryCircuitStaticFlowNodes = [
+  { key: "solar", label: "太陽能板", subtitle: "PV Modules" },
+  { key: "inverter", label: "逆變器", subtitle: "Inverter" },
+  { key: "board", label: "配電盤", subtitle: "Switchboard" }
 ] as const;
 
 
@@ -162,7 +145,7 @@ function FactoryCircuitLeafVine({
 
 
 
-const LOAD_ROW_SVG_ICONS: Record<string, React.ReactNode> = {
+const LOAD_ROW_SVG_ICONS: Record<string, ReactNode> = {
   stamping: (
     <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-factory-circuit-icon="stamping">
       <rect x="3" y="16" width="18" height="5" rx="1" />
@@ -228,7 +211,6 @@ export function FactoryCircuit({
   pageId?: string;
 }) {
   useBodyClass("page-hero-shell");
-  const { connectionState, snapshot } = useLiveMetrics();
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
@@ -349,22 +331,6 @@ export function FactoryCircuit({
       }
     };
   }, [runtimeResolvedConfig, seedConfig]);
-  const viewModel = useMemo(
-    () =>
-      buildFactoryCircuitViewModel({
-        circuits: circuitsRuntimeSource.circuits,
-        connectionState,
-        loadState: circuitsRuntimeSource.loadState,
-        snapshot,
-        factoryCircuitStory: factoryStoryRuntime.payload ?? undefined
-      }),
-    [circuitsRuntimeSource, connectionState, snapshot, factoryStoryRuntime.payload]
-  );
-
-  const kpiSparklineValues = useMemo(
-    () => viewModel.kpis.map((_, index) => trendSeries.map((value) => value - index * 1.5)),
-    [viewModel.kpis]
-  );
 
   const activeRowsY = useMemo(() => {
     return loadRowOrder
@@ -427,10 +393,6 @@ export function FactoryCircuit({
   const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-  const loadRowRhythm = resolveFactoryLoadRowRhythmConfig(
-    resolvedConfig.rhythm.factoryLoadRows,
-    seedConfig.rhythm.factoryLoadRows
-  );
 
   const titleLayout = withContentOffset(factoryCircuitTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
@@ -548,7 +510,7 @@ export function FactoryCircuit({
         }}
       />
 
-      {viewModel.flowNodes.map((node) => {
+      {factoryCircuitStaticFlowNodes.map((node) => {
         const layout = withContentOffset(resolvedConfig.nodes[node.key]);
         const nodeTreatment = resolveFlowNodeTreatmentConfig(
           resolvedConfig.nodeTreatments[node.key],
@@ -668,9 +630,9 @@ export function FactoryCircuit({
                 style={{
                   strokeDasharray: `24 ${pathLength - 24}`,
                   animation: `factory-energy-flow-generic ${duration}s linear infinite`,
-                  "--fc-offset-target": `-${pathLength}px` as any,
-                  filter: "drop-shadow(0 0 2px rgba(82, 125, 59, 0.6)) drop-shadow(0 0 4px rgba(82, 125, 59, 0.4))",
-                }}
+                  "--fc-offset-target": `-${pathLength}px`,
+                  filter: "drop-shadow(0 0 2px rgba(82, 125, 59, 0.6)) drop-shadow(0 0 4px rgba(82, 125, 59, 0.4))"
+                } as CSSProperties & Record<"--fc-offset-target", string>}
               />
             );
           })}
@@ -684,101 +646,14 @@ export function FactoryCircuit({
           ))}
         </svg>
       </div>
-
-      <section
-         className="factory-circuit-load-panel"
-         style={{
-           ...buildFactoryLoadRowRhythmStyle(loadRowRhythm),
-           height: `${resolvedConfig.loadPanel.height}px`,
-           left: `${resolvedConfig.loadPanel.left}px`,
-           top: `${resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET}px`,
-           width: `${resolvedConfig.loadPanel.width}px`
-         }}
-      >
-        {viewModel.loadRows.map((row, index) => {
-          const cardState = resolvedConfig.loadRowStates?.[loadRowOrder[index]!];
-          if (cardState?.visible === false) {
-            return null;
-          }
-
-          const layout = withContentOffset(resolvedConfig.loadRows[loadRowOrder[index]!]);
-          const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
-          return (
-            <article
-              key={`${row.labelZh}-${index}`}
-              className={`factory-circuit-load-row${layout.height <= 65 ? " is-compact" : ""}`}
-              style={{
-                height: `${layout.height}px`,
-                left: `${layout.left - resolvedConfig.loadPanel.left}px`,
-                top: `${layout.top - (resolvedConfig.loadPanel.top - CONTENT_TOP_OFFSET)}px`,
-                width: `${layout.width}px`
-              }}
-            >
-              <div className="factory-circuit-load-icon">
-                {LOAD_ROW_SVG_ICONS[loadRowOrder[index]!]}
-              </div>
-              <div className="factory-circuit-load-copy">
-                <strong>{row.labelZh}</strong>
-                <small>{row.labelEn}</small>
-                <span className={`factory-circuit-load-state tone-${row.statusTone}`}>{row.statusLabel}</span>
-              </div>
-              <b>
-                {isConfiguring
-                  ? displayPageCardConfiguringLabel
-                  : row.isEmpty
-                    ? `${row.fallbackSharePercent}%`
-                    : `${row.sharePercent}%`}
-              </b>
-            </article>
-          );
-        })}
-      </section>
-
-      {viewModel.kpis.map((metric, index) => {
-        const kpiKey = kpiLayoutOrder[index]!;
-        const cardState = resolvedConfig.kpiCardStates?.[kpiKey];
-        if (cardState?.visible === false) {
-          return null;
-        }
-
-        const layout = withContentOffset(resolvedConfig.kpiCards[kpiKey]);
-        const cardStyle = createDisplayCardStyleConfig(resolvedConfig.cardStyles[kpiKey]);
-        const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
-        const className =
-          kpiLayoutOrder[index] === "flow" ? "factory-circuit-kpi-card factory-circuit-kpi-routing" : "factory-circuit-kpi-card";
-
-        return (
-          <DisplayCardFrame
-            key={metric.label}
-            surface="metric"
-            cardStyle={cardStyle}
-            className={className}
-            style={{
-              height: `${layout.height}px`,
-              left: `${layout.left}px`,
-              top: `${layout.top}px`,
-              width: `${layout.width}px`
-            }}
-          >
-            <DisplayCardHeader
-              icon={renderDisplayPageIcon({
-                alt: metric.label,
-                className: "h-full w-full",
-                seedSource: seedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!],
-                source: resolvedConfig.iconSources.kpiCards[kpiLayoutOrder[index]!]
-              })}
-              subtitle={metric.helper}
-              title={metric.label}
-            />
-            <DisplayCardValueRow align={cardStyle.valueRowAlign} unit={isConfiguring ? "" : metric.unit}
-              value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
-            />
-            <DisplayCardFooter>
-              <Sparkline className="factory-circuit-kpi-sparkline" values={kpiSparklineValues[index]!} />
-            </DisplayCardFooter>
-          </DisplayCardFrame>
-        );
-      })}
+      <FactoryCircuitRuntimeContent
+        circuits={circuitsRuntimeSource.circuits}
+        factoryCircuitStory={factoryStoryRuntime.payload ?? undefined}
+        loadRowIcons={LOAD_ROW_SVG_ICONS}
+        loadState={circuitsRuntimeSource.loadState}
+        resolvedConfig={resolvedConfig}
+        seedConfig={seedConfig}
+      />
       <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );

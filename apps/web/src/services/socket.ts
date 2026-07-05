@@ -6,6 +6,11 @@ import type {
 } from "@solar-display/shared";
 import { io, type Socket } from "socket.io-client";
 import { routeMetaMap } from "../app/routeMeta";
+import {
+  getLiveMetricsStoreState,
+  replaceLiveMetricsConnectionState,
+  replaceLiveMetricsSnapshot
+} from "../hooks/liveMetricsStore";
 import { isViteDevRuntime } from "./api";
 import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
@@ -85,6 +90,7 @@ function setConnectionState(next: Partial<SocketConnectionState>) {
     ...connectionState,
     ...next
   };
+  replaceLiveMetricsConnectionState(connectionState);
   notifyConnectionState();
 }
 
@@ -204,6 +210,7 @@ function createSocketClient(sessionClass: ManagementSocketSessionClass) {
 
   client.on("liveMetrics:update", (snapshot) => {
     cachedLiveMetrics = snapshot;
+    replaceLiveMetricsSnapshot(snapshot);
   });
 
   client.on("mqtt:status", (status) => {
@@ -232,7 +239,7 @@ export function getSocketClient() {
 }
 
 export function getCachedLiveMetrics() {
-  return cachedLiveMetrics;
+  return getLiveMetricsStoreState().snapshot;
 }
 
 export function getCachedMqttStatus() {

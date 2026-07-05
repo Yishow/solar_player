@@ -1,30 +1,14 @@
-import { useMemo, type CSSProperties } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import {
-  displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus,
   resolveDisplayPageMediaSource
 } from "@solar-display/shared";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
-import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
-import {
-  DisplayCardFooter,
-  DisplayCardFrame,
-  DisplayCardHeader,
-  DisplayCardValueRow
-} from "../../components/displayPageCards";
 import { DisplayPageLoadingState } from "../../components/DisplayPageLoadingState";
-import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   createGoldLineChromeConfig,
   createLeafOrnamentChromeConfig
 } from "../shared/displayPageChromeConfig";
-import {
-  buildFlowConnectorTreatmentStyle,
-  buildFlowNodeTreatmentStyle,
-  resolveFlowConnectorTreatmentConfig,
-  resolveFlowNodeTreatmentConfig
-} from "../shared/displayPageFlowTreatmentConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import { buildDisplayPageMediaPresentation } from "../displayPageMediaStyle";
 import { solarHeroMediaEffectResolverOptions } from "../shared/displayPageMediaEffectConfig";
@@ -35,7 +19,6 @@ import {
   useDisplayPageConfig
 } from "../../hooks/useDisplayPageConfig";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
-import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
   createSolarDisplayPageSeedConfig,
   type SolarDisplayPageConfig,
@@ -51,7 +34,7 @@ import {
 } from "./layout";
 import "../../components/displayPageCards.css";
 import "./solar.css";
-import { buildSolarViewModel } from "./viewModel";
+import { SolarRuntimeContent } from "./runtimeContent";
 
 const CONTENT_TOP_OFFSET = solarContentTopOffset;
 
@@ -157,199 +140,49 @@ function splitSolarTitleLine(titleLine: string) {
   };
 }
 
-export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageConfig; pageId?: string }) {
-  useBodyClass("page-hero-shell");
-  const { isSocketConnected, snapshot } = useLiveMetrics();
-  const runtimeHydrationEnabled = config === undefined;
-  const runtimeStage = "live" as const;
-  const seedConfig = useMemo(
-    () =>
-      createSolarDisplayPageSeedConfig(
-        solarAssetRuntimeMap.hero,
-        "太陽能車棚與綠能展示場域",
-        solarSeedIconAssetSources
-      ),
-    []
-  );
-  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
-    enabled: runtimeHydrationEnabled,
-    stage: runtimeStage
-  });
-  const solarStoryRuntime = useDisplayStoryRuntime("solar", {
-    enabled: runtimeHydrationEnabled
-  });
-
-  const runtimeResolvedConfig = config ?? runtimeConfig.config;
-  const resolvedConfig = useMemo<SolarDisplayPageConfig>(() => {
-    const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
-    const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
-    return {
-      ...runtimeResolvedConfig,
-      chrome: {
-        ...seedConfig.chrome,
-        ...runtimeChrome,
-        ornaments: {
-          ...seedConfig.chrome.ornaments,
-          ...runtimeOrnaments,
-          goldLine: createGoldLineChromeConfig({
-            ...seedConfig.chrome.ornaments.goldLine,
-            ...(runtimeOrnaments.goldLine ?? {})
-          }),
-          leaf: createLeafOrnamentChromeConfig({
-            ...seedConfig.chrome.ornaments.leaf,
-            ...(runtimeOrnaments.leaf ?? {})
-          })
-        }
-      }
-    };
-  }, [runtimeResolvedConfig, seedConfig]);
-  const solarStoryPayload = solarStoryRuntime.payload ?? undefined;
-  const viewModel = useMemo(
-    () =>
-      buildSolarViewModel({
-        isSocketConnected,
-        snapshot,
-        solarStory: solarStoryPayload
-      }),
-    [isSocketConnected, snapshot, solarStoryPayload]
-  );
-
-  const flowNodeItems = useMemo(
-    () =>
-      flowNodeOrder.map((flowItem) => {
-        const layout = withContentOffset(resolvedConfig.flowNodes[flowItem.key]);
-        const nodeTreatment = resolveFlowNodeTreatmentConfig(
-          resolvedConfig.flowNodeTreatments[flowItem.key],
-          seedConfig.flowNodeTreatments[flowItem.key]
-        );
-        return {
-          className: [
-            "solar-flow-node",
-            flowItem.key === "co2" ? "solar-flow-node-co2" : ""
-          ].join(" "),
-          key: flowItem.key,
-          seedSource: seedConfig.iconSources.flowNodes[flowItem.key],
-          source: resolvedConfig.iconSources.flowNodes[flowItem.key],
-          style: {
-            height: `${layout.height}px`,
-            left: `${layout.left}px`,
-            top: `${layout.top}px`,
-            width: `${layout.width}px`,
-            ...buildFlowNodeTreatmentStyle(nodeTreatment)
-          }
-        };
-      }),
-    [resolvedConfig, seedConfig]
-  );
-
-
-  const connectorItems = useMemo(
-    () =>
-      connectorOrder.map((connector) => {
-        const layout = withContentOffset(resolvedConfig.connectors[connector.key]);
-        const treatment = resolveFlowConnectorTreatmentConfig(
-          resolvedConfig.connectorTreatments[connector.key],
-          seedConfig.connectorTreatments[connector.key]
-        );
-        return {
-          className: connector.className,
-          key: connector.key,
-          style: {
-            height: `${treatment.strokeWidth}px`,
-            left: `${layout.left}px`,
-            top: `${layout.top + (layout.height - treatment.strokeWidth) / 2}px`,
-            width: `${layout.width}px`,
-            ...buildFlowConnectorTreatmentStyle(treatment)
-          }
-        };
-      }),
-    [resolvedConfig, seedConfig]
-  );
-
-  const kpiCardItems = useMemo(
-    () =>
-      kpiCardOrder.map((cardItem) => ({
-        cardStyle: createDisplayCardStyleConfig(resolvedConfig.cardStyles[cardItem.key]),
-        englishLabel: cardItem.englishLabel,
-        key: cardItem.key,
-        seedSource: seedConfig.iconSources.kpiCards[cardItem.key],
-        source: resolvedConfig.iconSources.kpiCards[cardItem.key],
-        status: resolveDisplayPageCardStatus(resolvedConfig.kpiCardStates?.[cardItem.key]),
-        visible: resolvedConfig.kpiCardStates?.[cardItem.key]?.visible !== false,
-        style: (() => {
-          const layout = withContentOffset(resolvedConfig.kpiCards[cardItem.key]);
-          return {
-            height: `${layout.height}px`,
-            left: `${layout.left}px`,
-            top: `${layout.top}px`,
-            width: `${layout.width}px`
-          };
-        })()
-      })),
-    [resolvedConfig, seedConfig]
-  );
-
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
-    usesRuntimeFallback: solarStoryRuntime.usesFallback
-  });
-  const solarTitleLine2 = useMemo(
-    () => splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]),
-    [resolvedConfig.heroCopy.titleLines]
-  );
-  const heroMediaSource = useMemo(
-    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
-    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
-  );
-  const heroMediaPresentation = useMemo(
-    () =>
-      buildDisplayPageMediaPresentation(
-        resolvedConfig.heroMedia,
-        solarHeroMediaEffectResolverOptions
-      ),
-    [resolvedConfig.heroMedia]
-  );
-  const heroTypography = resolvedConfig.chrome.heroTypography;
-  const freeformObjects =
-    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-
-  const titleLayout = useMemo(() => withContentOffset(solarTitleLayout), []);
-  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
-  const goldLineLayout = useMemo(
-    () =>
-      withContentOffset({
-        left: resolvedConfig.chrome.ornaments.goldLine.baseLeft,
-        top: resolvedConfig.chrome.ornaments.goldLine.baseTop,
-        width: resolvedConfig.chrome.ornaments.goldLine.baseWidth
-      }),
-    [resolvedConfig.chrome.ornaments.goldLine]
-  );
-  const leafLayout = useMemo(
-    () =>
-      withContentOffset({
-        height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
-        left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
-        top: resolvedConfig.chrome.ornaments.leaf.baseTop,
-        width: resolvedConfig.chrome.ornaments.leaf.baseWidth
-      }),
-    [resolvedConfig.chrome.ornaments.leaf]
-  );
-
-  if (
-    shouldDeferDisplayPageRuntimeRender({
-      runtimeHydrationEnabled,
-      isLoading: runtimeConfig.isLoading,
-      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
-      stage: runtimeStage
-    })
-  ) {
-    return <DisplayPageLoadingState />;
-  }
-
+const SolarStaticShell = memo(function SolarStaticShell({
+  freeformObjects,
+  goldLineLayout,
+  heroLayout,
+  heroMediaPresentation,
+  heroMediaSource,
+  heroTypography,
+  leafLayout,
+  resolvedConfig,
+  solarTitleLine2,
+  titleLayout
+}: {
+  freeformObjects: DisplayPageFreeformObject[];
+  goldLineLayout: {
+    left: number;
+    top: number;
+    width: number;
+  };
+  heroLayout: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  };
+  heroMediaPresentation: ReturnType<typeof buildDisplayPageMediaPresentation>;
+  heroMediaSource: string | null;
+  heroTypography: SolarDisplayPageConfig["chrome"]["heroTypography"];
+  leafLayout: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  };
+  resolvedConfig: SolarDisplayPageConfig;
+  solarTitleLine2: ReturnType<typeof splitSolarTitleLine>;
+  titleLayout: {
+    left: number;
+    top: number;
+    width: number;
+  };
+}) {
   return (
-    <section className="solar-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
+    <>
       <DisplayLeafOrnament
         className="solar-leaf-watermark display-surface-leaf-ornament"
         config={resolvedConfig.chrome.ornaments.leaf}
@@ -453,167 +286,135 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         ))}
       </figure>
 
-      {flowNodeItems.map((item, index) => {
-        const node = viewModel.flowNodes[index]!;
-
-        return (
-          <article
-            key={item.key}
-            className={item.className}
-            style={item.style}
-          >
-            {renderDisplayPageIcon({
-              alt: node.label,
-              className: "solar-flow-icon",
-              seedSource: item.seedSource,
-              source: item.source
-            })}
-            <h3>{node.label}</h3>
-            <p>{node.footnote}</p>
-            <div className="solar-flow-value">{node.value}</div>
-          </article>
-        );
-      })}
-
-      <div aria-hidden="true" className="solar-routing">
-        {/* 太陽能到逆變器 (solarToInverter) */}
-        {(() => {
-          const startX = 1025;
-          const endX = 1180;
-          const width = endX - startX;
-          return (
-            <svg
-              style={{
-                position: "absolute",
-                left: `${startX}px`,
-                top: `${167 - 8}px`,
-                width: `${width}px`,
-                height: "16px",
-                overflow: "visible",
-                zIndex: 10
-              }}
-              viewBox={`0 0 ${width} 16`}
-            >
-              <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-1" />
-              {/* 兩端圓點在圓周中心 */}
-              <circle cx={0} cy={8} r={5} fill="#527d3b" />
-              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-1.5s" />
-            </svg>
-          );
-        })()}
-
-        {/* 逆變器到工廠 (inverterToFactory) */}
-        {(() => {
-          const startX = 1410;
-          const endX = 1550;
-          const width = endX - startX;
-          return (
-            <svg
-              style={{
-                position: "absolute",
-                left: `${startX}px`,
-                top: `${167 - 8}px`,
-                width: `${width}px`,
-                height: "16px",
-                overflow: "visible",
-                zIndex: 10
-              }}
-              viewBox={`0 0 ${width} 16`}
-            >
-              <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-2" />
-              {/* 兩端圓點在圓周中心 */}
-              <circle cx={0} cy={8} r={5} fill="#527d3b" />
-              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-3.0s" />
-            </svg>
-          );
-        })()}
-
-        {/* 逆變器到減碳 (inverterToCo2) */}
-        {(() => {
-          const startX = 1365;
-          const startY = 258; // 變流器圓周邊緣 Y 交點 (已 offset)
-          const endX = 1545;  // 減碳卡片左側邊緣 X
-          const endY = 499;  // 減碳卡片左側中心 Y (已 offset)
-          const width = endX - startX;
-          const vHeight = endY - startY;
-          return (
-            <svg
-              style={{
-                position: "absolute",
-                left: `${startX}px`,
-                top: `${startY}px`,
-                width: `${width}px`,
-                height: `${vHeight + 8}px`,
-                overflow: "visible",
-                zIndex: 10
-              }}
-              viewBox={`0 0 ${width} ${vHeight + 8}`}
-            >
-              <path
-                d={`M 1.25 0 V ${vHeight} H ${width}`}
-                fill="none"
-                stroke="rgba(234, 161, 30, 0.25)"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d={`M 1.25 0 V ${vHeight} H ${width}`}
-                fill="none"
-                stroke="#eaa11e"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="solar-flow-line-orange"
-              />
-              {/* 兩端圓點在圓周中心 */}
-              <circle cx={1.25} cy={0} r={5} fill="#eaa11e" />
-              <circle cx={width} cy={vHeight} r={5} fill="#eaa11e" className="solar-reveal-3.0s" />
-            </svg>
-          );
-        })()}
-      </div>
-
-      {kpiCardItems.map((item, index) => {
-        if (!item.visible) {
-          return null;
-        }
-
-        const metric = viewModel.kpis[index]!;
-        const isConfiguring = item.status === "configuring";
-
-        return (
-          <DisplayCardFrame
-            cardStyle={item.cardStyle}
-            key={item.key}
-            className="solar-kpi-card"
-            surface="metric"
-            style={item.style}
-          >
-            <DisplayCardHeader
-              icon={renderDisplayPageIcon({
-                alt: metric.label,
-                className: "solar-kpi-icon",
-                seedSource: item.seedSource,
-                source: item.source
-              })}
-              subtitle={item.englishLabel}
-              title={metric.label}
-            />
-            <DisplayCardValueRow
-              align={item.cardStyle.valueRowAlign}
-              unit={isConfiguring ? "" : metric.unit}
-              value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
-            />
-            <DisplayCardFooter>
-              <p className="solar-kpi-helper">{metric.helper}</p>
-            </DisplayCardFooter>
-          </DisplayCardFrame>
-        );
-      })}
       <DisplayPageObjectLayer objects={freeformObjects} />
+    </>
+  );
+});
+
+export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageConfig; pageId?: string }) {
+  useBodyClass("page-hero-shell");
+  const runtimeHydrationEnabled = config === undefined;
+  const runtimeStage = "live" as const;
+  const seedConfig = useMemo(
+    () =>
+      createSolarDisplayPageSeedConfig(
+        solarAssetRuntimeMap.hero,
+        "太陽能車棚與綠能展示場域",
+        solarSeedIconAssetSources
+      ),
+    []
+  );
+  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
+    enabled: runtimeHydrationEnabled,
+    stage: runtimeStage
+  });
+  const solarStoryRuntime = useDisplayStoryRuntime("solar", {
+    enabled: runtimeHydrationEnabled
+  });
+
+  const runtimeResolvedConfig = config ?? runtimeConfig.config;
+  const resolvedConfig = useMemo<SolarDisplayPageConfig>(() => {
+    const runtimeChrome = runtimeResolvedConfig.chrome ?? seedConfig.chrome;
+    const runtimeOrnaments = runtimeChrome.ornaments ?? seedConfig.chrome.ornaments;
+    return {
+      ...runtimeResolvedConfig,
+      chrome: {
+        ...seedConfig.chrome,
+        ...runtimeChrome,
+        ornaments: {
+          ...seedConfig.chrome.ornaments,
+          ...runtimeOrnaments,
+          goldLine: createGoldLineChromeConfig({
+            ...seedConfig.chrome.ornaments.goldLine,
+            ...(runtimeOrnaments.goldLine ?? {})
+          }),
+          leaf: createLeafOrnamentChromeConfig({
+            ...seedConfig.chrome.ornaments.leaf,
+            ...(runtimeOrnaments.leaf ?? {})
+          })
+        }
+      }
+    };
+  }, [runtimeResolvedConfig, seedConfig]);
+  const solarStoryPayload = solarStoryRuntime.payload ?? undefined;
+  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
+    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
+    runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
+    usesRuntimeFallback: solarStoryRuntime.usesFallback
+  });
+  const solarTitleLine2 = useMemo(
+    () => splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]),
+    [resolvedConfig.heroCopy.titleLines]
+  );
+  const heroMediaSource = useMemo(
+    () => resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src),
+    [resolvedConfig.heroMedia, seedConfig.heroMedia.src]
+  );
+  const heroMediaPresentation = useMemo(
+    () =>
+      buildDisplayPageMediaPresentation(
+        resolvedConfig.heroMedia,
+        solarHeroMediaEffectResolverOptions
+      ),
+    [resolvedConfig.heroMedia]
+  );
+  const heroTypography = resolvedConfig.chrome.heroTypography;
+  const freeformObjects =
+    (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
+
+  const titleLayout = useMemo(() => withContentOffset(solarTitleLayout), []);
+  const heroLayout = useMemo(() => withContentOffset(resolvedConfig.heroContainer), [resolvedConfig.heroContainer]);
+  const goldLineLayout = useMemo(
+    () =>
+      withContentOffset({
+        left: resolvedConfig.chrome.ornaments.goldLine.baseLeft,
+        top: resolvedConfig.chrome.ornaments.goldLine.baseTop,
+        width: resolvedConfig.chrome.ornaments.goldLine.baseWidth
+      }),
+    [resolvedConfig.chrome.ornaments.goldLine]
+  );
+  const leafLayout = useMemo(
+    () =>
+      withContentOffset({
+        height: resolvedConfig.chrome.ornaments.leaf.baseHeight,
+        left: resolvedConfig.chrome.ornaments.leaf.baseLeft,
+        top: resolvedConfig.chrome.ornaments.leaf.baseTop,
+        width: resolvedConfig.chrome.ornaments.leaf.baseWidth
+      }),
+    [resolvedConfig.chrome.ornaments.leaf]
+  );
+
+  if (
+    shouldDeferDisplayPageRuntimeRender({
+      runtimeHydrationEnabled,
+      isLoading: runtimeConfig.isLoading,
+      lastLoadedEnvelope: runtimeConfig.lastLoadedEnvelope,
+      stage: runtimeStage
+    })
+  ) {
+    return <DisplayPageLoadingState />;
+  }
+
+  return (
+    <section className="solar-display-page">
+      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
+      <SolarStaticShell
+        freeformObjects={freeformObjects}
+        goldLineLayout={goldLineLayout}
+        heroLayout={heroLayout}
+        heroMediaPresentation={heroMediaPresentation}
+        heroMediaSource={heroMediaSource}
+        heroTypography={heroTypography}
+        leafLayout={leafLayout}
+        resolvedConfig={resolvedConfig}
+        solarTitleLine2={solarTitleLine2}
+        titleLayout={titleLayout}
+      />
+      <SolarRuntimeContent
+        resolvedConfig={resolvedConfig}
+        seedConfig={seedConfig}
+        solarStoryPayload={solarStoryPayload}
+      />
     </section>
   );
 }

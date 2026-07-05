@@ -8,6 +8,7 @@ import {
 } from "./displayPageConfig";
 
 const overviewSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const overviewRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtimeContent.tsx"), "utf8");
 
 test("overview runtime helper omits KPI cards with visible false", () => {
   const config = createOverviewDisplayPageSeedConfig();
@@ -24,6 +25,6 @@ test("overview runtime helper treats missing KPI visible as visible", () => {
 });
 
 test("overview runtime filters KPI render order through the visible helper", () => {
-  assert.match(overviewSource, /if \(!shouldRenderOverviewKpiCard\(resolvedConfig\.kpiCards\[cardItem\.key\]\)\) \{/);
-  assert.match(overviewSource, /return null;/);
+  assert.match(overviewRuntimeSource, /if \(!shouldRenderOverviewKpiCard\(resolvedConfig\.kpiCards\[cardItem\.key\]\)\) \{/);
+  assert.match(overviewRuntimeSource, /return null;/);
 });

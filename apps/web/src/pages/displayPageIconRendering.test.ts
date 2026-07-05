@@ -7,8 +7,12 @@ function readPageSource(pageName: string) {
   return readFileSync(path.join(import.meta.dirname, pageName, "index.tsx"), "utf8");
 }
 
+function readRuntimeContentSource(pageName: string) {
+  return readFileSync(path.join(import.meta.dirname, pageName, "runtimeContent.tsx"), "utf8");
+}
+
 test("overview runtime routes KPI icons through the shared icon resolver", () => {
-  const source = readPageSource("Overview");
+  const source = readRuntimeContentSource("Overview");
 
   assert.match(source, /renderDisplayPageIcon\(\{/);
   assert.match(source, /resolvedConfig\.iconSources\[shell\.cardItem\.key\]/);
@@ -16,7 +20,7 @@ test("overview runtime routes KPI icons through the shared icon resolver", () =>
 });
 
 test("solar runtime routes flow and KPI icons through the shared icon resolver", () => {
-  const source = readPageSource("Solar");
+  const source = readRuntimeContentSource("Solar");
 
   assert.match(source, /resolvedConfig\.iconSources\.flowNodes\[flowItem\.key\]/);
   assert.match(source, /seedConfig\.iconSources\.flowNodes\[flowItem\.key\]/);
@@ -24,12 +28,13 @@ test("solar runtime routes flow and KPI icons through the shared icon resolver",
   assert.match(source, /seedConfig\.iconSources\.kpiCards\[cardItem\.key\]/);
 });
 
-test("factory circuit runtime routes node, load row, and KPI icons through the shared icon resolver", () => {
-  const source = readPageSource("FactoryCircuit");
+test("factory circuit runtime keeps node icons on the page shell and routes KPI icons through the shared icon resolver", () => {
+  const pageSource = readPageSource("FactoryCircuit");
+  const runtimeSource = readRuntimeContentSource("FactoryCircuit");
 
-  assert.match(source, /resolvedConfig\.iconSources\.nodes\[node\.key\]/);
-  assert.match(source, /resolvedConfig\.iconSources\.loadRows\[loadRowOrder\[index\]!\]/);
-  assert.match(source, /resolvedConfig\.iconSources\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
+  assert.match(pageSource, /resolvedConfig\.iconSources\.nodes\[node\.key\]/);
+  assert.match(runtimeSource, /resolvedConfig\.iconSources\.kpiCards\[kpiLayoutOrder\[index\]!\]/);
+  assert.match(pageSource, /loadRowIcons=\{LOAD_ROW_SVG_ICONS\}/);
 });
 
 test("images runtime routes placeholder icons through the shared icon resolver", () => {

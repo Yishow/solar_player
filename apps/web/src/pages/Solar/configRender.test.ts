@@ -5,15 +5,16 @@ import test from "node:test";
 import { createSolarDisplayPageSeedConfig, solarDisplayPageEditorRegions } from "./displayPageConfig";
 
 const solarSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const solarRuntimeSource = readFileSync(path.join(import.meta.dirname, "runtimeContent.tsx"), "utf8");
 
-function sourceBetween(start: string, end: string) {
-  const startIndex = solarSource.indexOf(start);
-  const endIndex = solarSource.indexOf(end, startIndex);
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex);
 
   assert.ok(startIndex >= 0, `missing source start: ${start}`);
   assert.ok(endIndex > startIndex, `missing source end: ${end}`);
 
-  return solarSource.slice(startIndex, endIndex);
+  return source.slice(startIndex, endIndex);
 }
 
 test("solar runtime reads resolved display config for hero, flow nodes, connectors, and KPI cards", () => {
@@ -41,18 +42,18 @@ test("solar runtime reads resolved display config for hero, flow nodes, connecto
     solarSource,
     /buildDisplayPageMediaPresentation\(\s*resolvedConfig\.heroMedia,\s*solarHeroMediaEffectResolverOptions\s*\)/
   );
-  assert.match(solarSource, /resolvedConfig\.flowNodes\[flowItem\.key\]/);
-  assert.match(solarSource, /resolvedConfig\.flowNodeTreatments\[flowItem\.key\]/);
-  assert.match(solarSource, /resolvedConfig\.connectors\[connector\.key\]/);
-  assert.match(solarSource, /resolvedConfig\.connectorTreatments\[connector\.key\]/);
-  assert.match(solarSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.flowNodes\[flowItem\.key\]/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.flowNodeTreatments\[flowItem\.key\]/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.connectors\[connector\.key\]/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.connectorTreatments\[connector\.key\]/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
 });
 
 test("solar value-only refresh keeps static geometry output on config-only memo paths", () => {
-  const flowNodeSource = sourceBetween("const flowNodeItems = useMemo(", "const connectorItems = useMemo(");
-  const connectorSource = sourceBetween("const connectorItems = useMemo(", "const kpiCardItems = useMemo(");
-  const kpiSource = sourceBetween("const kpiCardItems = useMemo(", "if (");
-  const heroSource = sourceBetween("const solarTitleLine2 = useMemo(", "const heroTypography = resolvedConfig.chrome.heroTypography");
+  const flowNodeSource = sourceBetween(solarRuntimeSource, "const flowNodeItems = useMemo(", "const connectorItems = useMemo(");
+  const connectorSource = sourceBetween(solarRuntimeSource, "const connectorItems = useMemo(", "const kpiCardItems = useMemo(");
+  const kpiSource = sourceBetween(solarRuntimeSource, "const kpiCardItems = useMemo(", "void connectorItems;");
+  const heroSource = sourceBetween(solarSource, "const solarTitleLine2 = useMemo(", "const heroTypography = resolvedConfig.chrome.heroTypography");
 
   assert.match(flowNodeSource, /\[resolvedConfig,\s*seedConfig\]/);
   assert.match(connectorSource, /\[resolvedConfig,\s*seedConfig\]/);
@@ -63,8 +64,8 @@ test("solar value-only refresh keeps static geometry output on config-only memo 
   assert.doesNotMatch(connectorSource, /viewModel/);
   assert.doesNotMatch(kpiSource, /viewModel/);
   assert.doesNotMatch(heroSource, /viewModel/);
-  assert.match(solarSource, /const node = viewModel\.flowNodes\[index\]!/);
-  assert.match(solarSource, /const metric = viewModel\.kpis\[index\]!/);
+  assert.match(solarRuntimeSource, /const node = viewModel\.flowNodes\[index\]!/);
+  assert.match(solarRuntimeSource, /const metric = viewModel\.kpis\[index\]!/);
 });
 
 test("solar display page seed config captures the current default hero and layout contract", () => {
@@ -104,10 +105,11 @@ test("solar display page seed config captures the current default hero and layou
 });
 
 test("solar runtime keeps story hydration staged behind visible config and socket metrics", () => {
-  assert.match(solarSource, /useLiveMetrics\(\)/);
+  assert.match(solarRuntimeSource, /useLiveMetricsSelector\(/);
   assert.match(solarSource, /useDisplayStoryRuntime\("solar",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(solarSource, /solarStoryRuntime\.payload \?\? undefined/);
-  assert.match(solarSource, /solarStory: solarStoryPayload/);
+  assert.match(solarRuntimeSource, /solarStory: solarStoryPayload/);
+  assert.match(solarRuntimeSource, /isSocketConnected: solarRuntimeSelection\.isSocketConnected/);
   assert.match(solarSource, /runtimeErrorMessage: runtimeHydrationEnabled \? solarStoryRuntime\.errorMessage : ""/);
   assert.match(solarSource, /usesRuntimeFallback: solarStoryRuntime\.usesFallback/);
 });
@@ -148,7 +150,7 @@ test("solar seed config provides KPI card state entries that default to normal a
 });
 
 test("solar runtime applies card visibility and configuring placeholder", () => {
-  assert.match(solarSource, /resolvedConfig\.kpiCardStates/);
-  assert.match(solarSource, /resolveDisplayPageCardStatus/);
-  assert.match(solarSource, /displayPageCardConfiguringLabel/);
+  assert.match(solarRuntimeSource, /resolvedConfig\.kpiCardStates/);
+  assert.match(solarRuntimeSource, /resolveDisplayPageCardStatus/);
+  assert.match(solarRuntimeSource, /displayPageCardConfiguringLabel/);
 });
