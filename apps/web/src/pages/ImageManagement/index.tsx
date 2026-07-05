@@ -268,12 +268,6 @@ export function ImageManagement() {
       return;
     }
 
-    if (hasSelectedDraftChanges) {
-      setMessage("請先儲存或重新同步目前圖片的未儲存變更，再切換其他素材。");
-      setErrorMessage("");
-      return;
-    }
-
     setSelectedImageId(nextImageId);
     setSelectedPlaylistEntryId(
       resolveSelectedPlaylistEntry(playlistEntries, nextImageId)?.entryId ?? null
@@ -283,12 +277,6 @@ export function ImageManagement() {
 
   const handleSelectPlaylistEntry = (nextEntryId: string) => {
     if (nextEntryId === selectedPlaylistEntryId) {
-      return;
-    }
-
-    if (hasSelectedDraftChanges) {
-      setMessage("請先儲存或重新同步目前 playlist row 的未儲存變更，再切換其他治理列。");
-      setErrorMessage("");
       return;
     }
 
@@ -519,6 +507,8 @@ export function ImageManagement() {
       onTogglePlaylistShuffle={handleTogglePlaylistShuffle}
       updateAssetField={updateAssetField}
       updatePlaylistEntryField={updatePlaylistEntryField}
+      lastSyncedAssets={lastSyncedAssets}
+      lastSyncedPlaylistEntries={lastSyncedPlaylistEntries}
     />
   );
 }

@@ -4,7 +4,7 @@ import type {
   ImageAsset
 } from "@solar-display/shared";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
-import { useMemo } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Switch, CustomSelect } from "../../components/management";
 import { ImageManagementAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
@@ -27,6 +27,51 @@ function badgeClass(badge: string) {
   if (badge === "封面") return "mgmt-chip is-cover";
   if (badge === "輪播中") return "mgmt-chip is-on";
   return "mgmt-chip";
+}
+
+function StepperButton({
+  label,
+  onClick,
+  disabled,
+  className
+}: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  className?: string;
+}) {
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startCounter = () => {
+    if (disabled) return;
+    onClick();
+    timerRef.current = setTimeout(() => {
+      intervalRef.current = setInterval(() => {
+        onClick();
+      }, 100);
+    }, 500);
+  };
+
+  const stopCounter = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
+
+  return (
+    <button
+      type="button"
+      className={className}
+      disabled={disabled}
+      onMouseDown={startCounter}
+      onMouseUp={stopCounter}
+      onMouseLeave={stopCounter}
+      onTouchStart={startCounter}
+      onTouchEnd={stopCounter}
+    >
+      {label}
+    </button>
+  );
 }
 
 type ImageManagementContentProps = {
@@ -102,6 +147,20 @@ type ImageManagementContentProps = {
       title: string;
     }>
   ) => void;
+  lastSyncedAssets?: ImageAsset[];
+  lastSyncedPlaylistEntries?: Array<{
+    entryId: string;
+    assetId: number | null;
+    displayOrder: number;
+    durationSeconds: number;
+    enabled: boolean;
+    fallbackMode: "display-placeholder" | "skip" | "use-cover";
+    title: string;
+    description: string;
+    area: string;
+    capturedAt: string;
+    tags: string[];
+  }>;
 };
 
 export function ImageManagementContent({
@@ -144,13 +203,73 @@ export function ImageManagementContent({
   onTogglePlaylistShuffle,
   storageUsage,
   updateAssetField,
-  updatePlaylistEntryField
+  updatePlaylistEntryField,
+  lastSyncedAssets,
+  lastSyncedPlaylistEntries
 }: ImageManagementContentProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const isAssetDirty = (id: number) => {
+    if (!lastSyncedAssets) return false;
+    const current = assets.find((a) => a.id === id);
+    const synced = lastSyncedAssets.find((a) => a.id === id);
+    if (!current || !synced) return false;
+    return (
+      current.title !== synced.title ||
+      current.description !== synced.description ||
+      current.aspectRatio !== synced.aspectRatio
+    );
+  };
+
+  const isPlaylistEntryDirty = (entryId: string) => {
+    if (!lastSyncedPlaylistEntries) return false;
+    const current = playlistEntries.find((e) => e.entryId === entryId);
+    const synced = lastSyncedPlaylistEntries.find((e) => e.entryId === entryId);
+    if (!current || !synced) return false;
+    return (
+      current.title !== synced.title ||
+      current.description !== synced.description ||
+      current.area !== synced.area ||
+      current.capturedAt !== synced.capturedAt ||
+      current.displayOrder !== synced.displayOrder ||
+      current.durationSeconds !== synced.durationSeconds ||
+      current.enabled !== synced.enabled ||
+      current.fallbackMode !== synced.fallbackMode ||
+      JSON.stringify(current.tags) !== JSON.stringify(synced.tags)
+    );
+  };
+
+  const isAnyDirty = useMemo(() => {
+    const assetsDirty = assets.some((a) => isAssetDirty(a.id));
+    const playlistDirty = playlistEntries.some((e) => isPlaylistEntryDirty(e.entryId));
+    return assetsDirty || playlistDirty;
+  }, [assets, lastSyncedAssets, playlistEntries, lastSyncedPlaylistEntries]);
+
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      const matchesSearch =
+        searchQuery.trim() === "" ||
+        (asset.title && asset.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (asset.description && asset.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (asset.originalName && asset.originalName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      let matchesStatus = true;
+      if (statusFilter === "on-playlist") {
+        matchesStatus = playlistEntries.some((e) => e.assetId === asset.id && e.enabled);
+      } else if (statusFilter === "cover") {
+        matchesStatus = !!asset.isCover;
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [assets, searchQuery, statusFilter, playlistEntries]);
+
   const viewModel = useMemo(
     () =>
       buildImageManagementViewModel({
         assetReferences,
-        assets,
+        assets: filteredAssets,
         errorMessage,
         isDeleting,
         isSaving,
@@ -164,7 +283,7 @@ export function ImageManagementContent({
       }),
     [
       assetReferences,
-      assets,
+      filteredAssets,
       errorMessage,
       isDeleting,
       isSaving,
@@ -177,6 +296,7 @@ export function ImageManagementContent({
       resolvedPlaylistEntries
     ]
   );
+
   const statusVariant =
     viewModel.actionBanner.tone === "error"
       ? "is-error"
@@ -190,6 +310,23 @@ export function ImageManagementContent({
   const selectedAsset = assets.find((asset) => asset.id === viewModel.selection?.id);
   const aspectRatioChoice = selectedAsset ? formatAspectRatioChoice(selectedAsset.aspectRatio) : "auto";
   const playlistTagsValue = viewModel.selection?.playlistTags?.join(" / ") ?? "";
+
+  const handleGridDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleGridDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && !isUploading) {
+      const mockEvent = {
+        target: {
+          files: e.dataTransfer.files,
+          value: ""
+        }
+      } as unknown as ChangeEvent<HTMLInputElement>;
+      await handleUpload(mockEvent);
+    }
+  };
 
   return (
     <div className="image-mgmt-page">
@@ -222,27 +359,67 @@ export function ImageManagementContent({
 
       <section className="settings-card mgmt-interactive-card im-card-full">
         <div className="settings-card__title">
-          <span>
-            圖片管理與輪播治理
-            <small>Image Management &amp; Playlist Governance · {viewModel.summary.totalImages} 張</small>
-          </span>
-          <Link className="im-title-handoff-link" to="/display-pages/editor?workspace=assets">
-            前往編輯器 <small>Asset Workspace →</small>
-          </Link>
-        </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <span>
+              圖片管理與輪播治理
+              <small>Image Management &amp; Playlist Governance · {viewModel.summary.totalImages} 張</small>
+            </span>
+            {viewModel.actionBanner.title && (
+              <div 
+                className={`mgmt-status im-status ${statusVariant}`} 
+                role="status"
+                style={{ 
+                  margin: 0, 
+                  padding: "4px 10px", 
+                  borderRadius: "6px", 
+                  fontSize: "12px",
+                  lineHeight: "1.2",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <span>{viewModel.actionBanner.title}</span>
+                {viewModel.actionBanner.detail && (
+                  <span style={{ opacity: 0.8, fontSize: "11px" }}>
+                    ({viewModel.actionBanner.detail})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
-        <div className={`mgmt-status im-status ${statusVariant}`} role="status">
-          {viewModel.actionBanner.title}
-          {viewModel.actionBanner.detail ? (
-            <>
-              <br />
-              <span style={{ opacity: 0.75 }}>{viewModel.actionBanner.detail}</span>
-            </>
-          ) : null}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* 搜尋與篩選過濾列 */}
+            <div className="im-filter-bar" style={{ margin: 0, gap: "8px" }}>
+              <input
+                type="text"
+                className="im-filter-search"
+                style={{ width: "220px", height: "34px", padding: "6px 12px" }}
+                placeholder="搜尋圖片標題、描述、檔名..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                className="im-filter-select"
+                style={{ width: "110px", height: "34px", padding: "6px 12px" }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">全部圖片</option>
+                <option value="on-playlist">輪播中</option>
+                <option value="cover">僅封面</option>
+              </select>
+            </div>
+
+            <Link className="im-title-handoff-link" to="/display-pages/editor?workspace=assets">
+              前往編輯器 <small>Asset Workspace →</small>
+            </Link>
+          </div>
         </div>
 
         <div className="im-main-content">
-          <div className="im-grid-wrap">
+          <div className="im-grid-wrap" onDragOver={handleGridDragOver} onDrop={handleGridDrop}>
             {viewModel.emptyState ? (
               <div className="im-empty">
                 <strong>{viewModel.emptyState.title}</strong>
@@ -253,6 +430,7 @@ export function ImageManagementContent({
               <div className="im-grid">
                 {viewModel.library.map((asset) => (
                   <button key={asset.id} type="button" onClick={() => handleSelectImage(asset.id)} className={`im-thumb ${asset.isSelected && selectedImageId !== null ? "is-selected" : ""}`}>
+                    {isAssetDirty(asset.id) && <div className="im-thumb__draft-dot" title="有未儲存的草稿變更" />}
                     <div className="im-thumb__media">
                       {asset.previewUrl ? <img src={asset.previewUrl} alt={asset.title} /> : <div className="im-thumb__placeholder">無預覽</div>}
                       <span className="im-thumb__order">{asset.orderLabel}</span>
@@ -265,6 +443,18 @@ export function ImageManagementContent({
                     </div>
                   </button>
                 ))}
+
+                {/* 網格末端拖放卡片 */}
+                <button
+                  type="button"
+                  className="im-thumb is-upload-placeholder"
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <span className="im-upload-placeholder__icon">＋</span>
+                  <span className="im-upload-placeholder__text">上傳新圖片</span>
+                  <span className="im-upload-placeholder__subtext">拖曳檔案至此或點擊</span>
+                </button>
               </div>
             )}
           </div>
@@ -281,7 +471,25 @@ export function ImageManagementContent({
 
                   <div className="im-preview">
                     <div className="im-preview__media">
-                      {viewModel.selection.previewUrl ? <img src={viewModel.selection.previewUrl} alt={viewModel.selection.title} /> : <div className="im-thumb__placeholder">無預覽</div>}
+                      <div className="im-preview__media-container">
+                        {viewModel.selection.previewUrl ? (
+                          <>
+                            <img src={viewModel.selection.previewUrl} alt={viewModel.selection.title} />
+                            <div 
+                              className="im-preview__focal-marker"
+                              style={{ 
+                                left: "50%", 
+                                top: "50%" 
+                              }}
+                              title="預設裁剪焦點"
+                            >
+                              <div className="im-preview__focal-marker-circle" />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="im-thumb__placeholder">無預覽</div>
+                        )}
+                      </div>
                     </div>
                     <div className="im-preview__body">
                       <div className="im-thumb__chips" style={{ marginBottom: 6 }}>
@@ -315,18 +523,31 @@ export function ImageManagementContent({
                         <small>Playlist Rows</small>
                       </div>
                       <div className="im-playlist-rows__list">
-                        {viewModel.selection.playlistEntryRows.map((row) => (
-                          <button
-                            key={row.entryId}
-                            type="button"
-                            className={`im-playlist-row${row.isSelected ? " is-selected" : ""}`}
-                            onClick={() => handleSelectPlaylistEntry(row.entryId)}
-                          >
-                            <strong>{row.entryId} · {row.title}</strong>
-                            <small>{row.area} · #{row.displayOrder} · {row.durationSeconds} 秒 · {row.fallbackMode}</small>
-                            <span>{row.runtimeLabel}</span>
-                          </button>
-                        ))}
+                        {viewModel.selection.playlistEntryRows.map((row) => {
+                          const isRowEnabled = playlistEntries.find((e) => e.entryId === row.entryId)?.enabled ?? false;
+                          return (
+                            <button
+                              key={row.entryId}
+                              type="button"
+                              className={`im-playlist-row${row.isSelected ? " is-selected" : ""}`}
+                              onClick={() => handleSelectPlaylistEntry(row.entryId)}
+                            >
+                              <div className="im-playlist-row-header">
+                                <strong>{row.entryId} · {row.title}</strong>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Switch
+                                    ariaLabel="啟用播放"
+                                    on={isRowEnabled}
+                                    disabled={isLoading || isDeleting}
+                                    onChange={(next) => updatePlaylistEntryField(row.entryId, { enabled: next })}
+                                  />
+                                </div>
+                              </div>
+                              <small>{row.area} · #{row.displayOrder} · {row.durationSeconds} 秒 · {row.fallbackMode}</small>
+                              <span>{row.runtimeLabel}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
@@ -370,20 +591,20 @@ export function ImageManagementContent({
                       <div className="im-form-row">
                         <label>播放順序 <small>Display Order</small></label>
                         <div className="im-stepper">
-                          <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDisplayOrder ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: Math.max(1, (viewModel.selection!.playlistDisplayOrder ?? 1) - 1) })}>−</button>
+                          <StepperButton label="−" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDisplayOrder ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: Math.max(1, (viewModel.selection!.playlistDisplayOrder ?? 1) - 1) })} />
                           <span className="im-stepper__value">{viewModel.selection.playlistDisplayOrder ?? 1}</span>
                           <span className="im-stepper__unit">位</span>
-                          <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: (viewModel.selection!.playlistDisplayOrder ?? 1) + 1 })}>+</button>
+                          <StepperButton label="+" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { displayOrder: (viewModel.selection!.playlistDisplayOrder ?? 1) + 1 })} />
                         </div>
                       </div>
 
                       <div className="im-form-row">
                         <label>播放時間 <small>Duration</small></label>
                         <div className="im-stepper">
-                          <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDurationSeconds ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: Math.max(1, (viewModel.selection!.playlistDurationSeconds ?? 1) - 1) })}>−</button>
+                          <StepperButton label="−" className="im-stepper__btn" disabled={isLoading || isDeleting || (viewModel.selection.playlistDurationSeconds ?? 1) <= 1} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: Math.max(1, (viewModel.selection!.playlistDurationSeconds ?? 1) - 1) })} />
                           <span className="im-stepper__value">{viewModel.selection.playlistDurationSeconds ?? 10}</span>
                           <span className="im-stepper__unit">秒</span>
-                          <button type="button" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: (viewModel.selection!.playlistDurationSeconds ?? 10) + 1 })}>+</button>
+                          <StepperButton label="+" className="im-stepper__btn" disabled={isLoading || isDeleting} onClick={() => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, { durationSeconds: (viewModel.selection!.playlistDurationSeconds ?? 10) + 1 })} />
                         </div>
                       </div>
 
@@ -504,7 +725,7 @@ export function ImageManagementContent({
                 </div>
 
                 <div className="im-sidebar-actions">
-                  <button type="button" className="im-btn primary" disabled={isLoading || isSaving || isDeleting} onClick={() => void handleSave()}>{isSaving ? "儲存中..." : "儲存"}</button>
+                  <button type="button" className={`im-btn primary${isAnyDirty ? " glow-save-active" : ""}`} disabled={isLoading || isSaving || isDeleting} onClick={() => void handleSave()}>{isSaving ? "儲存中..." : "儲存"}</button>
                   <button type="button" className="im-btn" disabled={isLoading || isSaving || isDeleting || viewModel.selection.isCover} onClick={() => void handleSetCover()}>{viewModel.selection.isCover ? "目前封面" : "設為封面"}</button>
                   <button type="button" className="im-btn danger" disabled={isLoading || isSaving || isDeleting || deleteBlocked} onClick={() => void handleDelete()}>{deleteBlocked ? "先解除引用" : isDeleting ? "移除中..." : "移除"}</button>
                 </div>
