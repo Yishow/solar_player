@@ -23,7 +23,7 @@ export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageId>(
   });
 
   return useRuntimeRefreshLifecycle<DisplayStoryPayloadByPageId[PageKey]>({
-    enabled: options?.enabled ?? true,
+    enabled: (options?.enabled ?? true) || (typeof window !== "undefined" && window.location.pathname.startsWith("/display-pages/editor")),
     initialPayload: options?.initialPayload,
     load: () => loadDisplayStoryRuntimePayload(pageKey),
     refreshKey: spec.refreshKey,

@@ -303,13 +303,22 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
 
   useEffect(() => {
     if (activeBackgroundSrc !== bgTransition.current) {
+      if (!runtimeHydrationEnabled) {
+        setBgTransition({
+          current: activeBackgroundSrc,
+          prev: undefined,
+          fadeCurrent: false
+        });
+        return;
+      }
+
       setBgTransition((prev) => ({
         current: activeBackgroundSrc,
         prev: prev.current,
         fadeCurrent: true
       }));
     }
-  }, [activeBackgroundSrc, bgTransition.current]);
+  }, [activeBackgroundSrc, bgTransition.current, runtimeHydrationEnabled]);
 
   useEffect(() => {
     if (bgTransition.fadeCurrent) {

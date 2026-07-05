@@ -19,7 +19,7 @@ export function useSustainabilityStoryRuntime(
   const warmPayload = periodPayloadCacheRef.current.get(selectedPeriod) ?? null;
 
   const runtime = useRuntimeRefreshLifecycle<SustainabilityStoryRuntimePayload>({
-    enabled: options?.enabled ?? true,
+    enabled: (options?.enabled ?? true) || (typeof window !== "undefined" && window.location.pathname.startsWith("/display-pages/editor")),
     initialPayload: warmPayload,
     load: async () => {
       const response = await fetchSustainabilityStory(selectedPeriod);
