@@ -790,7 +790,14 @@ export async function updateImageAsset(
   data: Partial<
     Pick<
       ImageAsset,
-      "title" | "description" | "displayDuration" | "includedInSlideshow" | "isCover" | "aspectRatio"
+      | "title"
+      | "description"
+      | "displayDuration"
+      | "includedInSlideshow"
+      | "isCover"
+      | "aspectRatio"
+      | "category"
+      | "usageScope"
     >
   >
 ) {

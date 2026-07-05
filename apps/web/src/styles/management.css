@@ -1,6 +1,9 @@
+@import "../pages/AssetLibrary/assetLibrary.css";
+
 /* Management primitives — shared across all 8 management pages.
  * Provides appearance-only rules; positioning belongs in each page's CSS.
  */
+
 
 :root {
   --mgmt-page-title-left: 58px;
@@ -675,7 +678,8 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -710,6 +714,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  white-space: nowrap;
   padding: 8px 12px;
   border: none;
   border-radius: 6px;

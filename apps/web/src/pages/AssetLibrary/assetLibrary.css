@@ -1,0 +1,252 @@
+/* assetLibrary.css - Asset Library UI Polish & Enhancements */
+
+/* 磨砂玻璃擬態控制列與面板 */
+.asset-library-glass {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 8px 32px 0 rgba(82, 91, 66, 0.04);
+}
+
+/* 卡片 Hover 微動畫與漸變效果 */
+.asset-library-card {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.25s ease, 
+              border-color 0.25s ease,
+              background-color 0.25s ease;
+  will-change: transform, box-shadow;
+}
+
+.asset-library-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 24px -10px rgba(82, 91, 66, 0.15), 
+              0 4px 12px -5px rgba(82, 91, 66, 0.1);
+  border-color: var(--green) !important;
+  background-color: var(--workspace-surface-accent) !important;
+}
+
+/* 骨架屏載入閃爍特效 */
+.asset-skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(82, 91, 66, 0.05) 25%,
+    rgba(82, 91, 66, 0.1) 37%,
+    rgba(82, 91, 66, 0.05) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.4s ease infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 拖曳上傳覆蓋提示區 */
+.asset-drag-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--workspace-surface-accent);
+  backdrop-filter: blur(6px);
+  border: 2.5px dashed var(--green);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0% {
+    border-color: rgba(95, 140, 80, 0.4);
+    box-shadow: inset 0 0 0 0 rgba(95, 140, 80, 0.1);
+  }
+  50% {
+    border-color: rgba(95, 140, 80, 1);
+    box-shadow: inset 0 0 20px 5px rgba(95, 140, 80, 0.15);
+  }
+  100% {
+    border-color: rgba(95, 140, 80, 0.4);
+    box-shadow: inset 0 0 0 0 rgba(95, 140, 80, 0.1);
+  }
+}
+
+/* 全螢幕大圖燈箱 (Lightbox) */
+.asset-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(18, 22, 15, 0.9);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.asset-lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 85vh;
+  transform: scale(0.95);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes scaleUp {
+  to {
+    transform: scale(1);
+  }
+}
+
+/* 批次操作浮動工具列 */
+.asset-batch-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 100px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(82, 91, 66, 0.15);
+  border-radius: 9999px;
+  box-shadow: 0 20px 40px -15px rgba(82, 91, 66, 0.2);
+  padding: 12px 28px;
+  z-index: 90;
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.asset-batch-bar.active {
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* 刪除確認玻璃擬態對話框 */
+.glass-confirm-dialog {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(82, 91, 66, 0.12) !important;
+  box-shadow: 0 20px 50px -12px rgba(82, 91, 66, 0.25);
+}
+
+/* 統一的高級按鈕樣式 */
+.asset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.asset-btn:active {
+  transform: scale(0.95);
+}
+
+.asset-btn-primary {
+  background-color: var(--green) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.12);
+}
+
+.asset-btn-primary:hover {
+  filter: brightness(0.9);
+  transform: translateY(-1px);
+}
+
+.asset-btn-primary:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.asset-btn-secondary {
+  background-color: var(--workspace-surface) !important;
+  color: var(--shell-copy-ink) !important;
+  border-color: var(--shell-divider) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.asset-btn-secondary:hover {
+  background-color: var(--workspace-surface-strong) !important;
+  border-color: var(--shell-title-ink) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.asset-btn-secondary:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.asset-btn-danger {
+  background-color: var(--workspace-surface-danger-ink, #8f452d) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.12);
+}
+
+.asset-btn-danger:hover {
+  filter: brightness(0.9);
+  transform: translateY(-1px);
+}
+
+.asset-btn-danger:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.asset-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 右側詳情面板玻璃卡片分組 */
+.detail-glass-card {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(12px) saturate(110%);
+  -webkit-backdrop-filter: blur(12px) saturate(110%);
+  border: 1px solid var(--workspace-surface-border) !important;
+  border-radius: 20px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-glass-card:hover {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(95, 140, 80, 0.25) !important;
+  box-shadow: 0 8px 24px rgba(82, 91, 66, 0.05);
+  transform: translateY(-1px);
+}
+
+.detail-glass-card-danger {
+  border-color: rgba(180, 82, 52, 0.15) !important;
+  background: rgba(180, 82, 52, 0.02) !important;
+}
+
+.detail-glass-card-danger:hover {
+  border-color: rgba(180, 82, 52, 0.3) !important;
+  background: rgba(180, 82, 52, 0.04) !important;
+  box-shadow: 0 8px 24px rgba(180, 82, 52, 0.05);
+}

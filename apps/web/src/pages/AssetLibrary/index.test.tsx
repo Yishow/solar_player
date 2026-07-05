@@ -143,7 +143,7 @@ test("embedded asset library shows return context and blocks deletion for refere
   assert.match(html, /Shared Shell Decorations 正在使用此素材/);
   assert.match(html, /解除引用後可刪除/);
   assert.match(html, /data-workspace-surface="status-board"/);
-  assert.match(html, /data-workspace-surface="selection-board"/);
+  assert.match(html, /data-workspace-surface="metadata-board"/);
   assert.match(html, /disabled=""/);
 });
 
@@ -170,6 +170,239 @@ test("embedded asset library exposes apply-and-return actions when opened from e
   assert.match(html, /返回展示頁編輯/);
   assert.match(html, /data-workspace-surface="context-board"/);
   assert.match(html, /data-workspace-surface="asset-actions"/);
+});
+
+test("asset library cards have the custom CSS class for glassmorphism hover transitions", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*asset-library-card[^"]*"/);
+});
+
+test("asset library displays skeleton loader pulsing cards when loading", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets: undefined
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*asset-skeleton-pulse[^"]*"/);
+});
+
+test("asset library displays search clear button when search query is present", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialQuery: "overview"
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*search-clear-btn[^"]*"/);
+});
+
+test("asset library displays drag overlay when dragging file over panel", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialDragging: true
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*asset-drag-overlay[^"]*"/);
+  assert.match(html, /拖曳檔案至此處上傳/);
+});
+
+test("asset library displays lightbox overlay when activeLightboxSrc is present", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialLightboxSrc: "http://localhost:3000/uploads/images/overview-hero.png"
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*asset-lightbox-backdrop[^"]*"/);
+  assert.match(html, /class="[^"]*asset-lightbox-content[^"]*"/);
+});
+
+test("asset library displays image dimensions and file size on detailed metadata view", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets
+      })
+    )
+  );
+
+  assert.match(html, /1920\s*x\s*1080/);
+  assert.match(html, /234\.4\s*KB/);
+});
+
+test("asset library displays color-coded badges for live/draft references and red outlines for blockers", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?workspace=assets"] },
+      React.createElement(AssetLibrary, {
+        embedded: true,
+        initialAssets,
+        initialReferences
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*reference-badge-live[^"]*"/);
+  assert.match(html, /class="[^"]*delete-blocker-alert[^"]*"/);
+});
+
+test("asset library displays batch action floating bar when isBatchMode is true", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialBatchMode: true
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*asset-batch-bar[^"]*active[^"]*"/);
+  assert.match(html, /批次刪除/);
+});
+
+test("asset library renders hover apply shortcuts in embedded mode", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?workspace=assets"] },
+      React.createElement(AssetLibrary, {
+        embedded: true,
+        initialAssets,
+        onApplySelection: () => {}
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*hover-apply-btn[^"]*"/);
+  assert.match(html, /套用此圖/);
+});
+
+test("asset library renders hover delete shortcuts or lock icons on card overlay", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialReferences
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*hover-delete-btn[^"]*"/);
+  assert.match(html, /class="[^"]*hover-lock-icon[^"]*"/);
+});
+
+test("asset library displays actionable redirect links for references", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialReferences
+      })
+    )
+  );
+
+  assert.match(html, /href="\/display-pages\/editor\?[^"]*"/);
+  assert.match(html, /target="_blank"/);
+});
+
+test("asset library details view exposes title edit and inline select dropdowns", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*inline-edit-title-btn[^"]*"/);
+});
+
+test("asset library batch mode disables checkboxes for referenced assets", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets,
+        initialReferences,
+        initialBatchMode: true
+      })
+    )
+  );
+
+  assert.match(html, /<input[^>]*type="checkbox"[^>]*disabled/);
+});
+
+test("asset library empty state displays dashed upload trigger card", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets: []
+      })
+    )
+  );
+
+  assert.match(html, /class="[^"]*empty-upload-trigger[^"]*"/);
+  assert.match(html, /點此上傳資產/);
+});
+
+test("asset library headers are sticky-safe and buttons use unified premium styling", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/settings/assets"] },
+      React.createElement(AssetLibrary, {
+        initialAssets
+      })
+    )
+  );
+
+  assert.doesNotMatch(html, /bg-transparent border-none px-0/);
+  assert.match(html, /class="[^"]*asset-btn-primary[^"]*"/);
+  assert.match(html, /class="[^"]*asset-btn-secondary[^"]*"/);
 });
 
 test("asset library route remains as compatibility entry to the editor workspace", () => {
