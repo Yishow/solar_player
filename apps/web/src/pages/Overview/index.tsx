@@ -89,7 +89,6 @@ function renderOverviewTitleLine(line: string) {
 
 const OverviewStaticShell = memo(function OverviewStaticShell({
   bgTransition,
-  freeformObjects,
   goldLineStyle,
   heroBannerStyle,
   heroMediaPresentation,
@@ -106,7 +105,6 @@ const OverviewStaticShell = memo(function OverviewStaticShell({
     prev: string | undefined;
     fadeCurrent: boolean;
   };
-  freeformObjects: DisplayPageFreeformObject[];
   goldLineStyle: {
     height: string;
     left: string;
@@ -227,8 +225,6 @@ const OverviewStaticShell = memo(function OverviewStaticShell({
           />
         ))}
       </figure>
-
-      <DisplayPageObjectLayer objects={freeformObjects} />
     </>
   );
 });
@@ -433,7 +429,6 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <OverviewStaticShell
         bgTransition={bgTransition}
-        freeformObjects={freeformObjects}
         goldLineStyle={goldLineStyle}
         heroBannerStyle={heroBannerStyle}
         heroMediaPresentation={heroMediaPresentation}
@@ -451,6 +446,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         seedConfig={seedConfig}
         storyOverviewPayload={storyOverviewPayload}
       />
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }

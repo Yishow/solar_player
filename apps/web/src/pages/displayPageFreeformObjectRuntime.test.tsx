@@ -18,3 +18,17 @@ test("all five playback pages wire the shared freeform object layer from resolve
     assert.match(source, /<DisplayPageObjectLayer objects=\{freeformObjects\} \/>/);
   }
 });
+
+test("overview and solar render the freeform object layer after runtime surfaces so overlays stay on top", () => {
+  const overviewSource = sources[0]!;
+  const solarSource = sources[1]!;
+
+  assert.ok(
+    overviewSource.indexOf("<OverviewRuntimeContent") < overviewSource.indexOf("<DisplayPageObjectLayer objects={freeformObjects} />"),
+    "Overview should render the object layer after runtime content"
+  );
+  assert.ok(
+    solarSource.indexOf("<SolarRuntimeContent") < solarSource.indexOf("<DisplayPageObjectLayer objects={freeformObjects} />"),
+    "Solar should render the object layer after runtime content"
+  );
+});

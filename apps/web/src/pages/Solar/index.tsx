@@ -141,7 +141,6 @@ function splitSolarTitleLine(titleLine: string) {
 }
 
 const SolarStaticShell = memo(function SolarStaticShell({
-  freeformObjects,
   goldLineLayout,
   heroLayout,
   heroMediaPresentation,
@@ -152,7 +151,6 @@ const SolarStaticShell = memo(function SolarStaticShell({
   solarTitleLine2,
   titleLayout
 }: {
-  freeformObjects: DisplayPageFreeformObject[];
   goldLineLayout: {
     left: number;
     top: number;
@@ -285,8 +283,6 @@ const SolarStaticShell = memo(function SolarStaticShell({
           />
         ))}
       </figure>
-
-      <DisplayPageObjectLayer objects={freeformObjects} />
     </>
   );
 });
@@ -399,7 +395,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     <section className="solar-display-page">
       <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <SolarStaticShell
-        freeformObjects={freeformObjects}
         goldLineLayout={goldLineLayout}
         heroLayout={heroLayout}
         heroMediaPresentation={heroMediaPresentation}
@@ -415,6 +410,7 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
         seedConfig={seedConfig}
         solarStoryPayload={solarStoryPayload}
       />
+      <DisplayPageObjectLayer objects={freeformObjects} />
     </section>
   );
 }
