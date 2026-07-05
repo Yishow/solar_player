@@ -573,21 +573,6 @@ export function FactoryCircuit({
           <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-78" />
         </svg>
 
-        {/* 逆變器垂直下墜向量連線 */}
-        <svg
-          style={{
-            position: "absolute",
-            left: "905px",
-            top: `${562 - CONTENT_TOP_OFFSET}px`,
-            width: "45px",
-            height: "188px"
-          }}
-          viewBox="0 0 45 188"
-        >
-          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={22.5} y1={0} x2={22.5} y2={188} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-188" />
-        </svg>
-
         <svg
           className="factory-circuit-routing-reference"
           style={{
