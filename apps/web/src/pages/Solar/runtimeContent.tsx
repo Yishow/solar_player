@@ -22,8 +22,9 @@ import {
 } from "../shared/displayPageFlowTreatmentConfig";
 import { buildSolarViewModel } from "./viewModel";
 import type { SolarDisplayPageConfig } from "./displayPageConfig";
+import { solarContentTopOffset } from "./layout";
 
-const CONTENT_TOP_OFFSET = 146;
+const CONTENT_TOP_OFFSET = solarContentTopOffset;
 
 const flowNodeOrder = [
   {
@@ -307,7 +308,7 @@ export function SolarRuntimeContent({
               <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
               <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-1" />
               <circle cx={0} cy={8} r={5} fill="#527d3b" />
-              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-1.5s" />
+              <circle cx={width} cy={8} r={5} fill="#527d3b" />
             </svg>
           );
         })()}
@@ -332,15 +333,15 @@ export function SolarRuntimeContent({
               <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
               <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-2" />
               <circle cx={0} cy={8} r={5} fill="#527d3b" />
-              <circle cx={width} cy={8} r={5} fill="#527d3b" className="solar-reveal-3.0s" />
+              <circle cx={width} cy={8} r={5} fill="#527d3b" />
             </svg>
           );
         })()}
 
         {(() => {
           const startX = 1365;
-          const startY = 258;
-          const endX = 1545;
+          const startY = 257.27; // 碰 Inverter 下圓周 (1366.25, 257.27)
+          const endX = 1545;  // 碰 Co2 左圓周 (1545, 499)
           const endY = 499;
           const width = endX - startX;
           const vHeight = endY - startY;
@@ -375,7 +376,7 @@ export function SolarRuntimeContent({
                 className="solar-flow-line-orange"
               />
               <circle cx={1.25} cy={0} r={5} fill="#eaa11e" />
-              <circle cx={width} cy={vHeight} r={5} fill="#eaa11e" className="solar-reveal-3.0s" />
+              <circle cx={width} cy={vHeight} r={5} fill="#eaa11e" />
             </svg>
           );
         })()}
