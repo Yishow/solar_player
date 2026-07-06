@@ -153,3 +153,88 @@ test("mapped MQTT live metrics publish playback sync only when runtime availabil
     await service.disconnect();
   }
 });
+
+test("solar runtime availability accepts derived self consumption inputs", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  const insertTopicMapping = database.prepare(
+    `
+      INSERT INTO topic_mappings (
+        metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `
+  );
+  for (const metricKey of [
+    "realTimePower",
+    "todayGeneration",
+    "totalGeneration",
+    "todayCo2Reduction",
+    "totalCo2Reduction",
+    "selfConsumptionEnergy",
+    "consumptionEnergy",
+    "systemEfficiency"
+  ]) {
+    insertTopicMapping.run(metricKey, "kuozui/plant/solar/runtime", "kW", null, 1, 0, 2);
+  }
+  const timestamp = "2026-07-07T00:00:00.000Z";
+  const insertLiveMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, ?, ?, 'good', '{}')
+    `
+  );
+  for (const metricKey of [
+    "realTimePower",
+    "todayGeneration",
+    "totalGeneration",
+    "todayCo2Reduction",
+    "totalCo2Reduction",
+    "selfConsumptionEnergy",
+    "consumptionEnergy"
+  ]) {
+    insertLiveMetric.run(metricKey, 1, "kW", timestamp);
+  }
+
+  const client = new FakeMqttClient();
+  const displaySyncEvents: Array<Pick<DisplaySyncEvent, "reason" | "scope">> = [];
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    },
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitDisplaySync: (event) => {
+        displaySyncEvents.push(event);
+      },
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: () => undefined,
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "kuozui/plant/solar/runtime", Buffer.from(JSON.stringify({ value: 3842 })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(
+      displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
+      [{ reason: "mqtt-live-runtime-availability-updated", scope: "mqtt" }]
+    );
+  } finally {
+    await service.disconnect();
+  }
+});

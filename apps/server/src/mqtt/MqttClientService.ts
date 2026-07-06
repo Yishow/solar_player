@@ -1,7 +1,8 @@
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import {
-  resolveLiveMetricKeysForPage,
+  hasLiveMetricRequirementsData,
+  resolveLiveMetricRequirementsForPage,
   type DisplayPageTemplateKey
 } from "@solar-display/shared";
 import {
@@ -90,11 +91,10 @@ function hasPlaybackRuntimeMetricsForTemplate(
   snapshot: LiveMetricsSnapshot,
   templateKey: DisplayPageTemplateKey
 ) {
-  const requiredMetricKeys = resolveLiveMetricKeysForPage(templateKey);
-  return (
-    requiredMetricKeys.length > 0
-    && requiredMetricKeys.every((metricKey) => snapshot.metrics[metricKey] !== undefined)
-  );
+  return hasLiveMetricRequirementsData({
+    metrics: snapshot.metrics,
+    requirements: resolveLiveMetricRequirementsForPage(templateKey)
+  });
 }
 
 function didPlaybackRuntimeAvailabilityChange(

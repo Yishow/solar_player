@@ -714,6 +714,66 @@ test("GET /api/display-pages/rotation-preview keeps a previously-seen live-data 
   }
 });
 
+test("GET /api/display-pages/rotation-preview keeps solar playable when self consumption can be derived", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key
+          WHEN 'solar' THEN 1
+          WHEN 'images' THEN 0
+          ELSE 0
+        END
+      `
+    )
+    .run();
+
+  const freshTimestamp = new Date().toISOString();
+  for (const metricKey of [
+    "realTimePower",
+    "todayGeneration",
+    "totalGeneration",
+    "todayCo2Reduction",
+    "totalCo2Reduction",
+    "selfConsumptionEnergy",
+    "consumptionEnergy",
+    "systemEfficiency"
+  ]) {
+    seedMetricReading(metricKey, freshTimestamp);
+  }
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "solar"),
+      true
+    );
+    assert.equal(body.preview.skippedPages.find((page) => page.pageKey === "solar"), undefined);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-pages/rotation-preview still skips a live-data page that has never received its full metric set", async () => {
   migrateDatabase();
   seedDatabase();

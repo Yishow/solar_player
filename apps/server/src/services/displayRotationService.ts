@@ -10,10 +10,10 @@ import type {
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
-  evaluatePageRuntimeFreshness,
+  evaluatePageRuntimeFreshnessForRequirements,
   evaluateDisplayRotation,
   resolveImagesPlaylistTotalDurationSeconds,
-  resolveLiveMetricKeysForPage,
+  resolveLiveMetricRequirementsForPage,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -479,8 +479,8 @@ function buildPageConditions(
     );
     const pageRequiresLiveData =
       page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
-    const requiredMetricKeys =
-      page.templateKey === undefined ? [] : resolveLiveMetricKeysForPage(page.templateKey);
+    const requiredMetricRequirements =
+      page.templateKey === undefined ? [] : resolveLiveMetricRequirementsForPage(page.templateKey);
     const runtimeFreshness = page.templateKey === undefined
       ? {
           fresh: true,
@@ -488,11 +488,11 @@ function buildPageConditions(
           stalestMetricKey: null,
           stalestTimestamp: null
         }
-      : evaluatePageRuntimeFreshness({
+      : evaluatePageRuntimeFreshnessForRequirements({
           freshnessWindowMs: freshMetricsDeadlineMs,
           metrics: liveMetrics.metrics,
           nowMs: now.getTime(),
-          requiredMetricKeys
+          requirements: requiredMetricRequirements
         });
     const readinessCondition =
       page.templateKey === undefined

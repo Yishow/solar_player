@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  evaluatePageRuntimeFreshnessForRequirements,
+  resolveLiveMetricRequirementsForPage,
   evaluatePageRuntimeFreshness,
   resolveLiveMetricKeysForPage
 } from "./displayPageFreshness.js";
@@ -17,6 +19,47 @@ test("resolveLiveMetricKeysForPage expands solar requirements into the live metr
     "systemEfficiency"
   ]);
   assert.deepEqual(resolveLiveMetricKeysForPage("images"), []);
+});
+
+test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use runtime alternatives", () => {
+  assert.deepEqual(resolveLiveMetricRequirementsForPage("solar"), [
+    { alternatives: [["realTimePower"]], requirementKey: "realTimePower" },
+    { alternatives: [["todayGeneration"]], requirementKey: "todayGeneration" },
+    {
+      alternatives: [
+        ["selfConsumptionRatio"],
+        ["selfConsumptionEnergy", "consumptionEnergy"]
+      ],
+      requirementKey: "selfConsumptionRatio"
+    },
+    { alternatives: [["todayCo2Reduction"], ["todayGeneration"]], requirementKey: "todayCo2Reduction" },
+    { alternatives: [["totalCo2Reduction"], ["totalGeneration"]], requirementKey: "totalCo2Reduction" },
+    { alternatives: [["systemEfficiency"]], requirementKey: "systemEfficiency" }
+  ]);
+});
+
+test("evaluatePageRuntimeFreshnessForRequirements accepts a complete derived alternative", () => {
+  const timestamp = "2026-05-23T00:00:20.000Z";
+  const result = evaluatePageRuntimeFreshnessForRequirements({
+    freshnessWindowMs: 30_000,
+    metrics: {
+      consumptionEnergy: { timestamp },
+      realTimePower: { timestamp },
+      selfConsumptionEnergy: { timestamp },
+      systemEfficiency: { timestamp },
+      todayGeneration: { timestamp },
+      totalGeneration: { timestamp }
+    },
+    nowMs: Date.parse("2026-05-23T00:00:30.000Z"),
+    requirements: resolveLiveMetricRequirementsForPage("solar")
+  });
+
+  assert.deepEqual(result, {
+    fresh: true,
+    hasRequiredData: true,
+    stalestMetricKey: null,
+    stalestTimestamp: null
+  });
 });
 
 test("evaluatePageRuntimeFreshness reports fresh only when every required metric is present and within the freshness window", () => {

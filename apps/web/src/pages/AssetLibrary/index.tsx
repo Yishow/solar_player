@@ -16,6 +16,7 @@ import {
   buildApiUrl,
   deleteImageAsset,
   getImages,
+  updateImageAsset,
   uploadManagedAsset
 } from "../../services/api";
 import { IMAGE_MANAGEMENT_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
@@ -375,6 +376,9 @@ export function AssetLibrary({
   const resolvedAssetReferences =
     initialReferences && initialReferences.assetId === selectedAssetId ? initialReferences : assetReferences;
   const selectedAssetPreviewSrc = selectedAsset ? resolveAssetPreviewSrc(selectedAsset) : null;
+  const selectedAssetTitle = selectedAsset
+    ? selectedAsset.title ?? selectedAsset.originalName ?? `素材 ${selectedAsset.id}`
+    : "";
   const selectedAssetHasBlockingReferences = (resolvedAssetReferences?.blockingIssues.length ?? 0) > 0;
 
   const categoryCounts = useMemo(() => ({
@@ -405,7 +409,7 @@ export function AssetLibrary({
   }, [selectedAssetId]);
   useEffect(() => {
     if (selectedAsset) {
-      setEditingTitleVal(selectedAsset.title);
+      setEditingTitleVal(selectedAssetTitle);
       setEditingDescVal(selectedAsset.description ?? "");
       setIsEditingTitle(false);
       setIsEditingDesc(false);
@@ -589,7 +593,10 @@ export function AssetLibrary({
           // ignore pre-detection failures
         }
 
-        const uploaded = await uploadManagedAsset(file, predictedCategory, uploadUsageScope);
+        const uploaded = await uploadManagedAsset(file, {
+          category: predictedCategory,
+          usageScope: uploadUsageScope
+        });
         setSelectedAssetId(uploaded.id);
       }
       await Promise.all([
@@ -649,7 +656,7 @@ export function AssetLibrary({
       setIsEditingTitle(false);
       return;
     }
-    if (editingTitleVal === selectedAsset.title) {
+    if (editingTitleVal === selectedAssetTitle) {
       setIsEditingTitle(false);
       return;
     }
@@ -934,7 +941,8 @@ export function AssetLibrary({
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             {/* Filter Group: Category */}
             <div className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="上傳預設分類">
+              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <title>上傳預設分類</title>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               <CustomSelect
@@ -951,7 +959,8 @@ export function AssetLibrary({
             
             {/* Filter Group: Usage Scope */}
             <div className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="上傳預設範圍">
+              <svg className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <title>上傳預設範圍</title>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.657-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.657-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
               <CustomSelect
@@ -1110,7 +1119,7 @@ export function AssetLibrary({
                         void handleSaveTitle();
                       }
                       if (e.key === "Escape") {
-                        setEditingTitleVal(selectedAsset.title);
+                        setEditingTitleVal(selectedAssetTitle);
                         setIsEditingTitle(false);
                       }
                     }}
@@ -1122,17 +1131,17 @@ export function AssetLibrary({
                     <span 
                       className="text-[16px] font-bold text-[var(--shell-title-ink)] truncate max-w-[160px] block cursor-pointer hover:bg-gray-50 px-1 rounded" 
                       onClick={() => {
-                        setEditingTitleVal(selectedAsset.title);
+                        setEditingTitleVal(selectedAssetTitle);
                         setIsEditingTitle(true);
                       }}
                       title="點擊編輯標題"
                     >
-                      {selectedAsset.title}
+                      {selectedAssetTitle}
                     </span>
                     <button
                       type="button"
                       onClick={() => {
-                        setEditingTitleVal(selectedAsset.title);
+                        setEditingTitleVal(selectedAssetTitle);
                         setIsEditingTitle(true);
                       }}
                       className="inline-edit-title-btn opacity-0 group-hover/title:opacity-100 text-gray-400 hover:text-[var(--green)] transition-opacity"
@@ -1221,7 +1230,7 @@ export function AssetLibrary({
               <div>
                 <div className="text-[var(--shell-subtitle-ink)] font-medium">格式與比例</div>
                 <div className="mt-1 font-semibold text-[var(--shell-title-ink)]">
-                  {selectedAsset.aspectRatio || "16:9"} ({selectedAsset.originalName.split(".").pop()?.toUpperCase() || "PNG"})
+                  {selectedAsset.aspectRatio || "16:9"} ({selectedAsset.originalName?.split(".").pop()?.toUpperCase() || "PNG"})
                 </div>
               </div>
               <div>
