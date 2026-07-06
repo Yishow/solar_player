@@ -63,6 +63,27 @@ test("weather projection is unavailable when fetch state is not fresh", () => {
   assert.equal(viewModel.weather.available, false);
 });
 
+test("weather projection stays visible when the snapshot is fresh but temperature is missing", () => {
+  const viewModel = buildOverviewViewModel({
+    ...baseArgs,
+    snapshot: snapshotWith({}),
+    weatherSnapshot: {
+      ...freshWeather,
+      airTemperature: null,
+      precipitation: null,
+      relativeHumidity: null,
+      windSpeed: null
+    }
+  });
+
+  assert.equal(viewModel.weather.available, true);
+  assert.equal(viewModel.weather.condition, "晴");
+  assert.equal(viewModel.weather.temperature, "--");
+  assert.equal(viewModel.weather.humidity, "--");
+  assert.equal((viewModel.weather as typeof viewModel.weather & { windSpeed?: string }).windSpeed, "--");
+  assert.equal((viewModel.weather as typeof viewModel.weather & { precipitation?: string }).precipitation, "--");
+});
+
 test("weather projection is unavailable when no weather snapshot is provided", () => {
   const viewModel = buildOverviewViewModel({
     ...baseArgs,
@@ -75,6 +96,12 @@ test("weather projection is unavailable when no weather snapshot is provided", (
 test("resolveOverviewWeatherSnapshot keeps the real snapshot when it is fresh", () => {
   assert.equal(resolveOverviewWeatherSnapshot(freshWeather, true), freshWeather);
   assert.equal(resolveOverviewWeatherSnapshot(freshWeather, false), freshWeather);
+});
+
+test("resolveOverviewWeatherSnapshot keeps a fresh partial snapshot in mock data mode", () => {
+  const partialWeather = { ...freshWeather, airTemperature: null };
+
+  assert.equal(resolveOverviewWeatherSnapshot(partialWeather, true), partialWeather);
 });
 
 test("resolveOverviewWeatherSnapshot falls back to the demo snapshot in mock data mode", () => {

@@ -545,7 +545,7 @@ export function resolveOverviewModernDefaultConfig(
           ...seedWidget,
           ...value,
           ...(alwaysShowThresholds === undefined ? {} : { alwaysShowThresholds }),
-          visible: value.visible === true
+          visible: value.visible ?? seedWidget.visible ?? true
         }
       ];
     })

@@ -28,7 +28,7 @@ export function resolveOverviewWeatherSnapshot(
   weatherSnapshot: WeatherCurrentSnapshot | undefined,
   isMockDataMode: boolean
 ): WeatherCurrentSnapshot | undefined {
-  if (weatherSnapshot && weatherSnapshot.fetchState === "fresh" && weatherSnapshot.airTemperature !== null) {
+  if (weatherSnapshot && weatherSnapshot.fetchState === "fresh") {
     return weatherSnapshot;
   }
 
@@ -102,11 +102,7 @@ function buildOverviewPhasePower(snapshot: LiveMetricsSnapshot) {
 }
 
 function buildOverviewWeather(weatherSnapshot?: WeatherCurrentSnapshot) {
-  if (
-    weatherSnapshot === undefined ||
-    weatherSnapshot.fetchState !== "fresh" ||
-    weatherSnapshot.airTemperature === null
-  ) {
+  if (weatherSnapshot === undefined || weatherSnapshot.fetchState !== "fresh") {
     return {
       available: false as const,
       condition: DENSITY_VALUE_PLACEHOLDER,
@@ -135,7 +131,10 @@ function buildOverviewWeather(weatherSnapshot?: WeatherCurrentSnapshot) {
       typeof precipitation === "number" && Number.isFinite(precipitation)
         ? `${Math.round(precipitation)} mm`
         : DENSITY_VALUE_PLACEHOLDER,
-    temperature: `${Math.round(weatherSnapshot.airTemperature)}°C`,
+    temperature:
+      weatherSnapshot.airTemperature === null
+        ? DENSITY_VALUE_PLACEHOLDER
+        : `${Math.round(weatherSnapshot.airTemperature)}°C`,
     windSpeed:
       typeof windSpeed === "number" && Number.isFinite(windSpeed)
         ? `${windSpeed.toFixed(1)} m/s`

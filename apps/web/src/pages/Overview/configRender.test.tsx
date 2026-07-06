@@ -219,20 +219,20 @@ test("overview config treats KPI cards without visible as visible", () => {
   assert.equal(resolved.kpiCards.power.visible, true);
 });
 
-test("overview config treats dashboard widgets without visible as hidden", () => {
+test("overview config treats dashboard widgets without visible as visible", () => {
   const seed = createOverviewDisplayPageSeedConfig();
-  const { visible: _visible, ...legacyGenerationTrend } = seed.dashboardWidgets.generationTrend;
+  const { visible: _visible, ...legacyWeather } = seed.dashboardWidgets.weather;
   const persisted = {
     ...seed,
     dashboardWidgets: {
       ...seed.dashboardWidgets,
-      generationTrend: legacyGenerationTrend
+      weather: legacyWeather
     }
   } as unknown as typeof seed;
 
   const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
 
-  assert.equal(resolved.dashboardWidgets.generationTrend.visible, false);
+  assert.equal(resolved.dashboardWidgets.weather.visible, true);
 });
 
 test("overview runtime upgrades persisted legacy defaults without overriding custom edits", () => {
