@@ -85,7 +85,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryProductionPower", 790, "kW", `${today}T09:00:00.000Z`, "good", '{"value":790}');
+    .run("factoryStampingPower", 790, "kW", `${today}T09:00:00.000Z`, "good", '{"value":790}');
   database
     .prepare(
       `
@@ -93,7 +93,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryLightingPower", 120, "kW", `${today}T09:00:00.000Z`, "good", '{"value":120}');
+    .run("factoryBodyPower", 120, "kW", `${today}T09:00:00.000Z`, "good", '{"value":120}');
   database
     .prepare(
       `
@@ -109,7 +109,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryEvGreenPower", 45, "kW", `${today}T09:00:00.000Z`, "good", '{"value":45}');
+    .run("factoryHeavyVehiclePower", 45, "kW", `${today}T09:00:00.000Z`, "good", '{"value":45}');
   database
     .prepare(
       `
@@ -117,7 +117,7 @@ function seedDisplayStoryFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryInfrastructurePower", 35, "kW", `${today}T09:00:00.000Z`, "good", '{"value":35}');
+    .run("factoryUtilityPower", 35, "kW", `${today}T09:00:00.000Z`, "good", '{"value":35}');
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("selfConsumptionRatio");
   database.prepare("DELETE FROM metric_snapshots").run();
   for (const [generation, capturedAt] of [
@@ -146,7 +146,7 @@ function seedDisplayStoryFixture() {
     .prepare(
       "UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?"
     )
-    .run("factory/power/hvac");
+    .run("factory/power/stamping");
 
   return { today };
 }
@@ -254,7 +254,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(
       body.factoryCircuit.slots.some(
         (slot) =>
-          slot.slotKey === "hvac" &&
+          slot.slotKey === "stamping" &&
           slot.bindingState === "missing" &&
           slot.fallbackReason === "missing-slot-binding"
       ),
@@ -269,7 +269,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalPowerKpi.provenance, "fallback");
     assert.equal(totalPowerKpi.sourceClass, "slot-aggregate");
     assert.equal(totalPowerKpi.value, "--");
-    assert.equal(totalPowerKpi.dependencyKeys.includes("hvac"), true);
+    assert.equal(totalPowerKpi.dependencyKeys.includes("stamping"), true);
 
     const selfConsumptionKpi = body.factoryCircuit.kpis.find(
       (metric) => metric.metricKey === "selfConsumption"
@@ -329,7 +329,7 @@ test("GET /api/display-story/factory-circuit exposes bilingual slot labels for p
   seedDisplayStoryFixture();
   getDatabase()
     .prepare("UPDATE topic_mappings SET name_zh = ?, name_en = ? WHERE metric_key = ?")
-    .run("一號產線", "Line 1", "factoryProductionPower");
+    .run("一號產線", "Line 1", "factoryStampingPower");
 
   const app = await buildApp();
 
@@ -353,10 +353,10 @@ test("GET /api/display-story/factory-circuit exposes bilingual slot labels for p
     };
 
     assert.equal(body.pageId, "factory-circuit");
-    const productionSlot = body.payload.slots.find((slot) => slot.slotKey === "production");
-    assert.equal(productionSlot?.label, "一號產線");
-    assert.equal(productionSlot?.labelZh, "一號產線");
-    assert.equal(productionSlot?.labelEn, "Line 1");
+    const stampingSlot = body.payload.slots.find((slot) => slot.slotKey === "stamping");
+    assert.equal(stampingSlot?.label, "一號產線");
+    assert.equal(stampingSlot?.labelZh, "一號產線");
+    assert.equal(stampingSlot?.labelEn, "Line 1");
   } finally {
     await app.close();
   }

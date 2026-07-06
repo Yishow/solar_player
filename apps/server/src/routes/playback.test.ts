@@ -276,7 +276,7 @@ test("GET /api/playback/settings and /api/playback/pages expose seeded playback 
     assert.equal(settingsBody.settings.idleMode, "disabled");
     assert.deepEqual(
       pagesBody.pages.map((page) => page.displayOrder),
-      [1, 2, 3, 4, 5]
+      [1, 2, 3, 4, 5, 6]
     );
   } finally {
     await app.close();
@@ -330,6 +330,7 @@ test("GET /api/playback/pages resolves duplicate display pages from the registry
         { pageKey: "overview", route: "/overview", templateKey: "overview" },
         { pageKey: "solar", route: "/solar", templateKey: "solar" },
         { pageKey: "factory-circuit", route: "/factory-circuit", templateKey: "factory-circuit" },
+        { pageKey: "factory-circuit-guanyin", route: "/factory-circuit-guanyin", templateKey: "factory-circuit" },
         { pageKey: "images", route: "/images", templateKey: "images" },
         { pageKey: "sustainability", route: "/sustainability", templateKey: "sustainability" },
         { pageKey: "images-2", route: "/images-secondary", templateKey: "images" }
@@ -362,11 +363,11 @@ test("GET /api/playback/rotation-plan exposes the persisted display rotation pla
 
     assert.deepEqual(
       body.rotationPlan.pages.map((page) => page.pageKey),
-      ["overview", "solar", "factory-circuit", "images", "sustainability"]
+      ["overview", "solar", "factory-circuit", "factory-circuit-guanyin", "images", "sustainability"]
     );
     assert.deepEqual(
       body.rotationPlan.pages.map((page) => page.durationSeconds),
-      [15, 15, 15, 15, 15]
+      [15, 15, 15, 15, 15, 15]
     );
   } finally {
     await app.close();
@@ -554,9 +555,10 @@ test("PUT /api/playback/rotation-plan persists page order, enabled state, and du
       [
         { pageKey: "sustainability", enabled: true, durationSeconds: 18 },
         { pageKey: "images", enabled: true, durationSeconds: 19 },
-        { pageKey: "factory-circuit", enabled: true, durationSeconds: 20 },
-        { pageKey: "solar", enabled: false, durationSeconds: 21 },
-        { pageKey: "overview", enabled: false, durationSeconds: 22 }
+        { pageKey: "factory-circuit-guanyin", enabled: true, durationSeconds: 20 },
+        { pageKey: "factory-circuit", enabled: false, durationSeconds: 21 },
+        { pageKey: "solar", enabled: false, durationSeconds: 22 },
+        { pageKey: "overview", enabled: false, durationSeconds: 23 }
       ]
     );
   } finally {
@@ -854,7 +856,7 @@ test("GET /api/display-pages/rotation-preview keeps slot conflicts blocking even
     .prepare(
       `
         UPDATE circuit_configs
-        SET display_slot = 'production'
+        SET display_slot = 'stamping'
         WHERE id IN (
           SELECT id
           FROM circuit_configs

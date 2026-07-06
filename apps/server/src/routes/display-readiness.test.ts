@@ -10,7 +10,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("realTimePower");
   database
     .prepare("UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?")
-    .run("factory/power/production");
+    .run("factory/power/stamping");
 
   const app = await buildApp();
 
@@ -79,7 +79,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "factoryProductionPower" &&
+          finding.requirementKey === "factoryStampingPower" &&
           finding.sourceType === "mqtt-metric"
       ),
       true
@@ -88,7 +88,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "production" &&
+          finding.requirementKey === "stamping" &&
           finding.sourceType === "circuit-slot" &&
           finding.status === "blocking" &&
           finding.blocking
@@ -230,7 +230,7 @@ test("GET /api/display-readiness tracks rendered sustainability indicators inste
 
 test("GET /api/display-readiness reports factory metric mapping gaps alongside slot bindings", async () => {
   const database = getDatabase();
-  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryProductionPower");
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryStampingPower");
 
   const app = await buildApp();
 
@@ -258,7 +258,7 @@ test("GET /api/display-readiness reports factory metric mapping gaps alongside s
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "factoryProductionPower" &&
+          finding.requirementKey === "factoryStampingPower" &&
           finding.sourceType === "mqtt-metric" &&
           finding.status === "blocking" &&
           finding.blocking &&
@@ -275,7 +275,7 @@ test("GET /api/display-readiness reports conflicting slot assignments", async ()
   const database = getDatabase();
   database
     .prepare("UPDATE circuit_configs SET display_slot = ? WHERE mqtt_topic IN (?, ?)")
-    .run("production", "factory/power/production", "factory/power/hvac");
+    .run("stamping", "factory/power/stamping", "factory/power/body");
 
   const app = await buildApp();
 
@@ -303,7 +303,7 @@ test("GET /api/display-readiness reports conflicting slot assignments", async ()
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "production" &&
+          finding.requirementKey === "stamping" &&
           finding.sourceType === "circuit-slot" &&
           finding.status === "blocking" &&
           finding.blocking &&
@@ -321,7 +321,7 @@ test("MQTT and circuit settings surfaces expose the same blocking readiness find
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("realTimePower");
   database
     .prepare("UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?")
-    .run("factory/power/production");
+    .run("factory/power/stamping");
 
   const app = await buildApp();
 
@@ -414,7 +414,7 @@ test("PUT /api/circuits/:id persists explicit display slot assignments", async (
     const updateResponse = await app.inject({
       method: "PUT",
       payload: {
-        displaySlot: "production"
+        displaySlot: "body"
       },
       url: `/api/circuits/${firstCircuit.id}`
     });
@@ -428,7 +428,7 @@ test("PUT /api/circuits/:id persists explicit display slot assignments", async (
     };
 
     assert.equal(body.success, true);
-    assert.equal(body.data.displaySlot, "production");
+    assert.equal(body.data.displaySlot, "body");
   } finally {
     await app.close();
   }

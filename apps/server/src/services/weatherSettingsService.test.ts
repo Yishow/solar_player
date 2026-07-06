@@ -50,7 +50,8 @@ test("weather settings survive a reload with the saved management contract", () 
     fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
     locationMode: "station",
     preset: "standard",
-    stationId: "C0I080"
+    stationId: "C0I080",
+    updateIntervalMinutes: 30
   });
 
   closeDatabaseConnection();
@@ -61,7 +62,8 @@ test("weather settings survive a reload with the saved management contract", () 
     fieldKeys: ["weather", "airTemperature", "relativeHumidity", "observationTime"],
     locationMode: "station",
     preset: "standard",
-    stationId: "C0I080"
+    stationId: "C0I080",
+    updateIntervalMinutes: 30
   });
 });
 
@@ -114,6 +116,7 @@ test("weather settings accept compact and complete presets as first-class saved 
     ],
     locationMode: "station",
     preset: "complete",
-    stationId: "C0I080"
+    stationId: "C0I080",
+    updateIntervalMinutes: 30
   });
 });

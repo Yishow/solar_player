@@ -653,12 +653,16 @@ test("MqttClientService publish forwards payload to the mqtt client when connect
     }
   });
 
-  await service.connect();
-  service.publish("test/topic", JSON.stringify({ value: 123 }));
+  try {
+    await service.connect();
+    service.publish("test/topic", JSON.stringify({ value: 123 }));
 
-  const client = clientInstance as any;
-  assert.ok(client);
-  assert.equal(client.published.length, 1);
-  assert.equal(client.published[0].topic, "test/topic");
-  assert.equal(JSON.parse(client.published[0].payload).value, 123);
+    const client = clientInstance as any;
+    assert.ok(client);
+    assert.equal(client.published.length, 1);
+    assert.equal(client.published[0].topic, "test/topic");
+    assert.equal(JSON.parse(client.published[0].payload).value, 123);
+  } finally {
+    await service.disconnect();
+  }
 });
