@@ -137,22 +137,28 @@ export function CircuitSettingsContent({
         <small>Save Settings</small>
       </button>
 
-      <div className={`mgmt-status cs-status ${statusVariant}`} role="status">
-        {viewModel.feedbackBanner.title}
-        {viewModel.feedbackBanner.detail ? (
-          <>
-            　·
-            <span style={{ opacity: 0.78 }}>{viewModel.feedbackBanner.detail}</span>
-          </>
-        ) : null}
-      </div>
 
       {remoteSyncBanner}
 
       <section className="settings-card mgmt-interactive-card cs-card">
         <div className="settings-card__title">
-          廠區用電迴路
-          <small>Factory Circuits · 共 {viewModel.summary.totalCircuitCount} 筆</small>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <span>
+              廠區用電迴路
+              <small>Factory Circuits · 共 {viewModel.summary.totalCircuitCount} 筆</small>
+            </span>
+            {viewModel.feedbackBanner.title ? (
+              <div className={`mgmt-status cs-status ${statusVariant}`} role="status">
+                {viewModel.feedbackBanner.title}
+                {viewModel.feedbackBanner.detail ? (
+                  <>
+                    　·
+                    <span style={{ opacity: 0.78 }}>{viewModel.feedbackBanner.detail}</span>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="cs-stats mgmt-stat-strip">
