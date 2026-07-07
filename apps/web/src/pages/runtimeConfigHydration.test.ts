@@ -14,7 +14,7 @@ const runtimePages = [
 
 const runtimeEntryMarkers = {
   FactoryCircuit: "FactoryCircuitRuntimeContent",
-  Images: "buildImagesViewModel",
+  Images: "resolveImagesActiveViewModel",
   Overview: "OverviewRuntimeContent",
   Solar: "SolarRuntimeContent",
   Sustainability: "buildSustainabilityViewModel"

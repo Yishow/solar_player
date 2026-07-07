@@ -39,7 +39,7 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
   assert.match(imagesSource, /const playbackActiveEntry =/);
   assert.match(imagesSource, /runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
-  assert.match(imagesSource, /resolveActiveImagePlaylistEntry\(playbackEntries,\s*autoplay\.activeIndex\)/);
+  assert.match(imagesSource, /resolveActiveImagePlaylistEntry\(viewModelEntries,\s*autoplay\.activeIndex\)/);
   assert.doesNotMatch(imagesSource, /playlistRuntime\.payload\?\.activeEntry/);
   assert.doesNotMatch(imagesSource, /runtimePlaylistEntries\.length > 0\s*\?/);
   assert.doesNotMatch(imagesSource, /imagesReferencePlaylistEntries\[Math\.min\(requestedIndex, imagesReferencePlaylistEntries\.length - 1\)\]/);
@@ -130,16 +130,24 @@ test("images runtime keeps playlist hydration staged while preserving autoplay a
   assert.match(imagesSource, /useImagePlaylistRuntime\(\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(imagesSource, /const runtimePlaylistEntries = playlistRuntime\.payload\?\.entries \?\? \[\]/);
   assert.match(imagesSource, /const playbackEntries = runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
-  assert.match(imagesSource, /const localRequestedActiveEntry = resolveActiveImagePlaylistEntry\(playbackEntries,\s*requestedIndex\)/);
-  assert.match(imagesSource, /const playbackActiveEntry = resolveActiveImagePlaylistEntry\(playbackEntries,\s*autoplay\.activeIndex\)/);
+  assert.match(imagesSource, /const localRequestedActiveEntry = resolveActiveImagePlaylistEntry\(viewModelEntries,\s*requestedIndex\)/);
+  assert.match(imagesSource, /const playbackActiveEntry = resolveActiveImagePlaylistEntry\(viewModelEntries,\s*autoplay\.activeIndex\)/);
   assert.match(imagesSource, /shuffleEnabled = runtimeHydrationEnabled/);
   assert.match(imagesSource, /activeEntry: localRequestedActiveEntry/);
-  assert.match(imagesSource, /entries: playbackEntries/);
+  assert.match(imagesSource, /entries: viewModelEntries/);
   assert.match(imagesSource, /runtimeErrorMessage: runtimeHydrationEnabled \? playlistRuntime\.errorMessage : ""/);
   assert.match(imagesSource, /usesRuntimeFallback: playlistRuntime\.usesFallback/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);
+});
+
+test("images runtime memoizes playlist-derived view data outside the active slide path", () => {
+  assert.match(imagesSource, /const viewModelEntries = useMemo\(/);
+  assert.match(imagesSource, /resolveImagesViewModelEntries\(\{/);
+  assert.match(imagesSource, /resolveImagesActiveViewModel\(\{/);
+  assert.match(imagesSource, /resolveVisibleImagesThumbnails\(\{/);
+  assert.doesNotMatch(imagesSource, /buildImagesViewModel\(\{/);
 });
 
 test("images info panel editor region exposes visibility toggle and configuring status select", () => {

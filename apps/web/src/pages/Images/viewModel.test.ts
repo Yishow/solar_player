@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildImagesViewModel } from "./viewModel";
+import {
+  buildImagesViewModel,
+  resolveImagesViewModelEntries,
+  resolveVisibleImagesThumbnails
+} from "./viewModel";
 
 const playlistEntries = [
   {
@@ -242,4 +246,27 @@ test("buildImagesViewModel keeps fallback-active thumbnails inside the same orde
   assert.equal(model.counter.current, "02");
   assert.equal(model.counter.total, "02");
   assert.equal(model.thumbnails[1]?.isActive, true);
+});
+
+test("resolveVisibleImagesThumbnails marks active thumbnails by active entry identity", () => {
+  const thumbnails = resolveImagesViewModelEntries({
+    assets,
+    coverAssetSource: "/brand-logo.png",
+    entries: playlistEntries
+  });
+
+  const visible = resolveVisibleImagesThumbnails({
+    activeEntryId: "IMG-03",
+    activeIndex: 2,
+    thumbnails
+  });
+  assert.equal(visible.visibleThumbnails[2]?.entryId, "IMG-03");
+  assert.equal(visible.visibleThumbnails[2]?.isActive, true);
+
+  const missingActive = resolveVisibleImagesThumbnails({
+    activeEntryId: "IMG-X",
+    activeIndex: 0,
+    thumbnails
+  });
+  assert.equal(missingActive.visibleThumbnails.some((thumbnail) => thumbnail.isActive), false);
 });

@@ -53,7 +53,11 @@ import {
 import { resolveRuntimeMediaUrl } from "../shared/runtimeMediaUrl";
 import "../../components/displayPageCards.css";
 import "./images.css";
-import { buildImagesViewModel } from "./viewModel";
+import {
+  resolveImagesActiveViewModel,
+  resolveImagesViewModelEntries,
+  resolveVisibleImagesThumbnails
+} from "./viewModel";
 
 const CONTENT_TOP_OFFSET = imagesContentTopOffset;
 
@@ -98,18 +102,25 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   });
   const runtimePlaylistEntries = playlistRuntime.payload?.entries ?? [];
   const playbackEntries = runtimeHydrationEnabled ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
-  const localRequestedActiveEntry = resolveActiveImagePlaylistEntry(playbackEntries, requestedIndex);
+  const viewModelEntries = useMemo(
+    () => resolveImagesViewModelEntries({
+      assets: [],
+      entries: playbackEntries
+    }),
+    [playbackEntries]
+  );
+  const localRequestedActiveEntry = resolveActiveImagePlaylistEntry(viewModelEntries, requestedIndex);
   const shuffleEnabled = runtimeHydrationEnabled
     ? playlistRuntime.payload?.settings.shuffle ?? false
     : false;
   const autoplay = useImagesAutoplay({
     activeEntry: localRequestedActiveEntry,
-    entries: playbackEntries,
+    entries: viewModelEntries,
     requestedIndex,
     setRequestedIndex,
     shuffle: shuffleEnabled
   });
-  const playbackActiveEntry = resolveActiveImagePlaylistEntry(playbackEntries, autoplay.activeIndex);
+  const playbackActiveEntry = resolveActiveImagePlaylistEntry(viewModelEntries, autoplay.activeIndex);
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -159,12 +170,10 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     resolvedConfig.mainStage,
     imagesMainStageMediaEffectResolverOptions
   );
-  const viewModel = buildImagesViewModel({
+  const viewModel = resolveImagesActiveViewModel({
     activeEntry: playbackActiveEntry,
     activeIndex: autoplay.activeIndex,
-    assets: [],
-    coverAssetSource: mainStageSource,
-    entries: playbackEntries
+    thumbnails: viewModelEntries
   });
   const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
     configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
@@ -175,11 +184,11 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
   const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
     (resolvedConfig as typeof resolvedConfig & { freeformObjects?: DisplayPageFreeformObject[] }).freeformObjects ?? [];
-  const visibleStart = Math.min(
-    Math.floor(viewModel.activeIndex / 4) * 4,
-    Math.max(viewModel.thumbnails.length - 4, 0)
-  );
-  const visibleThumbnails = viewModel.thumbnails.slice(visibleStart, visibleStart + 4);
+  const { visibleStart, visibleThumbnails } = resolveVisibleImagesThumbnails({
+    activeEntryId: viewModel.active.entryId,
+    activeIndex: viewModel.activeIndex,
+    thumbnails: viewModelEntries
+  });
 
   const titleLayout = withContentOffset(imagesTitleLayout);
   const copyLayout = withContentOffset(resolvedConfig.textBlocks.copy);
