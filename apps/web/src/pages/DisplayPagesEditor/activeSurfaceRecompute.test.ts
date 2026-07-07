@@ -12,7 +12,7 @@ const assetHealthSource = readFileSync(
 
 test("display pages editor gates full region graph work to the active editor surface", () => {
   assert.match(editorSource, /const shouldResolveEditorRegions =\s*\n\s*selectedWorkspace === "editor"/);
-  assert.match(editorSource, /shouldResolveEditorRegions\s*\?\s*resolveDisplayEditorRegions/);
+  assert.match(editorSource, /shouldResolveEditorRegions[\s\S]*resolveDisplayEditorRegions/);
   assert.match(editorSource, /shouldResolveEditorRegions \? resolveDisplayPageFreeformObjectRegions/);
   assert.match(editorSource, /const shouldRenderPreviewContent = renderPreview && selectedWorkspace === "editor"/);
 });

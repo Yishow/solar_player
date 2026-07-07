@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
 const editorSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const canvasPanePath = path.join(import.meta.dirname, "canvasPane.tsx");
+const canvasPaneSource = existsSync(canvasPanePath) ? readFileSync(canvasPanePath, "utf8") : "";
+const canvasWorkflowSource = readFileSync(path.join(import.meta.dirname, "useDisplayEditorCanvasWorkflow.ts"), "utf8");
 const publishingSource = readFileSync(path.join(import.meta.dirname, "publishing.ts"), "utf8");
 const runtimeSource = readFileSync(path.join(import.meta.dirname, "runtime.tsx"), "utf8");
 
@@ -44,8 +47,9 @@ test("display editor diagnostics and publishing hooks are gated by active right 
 
 test("display editor preview subtree creation is gated by editor workspace and renderPreview", () => {
   assert.match(editorSource, /const shouldRenderPreviewContent = renderPreview && selectedWorkspace === "editor"/);
-  assert.match(editorSource, /if \(!shouldRenderPreviewContent \|\| !selectedPage\.renderPreview\) \{/);
-  assert.match(editorSource, /selectedPage\.renderPreview as unknown as React\.ComponentType/);
+  assert.match(editorSource, /renderPreview=\{shouldRenderPreviewContent\}/);
+  assert.match(canvasPaneSource, /if \(!renderPreview \|\| !selectedPage\.renderPreview\) \{/);
+  assert.match(canvasPaneSource, /selectedPage\.renderPreview as unknown as React\.ComponentType/);
 });
 
 test("display editor region resolution is skipped outside editor surfaces that need it", () => {
@@ -54,4 +58,18 @@ test("display editor region resolution is skipped outside editor surfaces that n
   assert.match(editorSource, /selectedWorkspace === "assets" && assetReturnWorkspace === "editor" && Boolean\(assetContextId\)/);
   assert.match(editorSource, /shouldResolveEditorRegions[\s\S]*resolveDisplayEditorRegions/);
   assert.match(editorSource, /shouldResolveEditorRegions \? resolveDisplayPageFreeformObjectRegions/);
+});
+
+test("display editor profiling instruments region resolve, overlay resolve, and preview render boundaries", () => {
+  assert.match(editorSource, /measureDisplayEditorScope/);
+  assert.match(editorSource, /measureDisplayEditorScope\(\s*"region-resolve"[\s\S]*resolveDisplayEditorRegions/);
+  assert.match(canvasWorkflowSource, /measureDisplayEditorScope\(\s*"overlay-resolve"[\s\S]*resolveDisplayEditorOverlayState/);
+  assert.match(canvasPaneSource, /renderProfiledDisplayEditorPreview\(\s*selectedPage\.id/);
+});
+
+test("display editor canvas workflow is isolated from the route component", () => {
+  assert.match(canvasPaneSource, /export const DisplayEditorCanvasPane = React\.memo/);
+  assert.match(canvasPaneSource, /useDisplayEditorCanvasWorkflow\(/);
+  assert.match(editorSource, /<DisplayEditorCanvasPane/);
+  assert.doesNotMatch(editorSource, /useDisplayEditorCanvasWorkflow\(/);
 });

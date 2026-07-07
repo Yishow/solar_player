@@ -23,6 +23,7 @@ import {
   writeStoredDisplayEditorOverlayPreset,
   type DisplayEditorOverlayPreset
 } from "./canvasOverlayState";
+import { isDisplayEditorProfilingEnabled, measureDisplayEditorScope } from "./displayEditorProfiler";
 import { applyRegionRect } from "./displayEditorGeometry";
 import { isRegionLocked } from "./displayEditorRegionState";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
@@ -194,6 +195,7 @@ export function useDisplayEditorCanvasWorkflow({
   const [distanceLockArmed, setDistanceLockArmed] = useState(false);
   const [temporaryMeasureMode, setTemporaryMeasureMode] = useState(false);
   const [temporaryMeasureTargetRegionId, setTemporaryMeasureTargetRegionId] = useState<string | null>(null);
+  const displayEditorProfilingEnabled = useMemo(() => isDisplayEditorProfilingEnabled(), []);
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   const containerScaleRef = useRef(canvasContainerScale);
@@ -459,25 +461,31 @@ export function useDisplayEditorCanvasWorkflow({
 
   const overlayState = useMemo(
     () =>
-      resolveDisplayEditorOverlayState({
-        activeInteraction: canvasInteractionFeedback,
-        canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
-        canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
-        contentOffsetTop: EDITOR_PREVIEW_CONTENT_TOP,
-        distanceLockSession: canvasInteraction?.distanceLock ?? null,
-        lockedRegionIds,
-        measurementTargetRegion: temporaryMeasureTargetRegion,
-        overlayPreset,
-        regions,
-        selectedRegion,
-        selectedRegionIds,
-        selectionFeedbackLabel,
-        shellHeight: EDITOR_PREVIEW_SHELL_HEIGHT,
-        temporaryMeasureMode
-      }),
+      measureDisplayEditorScope(
+        "overlay-resolve",
+        () =>
+          resolveDisplayEditorOverlayState({
+            activeInteraction: canvasInteractionFeedback,
+            canvasHeight: EDITOR_PREVIEW_SURFACE_HEIGHT,
+            canvasWidth: EDITOR_PREVIEW_SURFACE_WIDTH,
+            contentOffsetTop: EDITOR_PREVIEW_CONTENT_TOP,
+            distanceLockSession: canvasInteraction?.distanceLock ?? null,
+            lockedRegionIds,
+            measurementTargetRegion: temporaryMeasureTargetRegion,
+            overlayPreset,
+            regions,
+            selectedRegion,
+            selectedRegionIds,
+            selectionFeedbackLabel,
+            shellHeight: EDITOR_PREVIEW_SHELL_HEIGHT,
+            temporaryMeasureMode
+          }),
+        { enabled: displayEditorProfilingEnabled }
+      ),
     [
       canvasInteraction?.distanceLock,
       canvasInteractionFeedback,
+      displayEditorProfilingEnabled,
       lockedRegionIds,
       overlayPreset,
       regions,

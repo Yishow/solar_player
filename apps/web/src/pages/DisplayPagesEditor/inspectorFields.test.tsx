@@ -990,6 +990,8 @@ test("display editor resolves card rail child nodes as first-class authoring reg
       "card-supporting-line",
       "card-disclaimer",
       "card-basis-source-label",
+      "card-visible",
+      "card-status",
       "card-frame-left",
       "card-frame-top",
       "card-frame-width",
