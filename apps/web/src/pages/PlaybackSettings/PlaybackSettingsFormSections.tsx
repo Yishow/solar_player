@@ -1,6 +1,10 @@
-import type {
-  PlaybackPage,
-  PlaybackSettings
+import {
+  DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
+  PLAYBACK_TRANSITION_SPEED_MAX_MS,
+  PLAYBACK_TRANSITION_SPEED_MIN_MS,
+  normalizePlaybackTransitionSpeed,
+  type PlaybackPage,
+  type PlaybackSettings
 } from "@solar-display/shared";
 import { memo, useState, useEffect, useRef } from "react";
 import { CustomSelect, Switch } from "../../components/management";
@@ -157,7 +161,7 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
   const [isDraggable, setIsDraggable] = useState(false);
 
   const brightness = settings?.brightness ?? 100;
-  const transitionSpeed = settings?.transitionSpeed ?? 1000;
+  const transitionSpeed = settings?.transitionSpeed ?? DEFAULT_PLAYBACK_TRANSITION_SPEED_MS;
   const { startChanging: startBrightnessChange, stopChanging: stopBrightnessChange } = useLongPressStepper(
     brightness,
     (next) => updateSettingsField("brightness", next),
@@ -356,12 +360,16 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
               <input
                 className="ps-stepper-input"
                 disabled={formDisabled || settings?.transitionType === "none"}
-                min={120}
+                max={PLAYBACK_TRANSITION_SPEED_MAX_MS}
+                min={PLAYBACK_TRANSITION_SPEED_MIN_MS}
                 step={100}
                 type="number"
                 value={String(transitionSpeed)}
                 onChange={(event) => {
-                  updateSettingsField("transitionSpeed", Math.max(120, Number.parseInt(event.target.value, 10) || 120));
+                  updateSettingsField(
+                    "transitionSpeed",
+                    normalizePlaybackTransitionSpeed(Number.parseInt(event.target.value, 10))
+                  );
                 }}
                 style={{
                   width: "130px",

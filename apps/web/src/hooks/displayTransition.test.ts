@@ -37,13 +37,13 @@ test("global transition css gives slide its own phase animations", () => {
 });
 
 test("resolveTransitionDurations splits the speed budget with a shorter out phase", () => {
-  assert.deepEqual(resolveTransitionDurations(1000), { inMs: 700, outMs: 300, totalMs: 1000 });
-  assert.deepEqual(resolveTransitionDurations(450), { inMs: 270, outMs: 180, totalMs: 450 });
+  assert.deepEqual(resolveTransitionDurations(220), { inMs: 132, outMs: 88, totalMs: 220 });
 });
 
-test("resolveTransitionDurations clamps the total budget and caps the out phase", () => {
-  // total clamps to 1200; out capped at 300
-  assert.deepEqual(resolveTransitionDurations(5000), { inMs: 900, outMs: 300, totalMs: 1200 });
+test("resolveTransitionDurations clamps the total budget for playback-friendly transitions", () => {
+  // Long full-screen fades keep the page repainting during route changes; cap the active animation budget.
+  assert.deepEqual(resolveTransitionDurations(1000), { inMs: 150, outMs: 100, totalMs: 250 });
+  assert.deepEqual(resolveTransitionDurations(5000), { inMs: 150, outMs: 100, totalMs: 250 });
   // below the floor clamps up to 120
   assert.deepEqual(resolveTransitionDurations(50), { inMs: 72, outMs: 48, totalMs: 120 });
 });

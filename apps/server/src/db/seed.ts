@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { DEFAULT_PLAYBACK_TRANSITION_SPEED_MS } from "@solar-display/shared";
 import {
   getEnvMqttSettings,
   hasExplicitMqttEnvSettings,
@@ -423,7 +424,22 @@ export function seedDatabase() {
         brightness = excluded.brightness,
         orientation = excluded.orientation,
         updated_at = CURRENT_TIMESTAMP
-    `).run(1, 1, 1, 0, "fade", 1000, 0, "08:00", "18:00", "1,2,3,4,5", 0, 300, 100, "landscape");
+    `).run(
+      1,
+      1,
+      1,
+      0,
+      "fade",
+      DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
+      0,
+      "08:00",
+      "18:00",
+      "1,2,3,4,5",
+      0,
+      300,
+      100,
+      "landscape"
+    );
 
     const snapshotCount = (
       database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number }

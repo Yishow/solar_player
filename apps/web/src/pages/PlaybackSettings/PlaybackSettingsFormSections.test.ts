@@ -20,8 +20,10 @@ test("playback settings stepper uses pointer events instead of duplicate mouse p
 
 test("playback settings exposes transition type and speed controls", () => {
     assert.match(source, /updateSettingsField\("transitionType"/);
-    assert.match(source, /updateSettingsField\("transitionSpeed"/);
-    assert.match(source, /Math\.max\(120, Number\.parseInt\(event\.target\.value, 10\) \|\| 120\)/);
+    assert.match(source, /updateSettingsField\(\s*"transitionSpeed"/);
+    assert.match(source, /PLAYBACK_TRANSITION_SPEED_MAX_MS/);
+    assert.match(source, /PLAYBACK_TRANSITION_SPEED_MIN_MS/);
+    assert.match(source, /normalizePlaybackTransitionSpeed\(Number\.parseInt\(event\.target\.value, 10\)\)/);
     assert.match(source, /value=\{settings\?\.transitionType \?\? "fade"\}/);
     assert.match(source, /\{ label: "淡入淡出 Fade", value: "fade" \}/);
     assert.match(source, /\{ label: "滑動切換 Slide", value: "slide" \}/);

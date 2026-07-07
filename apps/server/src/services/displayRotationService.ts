@@ -10,8 +10,10 @@ import type {
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
+  DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
   evaluatePageRuntimeFreshnessForRequirements,
   evaluateDisplayRotation,
+  normalizePlaybackTransitionSpeed,
   resolveImagesPlaylistTotalDurationSeconds,
   resolveLiveMetricRequirementsForPage,
   resolveDisplayPageFallbackPolicyByPageId
@@ -243,7 +245,10 @@ function serializeSettingsRow(row: PlaybackSettingsRow): PlaybackSettings {
     scheduleEnd: row.schedule_end,
     scheduleStart: row.schedule_start,
     startPage: row.start_page,
-    transitionSpeed: row.transition_speed,
+    transitionSpeed: normalizePlaybackTransitionSpeed(
+      row.transition_speed,
+      row.transition_type === "none"
+    ),
     transitionType: row.transition_type as PlaybackSettings["transitionType"],
     updatedAt: row.updated_at
   };
@@ -318,7 +323,7 @@ function readPlaybackSettingsRow(): PlaybackSettingsRow {
       schedule_end: null,
       schedule_start: null,
       start_page: 0,
-      transition_speed: 1000,
+      transition_speed: DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
       transition_type: "fade",
       updated_at: null
     }
@@ -337,7 +342,7 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
       ? body.transitionType
       : current.transition_type;
   const requestedTransitionSpeed =
-    typeof body.transitionSpeed === "number" ? Math.max(0, body.transitionSpeed) : current.transition_speed;
+    typeof body.transitionSpeed === "number" ? body.transitionSpeed : current.transition_speed;
   const nextSettings = {
     autoplay: body.autoplay ?? toBoolean(current.autoplay),
     brightness:
@@ -354,10 +359,10 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
     scheduleEnd: body.scheduleEnd === undefined ? current.schedule_end : body.scheduleEnd,
     scheduleStart: body.scheduleStart === undefined ? current.schedule_start : body.scheduleStart,
     startPage: typeof body.startPage === "number" ? body.startPage : current.start_page,
-    transitionSpeed:
+    transitionSpeed: normalizePlaybackTransitionSpeed(
+      requestedTransitionSpeed,
       nextTransitionType === "none"
-        ? requestedTransitionSpeed
-        : Math.max(120, requestedTransitionSpeed),
+    ),
     transitionType: nextTransitionType
   };
 

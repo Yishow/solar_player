@@ -1,4 +1,7 @@
-import type { PlaybackTransitionType } from "@solar-display/shared";
+import {
+  normalizePlaybackTransitionSpeed,
+  type PlaybackTransitionType
+} from "@solar-display/shared";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type DisplayTransitionPhase = "idle" | "out" | "hold" | "in";
@@ -10,8 +13,6 @@ export type DisplayTransitionDurations = {
   totalMs: number;
 };
 
-const TOTAL_MIN_MS = 120;
-const TOTAL_MAX_MS = 1200;
 const OUT_MAX_MS = 300;
 const OUT_RATIO = 0.4;
 
@@ -52,7 +53,7 @@ export function resolveTransitionDurations(transitionSpeed: number): DisplayTran
     return { inMs: 0, outMs: 0, totalMs: 0 };
   }
 
-  const totalMs = clamp(Math.round(transitionSpeed), TOTAL_MIN_MS, TOTAL_MAX_MS);
+  const totalMs = normalizePlaybackTransitionSpeed(transitionSpeed, true);
   const outMs = clamp(Math.round(totalMs * OUT_RATIO), 0, OUT_MAX_MS);
   const inMs = totalMs - outMs;
 

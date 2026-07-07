@@ -15,6 +15,7 @@ type UsePageRotationOptions = {
 export function usePageRotation(options: UsePageRotationOptions = {}) {
   const controller = usePlaybackController({
     currentPath: options.currentPath,
+    tickMode: "boundary",
     tickMs: options.tickMs
   });
   const previousControllerRouteRef = useRef<string | undefined>(undefined);

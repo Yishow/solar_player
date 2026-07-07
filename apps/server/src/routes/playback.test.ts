@@ -5,6 +5,8 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import {
   createPlaybackRuntime,
+  PLAYBACK_TRANSITION_SPEED_MAX_MS,
+  PLAYBACK_TRANSITION_SPEED_MIN_MS,
   displayPageFallbackPolicyByTemplateKey,
   evaluateDisplayRotation,
   getEnabledPlaybackPages,
@@ -419,6 +421,7 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
     assert.equal(updatedSettings.autoplay, false);
     assert.equal(updatedSettings.idleMode, "return-to-start");
     assert.deepEqual(updatedSettings.repeatDays, [1, 3, 5]);
+    assert.equal(updatedSettings.transitionSpeed, PLAYBACK_TRANSITION_SPEED_MAX_MS);
     assert.equal(updatedSettings.transitionType, "slide");
 
     const pagesUpdateResponse = await app.inject({
@@ -499,7 +502,10 @@ test("PUT /api/playback/settings clamps transition speed to the minimum playable
     });
 
     assert.equal(response.statusCode, 200);
-    assert.equal((response.json() as { settings: PlaybackSettings }).settings.transitionSpeed, 120);
+    assert.equal(
+      (response.json() as { settings: PlaybackSettings }).settings.transitionSpeed,
+      PLAYBACK_TRANSITION_SPEED_MIN_MS
+    );
   } finally {
     await app.close();
   }

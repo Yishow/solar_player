@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS playback_settings (
   loop BOOLEAN DEFAULT 1,
   start_page INTEGER DEFAULT 0,
   transition_type TEXT DEFAULT 'fade',
-  transition_speed INTEGER DEFAULT 1000,
+  transition_speed INTEGER DEFAULT 250,
   schedule_enabled BOOLEAN DEFAULT 0,
   schedule_start TEXT,
   schedule_end TEXT,

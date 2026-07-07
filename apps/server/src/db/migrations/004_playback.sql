@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS playback_settings (
   loop BOOLEAN DEFAULT 1,
   start_page INTEGER DEFAULT 0,
   transition_type TEXT DEFAULT 'fade',
-  transition_speed INTEGER DEFAULT 1000,
+  transition_speed INTEGER DEFAULT 250,
   schedule_enabled BOOLEAN DEFAULT 0,
   schedule_start TEXT,
   schedule_end TEXT,
@@ -56,7 +56,7 @@ SELECT
   1,
   0,
   'fade',
-  1000,
+  250,
   0,
   '08:00',
   '18:00',
@@ -89,7 +89,7 @@ SET
     WHEN transition_type IN ('fade', 'slide', 'none') THEN transition_type
     ELSE 'fade'
   END,
-  transition_speed = COALESCE(transition_speed, 1000),
+  transition_speed = COALESCE(transition_speed, 250),
   schedule_enabled = COALESCE(schedule_enabled, 0),
   schedule_start = COALESCE(schedule_start, '08:00'),
   schedule_end = COALESCE(schedule_end, '18:00'),

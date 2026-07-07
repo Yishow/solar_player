@@ -18,3 +18,7 @@ test("usePageRotation reloads playback runtime from relevant display sync scopes
   assert.match(usePageRotationSource, /createDisplaySyncPlaybackReloadCoordinator\(/);
   assert.match(usePageRotationSource, /coordinator\.notify\(event\)/);
 });
+
+test("usePageRotation keeps shell route rotation on boundary ticks instead of visual countdown ticks", () => {
+  assert.match(usePageRotationSource, /tickMode: "boundary"/);
+});

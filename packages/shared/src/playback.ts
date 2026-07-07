@@ -9,9 +9,23 @@ export type PlaybackRuntime = {
 };
 
 const DEFAULT_PAGE_DURATION_SECONDS = 15;
+export const PLAYBACK_TRANSITION_SPEED_MIN_MS = 120;
+export const PLAYBACK_TRANSITION_SPEED_MAX_MS = 250;
+export const DEFAULT_PLAYBACK_TRANSITION_SPEED_MS = 250;
 
 function normalizeDurationSeconds(value: number) {
   return Math.max(1, Number.isFinite(value) ? Math.floor(value) : DEFAULT_PAGE_DURATION_SECONDS);
+}
+
+export function normalizePlaybackTransitionSpeed(value: number, allowDisabled = false) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return allowDisabled ? 0 : PLAYBACK_TRANSITION_SPEED_MIN_MS;
+  }
+
+  return Math.min(
+    PLAYBACK_TRANSITION_SPEED_MAX_MS,
+    Math.max(PLAYBACK_TRANSITION_SPEED_MIN_MS, Math.round(value))
+  );
 }
 
 export function sortPlaybackPages(pages: PlaybackPage[]) {

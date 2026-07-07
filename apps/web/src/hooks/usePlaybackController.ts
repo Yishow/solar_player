@@ -25,7 +25,10 @@ type UsePlaybackControllerOptions = {
   rotationPreview?: DisplayRotationPreview | null;
   settings?: PlaybackSettings | null;
   tickMs?: number;
+  tickMode?: PlaybackRuntimeTickMode;
 };
+
+export type PlaybackRuntimeTickMode = "countdown" | "boundary";
 
 type PlaybackControllerState = {
   countdown: number;
@@ -45,6 +48,69 @@ type PlaybackControllerState = {
   togglePlay: () => void;
 };
 
+export function resolvePlaybackRuntimeTick({
+  current,
+  elapsedMs,
+  nowMs,
+  pages,
+  settings,
+  tickMode,
+  tickMs
+}: {
+  current: PlaybackRuntime;
+  elapsedMs: number;
+  nowMs: number;
+  pages: PlaybackPage[];
+  settings: PlaybackSettings;
+  tickMode: PlaybackRuntimeTickMode;
+  tickMs: number;
+}): PlaybackRuntime {
+  if (!current.isIdle && shouldEnterIdleMode(settings, current.lastInteractionAt, nowMs)) {
+    return createPlaybackRuntime(settings, pages, {
+      currentPageId: settings.startPage,
+      isIdle: true,
+      isPlaying: false,
+      lastInteractionAt: nowMs,
+      nowMs
+    });
+  }
+
+  if (!isPlaybackAllowedBySchedule(settings, new Date(nowMs))) {
+    return current.isPlaying
+      ? {
+          ...current,
+          isPlaying: false
+        }
+      : current;
+  }
+
+  if (!current.isPlaying) {
+    return current;
+  }
+
+  const elapsedCountdownMs = tickMode === "boundary" ? elapsedMs : tickMs;
+  const nextCountdownMs = current.countdownMs - elapsedCountdownMs;
+  if (nextCountdownMs > 0) {
+    return tickMode === "boundary"
+      ? current
+      : {
+          ...current,
+          countdownMs: nextCountdownMs
+        };
+  }
+
+  const atEdge = isPlaybackAtEdge(current, pages, 1);
+  const nextIndex = getNextPlaybackIndex(current.currentIndex, pages, settings.loop, 1);
+  const nextPage = getEnabledPlaybackPages(pages)[nextIndex] ?? null;
+
+  return {
+    ...current,
+    countdownMs: getPlaybackDurationMs(nextPage),
+    currentIndex: nextIndex,
+    isPlaying: atEdge && !settings.loop ? false : current.isPlaying
+  };
+}
+
 export function usePlaybackController(
   options: UsePlaybackControllerOptions = {}
 ): PlaybackControllerState {
@@ -62,7 +128,10 @@ export function usePlaybackController(
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
   const lastSyncedPathRef = useRef<string | undefined>(undefined);
+  const runtimeTickSignatureRef = useRef<string | null>(null);
+  const runtimeTickStartedAtRef = useRef(Date.now());
   const tickMs = options.tickMs ?? 250;
+  const tickMode = options.tickMode ?? "countdown";
 
   useEffect(() => {
     providedSettingsRef.current = options.settings ?? null;
@@ -82,6 +151,20 @@ export function usePlaybackController(
 
   useEffect(() => {
     runtimeRef.current = runtime;
+
+    const nextSignature = runtime
+      ? [
+          runtime.currentIndex,
+          runtime.countdownMs,
+          runtime.isIdle ? "idle" : "active",
+          runtime.isPlaying ? "playing" : "paused"
+        ].join(":")
+      : null;
+
+    if (runtimeTickSignatureRef.current !== nextSignature) {
+      runtimeTickSignatureRef.current = nextSignature;
+      runtimeTickStartedAtRef.current = Date.now();
+    }
   }, [runtime]);
 
   const currentPage = runtime ? getPlaybackPage(runtime, pages) : null;
@@ -112,7 +195,16 @@ export function usePlaybackController(
       const nowMs = Date.now();
       const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
         currentPath: options.currentPath,
-        currentRuntime: runtimeRef.current,
+        currentRuntime:
+          tickMode === "boundary" && runtimeRef.current?.isPlaying
+            ? {
+                ...runtimeRef.current,
+                countdownMs: Math.max(
+                  0,
+                  runtimeRef.current.countdownMs - (nowMs - runtimeTickStartedAtRef.current)
+                )
+              }
+            : runtimeRef.current,
         nextPages: runtimePages,
         nowMs,
         previousPages: pagesRef.current,
@@ -171,60 +263,26 @@ export function usePlaybackController(
         return;
       }
 
-      setRuntime((current) => {
-        if (!current) {
-          return current;
-        }
-
-        const currentPages = pagesRef.current;
-        const nowMs = Date.now();
-
-        if (shouldEnterIdleMode(nextSettings, current.lastInteractionAt, nowMs)) {
-          return createPlaybackRuntime(nextSettings, currentPages, {
-            currentPageId: nextSettings.startPage,
-            isIdle: true,
-            isPlaying: false,
-            lastInteractionAt: nowMs,
-            nowMs
-          });
-        }
-
-        if (!isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs))) {
-          return {
-            ...current,
-            isPlaying: false
-          };
-        }
-
-        if (!current.isPlaying) {
-          return current;
-        }
-
-        const nextCountdownMs = current.countdownMs - tickMs;
-        if (nextCountdownMs > 0) {
-          return {
-            ...current,
-            countdownMs: nextCountdownMs
-          };
-        }
-
-        const atEdge = isPlaybackAtEdge(current, currentPages, 1);
-        const nextIndex = getNextPlaybackIndex(current.currentIndex, currentPages, nextSettings.loop, 1);
-        const nextPage = playablePages[nextIndex] ?? null;
-
-        return {
-          ...current,
-          countdownMs: getPlaybackDurationMs(nextPage),
-          currentIndex: nextIndex,
-          isPlaying: atEdge && !nextSettings.loop ? false : current.isPlaying
-        };
+      const nowMs = Date.now();
+      const nextRuntime = resolvePlaybackRuntimeTick({
+        current: currentRuntime,
+        elapsedMs: nowMs - runtimeTickStartedAtRef.current,
+        nowMs,
+        pages: pagesRef.current,
+        settings: nextSettings,
+        tickMode,
+        tickMs
       });
+
+      if (nextRuntime !== currentRuntime) {
+        setRuntime(nextRuntime);
+      }
     }, tickMs);
 
     return () => {
       window.clearInterval(timerId);
     };
-  }, [pages, tickMs]);
+  }, [pages, tickMode, tickMs]);
 
   useEffect(() => {
     const handleInteraction = () => {
