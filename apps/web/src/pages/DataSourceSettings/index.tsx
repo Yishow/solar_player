@@ -410,7 +410,7 @@ export function DataSourceSettings() {
               as="article"
               family="operations"
               key={section.title}
-              className={`transition-all duration-300 hover:shadow-[0_12px_28px_rgba(59,54,40,0.06)] hover:-translate-y-0.5 ${
+              className={`transition-all duration-300 hover:shadow-[0_12px_28px_rgba(59,54,40,0.06)] ${
                 section.tone === "ready"
                   ? "border-[rgba(82,124,67,0.22)] bg-gradient-to-b from-[#fafcf8] to-[#f5f9f2]"
                   : "border-[rgba(201,136,26,0.28)] bg-gradient-to-b from-[#fdfbf7] to-[#faf6ed]"

@@ -211,7 +211,6 @@
 .images-gallery-arrow:hover {
   border-color: rgba(93, 126, 75, 0.48);
   background: rgba(255, 253, 247, 0.94);
-  transform: translateY(-1px);
 }
 
 .images-gallery-arrow:active {

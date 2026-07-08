@@ -130,7 +130,6 @@
   background: var(--mgmt-card-hover-bg);
   border-color: var(--mgmt-card-hover-border);
   box-shadow: var(--mgmt-card-hover-shadow);
-  transform: translateY(-2px);
 }
 
 

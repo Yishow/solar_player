@@ -26,7 +26,7 @@
   left: var(--mgmt-page-surface-left);
   top: var(--mgmt-page-surface-top);
   width: var(--mgmt-page-surface-width);
-  height: 648px;
+  height: 740px;
 }
 
 /* status bar positioning */
@@ -42,10 +42,32 @@
   width: auto;
 }
 
+/* summary panel */
+.cs-page .cs-summary-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cs-page .cs-summary-panel__left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cs-page .cs-summary-panel__right {
+  display: flex;
+  align-items: center;
+}
+
 /* inline stats strip */
 .cs-page .cs-stats {
-  gap: 24px;
-  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 24px;
+  margin-bottom: 0;
 }
 
 .cs-page .cs-stat {
@@ -75,15 +97,22 @@
 }
 
 .cs-page .cs-readiness {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   text-align: left;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .cs-page .cs-readiness-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .cs-page .cs-readiness-item {
@@ -91,6 +120,18 @@
   grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: flex-start;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(245, 243, 237, 0.6);
+  border: 1px solid rgba(97, 105, 81, 0.12);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.01);
+  transition: all 0.25s ease;
+}
+
+.cs-page .cs-readiness-item:hover {
+  background: rgba(245, 243, 237, 0.95);
+  border-color: rgba(97, 105, 81, 0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
 }
 
 .cs-page .cs-readiness-item__copy {
@@ -146,6 +187,18 @@
   border-bottom: 1px solid rgba(97, 105, 81, 0.1);
   vertical-align: top;
   background: #fffdf8;
+}
+
+.cs-page .cs-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.cs-page .cs-table tbody tr:hover td {
+  background-color: rgba(92, 133, 75, 0.025);
+}
+
+.cs-page .cs-table tbody tr.is-dirty:hover td {
+  background-color: rgba(252, 247, 226, 0.75);
 }
 
 .cs-page .cs-table tbody tr:last-child td {
@@ -363,28 +416,29 @@
 /* threshold range colored pill */
 .cs-page .cs-thr-pill {
   display: inline-block;
-  margin: 5px 0 0;
-  padding: 2px 9px;
-  border-radius: 20px;
-  font: 600 11px/1.6 var(--font-family-en);
+  margin: 6px 0 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font: 700 11px/1.2 var(--font-family-en);
   white-space: nowrap;
   border-width: 1px;
   border-style: solid;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 .cs-page .cs-thr-pill--normal {
-  background: rgba(92, 133, 75, 0.1);
+  background: #f4f8f3;
   color: #4c7540;
-  border-color: rgba(92, 133, 75, 0.22);
+  border-color: rgba(92, 133, 75, 0.18);
 }
 .cs-page .cs-thr-pill--attention {
-  background: rgba(201, 136, 26, 0.1);
+  background: #fbf7ee;
   color: #a86d10;
-  border-color: rgba(201, 136, 26, 0.22);
+  border-color: rgba(201, 136, 26, 0.18);
 }
 .cs-page .cs-thr-pill--warning {
-  background: rgba(193, 74, 74, 0.1);
+  background: #fdf5f5;
   color: #a03535;
-  border-color: rgba(193, 74, 74, 0.22);
+  border-color: rgba(193, 74, 74, 0.18);
 }
 
 /* bottom legend bar */
@@ -438,6 +492,52 @@
   top: 18px;
   width: 640px;
   z-index: 100;
+}
+
+/* table display layout refinements */
+.cs-page .cs-display-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cs-page .cs-display-row--controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cs-page .cs-display-row--status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.cs-page .cs-display-row--status .mgmt-chip {
+  flex-shrink: 0;
+}
+
+.cs-page .cs-display-row--status .cs-cell-caption {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-page .cs-display-detail-desc {
+  margin: 2px 0 0;
+  opacity: 0.75;
+}
+
+.cs-page .cs-icon-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cs-page .cs-unit-row {
+  margin-top: 2px;
 }
 
 

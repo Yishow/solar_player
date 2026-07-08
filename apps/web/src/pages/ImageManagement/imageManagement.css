@@ -248,7 +248,6 @@
 }
 
 .image-mgmt-page .im-thumb:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(92, 133, 75, 0.12);
   border-color: rgba(92, 133, 75, 0.45);
 }

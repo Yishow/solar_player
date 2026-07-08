@@ -19,7 +19,6 @@
 }
 
 .asset-library-card:hover {
-  transform: translateY(-2px) scale(1.01);
   box-shadow: 0 12px 24px -10px rgba(82, 91, 66, 0.15), 
               0 4px 12px -5px rgba(82, 91, 66, 0.1);
   border-color: var(--green) !important;
@@ -237,7 +236,6 @@
   background: rgba(255, 255, 255, 0.65) !important;
   border-color: rgba(95, 140, 80, 0.25) !important;
   box-shadow: 0 8px 24px rgba(82, 91, 66, 0.05);
-  transform: translateY(-1px);
 }
 
 .detail-glass-card-danger {
