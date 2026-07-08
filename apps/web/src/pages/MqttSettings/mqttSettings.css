@@ -438,6 +438,48 @@
   padding-left: 16px;
 }
 
+.mqtt-settings-page .topic-workspace-row__publish {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(150px, 1.2fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(93, 119, 69, 0.12);
+  border-radius: 8px;
+  background: rgba(248, 249, 246, 0.7);
+}
+
+.mqtt-settings-page .topic-workspace-row__publish-input {
+  height: 34px;
+}
+
+.mqtt-settings-page .map-row__publish {
+  height: 34px;
+  border: 1px solid rgba(93, 119, 69, 0.2);
+  border-radius: 8px;
+  background: #5d7745;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+}
+
+.mqtt-settings-page .map-row__publish:disabled {
+  background: #d9ddd4;
+  color: #7b837b;
+  cursor: not-allowed;
+}
+
+.mqtt-settings-page .topic-workspace-row__publish small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #747c77;
+  font-size: 11px;
+}
+
 .mqtt-settings-page .runtime-value {
   display: flex;
   align-items: baseline;
@@ -636,5 +678,4 @@
   width: 850px;
   z-index: 100;
 }
-
 

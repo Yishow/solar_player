@@ -7,6 +7,7 @@ import {
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
+import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
 
 type BuildSustainabilityViewModelArgs = {
   selectedPeriod?: SustainabilityPeriodKey;
@@ -154,6 +155,21 @@ function buildReferenceFallbackModuleCard(args: {
   };
 }
 
+function buildSustainabilitySourceTooltip(args: {
+  label: string;
+  metricKey: string;
+  provenance: SustainabilityProvenance;
+  unit: string;
+}) {
+  return buildMonitoringSourceTooltip({
+    dependencyKeys: [args.provenance.source],
+    label: args.label,
+    metricKey: args.metricKey,
+    sourceClass: args.provenance.sourceClass,
+    unit: args.unit
+  });
+}
+
 function buildModuleCard(
   module:
     | ReturnType<typeof normalizeSustainabilityStory>["modules"][number]
@@ -199,6 +215,9 @@ export function buildSustainabilityViewModel({
     (module) => module.type === "project-outcome"
   );
   const esgModule = normalized.modules.find((module) => module.type === "esg-summary");
+  const generationProvenance = resolved.period.bigNumberProvenance.accumulatedGenerationGwh;
+  const carbonProvenance = resolved.period.bigNumberProvenance.accumulatedCarbonReductionTons;
+  const savingProvenance = resolved.period.bigNumberProvenance.annualEnergySavingPercent;
 
   return {
     bigNumbers: [
@@ -206,7 +225,13 @@ export function buildSustainabilityViewModel({
         helper: "Total Generation",
         iconKey: "bars" as const,
         label: "累積發電量",
-        provenance: resolved.period.bigNumberProvenance.accumulatedGenerationGwh,
+        provenance: generationProvenance,
+        sourceTooltip: buildSustainabilitySourceTooltip({
+          label: "累積發電量",
+          metricKey: "accumulatedGenerationGwh",
+          provenance: generationProvenance,
+          unit: "MWh"
+        }),
         unit: "MWh",
         value: formatGenerationMwh(resolved.period.bigNumbers.accumulatedGenerationGwh, 1)
       },
@@ -214,7 +239,13 @@ export function buildSustainabilityViewModel({
         helper: "Total CO₂ Reduction",
         iconKey: "co2" as const,
         label: "累積 CO₂ 減量",
-        provenance: resolved.period.bigNumberProvenance.accumulatedCarbonReductionTons,
+        provenance: carbonProvenance,
+        sourceTooltip: buildSustainabilitySourceTooltip({
+          label: "累積 CO₂ 減量",
+          metricKey: "accumulatedCarbonReductionTons",
+          provenance: carbonProvenance,
+          unit: "t"
+        }),
         unit: "t",
         value: formatInteger(resolved.period.bigNumbers.accumulatedCarbonReductionTons)
       },
@@ -222,7 +253,13 @@ export function buildSustainabilityViewModel({
         helper: "Annual Energy Saving",
         iconKey: "leaf" as const,
         label: "年度節能成效",
-        provenance: resolved.period.bigNumberProvenance.annualEnergySavingPercent,
+        provenance: savingProvenance,
+        sourceTooltip: buildSustainabilitySourceTooltip({
+          label: "年度節能成效",
+          metricKey: "annualEnergySavingPercent",
+          provenance: savingProvenance,
+          unit: "%"
+        }),
         unit: "%",
         value: formatFixed(resolved.period.bigNumbers.annualEnergySavingPercent, 1)
       }

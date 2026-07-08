@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll for the Tailscale hotspot maintenance trigger
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=15s
+AccuracySec=5s
+Unit=tailscale-hotspot-trigger.service
+
+[Install]
+WantedBy=timers.target

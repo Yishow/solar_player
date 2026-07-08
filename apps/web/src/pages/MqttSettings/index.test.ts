@@ -123,3 +123,19 @@ test("mqtt settings polling merges runtime topic snapshots without overwriting l
   );
   assert.match(loadTopicsSource, /lastSyncedTopicsRef\.current\s*=\s*response\.topics/);
 });
+
+test("mqtt settings publishes transient numeric test values through the mapped metric key", () => {
+  assert.match(mqttSettingsSource, /const publishTopicValue = useCallback\(async \(metricKey: string, value: number\) => \{/);
+
+  const publishSource = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const publishTopicValue = useCallback(async (metricKey: string, value: number) => {"),
+    mqttSettingsSource.indexOf("const saveTopicMappings = useCallback(async () => {")
+  );
+
+  assert.match(publishSource, /`\/api\/settings\/mqtt\/topics\/\$\{encodeURIComponent\(metricKey\)\}\/publish`/);
+  assert.match(publishSource, /body:\s*JSON\.stringify\(\{\s*value\s*\}\)/);
+  assert.match(publishSource, /method:\s*"POST"/);
+  assert.match(publishSource, /await loadTopics\(\{\s*isPolling:\s*true\s*\}\)/);
+  assert.doesNotMatch(publishSource, /setTopics\(\(current\).*value/);
+  assert.match(mqttSettingsSource, /publishTopicValue=\{publishTopicValue\}/);
+});

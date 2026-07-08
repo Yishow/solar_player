@@ -16,10 +16,12 @@ const connectRdpPs1Path = path.join(repoRoot, "scripts/connect-raspi-rdp.ps1");
 const raspiBootstrapScriptPath = path.join(repoRoot, "deploy/raspi-bootstrap.sh");
 const lightweightDesktopScriptPath = path.join(repoRoot, "deploy/configure-lightweight-desktop.sh");
 const displaySleepScriptPath = path.join(repoRoot, "deploy/disable-display-sleep.sh");
+const displayPopupsScriptPath = path.join(repoRoot, "deploy/disable-xfce-display-popups.sh");
 const desktopThemeScriptPath = path.join(repoRoot, "deploy/apply-desktop-theme.sh");
 const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-system.sh");
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
+const hotspotTriggerScriptPath = path.join(repoRoot, "deploy/tailscale-hotspot-trigger.sh");
 const bashCommand = process.platform === "win32"
   ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
   : "bash";
@@ -63,10 +65,14 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/disable-display-sleep.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/disable-xfce-display-popups.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/apply-desktop-theme.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/repair-kiosk-system.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.service"), "[Service]\n");
+  writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.timer"), "[Timer]\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/start-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/stop-solar-kiosk.sh"), "#!/bin/bash\n");
@@ -279,6 +285,17 @@ test("bundle install script can source nvm before running pnpm install", () => {
   assert.match(source, /NVM_DIR/);
   assert.match(source, /source_nvm/);
   assert.match(source, /pnpm install --prod --frozen-lockfile/);
+});
+
+test("tailscale hotspot trigger documents safe network switching defaults", () => {
+  const source = readFileSync(hotspotTriggerScriptPath, "utf8");
+
+  assert.match(source, /HOTSPOT_CONNECTION_ID/);
+  assert.match(source, /BLUETOOTH_TRIGGER_MAC/);
+  assert.match(source, /HOTSPOT_SCAN_SSID/);
+  assert.match(source, /tailscale ip -4/);
+  assert.match(source, /nmcli con up id/);
+  assert.doesNotMatch(source, /nmcli con down/);
 });
 
 test("raspi one-key deploy dry-run reports target and skips destructive stages", () => {
@@ -790,6 +807,22 @@ test("lightweight desktop helper delegates display sleep setup to the standalone
   assert.match(source, /\$\{SCRIPT_DIR\}\/disable-display-sleep\.sh"\s+--user "\$\{KIOSK_USER\}"/);
 });
 
+test("xfce display popup helper disables hotplug dialogs and identity popups", () => {
+  const source = readFileSync(displayPopupsScriptPath, "utf8");
+
+  assert.match(source, /xfconf-query/);
+  assert.match(source, /\/Notify/);
+  assert.match(source, /\/IdentityPopups/);
+  assert.match(source, /\/AutoEnableProfiles/);
+  assert.match(source, /dbus-run-session/);
+});
+
+test("lightweight desktop helper delegates xfce display popup suppression to the standalone helper", () => {
+  const source = readFileSync(lightweightDesktopScriptPath, "utf8");
+
+  assert.match(source, /\$\{SCRIPT_DIR\}\/disable-xfce-display-popups\.sh"\s+--user "\$\{KIOSK_USER\}"/);
+});
+
 test("desktop theme helper installs a balanced xfce theme profile without touching auth flows", () => {
   const source = readFileSync(desktopThemeScriptPath, "utf8");
   const result = runBashScript(
@@ -1153,6 +1186,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
 
   try {
     writeFileSync(path.join(projectDir, "deploy.sh"), readFileSync(deployScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy.sh"));
 
     const result = runDeploy(projectDir, 1);
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -1179,10 +1213,14 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
@@ -1200,10 +1238,12 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
@@ -1224,6 +1264,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
 
   try {
     writeFileSync(path.join(projectDir, "deploy.sh"), readFileSync(deployScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy.sh"));
 
     const result = runDeploy(projectDir, 2);
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -1238,10 +1279,14 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
@@ -1255,10 +1300,12 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);

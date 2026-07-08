@@ -74,6 +74,21 @@ export type MqttStatus = {
   updatedAt: string;
 };
 
+export type MqttPublishResult =
+  | {
+      mode: "mock" | "mqtt";
+      payload: string;
+      success: true;
+      topic: string;
+    }
+  | {
+      message: string;
+      payload: string;
+      reason: "disconnected" | "publish-error";
+      success: false;
+      topic: string;
+    };
+
 const MQTT31_CLIENT_ID_LIMIT = 23;
 const TEST_CONNECTION_CLIENT_ID_SUFFIX = "-probe";
 const GENERIC_RUNTIME_CLIENT_IDS = new Set(["", "solar-display", "solar-display-player"]);
@@ -387,25 +402,35 @@ export class MqttClientService {
     };
   }
 
-  publish(topic: string, payload: string) {
+  async publish(topic: string, payload: string): Promise<MqttPublishResult> {
     if (this.mockMode) {
       this.logger.debug?.({ topic, payload }, "MQTT mock publish");
-      return;
+      return { mode: "mock", payload, success: true, topic };
     }
     if (!this.client || !this.status.connected) {
+      const message = "Cannot publish, MQTT client not connected";
       this.logger.warn(
         { broker: this.status.broker, clientId: this.status.clientId, topic },
-        "Cannot publish, MQTT client not connected"
+        message
       );
-      return;
+      return { message, payload, reason: "disconnected", success: false, topic };
     }
-    this.client.publish(topic, payload, (error) => {
-      if (error) {
-        this.logger.error(
-          { broker: this.status.broker, clientId: this.status.clientId, error, topic },
-          "MQTT publish failed"
-        );
-      }
+
+    const client = this.client;
+    return new Promise<MqttPublishResult>((resolve) => {
+      client.publish(topic, payload, (error) => {
+        if (error) {
+          const message = "MQTT publish failed";
+          this.logger.error(
+            { broker: this.status.broker, clientId: this.status.clientId, error, topic },
+            message
+          );
+          resolve({ message, payload, reason: "publish-error", success: false, topic });
+          return;
+        }
+
+        resolve({ mode: "mqtt", payload, success: true, topic });
+      });
     });
   }
 

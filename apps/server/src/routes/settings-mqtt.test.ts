@@ -253,6 +253,204 @@ test("PUT /api/settings/mqtt/topics clears a name when an empty string is sent",
   }
 });
 
+test("POST /api/settings/mqtt/topics/:metricKey/publish sends numeric value to the mapped topic", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  const published: Array<{ payload: string; topic: string }> = [];
+
+  try {
+    app.mqttClientService.getStatus = () => ({
+      broker: "localhost:1883",
+      clientId: "solar-display-test",
+      connected: true,
+      reason: "connected",
+      updatedAt: "2026-07-08T00:00:00.000Z"
+    });
+    app.mqttClientService.publish = (topic: string, payload: string) => {
+      published.push({ payload, topic });
+      return Promise.resolve({
+        mode: "mqtt",
+        payload,
+        success: true,
+        topic
+      });
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: 1200 }
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      metricKey: string;
+      payload: string;
+      success: boolean;
+      topic: string;
+    };
+    assert.equal(body.success, true);
+    assert.equal(body.metricKey, "selfConsumptionEnergy");
+    assert.equal(body.topic, "kuozui/plant/solar/self_consumption");
+    assert.equal(body.payload, "{\"value\":1200}");
+    assert.deepEqual(published, [
+      {
+        payload: "{\"value\":1200}",
+        topic: "kuozui/plant/solar/self_consumption"
+      }
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/settings/mqtt/topics/:metricKey/publish rejects invalid values without publishing", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  let publishCalls = 0;
+
+  try {
+    app.mqttClientService.publish = () => {
+      publishCalls += 1;
+      return Promise.resolve({
+        mode: "mqtt",
+        payload: "",
+        success: true,
+        topic: ""
+      });
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: "1200" }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json<{ success: boolean }>().success, false);
+    assert.equal(publishCalls, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/settings/mqtt/topics/:metricKey/publish rejects missing mappings without publishing", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  let publishCalls = 0;
+
+  try {
+    app.mqttClientService.publish = () => {
+      publishCalls += 1;
+      return Promise.resolve({
+        mode: "mqtt",
+        payload: "",
+        success: true,
+        topic: ""
+      });
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/notARealMetric/publish",
+      payload: { value: 1200 }
+    });
+
+    assert.equal(response.statusCode, 404);
+    assert.equal(response.json<{ success: boolean }>().success, false);
+    assert.equal(publishCalls, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/settings/mqtt/topics/:metricKey/publish rejects disabled and empty topic mappings without publishing", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  const restore = database.prepare(
+    "UPDATE topic_mappings SET topic = ?, enabled = ? WHERE metric_key = ?"
+  );
+  const app = await buildApp();
+  let publishCalls = 0;
+
+  try {
+    app.mqttClientService.publish = () => {
+      publishCalls += 1;
+      return Promise.resolve({
+        mode: "mqtt",
+        payload: "",
+        success: true,
+        topic: ""
+      });
+    };
+
+    database
+      .prepare("UPDATE topic_mappings SET enabled = 0 WHERE metric_key = ?")
+      .run("selfConsumptionEnergy");
+    const disabledResponse = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: 1200 }
+    });
+
+    restore.run("kuozui/plant/solar/self_consumption", 1, "selfConsumptionEnergy");
+    database.prepare("UPDATE topic_mappings SET topic = ? WHERE metric_key = ?").run("", "selfConsumptionEnergy");
+    const emptyTopicResponse = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: 1200 }
+    });
+
+    assert.equal(disabledResponse.statusCode, 409);
+    assert.equal(emptyTopicResponse.statusCode, 409);
+    assert.equal(publishCalls, 0);
+  } finally {
+    restore.run("kuozui/plant/solar/self_consumption", 1, "selfConsumptionEnergy");
+    await app.close();
+  }
+});
+
+test("POST /api/settings/mqtt/topics/:metricKey/publish rejects disconnected publish results", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  let publishCalls = 0;
+
+  try {
+    app.mqttClientService.publish = (topic: string, payload: string) => {
+      publishCalls += 1;
+      return Promise.resolve({
+        message: "Cannot publish, MQTT client not connected",
+        payload,
+        reason: "disconnected",
+        success: false,
+        topic
+      });
+    };
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: 1200 }
+    });
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.json<{ success: boolean }>().success, false);
+    assert.equal(publishCalls, 1);
+  } finally {
+    await app.close();
+  }
+});
+
 test("OPTIONS /api/settings/mqtt preflight allows PUT for cross-origin dev saves", async () => {
   migrateDatabase();
   seedDatabase();

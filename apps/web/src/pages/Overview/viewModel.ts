@@ -18,6 +18,7 @@ import type { WeatherCurrentSnapshot } from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
 import { mockWeatherSnapshot } from "../../mocks/weather";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
 
 const DENSITY_VALUE_PLACEHOLDER = "--";
 
@@ -373,6 +374,7 @@ function resolveStoryMetricCards(
       metricKey: metricCard.metricKey,
       provenance: storyMetric.provenance,
       sourceClass: storyMetric.sourceClass,
+      sourceTopics: storyMetric.sourceTopics,
       trendHours:
         Array.isArray(storyMetric.trendHours) &&
         storyMetric.trendHours.every((value) => typeof value === "number" && Number.isFinite(value))
@@ -523,6 +525,14 @@ export function buildOverviewViewModel({
         label: metricCard.label,
         metricKey: metricCard.metricKey,
         provenance: metricCard.provenance,
+        sourceTooltip: buildMonitoringSourceTooltip({
+          dependencyKeys: metricCard.dependencyKeys,
+          label: metricCard.label,
+          metricKey: metricCard.metricKey,
+          sourceTopics: metricCard.sourceTopics,
+          sourceClass: metricCard.sourceClass,
+          unit: metricCard.unit
+        }),
         sourceClass: metricCard.sourceClass,
         trendHours: metricCard.trendHours,
         trendSeries: metricCard.trendSeries,
@@ -558,6 +568,13 @@ export function buildOverviewViewModel({
       label: resolved.label,
       metricKey: resolved.metricKey,
       provenance: resolved.provenance,
+      sourceTooltip: buildMonitoringSourceTooltip({
+        dependencyKeys: resolved.dependencyKeys,
+        label: resolved.label,
+        metricKey: resolved.metricKey,
+        sourceClass: resolved.sourceClass,
+        unit: resolved.unit
+      }),
       sourceClass: resolved.sourceClass,
       trendHours: metricCard.trendHours,
       trendSeries: metricCard.trendSeries,

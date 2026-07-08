@@ -33,6 +33,9 @@ type TopicMappingResponse = {
 
 type SettingsBody = Partial<MqttSettingsResponse>;
 type TestConnectionBody = SettingsBody;
+type PublishTopicValueBody = {
+  value?: unknown;
+};
 
 type TopicMappingInput = {
   metricKey: string;
@@ -197,6 +200,26 @@ function getEnabledTopics() {
     .map((mapping) => mapping.topic);
 }
 
+function getTopicMappingByMetricKey(metricKey: string) {
+  const database = getDatabase();
+  return database
+    .prepare(
+      `
+        SELECT metric_key, topic, enabled
+        FROM topic_mappings
+        WHERE metric_key = ?
+        LIMIT 1
+      `
+    )
+    .get(metricKey) as
+    | {
+        enabled: number;
+        metric_key: string;
+        topic: string | null;
+      }
+    | undefined;
+}
+
 const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/runtime/mqtt-status", async () => ({
     status: app.mqttClientService.getStatus() satisfies RuntimeMqttStatus
@@ -294,6 +317,56 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       readiness: readDisplayReadinessReport()
     };
   });
+
+  app.post<{ Body: PublishTopicValueBody; Params: { metricKey: string } }>(
+    "/api/settings/mqtt/topics/:metricKey/publish",
+    async (request, reply) => {
+      const value = request.body?.value;
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return reply.status(400).send({
+          error: "Publish value must be a finite number",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const mapping = getTopicMappingByMetricKey(request.params.metricKey);
+      if (!mapping) {
+        return reply.status(404).send({
+          error: "MQTT topic mapping not found",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const topic = mapping.topic?.trim() ?? "";
+      if (mapping.enabled !== 1 || topic === "") {
+        return reply.status(409).send({
+          error: "MQTT topic mapping is not publishable",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const payload = JSON.stringify({ value });
+      const publishResult = await app.mqttClientService.publish(topic, payload);
+      if (!publishResult.success) {
+        return reply.status(409).send({
+          error: publishResult.message,
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        metricKey: mapping.metric_key,
+        payload,
+        status: app.mqttClientService.getStatus(),
+        success: true,
+        topic
+      };
+    }
+  );
 
   app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request) => {
     const database = getDatabase();

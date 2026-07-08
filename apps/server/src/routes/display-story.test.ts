@@ -13,6 +13,12 @@ function toLocalDateKey(date: Date) {
 function seedDisplayStoryFixture() {
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
+  const updateTopic = database.prepare(
+    "UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?"
+  );
+  updateTopic.run("kuozui/plant/solar/power", "realTimePower");
+  updateTopic.run("kuozui/plant/solar/self_consumption", "selfConsumptionEnergy");
+  updateTopic.run("kuozui/plant/factory/consumption", "consumptionEnergy");
   database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
@@ -171,6 +177,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
           fallbackReason: string | null;
           metricKey: string;
           provenance: string;
+          sourceTopics?: Array<{ metricKey: string; topic: string }>;
           sourceClass: string;
           value: string;
         }>;
@@ -185,6 +192,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
           dependencyKeys: string[];
           metricKey: string;
           provenance: string;
+          sourceTopics?: Array<{ metricKey: string; topic: string }>;
           sourceClass: string;
           trendHours?: number[];
           trendSeries?: number[];
@@ -206,6 +214,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
           fallbackReason: string | null;
           metricKey: string;
           provenance: string;
+          sourceTopics?: Array<{ metricKey: string; topic: string }>;
           sourceClass: string;
         }>;
         story: {
@@ -230,6 +239,9 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
+    assert.deepEqual(realTimePowerMetric?.sourceTopics, [
+      { metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }
+    ]);
     const expectedTrendHours = ["08", "09", "10", "11"].map((hour) =>
       new Date(`${today}T${hour}:00:00.000Z`).getHours()
     );
@@ -248,6 +260,10 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       "selfConsumptionRatio",
       "selfConsumptionEnergy",
       "consumptionEnergy"
+    ]);
+    assert.deepEqual(selfConsumptionMetric.sourceTopics, [
+      { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" },
+      { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption" }
     ]);
     assert.equal(body.solar.story.flowState.state, "degraded");
     assert.equal(body.solar.story.flowState.reason, "reduced-efficiency");

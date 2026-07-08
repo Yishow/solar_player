@@ -9,6 +9,7 @@ type ConnectFn = typeof import("mqtt").connect;
 
 class FakeMqttClient extends EventEmitter {
   connected = true;
+  publishError: Error | null = null;
   subscribeError: Error | null = null;
   published: Array<{ topic: string; payload: string }> = [];
 
@@ -24,7 +25,7 @@ class FakeMqttClient extends EventEmitter {
 
   publish(topic: string, payload: string, callback?: (error?: Error | null) => void) {
     this.published.push({ topic, payload });
-    queueMicrotask(() => callback?.(null));
+    queueMicrotask(() => callback?.(this.publishError));
     return this;
   }
 
@@ -655,13 +656,75 @@ test("MqttClientService publish forwards payload to the mqtt client when connect
 
   try {
     await service.connect();
-    service.publish("test/topic", JSON.stringify({ value: 123 }));
+    const result = await service.publish("test/topic", JSON.stringify({ value: 123 }));
 
     const client = clientInstance as any;
     assert.ok(client);
     assert.equal(client.published.length, 1);
     assert.equal(client.published[0].topic, "test/topic");
     assert.equal(JSON.parse(client.published[0].payload).value, 123);
+    assert.deepEqual(result, {
+      mode: "mqtt",
+      payload: JSON.stringify({ value: 123 }),
+      success: true,
+      topic: "test/topic"
+    });
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("MqttClientService publish reports disconnected state without publishing", async () => {
+  const client = new FakeMqttClient();
+  const warnings: Array<{ message?: string; payload: unknown }> = [];
+  const service = new MqttClientService({
+    connectFn: (() => client as unknown as MqttClient) as typeof import("mqtt").connect,
+    database: createDatabase(),
+    logger: {
+      debug: () => {},
+      info: () => {},
+      warn: (payload, message) => warnings.push({ message, payload }),
+      error: () => {}
+    }
+  });
+
+  const result = await service.publish("test/topic", JSON.stringify({ value: 123 }));
+
+  assert.deepEqual(client.published, []);
+  assert.equal(result.success, false);
+  assert.equal(result.reason, "disconnected");
+  assert.equal(warnings.length, 1);
+});
+
+test("MqttClientService publish reports mqtt callback errors", async () => {
+  let clientInstance: FakeMqttClient | null = null;
+
+  const connectFn = ((_url: string, _options?: IClientOptions) => {
+    clientInstance = new FakeMqttClient();
+    clientInstance.publishError = new Error("publish failed");
+    queueMicrotask(() => clientInstance?.emit("connect"));
+    return clientInstance as unknown as MqttClient;
+  }) as typeof import("mqtt").connect;
+
+  const errors: Array<{ message?: string; payload: unknown }> = [];
+  const service = new MqttClientService({
+    connectFn,
+    database: createDatabase() as unknown as Database.Database,
+    logger: {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: (payload, message) => errors.push({ message, payload })
+    }
+  });
+
+  try {
+    await service.connect();
+    const result = await service.publish("test/topic", JSON.stringify({ value: 123 }));
+
+    assert.equal(result.success, false);
+    assert.equal(result.reason, "publish-error");
+    assert.equal(errors.length, 1);
   } finally {
     await service.disconnect();
   }

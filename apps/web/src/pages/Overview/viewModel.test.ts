@@ -33,6 +33,7 @@ function createResolvedStoryMetric(args: {
   metricKey: string;
   provenance?: "cumulative" | "derived" | "fallback" | "live";
   sourceClass?: "cumulative-counter" | "derived-metric" | "mqtt-live";
+  sourceTopics?: Array<{ metricKey: string; topic: string }>;
   trendHours?: number[];
   trendSeries?: number[];
   trendUnit?: string;
@@ -51,6 +52,7 @@ function createResolvedStoryMetric(args: {
     metricKey: args.metricKey,
     provenance: args.provenance ?? "live",
     sourceClass: args.sourceClass ?? "mqtt-live",
+    sourceTopics: args.sourceTopics,
     trendHours: args.trendHours,
     trendSeries: args.trendSeries,
     trendUnit: args.trendUnit,
@@ -88,6 +90,51 @@ test("buildOverviewViewModel surfaces the custom topic name delivered via the st
 
   const fallbackCard = withoutStory.metrics.find((metric) => metric.metricKey === "realTimePower");
   assert.equal(fallbackCard?.label, "即時發電功率");
+});
+
+test("buildOverviewViewModel exposes source tooltip metadata for direct KPI cards", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot
+  });
+  const realTimePower = model.metrics.find((metric) => metric.metricKey === "realTimePower");
+
+  assert.match(realTimePower?.sourceTooltip ?? "", /Metric: realTimePower/);
+  assert.match(realTimePower?.sourceTooltip ?? "", /Topic: --/);
+  assert.match(realTimePower?.sourceTooltip ?? "", /Depends on: --/);
+});
+
+test("buildOverviewViewModel renders configured MQTT topic from story metadata in the tooltip", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          label: "即時輸出",
+          metricKey: "realTimePower",
+          sourceTopics: [
+            { metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }
+          ],
+          unit: "kW",
+          value: "612"
+        })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  const realTimePower = model.metrics.find((metric) => metric.metricKey === "realTimePower");
+  assert.ok(
+    (realTimePower?.sourceTooltip ?? "").includes("Topic: realTimePower=kuozui/plant/solar/power")
+  );
 });
 
 test("buildOverviewViewModel prefers live metrics when socket data is available", () => {

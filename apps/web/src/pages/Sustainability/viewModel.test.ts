@@ -262,6 +262,18 @@ test("buildSustainabilityViewModel labels are fixed built-ins with no metric_key
   assert.equal(model.bigNumbers[1]?.label, "累積 CO₂ 減量");
 });
 
+test("buildSustainabilityViewModel exposes source tooltip metadata for aggregate big-number cards", () => {
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "lifetime",
+    story: periodStory
+  });
+  const accumulatedGeneration = model.bigNumbers[0];
+
+  assert.match(accumulatedGeneration?.sourceTooltip ?? "", /Metric: accumulatedGenerationGwh/);
+  assert.match(accumulatedGeneration?.sourceTooltip ?? "", /Source: runtime-aggregate/);
+  assert.match(accumulatedGeneration?.sourceTooltip ?? "", /Topic: --/);
+});
+
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 

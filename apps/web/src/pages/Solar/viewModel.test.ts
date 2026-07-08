@@ -84,6 +84,75 @@ test("buildSolarViewModel centralizes flow nodes and KPI display fields", () => 
   assert.equal(model.kpis[0]?.value, "3,842");
 });
 
+test("buildSolarViewModel exposes source tooltip metadata for the self-consumption KPI", () => {
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot
+  });
+  const selfConsumption = model.kpis.find((kpi) => kpi.label === "自發自用比例") as
+    | { sourceTooltip?: string }
+    | undefined;
+
+  assert.ok(selfConsumption?.sourceTooltip);
+  assert.match(selfConsumption.sourceTooltip, /自發自用比例/);
+  assert.match(selfConsumption.sourceTooltip, /Metric: selfConsumptionRatio/);
+  assert.match(selfConsumption.sourceTooltip, /selfConsumptionEnergy/);
+  assert.match(selfConsumption.sourceTooltip, /consumptionEnergy/);
+});
+
+test("buildSolarViewModel renders configured dependency MQTT topics in the self-consumption tooltip", () => {
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot,
+    solarStory: {
+      kpis: [
+        {
+          metricKey: "todayGeneration",
+          label: "今日產出",
+          unit: "kWh",
+          value: "3,842",
+          comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" }
+        },
+        {
+          alertTone: "normal",
+          bindingState: "bound",
+          dependencyKeys: ["selfConsumptionRatio", "selfConsumptionEnergy", "consumptionEnergy"],
+          fallbackReason: null,
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: "fresh",
+          helper: "由自發自用量與總用電推導",
+          metricKey: "selfConsumptionRatio",
+          label: "自發自用比例",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          sourceTopics: [
+            { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" },
+            { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption" }
+          ],
+          unit: "%",
+          value: "75.0",
+          comparison: { state: "above-target", delta: "+5.0", fallbackReason: null, label: "超越目標" }
+        },
+        {
+          metricKey: "todayCo2Reduction",
+          label: "減碳",
+          unit: "t",
+          value: "1.9",
+          comparison: { state: "unavailable", delta: null, fallbackReason: null, label: "" }
+        }
+      ],
+      story: { flowState: { state: "degraded", reason: "reduced-efficiency", label: "效率降載" } }
+    } as any
+  });
+
+  const selfConsumption = model.kpis.find((kpi) => kpi.metricKey === "selfConsumptionRatio");
+  assert.ok(
+    (selfConsumption?.sourceTooltip ?? "").includes(
+      "Topic: selfConsumptionEnergy=kuozui/plant/solar/self_consumption, consumptionEnergy=kuozui/plant/factory/consumption"
+    )
+  );
+});
+
 test("buildSolarViewModel keeps fallback values when snapshot fields are missing", () => {
   const model = buildSolarViewModel({
     isSocketConnected: false,

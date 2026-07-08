@@ -82,6 +82,7 @@ OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true
 EOF
 "${SCRIPT_DIR}/disable-display-sleep.sh" --user "${KIOSK_USER}"
+"${SCRIPT_DIR}/disable-xfce-display-popups.sh" --user "${KIOSK_USER}"
 cat > "${kiosk_home}/.config/fcitx5/profile" <<'EOF'
 [Groups/0]
 Name=Default

@@ -129,6 +129,69 @@ function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): 
   };
 }
 
+test("mqtt settings content renders per-row publish controls for topic mappings", () => {
+  const html = renderContent({
+    publishTopicValue: async () => undefined,
+    topicPublishDrafts: {
+      selfConsumptionEnergy: "1200"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "selfConsumptionEnergy",
+        nameEn: null,
+        nameZh: "自發自用量",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/self_consumption",
+        unit: "kWh",
+        updatedAt: null,
+        valuePath: "$.value"
+      },
+      {
+        enabled: true,
+        id: 2,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "consumptionEnergy",
+        nameEn: null,
+        nameZh: "用電量",
+        quality: null,
+        rawPayload: null,
+        topic: "",
+        unit: "kWh",
+        updatedAt: null,
+        valuePath: "$.value"
+      },
+      {
+        enabled: false,
+        id: 3,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "todayGeneration",
+        nameEn: null,
+        nameZh: "今日發電量",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/today_energy",
+        unit: "kWh",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-publish-row="selfConsumptionEnergy"/);
+  assert.match(html, /data-mqtt-publish-disabled="false"/);
+  assert.match(html, /placeholder="輸入測試數值"/);
+  assert.match(html, /發佈測試值/);
+  assert.match(html, /data-mqtt-publish-row="consumptionEnergy"[^>]*data-mqtt-publish-disabled="true"/);
+  assert.match(html, /data-mqtt-publish-row="todayGeneration"[^>]*data-mqtt-publish-disabled="true"/);
+});
+
 test("mqtt settings content renders readiness coverage rows that distinguish mapping gaps from idle runtime topics", () => {
   const html = renderToStaticMarkup(
     React.createElement(MqttSettingsContent, {

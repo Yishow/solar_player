@@ -287,6 +287,7 @@ export function OverviewRuntimeContent({
             className="overview-kpi-card"
             surface="metric"
             style={shell.style}
+            title={metric.sourceTooltip}
           >
             <DisplayCardHeader
               icon={renderDisplayPageIcon({

@@ -118,6 +118,9 @@ test("buildFactoryCircuitViewModel centralizes threshold mapping by power and ke
   assert.equal(model.kpis[0]?.value, "--");
   assert.equal(model.kpis[0]?.provenance, "fallback");
   assert.equal(model.kpis[0]?.iconKey, "bolt");
+  assert.match(model.kpis[0]?.sourceTooltip ?? "", /Metric: totalPower/);
+  assert.match(model.kpis[0]?.sourceTooltip ?? "", /Source: slot-aggregate/);
+  assert.match(model.kpis[0]?.sourceTooltip ?? "", /Depends on: stamping/);
   assert.equal(model.kpis[1]?.value, "--");
   assert.equal(model.kpis[4]?.value, "待命");
 });
@@ -236,6 +239,9 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
           metricKey: "selfConsumption",
           provenance: "live",
           sourceClass: "mqtt-live",
+          sourceTopics: [
+            { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" }
+          ],
           unit: "kWh",
           value: "2,430"
         },
@@ -298,6 +304,11 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
   assert.equal(model.kpis[0]?.sourceClass, "slot-aggregate");
   assert.equal(model.kpis[2]?.value, "2,430");
   assert.equal(model.kpis[2]?.provenance, "live");
+  assert.ok(
+    (model.kpis[2]?.sourceTooltip ?? "").includes(
+      "Topic: selfConsumptionEnergy=kuozui/plant/solar/self_consumption"
+    )
+  );
   assert.equal(model.summary.statusLabel, "迴路資料已同步");
 });
 

@@ -58,10 +58,14 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
   cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
   cp "${PROJECT_DIR}/deploy/disable-display-sleep.sh" "${target_root}/deploy/disable-display-sleep.sh"
+  cp "${PROJECT_DIR}/deploy/disable-xfce-display-popups.sh" "${target_root}/deploy/disable-xfce-display-popups.sh"
   cp "${PROJECT_DIR}/deploy/apply-desktop-theme.sh" "${target_root}/deploy/apply-desktop-theme.sh"
   cp "${PROJECT_DIR}/deploy/repair-kiosk-system.sh" "${target_root}/deploy/repair-kiosk-system.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
+  cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.sh" "${target_root}/deploy/tailscale-hotspot-trigger.sh"
+  cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.service" "${target_root}/deploy/tailscale-hotspot-trigger.service"
+  cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.timer" "${target_root}/deploy/tailscale-hotspot-trigger.timer"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/start-solar-kiosk.sh" "${target_root}/deploy/start-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/stop-solar-kiosk.sh" "${target_root}/deploy/stop-solar-kiosk.sh"
@@ -80,10 +84,12 @@ copy_required_tree() {
     "${target_root}/deploy/raspi-bootstrap.sh" \
     "${target_root}/deploy/configure-lightweight-desktop.sh" \
     "${target_root}/deploy/disable-display-sleep.sh" \
+    "${target_root}/deploy/disable-xfce-display-popups.sh" \
     "${target_root}/deploy/apply-desktop-theme.sh" \
     "${target_root}/deploy/repair-kiosk-system.sh" \
     "${target_root}/deploy/readonly-system-enable.sh" \
     "${target_root}/deploy/readonly-system-disable.sh" \
+    "${target_root}/deploy/tailscale-hotspot-trigger.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
     "${target_root}/deploy/start-solar-kiosk.sh" \
     "${target_root}/deploy/stop-solar-kiosk.sh" \
@@ -140,10 +146,15 @@ Solar Display ${mode} deploy bundle
 7. Reset DB settings only: ./deploy/reset-db-settings.sh
 8. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
 9. Reapply no-sleep/no-screensaver only: sudo ./deploy/disable-display-sleep.sh --user <user>
-10. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
-11. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
-12. Prepare Raspberry Pi system-boot user-data before first boot:
+10. Suppress XFCE display hotplug popups only: sudo ./deploy/disable-xfce-display-popups.sh --user <user>
+11. After verification, dry-run read-only root hardening: sudo ./deploy/enable-readonly-root.sh
+12. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
+13. Prepare Raspberry Pi system-boot user-data before first boot:
     ./scripts/prepare-raspi-user-data.sh --boot-path /Volumes/system-boot
+14. Optional Tailscale maintenance hotspot trigger:
+    sudo install -m 755 ./deploy/tailscale-hotspot-trigger.sh /usr/local/sbin/tailscale-hotspot-trigger.sh
+    sudo install -m 644 ./deploy/tailscale-hotspot-trigger.service /etc/systemd/system/tailscale-hotspot-trigger.service
+    sudo install -m 644 ./deploy/tailscale-hotspot-trigger.timer /etc/systemd/system/tailscale-hotspot-trigger.timer
 
 Notes:
 - Offline bundles must be deployed to a machine with the same OS/CPU family used to build this bundle.
@@ -229,10 +240,14 @@ validate_inputs() {
   require_path "deploy/raspi-bootstrap.sh"
   require_path "deploy/configure-lightweight-desktop.sh"
   require_path "deploy/disable-display-sleep.sh"
+  require_path "deploy/disable-xfce-display-popups.sh"
   require_path "deploy/apply-desktop-theme.sh"
   require_path "deploy/repair-kiosk-system.sh"
   require_path "deploy/readonly-system-enable.sh"
   require_path "deploy/readonly-system-disable.sh"
+  require_path "deploy/tailscale-hotspot-trigger.sh"
+  require_path "deploy/tailscale-hotspot-trigger.service"
+  require_path "deploy/tailscale-hotspot-trigger.timer"
   require_path "deploy/install-kiosk.sh"
   require_path "deploy/start-solar-kiosk.sh"
   require_path "deploy/stop-solar-kiosk.sh"

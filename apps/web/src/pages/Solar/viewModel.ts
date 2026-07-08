@@ -11,6 +11,7 @@ import {
 } from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
 import type { LiveMetricsSnapshot } from "../../services/socket";
+import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
 
 type SolarMetricKey =
   | "realTimePower"
@@ -60,6 +61,7 @@ type BuildSolarViewModelArgs = {
       label: string;
       provenance?: string;
       sourceClass?: string;
+      sourceTopics?: Array<{ metricKey: string; topic: string }>;
       unit: string;
       value?: string;
     }>;
@@ -172,6 +174,7 @@ export function buildSolarViewModel({
             helper: storyKpi.helper ?? fallbackResolved.helper,
             provenance: (storyKpi.provenance as MonitoringMetricProvenance | undefined) ?? fallbackResolved.provenance,
             sourceClass: (storyKpi.sourceClass as MonitoringMetricSourceClass | undefined) ?? binding.sourceClass ?? fallbackResolved.sourceClass,
+            sourceTopics: storyKpi.sourceTopics,
             unit: storyKpi.unit ?? fallbackResolved.unit
           }
         : fallbackResolved;
@@ -190,7 +193,16 @@ export function buildSolarViewModel({
         helper: resolved.helper,
         iconKey: binding.iconKey,
         label: storyKpi?.label ?? binding.label,
+        metricKey: binding.metricKey,
         provenance: resolved.provenance,
+        sourceTooltip: buildMonitoringSourceTooltip({
+          dependencyKeys: resolved.dependencyKeys,
+          label: storyKpi?.label ?? binding.label,
+          metricKey: binding.metricKey,
+          sourceTopics: storyKpi?.sourceTopics,
+          sourceClass: resolved.sourceClass,
+          unit: storyKpi?.unit ?? resolved.unit
+        }),
         sourceClass: resolved.sourceClass,
         unit: storyKpi?.unit ?? resolved.unit,
         value
@@ -280,7 +292,15 @@ export function buildSolarViewModel({
         helper: resolved.helper,
         iconKey: binding.iconKey,
         label: binding.label,
+        metricKey: binding.metricKey,
         provenance: resolved.provenance,
+        sourceTooltip: buildMonitoringSourceTooltip({
+          dependencyKeys: resolved.dependencyKeys,
+          label: binding.label,
+          metricKey: binding.metricKey,
+          sourceClass: resolved.sourceClass,
+          unit: resolved.unit
+        }),
         sourceClass: resolved.sourceClass,
         unit: resolved.unit,
         value: resolved.value

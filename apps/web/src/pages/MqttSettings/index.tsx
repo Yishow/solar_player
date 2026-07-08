@@ -123,6 +123,8 @@ export function MqttSettings() {
   const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const lastSyncedTopicsRef = useRef(lastSyncedTopics);
+  const [topicPublishDrafts, setTopicPublishDrafts] = useState<Record<string, string>>({});
+  const [publishingTopicKey, setPublishingTopicKey] = useState<string | null>(null);
   const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
     useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
@@ -422,6 +424,10 @@ export function MqttSettings() {
     );
   }, [markDirty]);
 
+  const handleTopicPublishDraftChange = useCallback((metricKey: string, value: string) => {
+    setTopicPublishDrafts((current) => ({ ...current, [metricKey]: value }));
+  }, []);
+
   const handleWeatherSettingChange = useCallback(<Key extends keyof WeatherSettings>(
     key: Key,
     value: WeatherSettings[Key]
@@ -501,6 +507,27 @@ export function MqttSettings() {
       setActionState((current) => ({ ...current, isTestingConnection: false }));
     }
   }, [settings]);
+
+  const publishTopicValue = useCallback(async (metricKey: string, value: number) => {
+    setPublishingTopicKey(metricKey);
+    try {
+      const response = await requestJson<{
+        status: MqttStatus;
+      }>(`/api/settings/mqtt/topics/${encodeURIComponent(metricKey)}/publish`, {
+        body: JSON.stringify({ value }),
+        method: "POST"
+      });
+      setStatus(response.status);
+      setMessage(`MQTT 測試值已發佈：${metricKey}`);
+      setErrorMessage("");
+      await loadTopics({ isPolling: true });
+      refreshDeferredSettingsDiagnostics([reloadReadiness]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "發佈 MQTT 測試值失敗。");
+    } finally {
+      setPublishingTopicKey(null);
+    }
+  }, [reloadReadiness]);
 
   const saveTopicMappings = useCallback(async () => {
     setActionState((current) => ({ ...current, isSavingTopics: true }));
@@ -600,6 +627,7 @@ export function MqttSettings() {
       errorMessage={errorMessage}
       handleSettingChange={handleSettingChange}
       handleTopicChange={handleTopicChange}
+      handleTopicPublishDraftChange={handleTopicPublishDraftChange}
       lastConnectionTest={lastConnectionTest}
       liveMetricsConnectionState={liveMetricsConnectionState}
       liveMetricsSnapshot={liveMetricsSnapshot}
@@ -616,12 +644,15 @@ export function MqttSettings() {
         ) : null
       }
       removeTopicMapping={removeTopicMapping}
+      publishTopicValue={publishTopicValue}
+      publishingTopicKey={publishingTopicKey}
       saveSettings={saveSettings}
       saveTopicMappings={saveTopicMappings}
       settings={settings}
       status={status}
       testConnection={testConnection}
       toggleWeatherField={toggleWeatherField}
+      topicPublishDrafts={topicPublishDrafts}
       topics={topics}
       handleWeatherSettingChange={handleWeatherSettingChange}
       weatherOptions={weatherOptions}

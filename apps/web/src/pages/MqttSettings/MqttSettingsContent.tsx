@@ -38,6 +38,7 @@ type MqttSettingsContentProps = {
     key: Key,
     value: TopicMapping[Key]
   ) => void;
+  handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
   handleWeatherSettingChange: <Key extends keyof WeatherSettings>(
     key: Key,
     value: WeatherSettings[Key]
@@ -49,6 +50,8 @@ type MqttSettingsContentProps = {
   readiness: DisplayReadinessReport | null;
   readinessErrorMessage: string;
   removeTopicMapping: (rowId: number) => void;
+  publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
+  publishingTopicKey?: string | null;
   reloadTopics: () => Promise<void>;
   remoteSyncBanner: ReactNode;
   saveSettings: () => Promise<void>;
@@ -57,6 +60,7 @@ type MqttSettingsContentProps = {
   status: MqttStatus;
   testConnection: () => Promise<void>;
   toggleWeatherField: (fieldKey: WeatherFieldKey, enabled: boolean) => void;
+  topicPublishDrafts?: Record<string, string>;
   topics: TopicMapping[];
   weatherOptions: WeatherOptionsResponse | null;
   weatherOptionsErrorMessage: string;
@@ -209,6 +213,10 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                 key={`workspace-${topic.id}`}
                 topic={topic}
                 handleTopicChange={props.handleTopicChange}
+                handleTopicPublishDraftChange={props.handleTopicPublishDraftChange}
+                publishDraftValue={props.topicPublishDrafts?.[topic.metricKey] ?? ""}
+                publishTopicValue={props.publishTopicValue}
+                publishingTopicKey={props.publishingTopicKey ?? null}
                 removeTopicMapping={props.removeTopicMapping}
               />
             ))}

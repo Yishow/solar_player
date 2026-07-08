@@ -1,0 +1,9 @@
+[Unit]
+Description=Switch Wi-Fi to a remembered hotspot when the Tailscale maintenance trigger is present
+Wants=NetworkManager.service bluetooth.service tailscaled.service
+After=NetworkManager.service bluetooth.service tailscaled.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/solar-display/tailscale-hotspot-trigger.env
+ExecStart=/usr/local/sbin/tailscale-hotspot-trigger.sh

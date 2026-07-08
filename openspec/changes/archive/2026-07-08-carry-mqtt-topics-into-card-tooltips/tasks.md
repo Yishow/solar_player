@@ -1,0 +1,5 @@
+- [x] 1. Add RED server display-story test coverage for Requirement: Expose monitoring card source composition in playback tooltips, showing direct and derived monitoring metrics include configured source topic metadata from `topic_mappings`; verify with `pnpm --filter @solar-display/server exec tsx --test src/routes/display-story.test.ts` failing before implementation.
+- [x] 2. Add RED web view model tests for tooltip rendering, showing Overview direct KPI and Solar self-consumption tooltip render configured topics; verify focused web tests fail before implementation.
+- [x] 3. Implement shared type and server display-story source topic propagation from `topic_mappings` into monitoring story bindings.
+- [x] 4. Implement web tooltip rendering consumption of story topic metadata while preserving `--` for missing aggregate topics.
+- [x] 5. Run verification for focused server/web tests, `pnpm run build`, `spectra validate carry-mqtt-topics-into-card-tooltips`, and `spectra analyze carry-mqtt-topics-into-card-tooltips --json`.

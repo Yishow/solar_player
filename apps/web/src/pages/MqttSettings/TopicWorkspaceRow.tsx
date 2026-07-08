@@ -18,6 +18,10 @@ export type TopicWorkspaceRowProps = {
     key: Key,
     value: TopicMapping[Key]
   ) => void;
+  handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
+  publishDraftValue?: string;
+  publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
+  publishingTopicKey?: string | null;
   /** 移除特定 Topic 對照的事件函式 */
   removeTopicMapping: (rowId: number) => void;
 };
@@ -69,8 +73,25 @@ function TopicInputGroup({
 function TopicWorkspaceRowImpl({
   topic,
   handleTopicChange,
+  handleTopicPublishDraftChange,
+  publishDraftValue = "",
+  publishTopicValue,
+  publishingTopicKey = null,
   removeTopicMapping
 }: TopicWorkspaceRowProps) {
+  const trimmedPublishDraft = publishDraftValue.trim();
+  const publishNumber = Number(trimmedPublishDraft);
+  const publishValueIsValid = trimmedPublishDraft !== "" && Number.isFinite(publishNumber);
+  const isPublishing = publishingTopicKey === topic.metricKey;
+  const publishDisabledReason = !topic.enabled
+    ? "此 mapping 已停用"
+    : topic.topic.trim() === ""
+      ? "尚未設定 topic"
+      : !publishValueIsValid
+        ? "請輸入 finite number"
+        : "";
+  const publishDisabled = isPublishing || publishDisabledReason !== "" || !publishTopicValue;
+
   return (
     <div className="topic-workspace-row mgmt-interactive-card" data-mqtt-row="editable-topic-row">
       <div className="topic-workspace-row__header">
@@ -139,6 +160,35 @@ function TopicWorkspaceRowImpl({
             <small>{topic.runtimeUnit || "--"}</small>
           </span>
         </div>
+      </div>
+
+      <div
+        className="topic-workspace-row__publish"
+        data-mqtt-publish-row={topic.metricKey}
+        data-mqtt-publish-disabled={publishDisabled ? "true" : "false"}
+      >
+        <label className="input-group topic-workspace-row__publish-input">
+          <span className="input-prefix">測試數值</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="輸入測試數值"
+            value={publishDraftValue}
+            onChange={(event) => handleTopicPublishDraftChange?.(topic.metricKey, event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="map-row__publish"
+          disabled={publishDisabled}
+          onClick={() => {
+            if (publishDisabled || !publishTopicValue) return;
+            void publishTopicValue(topic.metricKey, publishNumber);
+          }}
+        >
+          {isPublishing ? "發佈中..." : "發佈測試值"}
+        </button>
+        <small>{publishDisabledReason || "Payload: { \"value\": number }"}</small>
       </div>
 
       <div className="topic-workspace-row__meta">

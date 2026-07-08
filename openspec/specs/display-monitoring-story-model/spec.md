@@ -431,3 +431,264 @@ tests:
   - apps/web/src/hooks/displayPageDraftSession.test.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
 -->
+
+---
+### Requirement: Expose monitoring card source composition in playback tooltips
+
+The system SHALL expose source composition for playback monitoring cards so operators can inspect the metric keys, MQTT topics, and dependencies behind displayed card values.
+
+#### Scenario: Operator inspects a direct MQTT metric card
+
+- **WHEN** an operator hovers or focuses a monitoring card whose value comes from a direct metric mapping
+- **THEN** the card tooltip SHALL identify the displayed metric key
+- **AND** the tooltip SHALL identify the configured MQTT topic when one exists
+- **AND** the tooltip SHALL identify the displayed unit when one exists
+
+#### Scenario: Operator inspects a derived metric card
+
+- **WHEN** an operator hovers or focuses the Solar self-consumption ratio card
+- **THEN** the card tooltip SHALL identify `selfConsumptionRatio` as the displayed metric
+- **AND** the tooltip SHALL identify `selfConsumptionEnergy` and `consumptionEnergy` as dependency keys for fallback derivation
+- **AND** the tooltip SHALL identify configured MQTT topics for `selfConsumptionEnergy` and `consumptionEnergy` when those dependency mappings exist
+- **AND** the tooltip SHALL preserve the visible card label `自發自用比例`
+
+#### Scenario: Operator inspects an aggregate or partially mapped card
+
+- **WHEN** a monitoring card has dependency metadata but no direct MQTT topic
+- **THEN** the tooltip SHALL show the available source class and dependency keys
+- **AND** the tooltip SHALL use a clear empty marker for missing direct topic instead of hiding the source line
+
+#### Scenario: Tooltip does not change playback layout
+
+- **WHEN** source composition tooltip metadata is added to monitoring cards
+- **THEN** the card frame size, value row, icon, and visible card copy SHALL remain layout-stable
+- **AND** the tooltip SHALL NOT require new page-local hardcoded copy for each card
+
+<!-- @trace
+source: carry-mqtt-topics-into-card-tooltips
+updated: 2026-07-08
+code:
+  - deploy/tailscale-hotspot-trigger.sh
+  - .env.example
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - packages/shared/src/displayStory.ts
+  - apps/web/src/pages/Solar/viewModel.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - deploy/tailscale-hotspot-trigger.timer
+  - deploy/disable-xfce-display-popups.sh
+  - deploy/tailscale-hotspot-trigger.service
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
+  - deploy/configure-lightweight-desktop.sh
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - deploy.sh
+  - apps/web/src/components/displayPageCards.tsx
+  - apps/web/src/pages/Solar/runtimeContent.tsx
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
+  - apps/web/src/pages/shared/monitoringSourceTooltip.ts
+tests:
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/components/displayPageCards.test.tsx
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
+-->
+
+---
+### Requirement: Expose monitoring card diagnostics for management surfaces
+
+The system SHALL expose monitoring card diagnostics from shared monitoring story data for management surfaces.
+
+#### Scenario: Management surface requests monitoring card diagnostics
+
+- **WHEN** a management surface requests diagnostics for Overview, Solar, or Factory Circuit value cards
+- **THEN** the shared monitoring story data SHALL expose card target identity, metric identity, current source value, display value, unit, source topics, dependency metrics, fallback reason, freshness state, and last update
+- **AND** the diagnostic payload SHALL use stable identifiers rather than page-local display text as the only target identity
+
+##### Example: Overview power card exposes stable diagnostics
+
+- **GIVEN** the Overview real-time power card uses metric `realTimePower`
+- **WHEN** diagnostics are generated for Overview
+- **THEN** the diagnostic row includes page id `overview`, metric key `realTimePower`, source topic `kuozui/plant/solar/power`, display value, source value, and freshness state
+
+#### Scenario: Card derives from multiple monitoring inputs
+
+- **WHEN** a card display value derives from more than one monitoring metric
+- **THEN** the diagnostic payload SHALL list each required input with its metric key, topic mapping state, source topic when mapped, and latest value state
+- **AND** the payload SHALL identify which input blocks the computed display value when the card is unavailable
+
+##### Example: Self-consumption ratio reports missing consumption input
+
+- **GIVEN** `selfConsumptionEnergy` is live
+- **AND** `consumptionEnergy` has no latest value
+- **WHEN** diagnostics are generated for the self-consumption ratio card
+- **THEN** the diagnostic row lists both inputs
+- **AND** the row identifies `consumptionEnergy` as the blocking input
+
+
+<!-- @trace
+source: add-topic-workspace-card-data-management
+updated: 2026-07-08
+code:
+  - deploy/configure-lightweight-desktop.sh
+  - .env.example
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - packages/shared/src/displayCardData.ts
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/db/migrations/018_display_value_overrides.sql
+  - deploy/tailscale-hotspot-trigger.timer
+  - scripts/deploy.test.mjs
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/components/displayPageCards.tsx
+  - apps/web/src/pages/Solar/viewModel.ts
+  - deploy/tailscale-hotspot-trigger.sh
+  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
+  - apps/web/src/pages/shared/monitoringSourceTooltip.ts
+  - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
+  - deploy.sh
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/routes/display-card-data.ts
+  - apps/server/src/app.ts
+  - deploy/disable-xfce-display-popups.sh
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - packages/shared/src/index.ts
+  - deploy/tailscale-hotspot-trigger.service
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/services/displayValueOverrideService.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
+  - apps/web/src/pages/Solar/runtimeContent.tsx
+tests:
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/web/src/components/displayPageCards.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+-->
+
+---
+### Requirement: Apply display overrides after monitoring source resolution
+
+The system SHALL apply display overrides after monitoring source values and fallback states are resolved.
+
+#### Scenario: Override exists for a monitoring card
+
+- **WHEN** a display override is active for a monitoring card target
+- **THEN** the playback story payload SHALL expose the override value as the display value
+- **AND** management diagnostics SHALL expose both the original source value and the applied override value
+- **AND** freshness and source topic metadata SHALL continue to describe the original monitoring source
+
+##### Example: Monitoring override keeps source metadata
+
+- **GIVEN** `realTimePower` source value is `42 kW`
+- **AND** an active override displays `60 kW`
+- **WHEN** diagnostics are generated for the Overview power card
+- **THEN** the row reports source value `42 kW`, display value `60 kW`, and the original source topic
+
+#### Scenario: Override is inactive or expired
+
+- **WHEN** a display override for a monitoring card target is inactive or expired
+- **THEN** the playback story payload SHALL use the real source or fallback-resolved value
+- **AND** management diagnostics SHALL mark the override as inactive rather than applying it
+
+##### Example: Expired monitoring override is not applied
+
+- **GIVEN** `realTimePower` source value is `42 kW`
+- **AND** an override value `60 kW` expired at `2026-07-08T09:00:00.000Z`
+- **WHEN** diagnostics are generated after that expiry
+- **THEN** playback receives `42 kW`
+- **AND** diagnostics mark the override as inactive
+
+<!-- @trace
+source: add-topic-workspace-card-data-management
+updated: 2026-07-08
+code:
+  - deploy/configure-lightweight-desktop.sh
+  - .env.example
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - packages/shared/src/displayCardData.ts
+  - packages/shared/src/displayStory.ts
+  - apps/server/src/db/migrations/018_display_value_overrides.sql
+  - deploy/tailscale-hotspot-trigger.timer
+  - scripts/deploy.test.mjs
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/components/displayPageCards.tsx
+  - apps/web/src/pages/Solar/viewModel.ts
+  - deploy/tailscale-hotspot-trigger.sh
+  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
+  - apps/web/src/pages/shared/monitoringSourceTooltip.ts
+  - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
+  - deploy.sh
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/routes/display-card-data.ts
+  - apps/server/src/app.ts
+  - deploy/disable-xfce-display-popups.sh
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - packages/shared/src/index.ts
+  - deploy/tailscale-hotspot-trigger.service
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/services/displayValueOverrideService.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
+  - apps/web/src/pages/Solar/runtimeContent.tsx
+tests:
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/web/src/components/displayPageCards.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+-->

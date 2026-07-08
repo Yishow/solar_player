@@ -160,73 +160,78 @@ export function CircuitSettingsContent({
             ) : null}
           </div>
         </div>
-
-        <div className="cs-stats mgmt-stat-strip">
-          <div className="cs-stat mgmt-stat">
-            <span className="cs-stat__label">
-              迴路總數
-              <small>Total</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.totalCircuitCount}</span>
-          </div>
-          <div className="cs-stat mgmt-stat">
-            <span className="cs-stat__label">
-              顯示中
-              <small>Visible</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.enabledCircuitCount}</span>
-          </div>
-          <div className="cs-stat mgmt-stat">
-            <span className="cs-stat__label">
-              隱藏中
-              <small>Hidden</small>
-            </span>
-            <span className="cs-stat__value" style={{ color: "#888d86" }}>
-              {viewModel.summary.disabledCircuitCount}
-            </span>
-          </div>
-          <div className="cs-stat mgmt-stat">
-            <span className="cs-stat__label">
-              額定容量總和
-              <small>Capacity</small>
-            </span>
-            <span className="cs-stat__value">{viewModel.summary.capacityLabel}</span>
-          </div>
-          <div className="cs-stat mgmt-stat">
-            <span className="cs-stat__label">
-              待儲存
-              <small>Dirty</small>
-            </span>
-            <span className="cs-stat__value" style={{ color: dirtyCount > 0 ? "#c9881a" : "#888d86" }}>
-              {dirtyCount}
-            </span>
-          </div>
-        </div>
-
-        <div className={`mgmt-status cs-readiness ${readinessVariant}`.trim()} role="status">
-          {readinessSummary}
-        </div>
-        {readinessFindings.length > 0 && !readinessErrorMessage && !readinessLoading ? (
-          <div className="cs-readiness-list">
-            {readinessFindings.slice(0, 3).map((finding) => (
-              <div key={`${finding.pageId}-${finding.requirementKey}`} className="cs-readiness-item mgmt-banner">
-                <span className={chipClass(finding.status === "blocking" ? "danger" : "warning")}>
-                  {finding.status === "blocking" ? "Blocking" : "Warning"}
-                </span>
-                <div className="cs-readiness-item__copy">
-                  <strong>
-                    {readinessReferenceLabel(
-                      finding,
-                      (finding.sourceId ? rowById.get(finding.sourceId.split(",")[0] ?? "") : undefined)
-                        ?? rowBySlot.get(finding.requirementKey)
-                    )}
-                  </strong>
-                  <small>{finding.reason}</small>
-                </div>
+        <div className="cs-summary-panel">
+          <div className="cs-summary-panel__left">
+            <div className={`mgmt-status cs-readiness ${readinessVariant}`.trim()} role="status">
+              {readinessSummary}
+            </div>
+            {readinessFindings.length > 0 && !readinessErrorMessage && !readinessLoading ? (
+              <div className="cs-readiness-list">
+                {readinessFindings.slice(0, 3).map((finding) => (
+                  <div key={`${finding.pageId}-${finding.requirementKey}`} className="cs-readiness-item mgmt-banner">
+                    <span className={chipClass(finding.status === "blocking" ? "danger" : "warning")}>
+                      {finding.status === "blocking" ? "Blocking" : "Warning"}
+                    </span>
+                    <div className="cs-readiness-item__copy">
+                      <strong>
+                        {readinessReferenceLabel(
+                          finding,
+                          (finding.sourceId ? rowById.get(finding.sourceId.split(",")[0] ?? "") : undefined)
+                            ?? rowBySlot.get(finding.requirementKey)
+                        )}
+                      </strong>
+                      <small>{finding.reason}</small>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : null}
           </div>
-        ) : null}
+
+          <div className="cs-summary-panel__right">
+            <div className="cs-stats mgmt-stat-strip">
+              <div className="cs-stat mgmt-stat">
+                <span className="cs-stat__label">
+                  迴路總數
+                  <small>Total</small>
+                </span>
+                <span className="cs-stat__value">{viewModel.summary.totalCircuitCount}</span>
+              </div>
+              <div className="cs-stat mgmt-stat">
+                <span className="cs-stat__label">
+                  顯示中
+                  <small>Visible</small>
+                </span>
+                <span className="cs-stat__value">{viewModel.summary.enabledCircuitCount}</span>
+              </div>
+              <div className="cs-stat mgmt-stat">
+                <span className="cs-stat__label">
+                  隱藏中
+                  <small>Hidden</small>
+                </span>
+                <span className="cs-stat__value" style={{ color: "#888d86" }}>
+                  {viewModel.summary.disabledCircuitCount}
+                </span>
+              </div>
+              <div className="cs-stat mgmt-stat">
+                <span className="cs-stat__label">
+                  額定容量總和
+                  <small>Capacity</small>
+                </span>
+                <span className="cs-stat__value">{viewModel.summary.capacityLabel}</span>
+              </div>
+              <div className="cs-stat mgmt-stat">
+                <span className="cs-stat__label">
+                  待儲存
+                  <small>Dirty</small>
+                </span>
+                <span className="cs-stat__value" style={{ color: dirtyCount > 0 ? "#c9881a" : "#888d86" }}>
+                  {dirtyCount}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {isLoading ? (
           <div className="cs-empty">

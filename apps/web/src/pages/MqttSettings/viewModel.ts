@@ -50,6 +50,7 @@ export type TopicMapping = {
 };
 
 export type ActionState = {
+  isLoadingCardData?: boolean;
   isLoadingSettings: boolean;
   isLoadingTopics: boolean;
   isSavingSettings: boolean;

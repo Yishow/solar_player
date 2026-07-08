@@ -7,6 +7,7 @@ import type {
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload,
   MonitoringMetricBinding,
+  MonitoringMetricSourceTopic,
   MonitoringStoryState,
   OverviewStoryPayload,
   SolarComparisonTarget
@@ -189,6 +190,7 @@ const slotOrder: DisplayCircuitSlotKey[] = [
 type TopicDisplayName = {
   nameEn: string | null;
   nameZh: string | null;
+  topic: string | null;
 };
 
 type DisplayStorySourceContext = {
@@ -299,15 +301,21 @@ function resolveStoryMetricReading(
  */
 function readTopicDisplayNames(): Map<string, TopicDisplayName> {
   const rows = getDatabase()
-    .prepare("SELECT metric_key, name_zh, name_en FROM topic_mappings")
-    .all() as Array<{ metric_key: string; name_zh: string | null; name_en: string | null }>;
+    .prepare("SELECT metric_key, name_zh, name_en, topic FROM topic_mappings")
+    .all() as Array<{
+      metric_key: string;
+      name_en: string | null;
+      name_zh: string | null;
+      topic: string | null;
+    }>;
 
   return new Map(
     rows.map((row) => [
       row.metric_key,
       {
         nameEn: row.name_en?.trim() || null,
-        nameZh: row.name_zh?.trim() || null
+        nameZh: row.name_zh?.trim() || null,
+        topic: row.topic?.trim() || null
       }
     ])
   );
@@ -337,6 +345,20 @@ function resolveTopicDisplayLabels(args: {
     labelEn: custom?.nameEn ?? args.defaultEn,
     labelZh: custom?.nameZh ?? args.defaultZh
   };
+}
+
+function resolveSourceTopics(args: {
+  dependencyKeys?: string[];
+  metricKey: string;
+  topicNames: Map<string, TopicDisplayName>;
+}): MonitoringMetricSourceTopic[] | undefined {
+  const keys = args.dependencyKeys?.length ? args.dependencyKeys : [args.metricKey];
+  const sourceTopics = keys.flatMap((metricKey) => {
+    const topic = args.topicNames.get(metricKey)?.topic;
+    return topic ? [{ metricKey, topic }] : [];
+  });
+
+  return sourceTopics.length > 0 ? sourceTopics : undefined;
 }
 
 function readCircuits() {
@@ -511,6 +533,7 @@ function buildFactoryFallbackKpi(args: {
   label: string;
   metricKey: FactoryCircuitKpiKey;
   sourceClass: "derived-metric" | "mqtt-live" | "slot-aggregate";
+  sourceTopics?: MonitoringMetricSourceTopic[];
   unit: string;
   value?: string;
 }) {
@@ -526,6 +549,7 @@ function buildFactoryFallbackKpi(args: {
     metricKey: args.metricKey,
     provenance: "fallback" as const,
     sourceClass: args.sourceClass,
+    sourceTopics: args.sourceTopics,
     unit: args.unit,
     value: args.value ?? "--"
   };
@@ -539,6 +563,7 @@ function buildFactoryResolvedKpi(args: {
   metricKey: FactoryCircuitKpiKey;
   provenance: "aggregate" | "derived" | "live";
   sourceClass: "derived-metric" | "mqtt-live" | "slot-aggregate";
+  sourceTopics?: MonitoringMetricSourceTopic[];
   unit: string;
   value: number | string;
 }) {
@@ -554,6 +579,7 @@ function buildFactoryResolvedKpi(args: {
     metricKey: args.metricKey,
     provenance: args.provenance,
     sourceClass: args.sourceClass,
+    sourceTopics: args.sourceTopics,
     unit: args.unit,
     value: typeof args.value === "number" ? formatMonitoringValue(args.value, args.unit) : args.value
   };
@@ -584,6 +610,7 @@ function resolveFactoryCircuitKpis(args: {
   slots: FactoryCircuitStoryPayload["slots"];
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
   summary: FactoryCircuitStoryPayload["summary"];
+  topicNames: Map<string, TopicDisplayName>;
 }) {
   const aggregateDependencyKeys = [...slotOrder];
   const aggregateFailure = args.slots.find(
@@ -642,6 +669,11 @@ function resolveFactoryCircuitKpis(args: {
         label: "太陽能供應占比",
         metricKey: "solarShare",
         sourceClass: "derived-metric",
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: ["realTimePower"],
+          metricKey: "solarShare",
+          topicNames: args.topicNames
+        }),
         unit: "%"
       })
     : solarPower.bindingState !== "bound" || solarPower.freshnessState !== "fresh"
@@ -655,6 +687,11 @@ function resolveFactoryCircuitKpis(args: {
           label: "太陽能供應占比",
           metricKey: "solarShare",
           sourceClass: "derived-metric",
+          sourceTopics: resolveSourceTopics({
+            dependencyKeys: ["realTimePower"],
+            metricKey: "solarShare",
+            topicNames: args.topicNames
+          }),
           unit: "%"
         })
       : buildFactoryResolvedKpi({
@@ -665,6 +702,11 @@ function resolveFactoryCircuitKpis(args: {
           metricKey: "solarShare",
           provenance: "derived",
           sourceClass: "derived-metric",
+          sourceTopics: resolveSourceTopics({
+            dependencyKeys: ["realTimePower"],
+            metricKey: "solarShare",
+            topicNames: args.topicNames
+          }),
           unit: "%",
           value: (args.snapshot.metrics.realTimePower!.value / totalPowerValue) * 100
         });
@@ -689,6 +731,11 @@ function resolveFactoryCircuitKpis(args: {
         label: "今日自發自用電量",
         metricKey: "selfConsumption",
         sourceClass: "mqtt-live",
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: ["selfConsumptionEnergy"],
+          metricKey: "selfConsumption",
+          topicNames: args.topicNames
+        }),
         unit: "kWh"
       })
     : buildFactoryResolvedKpi({
@@ -699,6 +746,11 @@ function resolveFactoryCircuitKpis(args: {
         metricKey: "selfConsumption",
         provenance: "live",
         sourceClass: "mqtt-live",
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: ["selfConsumptionEnergy"],
+          metricKey: "selfConsumption",
+          topicNames: args.topicNames
+        }),
         unit: selfConsumption.unit,
         value: selfConsumption.value
       });
@@ -818,7 +870,12 @@ export function readOverviewDisplayStory(
         now: context.snapshot.timestamp ?? undefined,
         reading
       }),
-      label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label)
+      label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
+      sourceTopics: resolveSourceTopics({
+        dependencyKeys: binding.dependencyKeys,
+        metricKey: binding.metricKey,
+        topicNames: context.topicNames
+      })
     };
 
     if (binding.metricKey === "realTimePower" && trendProfile.series.length > 0) {
@@ -871,6 +928,11 @@ export function readSolarDisplayStory(
       return {
         ...resolved,
         label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: resolved.dependencyKeys,
+          metricKey: binding.metricKey,
+          topicNames: context.topicNames
+        }),
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: comparisonActualValue,
@@ -973,7 +1035,8 @@ export function readFactoryCircuitDisplayStory(
       isConnected: context.isConnected,
       slots: factorySlots,
       snapshot: context.snapshot,
-      summary: factorySummary
+      summary: factorySummary,
+      topicNames: context.topicNames
     }),
     slots: factorySlots,
     summary: factorySummary

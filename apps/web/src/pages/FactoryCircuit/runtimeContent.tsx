@@ -234,6 +234,7 @@ export function FactoryCircuitRuntimeContent({
             surface="metric"
             cardStyle={cardStyle}
             className={className}
+            title={metric.sourceTooltip}
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,

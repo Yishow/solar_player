@@ -45,6 +45,11 @@ export type MonitoringMetricReading = {
   value: number;
 };
 
+export type MonitoringMetricSourceTopic = {
+  metricKey: string;
+  topic: string;
+};
+
 export type MonitoringMetricBinding<TMetric extends string = MetricKey> = {
   dependencyKeys?: string[];
   fallbackHelper?: string;
@@ -67,6 +72,7 @@ export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> 
     metricKey: TMetric;
     provenance: MonitoringMetricProvenance;
     sourceClass: MonitoringMetricSourceClass;
+    sourceTopics?: MonitoringMetricSourceTopic[];
     unit: string;
     value: string;
   };

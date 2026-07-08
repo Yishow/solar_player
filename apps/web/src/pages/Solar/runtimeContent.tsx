@@ -397,6 +397,7 @@ export function SolarRuntimeContent({
             className="solar-kpi-card"
             surface="metric"
             style={item.style}
+            title={metric.sourceTooltip}
           >
             <DisplayCardHeader
               icon={renderDisplayPageIcon({

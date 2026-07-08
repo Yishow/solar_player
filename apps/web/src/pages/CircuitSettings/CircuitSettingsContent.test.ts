@@ -19,7 +19,8 @@ test("circuit settings keeps bulk table editing while replacing freeform icon au
   assert.match(circuitSettingsSource, /<CustomSelect/);
   assert.match(circuitSettingsSource, /value=\{row\.icon \?\? ""\}/);
   assert.match(circuitSettingsSource, /value=\{row\.unit \?\? ""\}/);
-  assert.match(circuitSettingsSource, /row\.slotImpactLabel/);
+  assert.match(circuitSettingsSource, /row\.displaySlot/);
+  assert.match(circuitSettingsSource, /row\.validationDetail/);
   assert.match(circuitSettingsSource, /row\.thresholdSummaryLabel/);
   assert.doesNotMatch(circuitSettingsSource, /Display Impact/);
   assert.doesNotMatch(circuitSettingsSource, /placeholder="bolt"/);

@@ -36,6 +36,22 @@ test("display page metric-card primitives render shared frame, header, centered 
   assert.match(markup, /display-card-footer/);
 });
 
+test("display page card frame exposes source composition through a stable title attribute", () => {
+  const markup = renderToStaticMarkup(
+    <DisplayCardFrame
+      className="solar-kpi-card"
+      surface="metric"
+      title={"自發自用比例\nMetric: selfConsumptionRatio\nTopic: --\nDepends on: selfConsumptionEnergy, consumptionEnergy"}
+    >
+      <DisplayCardHeader subtitle="Self-consumption Ratio" title="自發自用比例" />
+    </DisplayCardFrame>
+  );
+
+  assert.match(markup, /title="自發自用比例/);
+  assert.match(markup, /Metric: selfConsumptionRatio/);
+  assert.match(markup, /Depends on: selfConsumptionEnergy, consumptionEnergy/);
+});
+
 test("display page info-card primitives preserve icon, body, and metadata slots", () => {
   const markup = renderToStaticMarkup(
     <DisplayCardFrame className="images-info-card" surface="info">

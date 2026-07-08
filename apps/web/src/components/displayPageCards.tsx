@@ -23,18 +23,21 @@ export const DisplayCardFrame = memo(function DisplayCardFrame({
   children,
   className,
   style,
-  surface
+  surface,
+  title
 }: {
   cardStyle?: DisplayCardStyleConfig;
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
   surface: DisplayCardSurface;
+  title?: string;
 }) {
   return (
     <article
       className={classNames("display-card-frame", `display-card-surface-${surface}`, className)}
       style={cardStyle ? { ...buildDisplayCardStyleVars(cardStyle), ...style } : style}
+      title={title}
     >
       {children}
     </article>

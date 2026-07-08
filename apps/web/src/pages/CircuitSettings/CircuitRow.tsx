@@ -94,7 +94,7 @@ export const CircuitRow = memo(function CircuitRow({
         </div>
       </td>
       <td className="col-icon">
-        <div className="cs-icon-stack">
+        <div className="cs-icon-layout">
           <div className="cs-icon-row">
             <span className="cs-icon-glyph">{iconGlyph(row.icon)}</span>
             <CustomSelect
@@ -103,11 +103,13 @@ export const CircuitRow = memo(function CircuitRow({
               options={row.iconOptions}
             />
           </div>
-          <CustomSelect
-            value={row.unit ?? ""}
-            onChange={(value) => handleFieldChange(row.id, "unit", value)}
-            options={row.unitOptions}
-          />
+          <div className="cs-unit-row">
+            <CustomSelect
+              value={row.unit ?? ""}
+              onChange={(value) => handleFieldChange(row.id, "unit", value)}
+              options={row.unitOptions}
+            />
+          </div>
         </div>
       </td>
       <td className="col-topic">
@@ -174,31 +176,37 @@ export const CircuitRow = memo(function CircuitRow({
         <p className="cs-thr-pill cs-thr-pill--warning">{row.warningRangeLabel}</p>
       </td>
       <td className="col-display">
-        <div className="cs-display-stack">
-          <p className="cs-cell-caption">{row.slotImpactLabel}</p>
-          <CustomSelect
-            value={row.displaySlot ?? ""}
-            onChange={(value) =>
-              handleFieldChange(
-                row.id,
-                "displaySlot",
-                value === "" ? null : value
-              )
-            }
-            options={slotSelectOptions}
-          />
-          <div className="cs-toggle">
-            <Switch
-              ariaLabel={`${row.nameZh ?? "迴路"} 顯示`}
-              on={row.enabled}
-              onChange={(next) => handleFieldChange(row.id, "enabled", next)}
+        <div className="cs-display-layout">
+          <div className="cs-display-row cs-display-row--controls">
+            <CustomSelect
+              value={row.displaySlot ?? ""}
+              onChange={(value) =>
+                handleFieldChange(
+                  row.id,
+                  "displaySlot",
+                  value === "" ? null : value
+                )
+              }
+              options={slotSelectOptions}
             />
-            <span className="cs-toggle-label">{row.visibilityLabel}</span>
+            <div className="cs-toggle">
+              <Switch
+                ariaLabel={`${row.nameZh ?? "迴路"} 顯示`}
+                on={row.enabled}
+                onChange={(next) => handleFieldChange(row.id, "enabled", next)}
+              />
+              <span className="cs-toggle-label">{row.visibilityLabel}</span>
+            </div>
           </div>
-          <span className={chipClass(row.validationTone)}>{row.validationLabel}</span>
-          <p className="cs-cell-caption">{row.thresholdSummaryLabel}</p>
-          <p className="cs-cell-caption">
-            Slot: {row.displaySlot ? (slotLabelMap[row.displaySlot] ?? row.displaySlot) : "未綁定"} · {row.validationDetail}
+
+          <div className="cs-display-row cs-display-row--status">
+            <span className={chipClass(row.validationTone)}>{row.validationLabel}</span>
+            <p className="cs-cell-caption">
+              Slot: {row.displaySlot ? (slotLabelMap[row.displaySlot] ?? row.displaySlot) : "未綁定"} · {row.validationDetail}
+            </p>
+          </div>
+          <p className="cs-cell-caption cs-display-detail-desc" title={row.thresholdSummaryLabel}>
+            {row.thresholdSummaryLabel}
           </p>
         </div>
       </td>

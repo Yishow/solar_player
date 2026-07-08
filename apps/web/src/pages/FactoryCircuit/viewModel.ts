@@ -6,6 +6,7 @@ import type {
 } from "@solar-display/shared";
 import { resolveMonitoringSlotBinding } from "@solar-display/shared";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
 
 export type FactoryCircuitLoadState = "loading" | "ready" | "error";
 export type FactoryCircuitRuntime = CircuitConfig & {
@@ -199,6 +200,27 @@ function buildFallbackKpi(args: {
   };
 }
 
+function withFactoryCircuitKpiSourceTooltip<T extends {
+  dependencyKeys: string[];
+  label: string;
+  metricKey: string;
+  sourceClass: string;
+  sourceTopics?: Array<{ metricKey: string; topic: string }>;
+  unit: string;
+}>(kpi: T) {
+  return {
+    ...kpi,
+    sourceTooltip: buildMonitoringSourceTooltip({
+      dependencyKeys: kpi.dependencyKeys,
+      label: kpi.label,
+      metricKey: kpi.metricKey,
+      sourceTopics: kpi.sourceTopics,
+      sourceClass: kpi.sourceClass,
+      unit: kpi.unit
+    })
+  };
+}
+
 function buildFactoryCircuitStoryKpis(story: FactoryCircuitStoryPayload) {
   const kpiOrder: FactoryCircuitKpiKey[] = [
     "totalPower",
@@ -229,7 +251,7 @@ function buildFactoryCircuitStoryKpis(story: FactoryCircuitStoryPayload) {
       unit: key === "flow" ? "Fallback" : key === "solarShare" ? "%" : key === "selfConsumption" ? "kWh" : "kW",
       value: key === "flow" ? "待命" : "--"
     });
-  });
+  }).map(withFactoryCircuitKpiSourceTooltip);
 }
 
 function buildFlowFallbackLabel(args: {
@@ -626,7 +648,7 @@ export function buildFactoryCircuitViewModel({
             unit: "Fallback",
             value: "待命"
           })
-    ],
+    ].map(withFactoryCircuitKpiSourceTooltip),
     loadRows,
     summary: {
       statusLabel: loadState === "loading"

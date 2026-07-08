@@ -526,6 +526,7 @@ export function Sustainability({
             key={item.label}
             className="sustainability-kpi-card"
             surface="metric"
+            title={item.sourceTooltip}
             style={{
               height: `${layout.height}px`,
               left: `${layout.left}px`,

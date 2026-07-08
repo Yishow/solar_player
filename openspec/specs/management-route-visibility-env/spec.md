@@ -10,11 +10,13 @@ TBD - created by archiving change 'add-management-route-visibility-env'. Update 
 
 The system SHALL read `VITE_HIDDEN_MANAGEMENT_ROUTES` as a comma-separated list of management route paths and SHALL omit matching management routes from operator navigation.
 
-#### Scenario: Trends and History are hidden by default
+#### Scenario: Trends, History, Brand, and Slideshow Preview are hidden by default
 
-- **WHEN** the web bundle is built with `VITE_HIDDEN_MANAGEMENT_ROUTES=/trends,/history`
+- **WHEN** the web bundle is built with `VITE_HIDDEN_MANAGEMENT_ROUTES=/trends,/history,/brand,/slideshow-preview`
 - **THEN** management navigation SHALL NOT include `趨勢`
 - **AND** management navigation SHALL NOT include `歷史`
+- **AND** management navigation SHALL NOT include `品牌`
+- **AND** management navigation SHALL NOT include `預覽`
 - **AND** other visible management routes SHALL remain available
 
 #### Scenario: Hidden route input includes spaces and repeated commas
