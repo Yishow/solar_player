@@ -86,17 +86,24 @@ function buildCalculationSettingsPayload(
 }
 
 export async function loadDataSourceSettingsRoute() {
-  try {
-    cachedDataSourceOverview = await getDataSourceOverview();
+  const [overviewResult, calculationSettingsResult] = await Promise.allSettled([
+    getDataSourceOverview(),
+    getCalculationSettings()
+  ]);
+
+  if (overviewResult.status === "fulfilled") {
+    cachedDataSourceOverview = overviewResult.value;
     cachedDataSourceErrorMessage = "";
-  } catch (error) {
+  } else {
+    const error = overviewResult.reason;
     cachedDataSourceErrorMessage = error instanceof Error ? error.message : "資料來源診斷同步失敗。";
   }
 
-  try {
-    cachedCalculationSettings = await getCalculationSettings();
+  if (calculationSettingsResult.status === "fulfilled") {
+    cachedCalculationSettings = calculationSettingsResult.value;
     cachedCalculationSettingsErrorMessage = "";
-  } catch (error) {
+  } else {
+    const error = calculationSettingsResult.reason;
     cachedCalculationSettings = null;
     cachedCalculationSettingsErrorMessage = error instanceof Error ? error.message : "換算係數同步失敗。";
   }

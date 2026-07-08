@@ -34,7 +34,9 @@ test("circuit settings renders rows before deferred readiness diagnostics", () =
   assert.match(circuitSettingsIndexSource, /force: initialEditableModel !== null,\s*silent: initialEditableModel !== null/s);
   assert.match(circuitSettingsLoadModelSource, /let cachedCircuitEditableModel: CircuitEditableModel \| null = null/);
   assert.match(circuitSettingsLoadModelSource, /getPlaybackPages/);
-  assert.match(circuitSettingsLoadModelSource, /playbackPages: await \(loaders\.readPlaybackPages \?\? getPlaybackPages\)\(\)/);
+  assert.match(circuitSettingsLoadModelSource, /const \[circuits,\s*playbackPages\] = await Promise\.all\(\[/);
+  assert.match(circuitSettingsLoadModelSource, /\(loaders\.readCircuits \?\? getCircuits\)\(\)/);
+  assert.match(circuitSettingsLoadModelSource, /\(loaders\.readPlaybackPages \?\? getPlaybackPages\)\(\)/);
   assert.match(circuitSettingsLoadModelSource, /const canUseCache = !loaders\.readCircuits && !loaders\.readPlaybackPages/);
   assert.match(circuitSettingsLoadModelSource, /if \(!options\.force && canUseCache && cachedCircuitEditableModel\)/);
   assert.match(circuitSettingsIndexSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedCircuits\s*\}\)/);

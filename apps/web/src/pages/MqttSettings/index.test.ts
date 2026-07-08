@@ -5,6 +5,7 @@ import test from "node:test";
 
 const pageDir = path.resolve(import.meta.dirname);
 const mqttSettingsSource = fs.readFileSync(path.join(pageDir, "index.tsx"), "utf8");
+const factoryTopicSitesSource = fs.readFileSync(path.join(pageDir, "factoryTopicSites.ts"), "utf8");
 const mqttSettingsLoadModelSource = fs.readFileSync(path.join(pageDir, "loadModel.ts"), "utf8");
 
 test("mqtt settings includes custom display names in the topics save payload", () => {
@@ -108,6 +109,27 @@ test("mqtt settings lists three-phase metric keys as creatable, manageable topic
       `expected ${metricKey} to be a creatable metric option`
     );
   }
+});
+
+test("mqtt settings lists page-scoped Factory Circuit metric keys as creatable topic mappings", () => {
+  const optionsBlock = mqttSettingsSource.slice(
+    mqttSettingsSource.indexOf("const defaultMetricOptions = ["),
+    mqttSettingsSource.indexOf("] as const;", mqttSettingsSource.indexOf("const defaultMetricOptions = ["))
+  );
+
+  for (const metricKey of [
+    "factoryStampingPower",
+    "factoryOfficePower",
+    "factoryCircuit.guanyin.stampingPower",
+    "factoryCircuit.guanyin.edCoatingPower"
+  ]) {
+    assert.ok(factoryTopicSitesSource.includes(metricKey), `expected ${metricKey} to be a Factory Circuit metric key`);
+  }
+
+  assert.match(optionsBlock, /\.\.\.jungliFactoryTopicMetricKeys/);
+  assert.match(optionsBlock, /\.\.\.guanyinFactoryTopicMetricKeys/);
+  assert.match(mqttSettingsSource, /factoryTopicMetricKeysBySite\[activeCardDataSite\]/);
+  assert.match(mqttSettingsSource, /isTopicMetricVisibleForFactorySite\(option,\s*activeCardDataSite\)/);
 });
 
 test("mqtt settings defers diagnostics polling and weather preview until persisted controls load", () => {

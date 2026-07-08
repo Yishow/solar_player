@@ -20,14 +20,14 @@ import type {
 import { buildMqttSettingsViewModel } from "./viewModel";
 import { CustomSelect } from "../../components/management";
 import { TopicWorkspaceRow } from "./TopicWorkspaceRow";
+import {
+  factoryTopicSiteOptions,
+  isTopicMetricVisibleForFactorySite,
+  type FactoryTopicSite
+} from "./factoryTopicSites";
 
 export type TopicWorkspaceTab = "source" | "topic" | "card-data";
-export type CardDataSiteFilter = "jungli" | "guanyin";
-
-const cardDataSiteOptions: Array<{ label: string; value: CardDataSiteFilter }> = [
-  { label: "中壢廠", value: "jungli" },
-  { label: "觀音廠", value: "guanyin" }
-];
+export type CardDataSiteFilter = FactoryTopicSite;
 
 type MqttSettingsContentProps = {
   actionState: ActionState;
@@ -195,8 +195,14 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
   const activeTopicWorkspaceTab = props.activeTopicWorkspaceTab ?? "topic";
   const enabledCardDataSites = props.enabledCardDataSites ?? ["jungli", "guanyin"];
   const activeCardDataSite = props.activeCardDataSite ?? enabledCardDataSites[0] ?? "jungli";
-  const cardDataSiteOptionsForEnabledPages = cardDataSiteOptions.filter((option) =>
+  const cardDataSiteOptionsForEnabledPages = factoryTopicSiteOptions.filter((option) =>
     enabledCardDataSites.includes(option.value)
+  );
+  const visibleTopicWorkspaceRows = viewModel.topicWorkspaceRows.filter((topic) =>
+    isTopicMetricVisibleForFactorySite(topic.metricKey, activeCardDataSite)
+  );
+  const visibleCoverageRows = viewModel.coverageRows.filter((row) =>
+    isTopicMetricVisibleForFactorySite(row.requirementKey, activeCardDataSite)
   );
   const visibleCardDataRows = (props.cardDataRows ?? []).filter((row) =>
     row.pageId === "factory-circuit"
@@ -296,11 +302,30 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
 
         {activeTopicWorkspaceTab === "topic" ? (
           <div className="mqtt-workspace-panel mqtt-topic-panel">
-            {viewModel.feedbackBanner.detail ? (
-              <div className={`mgmt-status mqtt-workspace-status is-${viewModel.feedbackBanner.visualTone}`}>
-                {viewModel.feedbackBanner.detail}
-              </div>
-            ) : null}
+            <div className="mqtt-topic-toolbar">
+              {viewModel.feedbackBanner.detail ? (
+                <div className={`mgmt-status mqtt-workspace-status is-${viewModel.feedbackBanner.visualTone}`}>
+                  {viewModel.feedbackBanner.detail}
+                </div>
+              ) : null}
+              {cardDataSiteOptionsForEnabledPages.length > 1 ? (
+                <div className="mqtt-card-data-site-toggle" role="tablist" aria-label="Topic mapping 廠區">
+                  {cardDataSiteOptionsForEnabledPages.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeCardDataSite === option.value}
+                      className={activeCardDataSite === option.value ? "active" : ""}
+                      data-mqtt-topic-site-toggle={option.value}
+                      onClick={() => selectCardDataSite(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div className="mqtt-runtime-summary">
               <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.topicWorkspaceSummary.runtimeStatusTone)}`} role="status">
                 <span className="conn-status__dot" aria-hidden />
@@ -309,14 +334,14 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
               </div>
               {props.readinessErrorMessage ? (
                 <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
-              ) : viewModel.coverageRows.length > 0 ? (
+              ) : visibleCoverageRows.length > 0 ? (
                 <details className="mqtt-coverage-details">
                   <summary className="mqtt-coverage-summary-toggle">
                     <span>播放器指標覆蓋狀況 (Coverage Findings)</span>
-                    <span className="coverage-badge-count">{viewModel.topicWorkspaceSummary.coverageCount}</span>
+                    <span className="coverage-badge-count">{visibleCoverageRows.length}</span>
                   </summary>
                   <div className="mqtt-runtime-feedback">
-                    {viewModel.coverageRows.slice(0, 3).map((row) => (
+                    {visibleCoverageRows.slice(0, 3).map((row) => (
                       <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
                         <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
                         <div className="mqtt-runtime-feedback__copy">
@@ -325,18 +350,18 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                         </div>
                       </div>
                     ))}
-                    {viewModel.coverageRows.length > 3 ? (
-                      <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
+                    {visibleCoverageRows.length > 3 ? (
+                      <p className="mqtt-runtime-feedback__more">另有 {visibleCoverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
                     ) : null}
                   </div>
                 </details>
               ) : null}
             </div>
-            {viewModel.topicWorkspaceRows.length === 0 ? (
+            {visibleTopicWorkspaceRows.length === 0 ? (
               <div className="empty-block">尚未設定任何 topic mapping。<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>新增後即可在同一張卡內直接查看 runtime 狀態、coverage 與編輯欄位。</span></div>
             ) : (
               <div className="topic-workspace-list">
-                {viewModel.topicWorkspaceRows.map((topic) => (
+                {visibleTopicWorkspaceRows.map((topic) => (
                   <TopicWorkspaceRow
                     key={`workspace-${topic.id}`}
                     topic={topic}

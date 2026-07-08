@@ -236,7 +236,8 @@
   overflow: hidden;
 }
 
-.mqtt-settings-page .mqtt-card-data-toolbar {
+.mqtt-settings-page .mqtt-card-data-toolbar,
+.mqtt-settings-page .mqtt-topic-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -244,7 +245,8 @@
   margin-bottom: 12px;
 }
 
-.mqtt-settings-page .mqtt-card-data-toolbar .mqtt-workspace-status {
+.mqtt-settings-page .mqtt-card-data-toolbar .mqtt-workspace-status,
+.mqtt-settings-page .mqtt-topic-toolbar .mqtt-workspace-status {
   flex: 1;
   min-width: 0;
   margin-bottom: 0;

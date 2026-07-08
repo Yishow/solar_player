@@ -231,6 +231,127 @@ test("mqtt settings content combines source mode and topic controls into a three
   assert.doesNotMatch(html, /class="[^"]*mqtt-mode/);
 });
 
+test("mqtt settings content filters Factory Circuit topic mappings by active factory site", () => {
+  const topics = [
+    {
+      enabled: true,
+      id: 1,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "factoryStampingPower",
+      nameEn: null,
+      nameZh: "中壢沖壓",
+      quality: null,
+      rawPayload: null,
+      topic: "factory/jungli/stamping",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    },
+    {
+      enabled: true,
+      id: 2,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "factoryHeavyVehiclePower",
+      nameEn: null,
+      nameZh: "舊大車",
+      quality: null,
+      rawPayload: null,
+      topic: "factory/power/heavy_vehicle",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    },
+    {
+      enabled: true,
+      id: 3,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "factoryCircuit.guanyin.stampingPower",
+      nameEn: null,
+      nameZh: "觀音沖壓",
+      quality: null,
+      rawPayload: null,
+      topic: "factory/guanyin/stamping",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    },
+    {
+      enabled: true,
+      id: 4,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "realTimePower",
+      nameEn: null,
+      nameZh: "即時發電功率",
+      quality: null,
+      rawPayload: null,
+      topic: "kuozui/plant/solar/power",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    }
+  ];
+
+  const jungliHtml = renderContent({
+    activeTopicWorkspaceTab: "topic",
+    topics
+  });
+
+  assert.match(jungliHtml, /data-mqtt-topic-site-toggle="jungli"/);
+  assert.match(jungliHtml, /data-mqtt-topic-site-toggle="guanyin"/);
+  assert.match(jungliHtml, /中壢沖壓/);
+  assert.match(jungliHtml, /即時發電功率/);
+  assert.doesNotMatch(jungliHtml, /觀音沖壓/);
+  assert.doesNotMatch(jungliHtml, /舊大車/);
+
+  const guanyinHtml = renderContent({
+    activeTopicWorkspaceTab: "topic",
+    activeCardDataSite: "guanyin",
+    readiness: {
+      findings: [
+        {
+          blocking: true,
+          pageId: "factory-circuit",
+          reason: "Missing Jungli topic",
+          requirementKey: "factoryStampingPower",
+          sourceId: null,
+          sourceType: "mqtt-metric",
+          status: "blocking"
+        },
+        {
+          blocking: true,
+          pageId: "factory-circuit-guanyin",
+          reason: "Missing Guanyin topic",
+          requirementKey: "factoryCircuit.guanyin.stampingPower",
+          sourceId: null,
+          sourceType: "mqtt-metric",
+          status: "blocking"
+        }
+      ],
+      generatedAt: "2026-07-08T09:00:00.000Z",
+      pages: [],
+      summary: {
+        blockingCount: 2,
+        mqttCoverage: { blockingCount: 2, readyCount: 0 },
+        readyCount: 0,
+        slotCoverage: { blockingCount: 0, readyCount: 0 },
+        warningCount: 0
+      }
+    },
+    topics
+  });
+
+  assert.match(guanyinHtml, /觀音沖壓/);
+  assert.match(guanyinHtml, /即時發電功率/);
+  assert.match(guanyinHtml, /factoryCircuit\.guanyin\.stampingPower/);
+  assert.doesNotMatch(guanyinHtml, /中壢沖壓/);
+  assert.doesNotMatch(guanyinHtml, /舊大車/);
+  assert.doesNotMatch(guanyinHtml, /factoryStampingPower/);
+});
+
 test("mqtt settings content renders source mode controls inside the merged workspace tab", () => {
   const html = renderContent({
     activeTopicWorkspaceTab: "source",

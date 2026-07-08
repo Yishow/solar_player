@@ -49,9 +49,13 @@ export async function loadCircuitEditableModel(
     return cachedCircuitEditableModel;
   }
 
+  const [circuits, playbackPages] = await Promise.all([
+    (loaders.readCircuits ?? getCircuits)(),
+    (loaders.readPlaybackPages ?? getPlaybackPages)()
+  ]);
   const model = {
-    circuits: await (loaders.readCircuits ?? getCircuits)(),
-    playbackPages: await (loaders.readPlaybackPages ?? getPlaybackPages)()
+    circuits,
+    playbackPages
   };
 
   if (canUseCache) {

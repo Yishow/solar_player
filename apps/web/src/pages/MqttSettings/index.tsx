@@ -31,6 +31,12 @@ import {
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
 import type { CardDataSiteFilter, TopicWorkspaceTab } from "./MqttSettingsContent";
+import {
+  factoryTopicMetricKeysBySite,
+  guanyinFactoryTopicMetricKeys,
+  isTopicMetricVisibleForFactorySite,
+  jungliFactoryTopicMetricKeys
+} from "./factoryTopicSites";
 import { type ActionState, type ConnectionTestFeedback, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
@@ -62,9 +68,10 @@ const defaultMetricOptions = [
   "factoryProductionPower",
   "factoryHvacPower",
   "factoryLightingPower",
-  "factoryOfficePower",
   "factoryEvGreenPower",
   "factoryInfrastructurePower",
+  ...jungliFactoryTopicMetricKeys,
+  ...guanyinFactoryTopicMetricKeys,
   "phaseRVoltage",
   "phaseRCurrent",
   "phaseRPower",
@@ -675,13 +682,22 @@ export function MqttSettings() {
   }, [reloadReadiness]);
 
   const addTopicMapping = useCallback(() => {
+    const activeMetricOptions = metricOptions.filter((option) =>
+      isTopicMetricVisibleForFactorySite(option, activeCardDataSite)
+    );
+    const activeFactoryMetricOptions = factoryTopicMetricKeysBySite[activeCardDataSite].filter((option) =>
+      activeMetricOptions.includes(option)
+    );
+    const addableMetricOptions = [...activeFactoryMetricOptions, ...activeMetricOptions.filter(
+      (option) => !activeFactoryMetricOptions.includes(option)
+    )];
     const nextMetricKey =
-      metricOptions.find((option) => !topics.some((topic) => topic.metricKey === option)) ??
-      metricOptions[0];
+      addableMetricOptions.find((option) => !topics.some((topic) => topic.metricKey === option)) ??
+      addableMetricOptions[0];
     if (!nextMetricKey) return;
     markDirty("已新增一筆 topic mapping，尚未儲存。");
     setTopics((current) => [...current, createEmptyMapping(nextMetricKey)]);
-  }, [metricOptions, topics, markDirty]);
+  }, [activeCardDataSite, metricOptions, topics, markDirty]);
 
   const removeTopicMapping = useCallback((rowId: number) => {
     markDirty("已移除一筆 topic mapping，尚未儲存。");
