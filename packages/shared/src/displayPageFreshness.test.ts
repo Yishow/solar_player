@@ -38,6 +38,30 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
   ]);
 });
 
+test("resolveLiveMetricRequirementsForPage uses Guanyin Factory Circuit metric keys", () => {
+  assert.deepEqual(resolveLiveMetricRequirementsForPage("factory-circuit-guanyin"), [
+    { alternatives: [["factoryCircuit.guanyin.stampingPower"]], requirementKey: "factoryCircuit.guanyin.stampingPower" },
+    { alternatives: [["factoryCircuit.guanyin.bodyPower"]], requirementKey: "factoryCircuit.guanyin.bodyPower" },
+    { alternatives: [["factoryCircuit.guanyin.paintingPower"]], requirementKey: "factoryCircuit.guanyin.paintingPower" },
+    { alternatives: [["factoryCircuit.guanyin.assemblyPower"]], requirementKey: "factoryCircuit.guanyin.assemblyPower" },
+    { alternatives: [["factoryCircuit.guanyin.utilityPower"]], requirementKey: "factoryCircuit.guanyin.utilityPower" },
+    { alternatives: [["factoryCircuit.guanyin.officePower"]], requirementKey: "factoryCircuit.guanyin.officePower" },
+    { alternatives: [["factoryCircuit.guanyin.heavyVehiclePower"]], requirementKey: "factoryCircuit.guanyin.heavyVehiclePower" },
+    { alternatives: [["factoryCircuit.guanyin.edCoatingPower"]], requirementKey: "factoryCircuit.guanyin.edCoatingPower" }
+  ]);
+});
+
+test("resolveLiveMetricRequirementsForPage limits Jungli Factory Circuit to six visible metric keys", () => {
+  assert.deepEqual(resolveLiveMetricRequirementsForPage("factory-circuit"), [
+    { alternatives: [["factoryStampingPower"]], requirementKey: "factoryStampingPower" },
+    { alternatives: [["factoryBodyPower"]], requirementKey: "factoryBodyPower" },
+    { alternatives: [["factoryPaintingPower"]], requirementKey: "factoryPaintingPower" },
+    { alternatives: [["factoryAssemblyPower"]], requirementKey: "factoryAssemblyPower" },
+    { alternatives: [["factoryUtilityPower"]], requirementKey: "factoryUtilityPower" },
+    { alternatives: [["factoryOfficePower"]], requirementKey: "factoryOfficePower" }
+  ]);
+});
+
 test("evaluatePageRuntimeFreshnessForRequirements accepts a complete derived alternative", () => {
   const timestamp = "2026-05-23T00:00:20.000Z";
   const result = evaluatePageRuntimeFreshnessForRequirements({

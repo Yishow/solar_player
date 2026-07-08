@@ -358,3 +358,62 @@ tests:
   - apps/server/src/routes/display-card-data.test.ts
   - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
 -->
+
+---
+### Requirement: Factory Circuit card diagnostics are page-scoped
+The system SHALL list Factory Circuit card diagnostics separately for each Factory Circuit page instance.
+
+#### Scenario: Operator reviews Factory Circuit card data across sites
+- **WHEN** the operator opens the `Card Data Management` tab
+- **THEN** the system SHALL list Jungli Factory Circuit rows with `factory-circuit` identity
+- **AND** the system SHALL list Guanyin Factory Circuit rows with `factory-circuit-guanyin` identity
+- **AND** each Factory Circuit slot row SHALL expose the page-scoped metric key used by that site
+
+##### Example: Same slot name appears as distinct card rows
+- **GIVEN** Jungli and Guanyin both have a `stamping` slot
+- **WHEN** card diagnostics are generated
+- **THEN** Jungli stamping SHALL be identified as `factory-circuit.slot.stamping`
+- **AND** Guanyin stamping SHALL be identified as `factory-circuit-guanyin.slot.stamping`
+- **AND** the two rows SHALL use distinct metric keys
+
+<!-- @trace
+source: scope-factory-circuit-data-by-page-key
+updated: 2026-07-08
+code:
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/019_circuit_page_scope.sql
+  - apps/server/src/db/migrations/020_fix_factory_circuit_site_counts.sql
+  - packages/shared/src/displayCardData.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/db/migrations/018_display_value_overrides.sql
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - packages/shared/src/displayStory.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/server/src/db/seed.ts
+  - packages/shared/src/displayPageConfig.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - apps/server/src/services/displayValueOverrideService.ts
+  - apps/server/src/services/displayRotationService.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/routes/circuits.ts
+  - apps/server/src/routes/display-story.ts
+  - packages/shared/src/types.ts
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/services/displayReadinessService.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/server/src/routes/display-card-data.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+tests:
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/routes/circuits.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+-->

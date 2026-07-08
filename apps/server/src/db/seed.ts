@@ -28,11 +28,21 @@ const topicMappings = [
   { metricKey: "factoryUtilityPower", topic: "factory/power/utility", unit: "kW" },
   { metricKey: "factoryOfficePower", topic: "factory/power/office", unit: "kW" },
   { metricKey: "factoryHeavyVehiclePower", topic: "factory/power/heavy_vehicle", unit: "kW" },
-  { metricKey: "factoryEdCoatingPower", topic: "factory/power/ed_coating", unit: "kW" }
+  { metricKey: "factoryEdCoatingPower", topic: "factory/power/ed_coating", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.stampingPower", topic: "factory/guanyin/power/stamping", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.bodyPower", topic: "factory/guanyin/power/body", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.paintingPower", topic: "factory/guanyin/power/painting", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.assemblyPower", topic: "factory/guanyin/power/assembly", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.utilityPower", topic: "factory/guanyin/power/utility", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.officePower", topic: "factory/guanyin/power/office", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.heavyVehiclePower", topic: "factory/guanyin/power/heavy_vehicle", unit: "kW" },
+  { metricKey: "factoryCircuit.guanyin.edCoatingPower", topic: "factory/guanyin/power/ed_coating", unit: "kW" }
 ] as const;
 
 const circuitConfigs = [
   {
+    pageKey: "factory-circuit",
+    displaySlot: "stamping",
     nameZh: "沖壓工程",
     nameEn: "Stamping Shop",
     icon: "factory",
@@ -40,6 +50,8 @@ const circuitConfigs = [
     ratedCapacity: 850
   },
   {
+    pageKey: "factory-circuit",
+    displaySlot: "body",
     nameZh: "車身工程",
     nameEn: "Body Shop",
     icon: "wind",
@@ -47,6 +59,8 @@ const circuitConfigs = [
     ratedCapacity: 620
   },
   {
+    pageKey: "factory-circuit",
+    displaySlot: "painting",
     nameZh: "塗裝工程",
     nameEn: "Painting Shop",
     icon: "lightbulb",
@@ -54,6 +68,8 @@ const circuitConfigs = [
     ratedCapacity: 180
   },
   {
+    pageKey: "factory-circuit",
+    displaySlot: "assembly",
     nameZh: "裝配工程",
     nameEn: "Assembly Shop",
     icon: "building-2",
@@ -61,6 +77,8 @@ const circuitConfigs = [
     ratedCapacity: 240
   },
   {
+    pageKey: "factory-circuit",
+    displaySlot: "utility",
     nameZh: "原動力",
     nameEn: "Utility & Powerhouse",
     icon: "battery-charging",
@@ -68,6 +86,8 @@ const circuitConfigs = [
     ratedCapacity: 320
   },
   {
+    pageKey: "factory-circuit",
+    displaySlot: "office",
     nameZh: "事務系",
     nameEn: "Office & Administration",
     icon: "settings-2",
@@ -75,17 +95,75 @@ const circuitConfigs = [
     ratedCapacity: 200
   },
   {
-    nameZh: "大車工程",
-    nameEn: "Heavy Vehicle Line",
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "stamping",
+    nameZh: "觀音沖壓工程",
+    nameEn: "Guanyin Stamping Shop",
+    icon: "factory",
+    mqttTopic: "factory/guanyin/power/stamping",
+    ratedCapacity: 850
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "body",
+    nameZh: "觀音車身工程",
+    nameEn: "Guanyin Body Shop",
+    icon: "wind",
+    mqttTopic: "factory/guanyin/power/body",
+    ratedCapacity: 620
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "painting",
+    nameZh: "觀音塗裝工程",
+    nameEn: "Guanyin Painting Shop",
+    icon: "lightbulb",
+    mqttTopic: "factory/guanyin/power/painting",
+    ratedCapacity: 180
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "assembly",
+    nameZh: "觀音裝配工程",
+    nameEn: "Guanyin Assembly Shop",
+    icon: "building-2",
+    mqttTopic: "factory/guanyin/power/assembly",
+    ratedCapacity: 240
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "utility",
+    nameZh: "觀音原動力",
+    nameEn: "Guanyin Utility & Powerhouse",
+    icon: "battery-charging",
+    mqttTopic: "factory/guanyin/power/utility",
+    ratedCapacity: 320
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "office",
+    nameZh: "觀音事務系",
+    nameEn: "Guanyin Office & Administration",
+    icon: "settings-2",
+    mqttTopic: "factory/guanyin/power/office",
+    ratedCapacity: 200
+  },
+  {
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "heavy_vehicle",
+    nameZh: "觀音大車工程",
+    nameEn: "Guanyin Heavy Vehicle Line",
     icon: "car",
-    mqttTopic: "factory/power/heavy_vehicle",
+    mqttTopic: "factory/guanyin/power/heavy_vehicle",
     ratedCapacity: 400
   },
   {
-    nameZh: "ED電著",
-    nameEn: "ED Coating Line",
+    pageKey: "factory-circuit-guanyin",
+    displaySlot: "ed_coating",
+    nameZh: "觀音ED電著",
+    nameEn: "Guanyin ED Coating Line",
     icon: "refresh",
-    mqttTopic: "factory/power/ed_coating",
+    mqttTopic: "factory/guanyin/power/ed_coating",
     ratedCapacity: 300
   }
 ] as const;
@@ -160,6 +238,7 @@ export function seedDatabase() {
 
   const insertCircuitConfig = database.prepare(`
     INSERT INTO circuit_configs (
+      page_key,
       name_zh,
       name_en,
       icon,
@@ -178,9 +257,9 @@ export function seedDatabase() {
       created_at,
       updated_at
     )
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     WHERE NOT EXISTS (
-      SELECT 1 FROM circuit_configs WHERE mqtt_topic = ?
+      SELECT 1 FROM circuit_configs WHERE page_key = ? AND display_slot = ?
     )
   `);
 
@@ -313,12 +392,13 @@ export function seedDatabase() {
 
     circuitConfigs.forEach((circuitConfig, index) => {
       insertCircuitConfig.run(
+        circuitConfig.pageKey,
         circuitConfig.nameZh,
         circuitConfig.nameEn,
         circuitConfig.icon,
         "kW",
         circuitConfig.mqttTopic,
-        ["stamping", "body", "painting", "assembly", "utility", "office", "heavy_vehicle", "ed_coating"][index],
+        circuitConfig.displaySlot,
         circuitConfig.ratedCapacity,
         0,
         circuitConfig.ratedCapacity * 0.7,
@@ -328,7 +408,8 @@ export function seedDatabase() {
         circuitConfig.ratedCapacity,
         index + 1,
         1,
-        circuitConfig.mqttTopic
+        circuitConfig.pageKey,
+        circuitConfig.displaySlot
       );
     });
 

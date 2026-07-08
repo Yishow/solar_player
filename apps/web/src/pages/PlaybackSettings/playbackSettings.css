@@ -285,6 +285,51 @@
   padding-right: 8px;
 }
 
+.playback-settings-page .ps-site-control {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+.playback-settings-page .ps-site-control__list {
+  display: grid;
+  gap: 8px;
+}
+
+.playback-settings-page .ps-site-control__row {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(93, 119, 69, 0.14);
+  border-radius: 8px;
+  background: #ffffff;
+  transition: background-color 0.22s ease, border-color 0.22s ease, opacity 0.22s ease;
+}
+
+.playback-settings-page .ps-site-control__row.is-disabled {
+  opacity: 0.62;
+  background: #f6f8f5;
+}
+
+.playback-settings-page .ps-site-control__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playback-settings-page .ps-site-control__copy strong {
+  font-size: 13px;
+  color: #2b332f;
+}
+
+.playback-settings-page .ps-site-control__copy small {
+  font: 400 10px/1.35 var(--font-family-en);
+  color: #7c837b;
+}
+
 .playback-settings-page .ps-card-order .ps-card-content::-webkit-scrollbar,
 .playback-settings-page .ps-card-duration .ps-card-content::-webkit-scrollbar {
   width: 6px;

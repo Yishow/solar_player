@@ -4,16 +4,20 @@ import type {
   DisplayStoryPayload,
   DisplayStoryPayloadByPageId,
   DisplayCircuitSlotKey,
+  FactoryCircuitPageKey,
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload,
   MonitoringMetricBinding,
   MonitoringMetricSourceTopic,
   MonitoringStoryState,
   OverviewStoryPayload,
+  ResolvedMonitoringMetricBinding,
   SolarComparisonTarget
 } from "@solar-display/shared";
 import {
   formatMonitoringValue,
+  resolveFactoryCircuitSlotKeys,
+  resolveFactoryCircuitSlotMetricKey,
   resolveMonitoringMetricBinding,
   resolveMonitoringSlotBinding,
   resolveMonitoringSummaryState,
@@ -28,6 +32,10 @@ import {
   selectHourlyGenerationTrendProfile
 } from "./generationTrendSeries.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import {
+  formatDisplayOverrideValue,
+  readActiveDisplayValueOverrides
+} from "./displayValueOverrideService.js";
 
 type StoryMetricKey =
   | "realTimePower"
@@ -46,6 +54,7 @@ type CircuitRow = {
   mqtt_topic: string | null;
   name_en: string | null;
   name_zh: string | null;
+  page_key: string;
   warning_min: number | null;
 };
 
@@ -154,17 +163,6 @@ const solarTargets: Partial<Record<StoryMetricKey, SolarComparisonTarget>> = {
   todayGeneration: { label: "今日目標", unit: "kWh", value: 2400 }
 };
 
-const slotMetricMap: Record<DisplayCircuitSlotKey, string> = {
-  stamping: "factoryStampingPower",
-  body: "factoryBodyPower",
-  painting: "factoryPaintingPower",
-  assembly: "factoryAssemblyPower",
-  utility: "factoryUtilityPower",
-  office: "factoryOfficePower",
-  heavy_vehicle: "factoryHeavyVehiclePower",
-  ed_coating: "factoryEdCoatingPower"
-};
-
 const slotDefaultLabels: Record<DisplayCircuitSlotKey, { en: string; zh: string }> = {
   stamping: { en: "Stamping Shop", zh: "沖壓工程" },
   body: { en: "Body Shop", zh: "車身工程" },
@@ -175,17 +173,6 @@ const slotDefaultLabels: Record<DisplayCircuitSlotKey, { en: string; zh: string 
   heavy_vehicle: { en: "Heavy Vehicle Line", zh: "大車工程" },
   ed_coating: { en: "ED Coating Line", zh: "ED電著" }
 };
-
-const slotOrder: DisplayCircuitSlotKey[] = [
-  "stamping",
-  "body",
-  "painting",
-  "assembly",
-  "utility",
-  "office",
-  "heavy_vehicle",
-  "ed_coating"
-];
 
 type TopicDisplayName = {
   nameEn: string | null;
@@ -201,6 +188,10 @@ type DisplayStorySourceContext = {
   isConnected: boolean;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
   topicNames: Map<string, TopicDisplayName>;
+};
+
+type DisplayStoryReadOptions = {
+  applyDisplayOverrides?: boolean;
 };
 
 function toBoolean(value: unknown) {
@@ -371,6 +362,7 @@ function readCircuits() {
           name_en,
           mqtt_topic,
           display_slot,
+          page_key,
           attention_min,
           warning_min,
           enabled
@@ -606,13 +598,14 @@ function resolveFactoryDegradedHelper(slot: FactoryCircuitStoryPayload["slots"][
 }
 
 function resolveFactoryCircuitKpis(args: {
+  pageKey: FactoryCircuitPageKey;
   isConnected: boolean;
   slots: FactoryCircuitStoryPayload["slots"];
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
   summary: FactoryCircuitStoryPayload["summary"];
   topicNames: Map<string, TopicDisplayName>;
 }) {
-  const aggregateDependencyKeys = [...slotOrder];
+  const aggregateDependencyKeys = args.slots.flatMap((slot) => slot.metricKey ? [slot.metricKey] : []);
   const aggregateFailure = args.slots.find(
     (slot) =>
       slot.bindingState !== "bound" ||
@@ -851,8 +844,36 @@ function readOverviewGenerationTrendSeries() {
   return selectHourlyGenerationTrendProfile(rows, { now: new Date() });
 }
 
+function applyMonitoringDisplayOverrides<
+  TMetric extends string,
+  TMetricRow extends ResolvedMonitoringMetricBinding<TMetric>
+>(
+  pageId: DisplayStoryPageId,
+  metrics: TMetricRow[],
+  options: DisplayStoryReadOptions = {}
+) {
+  if (options.applyDisplayOverrides === false) {
+    return metrics;
+  }
+
+  const overrides = readActiveDisplayValueOverrides();
+
+  return metrics.map((metric) => {
+    const override = overrides.get(`${pageId}.${metric.metricKey}`);
+    if (!override) {
+      return metric;
+    }
+
+    return {
+      ...metric,
+      value: formatDisplayOverrideValue(override.displayValue, override.unit ?? metric.unit)
+    };
+  });
+}
+
 export function readOverviewDisplayStory(
-  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+  context: DisplayStorySourceContext = createDisplayStorySourceContext(),
+  options: DisplayStoryReadOptions = {}
 ): OverviewStoryPayload {
   const trendProfile = readOverviewGenerationTrendSeries();
   const overview = overviewMetrics.map((binding) => {
@@ -890,20 +911,23 @@ export function readOverviewDisplayStory(
     return resolved;
   });
 
+  const metrics = applyMonitoringDisplayOverrides("overview", overview, options);
+
   return {
-    metrics: overview,
+    metrics,
     readinessFindings: readDisplayReadinessReport().findings.filter(
       (finding) => finding.pageId === "overview" && finding.status !== "ready"
     ),
-    summary: resolveMonitoringSummaryState(overview)
+    summary: resolveMonitoringSummaryState(metrics)
   };
 }
 
 export function readSolarDisplayStory(
-  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+  context: DisplayStorySourceContext = createDisplayStorySourceContext(),
+  options: DisplayStoryReadOptions = {}
 ): DisplayStoryPayload["solar"] {
   return {
-    kpis: solarKpis.map((binding) => {
+    kpis: applyMonitoringDisplayOverrides("solar", solarKpis.map((binding) => {
       const resolved = resolveSolarKpiBinding({
         binding,
         calculationSettings: context.calculationSettings,
@@ -939,27 +963,52 @@ export function readSolarDisplayStory(
           target: solarTargets[binding.metricKey]
         })
       };
-    }),
+    }), options),
     story: {
       flowState: context.flowState
     }
   };
 }
 
+export function readFactoryCircuitDisplayStory(): FactoryCircuitStoryPayload;
 export function readFactoryCircuitDisplayStory(
-  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+  pageKey: FactoryCircuitPageKey,
+  context?: DisplayStorySourceContext,
+  options?: DisplayStoryReadOptions
+): FactoryCircuitStoryPayload;
+export function readFactoryCircuitDisplayStory(
+  context: DisplayStorySourceContext,
+  options?: DisplayStoryReadOptions
+): FactoryCircuitStoryPayload;
+export function readFactoryCircuitDisplayStory(
+  pageKeyOrContext: FactoryCircuitPageKey | DisplayStorySourceContext = "factory-circuit",
+  contextOrOptions?: DisplayStorySourceContext | DisplayStoryReadOptions,
+  maybeOptions: DisplayStoryReadOptions = {}
 ): FactoryCircuitStoryPayload {
+  const pageKey = typeof pageKeyOrContext === "string" ? pageKeyOrContext : "factory-circuit";
+  const context =
+    typeof pageKeyOrContext === "string"
+      ? (contextOrOptions && "snapshot" in contextOrOptions
+        ? contextOrOptions
+        : createDisplayStorySourceContext())
+      : pageKeyOrContext;
+  const options =
+    typeof pageKeyOrContext === "string"
+      ? maybeOptions
+      : (contextOrOptions as DisplayStoryReadOptions | undefined) ?? {};
   const slotStates: MonitoringStoryState[] = [];
+  const scopedSlotKeys = resolveFactoryCircuitSlotKeys(pageKey);
+  const scopedCircuits = context.circuits.filter((circuit) => circuit.page_key === pageKey);
 
-  const factorySlots = slotOrder.map((slotKey) => {
-    const matches = context.circuits.filter((circuit) => circuit.display_slot === slotKey);
+  const factorySlots = scopedSlotKeys.map((slotKey) => {
+    const matches = scopedCircuits.filter((circuit) => circuit.display_slot === slotKey);
     const binding = resolveMonitoringSlotBinding({
       circuitId: matches.length === 1 ? matches[0]!.id : null,
       conflictingCircuitIds: matches.map((circuit) => circuit.id),
       slotKey
     });
     const circuit = matches.length === 1 ? matches[0]! : null;
-    const metricKey = slotMetricMap[slotKey];
+    const metricKey = resolveFactoryCircuitSlotMetricKey(pageKey, slotKey);
     const reading = metricKey ? context.snapshot.metrics[metricKey] ?? null : null;
     const slotDefaults = slotDefaultLabels[slotKey];
     const slotLabels = resolveTopicDisplayLabels({
@@ -1025,39 +1074,44 @@ export function readFactoryCircuitDisplayStory(
         state.fallbackReason !== "missing-live-power"
           ? reading?.value ?? null
           : null,
+      metricKey,
       slotKey
     };
   });
   const factorySummary = resolveMonitoringSummaryState(slotStates);
 
   return {
-    kpis: resolveFactoryCircuitKpis({
+    kpis: applyMonitoringDisplayOverrides(pageKey, resolveFactoryCircuitKpis({
+      pageKey,
       isConnected: context.isConnected,
       slots: factorySlots,
       snapshot: context.snapshot,
       summary: factorySummary,
       topicNames: context.topicNames
-    }),
+    }), options),
     slots: factorySlots,
     summary: factorySummary
   };
 }
 
 export function readDisplayStoryPages(
-  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+  context: DisplayStorySourceContext = createDisplayStorySourceContext(),
+  options: DisplayStoryReadOptions = {}
 ): DisplayStoryPayloadByPageId {
   return {
-    "factory-circuit": readFactoryCircuitDisplayStory(context),
-    overview: readOverviewDisplayStory(context),
-    solar: readSolarDisplayStory(context)
+    "factory-circuit": readFactoryCircuitDisplayStory("factory-circuit", context, options),
+    "factory-circuit-guanyin": readFactoryCircuitDisplayStory("factory-circuit-guanyin", context, options),
+    overview: readOverviewDisplayStory(context, options),
+    solar: readSolarDisplayStory(context, options)
   };
 }
 
 export function readDisplayStoryPage<PageId extends DisplayStoryPageId>(
   pageId: PageId,
-  context: DisplayStorySourceContext = createDisplayStorySourceContext()
+  context: DisplayStorySourceContext = createDisplayStorySourceContext(),
+  options: DisplayStoryReadOptions = {}
 ): DisplayStoryPagePayload<PageId> {
-  const pages = readDisplayStoryPages(context);
+  const pages = readDisplayStoryPages(context, options);
 
   return {
     generatedAt: context.generatedAt,
@@ -1066,9 +1120,9 @@ export function readDisplayStoryPage<PageId extends DisplayStoryPageId>(
   };
 }
 
-export function readDisplayStory(): DisplayStoryPayload {
+export function readDisplayStory(options: DisplayStoryReadOptions = {}): DisplayStoryPayload {
   const context = createDisplayStorySourceContext();
-  const pages = readDisplayStoryPages(context);
+  const pages = readDisplayStoryPages(context, options);
 
   return {
     factoryCircuit: pages["factory-circuit"],

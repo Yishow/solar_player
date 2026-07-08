@@ -4,7 +4,9 @@ import { CircuitRow } from "./CircuitRow";
 import { buildCircuitSettingsViewModel } from "./viewModel";
 
 type CircuitSettingsContentProps = {
+  activeSiteKey: "factory-circuit" | "factory-circuit-guanyin";
   dirtyCount: number;
+  enabledSiteOptions: Array<{ label: string; pageKey: "factory-circuit" | "factory-circuit-guanyin" }>;
   handleAdd: () => Promise<void>;
   handleDelete: (id: number) => Promise<void>;
   handleFieldChange: <Key extends keyof CircuitConfig>(
@@ -20,6 +22,7 @@ type CircuitSettingsContentProps = {
   readinessLoading: boolean;
   remoteSyncBanner: ReactNode;
   saveAll: () => Promise<void>;
+  setActiveSiteKey: (pageKey: "factory-circuit" | "factory-circuit-guanyin") => void;
   viewModel: ReturnType<typeof buildCircuitSettingsViewModel>;
 };
 
@@ -53,7 +56,9 @@ function readinessReferenceLabel(
 }
 
 export function CircuitSettingsContent({
+  activeSiteKey,
   dirtyCount,
+  enabledSiteOptions,
   handleAdd,
   handleDelete,
   handleFieldChange,
@@ -65,6 +70,7 @@ export function CircuitSettingsContent({
   readinessLoading,
   remoteSyncBanner,
   saveAll,
+  setActiveSiteKey,
   viewModel
 }: CircuitSettingsContentProps) {
   const statusVariant =
@@ -74,7 +80,9 @@ export function CircuitSettingsContent({
         ? "is-loading"
         : "";
   const readinessFindings =
-    readiness?.findings.filter((finding) => finding.sourceType === "circuit-slot") ?? [];
+    readiness?.findings.filter(
+      (finding) => finding.sourceType === "circuit-slot" && finding.pageId === activeSiteKey
+    ) ?? [];
   const blockingReadinessCount = readinessFindings.filter((finding) => finding.status === "blocking").length;
   const warningReadinessCount = readinessFindings.filter((finding) => finding.status === "warning").length;
   const readinessVariant = readinessErrorMessage
@@ -159,6 +167,23 @@ export function CircuitSettingsContent({
               </div>
             ) : null}
           </div>
+          {enabledSiteOptions.length > 1 ? (
+            <div className="cs-site-toggle" role="tablist" aria-label="迴路設定廠區">
+              {enabledSiteOptions.map((site) => (
+                <button
+                  key={site.pageKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeSiteKey === site.pageKey}
+                  className={activeSiteKey === site.pageKey ? "active" : ""}
+                  data-circuit-site-toggle={site.pageKey}
+                  onClick={() => setActiveSiteKey(site.pageKey)}
+                >
+                  {site.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="cs-summary-panel">
           <div className="cs-summary-panel__left">
@@ -233,7 +258,12 @@ export function CircuitSettingsContent({
           </div>
         </div>
 
-        {isLoading ? (
+        {enabledSiteOptions.length === 0 && !isLoading ? (
+          <div className="cs-empty">
+            <strong>尚未啟用任何 Factory Circuit 廠區</strong>
+            <span style={{ fontSize: 13 }}>請先到播放設定啟用中壢廠或觀音廠，再回到這裡管理該廠區迴路。</span>
+          </div>
+        ) : isLoading ? (
           <div className="cs-empty">
             <strong>正在載入迴路設定</strong>
             <span style={{ fontSize: 13 }}>同步 circuits route 中，請稍候。</span>

@@ -120,12 +120,20 @@ test("irrelevant display-sync scopes no longer trigger management reloads", asyn
     false
   );
   assert.equal(
+    shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "playback" }, MQTT_SETTINGS_DISPLAY_SYNC_SCOPES),
+    true
+  );
+  assert.equal(
     shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "weather" }, MQTT_SETTINGS_DISPLAY_SYNC_SCOPES),
     true
   );
   assert.equal(
     shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "mqtt" }, CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES),
     false
+  );
+  assert.equal(
+    shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "playback" }, CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES),
+    true
   );
   assert.equal(
     shouldHandleDisplaySyncScope({ ...baseDisplaySyncEvent, scope: "playback" }, DEVICE_STATUS_DISPLAY_SYNC_SCOPES),

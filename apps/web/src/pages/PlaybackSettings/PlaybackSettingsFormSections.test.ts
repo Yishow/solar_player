@@ -30,6 +30,16 @@ test("playback settings exposes transition type and speed controls", () => {
     assert.match(source, /\{ label: "無轉場 None", value: "none" \}/);
 });
 
+test("playback settings exposes factory site enablement as playback page enabled state", () => {
+    assert.match(source, /廠區啟用/);
+    assert.match(source, /Factory Sites/);
+    assert.match(source, /ps-site-control/);
+    assert.match(source, /viewModel\.factorySiteRows\.map/);
+    assert.match(source, /page\.pageKey === pageKey \? \{ \.\.\.page, enabled \}/);
+    assert.match(source, /ps-card-control/);
+    assert.doesNotMatch(source, /ps-card-sites/);
+});
+
 test("playback settings form sections are memoized for tick and preview isolation", () => {
     assert.match(source, /export const PlaybackSettingsFormSections = memo\(function PlaybackSettingsFormSections/);
 });

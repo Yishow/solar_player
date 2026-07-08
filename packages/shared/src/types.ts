@@ -51,6 +51,7 @@ export interface MqttTopicMapping {
 
 export interface CircuitConfig {
   id: number;
+  pageKey?: string;
   nameZh: string | null;
   nameEn: string | null;
   icon: string | null;

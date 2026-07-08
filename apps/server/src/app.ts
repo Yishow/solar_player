@@ -32,6 +32,7 @@ import dataSourceRoute from "./routes/data-source.js";
 import deviceRoute from "./routes/device.js";
 import deviceDisplayOpsRoute from "./routes/device-display-ops.js";
 import displayOpsRoute from "./routes/display-ops.js";
+import displayCardDataRoute from "./routes/display-card-data.js";
 import displayPageRegistryRoute from "./routes/display-page-registry.js";
 import displayPagesRoute from "./routes/display-pages.js";
 import displayReadinessRoute from "./routes/display-readiness.js";
@@ -156,6 +157,7 @@ export async function buildApp() {
   await app.register(deviceRoute);
   await app.register(deviceDisplayOpsRoute);
   await app.register(displayOpsRoute);
+  await app.register(displayCardDataRoute);
   await app.register(displayPageRegistryRoute);
   await app.register(displayPagesRoute);
   await app.register(displayReadinessRoute);

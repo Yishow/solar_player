@@ -13,6 +13,7 @@ export * from "./displayReadiness.js";
 export * from "./displayPageFreshness.js";
 export * from "./deviceDisplayOps.js";
 export * from "./displayStory.js";
+export * from "./displayCardData.js";
 export * from "./imagePlaylist.js";
 export * from "./managementAccess.js";
 export * from "./managementDraftSave.js";

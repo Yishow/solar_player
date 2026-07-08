@@ -24,6 +24,7 @@ type CircuitRow = {
   mqtt_topic: string | null;
   name_en: string | null;
   name_zh: string | null;
+  page_key: string;
 };
 
 function toBoolean(value: unknown) {
@@ -46,6 +47,7 @@ function readCircuits(): CircuitConfig[] {
           name_en,
           mqtt_topic,
           display_slot,
+          page_key,
           enabled
         FROM circuit_configs
       `
@@ -68,7 +70,8 @@ function readCircuits(): CircuitConfig[] {
     ratedCapacity: null,
     unit: null,
     warningMax: null,
-    warningMin: null
+    warningMin: null,
+    pageKey: row.page_key
   }));
 }
 
@@ -127,7 +130,9 @@ function buildSlotFindings(): DisplayReadinessFinding[] {
 
   return displaySlotRequirements.map((requirement) => {
     const matches = enabledCircuits.filter(
-      (circuit) => circuit.displaySlot === requirement.requirementKey
+      (circuit) =>
+        circuit.pageKey === requirement.pageId &&
+        circuit.displaySlot === requirement.requirementKey
     );
 
     if (matches.length === 0) {

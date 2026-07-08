@@ -12,6 +12,55 @@ export const displayCircuitSlotKeys = [
 ] as const;
 
 export type DisplayCircuitSlotKey = (typeof displayCircuitSlotKeys)[number];
+export const factoryCircuitPageKeys = ["factory-circuit", "factory-circuit-guanyin"] as const;
+export type FactoryCircuitPageKey = (typeof factoryCircuitPageKeys)[number];
+
+export const factoryCircuitSlotKeysByPageKey: Record<FactoryCircuitPageKey, DisplayCircuitSlotKey[]> = {
+  "factory-circuit": ["stamping", "body", "painting", "assembly", "utility", "office"],
+  "factory-circuit-guanyin": [...displayCircuitSlotKeys]
+};
+
+const factoryCircuitLegacySlotMetricKeys: Record<DisplayCircuitSlotKey, string> = {
+  stamping: "factoryStampingPower",
+  body: "factoryBodyPower",
+  painting: "factoryPaintingPower",
+  assembly: "factoryAssemblyPower",
+  utility: "factoryUtilityPower",
+  office: "factoryOfficePower",
+  heavy_vehicle: "factoryHeavyVehiclePower",
+  ed_coating: "factoryEdCoatingPower"
+};
+
+const factoryCircuitGuanyinSlotMetricKeys: Record<DisplayCircuitSlotKey, string> = {
+  stamping: "factoryCircuit.guanyin.stampingPower",
+  body: "factoryCircuit.guanyin.bodyPower",
+  painting: "factoryCircuit.guanyin.paintingPower",
+  assembly: "factoryCircuit.guanyin.assemblyPower",
+  utility: "factoryCircuit.guanyin.utilityPower",
+  office: "factoryCircuit.guanyin.officePower",
+  heavy_vehicle: "factoryCircuit.guanyin.heavyVehiclePower",
+  ed_coating: "factoryCircuit.guanyin.edCoatingPower"
+};
+
+export function isFactoryCircuitPageKey(value: string): value is FactoryCircuitPageKey {
+  return (factoryCircuitPageKeys as readonly string[]).includes(value);
+}
+
+export function resolveFactoryCircuitSlotKeys(pageKey: FactoryCircuitPageKey): DisplayCircuitSlotKey[] {
+  return factoryCircuitSlotKeysByPageKey[pageKey];
+}
+
+export function resolveFactoryCircuitSlotMetricKey(
+  pageKey: FactoryCircuitPageKey,
+  slotKey: DisplayCircuitSlotKey
+): string {
+  if (pageKey === "factory-circuit-guanyin") {
+    return factoryCircuitGuanyinSlotMetricKeys[slotKey];
+  }
+
+  return factoryCircuitLegacySlotMetricKeys[slotKey];
+}
+
 export type DisplayReadinessSourceType = "circuit-slot" | "derived-metric" | "mqtt-metric";
 export type DisplayReadinessStatus = "blocking" | "ready" | "warning";
 
@@ -59,6 +108,14 @@ export type DisplayReadinessReport = {
   };
 };
 
+const factoryCircuitMetricRequirements: DisplayRequirementDescriptor[] = factoryCircuitPageKeys.flatMap(
+  (pageId) => resolveFactoryCircuitSlotKeys(pageId).map((slotKey) => ({
+    pageId,
+    requirementKey: resolveFactoryCircuitSlotMetricKey(pageId, slotKey),
+    sourceType: "mqtt-metric" as const
+  }))
+);
+
 export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "overview", requirementKey: "realTimePower", sourceType: "mqtt-metric" },
   { pageId: "overview", requirementKey: "todayGeneration", sourceType: "mqtt-metric" },
@@ -76,14 +133,7 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
   { pageId: "solar", requirementKey: "systemEfficiency", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryStampingPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryBodyPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryPaintingPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryAssemblyPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryUtilityPower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryOfficePower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryHeavyVehiclePower", sourceType: "mqtt-metric" },
-  { pageId: "factory-circuit", requirementKey: "factoryEdCoatingPower", sourceType: "mqtt-metric" },
+  ...factoryCircuitMetricRequirements,
   {
     pageId: "sustainability",
     requirementKey: "accumulatedGenerationGwh",
@@ -110,12 +160,12 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   }
 ];
 
-export const displaySlotRequirements: DisplayRequirementDescriptor[] = displayCircuitSlotKeys.map(
-  (slotKey) => ({
-    pageId: "factory-circuit",
+export const displaySlotRequirements: DisplayRequirementDescriptor[] = factoryCircuitPageKeys.flatMap(
+  (pageId) => resolveFactoryCircuitSlotKeys(pageId).map((slotKey) => ({
+    pageId,
     requirementKey: slotKey,
     sourceType: "circuit-slot"
-  })
+  }))
 );
 
 export const displayReadinessRequirements: DisplayRequirementDescriptor[] = [

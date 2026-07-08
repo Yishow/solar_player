@@ -1,4 +1,4 @@
-import type { DisplayPageTemplateKey } from "./displayPageConfig.js";
+import type { DisplayPageKey } from "./displayPageConfig.js";
 import { displayMetricRequirements, type DisplayRequirementDescriptor } from "./displayReadiness.js";
 
 export type LiveMetricRuntimeRequirement = {
@@ -18,11 +18,11 @@ const solarRuntimeAlternatives: Record<string, string[][]> = {
   totalCo2Reduction: [["totalCo2Reduction"], ["totalGeneration"]]
 };
 
-export function resolveLiveMetricKeysForPage(templateKey: DisplayPageTemplateKey) {
+export function resolveLiveMetricKeysForPage(pageKey: DisplayPageKey) {
   const metricKeys: string[] = [];
 
   for (const requirement of displayMetricRequirements) {
-    if (requirement.pageId !== templateKey) {
+    if (requirement.pageId !== pageKey) {
       continue;
     }
 
@@ -42,10 +42,10 @@ export function resolveLiveMetricKeysForPage(templateKey: DisplayPageTemplateKey
 }
 
 function resolveRequirementAlternatives(
-  templateKey: DisplayPageTemplateKey,
+  pageKey: DisplayPageKey,
   requirement: DisplayRequirementDescriptor
 ) {
-  const override = templateKey === "solar"
+  const override = pageKey === "solar"
     ? solarRuntimeAlternatives[requirement.requirementKey]
     : undefined;
   if (override) {
@@ -73,12 +73,12 @@ function resolveRequirementAlternatives(
 }
 
 export function resolveLiveMetricRequirementsForPage(
-  templateKey: DisplayPageTemplateKey
+  pageKey: DisplayPageKey
 ): LiveMetricRuntimeRequirement[] {
   return displayMetricRequirements
-    .filter((requirement) => requirement.pageId === templateKey)
+    .filter((requirement) => requirement.pageId === pageKey)
     .map((requirement) => ({
-      alternatives: resolveRequirementAlternatives(templateKey, requirement),
+      alternatives: resolveRequirementAlternatives(pageKey, requirement),
       requirementKey: requirement.requirementKey
     }));
 }

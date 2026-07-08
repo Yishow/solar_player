@@ -1,4 +1,4 @@
-import type { DisplayCircuitSlotKey, DisplayReadinessFinding } from "./displayReadiness.js";
+import type { DisplayCircuitSlotKey, DisplayReadinessFinding, FactoryCircuitPageKey } from "./displayReadiness.js";
 import type { MetricKey } from "./types.js";
 
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
@@ -92,6 +92,7 @@ export type FactoryCircuitStorySlot = MonitoringStoryState & {
   labelEn?: string;
   labelZh?: string;
   livePowerKw: number | null;
+  metricKey?: string;
   slotKey: DisplayCircuitSlotKey;
 };
 
@@ -119,7 +120,7 @@ export type SolarFlowStoryState = {
   state: "degraded" | "normal" | "standby";
 };
 
-export type DisplayStoryPageId = "overview" | "solar" | "factory-circuit";
+export type DisplayStoryPageId = "overview" | "solar" | FactoryCircuitPageKey;
 
 export type OverviewStoryMetric = ResolvedMonitoringMetricBinding<string> & {
   trendHours?: number[];
@@ -153,6 +154,7 @@ export type DisplayStoryPayload = {
 
 export type DisplayStoryPayloadByPageId = {
   "factory-circuit": FactoryCircuitStoryPayload;
+  "factory-circuit-guanyin": FactoryCircuitStoryPayload;
   overview: OverviewStoryPayload;
   solar: SolarStoryPayload;
 };

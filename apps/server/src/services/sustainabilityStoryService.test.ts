@@ -18,12 +18,14 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readSustainabilityStory }
+  { readSustainabilityStory },
+  { clearDisplayValueOverride, saveDisplayValueOverride }
 ] = await Promise.all([
   import("../db/index.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
-  import("./sustainabilityStoryService.js")
+  import("./sustainabilityStoryService.js"),
+  import("./displayValueOverrideService.js")
 ]);
 
 const story: SustainabilityStoryInput = {
@@ -256,6 +258,62 @@ test("readSustainabilityStory normalizes GWh live metrics before deriving sustai
   assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
   assert.equal(story.period.highlights[0]?.unit, "MWh");
   assert.equal(story.period.highlights[0]?.value, "18,600.0");
+});
+
+test("readSustainabilityStory applies and clears household display overrides without changing formulas", () => {
+  const database = getDatabase();
+  const timestamp = "2026-07-08T09:00:00.000Z";
+  const today = "2026-07-08";
+
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total
+        ) VALUES (?, 100, 80, 16)
+      `
+    )
+    .run(today);
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('selfConsumption', 360, ?, 0)
+        ON CONFLICT(metric_key) DO UPDATE SET
+          total_value = excluded.total_value,
+          last_updated = excluded.last_updated
+      `
+    )
+    .run(timestamp);
+
+  const formulaStory = readSustainabilityStory(undefined, { applyDisplayOverrides: false });
+  assert.equal(formulaStory.householdEquivalents.today.householdCountDisplay, "4");
+
+  saveDisplayValueOverride(
+    {
+      cardId: "sustainability.household.today",
+      metricKey: "householdEquivalent.today",
+      pageId: "sustainability",
+      targetId: "sustainability.household.today",
+      unit: "口之家"
+    },
+    { displayValue: 9 }
+  );
+
+  const overriddenStory = readSustainabilityStory();
+  const rawStory = readSustainabilityStory(undefined, { applyDisplayOverrides: false });
+
+  assert.equal(overriddenStory.householdEquivalents.today.householdCountDisplay, "9.0");
+  assert.equal(rawStory.householdEquivalents.today.householdCountDisplay, "4");
+
+  clearDisplayValueOverride("sustainability.household.today");
+
+  const restoredStory = readSustainabilityStory();
+  assert.equal(restoredStory.householdEquivalents.today.householdCountDisplay, "4");
 });
 
 test("readSustainabilityStory preserves sub-0.1 GWh precision when formatting MWh highlights", () => {

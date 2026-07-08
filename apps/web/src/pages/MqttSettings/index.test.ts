@@ -51,6 +51,39 @@ test("mqtt settings computes broker topic and weather draft scopes before render
   assert.match(mqttSettingsSource, /draftSections=\{draftSections\}/);
 });
 
+test("mqtt settings keeps Topic workspace tab selection in route state without resetting drafts", () => {
+  assert.match(mqttSettingsSource, /useState<TopicWorkspaceTab>\("topic"\)/);
+  assert.match(mqttSettingsSource, /activeTopicWorkspaceTab=\{activeTopicWorkspaceTab\}/);
+  assert.match(mqttSettingsSource, /handleTopicWorkspaceTabChange=\{setActiveTopicWorkspaceTab\}/);
+  assert.doesNotMatch(mqttSettingsSource, /setSettings\([^)]*activeTopicWorkspaceTab/);
+  assert.doesNotMatch(mqttSettingsSource, /setTopics\([^)]*activeTopicWorkspaceTab/);
+});
+
+test("mqtt settings keeps card data site selection in route state without resetting drafts", () => {
+  assert.match(mqttSettingsSource, /useState<CardDataSiteFilter>\("jungli"\)/);
+  assert.match(mqttSettingsSource, /activeCardDataSite=\{activeCardDataSite\}/);
+  assert.match(mqttSettingsSource, /getPlaybackPages/);
+  assert.match(mqttSettingsSource, /enabledCardDataSites=\{enabledCardDataSites\}/);
+  assert.match(mqttSettingsSource, /enabledPageKeys\.has\("factory-circuit-guanyin"\)/);
+  assert.match(mqttSettingsSource, /handleCardDataSiteChange=\{setActiveCardDataSite\}/);
+  assert.doesNotMatch(mqttSettingsSource, /setSettings\([^)]*activeCardDataSite/);
+  assert.doesNotMatch(mqttSettingsSource, /setTopics\([^)]*activeCardDataSite/);
+});
+
+test("mqtt settings loads card diagnostics only for the card data workspace tab", () => {
+  assert.match(mqttSettingsSource, /getDisplayCardData/);
+  assert.match(mqttSettingsSource, /const \[cardData,\s*setCardData\]/);
+  assert.match(mqttSettingsSource, /activeTopicWorkspaceTab !== "card-data"/);
+  assert.match(mqttSettingsSource, /cardDataRows=\{cardData\?\.rows \?\? \[\]\}/);
+  assert.match(mqttSettingsSource, /cardDataErrorMessage=\{cardDataErrorMessage\}/);
+});
+
+test("mqtt settings renders the merged workspace instead of standalone source and topic cards", () => {
+  assert.match(mqttSettingsSource, /activeTopicWorkspaceTab/);
+  assert.match(mqttSettingsSource, /MqttSettingsContent/);
+  assert.doesNotMatch(mqttSettingsSource, /mqtt-mode/);
+});
+
 test("mqtt settings lists three-phase metric keys as creatable, manageable topic mappings", () => {
   const optionsBlock = mqttSettingsSource.slice(
     mqttSettingsSource.indexOf("const defaultMetricOptions = ["),

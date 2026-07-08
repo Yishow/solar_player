@@ -30,7 +30,14 @@ const runtimeRefreshRegistry: Record<DisplayPageKey, RuntimeRefreshRegistryEntry
     fallbackRefreshScopes: ["circuits", "display-pages"],
     refreshKey: (context) =>
       context.dependencyKey ? `factory-circuit:${context.dependencyKey}` : "factory-circuit",
-    refreshScopes: ["circuits", "display-pages", "mqtt"],
+    refreshScopes: ["circuits", "display-pages", "mqtt", "playback"],
+    sourceKind: "display-story"
+  },
+  "factory-circuit-guanyin": {
+    fallbackRefreshScopes: ["circuits", "display-pages"],
+    refreshKey: (context) =>
+      context.dependencyKey ? `factory-circuit-guanyin:${context.dependencyKey}` : "factory-circuit-guanyin",
+    refreshScopes: ["circuits", "display-pages", "mqtt", "playback"],
     sourceKind: "display-story"
   },
   images: {

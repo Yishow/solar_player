@@ -4,6 +4,7 @@ import type {
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
   DisplayClientLivenessSnapshot,
+  DisplayCardDataResponse,
   DisplayStoryPageId,
   DisplayStoryPagePayload,
   DisplayStoryPayload,
@@ -211,6 +212,37 @@ export async function getPlaybackSettings() {
     settings: PlaybackSettings;
   }>("/api/playback/settings");
   return response.settings;
+}
+
+export async function getDisplayCardData() {
+  return requestJson<DisplayCardDataResponse>("/api/display-card-data");
+}
+
+export async function saveDisplayCardOverride(targetId: string, displayValue: number) {
+  const response = await requestJson<{
+    row: DisplayCardDataResponse["rows"][number];
+    success: boolean;
+  }>(
+    `/api/display-card-data/overrides/${encodeURIComponent(targetId)}`,
+    {
+      body: JSON.stringify({ displayValue }),
+      method: "PUT"
+    }
+  );
+  return response.row;
+}
+
+export async function clearDisplayCardOverride(targetId: string) {
+  const response = await requestJson<{
+    row: DisplayCardDataResponse["rows"][number];
+    success: boolean;
+  }>(
+    `/api/display-card-data/overrides/${encodeURIComponent(targetId)}`,
+    {
+      method: "DELETE"
+    }
+  );
+  return response.row;
 }
 
 export async function updatePlaybackSettings(settings: Partial<PlaybackSettings>) {

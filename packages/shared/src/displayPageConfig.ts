@@ -9,10 +9,17 @@ export const displayPageTemplateKeys = [
   "sustainability"
 ] as const;
 
-export const displayPageKeys = displayPageTemplateKeys;
+export const displayPageKeys = [
+  "overview",
+  "solar",
+  "factory-circuit",
+  "factory-circuit-guanyin",
+  "images",
+  "sustainability"
+] as const;
 
 export type DisplayPageTemplateKey = (typeof displayPageTemplateKeys)[number];
-export type DisplayPageKey = DisplayPageTemplateKey;
+export type DisplayPageKey = (typeof displayPageKeys)[number];
 export type DisplayPageId = string;
 
 export type DisplayPageInstance = {

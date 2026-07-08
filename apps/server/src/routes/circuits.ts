@@ -5,6 +5,7 @@ import { readDisplayReadinessReport } from "../services/displayReadinessService.
 
 type CircuitRow = {
   id: number;
+  page_key: string;
   name_zh: string | null;
   name_en: string | null;
   icon: string | null;
@@ -29,6 +30,7 @@ function toBoolean(value: unknown): boolean {
 function serializeCircuit(row: CircuitRow): CircuitConfig {
   return {
     id: row.id,
+    pageKey: row.page_key,
     nameZh: row.name_zh,
     nameEn: row.name_en,
     icon: row.icon,
@@ -47,17 +49,22 @@ function serializeCircuit(row: CircuitRow): CircuitConfig {
   };
 }
 
-function getAllCircuits(): CircuitConfig[] {
+function getAllCircuits(pageKey?: string): CircuitConfig[] {
   const db = getDatabase();
   const rows = db
     .prepare(
-      `SELECT * FROM circuit_configs ORDER BY display_order ASC, id ASC`
+      `
+        SELECT * FROM circuit_configs
+        WHERE (? IS NULL OR page_key = ?)
+        ORDER BY display_order ASC, id ASC
+      `
     )
-    .all() as CircuitRow[];
+    .all(pageKey ?? null, pageKey ?? null) as CircuitRow[];
   return rows.map(serializeCircuit);
 }
 
 type CircuitCreateBody = {
+  pageKey?: string;
   nameZh: string;
   nameEn?: string;
   icon?: string;
@@ -82,9 +89,9 @@ type ReorderBody = { circuits: ReorderItem[] };
 
 const circuitsRoute: FastifyPluginAsync = async (app) => {
   // GET /api/circuits
-  app.get("/api/circuits", async () => ({
+  app.get<{ Querystring: { pageKey?: string } }>("/api/circuits", async (request) => ({
     success: true,
-    data: getAllCircuits(),
+    data: getAllCircuits(request.query.pageKey?.trim() || undefined),
     readiness: readDisplayReadinessReport()
   }));
 
@@ -97,12 +104,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     const result = db
       .prepare(
         `INSERT INTO circuit_configs (
-          name_zh, name_en, icon, unit, mqtt_topic, display_slot, rated_capacity,
+          page_key, name_zh, name_en, icon, unit, mqtt_topic, display_slot, rated_capacity,
           normal_min, normal_max, attention_min, attention_max, warning_min, warning_max,
           display_order, enabled
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
+        body.pageKey?.trim() || "factory-circuit",
         body.nameZh ?? null,
         body.nameEn ?? null,
         body.icon ?? null,
@@ -161,6 +169,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       db.prepare(
         `UPDATE circuit_configs SET
           name_zh = COALESCE(?, name_zh),
+          page_key = COALESCE(?, page_key),
           name_en = COALESCE(?, name_en),
           icon = COALESCE(?, icon),
           unit = COALESCE(?, unit),
@@ -179,6 +188,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         WHERE id = ?`
       ).run(
         body.nameZh ?? null,
+        body.pageKey?.trim() || null,
         body.nameEn ?? null,
         body.icon ?? null,
         body.unit ?? null,

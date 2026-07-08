@@ -1,5 +1,5 @@
-import type { CircuitConfig } from "@solar-display/shared";
-import { requestJson } from "../../services/api";
+import type { CircuitConfig, PlaybackPage } from "@solar-display/shared";
+import { getPlaybackPages, requestJson } from "../../services/api";
 
 type CircuitListResponse = {
   success: boolean;
@@ -9,6 +9,7 @@ type CircuitListResponse = {
 
 type CircuitEditableModelLoaders = {
   readCircuits?: () => Promise<CircuitConfig[]>;
+  readPlaybackPages?: () => Promise<PlaybackPage[]>;
 };
 
 type CircuitEditableModelLoadOptions = {
@@ -17,6 +18,7 @@ type CircuitEditableModelLoadOptions = {
 
 export type CircuitEditableModel = {
   circuits: CircuitConfig[];
+  playbackPages: PlaybackPage[];
 };
 
 let cachedCircuitEditableModel: CircuitEditableModel | null = null;
@@ -41,14 +43,15 @@ export async function loadCircuitEditableModel(
   loaders: CircuitEditableModelLoaders = {},
   options: CircuitEditableModelLoadOptions = {}
 ): Promise<CircuitEditableModel> {
-  const canUseCache = !loaders.readCircuits;
+  const canUseCache = !loaders.readCircuits && !loaders.readPlaybackPages;
 
   if (!options.force && canUseCache && cachedCircuitEditableModel) {
     return cachedCircuitEditableModel;
   }
 
   const model = {
-    circuits: await (loaders.readCircuits ?? getCircuits)()
+    circuits: await (loaders.readCircuits ?? getCircuits)(),
+    playbackPages: await (loaders.readPlaybackPages ?? getPlaybackPages)()
   };
 
   if (canUseCache) {

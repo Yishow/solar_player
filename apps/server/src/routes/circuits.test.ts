@@ -41,6 +41,8 @@ test("GET /api/circuits returns seeded circuits", async () => {
     const body = response.json() as { success: boolean; data: CircuitConfig[] };
     assert.equal(body.success, true);
     assert.ok(body.data.length > 0, "Should have seeded circuits");
+    assert.equal(body.data.filter((circuit) => circuit.pageKey === "factory-circuit").length, 6);
+    assert.equal(body.data.filter((circuit) => circuit.pageKey === "factory-circuit-guanyin").length, 8);
   } finally {
     await app.close();
   }
@@ -77,6 +79,65 @@ test("POST /api/circuits creates a new circuit", async () => {
   }
 });
 
+test("GET and POST /api/circuits preserve Factory Circuit page key scope", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearCircuitsTable();
+
+  const app = await buildApp();
+
+  try {
+    const jungliResponse = await app.inject({
+      method: "POST",
+      url: "/api/circuits",
+      payload: {
+        displaySlot: "stamping",
+        nameZh: "中壢沖壓",
+        pageKey: "factory-circuit",
+        ratedCapacity: 500
+      }
+    });
+    const guanyinResponse = await app.inject({
+      method: "POST",
+      url: "/api/circuits",
+      payload: {
+        displaySlot: "stamping",
+        nameZh: "觀音沖壓",
+        pageKey: "factory-circuit-guanyin",
+        ratedCapacity: 600
+      }
+    });
+
+    assert.equal(jungliResponse.statusCode, 200);
+    assert.equal(guanyinResponse.statusCode, 200);
+    assert.equal((jungliResponse.json() as { data: CircuitConfig }).data.pageKey, "factory-circuit");
+    assert.equal((guanyinResponse.json() as { data: CircuitConfig }).data.pageKey, "factory-circuit-guanyin");
+
+    const jungliListResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits?pageKey=factory-circuit"
+    });
+    const guanyinListResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits?pageKey=factory-circuit-guanyin"
+    });
+    const allListResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits"
+    });
+
+    const jungliRows = (jungliListResponse.json() as { data: CircuitConfig[] }).data;
+    const guanyinRows = (guanyinListResponse.json() as { data: CircuitConfig[] }).data;
+    const allRows = (allListResponse.json() as { data: CircuitConfig[] }).data;
+
+    assert.deepEqual(jungliRows.map((row) => row.nameZh), ["中壢沖壓"]);
+    assert.deepEqual(guanyinRows.map((row) => row.nameZh), ["觀音沖壓"]);
+    assert.equal(allRows.length, 2);
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/circuits/:id updates circuit metadata", async () => {
   migrateDatabase();
   seedDatabase();
@@ -103,6 +164,56 @@ test("PUT /api/circuits/:id updates circuit metadata", async () => {
     const updated = (updateResponse.json() as { data: CircuitConfig }).data;
     assert.equal(updated.nameZh, "更新名稱");
     assert.equal(updated.ratedCapacity, 999);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/circuits/:id updates Factory Circuit page key scope", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearCircuitsTable();
+
+  const app = await buildApp();
+
+  try {
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/circuits",
+      payload: {
+        displaySlot: "office",
+        nameZh: "待調整工程",
+        pageKey: "factory-circuit",
+        ratedCapacity: 500
+      }
+    });
+    const created = (createResponse.json() as { data: CircuitConfig }).data;
+
+    const updateResponse = await app.inject({
+      method: "PUT",
+      url: `/api/circuits/${created.id}`,
+      payload: {
+        pageKey: "factory-circuit-guanyin"
+      }
+    });
+
+    assert.equal(updateResponse.statusCode, 200);
+    assert.equal((updateResponse.json() as { data: CircuitConfig }).data.pageKey, "factory-circuit-guanyin");
+
+    const jungliResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits?pageKey=factory-circuit"
+    });
+    const guanyinResponse = await app.inject({
+      method: "GET",
+      url: "/api/circuits?pageKey=factory-circuit-guanyin"
+    });
+
+    assert.deepEqual((jungliResponse.json() as { data: CircuitConfig[] }).data, []);
+    assert.deepEqual(
+      (guanyinResponse.json() as { data: CircuitConfig[] }).data.map((row) => row.id),
+      [created.id]
+    );
   } finally {
     await app.close();
   }

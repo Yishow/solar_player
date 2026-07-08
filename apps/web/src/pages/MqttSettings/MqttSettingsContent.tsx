@@ -1,4 +1,6 @@
 import type {
+  DisplayCardDataAction,
+  DisplayCardDataRow,
   DisplayReadinessReport,
   WeatherFieldKey,
   WeatherHeaderContract,
@@ -19,10 +21,22 @@ import { buildMqttSettingsViewModel } from "./viewModel";
 import { CustomSelect } from "../../components/management";
 import { TopicWorkspaceRow } from "./TopicWorkspaceRow";
 
+export type TopicWorkspaceTab = "source" | "topic" | "card-data";
+export type CardDataSiteFilter = "jungli" | "guanyin";
+
+const cardDataSiteOptions: Array<{ label: string; value: CardDataSiteFilter }> = [
+  { label: "中壢廠", value: "jungli" },
+  { label: "觀音廠", value: "guanyin" }
+];
 
 type MqttSettingsContentProps = {
   actionState: ActionState;
+  activeCardDataSite?: CardDataSiteFilter;
+  activeTopicWorkspaceTab?: TopicWorkspaceTab;
   addTopicMapping: () => void;
+  cardDataErrorMessage?: string;
+  cardDataRows?: DisplayCardDataRow[];
+  enabledCardDataSites?: CardDataSiteFilter[];
   draftSections?: {
     broker: boolean;
     topic: boolean;
@@ -38,7 +52,11 @@ type MqttSettingsContentProps = {
     key: Key,
     value: TopicMapping[Key]
   ) => void;
+  handleCardDataSiteChange?: (site: CardDataSiteFilter) => void;
+  handleConfigureTopicMetric?: (metricKey: string) => void;
+  handleTopicWorkspaceTabChange?: (tab: TopicWorkspaceTab) => void;
   handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
+  handleOverrideDraftChange?: (targetId: string, value: string) => void;
   handleWeatherSettingChange: <Key extends keyof WeatherSettings>(
     key: Key,
     value: WeatherSettings[Key]
@@ -47,20 +65,26 @@ type MqttSettingsContentProps = {
   liveMetricsConnectionState: SocketConnectionState["status"];
   liveMetricsSnapshot: LiveMetricsSnapshot | null;
   message: string;
+  highlightedTopicMetricKey?: string | null;
+  isLoadingCardData?: boolean;
   readiness: DisplayReadinessReport | null;
   readinessErrorMessage: string;
   removeTopicMapping: (rowId: number) => void;
   publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
   publishingTopicKey?: string | null;
+  clearDisplayOverride?: (targetId: string) => Promise<void>;
   reloadTopics: () => Promise<void>;
   remoteSyncBanner: ReactNode;
   saveSettings: () => Promise<void>;
+  saveDisplayOverride?: (targetId: string, value: number) => Promise<void>;
   saveTopicMappings: () => Promise<void>;
+  savingOverrideTargetId?: string | null;
   settings: MqttSettingsForm;
   status: MqttStatus;
   testConnection: () => Promise<void>;
   toggleWeatherField: (fieldKey: WeatherFieldKey, enabled: boolean) => void;
   topicPublishDrafts?: Record<string, string>;
+  overrideDrafts?: Record<string, string>;
   topics: TopicMapping[];
   weatherOptions: WeatherOptionsResponse | null;
   weatherOptionsErrorMessage: string;
@@ -81,6 +105,46 @@ function resolveCoverageChipClass(stateLabel: string) {
   if (stateLabel === "Mapping Gap") return "mgmt-chip is-danger";
   if (stateLabel === "Idle Runtime") return "mgmt-chip is-warning";
   return "mgmt-chip";
+}
+
+function resolveCardDataPageLabel(pageId: string) {
+  if (pageId === "factory-circuit") return "Factory Circuit";
+  if (pageId === "factory-circuit-guanyin") return "Factory Circuit (Guanyin)";
+  if (pageId === "overview") return "Overview";
+  if (pageId === "solar") return "Solar";
+  if (pageId === "sustainability") return "Sustainability";
+  return pageId;
+}
+
+function isCardDataRowVisibleForSite(row: DisplayCardDataRow, site: CardDataSiteFilter) {
+  if (row.pageId === "factory-circuit") return site === "jungli";
+  if (row.pageId === "factory-circuit-guanyin") return site === "guanyin";
+  return true;
+}
+
+function resolveCardDataStatusClass(status: string) {
+  if (status === "ready") return "mgmt-chip is-success";
+  if (status === "missing-topic" || status === "formula-input-missing") return "mgmt-chip is-danger";
+  if (status === "overridden") return "mgmt-chip is-success";
+  return "mgmt-chip is-warning";
+}
+
+function isPublishAction(
+  action: DisplayCardDataAction
+): action is DisplayCardDataAction & { metricKey: string; type: "publish-test-value" } {
+  return action.type === "publish-test-value" && "metricKey" in action;
+}
+
+function isConfigureTopicAction(
+  action: DisplayCardDataAction
+): action is DisplayCardDataAction & { metricKey: string; type: "configure-topic" } {
+  return action.type === "configure-topic" && "metricKey" in action;
+}
+
+function isCalculationAction(
+  action: DisplayCardDataAction
+): action is Extract<DisplayCardDataAction, { type: "edit-calculation-settings" }> {
+  return action.type === "edit-calculation-settings";
 }
 
 /**
@@ -128,6 +192,25 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
     ]
   );
   const connStatusVariant = resolveConnStatus(viewModel.connection.statusTone);
+  const activeTopicWorkspaceTab = props.activeTopicWorkspaceTab ?? "topic";
+  const enabledCardDataSites = props.enabledCardDataSites ?? ["jungli", "guanyin"];
+  const activeCardDataSite = props.activeCardDataSite ?? enabledCardDataSites[0] ?? "jungli";
+  const cardDataSiteOptionsForEnabledPages = cardDataSiteOptions.filter((option) =>
+    enabledCardDataSites.includes(option.value)
+  );
+  const visibleCardDataRows = (props.cardDataRows ?? []).filter((row) =>
+    row.pageId === "factory-circuit"
+      ? activeCardDataSite === "jungli" && enabledCardDataSites.includes("jungli")
+      : row.pageId === "factory-circuit-guanyin"
+        ? activeCardDataSite === "guanyin" && enabledCardDataSites.includes("guanyin")
+        : isCardDataRowVisibleForSite(row, activeCardDataSite)
+  );
+  const selectTopicWorkspaceTab = (tab: TopicWorkspaceTab) => {
+    props.handleTopicWorkspaceTabChange?.(tab);
+  };
+  const selectCardDataSite = (site: CardDataSiteFilter) => {
+    props.handleCardDataSiteChange?.(site);
+  };
 
   return (
     <div className="mqtt-settings-page">
@@ -136,99 +219,366 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
         <p className="mgmt-page-title__subtitle">MQTT Settings</p>
       </section>
 
-      <button type="button" className="mgmt-action mqtt-test-conn" disabled={viewModel.actions.testConnectionDisabled} onClick={() => void props.testConnection()}>
+      <button
+        type="button"
+        className="mgmt-action mqtt-test-conn"
+        disabled={viewModel.actions.testConnectionDisabled}
+        onClick={() => void props.testConnection()}
+      >
         {viewModel.actions.testConnectionLabel}
         <small>Test Connection</small>
       </button>
-      <button type="button" className="mgmt-action primary mqtt-save" disabled={viewModel.actions.saveSettingsDisabled} onClick={() => void props.saveSettings()}>
+      <button
+        type="button"
+        className="mgmt-action primary mqtt-save"
+        disabled={viewModel.actions.saveSettingsDisabled}
+        onClick={() => void props.saveSettings()}
+      >
         {viewModel.actions.saveSettingsLabel}
         <small>Save Settings</small>
       </button>
 
       {props.remoteSyncBanner}
 
-      <section className="settings-card mgmt-interactive-card mqtt-mode">
-        <div className="settings-card__title">資料來源模式<small>Data Mode</small></div>
-        <div className="seg" role="tablist">
-          {viewModel.modeOptions.map((option) => (
-            <button key={option.value} type="button" role="tab" aria-selected={option.isActive} className={option.isActive ? "active" : ""} onClick={() => props.handleSettingChange("dataMode", option.value)}>
-              {option.label}
+      <section className="settings-card mgmt-interactive-card mqtt-topic-workspace" data-mqtt-section="topic-workspace">
+        <div className="settings-card__title">Topic 工作區<small>Topic Workspace</small></div>
+        <div className="mqtt-workspace-tabs" role="tablist" aria-label="Topic workspace views">
+          {[
+            { id: "source" as const, label: "資料來源模式", subtitle: "Data Mode" },
+            { id: "topic" as const, label: "Topic mapping", subtitle: "Mappings" },
+            { id: "card-data" as const, label: "卡片資料管理", subtitle: "Card Data" }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTopicWorkspaceTab === tab.id}
+              className={activeTopicWorkspaceTab === tab.id ? "active" : ""}
+              data-mqtt-workspace-tab={tab.id}
+              onClick={() => selectTopicWorkspaceTab(tab.id)}
+            >
+              {tab.label}
+              <small>{tab.subtitle}</small>
             </button>
           ))}
         </div>
-        <div className="broker-fields">
-          {viewModel.brokerFields.map((field) => (
-            <label key={field.key} className="text-field">
-              <span className="field-label">{field.label}</span>
-              <input type={field.type} disabled={field.disabled} inputMode={field.inputMode === "numeric" ? "numeric" : undefined} value={field.value} onChange={(event) => props.handleSettingChange(field.key as keyof MqttSettingsForm, event.target.value as MqttSettingsForm[keyof MqttSettingsForm])} />
-            </label>
-          ))}
-        </div>
-        <div className={`conn-status ${connStatusVariant}`} role="status">
-          <span className="conn-status__dot" aria-hidden />
-          {viewModel.feedbackBanner.title}
-          <small>{viewModel.feedbackBanner.detail}</small>
-        </div>
-      </section>
 
-      <section className="settings-card mgmt-interactive-card mqtt-topic-workspace" data-mqtt-section="topic-workspace">
-        <div className="settings-card__title">Topic 工作區<small>Topic Workspace</small></div>
-        <div className="mqtt-runtime-summary">
-          <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.topicWorkspaceSummary.runtimeStatusTone)}`} role="status">
-            <span className="conn-status__dot" aria-hidden />
-            {viewModel.topicWorkspaceSummary.runtimeStatusLabel}
-            <small>{viewModel.topicWorkspaceSummary.runtimeStatusDetail}</small>
-          </div>
-          {props.readinessErrorMessage ? (
-            <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
-          ) : viewModel.coverageRows.length > 0 ? (
-            <details className="mqtt-coverage-details">
-              <summary className="mqtt-coverage-summary-toggle">
-                <span>播放器指標覆蓋狀況 (Coverage Findings)</span>
-                <span className="coverage-badge-count">{viewModel.topicWorkspaceSummary.coverageCount}</span>
-              </summary>
-              <div className="mqtt-runtime-feedback">
-                {viewModel.coverageRows.slice(0, 3).map((row) => (
-                  <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
-                    <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
-                    <div className="mqtt-runtime-feedback__copy">
-                      <strong>{row.metricLabelZh}</strong>
-                      <small>{row.detail}</small>
-                    </div>
-                  </div>
-                ))}
-                {viewModel.coverageRows.length > 3 ? (
-                  <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
-                ) : null}
+        {activeTopicWorkspaceTab === "source" ? (
+          <div className="mqtt-workspace-panel mqtt-source-panel">
+            {viewModel.feedbackBanner.detail ? (
+              <div className={`mgmt-status mqtt-workspace-status is-${viewModel.feedbackBanner.visualTone}`}>
+                {viewModel.feedbackBanner.detail}
               </div>
-            </details>
-          ) : null}
-        </div>
-        {viewModel.topicWorkspaceRows.length === 0 ? (
-          <div className="empty-block">尚未設定任何 topic mapping。<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>新增後即可在同一張卡內直接查看 runtime 狀態、coverage 與編輯欄位。</span></div>
-        ) : (
-          <div className="topic-workspace-list">
-            {viewModel.topicWorkspaceRows.map((topic) => (
-              <TopicWorkspaceRow
-                key={`workspace-${topic.id}`}
-                topic={topic}
-                handleTopicChange={props.handleTopicChange}
-                handleTopicPublishDraftChange={props.handleTopicPublishDraftChange}
-                publishDraftValue={props.topicPublishDrafts?.[topic.metricKey] ?? ""}
-                publishTopicValue={props.publishTopicValue}
-                publishingTopicKey={props.publishingTopicKey ?? null}
-                removeTopicMapping={props.removeTopicMapping}
-              />
-            ))}
+            ) : null}
+
+            <div className="seg mqtt-mode-seg" role="tablist">
+              {viewModel.modeOptions.map((option) => (
+                <button key={option.value} type="button" role="tab" aria-selected={option.isActive} className={option.isActive ? "active" : ""} onClick={() => props.handleSettingChange("dataMode", option.value)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="broker-fields">
+              {viewModel.brokerFields.map((field) => (
+                <label key={field.key} className="text-field">
+                  <span className="field-label">{field.label}</span>
+                  <input type={field.type} disabled={field.disabled} inputMode={field.inputMode === "numeric" ? "numeric" : undefined} value={field.value} onChange={(event) => props.handleSettingChange(field.key as keyof MqttSettingsForm, event.target.value as MqttSettingsForm[keyof MqttSettingsForm])} />
+                </label>
+              ))}
+            </div>
+            <div className={`conn-status mqtt-source-status ${connStatusVariant}`} role="status">
+              <span className="conn-status__dot" aria-hidden />
+              {viewModel.feedbackBanner.title}
+              <small>{viewModel.feedbackBanner.detail}</small>
+            </div>
           </div>
-        )}
-        <div className="map-actions">
-          <button type="button" className="map-add" onClick={props.addTopicMapping}>＋ 新增 mapping</button>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="map-add" disabled={viewModel.actions.reloadTopicsDisabled} onClick={() => void props.reloadTopics()}>{viewModel.actions.reloadTopicsLabel}</button>
-            <button type="button" className="map-save" disabled={viewModel.actions.saveMappingsDisabled} onClick={() => void props.saveTopicMappings()}>{viewModel.actions.saveMappingsLabel}</button>
+        ) : null}
+
+        {activeTopicWorkspaceTab === "topic" ? (
+          <div className="mqtt-workspace-panel mqtt-topic-panel">
+            {viewModel.feedbackBanner.detail ? (
+              <div className={`mgmt-status mqtt-workspace-status is-${viewModel.feedbackBanner.visualTone}`}>
+                {viewModel.feedbackBanner.detail}
+              </div>
+            ) : null}
+            <div className="mqtt-runtime-summary">
+              <div className={`conn-status mqtt-runtime-status ${resolveConnStatus(viewModel.topicWorkspaceSummary.runtimeStatusTone)}`} role="status">
+                <span className="conn-status__dot" aria-hidden />
+                {viewModel.topicWorkspaceSummary.runtimeStatusLabel}
+                <small>{viewModel.topicWorkspaceSummary.runtimeStatusDetail}</small>
+              </div>
+              {props.readinessErrorMessage ? (
+                <div className="mgmt-status is-error mqtt-runtime-feedback">{props.readinessErrorMessage}</div>
+              ) : viewModel.coverageRows.length > 0 ? (
+                <details className="mqtt-coverage-details">
+                  <summary className="mqtt-coverage-summary-toggle">
+                    <span>播放器指標覆蓋狀況 (Coverage Findings)</span>
+                    <span className="coverage-badge-count">{viewModel.topicWorkspaceSummary.coverageCount}</span>
+                  </summary>
+                  <div className="mqtt-runtime-feedback">
+                    {viewModel.coverageRows.slice(0, 3).map((row) => (
+                      <div key={`${row.pageId}-${row.requirementKey}`} className="mqtt-runtime-feedback__row">
+                        <span className={resolveCoverageChipClass(row.stateLabel)}>{row.stateLabel}</span>
+                        <div className="mqtt-runtime-feedback__copy">
+                          <strong>{row.metricLabelZh}</strong>
+                          <small>{row.detail}</small>
+                        </div>
+                      </div>
+                    ))}
+                    {viewModel.coverageRows.length > 3 ? (
+                      <p className="mqtt-runtime-feedback__more">另有 {viewModel.coverageRows.length - 3} 項 coverage finding，請完成 topic mapping 或等待首筆收值。</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+            {viewModel.topicWorkspaceRows.length === 0 ? (
+              <div className="empty-block">尚未設定任何 topic mapping。<br /><span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>新增後即可在同一張卡內直接查看 runtime 狀態、coverage 與編輯欄位。</span></div>
+            ) : (
+              <div className="topic-workspace-list">
+                {viewModel.topicWorkspaceRows.map((topic) => (
+                  <TopicWorkspaceRow
+                    key={`workspace-${topic.id}`}
+                    topic={topic}
+                    handleTopicChange={props.handleTopicChange}
+                    handleTopicPublishDraftChange={props.handleTopicPublishDraftChange}
+                    highlighted={props.highlightedTopicMetricKey === topic.metricKey}
+                    publishDraftValue={props.topicPublishDrafts?.[topic.metricKey] ?? ""}
+                    publishTopicValue={props.publishTopicValue}
+                    publishingTopicKey={props.publishingTopicKey ?? null}
+                    removeTopicMapping={props.removeTopicMapping}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="map-actions">
+              <button type="button" className="map-add" onClick={props.addTopicMapping}>＋ 新增 mapping</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" className="map-add" disabled={viewModel.actions.reloadTopicsDisabled} onClick={() => void props.reloadTopics()}>{viewModel.actions.reloadTopicsLabel}</button>
+                <button type="button" className="map-save" disabled={viewModel.actions.saveMappingsDisabled} onClick={() => void props.saveTopicMappings()}>{viewModel.actions.saveMappingsLabel}</button>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : null}
+
+        {activeTopicWorkspaceTab === "card-data" ? (
+          <div className="mqtt-workspace-panel mqtt-card-data-panel">
+            <div className="mqtt-card-data-toolbar">
+              {viewModel.feedbackBanner.detail ? (
+                <div className={`mgmt-status mqtt-workspace-status is-${viewModel.feedbackBanner.visualTone}`}>
+                  {viewModel.feedbackBanner.detail}
+                </div>
+              ) : null}
+              {cardDataSiteOptionsForEnabledPages.length > 1 ? (
+                <div className="mqtt-card-data-site-toggle" role="tablist" aria-label="卡片資料廠區">
+                  {cardDataSiteOptionsForEnabledPages.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeCardDataSite === option.value}
+                      className={activeCardDataSite === option.value ? "active" : ""}
+                      data-mqtt-card-data-site-toggle={option.value}
+                      onClick={() => selectCardDataSite(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {props.cardDataErrorMessage ? (
+              <div className="mgmt-status is-error mqtt-card-data-feedback">{props.cardDataErrorMessage}</div>
+            ) : null}
+            {props.isLoadingCardData ? (
+              <div className="empty-block">正在載入卡片資料診斷...</div>
+            ) : visibleCardDataRows.length === 0 ? (
+              <div className="empty-block">
+                尚未取得卡片資料診斷。<br />
+                <span style={{ display: "inline-block", marginTop: 8, fontSize: 13 }}>切換到此分頁後會列出卡片來源、缺值原因與展示覆寫。</span>
+              </div>
+            ) : (
+              <div className="mqtt-card-data-list">
+                {visibleCardDataRows.map((row) => {
+                  const publishActions = row.actions.filter(isPublishAction);
+                  const configureActions = row.actions.filter(isConfigureTopicAction);
+                  const calculationActions = row.actions.filter(isCalculationAction);
+                  const canSetOverride = row.actions.some((action) => action.type === "set-display-override");
+                  const overrideDraftValue = props.overrideDrafts?.[row.cardId] ?? "";
+                  const trimmedOverrideValue = overrideDraftValue.trim();
+                  const numericOverrideValue = Number(trimmedOverrideValue);
+                  const overrideInputInvalid =
+                    trimmedOverrideValue !== "" && !Number.isFinite(numericOverrideValue);
+                  const canSaveOverride =
+                    trimmedOverrideValue !== "" &&
+                    Number.isFinite(numericOverrideValue) &&
+                    props.savingOverrideTargetId !== row.cardId &&
+                    Boolean(props.saveDisplayOverride);
+                  const canClearOverride =
+                    Boolean(row.override) &&
+                    props.savingOverrideTargetId !== row.cardId &&
+                    Boolean(props.clearDisplayOverride);
+
+                  return (
+                  <article
+                    key={row.cardId}
+                    className="mqtt-card-data-row mgmt-interactive-card"
+                    data-mqtt-card-data-row={row.cardId}
+                  >
+                    <div className="mqtt-card-data-row__header">
+                      <div className="mqtt-card-data-row__title">
+                        <span className={resolveCardDataStatusClass(row.status)}>{row.status}</span>
+                        <strong>{resolveCardDataPageLabel(row.pageId)} · {row.label}</strong>
+                        <small>{row.metricKey}</small>
+                      </div>
+                      <div className="mqtt-card-data-row__value">
+                        <b>{row.displayValue}</b>
+                        <small>{row.unit}</small>
+                        {row.override ? (
+                          <span data-mqtt-card-override-state={row.override.active ? "active" : "inactive"}>
+                            {row.override.active ? "展示覆寫" : "覆寫停用"} · 原始 {row.originalValue ?? "--"} {row.unit}
+                          </span>
+                        ) : row.status === "overridden" ? (
+                          <span>原始 {row.originalValue ?? "--"} {row.unit}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mqtt-card-data-row__meta">
+                      <span>來源：{row.sourceClassification}</span>
+                      {row.aggregateSource ? <span>聚合：{row.aggregateSource}</span> : null}
+                      {row.formula ? <span>公式：{row.formula}</span> : null}
+                      {row.lastUpdatedAt ? <span>更新：{row.lastUpdatedAt}</span> : null}
+                    </div>
+                    <div className="mqtt-card-data-row__sources">
+                      <div>
+                        <span className="field-label">Topic</span>
+                        <p>{row.sourceTopics.length > 0 ? row.sourceTopics.map((topic) => `${topic.metricKey}=${topic.topic}`).join(", ") : "--"}</p>
+                      </div>
+                      <div>
+                        <span className="field-label">Depends on</span>
+                        <p>{row.dependencies.length > 0 ? row.dependencies.map((dependency) => `${dependency.metricKey}${dependency.topic ? `=${dependency.topic}` : ""}`).join(", ") : "--"}</p>
+                      </div>
+                      <div>
+                        <span className="field-label">Calculation</span>
+                        <p>{row.calculationFields.length > 0 ? row.calculationFields.join(", ") : "--"}</p>
+                      </div>
+                    </div>
+                    <div className="mqtt-card-data-row__actions">
+                      {canSetOverride ? (
+                        <div
+                          className="mqtt-card-data-row__override"
+                          data-mqtt-card-override-row={row.cardId}
+                          data-mqtt-card-override-invalid={overrideInputInvalid ? "true" : "false"}
+                          title="只改播放頁顯示值，不寫回 MQTT 或歷史資料"
+                        >
+                          <label className="input-group topic-workspace-row__publish-input">
+                            <span className="input-prefix">只改展示值</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              placeholder={row.originalValue ?? row.displayValue}
+                              title="只改播放頁顯示值，不寫回 MQTT 或歷史資料"
+                              value={overrideDraftValue}
+                              onChange={(event) => props.handleOverrideDraftChange?.(row.cardId, event.target.value)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="map-row__publish"
+                            disabled={!canSaveOverride}
+                            title="只改播放頁顯示值，不寫回 MQTT 或歷史資料"
+                            onClick={() => {
+                              if (!canSaveOverride || !props.saveDisplayOverride) return;
+                              void props.saveDisplayOverride(row.cardId, numericOverrideValue);
+                            }}
+                          >
+                            {props.savingOverrideTargetId === row.cardId ? "套用中..." : "套用展示值"}
+                          </button>
+                          <button
+                            type="button"
+                            className="map-add"
+                            disabled={!canClearOverride}
+                            title="清除展示覆寫，恢復原始資料顯示"
+                            onClick={() => {
+                              if (!canClearOverride || !props.clearDisplayOverride) return;
+                              void props.clearDisplayOverride(row.cardId);
+                            }}
+                          >
+                            清除覆寫
+                          </button>
+                          {overrideInputInvalid ? <small>請輸入數字</small> : null}
+                        </div>
+                      ) : null}
+                      {publishActions.map((action) => {
+                        const draftValue = props.topicPublishDrafts?.[action.metricKey] ?? "";
+                        const trimmedValue = draftValue.trim();
+                        const numericValue = Number(trimmedValue);
+                        const canPublish =
+                          trimmedValue !== "" &&
+                          Number.isFinite(numericValue) &&
+                          props.publishingTopicKey !== action.metricKey &&
+                          Boolean(props.publishTopicValue);
+
+                        return (
+                          <div
+                            key={`publish-${action.metricKey}`}
+                            className="mqtt-card-data-row__publish"
+                            data-mqtt-card-publish-row={action.metricKey}
+                            data-mqtt-card-publish-disabled={canPublish ? "false" : "true"}
+                            title="發佈數字到此 metric 對應的 MQTT topic，會走真實資料流程"
+                          >
+                            <label className="input-group topic-workspace-row__publish-input">
+                              <span className="input-prefix">發佈到 MQTT</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                placeholder="輸入要發佈的 MQTT 數值"
+                                title="發佈數字到此 metric 對應的 MQTT topic，會走真實資料流程"
+                                value={draftValue}
+                                onChange={(event) => props.handleTopicPublishDraftChange?.(action.metricKey, event.target.value)}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="map-row__publish"
+                              disabled={!canPublish}
+                              title="發佈數字到此 metric 對應的 MQTT topic，會走真實資料流程"
+                              onClick={() => {
+                                if (!canPublish || !props.publishTopicValue) return;
+                                void props.publishTopicValue(action.metricKey, numericValue);
+                              }}
+                            >
+                              {props.publishingTopicKey === action.metricKey ? "發佈中..." : "發佈到 MQTT"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {configureActions.map((action) => (
+                        <button
+                          key={`configure-${action.metricKey}`}
+                          type="button"
+                          className="map-add"
+                          data-mqtt-card-configure-topic={action.metricKey}
+                          onClick={() => props.handleConfigureTopicMetric?.(action.metricKey)}
+                        >
+                          設定 Topic：{action.metricKey}
+                        </button>
+                      ))}
+                      {calculationActions.flatMap((action) =>
+                        action.fields.map((field) => (
+                          <span key={`calc-${field}`} className="mgmt-chip" data-mqtt-card-calculation-field={field}>
+                            {field}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="settings-card mgmt-interactive-card mqtt-weather-card" data-mqtt-section="weather-card">

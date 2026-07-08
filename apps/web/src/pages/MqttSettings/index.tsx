@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type DisplayCardDataResponse,
   DEFAULT_WEATHER_SETTINGS,
+  type PlaybackPage,
   type WeatherFieldKey,
   type WeatherHeaderContract,
   type WeatherOptionsResponse,
@@ -19,11 +21,16 @@ import {
   getWeatherOptions,
   getWeatherPreview,
   getWeatherSettings,
+  getDisplayCardData,
+  getPlaybackPages,
+  clearDisplayCardOverride,
   requestJson,
+  saveDisplayCardOverride,
   updateWeatherSettings
 } from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
+import type { CardDataSiteFilter, TopicWorkspaceTab } from "./MqttSettingsContent";
 import { type ActionState, type ConnectionTestFeedback, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
@@ -125,6 +132,14 @@ export function MqttSettings() {
   const lastSyncedTopicsRef = useRef(lastSyncedTopics);
   const [topicPublishDrafts, setTopicPublishDrafts] = useState<Record<string, string>>({});
   const [publishingTopicKey, setPublishingTopicKey] = useState<string | null>(null);
+  const [overrideDrafts, setOverrideDrafts] = useState<Record<string, string>>({});
+  const [savingOverrideTargetId, setSavingOverrideTargetId] = useState<string | null>(null);
+  const [activeTopicWorkspaceTab, setActiveTopicWorkspaceTab] = useState<TopicWorkspaceTab>("topic");
+  const [activeCardDataSite, setActiveCardDataSite] = useState<CardDataSiteFilter>("jungli");
+  const [highlightedTopicMetricKey, setHighlightedTopicMetricKey] = useState<string | null>(null);
+  const [cardData, setCardData] = useState<DisplayCardDataResponse | null>(null);
+  const [cardDataErrorMessage, setCardDataErrorMessage] = useState("");
+  const [playbackPages, setPlaybackPages] = useState<PlaybackPage[]>([]);
   const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
     useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
@@ -142,6 +157,7 @@ export function MqttSettings() {
     isSavingSettings: false,
     isSavingTopics: false,
     isTestingConnection: false,
+    isLoadingCardData: false,
     isRefreshingWeather: false
   });
   const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(initialEditableModel !== null);
@@ -279,6 +295,14 @@ export function MqttSettings() {
     }
   };
 
+  const loadPlaybackPages = useCallback(async () => {
+    try {
+      setPlaybackPages(await getPlaybackPages());
+    } catch {
+      setPlaybackPages([]);
+    }
+  }, []);
+
   const loadMqttEditableModel = async ({
     force = false,
     propagateError = false,
@@ -313,13 +337,14 @@ export function MqttSettings() {
     const bootstrap = async () => {
       try {
         await loadMqttEditableModel({ force: initialEditableModel !== null });
+        await loadPlaybackPages();
       } catch {
         // individual loaders surface their own errors
       }
     };
     void bootstrap();
 
-  }, [initialEditableModel]);
+  }, [initialEditableModel, loadPlaybackPages]);
 
   useEffect(() => {
     if (!hasLoadedTopics) {
@@ -338,6 +363,26 @@ export function MqttSettings() {
       window.clearInterval(pollTimer);
     };
   }, [hasLoadedTopics]);
+
+  const loadCardData = useCallback(async () => {
+    setActionState((current) => ({ ...current, isLoadingCardData: true }));
+    try {
+      setCardData(await getDisplayCardData());
+      setCardDataErrorMessage("");
+    } catch (error) {
+      setCardDataErrorMessage(error instanceof Error ? error.message : "載入卡片資料診斷失敗。");
+    } finally {
+      setActionState((current) => ({ ...current, isLoadingCardData: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedMqttEditableModel || activeTopicWorkspaceTab !== "card-data") {
+      return;
+    }
+
+    void loadCardData();
+  }, [activeTopicWorkspaceTab, hasLoadedMqttEditableModel, loadCardData]);
 
   useEffect(() => {
     if (!hasLoadedWeatherSettings) {
@@ -426,6 +471,15 @@ export function MqttSettings() {
 
   const handleTopicPublishDraftChange = useCallback((metricKey: string, value: string) => {
     setTopicPublishDrafts((current) => ({ ...current, [metricKey]: value }));
+  }, []);
+
+  const handleOverrideDraftChange = useCallback((targetId: string, value: string) => {
+    setOverrideDrafts((current) => ({ ...current, [targetId]: value }));
+  }, []);
+
+  const handleConfigureTopicMetric = useCallback((metricKey: string) => {
+    setHighlightedTopicMetricKey(metricKey);
+    setActiveTopicWorkspaceTab("topic");
   }, []);
 
   const handleWeatherSettingChange = useCallback(<Key extends keyof WeatherSettings>(
@@ -521,13 +575,51 @@ export function MqttSettings() {
       setMessage(`MQTT 測試值已發佈：${metricKey}`);
       setErrorMessage("");
       await loadTopics({ isPolling: true });
+      if (activeTopicWorkspaceTab === "card-data") {
+        await loadCardData();
+      }
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "發佈 MQTT 測試值失敗。");
     } finally {
       setPublishingTopicKey(null);
     }
-  }, [reloadReadiness]);
+  }, [activeTopicWorkspaceTab, loadCardData, reloadReadiness]);
+
+  const saveDisplayOverride = useCallback(async (targetId: string, value: number) => {
+    if (!Number.isFinite(value)) {
+      setErrorMessage("展示覆寫值必須是數字。");
+      return;
+    }
+
+    setSavingOverrideTargetId(targetId);
+    try {
+      await saveDisplayCardOverride(targetId, value);
+      setOverrideDrafts((current) => ({ ...current, [targetId]: "" }));
+      setMessage(`展示覆寫已套用：${targetId}`);
+      setErrorMessage("");
+      await loadCardData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "套用展示覆寫失敗。");
+    } finally {
+      setSavingOverrideTargetId(null);
+    }
+  }, [loadCardData]);
+
+  const clearDisplayOverride = useCallback(async (targetId: string) => {
+    setSavingOverrideTargetId(targetId);
+    try {
+      await clearDisplayCardOverride(targetId);
+      setOverrideDrafts((current) => ({ ...current, [targetId]: "" }));
+      setMessage(`展示覆寫已清除：${targetId}`);
+      setErrorMessage("");
+      await loadCardData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "清除展示覆寫失敗。");
+    } finally {
+      setSavingOverrideTargetId(null);
+    }
+  }, [loadCardData]);
 
   const saveTopicMappings = useCallback(async () => {
     setActionState((current) => ({ ...current, isSavingTopics: true }));
@@ -613,24 +705,53 @@ export function MqttSettings() {
     relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
       await loadMqttEditableModel({ propagateError: true, topicsAsPolling: true });
+      await loadPlaybackPages();
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }
   });
 
   useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, MQTT_SETTINGS_DISPLAY_SYNC_SCOPES);
 
+  const enabledCardDataSites = useMemo<CardDataSiteFilter[]>(() => {
+    const enabledPageKeys = new Set(
+      playbackPages.filter((page) => page.enabled).map((page) => page.pageKey)
+    );
+    const sites: CardDataSiteFilter[] = [];
+    if (enabledPageKeys.has("factory-circuit")) sites.push("jungli");
+    if (enabledPageKeys.has("factory-circuit-guanyin")) sites.push("guanyin");
+    return sites.length > 0 ? sites : ["jungli", "guanyin"];
+  }, [playbackPages]);
+
+  useEffect(() => {
+    if (!enabledCardDataSites.includes(activeCardDataSite)) {
+      setActiveCardDataSite(enabledCardDataSites[0] ?? "jungli");
+    }
+  }, [activeCardDataSite, enabledCardDataSites]);
+
   return (
     <MqttSettingsContent
       actionState={actionState}
+      activeCardDataSite={activeCardDataSite}
+      activeTopicWorkspaceTab={activeTopicWorkspaceTab}
       addTopicMapping={addTopicMapping}
+      cardDataErrorMessage={cardDataErrorMessage}
+      cardDataRows={cardData?.rows ?? []}
+      clearDisplayOverride={clearDisplayOverride}
       draftSections={draftSections}
+      enabledCardDataSites={enabledCardDataSites}
       errorMessage={errorMessage}
       handleSettingChange={handleSettingChange}
+      handleCardDataSiteChange={setActiveCardDataSite}
+      handleConfigureTopicMetric={handleConfigureTopicMetric}
+      handleOverrideDraftChange={handleOverrideDraftChange}
       handleTopicChange={handleTopicChange}
       handleTopicPublishDraftChange={handleTopicPublishDraftChange}
+      handleTopicWorkspaceTabChange={setActiveTopicWorkspaceTab}
       lastConnectionTest={lastConnectionTest}
       liveMetricsConnectionState={liveMetricsConnectionState}
       liveMetricsSnapshot={liveMetricsSnapshot}
+      isLoadingCardData={actionState.isLoadingCardData}
+      highlightedTopicMetricKey={highlightedTopicMetricKey}
       message={message}
       readiness={readiness}
       readinessErrorMessage={readinessErrorMessage}
@@ -646,8 +767,11 @@ export function MqttSettings() {
       removeTopicMapping={removeTopicMapping}
       publishTopicValue={publishTopicValue}
       publishingTopicKey={publishingTopicKey}
+      overrideDrafts={overrideDrafts}
       saveSettings={saveSettings}
+      saveDisplayOverride={saveDisplayOverride}
       saveTopicMappings={saveTopicMappings}
+      savingOverrideTargetId={savingOverrideTargetId}
       settings={settings}
       status={status}
       testConnection={testConnection}

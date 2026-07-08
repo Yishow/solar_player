@@ -198,6 +198,13 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
     setIsDraggable(false);
   };
 
+  const setFactorySiteEnabled = (pageKey: string, enabled: boolean) => {
+    markDirty();
+    setPages((current) =>
+      current.map((page) => (page.pageKey === pageKey ? { ...page, enabled } : page))
+    );
+  };
+
   return (
     <div className="ps-bottom-cards">
       <div className="ps-card-wrapper ps-card-order">
@@ -341,6 +348,27 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
               <div className="ps-row-label">循環播放 <small>Loop Mode</small></div>
               <Switch ariaLabel="循環播放" on={settings?.loop ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("loop", next)} />
             </div>
+            {viewModel.factorySiteRows.length > 0 ? (
+              <div className="ps-site-control">
+                <div className="ps-row-label">廠區啟用 <small>Factory Sites</small></div>
+                <div className="ps-site-control__list">
+                  {viewModel.factorySiteRows.map((site) => (
+                    <div key={site.pageKey} className={`ps-site-control__row${!site.enabled ? " is-disabled" : ""}`}>
+                      <div className="ps-site-control__copy">
+                        <strong>{site.label}</strong>
+                        <small>{site.detail}</small>
+                      </div>
+                      <Switch
+                        ariaLabel={`${site.label} Factory Circuit`}
+                        disabled={formDisabled}
+                        on={site.enabled}
+                        onChange={(next) => setFactorySiteEnabled(site.pageKey, next)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="ps-row-flex">
               <div className="ps-row-label">轉場效果 <small>Transition Effect</small></div>
               <CustomSelect

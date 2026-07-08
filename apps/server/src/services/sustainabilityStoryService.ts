@@ -13,6 +13,10 @@ import {
 import { getDatabase } from "../db/index.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
+import {
+  formatDisplayOverrideValue,
+  readActiveDisplayValueOverrides
+} from "./displayValueOverrideService.js";
 import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
 
 const settingKey = "sustainability_story";
@@ -31,6 +35,9 @@ type CounterSnapshot = {
 };
 
 type CounterMap = Map<string, CounterSnapshot>;
+type SustainabilityStoryReadOptions = {
+  applyDisplayOverrides?: boolean;
+};
 
 const liveMetricCounterFallbackMap: Record<CounterMetricKey, string> = {
   co2: "totalCo2Reduction",
@@ -462,7 +469,43 @@ function mergePeriod(
   } satisfies SustainabilityPeriodStoryInput;
 }
 
-export function readSustainabilityStory(period?: SustainabilityPeriodKey) {
+function applyHouseholdDisplayOverrides(
+  householdEquivalents: ReturnType<typeof readHouseholdEquivalenceCards>
+) {
+  const overrides = readActiveDisplayValueOverrides();
+
+  return {
+    cumulative: (() => {
+      const override = overrides.get("sustainability.household.cumulative");
+      return override
+        ? {
+            ...householdEquivalents.cumulative,
+            householdCountDisplay: formatDisplayOverrideValue(
+              override.displayValue,
+              override.unit ?? householdEquivalents.cumulative.householdLabel
+            )
+          }
+        : householdEquivalents.cumulative;
+    })(),
+    today: (() => {
+      const override = overrides.get("sustainability.household.today");
+      return override
+        ? {
+            ...householdEquivalents.today,
+            householdCountDisplay: formatDisplayOverrideValue(
+              override.displayValue,
+              override.unit ?? householdEquivalents.today.householdLabel
+            )
+          }
+        : householdEquivalents.today;
+    })()
+  };
+}
+
+export function readSustainabilityStory(
+  period?: SustainabilityPeriodKey,
+  options: SustainabilityStoryReadOptions = {}
+) {
   const storyConfig = readStoredStory();
   const counterMap = readCounterSnapshots();
   const householdEquivalents = readHouseholdEquivalenceCards();
@@ -474,7 +517,10 @@ export function readSustainabilityStory(period?: SustainabilityPeriodKey) {
   ) as SustainabilityStoryInput["periods"];
   const story = normalizeSustainabilityStory({
     ...storyConfig,
-    householdEquivalents,
+    householdEquivalents:
+      options.applyDisplayOverrides === false
+        ? householdEquivalents
+        : applyHouseholdDisplayOverrides(householdEquivalents),
     periods: derivedPeriods
   });
   const resolved = resolveSustainabilityStoryPeriod(story, period);

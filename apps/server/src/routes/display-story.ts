@@ -8,7 +8,8 @@ import {
 const displayStoryPageIds = new Set<DisplayStoryPageId>([
   "overview",
   "solar",
-  "factory-circuit"
+  "factory-circuit",
+  "factory-circuit-guanyin"
 ]);
 
 function isDisplayStoryPageId(pageId: string): pageId is DisplayStoryPageId {

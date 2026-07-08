@@ -32,6 +32,12 @@ type BuildPlaybackSettingsViewModelArgs = {
 };
 
 export type PlaybackSettingsFormViewModel = {
+  factorySiteRows: Array<{
+    detail: string;
+    enabled: boolean;
+    label: string;
+    pageKey: string;
+  }>;
   pageRows: Array<
     PlaybackPage & {
       canMoveDown: boolean;
@@ -57,9 +63,21 @@ const builtInPlaybackPageLabelMap = new Map([
   ["overview", "總覽"],
   ["solar", "太陽能"],
   ["factory-circuit", "工廠迴路"],
+  ["factory-circuit-guanyin", "工廠迴路（觀音）"],
   ["images", "圖庫"],
   ["sustainability", "永續"]
 ]);
+
+const factorySitePlaybackPageDefinitions = [
+  {
+    label: "中壢廠",
+    pageKey: "factory-circuit"
+  },
+  {
+    label: "觀音廠",
+    pageKey: "factory-circuit-guanyin"
+  }
+] as const;
 
 const displayOpsTextReplacements = [
   ["Asset is still referenced by a live display surface", "素材仍被正式展示頁引用"],
@@ -284,6 +302,19 @@ export function buildPlaybackSettingsFormViewModel({
   const sortedPages = sortPlaybackPages(pages);
 
   return {
+    factorySiteRows: factorySitePlaybackPageDefinitions.flatMap((site) => {
+      const page = sortedPages.find((candidate) => candidate.pageKey === site.pageKey);
+      if (!page) {
+        return [];
+      }
+
+      return [{
+        detail: `${page.labelZh} · ${page.route}`,
+        enabled: page.enabled,
+        label: site.label,
+        pageKey: site.pageKey
+      }];
+    }),
     pageRows: sortedPages.map((page, index) => ({
       ...page,
       canMoveDown: index < sortedPages.length - 1,

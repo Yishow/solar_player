@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { WeatherCurrentSnapshot, WeatherHeaderContract, WeatherOptionsResponse, WeatherSettings } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MqttSettingsContent } from "./MqttSettingsContent";
+
+const mqttSettingsCss = readFileSync(
+  new URL("./mqttSettings.css", import.meta.url),
+  "utf8"
+);
 
 function createWeatherSettings(overrides: Partial<WeatherSettings> = {}): WeatherSettings {
   return {
@@ -190,6 +196,438 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
   assert.match(html, /發佈測試值/);
   assert.match(html, /data-mqtt-publish-row="consumptionEnergy"[^>]*data-mqtt-publish-disabled="true"/);
   assert.match(html, /data-mqtt-publish-row="todayGeneration"[^>]*data-mqtt-publish-disabled="true"/);
+});
+
+test("mqtt settings content combines source mode and topic controls into a three-tab workspace", () => {
+  const html = renderContent({
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "realTimePower",
+        nameEn: null,
+        nameZh: "即時發電功率",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-section="topic-workspace"/);
+  assert.match(html, /data-mqtt-workspace-tab="source"/);
+  assert.match(html, /data-mqtt-workspace-tab="topic"/);
+  assert.match(html, /data-mqtt-workspace-tab="card-data"/);
+  assert.match(html, /資料來源模式/);
+  assert.match(html, /Topic mapping/);
+  assert.match(html, /卡片資料管理/);
+  assert.match(html, /data-mqtt-row="editable-topic-row"/);
+  assert.doesNotMatch(html, /data-mqtt-section="source-mode-card"/);
+  assert.doesNotMatch(html, /class="[^"]*mqtt-mode/);
+});
+
+test("mqtt settings content renders source mode controls inside the merged workspace tab", () => {
+  const html = renderContent({
+    activeTopicWorkspaceTab: "source",
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt",
+      host: "localhost",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "localhost:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T09:31:00.000Z"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "realTimePower",
+        nameEn: null,
+        nameZh: "即時發電功率",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /aria-selected="true"[^>]*data-mqtt-workspace-tab="source"/);
+  assert.match(html, /Broker 主機/);
+  assert.match(html, /value="localhost"/);
+  assert.match(html, /Test connection/);
+  assert.match(html, /Save settings/);
+  assert.match(html, /Broker 已連線/);
+  assert.doesNotMatch(html, /data-mqtt-row="editable-topic-row"/);
+});
+
+test("mqtt settings content renders card data diagnostics in the third workspace tab", () => {
+  const html = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    publishTopicValue: async () => undefined,
+    topicPublishDrafts: {
+      realTimePower: "60"
+    },
+    cardDataRows: [
+      {
+        actions: [{ metricKey: "realTimePower", type: "publish-test-value" }, { type: "set-display-override" }],
+        aggregateSource: null,
+        calculationFields: [],
+        cardId: "overview.realTimePower",
+        dependencies: [
+          {
+            latestValue: "42 kW",
+            metricKey: "realTimePower",
+            status: "ready",
+            topic: "kuozui/plant/solar/power"
+          }
+        ],
+        displayValue: "42.0",
+        formula: null,
+        label: "即時發電功率",
+        lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+        metricKey: "realTimePower",
+        originalValue: "42.0",
+        override: null,
+        pageId: "overview",
+        sourceClassification: "mqtt-live",
+        sourceTopics: [{ metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }],
+        status: "ready",
+        unit: "kW"
+      },
+      {
+        actions: [{ metricKey: "todayGeneration", type: "configure-topic" }],
+        aggregateSource: null,
+        calculationFields: [],
+        cardId: "overview.todayGeneration",
+        dependencies: [
+          {
+            latestValue: null,
+            metricKey: "todayGeneration",
+            status: "missing-topic",
+            topic: null
+          }
+        ],
+        displayValue: "--",
+        formula: null,
+        label: "今日發電量",
+        lastUpdatedAt: null,
+        metricKey: "todayGeneration",
+        originalValue: "--",
+        override: null,
+        pageId: "overview",
+        sourceClassification: "mqtt-live",
+        sourceTopics: [],
+        status: "missing-topic",
+        unit: "kWh"
+      },
+      {
+        actions: [{ fields: ["householdDailyUsageKwh"], type: "edit-calculation-settings" }],
+        aggregateSource: "daily-self-consumption",
+        calculationFields: ["householdDailyUsageKwh"],
+        cardId: "sustainability.household.today",
+        dependencies: [],
+        displayValue: "4",
+        formula: "daily selfConsumption / householdDailyUsageKwh",
+        label: "今日綠電效益",
+        lastUpdatedAt: "2026-07-08T00:00:00.000Z",
+        metricKey: "householdEquivalent.today",
+        originalValue: "4",
+        override: null,
+        pageId: "sustainability",
+        sourceClassification: "daily-summary",
+        sourceTopics: [],
+        status: "ready",
+        unit: "戶4口之家"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-card-data-row="overview\.realTimePower"/);
+  assert.match(html, /data-mqtt-card-publish-row="realTimePower"[^>]*data-mqtt-card-publish-disabled="false"/);
+  assert.match(html, /Overview/);
+  assert.match(html, /即時發電功率/);
+  assert.match(html, /42.0/);
+  assert.match(html, /kuozui\/plant\/solar\/power/);
+  assert.match(html, /realTimePower/);
+  assert.match(html, /data-mqtt-card-data-row="sustainability\.household\.today"/);
+  assert.match(html, /data-mqtt-card-configure-topic="todayGeneration"/);
+  assert.match(html, /daily-self-consumption/);
+  assert.match(html, /householdDailyUsageKwh/);
+  assert.match(html, /data-mqtt-card-calculation-field="householdDailyUsageKwh"/);
+  assert.match(html, /daily selfConsumption \/ householdDailyUsageKwh/);
+});
+
+test("mqtt settings content labels Guanyin Factory Circuit card diagnostics distinctly", () => {
+  const html = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    activeCardDataSite: "guanyin",
+    cardDataRows: [
+      {
+        actions: [{ metricKey: "factoryCircuit.guanyin.stampingPower", type: "publish-test-value" }],
+        aggregateSource: null,
+        calculationFields: [],
+        cardId: "factory-circuit-guanyin.slot.stamping",
+        dependencies: [
+          {
+            latestValue: "20 kW",
+            metricKey: "factoryCircuit.guanyin.stampingPower",
+            status: "ready",
+            topic: "factory/guanyin/stamping"
+          }
+        ],
+        displayValue: "20.0",
+        formula: null,
+        label: "觀音沖壓",
+        lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+        metricKey: "factoryCircuit.guanyin.stampingPower",
+        originalValue: "20.0",
+        override: null,
+        pageId: "factory-circuit-guanyin",
+        sourceClassification: "mqtt-live",
+        sourceTopics: [
+          {
+            metricKey: "factoryCircuit.guanyin.stampingPower",
+            topic: "factory/guanyin/stamping"
+          }
+        ],
+        status: "ready",
+        unit: "kW"
+      }
+    ]
+  });
+
+  assert.match(html, /Factory Circuit \(Guanyin\)/);
+  assert.match(html, /factoryCircuit\.guanyin\.stampingPower/);
+});
+
+test("mqtt settings content filters card data diagnostics by factory site", () => {
+  const cardDataRows: NonNullable<React.ComponentProps<typeof MqttSettingsContent>["cardDataRows"]> = [
+    {
+      actions: [{ metricKey: "factoryStampingPower", type: "publish-test-value" }],
+      aggregateSource: null,
+      calculationFields: [],
+      cardId: "factory-circuit.slot.stamping",
+      dependencies: [
+        {
+          latestValue: "10 kW",
+          metricKey: "factoryStampingPower",
+          status: "ready",
+          topic: "factory/jungli/stamping"
+        }
+      ],
+      displayValue: "10.0",
+      formula: null,
+      label: "中壢沖壓",
+      lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+      metricKey: "factoryStampingPower",
+      originalValue: "10.0",
+      override: null,
+      pageId: "factory-circuit",
+      sourceClassification: "mqtt-live",
+      sourceTopics: [{ metricKey: "factoryStampingPower", topic: "factory/jungli/stamping" }],
+      status: "ready",
+      unit: "kW"
+    },
+    {
+      actions: [{ metricKey: "factoryCircuit.guanyin.stampingPower", type: "publish-test-value" }],
+      aggregateSource: null,
+      calculationFields: [],
+      cardId: "factory-circuit-guanyin.slot.stamping",
+      dependencies: [
+        {
+          latestValue: "20 kW",
+          metricKey: "factoryCircuit.guanyin.stampingPower",
+          status: "ready",
+          topic: "factory/guanyin/stamping"
+        }
+      ],
+      displayValue: "20.0",
+      formula: null,
+      label: "觀音沖壓",
+      lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+      metricKey: "factoryCircuit.guanyin.stampingPower",
+      originalValue: "20.0",
+      override: null,
+      pageId: "factory-circuit-guanyin",
+      sourceClassification: "mqtt-live",
+      sourceTopics: [{ metricKey: "factoryCircuit.guanyin.stampingPower", topic: "factory/guanyin/stamping" }],
+      status: "ready",
+      unit: "kW"
+    },
+    {
+      actions: [{ metricKey: "realTimePower", type: "publish-test-value" }],
+      aggregateSource: null,
+      calculationFields: [],
+      cardId: "overview.realTimePower",
+      dependencies: [],
+      displayValue: "42.0",
+      formula: null,
+      label: "即時發電功率",
+      lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+      metricKey: "realTimePower",
+      originalValue: "42.0",
+      override: null,
+      pageId: "overview",
+      sourceClassification: "mqtt-live",
+      sourceTopics: [{ metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }],
+      status: "ready",
+      unit: "kW"
+    }
+  ];
+
+  const jungliHtml = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    cardDataRows
+  });
+
+  assert.match(jungliHtml, /data-mqtt-card-data-site-toggle="jungli"/);
+  assert.match(jungliHtml, /data-mqtt-card-data-site-toggle="guanyin"/);
+  assert.match(jungliHtml, /中壢沖壓/);
+  assert.doesNotMatch(jungliHtml, /觀音沖壓/);
+  assert.match(jungliHtml, /即時發電功率/);
+
+  const guanyinHtml = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    activeCardDataSite: "guanyin",
+    cardDataRows
+  });
+
+  assert.doesNotMatch(guanyinHtml, /中壢沖壓/);
+  assert.match(guanyinHtml, /觀音沖壓/);
+  assert.match(guanyinHtml, /即時發電功率/);
+
+  const jungliOnlyHtml = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    cardDataRows,
+    enabledCardDataSites: ["jungli"]
+  });
+
+  assert.doesNotMatch(jungliOnlyHtml, /data-mqtt-card-data-site-toggle="guanyin"/);
+  assert.match(jungliOnlyHtml, /中壢沖壓/);
+  assert.doesNotMatch(jungliOnlyHtml, /觀音沖壓/);
+});
+
+test("mqtt settings content renders display override controls and invalid numeric state", () => {
+  const html = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    clearDisplayOverride: async () => undefined,
+    handleOverrideDraftChange: () => undefined,
+    handleTopicPublishDraftChange: () => undefined,
+    overrideDrafts: {
+      "overview.realTimePower": "good looking"
+    },
+    publishTopicValue: async () => undefined,
+    saveDisplayOverride: async () => undefined,
+    topicPublishDrafts: {
+      realTimePower: "60"
+    },
+    cardDataRows: [
+      {
+        actions: [{ metricKey: "realTimePower", type: "publish-test-value" }, { type: "set-display-override" }],
+        aggregateSource: null,
+        calculationFields: [],
+        cardId: "overview.realTimePower",
+        dependencies: [],
+        displayValue: "60.0",
+        formula: null,
+        label: "即時發電功率",
+        lastUpdatedAt: "2026-07-08T09:00:00.000Z",
+        metricKey: "realTimePower",
+        originalValue: "42.0",
+        override: {
+          active: true,
+          cardId: "overview.realTimePower",
+          displayValue: 60,
+          enabled: true,
+          expiresAt: null,
+          metricKey: "realTimePower",
+          pageId: "overview",
+          reason: null,
+          targetId: "overview.realTimePower",
+          unit: "kW",
+          updatedAt: "2026-07-08T09:10:00.000Z"
+        },
+        pageId: "overview",
+        sourceClassification: "mqtt-live",
+        sourceTopics: [],
+        status: "overridden",
+        unit: "kW"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-card-override-row="overview\.realTimePower"/);
+  assert.match(html, /data-mqtt-card-publish-row="realTimePower"/);
+  assert.ok(
+    html.indexOf('data-mqtt-card-override-row="overview.realTimePower"') <
+      html.indexOf('data-mqtt-card-publish-row="realTimePower"')
+  );
+  assert.match(html, /data-mqtt-card-override-invalid="true"/);
+  assert.match(html, /data-mqtt-card-override-state="active"/);
+  assert.match(html, /展示覆寫/);
+  assert.match(html, /原始 42\.0 kW/);
+  assert.match(html, /只改展示值/);
+  assert.match(html, /套用展示值/);
+  assert.match(html, /清除覆寫/);
+  assert.match(html, /發佈到 MQTT/);
+  assert.match(html, /title="只改播放頁顯示值，不寫回 MQTT 或歷史資料"/);
+  assert.match(html, /title="發佈數字到此 metric 對應的 MQTT topic，會走真實資料流程"/);
+  assert.match(html, /請輸入數字/);
+});
+
+test("mqtt card data action input prefixes stay horizontal", () => {
+  assert.match(
+    mqttSettingsCss,
+    /\.mqtt-settings-page \.mqtt-card-data-row__(?:publish|override) \.input-prefix[\s\S]*white-space:\s*nowrap/
+  );
+  assert.match(
+    mqttSettingsCss,
+    /\.mqtt-settings-page \.mqtt-card-data-row__(?:publish|override) \.input-prefix[\s\S]*min-width:\s*96px/
+  );
+});
+
+test("mqtt settings content marks the topic row highlighted by card data actions", () => {
+  const html = renderContent({
+    highlightedTopicMetricKey: "todayGeneration",
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "todayGeneration",
+        nameEn: null,
+        nameZh: "今日發電量",
+        quality: null,
+        rawPayload: null,
+        topic: "",
+        unit: "kWh",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-topic-highlighted="true"/);
 });
 
 test("mqtt settings content renders readiness coverage rows that distinguish mapping gaps from idle runtime topics", () => {

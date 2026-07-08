@@ -1,4 +1,4 @@
-import type { CircuitConfig } from "@solar-display/shared";
+import type { CircuitConfig, PlaybackPage } from "@solar-display/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import { useDisplaySyncDraftGuard } from "../../hooks/displaySyncDraftGuard";
@@ -36,6 +36,13 @@ type CircuitEditableModelLoadOptions = {
   propagateError?: boolean;
   silent?: boolean;
 };
+
+type CircuitSiteKey = "factory-circuit" | "factory-circuit-guanyin";
+
+const circuitSiteDefinitions: Array<{ label: string; pageKey: CircuitSiteKey }> = [
+  { label: "中壢廠", pageKey: "factory-circuit" },
+  { label: "觀音廠", pageKey: "factory-circuit-guanyin" }
+];
 
 export async function loadCircuitSettingsRoute() {
   try {
@@ -83,9 +90,9 @@ function toCircuitPayload(circuit: CircuitConfig): Omit<CircuitConfig, "id"> {
   return payload;
 }
 
-function buildNewCircuitDraft(circuits: CircuitConfig[]): Partial<CircuitConfig> {
-  const nextOrder =
-    circuits.reduce((maxOrder, circuit) => Math.max(maxOrder, circuit.displayOrder ?? 0), 0) + 1;
+function buildNewCircuitDraft(circuits: CircuitConfig[], pageKey: CircuitSiteKey): Partial<CircuitConfig> {
+  const siteCircuits = circuits.filter((circuit) => circuit.pageKey === pageKey);
+  const nextOrder = siteCircuits.reduce((maxOrder, circuit) => Math.max(maxOrder, circuit.displayOrder ?? 0), 0) + 1;
   return {
     attentionMax: 90,
     attentionMin: 70,
@@ -99,6 +106,7 @@ function buildNewCircuitDraft(circuits: CircuitConfig[]): Partial<CircuitConfig>
     normalMax: 70,
     normalMin: 0,
     ratedCapacity: 100,
+    pageKey,
     unit: "kW",
     warningMax: 100,
     warningMin: 90
@@ -113,6 +121,8 @@ function parseNumberInput(value: string, fallback = 0) {
 export function CircuitSettings() {
   const initialEditableModel = useMemo(() => readCachedCircuitEditableModel(), []);
   const [circuits, setCircuits] = useState<CircuitConfig[]>(initialEditableModel?.circuits ?? []);
+  const [playbackPages, setPlaybackPages] = useState<PlaybackPage[]>(initialEditableModel?.playbackPages ?? []);
+  const [activeSiteKey, setActiveSiteKey] = useState<CircuitSiteKey>("factory-circuit");
   const [dirtyIds, setDirtyIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(initialEditableModel === null);
   const [isAdding, setIsAdding] = useState(false);
@@ -134,8 +144,28 @@ export function CircuitSettings() {
 
   const applyCircuitEditableModel = (model: CircuitEditableModel) => {
     setCircuits(model.circuits);
+    setPlaybackPages(model.playbackPages);
     setHasLoadedCircuits(true);
   };
+
+  const enabledCircuitSiteOptions = useMemo(() => {
+    const playbackPageByKey = new Map(playbackPages.map((page) => [page.pageKey, page] as const));
+    return circuitSiteDefinitions.filter((site) => playbackPageByKey.get(site.pageKey)?.enabled);
+  }, [playbackPages]);
+
+  useEffect(() => {
+    if (
+      enabledCircuitSiteOptions.length > 0 &&
+      !enabledCircuitSiteOptions.some((site) => site.pageKey === activeSiteKey)
+    ) {
+      setActiveSiteKey(enabledCircuitSiteOptions[0]?.pageKey ?? "factory-circuit");
+    }
+  }, [activeSiteKey, enabledCircuitSiteOptions]);
+
+  const visibleCircuits = useMemo(
+    () => circuits.filter((circuit) => circuit.pageKey === activeSiteKey),
+    [activeSiteKey, circuits]
+  );
 
   const loadCircuits = useCallback(async ({
     force = true,
@@ -210,7 +240,7 @@ export function CircuitSettings() {
     setIsAdding(true);
     setErrorMessage("");
     try {
-      const created = await createCircuit(buildNewCircuitDraft(circuits));
+      const created = await createCircuit(buildNewCircuitDraft(circuits, activeSiteKey));
       setCircuits((current) => [...current, created]);
       setMessage("已新增迴路，請補齊欄位後按下儲存設定。");
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
@@ -219,7 +249,7 @@ export function CircuitSettings() {
     } finally {
       setIsAdding(false);
     }
-  }, [circuits, reloadReadiness]);
+  }, [activeSiteKey, circuits, reloadReadiness]);
 
   const handleSaveAll = useCallback(async () => {
     if (dirtyIds.length === 0) {
@@ -285,7 +315,7 @@ export function CircuitSettings() {
   const viewModel = useMemo(
     () =>
       buildCircuitSettingsViewModel({
-        circuits,
+        circuits: visibleCircuits,
         deletingId,
         dirtyIds,
         errorMessage,
@@ -296,12 +326,14 @@ export function CircuitSettings() {
         message,
         readiness
       }),
-    [circuits, deletingId, dirtyIds, errorMessage, isAdding, isLoading, isReloading, isSaving, message, readiness]
+    [deletingId, dirtyIds, errorMessage, isAdding, isLoading, isReloading, isSaving, message, readiness, visibleCircuits]
   );
 
   return (
     <CircuitSettingsContent
       dirtyCount={dirtyIds.length}
+      activeSiteKey={activeSiteKey}
+      enabledSiteOptions={enabledCircuitSiteOptions}
       handleAdd={handleAdd}
       handleDelete={handleDelete}
       handleFieldChange={handleFieldChange}
@@ -320,6 +352,7 @@ export function CircuitSettings() {
         ) : null
       }
       saveAll={handleSaveAll}
+      setActiveSiteKey={setActiveSiteKey}
       viewModel={viewModel}
     />
   );

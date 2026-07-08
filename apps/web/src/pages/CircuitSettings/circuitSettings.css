@@ -42,6 +42,44 @@
   width: auto;
 }
 
+.cs-page .settings-card__title {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cs-page .cs-site-toggle {
+  flex: 0 0 auto;
+  width: 172px;
+  height: 36px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border: 1px solid rgba(92, 105, 79, 0.22);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fffdf8;
+}
+
+.cs-page .cs-site-toggle button {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid rgba(92, 105, 79, 0.14);
+  background: transparent;
+  color: #4f5a52;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cs-page .cs-site-toggle button:last-child {
+  border-right: 0;
+}
+
+.cs-page .cs-site-toggle button.active {
+  background: #5c854b;
+  color: #fff;
+}
+
 /* summary panel */
 .cs-page .cs-summary-panel {
   display: grid;
@@ -539,5 +577,4 @@
 .cs-page .cs-unit-row {
   margin-top: 2px;
 }
-
 

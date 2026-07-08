@@ -33,9 +33,25 @@ test("circuit settings renders rows before deferred readiness diagnostics", () =
   assert.match(circuitSettingsIndexSource, /const \[hasLoadedCircuits, setHasLoadedCircuits\] = useState\(initialEditableModel !== null\)/);
   assert.match(circuitSettingsIndexSource, /force: initialEditableModel !== null,\s*silent: initialEditableModel !== null/s);
   assert.match(circuitSettingsLoadModelSource, /let cachedCircuitEditableModel: CircuitEditableModel \| null = null/);
+  assert.match(circuitSettingsLoadModelSource, /getPlaybackPages/);
+  assert.match(circuitSettingsLoadModelSource, /playbackPages: await \(loaders\.readPlaybackPages \?\? getPlaybackPages\)\(\)/);
+  assert.match(circuitSettingsLoadModelSource, /const canUseCache = !loaders\.readCircuits && !loaders\.readPlaybackPages/);
   assert.match(circuitSettingsLoadModelSource, /if \(!options\.force && canUseCache && cachedCircuitEditableModel\)/);
   assert.match(circuitSettingsIndexSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedCircuits\s*\}\)/);
   assert.match(circuitSettingsIndexSource, /setHasLoadedCircuits\(true\)/);
+});
+
+test("circuit settings scopes factory circuits by enabled playback site pages", () => {
+  assert.match(circuitSettingsIndexSource, /const \[playbackPages,\s*setPlaybackPages\]/);
+  assert.match(circuitSettingsIndexSource, /enabledCircuitSiteOptions/);
+  assert.match(circuitSettingsIndexSource, /playbackPageByKey\.get\(site\.pageKey\)\?\.enabled/);
+  assert.match(circuitSettingsIndexSource, /const visibleCircuits = useMemo/);
+  assert.match(circuitSettingsIndexSource, /circuit\.pageKey === activeSiteKey/);
+  assert.match(circuitSettingsIndexSource, /buildNewCircuitDraft\(circuits,\s*activeSiteKey\)/);
+  assert.match(circuitSettingsSource, /finding\.sourceType === "circuit-slot" && finding\.pageId === activeSiteKey/);
+  assert.match(circuitSettingsSource, /data-circuit-site-toggle=\{site\.pageKey\}/);
+  assert.match(circuitSettingsSource, /尚未啟用任何 Factory Circuit 廠區/);
+  assert.match(circuitSettingsSource, /請先到播放設定啟用中壢廠或觀音廠/);
 });
 
 test("circuit settings reuses editable loader before deferred readiness refresh", () => {

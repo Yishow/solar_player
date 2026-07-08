@@ -43,6 +43,10 @@ test("runtime refresh registry assigns dedicated refresh scopes for sustainabili
     ["circuits", "display-pages"]
   );
   assert.deepEqual(
+    resolveDisplayPageRuntimeRefreshSpec("factory-circuit").refreshScopes,
+    ["circuits", "display-pages", "mqtt", "playback"]
+  );
+  assert.deepEqual(
     resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "lifetime" }).refreshScopes,
     ["sustainability"]
   );

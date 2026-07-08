@@ -692,3 +692,61 @@ tests:
   - apps/server/src/routes/display-story.test.ts
   - apps/web/src/pages/Sustainability/viewModel.test.ts
 -->
+
+---
+### Requirement: Factory Circuit monitoring story supports page instances
+The system SHALL support Factory Circuit monitoring story payloads for each registered Factory Circuit page instance.
+
+#### Scenario: Page-scoped Factory Circuit story payload is requested
+- **WHEN** a caller requests a Factory Circuit page instance story by page key
+- **THEN** the story payload SHALL preserve the shared monitoring story model fields
+- **AND** the story payload SHALL resolve slots, KPIs, fallback reasons, source topics, and labels from the requested page instance
+
+##### Example: Aggregate dependency keys match the requested page
+- **GIVEN** `factory-circuit` has 6 scoped slots
+- **AND** `factory-circuit-guanyin` has 8 scoped slots
+- **WHEN** each page instance story is resolved
+- **THEN** the `totalPower` dependency keys for `factory-circuit` SHALL contain 6 slot keys
+- **AND** the `totalPower` dependency keys for `factory-circuit-guanyin` SHALL contain 8 slot keys
+
+<!-- @trace
+source: scope-factory-circuit-data-by-page-key
+updated: 2026-07-08
+code:
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/019_circuit_page_scope.sql
+  - apps/server/src/db/migrations/020_fix_factory_circuit_site_counts.sql
+  - packages/shared/src/displayCardData.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/db/migrations/018_display_value_overrides.sql
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - packages/shared/src/displayStory.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/server/src/db/seed.ts
+  - packages/shared/src/displayPageConfig.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - apps/server/src/services/displayValueOverrideService.ts
+  - apps/server/src/services/displayRotationService.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/routes/circuits.ts
+  - apps/server/src/routes/display-story.ts
+  - packages/shared/src/types.ts
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/services/displayReadinessService.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/server/src/routes/display-card-data.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+tests:
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/routes/circuits.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+-->

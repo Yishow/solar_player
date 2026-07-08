@@ -1,5 +1,6 @@
 import type {
   DisplayReadinessFinding,
+  DisplayPageKey,
   DisplayPageTemplateKey,
   DisplayRotationPageCondition,
   DisplayRotationPlan,
@@ -69,27 +70,28 @@ type MqttStatusLike = {
   reason: string | null;
 };
 
-const liveDataPageKeys = new Set<DisplayPageTemplateKey>([
+const liveDataPageKeys = new Set<DisplayPageKey>([
   "overview",
   "solar",
   "factory-circuit",
+  "factory-circuit-guanyin",
   "sustainability"
 ]);
 
-function buildReadinessFindingsByTemplateKey() {
-  const byTemplateKey = new Map<DisplayPageTemplateKey, DisplayReadinessFinding[]>();
+function buildReadinessFindingsByPageKey() {
+  const byPageKey = new Map<DisplayPageKey, DisplayReadinessFinding[]>();
 
   for (const finding of readDisplayReadinessReport().findings) {
     if (!finding.blocking || !liveDataPageKeys.has(finding.pageId)) {
       continue;
     }
 
-    const findings = byTemplateKey.get(finding.pageId) ?? [];
+    const findings = byPageKey.get(finding.pageId) ?? [];
     findings.push(finding);
-    byTemplateKey.set(finding.pageId, findings);
+    byPageKey.set(finding.pageId, findings);
   }
 
-  return byTemplateKey;
+  return byPageKey;
 }
 
 function resolveReadinessFindingPriority(finding: DisplayReadinessFinding) {
@@ -469,7 +471,7 @@ function buildPageConditions(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
   const liveMetrics = readLiveMetricsSnapshot();
-  const readinessFindingsByTemplateKey = buildReadinessFindingsByTemplateKey();
+  const readinessFindingsByPageKey = buildReadinessFindingsByPageKey();
   const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
   const pageConditions: Record<number, DisplayRotationPageCondition> = {};
 
@@ -482,10 +484,9 @@ function buildPageConditions(
       page.pageKey,
       page.templateKey ?? null
     );
-    const pageRequiresLiveData =
-      page.templateKey !== undefined && liveDataPageKeys.has(page.templateKey);
+    const pageRequiresLiveData = liveDataPageKeys.has(page.pageKey as DisplayPageKey);
     const requiredMetricRequirements =
-      page.templateKey === undefined ? [] : resolveLiveMetricRequirementsForPage(page.templateKey);
+      page.templateKey === undefined ? [] : resolveLiveMetricRequirementsForPage(page.pageKey as DisplayPageKey);
     const runtimeFreshness = page.templateKey === undefined
       ? {
           fresh: true,
@@ -503,7 +504,7 @@ function buildPageConditions(
       page.templateKey === undefined
         ? null
         : resolveReadinessSkipReason(
-            readinessFindingsByTemplateKey.get(page.templateKey) ?? []
+            readinessFindingsByPageKey.get(page.pageKey as DisplayPageKey) ?? []
           );
     const runtimeDataCondition = resolveRuntimeDataCondition({
       fallbackPolicy,

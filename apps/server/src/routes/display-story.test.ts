@@ -157,6 +157,147 @@ function seedDisplayStoryFixture() {
   return { today };
 }
 
+function seedPageScopedFactoryCircuitFixture() {
+  const database = getDatabase();
+  const today = toLocalDateKey(new Date());
+  database.prepare("DELETE FROM circuit_configs").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO circuit_configs (
+          page_key,
+          name_zh,
+          name_en,
+          icon,
+          unit,
+          mqtt_topic,
+          display_slot,
+          rated_capacity,
+          normal_min,
+          normal_max,
+          attention_min,
+          attention_max,
+          warning_min,
+          warning_max,
+          display_order,
+          enabled
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    );
+  const insertCircuit = database.prepare(
+    `
+      INSERT INTO circuit_configs (
+        page_key,
+        name_zh,
+        name_en,
+        icon,
+        unit,
+        mqtt_topic,
+        display_slot,
+        rated_capacity,
+        normal_min,
+        normal_max,
+        attention_min,
+        attention_max,
+        warning_min,
+        warning_max,
+        display_order,
+        enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+  );
+  const insertMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `
+  );
+  const insertTopic = database.prepare(
+    `
+      INSERT INTO topic_mappings (
+        metric_key,
+        topic,
+        unit,
+        value_path,
+        multiplier,
+        offset,
+        decimal_places,
+        enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(metric_key) DO UPDATE SET
+        topic = excluded.topic,
+        enabled = excluded.enabled
+    `
+  );
+  const jungliSlots = [
+    ["stamping", "沖壓工程", "factoryStampingPower", 10],
+    ["body", "車身工程", "factoryBodyPower", 20],
+    ["painting", "塗裝工程", "factoryPaintingPower", 30],
+    ["assembly", "裝配工程", "factoryAssemblyPower", 40],
+    ["utility", "原動力", "factoryUtilityPower", 50],
+    ["office", "事務系", "factoryOfficePower", 60]
+  ] as const;
+  const guanyinSlots = [
+    ["stamping", "觀音沖壓", "factoryCircuit.guanyin.stampingPower", 1],
+    ["body", "觀音車身", "factoryCircuit.guanyin.bodyPower", 2],
+    ["painting", "觀音塗裝", "factoryCircuit.guanyin.paintingPower", 3],
+    ["assembly", "觀音裝配", "factoryCircuit.guanyin.assemblyPower", 4],
+    ["utility", "觀音原動力", "factoryCircuit.guanyin.utilityPower", 5],
+    ["office", "觀音事務系", "factoryCircuit.guanyin.officePower", 6],
+    ["heavy_vehicle", "觀音大車工程", "factoryCircuit.guanyin.heavyVehiclePower", 7],
+    ["ed_coating", "觀音ED電著", "factoryCircuit.guanyin.edCoatingPower", 8]
+  ] as const;
+
+  for (const [index, [slotKey, label, metricKey, value]] of jungliSlots.entries()) {
+    insertCircuit.run(
+      "factory-circuit",
+      label,
+      label,
+      "factory",
+      "kW",
+      `factory/jungli/${slotKey}`,
+      slotKey,
+      100,
+      0,
+      70,
+      70,
+      90,
+      90,
+      100,
+      index + 1,
+      1
+    );
+    insertTopic.run(metricKey, `factory/jungli/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
+    insertMetric.run(metricKey, value, "kW", `${today}T09:00:00.000Z`, "good", `{"value":${value}}`);
+  }
+
+  for (const [index, [slotKey, label, metricKey, value]] of guanyinSlots.entries()) {
+    insertCircuit.run(
+      "factory-circuit-guanyin",
+      label,
+      label,
+      "factory",
+      "kW",
+      `factory/guanyin/${slotKey}`,
+      slotKey,
+      100,
+      0,
+      70,
+      70,
+      90,
+      90,
+      100,
+      index + 1,
+      1
+    );
+    insertTopic.run(metricKey, `factory/guanyin/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
+    insertMetric.run(metricKey, value, "kW", `${today}T09:00:00.000Z`, "good", `{"value":${value}}`);
+  }
+
+  return { guanyinSlots, jungliSlots };
+}
+
 test("GET /api/display-story exposes monitoring semantics for overview, solar, and factory slots", async () => {
   const { today } = seedDisplayStoryFixture();
 
@@ -285,7 +426,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalPowerKpi.provenance, "fallback");
     assert.equal(totalPowerKpi.sourceClass, "slot-aggregate");
     assert.equal(totalPowerKpi.value, "--");
-    assert.equal(totalPowerKpi.dependencyKeys.includes("stamping"), true);
+    assert.equal(totalPowerKpi.dependencyKeys.includes("factoryStampingPower"), true);
 
     const selfConsumptionKpi = body.factoryCircuit.kpis.find(
       (metric) => metric.metricKey === "selfConsumption"
@@ -373,6 +514,65 @@ test("GET /api/display-story/factory-circuit exposes bilingual slot labels for p
     assert.equal(stampingSlot?.label, "一號產線");
     assert.equal(stampingSlot?.labelZh, "一號產線");
     assert.equal(stampingSlot?.labelEn, "Line 1");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story resolves Factory Circuit circuit data by page key", async () => {
+  seedPageScopedFactoryCircuitFixture();
+  const app = await buildApp();
+
+  try {
+    const jungliResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+    const guanyinResponse = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit-guanyin"
+    });
+
+    assert.equal(jungliResponse.statusCode, 200);
+    assert.equal(guanyinResponse.statusCode, 200);
+
+    const jungliBody = jungliResponse.json() as {
+      pageId: string;
+      payload: {
+        kpis: Array<{ dependencyKeys: string[]; metricKey: string; value: string }>;
+        slots: Array<{ label: string; livePowerKw: number | null; slotKey: string }>;
+      };
+    };
+    const guanyinBody = guanyinResponse.json() as typeof jungliBody;
+
+    const jungliTotal = jungliBody.payload.kpis.find((metric) => metric.metricKey === "totalPower");
+    const guanyinTotal = guanyinBody.payload.kpis.find((metric) => metric.metricKey === "totalPower");
+
+    assert.equal(jungliBody.pageId, "factory-circuit");
+    assert.equal(guanyinBody.pageId, "factory-circuit-guanyin");
+    assert.equal(jungliBody.payload.slots.length, 6);
+    assert.equal(guanyinBody.payload.slots.length, 8);
+    assert.equal(jungliBody.payload.slots.some((slot) => slot.slotKey === "heavy_vehicle"), false);
+    assert.equal(jungliTotal?.value, "210");
+    assert.equal(guanyinTotal?.value, "36.0");
+    assert.deepEqual(jungliTotal?.dependencyKeys, [
+      "factoryStampingPower",
+      "factoryBodyPower",
+      "factoryPaintingPower",
+      "factoryAssemblyPower",
+      "factoryUtilityPower",
+      "factoryOfficePower"
+    ]);
+    assert.deepEqual(guanyinTotal?.dependencyKeys, [
+      "factoryCircuit.guanyin.stampingPower",
+      "factoryCircuit.guanyin.bodyPower",
+      "factoryCircuit.guanyin.paintingPower",
+      "factoryCircuit.guanyin.assemblyPower",
+      "factoryCircuit.guanyin.utilityPower",
+      "factoryCircuit.guanyin.officePower",
+      "factoryCircuit.guanyin.heavyVehiclePower",
+      "factoryCircuit.guanyin.edCoatingPower"
+    ]);
   } finally {
     await app.close();
   }

@@ -19,6 +19,7 @@ export type TopicWorkspaceRowProps = {
     value: TopicMapping[Key]
   ) => void;
   handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
+  highlighted?: boolean;
   publishDraftValue?: string;
   publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
   publishingTopicKey?: string | null;
@@ -74,6 +75,7 @@ function TopicWorkspaceRowImpl({
   topic,
   handleTopicChange,
   handleTopicPublishDraftChange,
+  highlighted = false,
   publishDraftValue = "",
   publishTopicValue,
   publishingTopicKey = null,
@@ -93,7 +95,11 @@ function TopicWorkspaceRowImpl({
   const publishDisabled = isPublishing || publishDisabledReason !== "" || !publishTopicValue;
 
   return (
-    <div className="topic-workspace-row mgmt-interactive-card" data-mqtt-row="editable-topic-row">
+    <div
+      className={`topic-workspace-row mgmt-interactive-card${highlighted ? " is-highlighted" : ""}`}
+      data-mqtt-row="editable-topic-row"
+      data-mqtt-topic-highlighted={highlighted ? "true" : "false"}
+    >
       <div className="topic-workspace-row__header">
         <div className="topic-workspace-row__metric-group">
           <span className={`topic-row__dot ${!topic.enabled ? "is-disabled" : topic.runtimeTone === "connected" ? "" : "is-idle"}`} aria-hidden />

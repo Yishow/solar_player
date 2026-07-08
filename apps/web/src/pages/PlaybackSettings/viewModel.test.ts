@@ -54,6 +54,26 @@ const pages: PlaybackPage[] = [
     labelZh: "圖庫",
     pageKey: "images",
     route: "/images"
+  },
+  {
+    displayOrder: 4,
+    durationSeconds: 18,
+    enabled: true,
+    id: 4,
+    labelEn: "Factory Circuit (Jungli)",
+    labelZh: "中壢廠區用電",
+    pageKey: "factory-circuit",
+    route: "/factory-circuit"
+  },
+  {
+    displayOrder: 5,
+    durationSeconds: 18,
+    enabled: false,
+    id: 5,
+    labelEn: "Factory Circuit (Guanyin)",
+    labelZh: "觀音廠區用電",
+    pageKey: "factory-circuit-guanyin",
+    route: "/factory-circuit-guanyin"
   }
 ];
 
@@ -111,7 +131,9 @@ test("reorderPlaybackPages rewrites display order after moving a page upward", (
     [
       { id: 1, displayOrder: 1 },
       { id: 3, displayOrder: 2 },
-      { id: 2, displayOrder: 3 }
+      { id: 2, displayOrder: 3 },
+      { id: 4, displayOrder: 4 },
+      { id: 5, displayOrder: 5 }
     ]
   );
 });
@@ -130,7 +152,26 @@ test("buildPlaybackSettingsFormViewModel returns the editable page-row lane with
     [
       { canMoveDown: true, canMoveUp: false, id: 1, orderLabel: "01", statusLabel: "啟用中" },
       { canMoveDown: true, canMoveUp: true, id: 2, orderLabel: "02", statusLabel: "啟用中" },
-      { canMoveDown: false, canMoveUp: true, id: 3, orderLabel: "03", statusLabel: "已停用" }
+      { canMoveDown: true, canMoveUp: true, id: 3, orderLabel: "03", statusLabel: "已停用" },
+      { canMoveDown: true, canMoveUp: true, id: 4, orderLabel: "04", statusLabel: "啟用中" },
+      { canMoveDown: false, canMoveUp: true, id: 5, orderLabel: "05", statusLabel: "已停用" }
+    ]
+  );
+  assert.deepEqual(
+    model.factorySiteRows,
+    [
+      {
+        detail: "中壢廠區用電 · /factory-circuit",
+        enabled: true,
+        label: "中壢廠",
+        pageKey: "factory-circuit"
+      },
+      {
+        detail: "觀音廠區用電 · /factory-circuit-guanyin",
+        enabled: false,
+        label: "觀音廠",
+        pageKey: "factory-circuit-guanyin"
+      }
     ]
   );
 });
@@ -151,9 +192,9 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
     settings
   });
 
-  assert.equal(model.summary.enabledCount, 2);
-  assert.equal(model.summary.totalPages, 3);
-  assert.equal(model.summary.totalDurationSeconds, 47);
+  assert.equal(model.summary.enabledCount, 3);
+  assert.equal(model.summary.totalPages, 5);
+  assert.equal(model.summary.totalDurationSeconds, 83);
   assert.equal(model.summary.startPageLabel, "02. 太陽能");
   assert.equal(model.summary.scheduleLabel, "每週一、三、五 • 07:30 - 19:00");
   assert.equal(model.saveBanner.tone, "ready");
@@ -202,6 +243,32 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
         stateLabel: "已停用",
         stateTone: "warning",
         templateKey: "images"
+      },
+      {
+        durationLabel: "18 秒",
+        id: 4,
+        instanceLabel: "中壢廠區用電 / /factory-circuit",
+        labelEn: "Factory Circuit (Jungli)",
+        labelZh: "中壢廠區用電",
+        orderLabel: "04",
+        pageId: "factory-circuit",
+        route: "/factory-circuit",
+        stateLabel: "已配置",
+        stateTone: "ready",
+        templateKey: "factory-circuit"
+      },
+      {
+        durationLabel: "18 秒",
+        id: 5,
+        instanceLabel: "觀音廠區用電 / /factory-circuit-guanyin",
+        labelEn: "Factory Circuit (Guanyin)",
+        labelZh: "觀音廠區用電",
+        orderLabel: "05",
+        pageId: "factory-circuit-guanyin",
+        route: "/factory-circuit-guanyin",
+        stateLabel: "已停用",
+        stateTone: "warning",
+        templateKey: null
       }
     ]
   );
@@ -254,7 +321,7 @@ test("buildPlaybackSettingsViewModel summarizes schedule, start page, and ordere
   assert.deepEqual(
     model.runtimeSummaryRows,
     [
-      { label: "Configured", value: "3 頁", valueTone: "default" },
+      { label: "Configured", value: "5 頁", valueTone: "default" },
       { label: "Effective", value: "1 頁", valueTone: "ready" },
       { label: "Skipped", value: "2 頁", valueTone: "warning" },
       { label: "Current", value: "總覽", valueTone: "accent" },
