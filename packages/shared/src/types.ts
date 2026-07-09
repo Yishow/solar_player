@@ -17,6 +17,7 @@ export type MetricKey =
   | "consumptionEnergy"
   | "selfConsumptionRatio"
   | "systemEfficiency"
+  | "factoryPeakMultiplier"
   | "factoryProductionPower"
   | "factoryHvacPower"
   | "factoryLightingPower"
@@ -75,6 +76,7 @@ export interface PlaybackSettings {
   startPage: number;
   transitionType: PlaybackTransitionType;
   transitionSpeed: number;
+  enforceFreshRuntimeData: boolean;
   scheduleEnabled: boolean;
   scheduleStart: string | null;
   scheduleEnd: string | null;

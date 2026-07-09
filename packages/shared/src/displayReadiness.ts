@@ -109,11 +109,12 @@ export type DisplayReadinessReport = {
 };
 
 const factoryCircuitMetricRequirements: DisplayRequirementDescriptor[] = factoryCircuitPageKeys.flatMap(
-  (pageId) => resolveFactoryCircuitSlotKeys(pageId).map((slotKey) => ({
-    pageId,
-    requirementKey: resolveFactoryCircuitSlotMetricKey(pageId, slotKey),
-    sourceType: "mqtt-metric" as const
-  }))
+  (pageId) =>
+    resolveFactoryCircuitSlotKeys(pageId).map((slotKey) => ({
+      pageId,
+      requirementKey: resolveFactoryCircuitSlotMetricKey(pageId, slotKey),
+      sourceType: "mqtt-metric" as const
+    }))
 );
 
 export const displayMetricRequirements: DisplayRequirementDescriptor[] = [

@@ -60,9 +60,9 @@ function resolveCardCopy(cardKey: HouseholdEquivalenceCardKey) {
   }
 
   return {
-    basisSourceLabel: "累積自發自用量",
+    basisSourceLabel: "累積發電量",
     eyebrow: "累積綠能成果",
-    supportingLine: "約相當於一個月電費"
+    supportingLine: "約相當於累積日用電"
   };
 }
 
@@ -155,10 +155,7 @@ export function deriveHouseholdEquivalenceCard(args: {
 }) {
   const calcProfile = resolveCalcProfile(args.calcProfile);
   const copy = resolveCardCopy(args.cardKey);
-  const basisUsage =
-    args.cardKey === "today"
-      ? calcProfile.averageDailyUsageKwh
-      : calcProfile.averageMonthlyUsageKwh;
+  const basisUsage = calcProfile.averageDailyUsageKwh;
 
   if (
     args.selfConsumptionKwh === null ||
@@ -187,7 +184,7 @@ export function deriveHouseholdEquivalenceCard(args: {
     householdLabel: calcProfile.householdLabel,
     provenance: {
       label: args.basisSourceLabel ?? copy.basisSourceLabel,
-      source: args.cardKey === "today" ? "daily-self-consumption" : "cumulative-self-consumption",
+      source: args.cardKey === "today" ? "daily-self-consumption" : "cumulative-generation",
       sourceClass: "derived-metric",
       syncState: "fresh",
       updatedAt: null,

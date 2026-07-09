@@ -1,4 +1,5 @@
 export const sustainabilityPeriodKeys = ["month", "quarter", "year", "lifetime"] as const;
+export const co2TreeEquivalentFactor = 6.25;
 
 export type SustainabilityPeriodKey = (typeof sustainabilityPeriodKeys)[number];
 export type SustainabilitySyncState = "fresh" | "missing" | "stale" | "warning";
