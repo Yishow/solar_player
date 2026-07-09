@@ -229,7 +229,7 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   });
 
   assert.equal(model.selectedPeriod, "quarter");
-  assert.equal(model.bigNumbers[0]?.value, "4,800.0");
+  assert.equal(model.bigNumbers[0]?.value, "4,800");
   assert.equal(model.highlights[0]?.label, "本季減碳");
   assert.equal(model.highlights[0]?.value, "312");
   assert.equal(model.provenance.label, "季報");
@@ -239,15 +239,16 @@ test("buildSustainabilityViewModel applies the selected period consistently acro
   assert.equal(model.comparison.delta, "+4.2%");
 });
 
-test("buildSustainabilityViewModel rounds the total CO₂ reduction to a whole number", () => {
+test("buildSustainabilityViewModel formats generation and trees as integers while keeping CO2 decimal precision", () => {
   const model = buildSustainabilityViewModel({
     selectedPeriod: "month",
     story: periodStory
   });
 
-  // accumulatedCarbonReductionTons is 38.4 for the month period; the CO₂ big
-  // number and the derived highlight must drop the decimal.
-  assert.equal(model.bigNumbers[1]?.value, "38");
+  assert.equal(model.bigNumbers[0]?.value, "600");
+  assert.equal(model.bigNumbers[1]?.value, "38.4");
+  assert.equal(model.bigNumbers[2]?.value, "2.4");
+  assert.equal(model.esgCards[2] && "value" in model.esgCards[2] ? model.esgCards[2].value : null, "180");
   const co2Highlight = model.highlights.find((highlight) => highlight.label === "累積減碳");
   assert.equal(co2Highlight?.value, "38");
 });
@@ -277,8 +278,8 @@ test("buildSustainabilityViewModel exposes source tooltip metadata for aggregate
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 
-  assert.equal(model.bigNumbers[0]?.value, "18,600.0");
-  assert.equal(model.bigNumbers[1]?.value, "9,842");
+  assert.equal(model.bigNumbers[0]?.value, "18,600");
+  assert.equal(model.bigNumbers[1]?.value, "9,842.0");
   assert.equal(model.bigNumbers[2]?.value, "12.4");
   assert.equal(model.comparison.state, "available");
   assert.equal(model.comparison.label, "較去年成長 2.1%");

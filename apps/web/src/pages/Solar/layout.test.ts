@@ -16,6 +16,21 @@ const solarCss = readFileSync(path.join(import.meta.dirname, "solar.css"), "utf8
 const connectorArrowWidth = 18;
 const connectorNodeGap = 14;
 
+function cssBlock(selector: string) {
+  const match = solarCss.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([\\s\\S]*?)\\}`));
+  assert.ok(match, `missing CSS block: ${selector}`);
+  return match[1]!;
+}
+
+function keyframesBlock(name: string) {
+  const start = solarCss.indexOf(`@keyframes ${name}`);
+  const next = solarCss.indexOf("@keyframes", start + 1);
+
+  assert.ok(start >= 0, `missing keyframes: ${name}`);
+
+  return solarCss.slice(start, next > start ? next : undefined);
+}
+
 test("solar layout centralizes main region geometry", () => {
   assert.deepEqual(solarTitleLayout, {
     left: 88,
@@ -67,6 +82,20 @@ test("solar flow diagram keeps circular energy nodes and directional connectors"
   assert.match(solarCss, /\.solar-connector::after\s*\{/);
   assert.match(solarCss, /border-left:\s*18px solid currentColor;/);
   assert.match(solarCss, /\.solar-connector-l::before\s*\{/);
+});
+
+test("solar flow animation keeps motion without animating SVG filters", () => {
+  assert.match(cssBlock(".solar-flow-line-1"), /animation:\s*solar-energy-flow-1 1\.5s linear infinite;/);
+  assert.match(cssBlock(".solar-flow-line-2"), /solar-energy-flow-2 1\.5s 1\.5s linear infinite/);
+  assert.match(cssBlock(".solar-flow-line-orange"), /solar-energy-flow-orange 1\.5s 1\.5s linear infinite/);
+
+  for (const keyframeName of [
+    "solar-energy-flow-1",
+    "solar-energy-flow-2",
+    "solar-energy-flow-orange"
+  ]) {
+    assert.doesNotMatch(keyframesBlock(keyframeName), /filter:/);
+  }
 });
 
 test("solar CO2 node keeps its title, footnote, and value separated inside the circle", () => {

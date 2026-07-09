@@ -3,17 +3,10 @@ import { DisplayCardFrame, DisplayCardHeader } from "../../../components/display
 import { toSparklineSmoothPath } from "../../../components/Sparkline";
 import { requestJson } from "../../../services/api";
 
-const MOCK_CONSUMPTION_SERIES = [
-  3100, 3200, 2850, 3400, 3150, 3250, 3000, 3500, 3600, 3300,
-  3450, 3550, 3200, 3400, 3650, 3700, 3480, 3620, 3800, 3750,
-  3500, 3680, 3900, 3850, 3720, 3950, 4100, 4000, 3980, 4200
-];
-
-const MOCK_DATES = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (29 - i));
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-});
+type MonthlyConsumptionSummary = {
+  consumptionTotal: number | null;
+  date: string;
+};
 
 function formatDateLabel(dateStr: string) {
   const parts = dateStr.split("-");
@@ -21,6 +14,19 @@ function formatDateLabel(dateStr: string) {
     return `${parseInt(parts[1]!, 10)}/${parseInt(parts[2]!, 10)}`;
   }
   return dateStr;
+}
+
+export function buildMonthlyConsumptionTrend(summaries: MonthlyConsumptionSummary[]) {
+  const validSummaries = summaries
+    .filter((summary): summary is MonthlyConsumptionSummary & { consumptionTotal: number } =>
+      typeof summary.consumptionTotal === "number"
+    )
+    .reverse();
+
+  return {
+    dates: validSummaries.map((summary) => formatDateLabel(summary.date)),
+    series: validSummaries.map((summary) => summary.consumptionTotal)
+  };
 }
 
 function niceCeil(value: number): number {
@@ -69,24 +75,21 @@ export function PhasePowerTableWidget({
   phasePower?: any; // kept to avoid compilation errors elsewhere
   style?: CSSProperties;
 }) {
-  const [series, setSeries] = useState<number[]>(MOCK_CONSUMPTION_SERIES);
-  const [dates, setDates] = useState<string[]>(MOCK_DATES);
+  const [series, setSeries] = useState<number[]>([]);
+  const [dates, setDates] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
-    requestJson<{ summaries: { date: string; consumptionTotal: number | null }[] }>("/api/metrics/daily-summary?range=month")
+    requestJson<{ summaries: MonthlyConsumptionSummary[] }>("/api/metrics/daily-summary?range=month")
       .then((res) => {
         if (!active) return;
-        const validSummaries = (res.summaries || [])
-          .filter((s) => s.consumptionTotal !== null)
-          .reverse();
-        if (validSummaries.length > 0) {
-          setSeries(validSummaries.map((s) => s.consumptionTotal!));
-          setDates(validSummaries.map((s) => formatDateLabel(s.date)));
-        }
+        const trend = buildMonthlyConsumptionTrend(res.summaries || []);
+        setSeries(trend.series);
+        setDates(trend.dates);
       })
       .catch(() => {
-        // Fall back silently to mock series
+        setSeries([]);
+        setDates([]);
       });
 
     return () => {

@@ -70,6 +70,10 @@ export function mergeDisplayPageConfig<T>(seedConfig: T, overrideConfig: unknown
       return deepClone(seedConfig);
     }
 
+    if (overrideConfig.length === 0) {
+      return [] as T;
+    }
+
     if (isDisplayPageMediaEffectLayerArray(seedConfig) || isDisplayPageMediaEffectLayerArray(overrideConfig)) {
       return deepClone(overrideConfig as T);
     }

@@ -48,7 +48,8 @@ const loadRowOrder = [
 
 const factoryCircuitRuntimeMetricKeys = [
   "realTimePower",
-  "selfConsumptionEnergy"
+  "selfConsumptionEnergy",
+  "todayGeneration"
 ] as const;
 
 type FactoryCircuitRuntimeSelection = {
@@ -106,18 +107,22 @@ function buildFactoryCircuitRuntimeSnapshot(
   readings: FactoryCircuitRuntimeSelection["readings"]
 ): LiveMetricsSnapshot {
   const metrics: LiveMetricsSnapshot["metrics"] = {};
+  let latestTimestamp: string | null = null;
 
   factoryCircuitRuntimeMetricKeys.forEach((metricKey, index) => {
     const reading = readings[index];
 
     if (reading) {
       metrics[metricKey] = reading;
+      if (reading.timestamp && (latestTimestamp === null || reading.timestamp > latestTimestamp)) {
+        latestTimestamp = reading.timestamp;
+      }
     }
   });
 
   return {
     metrics,
-    timestamp: null
+    timestamp: latestTimestamp
   };
 }
 

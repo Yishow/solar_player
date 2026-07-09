@@ -1,4 +1,5 @@
 import type { CircuitConfig, DisplayPageFreeformObject } from "@solar-display/shared";
+import { isFactoryCircuitPageKey } from "@solar-display/shared";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DisplayPageObjectLayer } from "../../components/DisplayPageObjectLayer";
@@ -211,10 +212,11 @@ export function FactoryCircuit({
   pageId?: string;
 }) {
   useBodyClass("page-hero-shell");
+  const factoryCircuitPageId = isFactoryCircuitPageKey(pageId) ? pageId : "factory-circuit";
   const runtimeHydrationEnabled = config === undefined;
   const runtimeStage = "live" as const;
   const seedConfig = useMemo(() => createFactoryCircuitDisplayPageSeedConfig(), []);
-  const runtimeConfig = useDisplayPageConfig(pageId, seedConfig, {
+  const runtimeConfig = useDisplayPageConfig(factoryCircuitPageId, seedConfig, {
     enabled: runtimeHydrationEnabled,
     stage: runtimeStage
   });
@@ -230,8 +232,8 @@ export function FactoryCircuit({
   }, [circuits]);
 
   const factoryCircuitRefreshSpec = useMemo(
-    () => resolveDisplayPageRuntimeRefreshSpec("factory-circuit"),
-    []
+    () => resolveDisplayPageRuntimeRefreshSpec(factoryCircuitPageId),
+    [factoryCircuitPageId]
   );
 
   loadCircuitsRef.current = async (mode) => {
@@ -243,7 +245,9 @@ export function FactoryCircuit({
     }
 
     try {
-      const data = await requestJson<{ success: boolean; data: CircuitConfig[] }>("/api/circuits");
+      const data = await requestJson<{ success: boolean; data: CircuitConfig[] }>(
+        `/api/circuits?pageKey=${encodeURIComponent(factoryCircuitPageId)}`
+      );
 
       if (!mountedRef.current || requestId !== requestIdRef.current) {
         return;
@@ -286,7 +290,7 @@ export function FactoryCircuit({
     }),
     [circuits, loadState]
   );
-  const factoryStoryRuntime = useDisplayStoryRuntime("factory-circuit", {
+  const factoryStoryRuntime = useDisplayStoryRuntime(factoryCircuitPageId, {
     dependencyKey: circuitsRuntimeSource.dependencyKey,
     enabled: runtimeHydrationEnabled
   });
@@ -349,28 +353,29 @@ export function FactoryCircuit({
       .filter((y): y is number => y !== null);
   }, [resolvedConfig.loadRowStates, resolvedConfig.loadRows]);
 
-  const { svgPath } = useMemo(() => {
+  const { routingCenterY, svgPath } = useMemo(() => {
     const minY = activeRowsY.length > 0 ? Math.min(...activeRowsY) : 304;
     const maxY = activeRowsY.length > 0 ? Math.max(...activeRowsY) : 304;
+    const routingCenterY = (minY + maxY) / 2;
 
-    const busMinY = minY < 304 ? minY + 16 : 304;
-    const busMaxY = maxY > 304 ? maxY - 16 : 304;
+    const busMinY = minY < routingCenterY ? minY + 16 : routingCenterY;
+    const busMaxY = maxY > routingCenterY ? maxY - 16 : routingCenterY;
 
-    let path = `M 4 304 H 40`;
+    let path = `M 4 ${routingCenterY} H 40`;
     if (activeRowsY.length > 1 && busMinY < busMaxY) {
       path += ` M 40 ${busMinY} V ${busMaxY}`;
     }
 
     for (const y of activeRowsY) {
-      if (Math.abs(y - 304) < 2) {
-        path += ` M 40 304 H 138`;
-      } else if (y < 304) {
+      if (Math.abs(y - routingCenterY) < 2) {
+        path += ` M 40 ${routingCenterY} H 138`;
+      } else if (y < routingCenterY) {
         path += ` M 40 ${y + 16} Q 40 ${y} 56 ${y} H 138`;
       } else {
         path += ` M 40 ${y - 16} Q 40 ${y} 56 ${y} H 138`;
       }
     }
-    return { svgPath: path };
+    return { routingCenterY, svgPath: path };
   }, [activeRowsY]);
 
   if (
@@ -593,14 +598,14 @@ export function FactoryCircuit({
           />
           {/* 流動粒子線：為每個 active row 渲染一條單一連續 path */}
           {activeRowsY.map((y, idx) => {
-            const isCenter = Math.abs(y - 304) < 2;
+            const isCenter = Math.abs(y - routingCenterY) < 2;
             const pathD = isCenter
-              ? "M 4 304 H 138"
-              : y < 304
-              ? `M 4 304 H 40 V ${y + 16} Q 40 ${y} 56 ${y} H 138`
-              : `M 4 304 H 40 V ${y - 16} Q 40 ${y} 56 ${y} H 138`;
+              ? `M 4 ${routingCenterY} H 138`
+              : y < routingCenterY
+              ? `M 4 ${routingCenterY} H 40 V ${y + 16} Q 40 ${y} 56 ${y} H 138`
+              : `M 4 ${routingCenterY} H 40 V ${y - 16} Q 40 ${y} 56 ${y} H 138`;
 
-            const pathLength = isCenter ? 134 : Math.abs(y - 304) + 127.1;
+            const pathLength = isCenter ? 134 : Math.abs(y - routingCenterY) + 127.1;
             const duration = 1.5; // 統一為 1.5 秒，確保所有粒子同時抵達各自的終點
 
             return (
@@ -623,7 +628,7 @@ export function FactoryCircuit({
           })}
 
           {/* 配電盤端統一輸出圓點 */}
-          <circle cx={4} cy={304} r={5} fill="#527d3b" />
+          <circle cx={4} cy={routingCenterY} r={5} fill="#527d3b" />
 
           {/* 負載端動態接收圓點 */}
           {activeRowsY.map((y, idx) => (

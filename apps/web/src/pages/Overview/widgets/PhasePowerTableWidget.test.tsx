@@ -1,21 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PhasePowerTableWidget } from "./PhasePowerTableWidget";
+import {
+  buildMonthlyConsumptionTrend,
+  PhasePowerTableWidget
+} from "./PhasePowerTableWidget";
 
-test("PhasePowerTableWidget renders monthly consumption curve title and peak", () => {
+test("PhasePowerTableWidget renders monthly consumption title and empty state before data arrives", () => {
   const markup = renderToStaticMarkup(<PhasePowerTableWidget />);
 
   assert.match(markup, /月用量曲線/);
   assert.match(markup, /Monthly Consumption/);
-  assert.match(markup, /overview-trend-chart-svg/);
-  assert.match(markup, /4,200 kWh/);
+  assert.match(markup, /尚無用量趨勢資料/);
+  assert.doesNotMatch(markup, /overview-trend-chart-svg/);
 });
 
-test("PhasePowerTableWidget renders SVG gridlines and area gradients", () => {
-  const markup = renderToStaticMarkup(<PhasePowerTableWidget />);
+test("buildMonthlyConsumptionTrend clears mock data when monthly summaries have no consumption", () => {
+  const trend = buildMonthlyConsumptionTrend([
+    { consumptionTotal: null, date: "2026-07-01" },
+    { consumptionTotal: null, date: "2026-07-02" }
+  ]);
 
-  assert.match(markup, /overview-consumption-area-fill/);
-  assert.match(markup, /overview-trend-gridline/);
-  assert.match(markup, /overview-trend-dot/);
+  assert.deepEqual(trend.series, []);
+  assert.deepEqual(trend.dates, []);
+});
+
+test("buildMonthlyConsumptionTrend maps current-month summaries chronologically", () => {
+  const trend = buildMonthlyConsumptionTrend([
+    { consumptionTotal: 2200, date: "2026-07-02" },
+    { consumptionTotal: null, date: "2026-07-03" },
+    { consumptionTotal: 1800, date: "2026-07-01" }
+  ]);
+
+  assert.deepEqual(trend.series, [1800, 2200]);
+  assert.deepEqual(trend.dates, ["7/1", "7/2"]);
 });

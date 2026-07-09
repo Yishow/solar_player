@@ -11,6 +11,7 @@ function buildTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping 
     lastReceivedAt: "2026-06-26T07:00:00.000Z",
     lastValue: 100,
     metricKey: "realTimePower",
+    multiplier: 1,
     nameZh: null,
     nameEn: null,
     quality: "good",

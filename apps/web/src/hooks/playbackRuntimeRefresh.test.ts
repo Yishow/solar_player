@@ -6,6 +6,7 @@ import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
 const settings: PlaybackSettings = {
   autoplay: true,
   brightness: 100,
+  enforceFreshRuntimeData: true,
   idleMode: "disabled",
   idleTimeout: 60,
   loop: true,

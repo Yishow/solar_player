@@ -59,7 +59,7 @@ export const defaultMqttStatus: MqttStatus = {
 
 let cachedMqttEditableModel: MqttEditableModel | null = null;
 
-const topicEditableFields = ["enabled", "metricKey", "topic", "nameZh", "nameEn", "unit", "valuePath"] as const;
+const topicEditableFields = ["enabled", "metricKey", "topic", "nameZh", "nameEn", "unit", "valuePath", "multiplier"] as const;
 
 function hasEditableTopicDraft(current: TopicMapping, synced: TopicMapping | undefined) {
   if (!synced) {
@@ -78,7 +78,8 @@ function preserveEditableTopicFields(polled: TopicMapping, current: TopicMapping
     nameZh: current.nameZh,
     nameEn: current.nameEn,
     unit: current.unit,
-    valuePath: current.valuePath
+    valuePath: current.valuePath,
+    multiplier: current.multiplier ?? 1
   };
 }
 

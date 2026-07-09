@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { WeatherCurrentSnapshot, WeatherHeaderContract } from "@solar-display/shared";
 import { getHeaderWeatherContract } from "../services/api";
+import {
+  resolveWeatherContractAfterRefresh,
+  shouldPollWeatherContract
+} from "./useHeaderWeatherMeta";
 import { setupWeatherPolling } from "./weatherPolling.js";
 
 /**
@@ -15,9 +19,9 @@ export function useOverviewWeather(enabled: boolean): WeatherCurrentSnapshot | u
     if (!enabled) return;
     try {
       const nextContract = await getHeaderWeatherContract();
-      setContract(nextContract);
+      setContract((current) => resolveWeatherContractAfterRefresh(current, nextContract));
     } catch {
-      setContract(null);
+      setContract((current) => resolveWeatherContractAfterRefresh(current, null));
     }
   }, [enabled]);
 
@@ -27,9 +31,8 @@ export function useOverviewWeather(enabled: boolean): WeatherCurrentSnapshot | u
 
   useEffect(() => {
     const intervalMinutes = contract?.settings?.updateIntervalMinutes ?? 30;
-    const isEnabled = enabled && (contract?.settings?.enabled ?? false);
-    return setupWeatherPolling(isEnabled, intervalMinutes, load);
-  }, [enabled, load, contract?.settings?.updateIntervalMinutes, contract?.settings?.enabled]);
+    return setupWeatherPolling(shouldPollWeatherContract(enabled, contract), intervalMinutes, load);
+  }, [enabled, load, contract, contract?.settings?.updateIntervalMinutes]);
 
   return contract?.current ?? undefined;
 }

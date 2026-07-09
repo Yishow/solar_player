@@ -28,7 +28,7 @@ test("factory load rows and routing use shared display-family surface and token 
   assert.match(factorySource, /function FactoryCircuitLineLeaf/);
   assert.match(factorySource, /function FactoryCircuitLeafVine/);
   assert.doesNotMatch(factorySource, /DisplayLeafOrnament/);
-  assert.match(factorySource, /const \{ svgPath \} = useMemo/);
+  assert.match(factorySource, /const \{[^}]*svgPath[^}]*\} = useMemo/);
   assert.match(factorySource, /activeRowsY\.map\(\(y, idx\) =>/);
   assert.match(factorySource, /<svg[\s\S]*viewBox="0 0 140 600"/);
   assert.doesNotMatch(factorySource, /factory-routing-pv-inverter-reference\.png/);

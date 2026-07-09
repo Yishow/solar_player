@@ -10,6 +10,7 @@ import {
 const settings: PlaybackSettings = {
   autoplay: true,
   brightness: 88,
+  enforceFreshRuntimeData: true,
   idleMode: "return-to-start",
   idleTimeout: 90,
   loop: true,

@@ -145,6 +145,37 @@ test("buildFactoryCircuitViewModel keeps the full prototype structure for empty 
   assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
 });
 
+test("buildFactoryCircuitViewModel falls back self-consumption KPI to today's generation when self-consumption is stale", () => {
+  const model = buildFactoryCircuitViewModel({
+    circuits: [],
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot: {
+      metrics: {
+        selfConsumptionEnergy: {
+          quality: "good",
+          timestamp: "2026-06-30T08:09:41.000Z",
+          unit: "kWh",
+          value: 22584
+        },
+        todayGeneration: {
+          quality: "good",
+          timestamp: "2026-07-09T08:43:14.000Z",
+          unit: "MWh",
+          value: 7.99
+        }
+      },
+      timestamp: "2026-07-09T08:43:14.000Z"
+    }
+  });
+
+  assert.equal(model.kpis[2]?.value, "7.99");
+  assert.equal(model.kpis[2]?.unit, "MWh");
+  assert.equal(model.kpis[2]?.helper, "以今日發電量替代自發自用量");
+  assert.equal(model.kpis[2]?.provenance, "derived");
+  assert.deepEqual(model.kpis[2]?.dependencyKeys, ["selfConsumptionEnergy", "todayGeneration"]);
+});
+
 test("buildFactoryCircuitRuntimes no longer guesses slot bindings from icon heuristics", () => {
   const runtimes = buildFactoryCircuitRuntimes([
     {
@@ -310,6 +341,113 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
     )
   );
   assert.equal(model.summary.statusLabel, "迴路資料已同步");
+});
+
+test("buildFactoryCircuitViewModel keeps stale story slots visible instead of treating them as empty", () => {
+  const model = buildFactoryCircuitViewModel({
+    circuits: [],
+    connectionState: "connected",
+    loadState: "ready",
+    snapshot,
+    factoryCircuitStory: {
+      kpis: [
+        {
+          alertTone: "warning",
+          bindingState: "bound",
+          dependencyKeys: ["stamping", "body"],
+          fallbackReason: "stale-data",
+          fallbackStrategy: "retain-last-reading",
+          freshnessState: "stale",
+          helper: "顯示最近一次有效讀值",
+          label: "目前廠區總用電",
+          metricKey: "totalPower",
+          provenance: "aggregate",
+          sourceClass: "slot-aggregate",
+          unit: "kW",
+          value: "830"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "bound",
+          dependencyKeys: ["realTimePower", "stamping", "body"],
+          fallbackReason: "stale-data",
+          fallbackStrategy: "retain-last-reading",
+          freshnessState: "stale",
+          helper: "顯示最近一次有效讀值",
+          label: "太陽能供應占比",
+          metricKey: "solarShare",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          unit: "%",
+          value: "49.4"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "bound",
+          dependencyKeys: ["selfConsumptionEnergy"],
+          fallbackReason: "stale-data",
+          fallbackStrategy: "retain-last-reading",
+          freshnessState: "stale",
+          helper: "顯示最近一次有效讀值",
+          label: "今日自發自用電量",
+          metricKey: "selfConsumption",
+          provenance: "live",
+          sourceClass: "mqtt-live",
+          unit: "MWh",
+          value: "9.2"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "bound",
+          dependencyKeys: ["factoryPeakMultiplier", "stamping", "body"],
+          fallbackReason: "stale-data",
+          fallbackStrategy: "retain-last-reading",
+          freshnessState: "stale",
+          helper: "顯示最近一次有效讀值",
+          label: "尖峰負載",
+          metricKey: "peak",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          unit: "kW",
+          value: "996"
+        },
+        {
+          alertTone: "warning",
+          bindingState: "bound",
+          dependencyKeys: ["stamping", "body"],
+          fallbackReason: "stale-data",
+          fallbackStrategy: "retain-last-reading",
+          freshnessState: "stale",
+          helper: "顯示最近一次有效讀值",
+          label: "目前綠電流向",
+          metricKey: "flow",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          unit: "Fallback",
+          value: "供應中"
+        }
+      ],
+      slots: [
+        { slotKey: "stamping", label: "故事版沖壓", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale", alertTone: "warning", livePowerKw: 520, circuitId: 1 },
+        { slotKey: "body", label: "故事版車身", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale", alertTone: "warning", livePowerKw: 310, circuitId: 2 },
+        { slotKey: "painting", label: "故事版塗裝", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
+        { slotKey: "assembly", label: "故事版裝配", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale", alertTone: "warning", livePowerKw: 0, circuitId: 4 },
+        { slotKey: "utility", label: "故事版原動力", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale", alertTone: "warning", livePowerKw: 0, circuitId: 5 },
+        { slotKey: "office", label: "故事版事務系", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale", alertTone: "warning", livePowerKw: 0, circuitId: 6 },
+        { slotKey: "heavy_vehicle", label: "故事版大車", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null },
+        { slotKey: "ed_coating", label: "故事版ED電著", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null }
+      ],
+      summary: { alertTone: "warning", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale" }
+    }
+  });
+
+  assert.equal(model.loadRows[0]?.isEmpty, false);
+  assert.equal(model.loadRows[0]?.livePowerKw, 520);
+  assert.equal(model.loadRows[0]?.statusLabel, "注意");
+  assert.equal(model.loadRows[0]?.statusTone, "warning");
+  assert.equal(model.kpis[0]?.value, "830");
+  assert.equal(model.kpis[0]?.freshnessState, "stale");
+  assert.equal(model.summary.statusLabel, "迴路資料延遲，顯示最近一次有效狀態");
 });
 
 test("buildFactoryCircuitViewModel surfaces the custom topic name via the story slot label", () => {

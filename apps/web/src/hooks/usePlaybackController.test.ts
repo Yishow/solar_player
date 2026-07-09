@@ -25,6 +25,7 @@ test("usePlaybackController can defer management diagnostics with injected setti
 const playbackSettings: PlaybackSettings = {
   autoplay: true,
   brightness: 80,
+  enforceFreshRuntimeData: true,
   idleMode: "disabled",
   idleTimeout: 60,
   loop: true,

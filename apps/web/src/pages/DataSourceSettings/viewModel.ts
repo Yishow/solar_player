@@ -57,6 +57,8 @@ export type DataSourceSettingsViewModel = {
       tone: SectionTone;
     };
     metrics: string[];
+    monthResetButtonDisabled: boolean;
+    monthResetButtonLabel: string;
     resetButtonDisabled: boolean;
     resetButtonLabel: string;
   };
@@ -87,6 +89,8 @@ type BuildDataSourceSettingsViewModelArgs = {
   errorMessage?: string;
   monitoringResetErrorMessage?: string;
   monitoringResetState?: MonitoringResetState;
+  monitoringMonthResetErrorMessage?: string;
+  monitoringMonthResetState?: MonitoringResetState;
   overview: DataSourceOverviewResponse | null;
   state: ViewState;
 };
@@ -187,14 +191,14 @@ function buildCalculationSettingsCard(
       value: draft.treeEquivalentFactor
     },
     {
-      description: "今日自發自用量換算四口之家戶數的每日基準。",
+      description: "今日與累積發電量換算四口之家戶數的每日基準。",
       key: "householdDailyUsageKwh",
       label: "每日家庭用電",
       unit: "kWh / day",
       value: draft.householdDailyUsageKwh
     },
     {
-      description: "累積自發自用量換算四口之家戶數的每月基準。",
+      description: "四口之家每月用電說明使用的參考基準。",
       key: "householdMonthlyUsageKwh",
       label: "每月家庭用電",
       unit: "kWh / month",
@@ -317,7 +321,9 @@ function buildCalculationSettingsCard(
 function buildMonitoringCard(
   overview: DataSourceOverviewResponse | null,
   resetState: MonitoringResetState,
-  resetErrorMessage = ""
+  resetErrorMessage = "",
+  monthResetState: MonitoringResetState = "ready",
+  monthResetErrorMessage = ""
 ) {
   if (!overview) {
     return {
@@ -328,6 +334,8 @@ function buildMonitoringCard(
         tone: "ready" as const
       },
       metrics: [],
+      monthResetButtonDisabled: true,
+      monthResetButtonLabel: "重設本月曲線",
       resetButtonDisabled: true,
       resetButtonLabel: "重設今日曲線"
     };
@@ -349,6 +357,8 @@ function buildMonitoringCard(
         tone: "warning" as const
       },
       metrics,
+      monthResetButtonDisabled: true,
+      monthResetButtonLabel: "重設本月曲線",
       resetButtonDisabled: true,
       resetButtonLabel: "重設中..."
     };
@@ -363,6 +373,8 @@ function buildMonitoringCard(
         tone: "error" as const
       },
       metrics,
+      monthResetButtonDisabled: monthResetState === "resetting",
+      monthResetButtonLabel: monthResetState === "resetting" ? "重設中..." : "重設本月曲線",
       resetButtonDisabled: false,
       resetButtonLabel: "重設今日曲線"
     };
@@ -377,8 +389,58 @@ function buildMonitoringCard(
         tone: "ready" as const
       },
       metrics,
+      monthResetButtonDisabled: monthResetState === "resetting",
+      monthResetButtonLabel: monthResetState === "resetting" ? "重設中..." : "重設本月曲線",
       resetButtonDisabled: false,
       resetButtonLabel: "再次重設今日曲線"
+    };
+  }
+
+  if (monthResetState === "resetting") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: "系統正在清除本月 1 日起的 metric_snapshots 與 daily_energy_summaries。",
+        title: "本月曲線重設中",
+        tone: "warning" as const
+      },
+      metrics,
+      monthResetButtonDisabled: true,
+      monthResetButtonLabel: "重設中...",
+      resetButtonDisabled: true,
+      resetButtonLabel: "重設今日曲線"
+    };
+  }
+
+  if (monthResetState === "error") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: monthResetErrorMessage || "本月曲線重設失敗。",
+        title: "本月曲線未重設",
+        tone: "error" as const
+      },
+      metrics,
+      monthResetButtonDisabled: false,
+      monthResetButtonLabel: "重設本月曲線",
+      resetButtonDisabled: false,
+      resetButtonLabel: "重設今日曲線"
+    };
+  }
+
+  if (monthResetState === "success") {
+    return {
+      anomalies: monitoring.anomalyMessages,
+      banner: {
+        detail: "本月曲線已從 1 日起重設；後續資料會重新建立本月用量趨勢。",
+        title: "本月曲線已重設",
+        tone: "ready" as const
+      },
+      metrics,
+      monthResetButtonDisabled: false,
+      monthResetButtonLabel: "再次重設本月曲線",
+      resetButtonDisabled: false,
+      resetButtonLabel: "重設今日曲線"
     };
   }
 
@@ -394,6 +456,8 @@ function buildMonitoringCard(
       tone: (hasAnomalies ? "warning" : "ready") as SectionTone
     },
     metrics,
+    monthResetButtonDisabled: false,
+    monthResetButtonLabel: "重設本月曲線",
     resetButtonDisabled: false,
     resetButtonLabel: "重設今日曲線"
   };
@@ -405,6 +469,8 @@ export function buildDataSourceSettingsViewModel({
   calculationSettingsErrorMessage = "",
   calculationSettingsState,
   errorMessage = "",
+  monitoringMonthResetErrorMessage = "",
+  monitoringMonthResetState = "ready",
   monitoringResetErrorMessage = "",
   monitoringResetState = "ready",
   overview,
@@ -423,7 +489,13 @@ export function buildDataSourceSettingsViewModel({
         calculationSettingsState,
         calculationSettingsErrorMessage
       ),
-      monitoringCard: buildMonitoringCard(null, monitoringResetState, monitoringResetErrorMessage),
+      monitoringCard: buildMonitoringCard(
+        null,
+        monitoringResetState,
+        monitoringResetErrorMessage,
+        monitoringMonthResetState,
+        monitoringMonthResetErrorMessage
+      ),
       recommendations: [],
       relatedActions: [],
       sections: []
@@ -466,7 +538,13 @@ export function buildDataSourceSettingsViewModel({
       calculationSettingsState,
       calculationSettingsErrorMessage
     ),
-    monitoringCard: buildMonitoringCard(overview, monitoringResetState, monitoringResetErrorMessage),
+    monitoringCard: buildMonitoringCard(
+      overview,
+      monitoringResetState,
+      monitoringResetErrorMessage,
+      monitoringMonthResetState,
+      monitoringMonthResetErrorMessage
+    ),
     recommendations: overview.recommendations.map((recommendation) => ({
       description: recommendation.description,
       kind: "recommendation",

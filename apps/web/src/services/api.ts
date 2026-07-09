@@ -709,6 +709,21 @@ export async function resetTodayTrend() {
   return response.data;
 }
 
+export async function resetMonthTrend() {
+  const response = await requestJson<{
+    data: {
+      deletedDailySummaries: number;
+      deletedSnapshots: number;
+      resetAt: string;
+      resetMonthStart: string;
+    };
+    success: boolean;
+  }>("/api/data-source/reset-month-trend", {
+    method: "POST"
+  });
+  return response.data;
+}
+
 export async function getDeviceLogExportMetadata() {
   const response = await requestJson<{
     data: DeviceLogExportMetadata;

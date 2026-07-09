@@ -39,6 +39,7 @@ const pages: PlaybackPage[] = [
 const settings: PlaybackSettings = {
   autoplay: true,
   brightness: 90,
+  enforceFreshRuntimeData: true,
   idleMode: "return-to-start",
   idleTimeout: 180,
   loop: true,

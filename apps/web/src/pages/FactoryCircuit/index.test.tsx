@@ -10,15 +10,20 @@ test("factory circuit reloads fallback circuits from relevant display sync scope
   assert.match(factoryCircuitPageSource, /useDisplaySyncRefresh\(/);
   assert.match(factoryCircuitPageSource, /loadCircuitsRef\.current\("refresh"\)/);
   assert.match(factoryCircuitPageSource, /factoryCircuitRefreshSpec\.fallbackRefreshScopes/);
-  assert.match(factoryCircuitPageSource, /resolveDisplayPageRuntimeRefreshSpec\("factory-circuit"\)/);
+  assert.match(factoryCircuitPageSource, /resolveDisplayPageRuntimeRefreshSpec\(factoryCircuitPageId\)/);
 });
 
 test("factory circuit keeps circuits fallback reload page-local and guards against stale refresh races", () => {
   assert.match(factoryCircuitPageSource, /const requestIdRef = useRef\(0\)/);
   assert.match(factoryCircuitPageSource, /const loadCircuitsRef = useRef/);
   assert.match(factoryCircuitPageSource, /requestId !== requestIdRef\.current/);
-  assert.match(factoryCircuitPageSource, /requestJson<\{ success: boolean; data: CircuitConfig\[\] \}>\("\/api\/circuits"\)/);
+  assert.match(factoryCircuitPageSource, /requestJson<\{ success: boolean; data: CircuitConfig\[\] \}>\(\s*`\/api\/circuits\?pageKey=\$\{encodeURIComponent\(factoryCircuitPageId\)\}`\s*\)/);
   assert.doesNotMatch(factoryCircuitPageSource, /useDisplayStoryRuntime\("factory-circuit",\s*\{[^}]*load:/s);
+});
+
+test("factory circuit runtime story follows the active page instance", () => {
+  assert.match(factoryCircuitPageSource, /useDisplayStoryRuntime\(factoryCircuitPageId,\s*\{/);
+  assert.doesNotMatch(factoryCircuitPageSource, /useDisplayStoryRuntime\("factory-circuit",/);
 });
 
 test("factory circuit refresh failures preserve the last settled fallback rows instead of blanking circuits state", () => {
@@ -56,4 +61,19 @@ test("factory circuit isolates live metrics subscriptions inside runtime content
   assert.match(factoryCircuitPageSource, /<FactoryCircuitRuntimeContent/);
   assert.match(factoryCircuitRuntimeSource, /useLiveMetricsSelector\(/);
   assert.match(factoryCircuitRuntimeSource, /buildFactoryCircuitViewModel\(/);
+});
+
+test("factory circuit routing trunk centers itself between active load rows", () => {
+  const geometryStart = factoryCircuitPageSource.indexOf("const { routingCenterY, svgPath } = useMemo");
+  const geometryEnd = factoryCircuitPageSource.indexOf("}, [activeRowsY]);", geometryStart);
+
+  assert.ok(geometryStart >= 0);
+  assert.ok(geometryEnd > geometryStart);
+
+  const routingGeometrySource = factoryCircuitPageSource.slice(geometryStart, geometryEnd);
+
+  assert.match(routingGeometrySource, /const routingCenterY = \(minY \+ maxY\) \/ 2;/);
+  assert.match(routingGeometrySource, /let path = `M 4 \$\{routingCenterY\} H 40`;/);
+  assert.match(routingGeometrySource, /Math\.abs\(y - routingCenterY\)/);
+  assert.doesNotMatch(routingGeometrySource, /M 4 304 H 40/);
 });

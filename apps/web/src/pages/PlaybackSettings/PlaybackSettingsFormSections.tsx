@@ -348,6 +348,18 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
               <div className="ps-row-label">循環播放 <small>Loop Mode</small></div>
               <Switch ariaLabel="循環播放" on={settings?.loop ?? false} disabled={formDisabled} onChange={(next) => updateSettingsField("loop", next)} />
             </div>
+            <div className="ps-row-flex">
+              <div className="ps-row-label">
+                即時資料 freshness 檢查
+                <small>Live Data Freshness</small>
+              </div>
+              <Switch
+                ariaLabel="即時資料 freshness 檢查"
+                on={settings?.enforceFreshRuntimeData ?? true}
+                disabled={formDisabled}
+                onChange={(next) => updateSettingsField("enforceFreshRuntimeData", next)}
+              />
+            </div>
             {viewModel.factorySiteRows.length > 0 ? (
               <div className="ps-site-control">
                 <div className="ps-row-label">廠區啟用 <small>Factory Sites</small></div>

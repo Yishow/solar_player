@@ -7,6 +7,17 @@ import { setupWeatherPolling } from "./weatherPolling.js";
 
 const HEADER_WEATHER_SYNC_SCOPES: readonly DisplaySyncEventScope[] = ["weather"];
 
+export function shouldPollWeatherContract(enabled: boolean, contract: WeatherHeaderContract | null) {
+  return enabled && (contract === null || contract.settings.enabled);
+}
+
+export function resolveWeatherContractAfterRefresh(
+  previous: WeatherHeaderContract | null,
+  next: WeatherHeaderContract | null
+) {
+  return next ?? previous;
+}
+
 export async function loadHeaderWeatherContract(
   loadContract: () => Promise<WeatherHeaderContract> = getHeaderWeatherContract
 ) {
@@ -19,9 +30,10 @@ export function useHeaderWeatherMeta(initialContract?: WeatherHeaderContract | n
 
   const refreshWeather = useCallback(async () => {
     try {
-      setContract(await loadHeaderWeatherContract());
+      const nextContract = await loadHeaderWeatherContract();
+      setContract((current) => resolveWeatherContractAfterRefresh(current, nextContract));
     } catch {
-      setContract(null);
+      setContract((current) => resolveWeatherContractAfterRefresh(current, null));
     } finally {
       setIsHydrated(true);
     }
@@ -32,10 +44,9 @@ export function useHeaderWeatherMeta(initialContract?: WeatherHeaderContract | n
   }, [refreshWeather]);
 
   useEffect(() => {
-    const enabled = contract?.settings?.enabled ?? false;
     const intervalMinutes = contract?.settings?.updateIntervalMinutes ?? 30;
-    return setupWeatherPolling(enabled, intervalMinutes, refreshWeather);
-  }, [refreshWeather, contract?.settings?.updateIntervalMinutes, contract?.settings?.enabled]);
+    return setupWeatherPolling(shouldPollWeatherContract(true, contract), intervalMinutes, refreshWeather);
+  }, [refreshWeather, contract, contract?.settings?.updateIntervalMinutes]);
 
   // Re-pull the persisted contract whenever weather settings are saved so the
   // shell header reflects the new selection without a manual reload.

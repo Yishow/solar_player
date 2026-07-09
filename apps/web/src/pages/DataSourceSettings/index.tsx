@@ -9,6 +9,7 @@ import {
 import {
   getCalculationSettings,
   getDataSourceOverview,
+  resetMonthTrend,
   resetTodayTrend,
   updateCalculationSettings,
   type CalculationSettings,
@@ -135,6 +136,9 @@ export function DataSourceSettings() {
   const [monitoringResetActionState, setMonitoringResetActionState] =
     useState<MonitoringResetActionState>("ready");
   const [monitoringResetErrorMessage, setMonitoringResetErrorMessage] = useState("");
+  const [monitoringMonthResetActionState, setMonitoringMonthResetActionState] =
+    useState<MonitoringResetActionState>("ready");
+  const [monitoringMonthResetErrorMessage, setMonitoringMonthResetErrorMessage] = useState("");
 
   useEffect(() => {
     if (cachedDataSourceOverview !== null || cachedDataSourceErrorMessage) {
@@ -214,6 +218,8 @@ export function DataSourceSettings() {
       calculationSettingsErrorMessage,
       calculationSettingsState: calculationSettingsActionState,
       errorMessage,
+      monitoringMonthResetErrorMessage,
+      monitoringMonthResetState: monitoringMonthResetActionState,
       monitoringResetErrorMessage,
       monitoringResetState: monitoringResetActionState,
       overview,
@@ -226,6 +232,8 @@ export function DataSourceSettings() {
       calculationSettingsErrorMessage,
       errorMessage,
       isLoading,
+      monitoringMonthResetActionState,
+      monitoringMonthResetErrorMessage,
       monitoringResetActionState,
       monitoringResetErrorMessage,
       overview
@@ -281,6 +289,26 @@ export function DataSourceSettings() {
       setMonitoringResetActionState("error");
       setMonitoringResetErrorMessage(
         error instanceof Error ? error.message : "今日曲線重設失敗。"
+      );
+    }
+  };
+
+  const runResetMonthTrend = async () => {
+    setMonitoringMonthResetActionState("resetting");
+    setMonitoringMonthResetErrorMessage("");
+
+    try {
+      await resetMonthTrend();
+      const nextOverview = await getDataSourceOverview();
+      cachedDataSourceOverview = nextOverview;
+      cachedDataSourceErrorMessage = "";
+      setOverview(nextOverview);
+      setErrorMessage("");
+      setMonitoringMonthResetActionState("success");
+    } catch (error) {
+      setMonitoringMonthResetActionState("error");
+      setMonitoringMonthResetErrorMessage(
+        error instanceof Error ? error.message : "本月曲線重設失敗。"
       );
     }
   };
@@ -372,8 +400,8 @@ export function DataSourceSettings() {
 
         <OpsSurface family="operations">
           <OpsSurfaceTitle
-            caption="當前日 snapshot 診斷與只清今日曲線的維運入口"
-            title="今日曲線維運"
+            caption="當前日 snapshot 診斷與本月 1 日起的曲線重設入口"
+            title="曲線維運"
           />
           <OpsInfoBanner
             className="mt-4"
@@ -407,6 +435,15 @@ export function DataSourceSettings() {
             >
               {viewModel.monitoringCard.resetButtonLabel}
               <small>Reset Today Trend</small>
+            </button>
+            <button
+              type="button"
+              className="mgmt-action"
+              disabled={viewModel.monitoringCard.monthResetButtonDisabled}
+              onClick={() => void runResetMonthTrend()}
+            >
+              {viewModel.monitoringCard.monthResetButtonLabel}
+              <small>Reset Month Trend</small>
             </button>
           </OpsActionRow>
         </OpsSurface>

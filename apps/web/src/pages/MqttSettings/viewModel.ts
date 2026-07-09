@@ -41,6 +41,7 @@ export type TopicMapping = {
   nameEn: string | null;
   unit: string;
   valuePath: string;
+  multiplier?: number;
   enabled: boolean;
   updatedAt: string | null;
   lastReceivedAt: string | null;
@@ -122,6 +123,7 @@ const weatherFieldLabelMap: Record<WeatherFieldKey, string> = {
 
 const metricLabelMap: Record<string, { en: string; zh: string; icon: ReferenceGlyphName }> = {
   consumptionEnergy: { en: "Consumption Energy", icon: "plug", zh: "用電量" },
+  factoryPeakMultiplier: { en: "Peak Load Multiplier", icon: "bars", zh: "尖峰倍率" },
   factoryEvGreenPower: { en: "EV / Green Facility", icon: "leaf", zh: "綠能設施" },
   factoryHvacPower: { en: "HVAC Power", icon: "refresh", zh: "空調設備" },
   factoryInfrastructurePower: { en: "Infrastructure Power", icon: "bars", zh: "基礎設施" },

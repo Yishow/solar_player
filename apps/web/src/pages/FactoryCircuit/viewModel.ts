@@ -119,6 +119,27 @@ function readMetricValue(snapshot: LiveMetricsSnapshot, key: string) {
   return snapshot.metrics[key]?.value ?? null;
 }
 
+function readMetricReading(snapshot: LiveMetricsSnapshot, key: string) {
+  return snapshot.metrics[key] ?? null;
+}
+
+function resolveMetricDay(timestamp: string | null | undefined) {
+  return typeof timestamp === "string" && timestamp.length >= 10 ? timestamp.slice(0, 10) : null;
+}
+
+function isReadingOnReferenceDay(reading: { timestamp?: string | null } | null, referenceTimestamp: string | null) {
+  const referenceDay = resolveMetricDay(referenceTimestamp);
+  const readingDay = resolveMetricDay(reading?.timestamp);
+
+  return referenceDay === null || readingDay === null || readingDay === referenceDay;
+}
+
+function formatFlexibleNumber(value: number) {
+  return value.toLocaleString("zh-TW", {
+    maximumFractionDigits: 2
+  });
+}
+
 function resolveStoryEmptyStatus(args: {
   bindingState: string;
   fallbackReason: string | null;
@@ -305,7 +326,6 @@ export function buildFactoryCircuitViewModel({
       factoryCircuitStory.slots.every(
         (slot) =>
           slot.bindingState === "bound" &&
-          slot.freshnessState === "fresh" &&
           slot.livePowerKw !== null
       );
     const totalPowerKw = aggregateAvailable
@@ -321,7 +341,6 @@ export function buildFactoryCircuitViewModel({
       const slotIsHealthy =
         storySlot !== undefined &&
         storySlot.bindingState === "bound" &&
-        storySlot.freshnessState === "fresh" &&
         storySlot.livePowerKw !== null;
 
       if (!slotIsHealthy) {
@@ -402,7 +421,16 @@ export function buildFactoryCircuitViewModel({
 
   const totalPowerDependencyKeys = slotDefinitions.map((slot) => slot.key);
   const totalPowerKw = circuits.reduce((sum, circuit) => sum + (circuit.livePowerKw ?? 0), 0);
-  const selfConsumptionKwh = readMetricValue(snapshot, "selfConsumptionEnergy");
+  const selfConsumptionReading = readMetricReading(snapshot, "selfConsumptionEnergy");
+  const todayGenerationReading = readMetricReading(snapshot, "todayGeneration");
+  const selfConsumptionKwh = isReadingOnReferenceDay(selfConsumptionReading, snapshot.timestamp)
+    ? selfConsumptionReading?.value ?? null
+    : null;
+  const todayGeneration = isReadingOnReferenceDay(todayGenerationReading, snapshot.timestamp)
+    ? todayGenerationReading?.value ?? null
+    : null;
+  const peakMultiplier = readMetricValue(snapshot, "factoryPeakMultiplier");
+  const peakMultiplierAvailable = peakMultiplier !== null && Number.isFinite(peakMultiplier) && peakMultiplier > 0;
   const hasCompleteRuntime = slotDefinitions.every((slot) => {
     const circuit = circuits.find((entry) => entry.displaySlot === slot.key);
     return circuit !== undefined && circuit.livePowerKw !== null;
@@ -583,8 +611,25 @@ export function buildFactoryCircuitViewModel({
             unit: "kWh",
             value: formatNumber(selfConsumptionKwh)
           }
+        : todayGeneration !== null
+          ? {
+              alertTone: "normal" as const,
+              bindingState: "bound" as const,
+              dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
+              fallbackReason: null,
+              fallbackStrategy: "derive-from-dependencies" as const,
+              freshnessState: "fresh" as const,
+              helper: "以今日發電量替代自發自用量",
+              iconKey: "sun" as const,
+              label: "今日自發自用電量",
+              metricKey: "selfConsumption" as const,
+              provenance: "derived" as const,
+              sourceClass: "derived-metric" as const,
+              unit: todayGenerationReading?.unit ?? "MWh",
+              value: formatFlexibleNumber(todayGeneration)
+            }
         : buildFallbackKpi({
-            dependencyKeys: ["selfConsumptionEnergy"],
+            dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
             fallbackReason: connectionState === "connected" ? "metric-unavailable" : "socket-disconnected",
             fallbackStrategy: "placeholder",
             helper: "等待自發自用數據",
@@ -594,25 +639,31 @@ export function buildFactoryCircuitViewModel({
             unit: "kWh"
           }),
       hasCompleteRuntime
+        && peakMultiplierAvailable
         ? {
             alertTone: "normal" as const,
             bindingState: "bound" as const,
-            dependencyKeys: totalPowerDependencyKeys,
+            dependencyKeys: ["factoryPeakMultiplier", ...totalPowerDependencyKeys],
             fallbackReason: null,
             fallbackStrategy: "derive-from-dependencies" as const,
             freshnessState: "fresh" as const,
-            helper: "Estimated Peak Load",
+            helper: `Estimated Peak Load x${peakMultiplier}`,
             iconKey: "bars" as const,
             label: "尖峰負載",
             metricKey: "peak" as const,
             provenance: "derived" as const,
             sourceClass: "derived-metric" as const,
             unit: "kW",
-            value: formatNumber(Math.round(totalPowerKw * 1.45))
+            value: formatNumber(Math.round(totalPowerKw * peakMultiplier))
           }
         : buildFallbackKpi({
-            dependencyKeys: totalPowerDependencyKeys,
-            fallbackReason: connectionState === "connected" ? "missing-live-power" : "socket-disconnected",
+            dependencyKeys: ["factoryPeakMultiplier", ...totalPowerDependencyKeys],
+            fallbackReason:
+              connectionState === "connected"
+                ? hasCompleteRuntime
+                  ? "metric-unavailable"
+                  : "missing-live-power"
+                : "socket-disconnected",
             fallbackStrategy: "derive-from-dependencies",
             helper: buildFlowFallbackLabel({ connectionState, loadState }),
             label: "尖峰負載",

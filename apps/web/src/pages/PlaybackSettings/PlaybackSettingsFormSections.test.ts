@@ -40,6 +40,13 @@ test("playback settings exposes factory site enablement as playback page enabled
     assert.doesNotMatch(source, /ps-card-sites/);
 });
 
+test("playback settings exposes the live data freshness enforcement toggle", () => {
+    assert.match(source, /即時資料 freshness 檢查/);
+    assert.match(source, /Live Data Freshness/);
+    assert.match(source, /settings\?\.enforceFreshRuntimeData \?\? true/);
+    assert.match(source, /updateSettingsField\("enforceFreshRuntimeData", next\)/);
+});
+
 test("playback settings form sections are memoized for tick and preview isolation", () => {
     assert.match(source, /export const PlaybackSettingsFormSections = memo\(function PlaybackSettingsFormSections/);
 });

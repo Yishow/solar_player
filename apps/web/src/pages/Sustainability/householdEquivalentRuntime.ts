@@ -9,7 +9,7 @@ export function resolveHouseholdEquivalentRuntimePayload(
   if (provenanceSource === "daily-self-consumption") {
     return householdEquivalents.today;
   }
-  if (provenanceSource === "cumulative-self-consumption") {
+  if (provenanceSource === "cumulative-generation" || provenanceSource === "cumulative-self-consumption") {
     return householdEquivalents.cumulative;
   }
 

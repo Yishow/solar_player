@@ -44,7 +44,7 @@ test("live runtime display pages defer first paint until persisted config hydrat
 
 test("live runtime display pages use the shared runtime refresh hook family instead of page-local fetch-once effects", () => {
   const sourceExpectations = {
-    FactoryCircuit: /useDisplayStoryRuntime\("factory-circuit"/,
+    FactoryCircuit: /useDisplayStoryRuntime\(factoryCircuitPageId/,
     Images: /useImagePlaylistRuntime\(\{\s*enabled:\s*runtimeHydrationEnabled\s*\}\)/,
     Overview: /useDisplayStoryRuntime\("overview"/,
     Solar: /useDisplayStoryRuntime\("solar"/,

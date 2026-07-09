@@ -182,6 +182,8 @@ test("buildDataSourceSettingsViewModel surfaces monitoring anomalies and reset a
   assert.equal(viewModel.monitoringCard.metrics.includes("最新 snapshot 2026-06-15"), true);
   assert.equal(viewModel.monitoringCard.anomalies.length, 2);
   assert.equal(viewModel.monitoringCard.resetButtonDisabled, false);
+  assert.equal(viewModel.monitoringCard.monthResetButtonDisabled, false);
+  assert.equal(viewModel.monitoringCard.monthResetButtonLabel, "重設本月曲線");
 });
 
 test("buildDataSourceSettingsViewModel turns API failure into a degraded page state", () => {
@@ -267,8 +269,8 @@ test("buildDataSourceSettingsViewModel exposes synchronized calculation coeffici
   const fieldDescriptions = Object.fromEntries(
     viewModel.calculationSettingsCard.fields.map((field) => [field.key, field.description])
   );
-  assert.equal(fieldDescriptions.householdDailyUsageKwh, "今日自發自用量換算四口之家戶數的每日基準。");
-  assert.equal(fieldDescriptions.householdMonthlyUsageKwh, "累積自發自用量換算四口之家戶數的每月基準。");
+  assert.equal(fieldDescriptions.householdDailyUsageKwh, "今日與累積發電量換算四口之家戶數的每日基準。");
+  assert.equal(fieldDescriptions.householdMonthlyUsageKwh, "四口之家每月用電說明使用的參考基準。");
   assert.deepEqual(
     viewModel.calculationSettingsCard.toggles.map((toggle) => [toggle.key, toggle.checked]),
     [["co2AutoConvertSmallToKg", false]]

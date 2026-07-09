@@ -65,6 +65,34 @@ function TopicInputGroup({
   );
 }
 
+function TopicMultiplierInput({
+  rowId,
+  value,
+  handleTopicChange
+}: {
+  rowId: number;
+  value: number;
+  handleTopicChange: TopicWorkspaceRowProps["handleTopicChange"];
+}) {
+  return (
+    <div className="input-group">
+      <span className="input-prefix">倍率</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        min="0"
+        step="0.01"
+        placeholder="1"
+        value={value}
+        onChange={(event) => {
+          const nextValue = Number(event.target.value);
+          handleTopicChange(rowId, "multiplier", Number.isFinite(nextValue) ? nextValue : 1);
+        }}
+      />
+    </div>
+  );
+}
+
 /**
  * Topic 工作區的單一對照項目元件。
  * 提供即時數值顯示、Topic/Unit 欄位編輯，以及啟用與移除之控制項。
@@ -155,6 +183,11 @@ function TopicWorkspaceRowImpl({
             label="Unit"
             placeholder="單位"
             value={topic.unit}
+            handleTopicChange={handleTopicChange}
+          />
+          <TopicMultiplierInput
+            rowId={topic.id}
+            value={topic.multiplier ?? 1}
             handleTopicChange={handleTopicChange}
           />
         </div>

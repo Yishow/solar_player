@@ -1,8 +1,7 @@
+import { co2TreeEquivalentFactor } from "@solar-display/shared";
 import { Sparkline } from "../../components/Sparkline";
 import { DisplayCardFooter } from "../../components/displayPageCards";
 import type { OverviewKpiCardConfig } from "./displayPageConfig";
-
-const co2TreeEquivalentFactor = 6.25;
 
 type OverviewKpiFooterMetric = {
     trendSeries?: number[];

@@ -273,6 +273,20 @@ test("mergeDisplayPageConfig preserves explicit empty canonical media effect lay
   assert.deepEqual(merged.heroMedia.effects, { layers: [] });
 });
 
+test("mergeDisplayPageConfig preserves an explicitly emptied overview background pool", () => {
+  const seedConfig = createOverviewDisplayPageSeedConfig("/overview-seed.jpg", undefined, [
+    "/overview-bg-1.png",
+    "/overview-bg-2.png"
+  ]);
+  const merged = mergeDisplayPageConfig(seedConfig, {
+    backgroundPool: {
+      sources: []
+    }
+  });
+
+  assert.deepEqual(merged.backgroundPool.sources, []);
+});
+
 test("mergeDisplayPageConfig upgrades legacy highlight items into metric-highlight cards", () => {
   const seedConfig = createSustainabilityDisplayPageSeedConfig("/sustainability-seed.jpg");
   const merged = mergeDisplayPageConfig(seedConfig, {

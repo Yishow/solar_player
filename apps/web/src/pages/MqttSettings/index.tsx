@@ -65,6 +65,7 @@ const defaultMetricOptions = [
   "selfConsumptionEnergy",
   "consumptionEnergy",
   "systemEfficiency",
+  "factoryPeakMultiplier",
   "factoryProductionPower",
   "factoryHvacPower",
   "factoryLightingPower",
@@ -109,6 +110,7 @@ function createEmptyMapping(metricKey: string): TopicMapping {
     lastReceivedAt: null,
     lastValue: null,
     metricKey,
+    multiplier: 1,
     nameZh: null,
     nameEn: null,
     quality: null,
@@ -636,6 +638,7 @@ export function MqttSettings() {
           topics: topics.map((topic) => ({
             enabled: topic.enabled,
             metricKey: topic.metricKey,
+            multiplier: topic.multiplier ?? 1,
             nameZh: topic.nameZh?.trim() ?? "",
             nameEn: topic.nameEn?.trim() ?? "",
             topic: topic.topic.trim(),
