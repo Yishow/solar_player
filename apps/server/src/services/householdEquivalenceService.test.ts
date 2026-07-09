@@ -32,7 +32,7 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
-test("readHouseholdEquivalenceCards derives today and cumulative household headlines from self-consumption bases", () => {
+test("readHouseholdEquivalenceCards derives today from self-consumption and cumulative from generation bases", () => {
   const database = getDatabase();
   const today = "2026-05-21";
 
@@ -61,7 +61,7 @@ test("readHouseholdEquivalenceCards derives today and cumulative household headl
       `
         INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+          ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -76,10 +76,114 @@ test("readHouseholdEquivalenceCards derives today and cumulative household headl
   assert.equal(cards.today.provenance?.source, "daily-self-consumption");
   assert.equal(cards.today.derivedStatus, "available");
 
-  assert.equal(cards.cumulative.householdCountDisplay, "35");
+  assert.equal(cards.cumulative.householdCountDisplay, "1,050");
   assert.equal(cards.cumulative.calcProfile?.label, profile.label);
-  assert.equal(cards.cumulative.provenance?.source, "cumulative-self-consumption");
+  assert.equal(cards.cumulative.provenance?.source, "cumulative-generation");
   assert.equal(cards.cumulative.derivedStatus, "available");
+});
+
+test("readHouseholdEquivalenceCards derives cumulative household headline from cumulative generation on the daily usage basis", () => {
+  const database = getDatabase();
+  const today = "2026-07-09";
+
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET household_daily_usage_kwh = 13,
+            household_monthly_usage_kwh = 400
+        WHERE id = 1
+      `
+    )
+    .run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total
+        ) VALUES (?, 100, 80, 16)
+      `
+    )
+    .run(today);
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 114820, '2026-07-09T08:43:30.386Z', 0),
+          ('selfConsumption', 22584, '2026-07-09T08:43:30.386Z', 0)
+      `
+    )
+    .run();
+
+  const cards = readHouseholdEquivalenceCards({
+    now: new Date(`${today}T12:00:00.000Z`)
+  });
+
+  assert.equal(cards.cumulative.householdCountDisplay, "8,832");
+  assert.equal(cards.cumulative.basisSourceLabel, "累積發電量");
+  assert.equal(cards.cumulative.provenance?.source, "cumulative-generation");
+  assert.equal(cards.cumulative.supportingLine, "約相當於累積日用電");
+});
+
+test("readHouseholdEquivalenceCards falls back to live today generation when daily self-consumption is stale zero", () => {
+  const database = getDatabase();
+
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET household_daily_usage_kwh = 13,
+            household_monthly_usage_kwh = 400
+        WHERE id = 1
+      `
+    )
+    .run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total
+        ) VALUES ('2026-07-08', 0, 0, 0)
+      `
+    )
+    .run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('generation', 114820, '2026-07-09T08:43:30.386Z', 0)
+      `
+    )
+    .run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('todayGeneration', 7.99, 'MWh', '2026-07-09T08:43:14.000Z', 'good', '{}')
+      `
+    )
+    .run();
+
+  const cards = readHouseholdEquivalenceCards({
+    now: new Date("2026-07-09T12:00:00.000Z")
+  });
+
+  assert.equal(cards.today.householdCountDisplay, "615");
+  assert.equal(cards.today.basisSourceLabel, "今日發電量");
+  assert.equal(cards.today.provenance?.source, "live-today-generation-fallback");
+  assert.equal(cards.today.provenance?.updatedAt, "2026-07-09T08:43:14.000Z");
 });
 
 test("readHouseholdEquivalenceCards fails closed when the daily self-consumption basis is unavailable", () => {
@@ -111,7 +215,7 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
       `
         INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+          ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -164,7 +268,7 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+        VALUES ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -178,7 +282,7 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
   assert.equal(cards.today.provenance?.updatedAt, `${latestAvailable}T00:00:00.000Z`);
 });
 
-test("readHouseholdEquivalenceCards falls back to live self-consumption when the cumulative counter has not flushed yet", () => {
+test("readHouseholdEquivalenceCards falls back to live total generation when the cumulative counter has not flushed yet", () => {
   const database = getDatabase();
   const today = "2026-05-21";
 
@@ -206,7 +310,7 @@ test("readHouseholdEquivalenceCards falls back to live self-consumption when the
     .prepare(
       `
         INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('selfConsumptionEnergy', 4.2, 'MWh', ?, 'good', '{}')
+        VALUES ('totalGeneration', 4.2, 'MWh', ?, 'good', '{}')
       `
     )
     .run(`${today}T10:00:00.000Z`);
@@ -216,8 +320,8 @@ test("readHouseholdEquivalenceCards falls back to live self-consumption when the
   });
 
   assert.equal(cards.cumulative.derivedStatus, "available");
-  assert.equal(cards.cumulative.householdCountDisplay, "35");
-  assert.equal(cards.cumulative.provenance?.source, "live-self-consumption-fallback");
+  assert.equal(cards.cumulative.householdCountDisplay, "1,050");
+  assert.equal(cards.cumulative.provenance?.source, "live-generation-fallback");
   assert.equal(cards.cumulative.provenance?.updatedAt, `${today}T10:00:00.000Z`);
 });
 
@@ -262,7 +366,7 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('selfConsumption', 4200, '2026-05-21T10:00:00.000Z', 0)
+        VALUES ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -272,7 +376,7 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
   });
 
   assert.equal(cards.today.householdCountDisplay, "12");
-  assert.equal(cards.cumulative.householdCountDisplay, "20");
+  assert.equal(cards.cumulative.householdCountDisplay, "700");
   assert.equal(cards.today.calcProfile?.averageDailyUsageKwh, 6);
   assert.equal(cards.cumulative.calcProfile?.averageMonthlyUsageKwh, 210);
   assert.equal(cards.today.calcProfile?.estimatedTariffPerKwh, 6.5);

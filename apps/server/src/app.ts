@@ -3,7 +3,7 @@ import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError, type FastifyServerOptions } from "fastify";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
@@ -111,7 +111,9 @@ export async function buildApp() {
     socketService
   });
 
-  getWeatherService().setMqttPublisher((topic, payload) => {
+  const weatherService = getWeatherService();
+  weatherService.setLogger(app.log);
+  weatherService.setMqttPublisher((topic, payload) => {
     mqttClientService?.publish(topic, payload);
   });
 
@@ -129,21 +131,23 @@ export async function buildApp() {
     trustedOrigins: trustedManagementOrigins
   });
 
-  await app.register(swagger, {
-    mode: "static",
-    specification: {
-      path: config.openapiPath,
-      baseDir: config.projectRoot
-    }
-  });
+  if (existsSync(config.openapiPath)) {
+    await app.register(swagger, {
+      mode: "static",
+      specification: {
+        path: config.openapiPath,
+        baseDir: config.projectRoot
+      }
+    });
 
-  await app.register(swaggerUi, {
-    routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "list",
-      deepLinking: false
-    }
-  });
+    await app.register(swaggerUi, {
+      routePrefix: "/docs",
+      uiConfig: {
+        docExpansion: "list",
+        deepLinking: false
+      }
+    });
+  }
 
   await app.register(healthRoute);
   await app.register(metricsRoute);

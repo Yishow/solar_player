@@ -100,8 +100,8 @@ export function bootstrapDisplaySeedAssets(options: BootstrapOptions = {}) {
 
       const sourcePath = resolveManifestSourcePath(entry, projectRoot);
       const targetPath = resolve(uploadsDir, entry.targetFilename);
-      if (!existsSync(sourcePath)) {
-        throw new Error(`Missing display seed asset source: ${entry.sourcePath}`);
+      if (!existsSync(sourcePath) && !existsSync(targetPath)) {
+        continue;
       }
 
       if (!existsSync(targetPath)) {

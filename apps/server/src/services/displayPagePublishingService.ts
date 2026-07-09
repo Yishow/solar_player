@@ -202,6 +202,7 @@ function readNextLiveVersion(pageId: DisplayPageId) {
 type LayoutRect = {
   bottom: number;
   height: number;
+  kind: "cardRail" | "media" | "region";
   left: number;
   regionId: string;
   right: number;
@@ -271,6 +272,7 @@ function pushGeometryValidationFindings(
 
 function pushLayoutRect(layoutRects: LayoutRect[], regionId: string, rect: {
   height: number;
+  kind?: LayoutRect["kind"];
   left: number;
   top: number;
   width: number;
@@ -282,6 +284,7 @@ function pushLayoutRect(layoutRects: LayoutRect[], regionId: string, rect: {
   layoutRects.push({
     bottom: rect.top + rect.height,
     height: rect.height,
+    kind: rect.kind ?? "region",
     left: rect.left,
     regionId,
     right: rect.left + rect.width,
@@ -725,7 +728,7 @@ function validateCardRail(
   }
 ) {
   pushGeometryValidationFindings(findings, regionId, rail.container);
-  pushLayoutRect(layoutRects, regionId, rail.container);
+  pushLayoutRect(layoutRects, regionId, { ...rail.container, kind: "cardRail" });
 
   for (const card of rail.cards) {
     if (!card.visible) {
@@ -837,6 +840,7 @@ function validateConfigDraft(
       ) {
         pushLayoutRect(layoutRects, regionId, {
           height: nHeight,
+          kind: isDisplayPageMediaBinding(value) ? "media" : "region",
           left: nLeft,
           top: nTop,
           width: nWidth
@@ -856,6 +860,13 @@ function validateConfigDraft(
         current.bottom > candidate.top;
 
       if (!overlaps) {
+        continue;
+      }
+
+      if (
+        (current.kind === "cardRail" && candidate.kind === "media") ||
+        (current.kind === "media" && candidate.kind === "cardRail")
+      ) {
         continue;
       }
 

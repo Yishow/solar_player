@@ -238,7 +238,13 @@ function monitoringRows(
     story[pageId].kpis.map((metric) =>
       monitoringRow({
         cardId: `${pageId}.${metric.metricKey}`,
-        formula: metric.sourceClass === "slot-aggregate" ? "sum(display circuit slots)" : null,
+        formula:
+          metric.sourceClass === "slot-aggregate"
+            ? "sum(display circuit slots)"
+            : metric.metricKey === "selfConsumption" &&
+              metric.dependencyKeys.includes("todayGeneration")
+              ? "todayGeneration fallback"
+              : null,
         liveMetrics,
         metric,
         overrides,
@@ -265,7 +271,7 @@ function formatFixedValue(value: number | null, digits: number) {
 }
 
 function formatGenerationMwh(valueGwh: number | null) {
-  return valueGwh === null ? "--" : formatFixedValue(valueGwh * 1000, 1);
+  return valueGwh === null ? "--" : formatIntegerValue(valueGwh * 1000);
 }
 
 function sustainabilityNumericRows(
@@ -405,12 +411,16 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
     {
       card: cards.cumulative,
       cardId: "sustainability.household.cumulative",
-      calculationFields: ["householdMonthlyUsageKwh"],
+      calculationFields: ["householdDailyUsageKwh"],
       metricKey: "householdEquivalent.cumulative",
       sourceClassification: "cumulative-counter"
     }
-  ].map((entry) =>
-    applyDisplayCardOverride({
+  ].map((entry) => {
+    const usesLiveTodayGenerationFallback =
+      entry.metricKey === "householdEquivalent.today" &&
+      entry.card.provenance.source === "live-today-generation-fallback";
+
+    return applyDisplayCardOverride({
       actions: [
         { fields: entry.calculationFields, type: "edit-calculation-settings" },
         ...displayOnlyActions()
@@ -431,21 +441,23 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
       ],
       displayValue: entry.card.householdCountDisplay,
       formula:
-        entry.metricKey === "householdEquivalent.today"
+        usesLiveTodayGenerationFallback
+          ? "todayGeneration / householdDailyUsageKwh"
+          : entry.metricKey === "householdEquivalent.today"
           ? "daily selfConsumption / householdDailyUsageKwh"
-          : "cumulative selfConsumption / householdMonthlyUsageKwh",
+          : "cumulative generation / householdDailyUsageKwh",
       label: entry.card.eyebrow,
       lastUpdatedAt: entry.card.provenance.updatedAt,
       metricKey: entry.metricKey,
       originalValue: entry.card.householdCountDisplay,
       override: null,
       pageId: "sustainability",
-      sourceClassification: entry.sourceClassification,
+      sourceClassification: usesLiveTodayGenerationFallback ? "mqtt-live" : entry.sourceClassification,
       sourceTopics: [],
       status: entry.card.derivedStatus === "available" ? "ready" : "waiting-aggregate",
       unit: entry.card.householdLabel
-    } satisfies DisplayCardDataRow, overrides)
-  );
+    } satisfies DisplayCardDataRow, overrides);
+  });
 }
 
 export function readDisplayCardData(): DisplayCardDataResponse {

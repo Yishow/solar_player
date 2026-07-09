@@ -27,6 +27,7 @@ import {
 import { getDatabase } from "../db/index.js";
 import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
+import { readPlaybackSettings } from "./displayRotationService.js";
 import {
   type HourlyGenerationTrendRow,
   selectHourlyGenerationTrendProfile
@@ -181,6 +182,7 @@ type TopicDisplayName = {
 };
 
 type DisplayStorySourceContext = {
+  allowStaleRuntimeData: boolean;
   calculationSettings: CalculationSettings;
   circuits: CircuitRow[];
   flowState: ReturnType<typeof resolveSolarFlowState>;
@@ -203,15 +205,16 @@ function roundTo(value: number, digits: number) {
 }
 
 function normalizeGenerationKwh(value: number, unit: string | null) {
-  if (unit === "GWh") {
-    return value * 1_000_000;
+  switch (unit?.trim().toLowerCase()) {
+    case "gwh":
+      return value * 1_000_000;
+    case "mwh":
+      return value * 1_000;
+    case "wh":
+      return value / 1_000;
+    default:
+      return value;
   }
-
-  if (unit === "MWh") {
-    return value * 1_000;
-  }
-
-  return value;
 }
 
 function readCumulativeCounter(metricKey: string) {
@@ -240,7 +243,7 @@ function buildDerivedCarbonReductionReading(
     unit: "t",
     value: roundTo(
       normalizeGenerationKwh(generationReading.value, generationReading.unit) * carbonEmissionFactor / 1000,
-      3
+      6
     )
   };
 }
@@ -492,6 +495,7 @@ function resolveSolarKpiBinding(args: {
 }
 
 function resolveFactoryMetricBinding(args: {
+  allowStaleRuntimeData?: boolean;
   dependencyKeys: string[];
   isConnected: boolean;
   label: string;
@@ -500,7 +504,7 @@ function resolveFactoryMetricBinding(args: {
   reading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null;
   unit: string;
 }) {
-  return resolveMonitoringMetricBinding({
+  const resolved = resolveMonitoringMetricBinding({
     binding: {
       dependencyKeys: args.dependencyKeys,
       fallbackIndex: 0,
@@ -513,6 +517,16 @@ function resolveFactoryMetricBinding(args: {
     now: args.now,
     reading: args.reading
   });
+
+  if (args.allowStaleRuntimeData && resolved.bindingState === "bound" && resolved.freshnessState === "stale") {
+    return {
+      ...resolved,
+      fallbackStrategy: "retain-last-reading" as const,
+      helper: "顯示最近一次有效讀值"
+    };
+  }
+
+  return resolved;
 }
 
 function buildFactoryFallbackKpi(args: {
@@ -548,8 +562,11 @@ function buildFactoryFallbackKpi(args: {
 }
 
 function buildFactoryResolvedKpi(args: {
+  alertTone?: MonitoringStoryState["alertTone"];
   dependencyKeys: string[];
+  fallbackReason?: MonitoringStoryState["fallbackReason"];
   fallbackStrategy: "derive-from-dependencies" | "placeholder";
+  freshnessState?: MonitoringStoryState["freshnessState"];
   helper: string;
   label: string;
   metricKey: FactoryCircuitKpiKey;
@@ -560,12 +577,12 @@ function buildFactoryResolvedKpi(args: {
   value: number | string;
 }) {
   return {
-    alertTone: "normal" as const,
+    alertTone: args.alertTone ?? "normal" as const,
     bindingState: "bound" as const,
     dependencyKeys: args.dependencyKeys,
-    fallbackReason: null,
+    fallbackReason: args.fallbackReason ?? null,
     fallbackStrategy: args.fallbackStrategy,
-    freshnessState: "fresh" as const,
+    freshnessState: args.freshnessState ?? "fresh" as const,
     helper: args.helper,
     label: args.label,
     metricKey: args.metricKey,
@@ -575,6 +592,20 @@ function buildFactoryResolvedKpi(args: {
     unit: args.unit,
     value: typeof args.value === "number" ? formatMonitoringValue(args.value, args.unit) : args.value
   };
+}
+
+function isUsableFactoryMetric(
+  state: Pick<MonitoringStoryState, "bindingState" | "freshnessState">,
+  allowStaleRuntimeData: boolean
+) {
+  return state.bindingState === "bound" && (
+    state.freshnessState === "fresh" ||
+    (allowStaleRuntimeData && state.freshnessState === "stale")
+  );
+}
+
+function resolveRetainedReadingHelper(baseHelper: string) {
+  return baseHelper === "顯示最近一次有效讀值" ? baseHelper : `顯示最近一次有效讀值｜${baseHelper}`;
 }
 
 function resolveFactoryDegradedHelper(slot: FactoryCircuitStoryPayload["slots"][number] | undefined) {
@@ -598,6 +629,7 @@ function resolveFactoryDegradedHelper(slot: FactoryCircuitStoryPayload["slots"][
 }
 
 function resolveFactoryCircuitKpis(args: {
+  allowStaleRuntimeData: boolean;
   pageKey: FactoryCircuitPageKey;
   isConnected: boolean;
   slots: FactoryCircuitStoryPayload["slots"];
@@ -608,14 +640,18 @@ function resolveFactoryCircuitKpis(args: {
   const aggregateDependencyKeys = args.slots.flatMap((slot) => slot.metricKey ? [slot.metricKey] : []);
   const aggregateFailure = args.slots.find(
     (slot) =>
-      slot.bindingState !== "bound" ||
-      slot.freshnessState !== "fresh" ||
+      !isUsableFactoryMetric(slot, args.allowStaleRuntimeData) ||
       slot.livePowerKw === null
   );
   const totalPowerValue = aggregateFailure
     ? null
     : args.slots.reduce((sum, slot) => sum + (slot.livePowerKw ?? 0), 0);
   const aggregateHelper = resolveFactoryDegradedHelper(aggregateFailure);
+  const aggregateFreshnessState = aggregateFailure?.freshnessState ??
+    (args.slots.some((slot) => slot.freshnessState === "stale") ? "stale" : "fresh");
+  const aggregateFallbackReason = aggregateFailure?.fallbackReason ??
+    (aggregateFreshnessState === "stale" ? "stale-data" : null);
+  const aggregateAlertTone = aggregateFreshnessState === "stale" ? "warning" : "normal";
 
   const totalPower = totalPowerValue === null
     ? buildFactoryFallbackKpi({
@@ -631,9 +667,15 @@ function resolveFactoryCircuitKpis(args: {
         unit: "kW"
       })
     : buildFactoryResolvedKpi({
+        alertTone: aggregateAlertTone,
         dependencyKeys: aggregateDependencyKeys,
+        fallbackReason: aggregateFallbackReason,
         fallbackStrategy: "placeholder",
-        helper: `${args.slots.length} 個迴路來源`,
+        freshnessState: aggregateFreshnessState,
+        helper:
+          aggregateFreshnessState === "stale"
+            ? resolveRetainedReadingHelper(`${args.slots.length} 個迴路來源`)
+            : `${args.slots.length} 個迴路來源`,
         label: "目前廠區總用電",
         metricKey: "totalPower",
         provenance: "aggregate",
@@ -643,6 +685,7 @@ function resolveFactoryCircuitKpis(args: {
       });
 
   const solarPower = resolveFactoryMetricBinding({
+    allowStaleRuntimeData: args.allowStaleRuntimeData,
     dependencyKeys: ["realTimePower"],
     isConnected: args.isConnected,
     label: "太陽能供應占比",
@@ -669,7 +712,7 @@ function resolveFactoryCircuitKpis(args: {
         }),
         unit: "%"
       })
-    : solarPower.bindingState !== "bound" || solarPower.freshnessState !== "fresh"
+    : !isUsableFactoryMetric(solarPower, args.allowStaleRuntimeData)
       ? buildFactoryFallbackKpi({
           bindingState: solarPower.bindingState,
           dependencyKeys: ["realTimePower", ...aggregateDependencyKeys],
@@ -688,9 +731,24 @@ function resolveFactoryCircuitKpis(args: {
           unit: "%"
         })
       : buildFactoryResolvedKpi({
+          alertTone:
+            totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
+              ? "warning"
+              : "normal",
           dependencyKeys: ["realTimePower", ...aggregateDependencyKeys],
+          fallbackReason:
+            totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
+              ? "stale-data"
+              : null,
           fallbackStrategy: "derive-from-dependencies",
-          helper: "Solar Supply Share",
+          freshnessState:
+            totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
+              ? "stale"
+              : "fresh",
+          helper:
+            totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
+              ? resolveRetainedReadingHelper("Solar Supply Share")
+              : "Solar Supply Share",
           label: "太陽能供應占比",
           metricKey: "solarShare",
           provenance: "derived",
@@ -705,6 +763,7 @@ function resolveFactoryCircuitKpis(args: {
         });
 
   const selfConsumption = resolveFactoryMetricBinding({
+    allowStaleRuntimeData: args.allowStaleRuntimeData,
     dependencyKeys: ["selfConsumptionEnergy"],
     isConnected: args.isConnected,
     label: "今日自發自用電量",
@@ -713,28 +772,67 @@ function resolveFactoryCircuitKpis(args: {
     reading: args.snapshot.metrics.selfConsumptionEnergy ?? null,
     unit: "kWh"
   });
-  const selfConsumptionKpi = selfConsumption.bindingState !== "bound" || selfConsumption.freshnessState !== "fresh"
-    ? buildFactoryFallbackKpi({
-        bindingState: selfConsumption.bindingState,
+  const todayGenerationFallback = resolveFactoryMetricBinding({
+    allowStaleRuntimeData: args.allowStaleRuntimeData,
+    dependencyKeys: ["todayGeneration"],
+    isConnected: args.isConnected,
+    label: "今日自發自用電量",
+    metricKey: "todayGeneration",
+    now: args.snapshot.timestamp ?? undefined,
+    reading: args.snapshot.metrics.todayGeneration ?? null,
+    unit: args.snapshot.metrics.todayGeneration?.unit ?? "kWh"
+  });
+  const selfConsumptionKpi = !isUsableFactoryMetric(selfConsumption, args.allowStaleRuntimeData)
+    ? isUsableFactoryMetric(todayGenerationFallback, args.allowStaleRuntimeData)
+      ? buildFactoryResolvedKpi({
+          alertTone: todayGenerationFallback.freshnessState === "stale" ? "warning" : "normal",
+          dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
+          fallbackReason: todayGenerationFallback.freshnessState === "stale" ? "stale-data" : null,
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: todayGenerationFallback.freshnessState,
+          helper:
+            todayGenerationFallback.freshnessState === "stale"
+              ? resolveRetainedReadingHelper("以今日發電量替代自發自用量")
+              : "以今日發電量替代自發自用量",
+          label: "今日自發自用電量",
+          metricKey: "selfConsumption",
+          provenance: "derived",
+          sourceClass: "derived-metric",
+          sourceTopics: resolveSourceTopics({
+            dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
+            metricKey: "selfConsumption",
+            topicNames: args.topicNames
+          }),
+          unit: todayGenerationFallback.unit,
+          value: todayGenerationFallback.value
+        })
+      : buildFactoryFallbackKpi({
+          bindingState: selfConsumption.bindingState,
+          dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
+          fallbackReason: selfConsumption.fallbackReason,
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: selfConsumption.freshnessState,
+          helper: selfConsumption.helper,
+          label: "今日自發自用電量",
+          metricKey: "selfConsumption",
+          sourceClass: "derived-metric",
+          sourceTopics: resolveSourceTopics({
+            dependencyKeys: ["selfConsumptionEnergy", "todayGeneration"],
+            metricKey: "selfConsumption",
+            topicNames: args.topicNames
+          }),
+          unit: "kWh"
+        })
+    : buildFactoryResolvedKpi({
+        alertTone: selfConsumption.freshnessState === "stale" ? "warning" : "normal",
         dependencyKeys: ["selfConsumptionEnergy"],
-        fallbackReason: selfConsumption.fallbackReason,
+        fallbackReason: selfConsumption.freshnessState === "stale" ? "stale-data" : null,
         fallbackStrategy: "placeholder",
         freshnessState: selfConsumption.freshnessState,
-        helper: selfConsumption.helper,
-        label: "今日自發自用電量",
-        metricKey: "selfConsumption",
-        sourceClass: "mqtt-live",
-        sourceTopics: resolveSourceTopics({
-          dependencyKeys: ["selfConsumptionEnergy"],
-          metricKey: "selfConsumption",
-          topicNames: args.topicNames
-        }),
-        unit: "kWh"
-      })
-    : buildFactoryResolvedKpi({
-        dependencyKeys: ["selfConsumptionEnergy"],
-        fallbackStrategy: "placeholder",
-        helper: selfConsumption.helper,
+        helper:
+          selfConsumption.freshnessState === "stale"
+            ? resolveRetainedReadingHelper(selfConsumption.helper)
+            : selfConsumption.helper,
         label: "今日自發自用電量",
         metricKey: "selfConsumption",
         provenance: "live",
@@ -748,10 +846,27 @@ function resolveFactoryCircuitKpis(args: {
         value: selfConsumption.value
       });
 
+  const peakMultiplier = resolveFactoryMetricBinding({
+    allowStaleRuntimeData: args.allowStaleRuntimeData,
+    dependencyKeys: ["factoryPeakMultiplier"],
+    isConnected: args.isConnected,
+    label: "尖峰倍率",
+    metricKey: "factoryPeakMultiplier",
+    now: args.snapshot.timestamp ?? undefined,
+    reading: args.snapshot.metrics.factoryPeakMultiplier ?? null,
+    unit: "x"
+  });
+  const peakDependencyKeys = ["factoryPeakMultiplier", ...aggregateDependencyKeys];
+  const peakMultiplierValue = Number.parseFloat(peakMultiplier.value);
+  const peakMultiplierAvailable =
+    isUsableFactoryMetric(peakMultiplier, args.allowStaleRuntimeData) &&
+    Number.isFinite(peakMultiplierValue) &&
+    peakMultiplierValue > 0;
+
   const peak = totalPowerValue === null
     ? buildFactoryFallbackKpi({
         bindingState: totalPower.bindingState,
-        dependencyKeys: aggregateDependencyKeys,
+        dependencyKeys: peakDependencyKeys,
         fallbackReason: totalPower.fallbackReason,
         fallbackStrategy: "derive-from-dependencies",
         freshnessState: totalPower.freshnessState,
@@ -759,18 +874,61 @@ function resolveFactoryCircuitKpis(args: {
         label: "尖峰負載",
         metricKey: "peak",
         sourceClass: "derived-metric",
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: ["factoryPeakMultiplier"],
+          metricKey: "peak",
+          topicNames: args.topicNames
+        }),
         unit: "kW"
       })
+    : !peakMultiplierAvailable
+      ? buildFactoryFallbackKpi({
+          bindingState: peakMultiplier.bindingState,
+          dependencyKeys: peakDependencyKeys,
+          fallbackReason: peakMultiplier.fallbackReason ?? "metric-unavailable",
+          fallbackStrategy: "derive-from-dependencies",
+          freshnessState: peakMultiplier.freshnessState,
+          helper: peakMultiplier.helper,
+          label: "尖峰負載",
+          metricKey: "peak",
+          sourceClass: "derived-metric",
+          sourceTopics: resolveSourceTopics({
+            dependencyKeys: ["factoryPeakMultiplier"],
+            metricKey: "peak",
+            topicNames: args.topicNames
+          }),
+          unit: "kW"
+        })
     : buildFactoryResolvedKpi({
-        dependencyKeys: aggregateDependencyKeys,
+        alertTone:
+          totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
+            ? "warning"
+            : "normal",
+        dependencyKeys: peakDependencyKeys,
+        fallbackReason:
+          totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
+            ? "stale-data"
+            : null,
         fallbackStrategy: "derive-from-dependencies",
-        helper: "依目前總負載推估",
+        freshnessState:
+          totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
+            ? "stale"
+            : "fresh",
+        helper:
+          totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
+            ? resolveRetainedReadingHelper(`依目前總負載與倍率 ${peakMultiplierValue} 推估`)
+            : `依目前總負載與倍率 ${peakMultiplierValue} 推估`,
         label: "尖峰負載",
         metricKey: "peak",
         provenance: "derived",
         sourceClass: "derived-metric",
+        sourceTopics: resolveSourceTopics({
+          dependencyKeys: ["factoryPeakMultiplier"],
+          metricKey: "peak",
+          topicNames: args.topicNames
+        }),
         unit: "kW",
-        value: totalPowerValue * 1.45
+        value: totalPowerValue * peakMultiplierValue
       });
 
   const flow = totalPowerValue === null
@@ -788,9 +946,15 @@ function resolveFactoryCircuitKpis(args: {
         value: "待命"
       })
     : buildFactoryResolvedKpi({
+        alertTone: totalPower.freshnessState === "stale" ? "warning" : "normal",
         dependencyKeys: aggregateDependencyKeys,
+        fallbackReason: totalPower.freshnessState === "stale" ? "stale-data" : null,
         fallbackStrategy: "placeholder",
-        helper: "Green Energy Routing",
+        freshnessState: totalPower.freshnessState,
+        helper:
+          totalPower.freshnessState === "stale"
+            ? resolveRetainedReadingHelper("Green Energy Routing")
+            : "Green Energy Routing",
         label: "目前綠電流向",
         metricKey: "flow",
         provenance: "derived",
@@ -807,8 +971,10 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
   const isConnected = snapshot.timestamp !== null;
   const power = snapshot.metrics.realTimePower?.value ?? null;
   const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
+  const playbackSettings = readPlaybackSettings();
 
   return {
+    allowStaleRuntimeData: !playbackSettings.enforceFreshRuntimeData,
     calculationSettings: readCalculationSettings(),
     circuits: readCircuits().filter((circuit) => toBoolean(circuit.enabled)),
     flowState: resolveSolarFlowState({
@@ -1029,6 +1195,7 @@ export function readFactoryCircuitDisplayStory(
           } satisfies MonitoringStoryState)
         : (() => {
             const readingState = resolveFactoryMetricBinding({
+              allowStaleRuntimeData: context.allowStaleRuntimeData,
               dependencyKeys: [metricKey],
               isConnected: context.isConnected,
               label: slotLabel,
@@ -1038,12 +1205,21 @@ export function readFactoryCircuitDisplayStory(
               unit: "kW"
             });
 
-            if (readingState.bindingState !== "bound" || readingState.freshnessState !== "fresh") {
+            if (!isUsableFactoryMetric(readingState, context.allowStaleRuntimeData)) {
               return {
                 alertTone: readingState.alertTone,
                 bindingState: "bound",
                 fallbackReason: readingState.fallbackReason,
                 freshnessState: readingState.freshnessState
+              } satisfies MonitoringStoryState;
+            }
+
+            if (readingState.freshnessState === "stale") {
+              return {
+                alertTone: readingState.alertTone,
+                bindingState: "bound",
+                fallbackReason: readingState.fallbackReason,
+                freshnessState: "stale"
               } satisfies MonitoringStoryState;
             }
 
@@ -1069,8 +1245,7 @@ export function readFactoryCircuitDisplayStory(
       labelEn: slotLabels.labelEn,
       labelZh: slotLabels.labelZh,
       livePowerKw:
-        state.bindingState === "bound" &&
-        state.freshnessState === "fresh" &&
+        isUsableFactoryMetric(state, context.allowStaleRuntimeData) &&
         state.fallbackReason !== "missing-live-power"
           ? reading?.value ?? null
           : null,
@@ -1082,6 +1257,7 @@ export function readFactoryCircuitDisplayStory(
 
   return {
     kpis: applyMonitoringDisplayOverrides(pageKey, resolveFactoryCircuitKpis({
+      allowStaleRuntimeData: context.allowStaleRuntimeData,
       pageKey,
       isConnected: context.isConnected,
       slots: factorySlots,

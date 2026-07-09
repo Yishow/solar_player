@@ -279,8 +279,123 @@ test("GET /api/display-card-data exposes household-equivalent derivation diagnos
     );
 
     assert.equal(cumulativeHousehold?.sourceClassification, "cumulative-counter");
-    assert.equal(cumulativeHousehold?.aggregateSource, "cumulative-self-consumption");
-    assert.deepEqual(cumulativeHousehold?.calculationFields, ["householdMonthlyUsageKwh"]);
+    assert.equal(cumulativeHousehold?.aggregateSource, "cumulative-generation");
+    assert.deepEqual(cumulativeHousehold?.calculationFields, ["householdDailyUsageKwh"]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-card-data identifies live today generation fallback for today's household equivalent", async () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const today = toLocalDateKey(new Date());
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total
+        ) VALUES (?, 0, 0, 0)
+      `
+    )
+    .run(today);
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('todayGeneration', 7.99, 'MWh', ?, 'good', '{}')
+      `
+    )
+    .run(`${today}T09:00:00.000Z`);
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-card-data"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      rows: Array<{
+        aggregateSource: string | null;
+        cardId: string;
+        displayValue: string;
+        formula: string;
+        sourceClassification: string;
+      }>;
+    };
+    const todayHousehold = body.rows.find(
+      (row) => row.cardId === "sustainability.household.today"
+    );
+
+    assert.equal(todayHousehold?.displayValue, "1,998");
+    assert.equal(todayHousehold?.sourceClassification, "mqtt-live");
+    assert.equal(todayHousehold?.aggregateSource, "live-today-generation-fallback");
+    assert.equal(todayHousehold?.formula, "todayGeneration / householdDailyUsageKwh");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-card-data marks factory self-consumption ready when today generation fallback is active", async () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const today = toLocalDateKey(new Date());
+  database
+    .prepare("UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?")
+    .run("solar/KN/today_mwh", "todayGeneration");
+  database
+    .prepare("UPDATE live_metric_values SET timestamp = ? WHERE metric_key = ?")
+    .run("2026-06-30T08:09:41.000Z", "selfConsumptionEnergy");
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('todayGeneration', 7.99, 'MWh', ?, 'good', '{}')
+        ON CONFLICT(metric_key) DO UPDATE SET
+          value = excluded.value,
+          unit = excluded.unit,
+          timestamp = excluded.timestamp,
+          quality = excluded.quality,
+          raw_payload = excluded.raw_payload
+      `
+    )
+    .run(`${today}T09:00:00.000Z`);
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-card-data"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      rows: Array<{
+        aggregateSource: string | null;
+        cardId: string;
+        displayValue: string;
+        formula: string | null;
+        sourceClassification: string;
+        status: string;
+        unit: string;
+      }>;
+    };
+    const factorySelfConsumption = body.rows.find(
+      (row) => row.cardId === "factory-circuit.selfConsumption"
+    );
+
+    assert.equal(factorySelfConsumption?.displayValue, "7.99");
+    assert.equal(factorySelfConsumption?.unit, "MWh");
+    assert.equal(factorySelfConsumption?.status, "ready");
+    assert.equal(factorySelfConsumption?.sourceClassification, "derived-metric");
+    assert.equal(factorySelfConsumption?.aggregateSource, null);
+    assert.equal(factorySelfConsumption?.formula, "todayGeneration fallback");
   } finally {
     await app.close();
   }
@@ -315,8 +430,8 @@ test("GET /api/display-card-data exposes sustainability numeric card diagnostics
     );
     assert.equal(generation?.pageId, "sustainability");
     assert.equal(generation?.metricKey, "accumulatedGenerationGwh");
-    assert.equal(generation?.displayValue, "18,600.0");
-    assert.equal(generation?.originalValue, "18,600.0");
+    assert.equal(generation?.displayValue, "18,600");
+    assert.equal(generation?.originalValue, "18,600");
     assert.equal(generation?.unit, "MWh");
     assert.equal(generation?.aggregateSource, "cumulative-counters");
     assert.equal(generation?.status, "ready");
@@ -324,7 +439,7 @@ test("GET /api/display-card-data exposes sustainability numeric card diagnostics
     const trees = body.rows.find(
       (row) => row.cardId === "sustainability.big-number.plantedTreeEquivalent"
     );
-    assert.equal(trees?.displayValue, "23,938");
+    assert.equal(trees?.displayValue, "57,544");
     assert.equal(trees?.unit, "trees");
   } finally {
     await app.close();

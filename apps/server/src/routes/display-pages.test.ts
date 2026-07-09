@@ -1062,6 +1062,68 @@ test("POST publish blocks rail cards that overflow the parent rail bounds", asyn
   }
 });
 
+test("POST publish allows a card rail to overlap media regions", async () => {
+  const app = await buildApp();
+
+  try {
+    await saveDraftConfig(app, "sustainability", {
+      heroMedia: {
+        fitMode: "cover",
+        height: 560,
+        left: 574,
+        sourceMode: "seed-default",
+        top: 146,
+        width: 1346
+      },
+      highlightRail: {
+        cards: [
+          {
+            contentSource: {
+              mode: "static",
+              payload: {
+                basisSourceLabel: "累積自發自用量",
+                derivedStatus: "available",
+                disclaimer: "依四口之家平均用電與估算電價換算",
+                eyebrow: "累積綠能成果",
+                householdCountDisplay: "56",
+                householdLabel: "戶4口之家",
+                supportingLine: "約相當於一個月家庭用電"
+              }
+            },
+            displayOrder: 1,
+            frame: {
+              height: 108,
+              left: 0,
+              top: 0,
+              width: 229
+            },
+            id: "household-cumulative",
+            template: "household-equivalent",
+            visible: true
+          }
+        ],
+        container: {
+          height: 108,
+          left: 1353,
+          top: 578,
+          width: 529
+        }
+      }
+    });
+
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/sustainability/publish"
+    });
+
+    assert.equal(publishRes.statusCode, 200);
+    const body = publishRes.json() as { validation: { canPublish: boolean } };
+    assert.equal(body.validation.canPublish, true);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST publish blocks visible rail cards that omit metric-highlight template fields", async () => {
   const app = await buildApp();
 

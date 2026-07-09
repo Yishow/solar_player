@@ -39,6 +39,7 @@ beforeEach(() => {
 const baseSettings: PlaybackSettings = {
   autoplay: true,
   brightness: 100,
+  enforceFreshRuntimeData: true,
   idleMode: "disabled",
   idleTimeout: 300,
   loop: true,
@@ -275,6 +276,7 @@ test("GET /api/playback/settings and /api/playback/pages expose seeded playback 
     };
 
     assert.deepEqual(settingsBody.settings.repeatDays, [1, 2, 3, 4, 5]);
+    assert.equal(settingsBody.settings.enforceFreshRuntimeData, true);
     assert.equal(settingsBody.settings.idleMode, "disabled");
     assert.deepEqual(
       pagesBody.pages.map((page) => page.displayOrder),
@@ -402,6 +404,7 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
       payload: {
         autoplay: false,
         brightness: 88,
+        enforceFreshRuntimeData: false,
         idleMode: "return-to-start",
         idleTimeout: 90,
         loop: false,
@@ -419,6 +422,7 @@ test("PUT /api/playback/settings and /api/playback/pages persist updates and emi
     assert.equal(settingsUpdateResponse.statusCode, 200);
     const updatedSettings = (settingsUpdateResponse.json() as { settings: PlaybackSettings }).settings;
     assert.equal(updatedSettings.autoplay, false);
+    assert.equal(updatedSettings.enforceFreshRuntimeData, false);
     assert.equal(updatedSettings.idleMode, "return-to-start");
     assert.deepEqual(updatedSettings.repeatDays, [1, 3, 5]);
     assert.equal(updatedSettings.transitionSpeed, PLAYBACK_TRANSITION_SPEED_MAX_MS);
@@ -782,6 +786,68 @@ test("GET /api/display-pages/rotation-preview keeps solar playable when self con
   }
 });
 
+test("GET /api/display-pages/rotation-preview keeps Factory Circuit playable when the peak multiplier mapping is unavailable", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryPeakMultiplier");
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key
+          WHEN 'factory-circuit' THEN 1
+          WHEN 'images' THEN 0
+          ELSE 0
+        END
+      `
+    )
+    .run();
+
+  const freshTimestamp = new Date().toISOString();
+  for (const metricKey of [
+    "factoryStampingPower",
+    "factoryBodyPower",
+    "factoryPaintingPower",
+    "factoryAssemblyPower",
+    "factoryUtilityPower",
+    "factoryOfficePower"
+  ]) {
+    seedMetricReading(metricKey, freshTimestamp);
+  }
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "factory-circuit"),
+      true
+    );
+    assert.equal(
+      body.preview.skippedPages.find((page) => page.pageKey === "factory-circuit"),
+      undefined
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-pages/rotation-preview still skips a live-data page that has never received its full metric set", async () => {
   migrateDatabase();
   seedDatabase();
@@ -848,6 +914,61 @@ test("GET /api/display-pages/rotation-preview still skips a live-data page that 
       body.preview.skippedPages.find((page) => page.pageKey === "solar")?.detail ?? "",
       /完整即時資料/
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-pages/rotation-preview can keep live-data pages in rotation when freshness enforcement is disabled", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key
+          WHEN 'solar' THEN 1
+          WHEN 'images' THEN 0
+          ELSE 0
+        END
+      `
+    )
+    .run();
+
+  const app = await buildApp();
+
+  try {
+    const settingsResponse = await app.inject({
+      method: "PUT",
+      url: "/api/playback/settings",
+      payload: {
+        enforceFreshRuntimeData: false
+      } satisfies Partial<PlaybackSettings>
+    });
+    assert.equal(settingsResponse.statusCode, 200);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/rotation-preview"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      preview: {
+        playablePages: PlaybackPage[];
+        skippedPages: Array<PlaybackPage & { detail?: string | null; skipReason: DisplayRotationSkipReason }>;
+      };
+    };
+
+    assert.equal(
+      body.preview.playablePages.some((page) => page.pageKey === "solar"),
+      true
+    );
+    assert.equal(body.preview.skippedPages.find((page) => page.pageKey === "solar"), undefined);
   } finally {
     await app.close();
   }

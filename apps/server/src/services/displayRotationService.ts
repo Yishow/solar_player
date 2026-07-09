@@ -37,6 +37,7 @@ type PlaybackSettingsRow = {
   schedule_end: string | null;
   schedule_start: string | null;
   start_page: number;
+  enforce_fresh_runtime_data: number;
   transition_speed: number;
   transition_type: string;
   updated_at: string | null;
@@ -156,6 +157,7 @@ function resolveReadinessSkipReason(findings: DisplayReadinessFinding[]) {
 }
 
 function resolveRuntimeDataCondition(args: {
+  enforceFreshRuntimeData: boolean;
   fallbackPolicy: FallbackPolicy;
   hasAllRequiredMetrics: boolean;
   mqttStatus: MqttStatusLike;
@@ -165,6 +167,10 @@ function resolveRuntimeDataCondition(args: {
   stalestTimestamp: string | null;
 }) {
   if (!args.pageRequiresLiveData) {
+    return null;
+  }
+
+  if (!args.enforceFreshRuntimeData) {
     return null;
   }
 
@@ -247,6 +253,7 @@ function serializeSettingsRow(row: PlaybackSettingsRow): PlaybackSettings {
     scheduleEnd: row.schedule_end,
     scheduleStart: row.schedule_start,
     startPage: row.start_page,
+    enforceFreshRuntimeData: toBoolean(row.enforce_fresh_runtime_data),
     transitionSpeed: normalizePlaybackTransitionSpeed(
       row.transition_speed,
       row.transition_type === "none"
@@ -303,6 +310,7 @@ function readPlaybackSettingsRow(): PlaybackSettingsRow {
           schedule_end,
           schedule_start,
           start_page,
+          COALESCE(enforce_fresh_runtime_data, 1) AS enforce_fresh_runtime_data,
           transition_speed,
           transition_type,
           updated_at
@@ -325,6 +333,7 @@ function readPlaybackSettingsRow(): PlaybackSettingsRow {
       schedule_end: null,
       schedule_start: null,
       start_page: 0,
+      enforce_fresh_runtime_data: 1,
       transition_speed: DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
       transition_type: "fade",
       updated_at: null
@@ -361,6 +370,8 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
     scheduleEnd: body.scheduleEnd === undefined ? current.schedule_end : body.scheduleEnd,
     scheduleStart: body.scheduleStart === undefined ? current.schedule_start : body.scheduleStart,
     startPage: typeof body.startPage === "number" ? body.startPage : current.start_page,
+    enforceFreshRuntimeData:
+      body.enforceFreshRuntimeData ?? toBoolean(current.enforce_fresh_runtime_data),
     transitionSpeed: normalizePlaybackTransitionSpeed(
       requestedTransitionSpeed,
       nextTransitionType === "none"
@@ -385,6 +396,7 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
           idle_timeout = ?,
           brightness = ?,
           orientation = ?,
+          enforce_fresh_runtime_data = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = (SELECT id FROM playback_settings LIMIT 1)
       `
@@ -402,7 +414,8 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
       nextSettings.idleMode,
       nextSettings.idleTimeout,
       nextSettings.brightness,
-      nextSettings.orientation
+      nextSettings.orientation,
+      nextSettings.enforceFreshRuntimeData ? 1 : 0
     );
 
   return readPlaybackSettings();
@@ -465,7 +478,8 @@ function readLiveStageRows() {
 function buildPageConditions(
   pages: PlaybackPage[],
   mqttStatus: MqttStatusLike,
-  now: Date
+  now: Date,
+  settings: PlaybackSettings
 ) {
   const liveStageByPage = new Map(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
@@ -507,6 +521,7 @@ function buildPageConditions(
             readinessFindingsByPageKey.get(page.pageKey as DisplayPageKey) ?? []
           );
     const runtimeDataCondition = resolveRuntimeDataCondition({
+      enforceFreshRuntimeData: settings.enforceFreshRuntimeData,
       fallbackPolicy,
       hasAllRequiredMetrics: runtimeFreshness.hasRequiredData,
       mqttStatus,
@@ -527,6 +542,7 @@ function buildPageConditions(
     const isReady =
       readinessCondition === null &&
       (!pageRequiresLiveData ||
+        !settings.enforceFreshRuntimeData ||
         runtimeFreshness.fresh ||
         mqttStatus.reason === "mock" ||
         runtimeFreshness.hasRequiredData);
@@ -614,7 +630,7 @@ export function readDisplayRotationPreview(options: {
   return evaluateDisplayRotation({
     fallbackRoute: "/offline",
     now,
-    pageConditions: buildPageConditions(pages, options.mqttStatus, now),
+    pageConditions: buildPageConditions(pages, options.mqttStatus, now, settings),
     pages,
     settings
   });

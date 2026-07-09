@@ -16,14 +16,34 @@ function createDatabase() {
     resolve(process.cwd(), "src/db/migrations/003_history.sql"),
     "utf8"
   );
+  const migration015 = readFileSync(
+    resolve(process.cwd(), "src/db/migrations/015_calculation_settings.sql"),
+    "utf8"
+  );
+  const migration016 = readFileSync(
+    resolve(process.cwd(), "src/db/migrations/016_co2_display_preference.sql"),
+    "utf8"
+  );
 
   database.exec(migration001);
   database.exec(migration003);
+  database.exec(migration015);
+  database.exec(migration016);
   database
     .prepare(
       `
-        INSERT INTO system_settings (key, value, updated_at)
-        VALUES ('co2_factor', '0.5', CURRENT_TIMESTAMP)
+        INSERT INTO calculation_settings (
+          id,
+          carbon_emission_factor,
+          tree_equivalent_factor,
+          co2_auto_convert_small_to_kg,
+          household_daily_usage_kwh,
+          household_monthly_usage_kwh,
+          estimated_tariff_per_kwh,
+          created_at,
+          updated_at
+        )
+        VALUES (1, 0.5, 2.6, 0, 4, 120, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `
     )
     .run();
@@ -199,6 +219,49 @@ test("MetricsAccumulatorService normalizes energy totals to kWh before persistin
     { metric_key: "consumption", total_value: 12500 },
     { metric_key: "generation", total_value: 419410 },
     { metric_key: "selfConsumption", total_value: 2 }
+  ]);
+
+  database.close();
+});
+
+test("MetricsAccumulatorService derives cumulative CO2 from normalized generation when external CO2 is inconsistent", () => {
+  const database = createDatabase();
+  const timestamp = "2026-07-09T05:35:46.000Z";
+
+  database
+    .prepare("UPDATE calculation_settings SET carbon_emission_factor = 0.467 WHERE id = 1")
+    .run();
+
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["totalGeneration", 2.716, "mWh"],
+          ["totalCo2Reduction", 9857.49, "t"]
+        ],
+        timestamp
+      )
+  });
+
+  service.initialize();
+  service.processAt(new Date(timestamp));
+  service.flush(true);
+
+  const persistedRows = database
+    .prepare(
+      `
+        SELECT metric_key, total_value
+        FROM cumulative_counters
+        WHERE metric_key IN ('generation', 'co2')
+        ORDER BY metric_key ASC
+      `
+    )
+    .all() as Array<{ metric_key: string; total_value: number }>;
+
+  assert.deepEqual(persistedRows, [
+    { metric_key: "co2", total_value: 1268.372 },
+    { metric_key: "generation", total_value: 2716 }
   ]);
 
   database.close();

@@ -21,6 +21,7 @@ const topicMappings = [
   { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption", unit: "kWh" },
   { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption", unit: "kWh" },
   { metricKey: "systemEfficiency", topic: "kuozui/plant/solar/efficiency", unit: "%" },
+  { metricKey: "factoryPeakMultiplier", topic: "factory/peak_multiplier", unit: "x" },
   { metricKey: "factoryStampingPower", topic: "factory/power/stamping", unit: "kW" },
   { metricKey: "factoryBodyPower", topic: "factory/power/body", unit: "kW" },
   { metricKey: "factoryPaintingPower", topic: "factory/power/painting", unit: "kW" },
@@ -208,13 +209,16 @@ export function buildIntradayGenerationCurve(): number[] {
 export function seedDatabase() {
   const database = getDatabase();
   normalizeMetricSnapshotCapturedAt(database);
-
-  const upsertSetting = database.prepare(`
+  const hasSeededIntradaySnapshots =
+    database
+      .prepare("SELECT 1 FROM system_settings WHERE key = 'intraday_snapshots_seeded' LIMIT 1")
+      .get() !== undefined;
+  const insertSetting = database.prepare(`
     INSERT INTO system_settings (key, value, updated_at)
-    VALUES (?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(key) DO UPDATE SET
-      value = excluded.value,
-      updated_at = CURRENT_TIMESTAMP
+    SELECT ?, ?, CURRENT_TIMESTAMP
+    WHERE NOT EXISTS (
+      SELECT 1 FROM system_settings WHERE key = ?
+    )
   `);
 
   const insertTopicMapping = database.prepare(`
@@ -279,7 +283,7 @@ export function seedDatabase() {
     )
   `);
 
-  const upsertCalculationSettings = database.prepare(`
+  const insertCalculationSettings = database.prepare(`
     INSERT INTO calculation_settings (
       id,
       carbon_emission_factor,
@@ -290,15 +294,11 @@ export function seedDatabase() {
       estimated_tariff_per_kwh,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ON CONFLICT(id) DO UPDATE SET
-      carbon_emission_factor = excluded.carbon_emission_factor,
-      tree_equivalent_factor = excluded.tree_equivalent_factor,
-      co2_auto_convert_small_to_kg = excluded.co2_auto_convert_small_to_kg,
-      household_daily_usage_kwh = excluded.household_daily_usage_kwh,
-      household_monthly_usage_kwh = excluded.household_monthly_usage_kwh,
-      estimated_tariff_per_kwh = excluded.estimated_tariff_per_kwh,
-      updated_at = CURRENT_TIMESTAMP
+    )
+    SELECT ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    WHERE NOT EXISTS (
+      SELECT 1 FROM calculation_settings WHERE id = ?
+    )
   `);
 
   const insertDisplayPageRegistryInstance = database.prepare(`
@@ -321,14 +321,9 @@ export function seedDatabase() {
     )
   `);
   database.transaction(() => {
-    database.prepare("DELETE FROM topic_mappings").run();
-    database.prepare("DELETE FROM circuit_configs").run();
-    database.prepare("DELETE FROM display_page_registry").run();
-    database.prepare("DELETE FROM display_page_configs WHERE page_key = 'factory-circuit-guanyin'").run();
-    database.prepare("DELETE FROM display_page_stage_configs WHERE page_key = 'factory-circuit-guanyin'").run();
-    upsertSetting.run("co2_factor", "0.494");
-    upsertSetting.run("data_mode", "mqtt");
-    upsertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5);
+    insertSetting.run("co2_factor", "0.494", "co2_factor");
+    insertSetting.run("data_mode", "mqtt", "data_mode");
+    insertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5, 1);
 
     const existingMqttSettings = database
       .prepare(
@@ -458,17 +453,17 @@ export function seedDatabase() {
     });
 
     database.prepare(`
-      INSERT INTO display_page_configs (page_key, config_json, updated_at)
+      INSERT OR IGNORE INTO display_page_configs (page_key, config_json, updated_at)
       VALUES ('factory-circuit-guanyin', ?, CURRENT_TIMESTAMP)
     `).run(guanyinConfigJson);
 
     database.prepare(`
-      INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
+      INSERT OR IGNORE INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
       VALUES ('factory-circuit-guanyin', 'draft', ?, 1, CURRENT_TIMESTAMP, NULL, NULL)
     `).run(guanyinConfigJson);
 
     database.prepare(`
-      INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
+      INSERT OR IGNORE INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at, published_at, published_by)
       VALUES ('factory-circuit-guanyin', 'live', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'system')
     `).run(guanyinConfigJson);
 
@@ -490,21 +485,7 @@ export function seedDatabase() {
         orientation,
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(id) DO UPDATE SET
-        autoplay = excluded.autoplay,
-        loop = excluded.loop,
-        start_page = excluded.start_page,
-        transition_type = excluded.transition_type,
-        transition_speed = excluded.transition_speed,
-        schedule_enabled = excluded.schedule_enabled,
-        schedule_start = excluded.schedule_start,
-        schedule_end = excluded.schedule_end,
-        repeat_days = excluded.repeat_days,
-        idle_mode = excluded.idle_mode,
-        idle_timeout = excluded.idle_timeout,
-        brightness = excluded.brightness,
-        orientation = excluded.orientation,
-        updated_at = CURRENT_TIMESTAMP
+      ON CONFLICT(id) DO NOTHING
     `).run(
       1,
       1,
@@ -526,7 +507,7 @@ export function seedDatabase() {
       database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number }
     ).count;
 
-    if (snapshotCount === 0) {
+    if (snapshotCount === 0 && !hasSeededIntradaySnapshots) {
       const insertSnapshot = database.prepare(
         "INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)"
       );
@@ -537,6 +518,11 @@ export function seedDatabase() {
         const capturedAt = new Date(dayStart.getTime() + hour * 60 * 60 * 1000);
         insertSnapshot.run(generationPower, capturedAt.toISOString());
       });
+      database
+        .prepare(
+          "INSERT OR IGNORE INTO system_settings (key, value, updated_at) VALUES ('intraday_snapshots_seeded', '1', CURRENT_TIMESTAMP)"
+        )
+        .run();
     }
   })();
 

@@ -7,6 +7,8 @@ import type {
   SustainabilityStoryInput
 } from "@solar-display/shared";
 import {
+  co2TreeEquivalentFactor,
+  formatMonitoringValue,
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
@@ -86,6 +88,15 @@ function resolveLiveMetricCounterFallbackValue(
   }
 
   return value;
+}
+
+function parseFormattedMonitoringNumber(value: string) {
+  const parsed = Number(value.replaceAll(",", "").trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveOverviewTreeEquivalentBasis(carbonReductionTons: number) {
+  return parseFormattedMonitoringNumber(formatMonitoringValue(carbonReductionTons, "t"));
 }
 
 function defaultStory(): SustainabilityStoryInput {
@@ -314,7 +325,10 @@ function buildBigNumbers(counterMap: CounterMap) {
   const plantedTreeEquivalent =
     accumulatedCarbonReductionTons === null
       ? null
-      : Math.round(accumulatedCarbonReductionTons * calculationSettings.treeEquivalentFactor);
+      : Math.round(
+        (resolveOverviewTreeEquivalentBasis(accumulatedCarbonReductionTons) ??
+          accumulatedCarbonReductionTons) * co2TreeEquivalentFactor
+      );
 
   return {
     values: {
@@ -374,7 +388,7 @@ function buildDerivedHighlights(
       label: `${prefix}發電`,
       provenance: provenance.accumulatedGenerationGwh,
       unit: "MWh",
-      value: formatGenerationMwh(bigNumbers.accumulatedGenerationGwh, 1)
+      value: formatGenerationMwh(bigNumbers.accumulatedGenerationGwh, 0)
     },
     {
       label: `${prefix}減碳`,
@@ -406,14 +420,42 @@ function buildDerivedHighlights(
   ];
 }
 
+function buildSustainabilityBigNumberCardId(metricKey: SustainabilityBigNumberKey) {
+  return `sustainability.big-number.${metricKey}`;
+}
+
+function applyBigNumberDisplayOverrides(
+  values: Record<SustainabilityBigNumberKey, number | null>
+) {
+  const overrides = readActiveDisplayValueOverrides();
+
+  return Object.fromEntries(
+    Object.entries(values).map(([metricKey, value]) => {
+      const override = overrides.get(
+        buildSustainabilityBigNumberCardId(metricKey as SustainabilityBigNumberKey)
+      );
+
+      return [
+        metricKey,
+        override ? override.displayValue : value
+      ];
+    })
+  ) as Record<SustainabilityBigNumberKey, number | null>;
+}
+
 function mergePeriod(
   periodKey: SustainabilityPeriodKey,
   inputPeriod: SustainabilityPeriodStoryInput | undefined,
-  counterMap: CounterMap
+  counterMap: CounterMap,
+  options: SustainabilityStoryReadOptions
 ) {
   const derived = buildBigNumbers(counterMap);
+  const bigNumbers =
+    options.applyDisplayOverrides === false
+      ? derived.values
+      : applyBigNumberDisplayOverrides(derived.values);
   const periodDefaults = buildPeriodDefaults(periodKey);
-  const anyRuntimeValuePresent = Object.values(derived.values).some(
+  const anyRuntimeValuePresent = Object.values(bigNumbers).some(
     (value) => value !== null
   );
   const mergedProvenance = mergeProvenance(
@@ -448,7 +490,7 @@ function mergePeriod(
         inputPeriod?.bigNumberProvenance?.plantedTreeEquivalent
       )
     },
-    bigNumbers: derived.values,
+    bigNumbers,
     comparison:
       inputPeriod?.comparison?.state === "available"
         ? {
@@ -464,7 +506,7 @@ function mergePeriod(
     highlights:
       inputPeriod?.highlights.length
         ? inputPeriod.highlights
-        : buildDerivedHighlights(periodKey, derived.values, derived.provenance),
+        : buildDerivedHighlights(periodKey, bigNumbers, derived.provenance),
     provenance: mergedProvenance
   } satisfies SustainabilityPeriodStoryInput;
 }
@@ -512,7 +554,7 @@ export function readSustainabilityStory(
   const derivedPeriods = Object.fromEntries(
     storyConfig.availablePeriods.map((periodKey) => [
       periodKey,
-      mergePeriod(periodKey, storyConfig.periods[periodKey], counterMap)
+      mergePeriod(periodKey, storyConfig.periods[periodKey], counterMap, options)
     ])
   ) as SustainabilityStoryInput["periods"];
   const story = normalizeSustainabilityStory({

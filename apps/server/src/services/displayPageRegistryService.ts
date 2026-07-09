@@ -132,7 +132,7 @@ function readDisplayPageRegistryRow(pageKey: string) {
           live.published_at AS last_published_at,
           CASE
             WHEN draft.version IS NOT NULL AND live.version IS NULL THEN 1
-            WHEN draft.version IS NOT NULL AND live.version IS NOT NULL AND draft.version != live.version THEN 1
+            WHEN draft.version IS NOT NULL AND live.version IS NOT NULL AND draft.config_json IS NOT live.config_json THEN 1
             ELSE 0
           END AS has_draft_changes
         FROM display_page_registry AS registry
@@ -256,7 +256,7 @@ export function listDisplayPageInstances() {
             live.published_at AS last_published_at,
             CASE
               WHEN draft.version IS NOT NULL AND live.version IS NULL THEN 1
-              WHEN draft.version IS NOT NULL AND live.version IS NOT NULL AND draft.version != live.version THEN 1
+              WHEN draft.version IS NOT NULL AND live.version IS NOT NULL AND draft.config_json IS NOT live.config_json THEN 1
               ELSE 0
             END AS has_draft_changes
           FROM display_page_registry AS registry

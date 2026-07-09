@@ -193,6 +193,10 @@ function toLocalDateKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function startOfLocalMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
 function toLocalTimeLabel(date: Date) {
   const pad = (value: number) => `${value}`.padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -284,6 +288,38 @@ function deleteTodayTrendSnapshots(now: Date) {
   return {
     deletedSnapshots: rowIds.length,
     resetDate: localDate
+  };
+}
+
+function deleteMonthTrendData(now: Date) {
+  const monthStart = toLocalDateKey(startOfLocalMonth(now));
+  const rows = getDatabase()
+    .prepare("SELECT id, captured_at FROM metric_snapshots")
+    .all() as Array<{ captured_at: string; id: number }>;
+  const snapshotIds = rows.flatMap((row) => {
+    const parsedAt = parseCapturedAt(row.captured_at);
+    if (Number.isNaN(parsedAt.getTime()) || toLocalDateKey(parsedAt) < monthStart) {
+      return [];
+    }
+
+    return [row.id];
+  });
+
+  const deleteSnapshot = getDatabase().prepare("DELETE FROM metric_snapshots WHERE id = ?");
+  const deleteSummaries = getDatabase().prepare("DELETE FROM daily_energy_summaries WHERE date >= ?");
+  const runDelete = getDatabase().transaction((ids: number[]) => {
+    for (const rowId of ids) {
+      deleteSnapshot.run(rowId);
+    }
+
+    return deleteSummaries.run(monthStart).changes;
+  });
+  const deletedDailySummaries = runDelete(snapshotIds);
+
+  return {
+    deletedDailySummaries,
+    deletedSnapshots: snapshotIds.length,
+    resetMonthStart: monthStart
   };
 }
 
@@ -421,6 +457,29 @@ const dataSourceRoute: FastifyPluginAsync = async (app) => {
         deletedSnapshots: result.deletedSnapshots,
         resetAt: new Date().toISOString(),
         resetDate: result.resetDate
+      },
+      success: true
+    });
+  });
+
+  app.post("/api/data-source/reset-month-trend", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    const result = deleteMonthTrendData(new Date());
+    app.socketService.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "month-trend-reset",
+      scope: "monitoring-history"
+    });
+
+    reply.send({
+      data: {
+        deletedDailySummaries: result.deletedDailySummaries,
+        deletedSnapshots: result.deletedSnapshots,
+        resetAt: new Date().toISOString(),
+        resetMonthStart: result.resetMonthStart
       },
       success: true
     });

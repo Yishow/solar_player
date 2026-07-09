@@ -23,6 +23,7 @@ type TopicMappingResponse = {
   nameEn: string | null;
   unit: string;
   valuePath: string;
+  multiplier: number;
   enabled: boolean;
   updatedAt: string | null;
   lastReceivedAt: string | null;
@@ -44,6 +45,7 @@ type TopicMappingInput = {
   nameEn?: string;
   unit?: string;
   valuePath?: string;
+  multiplier?: number;
   enabled?: boolean;
 };
 
@@ -71,6 +73,38 @@ function resolveCustomName(input: string | undefined, existing: string | null) {
   }
 
   return input.trim() || null;
+}
+
+function resolveMultiplier(input: number | undefined, existing: number) {
+  return typeof input === "number" && Number.isFinite(input) ? input : existing;
+}
+
+function canonicalizeMetricUnit(unit: string | undefined) {
+  const trimmed = unit?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  switch (trimmed.toLowerCase()) {
+    case "kw":
+      return "kW";
+    case "kwh":
+      return "kWh";
+    case "mwh":
+      return "MWh";
+    case "gwh":
+      return "GWh";
+    case "wh":
+      return "Wh";
+    case "kg":
+      return "kg";
+    case "t":
+      return "t";
+    case "%":
+      return "%";
+    default:
+      return trimmed;
+  }
 }
 
 function getSettingsRow() {
@@ -147,6 +181,7 @@ function readTopicMappings() {
           topic_mappings.name_en,
           topic_mappings.unit,
           topic_mappings.value_path,
+          topic_mappings.multiplier,
           topic_mappings.enabled,
           topic_mappings.updated_at,
           live_metric_values.timestamp AS last_received_at,
@@ -167,6 +202,7 @@ function readTopicMappings() {
     name_en: string | null;
     unit: string | null;
     value_path: string | null;
+    multiplier: number | null;
     enabled: number;
     updated_at: string | null;
     last_received_at: string | null;
@@ -183,6 +219,7 @@ function serializeTopicMappings(): TopicMappingResponse[] {
     lastReceivedAt: mapping.last_received_at,
     lastValue: mapping.last_value,
     metricKey: mapping.metric_key,
+    multiplier: mapping.multiplier ?? 1,
     nameEn: mapping.name_en,
     nameZh: mapping.name_zh,
     quality: mapping.quality,
@@ -413,19 +450,29 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
 
       for (const topic of topics) {
         const existingMapping = existingMappings.get(topic.metricKey);
+        const unit = canonicalizeMetricUnit(topic.unit);
         insertMapping.run(
           topic.metricKey,
           topic.topic,
           resolveCustomName(topic.nameZh, existingMapping?.name_zh ?? null),
           resolveCustomName(topic.nameEn, existingMapping?.name_en ?? null),
-          topic.unit?.trim() || null,
+          unit,
           topic.valuePath?.trim() || null,
-          existingMapping?.multiplier ?? 1,
+          resolveMultiplier(topic.multiplier, existingMapping?.multiplier ?? 1),
           existingMapping?.offset ?? 0,
-          existingMapping?.decimal_places ?? (topic.unit?.trim() === "%" ? 1 : 2),
+          existingMapping?.decimal_places ?? (unit === "%" ? 1 : 2),
           topic.enabled === false ? 0 : 1,
           existingMapping?.created_at ?? new Date().toISOString()
         );
+        database
+          .prepare(
+            `
+              UPDATE live_metric_values
+              SET unit = ?
+              WHERE metric_key = ?
+            `
+          )
+          .run(unit, topic.metricKey);
       }
     })();
 

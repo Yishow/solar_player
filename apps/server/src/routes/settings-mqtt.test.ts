@@ -150,6 +150,34 @@ test("GET /api/settings/mqtt/topics exposes custom display names per mapping", a
   }
 });
 
+test("GET /api/settings/mqtt/topics exposes multiplier for topic mappings", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  getDatabase()
+    .prepare("UPDATE topic_mappings SET multiplier = ? WHERE metric_key = ?")
+    .run(1.2, "realTimePower");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/mqtt/topics"
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      topics: Array<{ metricKey: string; multiplier: number }>;
+    };
+    const topic = body.topics.find((entry) => entry.metricKey === "realTimePower");
+    assert.equal(topic?.multiplier, 1.2);
+  } finally {
+    await app.close();
+  }
+});
+
 test("PUT /api/settings/mqtt/topics persists custom names and preserves them when omitted", async () => {
   migrateDatabase();
   seedDatabase();
@@ -207,6 +235,104 @@ test("PUT /api/settings/mqtt/topics persists custom names and preserves them whe
       .get("realTimePower") as { name_zh: string | null; name_en: string | null };
     assert.equal(preserved.name_zh, "一號廠輸出");
     assert.equal(preserved.name_en, "Plant A Output");
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics stores multiplier from mapping payload", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "factoryPeakMultiplier",
+            multiplier: 1.2,
+            topic: "factory/peak_multiplier",
+            unit: "x",
+            valuePath: "$.value"
+          }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const body = response.json() as {
+      topics: Array<{ metricKey: string; multiplier: number }>;
+    };
+    const topic = body.topics.find((entry) => entry.metricKey === "factoryPeakMultiplier");
+    const stored = getDatabase()
+      .prepare("SELECT multiplier FROM topic_mappings WHERE metric_key = ?")
+      .get("factoryPeakMultiplier") as { multiplier: number };
+    assert.equal(topic?.multiplier, 1.2);
+    assert.equal(stored.multiplier, 1.2);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics canonicalizes units and updates existing live metric units", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+  const timestamp = "2026-07-09T05:35:46.000Z";
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+    getDatabase()
+      .prepare(
+        `
+          INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+          VALUES ('todayGeneration', 2.72, 'kWh', ?, 'good', '{"value":2.72}')
+        `
+      )
+      .run(timestamp);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "todayGeneration",
+            topic: "kuozui/plant/solar/today_energy",
+            unit: "mWh"
+          }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      topics: Array<{ lastValue: number | null; metricKey: string; unit: string }>;
+    };
+    const topic = body.topics.find((entry) => entry.metricKey === "todayGeneration");
+    assert.equal(topic?.unit, "MWh");
+    assert.equal(topic?.lastValue, 2.72);
+
+    const stored = getDatabase()
+      .prepare(
+        `
+          SELECT topic_mappings.unit AS mapping_unit, live_metric_values.unit AS live_unit
+          FROM topic_mappings
+          LEFT JOIN live_metric_values ON live_metric_values.metric_key = topic_mappings.metric_key
+          WHERE topic_mappings.metric_key = ?
+        `
+      )
+      .get("todayGeneration") as { live_unit: string | null; mapping_unit: string | null };
+    assert.equal(stored.mapping_unit, "MWh");
+    assert.equal(stored.live_unit, "MWh");
   } finally {
     await app.close();
   }

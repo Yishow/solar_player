@@ -165,6 +165,57 @@ test("GET /api/display-readiness keeps solar self-consumption ready through deri
   }
 });
 
+test("GET /api/display-readiness does not block Factory Circuit when the peak multiplier mapping is unavailable", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryPeakMultiplier");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-readiness"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      readiness: {
+        findings: Array<{
+          blocking: boolean;
+          pageId: string;
+          requirementKey: string;
+          status: string;
+        }>;
+        pages: Array<{
+          blockingCount: number;
+          pageId: string;
+          status: string;
+        }>;
+      };
+    };
+
+    assert.equal(
+      body.readiness.findings.some(
+        (finding) =>
+          finding.pageId === "factory-circuit" &&
+          finding.requirementKey === "factoryPeakMultiplier" &&
+          finding.blocking
+      ),
+      false
+    );
+    assert.equal(
+      body.readiness.pages.find((page) => page.pageId === "factory-circuit")?.status,
+      "ready"
+    );
+    assert.equal(
+      body.readiness.pages.find((page) => page.pageId === "factory-circuit")?.blockingCount,
+      0
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-readiness tracks rendered sustainability indicators instead of legacy placeholder dependencies", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("totalGeneration");

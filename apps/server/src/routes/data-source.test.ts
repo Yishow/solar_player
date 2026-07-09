@@ -293,3 +293,92 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
     await app.close();
   }
 });
+
+test("POST /api/data-source/reset-month-trend deletes only current calendar-month trend data", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const previousMonth = new Date(currentMonth);
+  previousMonth.setDate(0);
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+
+  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(1800, `${toLocalDateKey(previousMonth)} 23:50:00`);
+  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(600, toLocalTimestamp(currentMonth, 1));
+  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(2400, toLocalTimestamp(now, 9));
+  database.prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)").run(
+    toLocalDateKey(previousMonth),
+    100,
+    1000
+  );
+  database.prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)").run(
+    toLocalDateKey(currentMonth),
+    200,
+    2000
+  );
+  database.prepare("INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count) VALUES (?, ?, ?, ?)").run(
+    "generation",
+    12000,
+    `${toLocalDateKey(now)}T09:00:00.000Z`,
+    0
+  );
+  database.prepare("INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload) VALUES (?, ?, ?, ?, ?, ?)").run(
+    "realTimePower",
+    2400,
+    "kW",
+    `${toLocalDateKey(now)}T09:00:00.000Z`,
+    "good",
+    "{\"value\":2400}"
+  );
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/data-source/reset-month-trend",
+      headers: {
+        "x-solar-management-token": "management-secret-value"
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      data: {
+        deletedDailySummaries: number;
+        deletedSnapshots: number;
+        resetMonthStart: string;
+      };
+      success: boolean;
+    };
+
+    assert.equal(body.success, true);
+    assert.equal(body.data.deletedSnapshots, 2);
+    assert.equal(body.data.deletedDailySummaries, 1);
+    assert.equal(body.data.resetMonthStart, toLocalDateKey(currentMonth));
+
+    const remainingSnapshots = database
+      .prepare("SELECT captured_at FROM metric_snapshots ORDER BY captured_at ASC")
+      .all() as Array<{ captured_at: string }>;
+    assert.deepEqual(remainingSnapshots, [{ captured_at: `${toLocalDateKey(previousMonth)} 23:50:00` }]);
+
+    const remainingSummaries = database
+      .prepare("SELECT date FROM daily_energy_summaries ORDER BY date ASC")
+      .all() as Array<{ date: string }>;
+    assert.deepEqual(remainingSummaries, [{ date: toLocalDateKey(previousMonth) }]);
+
+    const counterCount = database.prepare("SELECT COUNT(*) AS count FROM cumulative_counters").get() as { count: number };
+    const liveValueCount = database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number };
+    assert.equal(counterCount.count, 1);
+    assert.equal(liveValueCount.count, 1);
+  } finally {
+    await app.close();
+  }
+});

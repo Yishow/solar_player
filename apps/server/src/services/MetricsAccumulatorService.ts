@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import type { DisplaySyncEvent } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readCalculationSettings } from "./calculationSettingsService.js";
 
 export type CumulativeMetricKey = "generation" | "consumption" | "selfConsumption" | "co2";
 
@@ -228,11 +229,15 @@ export class MetricsAccumulatorService {
       this.setCounter("selfConsumption", roundTo(selfConsumption, 3));
     }
 
-    if (isFiniteNumber(explicitCo2)) {
-      this.setCounter("co2", roundTo(explicitCo2, 3));
-    } else {
+    if (
+      isFiniteNumber(totalGeneration) ||
+      isFiniteNumber(generationPower) ||
+      this.counters.generation > 0
+    ) {
       const co2Factor = this.readCo2Factor();
       this.setCounter("co2", roundTo(this.counters.generation * co2Factor, 3));
+    } else if (isFiniteNumber(explicitCo2)) {
+      this.setCounter("co2", roundTo(explicitCo2, 3));
     }
 
     if (isFiniteNumber(generationPower)) {
@@ -370,23 +375,7 @@ export class MetricsAccumulatorService {
   }
 
   private readCo2Factor() {
-    const row = this.database
-      .prepare(
-        `
-          SELECT value
-          FROM system_settings
-          WHERE key = 'co2_factor'
-          LIMIT 1
-        `
-      )
-      .get() as { value: string | null } | undefined;
-
-    if (!row?.value) {
-      return 0;
-    }
-
-    const parsed = Number(row.value);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return readCalculationSettings(this.database).carbonEmissionFactor;
   }
 
   private setCounter(metricKey: CumulativeMetricKey, nextValue: number) {

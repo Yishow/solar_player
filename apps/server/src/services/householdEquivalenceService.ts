@@ -23,7 +23,8 @@ type ReadHouseholdEquivalenceCardsOptions = {
 };
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function normalizeUnit(unit: string | null | undefined) {
@@ -64,61 +65,87 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
       `
     )
     .get(todayDate) as DailySummaryRow | undefined;
-  const cumulativeSelfConsumption = database
+  const liveMetrics = readLiveMetricsSnapshot(database).metrics;
+  const cumulativeGeneration = database
     .prepare(
       `
         SELECT total_value, last_updated
         FROM cumulative_counters
-        WHERE metric_key = 'selfConsumption'
+        WHERE metric_key = 'generation'
       `
     )
     .get() as CounterRow | undefined;
-  const liveSelfConsumption = readLiveMetricsSnapshot(database).metrics.selfConsumptionEnergy;
-  const cumulativeSelfConsumptionValue =
-    typeof cumulativeSelfConsumption?.total_value === "number"
-      ? cumulativeSelfConsumption.total_value
-      : typeof liveSelfConsumption?.value === "number"
-        ? normalizeEnergyToKwh(liveSelfConsumption.value, liveSelfConsumption.unit)
+  const liveGeneration = liveMetrics.totalGeneration;
+  const liveTodayGeneration = liveMetrics.todayGeneration;
+  const cumulativeGenerationValue =
+    typeof cumulativeGeneration?.total_value === "number"
+      ? cumulativeGeneration.total_value
+      : typeof liveGeneration?.value === "number"
+        ? normalizeEnergyToKwh(liveGeneration.value, liveGeneration.unit)
         : null;
-  const cumulativeSelfConsumptionUpdatedAt =
-    cumulativeSelfConsumption?.last_updated ??
-    liveSelfConsumption?.timestamp ??
+  const cumulativeGenerationUpdatedAt =
+    cumulativeGeneration?.last_updated ??
+    liveGeneration?.timestamp ??
     null;
-  const cumulativeSelfConsumptionSource =
-    typeof cumulativeSelfConsumption?.total_value === "number"
-      ? "cumulative-self-consumption"
-      : typeof liveSelfConsumption?.value === "number"
-        ? "live-self-consumption-fallback"
-        : "cumulative-self-consumption";
+  const cumulativeGenerationSource =
+    typeof cumulativeGeneration?.total_value === "number"
+      ? "cumulative-generation"
+      : typeof liveGeneration?.value === "number"
+        ? "live-generation-fallback"
+        : "cumulative-generation";
+  const dailySelfConsumptionValue =
+    typeof dailySummary?.self_consumption_total === "number"
+      ? dailySummary.self_consumption_total
+      : null;
+  const liveTodayGenerationValue =
+    typeof liveTodayGeneration?.value === "number"
+      ? normalizeEnergyToKwh(liveTodayGeneration.value, liveTodayGeneration.unit)
+      : null;
+  const shouldUseDailySelfConsumption =
+    dailySelfConsumptionValue !== null &&
+    (dailySummary?.date === todayDate
+      ? dailySelfConsumptionValue > 0 || liveTodayGenerationValue === null
+      : liveTodayGenerationValue === null);
+  const todayBasisValue = shouldUseDailySelfConsumption
+    ? dailySelfConsumptionValue
+    : liveTodayGenerationValue;
+  const todayBasisSourceLabel = shouldUseDailySelfConsumption ? "今日自發自用量" : "今日發電量";
+  const todayBasisSource = shouldUseDailySelfConsumption
+    ? "daily-self-consumption"
+    : "live-today-generation-fallback";
+  const todayBasisUpdatedAt = shouldUseDailySelfConsumption
+    ? dailySummary
+      ? `${dailySummary.date}T00:00:00.000Z`
+      : null
+    : liveTodayGeneration?.timestamp ?? null;
 
   return {
     cumulative: deriveHouseholdEquivalenceCard({
-      basisSourceLabel: "累積自發自用量",
+      basisSourceLabel: "累積發電量",
       calcProfile,
       cardKey: "cumulative",
       provenance: {
-        label: "累積自發自用量",
-        source: cumulativeSelfConsumptionSource,
+        label: "累積發電量",
+        source: cumulativeGenerationSource,
         sourceClass: "derived-metric",
         syncState:
-          cumulativeSelfConsumptionValue !== null ? "fresh" : "missing",
-        updatedAt: cumulativeSelfConsumptionUpdatedAt
+          cumulativeGenerationValue !== null ? "fresh" : "missing",
+        updatedAt: cumulativeGenerationUpdatedAt
       },
-      selfConsumptionKwh: cumulativeSelfConsumptionValue
+      selfConsumptionKwh: cumulativeGenerationValue
     }),
     today: deriveHouseholdEquivalenceCard({
-      basisSourceLabel: "今日自發自用量",
+      basisSourceLabel: todayBasisSourceLabel,
       calcProfile,
       cardKey: "today",
       provenance: {
-        label: "今日自發自用量",
-        source: "daily-self-consumption",
+        label: todayBasisSourceLabel,
+        source: todayBasisSource,
         sourceClass: "derived-metric",
-        syncState:
-          typeof dailySummary?.self_consumption_total === "number" ? "fresh" : "missing",
-        updatedAt: dailySummary ? `${dailySummary.date}T00:00:00.000Z` : null
+        syncState: todayBasisValue !== null ? "fresh" : "missing",
+        updatedAt: todayBasisUpdatedAt
       },
-      selfConsumptionKwh: dailySummary?.self_consumption_total ?? null
+      selfConsumptionKwh: todayBasisValue
     })
   };
 }

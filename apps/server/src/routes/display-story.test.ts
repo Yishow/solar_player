@@ -442,6 +442,62 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
   }
 });
 
+test("GET /api/display-story falls back factory self-consumption KPI to today generation when self-consumption is stale", async () => {
+  const { today } = seedDisplayStoryFixture();
+  const database = getDatabase();
+  database
+    .prepare("UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?")
+    .run("solar/KN/today_mwh", "todayGeneration");
+  database
+    .prepare("UPDATE live_metric_values SET timestamp = ? WHERE metric_key = ?")
+    .run("2026-06-30T08:09:41.000Z", "selfConsumptionEnergy");
+  database
+    .prepare("UPDATE live_metric_values SET value = ?, unit = ?, timestamp = ? WHERE metric_key = ?")
+    .run(7.99, "MWh", `${today}T09:00:00.000Z`, "todayGeneration");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      payload: {
+        kpis: Array<{
+          dependencyKeys: string[];
+          fallbackReason: string | null;
+          freshnessState: string;
+          helper: string;
+          metricKey: string;
+          provenance: string;
+          sourceTopics?: Array<{ metricKey: string; topic: string }>;
+          unit: string;
+          value: string;
+        }>;
+      };
+    };
+    const selfConsumption = body.payload.kpis.find(
+      (metric) => metric.metricKey === "selfConsumption"
+    );
+
+    assert.equal(selfConsumption?.value, "7.99");
+    assert.equal(selfConsumption?.unit, "MWh");
+    assert.equal(selfConsumption?.fallbackReason, null);
+    assert.equal(selfConsumption?.freshnessState, "fresh");
+    assert.equal(selfConsumption?.provenance, "derived");
+    assert.equal(selfConsumption?.helper, "以今日發電量替代自發自用量");
+    assert.deepEqual(selfConsumption?.dependencyKeys, ["selfConsumptionEnergy", "todayGeneration"]);
+    assert.deepEqual(selfConsumption?.sourceTopics, [
+      { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" },
+      { metricKey: "todayGeneration", topic: "solar/KN/today_mwh" }
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-story/:pageId returns only the requested page payload wrapper", async () => {
   seedDisplayStoryFixture();
 
@@ -573,6 +629,221 @@ test("GET /api/display-story resolves Factory Circuit circuit data by page key",
       "factoryCircuit.guanyin.heavyVehiclePower",
       "factoryCircuit.guanyin.edCoatingPower"
     ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story derives Factory Circuit peak from the configured multiplier metric", async () => {
+  seedPageScopedFactoryCircuitFixture();
+  const database = getDatabase();
+  const today = toLocalDateKey(new Date());
+  database
+    .prepare(
+      `
+        INSERT INTO topic_mappings (metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_key) DO UPDATE SET
+          topic = excluded.topic,
+          unit = excluded.unit,
+          value_path = excluded.value_path,
+          enabled = excluded.enabled
+      `
+    )
+    .run("factoryPeakMultiplier", "factory/peak_multiplier", "x", "$.value", 1, 0, 2, 1);
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("factoryPeakMultiplier", 1.2, "x", `${today}T09:00:00.000Z`, "good", "{\"value\":1.2}");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      payload: {
+        kpis: Array<{
+          dependencyKeys: string[];
+          metricKey: string;
+          sourceTopics?: Array<{ metricKey: string; topic: string | null }>;
+          value: string;
+        }>;
+      };
+    };
+    const peak = body.payload.kpis.find((metric) => metric.metricKey === "peak");
+
+    assert.equal(peak?.value, "252");
+    assert.deepEqual(peak?.dependencyKeys, [
+      "factoryPeakMultiplier",
+      "factoryStampingPower",
+      "factoryBodyPower",
+      "factoryPaintingPower",
+      "factoryAssemblyPower",
+      "factoryUtilityPower",
+      "factoryOfficePower"
+    ]);
+    assert.equal(
+      peak?.sourceTopics?.some(
+        (topic) => topic.metricKey === "factoryPeakMultiplier" && topic.topic === "factory/peak_multiplier"
+      ),
+      true
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story falls back when Factory Circuit peak multiplier is unavailable", async () => {
+  seedPageScopedFactoryCircuitFixture();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      payload: {
+        kpis: Array<{
+          fallbackReason: string | null;
+          metricKey: string;
+          provenance: string;
+          value: string;
+        }>;
+      };
+    };
+    const peak = body.payload.kpis.find((metric) => metric.metricKey === "peak");
+
+    assert.equal(peak?.value, "--");
+    assert.equal(peak?.provenance, "fallback");
+    assert.equal(peak?.fallbackReason, "metric-unavailable");
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visible when playback freshness enforcement is disabled", async () => {
+  seedPageScopedFactoryCircuitFixture();
+  const database = getDatabase();
+
+  database
+    .prepare("UPDATE playback_settings SET enforce_fresh_runtime_data = 0 WHERE id = 1")
+    .run();
+  database
+    .prepare(
+      `
+        UPDATE live_metric_values
+        SET timestamp = ?
+        WHERE metric_key IN (
+          'factoryCircuit.guanyin.stampingPower',
+          'factoryCircuit.guanyin.bodyPower',
+          'factoryCircuit.guanyin.paintingPower',
+          'factoryCircuit.guanyin.assemblyPower',
+          'factoryCircuit.guanyin.utilityPower',
+          'factoryCircuit.guanyin.officePower',
+          'factoryCircuit.guanyin.heavyVehiclePower',
+          'factoryCircuit.guanyin.edCoatingPower',
+          'selfConsumptionEnergy',
+          'todayGeneration'
+        )
+      `
+    )
+    .run("2026-07-09T09:57:00.000Z");
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run("realTimePower", 1200, "kW", "2026-07-09T11:00:00.000Z", "good", '{"value":1200}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_key) DO UPDATE SET
+          value = excluded.value,
+          unit = excluded.unit,
+          timestamp = excluded.timestamp,
+          quality = excluded.quality,
+          raw_payload = excluded.raw_payload
+      `
+    )
+    .run("selfConsumptionEnergy", 9.2, "MWh", "2026-07-09T09:57:00.000Z", "good", '{"value":9.2}');
+  database
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_key) DO UPDATE SET
+          value = excluded.value,
+          unit = excluded.unit,
+          timestamp = excluded.timestamp,
+          quality = excluded.quality,
+          raw_payload = excluded.raw_payload
+      `
+    )
+    .run("todayGeneration", 9.2, "MWh", "2026-07-09T09:57:00.000Z", "good", '{"value":9.2}');
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story/factory-circuit-guanyin"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      payload: {
+        kpis: Array<{
+          fallbackReason: string | null;
+          freshnessState: string;
+          helper: string;
+          metricKey: string;
+          provenance: string;
+          value: string;
+        }>;
+        slots: Array<{
+          fallbackReason: string | null;
+          freshnessState: string;
+          livePowerKw: number | null;
+          slotKey: string;
+        }>;
+        summary: {
+          fallbackReason: string | null;
+          freshnessState: string;
+        };
+      };
+    };
+
+    const totalPower = body.payload.kpis.find((metric) => metric.metricKey === "totalPower");
+    const selfConsumption = body.payload.kpis.find((metric) => metric.metricKey === "selfConsumption");
+    const stamping = body.payload.slots.find((slot) => slot.slotKey === "stamping");
+
+    assert.equal(totalPower?.value, "36.0");
+    assert.equal(totalPower?.provenance, "aggregate");
+    assert.equal(totalPower?.freshnessState, "stale");
+    assert.equal(totalPower?.fallbackReason, "stale-data");
+    assert.match(totalPower?.helper ?? "", /最近一次有效讀值/);
+    assert.equal(selfConsumption?.value, "9.2");
+    assert.equal(selfConsumption?.freshnessState, "stale");
+    assert.equal(stamping?.livePowerKw, 1);
+    assert.equal(stamping?.freshnessState, "stale");
+    assert.equal(stamping?.fallbackReason, "stale-data");
+    assert.equal(body.payload.summary.freshnessState, "stale");
+    assert.equal(body.payload.summary.fallbackReason, "stale-data");
   } finally {
     await app.close();
   }

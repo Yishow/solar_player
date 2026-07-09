@@ -141,6 +141,28 @@ test("bootstrapDisplaySeedAssets honors includedInSlideshow for playlist members
   assert.equal(readFlag("display-seed:images.thumbnail.test-b"), 0);
 });
 
+test("bootstrapDisplaySeedAssets skips missing bundled sources when the runtime bundle omits docs assets", () => {
+  const missingManifest = [
+    {
+      category: "background" as const,
+      key: "missing.runtime.asset",
+      sourcePath: join(sourceDir, "missing-runtime-asset.png"),
+      targetFilename: "display-seed-missing-runtime-asset.png",
+      title: "Missing Runtime Asset",
+      usageScope: "page-only" as const
+    }
+  ];
+
+  const result = bootstrapDisplaySeedAssets({ manifest: missingManifest });
+  const row = getDatabase()
+    .prepare("SELECT id FROM image_assets WHERE original_name = ?")
+    .get("display-seed:missing.runtime.asset");
+
+  assert.equal(result.created, 0);
+  assert.equal(result.reused, 0);
+  assert.equal(row, undefined);
+});
+
 test("the display seed manifest marks at least four slideshow images for the 4-up strip", async () => {
   const { displaySeedAssetManifest } = await import("./displaySeedAssetManifest.js");
   const slideshow = displaySeedAssetManifest.filter((entry) => entry.includedInSlideshow);

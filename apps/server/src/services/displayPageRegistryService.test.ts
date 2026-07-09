@@ -145,7 +145,7 @@ test("display page registry creates a second template-derived instance without o
     [
       {
         draftVersion: 3,
-        hasDraftChanges: true,
+        hasDraftChanges: false,
         lastPublishedAt: "2026-05-20T00:00:00.000Z",
         pageKey: "images",
         routeSlug: "images",
@@ -162,6 +162,22 @@ test("display page registry creates a second template-derived instance without o
     ]
   );
   assert.equal(registry[0]?.id === registry[1]?.id, false);
+});
+
+test("display page registry reports draft changes when draft and live content differ", () => {
+  getDatabase()
+    .prepare(
+      `UPDATE display_page_stage_configs
+       SET config_json = ?
+       WHERE page_key = 'images' AND stage = 'draft'`
+    )
+    .run("{\"hero\":false}");
+
+  const registry = listDisplayPageInstances();
+  assert.equal(registry[0]?.pageKey, "images");
+  assert.equal(registry[0]?.draftVersion, 3);
+  assert.equal(registry[0]?.liveVersion, 2);
+  assert.equal(registry[0]?.hasDraftChanges, true);
 });
 
 test("display page registry updates and archives an instance without changing its stable page key", () => {

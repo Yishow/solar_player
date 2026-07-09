@@ -157,6 +157,105 @@ test("metrics history routes keep year and total boundaries distinct", async () 
   }
 });
 
+test("monthly daily summaries start at the first day of the current calendar month", async () => {
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth() + 1;
+  const previousMonthDate = new Date(Date.UTC(currentYear, currentMonth - 2, 28));
+  const currentMonthDate = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  const formatDate = (date: Date) =>
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  const database = getDatabase();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+
+  database
+    .prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)")
+    .run(formatDate(previousMonthDate), 10, 100);
+  database
+    .prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)")
+    .run(formatDate(currentMonthDate), 20, 200);
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/metrics/daily-summary?range=month"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { summaries: Array<{ consumptionTotal: number; date: string }> };
+    assert.deepEqual(body.summaries.map((summary) => summary.date), [formatDate(currentMonthDate)]);
+    assert.deepEqual(body.summaries.map((summary) => summary.consumptionTotal), [200]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("monthly metric history snapshots start at the first moment of the current local calendar month", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const previousMonthSnapshot = new Date(monthStart.getTime() - 10 * 60 * 1000);
+  const currentMonthSnapshot = new Date(monthStart.getTime() + 15 * 60 * 1000);
+
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(88, 70, 41, 32, 46, 89, previousMonthSnapshot.toISOString());
+  database
+    .prepare(
+      `
+        INSERT INTO metric_snapshots (
+          generation,
+          consumption,
+          self_consumption,
+          co2,
+          ratio,
+          efficiency,
+          captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(120, 90, 60, 55, 50, 91, currentMonthSnapshot.toISOString());
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/metrics/history?range=month"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      range: string;
+      snapshots: Array<{ capturedAt: string }>;
+    };
+
+    assert.equal(body.range, "month");
+    assert.deepEqual(body.snapshots.map((snapshot) => snapshot.capturedAt), [currentMonthSnapshot.toISOString()]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("metrics history filters and sorts mixed timestamp formats chronologically", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM metric_snapshots").run();

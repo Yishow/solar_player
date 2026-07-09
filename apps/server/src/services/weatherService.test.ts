@@ -81,6 +81,45 @@ test("WeatherService returns stale cached weather when the upstream fetch later 
   assert.equal(stale.stationName, "內湖");
 });
 
+test("WeatherService logs upstream fetch failures without breaking unavailable fallback", async () => {
+  const warnings: Array<{ message?: string; payload: unknown }> = [];
+  const upstreamError = Object.assign(new Error("connect ETIMEDOUT"), {
+    code: "ETIMEDOUT"
+  });
+  const service = new WeatherService({
+    authorizationConfigured: true,
+    client: {
+      readCurrentWeather: async () => {
+        throw upstreamError;
+      },
+      readOptions: async () => {
+        throw new Error("not used");
+      }
+    },
+    logger: {
+      warn: (payload, message) => {
+        warnings.push({ message, payload });
+      }
+    },
+    now: () => new Date("2026-05-23T06:25:00.000Z")
+  });
+
+  const current = await service.getCurrentWeather(settings);
+
+  assert.equal(current.fetchState, "unavailable");
+  assert.equal(warnings.length, 1);
+  const warning = warnings[0];
+  assert.ok(warning);
+  assert.equal(warning.message, "CWA weather fetch failed");
+  assert.deepEqual(warning.payload, {
+    error: {
+      code: "ETIMEDOUT",
+      message: "connect ETIMEDOUT",
+      name: "Error"
+    }
+  });
+});
+
 test("WeatherService exposes an explicit unconfigured state when CWA authorization is absent", async () => {
   const service = new WeatherService({
     authorizationConfigured: false,

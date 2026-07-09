@@ -36,14 +36,22 @@ function isHistoryRange(value: string): value is HistoryRange {
   return value === "day" || value === "week" || value === "month" || value === "year" || value === "total";
 }
 
-const dailySummaryRangeToClause: Record<Exclude<HistoryRange, "total">, string> = {
+const dailySummaryRangeToClause: Record<Exclude<HistoryRange, "month" | "total">, string> = {
   day: "date >= date('now')",
-  month: "date >= date('now', '-29 day')",
   week: "date >= date('now', '-6 day')",
   year: "date >= date('now', 'start of year')"
 };
 
 const historyRangeError = "Invalid range. Expected day, week, month, year, or total.";
+
+function toLocalDateKey(date: Date) {
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toLocalMonthStartKey(date: Date) {
+  return toLocalDateKey(new Date(date.getFullYear(), date.getMonth(), 1));
+}
 
 function resolveSnapshotRangeCutoff(range: Exclude<HistoryRange, "total">): string {
   const now = new Date();
@@ -59,7 +67,7 @@ function resolveSnapshotRangeCutoff(range: Exclude<HistoryRange, "total">): stri
   }
 
   if (range === "month") {
-    return new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000).toISOString();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   }
 
   const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
@@ -126,7 +134,13 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     }
 
     const database = getDatabase();
-    const filterClause = rangeParam === "total" ? "" : `WHERE ${dailySummaryRangeToClause[rangeParam]}`;
+    const filterClause =
+      rangeParam === "total"
+        ? ""
+        : rangeParam === "month"
+          ? "WHERE date >= ?"
+          : `WHERE ${dailySummaryRangeToClause[rangeParam]}`;
+    const filterParams = rangeParam === "month" ? [toLocalMonthStartKey(new Date())] : [];
     const rows = database
       .prepare(
         `
@@ -145,7 +159,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
           ORDER BY date DESC
         `
       )
-      .all() as DailySummaryRow[];
+      .all(...filterParams) as DailySummaryRow[];
 
     return {
       summaries: rows.map((row) => ({

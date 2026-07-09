@@ -133,7 +133,7 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
-test("readSustainabilityStory derives carbon reduction and tree equivalence from configured coefficients", () => {
+test("readSustainabilityStory derives carbon reduction and tree equivalence with the overview tree factor", () => {
   const database = getDatabase();
   const timestamp = "2026-06-29T10:00:00.000Z";
 
@@ -164,7 +164,7 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence from
   const story = readSustainabilityStory("lifetime");
 
   assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 1);
-  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 3);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 6);
   assert.equal(
     story.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
     "generation-carbon-reduction"
@@ -173,6 +173,40 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence from
     story.period.bigNumberProvenance.plantedTreeEquivalent.source,
     "generation-tree-equivalent"
   );
+});
+
+test("readSustainabilityStory derives tree equivalence from the same rounded CO2 display basis as overview", () => {
+  const database = getDatabase();
+  const timestamp = "2026-06-29T10:00:00.000Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 53520, ?, 0),
+          ('consumption', 1000, ?, 0),
+          ('selfConsumption', 600, ?, 0)
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          carbon_emission_factor = 1,
+          tree_equivalent_factor = 3
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  const story = readSustainabilityStory("lifetime");
+
+  assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 53.52);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 334);
 });
 
 test("readSustainabilityStory falls back to live metrics when cumulative counters have not flushed yet", () => {
@@ -209,9 +243,9 @@ test("readSustainabilityStory falls back to live metrics when cumulative counter
   assert.equal(story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
   assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
   assert.equal(story.period.bigNumbers.annualEnergySavingPercent, 70);
-  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 58125);
   assert.equal(story.period.highlights[0]?.unit, "MWh");
-  assert.equal(story.period.highlights[0]?.value, "18,600.0");
+  assert.equal(story.period.highlights[0]?.value, "18,600");
   assert.equal(
     story.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
     timestamp
@@ -255,9 +289,9 @@ test("readSustainabilityStory normalizes GWh live metrics before deriving sustai
 
   assert.equal(story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
   assert.equal(story.period.bigNumbers.accumulatedCarbonReductionTons, 9300);
-  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 27900);
+  assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 58125);
   assert.equal(story.period.highlights[0]?.unit, "MWh");
-  assert.equal(story.period.highlights[0]?.value, "18,600.0");
+  assert.equal(story.period.highlights[0]?.value, "18,600");
 });
 
 test("readSustainabilityStory applies and clears household display overrides without changing formulas", () => {
@@ -316,7 +350,80 @@ test("readSustainabilityStory applies and clears household display overrides wit
   assert.equal(restoredStory.householdEquivalents.today.householdCountDisplay, "4");
 });
 
-test("readSustainabilityStory preserves sub-0.1 GWh precision when formatting MWh highlights", () => {
+test("readSustainabilityStory applies and clears big number display overrides without changing formulas", () => {
+  const database = getDatabase();
+  const timestamp = "2026-07-09T08:43:30.386Z";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 114820, ?, 0),
+          ('consumption', 38647, ?, 0),
+          ('selfConsumption', 22584, ?, 0)
+      `
+    )
+    .run(timestamp, timestamp, timestamp);
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET
+          carbon_emission_factor = 0.467,
+          tree_equivalent_factor = 2.6
+        WHERE id = 1
+      `
+    )
+    .run();
+
+  saveDisplayValueOverride(
+    {
+      cardId: "sustainability.big-number.annualEnergySavingPercent",
+      metricKey: "annualEnergySavingPercent",
+      pageId: "sustainability",
+      targetId: "sustainability.big-number.annualEnergySavingPercent",
+      unit: "%"
+    },
+    { displayValue: 8.4 }
+  );
+  saveDisplayValueOverride(
+    {
+      cardId: "sustainability.big-number.plantedTreeEquivalent",
+      metricKey: "plantedTreeEquivalent",
+      pageId: "sustainability",
+      targetId: "sustainability.big-number.plantedTreeEquivalent",
+      unit: "trees"
+    },
+    { displayValue: 18 }
+  );
+
+  const overriddenStory = readSustainabilityStory("lifetime");
+  const rawStory = readSustainabilityStory("lifetime", { applyDisplayOverrides: false });
+
+  assert.equal(overriddenStory.period.bigNumbers.annualEnergySavingPercent, 8.4);
+  assert.equal(overriddenStory.period.bigNumbers.plantedTreeEquivalent, 18);
+  assert.equal(rawStory.period.bigNumbers.annualEnergySavingPercent, 58.4);
+  assert.equal(rawStory.period.bigNumbers.plantedTreeEquivalent, 335);
+  assert.equal(
+    overriddenStory.period.highlights.find((highlight) => highlight.label === "節能成效")?.value,
+    "8.4"
+  );
+  assert.equal(
+    overriddenStory.period.highlights.find((highlight) => highlight.label === "植樹等效")?.value,
+    "18"
+  );
+
+  clearDisplayValueOverride("sustainability.big-number.annualEnergySavingPercent");
+  clearDisplayValueOverride("sustainability.big-number.plantedTreeEquivalent");
+
+  const restoredStory = readSustainabilityStory("lifetime");
+  assert.equal(restoredStory.period.bigNumbers.annualEnergySavingPercent, 58.4);
+  assert.equal(restoredStory.period.bigNumbers.plantedTreeEquivalent, 335);
+});
+
+test("readSustainabilityStory rounds MWh highlights to whole numbers", () => {
   const database = getDatabase();
   const timestamp = "2026-06-29T10:00:00.000Z";
 
@@ -337,5 +444,5 @@ test("readSustainabilityStory preserves sub-0.1 GWh precision when formatting MW
 
   assert.ok(Math.abs((story.period.bigNumbers.accumulatedGenerationGwh ?? 0) - 18.654321) < 0.000001);
   assert.equal(story.period.highlights[0]?.unit, "MWh");
-  assert.equal(story.period.highlights[0]?.value, "18,654.3");
+  assert.equal(story.period.highlights[0]?.value, "18,654");
 });

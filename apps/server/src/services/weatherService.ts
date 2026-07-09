@@ -7,10 +7,14 @@ import { CwaWeatherClient } from "./cwaWeatherClient.js";
 import { config } from "../config.js";
 
 type WeatherClientLike = Pick<CwaWeatherClient, "readCurrentWeather" | "readOptions">;
+type LoggerLike = {
+  warn: (payload: unknown, message?: string) => void;
+};
 
 type WeatherServiceOptions = {
   authorizationConfigured?: boolean;
   client?: WeatherClientLike;
+  logger?: LoggerLike;
   now?: () => Date;
 };
 
@@ -48,6 +52,7 @@ function buildEmptyOptions(fetchState: WeatherOptionsResponse["fetchState"]): We
 export class WeatherService {
   private readonly authorizationConfigured: boolean;
   private readonly client: WeatherClientLike;
+  private logger: LoggerLike | null;
   private readonly now: () => Date;
   private lastSuccessfulSnapshot: WeatherCurrentSnapshot | null = null;
   private cachedSnapshot: WeatherCurrentSnapshot | null = null;
@@ -61,7 +66,12 @@ export class WeatherService {
       datasetUrl: config.cwaOpenDataUrl,
       requestTimeoutMs: config.weatherRequestTimeoutMs
     });
+    this.logger = options.logger ?? null;
     this.now = options.now ?? (() => new Date());
+  }
+
+  setLogger(logger: LoggerLike) {
+    this.logger = logger;
   }
 
   setMqttPublisher(publishFn: (topic: string, payload: string) => void) {
@@ -110,7 +120,9 @@ export class WeatherService {
       }
 
       return this.lastSuccessfulSnapshot;
-    } catch {
+    } catch (error) {
+      this.logger?.warn({ error: serializeWeatherFetchError(error) }, "CWA weather fetch failed");
+
       if (!this.lastSuccessfulSnapshot) {
         return buildEmptySnapshot("unavailable");
       }
@@ -134,6 +146,23 @@ export class WeatherService {
 
     return this.client.readOptions(filters);
   }
+}
+
+function serializeWeatherFetchError(error: unknown) {
+  if (error instanceof Error) {
+    const code = (error as { code?: unknown }).code;
+
+    return {
+      code: typeof code === "string" ? code : undefined,
+      message: error.message,
+      name: error.name
+    };
+  }
+
+  return {
+    message: String(error),
+    name: "UnknownError"
+  };
 }
 
 let weatherServiceSingleton: WeatherService | null = null;
