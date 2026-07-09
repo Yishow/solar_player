@@ -112,6 +112,10 @@ function toBashScriptPath(cwd, scriptPath) {
 }
 
 function toBashPathValue(filePath) {
+  if (process.platform !== "win32") {
+    return filePath.split(path.sep).join("/");
+  }
+
   if (!path.win32.isAbsolute(filePath)) {
     return filePath.split(path.sep).join("/");
   }
@@ -294,6 +298,8 @@ test("tailscale hotspot trigger documents safe network switching defaults", () =
   assert.match(source, /BLUETOOTH_TRIGGER_MAC/);
   assert.match(source, /HOTSPOT_SCAN_SSID/);
   assert.match(source, /tailscale ip -4/);
+  assert.match(source, /active_hotspot_connected/);
+  assert.match(source, /nmcli -t -f NAME con show --active/);
   assert.match(source, /nmcli con up id/);
   assert.doesNotMatch(source, /nmcli con down/);
 });
@@ -646,6 +652,18 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
   } finally {
     removeTempDir(projectDir);
   }
+});
+
+test("raspi bootstrap cp fallback preserves runtime env and mutable directories", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+
+  assert.match(source, /--exclude \.env/);
+  assert.match(source, /--exclude data/);
+  assert.match(source, /--exclude logs/);
+  assert.match(source, /--exclude uploads/);
+  assert.doesNotMatch(source, /cp -R "\$\{BUNDLE_DIR\}\/\." "\$\{INSTALL_DIR\}\/"/);
+  assert.match(source, /! -name "\.env"/);
+  assert.match(source, /\.env\|data\|logs\|uploads/);
 });
 
 test("lightweight desktop helper configures xfce lightdm xrdp firefox without weakening ssh or sudo", () => {
@@ -1200,10 +1218,10 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "packages/shared/package.json")), true);
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/src/db/migrations/001_init.sql")), true);
     assert.equal(existsSync(path.join(bundleRoot, "apps/web/src/assets/playback/slide-overview.jpg")), true);
-    assert.equal(existsSync(path.join(bundleRoot, "docs/openapi.yaml")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "docs")), false);
     assert.equal(
       existsSync(path.join(bundleRoot, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-bg.png")),
-      true
+      false
     );
     assert.equal(existsSync(path.join(bundleRoot, ".env.example")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/solar-display.service")), true);

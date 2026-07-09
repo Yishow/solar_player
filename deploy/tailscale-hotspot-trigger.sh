@@ -34,6 +34,12 @@ hotspot_visible() {
     grep -Fxq -- "${HOTSPOT_SCAN_SSID}"
 }
 
+active_hotspot_connected() {
+  nmcli -t -f NAME con show --active 2>/dev/null |
+    sed 's/\\:/:/g' |
+    grep -Fxq -- "${HOTSPOT_CONNECTION_ID}"
+}
+
 tailscale_has_ip() {
   command -v tailscale >/dev/null 2>&1 || return 1
   tailscale ip -4 >/dev/null 2>&1
@@ -55,6 +61,11 @@ main() {
   require_command nmcli
 
   [[ -n "${HOTSPOT_CONNECTION_ID}" ]] || fail "HOTSPOT_CONNECTION_ID is required"
+
+  if active_hotspot_connected && tailscale_has_ip; then
+    log "already connected to ${HOTSPOT_CONNECTION_ID}; tailscale has IPv4: $(tailscale ip -4)"
+    return 0
+  fi
 
   if ! bluetooth_connected && ! hotspot_visible; then
     log "no trigger matched; leaving current Wi-Fi unchanged"

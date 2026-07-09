@@ -229,7 +229,24 @@ copy_bundle() {
       --exclude uploads \
       "${BUNDLE_DIR}/" "${INSTALL_DIR}/"
   else
-    cp -R "${BUNDLE_DIR}/." "${INSTALL_DIR}/"
+    find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 \
+      ! -name ".env" \
+      ! -name "data" \
+      ! -name "logs" \
+      ! -name "uploads" \
+      -exec rm -rf {} +
+    (
+      cd "${BUNDLE_DIR}"
+      shopt -s dotglob nullglob
+      for entry in *; do
+        case "${entry}" in
+          .env|data|logs|uploads)
+            continue
+            ;;
+        esac
+        cp -R "${entry}" "${INSTALL_DIR}/"
+      done
+    )
   fi
   mkdir -p "${INSTALL_DIR}/data" "${INSTALL_DIR}/logs" "${INSTALL_DIR}/uploads/images" "${INSTALL_DIR}/uploads/brand"
   chown -R "${KIOSK_USER}:${KIOSK_USER}" "${INSTALL_DIR}"

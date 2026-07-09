@@ -44,12 +44,6 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/apps/web/package.json" "${target_root}/apps/web/package.json"
   cp -R "${PROJECT_DIR}/packages/shared/dist" "${target_root}/packages/shared/dist"
   cp "${PROJECT_DIR}/packages/shared/package.json" "${target_root}/packages/shared/package.json"
-  mkdir -p "${target_root}/docs"
-  cp "${PROJECT_DIR}/docs/openapi.yaml" "${target_root}/docs/openapi.yaml"
-  mkdir -p "${target_root}/docs/reference/kuozui-green-fhd-html-prototype"
-  cp -R \
-    "${PROJECT_DIR}/docs/reference/kuozui-green-fhd-html-prototype/assets" \
-    "${target_root}/docs/reference/kuozui-green-fhd-html-prototype/assets"
   mkdir -p "${target_root}/deploy"
   cp "${PROJECT_DIR}/deploy/solar-display.service" "${target_root}/deploy/solar-display.service"
   cp "${PROJECT_DIR}/deploy/export-runtime-state.sh" "${target_root}/deploy/export-runtime-state.sh"
@@ -232,7 +226,6 @@ validate_inputs() {
   require_path "apps/web/dist"
   require_path "packages/shared/dist"
   require_path "apps/server/src/db/migrations"
-  require_path "docs/openapi.yaml"
   require_path "deploy/solar-display.service"
   require_path "deploy/export-runtime-state.sh"
   require_path "deploy/reset-db-settings.sh"
