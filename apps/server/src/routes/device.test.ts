@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
@@ -7,121 +7,166 @@ import {
   buildApp,
   tempDir
 } from "./display-pages-asset-governance.test-support.js";
+import { setDeviceLogJournalRunnerForTests } from "./device.js";
+import type { JournalRunner } from "../services/deviceLogService.js";
 
-test("GET /api/device/logs and /api/device/logs/export return safe log metadata in the ESM runtime", async () => {
-  const logDir = join(tempDir, "logs");
-  mkdirSync(logDir, { recursive: true });
-  writeFileSync(join(logDir, "older.log"), "older");
-  writeFileSync(join(logDir, "newer.log"), "newer");
-  writeFileSync(join(logDir, "ignore.txt"), "ignore");
-  utimesSync(join(logDir, "older.log"), new Date("2026-05-18T08:00:00.000Z"), new Date("2026-05-18T08:00:00.000Z"));
-  utimesSync(join(logDir, "newer.log"), new Date("2026-05-18T09:00:00.000Z"), new Date("2026-05-18T09:00:00.000Z"));
+const sampleJsonLine = JSON.stringify({
+  __REALTIME_TIMESTAMP: "1716022800000000",
+  MESSAGE: "injected solar-display error: fixture boom",
+  PRIORITY: "3"
+});
 
-  const previousLogDir = process.env.LOG_DIR;
-  process.env.LOG_DIR = logDir;
+function availableRunner(stdout = `${sampleJsonLine}\n`): JournalRunner {
+  return async ({ mode, limit }) => {
+    if (mode === "export") {
+      return {
+        exitCode: 0,
+        stdout: `2026-05-18T09:00:00+00:00 host solar-display[1]: export line limit=${limit}\n`,
+        stderr: ""
+      };
+    }
+    return { exitCode: 0, stdout, stderr: "" };
+  };
+}
+
+test("GET /api/device/logs returns journald summary for trusted callers", async () => {
+  setDeviceLogJournalRunnerForTests(availableRunner());
   const app = await buildApp();
 
   try {
-    const [logsResponse, exportResponse] = await Promise.all([
-      app.inject({
-        method: "GET",
-        url: "/api/device/logs?limit=1"
-      }),
-      app.inject({
-        method: "GET",
-        url: "/api/device/logs/export"
-      })
-    ]);
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/device/logs?limit=20"
+    });
 
-    assert.equal(logsResponse.statusCode, 200);
-    assert.equal(exportResponse.statusCode, 200);
-
-    const logsBody = logsResponse.json() as {
-      data: Array<{ file: string; modified: string; size: number }>;
-      success: boolean;
-    };
-    const exportBody = exportResponse.json() as {
-      data: { directory: string; files: string[] };
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      data: {
+        available: boolean;
+        entries: Array<{ message: string; priority: string; timestamp: string }>;
+        retention: { maxEntries: number; scope: string; unit: string };
+        source: string;
+        unavailableReason: string | null;
+      };
       success: boolean;
     };
 
-    assert.equal(logsBody.success, true);
-    assert.equal(logsBody.data.length, 1);
-    assert.equal(logsBody.data[0]?.file, "newer.log");
-    assert.equal(typeof logsBody.data[0]?.size, "number");
-    assert.equal(exportBody.success, true);
-    assert.equal(exportBody.data.directory, logDir);
-    assert.deepEqual(exportBody.data.files.sort(), ["newer.log", "older.log"]);
+    assert.equal(body.success, true);
+    assert.equal(body.data.source, "journald");
+    assert.equal(body.data.available, true);
+    assert.equal(body.data.unavailableReason, null);
+    assert.equal(body.data.retention.unit, "solar-display");
+    assert.equal(body.data.retention.scope, "current-boot");
+    assert.equal(body.data.retention.maxEntries, 20);
+    assert.equal(body.data.entries.length, 1);
+    assert.match(body.data.entries[0]?.message ?? "", /fixture boom/);
+    assert.equal(JSON.stringify(body.data).includes("LOG_DIR"), false);
   } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
     await app.close();
-    if (previousLogDir === undefined) {
-      delete process.env.LOG_DIR;
-    } else {
-      process.env.LOG_DIR = previousLogDir;
-    }
   }
 });
 
-test("GET /api/device/logs and /api/device/logs/export return safe error envelopes when the log directory is missing", async () => {
-  const previousLogDir = process.env.LOG_DIR;
-  process.env.LOG_DIR = join(tempDir, "missing-logs");
+test("GET /api/device/logs clamps limit and returns 503 unavailable envelopes", async () => {
+  setDeviceLogJournalRunnerForTests(async ({ limit }) => {
+    assert.equal(limit, 500);
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: "sudo: a password is required"
+    };
+  });
   const app = await buildApp();
 
   try {
-    const [logsResponse, exportResponse] = await Promise.all([
-      app.inject({
-        method: "GET",
-        url: "/api/device/logs"
-      }),
-      app.inject({
-        method: "GET",
-        url: "/api/device/logs/export"
-      })
-    ]);
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/device/logs?limit=9999"
+    });
 
-    assert.equal(logsResponse.statusCode, 404);
-    assert.equal(exportResponse.statusCode, 404);
-
-    const logsBody = logsResponse.json() as {
+    assert.equal(response.statusCode, 503);
+    const body = response.json() as {
+      data: {
+        available: boolean;
+        entries: unknown[];
+        source: string;
+        unavailableReason: string | null;
+      };
       error: string;
       success: boolean;
       timestamp: string;
     };
-    const exportBody = exportResponse.json() as {
-      error: string;
-      success: boolean;
-      timestamp: string;
-    };
 
-    assert.equal(logsBody.success, false);
-    assert.equal(logsBody.error, "No logs directory");
-    assert.equal(typeof logsBody.timestamp, "string");
-    assert.equal(exportBody.success, false);
-    assert.equal(exportBody.error, "No logs directory");
-    assert.equal(typeof exportBody.timestamp, "string");
+    assert.equal(body.success, false);
+    assert.equal(body.data.source, "journald");
+    assert.equal(body.data.available, false);
+    assert.equal(body.data.entries.length, 0);
+    assert.equal(body.data.unavailableReason, "journal access denied");
+    assert.equal(typeof body.timestamp, "string");
+    assert.equal(Array.isArray(body.data.entries) && body.data.entries.length === 0, true);
   } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
     await app.close();
-    if (previousLogDir === undefined) {
-      delete process.env.LOG_DIR;
-    } else {
-      process.env.LOG_DIR = previousLogDir;
-    }
   }
 });
 
-test("device status and log metadata deny untrusted remote readers", async () => {
-  const logDir = join(tempDir, "logs");
-  mkdirSync(logDir, { recursive: true });
-  writeFileSync(join(logDir, "player.log"), "ready\n", "utf8");
-  process.env.LOG_DIR = logDir;
+test("GET /api/device/logs/export returns text/plain attachment with Content-Disposition", async () => {
+  setDeviceLogJournalRunnerForTests(availableRunner());
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/device/logs/export?limit=50"
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.headers["content-type"] ?? "", /text\/plain/);
+    assert.match(
+      response.headers["content-disposition"] ?? "",
+      /attachment; filename="solar-display-journal-50\.txt"/
+    );
+    assert.match(response.body, /export line limit=50/);
+  } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
+    await app.close();
+  }
+});
+
+test("device status includes release identity and log routes deny untrusted callers without spawning", async () => {
+  let spawnCount = 0;
+  setDeviceLogJournalRunnerForTests(async () => {
+    spawnCount += 1;
+    return { exitCode: 0, stdout: `${sampleJsonLine}\n`, stderr: "" };
+  });
+
+  const previousManifest = process.env.RELEASE_MANIFEST_PATH;
+  const manifestPath = join(tempDir, "release-manifest.json");
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      releaseId: "0.1.0+deadbeefcafe",
+      commit: "deadbeefcafe0123456789abcdef0123456789ab",
+      builtAt: "2026-07-14T01:02:03.000Z",
+      packageVersion: "0.1.0",
+      schemaVersion: 22,
+      sourceDirty: true
+    }),
+    "utf8"
+  );
+  process.env.RELEASE_MANIFEST_PATH = manifestPath;
 
   const app = await buildApp();
 
   try {
-    const responses = await Promise.all([
+    const [statusResponse, logsResponse, exportResponse] = await Promise.all([
       app.inject({
         method: "GET",
-        url: "/api/device/status",
+        url: "/api/device/status"
+      }),
+      app.inject({
+        method: "GET",
+        url: "/api/device/logs",
         headers: {
           host: "player.example",
           origin: "https://evil.example"
@@ -137,13 +182,60 @@ test("device status and log metadata deny untrusted remote readers", async () =>
       })
     ]);
 
-    responses.forEach((response) => {
-      assert.equal(response.statusCode, 403);
-      assert.equal(response.json<{ access: string }>().access, "denied");
+    assert.equal(statusResponse.statusCode, 200);
+    const statusBody = statusResponse.json() as {
+      data: {
+        release: {
+          available: boolean;
+          releaseId: string | null;
+          sourceDirty: boolean | null;
+          schemaVersion: number | null;
+        };
+      };
+    };
+    assert.equal(statusBody.data.release.available, true);
+    assert.equal(statusBody.data.release.releaseId, "0.1.0+deadbeefcafe");
+    assert.equal(statusBody.data.release.sourceDirty, true);
+    assert.equal(statusBody.data.release.schemaVersion, 22);
+
+    assert.equal(logsResponse.statusCode, 403);
+    assert.equal(exportResponse.statusCode, 403);
+    assert.equal(logsResponse.json<{ access: string }>().access, "denied");
+    assert.equal(exportResponse.json<{ access: string }>().access, "denied");
+    assert.equal(spawnCount, 0, "untrusted requests must not execute the journal helper");
+  } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
+    await app.close();
+    if (previousManifest === undefined) {
+      delete process.env.RELEASE_MANIFEST_PATH;
+    } else {
+      process.env.RELEASE_MANIFEST_PATH = previousManifest;
+    }
+  }
+});
+
+test("/health stays cheap and does not require a release manifest", async () => {
+  const previousManifest = process.env.RELEASE_MANIFEST_PATH;
+  process.env.RELEASE_MANIFEST_PATH = join(tempDir, "definitely-missing-release-manifest.json");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/health"
     });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { status: string; timestamp: string };
+    assert.equal(body.status, "ok");
+    assert.equal(typeof body.timestamp, "string");
+    assert.equal("release" in body, false);
   } finally {
     await app.close();
-    delete process.env.LOG_DIR;
+    if (previousManifest === undefined) {
+      delete process.env.RELEASE_MANIFEST_PATH;
+    } else {
+      process.env.RELEASE_MANIFEST_PATH = previousManifest;
+    }
   }
 });
 

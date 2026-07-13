@@ -1,10 +1,4 @@
-# device-status-log-access Specification
-
-## Purpose
-
-TBD - created by archiving change 'harden-device-status-logs-diagnostics-and-telemetry-runtime'. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Provide ESM-safe Device Status log access
 
@@ -44,33 +38,3 @@ The system SHALL provide bounded recent solar-display journald records and a bou
 - **THEN** the server SHALL return an explicit denied response
 - **AND** it SHALL NOT execute journal export for the caller
 - **AND** it SHALL NOT expose log content, retention metadata, or host paths
-
-<!-- @trace
-source: align-device-log-source-and-release-identity
-updated: 2026-07-14
-code:
-  - apps/server/src/services/deviceLogService.ts
-  - apps/web/src/pages/DeviceStatus/loadModel.ts
-  - deploy.md
-  - scripts/generate-release-manifest.mjs
-  - deploy.sh
-  - deploy/install-kiosk.sh
-  - apps/web/src/services/api.ts
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/server/src/routes/device.ts
-  - deploy/read-solar-display-journal.sh
-  - apps/server/src/services/releaseIdentityService.ts
-  - scripts/deploy.test.mjs
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - deploy/deploy.sh
-  - apps/server/src/config.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-tests:
-  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/server/src/services/releaseIdentityService.test.ts
-  - apps/server/src/services/deviceLogService.test.ts
-  - apps/web/src/pages/DeviceStatus/index.test.tsx
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - apps/server/src/routes/device.test.ts
-  - apps/web/src/services/api.test.ts
--->

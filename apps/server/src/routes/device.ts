@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import { existsSync, readFileSync, readdirSync, statSync, statfsSync } from "node:fs";
+import { existsSync, readFileSync, statfsSync } from "node:fs";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
-import { join } from "node:path";
 import {
   buildUnsupportedDeviceControlResult,
   readDeviceDisplayOpsSummary
@@ -10,6 +9,13 @@ import {
   KioskExitUnavailableError,
   scheduleDeviceKioskExit
 } from "../services/deviceKioskExitService.js";
+import {
+  clampDeviceLogLimit,
+  exportDeviceLogs,
+  readDeviceLogSummary,
+  type JournalRunner
+} from "../services/deviceLogService.js";
+import { readReleaseIdentity } from "../services/releaseIdentityService.js";
 
 function getUptimeSeconds(): number {
   if (platform() === "linux") {
@@ -73,21 +79,11 @@ function getCpuUsage(): { cores: number; loadAvg: [number, number, number] } {
   return { cores: cpus().length, loadAvg };
 }
 
-function getRecentLogs(logDir: string, limit: number): Array<{ file: string; size: number; modified: string }> {
-  if (!existsSync(logDir)) return [];
-  const files = readdirSync(logDir)
-    .filter((f) => f.endsWith(".log"))
-    .map((f) => {
-      const stat = statSync(join(logDir, f));
-      return {
-        file: f,
-        size: stat.size,
-        modified: stat.mtime.toISOString()
-      };
-    })
-    .sort((a, b) => b.modified.localeCompare(a.modified))
-    .slice(0, limit);
-  return files;
+let journalRunnerOverride: JournalRunner | undefined;
+
+/** Test-only: inject a journal runner so routes never spawn host helpers. */
+export function setDeviceLogJournalRunnerForTests(runner: JournalRunner | undefined) {
+  journalRunnerOverride = runner;
 }
 
 const deviceRoute: FastifyPluginAsync = async (app) => {
@@ -103,6 +99,7 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     const displayOps = readDeviceDisplayOpsSummary({
       mqttStatus: app.mqttClientService.getStatus()
     });
+    const release = readReleaseIdentity();
 
     return {
       success: true,
@@ -117,7 +114,8 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         disk,
         displayOps,
         displayClients: app.socketService.getDisplayClientLivenessSnapshot(),
-        pid: process.pid
+        pid: process.pid,
+        release
       }
     };
   });
@@ -171,46 +169,66 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     }
   });
 
-  // GET /api/device/logs
+  // GET /api/device/logs — bounded solar-display journal summary (trusted only)
   app.get<{ Querystring: { limit?: string } }>("/api/device/logs", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
     }
 
-    const limit = Number.parseInt(request.query.limit ?? "20", 10) || 20;
-    const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
-    if (!existsSync(logDir)) {
-      reply.code(404);
+    const limit = clampDeviceLogLimit(request.query.limit);
+    const summary = await readDeviceLogSummary({
+      limit,
+      runner: journalRunnerOverride
+    });
+
+    if (!summary.available) {
+      reply.code(503);
       return {
         success: false,
-        error: "No logs directory",
+        error: summary.unavailableReason ?? "Device logs unavailable",
+        data: summary,
         timestamp: new Date().toISOString()
       };
     }
+
     return {
       success: true,
-      data: getRecentLogs(logDir, limit)
+      data: summary
     };
   });
 
-  // GET /api/device/logs/export
-  app.get("/api/device/logs/export", async (request, reply) => {
+  // GET /api/device/logs/export — bounded text/plain attachment (trusted only)
+  app.get<{ Querystring: { limit?: string } }>("/api/device/logs/export", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
     }
 
-    const logDir = process.env.LOG_DIR ?? join(process.cwd(), "logs");
-    if (!existsSync(logDir)) {
-      reply.code(404);
+    const limit = clampDeviceLogLimit(request.query.limit ?? "200");
+    const exported = await exportDeviceLogs({
+      limit,
+      runner: journalRunnerOverride
+    });
+
+    if (!exported.available) {
+      reply.code(503);
       return {
         success: false,
-        error: "No logs directory",
+        error: exported.unavailableReason ?? "Device logs unavailable",
+        data: {
+          source: exported.source,
+          available: false,
+          retention: exported.retention,
+          unavailableReason: exported.unavailableReason
+        },
         timestamp: new Date().toISOString()
       };
     }
-    // Return list of log files for download
-    const files = readdirSync(logDir).filter((f) => f.endsWith(".log"));
-    return { success: true, data: { directory: logDir, files } };
+
+    reply
+      .header("Content-Type", "text/plain; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="${exported.filename}"`)
+      .code(200)
+      .send(exported.content);
   });
 };
 

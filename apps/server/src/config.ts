@@ -50,6 +50,12 @@ export const config = {
       resolve(resolveDataDir(), "solar-display.sqlite")
     );
   },
+  get releaseManifestPath() {
+    return resolveEnvPath(
+      process.env.RELEASE_MANIFEST_PATH,
+      resolve(projectRoot, "release-manifest.json")
+    );
+  },
   get managementTrustedOrigins() {
     return process.env.MANAGEMENT_TRUSTED_ORIGINS;
   },

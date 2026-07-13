@@ -1,15 +1,15 @@
 import type { DeviceDisplayOpsSummary } from "@solar-display/shared";
 import {
   getDeviceDisplayOpsSummary,
-  getDeviceLogExportMetadata,
+  getDeviceLogs,
   getDeviceStatus,
-  type DeviceLogExportMetadata,
+  type DeviceLogSummary,
   type DeviceStatusResponseData
 } from "../../services/api";
 
 export type DeviceStatusModel = {
   displayOpsSummary: DeviceDisplayOpsSummary;
-  logExport: DeviceLogExportMetadata;
+  logSummary: DeviceLogSummary;
   status: DeviceStatusResponseData;
 };
 
@@ -29,15 +29,15 @@ export async function loadDeviceStatusModel(options: { force?: boolean } = {}) {
     return cachedDeviceStatusModel;
   }
 
-  const [status, logExport, displayOpsSummary] = await Promise.all([
+  const [status, logSummary, displayOpsSummary] = await Promise.all([
     getDeviceStatus(),
-    getDeviceLogExportMetadata(),
+    getDeviceLogs(20),
     getDeviceDisplayOpsSummary()
   ]);
 
   return rememberDeviceStatusModel({
     displayOpsSummary,
-    logExport,
+    logSummary,
     status
   });
 }

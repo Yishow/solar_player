@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useDeviceDisplayOpsSummary } from "../../hooks/useDeviceDisplayOpsSummary";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
-  getDeviceLogExportMetadata,
+  getDeviceLogs,
   getDeviceStatus,
   isManagementAccessDeniedError,
   runDeviceKioskExit,
   runDeviceDisplayDiagnostic,
-  type DeviceLogExportMetadata,
+  type DeviceLogSummary,
   type DeviceStatusResponseData
 } from "../../services/api";
 import "./device.css";
@@ -40,11 +40,11 @@ export function DeviceStatus() {
   const [initialDeviceStatusModel] = useState(() => readCachedDeviceStatusModel());
   const [status, setStatus] = useState<DeviceStatusResponseData | null>(initialDeviceStatusModel?.status ?? null);
   const [statusAccessDenied, setStatusAccessDenied] = useState(false);
-  const [logExport, setLogExport] = useState<DeviceLogExportMetadata | null>(initialDeviceStatusModel?.logExport ?? null);
-  const [logExportAccessDenied, setLogExportAccessDenied] = useState(false);
-  const [logExportError, setLogExportError] = useState("");
+  const [logSummary, setLogSummary] = useState<DeviceLogSummary | null>(initialDeviceStatusModel?.logSummary ?? null);
+  const [logSummaryAccessDenied, setLogSummaryAccessDenied] = useState(false);
+  const [logSummaryError, setLogSummaryError] = useState("");
   const [statusLoading, setStatusLoading] = useState(initialDeviceStatusModel === null);
-  const [logExportLoading, setLogExportLoading] = useState(initialDeviceStatusModel === null);
+  const [logSummaryLoading, setLogSummaryLoading] = useState(initialDeviceStatusModel === null);
   const [actionFeedback, setActionFeedback] = useState<DeviceActionFeedback>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const {
@@ -104,26 +104,26 @@ export function DeviceStatus() {
     }
   };
 
-  const loadLogExportMetadata = async ({ silent = false }: { silent?: boolean } = {}) => {
+  const loadLogSummary = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!silent) {
-      setLogExportLoading(true);
+      setLogSummaryLoading(true);
     }
     try {
-      setLogExport(await getDeviceLogExportMetadata());
-      setLogExportAccessDenied(false);
-      setLogExportError("");
+      setLogSummary(await getDeviceLogs(20));
+      setLogSummaryAccessDenied(false);
+      setLogSummaryError("");
     } catch (error) {
-      setLogExport(null);
+      setLogSummary(null);
       if (isManagementAccessDeniedError(error)) {
-        setLogExportAccessDenied(true);
-        setLogExportError("");
+        setLogSummaryAccessDenied(true);
+        setLogSummaryError("");
       } else {
-        setLogExportAccessDenied(false);
-        setLogExportError(error instanceof Error ? error.message : "裝置日誌目前不可用。");
+        setLogSummaryAccessDenied(false);
+        setLogSummaryError(error instanceof Error ? error.message : "裝置日誌目前不可用。");
       }
     } finally {
       if (!silent) {
-        setLogExportLoading(false);
+        setLogSummaryLoading(false);
       }
     }
   };
@@ -131,17 +131,17 @@ export function DeviceStatus() {
   useEffect(() => {
     if (initialDeviceStatusModel) {
       void loadDeviceStatus({ preserveProtectedState: true, silent: true });
-      void loadLogExportMetadata({ silent: true });
+      void loadLogSummary({ silent: true });
       return;
     }
 
     void loadDeviceStatus();
-    void loadLogExportMetadata();
+    void loadLogSummary();
   }, [initialDeviceStatusModel]);
 
   useDisplaySyncRefresh(() => {
     void loadDeviceStatus({ preserveProtectedState: true });
-    void loadLogExportMetadata();
+    void loadLogSummary();
     void reloadDisplayOpsSummary();
   }, DEVICE_STATUS_DISPLAY_SYNC_SCOPES);
 
@@ -216,10 +216,10 @@ export function DeviceStatus() {
         displayOpsLoading,
         displayOpsSummary,
         isLoading: statusLoading,
-        logExport,
-        logExportAccessDenied,
-        logExportError,
-        logExportLoading,
+        logSummary,
+        logSummaryAccessDenied,
+        logSummaryError,
+        logSummaryLoading,
         status,
         statusAccessDenied
       }),
@@ -229,10 +229,10 @@ export function DeviceStatus() {
       displayOpsLoading,
       displayOpsSummary,
       statusLoading,
-      logExport,
-      logExportAccessDenied,
-      logExportError,
-      logExportLoading,
+      logSummary,
+      logSummaryAccessDenied,
+      logSummaryError,
+      logSummaryLoading,
       status,
       statusAccessDenied
     ]

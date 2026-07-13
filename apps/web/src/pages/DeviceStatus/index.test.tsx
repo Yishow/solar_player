@@ -5,12 +5,13 @@ import test from "node:test";
 
 const deviceStatusSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
 
-test("device status loads host status and log export metadata as independent sources", () => {
+test("device status loads host status and journal log summary as independent sources", () => {
   assert.match(deviceStatusSource, /loadDeviceStatus\s*=\s*async/);
-  assert.match(deviceStatusSource, /loadLogExportMetadata\s*=\s*async/);
+  assert.match(deviceStatusSource, /loadLogSummary\s*=\s*async/);
   assert.doesNotMatch(deviceStatusSource, /Promise\.allSettled/);
   assert.match(deviceStatusSource, /void loadDeviceStatus\(\)/);
-  assert.match(deviceStatusSource, /void loadLogExportMetadata\(\)/);
+  assert.match(deviceStatusSource, /void loadLogSummary\(\)/);
+  assert.match(deviceStatusSource, /getDeviceLogs\(20\)/);
 });
 
 test("device status reuses a route-loaded status model before deferred refresh", () => {
@@ -20,7 +21,7 @@ test("device status reuses a route-loaded status model before deferred refresh",
   assert.match(deviceStatusSource, /useState\(initialDeviceStatusModel === null\)/);
   assert.match(deviceStatusSource, /useDeviceDisplayOpsSummary\(initialDeviceStatusModel\?\.displayOpsSummary\)/);
   assert.match(deviceStatusSource, /loadDeviceStatus\(\{ preserveProtectedState: true, silent: true \}\)/);
-  assert.match(deviceStatusSource, /loadLogExportMetadata\(\{ silent: true \}\)/);
+  assert.match(deviceStatusSource, /loadLogSummary\(\{ silent: true \}\)/);
 });
 
 test("device status exposes display ops loading separately from host status loading", () => {

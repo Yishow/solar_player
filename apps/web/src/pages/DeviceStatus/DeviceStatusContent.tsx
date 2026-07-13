@@ -287,7 +287,7 @@ export function DeviceStatusContent({
           <article className="ds-triage-panel">
             <h2 style={{ marginBottom: 12 }}>
               系統日誌
-              <small>Recent Logs</small>
+              <small>Journald</small>
             </h2>
             <div
               className={`mgmt-status ${
@@ -305,6 +305,13 @@ export function DeviceStatusContent({
                 {viewModel.logsTriage.needsHostInvestigation ? "目前建議準備 host-level investigation。" : "目前可先在 app 內完成 triage。"}
               </small>
             </div>
+            {viewModel.logsTriage.exportAvailable ? (
+              <div style={{ marginTop: 12 }}>
+                <a className="mgmt-button" href="/api/device/logs/export?limit=200">
+                  匯出 bounded journal
+                </a>
+              </div>
+            ) : null}
           </article>
         </div>
 

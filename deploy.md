@@ -589,3 +589,54 @@ Current progress at the time this file was written:
 - `deploy/disable-readonly-system.desktop`
 - `docs/runbooks/raspi-onekey-kiosk-deploy.md`
 - `openspec/changes/protect-runtime-backup-and-restore/`
+
+## Device Status log truth and release identity
+
+Production server logs are **journald unit `solar-display`**, not files under `LOG_DIR`.
+
+### Journal reader (least privilege)
+
+- Helper source: `deploy/read-solar-display-journal.sh`
+- Installed path: `/usr/local/sbin/read-solar-display-journal.sh` (root-owned, mode 755)
+- Sudoers drop-in: `/etc/sudoers.d/solar-display-journal` (mode 440)
+- Allowed invocations only:
+  - `sudo -n /usr/local/sbin/read-solar-display-journal.sh recent <1..500>`
+  - `sudo -n /usr/local/sbin/read-solar-display-journal.sh export <1..500>`
+- Unit, boot scope (`-b`), and output formats are fixed inside the helper. Callers cannot pass unit names, paths, or extra journalctl flags.
+- Installer (`deploy/install-kiosk.sh`) renders the sudoers drop-in to a temp file, runs `visudo -cf`, and **aborts without installing** on syntax failure.
+
+### Device Status API
+
+- `GET /api/device/logs?limit=N` — trusted management only; JSON `{ source, available, entries, retention, unavailableReason }`
+- `GET /api/device/logs/export?limit=N` — trusted management only; `text/plain` attachment, bounded to 500 records
+- Untrusted callers receive 403 **before** any helper spawn
+- When journal/helper/sudo is unavailable, responses are **503 with an explicit reason** — never a successful empty `.log` file listing
+
+### Release identity
+
+- Bundle/direct deploy generates `release-manifest.json` via `scripts/generate-release-manifest.mjs`
+- Fields: `releaseId`, `commit`, `builtAt`, `packageVersion`, `schemaVersion` (highest DB migration), `sourceDirty`
+- Runtime Device Status reads the installed manifest (default `<install-root>/release-manifest.json`, overridable with `RELEASE_MANIFEST_PATH`)
+- Missing/corrupt manifest → release identity unavailable with a bounded reason; **server stays healthy**
+- `/health` does **not** read or validate the release manifest
+
+### Failure runbook (operator)
+
+1. Inject or reproduce a `solar-display` error, then confirm host truth:
+   ```bash
+   sudo journalctl -u solar-display -b -n 50 --no-pager
+   ```
+2. Confirm the least-privilege reader (as kiosk user):
+   ```bash
+   sudo -n /usr/local/sbin/read-solar-display-journal.sh recent 20
+   ```
+3. From a trusted management session, open Device Status and verify the same bounded record appears under Journald.
+4. Compare Device Status **Release ID** with the deployed manifest:
+   ```bash
+   cat /data/solar-display/release-manifest.json
+   ```
+5. If Device Status shows journal unavailable:
+   - helper missing → re-run `sudo ./deploy/install-kiosk.sh`
+   - sudo denied → check `/etc/sudoers.d/solar-display-journal` and `visudo -cf`
+   - journald missing → host is not a production Linux journal host; treat as unavailable (do not fall back to scanning host paths)
+

@@ -11,7 +11,7 @@ import {
   fetchImagePlaylist,
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
-  getDeviceLogExportMetadata,
+  getDeviceLogs,
   runDeviceKioskExit,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
@@ -324,7 +324,7 @@ test("requestJson keeps caller headers while still using the normalized Headers 
   }
 });
 
-test("getDeviceLogExportMetadata reads directory and file names from the export metadata route", async () => {
+test("getDeviceLogs reads journald summary and maps unavailable envelopes", async () => {
   const originalFetch = globalThis.fetch;
   const seenUrls: string[] = [];
 
@@ -332,12 +332,25 @@ test("getDeviceLogExportMetadata reads directory and file names from the export 
     const url = String(input);
     seenUrls.push(url);
 
-    if (url.includes("/api/device/logs/export")) {
+    if (url.includes("/api/device/logs?limit=20")) {
       return new Response(
         JSON.stringify({
           data: {
-            directory: "/var/log/solar-display",
-            files: ["player.log", "worker.log"]
+            available: true,
+            entries: [
+              {
+                message: "player ready",
+                priority: "info",
+                timestamp: "2026-05-18T08:00:00.000Z"
+              }
+            ],
+            retention: {
+              maxEntries: 20,
+              scope: "current-boot",
+              unit: "solar-display"
+            },
+            source: "journald",
+            unavailableReason: null
           },
           success: true
         }),
@@ -354,11 +367,50 @@ test("getDeviceLogExportMetadata reads directory and file names from the export 
   };
 
   try {
-    const response = await getDeviceLogExportMetadata();
+    const response = await getDeviceLogs(20);
 
-    assert.deepEqual(seenUrls.map((url) => new URL(url).pathname + new URL(url).search), ["/api/device/logs/export"]);
-    assert.equal(response.directory, "/var/log/solar-display");
-    assert.deepEqual(response.files, ["player.log", "worker.log"]);
+    assert.deepEqual(seenUrls.map((url) => new URL(url).pathname + new URL(url).search), ["/api/device/logs?limit=20"]);
+    assert.equal(response.source, "journald");
+    assert.equal(response.available, true);
+    assert.equal(response.entries[0]?.message, "player ready");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getDeviceLogs returns unavailable journal summary from 503 envelopes", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        data: {
+          available: false,
+          entries: [],
+          retention: {
+            maxEntries: 20,
+            scope: "current-boot",
+            unit: "solar-display"
+          },
+          source: "journald",
+          unavailableReason: "journal access denied"
+        },
+        error: "journal access denied",
+        success: false,
+        timestamp: "2026-07-14T00:00:00.000Z"
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 503
+      }
+    );
+
+  try {
+    const response = await getDeviceLogs(20);
+    assert.equal(response.available, false);
+    assert.equal(response.unavailableReason, "journal access denied");
   } finally {
     globalThis.fetch = originalFetch;
   }

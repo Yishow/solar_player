@@ -18,6 +18,9 @@ KIOSK_STATE_DIR="${KIOSK_HOME}/.local/state/solar-display"
 KIOSK_DISPLAY_OUTPUT="${KIOSK_DISPLAY_OUTPUT:-}"
 GDM_CUSTOM_CONF="${GDM_CUSTOM_CONF:-/etc/gdm3/custom.conf}"
 SYSTEMD_UNIT_PATH="/etc/systemd/system/solar-display.service"
+JOURNAL_HELPER_SRC="${BUNDLE_ROOT}/deploy/read-solar-display-journal.sh"
+JOURNAL_HELPER_PATH="${JOURNAL_HELPER_PATH:-/usr/local/sbin/read-solar-display-journal.sh}"
+JOURNAL_SUDOERS_PATH="${JOURNAL_SUDOERS_PATH:-/etc/sudoers.d/solar-display-journal}"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
 LAUNCHER_NAME="Solar Display Kiosk.desktop"
 READONLY_ENABLE_LAUNCHER_NAME="Enable Read Only System.desktop"
@@ -123,7 +126,7 @@ if [[ -z "${PNPM_BIN}" || ! -x "${PNPM_BIN}" ]]; then
   exit 1
 fi
 
-echo "[3/6] Installing systemd service..."
+echo "[3/7] Installing systemd service..."
 sed \
   -e "s#^User=.*#User=${KIOSK_USER}#" \
   -e "s#^WorkingDirectory=.*#WorkingDirectory=${INSTALL_DIR}#" \
@@ -139,7 +142,31 @@ systemctl daemon-reload
 systemctl enable solar-display
 systemctl restart solar-display
 
-echo "[4/6] Installing kiosk launcher..."
+echo "[4/7] Installing least-privilege journal reader..."
+if [[ ! -f "${JOURNAL_HELPER_SRC}" ]]; then
+  echo "Missing journal helper source: ${JOURNAL_HELPER_SRC}" >&2
+  exit 1
+fi
+install -d -m 755 /usr/local/sbin
+install -m 755 -o root -g root "${JOURNAL_HELPER_SRC}" "${JOURNAL_HELPER_PATH}"
+
+# Render sudoers drop-in to a temp file, syntax-check with visudo, only then install.
+# Allows only the fixed helper path with recent|export and a numeric limit — no shell.
+journal_sudoers_tmp="$(mktemp)"
+cat > "${journal_sudoers_tmp}" <<EOF
+# Managed by deploy/install-kiosk.sh — solar-display journal reader for Device Status
+Defaults!${JOURNAL_HELPER_PATH} !requiretty
+${KIOSK_USER} ALL=(root) NOPASSWD: ${JOURNAL_HELPER_PATH} recent [0-9]*, ${JOURNAL_HELPER_PATH} export [0-9]*
+EOF
+if ! visudo -cf "${journal_sudoers_tmp}" >/dev/null; then
+  echo "sudoers syntax check failed for solar-display journal drop-in; not installing." >&2
+  rm -f "${journal_sudoers_tmp}"
+  exit 1
+fi
+install -m 440 -o root -g root "${journal_sudoers_tmp}" "${JOURNAL_SUDOERS_PATH}"
+rm -f "${journal_sudoers_tmp}"
+
+echo "[5/7] Installing kiosk launcher..."
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_BIN_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_AUTOSTART_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_DESKTOP_DIR}"
@@ -196,7 +223,7 @@ if command -v gio >/dev/null 2>&1; then
   su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
 fi
 
-echo "[5/6] Configuring GDM autologin..."
+echo "[6/7] Configuring GDM autologin..."
 if [[ ! -f "${GDM_CUSTOM_CONF}" ]]; then
   install -D -m 644 /dev/null "${GDM_CUSTOM_CONF}"
 fi
@@ -207,13 +234,16 @@ cp "${GDM_CUSTOM_CONF}" "${GDM_CUSTOM_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLoginEnable True
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLogin "${KIOSK_USER}"
 
-echo "[6/6] Checking service health..."
+echo "[7/7] Checking service health..."
 systemctl --no-pager --full status solar-display || true
 
-echo "[7/7] Done."
+echo "Done."
 echo ""
 echo "Reboot to verify full kiosk boot: sudo reboot"
-echo "Server logs: sudo journalctl -u solar-display -b -f"
+echo "Server logs (truth): sudo journalctl -u solar-display -b -f"
+echo "Device Status reader: sudo -n ${JOURNAL_HELPER_PATH} recent 20"
+echo "Journal sudoers: ${JOURNAL_SUDOERS_PATH}"
+echo "Release identity: ${INSTALL_DIR}/release-manifest.json"
 echo "Kiosk launcher log: ${LAUNCHER_LOG_PATH}"
 echo "Resolved node: ${NODE_BIN}"
 echo "Resolved pnpm: ${PNPM_BIN}"

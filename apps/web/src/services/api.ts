@@ -551,6 +551,17 @@ export async function getDeviceDisplayOpsSummary() {
   return response.summary;
 }
 
+export type DeviceReleaseIdentity = {
+  available: boolean;
+  builtAt: string | null;
+  commit: string | null;
+  packageVersion: string | null;
+  releaseId: string | null;
+  schemaVersion: number | null;
+  sourceDirty: boolean | null;
+  unavailableReason: string | null;
+};
+
 export type DeviceStatusResponseData = {
   hostname: string;
   platform: string;
@@ -562,12 +573,29 @@ export type DeviceStatusResponseData = {
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
   displayClients: DisplayClientLivenessSnapshot;
   pid: number;
+  release?: DeviceReleaseIdentity;
 };
 
-export type DeviceLogExportMetadata = {
-  directory: string | null;
-  files: string[];
+export type DeviceLogEntry = {
+  message: string;
+  priority: string;
+  timestamp: string;
 };
+
+export type DeviceLogSummary = {
+  available: boolean;
+  entries: DeviceLogEntry[];
+  retention: {
+    maxEntries: number;
+    scope: "current-boot";
+    unit: "solar-display";
+  };
+  source: "journald";
+  unavailableReason: string | null;
+};
+
+/** @deprecated Prefer DeviceLogSummary; kept as alias during transition. */
+export type DeviceLogExportMetadata = DeviceLogSummary;
 
 export type DeviceKioskExitResult = {
   scheduled: boolean;
@@ -674,12 +702,6 @@ export async function updateCalculationSettings(settings: CalculationSettings) {
   return response.settings;
 }
 
-type DeviceLogListEntry = {
-  file: string;
-  modified: string;
-  size: number;
-};
-
 export async function getDeviceStatus() {
   const response = await requestJson<{
     data: DeviceStatusResponseData;
@@ -724,15 +746,39 @@ export async function resetMonthTrend() {
   return response.data;
 }
 
-export async function getDeviceLogExportMetadata() {
-  const response = await requestJson<{
-    data: DeviceLogExportMetadata;
-    success: boolean;
-  }>("/api/device/logs/export");
-  if (!response.success) {
-    throw new Error("載入裝置日誌失敗。");
+export async function getDeviceLogs(limit = 20) {
+  try {
+    const response = await requestJson<{
+      data: DeviceLogSummary;
+      error?: string;
+      success: boolean;
+    }>(`/api/device/logs?limit=${encodeURIComponent(String(limit))}`);
+    if (!response.data) {
+      throw new Error(response.error || "載入裝置日誌失敗。");
+    }
+    return response.data;
+  } catch (error) {
+    if (error instanceof ManagementAccessDeniedError) {
+      throw error;
+    }
+    // 503 unavailable envelopes still carry the journald summary for UI truthfulness.
+    if (error instanceof ApiRequestError && error.body && typeof error.body === "object") {
+      const data = (error.body as { data?: DeviceLogSummary }).data;
+      if (data && data.source === "journald") {
+        return data;
+      }
+    }
+    throw error instanceof Error ? error : new Error("載入裝置日誌失敗。");
   }
-  return response.data;
+}
+
+/** @deprecated Prefer getDeviceLogs — export is now text/plain download. */
+export async function getDeviceLogExportMetadata() {
+  return getDeviceLogs(20);
+}
+
+export function getDeviceLogExportUrl(limit = 200) {
+  return `/api/device/logs/export?limit=${encodeURIComponent(String(limit))}`;
 }
 
 export async function runDeviceDisplayDiagnostic(action: "export-summary" | "refresh-readiness") {

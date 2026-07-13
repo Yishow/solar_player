@@ -66,11 +66,17 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
       }
     },
     isLoading: false,
-    logExport: {
-      directory: "/var/log/solar-display",
-      files: ["server.log", "worker.log"]
+    logSummary: {
+      available: true,
+      entries: [
+        { message: "server boot ready", priority: "info", timestamp: "2026-05-18T08:00:00.000Z" },
+        { message: "worker started", priority: "info", timestamp: "2026-05-18T08:01:00.000Z" }
+      ],
+      retention: { maxEntries: 20, scope: "current-boot", unit: "solar-display" },
+      source: "journald",
+      unavailableReason: null
     },
-    logExportError: "",
+    logSummaryError: "",
     status: {
       arch: "arm64",
       cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
@@ -110,17 +116,17 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.displayOpsSummary.hostRestartCommand, "systemctl restart solar-display");
   assert.match(model.displayOpsSummary.safeOpsHelper, /systemctl restart solar-display/);
   assert.match(model.displayOpsSummary.safeOpsHelper, /docs\/runbooks\/device-diagnostics-safe-ops\.md/);
-  assert.equal(model.logsSummary.statusTitle, "最近日誌");
-  assert.equal(model.logsSummary.fileCountLabel, "2 files");
-  assert.match(model.logsSummary.detail, /server\.log/);
+  assert.equal(model.logsSummary.statusTitle, "Journald 可用");
+  assert.equal(model.logsSummary.entryCountLabel, "2 entries");
+  assert.match(model.logsSummary.detail, /server boot ready/);
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,
     isLoading: true,
-    logExport: null,
-    logExportError: "",
+    logSummary: null,
+    logSummaryError: "",
     status: null
   });
 
@@ -139,8 +145,8 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
       tone: "error"
     },
     isLoading: false,
-    logExport: null,
-    logExportError: "No logs directory",
+    logSummary: null,
+    logSummaryError: "journal access denied",
     status: null
   });
 
@@ -148,7 +154,7 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
   assert.equal(model.networkRows[0]?.value, "● 未連線");
   assert.equal(model.networkRows[1]?.value, "需待裝置狀態恢復後確認");
   assert.equal(model.logsSummary.statusTitle, "日誌不可用");
-  assert.equal(model.logsSummary.fileCountLabel, "Unavailable");
+  assert.equal(model.logsSummary.entryCountLabel, "Unavailable");
 });
 
 test("buildDeviceStatusViewModel preserves unpublished triage semantics across the device surface", () => {
@@ -203,8 +209,8 @@ test("buildDeviceStatusViewModel preserves unpublished triage semantics across t
       }
     } as never,
     isLoading: false,
-    logExport: null,
-    logExportError: "",
+    logSummary: null,
+    logSummaryError: "",
     status: null
   });
 
@@ -271,11 +277,16 @@ test("buildDeviceStatusViewModel exposes summary-first hero cards diagnostics re
       }
     } as never,
     isLoading: false,
-    logExport: {
-      directory: "/var/log/solar-display",
-      files: ["server.log"]
+    logSummary: {
+      available: true,
+      entries: [
+        { message: "server.log event", priority: "info", timestamp: "2026-05-18T08:00:00.000Z" }
+      ],
+      retention: { maxEntries: 20, scope: "current-boot", unit: "solar-display" },
+      source: "journald",
+      unavailableReason: null
     },
-    logExportError: "",
+    logSummaryError: "",
     status: {
       arch: "arm64",
       cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
@@ -308,7 +319,7 @@ test("buildDeviceStatusViewModel exposes summary-first hero cards diagnostics re
   assert.match(model.diagnosticsSurface.safeScopeLabel, /safe-refresh/);
   assert.equal(model.diagnosticsSurface.unsupportedActions[0]?.label, "Reboot device");
   assert.equal(model.alertsTriage.summaryTitle, "1 display alert");
-  assert.equal(model.logsTriage.summaryTitle, "最近日誌");
+  assert.equal(model.logsTriage.summaryTitle, "Journald 可用");
   assert.equal(model.livenessTriage.summaryTitle, "0 clients");
 });
 
@@ -316,8 +327,8 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,
     isLoading: false,
-    logExport: null,
-    logExportError: "",
+    logSummary: null,
+    logSummaryError: "",
     now: new Date("2026-05-22T12:00:10.000Z"),
     status: {
       arch: "arm64",
@@ -466,8 +477,8 @@ test("buildDeviceStatusViewModel keeps configuration-readiness distinct from ope
       }
     } as never,
     isLoading: false,
-    logExport: null,
-    logExportError: "",
+    logSummary: null,
+    logSummaryError: "",
     status: null
   });
 
@@ -486,9 +497,9 @@ test("buildDeviceStatusViewModel keeps denied reads distinct from empty and gene
     },
     displayOpsAccessDenied: true,
     isLoading: false,
-    logExport: null,
-    logExportAccessDenied: true,
-    logExportError: "",
+    logSummary: null,
+    logSummaryAccessDenied: true,
+    logSummaryError: "",
     status: null,
     statusAccessDenied: true
   });
@@ -500,4 +511,49 @@ test("buildDeviceStatusViewModel keeps denied reads distinct from empty and gene
   assert.match(model.displayOpsSummary.safeOpsHelper, /systemctl restart solar-display/);
   assert.equal(model.logsSummary.statusTitle, "存取受限");
   assert.match(model.logsSummary.detail, /受信任的管理端/);
+});
+
+test("buildDeviceStatusViewModel presents journal unavailable and dirty release identity", () => {
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logSummary: {
+      available: false,
+      entries: [],
+      retention: { maxEntries: 20, scope: "current-boot", unit: "solar-display" },
+      source: "journald",
+      unavailableReason: "journal access denied"
+    },
+    logSummaryError: "",
+    status: {
+      arch: "arm64",
+      cpu: { cores: 4, loadAvg: [0.1, 0.1, 0.1] },
+      disk: { availableMB: 1, totalMB: 2, usePercent: 50, usedMB: 1 },
+      hostname: "KZ-Display-01",
+      memory: { freeMB: 1, totalMB: 2, usePercent: 50, usedMB: 1 },
+      nodeVersion: "v24.15.0",
+      pid: 9,
+      platform: "linux",
+      release: {
+        available: true,
+        builtAt: "2026-07-14T00:00:00.000Z",
+        commit: "deadbeefcafe0123456789abcdef0123456789ab",
+        packageVersion: "0.1.0",
+        releaseId: "0.1.0+deadbeefcafe-dirty",
+        schemaVersion: 22,
+        sourceDirty: true,
+        unavailableReason: null
+      },
+      uptimeSeconds: 60
+    }
+  });
+
+  assert.equal(model.logsSummary.statusTitle, "日誌不可用");
+  assert.match(model.logsSummary.detail, /journal access denied/);
+  assert.equal(model.logsSummary.sourceLabel, "journald");
+  assert.equal(model.logsTriage.exportAvailable, false);
+  const releaseId = model.systemRows.find((row) => row.label === "Release ID");
+  assert.match(releaseId?.value ?? "", /dirty/);
+  const schema = model.systemRows.find((row) => row.label === "Schema");
+  assert.equal(schema?.value, "22");
 });

@@ -62,6 +62,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.service" "${target_root}/deploy/tailscale-hotspot-trigger.service"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.timer" "${target_root}/deploy/tailscale-hotspot-trigger.timer"
   cp "${PROJECT_DIR}/deploy/install-kiosk.sh" "${target_root}/deploy/install-kiosk.sh"
+  cp "${PROJECT_DIR}/deploy/read-solar-display-journal.sh" "${target_root}/deploy/read-solar-display-journal.sh"
   cp "${PROJECT_DIR}/deploy/start-solar-kiosk.sh" "${target_root}/deploy/start-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/stop-solar-kiosk.sh" "${target_root}/deploy/stop-solar-kiosk.sh"
   cp "${PROJECT_DIR}/deploy/verify-kiosk-install.sh" "${target_root}/deploy/verify-kiosk-install.sh"
@@ -72,6 +73,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/scripts/raspi-onekey-deploy.sh" "${target_root}/scripts/raspi-onekey-deploy.sh"
   cp "${PROJECT_DIR}/scripts/prepare-raspi-user-data.sh" "${target_root}/scripts/prepare-raspi-user-data.sh"
   cp "${PROJECT_DIR}/scripts/prepare-raspi-user-data.ps1" "${target_root}/scripts/prepare-raspi-user-data.ps1"
+  cp "${PROJECT_DIR}/scripts/generate-release-manifest.mjs" "${target_root}/scripts/generate-release-manifest.mjs"
   chmod +x \
     "${target_root}/deploy/export-runtime-state.sh" \
     "${target_root}/deploy/restore-runtime-state.sh" \
@@ -87,6 +89,7 @@ copy_required_tree() {
     "${target_root}/deploy/readonly-system-disable.sh" \
     "${target_root}/deploy/tailscale-hotspot-trigger.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
+    "${target_root}/deploy/read-solar-display-journal.sh" \
     "${target_root}/deploy/start-solar-kiosk.sh" \
     "${target_root}/deploy/stop-solar-kiosk.sh" \
     "${target_root}/deploy/verify-kiosk-install.sh" \
@@ -222,6 +225,11 @@ build_bundle() {
   fi
 
   remove_bundle_noise "${target_root}"
+
+  # Immutable release identity for Device Status read-back (generated from the source tree).
+  node "${PROJECT_DIR}/scripts/generate-release-manifest.mjs" \
+    --project-root "${PROJECT_DIR}" \
+    --out "${target_root}/release-manifest.json"
 }
 
 validate_inputs() {
@@ -246,6 +254,7 @@ validate_inputs() {
   require_path "deploy/tailscale-hotspot-trigger.service"
   require_path "deploy/tailscale-hotspot-trigger.timer"
   require_path "deploy/install-kiosk.sh"
+  require_path "deploy/read-solar-display-journal.sh"
   require_path "deploy/start-solar-kiosk.sh"
   require_path "deploy/stop-solar-kiosk.sh"
   require_path "deploy/verify-kiosk-install.sh"
@@ -255,6 +264,7 @@ validate_inputs() {
   require_path "scripts/raspi-onekey-deploy.sh"
   require_path "scripts/prepare-raspi-user-data.sh"
   require_path "scripts/prepare-raspi-user-data.ps1"
+  require_path "scripts/generate-release-manifest.mjs"
   require_path "package.json"
   require_path "pnpm-lock.yaml"
   require_path "pnpm-workspace.yaml"

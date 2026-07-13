@@ -5,7 +5,7 @@ import {
   type DeviceSafeOpsGuidance,
   type DisplayFaultTriageSummary
 } from "@solar-display/shared";
-import type { DeviceLogExportMetadata } from "../../services/api";
+import type { DeviceLogSummary, DeviceReleaseIdentity } from "../../services/api";
 
 type DeviceRouteStatus = {
   hostname: string;
@@ -18,6 +18,7 @@ type DeviceRouteStatus = {
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
   displayClients?: DisplayClientLivenessSnapshot;
   pid: number;
+  release?: DeviceReleaseIdentity;
 };
 
 export type DeviceActionFeedback = {
@@ -32,10 +33,10 @@ type BuildDeviceStatusViewModelArgs = {
   displayOpsLoading?: boolean;
   displayOpsSummary?: DeviceDisplayOpsSummary | null;
   isLoading: boolean;
-  logExport: DeviceLogExportMetadata | null;
-  logExportAccessDenied?: boolean;
-  logExportError: string;
-  logExportLoading?: boolean;
+  logSummary: DeviceLogSummary | null;
+  logSummaryAccessDenied?: boolean;
+  logSummaryError: string;
+  logSummaryLoading?: boolean;
   now?: Date;
   status: DeviceRouteStatus | null;
   statusAccessDenied?: boolean;
@@ -251,16 +252,138 @@ const defaultSafeOpsGuidance: DeviceSafeOpsGuidance = {
   unsupportedOperations: []
 };
 
+function buildLogsSummary(
+  logSummary: DeviceLogSummary | null,
+  logSummaryAccessDenied: boolean,
+  logSummaryError: string,
+  logSummaryLoading: boolean
+) {
+  if (logSummaryAccessDenied) {
+    return {
+      detail: "此頁面僅對受信任的管理端開放。",
+      entryCountLabel: "--",
+      exportAvailable: false,
+      retentionLabel: "--",
+      sourceLabel: "journald",
+      statusTitle: "存取受限"
+    };
+  }
+
+  if (logSummaryLoading && logSummary === null && !logSummaryError) {
+    return {
+      detail: "正在同步 Journald 日誌摘要。",
+      entryCountLabel: "--",
+      exportAvailable: false,
+      retentionLabel: "--",
+      sourceLabel: "journald",
+      statusTitle: "同步中"
+    };
+  }
+
+  if (logSummaryError) {
+    return {
+      detail: logSummaryError,
+      entryCountLabel: "Unavailable",
+      exportAvailable: false,
+      retentionLabel: "--",
+      sourceLabel: "journald",
+      statusTitle: "日誌不可用"
+    };
+  }
+
+  if (logSummary === null) {
+    return {
+      detail: "尚未載入 Journald 日誌摘要。",
+      entryCountLabel: "--",
+      exportAvailable: false,
+      retentionLabel: "--",
+      sourceLabel: "journald",
+      statusTitle: "尚未載入"
+    };
+  }
+
+  if (!logSummary.available) {
+    return {
+      detail: logSummary.unavailableReason ?? "Journald 目前不可用。",
+      entryCountLabel: "Unavailable",
+      exportAvailable: false,
+      retentionLabel: `${logSummary.retention.scope} · max ${logSummary.retention.maxEntries}`,
+      sourceLabel: logSummary.source,
+      statusTitle: "日誌不可用"
+    };
+  }
+
+  const preview =
+    logSummary.entries.length > 0
+      ? logSummary.entries
+          .slice(0, 3)
+          .map((entry) => entry.message)
+          .join(" / ")
+      : "目前 boot 範圍內沒有 journal 記錄（不是「沒有錯誤」的保證）。";
+
+  return {
+    detail: preview,
+    entryCountLabel: `${logSummary.entries.length} entries`,
+    exportAvailable: true,
+    retentionLabel: `${logSummary.retention.scope} · max ${logSummary.retention.maxEntries}`,
+    sourceLabel: logSummary.source,
+    statusTitle: "Journald 可用"
+  };
+}
+
+function buildReleaseRows(status: DeviceRouteStatus | null, statusAccessDenied: boolean) {
+  if (statusAccessDenied) {
+    return [
+      { label: "Release ID", value: "存取受限" },
+      { label: "Commit", value: "-" },
+      { label: "Built At", value: "-" },
+      { label: "Package", value: "-" },
+      { label: "Schema", value: "-" }
+    ];
+  }
+
+  const release = status?.release;
+  if (!release || !release.available) {
+    return [
+      {
+        label: "Release ID",
+        value: release?.unavailableReason ?? "Release identity unavailable"
+      },
+      { label: "Commit", value: "-" },
+      { label: "Built At", value: "-" },
+      { label: "Package", value: "-" },
+      { label: "Schema", value: "-" }
+    ];
+  }
+
+  const shortCommit = release.commit ? release.commit.slice(0, 12) : "-";
+  return [
+    {
+      label: "Release ID",
+      value: release.sourceDirty ? `${release.releaseId ?? "-"} (dirty)` : (release.releaseId ?? "-")
+    },
+    { label: "Commit", value: shortCommit },
+    { label: "Built At", value: formatTimestamp(release.builtAt) },
+    { label: "Package", value: release.packageVersion ?? "-" },
+    {
+      label: "Schema",
+      value: release.schemaVersion === null || release.schemaVersion === undefined
+        ? "-"
+        : String(release.schemaVersion)
+    }
+  ];
+}
+
 export function buildDeviceStatusViewModel({
   actionFeedback,
   displayOpsAccessDenied = false,
   displayOpsLoading = false,
   displayOpsSummary,
   isLoading,
-  logExport,
-  logExportAccessDenied = false,
-  logExportError,
-  logExportLoading = false,
+  logSummary,
+  logSummaryAccessDenied = false,
+  logSummaryError,
+  logSummaryLoading = false,
   now = new Date(),
   status,
   statusAccessDenied = false
@@ -292,38 +415,13 @@ export function buildDeviceStatusViewModel({
         : diagnostics.length > 0
           ? `先執行 safe diagnostics，再決定是否升級到 ${safeOpsGuidance.hostRestartCommand}。`
           : `若問題持續，請依 runbook 改走 ${safeOpsGuidance.hostRestartCommand}。`;
-  const logsSummary = logExportAccessDenied
-    ? {
-        detail: "此頁面僅對受信任的管理端開放。",
-        directoryLabel: "--",
-        fileCountLabel: "--",
-        statusTitle: "存取受限"
-      }
-    : logExportLoading && logExport === null && !logExportError
-      ? {
-          detail: "正在同步裝置日誌 metadata。",
-          directoryLabel: "--",
-          fileCountLabel: "--",
-          statusTitle: "同步中"
-        }
-    : logExportError
-      ? {
-          detail: logExportError,
-          directoryLabel: "--",
-          fileCountLabel: "Unavailable",
-          statusTitle: "日誌不可用"
-        }
-      : {
-          detail:
-            logExport === null
-              ? "尚未載入裝置日誌 metadata。"
-              : logExport.files.length > 0
-                ? logExport.files.slice(0, 3).join(" / ")
-                : "目前沒有可供匯出的 .log 檔案。",
-          directoryLabel: logExport?.directory ?? "--",
-          fileCountLabel: logExport === null ? "--" : `${logExport.files.length} files`,
-          statusTitle: logExport === null ? "尚未載入" : "最近日誌"
-        };
+  const logsSummary = buildLogsSummary(
+    logSummary,
+    logSummaryAccessDenied,
+    logSummaryError,
+    logSummaryLoading
+  );
+  const releaseRows = buildReleaseRows(status, statusAccessDenied);
   const displayClientSummary = buildDisplayClientSummary(status?.displayClients, now);
   const alerts = displayOpsSummary?.alerts.map((alert) => ({
     ...alert,
@@ -467,7 +565,8 @@ export function buildDeviceStatusViewModel({
     logsSummary,
     logsTriage: {
       detail: logsSummary.detail,
-      helper: `${logsSummary.fileCountLabel} · ${logsSummary.directoryLabel}`,
+      exportAvailable: logsSummary.exportAvailable,
+      helper: `${logsSummary.sourceLabel} · ${logsSummary.entryCountLabel} · ${logsSummary.retentionLabel}`,
       needsHostInvestigation:
         logsSummary.statusTitle === "日誌不可用"
         || runtimeSummary.title === "同步失敗"
@@ -480,6 +579,7 @@ export function buildDeviceStatusViewModel({
       items: displayClientSummary.rows,
       summaryTitle: displayClientSummary.totalLabel
     },
+    releaseRows,
     resourceCards: [
       {
         gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",
@@ -541,7 +641,8 @@ export function buildDeviceStatusViewModel({
       {
         label: "PID",
         value: status ? String(status.pid) : "-"
-      }
+      },
+      ...releaseRows
     ]
   };
 }

@@ -97,7 +97,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n  - packages/*\n");
   writeFileSync(path.join(projectDir, ".env"), "MQTT_BROKER=broker.local\n");
   writeFileSync(path.join(projectDir, ".env.example"), "PORT=3000\n");
-  writeFileSync(path.join(projectDir, "apps/server/package.json"), JSON.stringify({ name: "@solar-display/server", type: "module" }, null, 2));
+  writeFileSync(path.join(projectDir, "apps/server/package.json"), JSON.stringify({ name: "@solar-display/server", type: "module", version: "0.1.0" }, null, 2));
   writeFileSync(path.join(projectDir, "apps/web/package.json"), JSON.stringify({ name: "@solar-display/web", type: "module" }, null, 2));
   writeFileSync(path.join(projectDir, "packages/shared/package.json"), JSON.stringify({ name: "@solar-display/shared", type: "module" }, null, 2));
   writeFileSync(path.join(projectDir, "apps/server/dist/server.js"), "console.log('server');\n");
@@ -124,6 +124,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.service"), "[Service]\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.timer"), "[Timer]\n");
   writeFileSync(path.join(projectDir, "deploy/install-kiosk.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/read-solar-display-journal.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/start-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/stop-solar-kiosk.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/verify-kiosk-install.sh"), "#!/bin/bash\n");
@@ -133,6 +134,21 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "scripts/raspi-onekey-deploy.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "scripts/prepare-raspi-user-data.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "scripts/prepare-raspi-user-data.ps1"), "Write-Host 'prepare'\n");
+  // Stub release generator for fixture bundles (avoids requiring a full git tree).
+  writeFileSync(
+    path.join(projectDir, "scripts/generate-release-manifest.mjs"),
+    `import { writeFileSync } from "node:fs";
+const out = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : "release-manifest.json";
+writeFileSync(out, JSON.stringify({
+  releaseId: "0.1.0+fixture",
+  commit: "fixturecommit0000000000000000000000000000",
+  builtAt: "2026-07-14T00:00:00.000Z",
+  packageVersion: "0.1.0",
+  schemaVersion: 1,
+  sourceDirty: false
+}, null, 2) + "\\n");
+`
+  );
   writeFileSync(path.join(projectDir, "docs/openapi.yaml"), "openapi: 3.0.0\n");
   writeFileSync(path.join(projectDir, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-bg.png"), "seed-image\n");
   writeFileSync(path.join(projectDir, "node_modules/fake-package/index.js"), "module.exports = {};\n");
@@ -1319,6 +1335,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/read-solar-display-journal.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/stop-solar-kiosk.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/verify-kiosk-install.sh")), true);
@@ -1328,6 +1345,13 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "scripts/raspi-onekey-deploy.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.ps1")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "scripts/generate-release-manifest.mjs")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "release-manifest.json")), true);
+    const releaseManifest = JSON.parse(readFileSync(path.join(bundleRoot, "release-manifest.json"), "utf8"));
+    assert.equal(releaseManifest.packageVersion, "0.1.0");
+    assert.equal(typeof releaseManifest.releaseId, "string");
+    assert.equal(typeof releaseManifest.commit, "string");
+    assert.equal(typeof releaseManifest.schemaVersion, "number");
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/restore-runtime-state.sh")), true);
@@ -2091,4 +2115,124 @@ test("Failed update preserves rollback material without destructive database rol
   } finally {
     removeTempDir(projectDir);
   }
+});
+
+const journalHelperPath = path.join(repoRoot, "deploy/read-solar-display-journal.sh");
+const generateReleaseManifestPath = path.join(repoRoot, "scripts/generate-release-manifest.mjs");
+
+test("solar-display journal helper accepts only fixed unit recent/export modes and clamps limit", () => {
+  const source = readFileSync(journalHelperPath, "utf8");
+
+  assert.match(source, /UNIT="solar-display"/);
+  assert.match(source, /recent\|export/);
+  assert.match(source, /MAX_LIMIT=500/);
+  assert.match(source, /MIN_LIMIT=1/);
+  assert.match(source, /journalctl -u "\$\{UNIT\}" -b --no-pager -n "\$\{LIMIT\}" -o json/);
+  assert.match(source, /journalctl -u "\$\{UNIT\}" -b --no-pager -n "\$\{LIMIT\}" -o short-iso/);
+  assert.doesNotMatch(source, /eval /);
+  // Caller cannot inject unit/path flags — only fixed UNIT constant is used.
+  assert.doesNotMatch(source, /--unit=/);
+  assert.doesNotMatch(source, /\$1.*journalctl|journalctl.*\$3/);
+
+  const rejectUnit = spawnSync(bashCommand, [journalHelperPath, "recent", "20", "--unit", "other"], {
+    encoding: "utf8"
+  });
+  assert.notEqual(rejectUnit.status, 0);
+
+  const rejectMode = spawnSync(bashCommand, [journalHelperPath, "all", "20"], {
+    encoding: "utf8"
+  });
+  assert.notEqual(rejectMode.status, 0);
+
+  const rejectLimit = spawnSync(bashCommand, [journalHelperPath, "recent", "abc"], {
+    encoding: "utf8"
+  });
+  assert.notEqual(rejectLimit.status, 0);
+
+  // Without journalctl on macOS/dev hosts the helper should fail closed with a bounded reason.
+  const recent = spawnSync(bashCommand, [journalHelperPath, "recent", "0"], {
+    encoding: "utf8"
+  });
+  // limit 0 clamps to 1 then either runs journalctl or reports missing journalctl.
+  assert.notEqual(recent.status, 0);
+  assert.match(`${recent.stderr}${recent.stdout}`, /journalctl|Usage|limit|error/i);
+});
+
+test("kiosk installer installs journal helper with visudo-checked sudoers drop-in", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/install-kiosk.sh"), "utf8");
+
+  assert.match(source, /read-solar-display-journal\.sh/);
+  assert.match(source, /\/usr\/local\/sbin\/read-solar-display-journal\.sh/);
+  assert.match(source, /\/etc\/sudoers\.d\/solar-display-journal/);
+  assert.match(source, /visudo -cf/);
+  assert.match(source, /NOPASSWD:.*recent \[0-9\]\*.*export \[0-9\]\*/);
+  assert.match(source, /syntax check failed/);
+  assert.match(source, /install -m 440/);
+  assert.match(source, /install -m 755 -o root -g root/);
+});
+
+test("generate-release-manifest writes commit package schema and dirty state", async () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "release-manifest-fixture-"));
+  try {
+    mkdirSync(path.join(fixtureRoot, "apps/server/src/db/migrations"), { recursive: true });
+    writeFileSync(
+      path.join(fixtureRoot, "apps/server/package.json"),
+      JSON.stringify({ name: "@solar-display/server", version: "1.2.3" }, null, 2)
+    );
+    writeFileSync(path.join(fixtureRoot, "apps/server/src/db/migrations/001_init.sql"), "-- init\n");
+    writeFileSync(path.join(fixtureRoot, "apps/server/src/db/migrations/009_later.sql"), "-- later\n");
+    writeFileSync(path.join(fixtureRoot, "apps/server/src/db/migrations/readme.txt"), "ignore\n");
+
+    const gitInit = spawnSync("git", ["init"], { cwd: fixtureRoot, encoding: "utf8" });
+    assert.equal(gitInit.status, 0, gitInit.stderr);
+    spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: fixtureRoot, encoding: "utf8" });
+    spawnSync("git", ["config", "user.name", "Test"], { cwd: fixtureRoot, encoding: "utf8" });
+    spawnSync("git", ["add", "."], { cwd: fixtureRoot, encoding: "utf8" });
+    const commit = spawnSync("git", ["commit", "-m", "fixture"], { cwd: fixtureRoot, encoding: "utf8" });
+    assert.equal(commit.status, 0, commit.stderr);
+
+    const outPath = path.join(fixtureRoot, "release-manifest.json");
+    const clean = spawnSync(
+      process.execPath,
+      [generateReleaseManifestPath, "--project-root", fixtureRoot, "--out", outPath],
+      { encoding: "utf8" }
+    );
+    assert.equal(clean.status, 0, clean.stderr || clean.stdout);
+    const cleanManifest = JSON.parse(readFileSync(outPath, "utf8"));
+    assert.equal(cleanManifest.packageVersion, "1.2.3");
+    assert.equal(cleanManifest.schemaVersion, 9);
+    assert.equal(cleanManifest.sourceDirty, false);
+    assert.equal(typeof cleanManifest.commit, "string");
+    assert.equal(cleanManifest.commit.length >= 7, true);
+    assert.equal(typeof cleanManifest.builtAt, "string");
+    assert.match(cleanManifest.releaseId, /^1\.2\.3\+/);
+    assert.equal(cleanManifest.releaseId.includes("dirty"), false);
+
+    writeFileSync(path.join(fixtureRoot, "dirty.txt"), "x\n");
+    const dirtyOut = path.join(fixtureRoot, "release-manifest-dirty.json");
+    const dirty = spawnSync(
+      process.execPath,
+      [generateReleaseManifestPath, "--project-root", fixtureRoot, "--out", dirtyOut],
+      { encoding: "utf8" }
+    );
+    assert.equal(dirty.status, 0, dirty.stderr || dirty.stdout);
+    const dirtyManifest = JSON.parse(readFileSync(dirtyOut, "utf8"));
+    assert.equal(dirtyManifest.sourceDirty, true);
+    assert.match(dirtyManifest.releaseId, /-dirty$/);
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
+});
+
+test("deploy.sh includes journal helper and generates release manifest into bundles", () => {
+  const source = readFileSync(deployScriptPath, "utf8");
+  assert.match(source, /read-solar-display-journal\.sh/);
+  assert.match(source, /generate-release-manifest\.mjs/);
+  assert.match(source, /release-manifest\.json/);
+});
+
+test("direct deploy copies or generates release-manifest.json", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/deploy.sh"), "utf8");
+  assert.match(source, /generate-release-manifest\.mjs/);
+  assert.match(source, /release-manifest\.json/);
 });
