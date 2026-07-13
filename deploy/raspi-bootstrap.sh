@@ -28,6 +28,154 @@ ok() {
   echo "OK: $*"
 }
 
+SERVICE_WAS_ACTIVE=0
+BACKUP_DIR=""
+PRIOR_APP_ARCHIVE=""
+RUNTIME_ARCHIVE=""
+RESTORE_HELPER=""
+
+remember_recovery_paths() {
+  if [[ -n "${BACKUP_DIR}" && -d "${BACKUP_DIR}" ]]; then
+    RUNTIME_ARCHIVE="${BACKUP_DIR}/runtime.tar.gz"
+    PRIOR_APP_ARCHIVE="${BACKUP_DIR}/prior-application.tar.gz"
+    if [[ -x "${INSTALL_DIR}/deploy/restore-runtime-state.sh" ]]; then
+      RESTORE_HELPER="${INSTALL_DIR}/deploy/restore-runtime-state.sh"
+    elif [[ -n "${BUNDLE_DIR}" && -x "${BUNDLE_DIR}/deploy/restore-runtime-state.sh" ]]; then
+      RESTORE_HELPER="${BUNDLE_DIR}/deploy/restore-runtime-state.sh"
+    else
+      RESTORE_HELPER="${INSTALL_DIR}/deploy/restore-runtime-state.sh"
+    fi
+  fi
+}
+
+print_recovery_handoff() {
+  remember_recovery_paths
+  echo "=== Recovery handoff (no automatic production DB rollback) ==="
+  if [[ -n "${BACKUP_DIR}" ]]; then
+    echo "Verified runtime backup: ${BACKUP_DIR}"
+  else
+    echo "Verified runtime backup: (not available)"
+  fi
+  if [[ -n "${PRIOR_APP_ARCHIVE}" ]]; then
+    echo "Prior application archive: ${PRIOR_APP_ARCHIVE}"
+  fi
+  if [[ -n "${RUNTIME_ARCHIVE}" ]]; then
+    echo "Runtime archive: ${RUNTIME_ARCHIVE}"
+  fi
+  echo "Restore is explicit and temp-first. Production DB is NOT automatically restored."
+  if [[ -n "${RESTORE_HELPER}" && -n "${BACKUP_DIR}" ]]; then
+    echo "Temp restore drill:"
+    echo "  ${RESTORE_HELPER} --backup-dir ${BACKUP_DIR} --drill"
+    echo "Explicit production overwrite (only after operator decision):"
+    echo "  ${RESTORE_HELPER} --backup-dir ${BACKUP_DIR} --target-root ${INSTALL_DIR} --confirm RESTORE-OVERWRITE"
+  fi
+  echo "Recommended order: restore prior application first, then evaluate whether explicit runtime restore is required."
+}
+
+stop_solar_display_if_active() {
+  SERVICE_WAS_ACTIVE=0
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  if systemctl is-active --quiet solar-display 2>/dev/null; then
+    SERVICE_WAS_ACTIVE=1
+    systemctl stop solar-display || fail "failed to stop solar-display.service before backup"
+    ok "stopped solar-display.service for verified backup"
+  else
+    ok "solar-display.service is inactive"
+  fi
+}
+
+start_solar_display_if_was_active() {
+  if [[ "${SERVICE_WAS_ACTIVE}" != "1" ]]; then
+    return 0
+  fi
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  systemctl start solar-display || echo "WARNING: failed to restart solar-display.service after backup failure" >&2
+  ok "restored previous solar-display.service active state"
+}
+
+estimate_backup_bytes() {
+  local total=0
+  local path_name size
+  for path_name in data uploads .env apps packages deploy package.json pnpm-lock.yaml pnpm-workspace.yaml; do
+    if [[ -e "${INSTALL_DIR}/${path_name}" ]]; then
+      size="$(du -sk "${INSTALL_DIR}/${path_name}" 2>/dev/null | awk '{print $1}')"
+      total=$((total + ${size:-0}))
+    fi
+  done
+  # du -sk is KiB; convert to bytes approx and add 20% margin.
+  echo $(( total * 1024 * 12 / 10 ))
+}
+
+preflight_backup_disk_space() {
+  local need available parent
+  parent="$(dirname "${INSTALL_DIR}")"
+  [[ -d "${INSTALL_DIR}/backups" ]] && parent="${INSTALL_DIR}/backups"
+  mkdir -p "${INSTALL_DIR}/backups" 2>/dev/null || true
+  need="$(estimate_backup_bytes)"
+  if command -v df >/dev/null 2>&1; then
+    available="$(df -Pk "${INSTALL_DIR}" 2>/dev/null | awk 'NR==2 {print $4}')"
+    available=$(( ${available:-0} * 1024 ))
+    if (( available > 0 && need > available )); then
+      fail "insufficient disk space for runtime backup (need ~${need} bytes, available ${available})"
+    fi
+  fi
+  ok "disk space preflight for backup passed"
+}
+
+create_verified_runtime_backup() {
+  # Only update mode with an existing install performs the backup gate.
+  if [[ "${MODE}" != "update" ]]; then
+    ok "init mode skips runtime backup gate"
+    return 0
+  fi
+
+  if [[ ! -d "${INSTALL_DIR}" ]]; then
+    fail "update mode requires an existing install root at ${INSTALL_DIR}"
+  fi
+
+  # Skip gate only when install has no mutable state and no application tree yet.
+  if [[ ! -e "${INSTALL_DIR}/data" && ! -e "${INSTALL_DIR}/.env" && ! -e "${INSTALL_DIR}/apps" && ! -e "${INSTALL_DIR}/package.json" ]]; then
+    ok "update install root is empty; backup gate skipped"
+    return 0
+  fi
+
+  [[ -n "${BUNDLE_DIR}" ]] || fail "--bundle-dir is required for update backup gate"
+  local export_helper="${BUNDLE_DIR}/deploy/export-runtime-state.sh"
+  [[ -f "${export_helper}" ]] || fail "export helper missing in staged bundle: ${export_helper}"
+
+  preflight_backup_disk_space
+  stop_solar_display_if_active
+
+  local export_log
+  export_log="$(mktemp)"
+  set +e
+  INSTALL_DIR="${INSTALL_DIR}" bash "${export_helper}" >"${export_log}" 2>&1
+  local export_status=$?
+  set -e
+  cat "${export_log}"
+
+  if [[ "${export_status}" -ne 0 ]]; then
+    start_solar_display_if_was_active
+    rm -f "${export_log}"
+    fail "verified runtime backup failed; application files were not replaced"
+  fi
+
+  BACKUP_DIR="$(awk -F= '/^BACKUP_DIR=/{print $2; exit}' "${export_log}")"
+  rm -f "${export_log}"
+  [[ -n "${BACKUP_DIR}" && -d "${BACKUP_DIR}" ]] || fail "export did not report a valid BACKUP_DIR"
+  [[ -f "${BACKUP_DIR}/runtime.tar.gz" ]] || fail "runtime archive missing after export"
+  [[ -f "${BACKUP_DIR}/runtime.tar.gz.sha256" ]] || fail "runtime archive sidecar missing after export"
+  [[ -f "${BACKUP_DIR}/manifest.json" ]] || fail "manifest missing after export"
+  [[ -f "${BACKUP_DIR}/prior-application.tar.gz" ]] || fail "prior application archive missing after export"
+
+  remember_recovery_paths
+  ok "verified runtime backup ready at ${BACKUP_DIR}"
+}
+
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --mode) MODE="${2:-}"; shift 2 ;;
@@ -286,7 +434,15 @@ check_host
 check_disk_layout
 
 if [[ "${DRY_RUN}" == "1" ]]; then
+  if [[ "${MODE}" == "update" ]]; then
+    ok "would stop solar-display when active and create a verified runtime backup before replacing application files"
+    ok "would fail closed on backup verification failure without replacing application files"
+    ok "would report backup path and recovery command (no automatic production DB rollback)"
+  else
+    ok "init mode would skip runtime backup gate (no existing runtime)"
+  fi
   ok "would copy bundle, install dependencies, configure desktop, install kiosk, and verify"
+  ok "would print recovery handoff if later installation or health verification fails"
   exit 0
 fi
 
@@ -295,6 +451,9 @@ configure_env
 if [[ "${CONFIGURE_ENV_ONLY}" == "1" ]]; then
   exit 0
 fi
+
+# Fail-closed backup gate: update mode must verify a snapshot before copy_bundle.
+create_verified_runtime_backup
 
 copy_bundle
 configure_env
@@ -312,7 +471,22 @@ install_node_if_needed
   ${RDP_PASSWORD:+--rdp-password "${RDP_PASSWORD}"}
 
 INSTALL_DIR="${INSTALL_DIR}" KIOSK_USER="${KIOSK_USER}" "${INSTALL_DIR}/deploy/install-kiosk.sh"
+
+set +e
 "${INSTALL_DIR}/deploy/verify-kiosk-install.sh" --install-dir "${INSTALL_DIR}" --kiosk-user "${KIOSK_USER}"
+verify_status=$?
+set -e
+
+if [[ "${verify_status}" -ne 0 ]]; then
+  echo "ERROR: kiosk/health verification failed after application replacement" >&2
+  print_recovery_handoff
+  exit "${verify_status}"
+fi
+
+if [[ -n "${BACKUP_DIR}" ]]; then
+  ok "update completed with verified backup at ${BACKUP_DIR}"
+  echo "Recovery command (temp drill): ${INSTALL_DIR}/deploy/restore-runtime-state.sh --backup-dir ${BACKUP_DIR} --drill"
+fi
 
 if [[ "${APPLY_READONLY}" == "1" ]]; then
   APPLY_READONLY_ROOT=1 INSTALL_DIR="${INSTALL_DIR}" KIOSK_USER="${KIOSK_USER}" "${INSTALL_DIR}/deploy/enable-readonly-root.sh"

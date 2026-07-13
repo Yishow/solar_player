@@ -8,6 +8,7 @@ import test from "node:test";
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const deployScriptPath = path.join(repoRoot, "deploy.sh");
 const exportScriptPath = path.join(repoRoot, "deploy/export-runtime-state.sh");
+const restoreScriptPath = path.join(repoRoot, "deploy/restore-runtime-state.sh");
 const resetDbScriptPath = path.join(repoRoot, "deploy/reset-db-settings.sh");
 const raspiDeployScriptPath = path.join(repoRoot, "scripts/raspi-onekey-deploy.sh");
 const prepareUserDataScriptPath = path.join(repoRoot, "scripts/prepare-raspi-user-data.sh");
@@ -25,6 +26,54 @@ const hotspotTriggerScriptPath = path.join(repoRoot, "deploy/tailscale-hotspot-t
 const bashCommand = process.platform === "win32"
   ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
   : "bash";
+
+function createSqliteDatabase(dbPath, { schemaVersions = ["001_init"], sentinel = null } = {}) {
+  mkdirSync(path.dirname(dbPath), { recursive: true });
+  const statements = [
+    "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP);",
+    "CREATE TABLE IF NOT EXISTS restore_sentinel (id INTEGER PRIMARY KEY, note TEXT);",
+    ...schemaVersions.map((version) => `INSERT OR IGNORE INTO schema_migrations (version) VALUES ('${version}');`)
+  ];
+
+  if (sentinel) {
+    statements.push(`INSERT INTO restore_sentinel (id, note) VALUES (1, '${String(sentinel).replace(/'/gu, "''")}');`);
+  }
+
+  const result = spawnSync("sqlite3", [dbPath, statements.join(" ")], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `Failed to create sqlite database at ${dbPath}`);
+  }
+}
+
+function fileMode(filePath) {
+  return statSync(filePath).mode & 0o777;
+}
+
+function writeFakeSystemctl(fakeBinDir, { isActive = false, logPath = null } = {}) {
+  mkdirSync(fakeBinDir, { recursive: true });
+  const systemctlPath = path.join(fakeBinDir, "systemctl");
+  const lines = [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    logPath ? `LOG_PATH=${JSON.stringify(toBashPathValue(logPath))}` : "LOG_PATH=",
+    'cmd="$1"',
+    'case "$cmd" in',
+    "  is-active)",
+    isActive ? "    exit 0" : "    exit 3",
+    "    ;;",
+    "  stop|start|restart)",
+    '    if [[ -n "${LOG_PATH}" ]]; then echo "$cmd ${@: -1}" >> "${LOG_PATH}"; fi',
+    "    exit 0",
+    "    ;;",
+    "  *)",
+    "    exit 0",
+    "    ;;",
+    "esac"
+  ];
+  writeFileSync(systemctlPath, `${lines.join("\n")}\n`);
+  markBashExecutable(systemctlPath);
+  return systemctlPath;
+}
 
 function makeFixtureProject() {
   const projectDir = mkdtempSync(path.join(tmpdir(), "solar-display-deploy-test-"));
@@ -60,6 +109,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "packages/shared/dist/index.js"), "export {};\n");
   writeFileSync(path.join(projectDir, "deploy/solar-display.service"), "[Service]\n");
   writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/reset-db-settings.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
@@ -86,7 +136,10 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "docs/openapi.yaml"), "openapi: 3.0.0\n");
   writeFileSync(path.join(projectDir, "docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-bg.png"), "seed-image\n");
   writeFileSync(path.join(projectDir, "node_modules/fake-package/index.js"), "module.exports = {};\n");
-  writeFileSync(path.join(projectDir, "data/solar-display.sqlite"), "db\n");
+  createSqliteDatabase(path.join(projectDir, "data/solar-display.sqlite"), {
+    schemaVersions: ["001_init"],
+    sentinel: "fixture-db"
+  });
   writeFileSync(path.join(projectDir, "uploads/images/hero.png"), "img\n");
   writeFileSync(path.join(projectDir, "uploads/brand/logo.png"), "brand\n");
   writeFileSync(path.join(projectDir, "apps/.DS_Store"), "junk\n");
@@ -336,6 +389,10 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
   assert.match(result.stdout, /RDP auth: passwordless/);
   assert.match(result.stdout, /Kiosk user: kz/);
   assert.match(result.stdout, /Readonly root: dry-run/);
+  assert.match(result.stdout, /verified runtime backup before replacing application files/);
+  assert.match(result.stdout, /backup verification failure would stop the update/);
+  assert.match(result.stdout, /recovery command/);
+  assert.match(result.stdout, /does not upload a bundle, create a backup/);
   assert.doesNotMatch(result.stdout, /\b(parted|mkfs|resize2fs|sfdisk)\b/);
 });
 
@@ -899,10 +956,11 @@ test("readonly desktop launchers call fixed helpers and require sudo", () => {
 
 test("runtime export script archives data uploads and .env from the install root", () => {
   const projectDir = makeFixtureProject();
-  const outputDir = path.join(projectDir, "exports");
+  const outputDir = path.join(projectDir, "backups");
 
   try {
     writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "package.json"), JSON.stringify({ name: "solar-display", version: "9.9.9" }, null, 2));
 
     const result = spawnSync(
       bashCommand,
@@ -922,9 +980,17 @@ test("runtime export script archives data uploads and .env from the install root
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /BACKUP_DIR=/);
 
-    const archivePath = path.join(outputDir, "solar-display-runtime-20260610-030000.tar.gz");
+    const backupDir = path.join(outputDir, "20260610-030000");
+    const archivePath = path.join(backupDir, "runtime.tar.gz");
     assert.equal(waitForPathExists(archivePath), true);
+    assert.equal(existsSync(path.join(backupDir, "manifest.json")), true);
+    assert.equal(existsSync(path.join(backupDir, "runtime.tar.gz.sha256")), true);
+    assert.equal(existsSync(path.join(backupDir, "prior-application.tar.gz")), true);
+    assert.equal(fileMode(backupDir), 0o700);
+    assert.equal(fileMode(archivePath), 0o600);
+    assert.equal(fileMode(path.join(backupDir, "manifest.json")), 0o600);
 
     const listing = spawnSync("tar", ["-tzf", archivePath], {
       cwd: projectDir,
@@ -932,11 +998,23 @@ test("runtime export script archives data uploads and .env from the install root
     });
 
     assert.equal(listing.status, 0, listing.stderr || listing.stdout);
-    assert.match(listing.stdout, /^data\/$/m);
-    assert.match(listing.stdout, /^data\/solar-display\.sqlite$/m);
-    assert.match(listing.stdout, /^uploads\/images\/hero\.png$/m);
-    assert.match(listing.stdout, /^uploads\/brand\/logo\.png$/m);
-    assert.match(listing.stdout, /^\.env$/m);
+    assert.match(listing.stdout, /(^|\/)data\/$/m);
+    assert.match(listing.stdout, /data\/solar-display\.sqlite/);
+    assert.match(listing.stdout, /uploads\/images\/hero\.png/);
+    assert.match(listing.stdout, /uploads\/brand\/logo\.png/);
+    assert.match(listing.stdout, /(^|\/)\.env$/m);
+    assert.match(listing.stdout, /manifest\.json/);
+
+    const manifest = JSON.parse(readFileSync(path.join(backupDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.schemaVersion, 1);
+    assert.equal(manifest.containsSecrets, true);
+    assert.equal(manifest.sourceRelease.name, "solar-display");
+    assert.equal(manifest.sourceRelease.version, "9.9.9");
+    assert.ok(manifest.entries.includes("data"));
+    assert.ok(manifest.entries.includes(".env"));
+    assert.ok(manifest.payloads["runtime.tar.gz"].sha256);
+    assert.ok(manifest.payloads["prior-application.tar.gz"].sha256);
+    assert.deepEqual(manifest.schemaVersions, ["001_init"]);
   } finally {
     removeTempDir(projectDir);
   }
@@ -1226,6 +1304,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, ".env.example")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/solar-display.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/restore-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
@@ -1251,6 +1330,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.ps1")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/restore-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
@@ -1292,6 +1372,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "apps/server/package.json")), true);
     assert.equal(existsSync(path.join(bundleRoot, "apps/web/src/assets/playback/slide-overview.jpg")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/restore-runtime-state.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
@@ -1313,6 +1394,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "scripts/prepare-raspi-user-data.ps1")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "install.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/export-runtime-state.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/restore-runtime-state.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/reset-db-settings.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
@@ -1594,6 +1676,418 @@ test("Install-root rendering preserves service hardening", () => {
     assert.match(invalid.stderr + invalid.stdout, /absolute path/i);
     assert.equal(existsSync(invalidTarget), false);
     removeTempDir(beforeInvalid);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime export fails closed when solar-display service is active", () => {
+  const projectDir = makeFixtureProject();
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const systemctlLog = path.join(projectDir, "systemctl.log");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFakeSystemctl(fakeBinDir, { isActive: true, logPath: systemctlLog });
+
+    const result = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: path.join(projectDir, "backups"),
+        EXPORT_TIMESTAMP: "active-service"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      bashPrependPathDirs: [fakeBinDir],
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr + result.stdout, /solar-display\.service is active/);
+    assert.equal(existsSync(path.join(projectDir, "backups/active-service/runtime.tar.gz")), false);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime export succeeds when solar-display service is inactive", () => {
+  const projectDir = makeFixtureProject();
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFakeSystemctl(fakeBinDir, { isActive: false });
+
+    const result = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: path.join(projectDir, "backups"),
+        EXPORT_TIMESTAMP: "inactive-service"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      bashPrependPathDirs: [fakeBinDir],
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /BACKUP_DIR=/);
+    assert.equal(existsSync(path.join(projectDir, "backups/inactive-service/runtime.tar.gz")), true);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime export fails closed when sqlite checkpoint/integrity preflight fails", () => {
+  const projectDir = makeFixtureProject();
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "data/solar-display.sqlite"), "not-a-sqlite-database\n");
+
+    const result = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: path.join(projectDir, "backups"),
+        EXPORT_TIMESTAMP: "bad-db"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr + result.stdout, /checkpoint|integrity|not a database|file is not a database|ERROR/i);
+    assert.equal(existsSync(path.join(projectDir, "backups/bad-db/runtime.tar.gz")), false);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime restore rejects tampered archive checksum and refuses non-empty target without confirm", () => {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+  const targetRoot = path.join(projectDir, "restore-target");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+    markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+
+    const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "tamper-case"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+
+    const backupDir = path.join(backupRoot, "tamper-case");
+    const archivePath = path.join(backupDir, "runtime.tar.gz");
+    writeFileSync(archivePath, `${readFileSync(archivePath)}tampered`);
+
+    mkdirSync(targetRoot, { recursive: true });
+    writeFileSync(path.join(targetRoot, "marker.txt"), "existing\n");
+
+    const tamperResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      ["--backup-dir", backupDir, "--target-root", targetRoot],
+      {
+        cwd: projectDir,
+        encoding: "utf8"
+      }
+    );
+    assert.notEqual(tamperResult.status, 0);
+    assert.match(tamperResult.stderr + tamperResult.stdout, /checksum|sidecar|manifest/i);
+    assert.equal(readFileSync(path.join(targetRoot, "marker.txt"), "utf8"), "existing\n");
+    assert.equal(existsSync(path.join(targetRoot, "data")), false);
+
+    // Recreate a clean backup for non-empty refusal.
+    const cleanExport = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "clean-case"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(cleanExport.status, 0, cleanExport.stderr || cleanExport.stdout);
+    const cleanBackup = path.join(backupRoot, "clean-case");
+
+    const refuseResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      ["--backup-dir", cleanBackup, "--target-root", targetRoot],
+      {
+        cwd: projectDir,
+        encoding: "utf8"
+      }
+    );
+    assert.notEqual(refuseResult.status, 0);
+    assert.match(refuseResult.stderr + refuseResult.stdout, /not empty|RESTORE-OVERWRITE/i);
+    assert.equal(readFileSync(path.join(targetRoot, "marker.txt"), "utf8"), "existing\n");
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime restore drill verifies integrity migrations and health on temp root only", () => {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+  const productionMarker = path.join(projectDir, "data/production-only.marker");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+    markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+    writeFileSync(productionMarker, "must-remain\n");
+
+    const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "drill-case"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+    const backupDir = path.join(backupRoot, "drill-case");
+
+    const drillLog = path.join(projectDir, "drill-commands.log");
+    const drillResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      ["--backup-dir", backupDir, "--drill"],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          RESTORE_DRILL_MIGRATE_CMD: `echo migrate-ok >> ${quoteForBash(toBashPathValue(drillLog))}`,
+          RESTORE_DRILL_HEALTH_CMD: `echo health-ok >> ${quoteForBash(toBashPathValue(drillLog))}`
+        },
+        encoding: "utf8"
+      }
+    );
+
+    assert.equal(drillResult.status, 0, drillResult.stderr || drillResult.stdout);
+    assert.match(drillResult.stdout, /integrity_check ok/i);
+    assert.match(drillResult.stdout, /migrations completed/i);
+    assert.match(drillResult.stdout, /health smoke returned healthy/i);
+    assert.equal(readFileSync(productionMarker, "utf8"), "must-remain\n");
+    assert.match(readFileSync(drillLog, "utf8"), /migrate-ok/);
+    assert.match(readFileSync(drillLog, "utf8"), /health-ok/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime restore with confirmation overwrites mutable paths only", () => {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+  const targetRoot = path.join(projectDir, "restore-target");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+    markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+
+    const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "overwrite-case"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+    const backupDir = path.join(backupRoot, "overwrite-case");
+
+    mkdirSync(path.join(targetRoot, "data"), { recursive: true });
+    writeFileSync(path.join(targetRoot, "data/old.sqlite"), "old\n");
+    writeFileSync(path.join(targetRoot, "apps-marker.txt"), "code-stays\n");
+
+    const restoreResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      ["--backup-dir", backupDir, "--target-root", targetRoot, "--confirm", "RESTORE-OVERWRITE"],
+      {
+        cwd: projectDir,
+        encoding: "utf8"
+      }
+    );
+    assert.equal(restoreResult.status, 0, restoreResult.stderr || restoreResult.stdout);
+    assert.equal(existsSync(path.join(targetRoot, "data/solar-display.sqlite")), true);
+    assert.equal(existsSync(path.join(targetRoot, "uploads/images/hero.png")), true);
+    assert.equal(existsSync(path.join(targetRoot, ".env")), true);
+    assert.equal(readFileSync(path.join(targetRoot, "apps-marker.txt"), "utf8"), "code-stays\n");
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("raspi bootstrap dry-run lists backup verification and recovery handoff stages", () => {
+  const result = runBashScript(
+    raspiBootstrapScriptPath,
+    [
+      "--mode",
+      "update",
+      "--dry-run",
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--bundle-dir",
+      "/tmp/fake-bundle"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /verified runtime backup before replacing application/);
+  assert.match(result.stdout, /fail closed on backup verification failure/);
+  assert.match(result.stdout, /recovery handoff/i);
+});
+
+test("raspi bootstrap ordered fixture stops service backs up then copies", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+
+  const stopIdx = source.indexOf("stop_solar_display_if_active");
+  const backupIdx = source.indexOf("create_verified_runtime_backup");
+  const copyIdx = source.indexOf("copy_bundle");
+  const failClosedIdx = source.indexOf("verified runtime backup failed; application files were not replaced");
+
+  assert.ok(stopIdx > 0);
+  assert.ok(backupIdx > 0);
+  assert.ok(copyIdx > backupIdx, "copy_bundle must appear after backup gate definition/use");
+  assert.ok(failClosedIdx > 0);
+  assert.match(source, /create_verified_runtime_backup\n\ncopy_bundle/);
+  assert.match(source, /print_recovery_handoff/);
+  assert.match(source, /no automatic production DB rollback/i);
+  assert.match(source, /RESTORE-OVERWRITE/);
+  assert.doesNotMatch(source, /restore-runtime-state\.sh --backup-dir .* --target-root .*\$\{INSTALL_DIR\}(?!.*confirm)/);
+});
+
+test("raspi bootstrap backup failure leaves install untouched and restores service state", () => {
+  const projectDir = makeFixtureProject();
+  const installDir = path.join(projectDir, "install");
+  const bundleDir = path.join(projectDir, "bundle");
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const systemctlLog = path.join(projectDir, "systemctl.log");
+
+  try {
+    mkdirSync(path.join(installDir, "data"), { recursive: true });
+    mkdirSync(path.join(installDir, "apps/server/dist"), { recursive: true });
+    createSqliteDatabase(path.join(installDir, "data/solar-display.sqlite"), { sentinel: "pre-update" });
+    writeFileSync(path.join(installDir, ".env"), "KEEP=1\n");
+    writeFileSync(path.join(installDir, "apps/server/dist/server.js"), "console.log('old');\n");
+    writeFileSync(path.join(installDir, "package.json"), JSON.stringify({ name: "solar-display", version: "1.0.0" }));
+
+    mkdirSync(path.join(bundleDir, "deploy"), { recursive: true });
+    // Export helper that always fails after being invoked.
+    writeFileSync(
+      path.join(bundleDir, "deploy/export-runtime-state.sh"),
+      "#!/bin/bash\necho 'forced export failure' >&2\nexit 9\n"
+    );
+    markBashExecutable(path.join(bundleDir, "deploy/export-runtime-state.sh"));
+    writeFileSync(path.join(bundleDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(bundleDir, "deploy/restore-runtime-state.sh"));
+
+    writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), readFileSync(raspiBootstrapScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
+    writeFakeSystemctl(fakeBinDir, { isActive: true, logPath: systemctlLog });
+
+    const result = runBashScript(
+      "deploy/raspi-bootstrap.sh",
+      [
+        "--mode",
+        "update",
+        "--skip-host-preflight",
+        "--skip-disk",
+        "--install-dir",
+        installDir,
+        "--bundle-dir",
+        bundleDir,
+        "--kiosk-user",
+        process.env.USER || "pi"
+      ],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env
+        },
+        bashPrependPathDirs: [fakeBinDir],
+        encoding: "utf8"
+      }
+    );
+
+    assert.notEqual(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stderr + result.stdout, /verified runtime backup failed|application files were not replaced/i);
+    assert.equal(readFileSync(path.join(installDir, "apps/server/dist/server.js"), "utf8"), "console.log('old');\n");
+    assert.equal(readFileSync(path.join(installDir, ".env"), "utf8"), "KEEP=1\n");
+    assert.equal(existsSync(systemctlLog), true, `systemctl log missing; stdout=${result.stdout}\nstderr=${result.stderr}`);
+    const systemctlOps = readFileSync(systemctlLog, "utf8");
+    assert.match(systemctlOps, /stop solar-display/);
+    assert.match(systemctlOps, /start solar-display/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Failed update preserves rollback material without destructive database rollback", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+
+  assert.match(source, /Prior application archive/);
+  assert.match(source, /Runtime archive/);
+  assert.match(source, /Temp restore drill/);
+  assert.match(source, /Production DB is NOT automatically restored/);
+  assert.match(source, /verify-kiosk-install\.sh/);
+  assert.match(source, /print_recovery_handoff/);
+  // Must not auto-invoke restore overwrite of install dir on health failure.
+  assert.doesNotMatch(
+    source,
+    /verify_status[\s\S]*restore-runtime-state\.sh[\s\S]*--confirm RESTORE-OVERWRITE/
+  );
+
+  // Fixture: production DB sentinel remains after a simulated health-failure handoff path.
+  const projectDir = makeFixtureProject();
+  try {
+    const installDir = path.join(projectDir, "install");
+    mkdirSync(path.join(installDir, "data"), { recursive: true });
+    createSqliteDatabase(path.join(installDir, "data/solar-display.sqlite"), { sentinel: "prod-sentinel" });
+    const note = spawnSync(
+      "sqlite3",
+      [path.join(installDir, "data/solar-display.sqlite"), "SELECT note FROM restore_sentinel WHERE id=1;"],
+      { encoding: "utf8" }
+    );
+    assert.equal(note.status, 0, note.stderr || note.stdout);
+    assert.equal(note.stdout.trim(), "prod-sentinel");
+    // Handoff documents recovery without mutating this sentinel.
+    assert.equal(
+      spawnSync(
+        "sqlite3",
+        [path.join(installDir, "data/solar-display.sqlite"), "SELECT note FROM restore_sentinel WHERE id=1;"],
+        { encoding: "utf8" }
+      ).stdout.trim(),
+      "prod-sentinel"
+    );
   } finally {
     removeTempDir(projectDir);
   }

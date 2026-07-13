@@ -119,6 +119,11 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 
 - `deploy/deploy.sh`：先在 repo 根目錄執行 `pnpm run build`，再把 application bundle（`apps/`、`packages/`、workspace manifests、`.env.example`、`deploy/` helpers）複製到**正式預設**安裝位置 `/data/solar-display`；也可傳入自訂絕對路徑（例：`bash deploy/deploy.sh /srv/solar-display`）。安裝 systemd unit 前會把 WorkingDirectory、EnvironmentFile、DATA_DIR、LOG_DIR、ReadWritePaths 渲染到選定 root。更新時不覆寫既有 `.env`、`data/`、`logs/`、`uploads/`。
 - `deploy/solar-display.service`：canonical systemd 範本（可直接閱讀的 `/data/solar-display` 路徑）；generic deploy 與 kiosk installer 會依 install root 渲染後再安裝。hardening：`NoNewPrivileges=true`、`ProtectSystem=strict`、有界 `ReadWritePaths`。
+- `scripts/raspi-onekey-deploy.sh`：本機 one-key 部署入口（SSH 上傳 bundle + remote bootstrap）。**update mode** 在覆蓋 application 前會 fail-closed 建立可驗證 runtime backup；dry-run 會列出 backup verification 與 recovery handoff stages，且不做任何 target 變更。
+- `deploy/export-runtime-state.sh`：停止 service 後建立 `backups/<timestamp>/`（目錄 0700、檔案 0600）含 runtime archive、SHA-256 sidecar、prior application archive 與 versioned manifest（含 secrets 標記與 checksums）。
+- `deploy/restore-runtime-state.sh`：checksum-first restore。預設拒絕非空 target；production overwrite 需 `--confirm RESTORE-OVERWRITE`。建議先跑 temp drill：
+  `deploy/restore-runtime-state.sh --backup-dir <backup-dir> --drill`
+  （drill 只寫 temp root，執行 integrity_check / migrations / health smoke，不碰 production service 或 DB。）
 
 ## 維運 Runbook
 

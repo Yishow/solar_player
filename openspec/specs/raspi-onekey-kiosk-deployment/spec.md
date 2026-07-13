@@ -8,7 +8,7 @@ TBD - created by archiving change 'add-raspi-onekey-kiosk-deploy'. Update Purpos
 
 ### Requirement: Provide a local Raspberry Pi kiosk deployment entrypoint
 
-The system SHALL provide a local deployment command that targets a Raspberry Pi over SSH, builds or selects a deploy bundle, uploads the bundle, invokes target-side bootstrap, restarts the service, and reports verification results.
+The system SHALL provide a local deployment command that targets a Raspberry Pi over SSH, builds or selects a deploy bundle, uploads the bundle, invokes target-side bootstrap, protects existing runtime state before an update, restarts the service, and reports verification and recovery results.
 
 #### Scenario: Operator starts an update deployment
 
@@ -16,176 +16,29 @@ The system SHALL provide a local deployment command that targets a Raspberry Pi 
 - **THEN** the command verifies SSH reachability and sudo access before uploading files
 - **AND** it prints the target, mode, install directory, bundle type, MQTT host setting, and readonly-root setting before making target changes
 - **AND** it prints the kiosk user derived from the SSH target or explicit override before making target changes
+- **AND** target-side bootstrap stops the active service and creates a verified runtime backup before replacing application files
+- **AND** a backup failure stops the update before application replacement
+- **AND** the final output reports the backup path and recovery command
 
 #### Scenario: Dry run reports planned stages without target changes
 
 - **WHEN** an operator runs the deployment entrypoint with dry-run enabled
-- **THEN** the command prints the local and remote stages that would run
-- **AND** it does not upload a bundle, install packages, restart services, edit partitions, or enable readonly root
+- **THEN** the command prints the local and remote stages that would run, including backup verification and recovery handoff
+- **AND** it does not upload a bundle, create a backup, install packages, restart services, edit partitions, or enable readonly root
 
 
 <!-- @trace
-source: add-raspi-onekey-kiosk-deploy
-updated: 2026-06-29
+source: protect-runtime-backup-and-restore
+updated: 2026-07-14
 code:
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/web/src/components/PageNumberPill.tsx
-  - deploy/enable-readonly-root.sh
-  - scripts/dev.test.mjs
-  - deploy/start-solar-kiosk.sh
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - apps/server/src/plugins/managementAuth.ts
-  - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/runbooks/raspi-onekey-kiosk-deploy.md
-  - deploy/disable-display-sleep.sh
-  - apps/web/src/pages/Overview/index.tsx
-  - docs/runbooks/sustainability-calculation-settings.md
-  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.ts
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - deploy/repair-kiosk-system.sh
-  - deploy.md
-  - apps/web/src/pages/DataSourceSettings/viewModel.ts
-  - apps/server/src/routes/calculation-settings.ts
-  - deploy/firefox-kiosk.desktop
-  - packages/shared/src/types.ts
-  - apps/web/src/pages/Overview/displayPageConfig.ts
-  - apps/web/src/app/managementRouteVisibility.ts
-  - apps/server/src/mqtt/MqttClientService.ts
-  - apps/web/src/pages/displayPageMediaStyle.ts
-  - deploy/verify-kiosk-install.sh
-  - README.md
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - apps/web/src/pages/Sustainability/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/Images/displayPageConfig.ts
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/pages/ImageManagement/imageManagement.css
-  - deploy/readonly-system-enable.sh
-  - apps/server/src/db/migrations/016_co2_display_preference.sql
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/DisplayPagesEditor/runtimeFactoryCircuit.tsx
-  - scripts/raspi-onekey-deploy.sh
-  - apps/web/src/pages/DisplayPagesEditor/runtimeOverview.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
-  - apps/web/src/pages/Images/index.tsx
-  - packages/shared/src/displayPageConfig.ts
-  - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
-  - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
-  - apps/web/src/pages/MqttSettings/loadModel.ts
-  - apps/web/src/pages/Solar/displayPageConfig.ts
-  - scripts/prepare-raspi-user-data.sh
-  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/web/src/mocks/weather.ts
-  - apps/web/src/pages/Overview/overview.css
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/server/src/services/deviceKioskExitService.ts
-  - docs/runbooks/device-diagnostics-safe-ops.md
-  - packages/shared/src/displayPageCardRail.ts
-  - apps/web/src/pages/Sustainability/index.tsx
-  - deploy/readonly-system-disable.sh
-  - apps/server/src/db/seed.ts
-  - apps/server/src/routes/device.ts
-  - scripts/connect-raspi-rdp.ps1
-  - scripts/dev-lib.mjs
-  - scripts/dev-lib.d.mts
-  - apps/web/src/hooks/usePageRotation.ts
-  - apps/server/src/services/calculationSettingsService.ts
-  - apps/web/scripts/run-tests.mjs
-  - apps/web/src/pages/FactoryCircuit/viewModel.ts
-  - packages/shared/src/displayStory.ts
-  - apps/web/vite.config.ts
-  - .env.example
-  - deploy.sh
   - deploy/raspi-bootstrap.sh
-  - deploy/apply-desktop-theme.sh
-  - apps/web/src/pages/DisplayPagesEditor/cardStatusField.ts
+  - deploy.sh
+  - scripts/raspi-onekey-deploy.sh
+  - README.md
+  - deploy/export-runtime-state.sh
+  - deploy.md
+  - deploy/restore-runtime-state.sh
   - scripts/deploy.test.mjs
-  - apps/server/src/db/migrations/015_calculation_settings.sql
-  - deploy/configure-lightweight-desktop.sh
-  - packages/shared/src/householdEquivalence.ts
-  - apps/web/scripts/run-tests.test.mjs
-  - apps/server/src/routes/settings-mqtt.ts
-  - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/services/generationTrendSeries.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
-  - docs/README.md
-  - apps/server/src/app.ts
-  - apps/web/src/services/api.ts
-  - apps/server/src/routes/data-source.ts
-  - deploy/disable-readonly-system.desktop
-  - deploy/enable-readonly-system.desktop
-  - apps/web/src/app/routeMeta.ts
-  - apps/server/src/services/MockMetricsFeedService.ts
-  - apps/web/src/pages/Overview/viewModel.ts
-  - apps/web/src/app/router.tsx
-  - apps/web/src/components/AppFooterNav.tsx
-  - deploy/solar-display.service
-  - scripts/prepare-raspi-user-data.ps1
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
-  - apps/web/src/pages/shared/PageScaffold.tsx
-  - apps/server/src/env.ts
-  - apps/web/src/pages/DataSourceSettings/index.tsx
-  - deploy/install-kiosk.sh
-  - scripts/dev.mjs
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-tests:
-  - apps/web/src/services/api.test.ts
-  - apps/server/src/services/calculationSettingsService.test.ts
-  - apps/server/src/services/displayStoryTopicNames.test.ts
-  - apps/server/src/routes/device.test.ts
-  - apps/server/src/services/carbonReductionConsistency.test.ts
-  - apps/web/src/hooks/usePageRotation.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/web/src/layouts/brandBootstrap.test.ts
-  - apps/web/src/pages/Overview/viewModel.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/server/src/services/generationTrendSeries.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/web/src/pages/Sustainability/viewModel.test.ts
-  - apps/server/src/routes/calculation-settings.test.ts
-  - apps/web/src/pages/Overview/densityViewModel.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
-  - apps/web/src/pages/DataSourceSettings/index.test.tsx
-  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/loadModel.test.ts
-  - apps/server/src/routes/data-source.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorPresets.test.ts
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
-  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
-  - apps/web/src/app/managementRouteVisibility.test.ts
-  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
-  - apps/web/src/viteProxy.test.ts
-  - apps/web/src/pages/MqttSettings/viewModel.test.ts
-  - apps/server/src/mqtt/metricKeyIngestion.test.ts
-  - apps/server/src/plugins/managementAuth.test.ts
-  - apps/web/src/app/router.test.ts
-  - apps/server/src/db/migrations/calculationSettings.test.ts
-  - apps/server/src/routes/settings-mqtt.test.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/server/src/db/migrations/topicDisplayNames.test.ts
-  - apps/web/src/pages/Solar/cardFamily.test.ts
-  - packages/shared/src/displayStory.test.ts
-  - apps/server/src/mqtt/MqttClientService.test.ts
-  - apps/server/src/services/householdEquivalenceService.test.ts
-  - apps/web/src/pages/Solar/viewModel.test.ts
-  - packages/shared/src/displayPageCardRail.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/server/src/services/MockMetricsFeedService.test.ts
 -->
 
 ---

@@ -385,6 +385,42 @@ RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
   --rdp-auth passwordless
 ```
 
+Update mode always runs a fail-closed runtime backup gate on the target before replacing application files:
+
+1. Stop `solar-display` when active.
+2. Create `backups/<timestamp>/` under the install root via `deploy/export-runtime-state.sh` (runtime archive, SHA-256 sidecar, prior application archive, versioned manifest; directory mode 0700, files 0600).
+3. Only after archive + sidecar + manifest verification succeeds, copy the new bundle.
+4. On backup failure the update exits nonzero, restores the previous service state, and does **not** replace application files.
+5. On later install/health failure the bootstrap prints prior application path, runtime archive path, and restore commands; it never automatically restores the production database.
+
+Dry-run (no target changes) lists these stages:
+
+```bash
+scripts/raspi-onekey-deploy.sh pi@<pi-ip> --mode update --dry-run
+```
+
+### Restore drill and explicit production restore
+
+Prefer temp drill first (does not touch production install root or service):
+
+```bash
+# On the Pi, after noting BACKUP_DIR from update output:
+sudo /data/solar-display/deploy/restore-runtime-state.sh \
+  --backup-dir /data/solar-display/backups/<timestamp> \
+  --drill
+```
+
+Only after operator decision, overwrite mutable runtime state with the documented confirmation token:
+
+```bash
+sudo /data/solar-display/deploy/restore-runtime-state.sh \
+  --backup-dir /data/solar-display/backups/<timestamp> \
+  --target-root /data/solar-display \
+  --confirm RESTORE-OVERWRITE
+```
+
+Do not upload unencrypted backup directories; archives may contain `.env` secrets (`containsSecrets: true` in the manifest).
+
 Fresh-card init for a 64G production card after the first SSH login. `/data` is fixed at 10GiB by default; root uses the remaining leading space.
 
 ```bash
@@ -493,8 +529,7 @@ Local:
 
 ```bash
 node scripts/deploy.test.mjs
-bash -n scripts/raspi-onekey-deploy.sh deploy/raspi-bootstrap.sh deploy/configure-lightweight-desktop.sh deploy/apply-desktop-theme.sh deploy/install-kiosk.sh deploy/enable-readonly-root.sh deploy/verify-kiosk-install.sh deploy/readonly-system-enable.sh deploy/readonly-system-disable.sh
-spectra validate add-raspi-onekey-kiosk-deploy
+bash -n scripts/raspi-onekey-deploy.sh deploy/raspi-bootstrap.sh deploy/export-runtime-state.sh deploy/restore-runtime-state.sh deploy/configure-lightweight-desktop.sh deploy/apply-desktop-theme.sh deploy/install-kiosk.sh deploy/enable-readonly-root.sh deploy/verify-kiosk-install.sh deploy/readonly-system-enable.sh deploy/readonly-system-disable.sh
 ```
 
 Remote disk check:
@@ -545,10 +580,12 @@ Current progress at the time this file was written:
 - `scripts/prepare-raspi-user-data.sh`
 - `scripts/prepare-raspi-user-data.ps1`
 - `deploy/raspi-bootstrap.sh`
+- `deploy/export-runtime-state.sh`
+- `deploy/restore-runtime-state.sh`
 - `deploy/configure-lightweight-desktop.sh`
 - `deploy/readonly-system-enable.sh`
 - `deploy/readonly-system-disable.sh`
 - `deploy/enable-readonly-system.desktop`
 - `deploy/disable-readonly-system.desktop`
 - `docs/runbooks/raspi-onekey-kiosk-deploy.md`
-- `openspec/changes/add-raspi-onekey-kiosk-deploy/tasks.md`
+- `openspec/changes/protect-runtime-backup-and-restore/`

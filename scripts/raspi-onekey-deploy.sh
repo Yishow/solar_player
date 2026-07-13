@@ -205,7 +205,12 @@ OK: would verify SSH reachability and sudo access
 OK: would build ${BUNDLE} bundle
 OK: would upload bundle to target staging directory
 OK: would run remote bootstrap
+OK: update mode would stop the active service and create a verified runtime backup before replacing application files
+OK: backup verification failure would stop the update before application replacement
+OK: would report backup path and recovery command on completion or health failure (no automatic production DB rollback)
+OK: recovery handoff would include restore drill and explicit overwrite commands
 OK: update mode does not run disk partition, filesystem format, or mount table mutation
+OK: dry-run does not upload a bundle, create a backup, install packages, restart services, edit partitions, or enable readonly root
 EOF
   exit 0
 fi

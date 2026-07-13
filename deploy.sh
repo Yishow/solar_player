@@ -47,6 +47,7 @@ copy_required_tree() {
   mkdir -p "${target_root}/deploy"
   cp "${PROJECT_DIR}/deploy/solar-display.service" "${target_root}/deploy/solar-display.service"
   cp "${PROJECT_DIR}/deploy/export-runtime-state.sh" "${target_root}/deploy/export-runtime-state.sh"
+  cp "${PROJECT_DIR}/deploy/restore-runtime-state.sh" "${target_root}/deploy/restore-runtime-state.sh"
   cp "${PROJECT_DIR}/deploy/reset-db-settings.sh" "${target_root}/deploy/reset-db-settings.sh"
   cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
@@ -73,6 +74,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/scripts/prepare-raspi-user-data.ps1" "${target_root}/scripts/prepare-raspi-user-data.ps1"
   chmod +x \
     "${target_root}/deploy/export-runtime-state.sh" \
+    "${target_root}/deploy/restore-runtime-state.sh" \
     "${target_root}/deploy/reset-db-settings.sh" \
     "${target_root}/deploy/enable-readonly-root.sh" \
     "${target_root}/deploy/raspi-bootstrap.sh" \
@@ -136,7 +138,7 @@ Solar Display ${mode} deploy bundle
 3. ${install_step}
 4. On Ubuntu 24.04 kiosk devices, run sudo ./deploy/install-kiosk.sh to enable server autostart, kz autologin, and Firefox kiosk launch.
 5. After apt maintenance or Firefox font changes, run sudo KIOSK_USER=<user> ./deploy/repair-kiosk-system.sh.
-6. To move live settings/content to another machine, run ./deploy/export-runtime-state.sh and copy the generated tarball.
+6. To move live settings/content to another machine, stop solar-display, run ./deploy/export-runtime-state.sh, and copy the generated backups/<timestamp>/ directory (do not upload unencrypted if it contains secrets).
 7. Reset DB settings only: ./deploy/reset-db-settings.sh
 8. Verify kiosk install: sudo ./deploy/verify-kiosk-install.sh
 9. Reapply no-sleep/no-screensaver only: sudo ./deploy/disable-display-sleep.sh --user <user>
@@ -198,6 +200,7 @@ echo "Start locally: pnpm --filter @solar-display/server start"
 echo "Systemd template: deploy/solar-display.service"
 echo "Ubuntu kiosk setup: sudo ./deploy/install-kiosk.sh"
 echo "Export current runtime data: ./deploy/export-runtime-state.sh"
+echo "Restore / drill a backup: ./deploy/restore-runtime-state.sh --backup-dir <dir> --drill"
 echo "Remember to update WorkingDirectory/User in the service file if your install path differs."
 EOF
 
@@ -228,6 +231,7 @@ validate_inputs() {
   require_path "apps/server/src/db/migrations"
   require_path "deploy/solar-display.service"
   require_path "deploy/export-runtime-state.sh"
+  require_path "deploy/restore-runtime-state.sh"
   require_path "deploy/reset-db-settings.sh"
   require_path "deploy/enable-readonly-root.sh"
   require_path "deploy/raspi-bootstrap.sh"
