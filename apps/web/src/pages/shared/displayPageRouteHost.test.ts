@@ -8,6 +8,11 @@ import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
 import { resolveDisplayPageRoutePeerConfigKeys } from "./displayPageRouteWarmup";
 
 const routeHostSource = readFileSync(path.join(import.meta.dirname, "displayPageRouteHost.tsx"), "utf8");
+const routeHostFrameSource = readFileSync(
+  path.join(import.meta.dirname, "displayPageRouteHostFrame.tsx"),
+  "utf8"
+);
+const routeHostSources = `${routeHostSource}\n${routeHostFrameSource}`;
 const registryHookSource = readFileSync(
   path.join(import.meta.dirname, "../../hooks/useDisplayPageRegistry.ts"),
   "utf8"
@@ -117,12 +122,16 @@ test("display page route host consumes refreshed registry snapshots after displa
 });
 
 test("display page route host loads only the current template chunk without editor runtime definitions", () => {
-  assert.doesNotMatch(routeHostSource, /from "\.\.\/DisplayPagesEditor\/runtimePageDefinitions"/);
-  assert.doesNotMatch(routeHostSource, /runtimePageDefinitions/);
-  assert.match(routeHostSource, /loadDisplayPageTemplate\(/);
-  assert.match(routeHostSource, /setLoadedTemplate\(/);
-  assert.match(routeHostSource, /throw templateLoadError/);
-  assert.match(routeHostSource, /isTemplatePending/);
+  assert.doesNotMatch(routeHostSources, /from "\.\.\/DisplayPagesEditor\/runtimePageDefinitions"/);
+  assert.doesNotMatch(routeHostSources, /runtimePageDefinitions/);
+  assert.match(routeHostFrameSource, /loadDisplayPageTemplate\(/);
+  assert.match(routeHostFrameSource, /setLoadedTemplate\(/);
+  assert.match(routeHostFrameSource, /throw templateLoadError/);
+  assert.match(routeHostFrameSource, /isTemplatePending/);
+  // Unresolved routes must clear retention and redirect, not sticky-render prior templates.
+  assert.match(routeHostFrameSource, /setLoadedTemplate\(null\)/);
+  assert.match(routeHostFrameSource, /if \(!page\)/);
+  assert.match(routeHostFrameSource, /<Navigate to="\/overview" replace \/>/);
 });
 
 test("display page route navigation preloads live config before swapping runtime pages", () => {
@@ -170,7 +179,7 @@ test("display page route navigation warms peer live configs without replaying th
 });
 
 test("display page route host uses the shared warm live config envelope path for first visible render", () => {
-  assert.doesNotMatch(routeHostSource, /getDisplayPageConfig\(/);
+  assert.doesNotMatch(routeHostSources, /getDisplayPageConfig\(/);
   assert.match(routeHostSource, /loadDisplayPageConfigEnvelope\(page\.pageKey,\s*"live"\)/);
   assert.match(configHookSource, /resolveCachedDisplayPageConfigSession\(pageId,\s*stage,\s*seedConfig\)/);
   assert.match(configHookSource, /lastLoadedEnvelope === null/);
@@ -312,6 +321,6 @@ test("refreshed registry snapshots update playback route metadata and footer ord
 
 test("registry-backed shell consumers converge through snapshot refresh without forcing a full browser reload", () => {
   assert.match(registryHookSource, /useDisplaySyncRefresh\(reload,\s*\["display-pages"\]\)/);
-  assert.doesNotMatch(routeHostSource, /window\.location\.reload|location\.reload/);
+  assert.doesNotMatch(routeHostSources, /window\.location\.reload|location\.reload/);
   assert.doesNotMatch(layoutShellSource, /window\.location\.reload|location\.reload/);
 });
