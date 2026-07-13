@@ -33,6 +33,7 @@ uploads/brand/*
 .superpowers/
 graphify-out/
 docs/fhd-witness/runs/
+artifacts/browser-smoke/
 
 # MemPalace per-project files (issue #185)
 mempalace.yaml
