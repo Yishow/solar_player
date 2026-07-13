@@ -11,6 +11,7 @@
     "fhd:witness:dry-run": "node scripts/capture-fhd-witness.mjs --dry-run",
     "build": "pnpm run build:shared && pnpm run build:web && pnpm run build:server",
     "test": "pnpm --filter @solar-display/server test && pnpm --filter @solar-display/web test",
+    "verify": "node ./scripts/verify.mjs",
     "build:shared": "pnpm --filter @solar-display/shared build",
     "build:web": "pnpm --filter @solar-display/web build",
     "build:server": "pnpm --filter @solar-display/server build",

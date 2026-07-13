@@ -10,21 +10,22 @@
 | `pnpm dev:fix` | rebuild better-sqlite3 後再 dev（原生模組壞掉時用） |
 | `pnpm dev:web` / `pnpm dev:server` | shared watch + 單邊 dev |
 | `pnpm build` | shared → web → server 依序 build（另有 `build:shared`、`build:web`、`build:server`） |
-| `pnpm test` | server + web 測試（**有 glob 陷阱，見下節**） |
+| `pnpm test` | 開發迴圈：完整 server suite + web suite（不含 build、deploy） |
+| `pnpm verify` | **交付 gate**：序列執行 build → server → web → deploy → server-runner（`scripts/verify.mjs`） |
 | `pnpm db:migrate` / `pnpm db:seed` | SQLite migration / seed |
 | `pnpm run fhd:witness -- --base-url <url>` | 擷取五個 playback 頁 1920x1080 witness（`fhd:witness:dry-run` 可先演練） |
 
 repo **沒有** lint、e2e、coverage gate、CI policy——不要發明，也不要在回報中假設它們存在。
 
-## 測試入口與 glob 陷阱
+## 測試入口：`test` vs `verify`
 
-- server：`pnpm --filter @solar-display/server test`（= `tsx --test --test-concurrency=1 src/**/*.test.ts`）。
-- **陷阱**：pnpm 用 `sh` 跑 script，`sh` 沒有 globstar，`src/**/*.test.ts` 只匹配「至少一層子目錄」的測試。`apps/server/src/` 頂層 5 檔不會被跑到：`config.test.ts`、`env.test.ts`、`logger.test.ts`、`server-startup.test.ts`、`serverRuntimeGuard.test.ts`。
-- **規則**：改到 `apps/server/src/` 頂層任何檔案（config.ts、env.ts、logger.ts、server.ts、serverRuntimeGuard.ts…）時，必須直跑對應測試並引用輸出：
-  `pnpm --filter @solar-display/server exec tsx --test src/<檔名>.test.ts`
-- web：`pnpm --filter @solar-display/web test`（`scripts/run-tests.mjs` 包 tsx --test，無此陷阱）。
+- **focused / 開發**：`pnpm test` 或套件級
+  - server：`pnpm --filter @solar-display/server test`（= `node ./scripts/run-tests.mjs`）。Node filesystem walk 明確列出 `apps/server/src/**/*.test.ts`（含頂層），lexical sort 後以 `tsx --test --test-concurrency=1` 執行。可傳 explicit targets：`pnpm --filter @solar-display/server test src/config.test.ts`。
+  - web：`pnpm --filter @solar-display/web test`（`scripts/run-tests.mjs` 包 tsx --test）。
+- **交付 gate**：`pnpm verify` 印出固定 stage labels：`build`、`server`、`web`、`deploy`、`server-runner`。任一 stage 非零即停止並保留該 label，後續 stage 不會掩蓋失敗。
 - shared：`packages/shared` 沒有獨立 test script。改 shared → 至少跑 `pnpm run build` + 受影響 app 的測試。
-- root `deploy.sh` 的測試在 `scripts/deploy.test.mjs`，不在 `pnpm test` 內，改 deploy.sh 時手動跑：`node --test scripts/deploy.test.mjs`。
+- deploy：`scripts/deploy.test.mjs` 已納入 `pnpm verify` 的 deploy stage；單獨跑：`node --test scripts/deploy.test.mjs`。
+- server runner 自我測試：`node --test apps/server/scripts/run-tests.test.mjs`（亦在 verify 的 server-runner stage）。
 - 測試命名 `*.test.ts`，放在被測程式旁邊（如 `apps/server/src/routes/images.test.ts`）。
 
 ## 命名、檔案風格、imports
