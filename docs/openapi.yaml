@@ -1,17 +1,63 @@
 openapi: 3.1.0
 info:
   title: Kuozui Green Energy Display API
-  version: 0.1.0
-  description: Phase 1 skeleton API for the solar display platform.
+  version: 0.2.0
+  description: |
+    Authoritative **critical-operation subset** for the Solar Display platform — not a complete route catalog.
+
+    Served at `/docs` (Swagger UI) and `/docs/json` from the static source `docs/openapi.yaml`.
+    Runtime Fastify routes that are not listed here still exist; this document only covers the
+    operator- and playback-critical contracts that the contract coverage tests lock.
+
+    ## Covered critical domains
+    - Health (`/health`)
+    - Playback bootstrap (`/api/playback/settings`, `/pages`, `/rotation-plan`)
+    - Display page registry (`/api/display-page-registry`)
+    - Display publishing (`/api/display-pages/{pageId}/draft|live|validate|publish`)
+    - MQTT settings (`/api/settings/mqtt`)
+    - Image catalog list/upload (`/api/images`)
+    - Display readiness (`/api/display-readiness`)
+    - Device status diagnostics (`/api/device/status`)
+
+    ## Explicitly excluded (non-exhaustive)
+    - Metrics / history / weather / brand / circuits / calculation settings
+    - Display story / sustainability story / card-data / shell decorations
+    - Data-source ops, image playlist governance beyond list/upload
+    - Device control mutations (reboot / clear-cache / kiosk-exit / logs)
+    - All other management and monitoring routes not listed in paths
+
+    ## Access classes (`x-solar-access-class`)
+    - `playback-safe` — readable without management trust (kiosk / public LAN bootstrap)
+    - `trusted-management-read` — GET that requires trusted management origin/token
+    - `trusted-management-mutation` — POST/PUT/PATCH/DELETE under `/api/*` gated by management auth
+
+    Response envelopes intentionally differ by domain. Do not assume a single shared success wrapper.
 servers:
   - url: http://localhost:3000
+tags:
+  - name: System
+    description: Process health
+  - name: Playback
+    description: Playback settings, page order, and rotation plan
+  - name: DisplayRegistry
+    description: Multi-instance display page registry
+  - name: DisplayPages
+    description: Draft/live authoring and publish pipeline
+  - name: Mqtt
+    description: MQTT broker settings (management)
+  - name: Images
+    description: Image asset catalog
+  - name: Readiness
+    description: Display readiness diagnostics
+  - name: Device
+    description: Device status diagnostics
 paths:
   /health:
     get:
       operationId: getHealth
       summary: Health check
-      tags:
-        - System
+      tags: [System]
+      x-solar-access-class: playback-safe
       responses:
         "200":
           description: Service is healthy
@@ -20,18 +66,704 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
         "500":
-          description: Service error
+          description: Safe internal error envelope
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playback/settings:
+    get:
+      operationId: getPlaybackSettings
+      summary: Read playback settings
+      tags: [Playback]
+      x-solar-access-class: playback-safe
+      responses:
+        "200":
+          description: Current playback settings with display ops summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackSettingsResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: putPlaybackSettings
+      summary: Update playback settings
+      tags: [Playback]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated playback settings with display ops summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackSettingsResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playback/pages:
+    get:
+      operationId: getPlaybackPages
+      summary: Read playback pages
+      tags: [Playback]
+      x-solar-access-class: playback-safe
+      responses:
+        "200":
+          description: Playback page list with display ops summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackPagesResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: putPlaybackPages
+      summary: Update playback pages
+      tags: [Playback]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pages:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        "200":
+          description: Updated playback pages with display ops summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackPagesResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playback/rotation-plan:
+    get:
+      operationId: getPlaybackRotationPlan
+      summary: Read display rotation plan
+      tags: [Playback]
+      x-solar-access-class: playback-safe
+      responses:
+        "200":
+          description: Current rotation plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackRotationPlanResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: putPlaybackRotationPlan
+      summary: Update display rotation plan
+      tags: [Playback]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pages:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        "200":
+          description: Updated rotation plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackRotationPlanResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-page-registry:
+    get:
+      operationId: getDisplayPageRegistry
+      summary: List display page registry instances
+      tags: [DisplayRegistry]
+      x-solar-access-class: playback-safe
+      responses:
+        "200":
+          description: Active registry pages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageRegistryListResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: postDisplayPageRegistry
+      summary: Create a display page registry instance
+      tags: [DisplayRegistry]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created page instance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageRegistryItemResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-page-registry/{pageKey}:
+    put:
+      operationId: putDisplayPageRegistryItem
+      summary: Update a display page registry instance
+      tags: [DisplayRegistry]
+      x-solar-access-class: trusted-management-mutation
+      parameters:
+        - $ref: "#/components/parameters/PageKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated page instance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageRegistryItemResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "404":
+          description: Page not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-page-registry/{pageKey}/archive:
+    post:
+      operationId: postDisplayPageRegistryArchive
+      summary: Archive a display page registry instance
+      tags: [DisplayRegistry]
+      x-solar-access-class: trusted-management-mutation
+      parameters:
+        - $ref: "#/components/parameters/PageKey"
+      responses:
+        "200":
+          description: Archived page instance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageRegistryItemResponse"
+        "400":
+          description: Archive rejected (e.g. last remaining template instance)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "404":
+          description: Page not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-pages/{pageId}/draft:
+    get:
+      operationId: getDisplayPageDraft
+      summary: Read display page draft config
+      tags: [DisplayPages]
+      x-solar-access-class: playback-safe
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Draft config envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageConfigEnvelopeResponse"
+        "404":
+          description: Unknown display page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: putDisplayPageDraft
+      summary: Save display page draft config
+      tags: [DisplayPages]
+      x-solar-access-class: trusted-management-mutation
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisplayPageConfigWriteBody"
+      responses:
+        "200":
+          description: Saved draft config envelope (existing shape, not a shared success wrapper)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageConfigEnvelopeResponse"
+        "400":
+          description: Invalid regions / freeformObjects / media placement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPagePlacementErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "404":
+          description: Unknown display page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Optimistic concurrency conflict on draft save
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageDraftSaveConflictResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-pages/{pageId}/live:
+    get:
+      operationId: getDisplayPageLive
+      summary: Read display page live config
+      tags: [DisplayPages]
+      x-solar-access-class: playback-safe
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Live config envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageConfigEnvelopeResponse"
+        "404":
+          description: Unknown display page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-pages/{pageId}/validate:
+    post:
+      operationId: postDisplayPageValidate
+      summary: Validate draft without publishing
+      tags: [DisplayPages]
+      x-solar-access-class: trusted-management-mutation
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Validation result for the current draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPageValidateResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "404":
+          description: Unknown display page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-pages/{pageId}/publish:
+    post:
+      operationId: postDisplayPagePublish
+      summary: Publish draft to live
+      tags: [DisplayPages]
+      x-solar-access-class: trusted-management-mutation
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                publishedBy:
+                  type: string
+      responses:
+        "200":
+          description: Published live config with validation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPagePublishSuccessResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "404":
+          description: Unknown display page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation failed; draft not published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayPagePublishValidationErrorResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/mqtt:
+    get:
+      operationId: getMqttSettings
+      summary: Read MQTT settings (password masked)
+      tags: [Mqtt]
+      x-solar-access-class: trusted-management-read
+      responses:
+        "200":
+          description: MQTT settings, connection status, and readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MqttSettingsResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: putMqttSettings
+      summary: Update MQTT settings
+      tags: [Mqtt]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated MQTT settings, status, and readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MqttSettingsResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/images:
+    get:
+      operationId: getImages
+      summary: List image assets
+      tags: [Images]
+      x-solar-access-class: playback-safe
+      responses:
+        "200":
+          description: Image catalog with success wrapper
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImagesListResponse"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: postImages
+      summary: Upload an image asset
+      tags: [Images]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                category:
+                  type: string
+                usageScope:
+                  type: string
+                includedInSlideshow:
+                  type: string
+      responses:
+        "201":
+          description: Uploaded image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageUploadSuccessResponse"
+        "400":
+          description: Missing file, invalid type, size/content validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/display-readiness:
+    get:
+      operationId: getDisplayReadiness
+      summary: Read display readiness report
+      tags: [Readiness]
+      x-solar-access-class: trusted-management-read
+      responses:
+        "200":
+          description: Readiness report wrapper
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayReadinessResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/device/status:
+    get:
+      operationId: getDeviceStatus
+      summary: Read device status diagnostics
+      tags: [Device]
+      x-solar-access-class: trusted-management-read
+      responses:
+        "200":
+          description: Device status with success/data wrapper
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceStatusResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+        "500":
+          description: Safe internal error envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
+  parameters:
+    PageId:
+      name: pageId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Display page key / instance id (e.g. overview)
+    PageKey:
+      name: pageKey
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Display page registry page key
+
   schemas:
     HealthResponse:
       type: object
-      required:
-        - status
-        - timestamp
+      required: [status, timestamp]
       properties:
         status:
           type: string
@@ -39,12 +771,10 @@ components:
         timestamp:
           type: string
           format: date-time
+
     ErrorResponse:
       type: object
-      required:
-        - success
-        - error
-        - timestamp
+      required: [success, error, timestamp]
       properties:
         success:
           type: boolean
@@ -54,3 +784,295 @@ components:
         timestamp:
           type: string
           format: date-time
+
+    ManagementAccessDenied:
+      type: object
+      required: [access, code, error, requiredRole, success, timestamp]
+      properties:
+        access:
+          type: string
+          const: denied
+        code:
+          type: string
+          const: management_access_denied
+        error:
+          type: string
+        requiredRole:
+          type: string
+          const: management-trusted
+        success:
+          type: boolean
+          const: false
+        timestamp:
+          type: string
+          format: date-time
+
+    PlaybackSettingsResponse:
+      type: object
+      required: [settings, displayOps]
+      properties:
+        settings:
+          type: object
+          additionalProperties: true
+        displayOps:
+          type: object
+          additionalProperties: true
+
+    PlaybackPagesResponse:
+      type: object
+      required: [pages, displayOps]
+      properties:
+        pages:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        displayOps:
+          type: object
+          additionalProperties: true
+
+    PlaybackRotationPlanResponse:
+      type: object
+      required: [rotationPlan]
+      properties:
+        rotationPlan:
+          type: object
+          additionalProperties: true
+
+    DisplayPageRegistryListResponse:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    DisplayPageRegistryItemResponse:
+      type: object
+      required: [page]
+      properties:
+        page:
+          type: object
+          additionalProperties: true
+
+    DisplayPageConfigEnvelope:
+      type: object
+      required: [pageId, regions, updatedAt, version]
+      properties:
+        pageId:
+          type: string
+        regions:
+          type: object
+          additionalProperties: true
+        freeformObjects:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        updatedAt:
+          type: ["string", "null"]
+        version:
+          type: number
+        stage:
+          type: string
+        assetFindings:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        publishedAt:
+          type: ["string", "null"]
+        publishedBy:
+          type: ["string", "null"]
+        validation:
+          nullable: true
+          additionalProperties: true
+        fallbackPolicy:
+          type: object
+          additionalProperties: true
+
+    DisplayPageConfigEnvelopeResponse:
+      type: object
+      required: [config]
+      properties:
+        config:
+          $ref: "#/components/schemas/DisplayPageConfigEnvelope"
+
+    DisplayPageConfigWriteBody:
+      type: object
+      properties:
+        baseVersion:
+          type: number
+        regions:
+          type: object
+          additionalProperties: true
+        freeformObjects:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    DisplayPagePlacementErrorResponse:
+      type: object
+      required: [success, error, timestamp]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    DisplayPageDraftSaveConflictResponse:
+      type: object
+      required: [code, conflict, error, success, timestamp]
+      properties:
+        code:
+          type: string
+          const: management_draft_conflict
+        conflict:
+          type: object
+          required: [baseVersion, currentVersion, latestEnvelope, resourceId, resourceType]
+          properties:
+            baseVersion:
+              type: number
+            currentVersion:
+              type: number
+            latestEnvelope:
+              $ref: "#/components/schemas/DisplayPageConfigEnvelope"
+            resourceId:
+              type: string
+            resourceType:
+              type: string
+        error:
+          type: string
+        success:
+          type: boolean
+          const: false
+        timestamp:
+          type: string
+          format: date-time
+
+    DisplayPageValidateResponse:
+      type: object
+      required: [validation]
+      properties:
+        validation:
+          type: object
+          additionalProperties: true
+
+    DisplayPagePublishSuccessResponse:
+      type: object
+      required: [config, validation]
+      properties:
+        config:
+          $ref: "#/components/schemas/DisplayPageConfigEnvelope"
+        validation:
+          type: object
+          additionalProperties: true
+
+    DisplayPagePublishValidationErrorResponse:
+      type: object
+      required: [success, error, validation, timestamp]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: string
+        validation:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+
+    MqttSettingsResponse:
+      type: object
+      required: [settings, status, readiness]
+      properties:
+        settings:
+          type: object
+          required: [host, port, username, password, clientId, dataMode]
+          properties:
+            host:
+              type: string
+            port:
+              type: number
+            username:
+              type: string
+            password:
+              type: string
+              description: Masked as **** in responses
+            clientId:
+              type: string
+            dataMode:
+              type: string
+              enum: [mqtt, mock]
+            reconnectInterval:
+              type: number
+            messageTimeout:
+              type: number
+        status:
+          type: object
+          additionalProperties: true
+        readiness:
+          type: object
+          additionalProperties: true
+
+    ImagesListResponse:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+
+    ImageUploadSuccessResponse:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+
+    DisplayReadinessResponse:
+      type: object
+      required: [readiness]
+      properties:
+        readiness:
+          type: object
+          additionalProperties: true
+
+    DeviceStatusResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: true

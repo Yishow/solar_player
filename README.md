@@ -7,7 +7,7 @@ Solar Display 是一套部署在 Raspberry Pi、Linux mini PC 或 kiosk browser 
 - `apps/web`：Vite + React + TypeScript 前端，負責播放頁與管理頁
 - `apps/server`：Fastify + TypeScript 後端，提供 REST API、Swagger UI、Socket.IO、SQLite 與 MQTT 整合
 - `packages/shared`：前後端共用型別與工具
-- `docs/openapi.yaml`：目前 server 使用的 OpenAPI 規格
+- `docs/openapi.yaml`：server 的 **authoritative critical-operation subset**（`/docs` / `/docs/json`），不是全站 route 目錄
 
 ## 現行狀態與 FHD 完成目標
 
@@ -111,7 +111,33 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 - `data/`：SQLite 與其他資料檔；server 預設資料庫檔名為 `solar-display.sqlite`
 - `uploads/images/`：圖片上傳與播放素材儲存位置
 - `logs/`：server log 目錄（由 `.env` / deploy service 指定）
-- `docs/openapi.yaml`：server 啟動時讀取的 OpenAPI 規格檔
+- `docs/openapi.yaml`：static OpenAPI source；Swagger UI 掛在 `/docs`，JSON 在 `/docs/json`
+
+### API 文件範圍（`/docs`）
+
+`/docs` **不是** 全站 API 目錄，也不是舊的「Phase 1 skeleton」。它是與 runtime 可自動比對的 **authoritative critical-operation subset**。
+
+**Covered critical domains**
+
+- Health：`GET /health`
+- Playback bootstrap：`/api/playback/settings`、`/pages`、`/rotation-plan`（GET/PUT）
+- Display page registry：list/create、item update、archive
+- Display publishing：draft GET/PUT、live GET、validate POST、publish POST
+- MQTT settings：`GET/PUT /api/settings/mqtt`
+- Images：`GET/POST /api/images`
+- Display readiness：`GET /api/display-readiness`
+- Device status：`GET /api/device/status`
+
+**Non-goals / still outside this subset**
+
+- Metrics、history、weather、brand、circuits、calculation settings
+- Display story、sustainability story、shell decorations、card-data
+- Data-source ops、image playlist governance（list/upload 以外）
+- Device control mutations（reboot / clear-cache / kiosk-exit / logs）
+- 其他未列在 `docs/openapi.yaml` paths 的 management / monitoring routes
+- 不統一 response envelope、不產生 client SDK、不切 dynamic OpenAPI generation
+
+每個 documented operation 有 `x-solar-access-class`：`playback-safe` | `trusted-management-read` | `trusted-management-mutation`。契約覆蓋測試在 `apps/server/src/routes/openapi-contract.test.ts`（讀 served `/docs/json` + app.inject）。
 
 ### 圖片上傳內容驗證（`POST /api/images`）
 
