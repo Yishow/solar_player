@@ -31,23 +31,44 @@ test("router wires a shell bootstrap loader into both playback and management sh
 });
 
 test("router preloads settings editable models before mounting settings pages", () => {
-  assert.match(routerSource, /import \{ DataSourceSettings, loadDataSourceSettingsRoute \}/);
-  assert.match(routerSource, /import \{ PlaybackSettings, loadPlaybackSettingsRoute \}/);
-  assert.match(routerSource, /import \{ ImageManagement, loadImageManagementRoute \}/);
-  assert.match(routerSource, /import \{ MqttSettings, loadMqttSettingsRoute \}/);
-  assert.match(routerSource, /import \{ CircuitSettings, loadCircuitSettingsRoute \}/);
-  assert.match(routerSource, /path:\s*"settings\/data-source",\s*loader:\s*createManagementRouteLoader\("settings\/data-source", loadDataSourceSettingsRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<DataSourceSettings \/>/s);
-  assert.match(routerSource, /path:\s*"settings\/playback",\s*loader:\s*createManagementRouteLoader\("settings\/playback", loadPlaybackSettingsRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<PlaybackSettings \/>/s);
-  assert.match(routerSource, /path:\s*"settings\/images",\s*loader:\s*createManagementRouteLoader\("settings\/images", loadImageManagementRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<ImageManagement \/>/s);
-  assert.match(routerSource, /path:\s*"settings\/mqtt",\s*loader:\s*createManagementRouteLoader\("settings\/mqtt", loadMqttSettingsRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<MqttSettings \/>/s);
-  assert.match(routerSource, /path:\s*"settings\/circuits",\s*loader:\s*createManagementRouteLoader\("settings\/circuits", loadCircuitSettingsRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<CircuitSettings \/>/s);
+  assert.doesNotMatch(routerSource, /import \{ DataSourceSettings, loadDataSourceSettingsRoute \}/);
+  assert.doesNotMatch(routerSource, /import \{ PlaybackSettings, loadPlaybackSettingsRoute \}/);
+  assert.doesNotMatch(routerSource, /import \{ ImageManagement, loadImageManagementRoute \}/);
+  assert.doesNotMatch(routerSource, /import \{ MqttSettings, loadMqttSettingsRoute \}/);
+  assert.doesNotMatch(routerSource, /import \{ CircuitSettings, loadCircuitSettingsRoute \}/);
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/data-source",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/data-source",[\s\S]*import\("\.\.\/pages\/DataSourceSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*DataSourceSettings/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/playback",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/playback",[\s\S]*import\("\.\.\/pages\/PlaybackSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*PlaybackSettings/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/images",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/images",[\s\S]*import\("\.\.\/pages\/ImageManagement"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*ImageManagement/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/mqtt",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/mqtt",[\s\S]*import\("\.\.\/pages\/MqttSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*MqttSettings/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/circuits",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/circuits",[\s\S]*import\("\.\.\/pages\/CircuitSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*CircuitSettings/s
+  );
 });
 
 test("router preloads status and editor models before mounting those pages", () => {
-  assert.match(routerSource, /import \{ DeviceStatus, loadDeviceStatusRoute \}/);
-  assert.match(routerSource, /import \{ DisplayPagesEditorRoute, loadDisplayPagesEditorRoute \}/);
-  assert.match(routerSource, /path:\s*"device-status",\s*loader:\s*createManagementRouteLoader\("device-status", loadDeviceStatusRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<DeviceStatus \/>/s);
-  assert.match(routerSource, /path:\s*"display-pages\/editor",\s*loader:\s*createManagementRouteLoader\("display-pages\/editor", loadDisplayPagesEditorRoute\),\s*hydrateFallbackElement:\s*<><\/>,\s*element:\s*<DisplayPagesEditorRoute \/>/s);
+  assert.doesNotMatch(routerSource, /import \{ DeviceStatus, loadDeviceStatusRoute \}/);
+  assert.doesNotMatch(routerSource, /import \{ DisplayPagesEditorRoute, loadDisplayPagesEditorRoute \}/);
+  assert.match(
+    routerSource,
+    /path:\s*"device-status",\s*loader:\s*createLazyManagementRouteLoader\(\s*"device-status",[\s\S]*import\("\.\.\/pages\/DeviceStatus"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*DeviceStatus/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"display-pages\/editor",\s*loader:\s*createLazyManagementRouteLoader\(\s*"display-pages\/editor",[\s\S]*import\("\.\.\/pages\/DisplayPagesEditor\/runtime"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*DisplayPagesEditorRoute/s
+  );
 });
 
 test("index.html seeds the browser title from cached brand state instead of a stale hardcoded brand", () => {

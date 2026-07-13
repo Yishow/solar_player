@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import type { PlaybackPage, PlaybackRuntime, PlaybackSettings } from "@solar-display/shared";
-import { resolvePlaybackRuntimeTick } from "./usePlaybackController";
+import {
+  resolveNextEffectivePlaybackTemplateKey,
+  resolvePlaybackPageTemplateKey,
+  resolvePlaybackRuntimeTick
+} from "./usePlaybackController";
 
 const hookDir = path.resolve(import.meta.dirname);
 const controllerSource = fs.readFileSync(path.join(hookDir, "usePlaybackController.ts"), "utf8");
@@ -20,6 +24,12 @@ test("usePlaybackController can defer management diagnostics with injected setti
   assert.match(controllerSource, /providedSettings \? Promise\.resolve\(providedSettings\) : getPlaybackSettings\(\)/);
   assert.match(controllerSource, /providedRotationPreview \? Promise\.resolve\(providedRotationPreview\) : getDisplayRotationPreview\(\)/);
   assert.match(controllerSource, /\[enabled, options\.rotationPreview, options\.settings\]/);
+});
+
+test("usePlaybackController prefetches the next effective playback template after rotation is known", () => {
+  assert.match(controllerSource, /prefetchDisplayPageTemplate\(nextTemplateKey\)/);
+  assert.match(controllerSource, /resolveNextEffectivePlaybackTemplateKey\(/);
+  assert.match(controllerSource, /\[enabled, pages, runtime\?\.currentIndex, settings\?\.loop\]/);
 });
 
 const playbackSettings: PlaybackSettings = {
@@ -100,4 +110,111 @@ test("boundary playback ticks advance only when the page boundary is reached", (
   assert.equal(nextRuntime.currentIndex, 1);
   assert.equal(nextRuntime.countdownMs, 20_000);
   assert.equal(nextRuntime.isPlaying, true);
+});
+
+const rotationPages: PlaybackPage[] = [
+  {
+    displayOrder: 1,
+    durationSeconds: 15,
+    enabled: true,
+    id: 1,
+    labelEn: "Overview",
+    labelZh: "總覽",
+    pageKey: "overview",
+    route: "/overview",
+    templateKey: "overview"
+  },
+  {
+    displayOrder: 2,
+    durationSeconds: 20,
+    enabled: false,
+    id: 2,
+    labelEn: "Solar Disabled",
+    labelZh: "太陽能停用",
+    pageKey: "solar",
+    route: "/solar",
+    templateKey: "solar"
+  },
+  {
+    displayOrder: 3,
+    durationSeconds: 18,
+    enabled: true,
+    id: 3,
+    labelEn: "Images",
+    labelZh: "綠能影像",
+    pageKey: "images",
+    route: "/images",
+    templateKey: "images"
+  },
+  {
+    displayOrder: 4,
+    durationSeconds: 22,
+    enabled: true,
+    id: 4,
+    labelEn: "Sustainability",
+    labelZh: "永續",
+    pageKey: "sustainability",
+    route: "/sustainability",
+    templateKey: "sustainability"
+  }
+];
+
+test("next effective playback template skips disabled pages", () => {
+  assert.equal(
+    resolveNextEffectivePlaybackTemplateKey({
+      currentIndex: 0,
+      loop: true,
+      pages: rotationPages
+    }),
+    "images"
+  );
+});
+
+test("next effective playback template wraps at the loop edge", () => {
+  assert.equal(
+    resolveNextEffectivePlaybackTemplateKey({
+      currentIndex: 2,
+      loop: true,
+      pages: rotationPages
+    }),
+    "overview"
+  );
+});
+
+test("next effective playback template stays on the last page without loop", () => {
+  assert.equal(
+    resolveNextEffectivePlaybackTemplateKey({
+      currentIndex: 2,
+      loop: false,
+      pages: rotationPages
+    }),
+    "sustainability"
+  );
+});
+
+test("next effective playback template falls back to pageKey when templateKey is absent", () => {
+  assert.equal(
+    resolvePlaybackPageTemplateKey({
+      displayOrder: 1,
+      durationSeconds: 15,
+      enabled: true,
+      id: 9,
+      labelEn: "Factory",
+      labelZh: "迴路",
+      pageKey: "factory-circuit-guanyin",
+      route: "/factory-circuit-guanyin"
+    }),
+    "factory-circuit"
+  );
+});
+
+test("next effective playback template returns null when no playable pages remain", () => {
+  assert.equal(
+    resolveNextEffectivePlaybackTemplateKey({
+      currentIndex: 0,
+      loop: true,
+      pages: rotationPages.map((page) => ({ ...page, enabled: false }))
+    }),
+    null
+  );
 });

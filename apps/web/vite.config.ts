@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => {
         [REACT_GRAB_BOOTSTRAP_ALIAS]: resolveReactGrabBootstrapTarget(mode)
       }
     },
+    build: {
+      manifest: true
+    },
     server: {
       host: "0.0.0.0",
       port: webPort,

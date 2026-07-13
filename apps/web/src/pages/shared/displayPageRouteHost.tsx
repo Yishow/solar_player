@@ -1,18 +1,21 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Navigate, type LoaderFunctionArgs, useLocation } from "react-router-dom";
+import type { DisplayPageTemplateKey } from "@solar-display/shared";
 import { loadDisplayPageConfigEnvelope } from "../../hooks/useDisplayPageConfig";
 import {
   loadDisplayPageRegistrySnapshot,
   useDisplayPageRegistry
 } from "../../hooks/useDisplayPageRegistry";
-import { runtimePageDefinitions } from "../DisplayPagesEditor/runtimePageDefinitions";
 import { resolveDisplayPageRouteInstance } from "./displayPageRouteResolver";
 import { warmDisplayPageRoutePeerConfigs } from "./displayPageRouteWarmup";
+import { loadDisplayPageTemplate } from "./displayPageTemplateLoaders";
 import "./displayPageRouteHost.css";
 
-const runtimePageDefinitionMap = new Map(
-  runtimePageDefinitions.map((definition) => [definition.templateKey, definition])
-);
+type LoadedDisplayPageTemplate = {
+  pageKey: string;
+  renderPage: (pageId: string) => ReactElement;
+  templateKey: DisplayPageTemplateKey;
+};
 
 export async function loadDisplayPageRoute({ params }: LoaderFunctionArgs) {
   const routeSlug = params.displayPageSlug;
@@ -45,20 +48,64 @@ export function DisplayPageRouteHost() {
     () => resolveDisplayPageRouteInstance(registry.pages, location.pathname),
     [location.pathname, registry.pages]
   );
-  const definition = useMemo(
-    () => (page?.templateKey ? runtimePageDefinitionMap.get(page.templateKey) : null),
-    [page?.templateKey]
-  );
+  const [loadedTemplate, setLoadedTemplate] = useState<LoadedDisplayPageTemplate | null>(null);
+  const [isTemplatePending, setIsTemplatePending] = useState(false);
+  const [templateLoadError, setTemplateLoadError] = useState<Error | null>(null);
 
-  if (definition?.renderPage && page) {
+  useEffect(() => {
+    if (!page?.templateKey) {
+      setIsTemplatePending(false);
+      setTemplateLoadError(null);
+      return;
+    }
+
+    const pageKey = page.pageKey;
+    const templateKey = page.templateKey;
+    let cancelled = false;
+
+    setIsTemplatePending(true);
+    setTemplateLoadError(null);
+
+    void loadDisplayPageTemplate(templateKey)
+      .then((runtime) => {
+        if (cancelled) {
+          return;
+        }
+
+        setLoadedTemplate({
+          pageKey,
+          renderPage: runtime.renderPage,
+          templateKey: runtime.templateKey
+        });
+        setIsTemplatePending(false);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        setTemplateLoadError(error instanceof Error ? error : new Error(String(error)));
+        setIsTemplatePending(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page?.pageKey, page?.templateKey]);
+
+  if (templateLoadError) {
+    throw templateLoadError;
+  }
+
+  if (loadedTemplate) {
     return (
-      <div className="display-page-route-frame" key={page.pageKey}>
-        {definition.renderPage(page.pageKey)}
+      <div className="display-page-route-frame" key={loadedTemplate.pageKey}>
+        {loadedTemplate.renderPage(loadedTemplate.pageKey)}
       </div>
     );
   }
 
-  if (registry.isLoading) {
+  if (registry.isLoading || isTemplatePending) {
     return null;
   }
 

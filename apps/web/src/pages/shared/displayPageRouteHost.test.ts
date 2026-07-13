@@ -116,6 +116,15 @@ test("display page route host consumes refreshed registry snapshots after displa
   assert.match(routeHostSource, /resolveDisplayPageRouteInstance\(registry\.pages, location\.pathname\)/);
 });
 
+test("display page route host loads only the current template chunk without editor runtime definitions", () => {
+  assert.doesNotMatch(routeHostSource, /from "\.\.\/DisplayPagesEditor\/runtimePageDefinitions"/);
+  assert.doesNotMatch(routeHostSource, /runtimePageDefinitions/);
+  assert.match(routeHostSource, /loadDisplayPageTemplate\(/);
+  assert.match(routeHostSource, /setLoadedTemplate\(/);
+  assert.match(routeHostSource, /throw templateLoadError/);
+  assert.match(routeHostSource, /isTemplatePending/);
+});
+
 test("display page route navigation preloads live config before swapping runtime pages", () => {
   assert.match(routeHostSource, /export async function loadDisplayPageRoute/);
   assert.match(routeHostSource, /loadDisplayPageRegistrySnapshot\(\)/);

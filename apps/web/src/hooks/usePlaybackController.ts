@@ -1,13 +1,15 @@
 import {
   createPlaybackRuntime,
+  type DisplayPageTemplateKey,
   type DisplayRotationPreview,
   getEnabledPlaybackPages,
   getNextPlaybackIndex,
   getPlaybackDurationMs,
   getPlaybackPage,
+  isDisplayPageTemplateKey,
   isPlaybackAllowedBySchedule,
   isPlaybackAtEdge,
-  resolvePlaybackIndexByRoute,
+  resolveDisplayPageTemplateKeyFromPageId,
   shouldEnterIdleMode,
   type PlaybackPage,
   type PlaybackRuntime,
@@ -15,9 +17,41 @@ import {
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { getDisplayRotationPreview, getPlaybackSettings } from "../services/api";
+import { prefetchDisplayPageTemplate } from "../pages/shared/displayPageTemplateLoaders";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
 import type { PlaybackRuntimeReloadOptions } from "./displaySyncPlaybackReload";
+
+export function resolvePlaybackPageTemplateKey(page: PlaybackPage | null): DisplayPageTemplateKey | null {
+  if (!page) {
+    return null;
+  }
+
+  if (page.templateKey && isDisplayPageTemplateKey(page.templateKey)) {
+    return page.templateKey;
+  }
+
+  return resolveDisplayPageTemplateKeyFromPageId(page.pageKey);
+}
+
+export function resolveNextEffectivePlaybackTemplateKey({
+  currentIndex,
+  loop,
+  pages
+}: {
+  currentIndex: number;
+  loop: boolean;
+  pages: PlaybackPage[];
+}): DisplayPageTemplateKey | null {
+  const playablePages = getEnabledPlaybackPages(pages);
+
+  if (playablePages.length === 0) {
+    return null;
+  }
+
+  const nextIndex = getNextPlaybackIndex(currentIndex, pages, loop, 1);
+  return resolvePlaybackPageTemplateKey(playablePages[nextIndex] ?? null);
+}
 
 type UsePlaybackControllerOptions = {
   currentPath?: string;
@@ -283,6 +317,24 @@ export function usePlaybackController(
       window.clearInterval(timerId);
     };
   }, [pages, tickMode, tickMs]);
+
+  useEffect(() => {
+    if (!enabled || !runtime || !settings) {
+      return;
+    }
+
+    const nextTemplateKey = resolveNextEffectivePlaybackTemplateKey({
+      currentIndex: runtime.currentIndex,
+      loop: settings.loop,
+      pages
+    });
+
+    if (!nextTemplateKey) {
+      return;
+    }
+
+    void prefetchDisplayPageTemplate(nextTemplateKey);
+  }, [enabled, pages, runtime?.currentIndex, settings?.loop]);
 
   useEffect(() => {
     const handleInteraction = () => {

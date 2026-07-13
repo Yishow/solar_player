@@ -17,3 +17,11 @@ test("display page route loader primes the shared registry snapshot for shell an
   assert.match(registryHookSource, /loadDisplayPageRegistrySnapshot\(/);
   assert.match(layoutShellSource, /useDisplayPageRegistry\(\)/);
 });
+
+test("display page route host retains the last successful template while the next chunk is pending", () => {
+  assert.match(routeHostSource, /loadedTemplate/);
+  assert.match(routeHostSource, /isTemplatePending/);
+  assert.match(routeHostSource, /if \(loadedTemplate\)/);
+  assert.match(routeHostSource, /if \(registry\.isLoading \|\| isTemplatePending\)/);
+  assert.match(routeHostSource, /throw templateLoadError/);
+});

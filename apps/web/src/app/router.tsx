@@ -8,18 +8,6 @@ import { routeMetaList } from "./routeMeta";
 import { LayoutShellRoute } from "../layouts/LayoutShell";
 import { ManagementShellRoute } from "../layouts/ManagementShell";
 import { loadShellBootstrap } from "../layouts/shellBootstrap";
-import { BrandAssets } from "../pages/BrandAssets";
-import { CircuitSettings, loadCircuitSettingsRoute } from "../pages/CircuitSettings";
-import { DataSourceSettings, loadDataSourceSettingsRoute } from "../pages/DataSourceSettings";
-import { DeviceStatus, loadDeviceStatusRoute } from "../pages/DeviceStatus";
-import { DisplayPagesEditorRoute, loadDisplayPagesEditorRoute } from "../pages/DisplayPagesEditor/runtime";
-import { EnergyHistory } from "../pages/EnergyHistory";
-import { EnergyTrend } from "../pages/EnergyTrend";
-import { ImageManagement, loadImageManagementRoute } from "../pages/ImageManagement";
-import { MqttSettings, loadMqttSettingsRoute } from "../pages/MqttSettings";
-import { OfflineError } from "../pages/OfflineError";
-import { PlaybackSettings, loadPlaybackSettingsRoute } from "../pages/PlaybackSettings";
-import { SlideshowPreview } from "../pages/SlideshowPreview";
 import { DisplayPageRouteHost, loadDisplayPageRoute } from "../pages/shared/displayPageRouteHost";
 
 type ManagementRouteLoader = (args: LoaderFunctionArgs) => unknown | Promise<unknown>;
@@ -37,6 +25,16 @@ function createManagementRouteLoader(path: string, routeLoader?: ManagementRoute
 
     return routeLoader ? routeLoader(args) : null;
   };
+}
+
+function createLazyManagementRouteLoader(
+  path: string,
+  loadRouteLoader: () => Promise<ManagementRouteLoader>
+): ManagementRouteLoader {
+  return createManagementRouteLoader(path, async (args) => {
+    const routeLoader = await loadRouteLoader();
+    return routeLoader(args);
+  });
 }
 
 export const router = createBrowserRouter([
@@ -66,24 +64,48 @@ export const router = createBrowserRouter([
       {
         path: "trends",
         loader: createManagementRouteLoader("trends"),
-        element: <EnergyTrend />
+        lazy: async () => {
+          const { EnergyTrend } = await import("../pages/EnergyTrend");
+          return { Component: EnergyTrend };
+        }
       },
       {
         path: "brand",
         loader: createManagementRouteLoader("brand"),
-        element: <BrandAssets />
+        lazy: async () => {
+          const { BrandAssets } = await import("../pages/BrandAssets");
+          return { Component: BrandAssets };
+        }
       },
       {
         path: "settings/playback",
-        loader: createManagementRouteLoader("settings/playback", loadPlaybackSettingsRoute),
+        loader: createLazyManagementRouteLoader(
+          "settings/playback",
+          async () => {
+            const { loadPlaybackSettingsRoute } = await import("../pages/PlaybackSettings");
+            return loadPlaybackSettingsRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <PlaybackSettings />
+        lazy: async () => {
+          const { PlaybackSettings } = await import("../pages/PlaybackSettings");
+          return { Component: PlaybackSettings };
+        }
       },
       {
         path: "settings/data-source",
-        loader: createManagementRouteLoader("settings/data-source", loadDataSourceSettingsRoute),
+        loader: createLazyManagementRouteLoader(
+          "settings/data-source",
+          async () => {
+            const { loadDataSourceSettingsRoute } = await import("../pages/DataSourceSettings");
+            return loadDataSourceSettingsRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <DataSourceSettings />
+        lazy: async () => {
+          const { DataSourceSettings } = await import("../pages/DataSourceSettings");
+          return { Component: DataSourceSettings };
+        }
       },
       {
         path: "settings/assets",
@@ -92,50 +114,104 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/images",
-        loader: createManagementRouteLoader("settings/images", loadImageManagementRoute),
+        loader: createLazyManagementRouteLoader(
+          "settings/images",
+          async () => {
+            const { loadImageManagementRoute } = await import("../pages/ImageManagement");
+            return loadImageManagementRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <ImageManagement />
+        lazy: async () => {
+          const { ImageManagement } = await import("../pages/ImageManagement");
+          return { Component: ImageManagement };
+        }
       },
       {
         path: "settings/mqtt",
-        loader: createManagementRouteLoader("settings/mqtt", loadMqttSettingsRoute),
+        loader: createLazyManagementRouteLoader(
+          "settings/mqtt",
+          async () => {
+            const { loadMqttSettingsRoute } = await import("../pages/MqttSettings");
+            return loadMqttSettingsRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <MqttSettings />
+        lazy: async () => {
+          const { MqttSettings } = await import("../pages/MqttSettings");
+          return { Component: MqttSettings };
+        }
       },
       {
         path: "settings/circuits",
-        loader: createManagementRouteLoader("settings/circuits", loadCircuitSettingsRoute),
+        loader: createLazyManagementRouteLoader(
+          "settings/circuits",
+          async () => {
+            const { loadCircuitSettingsRoute } = await import("../pages/CircuitSettings");
+            return loadCircuitSettingsRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <CircuitSettings />
+        lazy: async () => {
+          const { CircuitSettings } = await import("../pages/CircuitSettings");
+          return { Component: CircuitSettings };
+        }
       },
       {
         path: "history",
         loader: createManagementRouteLoader("history"),
-        element: <EnergyHistory />
+        lazy: async () => {
+          const { EnergyHistory } = await import("../pages/EnergyHistory");
+          return { Component: EnergyHistory };
+        }
       },
       {
         path: "offline",
         loader: createManagementRouteLoader("offline"),
-        element: <OfflineError />
+        lazy: async () => {
+          const { OfflineError } = await import("../pages/OfflineError");
+          return { Component: OfflineError };
+        }
       },
       {
         path: "slideshow-preview",
         loader: createManagementRouteLoader("slideshow-preview"),
-        element: <SlideshowPreview />
+        lazy: async () => {
+          const { SlideshowPreview } = await import("../pages/SlideshowPreview");
+          return { Component: SlideshowPreview };
+        }
       },
       {
         path: "device-status",
-        loader: createManagementRouteLoader("device-status", loadDeviceStatusRoute),
+        loader: createLazyManagementRouteLoader(
+          "device-status",
+          async () => {
+            const { loadDeviceStatusRoute } = await import("../pages/DeviceStatus");
+            return loadDeviceStatusRoute;
+          }
+        ),
         hydrateFallbackElement: <></>,
-        element: <DeviceStatus />
+        lazy: async () => {
+          const { DeviceStatus } = await import("../pages/DeviceStatus");
+          return { Component: DeviceStatus };
+        }
       }
     ]
   },
   {
     path: "display-pages/editor",
-    loader: createManagementRouteLoader("display-pages/editor", loadDisplayPagesEditorRoute),
+    loader: createLazyManagementRouteLoader(
+      "display-pages/editor",
+      async () => {
+        const { loadDisplayPagesEditorRoute } = await import("../pages/DisplayPagesEditor/runtime");
+        return loadDisplayPagesEditorRoute;
+      }
+    ),
     hydrateFallbackElement: <></>,
-    element: <DisplayPagesEditorRoute />
+    lazy: async () => {
+      const { DisplayPagesEditorRoute } = await import("../pages/DisplayPagesEditor/runtime");
+      return { Component: DisplayPagesEditorRoute };
+    }
   },
   {
     path: "shell-decorations/editor",
