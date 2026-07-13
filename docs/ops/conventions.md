@@ -50,7 +50,7 @@ repo **沒有** lint、e2e、coverage gate、CI policy——不要發明，也�
 
 ## 部署（三個入口各司其職，不是重複）
 
-- `deploy/`：現行部署實作。`deploy/deploy.sh` 安裝到 `/opt/solar-display`；`deploy/solar-display.service` 以 `NoNewPrivileges=true`、`ProtectSystem=strict`、`ReadWritePaths=...data ...logs ...uploads/images` 限制寫入。
+- `deploy/`：現行部署實作。`deploy/deploy.sh` **預設**安裝到 `/data/solar-display`（與 Pi / readonly-root / kiosk 同一契約）；可傳 explicit 絕對 install root，unit 的 WorkingDirectory、EnvironmentFile、DATA_DIR、LOG_DIR、ReadWritePaths 一律渲染到該 root。`deploy/solar-display.service` 保留 `/data/solar-display` canonical 範本，並以 `NoNewPrivileges=true`、`ProtectSystem=strict`、有界 `ReadWritePaths` hardening。更新不覆寫 `.env` / `data` / `logs` / `uploads`。
 - root `deploy.sh`：打包 online/offline bundle 到 `dist/deploy-bundles/`。
-- root `deploy.md`：Pi 5 kiosk 部署 handoff 說明，引用 deploy/ 內腳本。
-- 改部署路徑時，`deploy/deploy.sh`、service 檔、`deploy.md` 三處一起檢查。
+- root `deploy.md`：Pi 5 kiosk 部署 handoff 說明，引用 deploy/ 內腳本（正式 runtime 亦為 `/data/solar-display`）。
+- 改部署路徑時，`deploy/deploy.sh`、service 檔、`deploy.md`、本檔四處一起檢查；勿再描述 `/opt/solar-display` 為正式 service contract（舊 /opt 安裝需 operator 自行備份後改裝 /data）。

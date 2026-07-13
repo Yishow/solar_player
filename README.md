@@ -117,8 +117,8 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 
 `deploy/` 是目前的部署入口，內容對應現有腳本與 service 範本：
 
-- `deploy/deploy.sh`：先在 repo 根目錄執行 `pnpm run build`，再把 `apps/`、`packages/`、workspace manifests 與 `.env.example` 複製到預設安裝位置 `/opt/solar-display`
-- `deploy/solar-display.service`：systemd 服務範本，使用 `WorkingDirectory=/opt/solar-display`，並將 `DATA_DIR`、`LOG_DIR` 指向 `/opt/solar-display/data`、`/opt/solar-display/logs`
+- `deploy/deploy.sh`：先在 repo 根目錄執行 `pnpm run build`，再把 application bundle（`apps/`、`packages/`、workspace manifests、`.env.example`、`deploy/` helpers）複製到**正式預設**安裝位置 `/data/solar-display`；也可傳入自訂絕對路徑（例：`bash deploy/deploy.sh /srv/solar-display`）。安裝 systemd unit 前會把 WorkingDirectory、EnvironmentFile、DATA_DIR、LOG_DIR、ReadWritePaths 渲染到選定 root。更新時不覆寫既有 `.env`、`data/`、`logs/`、`uploads/`。
+- `deploy/solar-display.service`：canonical systemd 範本（可直接閱讀的 `/data/solar-display` 路徑）；generic deploy 與 kiosk installer 會依 install root 渲染後再安裝。hardening：`NoNewPrivileges=true`、`ProtectSystem=strict`、有界 `ReadWritePaths`。
 
 ## 維運 Runbook
 

@@ -1337,3 +1337,264 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     removeTempDir(projectDir);
   }
 });
+
+const productionDeployScriptPath = path.join(repoRoot, "deploy/deploy.sh");
+const productionServiceTemplatePath = path.join(repoRoot, "deploy/solar-display.service");
+
+function runProductionDeployFixture(installRoot, { projectDir, extraEnv = {} } = {}) {
+  const env = {
+    ...process.env,
+    DEPLOY_NO_SUDO: "1",
+    DEPLOY_SKIP_SYSTEMD: "1",
+    DEPLOY_BUILD_CMD: ":",
+    DEPLOY_PNPM_CMD: ":",
+    ...extraEnv
+  };
+
+  return spawnSync(bashCommand, [productionDeployScriptPath, installRoot], {
+    cwd: projectDir ?? repoRoot,
+    env,
+    encoding: "utf8"
+  });
+}
+
+function assertUnitPaths(unitText, root) {
+  assert.match(unitText, new RegExp(`^WorkingDirectory=${root.replace(/\//g, "\\/")}$`, "m"));
+  assert.match(unitText, new RegExp(`^EnvironmentFile=-${root.replace(/\//g, "\\/")}\\/\\.env$`, "m"));
+  assert.match(unitText, new RegExp(`^Environment=DATA_DIR=${root.replace(/\//g, "\\/")}\\/data$`, "m"));
+  assert.match(unitText, new RegExp(`^Environment=LOG_DIR=${root.replace(/\//g, "\\/")}\\/logs$`, "m"));
+  assert.match(
+    unitText,
+    new RegExp(
+      `^ReadWritePaths=${root.replace(/\//g, "\\/")}\\/data ${root.replace(/\//g, "\\/")}\\/logs ${root.replace(/\//g, "\\/")}\\/uploads\\/images ${root.replace(/\//g, "\\/")}\\/uploads\\/brand$`,
+      "m"
+    )
+  );
+  assert.match(unitText, /^NoNewPrivileges=true$/m);
+  assert.match(unitText, /^ProtectSystem=strict$/m);
+  assert.match(unitText, /^Restart=on-failure$/m);
+  assert.match(unitText, /^StandardOutput=journal$/m);
+  assert.match(unitText, /^StandardError=journal$/m);
+}
+
+test("Default deployment uses the canonical runtime root", () => {
+  const source = readFileSync(productionDeployScriptPath, "utf8");
+  assert.match(source, /CANONICAL_INSTALL_ROOT="\/data\/solar-display"/);
+  assert.match(source, /INSTALL_DIR="\$\{1:-\$\{CANONICAL_INSTALL_ROOT\}\}"/);
+  assert.doesNotMatch(source, /INSTALL_DIR="\$\{1:-\/opt\/solar-display\}"/);
+
+  // Canonical unit template is the readable /data contract (no /opt mismatch).
+  const unitTemplate = readFileSync(productionServiceTemplatePath, "utf8");
+  assertUnitPaths(unitTemplate, "/data/solar-display");
+  assert.doesNotMatch(unitTemplate, /\/opt\/solar-display/);
+
+  // Prove the no-arg default selects /data without mutating a real host path:
+  // dry-run validation only (fail closed before mkdir when root is rejected).
+  const projectDir = makeFixtureProject();
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/deploy.sh"),
+      readFileSync(productionDeployScriptPath, "utf8")
+    );
+    writeFileSync(
+      path.join(projectDir, "deploy/solar-display.service"),
+      readFileSync(productionServiceTemplatePath, "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/deploy.sh"));
+
+    // Explicit /data-equivalent under the fixture root exercises the same render
+    // path the default would use once host /data is writable.
+    const dataLikeRoot = path.join(projectDir, "data", "solar-display");
+    const result = spawnSync(
+      bashCommand,
+      [path.join(projectDir, "deploy/deploy.sh"), dataLikeRoot],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          DEPLOY_NO_SUDO: "1",
+          DEPLOY_SKIP_SYSTEMD: "1",
+          DEPLOY_BUILD_CMD: ":",
+          DEPLOY_PNPM_CMD: ":"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, new RegExp(`Installing to: ${dataLikeRoot.replace(/\//g, "\\/")}`));
+    const unitText = readFileSync(
+      path.join(dataLikeRoot, "deploy/solar-display.service.rendered"),
+      "utf8"
+    );
+    assertUnitPaths(unitText, dataLikeRoot);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Explicit install root propagates to the installed unit", () => {
+  const projectDir = makeFixtureProject();
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/deploy.sh"),
+      readFileSync(productionDeployScriptPath, "utf8")
+    );
+    writeFileSync(
+      path.join(projectDir, "deploy/solar-display.service"),
+      readFileSync(productionServiceTemplatePath, "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/deploy.sh"));
+
+    const installRoot = path.join(projectDir, "srv-solar-display");
+    const result = spawnSync(
+      bashCommand,
+      [path.join(projectDir, "deploy/deploy.sh"), installRoot],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          DEPLOY_NO_SUDO: "1",
+          DEPLOY_SKIP_SYSTEMD: "1",
+          DEPLOY_BUILD_CMD: ":",
+          DEPLOY_PNPM_CMD: ":"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const renderedPath = path.join(installRoot, "deploy/solar-display.service.rendered");
+    assert.equal(existsSync(renderedPath), true, "expected rendered unit under install root");
+    const unitText = readFileSync(renderedPath, "utf8");
+    assertUnitPaths(unitText, installRoot);
+    assert.doesNotMatch(unitText, /\/opt\/solar-display/);
+    // Custom root must not retain the canonical /data paths.
+    assert.doesNotMatch(unitText, /\/data\/solar-display/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Deployment preserves mutable runtime state", () => {
+  const projectDir = makeFixtureProject();
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/deploy.sh"),
+      readFileSync(productionDeployScriptPath, "utf8")
+    );
+    writeFileSync(
+      path.join(projectDir, "deploy/solar-display.service"),
+      readFileSync(productionServiceTemplatePath, "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/deploy.sh"));
+
+    const installRoot = path.join(projectDir, "existing-runtime");
+    mkdirSync(path.join(installRoot, "data"), { recursive: true });
+    mkdirSync(path.join(installRoot, "logs"), { recursive: true });
+    mkdirSync(path.join(installRoot, "uploads/images"), { recursive: true });
+    writeFileSync(path.join(installRoot, ".env"), "SENTINEL_ENV=keep-me\n");
+    writeFileSync(path.join(installRoot, "data/solar-display.sqlite"), "SENTINEL_DB\n");
+    writeFileSync(path.join(installRoot, "logs/app.log"), "SENTINEL_LOG\n");
+    writeFileSync(path.join(installRoot, "uploads/images/hero.png"), "SENTINEL_IMG\n");
+
+    // Also put decoy content in project mutable paths that must not be copied over.
+    writeFileSync(path.join(projectDir, ".env"), "SHOULD_NOT_OVERWRITE=true\n");
+    writeFileSync(path.join(projectDir, "data/solar-display.sqlite"), "PROJECT_DB\n");
+
+    const result = spawnSync(
+      bashCommand,
+      [path.join(projectDir, "deploy/deploy.sh"), installRoot],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          DEPLOY_NO_SUDO: "1",
+          DEPLOY_SKIP_SYSTEMD: "1",
+          DEPLOY_BUILD_CMD: ":",
+          DEPLOY_PNPM_CMD: ":"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    assert.equal(readFileSync(path.join(installRoot, ".env"), "utf8"), "SENTINEL_ENV=keep-me\n");
+    assert.equal(
+      readFileSync(path.join(installRoot, "data/solar-display.sqlite"), "utf8"),
+      "SENTINEL_DB\n"
+    );
+    assert.equal(readFileSync(path.join(installRoot, "logs/app.log"), "utf8"), "SENTINEL_LOG\n");
+    assert.equal(
+      readFileSync(path.join(installRoot, "uploads/images/hero.png"), "utf8"),
+      "SENTINEL_IMG\n"
+    );
+    // Application bundle refreshed independently.
+    assert.equal(existsSync(path.join(installRoot, "apps/server/dist/server.js")), true);
+    assert.equal(existsSync(path.join(installRoot, "package.json")), true);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Install-root rendering preserves service hardening", () => {
+  const projectDir = makeFixtureProject();
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/deploy.sh"),
+      readFileSync(productionDeployScriptPath, "utf8")
+    );
+    writeFileSync(
+      path.join(projectDir, "deploy/solar-display.service"),
+      readFileSync(productionServiceTemplatePath, "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/deploy.sh"));
+
+    const installRoot = path.join(projectDir, "hardened-root");
+    const result = spawnSync(
+      bashCommand,
+      [path.join(projectDir, "deploy/deploy.sh"), installRoot],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          DEPLOY_NO_SUDO: "1",
+          DEPLOY_SKIP_SYSTEMD: "1",
+          DEPLOY_BUILD_CMD: ":",
+          DEPLOY_PNPM_CMD: ":"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const unitText = readFileSync(
+      path.join(installRoot, "deploy/solar-display.service.rendered"),
+      "utf8"
+    );
+    assertUnitPaths(unitText, installRoot);
+
+    // Invalid relative root must fail before mutation.
+    const beforeInvalid = mkdtempSync(path.join(tmpdir(), "invalid-root-probe-"));
+    const invalidTarget = path.join(beforeInvalid, "should-not-exist");
+    const invalid = spawnSync(
+      bashCommand,
+      [path.join(projectDir, "deploy/deploy.sh"), "relative/not-absolute"],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          DEPLOY_NO_SUDO: "1",
+          DEPLOY_SKIP_SYSTEMD: "1",
+          DEPLOY_BUILD_CMD: ":",
+          DEPLOY_PNPM_CMD: ":"
+        },
+        encoding: "utf8"
+      }
+    );
+    assert.notEqual(invalid.status, 0);
+    assert.match(invalid.stderr + invalid.stdout, /absolute path/i);
+    assert.equal(existsSync(invalidTarget), false);
+    removeTempDir(beforeInvalid);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
