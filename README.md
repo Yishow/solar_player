@@ -113,6 +113,21 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 - `logs/`：server log 目錄（由 `.env` / deploy service 指定）
 - `docs/openapi.yaml`：server 啟動時讀取的 OpenAPI 規格檔
 
+### 圖片上傳內容驗證（`POST /api/images`）
+
+上傳 PNG / JPEG / WebP 時，server 在寫檔與寫入 DB 前會做 **byte-level container 檢查**（非完整像素 decode）：
+
+- 允許格式：`.png` / `.jpg` / `.jpeg` / `.webp`（以檔案簽名與容器結構辨識）
+- 壓縮後檔案大小上限：**10 MB**
+- 單邊像素上限：**8192**；總像素（width × height）上限：**33,177,600**
+- **副檔名、multipart 宣告 MIME、偵測到的實際格式必須一致**；DB 的 `mime_type` 使用偵測結果
+- 以下輸入會在 persist 前回 **bounded 400**（不回 server path、檔案內容或 stack）：
+  1. 重新命名的文字／非影像 binary
+  2. 截斷的 PNG / JPEG / WebP 容器
+  3. extension 與 declared MIME 不一致
+  4. 實際 bytes 與 extension／MIME 不一致
+  5. 超過單邊或總像素 budget
+
 ## 部署入口
 
 `deploy/` 是目前的部署入口，內容對應現有腳本與 service 範本：

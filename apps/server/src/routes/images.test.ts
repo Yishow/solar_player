@@ -434,6 +434,270 @@ test("POST /api/images rejects files with invalid extensions", async () => {
   }
 });
 
+function countImageAssets() {
+  return (getDatabase().prepare("SELECT COUNT(*) AS count FROM image_assets").get() as { count: number })
+    .count;
+}
+
+function countUploadFiles() {
+  const uploadsDir = process.env.UPLOADS_DIR ?? join(tempDir, "uploads", "images");
+  if (!existsSync(uploadsDir)) {
+    return 0;
+  }
+  return readdirSync(uploadsDir).length;
+}
+
+function assertBoundedClientError(body: { success?: boolean; error?: string }) {
+  assert.equal(body.success, false);
+  assert.equal(typeof body.error, "string");
+  const error = body.error ?? "";
+  assert.equal(error.includes(tempDir), false);
+  assert.equal(error.includes("uploads"), false);
+  assert.equal(error.includes("at "), false); // stack frame shape
+  assert.equal(error.includes("Buffer"), false);
+}
+
+function createMinimalWebpForRoute(width = 1, height = 1): Buffer {
+  const wMinus1 = width - 1;
+  const hMinus1 = height - 1;
+  const vp8xPayload = Buffer.alloc(10);
+  vp8xPayload[4] = wMinus1 & 0xff;
+  vp8xPayload[5] = (wMinus1 >> 8) & 0xff;
+  vp8xPayload[6] = (wMinus1 >> 16) & 0xff;
+  vp8xPayload[7] = hMinus1 & 0xff;
+  vp8xPayload[8] = (hMinus1 >> 8) & 0xff;
+  vp8xPayload[9] = (hMinus1 >> 16) & 0xff;
+  const chunkSize = Buffer.alloc(4);
+  chunkSize.writeUInt32LE(10, 0);
+  const riffBody = Buffer.concat([Buffer.from("WEBP"), Buffer.from("VP8X"), chunkSize, vp8xPayload]);
+  const riffSize = Buffer.alloc(4);
+  riffSize.writeUInt32LE(riffBody.length, 0);
+  return Buffer.concat([Buffer.from("RIFF"), riffSize, riffBody]);
+}
+
+test("POST /api/images rejects renamed text bytes presented as PNG without persisting", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+  const beforeAssets = countImageAssets();
+  const beforeFiles = countUploadFiles();
+
+  try {
+    const { payload, contentType } = buildMultipartBody(
+      "fake.png",
+      "image/png",
+      Buffer.from("not-a-real-png-payload")
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 400);
+    assertBoundedClientError(response.json() as { success?: boolean; error?: string });
+    assert.equal(countImageAssets(), beforeAssets);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images rejects extension/MIME/content mismatches without persisting", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+  const jpegBuffer = createMinimalJpeg();
+  const cases = [
+    { filename: "mismatch.png", mimeType: "image/png", content: jpegBuffer, label: "jpeg-as-png" },
+    {
+      filename: "mismatch.jpg",
+      mimeType: "image/png",
+      content: jpegBuffer,
+      label: "jpeg-bytes-png-mime"
+    },
+    {
+      filename: "mismatch.webp",
+      mimeType: "image/webp",
+      content: createMinimalPng(),
+      label: "png-as-webp"
+    }
+  ] as const;
+
+  try {
+    for (const testCase of cases) {
+      const beforeAssets = countImageAssets();
+      const beforeFiles = countUploadFiles();
+      const { payload, contentType } = buildMultipartBody(
+        testCase.filename,
+        testCase.mimeType,
+        testCase.content
+      );
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/images",
+        headers: { "content-type": contentType },
+        payload
+      });
+
+      assert.equal(response.statusCode, 400, testCase.label);
+      assertBoundedClientError(response.json() as { success?: boolean; error?: string });
+      assert.equal(countImageAssets(), beforeAssets, testCase.label);
+      assert.equal(countUploadFiles(), beforeFiles, testCase.label);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images rejects truncated and over-budget images without persisting", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const beforeAssets = countImageAssets();
+    const beforeFiles = countUploadFiles();
+
+    const truncatedJpeg = createMinimalJpeg().subarray(0, createMinimalJpeg().length - 2);
+    const truncatedUpload = buildMultipartBody("truncated.jpg", "image/jpeg", truncatedJpeg);
+    const truncatedResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": truncatedUpload.contentType },
+      payload: truncatedUpload.payload
+    });
+    assert.equal(truncatedResponse.statusCode, 400);
+    assertBoundedClientError(truncatedResponse.json() as { success?: boolean; error?: string });
+
+    // 8192 × 4054 exceeds 33,177,600 total pixels.
+    const overBudget = createMinimalWebpForRoute(8192, 4054);
+    const overBudgetUpload = buildMultipartBody("huge.webp", "image/webp", overBudget);
+    const overBudgetResponse = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": overBudgetUpload.contentType },
+      payload: overBudgetUpload.payload
+    });
+    assert.equal(overBudgetResponse.statusCode, 400);
+    assertBoundedClientError(overBudgetResponse.json() as { success?: boolean; error?: string });
+
+    assert.equal(countImageAssets(), beforeAssets);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images accepts valid WebP and stores detected mime type", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+
+  try {
+    const webp = createMinimalWebpForRoute(2, 2);
+    const { payload, contentType } = buildMultipartBody("ok.webp", "image/webp", webp);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 201);
+    const body = response.json() as { success: boolean; data: ImageAsset };
+    assert.equal(body.success, true);
+    assert.equal(body.data.mimeType, "image/webp");
+    assert.equal(body.data.originalName, "ok.webp");
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images rejects payloads over the 10MB compressed-size limit", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const app = await buildApp();
+  const beforeAssets = countImageAssets();
+  const beforeFiles = countUploadFiles();
+
+  try {
+    // Build a buffer larger than 10MB that still looks like a PNG signature so the
+    // multipart layer delivers it; size gate must reject before persistence.
+    const oversized = Buffer.alloc(10 * 1024 * 1024 + 64, 0);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(oversized);
+
+    const { payload, contentType } = buildMultipartBody("too-big.png", "image/png", oversized);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    // Fastify multipart may surface limit as 400/413/500 depending on version; accept
+    // non-success and assert no persistence either way.
+    assert.notEqual(response.statusCode, 201);
+    assert.equal(countImageAssets(), beforeAssets);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/images deletes the written file when metadata row cannot be reloaded", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const db = getDatabase();
+  db.exec(`
+    CREATE TRIGGER test_image_assets_delete_after_insert
+    AFTER INSERT ON image_assets
+    BEGIN
+      DELETE FROM image_assets WHERE id = NEW.id;
+    END;
+  `);
+
+  const app = await buildApp();
+  const beforeFiles = countUploadFiles();
+
+  try {
+    const pngBuffer = createMinimalPng();
+    const { payload, contentType } = buildMultipartBody("cleanup.png", "image/png", pngBuffer);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 500);
+    const body = response.json() as { success?: boolean; error?: string };
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Failed to save image metadata");
+    assertBoundedClientError(body);
+    assert.equal(countImageAssets(), 0);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    db.exec("DROP TRIGGER IF EXISTS test_image_assets_delete_after_insert");
+    await app.close();
+  }
+});
+
 test("PUT /api/images/:id updates image metadata", async () => {
   migrateDatabase();
   seedDatabase();

@@ -13,6 +13,12 @@ import {
   ensureImagePlaylistEntryForAsset
 } from "../services/imagePlaylistService.js";
 import {
+  imageContentValidationErrorMessage,
+  mimeTypeForContentValidatedExtension,
+  validateImageContent,
+  validateImageTypeAgreement
+} from "../services/imageContentValidation.js";
+import {
   ALLOWED_EXTENSIONS,
   deleteImageFile,
   ensureUploadsDir,
@@ -124,12 +130,39 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         .send(errorResponse("Invalid file type. Only .jpg, .jpeg, .png, .webp are allowed."));
     }
 
-    ensureUploadsDir();
     const buffer = await data.toBuffer();
     if (buffer.length > MAX_FILE_SIZE) {
       return reply.status(400).send(errorResponse("File too large. Maximum size is 10MB."));
     }
 
+    // PNG/JPEG/WebP: byte-level signature, container bounds, dimensions, and type agreement
+    // before any filesystem or DB write. SVG and other non-validated extensions keep the
+    // existing extension-only gate (no full content decode pipeline in this change).
+    let storedMimeType = data.mimetype;
+    const contentValidatedMime = mimeTypeForContentValidatedExtension(ext);
+    if (contentValidatedMime) {
+      const contentResult = validateImageContent(buffer);
+      if (!contentResult.ok) {
+        return reply
+          .status(400)
+          .send(errorResponse(imageContentValidationErrorMessage(contentResult)));
+      }
+
+      const agreementFailure = validateImageTypeAgreement({
+        extension: ext,
+        declaredMime: data.mimetype,
+        detected: contentResult
+      });
+      if (agreementFailure) {
+        return reply
+          .status(400)
+          .send(errorResponse(imageContentValidationErrorMessage(agreementFailure)));
+      }
+
+      storedMimeType = contentResult.mimeType;
+    }
+
+    ensureUploadsDir();
     const category = normalizeAssetCategory(readMultipartFieldValue(data.fields.category));
     const usageScope = normalizeAssetUsageScope(readMultipartFieldValue(data.fields.usageScope));
     const includedInSlideshow = normalizeBooleanField(
@@ -157,7 +190,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         data.filename,
         data.filename.replace(extname(data.filename), ""),
         null,
-        data.mimetype,
+        storedMimeType,
         buffer.length,
         includedInSlideshow ? 1 : 0
       );
