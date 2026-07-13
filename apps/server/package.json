@@ -22,7 +22,7 @@
     "better-sqlite3": "latest",
     "dotenv": "^17.4.2",
     "fastify": "latest",
-    "mqtt": "^5.15.1",
+    "mqtt": "^5.15.2",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
