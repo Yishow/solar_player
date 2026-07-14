@@ -127,7 +127,6 @@ test("display page route host loads only the current template chunk without edit
   assert.match(routeHostFrameSource, /loadDisplayPageTemplate\(/);
   assert.match(routeHostFrameSource, /setLoadedTemplate\(/);
   assert.match(routeHostFrameSource, /throw templateLoadError/);
-  assert.match(routeHostFrameSource, /isTemplatePending/);
   // Unresolved routes must clear retention and redirect, not sticky-render prior templates.
   assert.match(routeHostFrameSource, /setLoadedTemplate\(null\)/);
   assert.match(routeHostFrameSource, /if \(!page\)/);

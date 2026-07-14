@@ -21,14 +21,12 @@ export function DisplayPageRouteHostFrame({
   isRegistryLoading: boolean;
 }) {
   const [loadedTemplate, setLoadedTemplate] = useState<LoadedDisplayPageTemplate | null>(null);
-  const [isTemplatePending, setIsTemplatePending] = useState(false);
   const [templateLoadError, setTemplateLoadError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!page?.templateKey) {
       // Missing/archived/disabled routes must not keep a prior successful template mounted.
       setLoadedTemplate(null);
-      setIsTemplatePending(false);
       setTemplateLoadError(null);
       return;
     }
@@ -37,7 +35,6 @@ export function DisplayPageRouteHostFrame({
     const templateKey = page.templateKey;
     let cancelled = false;
 
-    setIsTemplatePending(true);
     setTemplateLoadError(null);
 
     void loadDisplayPageTemplate(templateKey)
@@ -51,7 +48,6 @@ export function DisplayPageRouteHostFrame({
           renderPage: runtime.renderPage,
           templateKey: runtime.templateKey
         });
-        setIsTemplatePending(false);
       })
       .catch((error) => {
         if (cancelled) {
@@ -59,7 +55,6 @@ export function DisplayPageRouteHostFrame({
         }
 
         setTemplateLoadError(error instanceof Error ? error : new Error(String(error)));
-        setIsTemplatePending(false);
       });
 
     return () => {
@@ -88,9 +83,5 @@ export function DisplayPageRouteHostFrame({
     );
   }
 
-  if (isRegistryLoading || isTemplatePending) {
-    return null;
-  }
-
-  return <Navigate to="/overview" replace />;
+  return null;
 }

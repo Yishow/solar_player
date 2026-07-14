@@ -137,6 +137,65 @@ test("display page route loader primes the shared registry snapshot for shell an
   assert.match(routeHostFrameSource, /setLoadedTemplate\(null\)/);
 });
 
+test("display page route host keeps a cold resolved route while its template loads", async () => {
+  const { rootEl } = installDom();
+  let root: Root | null = null;
+  const solarPage = createPage({
+    id: 2,
+    pageKey: "solar",
+    route: "/solar",
+    routeSlug: "solar",
+    templateKey: "solar",
+    displayNameEn: "Solar",
+    displayNameZh: "太陽能"
+  });
+
+  setDisplayPageTemplateImportersForTests({
+    solar: async () => new Promise<ReturnType<typeof stubRuntime>>(() => {})
+  });
+
+  try {
+    root = createRoot(rootEl);
+    await act(async () => {
+      root!.render(
+        createElement(
+          MemoryRouter,
+          { initialEntries: ["/solar"] },
+          createElement(
+            Routes,
+            null,
+            createElement(Route, {
+              path: "*",
+              element: createElement(
+                "div",
+                null,
+                createElement(LocationProbe),
+                createElement(DisplayPageRouteHostFrame, {
+                  page: solarPage,
+                  isRegistryLoading: false
+                })
+              )
+            })
+          )
+        )
+      );
+    });
+    await flushMicrotasks(6);
+
+    assert.equal(
+      rootEl.querySelector('[data-testid="location"]')?.getAttribute("data-pathname"),
+      "/solar"
+    );
+    assert.equal(rootEl.querySelector('[data-testid="template"]'), null);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    setDisplayPageTemplateImportersForTests(null);
+    resetDisplayPageTemplateLoadCacheForTests();
+  }
+});
+
 test("display page route host navigates to /overview when page becomes missing after a loaded template", async () => {
   const { rootEl } = installDom();
   let root: Root | null = null;
