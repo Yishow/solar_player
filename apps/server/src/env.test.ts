@@ -16,3 +16,13 @@ test("resolveEnvFilePath maps dist entrypoint to workspace .env", () => {
         "/opt/solar-display/.env"
     );
 });
+
+test("resolveEnvFilePath honors an explicit isolated env file", () => {
+    assert.equal(
+        resolveEnvFilePath(
+            "file:///opt/solar-display/apps/server/dist/server.js",
+            "/tmp/solar-browser-smoke.env"
+        ),
+        "/tmp/solar-browser-smoke.env"
+    );
+});

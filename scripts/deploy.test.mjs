@@ -10,6 +10,7 @@ const deployScriptPath = path.join(repoRoot, "deploy.sh");
 const exportScriptPath = path.join(repoRoot, "deploy/export-runtime-state.sh");
 const restoreScriptPath = path.join(repoRoot, "deploy/restore-runtime-state.sh");
 const resetDbScriptPath = path.join(repoRoot, "deploy/reset-db-settings.sh");
+const browserSmokeRunnerPath = path.join(repoRoot, "scripts/run-browser-smoke.mjs");
 const raspiDeployScriptPath = path.join(repoRoot, "scripts/raspi-onekey-deploy.sh");
 const prepareUserDataScriptPath = path.join(repoRoot, "scripts/prepare-raspi-user-data.sh");
 const prepareUserDataPs1Path = path.join(repoRoot, "scripts/prepare-raspi-user-data.ps1");
@@ -2295,4 +2296,11 @@ test("direct deploy copies or generates release-manifest.json", () => {
   const source = readFileSync(path.join(repoRoot, "deploy/deploy.sh"), "utf8");
   assert.match(source, /run_priv node[\s\S]*generate-release-manifest\.mjs/);
   assert.match(source, /release-manifest\.json/);
+});
+
+test("browser smoke pins server dotenv to an isolated temp file", () => {
+  const source = readFileSync(browserSmokeRunnerPath, "utf8");
+
+  assert.match(source, /browser-smoke\.env/u);
+  assert.match(source, /SOLAR_DISPLAY_ENV_FILE:\s*envFilePath/u);
 });

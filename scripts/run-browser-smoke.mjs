@@ -278,6 +278,7 @@ async function main() {
   const playwrightOutputDir = path.join(workRoot, "playwright-output");
   const serverLogPath = path.join(workRoot, "server.log");
   const consoleLogPath = path.join(workRoot, "browser-console.log");
+  const envFilePath = path.join(workRoot, "browser-smoke.env");
   const networkLogPath = path.join(workRoot, "network-summary.json");
   const runtimeManifestPath = path.join(runtimeDir, "runtime-manifest.json");
 
@@ -287,6 +288,7 @@ async function main() {
   await mkdir(runtimeDir, { recursive: true });
   await mkdir(playwrightOutputDir, { recursive: true });
   await mkdir(artifactDir, { recursive: true });
+  await writeFile(envFilePath, "");
 
   const productionDbHashBefore = hashPathIfPresent(PRODUCTION_DATABASE);
   const productionUploadsHashBefore = hashDirectorySnapshot(PRODUCTION_UPLOADS);
@@ -376,6 +378,7 @@ async function main() {
       MQTT_DATA_MODE: "mock",
       NODE_ENV: "production",
       PORT: String(SMOKE_PORT),
+      SOLAR_DISPLAY_ENV_FILE: envFilePath,
       UPLOADS_DIR: uploadsDir,
       WEB_DIST_DIR: path.join(repoRoot, "apps/web/dist")
     };

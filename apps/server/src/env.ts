@@ -5,7 +5,14 @@ function isWindowsDrivePathname(pathname: string) {
     return /^\/[A-Za-z]:\//.test(pathname);
 }
 
-export function resolveEnvFilePath(moduleUrl: string): string {
+export function resolveEnvFilePath(
+    moduleUrl: string,
+    explicitPath = process.env.SOLAR_DISPLAY_ENV_FILE
+): string {
+    if (explicitPath?.trim()) {
+        return resolve(explicitPath.trim());
+    }
+
     const url = new URL(moduleUrl);
 
     if (url.protocol !== "file:") {
