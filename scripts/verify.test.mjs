@@ -3,10 +3,10 @@ import test from "node:test";
 
 import { VERIFY_STAGES, runVerifyStages } from "./verify.mjs";
 
-test("root verify stages are build → server → web → deploy → server-runner", () => {
+test("root verify stages are build → bundle-budget → server → web → deploy → server-runner", () => {
   assert.deepEqual(
     VERIFY_STAGES.map((s) => s.label),
-    ["build", "server", "web", "deploy", "server-runner"]
+    ["build", "bundle-budget", "server", "web", "deploy", "server-runner"]
   );
 });
 

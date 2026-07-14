@@ -50,6 +50,14 @@ export type JournalRunner = (input: {
   mode: "export" | "recent";
 }) => Promise<JournalRunnerResult>;
 
+export type JournalExecResult = { stdout: string; stderr: string };
+
+export type JournalExecFunction = (
+  file: string,
+  args: readonly string[],
+  options: { encoding: "utf8"; maxBuffer: number; timeout: number }
+) => Promise<JournalExecResult>;
+
 export function clampDeviceLogLimit(raw: unknown): number {
   const parsed =
     typeof raw === "number"
@@ -119,7 +127,9 @@ function shouldUseSudo(): boolean {
   return true;
 }
 
-export function createDefaultJournalRunner(): JournalRunner {
+export function createDefaultJournalRunner(
+  exec: JournalExecFunction = execFileAsync
+): JournalRunner {
   return async ({ mode, limit }) => {
     const helperPath = resolveHelperPath();
     if (!existsSync(helperPath)) {
@@ -138,7 +148,7 @@ export function createDefaultJournalRunner(): JournalRunner {
       : [mode, String(clamped)];
 
     try {
-      const result = await execFileAsync(file, args, {
+      const result = await exec(file, args, {
         encoding: "utf8",
         maxBuffer: 2 * 1024 * 1024,
         timeout: 10_000
@@ -150,10 +160,10 @@ export function createDefaultJournalRunner(): JournalRunner {
       };
     } catch (error) {
       const err = error as {
-        code?: string;
+        code?: number | string;
         killed?: boolean;
+        signal?: string | null;
         message?: string;
-        status?: number | null;
         stderr?: string;
         stdout?: string;
       };
@@ -167,8 +177,10 @@ export function createDefaultJournalRunner(): JournalRunner {
       }
 
       const stderr = String(err.stderr ?? err.message ?? "journal reader failed");
-      const exitCode =
-        typeof err.status === "number" && Number.isFinite(err.status) ? err.status : 1;
+      // After the ENOENT (spawn-failure) guard, a numeric non-zero exit code lives
+      // on err.code. A timeout (or any signal kill) is reported as the conventional
+      // 124 so callers/mapRunnerFailure can distinguish it from a normal failure.
+      const exitCode = err.killed || err.signal ? 124 : typeof err.code === "number" ? err.code : 1;
 
       if (/password is required|a password is required|sudo:\s*a password/i.test(stderr)) {
         return {

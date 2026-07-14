@@ -323,6 +323,10 @@ export function usePlaybackController(
       return;
     }
 
+    if (!isPlaybackAllowedBySchedule(settings, new Date())) {
+      return;
+    }
+
     const nextTemplateKey = resolveNextEffectivePlaybackTemplateKey({
       currentIndex: runtime.currentIndex,
       loop: settings.loop,

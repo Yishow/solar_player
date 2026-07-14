@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   clampDeviceLogLimit,
+  createDefaultJournalRunner,
   exportDeviceLogs,
   parseJournalJsonLines,
   readDeviceLogSummary,
+  type JournalExecFunction,
   type JournalRunner
 } from "./deviceLogService.js";
 
@@ -123,4 +125,134 @@ test("exportDeviceLogs does not accept caller unit or path through the runner co
 
   const exported = await exportDeviceLogs({ runner, limit: 5 });
   assert.equal(exported.available, true);
+});
+
+// ---------------------------------------------------------------------------
+// createDefaultJournalRunner: exercises the real runner factory with an
+// injected exec so no real `sudo`/helper process is spawned. The factory
+// still runs its existsSync/env resolution, so each test points the helper
+// path at a real file (the node binary) and restores env afterwards.
+// ---------------------------------------------------------------------------
+
+type ExecErrorShape = {
+  code?: number | string | null;
+  killed?: boolean;
+  signal?: string | null;
+  message?: string;
+  stderr?: string;
+  stdout?: string;
+};
+
+function stubEnv(overrides: Record<string, string | undefined> = {}): () => void {
+  const tracked = new Set<string>([
+    "DEVICE_LOG_HELPER_PATH",
+    "DEVICE_LOG_HELPER_USE_SUDO",
+    ...Object.keys(overrides)
+  ]);
+  const saved: Record<string, string | undefined> = {};
+  for (const key of tracked) {
+    saved[key] = process.env[key];
+  }
+  // Point the helper at a real existing path so the existsSync gate passes and
+  // the injected exec is reached.
+  process.env.DEVICE_LOG_HELPER_PATH = process.execPath;
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+  return () => {
+    for (const key of tracked) {
+      if (saved[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = saved[key];
+      }
+    }
+  };
+}
+
+function failingExec(err: ExecErrorShape): JournalExecFunction {
+  return async () => {
+    throw Object.assign(new Error(err.message ?? "exec failed"), err);
+  };
+}
+
+test("createDefaultJournalRunner returns exitCode 0 and helper output on success", async () => {
+  const restore = stubEnv();
+  try {
+    const runner = createDefaultJournalRunner(async () => ({
+      stdout: "line-ok\n",
+      stderr: ""
+    }));
+    const result = await runner({ limit: 20, mode: "recent" });
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "line-ok\n");
+    assert.equal(result.stderr, "");
+  } finally {
+    restore();
+  }
+});
+
+test("createDefaultJournalRunner maps a numeric exit code from err.code", async () => {
+  const restore = stubEnv();
+  try {
+    const runner = createDefaultJournalRunner(
+      failingExec({ code: 42, stderr: "boom", stdout: "" })
+    );
+    const result = await runner({ limit: 20, mode: "recent" });
+    assert.equal(result.exitCode, 42);
+    assert.equal(result.stderr, "boom");
+    assert.equal(result.stdout, "");
+  } finally {
+    restore();
+  }
+});
+
+test("createDefaultJournalRunner maps ENOENT spawn failure to exit 127", async () => {
+  const restore = stubEnv();
+  try {
+    const runner = createDefaultJournalRunner(failingExec({ code: "ENOENT" }));
+    const result = await runner({ limit: 20, mode: "recent" });
+    assert.equal(result.exitCode, 127);
+    assert.match(result.stderr, /not installed|not available/i);
+  } finally {
+    restore();
+  }
+});
+
+test("createDefaultJournalRunner reports a killed/signal timeout as exit 124", async () => {
+  const restore = stubEnv();
+  try {
+    const runner = createDefaultJournalRunner(
+      failingExec({
+        killed: true,
+        signal: "SIGTERM",
+        code: null,
+        stderr: "timed out",
+        stdout: ""
+      })
+    );
+    const result = await runner({ limit: 20, mode: "recent" });
+    assert.equal(result.exitCode, 124);
+    assert.equal(result.stderr, "timed out");
+  } finally {
+    restore();
+  }
+});
+
+test("createDefaultJournalRunner detects a sudo password prompt as access denied", async () => {
+  const restore = stubEnv();
+  try {
+    const runner = createDefaultJournalRunner(
+      failingExec({ code: 1, stderr: "sudo: a password is required", stdout: "" })
+    );
+    const result = await runner({ limit: 20, mode: "recent" });
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stderr, "journal access denied");
+  } finally {
+    restore();
+  }
 });

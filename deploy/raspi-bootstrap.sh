@@ -116,12 +116,15 @@ preflight_backup_disk_space() {
   [[ -d "${INSTALL_DIR}/backups" ]] && parent="${INSTALL_DIR}/backups"
   mkdir -p "${INSTALL_DIR}/backups" 2>/dev/null || true
   need="$(estimate_backup_bytes)"
-  if command -v df >/dev/null 2>&1; then
-    available="$(df -Pk "${INSTALL_DIR}" 2>/dev/null | awk 'NR==2 {print $4}')"
-    available=$(( ${available:-0} * 1024 ))
-    if (( available > 0 && need > available )); then
-      fail "insufficient disk space for runtime backup (need ~${need} bytes, available ${available})"
-    fi
+  command -v df >/dev/null 2>&1 \
+    || fail "df is required for backup disk-space preflight but is unavailable (refusing to proceed without a space check)"
+  available="$(df -Pk "${INSTALL_DIR}" 2>/dev/null | awk 'NR==2 {print $4}')"
+  available=$(( ${available:-0} * 1024 ))
+  if (( available <= 0 )); then
+    fail "disk space preflight could not determine available space for ${INSTALL_DIR} (df returned no data; refusing to proceed)"
+  fi
+  if (( need > available )); then
+    fail "insufficient disk space for runtime backup (need ~${need} bytes, available ${available})"
   fi
   ok "disk space preflight for backup passed"
 }

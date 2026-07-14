@@ -74,12 +74,14 @@ render_service_unit() {
     fail "failed to render systemd unit for ${root}"
   fi
 
-  # Sanity: every path-sensitive field must mention the selected root.
-  if ! grep -q "^WorkingDirectory=${root}$" "${tmp}" \
-    || ! grep -q "^EnvironmentFile=-${root}/.env$" "${tmp}" \
-    || ! grep -q "^Environment=DATA_DIR=${root}/data$" "${tmp}" \
-    || ! grep -q "^Environment=LOG_DIR=${root}/logs$" "${tmp}" \
-    || ! grep -q "^ReadWritePaths=${root}/data ${root}/logs ${root}/uploads/images ${root}/uploads/brand$" "${tmp}"; then
+  # Sanity: every path-sensitive field must EXACTLY resolve to the selected root.
+  # Use fixed-string whole-line matching (-F -x) so a '.' in the install root is
+  # treated literally and a malformed sed render cannot pass via regex wildcard.
+  if ! grep -F -x -q -- "WorkingDirectory=${root}" "${tmp}" \
+    || ! grep -F -x -q -- "EnvironmentFile=-${root}/.env" "${tmp}" \
+    || ! grep -F -x -q -- "Environment=DATA_DIR=${root}/data" "${tmp}" \
+    || ! grep -F -x -q -- "Environment=LOG_DIR=${root}/logs" "${tmp}" \
+    || ! grep -F -x -q -- "ReadWritePaths=${root}/data ${root}/logs ${root}/uploads/images ${root}/uploads/brand" "${tmp}"; then
     rm -f "${tmp}"
     fail "rendered unit does not fully resolve paths under ${root}"
   fi
@@ -146,7 +148,16 @@ main() {
   # 3. Ownership for dependency install (no-op under DEPLOY_NO_SUDO when already owned)
   echo "[3/5] Preparing ownership..."
   if [[ "${DEPLOY_NO_SUDO:-0}" != "1" ]]; then
-    run_priv chown -R "${USER}:${USER}" "${INSTALL_DIR}"
+    # Chown ONLY the freshly copied application bundle trees and top-level config
+    # files. Explicitly exclude mutable runtime paths (data/logs/uploads/.env) so
+    # their ownership is preserved as-is; never chown the whole install root.
+    local chown_target
+    for chown_target in apps packages deploy node_modules \
+        package.json pnpm-lock.yaml pnpm-workspace.yaml .env.example release-manifest.json; do
+      if [[ -e "${INSTALL_DIR}/${chown_target}" ]]; then
+        run_priv chown -R "${USER}:${USER}" "${INSTALL_DIR}/${chown_target}"
+      fi
+    done
   fi
 
   # 4. Install production dependencies

@@ -297,65 +297,53 @@ test("playback survives reload and socket reconnect", async ({ page }) => {
   await waitForPlaybackShell(page);
   await waitForLiveMetricValue(page);
 
-  // Interrupt Socket.IO transport once without restarting the application.
-  await page.evaluate(async () => {
-    const candidates = Array.from(
-      document.querySelectorAll("body")
-    );
-    void candidates;
-
-    // Access the module singleton via any open engine websocket and close it.
-    // Socket.IO exposes active managers on the global through closed-over clients;
-    // fall back to closing every client WebSocket for this origin.
-    const sockets = (performance as unknown as { getEntriesByType?: (type: string) => unknown[] })
-      .getEntriesByType?.("resource") ?? [];
-    void sockets;
-
-    const anyWindow = window as unknown as {
-      __SMOKE_SOCKET_CLOSED__?: boolean;
-    };
-
-    // Close active WebSockets for this page by poking the browser's private list when available.
-    const chromeLike = window as unknown as {
-      WebSocket?: typeof WebSocket;
-    };
-    const OriginalWebSocket = chromeLike.WebSocket;
-    void OriginalWebSocket;
-
-    // Best-effort: find EventSource/WebSocket instances tracked by userland is unavailable;
-    // use page-level offline flip in the Playwright layer instead when evaluate cannot reach io.
-    anyWindow.__SMOKE_SOCKET_CLOSED__ = true;
+  // Observe the Socket.IO transport at the Playwright WebSocket layer so the
+  // reconnect assertion can verify the socket itself, not the REST bootstrap at
+  // /api/metrics/live. The server emits `mqtt:status` + `liveMetrics:update` to
+  // every socket on connection (apps/server/src/realtime/SocketService.ts), so a
+  // reconnected socket always receives a fresh server->client frame immediately.
+  const socketFramesReceivedAt: number[] = [];
+  page.on("websocket", (socket) => {
+    socket.on("framereceived", () => {
+      socketFramesReceivedAt.push(Date.now());
+    });
   });
 
-  // Use Playwright network offline flip to drop the Socket.IO transport once.
+  // The transport drop is performed by the Playwright context offline flip below;
+  // no in-page socket manipulation is needed (the app keeps its socket.io client
+  // in module scope and does not expose it on `window`, so reaching/closing it
+  // from page.evaluate is neither possible nor reliable).
+
+  // Drop the Socket.IO transport once without restarting the application.
   await page.context().setOffline(true);
+
+  // Confirm the network actually went offline (observable, bounded) before
+  // restoring it — instead of an arbitrary fixed sleep below the client's
+  // reconnectionDelay of 1500ms (apps/web/src/services/socket.ts).
+  await expect
+    .poll(async () => page.evaluate(() => navigator.onLine), { timeout: 10_000 })
+    .toBe(false);
+
   await expect(page.locator("body.page-hero-shell")).toBeVisible();
   await expect(page.locator("#root")).not.toBeEmpty();
   // Shell stays mounted during recovery (no application restart / blank root).
-  await page.waitForTimeout(400);
+
+  const framesBeforeRestore = socketFramesReceivedAt.length;
   await page.context().setOffline(false);
 
   await waitForPlaybackShell(page);
 
-  // Reconnect: wait until socket client reports connected again (via UI still showing live values).
+  // Reconnect assertion: wait for a server->client frame delivered over the
+  // reconnected Socket.IO WebSocket transport. A regression that only keeps REST
+  // alive (e.g. reconnection disabled, or the io reconnect handlers removed)
+  // cannot produce a WebSocket frame, so this genuinely verifies socket reconnect
+  // resuming live updates rather than a cached/REST value.
   await expect
-    .poll(async () => {
-      return page.evaluate(async () => {
-        try {
-          const response = await fetch("/api/metrics/live");
-          if (!response.ok) {
-            return null;
-          }
-          const body = (await response.json()) as {
-            metrics?: { realTimePower?: { value?: number } };
-          };
-          return body.metrics?.realTimePower?.value ?? null;
-        } catch {
-          return null;
-        }
-      });
-    }, { timeout: 20_000 })
-    .toEqual(expect.any(Number));
+    .poll(async () => socketFramesReceivedAt.length, {
+      message: "Socket.IO transport delivered a fresh frame after reconnect",
+      timeout: 20_000
+    })
+    .toBeGreaterThan(framesBeforeRestore);
 
   const afterReconnect = await waitForLiveMetricValue(page);
   expect(afterReconnect).toMatch(/\d/);

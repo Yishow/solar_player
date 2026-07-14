@@ -118,6 +118,9 @@ export function prefetchDisplayPageTemplate(
 
 /** Test-only helper to clear the promise cache between cases. */
 export function resetDisplayPageTemplateLoadCacheForTests() {
+  if (import.meta.env?.PROD) {
+    return;
+  }
   templateLoadCache.clear();
 }
 
@@ -125,6 +128,9 @@ export function resetDisplayPageTemplateLoadCacheForTests() {
 export function setDisplayPageTemplateImportersForTests(
   importers: Partial<Record<DisplayPageTemplateKey, TemplateImporter>> | null
 ) {
+  if (import.meta.env?.PROD) {
+    return;
+  }
   templateImporters = {
     ...defaultTemplateImporters,
     ...(importers ?? {})

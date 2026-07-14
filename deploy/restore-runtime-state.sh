@@ -109,7 +109,12 @@ verify_backup() {
     local prior_actual prior_expected
     prior_actual="$(sha256_file "${BACKUP_DIR}/prior-application.tar.gz")"
     prior_expected="$(manifest_payload_sha "${MANIFEST_PATH}" "prior-application.tar.gz" 2>/dev/null || true)"
-    if [[ -n "${prior_expected}" && "${prior_actual}" != "${prior_expected}" ]]; then
+    if [[ -z "${prior_expected}" ]]; then
+      if [[ "${DRILL}" == "1" ]]; then
+        fail "prior application archive checksum is missing from manifest; required for restore drill (refusing restore)"
+      fi
+      # Non-drill restore does not depend on the prior-application payload.
+    elif [[ "${prior_actual}" != "${prior_expected}" ]]; then
       fail "prior application archive does not match manifest payload checksum (refusing restore)"
     fi
   fi
@@ -139,6 +144,19 @@ validate_restore_target_root() {
   normalized="$(node -e 'const path = require("node:path"); process.stdout.write(path.resolve(process.argv[1]));' "${root}")" \
     || fail "restore target root could not be normalized: ${root}"
   [[ "${normalized}" != "/" ]] || fail "restore target root must not be filesystem root"
+
+  # Reject well-known system roots so an operator typo cannot rm -rf into /etc etc.
+  # The denylist may be overridden via RESTORE_TARGET_DENYLIST (empty disables).
+  local denylist="${RESTORE_TARGET_DENYLIST-/etc /usr /bin /sbin /boot /lib /lib64 /home /root /var /proc /sys /dev /run}"
+  if [[ -n "${denylist}" ]]; then
+    local denied
+    for denied in ${denylist}; do
+      if [[ "${normalized}" == "${denied}" || "${normalized}" == "${denied}/"* ]]; then
+        fail "restore target root must not be a system root: ${normalized} (under ${denied})"
+      fi
+    done
+  fi
+
   TARGET_ROOT="${normalized}"
 }
 
@@ -149,18 +167,56 @@ apply_mutable_paths() {
 
   mkdir -p "${dest_root}"
 
+  # Snapshot existing mutable paths so a mid-write failure can roll the target
+  # back to its pre-restore state instead of leaving it half-overwritten.
+  ROLLBACK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/solar-restore-rollback-XXXXXX")"
+
+  for path_name in data uploads .env; do
+    if [[ -e "${dest_root}/${path_name}" ]]; then
+      mkdir -p "$(dirname "${ROLLBACK_DIR}/${path_name}")"
+      cp -a "${dest_root}/${path_name}" "${ROLLBACK_DIR}/${path_name}"
+    fi
+  done
+
+  local apply_err=0
   for path_name in data uploads .env; do
     if [[ -e "${source_root}/${path_name}" ]]; then
       if [[ -d "${source_root}/${path_name}" ]]; then
         rm -rf "${dest_root}/${path_name}"
         mkdir -p "$(dirname "${dest_root}/${path_name}")"
-        cp -a "${source_root}/${path_name}" "${dest_root}/${path_name}"
+        if ! cp -a "${source_root}/${path_name}" "${dest_root}/${path_name}"; then
+          apply_err=1
+          break
+        fi
       else
         mkdir -p "$(dirname "${dest_root}/${path_name}")"
-        cp -a "${source_root}/${path_name}" "${dest_root}/${path_name}"
+        if ! cp -a "${source_root}/${path_name}" "${dest_root}/${path_name}"; then
+          apply_err=1
+          break
+        fi
       fi
     fi
   done
+
+  if [[ "${apply_err}" -ne 0 ]]; then
+    # Restore the pre-apply snapshot so the target is unchanged.
+    for path_name in data uploads .env; do
+      if [[ -e "${ROLLBACK_DIR}/${path_name}" ]]; then
+        rm -rf "${dest_root}/${path_name}"
+        mkdir -p "$(dirname "${dest_root}/${path_name}")"
+        cp -a "${ROLLBACK_DIR}/${path_name}" "${dest_root}/${path_name}"
+      elif [[ -e "${dest_root}/${path_name}" ]]; then
+        # Newly created during apply (no pre-existing snapshot); remove partial.
+        rm -rf "${dest_root}/${path_name}"
+      fi
+    done
+    rm -rf "${ROLLBACK_DIR}"
+    ROLLBACK_DIR=""
+    fail "failed to apply mutable path '${path_name}'; target rolled back to pre-restore snapshot"
+  fi
+
+  rm -rf "${ROLLBACK_DIR}"
+  ROLLBACK_DIR=""
 }
 
 target_is_nonempty() {
@@ -288,8 +344,9 @@ verify_backup
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/solar-restore-XXXXXX")"
 EXTRACT_DIR="${WORK_DIR}/extract"
+ROLLBACK_DIR=""
 cleanup() {
-  rm -rf "${WORK_DIR}"
+  rm -rf "${WORK_DIR}" "${ROLLBACK_DIR}"
 }
 trap cleanup EXIT
 
@@ -343,3 +400,28 @@ echo "Restored mutable paths from ${BACKUP_DIR}"
 echo "  source backup: ${BACKUP_DIR}"
 echo "  target root: ${TARGET_ROOT}"
 echo "Note: this helper never starts production services and never auto-rolls back a live DB without --confirm."
+
+# Persist an auditable restore record. Best-effort: never fatal on success.
+(
+  set +e
+  audit_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown-ts")"
+  audit_release="unknown"
+  if command -v node >/dev/null 2>&1; then
+    parsed_release="$(node -e '
+      try {
+        const fs = require("fs");
+        const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+        const r = m.sourceRelease || {};
+        process.stdout.write((r.name || "unknown") + "@" + (r.version || "unknown"));
+      } catch (e) {
+        process.stdout.write("unknown");
+      }
+    ' "${MANIFEST_PATH}" 2>/dev/null || true)"
+    [[ -n "${parsed_release}" ]] && audit_release="${parsed_release}"
+  fi
+  mkdir -p "${TARGET_ROOT}/logs" 2>/dev/null || true
+  audit_log="${TARGET_ROOT}/logs/restore-audit.log"
+  printf '%s\tbackup=%s\ttarget=%s\trelease=%s\n' \
+    "${audit_ts}" "${BACKUP_DIR}" "${TARGET_ROOT}" "${audit_release}" >> "${audit_log}" 2>/dev/null || true
+  chmod 0600 "${audit_log}" 2>/dev/null || true
+)

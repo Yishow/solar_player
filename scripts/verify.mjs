@@ -13,6 +13,12 @@ export const VERIFY_STAGES = [
     shell: false
   },
   {
+    label: "bundle-budget",
+    command: "node",
+    args: ["scripts/check-web-bundle-budget.mjs"],
+    shell: false
+  },
+  {
     label: "server",
     command: "pnpm",
     args: ["--filter", "@solar-display/server", "test"],

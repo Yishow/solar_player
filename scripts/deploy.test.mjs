@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -987,6 +988,7 @@ test("runtime export script archives data uploads and .env from the install root
           `INSTALL_DIR=${quoteForBash(toBashPathValue(projectDir))}`,
           `EXPORT_OUTPUT_DIR=${quoteForBash(toBashPathValue(outputDir))}`,
           "EXPORT_TIMESTAMP='20260610-030000'",
+          "EXPORT_ALLOW_LIVE=1",
           "bash deploy/export-runtime-state.sh"
         ].join(" ")
       ],
@@ -1778,7 +1780,8 @@ test("runtime export fails closed when sqlite checkpoint/integrity preflight fai
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: path.join(projectDir, "backups"),
-        EXPORT_TIMESTAMP: "bad-db"
+        EXPORT_TIMESTAMP: "bad-db",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -1809,7 +1812,8 @@ test("runtime restore rejects tampered archive checksum and refuses non-empty ta
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: backupRoot,
-        EXPORT_TIMESTAMP: "tamper-case"
+        EXPORT_TIMESTAMP: "tamper-case",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -1828,6 +1832,7 @@ test("runtime restore rejects tampered archive checksum and refuses non-empty ta
       ["--backup-dir", backupDir, "--target-root", targetRoot],
       {
         cwd: projectDir,
+        env: { ...process.env, RESTORE_TARGET_DENYLIST: "" },
         encoding: "utf8"
       }
     );
@@ -1843,7 +1848,8 @@ test("runtime restore rejects tampered archive checksum and refuses non-empty ta
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: backupRoot,
-        EXPORT_TIMESTAMP: "clean-case"
+        EXPORT_TIMESTAMP: "clean-case",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -1856,6 +1862,7 @@ test("runtime restore rejects tampered archive checksum and refuses non-empty ta
       ["--backup-dir", cleanBackup, "--target-root", targetRoot],
       {
         cwd: projectDir,
+        env: { ...process.env, RESTORE_TARGET_DENYLIST: "" },
         encoding: "utf8"
       }
     );
@@ -1900,7 +1907,8 @@ server.listen(Number(process.env.PORT), "127.0.0.1");
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: backupRoot,
-        EXPORT_TIMESTAMP: "drill-case"
+        EXPORT_TIMESTAMP: "drill-case",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -1949,7 +1957,8 @@ test("runtime restore rejects unsafe target roots before mutation", () => {
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: backupRoot,
-        EXPORT_TIMESTAMP: "unsafe-root-case"
+        EXPORT_TIMESTAMP: "unsafe-root-case",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -1997,7 +2006,8 @@ test("runtime restore with confirmation overwrites mutable paths only", () => {
         ...process.env,
         INSTALL_DIR: projectDir,
         EXPORT_OUTPUT_DIR: backupRoot,
-        EXPORT_TIMESTAMP: "overwrite-case"
+        EXPORT_TIMESTAMP: "overwrite-case",
+        EXPORT_ALLOW_LIVE: "1"
       },
       bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
       encoding: "utf8"
@@ -2014,6 +2024,7 @@ test("runtime restore with confirmation overwrites mutable paths only", () => {
       ["--backup-dir", backupDir, "--target-root", targetRoot, "--confirm", "RESTORE-OVERWRITE"],
       {
         cwd: projectDir,
+        env: { ...process.env, RESTORE_TARGET_DENYLIST: "" },
         encoding: "utf8"
       }
     );
@@ -2022,6 +2033,94 @@ test("runtime restore with confirmation overwrites mutable paths only", () => {
     assert.equal(existsSync(path.join(targetRoot, "uploads/images/hero.png")), true);
     assert.equal(existsSync(path.join(targetRoot, ".env")), true);
     assert.equal(readFileSync(path.join(targetRoot, "apps-marker.txt"), "utf8"), "code-stays\n");
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime restore rolls back target from snapshot when an apply copy fails", () => {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+  const targetRoot = path.join(projectDir, "restore-target");
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+    markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+
+    // `cp` stub: fail ONLY when copying out of the restore extract dir (the apply
+    // step), so apply_mutable_paths must roll back from its pre-apply snapshot.
+    // Delegate to the real cp for every other invocation (snapshots, export).
+    mkdirSync(fakeBinDir, { recursive: true });
+    const cpStubPath = path.join(fakeBinDir, "cp");
+    writeFileSync(cpStubPath, [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      'for arg in "$@"; do',
+      '  case "$arg" in',
+      "    */extract/*)",
+      '      echo "inject: forced cp failure on restore apply path" >&2',
+      "      exit 1",
+      "      ;;",
+      "  esac",
+      "done",
+      'exec /bin/cp "$@"',
+      ""
+    ].join("\n"));
+    markBashExecutable(cpStubPath);
+
+    // Existing production mutable state in the target that must survive a failed apply.
+    mkdirSync(path.join(targetRoot, "data"), { recursive: true });
+    createSqliteDatabase(path.join(targetRoot, "data/solar-display.sqlite"), { sentinel: "target-original" });
+    writeFileSync(path.join(targetRoot, ".env"), "TARGET_ENV=1\n");
+
+    // Build a verified backup from the fixture install root (distinct sentinel).
+    const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "rollback-case",
+        EXPORT_ALLOW_LIVE: "1"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+    const backupDir = path.join(backupRoot, "rollback-case");
+
+    const restoreResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      ["--backup-dir", backupDir, "--target-root", targetRoot, "--confirm", "RESTORE-OVERWRITE"],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          RESTORE_TARGET_DENYLIST: "",
+          // Prepend the cp stub while keeping node/tar/sqlite3 on the inherited PATH.
+          PATH: `${fakeBinDir}:${process.env.PATH}`
+        },
+        encoding: "utf8"
+      }
+    );
+
+    // Restore must fail and roll the target back to its pre-apply snapshot.
+    assert.notEqual(restoreResult.status, 0);
+    assert.match(restoreResult.stderr + restoreResult.stdout, /rolled back/i);
+    assert.match(restoreResult.stderr + restoreResult.stdout, /forced cp failure on restore apply/i);
+
+    // The target's original mutable state is intact (proves snapshot rollback).
+    const note = spawnSync(
+      "sqlite3",
+      [path.join(targetRoot, "data/solar-display.sqlite"), "SELECT note FROM restore_sentinel WHERE id=1;"],
+      { encoding: "utf8" }
+    );
+    assert.equal(note.status, 0, note.stderr || note.stdout);
+    assert.equal(note.stdout.trim(), "target-original");
+    assert.equal(readFileSync(path.join(targetRoot, ".env"), "utf8"), "TARGET_ENV=1\n");
   } finally {
     removeTempDir(projectDir);
   }
@@ -2151,28 +2250,129 @@ test("Failed update preserves rollback material without destructive database rol
     /verify_status[\s\S]*restore-runtime-state\.sh[\s\S]*--confirm RESTORE-OVERWRITE/
   );
 
-  // Fixture: production DB sentinel remains after a simulated health-failure handoff path.
+  // Fixture: drive a real raspi-bootstrap update whose post-update verification
+  // step is forced to fail, then assert the production DB is byte-for-byte
+  // unchanged and no destructive restore-runtime-state.sh --confirm was invoked.
+  // (This assertion would FAIL if someone added an automatic destructive rollback
+  //  into the verify-failure handoff path.)
   const projectDir = makeFixtureProject();
   try {
     const installDir = path.join(projectDir, "install");
+    const bundleDir = path.join(projectDir, "bundle");
+    const fakeBinDir = path.join(projectDir, "fake-bin");
+    const systemctlLog = path.join(projectDir, "systemctl.log");
+    const restoreStubLog = path.join(projectDir, "restore-stub.log");
+    const kioskUser = process.env.USER || "pi";
+
+    // Existing production runtime state that must survive a failed update.
     mkdirSync(path.join(installDir, "data"), { recursive: true });
+    mkdirSync(path.join(installDir, "apps/server/dist"), { recursive: true });
     createSqliteDatabase(path.join(installDir, "data/solar-display.sqlite"), { sentinel: "prod-sentinel" });
+    writeFileSync(path.join(installDir, ".env"), "KEEP=1\n");
+    writeFileSync(path.join(installDir, "apps/server/dist/server.js"), "console.log('old');\n");
+    writeFileSync(path.join(installDir, "package.json"), JSON.stringify({ name: "solar-display", version: "1.0.0" }));
+
+    const dbPath = path.join(installDir, "data/solar-display.sqlite");
+    const dbHashBefore = createHash("sha256").update(readFileSync(dbPath)).digest("hex");
+
+    // Bundle: real export helper + stubbed later stages + a restore stub that
+    // records any invocation (a destructive auto-rollback would call it).
+    mkdirSync(path.join(bundleDir, "deploy"), { recursive: true });
+    mkdirSync(path.join(bundleDir, "apps/server/dist"), { recursive: true });
+    writeFileSync(path.join(bundleDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(
+      path.join(bundleDir, "deploy/restore-runtime-state.sh"),
+      [
+        "#!/bin/bash",
+        "# Test stub: a destructive auto-rollback would invoke this; record any call.",
+        'if [[ -n "${SOLAR_RESTORE_STUB_LOG:-}" ]]; then',
+        '  printf "%s invoked: %s\\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "${SOLAR_RESTORE_STUB_LOG}" 2>/dev/null || true',
+        "fi",
+        "exit 0",
+        ""
+      ].join("\n")
+    );
+    for (const stub of ["configure-lightweight-desktop.sh", "install-kiosk.sh"]) {
+      writeFileSync(path.join(bundleDir, `deploy/${stub}`), "#!/bin/bash\nexit 0\n");
+    }
+    // Force the post-update verification step to fail so the recovery-handoff
+    // (no destructive rollback) path is actually exercised.
+    writeFileSync(path.join(bundleDir, "deploy/verify-kiosk-install.sh"), "#!/bin/bash\nexit 1\n");
+    writeFileSync(path.join(bundleDir, "apps/server/dist/server.js"), "console.log('new');\n");
+    writeFileSync(path.join(bundleDir, "package.json"), JSON.stringify({ name: "solar-display", version: "2.0.0" }));
+    writeFileSync(path.join(bundleDir, ".env.example"), "PORT=3000\n");
+    for (const scriptPath of [
+      "deploy/export-runtime-state.sh",
+      "deploy/restore-runtime-state.sh",
+      "deploy/configure-lightweight-desktop.sh",
+      "deploy/install-kiosk.sh",
+      "deploy/verify-kiosk-install.sh"
+    ]) {
+      markBashExecutable(path.join(bundleDir, scriptPath));
+    }
+
+    writeFakeSystemctl(fakeBinDir, { isActive: false, logPath: systemctlLog });
+    // Pass-through sudo so `sudo -u <kiosk-user> bash -lc ...` runs unprivileged.
+    const sudoPath = path.join(fakeBinDir, "sudo");
+    writeFileSync(sudoPath, ["#!/bin/bash", 'if [[ "$1" == "-u" ]]; then shift 2; fi', 'exec "$@"', ""].join("\n"));
+    markBashExecutable(sudoPath);
+    // chown stub: copy_bundle runs `chown -R user:user` directly (not via sudo);
+    // on macOS that user:group pair is invalid, so shadow it so the flow can
+    // progress past copy_bundle to the verify step under test.
+    writeFileSync(path.join(fakeBinDir, "chown"), "#!/bin/bash\nexit 0\n");
+    markBashExecutable(path.join(fakeBinDir, "chown"));
+
+    // makeFixtureProject seeds an empty `deploy/raspi-bootstrap.sh` stub; copy the
+    // real script over it so the relative-path invocation runs the actual update.
+    writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), readFileSync(raspiBootstrapScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
+
+    const result = runBashScript(
+      "deploy/raspi-bootstrap.sh",
+      [
+        "--mode",
+        "update",
+        "--skip-host-preflight",
+        "--skip-disk",
+        "--install-dir",
+        installDir,
+        "--bundle-dir",
+        bundleDir,
+        "--kiosk-user",
+        kioskUser
+      ],
+      {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          SOLAR_RESTORE_STUB_LOG: restoreStubLog,
+          // Keep real node/pnpm/tar/sqlite3/shasum/df/rsync reachable while the
+          // systemctl+sudo stubs shadow the front of PATH.
+          PATH: `${fakeBinDir}:${process.env.PATH}`
+        },
+        encoding: "utf8"
+      }
+    );
+
+    // The forced verify failure must surface the recovery handoff.
+    assert.notEqual(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stderr + result.stdout, /recovery handoff/i);
+    assert.match(result.stderr + result.stdout, /Production DB is NOT automatically restored/i);
+
+    // (a) Production DB bytes are unchanged after the failed update.
+    const dbHashAfter = createHash("sha256").update(readFileSync(dbPath)).digest("hex");
+    assert.equal(dbHashAfter, dbHashBefore, "production DB changed during failed update");
     const note = spawnSync(
       "sqlite3",
-      [path.join(installDir, "data/solar-display.sqlite"), "SELECT note FROM restore_sentinel WHERE id=1;"],
+      [dbPath, "SELECT note FROM restore_sentinel WHERE id=1;"],
       { encoding: "utf8" }
     );
     assert.equal(note.status, 0, note.stderr || note.stdout);
     assert.equal(note.stdout.trim(), "prod-sentinel");
-    // Handoff documents recovery without mutating this sentinel.
-    assert.equal(
-      spawnSync(
-        "sqlite3",
-        [path.join(installDir, "data/solar-display.sqlite"), "SELECT note FROM restore_sentinel WHERE id=1;"],
-        { encoding: "utf8" }
-      ).stdout.trim(),
-      "prod-sentinel"
-    );
+
+    // (b) No destructive restore-runtime-state.sh invocation occurred.
+    const restoreCalls = existsSync(restoreStubLog) ? readFileSync(restoreStubLog, "utf8") : "";
+    assert.equal(restoreCalls, "", `unexpected destructive restore invocation: ${restoreCalls}`);
   } finally {
     removeTempDir(projectDir);
   }

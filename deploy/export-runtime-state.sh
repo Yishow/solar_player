@@ -48,7 +48,11 @@ json_escape() {
 
 ensure_service_inactive() {
   if ! command -v systemctl >/dev/null 2>&1; then
-    return 0
+    if [[ "${EXPORT_ALLOW_LIVE:-0}" == "1" ]]; then
+      ok "systemctl unavailable; EXPORT_ALLOW_LIVE=1 opt-in accepted (live copy risk)"
+      return 0
+    fi
+    fail "systemctl unavailable; cannot confirm solar-display.service is inactive. Stop it manually or set EXPORT_ALLOW_LIVE=1 to proceed at your own risk (refusing live SQLite copy)"
   fi
 
   if systemctl is-active --quiet solar-display 2>/dev/null; then

@@ -32,6 +32,13 @@ test("usePlaybackController prefetches the next effective playback template afte
   assert.match(controllerSource, /\[enabled, pages, runtime\?\.currentIndex, settings\?\.loop\]/);
 });
 
+test("usePlaybackController does not prefetch the next template when the playback schedule blocks it", () => {
+  assert.match(
+    controllerSource,
+    /isPlaybackAllowedBySchedule\(settings, new Date\(\)\)[\s\S]*?prefetchDisplayPageTemplate\(nextTemplateKey\)/
+  );
+});
+
 const playbackSettings: PlaybackSettings = {
   autoplay: true,
   brightness: 80,

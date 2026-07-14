@@ -92,6 +92,28 @@ function collectReachableManifestKeys(manifest, startKeys) {
   return seen;
 }
 
+function collectStaticImportKeys(manifest, startKey) {
+  const queue = [startKey];
+  const seen = new Set(startKey ? [startKey] : []);
+
+  while (queue.length > 0) {
+    const key = queue.shift();
+    const entry = manifest[key];
+    if (!entry) {
+      continue;
+    }
+
+    for (const nextKey of entry.imports ?? []) {
+      if (!seen.has(nextKey)) {
+        seen.add(nextKey);
+        queue.push(nextKey);
+      }
+    }
+  }
+
+  return seen;
+}
+
 function findMatchingKeys(keys, markers) {
   return markers.map((marker) => {
     const match = [...keys].find((key) => key.includes(marker));
@@ -215,6 +237,29 @@ export async function checkWebBundleBudget({
   }
 
   // Ensure templates are not rolled into the initial entry file by checking entry source map / size graph.
+  // Static re-import guard: management/template markers must not appear in the entry's statically-reachable
+  // import graph (manifest `imports` edges). A static re-import would bundle the page into the initial load
+  // and bypass the dynamicImports checks above.
+  const staticReachableKeys = collectStaticImportKeys(manifest, primaryEntryKey);
+  const staticManagementMatches = findMatchingKeys(staticReachableKeys, MANAGEMENT_SOURCE_MARKERS)
+    .filter((item) => item.match)
+    .map((item) => item.marker);
+  const staticTemplateMatches = findMatchingKeys(staticReachableKeys, TEMPLATE_SOURCE_MARKERS)
+    .filter((item) => item.match)
+    .map((item) => item.marker);
+
+  if (staticManagementMatches.length > 0) {
+    failures.push(
+      `Management markers statically reachable from entry (bundled into initial load): ${staticManagementMatches.join(", ")}`
+    );
+  }
+
+  if (staticTemplateMatches.length > 0) {
+    failures.push(
+      `Playback template markers statically reachable from entry (bundled into initial load): ${staticTemplateMatches.join(", ")}`
+    );
+  }
+
   const entryDynamicCount = (primaryEntry.dynamicImports ?? []).length;
   if (entryDynamicCount === 0) {
     failures.push("Entry chunk has no dynamicImports; route/template splitting did not take effect");
