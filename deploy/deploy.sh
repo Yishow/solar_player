@@ -117,7 +117,7 @@ copy_application_bundle() {
   fi
   # Release identity for Device Status (regenerated at deploy time from the source tree).
   if [[ -f "${PROJECT_DIR}/scripts/generate-release-manifest.mjs" ]]; then
-    node "${PROJECT_DIR}/scripts/generate-release-manifest.mjs" \
+    run_priv node "${PROJECT_DIR}/scripts/generate-release-manifest.mjs" \
       --project-root "${PROJECT_DIR}" \
       --out "${dest}/release-manifest.json"
   elif [[ -f "${PROJECT_DIR}/release-manifest.json" ]]; then

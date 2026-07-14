@@ -639,4 +639,3 @@ Production server logs are **journald unit `solar-display`**, not files under `L
    - helper missing → re-run `sudo ./deploy/install-kiosk.sh`
    - sudo denied → check `/etc/sudoers.d/solar-display-journal` and `visudo -cf`
    - journald missing → host is not a production Linux journal host; treat as unavailable (do not fall back to scanning host paths)
-

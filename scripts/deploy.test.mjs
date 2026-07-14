@@ -2293,6 +2293,6 @@ test("deploy.sh includes journal helper and generates release manifest into bund
 
 test("direct deploy copies or generates release-manifest.json", () => {
   const source = readFileSync(path.join(repoRoot, "deploy/deploy.sh"), "utf8");
-  assert.match(source, /generate-release-manifest\.mjs/);
+  assert.match(source, /run_priv node[\s\S]*generate-release-manifest\.mjs/);
   assert.match(source, /release-manifest\.json/);
 });
