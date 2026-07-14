@@ -89,6 +89,7 @@ done
 MANIFEST_PATH="${BACKUP_DIR}/manifest.json"
 RUNTIME_ARCHIVE="${BACKUP_DIR}/runtime.tar.gz"
 RUNTIME_SIDECAR="${BACKUP_DIR}/runtime.tar.gz.sha256"
+PRIOR_APPLICATION_ARCHIVE="${BACKUP_DIR}/prior-application.tar.gz"
 
 [[ -f "${MANIFEST_PATH}" ]] || fail "manifest.json missing in ${BACKUP_DIR}"
 [[ -f "${RUNTIME_ARCHIVE}" ]] || fail "runtime.tar.gz missing in ${BACKUP_DIR}"
@@ -120,6 +121,25 @@ extract_runtime_to() {
   local dest="$1"
   mkdir -p "${dest}"
   tar -xzf "${RUNTIME_ARCHIVE}" -C "${dest}"
+}
+
+extract_prior_application_to() {
+  local dest="$1"
+  [[ -f "${PRIOR_APPLICATION_ARCHIVE}" ]] \
+    || fail "prior-application.tar.gz is required for restore drill"
+  mkdir -p "${dest}"
+  tar -xzf "${PRIOR_APPLICATION_ARCHIVE}" -C "${dest}"
+}
+
+validate_restore_target_root() {
+  local root="$1"
+  [[ "${root}" == /* ]] || fail "restore target root must be an absolute path: ${root}"
+
+  local normalized
+  normalized="$(node -e 'const path = require("node:path"); process.stdout.write(path.resolve(process.argv[1]));' "${root}")" \
+    || fail "restore target root could not be normalized: ${root}"
+  [[ "${normalized}" != "/" ]] || fail "restore target root must not be filesystem root"
+  TARGET_ROOT="${normalized}"
 }
 
 apply_mutable_paths() {
@@ -284,6 +304,7 @@ fi
 if [[ "${DRILL}" == "1" ]]; then
   DRILL_ROOT="${WORK_DIR}/drill-root"
   mkdir -p "${DRILL_ROOT}"
+  extract_prior_application_to "${DRILL_ROOT}"
   apply_mutable_paths "${EXTRACT_DIR}" "${DRILL_ROOT}"
 
   # Drill must not touch production service.
@@ -305,6 +326,7 @@ if [[ "${DRILL}" == "1" ]]; then
 fi
 
 [[ -n "${TARGET_ROOT}" ]] || fail "--target-root is required unless --drill is set"
+validate_restore_target_root "${TARGET_ROOT}"
 
 if target_is_nonempty "${TARGET_ROOT}"; then
   if [[ "${CONFIRM_TOKEN}" != "${REQUIRED_CONFIRM}" ]]; then

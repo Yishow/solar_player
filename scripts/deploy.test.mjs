@@ -1876,6 +1876,21 @@ test("runtime restore drill verifies integrity migrations and health on temp roo
     writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
     markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
     markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+    mkdirSync(path.join(projectDir, "apps/server/dist/db"), { recursive: true });
+    writeFileSync(
+      path.join(projectDir, "apps/server/dist/db/migrate.js"),
+      "export function migrateDatabase() { console.log('fixture migration ran'); }\n"
+    );
+    writeFileSync(
+      path.join(projectDir, "apps/server/dist/server.js"),
+      `import { createServer } from "node:http";
+const server = createServer((request, response) => {
+  response.setHeader("content-type", "application/json");
+  response.end(JSON.stringify({ status: request.url === "/health" ? "ok" : "not-found" }));
+});
+server.listen(Number(process.env.PORT), "127.0.0.1");
+`
+    );
     writeFileSync(productionMarker, "must-remain\n");
 
     const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
@@ -1892,7 +1907,6 @@ test("runtime restore drill verifies integrity migrations and health on temp roo
     assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
     const backupDir = path.join(backupRoot, "drill-case");
 
-    const drillLog = path.join(projectDir, "drill-commands.log");
     const drillResult = runBashScript(
       "deploy/restore-runtime-state.sh",
       ["--backup-dir", backupDir, "--drill"],
@@ -1900,8 +1914,7 @@ test("runtime restore drill verifies integrity migrations and health on temp roo
         cwd: projectDir,
         env: {
           ...process.env,
-          RESTORE_DRILL_MIGRATE_CMD: `echo migrate-ok >> ${quoteForBash(toBashPathValue(drillLog))}`,
-          RESTORE_DRILL_HEALTH_CMD: `echo health-ok >> ${quoteForBash(toBashPathValue(drillLog))}`
+          RESTORE_HEALTH_TIMEOUT_SECONDS: "5"
         },
         encoding: "utf8"
       }
@@ -1911,9 +1924,56 @@ test("runtime restore drill verifies integrity migrations and health on temp roo
     assert.match(drillResult.stdout, /integrity_check ok/i);
     assert.match(drillResult.stdout, /migrations completed/i);
     assert.match(drillResult.stdout, /health smoke returned healthy/i);
+    assert.match(drillResult.stdout, /fixture migration ran/i);
+    assert.doesNotMatch(drillResult.stdout, /migrations skipped/i);
     assert.equal(readFileSync(productionMarker, "utf8"), "must-remain\n");
-    assert.match(readFileSync(drillLog, "utf8"), /migrate-ok/);
-    assert.match(readFileSync(drillLog, "utf8"), /health-ok/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("runtime restore rejects unsafe target roots before mutation", () => {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+
+  try {
+    writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+    markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+
+    const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        INSTALL_DIR: projectDir,
+        EXPORT_OUTPUT_DIR: backupRoot,
+        EXPORT_TIMESTAMP: "unsafe-root-case"
+      },
+      bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+      encoding: "utf8"
+    });
+    assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+
+    const relativeResult = runBashScript(
+      "deploy/restore-runtime-state.sh",
+      [
+        "--backup-dir",
+        path.join(backupRoot, "unsafe-root-case"),
+        "--target-root",
+        "relative-target",
+        "--confirm",
+        "RESTORE-OVERWRITE"
+      ],
+      { cwd: projectDir, encoding: "utf8" }
+    );
+
+    assert.notEqual(relativeResult.status, 0);
+    assert.match(relativeResult.stderr + relativeResult.stdout, /absolute path/i);
+    assert.equal(existsSync(path.join(projectDir, "relative-target")), false);
+
+    const restoreSource = readFileSync(restoreScriptPath, "utf8");
+    assert.match(restoreSource, /restore target root must not be filesystem root/i);
   } finally {
     removeTempDir(projectDir);
   }
