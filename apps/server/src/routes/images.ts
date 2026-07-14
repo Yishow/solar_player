@@ -173,36 +173,45 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     writeFileSync(resolve(config.uploadsDir, uniqueFilename), buffer);
 
     const database = getDatabase();
-    const result = database
-      .prepare(
-        `
-          INSERT INTO image_assets (
-            category, usage_scope, filename, original_name, title, description,
-            mime_type, file_size, display_duration, display_order,
-            included_in_slideshow, is_cover, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, NULL, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        `
-      )
-      .run(
-        category,
-        usageScope,
-        uniqueFilename,
-        data.filename,
-        data.filename.replace(extname(data.filename), ""),
-        null,
-        storedMimeType,
-        buffer.length,
-        includedInSlideshow ? 1 : 0
-      );
+    let inserted: NonNullable<ReturnType<typeof getImageById>>;
+    try {
+      inserted = database.transaction(() => {
+        const result = database
+          .prepare(
+            `
+              INSERT INTO image_assets (
+                category, usage_scope, filename, original_name, title, description,
+                mime_type, file_size, display_duration, display_order,
+                included_in_slideshow, is_cover, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, NULL, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `
+          )
+          .run(
+            category,
+            usageScope,
+            uniqueFilename,
+            data.filename,
+            data.filename.replace(extname(data.filename), ""),
+            null,
+            storedMimeType,
+            buffer.length,
+            includedInSlideshow ? 1 : 0
+          );
 
-    const inserted = getImageById(result.lastInsertRowid as number);
-    if (!inserted) {
+        const image = getImageById(result.lastInsertRowid as number);
+        if (!image) {
+          throw new Error("Failed to save image metadata");
+        }
+
+        if (includedInSlideshow) {
+          ensureImagePlaylistEntryForAsset(image.id);
+        }
+
+        return image;
+      })();
+    } catch {
       deleteImageFile(uniqueFilename);
       return reply.status(500).send(errorResponse("Failed to save image metadata"));
-    }
-
-    if (includedInSlideshow) {
-      ensureImagePlaylistEntryForAsset(inserted.id);
     }
 
     app.socketService.emitImagesUpdated({

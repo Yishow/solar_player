@@ -10,11 +10,18 @@ process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 process.env.UPLOADS_DIR = join(tempDir, "uploads", "images");
 
-const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = await Promise.all([
+const [
+  { buildApp },
+  { migrateDatabase },
+  { seedDatabase },
+  { getDatabase },
+  { ensureImagePlaylistEntryForAsset }
+] = await Promise.all([
   import("../app.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
-  import("../db/index.js")
+  import("../db/index.js"),
+  import("../services/imagePlaylistService.js")
 ]);
 
 function clearImagesTable() {
@@ -694,6 +701,92 @@ test("POST /api/images deletes the written file when metadata row cannot be relo
     assert.equal(countUploadFiles(), beforeFiles);
   } finally {
     db.exec("DROP TRIGGER IF EXISTS test_image_assets_delete_after_insert");
+    await app.close();
+  }
+});
+
+test("POST /api/images deletes the written file when metadata insert throws", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const db = getDatabase();
+  db.exec(`
+    CREATE TRIGGER test_image_assets_fail_insert
+    BEFORE INSERT ON image_assets
+    BEGIN
+      SELECT RAISE(ABORT, 'forced image metadata failure');
+    END;
+  `);
+
+  const app = await buildApp();
+  const beforeFiles = countUploadFiles();
+
+  try {
+    const { payload, contentType } = buildMultipartBody(
+      "metadata-failure.png",
+      "image/png",
+      createMinimalPng()
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 500);
+    const body = response.json() as { success?: boolean; error?: string };
+    assert.equal(body.error, "Failed to save image metadata");
+    assertBoundedClientError(body);
+    assert.equal(countImageAssets(), 0);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    db.exec("DROP TRIGGER IF EXISTS test_image_assets_fail_insert");
+    await app.close();
+  }
+});
+
+test("POST /api/images rolls back metadata and file when playlist insert fails", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearImagesTable();
+
+  const db = getDatabase();
+  ensureImagePlaylistEntryForAsset(-1);
+  db.exec(`
+    CREATE TRIGGER test_image_playlist_fail_insert
+    BEFORE INSERT ON image_playlist_entries
+    BEGIN
+      SELECT RAISE(ABORT, 'forced image playlist failure');
+    END;
+  `);
+
+  const app = await buildApp();
+  const beforeFiles = countUploadFiles();
+
+  try {
+    const { payload, contentType } = buildMultipartBody(
+      "playlist-failure.png",
+      "image/png",
+      createMinimalPng(),
+      { includedInSlideshow: "true" }
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 500);
+    const body = response.json() as { success?: boolean; error?: string };
+    assert.equal(body.error, "Failed to save image metadata");
+    assertBoundedClientError(body);
+    assert.equal(countImageAssets(), 0);
+    assert.equal(countUploadFiles(), beforeFiles);
+  } finally {
+    db.exec("DROP TRIGGER IF EXISTS test_image_playlist_fail_insert");
     await app.close();
   }
 });
