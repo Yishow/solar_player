@@ -46,7 +46,7 @@ trap cleanup EXIT INT TERM HUP
 awk -v begin_marker="${BEGIN_MARKER}" -v end_marker="${END_MARKER}" '
   function emit_profile() {
     print begin_marker
-    print "dtparam=fan_temp0=50000"
+    print "dtparam=fan_temp0=0"
     print "dtparam=fan_temp0_hyst=5000"
     print "dtparam=fan_temp0_speed=75"
     print "dtparam=fan_temp1=60000"

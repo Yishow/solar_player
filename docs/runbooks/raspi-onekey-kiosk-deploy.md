@@ -30,6 +30,19 @@ For Windows RDP, set the same operation-time host:
 $PiHost = "<pi-host-or-magicdns>"
 ```
 
+## Pi 5 Minimum Fan Stage
+
+The kiosk installer manages `dtparam=fan_temp0=0` with hysteresis 5000 and PWM 75. This makes the existing first cooling stage the normal positive-temperature floor while the kernel `step_wise` governor continues to raise the fan at 60000, 67500, and 75000 m°C. It does not add a fifth stage, systemd timer, or fan daemon.
+
+The boot profile requires a reboot. After SSH returns, check within 20 seconds that `cur_state` is at least 1 and a `fan1_input` reports RPM greater than 0, then run the complete kiosk verifier:
+
+```bash
+ssh "${SSH_TARGET}" 'cat /sys/class/thermal/cooling_device0/cur_state; for input in /sys/class/hwmon/hwmon*/fan1_input; do test -r "$input" && printf "%s: " "$input" && cat "$input"; done'
+ssh "${SSH_TARGET}" 'sudo env KIOSK_USER="${USER}" /data/solar-display/deploy/verify-kiosk-install.sh'
+```
+
+To roll back, restore `dtparam=fan_temp0=50000` in the Solar Player managed block, reboot, and restore the previous release before the next deploy so the current helper does not reapply the 0 m°C baseline.
+
 ## New-Card Init
 
 Before first boot, write `system-boot/user-data` with the interactive helper. The no-argument defaults are `pi/pi` plus root password `kzroot` for local `su -`.

@@ -1,10 +1,4 @@
-# pi5-fan-thermal-control Specification
-
-## Purpose
-
-TBD - created by archiving change 'deploy-pi5-four-stage-fan-control'. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Persist the verified Pi 5 four-stage fan profile
 
@@ -45,19 +39,6 @@ The deployment system SHALL manage a Raspberry Pi 5 boot configuration block wit
 - **THEN** it exits nonzero with the failing path in the error message
 - **AND** the kiosk installer stops instead of reporting a successful thermal deployment
 
-
-<!-- @trace
-source: keep-pi5-fan-lowest-stage-running
-updated: 2026-07-16
-code:
-  - deploy/configure-pi5-fan-control.sh
-  - deploy/verify-kiosk-install.sh
-  - scripts/deploy.test.mjs
-  - deploy.md
-  - docs/runbooks/raspi-onekey-kiosk-deploy.md
--->
-
----
 ### Requirement: Verify the boot and runtime thermal contract
 
 The kiosk verification command SHALL verify the managed boot profile, active Linux thermal contract, minimum cooling state, and physical fan motion on Raspberry Pi 5.
@@ -88,14 +69,3 @@ The kiosk verification command SHALL verify the managed boot profile, active Lin
 - **WHEN** the managed boot profile is correct but the active thermal contract still differs
 - **THEN** verification reports the runtime mismatch and fails
 - **AND** the operator documentation directs the operator to reboot and rerun verification
-
-<!-- @trace
-source: keep-pi5-fan-lowest-stage-running
-updated: 2026-07-16
-code:
-  - deploy/configure-pi5-fan-control.sh
-  - deploy/verify-kiosk-install.sh
-  - scripts/deploy.test.mjs
-  - deploy.md
-  - docs/runbooks/raspi-onekey-kiosk-deploy.md
--->

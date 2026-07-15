@@ -61,6 +61,11 @@ test("Raspberry Pi deployment docs resolve connection targets at operation time"
     assert.match(contents, /PI_HOST="<pi-host-or-magicdns>"/u);
     assert.match(contents, /SSH_TARGET="[^\n]*\$\{PI_HOST\}[^\n]*"/u);
     assert.match(contents, /MQTT[^\n]*(?:dependency|外部依賴)/iu);
+    assert.match(contents, /fan_temp0=0/u);
+    assert.match(contents, /20 seconds/iu);
+    assert.match(contents, /cur_state/u);
+    assert.match(contents, /fan1_input/u);
+    assert.match(contents, /fan_temp0=50000/u);
     assert.doesNotMatch(contents, /\b(?:pi|kz)@(?:\d{1,3}\.){3}\d{1,3}\b/u);
     assert.doesNotMatch(contents, /-HostName\s+(?:\d{1,3}\.){3}\d{1,3}\b/u);
     assert.doesNotMatch(contents, /https?:\/\/(?!127\.0\.0\.1\b)(?:\d{1,3}\.){3}\d{1,3}\b/u);
@@ -352,7 +357,7 @@ test("Pi 5 fan helper writes one idempotent four-stage block before dtoverlay", 
     assert.match(firstConfig, /^# unrelated setting$/m);
 
     for (const [stage, temperature, speed] of [
-      [0, 50000, 75],
+      [0, 0, 75],
       [1, 60000, 125],
       [2, 67500, 175],
       [3, 75000, 250]
@@ -1500,13 +1505,15 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
   const modelPath = path.join(projectDir, "model");
   const configPath = path.join(projectDir, "config.txt");
   const thermalClassPath = path.join(projectDir, "thermal");
+  const hwmonClassPath = path.join(projectDir, "hwmon");
   const coolingDevicePath = path.join(thermalClassPath, "cooling_device0");
   const thermalZonePath = path.join(thermalClassPath, "thermal_zone0");
+  const fanHwmonPath = path.join(hwmonClassPath, "hwmon0");
   const kioskHome = path.join(projectDir, "home", "kz");
   const installDir = path.join(projectDir, "data-install");
   const fanBlock = [
     "# BEGIN Solar Player Pi 5 fan control",
-    "dtparam=fan_temp0=50000",
+    "dtparam=fan_temp0=0",
     "dtparam=fan_temp0_hyst=5000",
     "dtparam=fan_temp0_speed=75",
     "dtparam=fan_temp1=60000",
@@ -1533,7 +1540,9 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
     "--fan-config-path",
     configPath,
     "--thermal-class-path",
-    thermalClassPath
+    thermalClassPath,
+    "--hwmon-class-path",
+    hwmonClassPath
   ], {
     cwd: projectDir,
     bashPrependPathDirs: [fakeBinDir],
@@ -1551,11 +1560,15 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
     writeFileSync(configPath, `[all]\n${fanBlock}\ndtoverlay=vc4-kms-v3d\n`);
     mkdirSync(coolingDevicePath, { recursive: true });
     mkdirSync(thermalZonePath, { recursive: true });
+    mkdirSync(fanHwmonPath, { recursive: true });
     writeFileSync(path.join(coolingDevicePath, "type"), "pwm-fan\n");
     writeFileSync(path.join(coolingDevicePath, "max_state"), "4\n");
+    writeFileSync(path.join(coolingDevicePath, "cur_state"), "1\n");
+    writeFileSync(path.join(fanHwmonPath, "name"), "pwmfan\n");
+    writeFileSync(path.join(fanHwmonPath, "fan1_input"), "1700\n");
     writeFileSync(path.join(thermalZonePath, "mode"), "enabled\n");
     writeFileSync(path.join(thermalZonePath, "policy"), "step_wise\n");
-    [50000, 60000, 67500, 75000].forEach((temperature, index) => {
+    [0, 60000, 67500, 75000].forEach((temperature, index) => {
       writeFileSync(path.join(thermalZonePath, `trip_point_${index}_temp`), `${temperature}\n`);
       writeFileSync(path.join(thermalZonePath, `trip_point_${index}_type`), "active\n");
     });
@@ -1579,6 +1592,20 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
     writeFileSync(path.join(coolingDevicePath, "max_state"), "3\n");
     const badRuntime = runVerification();
     assert.match(badRuntime.stderr, /FAIL: Pi 5 fan runtime thermal contract is active/);
+
+    writeFileSync(path.join(coolingDevicePath, "max_state"), "4\n");
+    writeFileSync(path.join(coolingDevicePath, "cur_state"), "0\n");
+    const stoppedFloor = runVerification();
+    assert.match(stoppedFloor.stderr, /FAIL: Pi 5 fan runtime thermal contract is active/);
+
+    writeFileSync(path.join(coolingDevicePath, "cur_state"), "1\n");
+    writeFileSync(path.join(fanHwmonPath, "fan1_input"), "0\n");
+    const stoppedFan = runVerification();
+    assert.match(stoppedFan.stderr, /FAIL: Pi 5 fan runtime thermal contract is active/);
+
+    rmSync(path.join(fanHwmonPath, "fan1_input"));
+    const missingFanInput = runVerification();
+    assert.match(missingFanInput.stderr, /FAIL: Pi 5 fan runtime thermal contract is active/);
   } finally {
     removeTempDir(projectDir);
   }

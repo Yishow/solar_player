@@ -22,6 +22,19 @@ $PiHost = "<pi-host-or-magicdns>"
 
 `192.168.31.62` below is MQTT dependency configuration, not the Raspberry Pi connection target.
 
+## Pi 5 Minimum Fan Stage
+
+The managed Pi 5 profile uses `dtparam=fan_temp0=0`, `fan_temp0_hyst=5000`, and PWM 75 so the kernel `step_wise` governor keeps the existing lowest fan stage active at normal positive CPU temperatures. The remaining speed-up trips stay at 60000, 67500, and 75000 m°C; no userspace fan daemon or timer is installed.
+
+After deploying a changed profile, reboot before treating it as active. Once SSH is reachable again, verify within 20 seconds that cooling state is at least 1 and `fan1_input` is greater than 0:
+
+```bash
+ssh "${SSH_TARGET}" 'cat /sys/class/thermal/cooling_device0/cur_state; for input in /sys/class/hwmon/hwmon*/fan1_input; do test -r "$input" && printf "%s: " "$input" && cat "$input"; done'
+ssh "${SSH_TARGET}" 'sudo env KIOSK_USER="${USER}" /data/solar-display/deploy/verify-kiosk-install.sh'
+```
+
+Rollback requires restoring `dtparam=fan_temp0=50000` in the Solar Player managed block, rebooting, and restoring the previous release before another deployment; otherwise the current helper will apply the 0 m°C baseline again.
+
 ## 64G Production Card Quick Start
 
 Use this path for the real kiosk card. The order matters.

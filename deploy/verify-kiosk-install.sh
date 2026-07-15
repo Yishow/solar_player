@@ -8,6 +8,7 @@ KIOSK_HEALTH_URL="${KIOSK_HEALTH_URL:-http://127.0.0.1:3000/health}"
 MODEL_PATH="${MODEL_PATH:-/proc/device-tree/model}"
 FAN_CONFIG_PATH="${FAN_CONFIG_PATH:-/boot/firmware/config.txt}"
 THERMAL_CLASS_PATH="${THERMAL_CLASS_PATH:-/sys/class/thermal}"
+HWMON_CLASS_PATH="${HWMON_CLASS_PATH:-/sys/class/hwmon}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -18,6 +19,7 @@ while [[ "$#" -gt 0 ]]; do
     --model-path) MODEL_PATH="${2:-}"; shift 2 ;;
     --fan-config-path) FAN_CONFIG_PATH="${2:-}"; shift 2 ;;
     --thermal-class-path) THERMAL_CLASS_PATH="${2:-}"; shift 2 ;;
+    --hwmon-class-path) HWMON_CLASS_PATH="${2:-}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -165,7 +167,7 @@ pi5_fan_boot_profile_configured() {
   local expected actual begin_line overlay_line
   expected="$(cat <<'EOF'
 # BEGIN Solar Player Pi 5 fan control
-dtparam=fan_temp0=50000
+dtparam=fan_temp0=0
 dtparam=fan_temp0_hyst=5000
 dtparam=fan_temp0_speed=75
 dtparam=fan_temp1=60000
@@ -199,7 +201,7 @@ thermal_zone_has_active_trip_points() {
   local zone_path="$1"
   local expected_temperature trip_path trip_index
 
-  for expected_temperature in 50000 60000 67500 75000; do
+  for expected_temperature in 0 60000 67500 75000; do
     local found=0
     for trip_path in "${zone_path}"/trip_point_*_temp; do
       [[ -f "${trip_path}" ]] || continue
@@ -213,16 +215,34 @@ thermal_zone_has_active_trip_points() {
   done
 }
 
+pi5_fan_rpm_active() {
+  local hwmon_path fan_input rpm
+
+  for hwmon_path in "${HWMON_CLASS_PATH}"/hwmon*; do
+    [[ -d "${hwmon_path}" && -f "${hwmon_path}/name" ]] || continue
+    [[ "$(cat "${hwmon_path}/name")" == "pwmfan" ]] || continue
+    for fan_input in "${hwmon_path}"/fan*_input; do
+      [[ -f "${fan_input}" ]] || continue
+      rpm="$(cat "${fan_input}")"
+      [[ "${rpm}" =~ ^[1-9][0-9]*$ ]] && return 0
+    done
+  done
+
+  return 1
+}
+
 pi5_fan_runtime_contract_active() {
-  local cooling_path zone_path cooling_ok=0
+  local cooling_path zone_path cooling_ok=0 thermal_ok=0
 
   for cooling_path in "${THERMAL_CLASS_PATH}"/cooling_device*; do
     [[ -d "${cooling_path}" ]] || continue
     if [[
       -f "${cooling_path}/type"
       && -f "${cooling_path}/max_state"
+      && -f "${cooling_path}/cur_state"
       && "$(cat "${cooling_path}/type")" == "pwm-fan"
       && "$(cat "${cooling_path}/max_state")" == "4"
+      && "$(cat "${cooling_path}/cur_state")" =~ ^[1-9][0-9]*$
     ]]; then
       cooling_ok=1
       break
@@ -234,10 +254,13 @@ pi5_fan_runtime_contract_active() {
     [[ -d "${zone_path}" ]] || continue
     [[ -f "${zone_path}/mode" && "$(cat "${zone_path}/mode")" == "enabled" ]] || continue
     [[ -f "${zone_path}/policy" && "$(cat "${zone_path}/policy")" == "step_wise" ]] || continue
-    thermal_zone_has_active_trip_points "${zone_path}" && return 0
+    if thermal_zone_has_active_trip_points "${zone_path}"; then
+      thermal_ok=1
+      break
+    fi
   done
 
-  return 1
+  [[ "${thermal_ok}" == "1" ]] && pi5_fan_rpm_active
 }
 
 check "solar-display service is active" systemctl is-active --quiet solar-display
