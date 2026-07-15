@@ -12,7 +12,7 @@ The system SHALL provide a local deployment command that targets a Raspberry Pi 
 
 #### Scenario: Operator starts an update deployment
 
-- **WHEN** an operator runs the Raspberry Pi deployment entrypoint with a target such as `pi@<pi-ip>` or `kz@192.168.31.39` in update mode
+- **WHEN** an operator runs the Raspberry Pi deployment entrypoint with the operation-time `SSH_TARGET` in update mode
 - **THEN** the command verifies SSH reachability and sudo access before uploading files
 - **AND** it prints the target, mode, install directory, bundle type, MQTT host setting, and readonly-root setting before making target changes
 - **AND** it prints the kiosk user derived from the SSH target or explicit override before making target changes
@@ -1559,4 +1559,79 @@ tests:
   - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.test.ts
   - apps/web/src/components/shellFoundation.test.ts
   - apps/server/src/services/MockMetricsFeedService.test.ts
+-->
+
+---
+### Requirement: Resolve the Raspberry Pi connection target at operation time
+
+The deployment documentation SHALL treat the SSH target supplied by the operator for the current operation as the sole connection target and SHALL NOT persist a project Raspberry Pi fixed IP in SSH, deployment, RDP, health-check, or reboot-verification examples.
+
+#### Scenario: Operator prepares an SSH deployment session
+
+- **WHEN** an operator follows the Raspberry Pi deployment documentation
+- **THEN** the documentation instructs the operator to set a `<pi-host>` or `<ssh-target>` placeholder from the IP address or MagicDNS name supplied for that operation
+- **AND** subsequent SSH, one-key deployment, RDP, health, and reboot-verification commands reuse that selected target
+
+#### Scenario: Target address changes between operations
+
+- **WHEN** the Raspberry Pi receives a different LAN or Tailscale address
+- **THEN** the operator changes only the operation-time target value
+- **AND** no repository documentation edit is required
+
+#### Scenario: Documentation retains non-target infrastructure addresses
+
+- **WHEN** deployment documentation includes an address for a separate dependency such as the MQTT broker
+- **THEN** that address is explicitly identified as dependency configuration rather than the Raspberry Pi SSH target
+- **AND** it is not reused as an SSH, RDP, health, or reboot-verification target
+
+
+<!-- @trace
+source: deploy-pi5-four-stage-fan-control
+updated: 2026-07-16
+code:
+  - deploy/verify-kiosk-install.sh
+  - deploy/disable-xfce-display-popups.sh
+  - deploy.sh
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - deploy/configure-lightweight-desktop.sh
+  - deploy.md
+  - deploy/apply-desktop-theme.sh
+  - deploy/disable-display-sleep.sh
+  - deploy/configure-pi5-fan-control.sh
+  - scripts/deploy.test.mjs
+  - deploy/install-kiosk.sh
+-->
+
+---
+### Requirement: Include Pi 5 thermal configuration in kiosk installation
+
+The kiosk installation flow SHALL invoke the Pi 5 fan configuration helper before final kiosk verification and SHALL package that helper in every deploy bundle that supports Raspberry Pi kiosk installation.
+
+#### Scenario: One-key deployment installs the thermal profile
+
+- **WHEN** the one-key deployment reaches kiosk installation on Raspberry Pi 5
+- **THEN** the installer invokes the packaged fan configuration helper
+- **AND** helper failure stops installation before final verification is reported as successful
+
+#### Scenario: Deploy bundle is built
+
+- **WHEN** a deploy bundle is assembled
+- **THEN** it contains the executable Pi 5 fan configuration helper
+- **AND** bundle validation fails if the helper is missing
+
+<!-- @trace
+source: deploy-pi5-four-stage-fan-control
+updated: 2026-07-16
+code:
+  - deploy/verify-kiosk-install.sh
+  - deploy/disable-xfce-display-popups.sh
+  - deploy.sh
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - deploy/configure-lightweight-desktop.sh
+  - deploy.md
+  - deploy/apply-desktop-theme.sh
+  - deploy/disable-display-sleep.sh
+  - deploy/configure-pi5-fan-control.sh
+  - scripts/deploy.test.mjs
+  - deploy/install-kiosk.sh
 -->

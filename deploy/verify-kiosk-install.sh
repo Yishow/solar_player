@@ -5,6 +5,9 @@ INSTALL_DIR="${INSTALL_DIR:-/data/solar-display}"
 KIOSK_USER="${KIOSK_USER:-pi}"
 KIOSK_HOME="${KIOSK_HOME:-}"
 KIOSK_HEALTH_URL="${KIOSK_HEALTH_URL:-http://127.0.0.1:3000/health}"
+MODEL_PATH="${MODEL_PATH:-/proc/device-tree/model}"
+FAN_CONFIG_PATH="${FAN_CONFIG_PATH:-/boot/firmware/config.txt}"
+THERMAL_CLASS_PATH="${THERMAL_CLASS_PATH:-/sys/class/thermal}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -12,6 +15,9 @@ while [[ "$#" -gt 0 ]]; do
     --kiosk-user) KIOSK_USER="${2:-}"; shift 2 ;;
     --kiosk-home) KIOSK_HOME="${2:-}"; shift 2 ;;
     --health-url) KIOSK_HEALTH_URL="${2:-}"; shift 2 ;;
+    --model-path) MODEL_PATH="${2:-}"; shift 2 ;;
+    --fan-config-path) FAN_CONFIG_PATH="${2:-}"; shift 2 ;;
+    --thermal-class-path) THERMAL_CLASS_PATH="${2:-}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -120,6 +126,120 @@ display_sleep_disabled_when_x_available() {
   grep -q 'timeout:  0' <<< "${output}" && grep -q 'DPMS is Disabled' <<< "${output}"
 }
 
+xfce_user_config_writable_when_installed() {
+  command -v xfce4-panel >/dev/null 2>&1 || return 0
+
+  local path
+  for path in \
+    "${KIOSK_HOME}/.config/xfce4" \
+    "${KIOSK_HOME}/.config/xfce4/xfconf" \
+    "${KIOSK_HOME}/.config/xfce4/panel"; do
+    [[ -d "${path}" ]] || return 1
+    sudo -u "${KIOSK_USER}" test -w "${path}" || return 1
+  done
+}
+
+xfce_panel_running_when_x_available() {
+  command -v xfce4-panel >/dev/null 2>&1 || return 0
+  [[ -S /tmp/.X11-unix/X0 ]] || return 0
+
+  local pid
+  while read -r pid; do
+    [[ -n "${pid}" && -r "/proc/${pid}/environ" ]] || continue
+    if tr '\0' '\n' < "/proc/${pid}/environ" | grep -qx 'DISPLAY=:0'; then
+      return 0
+    fi
+  done < <(pgrep -u "${KIOSK_USER}" -x xfce4-panel 2>/dev/null || true)
+
+  return 1
+}
+
+is_raspberry_pi_5() {
+  [[ -r "${MODEL_PATH}" ]] || return 1
+  [[ "$(tr -d '\0' < "${MODEL_PATH}")" == *"Raspberry Pi 5"* ]]
+}
+
+pi5_fan_boot_profile_configured() {
+  [[ -r "${FAN_CONFIG_PATH}" ]] || return 1
+
+  local expected actual begin_line overlay_line
+  expected="$(cat <<'EOF'
+# BEGIN Solar Player Pi 5 fan control
+dtparam=fan_temp0=50000
+dtparam=fan_temp0_hyst=5000
+dtparam=fan_temp0_speed=75
+dtparam=fan_temp1=60000
+dtparam=fan_temp1_hyst=5000
+dtparam=fan_temp1_speed=125
+dtparam=fan_temp2=67500
+dtparam=fan_temp2_hyst=5000
+dtparam=fan_temp2_speed=175
+dtparam=fan_temp3=75000
+dtparam=fan_temp3_hyst=5000
+dtparam=fan_temp3_speed=250
+# END Solar Player Pi 5 fan control
+EOF
+)"
+  actual="$(awk '
+    $0 == "# BEGIN Solar Player Pi 5 fan control" { capture = 1 }
+    capture { print }
+    $0 == "# END Solar Player Pi 5 fan control" { capture = 0 }
+  ' "${FAN_CONFIG_PATH}")"
+
+  [[ "$(grep -Fxc '# BEGIN Solar Player Pi 5 fan control' "${FAN_CONFIG_PATH}" || true)" == "1" ]] || return 1
+  [[ "$(grep -Fxc '# END Solar Player Pi 5 fan control' "${FAN_CONFIG_PATH}" || true)" == "1" ]] || return 1
+  [[ "${actual}" == "${expected}" ]] || return 1
+
+  begin_line="$(grep -n -F '# BEGIN Solar Player Pi 5 fan control' "${FAN_CONFIG_PATH}" | cut -d: -f1)"
+  overlay_line="$(grep -n -m1 -E '^[[:space:]]*dtoverlay=' "${FAN_CONFIG_PATH}" | cut -d: -f1 || true)"
+  [[ -z "${overlay_line}" || "${begin_line}" -lt "${overlay_line}" ]]
+}
+
+thermal_zone_has_active_trip_points() {
+  local zone_path="$1"
+  local expected_temperature trip_path trip_index
+
+  for expected_temperature in 50000 60000 67500 75000; do
+    local found=0
+    for trip_path in "${zone_path}"/trip_point_*_temp; do
+      [[ -f "${trip_path}" ]] || continue
+      [[ "$(cat "${trip_path}")" == "${expected_temperature}" ]] || continue
+      trip_index="${trip_path%_temp}"
+      [[ -f "${trip_index}_type" && "$(cat "${trip_index}_type")" == "active" ]] || continue
+      found=1
+      break
+    done
+    [[ "${found}" == "1" ]] || return 1
+  done
+}
+
+pi5_fan_runtime_contract_active() {
+  local cooling_path zone_path cooling_ok=0
+
+  for cooling_path in "${THERMAL_CLASS_PATH}"/cooling_device*; do
+    [[ -d "${cooling_path}" ]] || continue
+    if [[
+      -f "${cooling_path}/type"
+      && -f "${cooling_path}/max_state"
+      && "$(cat "${cooling_path}/type")" == "pwm-fan"
+      && "$(cat "${cooling_path}/max_state")" == "4"
+    ]]; then
+      cooling_ok=1
+      break
+    fi
+  done
+  [[ "${cooling_ok}" == "1" ]] || return 1
+
+  for zone_path in "${THERMAL_CLASS_PATH}"/thermal_zone*; do
+    [[ -d "${zone_path}" ]] || continue
+    [[ -f "${zone_path}/mode" && "$(cat "${zone_path}/mode")" == "enabled" ]] || continue
+    [[ -f "${zone_path}/policy" && "$(cat "${zone_path}/policy")" == "step_wise" ]] || continue
+    thermal_zone_has_active_trip_points "${zone_path}" && return 0
+  done
+
+  return 1
+}
+
 check "solar-display service is active" systemctl is-active --quiet solar-display
 check "health endpoint responds: ${KIOSK_HEALTH_URL}" health_ready
 check "kernel modules are not hidden by cloud-initramfs-copymods tmpfs" modules_not_hidden_by_copymods
@@ -130,6 +250,14 @@ check "Fcitx5 Chewing is installed and present in the kiosk profile when Fcitx5 
 check "display sleep disable autostart is configured" display_sleep_autostart_configured
 check "system sleep targets are masked" system_sleep_targets_masked
 check "display sleep is disabled when X display is available" display_sleep_disabled_when_x_available
+check "XFCE user config directories are writable by ${KIOSK_USER}" xfce_user_config_writable_when_installed
+check "XFCE panel is running on display :0 when local X is available" xfce_panel_running_when_x_available
+if is_raspberry_pi_5; then
+  check "Pi 5 fan boot profile is configured" pi5_fan_boot_profile_configured
+  check "Pi 5 fan runtime thermal contract is active" pi5_fan_runtime_contract_active
+else
+  echo "SKIP: Pi 5 fan thermal checks not applicable"
+fi
 check "autostart launcher exists: ${AUTOSTART_LAUNCHER}" test -f "${AUTOSTART_LAUNCHER}"
 check "desktop re-entry launcher exists: ${DESKTOP_LAUNCHER}" test -f "${DESKTOP_LAUNCHER}"
 check "desktop re-entry launcher is executable: ${DESKTOP_LAUNCHER}" test -x "${DESKTOP_LAUNCHER}"

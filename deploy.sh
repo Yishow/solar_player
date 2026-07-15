@@ -52,6 +52,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/enable-readonly-root.sh" "${target_root}/deploy/enable-readonly-root.sh"
   cp "${PROJECT_DIR}/deploy/raspi-bootstrap.sh" "${target_root}/deploy/raspi-bootstrap.sh"
   cp "${PROJECT_DIR}/deploy/configure-lightweight-desktop.sh" "${target_root}/deploy/configure-lightweight-desktop.sh"
+  cp "${PROJECT_DIR}/deploy/configure-pi5-fan-control.sh" "${target_root}/deploy/configure-pi5-fan-control.sh"
   cp "${PROJECT_DIR}/deploy/disable-display-sleep.sh" "${target_root}/deploy/disable-display-sleep.sh"
   cp "${PROJECT_DIR}/deploy/disable-xfce-display-popups.sh" "${target_root}/deploy/disable-xfce-display-popups.sh"
   cp "${PROJECT_DIR}/deploy/apply-desktop-theme.sh" "${target_root}/deploy/apply-desktop-theme.sh"
@@ -81,6 +82,7 @@ copy_required_tree() {
     "${target_root}/deploy/enable-readonly-root.sh" \
     "${target_root}/deploy/raspi-bootstrap.sh" \
     "${target_root}/deploy/configure-lightweight-desktop.sh" \
+    "${target_root}/deploy/configure-pi5-fan-control.sh" \
     "${target_root}/deploy/disable-display-sleep.sh" \
     "${target_root}/deploy/disable-xfce-display-popups.sh" \
     "${target_root}/deploy/apply-desktop-theme.sh" \

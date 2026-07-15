@@ -25,6 +25,9 @@ const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-sys
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 const hotspotTriggerScriptPath = path.join(repoRoot, "deploy/tailscale-hotspot-trigger.sh");
+const fanControlScriptPath = path.join(repoRoot, "deploy/configure-pi5-fan-control.sh");
+const deployNotesPath = path.join(repoRoot, "deploy.md");
+const raspiDeployRunbookPath = path.join(repoRoot, "docs/runbooks/raspi-onekey-kiosk-deploy.md");
 const bashCommand = process.platform === "win32"
   ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
   : "bash";
@@ -50,6 +53,19 @@ function createSqliteDatabase(dbPath, { schemaVersions = ["001_init"], sentinel 
 function fileMode(filePath) {
   return statSync(filePath).mode & 0o777;
 }
+
+test("Raspberry Pi deployment docs resolve connection targets at operation time", () => {
+  for (const docPath of [deployNotesPath, raspiDeployRunbookPath]) {
+    const contents = readFileSync(docPath, "utf8");
+
+    assert.match(contents, /PI_HOST="<pi-host-or-magicdns>"/u);
+    assert.match(contents, /SSH_TARGET="[^\n]*\$\{PI_HOST\}[^\n]*"/u);
+    assert.match(contents, /MQTT[^\n]*(?:dependency|外部依賴)/iu);
+    assert.doesNotMatch(contents, /\b(?:pi|kz)@(?:\d{1,3}\.){3}\d{1,3}\b/u);
+    assert.doesNotMatch(contents, /-HostName\s+(?:\d{1,3}\.){3}\d{1,3}\b/u);
+    assert.doesNotMatch(contents, /https?:\/\/(?!127\.0\.0\.1\b)(?:\d{1,3}\.){3}\d{1,3}\b/u);
+  }
+});
 
 function writeFakeSystemctl(fakeBinDir, { isActive = false, logPath = null } = {}) {
   mkdirSync(fakeBinDir, { recursive: true });
@@ -116,6 +132,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/enable-readonly-root.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/configure-lightweight-desktop.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/configure-pi5-fan-control.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/disable-display-sleep.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/disable-xfce-display-popups.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/apply-desktop-theme.sh"), "#!/bin/bash\n");
@@ -308,6 +325,101 @@ function isExecutable(filePath) {
   return (statSync(filePath).mode & 0o111) !== 0;
 }
 
+test("Pi 5 fan helper writes one idempotent four-stage block before dtoverlay", () => {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-display-pi5-fan-"));
+  const modelPath = path.join(fixtureDir, "model");
+  const configPath = path.join(fixtureDir, "config.txt");
+
+  try {
+    writeFileSync(modelPath, "Raspberry Pi 5 Model B Rev 1.0\0");
+    writeFileSync(
+      configPath,
+      "[all]\ndtparam=audio=on\n# unrelated setting\ndtoverlay=vc4-kms-v3d\n[all]\n"
+    );
+
+    const first = runBashScript(
+      fanControlScriptPath,
+      ["--model-path", modelPath, "--config-path", configPath],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.equal(first.status, 0, first.stderr || first.stdout);
+    assert.match(first.stdout, /reboot required/i);
+
+    const firstConfig = readFileSync(configPath, "utf8");
+    assert.equal((firstConfig.match(/# BEGIN Solar Player Pi 5 fan control/gu) ?? []).length, 1);
+    assert.equal((firstConfig.match(/# END Solar Player Pi 5 fan control/gu) ?? []).length, 1);
+    assert.ok(firstConfig.indexOf("# END Solar Player Pi 5 fan control") < firstConfig.indexOf("dtoverlay=vc4-kms-v3d"));
+    assert.match(firstConfig, /^# unrelated setting$/m);
+
+    for (const [stage, temperature, speed] of [
+      [0, 50000, 75],
+      [1, 60000, 125],
+      [2, 67500, 175],
+      [3, 75000, 250]
+    ]) {
+      assert.match(firstConfig, new RegExp(`^dtparam=fan_temp${stage}=${temperature}$`, "m"));
+      assert.match(firstConfig, new RegExp(`^dtparam=fan_temp${stage}_hyst=5000$`, "m"));
+      assert.match(firstConfig, new RegExp(`^dtparam=fan_temp${stage}_speed=${speed}$`, "m"));
+    }
+
+    const second = runBashScript(
+      fanControlScriptPath,
+      ["--model-path", modelPath, "--config-path", configPath],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.equal(second.status, 0, second.stderr || second.stdout);
+    assert.match(second.stdout, /profile already configured/i);
+    assert.equal(readFileSync(configPath, "utf8"), firstConfig);
+  } finally {
+    removeTempDir(fixtureDir);
+  }
+});
+
+test("Pi 5 fan helper skips non-Pi-5 models without changing boot config", () => {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-display-non-pi5-fan-"));
+  const modelPath = path.join(fixtureDir, "model");
+  const configPath = path.join(fixtureDir, "config.txt");
+  const originalConfig = "[all]\ndtoverlay=vc4-kms-v3d\n";
+
+  try {
+    writeFileSync(modelPath, "Raspberry Pi 4 Model B Rev 1.5\0");
+    writeFileSync(configPath, originalConfig);
+
+    const result = runBashScript(
+      fanControlScriptPath,
+      ["--model-path", modelPath, "--config-path", configPath],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /not applicable/i);
+    assert.equal(readFileSync(configPath, "utf8"), originalConfig);
+  } finally {
+    removeTempDir(fixtureDir);
+  }
+});
+
+test("Pi 5 fan helper fails closed when the boot config is missing", () => {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-display-missing-pi5-fan-"));
+  const modelPath = path.join(fixtureDir, "model");
+  const configPath = path.join(fixtureDir, "missing-config.txt");
+
+  try {
+    writeFileSync(modelPath, "Raspberry Pi 5 Model B Rev 1.0\0");
+
+    const result = runBashScript(
+      fanControlScriptPath,
+      ["--model-path", modelPath, "--config-path", configPath],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, new RegExp(configPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
+  } finally {
+    removeTempDir(fixtureDir);
+  }
+});
+
 test("deploy.sh shows two deployment menu options", () => {
   const source = readFileSync(deployScriptPath, "utf8");
 
@@ -352,6 +464,14 @@ test("kiosk installer installs both autostart and desktop launchers for the kios
   assert.match(source, /env KIOSK_DISPLAY_OUTPUT=/);
   assert.match(source, /chmod \+x "\$\{KIOSK_DESKTOP_DIR\}\/Solar Display Kiosk\.desktop"/);
   assert.match(source, /metadata::trusted true/);
+});
+
+test("kiosk installer invokes the packaged Pi 5 fan helper fail closed", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/install-kiosk.sh"), "utf8");
+
+  assert.match(source, /FAN_CONTROL_HELPER="\$\{BUNDLE_ROOT\}\/deploy\/configure-pi5-fan-control\.sh"/);
+  assert.match(source, /^"\$\{FAN_CONTROL_HELPER\}"$/m);
+  assert.doesNotMatch(source, /FAN_CONTROL_HELPER[^\n]*\|\| true/);
 });
 
 test("bundle install script can source nvm before running pnpm install", () => {
@@ -832,6 +952,26 @@ test("lightweight desktop helper configures xfce lightdm xrdp firefox without we
   assert.doesNotMatch(source, /PasswordAuthentication no/);
 });
 
+test("desktop helpers explicitly assign every XFCE directory layer to the kiosk user", () => {
+  for (const scriptPath of [
+    lightweightDesktopScriptPath,
+    displaySleepScriptPath,
+    displayPopupsScriptPath,
+    desktopThemeScriptPath
+  ]) {
+    const source = readFileSync(scriptPath, "utf8");
+
+    assert.match(source, /"\$\{kiosk_home\}\/\.config\/xfce4"/u, scriptPath);
+    assert.match(source, /"\$\{kiosk_home\}\/\.config\/xfce4\/xfconf"/u, scriptPath);
+  }
+
+  const desktopSource = readFileSync(lightweightDesktopScriptPath, "utf8");
+  assert.match(desktopSource, /"\$\{kiosk_home\}\/\.config\/xfce4\/panel"/u);
+  assert.match(desktopSource, /"\$\{kiosk_home\}\/\.local"/u);
+  assert.match(desktopSource, /"\$\{kiosk_home\}\/\.local\/share"/u);
+  assert.match(desktopSource, /"\$\{kiosk_home\}\/\.local\/share\/fonts"/u);
+});
+
 test("repair kiosk system helper persists copymods modules and Firefox snap CJK fonts", () => {
   const source = readFileSync(repairKioskSystemScriptPath, "utf8");
 
@@ -1270,6 +1410,64 @@ test("kiosk verification helper fails when the desktop re-entry launcher is miss
   }
 });
 
+test("kiosk verification helper rejects an XFCE profile that the kiosk user cannot write", () => {
+  const projectDir = makeFixtureProject();
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const kioskHome = path.join(projectDir, "home", "kz");
+  const installDir = path.join(projectDir, "data-install");
+
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/verify-kiosk-install.sh"),
+      readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/verify-kiosk-install.sh"));
+    mkdirSync(path.join(kioskHome, ".config/xfce4/xfconf"), { recursive: true });
+    mkdirSync(path.join(kioskHome, ".config/xfce4/panel"), { recursive: true });
+    mkdirSync(fakeBinDir);
+    for (const runtimePath of ["data", "logs", "uploads/images", "uploads/brand"]) {
+      mkdirSync(path.join(installDir, runtimePath), { recursive: true });
+    }
+
+    for (const command of ["curl", "systemctl", "xfce4-panel"]) {
+      const commandPath = path.join(fakeBinDir, command);
+      writeFileSync(commandPath, "#!/bin/bash\nexit 0\n");
+      markBashExecutable(commandPath);
+    }
+    const sudoPath = path.join(fakeBinDir, "sudo");
+    writeFileSync(
+      sudoPath,
+      [
+        "#!/bin/bash",
+        "if [[ \"$1\" == \"-u\" ]]; then shift 2; fi",
+        `if [[ "$1" == "test" && "$2" == "-w" && "$3" == ${JSON.stringify(toBashPathValue(path.join(kioskHome, ".config/xfce4")))}* ]]; then exit 1; fi`,
+        "exec \"$@\"",
+        ""
+      ].join("\n")
+    );
+    markBashExecutable(sudoPath);
+
+    const result = runBashScript("deploy/verify-kiosk-install.sh", [
+      "--install-dir",
+      installDir,
+      "--kiosk-user",
+      "kz",
+      "--kiosk-home",
+      kioskHome
+    ], {
+      cwd: projectDir,
+      env: process.env,
+      bashPrependPathDirs: [fakeBinDir],
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /XFCE user config directories are writable by kz/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
 test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates", () => {
   const source = readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8");
 
@@ -1294,6 +1492,96 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /fc-match sans:lang=zh-tw/);
   assert.match(source, /findmnt -no SOURCE \/usr\/lib\/modules/);
   assert.match(source, /nmcli -t -f TYPE,STATE device status/);
+});
+
+test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures", () => {
+  const projectDir = makeFixtureProject();
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const modelPath = path.join(projectDir, "model");
+  const configPath = path.join(projectDir, "config.txt");
+  const thermalClassPath = path.join(projectDir, "thermal");
+  const coolingDevicePath = path.join(thermalClassPath, "cooling_device0");
+  const thermalZonePath = path.join(thermalClassPath, "thermal_zone0");
+  const kioskHome = path.join(projectDir, "home", "kz");
+  const installDir = path.join(projectDir, "data-install");
+  const fanBlock = [
+    "# BEGIN Solar Player Pi 5 fan control",
+    "dtparam=fan_temp0=50000",
+    "dtparam=fan_temp0_hyst=5000",
+    "dtparam=fan_temp0_speed=75",
+    "dtparam=fan_temp1=60000",
+    "dtparam=fan_temp1_hyst=5000",
+    "dtparam=fan_temp1_speed=125",
+    "dtparam=fan_temp2=67500",
+    "dtparam=fan_temp2_hyst=5000",
+    "dtparam=fan_temp2_speed=175",
+    "dtparam=fan_temp3=75000",
+    "dtparam=fan_temp3_hyst=5000",
+    "dtparam=fan_temp3_speed=250",
+    "# END Solar Player Pi 5 fan control"
+  ].join("\n");
+
+  const runVerification = () => runBashScript("deploy/verify-kiosk-install.sh", [
+    "--install-dir",
+    installDir,
+    "--kiosk-user",
+    "kz",
+    "--kiosk-home",
+    kioskHome,
+    "--model-path",
+    modelPath,
+    "--fan-config-path",
+    configPath,
+    "--thermal-class-path",
+    thermalClassPath
+  ], {
+    cwd: projectDir,
+    bashPrependPathDirs: [fakeBinDir],
+    env: process.env,
+    encoding: "utf8"
+  });
+
+  try {
+    writeFileSync(
+      path.join(projectDir, "deploy/verify-kiosk-install.sh"),
+      readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8")
+    );
+    markBashExecutable(path.join(projectDir, "deploy/verify-kiosk-install.sh"));
+    writeFileSync(modelPath, "Raspberry Pi 5 Model B Rev 1.0\0");
+    writeFileSync(configPath, `[all]\n${fanBlock}\ndtoverlay=vc4-kms-v3d\n`);
+    mkdirSync(coolingDevicePath, { recursive: true });
+    mkdirSync(thermalZonePath, { recursive: true });
+    writeFileSync(path.join(coolingDevicePath, "type"), "pwm-fan\n");
+    writeFileSync(path.join(coolingDevicePath, "max_state"), "4\n");
+    writeFileSync(path.join(thermalZonePath, "mode"), "enabled\n");
+    writeFileSync(path.join(thermalZonePath, "policy"), "step_wise\n");
+    [50000, 60000, 67500, 75000].forEach((temperature, index) => {
+      writeFileSync(path.join(thermalZonePath, `trip_point_${index}_temp`), `${temperature}\n`);
+      writeFileSync(path.join(thermalZonePath, `trip_point_${index}_type`), "active\n");
+    });
+
+    mkdirSync(fakeBinDir);
+    for (const command of ["systemctl", "curl"]) {
+      const commandPath = path.join(fakeBinDir, command);
+      writeFileSync(commandPath, "#!/bin/bash\nexit 0\n");
+      markBashExecutable(commandPath);
+    }
+
+    const correct = runVerification();
+    assert.match(correct.stdout, /OK: Pi 5 fan boot profile is configured/);
+    assert.match(correct.stdout, /OK: Pi 5 fan runtime thermal contract is active/);
+
+    writeFileSync(configPath, `[all]\n${fanBlock.replace("fan_temp3_speed=250", "fan_temp3_speed=249")}\ndtoverlay=vc4-kms-v3d\n`);
+    const badBootProfile = runVerification();
+    assert.match(badBootProfile.stderr, /FAIL: Pi 5 fan boot profile is configured/);
+
+    writeFileSync(configPath, `[all]\n${fanBlock}\ndtoverlay=vc4-kms-v3d\n`);
+    writeFileSync(path.join(coolingDevicePath, "max_state"), "3\n");
+    const badRuntime = runVerification();
+    assert.match(badRuntime.stderr, /FAIL: Pi 5 fan runtime thermal contract is active/);
+  } finally {
+    removeTempDir(projectDir);
+  }
 });
 
 test("deploy.sh online bundle includes runtime files without node_modules", () => {
@@ -1328,6 +1616,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-pi5-fan-control.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
@@ -1362,6 +1651,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-pi5-fan-control.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
@@ -1404,6 +1694,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-pi5-fan-control.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);
@@ -1426,6 +1717,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/enable-readonly-root.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/raspi-bootstrap.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-lightweight-desktop.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-pi5-fan-control.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-display-sleep.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/disable-xfce-display-popups.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/apply-desktop-theme.sh")), true);

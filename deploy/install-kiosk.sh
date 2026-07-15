@@ -21,6 +21,7 @@ SYSTEMD_UNIT_PATH="/etc/systemd/system/solar-display.service"
 JOURNAL_HELPER_SRC="${BUNDLE_ROOT}/deploy/read-solar-display-journal.sh"
 JOURNAL_HELPER_PATH="${JOURNAL_HELPER_PATH:-/usr/local/sbin/read-solar-display-journal.sh}"
 JOURNAL_SUDOERS_PATH="${JOURNAL_SUDOERS_PATH:-/etc/sudoers.d/solar-display-journal}"
+FAN_CONTROL_HELPER="${BUNDLE_ROOT}/deploy/configure-pi5-fan-control.sh"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
 LAUNCHER_NAME="Solar Display Kiosk.desktop"
 READONLY_ENABLE_LAUNCHER_NAME="Enable Read Only System.desktop"
@@ -35,6 +36,14 @@ if ! id "${KIOSK_USER}" >/dev/null 2>&1; then
   echo "User not found: ${KIOSK_USER}" >&2
   exit 1
 fi
+
+if [[ ! -x "${FAN_CONTROL_HELPER}" ]]; then
+  echo "Missing executable Pi 5 fan helper: ${FAN_CONTROL_HELPER}" >&2
+  exit 1
+fi
+
+echo "[1/8] Configuring Pi 5 fan control..."
+"${FAN_CONTROL_HELPER}"
 
 ensure_dir() {
   install -d -m "$1" -o "$2" -g "$3" "$4"
@@ -102,13 +111,13 @@ set_ini_key() {
   rm -f "${tmp}"
 }
 
-echo "[1/6] Ensuring runtime directories..."
+echo "[2/8] Ensuring runtime directories..."
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${INSTALL_DIR}/data"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${INSTALL_DIR}/logs"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${INSTALL_DIR}/uploads/images"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${INSTALL_DIR}/uploads/brand"
 
-echo "[2/6] Resolving node and pnpm..."
+echo "[3/8] Resolving node and pnpm..."
 if [[ -z "${NODE_BIN}" ]]; then
   NODE_BIN="$(resolve_user_bin node)"
 fi
@@ -126,7 +135,7 @@ if [[ -z "${PNPM_BIN}" || ! -x "${PNPM_BIN}" ]]; then
   exit 1
 fi
 
-echo "[3/7] Installing systemd service..."
+echo "[4/8] Installing systemd service..."
 sed \
   -e "s#^User=.*#User=${KIOSK_USER}#" \
   -e "s#^WorkingDirectory=.*#WorkingDirectory=${INSTALL_DIR}#" \
@@ -142,7 +151,7 @@ systemctl daemon-reload
 systemctl enable solar-display
 systemctl restart solar-display
 
-echo "[4/7] Installing least-privilege journal reader..."
+echo "[5/8] Installing least-privilege journal reader..."
 if [[ ! -f "${JOURNAL_HELPER_SRC}" ]]; then
   echo "Missing journal helper source: ${JOURNAL_HELPER_SRC}" >&2
   exit 1
@@ -166,7 +175,7 @@ fi
 install -m 440 -o root -g root "${journal_sudoers_tmp}" "${JOURNAL_SUDOERS_PATH}"
 rm -f "${journal_sudoers_tmp}"
 
-echo "[5/7] Installing kiosk launcher..."
+echo "[6/8] Installing kiosk launcher..."
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_BIN_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_AUTOSTART_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_DESKTOP_DIR}"
@@ -223,7 +232,7 @@ if command -v gio >/dev/null 2>&1; then
   su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
 fi
 
-echo "[6/7] Configuring GDM autologin..."
+echo "[7/8] Configuring GDM autologin..."
 if [[ ! -f "${GDM_CUSTOM_CONF}" ]]; then
   install -D -m 644 /dev/null "${GDM_CUSTOM_CONF}"
 fi
@@ -234,7 +243,7 @@ cp "${GDM_CUSTOM_CONF}" "${GDM_CUSTOM_CONF}.bak.$(date +%Y%m%d%H%M%S)"
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLoginEnable True
 set_ini_key "${GDM_CUSTOM_CONF}" daemon AutomaticLogin "${KIOSK_USER}"
 
-echo "[7/7] Checking service health..."
+echo "[8/8] Checking service health..."
 systemctl --no-pager --full status solar-display || true
 
 echo "Done."

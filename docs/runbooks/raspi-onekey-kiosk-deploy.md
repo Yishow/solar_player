@@ -6,13 +6,29 @@ This runbook covers Raspberry Pi 5 running Ubuntu 24.04 Server for the Solar Dis
 
 - Ubuntu 24.04 arm64 on Raspberry Pi 5.
 - Default user: `pi`.
-- Current project installed card: `kz@192.168.31.40`.
+- Current project installed card user: `kz`.
 - Install path: `/data/solar-display`.
-- MQTT broker: pass with `--mqtt-host`, currently `192.168.31.62`.
+- MQTT dependency broker: pass with `--mqtt-host`, currently `192.168.31.62`.
 - Browser: Firefox.
 - Lightweight desktop: XFCE + lightdm + xrdp.
 
 SSH and sudo remain password-protected. Local desktop login and RDP desktop entry can be configured to avoid a password prompt for kiosk operations.
+
+## Operation-Time Connection Target
+
+Set the IP address or MagicDNS name supplied for the current operation once. Reuse these values for SSH, deployment, health checks, and reboot verification; do not save a project Pi IP in this runbook.
+
+```bash
+PI_HOST="<pi-host-or-magicdns>"
+PI_USER="<pi-ssh-user>"
+SSH_TARGET="${PI_USER}@${PI_HOST}"
+```
+
+For Windows RDP, set the same operation-time host:
+
+```powershell
+$PiHost = "<pi-host-or-magicdns>"
+```
 
 ## New-Card Init
 
@@ -43,7 +59,7 @@ It installs `net-tools`, `curl`, `ca-certificates`, `git`, `vim`, `htop`, `tmux`
 Run from the development machine:
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode init \
   --create-data-partition \
   --data-size-gb 10 \
@@ -59,7 +75,7 @@ Init mode performs host preflight, disk layout checks, `/data` verification, bun
 Use update mode for normal deployments:
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode update \
   --skip-disk \
   --mqtt-host 192.168.31.62 \
@@ -87,7 +103,7 @@ On first install, `--mqtt-host 192.168.31.62` writes the MQTT broker host into `
 
 If `.env` already exists, deployment preserves it and prints that MQTT defaults were not overwritten.
 
-Current 2026-06-16 production-card check: `kz@192.168.31.40` has `MQTT_BROKER=192.168.31.62` and `MQTT_DATA_MODE=mqtt`, but `192.168.31.62:1883` is not reachable from either the Pi or the development machine. Fix the broker host, broker port, or firewall on `192.168.31.62` before expecting live MQTT data.
+Current 2026-06-16 production-card check: the operation-selected Pi has `MQTT_BROKER=192.168.31.62` and `MQTT_DATA_MODE=mqtt`, but the MQTT dependency at `192.168.31.62:1883` is not reachable from either the Pi or the development machine. Fix the broker host, broker port, or firewall before expecting live MQTT data.
 
 ## XFCE xrdp Firefox
 
@@ -130,16 +146,16 @@ sudo /data/solar-display/deploy/verify-kiosk-install.sh --kiosk-user kz
 
 Expected state: all four systemd targets are `masked`, the X screen saver timeout is `0`, and `DPMS is Disabled`.
 
-RDP passwordless mode is for controlled company LAN use. xrdp `autorun` still requires the RDP client to provide valid credentials before it enters the kiosk session, so Windows no-prompt access is handled by saving `TERMSRV/<pi-ip>` credentials on the Windows PC:
+RDP passwordless mode is for controlled company LAN use. xrdp `autorun` still requires the RDP client to provide valid credentials before it enters the kiosk session, so Windows no-prompt access is handled by saving the operation-selected `$PiHost` credentials on the Windows PC:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName <pi-ip> -User pi -Password pi
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName $PiHost -User pi -Password pi
 ```
 
-For the current installed card:
+For the current installed-card user:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 192.168.31.40 -User kz -Password kz
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName $PiHost -User kz -Password kz
 ```
 
 This does not disable SSH password authentication and does not add sudo passwordless rules.

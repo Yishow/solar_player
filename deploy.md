@@ -1,8 +1,26 @@
 # Solar Player Raspberry Pi 5 Deploy Notes
 
-Last updated: 2026-06-26
+Last updated: 2026-07-16
 
 This file is the handoff entry for the Raspberry Pi 5 kiosk deployment work. Read this first before continuing deployment discussion or running scripts.
+
+## Operation-Time Connection Target
+
+Set the Pi address or MagicDNS name supplied for the current operation once, then reuse the derived SSH target for SSH, deployment, health checks, and reboot verification. Do not store a project Pi IP in this document.
+
+```bash
+PI_HOST="<pi-host-or-magicdns>"
+PI_USER="<pi-ssh-user>"
+SSH_TARGET="${PI_USER}@${PI_HOST}"
+```
+
+For Windows RDP commands in this document, set the same operation-time value:
+
+```powershell
+$PiHost = "<pi-host-or-magicdns>"
+```
+
+`192.168.31.62` below is MQTT dependency configuration, not the Raspberry Pi connection target.
 
 ## 64G Production Card Quick Start
 
@@ -21,7 +39,7 @@ Use this path for the real kiosk card. The order matters.
 4. Confirm SSH and sudo:
 
    ```bash
-   ssh pi@<pi-ip>
+   ssh "${SSH_TARGET}"
    sudo whoami
    ```
 
@@ -34,7 +52,7 @@ Use this path for the real kiosk card. The order matters.
 6. From the development machine, run init deploy. In init mode, the deploy script reads `/boot/firmware/solar-deploy.env` from the Pi and uses its `DATA_SIZE_GB` / `MQTT_HOST` values unless you pass explicit CLI overrides:
 
    ```bash
-   RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+   RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
      --mode init \
      --create-data-partition \
      --data-size-gb 10 \
@@ -46,7 +64,7 @@ Use this path for the real kiosk card. The order matters.
 7. Verify kiosk, RDP, desktop re-entry, and MQTT. Only then apply readonly root:
 
    ```bash
-   RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+   RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
      --mode update \
      --skip-disk \
      --mqtt-host 192.168.31.62 \
@@ -57,22 +75,21 @@ Use this path for the real kiosk card. The order matters.
 
 Do not boot the card once before running the user-data helper. If Ubuntu grows root to the full 64G card, the deploy script must refuse online shrink and `/data` cannot be created safely by the one-key flow.
 
-## Current Target
+## Installed-Card Profile
 
-- Current maintenance target over Tailscale: `kz@100.99.99.2`
-- Last verified LAN targets on the same card: wired `kz@192.168.31.157`, Wi-Fi `kz@192.168.31.159` on 2026-06-17
+- Resolve the maintenance target from `PI_HOST` and `SSH_TARGET` for each operation.
 - SSH password: `kz`
 - sudo password: `kz`
 - Generic fresh-card default user: `pi`
 - The `kz` account is only for this project's current installed card.
-- MQTT broker: `192.168.31.62`
+- MQTT dependency broker: `192.168.31.62`
 - OS verified: Ubuntu 24.04.4 LTS arm64 on Raspberry Pi 5
 - Current disk state after one-key init:
   - `/dev/mmcblk0p1`: `system-boot`
   - `/dev/mmcblk0p2`: lower root, about 47.5G
   - `/dev/mmcblk0p3`: `/data`, 10G ext4
 
-Post-reboot readonly verification passed on 2026-06-17 for `100.99.99.3`:
+Post-reboot readonly verification passed on 2026-06-17 for the operation-selected target:
 
 - `/` source is `overlayroot`
 - `/` is mounted as overlay with `lowerdir=/media/root-ro` and `upperdir=/media/root-rw/overlay`
@@ -80,16 +97,16 @@ Post-reboot readonly verification passed on 2026-06-17 for `100.99.99.3`:
 - `solar-display`, `xrdp`, `xrdp-sesman`, and `lightdm` are active
 - `/data/solar-display/logs` remains writable after readonly reboot
 - `sudo env KIOSK_USER=kz /data/solar-display/deploy/verify-kiosk-install.sh` passes
-- `http://100.99.99.3:3000/health` is reachable from the development machine
-- `http://100.99.99.3:3000/api/playback/pages` reports all five pages `playable` with `skipCount: 0`
+- `http://${PI_HOST}:3000/health` is reachable from the development machine
+- `http://${PI_HOST}:3000/api/playback/pages` reports all five pages `playable` with `skipCount: 0`
 - agent-browser opened `/overview`, `/solar`, `/factory-circuit`, `/images`, and `/sustainability` successfully
 
 Current maintenance state after the 2026-06-17 apt maintenance window:
 
 - Readonly root is currently disabled for maintenance: `/` is `/dev/mmcblk0p2 ext4 rw,relatime`, and `/etc/overlayroot.local.conf` contains `overlayroot=n`.
 - `apt update` and `apt upgrade -y` completed; `apt-get -s upgrade` reports `0 upgraded, 0 newly installed, 0 to remove`, and `/var/run/reboot-required` is absent after the final reboot.
-- Wi-Fi is restored: `wlan0` connects to `netplan-wlan0-AX3600` at `192.168.31.159`.
-- Tailscale is restored: `tailscale0` exposes `100.99.99.3`, and SSH is reachable over Tailscale.
+- Wi-Fi is restored: `wlan0` connects to `netplan-wlan0-AX3600`.
+- Tailscale is restored, and SSH is reachable through the operation-selected target.
 - Firefox snap Traditional Chinese font fallback is repaired: snap-local `fc-match sans:lang=zh-tw` resolves to `Noto Sans CJK TC`, and the kiosk Firefox profile has `font.name*.zh-TW` preferences in `user.js`.
 - Playback service remains healthy: `http://127.0.0.1:3000/health` returns `{"status":"ok"}`, and `/api/playback/pages` responds.
 - No failed systemd units were present in the final verification.
@@ -359,7 +376,7 @@ Before first boot:
 After first SSH is available:
 
 ```bash
-ssh pi@<pi-ip>
+ssh "${SSH_TARGET}"
 sudo whoami
 su -
 ```
@@ -369,15 +386,15 @@ su -
 Primary local entry:
 
 ```bash
-scripts/raspi-onekey-deploy.sh pi@<pi-ip>
+scripts/raspi-onekey-deploy.sh "${SSH_TARGET}"
 ```
 
-The one-key deploy script derives the kiosk Linux user from the SSH target. Use `pi@<ip>` for new generic cards. Use `kz@100.99.99.3` only for the current project installed card, or pass `--kiosk-user <user>` explicitly.
+The one-key deploy script derives the kiosk Linux user from `SSH_TARGET`. Set `PI_USER=pi` for a generic new card or `PI_USER=kz` for the current installed card, then rebuild `SSH_TARGET`; alternatively pass `--kiosk-user <user>` explicitly.
 
 Normal update:
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode update \
   --skip-disk \
   --mqtt-host 192.168.31.62 \
@@ -396,7 +413,7 @@ Update mode always runs a fail-closed runtime backup gate on the target before r
 Dry-run (no target changes) lists these stages:
 
 ```bash
-scripts/raspi-onekey-deploy.sh pi@<pi-ip> --mode update --dry-run
+scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" --mode update --dry-run
 ```
 
 ### Restore drill and explicit production restore
@@ -424,7 +441,7 @@ Do not upload unencrypted backup directories; archives may contain `.env` secret
 Fresh-card init for a 64G production card after the first SSH login. `/data` is fixed at 10GiB by default; root uses the remaining leading space.
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode init \
   --create-data-partition \
   --data-size-gb 10 \
@@ -438,7 +455,7 @@ This is the command that creates `/data` from the free space left by disabled gr
 Final readonly apply, only after verification passes:
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh pi@<pi-ip> \
+RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode update \
   --skip-disk \
   --mqtt-host 192.168.31.62 \
@@ -466,7 +483,7 @@ Login policy:
 - Local desktop autologin: enabled for the kiosk user, default `pi`
 - RDP desktop entry: xrdp can autorun the kiosk session after the RDP client supplies valid credentials
 - Windows credential prompt: if you still see an RDP password prompt after the Pi-side `SolarKiosk` autorun fix, that prompt is from the Windows client credential cache, not the Pi login screen
-- Windows no-prompt RDP: use `scripts/connect-raspi-rdp.ps1` once to store `TERMSRV/<pi-ip>` credentials in Windows Credential Manager
+- Windows no-prompt RDP: use `scripts/connect-raspi-rdp.ps1` once with `$PiHost` to store the operation-selected target credentials in Windows Credential Manager
 - SSH: password required
 - sudo: password required
 
@@ -493,22 +510,16 @@ Raspberry Pi 5 desktop hardening included in `deploy/configure-lightweight-deskt
 - Clears stale `~/.cache/sessions` and `~/.config/xfce4-session` before writing the session.
 - Writes `/etc/X11/xorg.conf.d/99-solar-raspi-kms.conf` with `Option "kmsdev" "/dev/dri/card1"` to avoid HDMI/local Xorg falling back to framebuffer mode on this Pi 5 layout.
 
-On the current installed card, from Windows PowerShell:
+On Windows PowerShell, use the operation-time target:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 192.168.31.159 -User kz -Password kz
-```
-
-For the current Tailscale maintenance target:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 100.99.99.3 -User kz -Password kz
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName $PiHost -User kz -Password kz
 ```
 
 If Windows saved a wrong credential, clear it first:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName 100.99.99.3 -DeleteCredential
+powershell -ExecutionPolicy Bypass -File .\scripts\connect-raspi-rdp.ps1 -HostName $PiHost -DeleteCredential
 ```
 
 ## Desktop Launchers
@@ -535,19 +546,19 @@ bash -n scripts/raspi-onekey-deploy.sh deploy/raspi-bootstrap.sh deploy/export-r
 Remote disk check:
 
 ```bash
-ssh kz@100.99.99.3 'findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /; findmnt /data || true; lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS'
+ssh "${SSH_TARGET}" 'findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /; findmnt /data || true; lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS'
 ```
 
 Remote kiosk check after deployment:
 
 ```bash
-ssh pi@<pi-ip> 'curl -fsS http://127.0.0.1:3000/health && sudo env KIOSK_USER=pi /data/solar-display/deploy/verify-kiosk-install.sh'
+ssh "${SSH_TARGET}" 'curl -fsS http://127.0.0.1:3000/health && sudo env KIOSK_USER="${USER}" /data/solar-display/deploy/verify-kiosk-install.sh'
 ```
 
 Readonly check after reboot:
 
 ```bash
-ssh pi@<pi-ip> 'findmnt /; findmnt /data; sudo env KIOSK_USER=pi /data/solar-display/deploy/verify-kiosk-install.sh'
+ssh "${SSH_TARGET}" 'findmnt /; findmnt /data; sudo env KIOSK_USER="${USER}" /data/solar-display/deploy/verify-kiosk-install.sh'
 ```
 
 Expected:
@@ -570,7 +581,7 @@ add-raspi-onekey-kiosk-deploy
 
 Current progress at the time this file was written:
 
-- final Pi manual witness with real `/data`, readonly apply, reboot, and post-reboot verification completed on `kz@100.99.99.3`
+- final Pi manual witness with real `/data`, readonly apply, reboot, and post-reboot verification completed on the operation-selected target
 - HDMI/RDP repair was verified after the 2026-06-17 readonly reboot
 - remaining external issue: MQTT broker `192.168.31.62:1883` is unreachable from both the Pi and development machine
 
