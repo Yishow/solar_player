@@ -100,6 +100,7 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
   assert.equal(model.resourceCards[3]?.valueLabel, "Unavailable");
   assert.equal(model.resourceCards[3]?.helper, "目前無可信溫度量測來源");
+  assert.equal(model.systemRows.find((row) => row.label === "風扇狀態")?.value, "Unavailable");
   assert.match(model.feedback.title, /清除快取完成/);
   assert.equal(model.networkRows[0]?.value, "● 管理通道可達");
   assert.equal(model.networkRows[1]?.value, "目前無可信訊號強度量測");
@@ -119,6 +120,40 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
   assert.equal(model.logsSummary.statusTitle, "Journald 可用");
   assert.equal(model.logsSummary.entryCountLabel, "2 entries");
   assert.match(model.logsSummary.detail, /server boot ready/);
+});
+
+test("buildDeviceStatusViewModel formats measured Pi temperature and fan telemetry", () => {
+  const baseStatus: NonNullable<Parameters<typeof buildDeviceStatusViewModel>[0]["status"]> = {
+    arch: "arm64",
+    cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] as [number, number, number] },
+    disk: { availableMB: 40000, totalMB: 64000, usePercent: 35, usedMB: 24000 },
+    fan: { available: true, coolingState: null, rpm: 2450, status: "running" as const },
+    hostname: "KZ-Display-01",
+    memory: { freeMB: 4600, totalMB: 8000, usePercent: 42, usedMB: 3400 },
+    nodeVersion: "v24.15.0",
+    pid: 1234,
+    platform: "linux",
+    temperature: { available: true, celsius: 48.8 },
+    uptimeSeconds: 1315800
+  };
+  const buildModel = (status: typeof baseStatus) => buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    status
+  });
+
+  const rpmModel = buildModel(baseStatus);
+  assert.equal(rpmModel.resourceCards[3]?.valueLabel, "48.8°C");
+  assert.equal(rpmModel.resourceCards[3]?.gaugePercent, 49);
+  assert.equal(rpmModel.systemRows.find((row) => row.label === "風扇狀態")?.value, "運轉中 · 2450 RPM");
+
+  const coolingModel = buildModel({
+    ...baseStatus,
+    fan: { available: true, coolingState: 3, rpm: null, status: "running" }
+  });
+  assert.equal(coolingModel.systemRows.find((row) => row.label === "風扇狀態")?.value, "運轉中 · Cooling state 3");
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {

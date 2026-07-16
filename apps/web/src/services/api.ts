@@ -562,6 +562,18 @@ export type DeviceReleaseIdentity = {
   unavailableReason: string | null;
 };
 
+export type DeviceTemperatureTelemetry = {
+  available: boolean;
+  celsius: number | null;
+};
+
+export type DeviceFanTelemetry = {
+  available: boolean;
+  coolingState: number | null;
+  rpm: number | null;
+  status: "running" | "stopped" | "unavailable";
+};
+
 export type DeviceStatusResponseData = {
   hostname: string;
   platform: string;
@@ -571,6 +583,8 @@ export type DeviceStatusResponseData = {
   cpu: { cores: number; loadAvg: [number, number, number] };
   memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  temperature: DeviceTemperatureTelemetry;
+  fan: DeviceFanTelemetry;
   displayClients: DisplayClientLivenessSnapshot;
   pid: number;
   release?: DeviceReleaseIdentity;

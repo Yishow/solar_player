@@ -7,7 +7,10 @@ import {
   buildApp,
   tempDir
 } from "./display-pages-asset-governance.test-support.js";
-import { setDeviceLogJournalRunnerForTests } from "./device.js";
+import {
+  setDeviceLogJournalRunnerForTests,
+  setDeviceTelemetryRootsForTests
+} from "./device.js";
 import type { JournalRunner } from "../services/deviceLogService.js";
 
 const sampleJsonLine = JSON.stringify({
@@ -27,6 +30,18 @@ function availableRunner(stdout = `${sampleJsonLine}\n`): JournalRunner {
     }
     return { exitCode: 0, stdout, stderr: "" };
   };
+}
+
+function createDeviceTelemetryFixture() {
+  const root = join(tempDir, "device-telemetry");
+  const thermalRoot = join(root, "thermal");
+  const hwmonRoot = join(root, "hwmon");
+  const coolingRoot = join(root, "cooling");
+  rmSync(root, { force: true, recursive: true });
+  mkdirSync(thermalRoot, { recursive: true });
+  mkdirSync(hwmonRoot, { recursive: true });
+  mkdirSync(coolingRoot, { recursive: true });
+  return { coolingRoot, hwmonRoot, root, thermalRoot };
 }
 
 test("GET /api/device/logs returns journald summary for trusted callers", async () => {
@@ -211,6 +226,101 @@ test("device status includes release identity and log routes deny untrusted call
     } else {
       process.env.RELEASE_MANIFEST_PATH = previousManifest;
     }
+  }
+});
+
+test("GET /api/device/status reads Pi temperature and fan RPM on demand", async () => {
+  const roots = createDeviceTelemetryFixture();
+  const thermalZone = join(roots.thermalRoot, "thermal_zone0");
+  const hwmon = join(roots.hwmonRoot, "hwmon0");
+  mkdirSync(thermalZone);
+  mkdirSync(hwmon);
+  writeFileSync(join(thermalZone, "type"), "cpu-thermal\n", "utf8");
+  writeFileSync(join(thermalZone, "temp"), "48750\n", "utf8");
+  writeFileSync(join(hwmon, "fan1_input"), "2450\n", "utf8");
+  setDeviceTelemetryRootsForTests(roots);
+  const app = await buildApp();
+
+  try {
+    const runningResponse = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(runningResponse.statusCode, 200);
+    assert.deepEqual(runningResponse.json().data.temperature, {
+      available: true,
+      celsius: 48.8
+    });
+    assert.deepEqual(runningResponse.json().data.fan, {
+      available: true,
+      coolingState: null,
+      rpm: 2450,
+      status: "running"
+    });
+
+    writeFileSync(join(hwmon, "fan1_input"), "0\n", "utf8");
+    const stoppedResponse = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(stoppedResponse.json().data.fan.status, "stopped");
+    assert.equal(stoppedResponse.json().data.fan.rpm, 0);
+  } finally {
+    setDeviceTelemetryRootsForTests(undefined);
+    await app.close();
+    rmSync(roots.root, { force: true, recursive: true });
+  }
+});
+
+test("GET /api/device/status falls back to pwm-fan cooling state without inventing RPM", async () => {
+  const roots = createDeviceTelemetryFixture();
+  const coolingDevice = join(roots.coolingRoot, "cooling_device0");
+  mkdirSync(coolingDevice);
+  writeFileSync(join(coolingDevice, "type"), "pwm-fan\n", "utf8");
+  writeFileSync(join(coolingDevice, "cur_state"), "3\n", "utf8");
+  setDeviceTelemetryRootsForTests(roots);
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json().data.fan, {
+      available: true,
+      coolingState: 3,
+      rpm: null,
+      status: "running"
+    });
+  } finally {
+    setDeviceTelemetryRootsForTests(undefined);
+    await app.close();
+    rmSync(roots.root, { force: true, recursive: true });
+  }
+});
+
+test("GET /api/device/status keeps host telemetry available when thermal sources are invalid", async () => {
+  const roots = createDeviceTelemetryFixture();
+  const thermalZone = join(roots.thermalRoot, "thermal_zone0");
+  const hwmon = join(roots.hwmonRoot, "hwmon0");
+  mkdirSync(thermalZone);
+  mkdirSync(hwmon);
+  writeFileSync(join(thermalZone, "type"), "cpu-thermal\n", "utf8");
+  writeFileSync(join(thermalZone, "temp"), "not-a-temperature\n", "utf8");
+  writeFileSync(join(hwmon, "fan1_input"), "not-an-rpm\n", "utf8");
+  setDeviceTelemetryRootsForTests(roots);
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(response.statusCode, 200);
+    const data = response.json().data;
+    assert.deepEqual(data.temperature, { available: false, celsius: null });
+    assert.deepEqual(data.fan, {
+      available: false,
+      coolingState: null,
+      rpm: null,
+      status: "unavailable"
+    });
+    assert.equal(typeof data.cpu.cores, "number");
+    assert.equal(typeof data.memory.totalMB, "number");
+    assert.equal(typeof data.disk.totalMB, "number");
+  } finally {
+    setDeviceTelemetryRootsForTests(undefined);
+    await app.close();
+    rmSync(roots.root, { force: true, recursive: true });
   }
 });
 

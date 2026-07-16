@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import { existsSync, readFileSync, statfsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statfsSync } from "node:fs";
+import { join } from "node:path";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
 import {
   buildUnsupportedDeviceControlResult,
@@ -79,6 +80,118 @@ function getCpuUsage(): { cores: number; loadAvg: [number, number, number] } {
   return { cores: cpus().length, loadAvg };
 }
 
+type DeviceTelemetryRoots = {
+  coolingRoot: string;
+  hwmonRoot: string;
+  thermalRoot: string;
+};
+
+type FanTelemetry = {
+  available: boolean;
+  coolingState: number | null;
+  rpm: number | null;
+  status: "running" | "stopped" | "unavailable";
+};
+
+const defaultTelemetryRoots: DeviceTelemetryRoots = {
+  coolingRoot: "/sys/class/thermal",
+  hwmonRoot: "/sys/class/hwmon",
+  thermalRoot: "/sys/class/thermal"
+};
+
+let deviceTelemetryRootsOverride: DeviceTelemetryRoots | undefined;
+
+/** Test-only: point sysfs telemetry reads at bounded fixtures. */
+export function setDeviceTelemetryRootsForTests(roots: DeviceTelemetryRoots | undefined) {
+  deviceTelemetryRootsOverride = roots;
+}
+
+function listEntries(path: string): string[] {
+  try {
+    return readdirSync(path).sort();
+  } catch {
+    return [];
+  }
+}
+
+function readText(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+function readNonNegativeNumber(path: string): number | null {
+  const text = readText(path);
+  if (text === null || text === "") {
+    return null;
+  }
+
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function getTemperature(roots: DeviceTelemetryRoots): { available: boolean; celsius: number | null } {
+  const zones = listEntries(roots.thermalRoot).filter((name) => name.startsWith("thermal_zone"));
+  zones.sort((left, right) => {
+    const leftType = readText(join(roots.thermalRoot, left, "type"))?.toLowerCase() ?? "";
+    const rightType = readText(join(roots.thermalRoot, right, "type"))?.toLowerCase() ?? "";
+    return Number(rightType.includes("cpu")) - Number(leftType.includes("cpu"));
+  });
+
+  for (const zone of zones) {
+    const rawValue = readNonNegativeNumber(join(roots.thermalRoot, zone, "temp"));
+    if (rawValue === null) {
+      continue;
+    }
+    const celsius = rawValue >= 1000 ? rawValue / 1000 : rawValue;
+    return { available: true, celsius: Math.round(celsius * 10) / 10 };
+  }
+
+  return { available: false, celsius: null };
+}
+
+function getFanTelemetry(roots: DeviceTelemetryRoots): FanTelemetry {
+  for (const hwmon of listEntries(roots.hwmonRoot)) {
+    const hwmonPath = join(roots.hwmonRoot, hwmon);
+    for (const input of listEntries(hwmonPath).filter((name) => /^fan\d+_input$/.test(name))) {
+      const rpm = readNonNegativeNumber(join(hwmonPath, input));
+      if (rpm !== null) {
+        return {
+          available: true,
+          coolingState: null,
+          rpm: Math.round(rpm),
+          status: rpm > 0 ? "running" : "stopped"
+        };
+      }
+    }
+  }
+
+  for (const device of listEntries(roots.coolingRoot).filter((name) => name.startsWith("cooling_device"))) {
+    const devicePath = join(roots.coolingRoot, device);
+    if (readText(join(devicePath, "type"))?.toLowerCase() !== "pwm-fan") {
+      continue;
+    }
+    const coolingState = readNonNegativeNumber(join(devicePath, "cur_state"));
+    if (coolingState !== null) {
+      return {
+        available: true,
+        coolingState: Math.round(coolingState),
+        rpm: null,
+        status: coolingState > 0 ? "running" : "stopped"
+      };
+    }
+  }
+
+  return {
+    available: false,
+    coolingState: null,
+    rpm: null,
+    status: "unavailable"
+  };
+}
+
 let journalRunnerOverride: JournalRunner | undefined;
 
 /** Test-only: inject a journal runner so routes never spawn host helpers. */
@@ -96,6 +209,18 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
     const disk = getDiskUsage(process.env.DATA_DIR ?? "/tmp");
     const memory = getMemoryUsage();
     const cpu = getCpuUsage();
+    const telemetryRoots = deviceTelemetryRootsOverride ?? defaultTelemetryRoots;
+    const temperature = platform() === "linux" || deviceTelemetryRootsOverride
+      ? getTemperature(telemetryRoots)
+      : { available: false, celsius: null };
+    const fan = platform() === "linux" || deviceTelemetryRootsOverride
+      ? getFanTelemetry(telemetryRoots)
+      : {
+          available: false,
+          coolingState: null,
+          rpm: null,
+          status: "unavailable" as const
+        };
     const displayOps = readDeviceDisplayOpsSummary({
       mqttStatus: app.mqttClientService.getStatus()
     });
@@ -112,6 +237,8 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         cpu,
         memory,
         disk,
+        temperature,
+        fan,
         displayOps,
         displayClients: app.socketService.getDisplayClientLivenessSnapshot(),
         pid: process.pid,

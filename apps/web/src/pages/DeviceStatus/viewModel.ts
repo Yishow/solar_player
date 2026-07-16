@@ -5,7 +5,12 @@ import {
   type DeviceSafeOpsGuidance,
   type DisplayFaultTriageSummary
 } from "@solar-display/shared";
-import type { DeviceLogSummary, DeviceReleaseIdentity } from "../../services/api";
+import type {
+  DeviceFanTelemetry,
+  DeviceLogSummary,
+  DeviceReleaseIdentity,
+  DeviceTemperatureTelemetry
+} from "../../services/api";
 
 type DeviceRouteStatus = {
   hostname: string;
@@ -16,6 +21,8 @@ type DeviceRouteStatus = {
   cpu: { cores: number; loadAvg: [number, number, number] };
   memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
   disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  temperature?: DeviceTemperatureTelemetry;
+  fan?: DeviceFanTelemetry;
   displayClients?: DisplayClientLivenessSnapshot;
   pid: number;
   release?: DeviceReleaseIdentity;
@@ -116,6 +123,21 @@ function formatUptime(seconds: number | null) {
   }
 
   return `${minutes} 分`;
+}
+
+function formatFanTelemetry(fan: DeviceFanTelemetry | undefined) {
+  if (!fan?.available || fan.status === "unavailable") {
+    return "Unavailable";
+  }
+
+  const statusLabel = fan.status === "running" ? "運轉中" : "已停止";
+  if (fan.rpm !== null) {
+    return `${statusLabel} · ${fan.rpm} RPM`;
+  }
+  if (fan.coolingState !== null) {
+    return `${statusLabel} · Cooling state ${fan.coolingState}`;
+  }
+  return "Unavailable";
 }
 
 function formatPercent(value: number | null) {
@@ -600,10 +622,20 @@ export function buildDeviceStatusViewModel({
         valueLabel: status ? formatPercent(status.disk.usePercent) : "--"
       },
       {
-        gaugeValue: "--",
-        helper: status ? "目前無可信溫度量測來源" : "--",
+        gaugeValue: status?.temperature?.available && status.temperature.celsius !== null
+          ? `${status.temperature.celsius.toFixed(1)}°C`
+          : "--",
+        helper: status
+          ? status.temperature?.available
+            ? "Pi 5 CPU thermal"
+            : "目前無可信溫度量測來源"
+          : "--",
         label: "系統溫度",
-        valueLabel: status ? "Unavailable" : "--"
+        valueLabel: status
+          ? status.temperature?.available && status.temperature.celsius !== null
+            ? `${status.temperature.celsius.toFixed(1)}°C`
+            : "Unavailable"
+          : "--"
       }
     ].map((card, index) => {
       const gaugePercent = gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel);
@@ -637,6 +669,10 @@ export function buildDeviceStatusViewModel({
       {
         label: "CPU 核心",
         value: status ? String(status.cpu.cores) : "-"
+      },
+      {
+        label: "風扇狀態",
+        value: status ? formatFanTelemetry(status.fan) : "-"
       },
       {
         label: "PID",

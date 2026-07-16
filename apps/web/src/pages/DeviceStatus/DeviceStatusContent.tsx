@@ -1,18 +1,7 @@
 import { deviceAssetRuntimeMap } from "./assets";
 import { deviceLayout } from "./layout";
+import type { DeviceStatusResponseData } from "../../services/api";
 import { type DeviceActionFeedback, buildDeviceStatusViewModel } from "./viewModel";
-
-type DeviceRouteStatus = {
-  hostname: string;
-  platform: string;
-  arch: string;
-  nodeVersion: string;
-  uptimeSeconds: number;
-  cpu: { cores: number; loadAvg: [number, number, number] };
-  memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
-  disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
-  pid: number;
-};
 
 type DeviceStatusContentProps = {
   activeAction: string | null;
@@ -22,7 +11,7 @@ type DeviceStatusContentProps = {
   handleDiagnostic: (action: "export-summary" | "refresh-readiness", label: string) => Promise<void>;
   handleKioskExit: () => Promise<void>;
   isLoading: boolean;
-  status: DeviceRouteStatus | null;
+  status: DeviceStatusResponseData | null;
   viewModel: ReturnType<typeof buildDeviceStatusViewModel>;
 };
 
