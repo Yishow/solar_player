@@ -25,10 +25,13 @@ const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-sys
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 const hotspotTriggerScriptPath = path.join(repoRoot, "deploy/tailscale-hotspot-trigger.sh");
+const hotspotPolicyScriptPath = path.join(repoRoot, "deploy/configure-hotspot-priority.sh");
 const tailscaleInstallScriptPath = path.join(repoRoot, "deploy/install-tailscale.sh");
 const fanControlScriptPath = path.join(repoRoot, "deploy/configure-pi5-fan-control.sh");
 const deployNotesPath = path.join(repoRoot, "deploy.md");
 const raspiDeployRunbookPath = path.join(repoRoot, "docs/runbooks/raspi-onekey-kiosk-deploy.md");
+const pi5DeploymentSkillPath = path.join(repoRoot, ".agents/skills/pi5-deployment/SKILL.md");
+const pi5DeploymentSkillMetadataPath = path.join(repoRoot, ".agents/skills/pi5-deployment/agents/openai.yaml");
 const bashCommand = process.platform === "win32"
   ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
   : "bash";
@@ -77,6 +80,40 @@ test("Raspberry Pi deployment docs resolve connection targets at operation time"
     assert.doesNotMatch(contents, /-HostName\s+(?:\d{1,3}\.){3}\d{1,3}\b/u);
     assert.doesNotMatch(contents, /https?:\/\/(?!127\.0\.0\.1\b)(?:\d{1,3}\.){3}\d{1,3}\b/u);
   }
+});
+
+test("Pi 5 deployment skill requires safe update, hotspot, reboot, and recovery gates", () => {
+  const skill = readFileSync(pi5DeploymentSkillPath, "utf8");
+  const metadata = readFileSync(pi5DeploymentSkillMetadataPath, "utf8");
+  const deployNotes = readFileSync(deployNotesPath, "utf8");
+
+  assert.match(skill, /^---\nname: pi5-deployment\ndescription:/u);
+  assert.match(skill, /docs\/ops\/conventions\.md/u);
+  assert.match(skill, /deploy\.md/u);
+  assert.match(skill, /pnpm verify/u);
+  assert.match(skill, /scripts\/raspi-onekey-deploy\.sh/u);
+  assert.match(skill, /--mode update/u);
+  assert.match(skill, /--skip-disk/u);
+  assert.match(skill, /--hotspot-connection-id/u);
+  assert.match(skill, /--hotspot-scan-ssid/u);
+  assert.match(skill, /--hotspot-priority/u);
+  assert.match(skill, /verified backup/iu);
+  assert.match(skill, /no automatic production DB rollback/iu);
+  assert.match(skill, /reboot witness/iu);
+  assert.match(skill, /journalctl -b -u NetworkManager/u);
+  assert.match(skill, /nmcli/u);
+  assert.match(skill, /tailscale-hotspot-trigger\.timer/u);
+  assert.match(skill, /verify-kiosk-install\.sh/u);
+  assert.match(skill, /cur_state/u);
+  assert.match(skill, /fan1_input/u);
+  assert.match(skill, /release-manifest\.json/u);
+  assert.match(skill, /\/health/u);
+  assert.doesNotMatch(skill, /\b(?:pi|kz)@(?:\d{1,3}\.){3}\d{1,3}\b/u);
+  assert.doesNotMatch(skill, /SSH_PASSWORD=(?:pi|kz)\b/u);
+
+  assert.match(metadata, /display_name: "Pi 5 Deployment"/u);
+  assert.match(metadata, /default_prompt: "Use \$pi5-deployment/u);
+  assert.match(deployNotes, /\.agents\/skills\/pi5-deployment\/SKILL\.md/u);
 });
 
 function writeFakeSystemctl(fakeBinDir, { isActive = false, logPath = null } = {}) {
@@ -152,6 +189,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/install-tailscale.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/configure-hotspot-priority.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.service"), "[Service]\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.timer"), "[Timer]\n");
@@ -508,6 +546,126 @@ test("tailscale hotspot trigger documents safe network switching defaults", () =
   assert.doesNotMatch(source, /nmcli con down/);
 });
 
+test("hotspot policy configures priority and enables the delayed trigger without switching Wi-Fi", () => {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-hotspot-policy-"));
+  const fakeBinDir = path.join(fixtureDir, "bin");
+  const commandLog = path.join(fixtureDir, "commands.log");
+
+  try {
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFileSync(
+      path.join(fakeBinDir, "nmcli"),
+      [
+        "#!/bin/bash",
+        `printf 'nmcli %s\\n' "$*" >> ${quoteForBash(toBashPathValue(commandLog))}`,
+        'if [[ "$*" == "-g 802-11-wireless.ssid connection show Yishow" ]]; then',
+        "  printf 'Yishow\\n'",
+        "  exit 0",
+        "fi",
+        'if [[ "$*" == "connection show Yishow" ]]; then exit 0; fi',
+        'if [[ "$*" == "connection modify Yishow connection.autoconnect yes connection.autoconnect-priority 100" ]]; then exit 0; fi',
+        "exit 1",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      path.join(fakeBinDir, "systemctl"),
+      [
+        "#!/bin/bash",
+        `printf 'systemctl %s\\n' "$*" >> ${quoteForBash(toBashPathValue(commandLog))}`,
+        "exit 0",
+        ""
+      ].join("\n")
+    );
+    markBashExecutable(path.join(fakeBinDir, "nmcli"));
+    markBashExecutable(path.join(fakeBinDir, "systemctl"));
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = runBashScript(hotspotPolicyScriptPath, [
+        "--connection-id",
+        "Yishow",
+        "--scan-ssid",
+        "Yishow",
+        "--priority",
+        "100"
+      ], {
+        cwd: repoRoot,
+        bashPrependPathDirs: [fakeBinDir],
+        env: {
+          ...process.env,
+          HOTSPOT_ROOT: fixtureDir
+        },
+        encoding: "utf8"
+      });
+
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+    }
+
+    const envFile = readFileSync(path.join(fixtureDir, "etc/solar-display/tailscale-hotspot-trigger.env"), "utf8");
+    assert.equal(envFile, [
+      "HOTSPOT_CONNECTION_ID=Yishow",
+      "HOTSPOT_SCAN_SSID=Yishow",
+      "HOTSPOT_PRIORITY=100",
+      ""
+    ].join("\n"));
+    assert.equal(existsSync(path.join(fixtureDir, "usr/local/sbin/tailscale-hotspot-trigger.sh")), true);
+    assert.equal(existsSync(path.join(fixtureDir, "etc/systemd/system/tailscale-hotspot-trigger.service")), true);
+    assert.equal(existsSync(path.join(fixtureDir, "etc/systemd/system/tailscale-hotspot-trigger.timer")), true);
+
+    const commands = readFileSync(commandLog, "utf8");
+    assert.match(commands, /nmcli connection modify Yishow connection\.autoconnect yes connection\.autoconnect-priority 100/u);
+    assert.match(commands, /systemctl daemon-reload/u);
+    assert.match(commands, /systemctl enable tailscale-hotspot-trigger\.timer/u);
+    assert.doesNotMatch(commands, /systemctl (?:start|restart|enable --now)/u);
+    assert.doesNotMatch(commands, /nmcli (?:con|connection) (?:up|down)/u);
+  } finally {
+    removeTempDir(fixtureDir);
+  }
+});
+
+test("hotspot policy rejects invalid priority before changing target state", () => {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-hotspot-policy-invalid-"));
+  const fakeBinDir = path.join(fixtureDir, "bin");
+  const commandLog = path.join(fixtureDir, "commands.log");
+
+  try {
+    mkdirSync(fakeBinDir, { recursive: true });
+    for (const command of ["nmcli", "systemctl"]) {
+      const commandPath = path.join(fakeBinDir, command);
+      writeFileSync(commandPath, [
+        "#!/bin/bash",
+        `printf '${command} %s\\n' "$*" >> ${quoteForBash(toBashPathValue(commandLog))}`,
+        "exit 0",
+        ""
+      ].join("\n"));
+      markBashExecutable(commandPath);
+    }
+
+    const result = runBashScript(hotspotPolicyScriptPath, [
+      "--connection-id",
+      "Yishow",
+      "--scan-ssid",
+      "Yishow",
+      "--priority",
+      "high"
+    ], {
+      cwd: repoRoot,
+      bashPrependPathDirs: [fakeBinDir],
+      env: {
+        ...process.env,
+        HOTSPOT_ROOT: fixtureDir
+      },
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /priority must be an integer/u);
+    assert.equal(existsSync(commandLog), false);
+  } finally {
+    removeTempDir(fixtureDir);
+  }
+});
+
 function writeTailscaleInstallFixtureCommands(
   fakeBinDir,
   logPath,
@@ -794,6 +952,12 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
       "passwordless",
       "--rdp-password",
       "kz",
+      "--hotspot-connection-id",
+      "Yishow",
+      "--hotspot-scan-ssid",
+      "Yishow",
+      "--hotspot-priority",
+      "100",
       "--dry-run"
     ],
     {
@@ -811,6 +975,10 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
   assert.match(result.stdout, /RDP auth: passwordless/);
   assert.match(result.stdout, /Kiosk user: kz/);
   assert.match(result.stdout, /Readonly root: dry-run/);
+  assert.match(result.stdout, /Hotspot connection: Yishow/);
+  assert.match(result.stdout, /Hotspot scan SSID: Yishow/);
+  assert.match(result.stdout, /Hotspot priority: 100/);
+  assert.match(result.stdout, /would configure the preferred hotspot policy without switching the active Wi-Fi connection/);
   assert.match(result.stdout, /verified runtime backup before replacing application files/);
   assert.match(result.stdout, /backup verification failure would stop the update/);
   assert.match(result.stdout, /recovery command/);
@@ -818,6 +986,30 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
   assert.match(result.stdout, /does not upload a bundle, create a backup/);
   assert.doesNotMatch(result.stdout, /tailscale up|auth.?key/iu);
   assert.doesNotMatch(result.stdout, /\b(parted|mkfs|resize2fs|sfdisk)\b/);
+});
+
+test("raspi one-key deploy forwards hotspot policy and bootstrap orders it before verification", () => {
+  const entrypoint = readFileSync(raspiDeployScriptPath, "utf8");
+  const bootstrap = readFileSync(raspiBootstrapScriptPath, "utf8");
+  const bundleBuilder = readFileSync(deployScriptPath, "utf8");
+
+  assert.match(entrypoint, /--hotspot-connection-id/u);
+  assert.match(entrypoint, /--hotspot-scan-ssid/u);
+  assert.match(entrypoint, /--hotspot-priority/u);
+  assert.ok(entrypoint.includes('remote_args+=("--hotspot-connection-id" "${HOTSPOT_CONNECTION_ID}")'));
+  assert.ok(entrypoint.includes('remote_args+=("--hotspot-scan-ssid" "${HOTSPOT_SCAN_SSID}")'));
+  assert.ok(entrypoint.includes('remote_args+=("--hotspot-priority" "${HOTSPOT_PRIORITY}")'));
+
+  const kioskInstallIndex = bootstrap.indexOf('"${INSTALL_DIR}/deploy/install-kiosk.sh"');
+  const hotspotPolicyIndex = bootstrap.indexOf('"${INSTALL_DIR}/deploy/configure-hotspot-priority.sh"');
+  const kioskVerifyIndex = bootstrap.indexOf('"${INSTALL_DIR}/deploy/verify-kiosk-install.sh"');
+  assert.ok(kioskInstallIndex >= 0, "bootstrap must install the kiosk");
+  assert.ok(hotspotPolicyIndex > kioskInstallIndex, "hotspot policy must run after application and kiosk installation");
+  assert.ok(kioskVerifyIndex > hotspotPolicyIndex, "hotspot policy must run before final kiosk verification");
+  assert.doesNotMatch(bootstrap, /systemctl (?:start|restart) tailscale-hotspot-trigger\.timer/u);
+
+  assert.match(bundleBuilder, /deploy\/configure-hotspot-priority\.sh/u);
+  assert.match(bundleBuilder, /"\$\{target_root\}\/deploy\/configure-hotspot-priority\.sh"/u);
 });
 
 test("raspi one-key deploy supports non-interactive sudo and data creation confirmation", () => {
@@ -1845,6 +2037,110 @@ test("Tailscale verification requires the CLI plus an enabled and active daemon 
   assert.equal(ready.tailscaleInvoked, false, "readiness must not require login, backend state, or an assigned IP");
 });
 
+test("hotspot policy verification passes configured state, fails drift, and skips unconfigured targets", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8");
+  const functionSource = source.match(/verify_hotspot_policy\(\) \{[\s\S]*?\n\}/u)?.[0];
+
+  assert.ok(functionSource, "verifier must define verify_hotspot_policy");
+  assert.match(source, /SKIP: preferred hotspot policy is not configured/u);
+
+  const runFixture = ({ configured = true, priority = "100" } = {}) => {
+    const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-hotspot-verify-"));
+    const fakeBinDir = path.join(fixtureDir, "bin");
+    const envPath = path.join(fixtureDir, "hotspot.env");
+    const triggerPath = path.join(fixtureDir, "tailscale-hotspot-trigger.sh");
+    const servicePath = path.join(fixtureDir, "tailscale-hotspot-trigger.service");
+    const timerPath = path.join(fixtureDir, "tailscale-hotspot-trigger.timer");
+    mkdirSync(fakeBinDir, { recursive: true });
+
+    if (configured) {
+      writeFileSync(envPath, [
+        "HOTSPOT_CONNECTION_ID=Yishow",
+        "HOTSPOT_SCAN_SSID=Yishow",
+        "HOTSPOT_PRIORITY=100",
+        ""
+      ].join("\n"));
+      writeFileSync(triggerPath, "#!/bin/bash\n");
+      writeFileSync(servicePath, "[Service]\n");
+      writeFileSync(timerPath, "[Timer]\n");
+      markBashExecutable(triggerPath);
+    }
+
+    writeFileSync(path.join(fakeBinDir, "nmcli"), [
+      "#!/bin/bash",
+      'case "$*" in',
+      '  "connection show Yishow") exit 0 ;;',
+      '  "-g 802-11-wireless.ssid connection show Yishow") printf "Yishow\\n" ;;',
+      '  "-g connection.autoconnect connection show Yishow") printf "yes\\n" ;;',
+      `  "-g connection.autoconnect-priority connection show Yishow") printf "${priority}\\n" ;;`,
+      "  *) exit 1 ;;",
+      "esac",
+      ""
+    ].join("\n"));
+    writeFileSync(path.join(fakeBinDir, "systemctl"), [
+      "#!/bin/bash",
+      'if [[ "$*" == "is-enabled tailscale-hotspot-trigger.timer" ]]; then printf "enabled\\n"; exit 0; fi',
+      "exit 1",
+      ""
+    ].join("\n"));
+    markBashExecutable(path.join(fakeBinDir, "nmcli"));
+    markBashExecutable(path.join(fakeBinDir, "systemctl"));
+
+    const harnessPath = path.join(fixtureDir, "verify.sh");
+    writeFileSync(harnessPath, [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      functionSource,
+      "set +e",
+      "verify_hotspot_policy",
+      "status=$?",
+      "set -e",
+      'printf "status=%s\\n" "$status"',
+      "exit 0",
+      ""
+    ].join("\n"));
+    markBashExecutable(harnessPath);
+
+    const result = runBashScript(harnessPath, [], {
+      cwd: fixtureDir,
+      bashPrependPathDirs: [fakeBinDir],
+      env: {
+        ...process.env,
+        HOTSPOT_ENV_PATH: envPath,
+        HOTSPOT_TRIGGER_PATH: triggerPath,
+        HOTSPOT_SERVICE_PATH: servicePath,
+        HOTSPOT_TIMER_PATH: timerPath
+      },
+      encoding: "utf8"
+    });
+    return { fixtureDir, result };
+  };
+
+  const ready = runFixture();
+  try {
+    assert.equal(ready.result.status, 0, ready.result.stderr || ready.result.stdout);
+    assert.match(ready.result.stdout, /status=0/u);
+  } finally {
+    removeTempDir(ready.fixtureDir);
+  }
+
+  const drifted = runFixture({ priority: "0" });
+  try {
+    assert.equal(drifted.result.status, 0, drifted.result.stderr || drifted.result.stdout);
+    assert.match(drifted.result.stdout, /status=1/u);
+  } finally {
+    removeTempDir(drifted.fixtureDir);
+  }
+
+  const unconfigured = runFixture({ configured: false });
+  try {
+    assert.equal(unconfigured.result.status, 0, unconfigured.result.stderr || unconfigured.result.stdout);
+    assert.match(unconfigured.result.stdout, /status=2/u);
+  } finally {
+    removeTempDir(unconfigured.fixtureDir);
+  }
+});
+
 test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures", () => {
   const projectDir = makeFixtureProject();
   const fakeBinDir = path.join(projectDir, "fake-bin");
@@ -2031,6 +2327,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-hotspot-priority.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
@@ -2067,6 +2364,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-hotspot-priority.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
@@ -2111,6 +2409,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/configure-hotspot-priority.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
@@ -2135,6 +2434,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/configure-hotspot-priority.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);

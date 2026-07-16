@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pi 5 Deployment"
+  short_description: "Safely deploy and verify Solar Player Pi 5 kiosks"
+  default_prompt: "Use $pi5-deployment to update an installed Solar Player Pi 5 and verify reboot, Wi-Fi, thermal, and application health."

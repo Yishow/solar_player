@@ -22,6 +22,9 @@ ROOT_SIZE_GB=""
 DATA_SIZE_GB="10"
 MQTT_HOST_EXPLICIT=0
 DATA_SIZE_GB_EXPLICIT=0
+HOTSPOT_CONNECTION_ID=""
+HOTSPOT_SCAN_SSID=""
+HOTSPOT_PRIORITY="100"
 
 usage() {
   cat <<EOF
@@ -37,6 +40,9 @@ Options:
   --rdp-password <password>
   --sudo-password <password>
   --kiosk-user <user>
+  --hotspot-connection-id <name>
+  --hotspot-scan-ssid <ssid>
+  --hotspot-priority <integer>
   --dry-run
   --skip-disk
   --apply-readonly
@@ -132,6 +138,18 @@ while [[ "$#" -gt 0 ]]; do
       KIOSK_USER="${2:-}"
       shift 2
       ;;
+    --hotspot-connection-id)
+      HOTSPOT_CONNECTION_ID="${2:-}"
+      shift 2
+      ;;
+    --hotspot-scan-ssid)
+      HOTSPOT_SCAN_SSID="${2:-}"
+      shift 2
+      ;;
+    --hotspot-priority)
+      HOTSPOT_PRIORITY="${2:-}"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -171,6 +189,12 @@ done
 [[ "${BUNDLE}" == "online" || "${BUNDLE}" == "offline" ]] || fail "--bundle must be online or offline"
 [[ "${DESKTOP}" == "xfce-xrdp" || "${DESKTOP}" == "none" ]] || fail "--desktop must be xfce-xrdp or none"
 [[ "${RDP_AUTH}" == "passwordless" || "${RDP_AUTH}" == "system-password" ]] || fail "--rdp-auth must be passwordless or system-password"
+[[ "${HOTSPOT_PRIORITY}" =~ ^-?[0-9]+$ ]] || fail "--hotspot-priority must be an integer"
+if [[ -n "${HOTSPOT_CONNECTION_ID}" && -z "${HOTSPOT_SCAN_SSID}" ]]; then
+  HOTSPOT_SCAN_SSID="${HOTSPOT_CONNECTION_ID}"
+elif [[ -z "${HOTSPOT_CONNECTION_ID}" && -n "${HOTSPOT_SCAN_SSID}" ]]; then
+  fail "--hotspot-scan-ssid requires --hotspot-connection-id"
+fi
 
 if [[ -z "${KIOSK_USER}" ]]; then
   if [[ "${TARGET}" == *@* ]]; then
@@ -185,6 +209,13 @@ if [[ "${APPLY_READONLY}" == "1" ]]; then
   readonly_label="apply"
 fi
 
+hotspot_connection_label="disabled"
+hotspot_scan_label="n/a"
+if [[ -n "${HOTSPOT_CONNECTION_ID}" ]]; then
+  hotspot_connection_label="${HOTSPOT_CONNECTION_ID}"
+  hotspot_scan_label="${HOTSPOT_SCAN_SSID}"
+fi
+
 cat <<EOF
 Solar Display Raspberry Pi deploy
 Target: ${TARGET}
@@ -196,6 +227,9 @@ Desktop: ${DESKTOP}
 RDP auth: ${RDP_AUTH}
 Kiosk user: ${KIOSK_USER}
 Readonly root: ${readonly_label}
+Hotspot connection: ${hotspot_connection_label}
+Hotspot scan SSID: ${hotspot_scan_label}
+Hotspot priority: ${HOTSPOT_PRIORITY}
 EOF
 
 if [[ "${DRY_RUN}" == "1" ]]; then
@@ -206,6 +240,7 @@ OK: would build ${BUNDLE} bundle
 OK: would upload bundle to target staging directory
 OK: would run remote bootstrap
 OK: remote bootstrap would install the Tailscale CLI and enable/start tailscaled.service before application replacement
+${HOTSPOT_CONNECTION_ID:+OK: would configure the preferred hotspot policy without switching the active Wi-Fi connection}
 OK: update mode would stop the active service and create a verified runtime backup before replacing application files
 OK: backup verification failure would stop the update before application replacement
 OK: would report backup path and recovery command on completion or health failure (no automatic production DB rollback)
@@ -265,6 +300,11 @@ remote_args=(
 )
 if [[ -n "${RDP_PASSWORD}" ]]; then
   remote_args+=("--rdp-password" "${RDP_PASSWORD}")
+fi
+if [[ -n "${HOTSPOT_CONNECTION_ID}" ]]; then
+  remote_args+=("--hotspot-connection-id" "${HOTSPOT_CONNECTION_ID}")
+  remote_args+=("--hotspot-scan-ssid" "${HOTSPOT_SCAN_SSID}")
+  remote_args+=("--hotspot-priority" "${HOTSPOT_PRIORITY}")
 fi
 if [[ "${SKIP_DISK}" == "1" ]]; then
   remote_args+=("--skip-disk")

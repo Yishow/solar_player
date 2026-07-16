@@ -18,6 +18,9 @@ SKIP_HOST_PREFLIGHT=0
 DISK_FIXTURE=""
 CONFIGURE_ENV_ONLY=0
 KIOSK_USER="${KIOSK_USER:-pi}"
+HOTSPOT_CONNECTION_ID=""
+HOTSPOT_SCAN_SSID=""
+HOTSPOT_PRIORITY="100"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -189,6 +192,9 @@ while [[ "$#" -gt 0 ]]; do
     --rdp-auth) RDP_AUTH="${2:-}"; shift 2 ;;
     --rdp-password) RDP_PASSWORD="${2:-}"; shift 2 ;;
     --kiosk-user) KIOSK_USER="${2:-}"; shift 2 ;;
+    --hotspot-connection-id) HOTSPOT_CONNECTION_ID="${2:-}"; shift 2 ;;
+    --hotspot-scan-ssid) HOTSPOT_SCAN_SSID="${2:-}"; shift 2 ;;
+    --hotspot-priority) HOTSPOT_PRIORITY="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --skip-disk) SKIP_DISK=1; shift ;;
     --apply-readonly) APPLY_READONLY=1; shift ;;
@@ -205,6 +211,12 @@ done
 [[ "${MODE}" == "init" || "${MODE}" == "update" ]] || fail "--mode must be init or update"
 [[ "${DESKTOP}" == "xfce-xrdp" || "${DESKTOP}" == "none" ]] || fail "--desktop must be xfce-xrdp or none"
 [[ "${RDP_AUTH}" == "passwordless" || "${RDP_AUTH}" == "system-password" ]] || fail "--rdp-auth must be passwordless or system-password"
+[[ "${HOTSPOT_PRIORITY}" =~ ^-?[0-9]+$ ]] || fail "--hotspot-priority must be an integer"
+if [[ -n "${HOTSPOT_CONNECTION_ID}" && -z "${HOTSPOT_SCAN_SSID}" ]]; then
+  HOTSPOT_SCAN_SSID="${HOTSPOT_CONNECTION_ID}"
+elif [[ -z "${HOTSPOT_CONNECTION_ID}" && -n "${HOTSPOT_SCAN_SSID}" ]]; then
+  fail "--hotspot-scan-ssid requires --hotspot-connection-id"
+fi
 
 check_host() {
   [[ "${SKIP_HOST_PREFLIGHT}" == "1" ]] && return 0
@@ -438,6 +450,9 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   echo "MQTT host: ${MQTT_HOST}"
   echo "Desktop: ${DESKTOP}"
   echo "RDP auth: ${RDP_AUTH}"
+  echo "Hotspot connection: ${HOTSPOT_CONNECTION_ID:-disabled}"
+  echo "Hotspot scan SSID: ${HOTSPOT_SCAN_SSID:-n/a}"
+  echo "Hotspot priority: ${HOTSPOT_PRIORITY}"
 fi
 
 check_host
@@ -452,6 +467,9 @@ if [[ "${DRY_RUN}" == "1" ]]; then
     ok "init mode would skip runtime backup gate (no existing runtime)"
   fi
   ok "would copy bundle, install dependencies, configure desktop, install kiosk, and verify"
+  if [[ -n "${HOTSPOT_CONNECTION_ID}" ]]; then
+    ok "would configure the preferred hotspot policy without switching the active Wi-Fi connection"
+  fi
   ok "would print recovery handoff if later installation or health verification fails"
   exit 0
 fi
@@ -483,6 +501,13 @@ install_node_if_needed
   ${RDP_PASSWORD:+--rdp-password "${RDP_PASSWORD}"}
 
 INSTALL_DIR="${INSTALL_DIR}" KIOSK_USER="${KIOSK_USER}" "${INSTALL_DIR}/deploy/install-kiosk.sh"
+
+if [[ -n "${HOTSPOT_CONNECTION_ID}" ]]; then
+  "${INSTALL_DIR}/deploy/configure-hotspot-priority.sh" \
+    --connection-id "${HOTSPOT_CONNECTION_ID}" \
+    --scan-ssid "${HOTSPOT_SCAN_SSID}" \
+    --priority "${HOTSPOT_PRIORITY}"
+fi
 
 set +e
 "${INSTALL_DIR}/deploy/verify-kiosk-install.sh" --install-dir "${INSTALL_DIR}" --kiosk-user "${KIOSK_USER}"

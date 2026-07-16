@@ -4,6 +4,8 @@ Last updated: 2026-07-16
 
 This file is the handoff entry for the Raspberry Pi 5 kiosk deployment work. Read this first before continuing deployment discussion or running scripts.
 
+AI agents performing a live Pi deployment MUST use the repo-local workflow in `.agents/skills/pi5-deployment/SKILL.md`; this document remains the detailed human handoff and hardware-maintenance reference.
+
 ## Operation-Time Connection Target
 
 Set the Pi address or MagicDNS name supplied for the current operation once, then reuse the derived SSH target for SSH, deployment, health checks, and reboot verification. Do not store a project Pi IP in this document.

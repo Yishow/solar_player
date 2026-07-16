@@ -60,6 +60,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
   cp "${PROJECT_DIR}/deploy/install-tailscale.sh" "${target_root}/deploy/install-tailscale.sh"
+  cp "${PROJECT_DIR}/deploy/configure-hotspot-priority.sh" "${target_root}/deploy/configure-hotspot-priority.sh"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.sh" "${target_root}/deploy/tailscale-hotspot-trigger.sh"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.service" "${target_root}/deploy/tailscale-hotspot-trigger.service"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.timer" "${target_root}/deploy/tailscale-hotspot-trigger.timer"
@@ -91,6 +92,7 @@ copy_required_tree() {
     "${target_root}/deploy/readonly-system-enable.sh" \
     "${target_root}/deploy/readonly-system-disable.sh" \
     "${target_root}/deploy/install-tailscale.sh" \
+    "${target_root}/deploy/configure-hotspot-priority.sh" \
     "${target_root}/deploy/tailscale-hotspot-trigger.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
     "${target_root}/deploy/read-solar-display-journal.sh" \
@@ -154,10 +156,7 @@ Solar Display ${mode} deploy bundle
 12. Reusable Raspberry Pi deployment entry: ./scripts/raspi-onekey-deploy.sh kz@<pi-ip>
 13. Prepare Raspberry Pi system-boot user-data before first boot:
     ./scripts/prepare-raspi-user-data.sh --boot-path /Volumes/system-boot
-14. Optional Tailscale maintenance hotspot trigger:
-    sudo install -m 755 ./deploy/tailscale-hotspot-trigger.sh /usr/local/sbin/tailscale-hotspot-trigger.sh
-    sudo install -m 644 ./deploy/tailscale-hotspot-trigger.service /etc/systemd/system/tailscale-hotspot-trigger.service
-    sudo install -m 644 ./deploy/tailscale-hotspot-trigger.timer /etc/systemd/system/tailscale-hotspot-trigger.timer
+14. Preferred maintenance hotspot policy: pass --hotspot-connection-id, --hotspot-scan-ssid, and --hotspot-priority to scripts/raspi-onekey-deploy.sh. The target helper configures NetworkManager and enables the delayed trigger for the next boot without switching Wi-Fi during deployment.
 
 Notes:
 - Offline bundles must be deployed to a machine with the same OS/CPU family used to build this bundle.
@@ -255,6 +254,7 @@ validate_inputs() {
   require_path "deploy/readonly-system-enable.sh"
   require_path "deploy/readonly-system-disable.sh"
   require_path "deploy/install-tailscale.sh"
+  require_path "deploy/configure-hotspot-priority.sh"
   require_path "deploy/tailscale-hotspot-trigger.sh"
   require_path "deploy/tailscale-hotspot-trigger.service"
   require_path "deploy/tailscale-hotspot-trigger.timer"

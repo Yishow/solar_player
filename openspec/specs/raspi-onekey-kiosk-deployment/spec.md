@@ -8,37 +8,55 @@ TBD - created by archiving change 'add-raspi-onekey-kiosk-deploy'. Update Purpos
 
 ### Requirement: Provide a local Raspberry Pi kiosk deployment entrypoint
 
-The system SHALL provide a local deployment command that targets a Raspberry Pi over SSH, builds or selects a deploy bundle, uploads the bundle, invokes target-side bootstrap, protects existing runtime state before an update, restarts the service, and reports verification and recovery results.
+The system SHALL provide a local deployment command that targets a Raspberry Pi over SSH, builds or selects a deploy bundle, uploads the bundle, invokes target-side bootstrap, protects existing runtime state before an update, applies an operation-selected hotspot policy when requested, restarts the service, and reports verification and recovery results.
 
 #### Scenario: Operator starts an update deployment
 
 - **WHEN** an operator runs the Raspberry Pi deployment entrypoint with the operation-time `SSH_TARGET` in update mode
 - **THEN** the command verifies SSH reachability and sudo access before uploading files
-- **AND** it prints the target, mode, install directory, bundle type, MQTT host setting, and readonly-root setting before making target changes
+- **AND** it prints the target, mode, install directory, bundle type, MQTT host setting, readonly-root setting, and hotspot policy inputs before making target changes
 - **AND** it prints the kiosk user derived from the SSH target or explicit override before making target changes
 - **AND** target-side bootstrap stops the active service and creates a verified runtime backup before replacing application files
 - **AND** a backup failure stops the update before application replacement
+- **AND** it forwards the hotspot connection id, scan SSID, and integer priority to target bootstrap when hotspot management is requested
 - **AND** the final output reports the backup path and recovery command
 
 #### Scenario: Dry run reports planned stages without target changes
 
 - **WHEN** an operator runs the deployment entrypoint with dry-run enabled
-- **THEN** the command prints the local and remote stages that would run, including backup verification and recovery handoff
-- **AND** it does not upload a bundle, create a backup, install packages, restart services, edit partitions, or enable readonly root
+- **THEN** the command prints the local and remote stages that would run, including backup verification, hotspot policy configuration when requested, and recovery handoff
+- **AND** it does not upload a bundle, create a backup, install packages, change NetworkManager profiles, install or enable systemd units, restart services, edit partitions, or enable readonly root
 
 
 <!-- @trace
-source: protect-runtime-backup-and-restore
-updated: 2026-07-14
+source: persist-pi5-hotspot-priority-and-deployment-skill
+updated: 2026-07-16
 code:
-  - deploy/raspi-bootstrap.sh
   - deploy.sh
-  - scripts/raspi-onekey-deploy.sh
-  - README.md
-  - deploy/export-runtime-state.sh
-  - deploy.md
-  - deploy/restore-runtime-state.sh
+  - .agents/skills/pi5-deployment/agents/openai.yaml
+  - apps/server/src/services/DailySummaryService.ts
+  - deploy/verify-kiosk-install.sh
   - scripts/deploy.test.mjs
+  - deploy.md
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - deploy/raspi-bootstrap.sh
+  - deploy/configure-hotspot-priority.sh
+  - apps/web/src/pages/FactoryCircuit/layout.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - scripts/raspi-onekey-deploy.sh
+  - .agents/skills/pi5-deployment/SKILL.md
+  - apps/server/src/services/MockMetricsFeedService.ts
+tests:
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
+  - apps/server/src/services/DailySummaryService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/FactoryCircuit/layout.test.ts
 -->
 
 ---
