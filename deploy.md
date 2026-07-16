@@ -77,6 +77,7 @@ Use this path for the real kiosk card. The order matters.
    ```bash
    RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
      --mode init \
+     --scope full \
      --create-data-partition \
      --data-size-gb 10 \
      --mqtt-host 192.168.31.62 \
@@ -89,6 +90,7 @@ Use this path for the real kiosk card. The order matters.
    ```bash
    RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
      --mode update \
+     --scope full \
      --skip-disk \
      --mqtt-host 192.168.31.62 \
      --desktop xfce-xrdp \
@@ -412,17 +414,22 @@ Primary local entry:
 scripts/raspi-onekey-deploy.sh "${SSH_TARGET}"
 ```
 
+The deploy entry has two explicit scopes:
+
+- `--scope app` is the normal installed-application update. With `--mode update` it is also the default. It backs up and replaces application files, installs production dependencies, restarts the existing service, and verifies the release manifest, service, and `/health`. It does not run apt, Tailscale, disk, environment, desktop, kiosk, boot, hotspot, readonly, full verifier, or reboot actions.
+- `--scope full` is for fresh-card deployment, redeployment, or host-level changes. With `--mode init` it is also the default. It retains the full disk, OS, desktop/RDP, kiosk/autostart, boot, fan, Wi-Fi/hotspot, readonly-root, and applicable reboot-witness flow.
+
+An explicit request to send the current dirty worktree to a test Pi may use app scope. The generated `release-manifest.json` must retain `sourceDirty: true` and the base commit must be reported; it is not a clean release.
+
 The one-key deploy script derives the kiosk Linux user from `SSH_TARGET`. Set `PI_USER=pi` for a generic new card or `PI_USER=kz` for the current installed card, then rebuild `SSH_TARGET`; alternatively pass `--kiosk-user <user>` explicitly.
 
 Normal update:
 
 ```bash
-RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
+SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode update \
-  --skip-disk \
-  --mqtt-host 192.168.31.62 \
-  --desktop xfce-xrdp \
-  --rdp-auth passwordless
+  --scope app \
+  --skip-disk
 ```
 
 Update mode always runs a fail-closed runtime backup gate on the target before replacing application files:
@@ -436,7 +443,7 @@ Update mode always runs a fail-closed runtime backup gate on the target before r
 Dry-run (no target changes) lists these stages:
 
 ```bash
-scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" --mode update --dry-run
+scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" --mode update --scope app --dry-run
 ```
 
 ### Restore drill and explicit production restore
@@ -466,6 +473,7 @@ Fresh-card init for a 64G production card after the first SSH login. `/data` is 
 ```bash
 RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode init \
+  --scope full \
   --create-data-partition \
   --data-size-gb 10 \
   --mqtt-host 192.168.31.62 \
@@ -480,6 +488,7 @@ Final readonly apply, only after verification passes:
 ```bash
 RDP_PASSWORD=pi SSH_PASSWORD=pi scripts/raspi-onekey-deploy.sh "${SSH_TARGET}" \
   --mode update \
+  --scope full \
   --skip-disk \
   --mqtt-host 192.168.31.62 \
   --desktop xfce-xrdp \

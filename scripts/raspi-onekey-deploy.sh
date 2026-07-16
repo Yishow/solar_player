@@ -6,6 +6,7 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 TARGET="${1:-}"
 MODE="update"
+DEPLOY_SCOPE=""
 INSTALL_DIR="/data/solar-display"
 MQTT_HOST="192.168.31.62"
 BUNDLE="online"
@@ -32,6 +33,7 @@ Usage: scripts/raspi-onekey-deploy.sh <user@host> [options]
 
 Options:
   --mode init|update
+  --scope app|full
   --install-dir <path>
   --mqtt-host <host>
   --bundle online|offline
@@ -103,6 +105,10 @@ while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --mode)
       MODE="${2:-}"
+      shift 2
+      ;;
+    --scope)
+      DEPLOY_SCOPE="${2:-}"
       shift 2
       ;;
     --install-dir)
@@ -186,6 +192,21 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 [[ "${MODE}" == "init" || "${MODE}" == "update" ]] || fail "--mode must be init or update"
+if [[ -z "${DEPLOY_SCOPE}" ]]; then
+  if [[ "${MODE}" == "init" ]]; then
+    DEPLOY_SCOPE="full"
+  else
+    DEPLOY_SCOPE="app"
+  fi
+fi
+[[ "${DEPLOY_SCOPE}" == "app" || "${DEPLOY_SCOPE}" == "full" ]] || fail "--scope must be app or full"
+if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+  [[ "${MODE}" == "update" ]] || fail "--mode init requires --scope full"
+  [[ "${APPLY_READONLY}" == "0" ]] || fail "--apply-readonly requires --scope full"
+  [[ "${CREATE_DATA_PARTITION}" == "0" ]] || fail "--create-data-partition requires --scope full"
+  [[ -z "${ROOT_SIZE_GB}" ]] || fail "--root-size-gb requires --scope full"
+  [[ -z "${HOTSPOT_CONNECTION_ID}" && -z "${HOTSPOT_SCAN_SSID}" ]] || fail "hotspot options require --scope full"
+fi
 [[ "${BUNDLE}" == "online" || "${BUNDLE}" == "offline" ]] || fail "--bundle must be online or offline"
 [[ "${DESKTOP}" == "xfce-xrdp" || "${DESKTOP}" == "none" ]] || fail "--desktop must be xfce-xrdp or none"
 [[ "${RDP_AUTH}" == "passwordless" || "${RDP_AUTH}" == "system-password" ]] || fail "--rdp-auth must be passwordless or system-password"
@@ -220,6 +241,7 @@ cat <<EOF
 Solar Display Raspberry Pi deploy
 Target: ${TARGET}
 Mode: ${MODE}
+Scope: ${DEPLOY_SCOPE}
 Install dir: ${INSTALL_DIR}
 MQTT host: ${MQTT_HOST}
 Bundle: ${BUNDLE}
@@ -233,8 +255,26 @@ Hotspot priority: ${HOTSPOT_PRIORITY}
 EOF
 
 if [[ "${DRY_RUN}" == "1" ]]; then
+  if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+    cat <<EOF
+Dry run stages:
+OK: would verify SSH reachability and sudo access
+OK: would build ${BUNDLE} bundle
+OK: would upload bundle to target staging directory
+OK: would run remote bootstrap
+OK: would update application files only
+OK: would stop the active service and create a verified runtime backup before replacing application files
+OK: backup verification failure would stop the update before application replacement
+OK: would install production dependencies, restart the existing solar-display.service, and verify release manifest, service, and /health
+OK: would report backup path and recovery command on completion or health failure (no automatic production DB rollback)
+OK: would not run apt, desktop, kiosk, boot, hotspot, readonly, or reboot actions
+OK: dry-run does not upload a bundle, create a backup, install dependencies, or restart services
+EOF
+    exit 0
+  fi
   cat <<EOF
 Dry run stages:
+OK: would run full host deployment
 OK: would verify SSH reachability and sudo access
 OK: would build ${BUNDLE} bundle
 OK: would upload bundle to target staging directory
@@ -251,7 +291,7 @@ EOF
   exit 0
 fi
 
-if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
+if [[ "${DEPLOY_SCOPE}" == "full" && "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
   fail "RDP passwordless requires --rdp-password or RDP_PASSWORD; SSH and sudo remain password-protected"
 fi
 
@@ -291,6 +331,7 @@ rsync -az --delete -e "${rsync_rsh}" "${bundle_root}/" "${TARGET}:${remote_stage
 
 remote_args=(
   "--mode" "${MODE}"
+  "--scope" "${DEPLOY_SCOPE}"
   "--install-dir" "${INSTALL_DIR}"
   "--mqtt-host" "${MQTT_HOST}"
   "--bundle-dir" "${remote_stage}"

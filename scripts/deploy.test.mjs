@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -93,6 +93,12 @@ test("Pi 5 deployment skill requires safe update, hotspot, reboot, and recovery 
   assert.match(skill, /pnpm verify/u);
   assert.match(skill, /scripts\/raspi-onekey-deploy\.sh/u);
   assert.match(skill, /--mode update/u);
+  assert.match(skill, /--scope app/u);
+  assert.match(skill, /--scope full/u);
+  assert.match(skill, /current changes to a test Pi/iu);
+  assert.match(skill, /sourceDirty.*true/iu);
+  assert.match(skill, /app scope.*must not.*reboot/iu);
+  assert.match(skill, /full scope.*reboot witness/iu);
   assert.match(skill, /--skip-disk/u);
   assert.match(skill, /--hotspot-connection-id/u);
   assert.match(skill, /--hotspot-scan-ssid/u);
@@ -114,6 +120,8 @@ test("Pi 5 deployment skill requires safe update, hotspot, reboot, and recovery 
   assert.match(metadata, /display_name: "Pi 5 Deployment"/u);
   assert.match(metadata, /default_prompt: "Use \$pi5-deployment/u);
   assert.match(deployNotes, /\.agents\/skills\/pi5-deployment\/SKILL\.md/u);
+  assert.match(deployNotes, /--scope app/u);
+  assert.match(deployNotes, /--scope full/u);
 });
 
 function writeFakeSystemctl(fakeBinDir, { isActive = false, logPath = null } = {}) {
@@ -914,6 +922,8 @@ test("raspi bootstrap prerequisite failure prevents backup and application repla
     const result = runBashScript("deploy/raspi-bootstrap.sh", [
       "--mode",
       "update",
+      "--scope",
+      "full",
       "--skip-host-preflight",
       "--skip-disk",
       "--install-dir",
@@ -937,6 +947,55 @@ test("raspi bootstrap prerequisite failure prevents backup and application repla
   }
 });
 
+test("raspi deployment scope defaults update to app and init to full", () => {
+  const updateResult = runBashScript(
+    raspiDeployScriptPath,
+    ["kz@test-pi", "--mode", "update", "--dry-run"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.equal(updateResult.status, 0, updateResult.stderr || updateResult.stdout);
+  assert.match(updateResult.stdout, /Scope: app/u);
+  assert.match(updateResult.stdout, /would update application files only/u);
+  assert.match(updateResult.stdout, /would not run apt, desktop, kiosk, boot, hotspot, readonly, or reboot actions/u);
+  assert.doesNotMatch(updateResult.stdout, /install the Tailscale CLI/u);
+
+  const initResult = runBashScript(
+    raspiDeployScriptPath,
+    ["pi@fresh-pi", "--mode", "init", "--dry-run"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.equal(initResult.status, 0, initResult.stderr || initResult.stdout);
+  assert.match(initResult.stdout, /Scope: full/u);
+  assert.match(initResult.stdout, /would run full host deployment/u);
+});
+
+test("raspi deployment scope forwards explicit scope and rejects host options in app scope", () => {
+  const entrypoint = readFileSync(raspiDeployScriptPath, "utf8");
+  assert.match(entrypoint, /--scope app\|full/u);
+  assert.ok(entrypoint.includes('"--scope" "${DEPLOY_SCOPE}"'));
+
+  const conflictResult = runBashScript(
+    raspiDeployScriptPath,
+    [
+      "kz@test-pi",
+      "--mode",
+      "update",
+      "--scope",
+      "app",
+      "--hotspot-connection-id",
+      "Yishow",
+      "--dry-run"
+    ],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.notEqual(conflictResult.status, 0);
+  assert.match(conflictResult.stderr, /hotspot options require --scope full/u);
+  assert.doesNotMatch(conflictResult.stdout, /Building|Uploading bundle/u);
+});
+
 test("raspi one-key deploy dry-run reports target and skips destructive stages", () => {
   const result = runBashScript(
     raspiDeployScriptPath,
@@ -944,6 +1003,8 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
       "kz@192.168.31.39",
       "--mode",
       "update",
+      "--scope",
+      "full",
       "--mqtt-host",
       "192.168.31.62",
       "--desktop",
@@ -1287,6 +1348,8 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
     const createResult = runBashScript("deploy/raspi-bootstrap.sh", [
       "--mode",
       "update",
+      "--scope",
+      "full",
       "--skip-host-preflight",
       "--skip-disk",
       "--configure-env-only",
@@ -1307,6 +1370,8 @@ test("raspi bootstrap creates mqtt env only when target env is missing", () => {
     const preserveResult = runBashScript("deploy/raspi-bootstrap.sh", [
       "--mode",
       "update",
+      "--scope",
+      "full",
       "--skip-host-preflight",
       "--skip-disk",
       "--configure-env-only",
@@ -1334,9 +1399,10 @@ test("raspi bootstrap cp fallback preserves runtime env and mutable directories"
   assert.match(source, /--exclude data/);
   assert.match(source, /--exclude logs/);
   assert.match(source, /--exclude uploads/);
+  assert.match(source, /--exclude backups/);
   assert.doesNotMatch(source, /cp -R "\$\{BUNDLE_DIR\}\/\." "\$\{INSTALL_DIR\}\/"/);
   assert.match(source, /! -name "\.env"/);
-  assert.match(source, /\.env\|data\|logs\|uploads/);
+  assert.match(source, /\.env\|data\|logs\|uploads\|backups/);
 });
 
 test("lightweight desktop helper configures xfce lightdm xrdp firefox without weakening ssh or sudo", () => {
@@ -3153,6 +3219,194 @@ test("raspi bootstrap dry-run lists backup verification and recovery handoff sta
   assert.match(result.stdout, /recovery handoff/i);
 });
 
+test("raspi bootstrap app scope limits work to verified application update", () => {
+  const result = runBashScript(
+    raspiBootstrapScriptPath,
+    [
+      "--mode",
+      "update",
+      "--scope",
+      "app",
+      "--dry-run",
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--bundle-dir",
+      "/tmp/fake-bundle"
+    ],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Scope: app/u);
+  assert.match(result.stdout, /application files only/u);
+  assert.match(result.stdout, /release manifest, existing service, and \/health/u);
+  assert.match(result.stdout, /would not run apt, Tailscale, desktop, kiosk, boot, hotspot, readonly, or reboot actions/u);
+  assert.doesNotMatch(result.stdout, /configure desktop/u);
+
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+  assert.match(source, /require_app_update_prerequisites/u);
+  assert.match(source, /verify_app_update/u);
+  assert.match(source, /if \[\[ "\$\{DEPLOY_SCOPE\}" == "app" \]\]/u);
+  assert.match(source, /systemctl restart solar-display\.service/u);
+});
+
+test("raspi bootstrap app scope rejects full-host options before mutation", () => {
+  const result = runBashScript(
+    raspiBootstrapScriptPath,
+    ["--mode", "update", "--scope", "app", "--apply-readonly", "--dry-run", "--skip-host-preflight", "--skip-disk"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr + result.stdout, /--apply-readonly requires --scope full/u);
+  assert.doesNotMatch(result.stdout, /copy bundle/u);
+});
+
+test("raspi bootstrap app scope executes backup, replacement, restart, and health without host helpers", () => {
+  const projectDir = makeFixtureProject();
+  const installDir = path.join(projectDir, "install");
+  const bundleDir = path.join(projectDir, "bundle");
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const operationLog = path.join(projectDir, "operations.log");
+  const serviceState = path.join(projectDir, "service.state");
+  const healthAttemptState = path.join(projectDir, "health-attempt.state");
+  const hostHelperLog = path.join(projectDir, "host-helper.log");
+  const kioskUser = process.env.USER || "pi";
+
+  try {
+    mkdirSync(path.join(installDir, "apps/server/dist"), { recursive: true });
+    mkdirSync(path.join(installDir, "data"), { recursive: true });
+    createSqliteDatabase(path.join(installDir, "data/solar-display.sqlite"), { sentinel: "app-update" });
+    writeFileSync(path.join(installDir, ".env"), "KEEP=1\n");
+    writeFileSync(path.join(installDir, "apps/server/dist/server.js"), "old application\n");
+    writeFileSync(path.join(installDir, "package.json"), JSON.stringify({ name: "old-app" }));
+
+    mkdirSync(path.join(bundleDir, "apps/server/dist"), { recursive: true });
+    mkdirSync(path.join(bundleDir, "deploy"), { recursive: true });
+    writeFileSync(path.join(bundleDir, "apps/server/dist/server.js"), "new deployed application\n");
+    writeFileSync(path.join(bundleDir, "package.json"), JSON.stringify({ name: "new-app" }));
+    writeFileSync(path.join(bundleDir, "release-manifest.json"), '{"releaseId":"fixture-app"}\n');
+    writeFileSync(path.join(bundleDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+    writeFileSync(path.join(bundleDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+    for (const helper of [
+      "install-tailscale.sh",
+      "configure-lightweight-desktop.sh",
+      "install-kiosk.sh",
+      "configure-hotspot-priority.sh",
+      "enable-readonly-root.sh",
+      "verify-kiosk-install.sh"
+    ]) {
+      writeFileSync(
+        path.join(bundleDir, `deploy/${helper}`),
+        `#!/bin/bash\nprintf '%s\\n' ${JSON.stringify(helper)} >> ${JSON.stringify(toBashPathValue(hostHelperLog))}\n`
+      );
+    }
+    for (const helper of readdirSync(path.join(bundleDir, "deploy"))) {
+      markBashExecutable(path.join(bundleDir, "deploy", helper));
+    }
+
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFileSync(serviceState, "active\n");
+    writeFileSync(
+      path.join(fakeBinDir, "systemctl"),
+      [
+        "#!/bin/bash",
+        "set -euo pipefail",
+        `STATE=${JSON.stringify(toBashPathValue(serviceState))}`,
+        `LOG=${JSON.stringify(toBashPathValue(operationLog))}`,
+        'case "$1" in',
+        '  cat) exit 0 ;;',
+        '  is-active) [[ "$(cat "${STATE}")" == "active" ]] ;;',
+        '  stop) echo inactive > "${STATE}"; echo stop >> "${LOG}" ;;',
+        '  restart|start) echo active > "${STATE}"; echo "$1" >> "${LOG}" ;;',
+        '  *) exit 0 ;;',
+        "esac",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      path.join(fakeBinDir, "sudo"),
+      [
+        "#!/bin/bash",
+        "set -euo pipefail",
+        `LOG=${JSON.stringify(toBashPathValue(operationLog))}`,
+        'if [[ "$1" == "-u" ]]; then shift 2; fi',
+        'if [[ "$*" == *"command -v node"* ]]; then exit 0; fi',
+        'if [[ "$*" == *"pnpm install"* ]]; then echo pnpm-install >> "${LOG}"; exit 0; fi',
+        'exec "$@"',
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      path.join(fakeBinDir, "curl"),
+      [
+        "#!/bin/bash",
+        `STATE=${JSON.stringify(toBashPathValue(healthAttemptState))}`,
+        `echo health >> ${JSON.stringify(toBashPathValue(operationLog))}`,
+        'attempt=0; [[ -f "${STATE}" ]] && attempt=$(cat "${STATE}")',
+        'attempt=$((attempt + 1)); echo "${attempt}" > "${STATE}"',
+        '(( attempt >= 3 ))',
+        ""
+      ].join("\n")
+    );
+    writeFileSync(path.join(fakeBinDir, "chown"), "#!/bin/bash\nexit 0\n");
+    for (const command of ["systemctl", "sudo", "curl", "chown"]) {
+      markBashExecutable(path.join(fakeBinDir, command));
+    }
+
+    writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), readFileSync(raspiBootstrapScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
+    const result = runBashScript(
+      "deploy/raspi-bootstrap.sh",
+      [
+        "--mode", "update", "--scope", "app", "--skip-host-preflight", "--skip-disk",
+        "--install-dir", installDir, "--bundle-dir", bundleDir, "--kiosk-user", kioskUser
+      ],
+      {
+        cwd: projectDir,
+        env: process.env,
+        bashPrependPathDirs: [fakeBinDir],
+        encoding: "utf8"
+      }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(readFileSync(path.join(installDir, ".env"), "utf8"), "KEEP=1\n");
+    assert.equal(
+      readFileSync(path.join(installDir, "apps/server/dist/server.js"), "utf8"),
+      "new deployed application\n",
+      `stdout=${result.stdout}\nstderr=${result.stderr}\nbundle=${readFileSync(path.join(bundleDir, "apps/server/dist/server.js"), "utf8")}`
+    );
+    const backups = readdirSync(path.join(installDir, "backups"));
+    assert.equal(backups.length, 1);
+    assert.equal(existsSync(path.join(installDir, "backups", backups[0], "prior-application.tar.gz")), true);
+    assert.deepEqual(readFileSync(operationLog, "utf8").trim().split("\n"), [
+      "stop",
+      "pnpm-install",
+      "restart",
+      "health",
+      "health",
+      "health"
+    ]);
+    assert.equal(existsSync(hostHelperLog), false);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("raspi bootstrap app scope prints recovery handoff for install or restart failure", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+  const dryRunAppBranch = source.indexOf(
+    'if [[ "${DEPLOY_SCOPE}" == "app" ]]; then',
+    source.indexOf('if [[ "${DRY_RUN}" == "1" ]]')
+  );
+  const appBranchStart = source.indexOf('if [[ "${DEPLOY_SCOPE}" == "app" ]]; then', dryRunAppBranch + 1);
+  const appBranch = source.slice(appBranchStart, source.indexOf("configure_env", appBranchStart));
+
+  assert.match(appBranch, /set \+e[\s\S]*pnpm install[\s\S]*systemctl restart[\s\S]*verify_app_update/u);
+  assert.match(appBranch, /app_update_status=\$\?[\s\S]*print_recovery_handoff/u);
+});
+
 test("raspi bootstrap ordered fixture stops service backs up then copies", () => {
   const source = readFileSync(raspiBootstrapScriptPath, "utf8");
 
@@ -3208,6 +3462,8 @@ test("raspi bootstrap backup failure leaves install untouched and restores servi
       [
         "--mode",
         "update",
+        "--scope",
+        "full",
         "--skip-host-preflight",
         "--skip-disk",
         "--install-dir",
@@ -3339,6 +3595,8 @@ test("Failed update preserves rollback material without destructive database rol
       [
         "--mode",
         "update",
+        "--scope",
+        "full",
         "--skip-host-preflight",
         "--skip-disk",
         "--install-dir",

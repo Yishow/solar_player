@@ -2,6 +2,7 @@
 set -euo pipefail
 
 MODE="update"
+DEPLOY_SCOPE=""
 INSTALL_DIR="/data/solar-display"
 MQTT_HOST="192.168.31.62"
 BUNDLE_DIR=""
@@ -185,6 +186,7 @@ create_verified_runtime_backup() {
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --mode) MODE="${2:-}"; shift 2 ;;
+    --scope) DEPLOY_SCOPE="${2:-}"; shift 2 ;;
     --install-dir) INSTALL_DIR="${2:-}"; shift 2 ;;
     --mqtt-host) MQTT_HOST="${2:-}"; shift 2 ;;
     --bundle-dir) BUNDLE_DIR="${2:-}"; shift 2 ;;
@@ -209,6 +211,21 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 [[ "${MODE}" == "init" || "${MODE}" == "update" ]] || fail "--mode must be init or update"
+if [[ -z "${DEPLOY_SCOPE}" ]]; then
+  if [[ "${MODE}" == "init" ]]; then
+    DEPLOY_SCOPE="full"
+  else
+    DEPLOY_SCOPE="app"
+  fi
+fi
+[[ "${DEPLOY_SCOPE}" == "app" || "${DEPLOY_SCOPE}" == "full" ]] || fail "--scope must be app or full"
+if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+  [[ "${MODE}" == "update" ]] || fail "--mode init requires --scope full"
+  [[ "${APPLY_READONLY}" == "0" ]] || fail "--apply-readonly requires --scope full"
+  [[ "${CREATE_DATA_PARTITION}" == "0" ]] || fail "--create-data-partition requires --scope full"
+  [[ -z "${ROOT_SIZE_GB}" ]] || fail "--root-size-gb requires --scope full"
+  [[ -z "${HOTSPOT_CONNECTION_ID}" && -z "${HOTSPOT_SCAN_SSID}" ]] || fail "hotspot options require --scope full"
+fi
 [[ "${DESKTOP}" == "xfce-xrdp" || "${DESKTOP}" == "none" ]] || fail "--desktop must be xfce-xrdp or none"
 [[ "${RDP_AUTH}" == "passwordless" || "${RDP_AUTH}" == "system-password" ]] || fail "--rdp-auth must be passwordless or system-password"
 [[ "${HOTSPOT_PRIORITY}" =~ ^-?[0-9]+$ ]] || fail "--hotspot-priority must be an integer"
@@ -390,6 +407,7 @@ copy_bundle() {
       --exclude data \
       --exclude logs \
       --exclude uploads \
+      --exclude backups \
       "${BUNDLE_DIR}/" "${INSTALL_DIR}/"
   else
     find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 \
@@ -397,13 +415,14 @@ copy_bundle() {
       ! -name "data" \
       ! -name "logs" \
       ! -name "uploads" \
+      ! -name "backups" \
       -exec rm -rf {} +
     (
       cd "${BUNDLE_DIR}"
       shopt -s dotglob nullglob
       for entry in *; do
         case "${entry}" in
-          .env|data|logs|uploads)
+          .env|data|logs|uploads|backups)
             continue
             ;;
         esac
@@ -443,9 +462,38 @@ install_tailscale_prerequisite() {
   "${helper}" || fail "Tailscale prerequisite failed before application replacement"
 }
 
+require_app_update_prerequisites() {
+  [[ -d "${INSTALL_DIR}" ]] || fail "app update requires an existing install root at ${INSTALL_DIR}; use --scope full for deployment"
+  [[ -n "${BUNDLE_DIR}" && -d "${BUNDLE_DIR}" ]] || fail "--bundle-dir is required for app update"
+  [[ -s "${BUNDLE_DIR}/release-manifest.json" ]] || fail "release manifest missing from staged bundle"
+  command -v systemctl >/dev/null 2>&1 || fail "systemctl is required for app update"
+  systemctl cat solar-display.service >/dev/null 2>&1 || fail "solar-display.service is not installed; use --scope full"
+  command -v curl >/dev/null 2>&1 || fail "curl is required for app update verification"
+  sudo -u "${KIOSK_USER}" bash -lc 'source "${HOME}/.nvm/nvm.sh" 2>/dev/null || true; command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1' \
+    || fail "existing Node and pnpm are required for app update; use --scope full"
+  ok "app update prerequisites are available"
+}
+
+verify_app_update() {
+  local attempt
+  [[ -s "${INSTALL_DIR}/release-manifest.json" ]] || fail "installed release manifest is missing"
+  cmp -s "${BUNDLE_DIR}/release-manifest.json" "${INSTALL_DIR}/release-manifest.json" \
+    || fail "installed release manifest does not match staged bundle"
+  systemctl is-active --quiet solar-display.service || fail "solar-display.service is not active after app update"
+  for ((attempt = 1; attempt <= 15; attempt += 1)); do
+    if curl -fsS --max-time 2 http://127.0.0.1:3000/health >/dev/null; then
+      ok "release manifest, existing service, and /health verified"
+      return
+    fi
+    sleep 1
+  done
+  fail "/health failed after app update"
+}
+
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "Bootstrap dry run"
   echo "Mode: ${MODE}"
+  echo "Scope: ${DEPLOY_SCOPE}"
   echo "Install dir: ${INSTALL_DIR}"
   echo "MQTT host: ${MQTT_HOST}"
   echo "Desktop: ${DESKTOP}"
@@ -459,6 +507,14 @@ check_host
 check_disk_layout
 
 if [[ "${DRY_RUN}" == "1" ]]; then
+  if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+    ok "would update application files only after creating a verified runtime backup before replacing application files"
+    ok "would fail closed on backup verification failure without replacing application files"
+    ok "would install production dependencies, restart solar-display.service, and verify release manifest, existing service, and /health"
+    ok "would print recovery handoff with backup path and recovery command (no automatic production DB rollback)"
+    ok "would not run apt, Tailscale, desktop, kiosk, boot, hotspot, readonly, or reboot actions"
+    exit 0
+  fi
   if [[ "${MODE}" == "update" ]]; then
     ok "would stop solar-display when active and create a verified runtime backup before replacing application files"
     ok "would fail closed on backup verification failure without replacing application files"
@@ -471,6 +527,34 @@ if [[ "${DRY_RUN}" == "1" ]]; then
     ok "would configure the preferred hotspot policy without switching the active Wi-Fi connection"
   fi
   ok "would print recovery handoff if later installation or health verification fails"
+  exit 0
+fi
+
+if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+  require_app_update_prerequisites
+  create_verified_runtime_backup
+  set +e
+  (
+    set -e
+    copy_bundle
+    (
+      cd "${INSTALL_DIR}"
+      sudo -u "${KIOSK_USER}" bash -lc 'source "${HOME}/.nvm/nvm.sh" 2>/dev/null || true; pnpm install --prod --no-frozen-lockfile'
+    )
+    systemctl restart solar-display.service
+    verify_app_update
+  )
+  app_update_status=$?
+  set -e
+  if [[ "${app_update_status}" -ne 0 ]]; then
+    echo "ERROR: application update failed after verified backup" >&2
+    print_recovery_handoff
+    exit "${app_update_status}"
+  fi
+  if [[ -n "${BACKUP_DIR}" ]]; then
+    ok "app update completed with verified backup at ${BACKUP_DIR}"
+    echo "Recovery command (temp drill): ${INSTALL_DIR}/deploy/restore-runtime-state.sh --backup-dir ${BACKUP_DIR} --drill"
+  fi
   exit 0
 fi
 
