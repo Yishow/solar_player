@@ -424,6 +424,13 @@ install_node_if_needed() {
   '
 }
 
+install_tailscale_prerequisite() {
+  [[ -n "${BUNDLE_DIR}" ]] || fail "--bundle-dir is required for the Tailscale prerequisite"
+  local helper="${BUNDLE_DIR}/deploy/install-tailscale.sh"
+  [[ -x "${helper}" ]] || fail "Tailscale prerequisite helper missing or not executable: ${helper}"
+  "${helper}" || fail "Tailscale prerequisite failed before application replacement"
+}
+
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "Bootstrap dry run"
   echo "Mode: ${MODE}"
@@ -454,6 +461,8 @@ configure_env
 if [[ "${CONFIGURE_ENV_ONLY}" == "1" ]]; then
   exit 0
 fi
+
+install_tailscale_prerequisite
 
 # Fail-closed backup gate: update mode must verify a snapshot before copy_bundle.
 create_verified_runtime_backup

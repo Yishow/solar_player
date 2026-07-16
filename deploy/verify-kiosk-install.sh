@@ -87,9 +87,12 @@ wifi_connected_when_present() {
   nmcli -t -f TYPE,STATE device status | grep -qx 'wifi:connected'
 }
 
-tailscale_active_when_installed() {
-  command -v tailscale >/dev/null 2>&1 || return 0
-  systemctl is-active --quiet tailscaled
+tailscale_prerequisite_ready() {
+  local enablement
+  command -v tailscale >/dev/null 2>&1 || return 1
+  enablement="$(systemctl is-enabled tailscaled.service 2>/dev/null)" || return 1
+  [[ "${enablement}" == "enabled" ]] &&
+    systemctl is-active --quiet tailscaled.service
 }
 
 fcitx_chewing_configured_when_fcitx_is_installed() {
@@ -268,7 +271,7 @@ check "health endpoint responds: ${KIOSK_HEALTH_URL}" health_ready
 check "kernel modules are not hidden by cloud-initramfs-copymods tmpfs" modules_not_hidden_by_copymods
 check "Firefox snap resolves Traditional Chinese to Noto Sans CJK TC when installed" firefox_snap_uses_noto_cjk
 check "Wi-Fi is connected when a Wi-Fi device is present" wifi_connected_when_present
-check "tailscaled is active when Tailscale is installed" tailscale_active_when_installed
+check "Tailscale CLI is installed and tailscaled.service is enabled and active" tailscale_prerequisite_ready
 check "Fcitx5 Chewing is installed and present in the kiosk profile when Fcitx5 is installed" fcitx_chewing_configured_when_fcitx_is_installed
 check "display sleep disable autostart is configured" display_sleep_autostart_configured
 check "system sleep targets are masked" system_sleep_targets_masked

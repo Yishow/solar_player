@@ -30,6 +30,14 @@ For Windows RDP, set the same operation-time host:
 $PiHost = "<pi-host-or-magicdns>"
 ```
 
+## Tailscale Deployment Prerequisite
+
+The one-key bootstrap installs the Tailscale CLI from the official Ubuntu Noble repository and requires `tailscaled.service` to be enabled and active before application replacement. Local deployment verification checks only that package-and-daemon readiness; a fresh node may therefore pass while `tailscale status` reports `NeedsLogin` and has no Tailscale IP.
+
+Enrollment is a separate administrator handoff. This repository does not run `tailscale up` or read or write reusable auth keys. After the administrator completes interactive login or an externally supplied one-time enrollment, the Tailscale control plane assigns the IP address and MagicDNS name. Put that current value in `PI_HOST`, rebuild `SSH_TARGET`, and do not save a fixed Pi address in repository files.
+
+If the Tailscale CLI is absent or `tailscaled.service` is not persistently enabled (`systemctl is-enabled tailscaled.service` must report exactly `enabled`) while readonly overlay root is active, deployment stops before application replacement. Temporarily disable readonly root and reboot, then rerun deployment so the package and systemd enablement persist. An already enabled but temporarily inactive daemon can be started without changing the readonly filesystem.
+
 ## Pi 5 Minimum Fan Stage
 
 The kiosk installer manages `dtparam=fan_temp0=0` with hysteresis 5000 and PWM 75. This makes the existing first cooling stage the normal positive-temperature floor while the kernel `step_wise` governor continues to raise the fan at 60000, 67500, and 75000 m°C. It does not add a fifth stage, systemd timer, or fan daemon.

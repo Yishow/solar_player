@@ -25,6 +25,7 @@ const repairKioskSystemScriptPath = path.join(repoRoot, "deploy/repair-kiosk-sys
 const readonlyEnableScriptPath = path.join(repoRoot, "deploy/readonly-system-enable.sh");
 const readonlyDisableScriptPath = path.join(repoRoot, "deploy/readonly-system-disable.sh");
 const hotspotTriggerScriptPath = path.join(repoRoot, "deploy/tailscale-hotspot-trigger.sh");
+const tailscaleInstallScriptPath = path.join(repoRoot, "deploy/install-tailscale.sh");
 const fanControlScriptPath = path.join(repoRoot, "deploy/configure-pi5-fan-control.sh");
 const deployNotesPath = path.join(repoRoot, "deploy.md");
 const raspiDeployRunbookPath = path.join(repoRoot, "docs/runbooks/raspi-onekey-kiosk-deploy.md");
@@ -66,6 +67,12 @@ test("Raspberry Pi deployment docs resolve connection targets at operation time"
     assert.match(contents, /cur_state/u);
     assert.match(contents, /fan1_input/u);
     assert.match(contents, /fan_temp0=50000/u);
+    assert.match(contents, /Tailscale Deployment Prerequisite/u);
+    assert.match(contents, /tailscaled\.service` to be enabled and active/u);
+    assert.match(contents, /NeedsLogin/u);
+    assert.match(contents, /control plane assigns the IP address and MagicDNS name/iu);
+    assert.match(contents, /does not run `tailscale up` or read or write reusable auth keys/iu);
+    assert.match(contents, /disable readonly root and reboot/iu);
     assert.doesNotMatch(contents, /\b(?:pi|kz)@(?:\d{1,3}\.){3}\d{1,3}\b/u);
     assert.doesNotMatch(contents, /-HostName\s+(?:\d{1,3}\.){3}\d{1,3}\b/u);
     assert.doesNotMatch(contents, /https?:\/\/(?!127\.0\.0\.1\b)(?:\d{1,3}\.){3}\d{1,3}\b/u);
@@ -144,6 +151,7 @@ function makeFixtureProject() {
   writeFileSync(path.join(projectDir, "deploy/repair-kiosk-system.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-enable.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/readonly-system-disable.sh"), "#!/bin/bash\n");
+  writeFileSync(path.join(projectDir, "deploy/install-tailscale.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.sh"), "#!/bin/bash\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.service"), "[Service]\n");
   writeFileSync(path.join(projectDir, "deploy/tailscale-hotspot-trigger.timer"), "[Timer]\n");
@@ -500,6 +508,277 @@ test("tailscale hotspot trigger documents safe network switching defaults", () =
   assert.doesNotMatch(source, /nmcli con down/);
 });
 
+function writeTailscaleInstallFixtureCommands(
+  fakeBinDir,
+  logPath,
+  { rootFilesystem = "ext4", cliInstalled = false, enabled = false, enablement = null, active = false, ready = false } = {}
+) {
+  mkdirSync(fakeBinDir, { recursive: true });
+  const bashLogPath = toBashPathValue(logPath);
+  const bashFakeBinDir = toBashPathValue(fakeBinDir);
+  const hasCli = cliInstalled || ready;
+  const enablementState = ready ? "enabled" : (enablement ?? (enabled ? "enabled" : "disabled"));
+  const isActive = active || ready;
+
+  writeFileSync(
+    path.join(fakeBinDir, "apt-get"),
+    [
+      "#!/bin/bash",
+      `printf 'apt-get %s\\n' "$*" >> ${quoteForBash(bashLogPath)}`,
+      'if [[ "$*" == "install -y tailscale" ]]; then',
+      `  printf '#!/bin/bash\\nexit 0\\n' > ${quoteForBash(`${bashFakeBinDir}/tailscale`)}`,
+      `  chmod 755 ${quoteForBash(`${bashFakeBinDir}/tailscale`)}`,
+      "fi",
+      ""
+    ].join("\n")
+  );
+  writeFileSync(
+    path.join(fakeBinDir, "curl"),
+    [
+      "#!/bin/bash",
+      "out=",
+      "url=",
+      "while [[ $# -gt 0 ]]; do",
+      '  case "$1" in',
+      '    -o) out="$2"; shift 2 ;;',
+      '    -*) shift ;;',
+      '    *) url="$1"; shift ;;',
+      "  esac",
+      "done",
+      `printf 'curl %s\\n' "$url" >> ${quoteForBash(bashLogPath)}`,
+      'printf "fixture\\n" > "$out"',
+      ""
+    ].join("\n")
+  );
+  writeFileSync(
+    path.join(fakeBinDir, "install"),
+    [
+      "#!/bin/bash",
+      `printf 'install %s\\n' "$*" >> ${quoteForBash(bashLogPath)}`,
+      "exit 0",
+      ""
+    ].join("\n")
+  );
+  writeFileSync(path.join(fakeBinDir, "findmnt"), `#!/bin/bash\nprintf '${rootFilesystem}\\n'\n`);
+  writeFileSync(
+    path.join(fakeBinDir, "systemctl"),
+    [
+      "#!/bin/bash",
+      `enabled_path=${quoteForBash(`${bashFakeBinDir}/tailscaled.enabled`)}`,
+      `active_path=${quoteForBash(`${bashFakeBinDir}/tailscaled.active`)}`,
+      `printf 'systemctl %s\\n' "$*" >> ${quoteForBash(bashLogPath)}`,
+      'case "$1" in',
+      '  is-enabled) state="$(cat "$enabled_path" 2>/dev/null || echo disabled)"; echo "$state"; [[ "$state" == "enabled" || "$state" == "enabled-runtime" ]] ;;',
+      '  is-active) [[ -f "$active_path" ]] ;;',
+      '  enable) echo enabled > "$enabled_path"; touch "$active_path" ;;',
+      '  start) touch "$active_path" ;;',
+      "  *) exit 1 ;;",
+      "esac",
+      ""
+    ].join("\n")
+  );
+
+  for (const command of ["apt-get", "curl", "install", "findmnt", "systemctl"]) {
+    markBashExecutable(path.join(fakeBinDir, command));
+  }
+
+  if (hasCli) {
+    writeFileSync(path.join(fakeBinDir, "tailscale"), "#!/bin/bash\nexit 0\n");
+    markBashExecutable(path.join(fakeBinDir, "tailscale"));
+  }
+  if (enablementState !== "disabled") writeFileSync(path.join(fakeBinDir, "tailscaled.enabled"), `${enablementState}\n`);
+  if (isActive) writeFileSync(path.join(fakeBinDir, "tailscaled.active"), "active\n");
+}
+
+function runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath) {
+  const sourcedScript = toBashPathValue(tailscaleInstallScriptPath);
+  return spawnSync(
+    bashCommand,
+    ["-c", `source ${quoteForBash(sourcedScript)}; require_root() { :; }; main`],
+    {
+      cwd: projectDir,
+      env: buildBashEnv({ ...process.env, OS_RELEASE_PATH: osReleasePath }, {
+        pathKeys: ["OS_RELEASE_PATH"],
+        prependPathDirs: [fakeBinDir]
+      }),
+      encoding: "utf8"
+    }
+  );
+}
+
+test("Tailscale prerequisite helper installs the official Noble package without enrollment", () => {
+  const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-install-test-"));
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const osReleasePath = path.join(projectDir, "os-release");
+  const logPath = path.join(projectDir, "commands.log");
+
+  try {
+    writeFileSync(osReleasePath, 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\n');
+    writeTailscaleInstallFixtureCommands(fakeBinDir, logPath);
+
+    const result = runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const commandLog = readFileSync(logPath, "utf8");
+    assert.match(commandLog, /noble\.noarmor\.gpg/);
+    assert.match(commandLog, /noble\.tailscale-keyring\.list/);
+    assert.match(commandLog, /apt-get install -y tailscale/);
+    assert.match(commandLog, /systemctl enable --now tailscaled\.service/);
+    assert.doesNotMatch(commandLog + result.stdout + result.stderr, /tailscale up|auth.?key/iu);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Tailscale prerequisite helper is offline-idempotent when the daemon is ready", () => {
+  const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-ready-test-"));
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const osReleasePath = path.join(projectDir, "os-release");
+  const logPath = path.join(projectDir, "commands.log");
+
+  try {
+    writeFileSync(osReleasePath, 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\n');
+    writeTailscaleInstallFixtureCommands(fakeBinDir, logPath, { ready: true });
+
+    const result = runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    const commandLog = readFileSync(logPath, "utf8");
+    assert.doesNotMatch(commandLog, /apt-get|curl |install |enable --now/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Tailscale prerequisite helper rejects a transient readonly overlay install", () => {
+  const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-overlay-test-"));
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const osReleasePath = path.join(projectDir, "os-release");
+  const logPath = path.join(projectDir, "commands.log");
+
+  try {
+    writeFileSync(osReleasePath, 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\n');
+    writeTailscaleInstallFixtureCommands(fakeBinDir, logPath, { rootFilesystem: "overlay" });
+
+    const result = runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /disable readonly root.*reboot/iu);
+    const commandLog = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    assert.doesNotMatch(commandLog, /apt-get|curl |install /);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Tailscale prerequisite helper starts an enabled inactive daemon on readonly overlay", () => {
+  const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-overlay-start-test-"));
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const osReleasePath = path.join(projectDir, "os-release");
+  const logPath = path.join(projectDir, "commands.log");
+
+  try {
+    writeFileSync(osReleasePath, 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\n');
+    writeTailscaleInstallFixtureCommands(fakeBinDir, logPath, {
+      rootFilesystem: "overlay",
+      cliInstalled: true,
+      enabled: true,
+      active: false
+    });
+
+    const result = runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const commandLog = readFileSync(logPath, "utf8");
+    assert.match(commandLog, /systemctl start tailscaled\.service/);
+    assert.doesNotMatch(commandLog, /apt-get|curl |install |enable --now/);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("Tailscale prerequisite helper rejects runtime-only enablement on readonly overlay", () => {
+  const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-overlay-runtime-enabled-test-"));
+  const fakeBinDir = path.join(projectDir, "fake-bin");
+  const osReleasePath = path.join(projectDir, "os-release");
+  const logPath = path.join(projectDir, "commands.log");
+
+  try {
+    writeFileSync(osReleasePath, 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\n');
+    writeTailscaleInstallFixtureCommands(fakeBinDir, logPath, {
+      rootFilesystem: "overlay",
+      cliInstalled: true,
+      enablement: "enabled-runtime",
+      active: true
+    });
+
+    const result = runTailscaleInstallFixture(projectDir, fakeBinDir, osReleasePath);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /disable readonly root.*reboot/iu);
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
+test("raspi bootstrap runs the staged Tailscale prerequisite before backup and replacement", () => {
+  const source = readFileSync(raspiBootstrapScriptPath, "utf8");
+  const helperIdx = source.indexOf("\ninstall_tailscale_prerequisite\n");
+  const backupIdx = source.indexOf("\ncreate_verified_runtime_backup\n");
+  const copyIdx = source.indexOf("\ncopy_bundle\n");
+
+  assert.ok(helperIdx > 0, "bootstrap must invoke the staged Tailscale helper");
+  assert.ok(backupIdx > helperIdx, "Tailscale prerequisite must run before the backup gate");
+  assert.ok(copyIdx > backupIdx, "application replacement must remain after the backup gate");
+  assert.match(source, /Tailscale prerequisite helper missing/);
+});
+
+test("raspi bootstrap prerequisite failure prevents backup and application replacement", () => {
+  const projectDir = makeFixtureProject();
+  const installDir = path.join(projectDir, "install");
+  const bundleDir = path.join(projectDir, "bundle");
+  const backupMarker = path.join(projectDir, "backup-called");
+
+  try {
+    mkdirSync(path.join(installDir, "apps/server/dist"), { recursive: true });
+    writeFileSync(path.join(installDir, "apps/server/dist/server.js"), "old application\n");
+    writeFileSync(path.join(installDir, ".env"), "KEEP=1\n");
+    mkdirSync(path.join(bundleDir, "apps/server/dist"), { recursive: true });
+    mkdirSync(path.join(bundleDir, "deploy"), { recursive: true });
+    writeFileSync(path.join(bundleDir, "apps/server/dist/server.js"), "new application\n");
+    writeFileSync(path.join(bundleDir, "deploy/install-tailscale.sh"), "#!/bin/bash\necho forced prerequisite failure >&2\nexit 9\n");
+    markBashExecutable(path.join(bundleDir, "deploy/install-tailscale.sh"));
+    writeFileSync(
+      path.join(bundleDir, "deploy/export-runtime-state.sh"),
+      `#!/bin/bash\ntouch ${quoteForBash(toBashPathValue(backupMarker))}\nexit 10\n`
+    );
+    markBashExecutable(path.join(bundleDir, "deploy/export-runtime-state.sh"));
+    writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), readFileSync(raspiBootstrapScriptPath, "utf8"));
+    markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
+
+    const result = runBashScript("deploy/raspi-bootstrap.sh", [
+      "--mode",
+      "update",
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--install-dir",
+      installDir,
+      "--bundle-dir",
+      bundleDir,
+      "--kiosk-user",
+      process.env.USER || "pi"
+    ], {
+      cwd: projectDir,
+      env: process.env,
+      encoding: "utf8"
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr + result.stdout, /Tailscale prerequisite failed before application replacement/);
+    assert.equal(existsSync(backupMarker), false, "backup must not start after prerequisite failure");
+    assert.equal(readFileSync(path.join(installDir, "apps/server/dist/server.js"), "utf8"), "old application\n");
+  } finally {
+    removeTempDir(projectDir);
+  }
+});
+
 test("raspi one-key deploy dry-run reports target and skips destructive stages", () => {
   const result = runBashScript(
     raspiDeployScriptPath,
@@ -535,7 +814,9 @@ test("raspi one-key deploy dry-run reports target and skips destructive stages",
   assert.match(result.stdout, /verified runtime backup before replacing application files/);
   assert.match(result.stdout, /backup verification failure would stop the update/);
   assert.match(result.stdout, /recovery command/);
+  assert.match(result.stdout, /install the Tailscale CLI and enable\/start tailscaled\.service before application replacement/);
   assert.match(result.stdout, /does not upload a bundle, create a backup/);
+  assert.doesNotMatch(result.stdout, /tailscale up|auth.?key/iu);
   assert.doesNotMatch(result.stdout, /\b(parted|mkfs|resize2fs|sfdisk)\b/);
 });
 
@@ -1481,7 +1762,10 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /Exec=env KIOSK_DISPLAY_OUTPUT=/);
   assert.match(source, /Firefox snap resolves Traditional Chinese to Noto Sans CJK TC/);
   assert.match(source, /Wi-Fi is connected when a Wi-Fi device is present/);
-  assert.match(source, /tailscaled is active when Tailscale is installed/);
+  assert.match(source, /Tailscale CLI is installed and tailscaled\.service is enabled and active/);
+  assert.match(source, /systemctl is-enabled tailscaled\.service/);
+  assert.match(source, /\[\[ "\$\{enablement\}" == "enabled" \]\]/);
+  assert.match(source, /systemctl is-active --quiet tailscaled\.service/);
   assert.match(source, /display sleep disable autostart is configured/);
   assert.match(source, /display sleep is disabled when X display is available/);
   assert.match(source, /system sleep targets are masked/);
@@ -1497,6 +1781,68 @@ test("kiosk verification helper checks modules Firefox Wi-Fi and Tailscale gates
   assert.match(source, /fc-match sans:lang=zh-tw/);
   assert.match(source, /findmnt -no SOURCE \/usr\/lib\/modules/);
   assert.match(source, /nmcli -t -f TYPE,STATE device status/);
+});
+
+test("Tailscale verification requires the CLI plus an enabled and active daemon without enrollment", () => {
+  const source = readFileSync(path.join(repoRoot, "deploy/verify-kiosk-install.sh"), "utf8");
+  const functionSource = source.match(/tailscale_prerequisite_ready\(\) \{[\s\S]*?\n\}/u)?.[0];
+
+  assert.ok(functionSource, "verifier must define tailscale_prerequisite_ready");
+
+  const runFixture = ({ cliInstalled, enablement, active }) => {
+    const projectDir = mkdtempSync(path.join(tmpdir(), "solar-tailscale-verify-test-"));
+    const fakeBinDir = path.join(projectDir, "fake-bin");
+    const invocationLog = path.join(projectDir, "tailscale-invocations.log");
+    const verifierPath = path.join(projectDir, "verify-tailscale.sh");
+
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFileSync(path.join(fakeBinDir, "systemctl"), [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      'case "$1" in',
+      `  is-enabled) echo ${enablement}; [[ ${quoteForBash(enablement)} == enabled || ${quoteForBash(enablement)} == enabled-runtime ]] ;;`,
+      `  is-active) exit ${active ? 0 : 1} ;;`,
+      "  *) exit 1 ;;",
+      "esac",
+      ""
+    ].join("\n"));
+    markBashExecutable(path.join(fakeBinDir, "systemctl"));
+
+    if (cliInstalled) {
+      writeFileSync(path.join(fakeBinDir, "tailscale"), [
+        "#!/bin/bash",
+        `echo invoked >> ${quoteForBash(toBashPathValue(invocationLog))}`,
+        "echo NeedsLogin",
+        "exit 99",
+        ""
+      ].join("\n"));
+      markBashExecutable(path.join(fakeBinDir, "tailscale"));
+    }
+
+    writeFileSync(verifierPath, `#!/bin/bash\nset -u\n${functionSource}\ntailscale_prerequisite_ready\n`);
+    markBashExecutable(verifierPath);
+
+    const result = spawnSync(bashCommand, [verifierPath], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        PATH: `${fakeBinDir}:/usr/bin:/bin`
+      },
+      encoding: "utf8"
+    });
+    const tailscaleInvoked = existsSync(invocationLog);
+    removeTempDir(projectDir);
+    return { result, tailscaleInvoked };
+  };
+
+  assert.notEqual(runFixture({ cliInstalled: false, enablement: "enabled", active: true }).result.status, 0);
+  assert.notEqual(runFixture({ cliInstalled: true, enablement: "disabled", active: true }).result.status, 0);
+  assert.notEqual(runFixture({ cliInstalled: true, enablement: "enabled", active: false }).result.status, 0);
+  assert.notEqual(runFixture({ cliInstalled: true, enablement: "enabled-runtime", active: true }).result.status, 0);
+
+  const ready = runFixture({ cliInstalled: true, enablement: "enabled", active: true });
+  assert.equal(ready.result.status, 0, ready.result.stderr || ready.result.stdout);
+  assert.equal(ready.tailscaleInvoked, false, "readiness must not require login, backend state, or an assigned IP");
 });
 
 test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures", () => {
@@ -1528,7 +1874,7 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
     "# END Solar Player Pi 5 fan control"
   ].join("\n");
 
-  const runVerification = () => runBashScript("deploy/verify-kiosk-install.sh", [
+  const runVerification = ({ tailscaleEnablement = "enabled", tailscaleActive = true } = {}) => runBashScript("deploy/verify-kiosk-install.sh", [
     "--install-dir",
     installDir,
     "--kiosk-user",
@@ -1546,7 +1892,11 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
   ], {
     cwd: projectDir,
     bashPrependPathDirs: [fakeBinDir],
-    env: process.env,
+    env: {
+      ...process.env,
+      TAILSCALE_ENABLEMENT: tailscaleEnablement,
+      TAILSCALE_ACTIVE: tailscaleActive ? "1" : "0"
+    },
     encoding: "utf8"
   });
 
@@ -1574,15 +1924,45 @@ test("kiosk verification checks Pi 5 boot profile and runtime thermal fixtures",
     });
 
     mkdirSync(fakeBinDir);
-    for (const command of ["systemctl", "curl"]) {
+    writeFileSync(path.join(fakeBinDir, "systemctl"), [
+      "#!/bin/bash",
+      'unit="${@: -1}"',
+      'case "$1:$unit" in',
+      '  is-enabled:tailscaled.service) echo "${TAILSCALE_ENABLEMENT}"; [[ "${TAILSCALE_ENABLEMENT}" == "enabled" || "${TAILSCALE_ENABLEMENT}" == "enabled-runtime" ]] ;;',
+      '  is-active:tailscaled.service) [[ "${TAILSCALE_ACTIVE}" == "1" ]] ;;',
+      "  is-enabled:sleep.target|is-enabled:suspend.target|is-enabled:hibernate.target|is-enabled:hybrid-sleep.target) echo masked ;;",
+      "  *) exit 0 ;;",
+      "esac",
+      ""
+    ].join("\n"));
+    markBashExecutable(path.join(fakeBinDir, "systemctl"));
+    for (const command of ["curl", "tailscale"]) {
       const commandPath = path.join(fakeBinDir, command);
-      writeFileSync(commandPath, "#!/bin/bash\nexit 0\n");
+      writeFileSync(commandPath, command === "tailscale" ? "#!/bin/bash\necho NeedsLogin\nexit 99\n" : "#!/bin/bash\nexit 0\n");
       markBashExecutable(commandPath);
     }
 
     const correct = runVerification();
+    assert.match(correct.stdout, /OK: Tailscale CLI is installed and tailscaled\.service is enabled and active/);
     assert.match(correct.stdout, /OK: Pi 5 fan boot profile is configured/);
     assert.match(correct.stdout, /OK: Pi 5 fan runtime thermal contract is active/);
+
+    const disabledTailscale = runVerification({ tailscaleEnablement: "disabled" });
+    assert.notEqual(disabledTailscale.status, 0);
+    assert.match(disabledTailscale.stderr, /FAIL: Tailscale CLI is installed and tailscaled\.service is enabled and active/);
+
+    const inactiveTailscale = runVerification({ tailscaleActive: false });
+    assert.notEqual(inactiveTailscale.status, 0);
+    assert.match(inactiveTailscale.stderr, /FAIL: Tailscale CLI is installed and tailscaled\.service is enabled and active/);
+
+    const runtimeEnabledTailscale = runVerification({ tailscaleEnablement: "enabled-runtime" });
+    assert.notEqual(runtimeEnabledTailscale.status, 0);
+    assert.match(runtimeEnabledTailscale.stderr, /FAIL: Tailscale CLI is installed and tailscaled\.service is enabled and active/);
+
+    rmSync(path.join(fakeBinDir, "tailscale"));
+    const missingTailscale = runVerification();
+    assert.notEqual(missingTailscale.status, 0);
+    assert.match(missingTailscale.stderr, /FAIL: Tailscale CLI is installed and tailscaled\.service is enabled and active/);
 
     writeFileSync(configPath, `[all]\n${fanBlock.replace("fan_temp3_speed=250", "fan_temp3_speed=249")}\ndtoverlay=vc4-kms-v3d\n`);
     const badBootProfile = runVerification();
@@ -1650,6 +2030,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
@@ -1685,6 +2066,7 @@ test("deploy.sh online bundle includes runtime files without node_modules", () =
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
@@ -1728,6 +2110,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(existsSync(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(existsSync(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.service")), true);
     assert.equal(existsSync(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.timer")), true);
@@ -1751,6 +2134,7 @@ test("deploy.sh offline bundle includes node_modules for copy-only deployment", 
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/repair-kiosk-system.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-enable.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/readonly-system-disable.sh")), true);
+    assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-tailscale.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/tailscale-hotspot-trigger.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/install-kiosk.sh")), true);
     assert.equal(isExecutable(path.join(bundleRoot, "deploy/start-solar-kiosk.sh")), true);
@@ -2512,6 +2896,8 @@ test("raspi bootstrap backup failure leaves install untouched and restores servi
     markBashExecutable(path.join(bundleDir, "deploy/export-runtime-state.sh"));
     writeFileSync(path.join(bundleDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
     markBashExecutable(path.join(bundleDir, "deploy/restore-runtime-state.sh"));
+    writeFileSync(path.join(bundleDir, "deploy/install-tailscale.sh"), "#!/bin/bash\nexit 0\n");
+    markBashExecutable(path.join(bundleDir, "deploy/install-tailscale.sh"));
 
     writeFileSync(path.join(projectDir, "deploy/raspi-bootstrap.sh"), readFileSync(raspiBootstrapScriptPath, "utf8"));
     markBashExecutable(path.join(projectDir, "deploy/raspi-bootstrap.sh"));
@@ -2614,6 +3000,7 @@ test("Failed update preserves rollback material without destructive database rol
     for (const stub of ["configure-lightweight-desktop.sh", "install-kiosk.sh"]) {
       writeFileSync(path.join(bundleDir, `deploy/${stub}`), "#!/bin/bash\nexit 0\n");
     }
+    writeFileSync(path.join(bundleDir, "deploy/install-tailscale.sh"), "#!/bin/bash\nexit 0\n");
     // Force the post-update verification step to fail so the recovery-handoff
     // (no destructive rollback) path is actually exercised.
     writeFileSync(path.join(bundleDir, "deploy/verify-kiosk-install.sh"), "#!/bin/bash\nexit 1\n");
@@ -2623,6 +3010,7 @@ test("Failed update preserves rollback material without destructive database rol
     for (const scriptPath of [
       "deploy/export-runtime-state.sh",
       "deploy/restore-runtime-state.sh",
+      "deploy/install-tailscale.sh",
       "deploy/configure-lightweight-desktop.sh",
       "deploy/install-kiosk.sh",
       "deploy/verify-kiosk-install.sh"

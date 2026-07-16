@@ -205,6 +205,7 @@ OK: would verify SSH reachability and sudo access
 OK: would build ${BUNDLE} bundle
 OK: would upload bundle to target staging directory
 OK: would run remote bootstrap
+OK: remote bootstrap would install the Tailscale CLI and enable/start tailscaled.service before application replacement
 OK: update mode would stop the active service and create a verified runtime backup before replacing application files
 OK: backup verification failure would stop the update before application replacement
 OK: would report backup path and recovery command on completion or health failure (no automatic production DB rollback)

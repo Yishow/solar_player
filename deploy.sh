@@ -59,6 +59,7 @@ copy_required_tree() {
   cp "${PROJECT_DIR}/deploy/repair-kiosk-system.sh" "${target_root}/deploy/repair-kiosk-system.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-enable.sh" "${target_root}/deploy/readonly-system-enable.sh"
   cp "${PROJECT_DIR}/deploy/readonly-system-disable.sh" "${target_root}/deploy/readonly-system-disable.sh"
+  cp "${PROJECT_DIR}/deploy/install-tailscale.sh" "${target_root}/deploy/install-tailscale.sh"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.sh" "${target_root}/deploy/tailscale-hotspot-trigger.sh"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.service" "${target_root}/deploy/tailscale-hotspot-trigger.service"
   cp "${PROJECT_DIR}/deploy/tailscale-hotspot-trigger.timer" "${target_root}/deploy/tailscale-hotspot-trigger.timer"
@@ -89,6 +90,7 @@ copy_required_tree() {
     "${target_root}/deploy/repair-kiosk-system.sh" \
     "${target_root}/deploy/readonly-system-enable.sh" \
     "${target_root}/deploy/readonly-system-disable.sh" \
+    "${target_root}/deploy/install-tailscale.sh" \
     "${target_root}/deploy/tailscale-hotspot-trigger.sh" \
     "${target_root}/deploy/install-kiosk.sh" \
     "${target_root}/deploy/read-solar-display-journal.sh" \
@@ -252,6 +254,7 @@ validate_inputs() {
   require_path "deploy/repair-kiosk-system.sh"
   require_path "deploy/readonly-system-enable.sh"
   require_path "deploy/readonly-system-disable.sh"
+  require_path "deploy/install-tailscale.sh"
   require_path "deploy/tailscale-hotspot-trigger.sh"
   require_path "deploy/tailscale-hotspot-trigger.service"
   require_path "deploy/tailscale-hotspot-trigger.timer"
