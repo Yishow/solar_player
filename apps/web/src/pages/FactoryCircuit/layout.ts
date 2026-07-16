@@ -80,37 +80,37 @@ export const factoryCircuitJungliLoadRows = [
   {
     height: 84,
     left: 1392,
-    top: 146,
+    top: 160,
     width: 470
   },
   {
     height: 84,
     left: 1392,
-    top: 241,
+    top: 255,
     width: 470
   },
   {
     height: 84,
     left: 1392,
-    top: 336,
+    top: 350,
     width: 470
   },
   {
     height: 84,
     left: 1392,
-    top: 431,
+    top: 445,
     width: 470
   },
   {
     height: 84,
     left: 1392,
-    top: 526,
+    top: 540,
     width: 470
   },
   {
     height: 84,
     left: 1392,
-    top: 621,
+    top: 635,
     width: 470
   },
   {
