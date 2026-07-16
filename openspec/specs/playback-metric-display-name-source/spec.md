@@ -8,49 +8,39 @@ TBD - created by archiving change 'mqtt-topic-custom-display-names'. Update Purp
 
 ### Requirement: Topic custom names are the source of playback metric display names
 
-The system SHALL resolve the display name of each story-driven playback metric card that maps to a `metric_key` from that metric's topic mapping custom name, and SHALL deliver the resolved name to playback through the playback-safe display-story payload. When a metric maps to a topic mapping whose `nameZh`/`nameEn` is set, the playback card SHALL display that custom name as the authoritative source. Management topic data SHALL NOT be exposed directly to playback sessions; the server story payload is the sole delivery channel.
+The system SHALL resolve the default display name of each story-driven playback metric card that maps to a metric_key from that metric's topic mapping custom name, and SHALL deliver the resolved name to playback through the playback-safe display-story payload. When a metric maps to a topic mapping whose nameZh/nameEn is set, the playback card SHALL display that custom name unless the card has an explicitly supported page-scoped non-blank title override. For Overview KPI cards, a non-blank editor title override SHALL take precedence only for that card. Management topic data SHALL NOT be exposed directly to playback sessions; the server story payload remains the sole delivery channel for topic custom names.
 
-#### Scenario: Custom name drives playback label
+#### Scenario: Custom name drives playback label without a page override
 
-- **WHEN** a topic mapping for a given `metric_key` has a custom Chinese name set
-- **AND** a story-driven playback page (Overview, Solar, or Factory Circuit) renders the card bound to that `metric_key` with the display-story payload present
+- **WHEN** a topic mapping for a given metric_key has a custom Chinese name set
+- **AND** a story-driven playback page renders the card with the display-story payload present
+- **AND** the card has no supported page-scoped non-blank title override
 - **THEN** the card's label displays the custom name resolved by the server story
 
-##### Example: metric_key to playback label
+##### Example: metric_key to default playback label
 
-| metric_key            | topic nameZh | Rendered playback label |
-| --------------------- | ------------ | ----------------------- |
-| realTimePower         | "即時輸出"   | "即時輸出"              |
-| factoryProductionPower| "一號產線"   | "一號產線"              |
+| metric_key | topic nameZh | Page title override | Rendered playback label |
+| --- | --- | --- | --- |
+| realTimePower | "即時輸出" | unset | "即時輸出" |
+| factoryProductionPower | "一號產線" | unsupported | "一號產線" |
+
+#### Scenario: Overview page title override takes precedence locally
+
+- **WHEN** an Overview KPI card resolves the runtime metric label "即時輸出"
+- **AND** that card's editor configuration has the non-blank title override "即時發電功率"
+- **THEN** the Overview card displays "即時發電功率"
+- **AND** the topic mapping and other metric consumers continue to use "即時輸出"
 
 
 <!-- @trace
-source: mqtt-topic-custom-display-names
-updated: 2026-06-29
+source: add-overview-card-title-editor-controls
+updated: 2026-07-16
 code:
-  - packages/shared/src/types.ts
-  - apps/server/src/routes/settings-mqtt.ts
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/db/migrations/014_topic_display_names.sql
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/MqttSettings/loadModel.ts
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/Overview/runtimeContent.tsx
 tests:
-  - apps/web/src/pages/Sustainability/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/viewModel.test.ts
-  - apps/server/src/db/migrations/topicDisplayNames.test.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/web/src/pages/Solar/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/server/src/services/displayStoryTopicNames.test.ts
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/server/src/routes/settings-mqtt.test.ts
-  - apps/web/src/pages/Overview/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/loadModel.test.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
+  - apps/web/src/pages/Overview/displayPageConfig.test.ts
 -->
 
 ---

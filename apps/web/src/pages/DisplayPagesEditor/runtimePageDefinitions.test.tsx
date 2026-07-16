@@ -22,6 +22,10 @@ const runtimeDefinitionsSource = readFileSync(
   "utf8"
 );
 const displayEditorIndexSource = readFileSync(path.join(import.meta.dirname, "index.tsx"), "utf8");
+const overviewRuntimeSource = readFileSync(
+  path.join(import.meta.dirname, "../Overview/runtimeContent.tsx"),
+  "utf8"
+);
 
 test("runtime page definitions expand registry-backed duplicate instances into independent editor tabs", () => {
   const registryPages: DisplayPageInstance[] = [
@@ -324,6 +328,39 @@ test("schema-backed media placement regions resolve fit, focus, and align defaul
       assert.equal(field.value, expectedValue, `unexpected default for ${fieldId}`);
     }
   }
+});
+
+test("Overview KPI title override resolves through the schema-backed editor field", () => {
+  const overviewSeed = createOverviewDisplayPageSeedConfig();
+  overviewSeed.kpiCards.power = {
+    ...overviewSeed.kpiCards.power,
+    titleOverride: "即時發電功率"
+  };
+
+  const powerRegion = resolveDisplayEditorRegions(
+    overviewSeed,
+    resolvePageRegionSchemas("overview"),
+    overviewSeed
+  ).find((region) => region.id === "overview-kpi-power");
+
+  assert.ok(powerRegion, "expected overview-kpi-power region");
+  const titleField = powerRegion.fields.find(
+    (field) => field.schema.path.join(".") === "kpiCards.power.titleOverride"
+  );
+  assert.ok(titleField, "expected power titleOverride field");
+  assert.equal(titleField.schema.fieldType, "text");
+  assert.equal(titleField.value, "即時發電功率");
+});
+
+test("Overview runtime applies the page title resolver without replacing other KPI presentation fields", () => {
+  assert.match(
+    overviewRuntimeSource,
+    /title=\{resolveOverviewKpiCardTitle\(\s*resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\.titleOverride,\s*metric\.label\s*\)\}/
+  );
+  assert.match(overviewRuntimeSource, /subtitle=\{shell\.cardItem\.englishLabel\}/);
+  assert.match(overviewRuntimeSource, /unit=\{isConfiguring \? "" : metric\.unit\}/);
+  assert.match(overviewRuntimeSource, /value=\{isConfiguring \? displayPageCardConfiguringLabel : metric\.value\}/);
+  assert.match(overviewRuntimeSource, /<OverviewKpiFooter footer=\{resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\} metric=\{metric\} \/>/);
 });
 
 test("display page editor no longer falls back to the phase-only inspector message for supported runtime pages", () => {

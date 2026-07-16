@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     createOverviewDisplayPageSeedConfig,
     overviewDisplayPageEditorRegions,
+    resolveOverviewKpiCardTitle,
     resolveOverviewModernDefaultConfig
 } from "./displayPageConfig";
 
@@ -70,6 +71,56 @@ test("overview config preserves explicit KPI footer and visibility edits even wh
     assert.equal(resolved.kpiCards.today.footerText, "操作員自訂說明");
     assert.equal(resolved.kpiCards.today.targetValue, 7200);
     assert.equal(resolved.kpiCards.today.visible, false);
+});
+
+test("overview KPI title overrides remain optional and preserve an explicit draft value independently", () => {
+    const seed = createOverviewDisplayPageSeedConfig();
+    const persisted = createOverviewDisplayPageSeedConfig();
+
+    assert.equal(seed.kpiCards.power.titleOverride, undefined);
+    persisted.kpiCards.power = {
+        ...persisted.kpiCards.power,
+        titleOverride: "即時發電功率"
+    };
+
+    const resolved = resolveOverviewModernDefaultConfig(persisted, seed);
+
+    assert.equal(resolved.kpiCards.power.titleOverride, "即時發電功率");
+    for (const key of ["today", "total", "co2Today", "co2Total"] as const) {
+        assert.equal(resolved.kpiCards[key].titleOverride, undefined);
+    }
+});
+
+test("overview KPI title resolution prefers a trimmed page override and otherwise preserves the runtime label", () => {
+    const fallbackCases: Array<[string | undefined, string]> = [
+        [undefined, "即時輸出"],
+        ["", "即時輸出"],
+        ["   ", "即時輸出"],
+        [undefined, "一號產線"]
+    ];
+
+    for (const [titleOverride, runtimeLabel] of fallbackCases) {
+        assert.equal(resolveOverviewKpiCardTitle(titleOverride, runtimeLabel), runtimeLabel);
+    }
+
+    assert.equal(
+        resolveOverviewKpiCardTitle("  即時發電功率  ", "即時輸出"),
+        "即時發電功率"
+    );
+});
+
+test("overview KPI editor regions expose an independent title text field for all five cards", () => {
+    for (const key of ["power", "today", "total", "co2Today", "co2Total"] as const) {
+        const region = overviewDisplayPageEditorRegions.find((entry) => entry.id === `overview-kpi-${key}`);
+        assert.ok(region, `expected overview-kpi-${key} region`);
+
+        const titleField = region.fields.find(
+            (field) => field.path.join(".") === `kpiCards.${key}.titleOverride`
+        );
+        assert.ok(titleField, `expected ${key} titleOverride inspector field`);
+        assert.equal(titleField.fieldType, "text");
+        assert.equal(titleField.label, "標題文字");
+    }
 });
 
 test("overview KPI editor regions expose footer controls with visibleWhen wiring", () => {

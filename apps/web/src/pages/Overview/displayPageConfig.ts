@@ -215,8 +215,13 @@ export type OverviewKpiCardConfig = OverviewDisplayRect & {
   footerType: OverviewKpiFooterType;
   status?: DisplayPageCardStatus;
   targetValue?: number;
+  titleOverride?: string;
   visible: boolean;
 };
+
+export function resolveOverviewKpiCardTitle(titleOverride: string | undefined, runtimeLabel: string) {
+  return titleOverride?.trim() || runtimeLabel;
+}
 
 export type OverviewDashboardWidgetKey =
   | "alertNotifications"
@@ -923,6 +928,12 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
       widthPath: ["kpiCards", key, "width"]
     },
     fields: [
+      {
+        fieldType: "text",
+        id: `${key}-title-override`,
+        label: "標題文字",
+        path: ["kpiCards", key, "titleOverride"]
+      },
       ...buildDisplayCardStyleFields({
         idPrefix: key,
         path: ["cardStyles", key]

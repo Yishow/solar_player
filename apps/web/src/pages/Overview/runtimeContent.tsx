@@ -16,6 +16,7 @@ import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shar
 import { buildOverviewViewModel } from "./viewModel";
 import { OverviewKpiFooter } from "./OverviewKpiFooter";
 import {
+  resolveOverviewKpiCardTitle,
   shouldRenderOverviewDashboardWidget,
   shouldRenderOverviewKpiCard,
   type OverviewDisplayPageConfig
@@ -298,7 +299,10 @@ export function OverviewRuntimeContent({
               })}
               iconContainerClassName="overview-kpi-icon-shell"
               subtitle={shell.cardItem.englishLabel}
-              title={metric.label}
+              title={resolveOverviewKpiCardTitle(
+                resolvedConfig.kpiCards[shell.cardItem.key].titleOverride,
+                metric.label
+              )}
             />
             <DisplayCardValueRow
               align={shell.cardStyle.valueRowAlign}
