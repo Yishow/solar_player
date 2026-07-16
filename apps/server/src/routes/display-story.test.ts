@@ -442,6 +442,60 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
   }
 });
 
+test("MQTT restart exposes persisted Overview history before a new live reading arrives", async () => {
+  const { today } = seedDisplayStoryFixture();
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO daily_energy_summaries (
+          date,
+          generation_total,
+          consumption_total,
+          self_consumption_total,
+          co2_total
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+          generation_total = excluded.generation_total,
+          consumption_total = excluded.consumption_total,
+          self_consumption_total = excluded.self_consumption_total,
+          co2_total = excluded.co2_total
+      `
+    )
+    .run(today, 82.5, 123.4, 61.2, 40.8);
+
+  const app = await buildApp();
+
+  try {
+    const [storyResponse, summaryResponse] = await Promise.all([
+      app.inject({ method: "GET", url: "/api/display-story" }),
+      app.inject({ method: "GET", url: "/api/metrics/daily-summary?range=month" })
+    ]);
+
+    assert.equal(storyResponse.statusCode, 200);
+    const story = storyResponse.json() as {
+      overview: {
+        metrics: Array<{ metricKey: string; trendSeries?: number[] }>;
+      };
+    };
+    const realTimePower = story.overview.metrics.find(
+      (metric) => metric.metricKey === "realTimePower"
+    );
+    assert.deepEqual(realTimePower?.trendSeries, [82, 95, 101, 108]);
+
+    assert.equal(summaryResponse.statusCode, 200);
+    const summary = summaryResponse.json() as {
+      summaries: Array<{ consumptionTotal: number; date: string }>;
+    };
+    const todaySummary = summary.summaries.find((row) => row.date === today);
+    assert.equal(todaySummary?.date, today);
+    assert.equal(todaySummary?.consumptionTotal, 123.4);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-story falls back factory self-consumption KPI to today generation when self-consumption is stale", async () => {
   const { today } = seedDisplayStoryFixture();
   const database = getDatabase();

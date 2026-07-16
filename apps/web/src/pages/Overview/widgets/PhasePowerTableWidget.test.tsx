@@ -3,7 +3,8 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildMonthlyConsumptionTrend,
-  PhasePowerTableWidget
+  PhasePowerTableWidget,
+  shouldRefreshMonthlyConsumption
 } from "./PhasePowerTableWidget";
 
 test("PhasePowerTableWidget renders monthly consumption title and empty state before data arrives", () => {
@@ -34,4 +35,10 @@ test("buildMonthlyConsumptionTrend maps current-month summaries chronologically"
 
   assert.deepEqual(trend.series, [1800, 2200]);
   assert.deepEqual(trend.dates, ["7/1", "7/2"]);
+});
+
+test("monthly consumption refreshes only for monitoring-history sync", () => {
+  assert.equal(shouldRefreshMonthlyConsumption({ scope: "monitoring-history" }), true);
+  assert.equal(shouldRefreshMonthlyConsumption({ scope: "mqtt" }), false);
+  assert.equal(shouldRefreshMonthlyConsumption({ scope: "display-pages" }), false);
 });

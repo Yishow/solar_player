@@ -1,12 +1,21 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import type { DisplaySyncEvent } from "@solar-display/shared";
+import type { CSSProperties } from "react";
 import { DisplayCardFrame, DisplayCardHeader } from "../../../components/displayPageCards";
 import { toSparklineSmoothPath } from "../../../components/Sparkline";
+import { useRuntimeRefreshLifecycle } from "../../../hooks/useRuntimeRefreshLifecycle";
 import { requestJson } from "../../../services/api";
+import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../../runtimeRefreshRegistry";
 
 type MonthlyConsumptionSummary = {
   consumptionTotal: number | null;
   date: string;
 };
+
+const monthlyConsumptionRefresh = resolveMonitoringHistoryRuntimeRefreshSpec("month");
+
+export function shouldRefreshMonthlyConsumption(event: Pick<DisplaySyncEvent, "scope">) {
+  return monthlyConsumptionRefresh.refreshScopes.includes(event.scope);
+}
 
 function formatDateLabel(dateStr: string) {
   const parts = dateStr.split("-");
@@ -75,27 +84,17 @@ export function PhasePowerTableWidget({
   phasePower?: any; // kept to avoid compilation errors elsewhere
   style?: CSSProperties;
 }) {
-  const [series, setSeries] = useState<number[]>([]);
-  const [dates, setDates] = useState<string[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    requestJson<{ summaries: MonthlyConsumptionSummary[] }>("/api/metrics/daily-summary?range=month")
-      .then((res) => {
-        if (!active) return;
-        const trend = buildMonthlyConsumptionTrend(res.summaries || []);
-        setSeries(trend.series);
-        setDates(trend.dates);
-      })
-      .catch(() => {
-        setSeries([]);
-        setDates([]);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const monthlyConsumptionRuntime = useRuntimeRefreshLifecycle<{
+    summaries: MonthlyConsumptionSummary[];
+  }>({
+    enabled: true,
+    load: () => requestJson("/api/metrics/daily-summary?range=month"),
+    refreshKey: monthlyConsumptionRefresh.refreshKey,
+    shouldRefresh: shouldRefreshMonthlyConsumption
+  });
+  const { dates, series } = buildMonthlyConsumptionTrend(
+    monthlyConsumptionRuntime.payload?.summaries ?? []
+  );
 
   const yTicks = buildYTicks(series, 3);
   const niceMax = yTicks[0]?.value ?? 0;

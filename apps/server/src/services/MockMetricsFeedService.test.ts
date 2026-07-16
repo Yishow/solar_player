@@ -153,3 +153,36 @@ test("writeReading keeps a single realTimePower row across repeated writes", () 
   assert.equal(realTimePowerCount, 1);
   assert.equal(totalCount, 14);
 });
+
+test("mock cumulative energy advances within a day and does not reset across local days", () => {
+  migrateDatabase();
+  const database = getDatabase();
+  let current = new Date(2026, 5, 9, 12, 0, 0);
+  const service = new MockMetricsFeedService({ database, now: () => current });
+  const readCumulativeEnergy = () => {
+    const metrics = readLiveMetricsSnapshot(database).metrics;
+    return {
+      consumption: metrics.consumptionEnergy!.value,
+      generation: metrics.totalGeneration!.value,
+      selfConsumption: metrics.selfConsumptionEnergy!.value
+    };
+  };
+
+  service.writeReading();
+  const noon = readCumulativeEnergy();
+
+  current = new Date(2026, 5, 9, 13, 0, 0);
+  service.writeReading();
+  const afternoon = readCumulativeEnergy();
+
+  current = new Date(2026, 5, 10, 12, 0, 0);
+  service.writeReading();
+  const nextDay = readCumulativeEnergy();
+
+  assert.ok(afternoon.generation > noon.generation, "sub-1000 kWh generation changes must remain visible");
+  assert.ok(afternoon.consumption >= noon.consumption);
+  assert.ok(afternoon.selfConsumption >= noon.selfConsumption);
+  assert.ok(nextDay.generation > afternoon.generation);
+  assert.ok(nextDay.consumption >= afternoon.consumption);
+  assert.ok(nextDay.selfConsumption >= afternoon.selfConsumption);
+});

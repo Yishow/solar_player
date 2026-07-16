@@ -18,8 +18,16 @@ type PeakSnapshot = {
   peakGenerationTime: string | null;
 };
 
+type DailySummaryRow = PeakSnapshot & {
+  co2Total: number;
+  consumptionTotal: number;
+  generationTotal: number;
+  selfConsumptionTotal: number;
+};
+
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function clampDelta(total: number, baseline: number) {
@@ -98,6 +106,15 @@ export class DailySummaryService {
         this.peaks.peakConsumptionTime = snapshot.capturedAt;
       }
     }
+
+    if (this.currentDateKey !== null && this.baselineCounters !== null) {
+      this.persistSummary(this.currentDateKey, counters, this.baselineCounters);
+      this.emitDisplaySync?.({
+        generatedAt: new Date().toISOString(),
+        reason: "daily-summary-updated",
+        scope: "monitoring-history"
+      });
+    }
   }
 
   private initialize(now: Date) {
@@ -106,7 +123,42 @@ export class DailySummaryService {
     }
 
     this.currentDateKey = toDateKey(now);
-    this.baselineCounters = this.metricsAccumulatorService.getCounters();
+    const counters = this.metricsAccumulatorService.getCounters();
+    const existing = this.database
+      .prepare(
+        `
+          SELECT
+            generation_total AS generationTotal,
+            consumption_total AS consumptionTotal,
+            self_consumption_total AS selfConsumptionTotal,
+            co2_total AS co2Total,
+            peak_generation AS peakGeneration,
+            peak_generation_time AS peakGenerationTime,
+            peak_consumption AS peakConsumption,
+            peak_consumption_time AS peakConsumptionTime
+          FROM daily_energy_summaries
+          WHERE date = ?
+        `
+      )
+      .get(this.currentDateKey) as DailySummaryRow | undefined;
+
+    this.baselineCounters = existing
+      ? {
+          co2: counters.co2 - existing.co2Total,
+          consumption: counters.consumption - existing.consumptionTotal,
+          generation: counters.generation - existing.generationTotal,
+          selfConsumption: counters.selfConsumption - existing.selfConsumptionTotal
+        }
+      : counters;
+
+    if (existing) {
+      this.peaks = {
+        peakConsumption: existing.peakConsumption,
+        peakConsumptionTime: existing.peakConsumptionTime,
+        peakGeneration: existing.peakGeneration,
+        peakGenerationTime: existing.peakGenerationTime
+      };
+    }
   }
 
   private persistSummary(date: string, totals: CumulativeCounters, baseline: CumulativeCounters) {
@@ -147,10 +199,5 @@ export class DailySummaryService {
         this.peaks.peakConsumptionTime
       );
 
-    this.emitDisplaySync?.({
-      generatedAt: new Date().toISOString(),
-      reason: "daily-summary-updated",
-      scope: "monitoring-history"
-    });
   }
 }

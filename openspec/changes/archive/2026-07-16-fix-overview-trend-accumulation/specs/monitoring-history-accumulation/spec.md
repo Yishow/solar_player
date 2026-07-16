@@ -1,0 +1,40 @@
+## ADDED Requirements
+
+### Requirement: Monitoring counters and daily summaries accumulate continuously
+
+The monitoring history pipeline SHALL keep mock cumulative energy readings non-decreasing across updates and local-day boundaries. The daily summary service SHALL persist the current local day's deltas while the service is running and SHALL resume the same day's persisted deltas after a service restart.
+Mock readings SHALL only be produced when the stored data mode is `mock`. In MQTT mode, a server restart SHALL restore persisted cumulative counters, current-day daily summaries, and current-day generation trend snapshots without requiring a new MQTT message and SHALL NOT substitute mock readings.
+
+#### Scenario: Mock cumulative readings advance within and across days
+
+- **WHEN** the mock feed produces readings at two increasing times on one local day and then on the next local day
+- **THEN** cumulative generation, consumption, and self-consumption SHALL NOT decrease between readings
+
+##### Example: Day boundary remains cumulative
+
+- **GIVEN** mock readings are produced at 2026-06-09 12:00, 2026-06-09 13:00, and 2026-06-10 12:00 local time
+- **WHEN** their cumulative energy values are compared chronologically
+- **THEN** each later cumulative value is greater than or equal to its preceding value
+
+#### Scenario: Current-day summary updates before day rollover
+
+- **WHEN** cumulative counters increase during one local day and the daily summary service processes the new counters
+- **THEN** the row for that local date SHALL be inserted or updated with the delta from the day baseline
+
+##### Example: Same-day counters produce a visible summary
+
+- **GIVEN** the day baseline has generation 12 kWh and consumption 4 kWh
+- **AND** current counters have generation 15 kWh and consumption 5 kWh
+- **WHEN** the service processes the current day
+- **THEN** the current-day summary contains generation 3 kWh and consumption 1 kWh
+
+#### Scenario: Current-day summary resumes after restart
+
+- **WHEN** a service starts on a date that already has a persisted daily summary and cumulative counters continue increasing
+- **THEN** the service SHALL restore the day baseline from the persisted summary and SHALL extend rather than replace the existing daily totals
+
+#### Scenario: MQTT mode restores persisted Overview data before a new message
+
+- **WHEN** the server starts in MQTT mode with persisted cumulative counters, a current-day daily summary, and current-day metric snapshots but the broker has not delivered a new message
+- **THEN** Overview SHALL expose the persisted cumulative values, monthly-consumption point, and current-day generation trend
+- **AND** the server SHALL NOT start or read the mock metrics feed

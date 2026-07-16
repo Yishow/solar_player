@@ -266,3 +266,46 @@ test("MetricsAccumulatorService derives cumulative CO2 from normalized generatio
 
   database.close();
 });
+
+test("MetricsAccumulatorService restores persisted counters before a new MQTT reading arrives", () => {
+  const database = createDatabase();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES
+          ('generation', 12346, '2026-07-16T06:00:00.000Z', 0),
+          ('consumption', 2100, '2026-07-16T06:00:00.000Z', 1),
+          ('selfConsumption', 2234, '2026-07-16T06:00:00.000Z', 1),
+          ('co2', 6111.27, '2026-07-16T06:00:00.000Z', 1)
+      `
+    )
+    .run();
+
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () => ({ metrics: {}, timestamp: null })
+  });
+
+  service.initialize();
+
+  assert.deepEqual(service.getCounters(), {
+    co2: 6111.27,
+    consumption: 2100,
+    generation: 12346,
+    selfConsumption: 2234
+  });
+  assert.deepEqual(service.getLatestSnapshot(), {
+    capturedAt: null,
+    co2: 6111.27,
+    consumption: 2100,
+    consumptionPower: null,
+    efficiency: null,
+    generation: 12346,
+    generationPower: null,
+    ratio: 18.09,
+    selfConsumption: 2234
+  });
+
+  database.close();
+});
