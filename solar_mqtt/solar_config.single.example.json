@@ -1,0 +1,32 @@
+{
+  "factories": [
+    {
+      "factory_id": "KN",
+      "base_url": "http://192.168.80.5",
+      "login_user": "toyota",
+      "login_pass": "toyota"
+    }
+  ],
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "mqtt_prefix": "solar",
+  "interval": 60,
+  "mosquitto_path": "C:\\Program Files\\mosquitto\\mosquitto.exe",
+  "mosquitto_config": "C:\\Program Files\\mosquitto\\mosquitto.conf",
+  "ha_discovery": false,
+  "ha_discovery_prefix": "homeassistant",
+  "sqlite_path": "solar.db",
+  "sqlite_enabled": true,
+  "night_pause": false,
+  "night_lat": 24.9576,
+  "night_lon": 121.2254,
+  "night_padding_min": 30,
+  "anomaly_daytime_zero_minutes": 5,
+  "heartbeat_interval": 30,
+  "mqtt_retain_summary": true,
+  "mqtt_retain_zone": true,
+  "mqtt_retain_status": true,
+  "mqtt_retain_config": true,
+  "mqtt_retain_alert": false,
+  "mqtt_retain_heartbeat": false
+}

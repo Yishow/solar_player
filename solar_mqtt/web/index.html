@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Solar Web Console</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Solar Web Console</h1>
+    <p>KN / CL MQTT 監控與設定頁面</p>
+  </header>
+
+  <main class="console-layout">
+    <section id="summary-panel" class="panel summary-strip">
+      <div class="summary-item">
+        <span class="summary-label">Connection</span>
+        <strong id="summary-connection-state">Disconnected</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Prefix</span>
+        <strong id="summary-active-prefix">solar</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Last Update</span>
+        <strong id="summary-last-update">No messages yet</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">KN</span>
+        <strong id="summary-kn-state">No Data</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">CL</span>
+        <strong id="summary-cl-state">No Data</strong>
+      </div>
+    </section>
+
+    <section id="monitoring-panel" class="monitoring-grid">
+      <div id="factory-panel-kn" class="factory-panel">
+        <div class="factory-header">
+          <h2>KN Monitoring</h2>
+          <span id="factory-status-kn" class="factory-status" data-state="idle">No Data</span>
+          <span id="factory-updated-kn" class="factory-updated">Never</span>
+        </div>
+        <div id="factory-highlights-kn" class="factory-highlights"></div>
+        <div id="factory-topic-list-kn" class="factory-topic-list"></div>
+      </div>
+      <div id="factory-panel-cl" class="factory-panel">
+        <div class="factory-header">
+          <h2>CL Monitoring</h2>
+          <span id="factory-status-cl" class="factory-status" data-state="idle">No Data</span>
+          <span id="factory-updated-cl" class="factory-updated">Never</span>
+        </div>
+        <div id="factory-highlights-cl" class="factory-highlights"></div>
+        <div id="factory-topic-list-cl" class="factory-topic-list"></div>
+      </div>
+    </section>
+
+    <section id="operations-panel" class="operations-stack">
+      <div id="settings-module" class="operations-module">
+        <div class="toolbar">
+          <label>
+            <span>Selected Factory</span>
+            <select id="selected-factory" name="selectedFactory">
+              <option value="KN">KN</option>
+              <option value="CL">CL</option>
+            </select>
+          </label>
+          <button id="load-config" type="button">Load Config</button>
+          <button id="save-config" type="submit" form="config-form">Save Config</button>
+          <span id="config-status" class="status-text">Select a factory.</span>
+          <span id="restart-hint" class="panel-note" hidden>Fields marked restart required are being edited. Check “Include restart” if you want to publish <code>restart: true</code>.</span>
+        </div>
+        <details class="operation-details">
+          <summary>Settings fields</summary>
+          <form id="config-form" class="stack config-form">
+            <label>
+              <span>Factory ID</span>
+              <input name="factory_id" readonly>
+            </label>
+            <div class="config-groups">
+              <fieldset>
+                <legend>Service Broker <span class="field-effect">restart required</span></legend>
+                <label><span>mqtt_host</span><input name="mqtt_host"></label>
+                <label><span>mqtt_port</span><input name="mqtt_port" type="number" min="1"></label>
+                <label><span>mqtt_prefix</span><input name="mqtt_prefix"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Runtime <span class="field-effect">applies without restart</span></legend>
+                <label><span>interval</span><input name="interval" type="number" min="1"></label>
+                <label><span>heartbeat_interval</span><input name="heartbeat_interval" type="number" min="1"></label>
+                <label><span>anomaly_daytime_zero_minutes</span><input name="anomaly_daytime_zero_minutes" type="number" min="1"></label>
+                <label><span>night_pause</span><input name="night_pause" type="checkbox"></label>
+                <label><span>night_lat</span><input name="night_lat" type="number" step="any"></label>
+                <label><span>night_lon</span><input name="night_lon" type="number" step="any"></label>
+                <label><span>night_padding_min</span><input name="night_padding_min" type="number" min="1"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Storage <span class="field-effect">restart required</span></legend>
+                <label><span>sqlite_path</span><input name="sqlite_path"></label>
+                <label><span>sqlite_enabled</span><input name="sqlite_enabled" type="checkbox"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Mosquitto <span class="field-effect">restart required</span></legend>
+                <label><span>mosquitto_path</span><input name="mosquitto_path"></label>
+                <label><span>mosquitto_config</span><input name="mosquitto_config"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Discovery <span class="field-effect">applies without restart</span></legend>
+                <label><span>ha_discovery</span><input name="ha_discovery" type="checkbox"></label>
+                <label><span>ha_discovery_prefix</span><input name="ha_discovery_prefix"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Retain <span class="field-effect">applies without restart</span></legend>
+                <label><span>mqtt_retain_summary</span><input name="mqtt_retain_summary" type="checkbox"></label>
+                <label><span>mqtt_retain_zone</span><input name="mqtt_retain_zone" type="checkbox"></label>
+                <label><span>mqtt_retain_status</span><input name="mqtt_retain_status" type="checkbox"></label>
+                <label><span>mqtt_retain_config</span><input name="mqtt_retain_config" type="checkbox"></label>
+                <label><span>mqtt_retain_alert</span><input name="mqtt_retain_alert" type="checkbox"></label>
+                <label><span>mqtt_retain_heartbeat</span><input name="mqtt_retain_heartbeat" type="checkbox"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Factory Target <span class="field-effect">applies without restart</span></legend>
+                <label><span>base_url</span><input name="base_url"></label>
+                <label><span>login_user</span><input name="login_user"></label>
+                <label><span>login_pass</span><input name="login_pass"></label>
+              </fieldset>
+            </div>
+            <label class="checkbox-row">
+              <input id="restart-required" type="checkbox">
+              <span>Include restart</span>
+            </label>
+          </form>
+        </details>
+      </div>
+
+      <div id="publish-module" class="operations-module">
+        <div class="toolbar">
+          <span class="toolbar-title">Publish Module</span>
+          <p id="publish-error" class="error-text" hidden></p>
+        </div>
+        <details class="operation-details">
+          <summary>Publish fields</summary>
+          <form id="publish-form" class="stack">
+            <label>
+              <span>Topic</span>
+              <input id="publish-topic" name="publishTopic" autocomplete="off">
+            </label>
+            <label>
+              <span>JSON payload</span>
+              <textarea id="publish-payload" name="publishPayload" rows="6">{}</textarea>
+            </label>
+            <div class="actions">
+              <button id="publish-submit" type="submit">Publish</button>
+            </div>
+          </form>
+        </details>
+      </div>
+
+      <div id="broker-module" class="operations-module">
+        <div class="toolbar">
+          <span id="broker-status" class="status-pill" data-state="disconnected">Disconnected</span>
+          <span id="broker-status-text" class="status-text">Disconnected</span>
+        </div>
+        <details class="operation-details">
+          <summary>Broker fields</summary>
+          <form id="broker-form" class="stack">
+            <label>
+              <span>Host</span>
+              <input id="broker-host" name="brokerHost" value="localhost" autocomplete="off">
+            </label>
+            <label>
+              <span>WebSocket Port</span>
+              <input id="broker-port" name="brokerPort" type="number" min="1" value="8884">
+            </label>
+            <label>
+              <span>Client ID</span>
+              <input id="client-id" name="clientId" autocomplete="off">
+            </label>
+            <label>
+              <span>Active Prefix</span>
+              <input id="active-prefix" name="activePrefix" value="solar" autocomplete="off">
+            </label>
+            <div class="actions">
+              <button id="connect-broker" type="submit">Connect</button>
+              <button id="disconnect-broker" type="button">Disconnect</button>
+            </div>
+          </form>
+        </details>
+        <div class="status-legend" aria-label="Connection states">
+          <span data-state="disconnected">Disconnected</span>
+          <span data-state="connecting">Connecting</span>
+          <span data-state="connected">Connected</span>
+          <span data-state="reconnecting">Reconnecting</span>
+          <span data-state="error">Error</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
