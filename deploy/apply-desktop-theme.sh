@@ -44,6 +44,8 @@ kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" \
   "${kiosk_home}/.config" \
   "${kiosk_home}/.config/gtk-3.0" \
+  "${kiosk_home}/.config/xfce4" \
+  "${kiosk_home}/.config/xfce4/xfconf" \
   "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml"
 
 cat > "${kiosk_home}/.config/gtk-3.0/settings.ini" <<EOF

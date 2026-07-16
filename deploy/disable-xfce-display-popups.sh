@@ -32,6 +32,9 @@ command -v dbus-run-session >/dev/null 2>&1 || fail "Missing dbus-run-session; i
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 kiosk_uid="$(id -u "${KIOSK_USER}")"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" \
+  "${kiosk_home}/.config" \
+  "${kiosk_home}/.config/xfce4" \
+  "${kiosk_home}/.config/xfce4/xfconf" \
   "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml"
 
 run_xfconf() {

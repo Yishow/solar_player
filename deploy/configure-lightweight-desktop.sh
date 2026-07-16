@@ -56,7 +56,20 @@ apt-get install -y xfce4 lightdm xrdp xorgxrdp xserver-xorg-input-libinput x11-x
 kiosk_home="$(getent passwd "${KIOSK_USER}" | cut -d: -f6)"
 install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}"
 rm -rf "${kiosk_home}/.cache/sessions" "${kiosk_home}/.config/xfce4-session"
-install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" "${kiosk_home}/.cache" "${kiosk_home}/.config" "${kiosk_home}/.config/fcitx5" "${kiosk_home}/.config/autostart" "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml" "${kiosk_home}/.local/bin" "${kiosk_home}/.local/share/fonts/noto-cjk"
+install -d -m 755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" \
+  "${kiosk_home}/.cache" \
+  "${kiosk_home}/.config" \
+  "${kiosk_home}/.config/fcitx5" \
+  "${kiosk_home}/.config/autostart" \
+  "${kiosk_home}/.config/xfce4" \
+  "${kiosk_home}/.config/xfce4/xfconf" \
+  "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml" \
+  "${kiosk_home}/.config/xfce4/panel" \
+  "${kiosk_home}/.local" \
+  "${kiosk_home}/.local/bin" \
+  "${kiosk_home}/.local/share" \
+  "${kiosk_home}/.local/share/fonts" \
+  "${kiosk_home}/.local/share/fonts/noto-cjk"
 cat > "${kiosk_home}/.xsession" <<'EOF'
 #!/bin/sh
 export XDG_CONFIG_DIRS="/etc/xdg"

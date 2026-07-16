@@ -75,8 +75,12 @@ HandleLidSwitchDocked=ignore
 EOF
 
 install -d -m 0755 -o "${KIOSK_USER}" -g "${KIOSK_USER}" \
+  "${kiosk_home}/.local" \
   "${kiosk_home}/.local/bin" \
+  "${kiosk_home}/.config" \
   "${kiosk_home}/.config/autostart" \
+  "${kiosk_home}/.config/xfce4" \
+  "${kiosk_home}/.config/xfce4/xfconf" \
   "${kiosk_home}/.config/xfce4/xfconf/xfce-perchannel-xml"
 
 cat > "${kiosk_home}/.local/bin/solar-disable-display-sleep.sh" <<'EOF'
