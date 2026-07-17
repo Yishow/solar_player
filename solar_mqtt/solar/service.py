@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import threading
 from datetime import datetime
+from math import isfinite
 
 from . import discovery
 from .anomaly import AnomalyDetector
@@ -60,6 +61,7 @@ class FactoryService:
         self._thread: threading.Thread | None = None
         self._ha_discovery_done = False
         self._last_zone_ids: list[int] = []
+        self._last_complete_zone_ids: set[int] | None = None
 
     # ── 生命週期 ──
     def start(self) -> None:
@@ -145,6 +147,36 @@ class FactoryService:
         return True
 
     # ── 發佈 ──
+    def _apply_factory_total(self, summary: dict, zones: list[dict]) -> float | None:
+        current_ids = {z.get("zone_id") for z in zones}
+        previous_ids = getattr(self, "_last_complete_zone_ids", None)
+        missing_ids = (previous_ids or set()) - current_ids
+        invalid_ids = []
+        totals = []
+
+        for zone in zones:
+            value = zone.get("total_mwh")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
+                invalid_ids.append(zone.get("zone_id"))
+            else:
+                totals.append(float(value))
+
+        if not zones or missing_ids or invalid_ids:
+            summary.pop("total_mwh", None)
+            affected = sorted({str(zone_id) for zone_id in missing_ids | set(invalid_ids)})
+            detail = ", ".join(f"zone {zone_id}" for zone_id in affected[:10])
+            if len(affected) > 10:
+                detail += f" 等 {len(affected)} 個 zone"
+            if not detail:
+                detail = "zone list empty"
+            self._on_alert(self.factory_id, "WARN", f"廠區累積總量不完整: {detail}")
+            return None
+
+        total_mwh = round(sum(totals), 3)
+        summary["total_mwh"] = total_mwh
+        self._last_complete_zone_ids = current_ids
+        return total_mwh
+
     def _publish_data(self, summary: dict, zones: list[dict]) -> None:
         prefix = CONFIG.get("mqtt_prefix", "solar")
         factory = self.factory_id
@@ -153,6 +185,7 @@ class FactoryService:
 
         retain_summary = bool(CONFIG.get("mqtt_retain_summary", True))
         retain_zone = bool(CONFIG.get("mqtt_retain_zone", True))
+        total_mwh = self._apply_factory_total(summary, zones)
 
         self.bus.publish_json(
             f"{base}/summary",
@@ -174,6 +207,12 @@ class FactoryService:
             {"value": summary.get("month_mwh")},
             retain=retain_summary,
         )
+        if total_mwh is not None:
+            self.bus.publish_json(
+                f"{base}/total_mwh",
+                {"value": total_mwh},
+                retain=retain_summary,
+            )
 
         for z in zones:
             zid = z["zone_id"]

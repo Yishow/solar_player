@@ -224,6 +224,41 @@ test("MetricsAccumulatorService normalizes energy totals to kWh before persistin
   database.close();
 });
 
+test("MetricsAccumulatorService persists the canonical CL plus KN total and derives CO2 from the configured factor", () => {
+  const database = createDatabase();
+  const timestamp = "2026-06-26T15:37:55+08:00";
+  database
+    .prepare("UPDATE calculation_settings SET carbon_emission_factor = 0.495 WHERE id = 1")
+    .run();
+
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["totalGeneration", 13645.876, "MWh"],
+          ["factoryGeneration.cl.totalMwh", 999999, "MWh"],
+          ["factoryGeneration.kn.totalMwh", 999999, "MWh"],
+          ["totalCo2Reduction", 999999, "t"]
+        ],
+        timestamp
+      )
+  });
+
+  service.initialize();
+  service.processAt(new Date(timestamp));
+  service.flush(true);
+
+  assert.deepEqual(service.getCounters(), {
+    co2: 6754708.62,
+    consumption: 0,
+    generation: 13645876,
+    selfConsumption: 0
+  });
+
+  database.close();
+});
+
 test("MetricsAccumulatorService derives cumulative CO2 from normalized generation when external CO2 is inconsistent", () => {
   const database = createDatabase();
   const timestamp = "2026-07-09T05:35:46.000Z";
@@ -306,6 +341,41 @@ test("MetricsAccumulatorService restores persisted counters before a new MQTT re
     ratio: 18.09,
     selfConsumption: 2234
   });
+
+  database.close();
+});
+
+test("MetricsAccumulatorService preserves a newer persisted reset during an immediate forced flush", () => {
+  const database = createDatabase();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+    VALUES ('generation', 2000000, '2026-07-17T05:00:00.000Z', 4)
+  `).run();
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () => ({ metrics: {}, timestamp: null })
+  });
+  service.initialize();
+
+  database.prepare(`
+    UPDATE cumulative_counters
+    SET total_value = 1100000,
+        last_updated = '2026-07-17T05:01:00.000Z',
+        reset_count = 5
+    WHERE metric_key = 'generation'
+  `).run();
+
+  service.flush(true);
+
+  assert.deepEqual(
+    database.prepare(`
+      SELECT total_value, reset_count
+      FROM cumulative_counters
+      WHERE metric_key = 'generation'
+    `).get(),
+    { reset_count: 5, total_value: 1100000 }
+  );
+  assert.equal(service.getCounters().generation, 1100000);
 
   database.close();
 });

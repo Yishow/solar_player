@@ -18,7 +18,7 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readSustainabilityStory },
+  { readSustainabilityStory, resolveSustainabilityFactoryScope, saveSustainabilityStory },
   { clearDisplayValueOverride, saveDisplayValueOverride }
 ] = await Promise.all([
   import("../db/index.js"),
@@ -167,11 +167,11 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence with
   assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 6);
   assert.equal(
     story.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
-    "generation-carbon-reduction"
+    "CL + KN MQTT aggregate × carbonEmissionFactor (CL today_mwh missing)"
   );
   assert.equal(
     story.period.bigNumberProvenance.plantedTreeEquivalent.source,
-    "generation-tree-equivalent"
+    "CL + KN MQTT aggregate × carbonEmissionFactor × co2TreeEquivalentFactor (CL today_mwh missing)"
   );
 });
 
@@ -445,4 +445,207 @@ test("readSustainabilityStory rounds MWh highlights to whole numbers", () => {
   assert.ok(Math.abs((story.period.bigNumbers.accumulatedGenerationGwh ?? 0) - 18.654321) < 0.000001);
   assert.equal(story.period.highlights[0]?.unit, "MWh");
   assert.equal(story.period.highlights[0]?.value, "18,654");
+});
+
+test("readSustainabilityStory uses the CL and KN cumulative aggregate and older source timestamp", () => {
+  const database = getDatabase();
+  const clTimestamp = "2026-06-26T15:38:10+08:00";
+  const knTimestamp = "2026-06-26T15:37:55+08:00";
+
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('generation', 13645876, ?, 0)
+      `
+    )
+    .run(knTimestamp);
+  const insert = database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, 'MWh', ?, 'good', ?)
+  `);
+  for (const [factory, timestamp, today, month, total] of [
+    ["cl", clTimestamp, 3.49, 366.93, 9986.306],
+    ["kn", knTimestamp, 2.92, 265.77, 3659.57]
+  ] as const) {
+    const rawPayload = JSON.stringify({ month_mwh: month, timestamp, today_mwh: today, total_mwh: total });
+    insert.run(`factoryGeneration.${factory}.todayMwh`, today, timestamp, rawPayload);
+    insert.run(`factoryGeneration.${factory}.monthMwh`, month, timestamp, rawPayload);
+    insert.run(`factoryGeneration.${factory}.totalMwh`, total, timestamp, rawPayload);
+  }
+  database
+    .prepare("UPDATE calculation_settings SET carbon_emission_factor = 0.495 WHERE id = 1")
+    .run();
+
+  const result = readSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date("2026-06-26T15:38:20+08:00")
+  });
+
+  assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, 13.645876);
+  assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, 6754.709);
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedGenerationGwh.source,
+    "CL + KN MQTT aggregate"
+  );
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
+    "CL + KN MQTT aggregate × carbonEmissionFactor"
+  );
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
+    knTimestamp
+  );
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedGenerationGwh.syncState,
+    "fresh"
+  );
+});
+
+function setFactoryPlaybackSelection(clEnabled: boolean, knEnabled: boolean) {
+  const database = getDatabase();
+  database
+    .prepare("UPDATE display_page_registry SET enabled = ? WHERE page_key = 'factory-circuit'")
+    .run(clEnabled ? 1 : 0);
+  database
+    .prepare("UPDATE display_page_registry SET enabled = ? WHERE page_key = 'factory-circuit-guanyin'")
+    .run(knEnabled ? 1 : 0);
+}
+
+function insertFactoryGenerationSources(args: { knTimestamp?: string }) {
+  const database = getDatabase();
+  const clTimestamp = "2026-06-26T15:38:10+08:00";
+  const knTimestamp = args.knTimestamp ?? "2026-06-26T15:37:55+08:00";
+  const insert = database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, 'MWh', ?, 'good', ?)
+  `);
+
+  for (const [factory, timestamp, today, month, total] of [
+    ["cl", clTimestamp, 3.49, 366.93, 9986.306],
+    ["kn", knTimestamp, 2.92, 265.77, 3659.57]
+  ] as const) {
+    const rawPayload = JSON.stringify({ month_mwh: month, timestamp, today_mwh: today, total_mwh: total });
+    insert.run(`factoryGeneration.${factory}.todayMwh`, today, timestamp, rawPayload);
+    insert.run(`factoryGeneration.${factory}.monthMwh`, month, timestamp, rawPayload);
+    insert.run(`factoryGeneration.${factory}.totalMwh`, total, timestamp, rawPayload);
+  }
+}
+
+test("resolveSustainabilityFactoryScope maps all playback factory enablement combinations", () => {
+  assert.equal(resolveSustainabilityFactoryScope([
+    { enabled: true, pageKey: "factory-circuit" },
+    { enabled: false, pageKey: "factory-circuit-guanyin" }
+  ]), "CL");
+  assert.equal(resolveSustainabilityFactoryScope([
+    { enabled: false, pageKey: "factory-circuit" },
+    { enabled: true, pageKey: "factory-circuit-guanyin" }
+  ]), "KN");
+  assert.equal(resolveSustainabilityFactoryScope([
+    { enabled: true, pageKey: "factory-circuit" },
+    { enabled: true, pageKey: "factory-circuit-guanyin" }
+  ]), "CL+KN");
+  assert.equal(resolveSustainabilityFactoryScope([
+    { enabled: false, pageKey: "factory-circuit" },
+    { enabled: false, pageKey: "factory-circuit-guanyin" }
+  ]), "none");
+});
+
+test("readSustainabilityStory scopes generation and CO2 to CL, KN, both, or none", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  insertFactoryGenerationSources({});
+  database
+    .prepare("UPDATE calculation_settings SET carbon_emission_factor = 0.495 WHERE id = 1")
+    .run();
+  const now = new Date("2026-06-26T15:38:20+08:00");
+
+  const cases = [
+    { cl: true, co2: 4943.221, generation: 9.986306, kn: false, source: "CL MQTT" },
+    { cl: false, co2: 1811.487, generation: 3.65957, kn: true, source: "KN MQTT" },
+    { cl: true, co2: 6754.709, generation: 13.645876, kn: true, source: "CL + KN MQTT aggregate" },
+    { cl: false, co2: null, generation: null, kn: false, source: "未選擇廠區" }
+  ] as const;
+
+  for (const expected of cases) {
+    setFactoryPlaybackSelection(expected.cl, expected.kn);
+    const result = readSustainabilityStory("lifetime", { applyDisplayOverrides: false, now });
+
+    assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, expected.generation);
+    assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, expected.co2);
+    assert.equal(
+      result.period.bigNumberProvenance.accumulatedGenerationGwh.source,
+      expected.source
+    );
+  }
+});
+
+test("CL-only Sustainability remains fresh when KN is stale", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  insertFactoryGenerationSources({ knTimestamp: "2026-06-26T15:37:00+08:00" });
+  setFactoryPlaybackSelection(true, false);
+
+  const result = readSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date("2026-06-26T15:38:20+08:00")
+  });
+
+  assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, 9.986306);
+  assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.syncState, "fresh");
+  assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt, "2026-06-26T15:38:10+08:00");
+});
+
+test("no factory selection does not fall back to the combined generation counter", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(`
+      INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+      VALUES ('generation', 13645876, '2026-06-26T15:37:55+08:00', 0)
+    `)
+    .run();
+  setFactoryPlaybackSelection(false, false);
+
+  const result = readSustainabilityStory("lifetime", { applyDisplayOverrides: false });
+
+  assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, null);
+  assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, null);
+  assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.source, "未選擇廠區");
+  assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt, null);
+});
+
+test("stored editorial provenance cannot override the runtime factory scope", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  insertFactoryGenerationSources({});
+  setFactoryPlaybackSelection(true, false);
+  const configuredStory = structuredClone(story);
+  configuredStory.periods.lifetime!.bigNumberProvenance = {
+    accumulatedGenerationGwh: {
+      label: "舊來源",
+      source: "legacy combined counter",
+      sourceClass: "runtime-aggregate",
+      syncState: "fresh",
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    }
+  };
+  saveSustainabilityStory(configuredStory);
+
+  const result = readSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date("2026-06-26T15:38:20+08:00")
+  });
+
+  assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.source, "CL MQTT");
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
+    "2026-06-26T15:38:10+08:00"
+  );
 });

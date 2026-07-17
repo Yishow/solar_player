@@ -13,11 +13,6 @@ type MetricFreshnessState = {
   timestamp: string;
 };
 
-const solarRuntimeAlternatives: Record<string, string[][]> = {
-  todayCo2Reduction: [["todayCo2Reduction"], ["todayGeneration"]],
-  totalCo2Reduction: [["totalCo2Reduction"], ["totalGeneration"]]
-};
-
 export function resolveLiveMetricKeysForPage(pageKey: DisplayPageKey) {
   const metricKeys: string[] = [];
 
@@ -41,17 +36,7 @@ export function resolveLiveMetricKeysForPage(pageKey: DisplayPageKey) {
   return metricKeys;
 }
 
-function resolveRequirementAlternatives(
-  pageKey: DisplayPageKey,
-  requirement: DisplayRequirementDescriptor
-) {
-  const override = pageKey === "solar"
-    ? solarRuntimeAlternatives[requirement.requirementKey]
-    : undefined;
-  if (override) {
-    return override;
-  }
-
+function resolveRequirementAlternatives(requirement: DisplayRequirementDescriptor) {
   if (requirement.sourceType !== "derived-metric") {
     return [[requirement.requirementKey]];
   }
@@ -78,7 +63,7 @@ export function resolveLiveMetricRequirementsForPage(
   return displayMetricRequirements
     .filter((requirement) => requirement.pageId === pageKey)
     .map((requirement) => ({
-      alternatives: resolveRequirementAlternatives(pageKey, requirement),
+      alternatives: resolveRequirementAlternatives(requirement),
       requirementKey: requirement.requirementKey
     }));
 }

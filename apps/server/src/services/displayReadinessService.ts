@@ -7,9 +7,16 @@ import type {
 import {
   displayCircuitSlotKeys,
   displayMetricRequirements,
-  displaySlotRequirements
+  displaySlotRequirements,
+  factoryGenerationDependencyKeys,
+  factoryGenerationDerivedRequirementKeys
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import {
+  evaluateFactoryGenerationAggregate,
+  evaluateFactoryGenerationScope,
+  resolveFactoryGenerationScope
+} from "./factoryGenerationAggregateService.js";
 
 type TopicMappingRow = {
   enabled: number;
@@ -75,8 +82,54 @@ function readCircuits(): CircuitConfig[] {
   }));
 }
 
-function buildMetricFindings(): DisplayReadinessFinding[] {
+const factoryGenerationRequirementKeys = new Set(factoryGenerationDerivedRequirementKeys);
+const canonicalGenerationMetricKeyByRequirement: Record<string, "todayGeneration" | "totalGeneration"> = {
+  accumulatedCarbonReductionTons: "totalGeneration",
+  accumulatedGenerationGwh: "totalGeneration",
+  plantedTreeEquivalent: "totalGeneration",
+  todayCo2Reduction: "todayGeneration",
+  todayGeneration: "todayGeneration",
+  totalCo2Reduction: "totalGeneration",
+  totalGeneration: "totalGeneration"
+};
+
+function readCanonicalGenerationValue(requirementKey: string) {
+  const metricKey = canonicalGenerationMetricKeyByRequirement[requirementKey];
+  if (!metricKey) {
+    return false;
+  }
+  const row = getDatabase()
+    .prepare("SELECT value FROM live_metric_values WHERE metric_key = ?")
+    .get(metricKey) as { value: number | null } | undefined;
+  return typeof row?.value === "number" && Number.isFinite(row.value);
+}
+
+function formatAggregateIssue(
+  issue: ReturnType<typeof evaluateFactoryGenerationAggregate>["issues"][number]
+) {
+  return `${issue.factory} ${issue.field} ${issue.reason}`;
+}
+
+function readSustainabilityFactoryScope() {
+  const pages = getDatabase()
+    .prepare(
+      `
+        SELECT page_key AS pageKey, enabled
+        FROM display_page_registry
+        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
+          AND archived_at IS NULL
+      `
+    )
+    .all() as Array<{ enabled: number; pageKey: string }>;
+
+  return resolveFactoryGenerationScope(
+    pages.map((page) => ({ enabled: toBoolean(page.enabled), pageKey: page.pageKey }))
+  );
+}
+
+function buildMetricFindings(now: Date): DisplayReadinessFinding[] {
   const mappings = new Map(readTopicMappings().map((row) => [row.metric_key, row]));
+  const aggregate = evaluateFactoryGenerationAggregate(getDatabase(), now);
 
   return displayMetricRequirements.map((requirement) => {
     const metricKeys = requirement.dependencyKeys ?? [requirement.requirementKey];
@@ -102,6 +155,83 @@ function buildMetricFindings(): DisplayReadinessFinding[] {
     const derivedReason = derivedMappings
       .map(({ mapping, metricKey }) => mapping?.topic?.trim() || metricKey)
       .join(", ");
+
+    if (factoryGenerationRequirementKeys.has(requirement.requirementKey)) {
+      const scope = requirement.pageId === "sustainability"
+        ? readSustainabilityFactoryScope()
+        : "CL+KN";
+      if (scope === "none") {
+        return {
+          blocking: true,
+          pageId: requirement.pageId,
+          reason: "no factory selected in playback settings",
+          requirementKey: requirement.requirementKey,
+          sourceId: null,
+          sourceType: requirement.sourceType,
+          status: "blocking"
+        };
+      }
+      const requiredDependencyKeys = factoryGenerationDependencyKeys.filter((metricKey) =>
+        scope === "CL+KN" || metricKey.startsWith(`factoryGeneration.${scope.toLowerCase()}.`)
+      );
+      const sourceMappings = requiredDependencyKeys.map((metricKey) => ({
+        metricKey,
+        mapping: mappings.get(metricKey)
+      }));
+      const sourceMappingsAvailable = sourceMappings.every(
+        ({ mapping }) =>
+          Boolean(mapping && toBoolean(mapping.enabled) && (mapping.topic?.trim().length ?? 0) > 0)
+      );
+      const sourceTopics = [
+        ...new Set(
+          sourceMappings
+            .map(({ mapping }) => mapping?.topic?.trim())
+            .filter((topic): topic is string => Boolean(topic))
+        )
+      ].join(", ");
+      if (!sourceMappingsAvailable) {
+        const missingKeys = sourceMappings
+          .filter(({ mapping }) => !mapping || !toBoolean(mapping.enabled) || !mapping.topic?.trim())
+          .map(({ metricKey }) => metricKey)
+          .join(", ");
+        return {
+          blocking: true,
+          pageId: requirement.pageId,
+          reason: `missing CL/KN MQTT mapping: ${missingKeys}`,
+          requirementKey: requirement.requirementKey,
+          sourceId: sourceTopics || null,
+          sourceType: requirement.sourceType,
+          status: "blocking"
+        };
+      }
+
+      const scopedEvaluation = scope === "CL+KN"
+        ? aggregate
+        : evaluateFactoryGenerationScope(getDatabase(), scope, now);
+      if (scopedEvaluation.state !== "ready") {
+        const hasCanonicalFallback = scope === "CL+KN"
+          && readCanonicalGenerationValue(requirement.requirementKey);
+        return {
+          blocking: false,
+          pageId: requirement.pageId,
+          reason: `${scopedEvaluation.issues.map(formatAggregateIssue).join(", ")}${hasCanonicalFallback ? "; using last canonical generation" : ""}`,
+          requirementKey: requirement.requirementKey,
+          sourceId: sourceTopics,
+          sourceType: requirement.sourceType,
+          status: "warning"
+        };
+      }
+
+      return {
+        blocking: false,
+        pageId: requirement.pageId,
+        reason: scope === "CL+KN" ? "CL + KN MQTT aggregate ready" : `${scope} MQTT ready`,
+        requirementKey: requirement.requirementKey,
+        sourceId: sourceTopics,
+        sourceType: requirement.sourceType,
+        status: "ready"
+      };
+    }
 
     return {
       blocking: !available,
@@ -188,8 +318,9 @@ function toPageSummary(
   };
 }
 
-export function readDisplayReadinessReport(): DisplayReadinessReport {
-  const findings = [...buildMetricFindings(), ...buildSlotFindings()];
+export function readDisplayReadinessReport(options: { now?: Date } = {}): DisplayReadinessReport {
+  const now = options.now ?? new Date();
+  const findings = [...buildMetricFindings(now), ...buildSlotFindings()];
   const pageIds = [...new Set(findings.map((finding) => finding.pageId))];
   const pages = pageIds.map((pageId) =>
     toPageSummary(
@@ -197,12 +328,16 @@ export function readDisplayReadinessReport(): DisplayReadinessReport {
       findings.filter((finding) => finding.pageId === pageId)
     )
   );
-  const mqttFindings = findings.filter((finding) => finding.sourceType === "mqtt-metric");
+  const mqttFindings = findings.filter(
+    (finding) =>
+      finding.sourceType === "mqtt-metric"
+      || factoryGenerationRequirementKeys.has(finding.requirementKey)
+  );
   const slotFindings = findings.filter((finding) => finding.sourceType === "circuit-slot");
 
   return {
     findings,
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
     pages,
     summary: {
       blockingCount: findings.filter((finding) => finding.status === "blocking").length,

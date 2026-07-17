@@ -2,6 +2,7 @@ import type {
   DisplayCardDataAction,
   DisplayCardDataRow,
   DisplayReadinessReport,
+  WeatherDiagnostic,
   WeatherFieldKey,
   WeatherHeaderContract,
   WeatherOptionsResponse,
@@ -36,6 +37,7 @@ type MqttSettingsContentProps = {
   addTopicMapping: () => void;
   cardDataErrorMessage?: string;
   cardDataRows?: DisplayCardDataRow[];
+  copyWeatherDiagnostic?: (text: string) => Promise<void> | void;
   enabledCardDataSites?: CardDataSiteFilter[];
   draftSections?: {
     broker: boolean;
@@ -87,6 +89,7 @@ type MqttSettingsContentProps = {
   overrideDrafts?: Record<string, string>;
   topics: TopicMapping[];
   weatherOptions: WeatherOptionsResponse | null;
+  weatherDiagnostic?: WeatherDiagnostic | null;
   weatherOptionsErrorMessage: string;
   weatherPreviewContract: WeatherHeaderContract | null;
   weatherPreviewErrorMessage: string;
@@ -167,6 +170,7 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
         settings: props.settings,
         status: props.status,
         topics: props.topics,
+        weatherDiagnostic: props.weatherDiagnostic,
         weatherOptions: props.weatherOptions,
         weatherOptionsErrorMessage: props.weatherOptionsErrorMessage,
         weatherPreviewContract: props.weatherPreviewContract,
@@ -184,6 +188,7 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
       props.settings,
       props.status,
       props.topics,
+      props.weatherDiagnostic,
       props.weatherOptions,
       props.weatherOptionsErrorMessage,
       props.weatherPreviewContract,
@@ -639,6 +644,42 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
         {viewModel.weatherCard.configFeedback ? (
           <div className="mgmt-status mqtt-weather-card__config-notice">{viewModel.weatherCard.configFeedback}</div>
         ) : null}
+        <div
+          className={`mqtt-weather-diagnostic ${viewModel.weatherCard.diagnostic.tone === "error" ? "is-error" : viewModel.weatherCard.diagnostic.tone === "warning" ? "is-warning" : ""}`}
+          data-weather-diagnostic-source={viewModel.weatherCard.diagnostic.source}
+          data-weather-diagnostic-stage={viewModel.weatherCard.diagnostic.stage}
+          data-weather-diagnostic-state={viewModel.weatherCard.diagnostic.state}
+        >
+          <div className="mqtt-weather-diagnostic__header">
+            <div>
+              <strong>最近一次天氣資料診斷</strong>
+              <small>{viewModel.weatherCard.diagnostic.stateLabel}</small>
+            </div>
+            <button
+              type="button"
+              className="map-add"
+              data-weather-diagnostic-copy
+              onClick={() => void props.copyWeatherDiagnostic?.(viewModel.weatherCard.diagnostic.copyText)}
+            >
+              複製診斷
+            </button>
+          </div>
+          <p>{viewModel.weatherCard.diagnostic.safeSummary}</p>
+          <dl className="mqtt-weather-diagnostic__details">
+            <div><dt>錯誤碼</dt><dd>{viewModel.weatherCard.diagnostic.code ?? "—"}</dd></div>
+            <div><dt>來源</dt><dd>{viewModel.weatherCard.diagnostic.sourceLabel}</dd></div>
+            {viewModel.weatherCard.diagnostic.stageLabel ? (
+              <div><dt>階段</dt><dd>{viewModel.weatherCard.diagnostic.stageLabel}</dd></div>
+            ) : null}
+            <div><dt>操作</dt><dd>{viewModel.weatherCard.diagnostic.operationLabel}</dd></div>
+            <div><dt>發生時間</dt><dd>{viewModel.weatherCard.diagnostic.occurredAtLabel}</dd></div>
+            <div><dt>上次成功</dt><dd>{viewModel.weatherCard.diagnostic.lastSuccessAtLabel}</dd></div>
+            <div><dt>重試</dt><dd>{viewModel.weatherCard.diagnostic.retryableLabel}</dd></div>
+            {viewModel.weatherCard.diagnostic.httpStatusLabel ? (
+              <div><dt>HTTP</dt><dd>{viewModel.weatherCard.diagnostic.httpStatusLabel}</dd></div>
+            ) : null}
+          </dl>
+        </div>
         <div className="mqtt-weather-card__controls">
           <label className="map-row__toggle mqtt-weather-card__toggle">
             <input

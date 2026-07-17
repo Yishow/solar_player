@@ -1,9 +1,11 @@
 import {
   type WeatherCurrentSnapshot,
+  type WeatherDiagnostic,
+  type WeatherDiagnosticOperation,
   type WeatherOptionsResponse,
   type WeatherSettings
 } from "@solar-display/shared";
-import { CwaWeatherClient } from "./cwaWeatherClient.js";
+import { CwaWeatherClient, CwaWeatherRequestError } from "./cwaWeatherClient.js";
 import { config } from "../config.js";
 
 type WeatherClientLike = Pick<CwaWeatherClient, "readCurrentWeather" | "readOptions">;
@@ -49,6 +51,62 @@ function buildEmptyOptions(fetchState: WeatherOptionsResponse["fetchState"]): We
   };
 }
 
+const initialDiagnostic: WeatherDiagnostic = {
+  code: null,
+  httpStatus: null,
+  lastSuccessAt: null,
+  occurredAt: null,
+  operation: null,
+  retryable: false,
+  safeSummary: "尚未執行天氣資料請求",
+  source: "unavailable",
+  state: "never-attempted"
+};
+
+function buildFailureDiagnostic(
+  error: unknown,
+  operation: WeatherDiagnosticOperation,
+  occurredAt: string,
+  lastSuccessAt: string | null,
+  source: WeatherDiagnostic["source"]
+): WeatherDiagnostic {
+  if (error instanceof CwaWeatherRequestError) {
+    const summaryByCode = {
+      WEATHER_CONNECTION_TIMEOUT: "CWA 連線逾時",
+      WEATHER_DNS_LOOKUP_FAILED: "無法解析 CWA 主機名稱",
+      WEATHER_HTTP_ERROR: "CWA 回傳 HTTP 錯誤",
+      WEATHER_INVALID_PAYLOAD: "CWA 回傳資料格式無效",
+      WEATHER_REQUEST_TIMEOUT: "CWA 請求逾時",
+      WEATHER_TLS_FAILED: "CWA TLS 連線失敗",
+      WEATHER_UNCONFIGURED: "CWA 授權尚未設定",
+      WEATHER_UNKNOWN_ERROR: "CWA 請求失敗"
+    } as const;
+    return {
+      code: error.code,
+      httpStatus: error.httpStatus,
+      lastSuccessAt,
+      occurredAt,
+      operation,
+      retryable: error.retryable,
+      safeSummary: summaryByCode[error.code],
+      source,
+      state: "error"
+    };
+  }
+
+  return {
+    code: "WEATHER_UNKNOWN_ERROR",
+    httpStatus: null,
+    lastSuccessAt,
+    occurredAt,
+    operation,
+    retryable: true,
+    safeSummary: "CWA 請求失敗",
+    source,
+    state: "error"
+  };
+}
+
 export class WeatherService {
   private readonly authorizationConfigured: boolean;
   private readonly client: WeatherClientLike;
@@ -57,6 +115,7 @@ export class WeatherService {
   private lastSuccessfulSnapshot: WeatherCurrentSnapshot | null = null;
   private cachedSnapshot: WeatherCurrentSnapshot | null = null;
   private cacheExpiredAt: Date | null = null;
+  private diagnostic: WeatherDiagnostic = initialDiagnostic;
   private mqttPublish: ((topic: string, payload: string) => void) | null = null;
 
   constructor(options: WeatherServiceOptions = {}) {
@@ -82,8 +141,41 @@ export class WeatherService {
     this.cacheExpiredAt = null;
   }
 
+  getDiagnostic(): WeatherDiagnostic {
+    return { ...this.diagnostic };
+  }
+
+  private recordUnconfigured(operation: WeatherDiagnosticOperation) {
+    this.diagnostic = {
+      code: "WEATHER_UNCONFIGURED",
+      httpStatus: null,
+      lastSuccessAt: this.diagnostic.lastSuccessAt,
+      occurredAt: this.now().toISOString(),
+      operation,
+      retryable: false,
+      safeSummary: "CWA 授權尚未設定",
+      source: "unavailable",
+      state: "unconfigured"
+    };
+  }
+
+  private recordSuccess(operation: WeatherDiagnosticOperation, occurredAt: string) {
+    this.diagnostic = {
+      code: null,
+      httpStatus: null,
+      lastSuccessAt: occurredAt,
+      occurredAt,
+      operation,
+      retryable: false,
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "upstream",
+      state: "ok"
+    };
+  }
+
   async getCurrentWeather(settings: WeatherSettings): Promise<WeatherCurrentSnapshot> {
     if (!this.authorizationConfigured) {
+      this.recordUnconfigured("current");
       return buildEmptySnapshot("unconfigured");
     }
 
@@ -93,6 +185,12 @@ export class WeatherService {
       && this.cacheExpiredAt
       && nowTime < this.cacheExpiredAt
     ) {
+      if (this.cachedSnapshot.fetchState === "fresh") {
+        this.diagnostic = {
+          ...this.diagnostic,
+          source: "cache"
+        };
+      }
       return this.cachedSnapshot;
     }
 
@@ -107,6 +205,7 @@ export class WeatherService {
         staleAt: null
       };
       this.cachedSnapshot = this.lastSuccessfulSnapshot;
+      this.recordSuccess("current", nowTime.toISOString());
 
       const intervalMinutes = settings.updateIntervalMinutes > 0 ? settings.updateIntervalMinutes : 30;
       this.cacheExpiredAt = new Date(nowTime.getTime() + intervalMinutes * 60 * 1000);
@@ -121,6 +220,13 @@ export class WeatherService {
 
       return this.lastSuccessfulSnapshot;
     } catch (error) {
+      this.diagnostic = buildFailureDiagnostic(
+        error,
+        "current",
+        nowTime.toISOString(),
+        this.diagnostic.lastSuccessAt,
+        this.lastSuccessfulSnapshot ? "stale" : "unavailable"
+      );
       this.logger?.warn({ error: serializeWeatherFetchError(error) }, "CWA weather fetch failed");
 
       if (!this.lastSuccessfulSnapshot) {
@@ -141,27 +247,41 @@ export class WeatherService {
 
   async getOptions(filters?: { countyName?: string | null }): Promise<WeatherOptionsResponse> {
     if (!this.authorizationConfigured) {
+      this.recordUnconfigured("options");
       return buildEmptyOptions("unconfigured");
     }
 
-    return this.client.readOptions(filters);
+    const nowTime = this.now();
+    try {
+      const options = await this.client.readOptions(filters);
+      this.recordSuccess("options", nowTime.toISOString());
+      return options;
+    } catch (error) {
+      this.diagnostic = buildFailureDiagnostic(
+        error,
+        "options",
+        nowTime.toISOString(),
+        this.diagnostic.lastSuccessAt,
+        "unavailable"
+      );
+      throw error;
+    }
   }
 }
 
 function serializeWeatherFetchError(error: unknown) {
-  if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
-
+  if (error instanceof CwaWeatherRequestError) {
     return {
-      code: typeof code === "string" ? code : undefined,
-      message: error.message,
-      name: error.name
+      code: error.code,
+      message: error.safeSummary,
+      name: "WeatherRequestError"
     };
   }
 
   return {
-    message: String(error),
-    name: "UnknownError"
+    code: "WEATHER_UNKNOWN_ERROR",
+    message: "CWA request failed",
+    name: "WeatherRequestError"
   };
 }
 

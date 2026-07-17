@@ -22,6 +22,32 @@ export type WeatherLocationMode = (typeof weatherLocationModes)[number];
 export const weatherFetchStates = ["fresh", "stale", "unconfigured", "unavailable"] as const;
 export type WeatherFetchState = (typeof weatherFetchStates)[number];
 
+export type WeatherDiagnosticCode =
+  | "WEATHER_UNCONFIGURED"
+  | "WEATHER_DNS_LOOKUP_FAILED"
+  | "WEATHER_CONNECTION_TIMEOUT"
+  | "WEATHER_REQUEST_TIMEOUT"
+  | "WEATHER_TLS_FAILED"
+  | "WEATHER_HTTP_ERROR"
+  | "WEATHER_INVALID_PAYLOAD"
+  | "WEATHER_UNKNOWN_ERROR";
+
+export type WeatherDiagnosticState = "never-attempted" | "ok" | "error" | "unconfigured";
+export type WeatherDiagnosticOperation = "current" | "options";
+export type WeatherDiagnosticSource = "upstream" | "cache" | "stale" | "unavailable";
+
+export type WeatherDiagnostic = {
+  code: WeatherDiagnosticCode | null;
+  httpStatus: number | null;
+  lastSuccessAt: string | null;
+  occurredAt: string | null;
+  operation: WeatherDiagnosticOperation | null;
+  retryable: boolean;
+  safeSummary: string;
+  source: WeatherDiagnosticSource;
+  state: WeatherDiagnosticState;
+};
+
 export const headerWeatherStates = ["loading", "ready", "disabled", "unavailable", "stale"] as const;
 export type HeaderWeatherState = (typeof headerWeatherStates)[number];
 

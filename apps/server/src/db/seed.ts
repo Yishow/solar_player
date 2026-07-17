@@ -14,10 +14,6 @@ import { normalizeMetricSnapshotCapturedAt } from "./normalizeMetricSnapshotCapt
 
 const topicMappings = [
   { metricKey: "realTimePower", topic: "kuozui/plant/solar/power", unit: "kW" },
-  { metricKey: "todayGeneration", topic: "kuozui/plant/solar/today_energy", unit: "kWh" },
-  { metricKey: "totalGeneration", topic: "kuozui/plant/solar/total_energy", unit: "kWh" },
-  { metricKey: "todayCo2Reduction", topic: "kuozui/plant/solar/today_co2", unit: "t" },
-  { metricKey: "totalCo2Reduction", topic: "kuozui/plant/solar/total_co2", unit: "t" },
   { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption", unit: "kWh" },
   { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption", unit: "kWh" },
   { metricKey: "systemEfficiency", topic: "kuozui/plant/solar/efficiency", unit: "%" },

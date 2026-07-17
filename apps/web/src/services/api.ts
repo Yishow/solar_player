@@ -26,6 +26,7 @@ import type {
   PlaybackSettings,
   ImagePlaylistEntryInput,
   WeatherHeaderContract,
+  WeatherDiagnostic,
   WeatherOptionsResponse,
   WeatherSettings,
   ResolvedImagePlaylistEntry,
@@ -970,6 +971,11 @@ export async function getHeaderWeatherContract() {
 export async function getWeatherSettings() {
   const response = await requestJson<{ settings: WeatherSettings }>("/api/weather/settings");
   return response.settings;
+}
+
+export async function getWeatherDiagnostics() {
+  const response = await requestJson<{ diagnostic: WeatherDiagnostic }>("/api/weather/diagnostics");
+  return response.diagnostic;
 }
 
 export async function updateWeatherSettings(settings: WeatherSettings) {

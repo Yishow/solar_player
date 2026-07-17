@@ -53,7 +53,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
         (finding) =>
           finding.pageId === "overview" &&
           finding.requirementKey === "todayCo2Reduction" &&
-          finding.sourceType === "mqtt-metric"
+          finding.sourceType === "derived-metric"
       ),
       true
     );
@@ -62,7 +62,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
         (finding) =>
           finding.pageId === "overview" &&
           finding.requirementKey === "totalCo2Reduction" &&
-          finding.sourceType === "mqtt-metric"
+          finding.sourceType === "derived-metric"
       ),
       true
     );
@@ -250,8 +250,8 @@ test("GET /api/display-readiness tracks rendered sustainability indicators inste
           finding.pageId === "sustainability" &&
           finding.requirementKey === "accumulatedGenerationGwh" &&
           finding.sourceType === "derived-metric" &&
-          finding.status === "blocking" &&
-          /totalGeneration/i.test(finding.reason)
+          finding.status === "warning" &&
+          /CL today_mwh missing/i.test(finding.reason)
       ),
       true
     );

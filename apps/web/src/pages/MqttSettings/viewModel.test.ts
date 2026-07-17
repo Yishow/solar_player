@@ -3,11 +3,12 @@ import test from "node:test";
 import type {
   DisplayReadinessReport,
   WeatherCurrentSnapshot,
+  WeatherDiagnostic,
   WeatherHeaderContract,
   WeatherOptionsResponse,
   WeatherSettings
 } from "@solar-display/shared";
-import { buildMqttSettingsViewModel } from "./viewModel";
+import { buildMqttSettingsViewModel, resolveWeatherRefreshFeedback } from "./viewModel";
 
 function createReadinessReport(findings: DisplayReadinessReport["findings"]): DisplayReadinessReport {
   return {
@@ -102,6 +103,60 @@ function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): 
     ...overrides
   };
 }
+
+function createWeatherDiagnostic(overrides: Partial<WeatherDiagnostic> = {}): WeatherDiagnostic {
+  return {
+    code: null,
+    httpStatus: null,
+    lastSuccessAt: null,
+    occurredAt: null,
+    operation: null,
+    retryable: false,
+    safeSummary: "尚未執行天氣資料請求",
+    source: "unavailable",
+    state: "never-attempted",
+    ...overrides
+  };
+}
+
+test("manual weather refresh only reports success for a live upstream result", () => {
+  assert.deepEqual(
+    resolveWeatherRefreshFeedback(createWeatherDiagnostic({
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "upstream",
+      state: "ok"
+    })),
+    {
+      errorMessage: "",
+      message: "天氣資訊已立即更新。"
+    }
+  );
+
+  assert.deepEqual(
+    resolveWeatherRefreshFeedback(createWeatherDiagnostic({
+      code: "WEATHER_DNS_LOOKUP_FAILED",
+      safeSummary: "CWA hostname lookup failed",
+      source: "stale",
+      state: "error"
+    })),
+    {
+      errorMessage: "天氣即時更新失敗（WEATHER_DNS_LOOKUP_FAILED）；目前顯示舊資料。",
+      message: ""
+    }
+  );
+
+  assert.deepEqual(
+    resolveWeatherRefreshFeedback(createWeatherDiagnostic({
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "cache",
+      state: "ok"
+    })),
+    {
+      errorMessage: "天氣即時更新未完成；本次只取得快取資料。",
+      message: ""
+    }
+  );
+});
 
 test("buildMqttSettingsViewModel centralizes broker status and topic runtime mapping", () => {
   const model = buildMqttSettingsViewModel({
@@ -412,6 +467,15 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
         sourceId: "realTimePower",
         sourceType: "mqtt-metric",
         status: "warning"
+      },
+      {
+        blocking: false,
+        pageId: "sustainability",
+        reason: "CL + KN MQTT aggregate ready",
+        requirementKey: "accumulatedGenerationGwh",
+        sourceId: "solar/CL/summary, solar/KN/summary",
+        sourceType: "derived-metric",
+        status: "ready"
       }
     ]),
     settings: {
@@ -446,6 +510,36 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
         unit: "kW",
         updatedAt: "2026-05-20T10:05:00.000Z",
         valuePath: "$.value"
+      },
+      {
+        enabled: true,
+        id: 2,
+        lastReceivedAt: null,
+        lastValue: 9986.306,
+        metricKey: "factoryGeneration.cl.totalMwh",
+        nameZh: "中壢累積發電量",
+        nameEn: "Jungli Total Generation",
+        quality: "good",
+        rawPayload: "{}",
+        topic: "solar/CL/summary",
+        unit: "MWh",
+        updatedAt: "2026-05-20T10:05:00.000Z",
+        valuePath: "$.total_mwh"
+      },
+      {
+        enabled: true,
+        id: 3,
+        lastReceivedAt: null,
+        lastValue: 3659.57,
+        metricKey: "factoryGeneration.kn.totalMwh",
+        nameZh: "觀音累積發電量",
+        nameEn: "Guanyin Total Generation",
+        quality: "good",
+        rawPayload: "{}",
+        topic: "solar/KN/summary",
+        unit: "MWh",
+        updatedAt: "2026-05-20T10:05:00.000Z",
+        valuePath: "$.total_mwh"
       }
     ],
     weatherOptions: createWeatherOptions(),
@@ -469,6 +563,8 @@ test("buildMqttSettingsViewModel distinguishes mapped-but-idle topics from disco
 
   assert.equal(idleModel.liveTopicRows[0]?.runtimeLabel, "Idle");
   assert.equal(idleModel.coverageRows[0]?.stateLabel, "Idle Runtime");
+  assert.equal(idleModel.coverageRows[1]?.stateLabel, "Ready");
+  assert.equal(idleModel.coverageRows[1]?.detail, "CL + KN MQTT aggregate ready");
   assert.equal(disconnectedModel.liveTopicRows[0]?.runtimeLabel, "Disconnected");
   assert.equal(disconnectedModel.runtimePreview.statusLabel, "串流不可用");
 });
@@ -780,6 +876,123 @@ test("buildMqttSettingsViewModel explains the unconfigured CWA weather source in
   });
 
   assert.equal(configuredModel.weatherCard.configFeedback, "");
+});
+
+test("buildMqttSettingsViewModel displays bounded weather diagnostics and safe copy context", () => {
+  const baseArgs = {
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: false,
+      isSavingTopics: false,
+      isTestingConnection: false
+    },
+    errorMessage: "",
+    lastConnectionTest: null,
+    liveMetricsConnectionState: "connected" as const,
+    liveMetricsSnapshot: { metrics: {}, timestamp: null },
+    message: "Weather settings 已同步。",
+    readiness: null,
+    settings: {
+      clientId: "solar-display-player",
+      dataMode: "mqtt" as const,
+      host: "localhost",
+      messageTimeout: "30",
+      password: "",
+      port: "1883",
+      reconnectInterval: "5000",
+      username: ""
+    },
+    status: {
+      broker: "localhost:1883",
+      clientId: "solar-display-player",
+      connected: true,
+      reason: null,
+      updatedAt: "2026-05-23T06:20:00.000Z"
+    },
+    topics: [],
+    weatherOptions: createWeatherOptions(),
+    weatherOptionsErrorMessage: "",
+    weatherPreviewContract: createWeatherPreviewContract(),
+    weatherPreviewErrorMessage: "",
+    weatherSettings: createWeatherSettings()
+  };
+
+  const neverAttempted = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherDiagnostic: createWeatherDiagnostic()
+  });
+  const ok = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherDiagnostic: createWeatherDiagnostic({
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:20:00.000Z",
+      operation: "options",
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "upstream",
+      state: "ok"
+    })
+  });
+  const unconfigured = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherDiagnostic: createWeatherDiagnostic({
+      code: "WEATHER_UNCONFIGURED",
+      occurredAt: "2026-05-23T06:21:00.000Z",
+      operation: "current",
+      safeSummary: "CWA 授權尚未設定",
+      state: "unconfigured"
+    })
+  });
+  const error = buildMqttSettingsViewModel({
+    ...baseArgs,
+    weatherDiagnostic: createWeatherDiagnostic({
+      code: "WEATHER_HTTP_ERROR",
+      httpStatus: 503,
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:22:00.000Z",
+      operation: "options",
+      retryable: true,
+      safeSummary: "CWA 回傳 HTTP 錯誤",
+      state: "error"
+    })
+  });
+
+  assert.equal(neverAttempted.weatherCard.diagnostic.stateLabel, "尚未執行");
+  assert.equal(ok.weatherCard.diagnostic.stateLabel, "取得成功");
+  assert.equal(unconfigured.weatherCard.diagnostic.stateLabel, "尚未設定");
+  assert.deepEqual(error.weatherCard.diagnostic, {
+    code: "WEATHER_HTTP_ERROR",
+    copyText: [
+      "Weather diagnostic",
+      "State: error",
+      "Source: unavailable",
+      "Stage: http",
+      "Code: WEATHER_HTTP_ERROR",
+      "Operation: options",
+      "Occurred at: 2026-05-23T06:22:00.000Z",
+      "Last success at: 2026-05-23T06:20:00.000Z",
+      "Retryable: true",
+      "HTTP status: 503",
+      "Summary: CWA 回傳 HTTP 錯誤"
+    ].join("\n"),
+    httpStatusLabel: "503",
+    lastSuccessAtLabel: error.weatherCard.diagnostic.lastSuccessAtLabel,
+    occurredAtLabel: error.weatherCard.diagnostic.occurredAtLabel,
+    operationLabel: "測站／縣市選項",
+    retryableLabel: "可重試",
+    safeSummary: "CWA 回傳 HTTP 錯誤",
+    source: "unavailable",
+    sourceLabel: "無可用資料",
+    stage: "http",
+    stageLabel: "HTTP",
+    state: "error",
+    stateLabel: "取得失敗",
+    tone: "error"
+  });
+  assert.equal(error.weatherCard.diagnostic.copyText.includes("Authorization"), false);
+  assert.equal(error.weatherCard.diagnostic.copyText.includes("http://"), false);
+  assert.ok(error.weatherCard.diagnostic.copyText.length <= 512);
 });
 
 test("buildMqttSettingsViewModel models weather presets preview and custom-field fallback", () => {

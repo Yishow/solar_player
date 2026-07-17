@@ -48,7 +48,7 @@ test("runtime refresh registry assigns dedicated refresh scopes for sustainabili
   );
   assert.deepEqual(
     resolveDisplayPageRuntimeRefreshSpec("sustainability", { selectedPeriod: "lifetime" }).refreshScopes,
-    ["sustainability"]
+    ["sustainability", "playback"]
   );
   assert.deepEqual(resolveMonitoringHistoryRuntimeRefreshSpec("month").refreshScopes, ["monitoring-history"]);
 });

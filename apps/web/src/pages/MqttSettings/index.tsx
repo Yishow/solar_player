@@ -4,6 +4,7 @@ import {
   DEFAULT_WEATHER_SETTINGS,
   type PlaybackPage,
   type WeatherFieldKey,
+  type WeatherDiagnostic,
   type WeatherHeaderContract,
   type WeatherOptionsResponse,
   type WeatherSettings
@@ -19,6 +20,7 @@ import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import {
   getWeatherOptions,
+  getWeatherDiagnostics,
   getWeatherPreview,
   getWeatherSettings,
   getDisplayCardData,
@@ -37,7 +39,14 @@ import {
   isTopicMetricVisibleForFactorySite,
   jungliFactoryTopicMetricKeys
 } from "./factoryTopicSites";
-import { type ActionState, type ConnectionTestFeedback, type MqttSettingsForm, type MqttStatus, type TopicMapping } from "./viewModel";
+import {
+  type ActionState,
+  type ConnectionTestFeedback,
+  type MqttSettingsForm,
+  type MqttStatus,
+  type TopicMapping,
+  resolveWeatherRefreshFeedback
+} from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
 import { MQTT_SETTINGS_DISPLAY_SYNC_SCOPES } from "../managementDisplaySyncScopes";
 import {
@@ -153,6 +162,7 @@ export function MqttSettings() {
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] =
     useState<WeatherSettings>(initialEditableModel?.weatherSettings ?? DEFAULT_WEATHER_SETTINGS);
   const [weatherOptions, setWeatherOptions] = useState<WeatherOptionsResponse | null>(null);
+  const [weatherDiagnostic, setWeatherDiagnostic] = useState<WeatherDiagnostic | null>(null);
   const [weatherOptionsErrorMessage, setWeatherOptionsErrorMessage] = useState("");
   const [weatherPreviewContract, setWeatherPreviewContract] = useState<WeatherHeaderContract | null>(null);
   const [weatherPreviewErrorMessage, setWeatherPreviewErrorMessage] = useState("");
@@ -304,6 +314,14 @@ export function MqttSettings() {
     }
   };
 
+  const loadWeatherDiagnostic = useCallback(async () => {
+    try {
+      setWeatherDiagnostic(await getWeatherDiagnostics());
+    } catch {
+      // Keep the latest visible diagnostic when a refresh request itself fails.
+    }
+  }, []);
+
   const loadPlaybackPages = useCallback(async () => {
     try {
       setPlaybackPages(await getPlaybackPages());
@@ -347,13 +365,14 @@ export function MqttSettings() {
       try {
         await loadMqttEditableModel({ force: initialEditableModel !== null });
         await loadPlaybackPages();
+        await loadWeatherDiagnostic();
       } catch {
         // individual loaders surface their own errors
       }
     };
     void bootstrap();
 
-  }, [initialEditableModel, loadPlaybackPages]);
+  }, [initialEditableModel, loadPlaybackPages, loadWeatherDiagnostic]);
 
   useEffect(() => {
     if (!hasLoadedTopics) {
@@ -412,13 +431,17 @@ export function MqttSettings() {
             error instanceof Error ? error.message : "目前無法載入測站選項。"
           );
         }
+      } finally {
+        if (active) {
+          void loadWeatherDiagnostic();
+        }
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [hasLoadedWeatherSettings, weatherSettings.countyName]);
+  }, [hasLoadedWeatherSettings, weatherSettings.countyName, loadWeatherDiagnostic]);
 
   useEffect(() => {
     if (!hasLoadedWeatherSettings) {
@@ -534,17 +557,30 @@ export function MqttSettings() {
   const refreshWeather = useCallback(async () => {
     setActionState((current) => ({ ...current, isRefreshingWeather: true }));
     try {
-      const response = await requestJson<WeatherHeaderContract>("/api/weather/refresh", {
+      const response = await requestJson<WeatherHeaderContract & { diagnostic: WeatherDiagnostic }>("/api/weather/refresh", {
         method: "POST"
       });
       setWeatherPreviewContract(response);
+      setWeatherDiagnostic(response.diagnostic);
       setWeatherPreviewErrorMessage("");
-      setMessage("天氣資訊已立即更新。");
-      setErrorMessage("");
+      const feedback = resolveWeatherRefreshFeedback(response.diagnostic);
+      setMessage(feedback.message);
+      setErrorMessage(feedback.errorMessage);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "手動更新天氣失敗。");
     } finally {
+      await loadWeatherDiagnostic();
       setActionState((current) => ({ ...current, isRefreshingWeather: false }));
+    }
+  }, [loadWeatherDiagnostic]);
+
+  const copyWeatherDiagnostic = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage("天氣診斷已複製。");
+      setErrorMessage("");
+    } catch {
+      setErrorMessage("無法複製天氣診斷，請手動選取內容。");
     }
   }, []);
 
@@ -755,6 +791,7 @@ export function MqttSettings() {
       addTopicMapping={addTopicMapping}
       cardDataErrorMessage={cardDataErrorMessage}
       cardDataRows={cardData?.rows ?? []}
+      copyWeatherDiagnostic={copyWeatherDiagnostic}
       clearDisplayOverride={clearDisplayOverride}
       draftSections={draftSections}
       enabledCardDataSites={enabledCardDataSites}
@@ -799,6 +836,7 @@ export function MqttSettings() {
       topics={topics}
       handleWeatherSettingChange={handleWeatherSettingChange}
       weatherOptions={weatherOptions}
+      weatherDiagnostic={weatherDiagnostic}
       weatherOptionsErrorMessage={weatherOptionsErrorMessage}
       weatherPreviewContract={weatherPreviewContract}
       weatherPreviewErrorMessage={weatherPreviewErrorMessage}

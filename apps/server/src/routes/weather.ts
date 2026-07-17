@@ -149,6 +149,16 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
     return options;
   });
 
+  app.get("/api/weather/diagnostics", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return {
+      diagnostic: getWeatherService().getDiagnostic()
+    };
+  });
+
   app.get("/api/weather/current", async () => {
     const settings = readWeatherSettings();
     const current = settings.enabled
@@ -175,6 +185,7 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
 
     return {
       current,
+      diagnostic: getWeatherService().getDiagnostic(),
       settings: buildPublicWeatherHeaderSettings(settings)
     };
   });

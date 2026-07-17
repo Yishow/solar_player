@@ -1,8 +1,12 @@
 import threading
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from math import inf, nan
 from unittest.mock import patch
 
 from solar.config import CONFIG, DEFAULT_GLOBAL
+from solar.display import print_result
 from solar.service import FactoryService
 
 
@@ -12,7 +16,7 @@ class DummyBus:
         self.raw_calls = []
 
     def publish_json(self, topic, data, retain=True, qos=1):
-        self.json_calls.append({"topic": topic, "retain": retain, "data": data})
+        self.json_calls.append({"topic": topic, "retain": retain, "qos": qos, "data": data})
         return True
 
     def publish(self, topic, payload, retain=True, qos=1):
@@ -73,6 +77,93 @@ class MqttRetainTests(unittest.TestCase):
         CONFIG.globals.clear()
         CONFIG.globals.update(self.original_globals)
         CONFIG.factories = self.original_factories
+
+    def _service(self, factory_id="KN"):
+        svc = FactoryService.__new__(FactoryService)
+        svc.factory_id = factory_id
+        svc.bus = DummyBus()
+        svc.storage = DummyStorage()
+        svc._last_complete_zone_ids = None
+        return svc
+
+    def test_publish_data_sums_complete_factory_zone_totals(self):
+        examples = [
+            ("CL", [5587.416, 4398.890, 0, 0, 0], 9986.306),
+            ("KN", [628.070, 3031.500], 3659.570),
+        ]
+
+        for factory_id, totals, expected in examples:
+            with self.subTest(factory_id=factory_id):
+                svc = self._service(factory_id)
+                summary = {"total_power_kw": 1.2, "today_mwh": 3.4, "month_mwh": 5.6}
+                zones = [
+                    {"zone_id": index, "total_mwh": total}
+                    for index, total in enumerate(totals, start=1)
+                ]
+
+                svc._publish_data(summary, zones)
+
+                calls = {call["topic"]: call for call in svc.bus.json_calls}
+                self.assertEqual(calls[f"solar/{factory_id}/summary"]["data"]["total_mwh"], expected)
+                self.assertEqual(calls[f"solar/{factory_id}/total_mwh"]["data"], {"value": expected})
+                self.assertTrue(calls[f"solar/{factory_id}/total_mwh"]["retain"])
+                self.assertEqual(calls[f"solar/{factory_id}/total_mwh"]["qos"], 1)
+
+    def test_publish_data_skips_factory_total_for_invalid_zone_values(self):
+        for invalid in (None, nan, inf):
+            with self.subTest(invalid=invalid):
+                svc = self._service("CL")
+                summary = {"total_power_kw": 1.2, "today_mwh": 3.4, "month_mwh": 5.6}
+                zones = [
+                    {"zone_id": 1, "total_mwh": 5587.416},
+                    {"zone_id": 2, "total_mwh": invalid},
+                ]
+
+                svc._publish_data(summary, zones)
+
+                calls = {call["topic"]: call for call in svc.bus.json_calls}
+                self.assertNotIn("total_mwh", calls["solar/CL/summary"]["data"])
+                self.assertNotIn("solar/CL/total_mwh", calls)
+                self.assertEqual(svc.storage.alerts[-1][0:2], ("CL", "WARN"))
+                self.assertIn("zone 2", svc.storage.alerts[-1][2])
+
+    def test_publish_data_preserves_total_when_known_zone_disappears(self):
+        svc = self._service("CL")
+        summary = {"total_power_kw": 1.2, "today_mwh": 3.4, "month_mwh": 5.6}
+        complete = [
+            {"zone_id": zone_id, "total_mwh": total}
+            for zone_id, total in enumerate([5587.416, 4398.890, 0, 0, 0], start=1)
+        ]
+        svc._publish_data(summary, complete)
+        svc.bus.json_calls.clear()
+
+        svc._publish_data(summary, [zone for zone in complete if zone["zone_id"] != 2])
+
+        calls = {call["topic"]: call for call in svc.bus.json_calls}
+        self.assertNotIn("total_mwh", calls["solar/CL/summary"]["data"])
+        self.assertNotIn("solar/CL/total_mwh", calls)
+        self.assertIn("zone 2", svc.storage.alerts[-1][2])
+
+    def test_terminal_output_shows_factory_total_and_incomplete_zone(self):
+        svc = self._service("KN")
+        summary = {"total_power_kw": 98.2, "today_mwh": 2.92, "month_mwh": 265.77}
+        zones = [
+            {"zone_id": 1, "name": "一期", "total_mwh": 628.070},
+            {"zone_id": 2, "name": "二期", "total_mwh": 3031.500},
+        ]
+        output = StringIO()
+
+        with redirect_stdout(output):
+            svc._publish_data(summary, zones)
+            print_result("KN", summary, zones, True, "solar", "broker.local", 1883)
+            zones[1]["total_mwh"] = None
+            svc._publish_data(summary, zones)
+
+        rendered = output.getvalue()
+        self.assertIn("累積: 3659.570 MWh", rendered)
+        self.assertIn("solar/KN/total_mwh", rendered)
+        self.assertIn("廠區累積總量不完整: zone 2", rendered)
+        self.assertNotIn("login_pass", rendered)
 
     def test_default_global_config_contains_retain_flags(self):
         self.assertIs(DEFAULT_GLOBAL["mqtt_retain_summary"], True)

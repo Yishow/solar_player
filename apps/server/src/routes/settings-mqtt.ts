@@ -3,6 +3,7 @@ import type { RuntimeMqttStatus } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
+import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -36,6 +37,9 @@ type SettingsBody = Partial<MqttSettingsResponse>;
 type TestConnectionBody = SettingsBody;
 type PublishTopicValueBody = {
   value?: unknown;
+};
+type ResetFactoryGenerationBaselineBody = {
+  expectedTotalMwh?: unknown;
 };
 
 type TopicMappingInput = {
@@ -354,6 +358,46 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       readiness: readDisplayReadinessReport()
     };
   });
+
+  app.post<{ Body: ResetFactoryGenerationBaselineBody }>(
+    "/api/settings/mqtt/factory-generation/reset-baseline",
+    async (request, reply) => {
+      const expectedTotalMwh = request.body?.expectedTotalMwh;
+      if (
+        typeof expectedTotalMwh !== "number"
+        || !Number.isFinite(expectedTotalMwh)
+        || expectedTotalMwh < 0
+      ) {
+        return reply.status(400).send({
+          code: "INVALID_FACTORY_GENERATION_RESET_CONFIRMATION",
+          success: false
+        });
+      }
+
+      const result = resetFactoryGenerationBaseline(getDatabase(), expectedTotalMwh);
+      if (!result.ok) {
+        return reply.status(409).send({
+          code: "FACTORY_GENERATION_BASELINE_RESET_REJECTED",
+          reason: result.reason,
+          success: false
+        });
+      }
+
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "factory-generation-baseline-reset",
+        scope: "mqtt"
+      });
+      return {
+        reset: {
+          acceptedTotalMwh: result.acceptedTotalMwh,
+          previousTotalMwh: result.previousTotalMwh,
+          updatedAt: result.updatedAt
+        },
+        success: true
+      };
+    }
+  );
 
   app.post<{ Body: PublishTopicValueBody; Params: { metricKey: string } }>(
     "/api/settings/mqtt/topics/:metricKey/publish",

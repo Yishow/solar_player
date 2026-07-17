@@ -9,6 +9,13 @@ export type CumulativeMetricKey = "generation" | "consumption" | "selfConsumptio
 
 export type CumulativeCounters = Record<CumulativeMetricKey, number>;
 
+const CUMULATIVE_METRIC_KEYS = new Set<CumulativeMetricKey>([
+  "generation",
+  "consumption",
+  "selfConsumption",
+  "co2"
+]);
+
 export type MetricsAggregateSnapshot = {
   capturedAt: string | null;
   co2: number;
@@ -43,6 +50,10 @@ type PowerObservation = {
 
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isCumulativeMetricKey(value: string): value is CumulativeMetricKey {
+  return CUMULATIVE_METRIC_KEYS.has(value as CumulativeMetricKey);
 }
 
 function parseTimestamp(value: string | null | undefined) {
@@ -204,6 +215,7 @@ export class MetricsAccumulatorService {
 
   processAt(now: Date) {
     this.initialize();
+    this.syncPersistedResets();
 
     const snapshot = this.readSnapshot();
     const observedTimestamp = snapshot.timestamp ?? now.toISOString();
@@ -266,6 +278,7 @@ export class MetricsAccumulatorService {
 
   flush(force = false) {
     this.initialize();
+    this.syncPersistedResets();
 
     if (!force && !this.dirty) {
       return;
@@ -310,6 +323,7 @@ export class MetricsAccumulatorService {
 
   getCounters(): CumulativeCounters {
     this.initialize();
+    this.syncPersistedResets();
     return {
       ...this.counters
     };
@@ -317,6 +331,7 @@ export class MetricsAccumulatorService {
 
   getLatestSnapshot() {
     this.initialize();
+    this.syncPersistedResets();
     return {
       ...this.latestSnapshot
     };
@@ -376,6 +391,40 @@ export class MetricsAccumulatorService {
 
   private readCo2Factor() {
     return readCalculationSettings(this.database).carbonEmissionFactor;
+  }
+
+  private syncPersistedResets() {
+    const rows = this.database
+      .prepare(`
+        SELECT metric_key, total_value, last_updated, reset_count
+        FROM cumulative_counters
+      `)
+      .all() as CumulativeCounterRow[];
+    let changed = false;
+
+    for (const row of rows) {
+      if (!isCumulativeMetricKey(row.metric_key) || !isFiniteNumber(row.total_value)) {
+        continue;
+      }
+      const persistedResetCount = row.reset_count ?? 0;
+      if (persistedResetCount <= (this.resetCounts.get(row.metric_key) ?? 0)) {
+        continue;
+      }
+
+      this.counters[row.metric_key] = row.total_value;
+      this.resetCounts.set(row.metric_key, persistedResetCount);
+      if (row.metric_key === "generation") {
+        const timestampMs = parseTimestamp(row.last_updated);
+        if (timestampMs !== null) {
+          this.lastSeenGenerationPower = { timestampMs };
+        }
+      }
+      changed = true;
+    }
+
+    if (changed) {
+      this.latestSnapshot = this.buildAggregateSnapshot(null);
+    }
   }
 
   private setCounter(metricKey: CumulativeMetricKey, nextValue: number) {

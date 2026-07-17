@@ -20,6 +20,14 @@ import {
   readActiveDisplayValueOverrides
 } from "./displayValueOverrideService.js";
 import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
+import {
+  evaluateFactoryGenerationScope,
+  resolveFactoryGenerationScope,
+  type FactoryGenerationEvaluation,
+  type FactoryGenerationScope,
+  type FactoryPlaybackPage
+} from "./factoryGenerationAggregateService.js";
+import { readPlaybackPages } from "./displayRotationService.js";
 
 const settingKey = "sustainability_story";
 
@@ -39,7 +47,14 @@ type CounterSnapshot = {
 type CounterMap = Map<string, CounterSnapshot>;
 type SustainabilityStoryReadOptions = {
   applyDisplayOverrides?: boolean;
+  now?: Date;
 };
+
+export function resolveSustainabilityFactoryScope(
+  pages: readonly FactoryPlaybackPage[]
+): FactoryGenerationScope {
+  return resolveFactoryGenerationScope(pages);
+}
 
 const liveMetricCounterFallbackMap: Record<CounterMetricKey, string> = {
   co2: "totalCo2Reduction",
@@ -306,8 +321,78 @@ function readCounter(counterMap: CounterMap, metricKey: CounterMetricKey) {
   };
 }
 
-function buildBigNumbers(counterMap: CounterMap) {
-  const generation = readCounter(counterMap, "generation");
+function buildFactoryGenerationProvenance(
+  label: string,
+  source: string,
+  sourceClass: SustainabilityProvenance["sourceClass"],
+  evaluation: FactoryGenerationEvaluation | null,
+  fallback: CounterSnapshot
+) {
+  if (!evaluation) {
+    return {
+      label,
+      source: "未選擇廠區",
+      sourceClass: "missing",
+      syncState: "missing",
+      updatedAt: null
+    } satisfies SustainabilityProvenance;
+  }
+
+  const issue = evaluation.issues
+    .map((item) => `${item.factory} ${item.field} ${item.reason}`)
+    .join(", ");
+
+  return {
+    label,
+    source: issue ? `${source} (${issue})` : source,
+    sourceClass:
+      evaluation.state !== "ready" && typeof fallback.value !== "number"
+        ? "missing"
+        : sourceClass,
+    syncState:
+      evaluation.state === "ready"
+        ? "fresh"
+        : evaluation.state === "stale"
+          ? "stale"
+          : evaluation.state === "missing" || evaluation.state === "invalid"
+            ? "missing"
+            : "warning",
+    updatedAt: evaluation.updatedAt ?? fallback.updatedAt
+  } satisfies SustainabilityProvenance;
+}
+
+function resolveScopedGeneration(counterMap: CounterMap, now: Date) {
+  const scope = resolveSustainabilityFactoryScope(readPlaybackPages());
+  const combinedFallback = scope === "CL+KN"
+    ? readCounter(counterMap, "generation")
+    : { updatedAt: null, value: null } satisfies CounterSnapshot;
+
+  if (scope === "none") {
+    return {
+      evaluation: null,
+      generation: combinedFallback,
+      source: "未選擇廠區"
+    };
+  }
+
+  const evaluation = evaluateFactoryGenerationScope(getDatabase(), scope, now);
+  const generation = evaluation.state === "ready" && "values" in evaluation
+    ? {
+        updatedAt: evaluation.updatedAt,
+        value: evaluation.values.totalGeneration * 1_000
+      }
+    : combinedFallback;
+
+  return {
+    evaluation,
+    generation,
+    source: scope === "CL+KN" ? "CL + KN MQTT aggregate" : `${scope} MQTT`
+  };
+}
+
+function buildBigNumbers(counterMap: CounterMap, now: Date) {
+  const scopedGeneration = resolveScopedGeneration(counterMap, now);
+  const generation = scopedGeneration.generation;
   const consumption = readCounter(counterMap, "consumption");
   const selfConsumption = readCounter(counterMap, "selfConsumption");
   const calculationSettings = readCalculationSettings();
@@ -341,17 +426,19 @@ function buildBigNumbers(counterMap: CounterMap) {
       plantedTreeEquivalent
     } satisfies Record<SustainabilityBigNumberKey, number | null>,
     provenance: {
-      accumulatedCarbonReductionTons: buildCounterProvenance(
+      accumulatedCarbonReductionTons: buildFactoryGenerationProvenance(
         "累積減碳",
-        "generation-carbon-reduction",
+        `${scopedGeneration.source} × carbonEmissionFactor`,
         "derived-metric",
-        [generation]
+        scopedGeneration.evaluation,
+        generation
       ),
-      accumulatedGenerationGwh: buildCounterProvenance(
+      accumulatedGenerationGwh: buildFactoryGenerationProvenance(
         "累積發電",
-        "cumulative-counters",
+        scopedGeneration.source,
         "runtime-aggregate",
-        [generation]
+        scopedGeneration.evaluation,
+        generation
       ),
       annualEnergySavingPercent: buildCounterProvenance(
         "年度節能成效",
@@ -359,11 +446,12 @@ function buildBigNumbers(counterMap: CounterMap) {
         "derived-metric",
         [selfConsumption, consumption]
       ),
-      plantedTreeEquivalent: buildCounterProvenance(
+      plantedTreeEquivalent: buildFactoryGenerationProvenance(
         "植樹等效",
-        "generation-tree-equivalent",
+        `${scopedGeneration.source} × carbonEmissionFactor × co2TreeEquivalentFactor`,
         "derived-metric",
-        [generation]
+        scopedGeneration.evaluation,
+        generation
       )
     }
   };
@@ -449,7 +537,7 @@ function mergePeriod(
   counterMap: CounterMap,
   options: SustainabilityStoryReadOptions
 ) {
-  const derived = buildBigNumbers(counterMap);
+  const derived = buildBigNumbers(counterMap, options.now ?? new Date());
   const bigNumbers =
     options.applyDisplayOverrides === false
       ? derived.values
@@ -473,22 +561,13 @@ function mergePeriod(
 
   return {
     bigNumberProvenance: {
-      accumulatedCarbonReductionTons: mergeProvenance(
-        derived.provenance.accumulatedCarbonReductionTons,
-        inputPeriod?.bigNumberProvenance?.accumulatedCarbonReductionTons
-      ),
-      accumulatedGenerationGwh: mergeProvenance(
-        derived.provenance.accumulatedGenerationGwh,
-        inputPeriod?.bigNumberProvenance?.accumulatedGenerationGwh
-      ),
+      accumulatedCarbonReductionTons: derived.provenance.accumulatedCarbonReductionTons,
+      accumulatedGenerationGwh: derived.provenance.accumulatedGenerationGwh,
       annualEnergySavingPercent: mergeProvenance(
         derived.provenance.annualEnergySavingPercent,
         inputPeriod?.bigNumberProvenance?.annualEnergySavingPercent
       ),
-      plantedTreeEquivalent: mergeProvenance(
-        derived.provenance.plantedTreeEquivalent,
-        inputPeriod?.bigNumberProvenance?.plantedTreeEquivalent
-      )
+      plantedTreeEquivalent: derived.provenance.plantedTreeEquivalent
     },
     bigNumbers,
     comparison:
@@ -569,7 +648,7 @@ export function readSustainabilityStory(
 
   return {
     ...story,
-    generatedAt: new Date().toISOString(),
+    generatedAt: (options.now ?? new Date()).toISOString(),
     period: resolved.period,
     selectedPeriod: resolved.selectedPeriod
   };

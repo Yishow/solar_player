@@ -117,22 +117,41 @@ const factoryCircuitMetricRequirements: DisplayRequirementDescriptor[] = factory
     }))
 );
 
+export const factoryGenerationDependencyKeys: readonly string[] = [
+  "factoryGeneration.cl.todayMwh",
+  "factoryGeneration.cl.monthMwh",
+  "factoryGeneration.cl.totalMwh",
+  "factoryGeneration.kn.todayMwh",
+  "factoryGeneration.kn.monthMwh",
+  "factoryGeneration.kn.totalMwh"
+];
+
+export const factoryGenerationDerivedRequirementKeys: readonly string[] = [
+  "todayGeneration",
+  "totalGeneration",
+  "todayCo2Reduction",
+  "totalCo2Reduction",
+  "accumulatedGenerationGwh",
+  "accumulatedCarbonReductionTons",
+  "plantedTreeEquivalent"
+];
+
 export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
   { pageId: "overview", requirementKey: "realTimePower", sourceType: "mqtt-metric" },
-  { pageId: "overview", requirementKey: "todayGeneration", sourceType: "mqtt-metric" },
-  { pageId: "overview", requirementKey: "totalGeneration", sourceType: "mqtt-metric" },
-  { pageId: "overview", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
-  { pageId: "overview", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
+  { dependencyKeys: ["todayGeneration", ...factoryGenerationDependencyKeys], pageId: "overview", requirementKey: "todayGeneration", sourceType: "derived-metric" },
+  { dependencyKeys: ["totalGeneration", ...factoryGenerationDependencyKeys], pageId: "overview", requirementKey: "totalGeneration", sourceType: "derived-metric" },
+  { dependencyKeys: ["todayCo2Reduction", "todayGeneration", ...factoryGenerationDependencyKeys], pageId: "overview", requirementKey: "todayCo2Reduction", sourceType: "derived-metric" },
+  { dependencyKeys: ["totalCo2Reduction", "totalGeneration", ...factoryGenerationDependencyKeys], pageId: "overview", requirementKey: "totalCo2Reduction", sourceType: "derived-metric" },
   { pageId: "solar", requirementKey: "realTimePower", sourceType: "mqtt-metric" },
-  { pageId: "solar", requirementKey: "todayGeneration", sourceType: "mqtt-metric" },
+  { dependencyKeys: ["todayGeneration", ...factoryGenerationDependencyKeys], pageId: "solar", requirementKey: "todayGeneration", sourceType: "derived-metric" },
   {
     dependencyKeys: ["selfConsumptionRatio", "selfConsumptionEnergy", "consumptionEnergy"],
     pageId: "solar",
     requirementKey: "selfConsumptionRatio",
     sourceType: "derived-metric"
   },
-  { pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "mqtt-metric" },
-  { pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "mqtt-metric" },
+  { dependencyKeys: ["todayCo2Reduction", "todayGeneration", ...factoryGenerationDependencyKeys], pageId: "solar", requirementKey: "todayCo2Reduction", sourceType: "derived-metric" },
+  { dependencyKeys: ["totalCo2Reduction", "totalGeneration", ...factoryGenerationDependencyKeys], pageId: "solar", requirementKey: "totalCo2Reduction", sourceType: "derived-metric" },
   { pageId: "solar", requirementKey: "systemEfficiency", sourceType: "mqtt-metric" },
   ...factoryCircuitMetricRequirements,
   {
@@ -145,7 +164,7 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
     pageId: "sustainability",
     requirementKey: "accumulatedCarbonReductionTons",
     sourceType: "derived-metric",
-    dependencyKeys: ["totalCo2Reduction"]
+    dependencyKeys: ["totalGeneration"]
   },
   {
     pageId: "sustainability",
@@ -157,7 +176,7 @@ export const displayMetricRequirements: DisplayRequirementDescriptor[] = [
     pageId: "sustainability",
     requirementKey: "plantedTreeEquivalent",
     sourceType: "derived-metric",
-    dependencyKeys: ["totalCo2Reduction"]
+    dependencyKeys: ["totalGeneration"]
   }
 ];
 

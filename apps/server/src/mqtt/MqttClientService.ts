@@ -13,6 +13,7 @@ import {
 import { getDatabase } from "../db/index.js";
 import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
+import { updateFactoryGenerationAggregate } from "../services/factoryGenerationAggregateService.js";
 import { parse } from "./PayloadParser.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "./settings-source.js";
 
@@ -873,6 +874,19 @@ export class MqttClientService {
             topic
           },
           "Failed to parse MQTT payload"
+        );
+      }
+    }
+
+    if (
+      persistedMetricCount > 0
+      && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."))
+    ) {
+      const aggregateStatus = updateFactoryGenerationAggregate(this.database);
+      if (aggregateStatus.state !== "ready") {
+        this.logger.warn(
+          { issues: aggregateStatus.issues, state: aggregateStatus.state },
+          "CL+KN generation aggregate is not ready"
         );
       }
     }

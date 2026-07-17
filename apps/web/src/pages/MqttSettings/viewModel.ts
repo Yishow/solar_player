@@ -1,5 +1,6 @@
 import type {
   DisplayReadinessReport,
+  WeatherDiagnostic,
   WeatherFieldKey,
   WeatherHeaderContract,
   WeatherOptionsResponse,
@@ -9,7 +10,7 @@ import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import { resolveHeaderWeatherMeta } from "../../components/headerWeatherMeta";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
-import { weatherFieldKeys } from "@solar-display/shared";
+import { factoryGenerationDerivedRequirementKeys, weatherFieldKeys } from "@solar-display/shared";
 import { weatherFieldPresetOptions } from "./weatherFieldPresets";
 
 export type DataMode = "mqtt" | "mock";
@@ -89,6 +90,7 @@ type BuildMqttSettingsViewModelArgs = {
   weatherPreviewContract: WeatherHeaderContract | null;
   weatherPreviewErrorMessage: string;
   weatherSettings: WeatherSettings;
+  weatherDiagnostic?: WeatherDiagnostic | null;
 };
 
 type SectionGuide = {
@@ -303,6 +305,103 @@ function resolveWeatherValidationFeedback(weatherSettings: WeatherSettings) {
   return "";
 }
 
+export function resolveWeatherRefreshFeedback(diagnostic: WeatherDiagnostic) {
+  if (diagnostic.state === "ok" && diagnostic.source === "upstream") {
+    return {
+      errorMessage: "",
+      message: "天氣資訊已立即更新。"
+    };
+  }
+
+  const code = diagnostic.code ? `（${diagnostic.code}）` : "";
+  const sourceDetail = {
+    cache: "本次只取得快取資料。",
+    stale: "目前顯示舊資料。",
+    unavailable: "目前沒有可用天氣資料。",
+    upstream: "請查看下方診斷。"
+  }[diagnostic.source];
+  const outcome = diagnostic.state === "error" ? "失敗" : "未完成";
+
+  return {
+    errorMessage: `天氣即時更新${outcome}${code}；${sourceDetail}`,
+    message: ""
+  };
+}
+
+function buildWeatherDiagnosticModel(diagnostic: WeatherDiagnostic | null) {
+  const value: WeatherDiagnostic = diagnostic ?? {
+    code: null,
+    httpStatus: null,
+    lastSuccessAt: null,
+    occurredAt: null,
+    operation: null,
+    retryable: false,
+    safeSummary: "尚未執行天氣資料請求",
+    source: "unavailable",
+    state: "never-attempted"
+  };
+  const stateMeta = {
+    error: { label: "取得失敗", tone: "error" as const },
+    "never-attempted": { label: "尚未執行", tone: "muted" as const },
+    ok: { label: "取得成功", tone: "ready" as const },
+    unconfigured: { label: "尚未設定", tone: "warning" as const }
+  }[value.state];
+  const sourceLabel = {
+    cache: "快取資料",
+    stale: "使用舊資料",
+    unavailable: "無可用資料",
+    upstream: "即時上游"
+  }[value.source];
+  const stage = (() => {
+    switch (value.code) {
+      case "WEATHER_UNCONFIGURED": return { id: "configuration", label: "Configuration" };
+      case "WEATHER_DNS_LOOKUP_FAILED": return { id: "dns", label: "DNS" };
+      case "WEATHER_CONNECTION_TIMEOUT": return { id: "connect", label: "Connect" };
+      case "WEATHER_TLS_FAILED": return { id: "tls", label: "TLS" };
+      case "WEATHER_HTTP_ERROR":
+      case "WEATHER_REQUEST_TIMEOUT": return { id: "http", label: "HTTP" };
+      case "WEATHER_INVALID_PAYLOAD": return { id: "payload", label: "Payload" };
+      case "WEATHER_UNKNOWN_ERROR": return { id: "unknown", label: "Unknown" };
+      default: return null;
+    }
+  })();
+  const copyText = [
+    "Weather diagnostic",
+    `State: ${value.state}`,
+    `Source: ${value.source}`,
+    `Stage: ${stage?.id ?? "-"}`,
+    `Code: ${value.code ?? "-"}`,
+    `Operation: ${value.operation ?? "-"}`,
+    `Occurred at: ${value.occurredAt ?? "-"}`,
+    `Last success at: ${value.lastSuccessAt ?? "-"}`,
+    `Retryable: ${value.retryable}`,
+    `HTTP status: ${value.httpStatus ?? "-"}`,
+    `Summary: ${value.safeSummary}`
+  ].join("\n");
+
+  return {
+    code: value.code,
+    copyText,
+    httpStatusLabel: value.httpStatus === null ? null : String(value.httpStatus),
+    lastSuccessAtLabel: value.lastSuccessAt ? formatTimestamp(value.lastSuccessAt) : "尚無成功紀錄",
+    occurredAtLabel: value.occurredAt ? formatTimestamp(value.occurredAt) : "尚未執行",
+    operationLabel: value.operation === "current"
+      ? "目前天氣"
+      : value.operation === "options"
+        ? "測站／縣市選項"
+        : "尚未執行",
+    retryableLabel: value.retryable ? "可重試" : "不可重試",
+    safeSummary: value.safeSummary,
+    source: value.source,
+    sourceLabel,
+    stage: stage?.id ?? null,
+    stageLabel: stage?.label ?? null,
+    state: value.state,
+    stateLabel: stateMeta.label,
+    tone: stateMeta.tone
+  };
+}
+
 function resolvePageLabel(pageId: string | null) {
   if (!pageId) {
     return "Mapped Runtime";
@@ -412,6 +511,7 @@ export function buildMqttSettingsViewModel({
   settings,
   status,
   topics,
+  weatherDiagnostic = null,
   weatherOptions,
   weatherOptionsErrorMessage,
   weatherPreviewContract,
@@ -468,10 +568,35 @@ export function buildMqttSettingsViewModel({
   };
 
   const coverageRows = (readiness?.findings ?? [])
-    .filter((finding) => finding.sourceType === "mqtt-metric")
+    .filter(
+      (finding) =>
+        finding.sourceType === "mqtt-metric"
+        || factoryGenerationDerivedRequirementKeys.includes(finding.requirementKey)
+    )
     .map((finding) => {
       const topic = mappedTopics.find((candidate) => candidate.metricKey === finding.requirementKey);
       const metric = describeMetric(finding.requirementKey);
+
+      if (finding.sourceType === "derived-metric") {
+        return {
+          detail: finding.reason,
+          metricLabelZh: metric.zh,
+          pageId: finding.pageId,
+          requirementKey: finding.requirementKey,
+          stateLabel:
+            finding.status === "ready"
+              ? "Ready"
+              : finding.status === "warning"
+                ? "Derived Warning"
+                : "Dependency Blocked",
+          stateTone:
+            finding.status === "ready"
+              ? ("connected" as const)
+              : finding.status === "warning"
+                ? ("connecting" as const)
+                : ("disconnected" as const)
+        };
+      }
 
       if (!topic || !topic.enabled || topic.topic.trim() === "") {
         return {
@@ -812,6 +937,7 @@ export function buildMqttSettingsViewModel({
       contractStatusDetail: weatherContractDetail,
       contractStatusTitle: sectionGuides.weather.title,
       countyOptions: weatherOptions?.counties ?? [],
+      diagnostic: buildWeatherDiagnosticModel(weatherDiagnostic),
       customFieldOptions,
       enabled: weatherSettings.enabled,
       localValidationFeedback: localWeatherValidationFeedback,

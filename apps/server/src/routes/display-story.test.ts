@@ -544,8 +544,7 @@ test("GET /api/display-story falls back factory self-consumption KPI to today ge
     assert.equal(selfConsumption?.helper, "以今日發電量替代自發自用量");
     assert.deepEqual(selfConsumption?.dependencyKeys, ["selfConsumptionEnergy", "todayGeneration"]);
     assert.deepEqual(selfConsumption?.sourceTopics, [
-      { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" },
-      { metricKey: "todayGeneration", topic: "solar/KN/today_mwh" }
+      { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" }
     ]);
   } finally {
     await app.close();

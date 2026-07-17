@@ -1,5 +1,6 @@
 import type {
   WeatherCurrentSnapshot,
+  WeatherDiagnosticCode,
   WeatherOptionsResponse,
   WeatherStationOption
 } from "@solar-display/shared";
@@ -58,6 +59,87 @@ type StationRecord = {
 const SPECIAL_NUMBER_VALUES = new Set(["-98", "-99", "990", "X"]);
 const SPECIAL_TEXT_VALUES = new Set(["", "X", "-98", "-99"]);
 const DEFAULT_CWA_DATASET_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001";
+const DNS_ERROR_CODES = new Set(["EAI_AGAIN", "ENOTFOUND"]);
+const TLS_ERROR_CODES = new Set([
+  "CERT_HAS_EXPIRED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
+]);
+
+const SAFE_SUMMARIES: Record<WeatherDiagnosticCode, string> = {
+  WEATHER_CONNECTION_TIMEOUT: "CWA connection timed out",
+  WEATHER_DNS_LOOKUP_FAILED: "CWA hostname lookup failed",
+  WEATHER_HTTP_ERROR: "CWA returned an HTTP error",
+  WEATHER_INVALID_PAYLOAD: "CWA returned an invalid payload",
+  WEATHER_REQUEST_TIMEOUT: "CWA request timed out",
+  WEATHER_TLS_FAILED: "CWA TLS connection failed",
+  WEATHER_UNCONFIGURED: "CWA authorization is not configured",
+  WEATHER_UNKNOWN_ERROR: "CWA request failed"
+};
+
+export class CwaWeatherRequestError extends Error {
+  readonly code: WeatherDiagnosticCode;
+  readonly httpStatus: number | null;
+  readonly retryable: boolean;
+  readonly safeSummary: string;
+
+  constructor(options: {
+    code: WeatherDiagnosticCode;
+    httpStatus?: number | null;
+    retryable: boolean;
+  }) {
+    const safeSummary = SAFE_SUMMARIES[options.code];
+    super(safeSummary);
+    this.name = "CwaWeatherRequestError";
+    this.code = options.code;
+    this.httpStatus = options.httpStatus ?? null;
+    this.retryable = options.retryable;
+    this.safeSummary = safeSummary;
+  }
+}
+
+function readErrorField(error: unknown, field: "code" | "name"): string | null {
+  let current = error;
+  for (let depth = 0; depth < 3 && current && typeof current === "object"; depth += 1) {
+    const value = (current as Record<string, unknown>)[field];
+    if (typeof value === "string") {
+      return value;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+function classifyRequestFailure(error: unknown) {
+  if (error instanceof CwaWeatherRequestError) {
+    return error;
+  }
+  if (error instanceof SyntaxError) {
+    return new CwaWeatherRequestError({
+      code: "WEATHER_INVALID_PAYLOAD",
+      retryable: true
+    });
+  }
+
+  const name = readErrorField(error, "name");
+  const code = readErrorField(error, "code");
+  if (name === "AbortError") {
+    return new CwaWeatherRequestError({ code: "WEATHER_REQUEST_TIMEOUT", retryable: true });
+  }
+  if (code && DNS_ERROR_CODES.has(code)) {
+    return new CwaWeatherRequestError({ code: "WEATHER_DNS_LOOKUP_FAILED", retryable: true });
+  }
+  if (code === "ETIMEDOUT") {
+    return new CwaWeatherRequestError({ code: "WEATHER_CONNECTION_TIMEOUT", retryable: true });
+  }
+  if (code && TLS_ERROR_CODES.has(code)) {
+    return new CwaWeatherRequestError({ code: "WEATHER_TLS_FAILED", retryable: true });
+  }
+
+  return new CwaWeatherRequestError({ code: "WEATHER_UNKNOWN_ERROR", retryable: true });
+}
 
 function normalizeText(value: unknown) {
   if (typeof value !== "string") {
@@ -132,7 +214,13 @@ function normalizeCurrentSnapshot(station: StationRecord, updatedAt: string): We
 
 function readStations(payload: unknown): StationRecord[] {
   const stations = (payload as { records?: { Station?: unknown } })?.records?.Station;
-  return Array.isArray(stations) ? (stations as StationRecord[]) : [];
+  if (!Array.isArray(stations)) {
+    throw new CwaWeatherRequestError({
+      code: "WEATHER_INVALID_PAYLOAD",
+      retryable: true
+    });
+  }
+  return stations as StationRecord[];
 }
 
 export class CwaWeatherClient {
@@ -184,7 +272,10 @@ export class CwaWeatherClient {
         }) ?? stations[0];
 
     if (!station) {
-      throw new Error("CWA weather station not found");
+      throw new CwaWeatherRequestError({
+        code: "WEATHER_INVALID_PAYLOAD",
+        retryable: true
+      });
     }
 
     return normalizeCurrentSnapshot(station, updatedAt);
@@ -209,10 +300,19 @@ export class CwaWeatherClient {
       });
 
       if (!response.ok) {
-        throw new Error(`CWA request failed with status ${response.status}`);
+        throw new CwaWeatherRequestError({
+          code: "WEATHER_HTTP_ERROR",
+          httpStatus: response.status,
+          retryable: response.status === 408
+            || response.status === 425
+            || response.status === 429
+            || response.status >= 500
+        });
       }
 
       return await response.json();
+    } catch (error) {
+      throw classifyRequestFailure(error);
     } finally {
       clearTimeout(timeout);
     }

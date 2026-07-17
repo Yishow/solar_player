@@ -433,7 +433,7 @@ test("GET /api/display-card-data exposes sustainability numeric card diagnostics
     assert.equal(generation?.displayValue, "18,600");
     assert.equal(generation?.originalValue, "18,600");
     assert.equal(generation?.unit, "MWh");
-    assert.equal(generation?.aggregateSource, "cumulative-counters");
+    assert.equal(generation?.aggregateSource, "CL + KN MQTT aggregate (CL today_mwh missing)");
     assert.equal(generation?.status, "ready");
 
     const trees = body.rows.find(

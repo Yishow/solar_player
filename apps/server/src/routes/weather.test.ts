@@ -206,7 +206,7 @@ test("weather management reads stay trusted while current weather stays public-s
   const app = await buildApp();
 
   try {
-    const [settingsResponse, optionsResponse, currentResponse] = await Promise.all([
+    const [settingsResponse, optionsResponse, diagnosticsResponse, currentResponse] = await Promise.all([
       app.inject({
         headers: {
           host: "player.example",
@@ -229,14 +229,179 @@ test("weather management reads stay trusted while current weather stays public-s
           origin: "https://evil.example"
         },
         method: "GET",
+        url: "/api/weather/diagnostics"
+      }),
+      app.inject({
+        headers: {
+          host: "player.example",
+          origin: "https://evil.example"
+        },
+        method: "GET",
         url: "/api/weather/current"
       })
     ]);
 
     assert.equal(settingsResponse.statusCode, 403);
     assert.equal(optionsResponse.statusCode, 403);
+    assert.equal(diagnosticsResponse.statusCode, 403);
     assert.equal(currentResponse.statusCode, 200);
     assert.equal(currentResponse.json<{ current: { fetchState: string } }>().current.fetchState, "unconfigured");
+  } finally {
+    await app.close();
+  }
+});
+
+test("weather diagnostics expose a bounded request timeout only to trusted management reads", async () => {
+  process.env.CWA_AUTHORIZATION = "test-token";
+  let fetchCount = 0;
+  globalThis.fetch = ((async () => {
+    fetchCount += 1;
+    if (fetchCount > 1) {
+      throw Object.assign(new Error("secret-token at https://internal.example/weather"), {
+        name: "AbortError"
+      });
+    }
+
+    return {
+      async json() {
+        return sampleDataset;
+      },
+      ok: true,
+      status: 200
+    };
+  }) as unknown) as typeof globalThis.fetch;
+
+  const app = await buildApp();
+
+  try {
+    const initialResponse = await app.inject({
+      method: "GET",
+      url: "/api/weather/diagnostics"
+    });
+    assert.equal(initialResponse.statusCode, 200);
+    assert.deepEqual(initialResponse.json(), {
+      diagnostic: {
+        code: null,
+        httpStatus: null,
+        lastSuccessAt: null,
+        occurredAt: null,
+        operation: null,
+        retryable: false,
+        safeSummary: "尚未執行天氣資料請求",
+        source: "unavailable",
+        state: "never-attempted"
+      }
+    });
+
+    const saveResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        countyName: "臺北市",
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
+        preset: "compact",
+        stationId: "C0I080",
+        updateIntervalMinutes: 10
+      },
+      url: "/api/weather/settings"
+    });
+    assert.equal(saveResponse.statusCode, 200);
+
+    const refreshResponse = await app.inject({
+      method: "POST",
+      url: "/api/weather/refresh"
+    });
+    assert.equal(refreshResponse.statusCode, 200);
+    assert.equal(refreshResponse.json<{ current: { fetchState: string } }>().current.fetchState, "unavailable");
+
+    const diagnosticsResponse = await app.inject({
+      method: "GET",
+      url: "/api/weather/diagnostics"
+    });
+    assert.equal(diagnosticsResponse.statusCode, 200);
+    const diagnostic = diagnosticsResponse.json<{
+      diagnostic: {
+        code: string;
+        httpStatus: number | null;
+        operation: string;
+        retryable: boolean;
+        safeSummary: string;
+        state: string;
+      };
+    }>().diagnostic;
+    assert.deepEqual(diagnostic, {
+      code: "WEATHER_REQUEST_TIMEOUT",
+      httpStatus: null,
+      lastSuccessAt: diagnosticsResponse.json<{ diagnostic: { lastSuccessAt: string | null } }>().diagnostic.lastSuccessAt,
+      occurredAt: diagnosticsResponse.json<{ diagnostic: { occurredAt: string } }>().diagnostic.occurredAt,
+      operation: "current",
+      retryable: true,
+      safeSummary: "CWA 請求逾時",
+      source: "unavailable",
+      state: "error"
+    });
+    assert.equal(diagnosticsResponse.body.includes("secret-token"), false);
+    assert.equal(diagnosticsResponse.body.includes("internal.example"), false);
+
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: "/api/weather/current"
+    });
+    assert.equal(publicResponse.statusCode, 200);
+    assert.equal(publicResponse.body.includes("WEATHER_"), false);
+    assert.equal(publicResponse.body.includes("diagnostic"), false);
+    assert.equal(publicResponse.body.includes("safeSummary"), false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("manual weather refresh bypasses cache and returns the settled upstream diagnostic", async () => {
+  process.env.CWA_AUTHORIZATION = "test-token";
+  let fetchCount = 0;
+  globalThis.fetch = ((async () => {
+    fetchCount += 1;
+    return {
+      async json() {
+        return sampleDataset;
+      },
+      ok: true,
+      status: 200
+    };
+  }) as unknown) as typeof globalThis.fetch;
+
+  const app = await buildApp();
+  try {
+    const saveResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        countyName: "臺北市",
+        enabled: true,
+        fieldKeys: ["weather", "airTemperature"],
+        locationMode: "station",
+        preset: "compact",
+        stationId: "C0I080",
+        updateIntervalMinutes: 10
+      },
+      url: "/api/weather/settings"
+    });
+    assert.equal(saveResponse.statusCode, 200);
+    fetchCount = 0;
+
+    const currentResponse = await app.inject({ method: "GET", url: "/api/weather/current" });
+    assert.equal(currentResponse.statusCode, 200);
+    assert.equal(fetchCount, 1);
+
+    const refreshResponse = await app.inject({ method: "POST", url: "/api/weather/refresh" });
+    assert.equal(refreshResponse.statusCode, 200);
+    assert.equal(fetchCount, 2);
+    assert.equal(refreshResponse.json<{ diagnostic: { source: string } }>().diagnostic.source, "upstream");
+
+    const publicResponse = await app.inject({ method: "GET", url: "/api/weather/current" });
+    assert.equal(publicResponse.statusCode, 200);
+    assert.equal(publicResponse.body.includes("diagnostic"), false);
+    assert.equal(publicResponse.body.includes("source"), false);
   } finally {
     await app.close();
   }

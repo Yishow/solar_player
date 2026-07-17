@@ -888,6 +888,63 @@
 }
 
 /* weather card */
+.mqtt-settings-page .mqtt-weather-diagnostic {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid rgba(92, 105, 79, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 253, 248, 0.72);
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic.is-error {
+  border-color: rgba(181, 70, 58, 0.34);
+  background: rgba(255, 240, 238, 0.72);
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic.is-warning {
+  border-color: rgba(201, 136, 26, 0.32);
+  background: rgba(252, 240, 217, 0.72);
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__header div,
+.mqtt-settings-page .mqtt-weather-diagnostic__details div {
+  display: grid;
+  gap: 2px;
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__header small,
+.mqtt-settings-page .mqtt-weather-diagnostic p,
+.mqtt-settings-page .mqtt-weather-diagnostic__details {
+  margin: 0;
+  color: #6f766f;
+  font-size: 13px;
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__details dt {
+  color: #7f867f;
+}
+
+.mqtt-settings-page .mqtt-weather-diagnostic__details dd {
+  margin: 0;
+  color: #344039;
+  overflow-wrap: anywhere;
+}
+
 .mqtt-settings-page .mqtt-weather-card__controls {
   display: grid;
   gap: 14px;

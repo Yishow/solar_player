@@ -88,6 +88,91 @@ test("GET /api/settings/mqtt denies untrusted readers while runtime mqtt bootstr
   }
 });
 
+test("POST factory generation baseline reset requires trusted access and exact current confirmation", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+  database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('totalGeneration', 2000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
+  `).run();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+    VALUES ('generation', 2000000, CURRENT_TIMESTAMP, 0)
+  `).run();
+  const sourceTimestamp = new Date().toISOString();
+  const insertSource = database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, 'MWh', ?, 'good', ?)
+  `);
+  for (const [factory, values] of [
+    ["cl", { month: 20, today: 2, total: 800 }],
+    ["kn", { month: 10, today: 1, total: 300 }]
+  ] as const) {
+    const rawPayload = JSON.stringify({
+      month_mwh: values.month,
+      timestamp: sourceTimestamp,
+      today_mwh: values.today,
+      total_mwh: values.total
+    });
+    insertSource.run(`factoryGeneration.${factory}.todayMwh`, values.today, sourceTimestamp, rawPayload);
+    insertSource.run(`factoryGeneration.${factory}.monthMwh`, values.month, sourceTimestamp, rawPayload);
+    insertSource.run(`factoryGeneration.${factory}.totalMwh`, values.total, sourceTimestamp, rawPayload);
+  }
+
+  const app = await buildApp();
+  try {
+    const denied = await app.inject({
+      headers: {
+        host: "player.example",
+        origin: "https://evil.example"
+      },
+      method: "POST",
+      payload: { expectedTotalMwh: 1100 },
+      url: "/api/settings/mqtt/factory-generation/reset-baseline"
+    });
+    assert.equal(denied.statusCode, 403);
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+      2000
+    );
+
+    const mismatch = await app.inject({
+      method: "POST",
+      payload: { expectedTotalMwh: 1099 },
+      url: "/api/settings/mqtt/factory-generation/reset-baseline"
+    });
+    assert.equal(mismatch.statusCode, 409);
+    assert.equal(mismatch.json<{ reason: string }>().reason, "confirmation-mismatch");
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+      2000
+    );
+
+    const accepted = await app.inject({
+      method: "POST",
+      payload: { expectedTotalMwh: 1100 },
+      url: "/api/settings/mqtt/factory-generation/reset-baseline"
+    });
+    assert.equal(accepted.statusCode, 200);
+    assert.deepEqual(accepted.json(), {
+      reset: {
+        acceptedTotalMwh: 1100,
+        previousTotalMwh: 2000,
+        updatedAt: sourceTimestamp
+      },
+      success: true
+    });
+  } finally {
+    database.prepare("DELETE FROM live_metric_values").run();
+    database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+    await app.close();
+  }
+});
+
 test("GET /api/settings/mqtt/topics exposes broker status alongside topic and readiness snapshots", async () => {
   migrateDatabase();
   seedDatabase();

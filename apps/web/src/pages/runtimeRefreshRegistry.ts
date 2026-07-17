@@ -57,7 +57,7 @@ const runtimeRefreshRegistry: Record<DisplayPageKey, RuntimeRefreshRegistryEntry
   },
   sustainability: {
     refreshKey: (context) => `sustainability:${context.selectedPeriod ?? "lifetime"}`,
-    refreshScopes: ["sustainability"],
+    refreshScopes: ["sustainability", "playback"],
     sourceKind: "sustainability-story"
   }
 };

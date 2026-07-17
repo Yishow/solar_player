@@ -91,6 +91,85 @@ test("enabled topic mapping ingests under its metric_key without a metric_key wh
   }
 });
 
+test("CL and KN summaries produce canonical generation while a disabled legacy direct topic cannot overwrite it", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("UPDATE mqtt_settings SET message_timeout = 60, data_mode = 'mqtt'").run();
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = 'totalGeneration'").run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES ('totalGeneration', 'legacy/solar/total', 'kWh', '$.value', 1, 0, 3, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run();
+
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    }
+  });
+  const clTimestamp = new Date(Date.now() - 10_000).toISOString();
+  const knTimestamp = new Date(Date.now() - 20_000).toISOString();
+
+  try {
+    await service.connect();
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      today_mwh: 3.49,
+      month_mwh: 366.93,
+      total_mwh: 9986.306,
+      timestamp: clTimestamp
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").get(), undefined);
+
+    client.emit("message", "solar/KN/summary", Buffer.from(JSON.stringify({
+      today_mwh: 2.92,
+      month_mwh: 265.77,
+      total_mwh: 3659.570,
+      timestamp: knTimestamp
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(
+      database
+        .prepare(
+          `
+            SELECT metric_key, value, unit, timestamp
+            FROM live_metric_values
+            WHERE metric_key IN ('todayGeneration', 'monthGeneration', 'totalGeneration')
+            ORDER BY metric_key
+          `
+        )
+        .all(),
+      [
+        { metric_key: "monthGeneration", value: 632.7, unit: "MWh", timestamp: knTimestamp },
+        { metric_key: "todayGeneration", value: 6.41, unit: "MWh", timestamp: knTimestamp },
+        { metric_key: "totalGeneration", value: 13645.876, unit: "MWh", timestamp: knTimestamp }
+      ]
+    );
+
+    client.emit("message", "legacy/solar/total", Buffer.from(JSON.stringify({ value: 999999999 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+      13645.876
+    );
+  } finally {
+    await service.disconnect();
+  }
+});
+
 test("mapped MQTT live metrics publish playback sync only when runtime availability changes", async () => {
   migrateDatabase();
   seedDatabase();
@@ -144,7 +223,7 @@ test("mapped MQTT live metrics publish playback sync only when runtime availabil
     await new Promise((resolve) => setImmediate(resolve));
 
     const snapshot = readLiveMetricsSnapshot(database);
-    assert.equal(snapshot.metrics.todayGeneration?.value, 4001);
+    assert.equal(snapshot.metrics["factoryGeneration.cl.todayMwh"]?.value, 4001);
     assert.deepEqual(
       displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
       [{ reason: "mqtt-live-runtime-availability-updated", scope: "mqtt" }]
@@ -170,10 +249,12 @@ test("solar runtime availability accepts derived self consumption inputs", async
   );
   for (const metricKey of [
     "realTimePower",
-    "todayGeneration",
-    "totalGeneration",
-    "todayCo2Reduction",
-    "totalCo2Reduction",
+    "factoryGeneration.cl.todayMwh",
+    "factoryGeneration.cl.monthMwh",
+    "factoryGeneration.cl.totalMwh",
+    "factoryGeneration.kn.todayMwh",
+    "factoryGeneration.kn.monthMwh",
+    "factoryGeneration.kn.totalMwh",
     "selfConsumptionEnergy",
     "consumptionEnergy",
     "systemEfficiency"
@@ -191,8 +272,12 @@ test("solar runtime availability accepts derived self consumption inputs", async
     "realTimePower",
     "todayGeneration",
     "totalGeneration",
-    "todayCo2Reduction",
-    "totalCo2Reduction",
+    "factoryGeneration.cl.todayMwh",
+    "factoryGeneration.cl.monthMwh",
+    "factoryGeneration.cl.totalMwh",
+    "factoryGeneration.kn.todayMwh",
+    "factoryGeneration.kn.monthMwh",
+    "factoryGeneration.kn.totalMwh",
     "selfConsumptionEnergy",
     "consumptionEnergy"
   ]) {

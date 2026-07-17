@@ -69,6 +69,7 @@ def print_result(
         f"今日: {fmt(summary.get('today_mwh'), '.2f')} MWh  |  "
         f"本月: {fmt(summary.get('month_mwh'), '.2f')} MWh"
     )
+    print(f"  累積: {fmt(summary.get('total_mwh'), '.3f')} MWh")
     print("-" * 60)
     for z in zones:
         print(
@@ -80,10 +81,11 @@ def print_result(
     print("-" * 60)
     print(f"  MQTT: {'OK' if mqtt_ok else 'FAIL'}   prefix={prefix}/{factory}")
     print("-" * 60)
-    print(f"    → {prefix}/{factory}/summary          (JSON) total_power_kw, today_mwh, month_mwh")
+    print(f"    → {prefix}/{factory}/summary          (JSON) total_power_kw, today_mwh, month_mwh, total_mwh")
     print(f"    → {prefix}/{factory}/total_power_kw   {fmt(summary.get('total_power_kw'), '.1f')} kW")
     print(f"    → {prefix}/{factory}/today_mwh        {fmt(summary.get('today_mwh'), '.2f')} MWh")
     print(f"    → {prefix}/{factory}/month_mwh        {fmt(summary.get('month_mwh'), '.2f')} MWh")
+    print(f"    → {prefix}/{factory}/total_mwh        {fmt(summary.get('total_mwh'), '.3f')} MWh")
     print(f"    → {prefix}/{factory}/status           (JSON) running / stopped / paused")
     print(f"    → {prefix}/{factory}/heartbeat        (JSON) 每 N 秒")
     print(f"    → {prefix}/{factory}/alert            (JSON) 異常通知")

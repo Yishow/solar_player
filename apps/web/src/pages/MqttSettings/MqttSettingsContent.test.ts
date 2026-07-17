@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import type { WeatherCurrentSnapshot, WeatherHeaderContract, WeatherOptionsResponse, WeatherSettings } from "@solar-display/shared";
+import type { WeatherCurrentSnapshot, WeatherDiagnostic, WeatherHeaderContract, WeatherOptionsResponse, WeatherSettings } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MqttSettingsContent } from "./MqttSettingsContent";
 
 const mqttSettingsCss = readFileSync(
   new URL("./mqttSettings.css", import.meta.url),
+  "utf8"
+);
+const mqttSettingsIndexSource = readFileSync(
+  new URL("./index.tsx", import.meta.url),
   "utf8"
 );
 
@@ -131,6 +135,21 @@ function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): 
       }
     ],
     updatedAt: "2026-05-23T06:20:00.000Z",
+    ...overrides
+  };
+}
+
+function createWeatherDiagnostic(overrides: Partial<WeatherDiagnostic> = {}): WeatherDiagnostic {
+  return {
+    code: null,
+    httpStatus: null,
+    lastSuccessAt: null,
+    occurredAt: null,
+    operation: null,
+    retryable: false,
+    safeSummary: "尚未執行天氣資料請求",
+    source: "unavailable",
+    state: "never-attempted",
     ...overrides
   };
 }
@@ -1169,6 +1188,110 @@ test("mqtt settings content renders weather controls and preview inside the weat
   assert.match(html, /板橋 多雲 30°C/);
   assert.match(html, /精簡/);
   assert.doesNotMatch(html, /field selection controls/i);
+});
+
+test("mqtt settings content keeps the latest bounded weather diagnostic visible and copyable", () => {
+  const html = renderContent({
+    weatherDiagnostic: createWeatherDiagnostic({
+      code: "WEATHER_DNS_LOOKUP_FAILED",
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:22:00.000Z",
+      operation: "options",
+      retryable: true,
+      safeSummary: "無法解析 CWA 主機名稱",
+      state: "error"
+    })
+  });
+
+  assert.match(html, /data-weather-diagnostic-state="error"/);
+  assert.match(html, /WEATHER_DNS_LOOKUP_FAILED/);
+  assert.match(html, /測站／縣市選項/);
+  assert.match(html, /可重試/);
+  assert.match(html, /無法解析 CWA 主機名稱/);
+  assert.match(html, /data-weather-diagnostic-copy/);
+  assert.doesNotMatch(html, /Authorization=/);
+  assert.doesNotMatch(html, /internal\.example/);
+});
+
+test("Support manual weather refresh with source, stale state, and transport failure stage", () => {
+  const upstreamHtml = renderContent({
+    weatherDiagnostic: createWeatherDiagnostic({
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:20:00.000Z",
+      operation: "current",
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "upstream",
+      state: "ok"
+    })
+  });
+  assert.match(upstreamHtml, /data-weather-diagnostic-source="upstream"/);
+  assert.match(upstreamHtml, /即時上游/);
+
+  const cacheHtml = renderContent({
+    weatherDiagnostic: createWeatherDiagnostic({
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:20:00.000Z",
+      operation: "current",
+      safeSummary: "CWA 天氣資料取得成功",
+      source: "cache",
+      state: "ok"
+    })
+  });
+  assert.match(cacheHtml, /data-weather-diagnostic-source="cache"/);
+  assert.match(cacheHtml, /快取資料/);
+
+  const staleHtml = renderContent({
+    weatherDiagnostic: createWeatherDiagnostic({
+      code: "WEATHER_DNS_LOOKUP_FAILED",
+      lastSuccessAt: "2026-05-23T06:20:00.000Z",
+      occurredAt: "2026-05-23T06:22:00.000Z",
+      operation: "current",
+      retryable: true,
+      safeSummary: "無法解析 CWA 主機名稱",
+      source: "stale",
+      state: "error"
+    }),
+    weatherPreviewContract: createWeatherPreviewContract({
+      current: createWeatherCurrent({
+        fetchState: "stale",
+        staleAt: "2026-05-23T06:22:00.000Z"
+      })
+    })
+  });
+  assert.match(staleHtml, /data-weather-diagnostic-source="stale"/);
+  assert.match(staleHtml, /data-weather-diagnostic-stage="dns"/);
+  assert.match(staleHtml, /使用舊資料/);
+  assert.match(staleHtml, /WEATHER_DNS_LOOKUP_FAILED/);
+  assert.match(staleHtml, />DNS</);
+
+  const unavailableHtml = renderContent({
+    weatherDiagnostic: createWeatherDiagnostic({
+      code: "WEATHER_CONNECTION_TIMEOUT",
+      occurredAt: "2026-05-23T06:23:00.000Z",
+      operation: "current",
+      retryable: true,
+      safeSummary: "CWA 連線逾時",
+      source: "unavailable",
+      state: "error"
+    })
+  });
+  assert.match(unavailableHtml, /data-weather-diagnostic-source="unavailable"/);
+  assert.match(unavailableHtml, /data-weather-diagnostic-stage="connect"/);
+  assert.match(unavailableHtml, /無可用資料/);
+  assert.match(unavailableHtml, /WEATHER_CONNECTION_TIMEOUT/);
+});
+
+test("mqtt settings refreshes weather diagnostics after options and manual current operations without page reload", () => {
+  assert.match(mqttSettingsIndexSource, /getWeatherDiagnostics/);
+  assert.match(
+    mqttSettingsIndexSource,
+    /getWeatherOptions[\s\S]{0,1800}finally[\s\S]{0,300}loadWeatherDiagnostic/
+  );
+  assert.match(
+    mqttSettingsIndexSource,
+    /const refreshWeather[\s\S]{0,1800}finally[\s\S]{0,300}loadWeatherDiagnostic/
+  );
+  assert.doesNotMatch(mqttSettingsIndexSource, /location\.reload/);
 });
 
 test("mqtt settings content exposes custom field controls and unavailable preview fallback", () => {

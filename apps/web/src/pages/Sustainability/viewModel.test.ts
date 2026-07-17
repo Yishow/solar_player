@@ -253,6 +253,54 @@ test("buildSustainabilityViewModel formats generation and trees as integers whil
   assert.equal(co2Highlight?.value, "38");
 });
 
+test("buildSustainabilityViewModel formats the CL and KN cumulative generation and derived CO2", () => {
+  const aggregateStory = structuredClone(periodStory);
+  const lifetime = aggregateStory.periods.lifetime!;
+  lifetime.bigNumbers.accumulatedGenerationGwh = 13.645876;
+  lifetime.bigNumbers.accumulatedCarbonReductionTons = 6754.709;
+  lifetime.bigNumberProvenance!.accumulatedGenerationGwh = {
+    label: "累積發電",
+    source: "CL + KN MQTT aggregate",
+    sourceClass: "runtime-aggregate",
+    syncState: "fresh",
+    updatedAt: "2026-06-26T15:37:55+08:00"
+  };
+
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "lifetime",
+    story: aggregateStory
+  });
+
+  assert.equal(model.bigNumbers[0]?.value, "13,646");
+  assert.equal(model.bigNumbers[1]?.value, "6,754.7");
+  assert.match(model.bigNumbers[0]?.sourceTooltip ?? "", /CL \+ KN MQTT aggregate/);
+  assert.equal(model.bigNumbers[0]?.provenance.updatedAt, "2026-06-26T15:37:55+08:00");
+});
+
+test("buildSustainabilityViewModel preserves CL-only values and provenance", () => {
+  const clStory = structuredClone(periodStory);
+  const lifetime = clStory.periods.lifetime!;
+  lifetime.bigNumbers.accumulatedGenerationGwh = 9.986306;
+  lifetime.bigNumbers.accumulatedCarbonReductionTons = 4943.221;
+  lifetime.bigNumberProvenance!.accumulatedGenerationGwh = {
+    label: "累積發電",
+    source: "CL MQTT",
+    sourceClass: "runtime-aggregate",
+    syncState: "fresh",
+    updatedAt: "2026-06-26T15:38:10+08:00"
+  };
+
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "lifetime",
+    story: clStory
+  });
+
+  assert.equal(model.bigNumbers[0]?.value, "9,986");
+  assert.equal(model.bigNumbers[1]?.value, "4,943.2");
+  assert.match(model.bigNumbers[0]?.sourceTooltip ?? "", /CL MQTT/);
+  assert.doesNotMatch(model.bigNumbers[0]?.sourceTooltip ?? "", /KN MQTT/);
+});
+
 test("buildSustainabilityViewModel labels are fixed built-ins with no metric_key topic-name binding", () => {
   // Scope boundary for mqtt-topic-custom-display-names: Sustainability cards are
   // driven by an aggregate SustainabilityStoryInput (period big numbers), not by

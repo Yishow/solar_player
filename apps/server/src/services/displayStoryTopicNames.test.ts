@@ -46,13 +46,13 @@ test("overview story falls back to built-in default when custom name is empty", 
   assert.equal(metric?.label, "即時發電功率");
 });
 
-test("solar story uses custom topic name as label when set", () => {
+test("solar story ignores the disabled legacy direct generation topic name", () => {
   setTopicName("todayGeneration", "今日產出", "Today Output");
 
   const story = storyService.readSolarDisplayStory();
   const kpi = story.kpis.find((entry) => entry.metricKey === "todayGeneration");
 
-  assert.equal(kpi?.label, "今日產出");
+  assert.equal(kpi?.label, "今日發電量");
   // restore
   setTopicName("todayGeneration", null, null);
 });
