@@ -750,3 +750,402 @@ tests:
   - apps/server/src/routes/circuits.test.ts
   - apps/server/src/services/displayStoryService.test.ts
 -->
+
+---
+### Requirement: Shared monitoring story can apply a display-only sub-ton CO2 unit preference
+
+The system SHALL allow the shared monitoring story output for CO2 metrics to apply a display-only unit preference without changing the underlying carbon reduction calculation basis. When the global CO2 display preference is enabled and a CO2 metric's computed base unit is `t`, any non-zero value whose absolute magnitude is less than 1 SHALL be rendered for display as `kg` using `t * 1000`. Values equal to 0 SHALL remain displayed as `t`, values whose absolute magnitude is 1 or greater SHALL remain displayed as `t`, and unavailable values SHALL keep their existing fallback display.
+
+#### Scenario: Enabled preference converts sub-ton CO2 displays to kilograms
+
+- **WHEN** the global CO2 display preference is enabled
+- **AND** a shared monitoring story CO2 metric resolves to a non-zero value smaller than 1 ton in magnitude
+- **THEN** the story display output renders that metric in kilograms
+- **AND** the converted value equals the ton value multiplied by 1000
+
+##### Example: Overview and Solar share the same converted display
+
+| Base tons | Preference | Display value | Display unit |
+| --------- | ---------- | ------------- | ------------ |
+| 0.011781  | true       | 11.8          | kg           |
+| 0.495     | true       | 495           | kg           |
+
+#### Scenario: Disabled preference keeps ton display
+
+- **WHEN** the global CO2 display preference is disabled
+- **AND** a shared monitoring story CO2 metric resolves to a value smaller than 1 ton in magnitude
+- **THEN** the story display output keeps the metric displayed in tons
+
+##### Example: Disabled preference preserves ton output
+
+| Base tons | Preference | Display value | Display unit |
+| --------- | ---------- | ------------- | ------------ |
+| 0.011781  | false      | 0.01          | t            |
+| 0.495     | false      | 0.5           | t            |
+
+#### Scenario: Zero, fallback, and full-ton values do not switch units
+
+- **WHEN** the global CO2 display preference is enabled
+- **THEN** zero-ton values stay displayed in tons, unavailable values keep their existing fallback display, and values whose absolute magnitude is 1 ton or greater stay displayed in tons
+
+##### Example: Non-converted cases
+
+| Base value | Base unit | Preference | Display value | Display unit |
+| ---------- | --------- | ---------- | ------------- | ------------ |
+| 0          | t         | true       | 0             | t            |
+| 1          | t         | true       | 1             | t            |
+| --         | t         | true       | --            | t            |
+
+<!-- @trace
+source: add-global-small-co2-display-toggle
+updated: 2026-07-21
+code:
+  - apps/server/src/services/displayValueOverrideService.ts
+  - apps/web/src/pages/Overview/layout.ts
+  - apps/server/src/db/seed.ts
+  - tests/browser/fixtures/runtime.ts
+  - deploy/configure-pi5-fan-control.sh
+  - apps/server/src/routes/data-source.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
+  - apps/server/src/env.ts
+  - scripts/fhd-witness-config.mjs
+  - solar_mqtt/web/app.js
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - apps/server/src/db/migrations/022_factory_peak_multiplier.sql
+  - apps/web/src/components/AppHeader.tsx
+  - apps/server/src/db/migrations/020_fix_factory_circuit_site_counts.sql
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
+  - apps/web/src/hooks/useHeaderWeatherMeta.ts
+  - deploy/start-solar-kiosk.sh
+  - packages/shared/src/householdEquivalence.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - apps/web/src/pages/shared/monitoringSourceTooltip.ts
+  - apps/server/src/db/migrations/024_fix_factory_circuit_jungli_region_rows.sql
+  - .agents/skills/pi5-deployment/agents/openai.yaml
+  - package.json
+  - apps/server/src/services/weatherService.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasPane.tsx
+  - apps/web/src/hooks/displayTransition.ts
+  - deploy/verify-kiosk-install.sh
+  - apps/web/src/pages/CircuitSettings/viewModel.ts
+  - docs/ops/fhd-closeout.md
+  - docs/ops/judgment.md
+  - apps/web/src/hooks/weatherPolling.ts
+  - deploy/install-tailscale.sh
+  - apps/web/package.json
+  - solar_mqtt/solar/mosquitto.py
+  - deploy/configure-lightweight-desktop.sh
+  - deploy/disable-xfce-display-popups.sh
+  - apps/web/src/pages/Images/index.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - deploy/configure-hotspot-priority.sh
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - apps/web/src/styles/global.css
+  - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
+  - docs/ops/maintenance.md
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/pages/managementDisplaySyncScopes.ts
+  - apps/server/src/routes/device.ts
+  - apps/web/src/pages/FactoryCircuit/layout.ts
+  - packages/shared/src/sustainabilityStory.ts
+  - apps/server/src/db/migrations/021_playback_runtime_freshness_policy.sql
+  - apps/server/src/services/displaySeedAssetBootstrapService.ts
+  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/server/src/services/displayReadinessService.ts
+  - apps/server/src/services/imageContentValidation.ts
+  - apps/web/src/pages/shared/displayPageTemplateLoaders.ts
+  - apps/web/src/services/api.ts
+  - solar_mqtt/solar/scraper.py
+  - apps/server/src/services/weatherSettingsService.ts
+  - deploy/disable-display-sleep.sh
+  - apps/server/src/services/DailySummaryService.ts
+  - docs/roadmaps/2026-07-13-project-improvement-roadmap.md
+  - apps/web/src/pages/Solar/viewModel.ts
+  - deploy/raspi-bootstrap.sh
+  - scripts/generate-release-manifest.mjs
+  - scripts/verify.mjs
+  - apps/web/src/hooks/useDisplayStoryRuntime.ts
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - docs/ops/dispatch.md
+  - deploy.sh
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/ImageManagement/imageManagement.css
+  - apps/web/src/styles/management.css
+  - deploy/tailscale-hotspot-trigger.sh
+  - apps/web/src/pages/Sustainability/sustainability.css
+  - apps/server/src/db/migrations/025_cl_kn_generation_summary_topics.sql
+  - apps/web/src/pages/Overview/OverviewKpiFooter.tsx
+  - apps/server/src/routes/images.ts
+  - packages/shared/src/displayReadiness.ts
+  - packages/shared/src/playback.ts
+  - apps/server/src/services/calculationSettingsService.ts
+  - apps/web/src/pages/Images/images.css
+  - apps/web/src/pages/MqttSettings/factoryTopicSites.ts
+  - .env.example
+  - apps/server/src/services/displayCardDataService.ts
+  - CLAUDE.md
+  - packages/shared/src/types.ts
+  - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
+  - apps/web/src/components/StatusBadge.tsx
+  - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.ts
+  - docs/ops/diagnosis.md
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - solar_mqtt/web/styles.css
+  - apps/web/src/pages/shared/displayPageRouteHostFrame.tsx
+  - scripts/check-web-bundle-budget.mjs
+  - apps/web/src/pages/CircuitSettings/loadModel.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/server/src/db/migrations/019_circuit_page_scope.sql
+  - apps/server/src/services/cwaWeatherClient.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
+  - deploy/tailscale-hotspot-trigger.timer
+  - docs/ops/conventions.md
+  - apps/web/src/pages/Images/viewModel.ts
+  - apps/web/src/pages/MqttSettings/loadModel.ts
+  - apps/server/scripts/run-tests.test.mjs
+  - packages/shared/src/index.ts
+  - packages/shared/src/displayCardData.ts
+  - apps/server/src/routes/circuits.ts
+  - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
+  - apps/web/src/components/headerWeatherMeta.ts
+  - apps/server/src/db/migrations/023_normalize_factory_circuit_jungli_rows.sql
+  - apps/server/scripts/run-tests.mjs
+  - .agents/skills/pi5-deployment/SKILL.md
+  - packages/shared/src/weather.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/server/src/services/displayPagePublishingService.ts
+  - apps/server/src/db/migrations/018_display_value_overrides.sql
+  - apps/web/src/pages/PlaybackSettings/playbackSettings.css
+  - deploy/export-runtime-state.sh
+  - docs/runbooks/raspi-onekey-kiosk-deploy.md
+  - apps/server/src/services/deviceLogService.ts
+  - apps/server/src/config.ts
+  - apps/web/src/pages/DeviceStatus/loadModel.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/shared/DisplayLeafOrnament.tsx
+  - solar_mqtt/solar/anomaly.py
+  - solar_mqtt/solar_config.single.example.json
+  - docs/openapi.yaml
+  - apps/web/src/pages/Sustainability/viewModel.ts
+  - scripts/verify.test.mjs
+  - docs/ops/letter.md
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - apps/server/src/app.ts
+  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
+  - apps/web/src/pages/shared/displayPageRouteHost.tsx
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - packages/shared/src/displayStory.ts
+  - solar_mqtt/solar_config.kn_cl.example.json
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - apps/server/src/db/migrations/017_weather_update_interval.sql
+  - apps/server/src/routes/display-card-data.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/server/src/routes/display-story.ts
+  - solar_mqtt/solar_config.json
+  - docs/ops/delegation.md
+  - solar_mqtt/solar/config.py
+  - solar_mqtt/solar_config.mosquitto.example.json
+  - apps/web/src/hooks/useOverviewWeather.ts
+  - apps/web/src/pages/AssetLibrary/index.tsx
+  - apps/web/src/pages/shared/displaySurfaceChrome.css
+  - deploy/tailscale-hotspot-trigger.service
+  - scripts/raspi-onekey-deploy.sh
+  - apps/web/src/hooks/usePageRotation.ts
+  - solar_mqtt/web/vendor/mqtt.min.js
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - deploy/read-solar-display-journal.sh
+  - apps/server/src/routes/weather.ts
+  - scripts/verify-weather-connectivity.test.mjs
+  - apps/server/src/routes/metrics-history.ts
+  - apps/web/src/pages/Overview/overview.css
+  - deploy/apply-desktop-theme.sh
+  - deploy.md
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/web/src/pages/ImageManagement/index.tsx
+  - apps/server/src/serverRuntimeGuard.ts
+  - apps/server/src/db/migrations/001_init.sql
+  - apps/web/src/pages/Solar/runtimeContent.tsx
+  - apps/web/src/pages/Sustainability/householdEquivalentRuntime.ts
+  - AGENTS.md
+  - playwright.config.ts
+  - scripts/verify-weather-connectivity.mjs
+  - solar_mqtt/solar/__init__.py
+  - solar_mqtt/solar/storage.py
+  - apps/web/src/pages/Solar/solar.css
+  - solar_mqtt/solar/heartbeat.py
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - deploy/restore-runtime-state.sh
+  - apps/web/src/styles/tokens.css
+  - apps/server/package.json
+  - apps/web/src/pages/CircuitSettings/circuitSettings.css
+  - deploy/deploy.sh
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/server/src/mqtt/MqttClientService.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - scripts/deploy.test.mjs
+  - solar_mqtt/solar/winsvc.py
+  - apps/server/src/services/displayRotationService.ts
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/server/src/services/releaseIdentityService.ts
+  - packages/shared/src/displayPageConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - scripts/run-browser-smoke.mjs
+  - README.md
+  - apps/web/src/pages/Sustainability/index.tsx
+  - solar_mqtt/web/index.html
+  - solar_mqtt/solar/schedule.py
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/components/displayPageCards.tsx
+  - apps/web/src/pages/CircuitSettings/index.tsx
+  - solar_mqtt/solar/discovery.py
+  - solar_mqtt/solar/service.py
+  - solar_mqtt/scrape_solar.py
+  - deploy/install-kiosk.sh
+  - apps/web/src/pages/Overview/assets.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorProfiler.tsx
+  - apps/server/src/services/displayPageRegistryService.ts
+  - solar_mqtt/solar/mqtt_bus.py
+  - apps/server/src/db/migrations/004_playback.sql
+  - apps/web/src/pages/PlaybackSettings/viewModel.ts
+  - apps/web/src/services/socket.ts
+  - solar_mqtt/solar/display.py
+  - apps/web/src/pages/AssetLibrary/assetLibrary.css
+  - apps/web/src/hooks/useLiveMetrics.ts
+tests:
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/PlaybackSettings/viewModel.test.ts
+  - apps/web/src/pages/Overview/widgetStyles.test.ts
+  - apps/server/src/routes/circuits.test.ts
+  - apps/server/src/services/displaySeedAssetBootstrapService.test.ts
+  - apps/web/src/pages/Overview/layout.test.ts
+  - apps/web/src/pages/fhdWitnessTooling.test.ts
+  - apps/web/src/pages/shared/displayPageTemplateLoaders.test.ts
+  - apps/web/src/pages/MqttSettings/loadModel.test.ts
+  - apps/web/src/app/router.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/pages/Solar/cardFamily.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/server/src/services/imageContentValidation.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/services/cwaWeatherClient.test.ts
+  - apps/web/src/pages/DataSourceSettings/index.test.tsx
+  - apps/web/src/pages/SlideshowPreview/viewModel.test.ts
+  - apps/server/src/services/weatherSettingsService.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/activeSurfaceRecompute.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/pages/FactoryCircuit/index.test.tsx
+  - apps/web/src/components/displayPageCards.test.tsx
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/web/src/pages/Overview/densityViewModel.test.ts
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/services/releaseIdentityService.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/web/src/pages/Overview/kpiFooter.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorProfiler.test.tsx
+  - apps/server/src/serverRuntimeGuard.test.ts
+  - apps/web/src/pages/DeviceStatus/index.test.tsx
+  - solar_mqtt/test_config_path.py
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - apps/web/src/pages/FactoryCircuit/cardFamily.test.ts
+  - apps/web/src/pages/displayPageFreeformObjectRuntime.test.tsx
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/services/displayReadinessService.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/pages/Overview/cardVisibility.test.ts
+  - apps/web/src/pages/PlaybackSettings/loadModel.test.ts
+  - apps/web/src/hooks/weatherHooks.test.ts
+  - apps/web/src/pages/Solar/layout.test.ts
+  - apps/web/src/components/headerWeatherMeta.test.ts
+  - apps/server/src/services/weatherService.test.ts
+  - apps/web/src/pages/FactoryCircuit/runtimeIsolation.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/editorStaging.test.tsx
+  - apps/web/src/pages/Solar/runtimeIsolation.test.tsx
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/hooks/displayTransition.test.ts
+  - apps/server/src/services/DailySummaryService.test.ts
+  - apps/web/src/pages/FactoryCircuit/layout.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/web/src/pages/AssetLibrary/index.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
+  - apps/server/src/routes/images.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/server/src/db/migrations/factoryCircuitJungliRows.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - apps/web/src/pages/runtimeConfigHydration.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - solar_mqtt/test_mqtt_retain.py
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/web/src/pages/CircuitSettings/loadModel.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
+  - apps/web/src/pages/shared/displayPageRouteHost.test.tsx
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/web/src/pages/MqttSettings/weatherFieldPresets.test.ts
+  - apps/server/src/appOpenapiDocs.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - tests/browser/critical-journeys.spec.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/server/src/db/displayPageRegistrySeed.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/db/factoryCircuitPageScopeMigration.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/server/src/env.test.ts
+  - apps/server/src/routes/display-readiness.test.ts
+  - apps/server/src/routes/display-pages.test.ts
+  - apps/web/src/pages/Images/viewModel.test.ts
+  - apps/web/src/pages/managementDisplaySync.test.ts
+  - solar_mqtt/test_web_assets.py
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/db/migrations/weatherUpdateInterval.test.ts
+  - apps/web/src/hooks/playbackRuntimeRefresh.test.ts
+  - apps/server/src/routes/openapi-contract.test.ts
+  - apps/web/src/pages/Overview/render.test.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/web/src/pages/Overview/widgets/WeatherCardWidget.test.tsx
+  - apps/web/src/pages/Overview/widgets/overviewWidgets.test.tsx
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/server/src/services/deviceLogService.test.ts
+  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/displayPageIconRendering.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/layouts/brandBootstrap.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+-->
