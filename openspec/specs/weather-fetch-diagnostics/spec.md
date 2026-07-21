@@ -43,6 +43,7 @@ The server SHALL classify failures from current-weather and weather-options requ
 | Invalid CWA payload | `WEATHER_INVALID_PAYLOAD` | true |
 | Unknown failure | `WEATHER_UNKNOWN_ERROR` | true |
 
+---
 ### Requirement: Retain the latest bounded weather operation diagnostic
 
 The weather service SHALL retain the latest current-weather or weather-options operation result in memory, including its state, operation, occurrence time, last successful operation time, safe code, safe summary, optional HTTP status, and retryable flag.
@@ -67,6 +68,7 @@ The weather service SHALL retain the latest current-weather or weather-options o
 - **THEN** the diagnostic state SHALL be `never-attempted`
 - **AND** operation, code, occurrence time, and last success time SHALL be null
 
+---
 ### Requirement: Expose diagnostics only through a trusted management endpoint
 
 The server SHALL expose the latest bounded weather diagnostic through `GET /api/weather/diagnostics` only to trusted management readers, while keeping public playback weather contracts free of diagnostic details.
@@ -87,3 +89,105 @@ The server SHALL expose the latest bounded weather diagnostic through `GET /api/
 
 - **WHEN** any client requests the public current-weather contract
 - **THEN** the response SHALL NOT include diagnostic code, raw error, request URL, token, credentials, stack trace, or internal hostname fields
+
+---
+### Requirement: Identify the source of each weather operation result
+
+The trusted weather diagnostic SHALL identify whether the latest operation result came from a live upstream response, cache, stale fallback, or no available snapshot while keeping public weather contracts free of diagnostic details.
+
+#### Scenario: Upstream returns a structurally invalid success document
+
+- **WHEN** CWA responds with HTTP 200 but `records.Station` is missing or is not an array
+- **THEN** the operation SHALL fail with `WEATHER_INVALID_PAYLOAD`
+- **AND** it SHALL NOT expose a fresh empty station/options result
+
+#### Scenario: Manual refresh reaches CWA
+
+- **WHEN** a trusted manual refresh completes with a valid CWA response
+- **THEN** the latest diagnostic SHALL report `state: ok` and `source: upstream`
+- **AND** the diagnostic occurrence time SHALL describe that refresh attempt
+
+#### Scenario: Upstream fails while a stale snapshot is available
+
+- **WHEN** a weather request fails and the service returns its last successful snapshot
+- **THEN** the latest diagnostic SHALL retain the bounded transport failure and report `source: stale`
+- **AND** the diagnostic SHALL preserve `lastSuccessAt`
+
+#### Scenario: A normal read is served from cache
+
+- **WHEN** a non-refresh weather read returns an unexpired cached snapshot without contacting CWA
+- **THEN** the operation result SHALL be distinguishable as `source: cache`
+- **AND** it SHALL NOT replace the occurrence time of the latest upstream attempt
+
+<!-- @trace
+source: diagnose-and-restore-site-weather-connectivity
+updated: 2026-07-21
+code:
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/routes/weather.ts
+  - solar_mqtt/web/index.html
+  - solar_mqtt/solar/winsvc.py
+  - apps/server/src/routes/settings-mqtt.ts
+  - solar_mqtt/solar/heartbeat.py
+  - solar_mqtt/web/app.js
+  - solar_mqtt/solar/schedule.py
+  - solar_mqtt/solar_config.single.example.json
+  - packages/shared/src/weather.ts
+  - solar_mqtt/solar_config.kn_cl.example.json
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - solar_mqtt/solar/config.py
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/db/migrations/025_cl_kn_generation_summary_topics.sql
+  - apps/web/src/services/api.ts
+  - solar_mqtt/solar/scraper.py
+  - solar_mqtt/solar/service.py
+  - apps/server/src/services/cwaWeatherClient.ts
+  - apps/server/src/services/weatherService.ts
+  - solar_mqtt/solar/__init__.py
+  - solar_mqtt/solar/display.py
+  - solar_mqtt/web/vendor/mqtt.min.js
+  - solar_mqtt/solar_config.mosquitto.example.json
+  - solar_mqtt/solar/anomaly.py
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/server/src/db/seed.ts
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - solar_mqtt/solar/mosquitto.py
+  - solar_mqtt/solar/discovery.py
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - solar_mqtt/solar/storage.py
+  - apps/server/src/services/displayReadinessService.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - scripts/verify-weather-connectivity.test.mjs
+  - solar_mqtt/solar_config.json
+  - scripts/verify-weather-connectivity.mjs
+  - solar_mqtt/solar/mqtt_bus.py
+  - solar_mqtt/web/styles.css
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - solar_mqtt/scrape_solar.py
+  - apps/server/src/mqtt/MqttClientService.ts
+tests:
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - solar_mqtt/test_web_assets.py
+  - apps/server/src/services/cwaWeatherClient.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - solar_mqtt/test_config_path.py
+  - apps/server/src/routes/display-readiness.test.ts
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - solar_mqtt/test_mqtt_retain.py
+  - apps/server/src/services/displayReadinessService.test.ts
+  - apps/server/src/services/weatherService.test.ts
+-->
