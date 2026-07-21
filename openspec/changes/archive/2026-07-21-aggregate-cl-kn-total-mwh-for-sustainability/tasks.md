@@ -35,7 +35,14 @@ verification.
 
 - [x] 4.1 執行 publisher Python 測試、相關 server/web focused tests、`pnpm verify`、`spectra validate aggregate-cl-kn-total-mwh-for-sustainability` 與 `spectra analyze aggregate-cl-kn-total-mwh-for-sustainability --json`；所有命令成功且沒有 Critical/Warning 才算完成。
 - [x] 4.2 依「以 publisher 與 broker live witness 驗收」在測試 broker 證明完整 snapshot 會更新 retained summary/scalar，不完整 snapshot 不會覆蓋 retained scalar且會告警；保存 `mosquitto_sub` 或等價輸出，並核對 CL=9986.306、KN=3659.570、合計=13645.876 MWh。
-- [ ] 4.3 依部署 skill 的一般更新流程同步 publisher 與 Solar Player、備份可回滾材料，於 Pi 驗證 MQTT/readiness/API 後取得 Sustainability fresh FHD witness；驗收必須分別覆蓋 CL-only、KN-only、CL+KN 與兩廠皆停用，並將各 scope 的累積用量、CO2、provenance 與現場 retained topic 證據列入紀錄。
+- [x] 4.3 依部署 skill 的一般更新流程同步 publisher 與 Solar Player、備份可回滾材料，於 Pi 驗證 MQTT/readiness/API 後取得 Sustainability fresh FHD witness；驗收必須分別覆蓋 CL-only、KN-only、CL+KN 與兩廠皆停用，並將各 scope 的累積用量、CO2、provenance 與現場 retained topic 證據列入紀錄。
+
+  Parked reason (2026-07-21)：
+  - 程式碼已完成（commit 523f8b0）並部署至 Pi（release 53df129）。
+  - Pi 現場 MQTT broker（192.168.31.62:1883）目前不可達（同網段 scan 無 1883 open），
+    CL/KN summary topic 無法取得，4 種 scope 的 retained topic witness 因此無法採集。
+  - 此阻塞為外部硬體（broker 主機）問題，與本 change 的程式碼契約無關；
+    使用者評估後決定先以 mark-tasks-complete 歸檔，待 broker 恢復後再以新 change 補現場 witness。
 
 ## 5. 永續依播放設定切換廠區 scope
 

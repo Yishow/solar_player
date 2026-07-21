@@ -1926,3 +1926,131 @@ tests:
   - apps/server/src/mqtt/MqttClientService.test.ts
   - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
 -->
+
+---
+### Requirement: Identify the playback-scoped factory source for Sustainability
+
+Sustainability cumulative generation and carbon reduction SHALL expose provenance that identifies the MQTT factory summaries required by the current playback factory scope, their completeness, and the applicable source update time.
+
+#### Scenario: One factory source is selected
+
+- **WHEN** playback settings resolve Sustainability to CL-only or KN-only
+- **THEN** provenance SHALL identify only that factory source
+- **AND** freshness SHALL be evaluated from that factory source timestamp
+- **AND** the unselected factory state SHALL NOT degrade the selected source
+
+##### Example: CL-only ignores stale KN
+
+- **GIVEN** only `factory-circuit` is enabled, CL was updated at `15:38:10`, and KN is stale
+- **WHEN** Sustainability renders
+- **THEN** provenance identifies CL, reports fresh, and uses `15:38:10`
+
+#### Scenario: Both factory sources are current
+
+- **WHEN** both factory pages are enabled and Sustainability renders cumulative generation and carbon reduction from a complete CL plus KN aggregate
+- **THEN** provenance SHALL identify both factory sources
+- **AND** it SHALL report a fresh aggregate state
+- **AND** its update time SHALL equal the older CL or KN source timestamp
+
+##### Example: KN has the older timestamp
+
+- **GIVEN** CL was updated at `15:38:10` and KN was updated at `15:37:55`
+- **WHEN** Sustainability renders the complete aggregate
+- **THEN** provenance identifies CL and KN, reports fresh, and uses `15:37:55` as the aggregate update time
+
+#### Scenario: A required factory source becomes unavailable
+
+- **WHEN** a source required by the current scope becomes missing, stale, invalid, or regresses
+- **THEN** Sustainability provenance SHALL identify the affected factory and degraded scoped state
+- **AND** the displayed value SHALL NOT be presented as a newly complete scoped total
+
+##### Example: CL total becomes invalid
+
+- **GIVEN** the last complete displayed total is 13645.876 MWh
+- **WHEN** both factories are enabled and CL summary omits `total_mwh` while KN remains current
+- **THEN** provenance identifies CL as invalid and the page does not label a KN-only value as a complete aggregate
+
+#### Scenario: No factory source is selected
+
+- **WHEN** both factory playback pages are disabled
+- **THEN** provenance SHALL state that no factory is selected
+- **AND** it SHALL NOT present a previous CL, KN, or CL plus KN timestamp as current
+
+##### Example: Previous combined timestamp is suppressed
+
+- **GIVEN** the last combined source timestamp was `15:37:55` and both factory pages are now disabled
+- **WHEN** Sustainability renders
+- **THEN** provenance reports no factory selected and does not show `15:37:55` as a current source time
+
+<!-- @trace
+source: aggregate-cl-kn-total-mwh-for-sustainability
+updated: 2026-07-21
+code:
+  - solar_mqtt/web/index.html
+  - apps/server/src/services/displayReadinessService.ts
+  - scripts/verify-weather-connectivity.mjs
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/mqtt/MqttClientService.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/db/seed.ts
+  - solar_mqtt/solar/mosquitto.py
+  - solar_mqtt/solar_config.mosquitto.example.json
+  - apps/server/src/services/weatherService.ts
+  - solar_mqtt/web/app.js
+  - solar_mqtt/solar/storage.py
+  - solar_mqtt/solar_config.single.example.json
+  - apps/web/src/services/api.ts
+  - solar_mqtt/solar/service.py
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/db/migrations/025_cl_kn_generation_summary_topics.sql
+  - solar_mqtt/solar/__init__.py
+  - solar_mqtt/solar/heartbeat.py
+  - solar_mqtt/web/styles.css
+  - apps/server/src/services/cwaWeatherClient.ts
+  - solar_mqtt/solar_config.kn_cl.example.json
+  - solar_mqtt/solar/anomaly.py
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - solar_mqtt/web/vendor/mqtt.min.js
+  - solar_mqtt/solar/display.py
+  - solar_mqtt/scrape_solar.py
+  - solar_mqtt/solar/winsvc.py
+  - packages/shared/src/displayReadiness.ts
+  - solar_mqtt/solar/mqtt_bus.py
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - solar_mqtt/solar/scraper.py
+  - solar_mqtt/solar/discovery.py
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - solar_mqtt/solar/config.py
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - scripts/verify-weather-connectivity.test.mjs
+  - apps/server/src/routes/weather.ts
+  - solar_mqtt/solar/schedule.py
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - packages/shared/src/weather.ts
+  - solar_mqtt/solar_config.json
+  - apps/server/src/routes/settings-mqtt.ts
+tests:
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - solar_mqtt/test_mqtt_retain.py
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/weatherService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - solar_mqtt/test_web_assets.py
+  - apps/server/src/services/displayReadinessService.test.ts
+  - apps/server/src/services/cwaWeatherClient.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/server/src/routes/display-readiness.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - solar_mqtt/test_config_path.py
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+-->

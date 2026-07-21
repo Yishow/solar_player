@@ -755,52 +755,114 @@ tests:
 ---
 ### Requirement: Carbon reduction is derived uniformly from generation and the carbon emission factor across playback pages
 
-The system SHALL compute carbon reduction from generation and the configured carbon emission factor, uniformly for the Overview, Solar, and Sustainability pages. Today's carbon reduction (tons) SHALL be today's generation (kWh) multiplied by the carbon emission factor divided by 1000, and cumulative carbon reduction (tons) SHALL be cumulative generation (kWh) multiplied by the carbon emission factor divided by 1000. The system SHALL NOT use the MQTT `todayCo2Reduction`, `totalCo2Reduction`, or `co2` counters as the source for the displayed carbon reduction cards. When the underlying generation value is unavailable or non-finite, the carbon reduction card SHALL keep its existing unavailable/`--` fallback rather than emitting a fabricated value.
+The system SHALL compute carbon reduction from generation and the configured carbon emission factor. Overview and Solar SHALL retain their canonical CL plus KN generation basis. Sustainability SHALL instead use the factory scope resolved from playback settings: CL only, KN only, or the complete CL plus KN aggregate. Today's carbon reduction (tons) SHALL be the applicable scoped generation (kWh) multiplied by the carbon emission factor divided by 1000, and cumulative carbon reduction (tons) SHALL use the applicable scoped cumulative generation by the same formula. Sustainability tree equivalence and any other value derived from cumulative carbon reduction SHALL use that same scope. The system SHALL NOT use the MQTT `todayCo2Reduction`, `totalCo2Reduction`, or `co2` counters as the source for the displayed carbon reduction cards. When the applicable scoped generation value is unavailable or non-finite, the carbon reduction card SHALL keep its existing unavailable/`--` fallback rather than emitting a fabricated value.
 
-#### Scenario: Carbon reduction matches across the three pages for the same factor
+#### Scenario: Combined Sustainability scope matches the canonical pages
 
-- **WHEN** the carbon emission factor is configured to a value
-- **THEN** the Overview, Solar, and Sustainability today/cumulative carbon reduction cards each derive from the same factor and the corresponding generation
+- **WHEN** the carbon emission factor is configured, complete canonical CL plus KN generation is available, and both factory pages are enabled
+- **THEN** the Overview, Solar, and Sustainability today/cumulative carbon reduction cards each derive from the same factor and the corresponding canonical generation
 - **AND** the same generation and factor yield the same carbon reduction value on all three pages
 
-##### Example: today carbon reduction from generation
+##### Example: cumulative carbon reduction from factory totals
 
-- **GIVEN** today's generation is 2000 kWh and the carbon emission factor is 0.495
-- **WHEN** today's carbon reduction is computed
-- **THEN** the value is 0.99 tons
+- **GIVEN** CL cumulative generation is 9986.306 MWh, KN cumulative generation is 3659.570 MWh, and the carbon emission factor is 0.495 kgCO₂e/kWh
+- **WHEN** cumulative carbon reduction is computed
+- **THEN** accumulated generation is 13645.876 MWh
+- **AND** cumulative carbon reduction is 6754.709 tons after display rounding
+
+#### Scenario: A single factory scope calculates only that factory
+
+- **WHEN** only one factory page is enabled and its current cumulative `total_mwh` is available
+- **THEN** Sustainability accumulated generation SHALL equal that factory total only
+- **AND** accumulated carbon reduction and tree equivalence SHALL be derived from that same single-factory total
+
+##### Example: separate CL and KN results
+
+- **GIVEN** CL cumulative generation is 9986.306 MWh, KN cumulative generation is 3659.570 MWh, and the carbon emission factor is 0.495 kgCO₂e/kWh
+- **WHEN** only CL is enabled
+- **THEN** Sustainability accumulated generation is 9986.306 MWh and cumulative carbon reduction is 4943.221 tons after display rounding
+- **WHEN** only KN is enabled
+- **THEN** Sustainability accumulated generation is 3659.570 MWh and cumulative carbon reduction is 1811.487 tons after display rounding
 
 #### Scenario: Missing generation keeps the fallback
 
-- **WHEN** the generation value for a carbon reduction card is unavailable or non-finite
-- **THEN** the card keeps its existing unavailable/`--` fallback
-- **AND** no fabricated carbon reduction value is shown
+- **WHEN** a generation dependency required by the current Sustainability scope is unavailable, stale, non-finite, or rejected as a cumulative regression
+- **THEN** the card keeps the last valid value for that same scope with stale provenance or its existing unavailable/`--` fallback
+- **AND** no partial or fabricated carbon reduction value is shown
+- **AND** a factory outside the current single-factory scope SHALL NOT make the selected factory unavailable
 
 
 <!-- @trace
-source: playback-conversion-coefficients
-updated: 2026-06-29
+source: aggregate-cl-kn-total-mwh-for-sustainability
+updated: 2026-07-21
 code:
-  - packages/shared/src/householdEquivalence.ts
-  - apps/web/src/services/api.ts
-  - apps/server/src/db/migrations/015_calculation_settings.sql
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/app.ts
-  - apps/web/src/pages/DataSourceSettings/index.tsx
-  - apps/web/src/pages/DataSourceSettings/viewModel.ts
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - apps/server/src/routes/calculation-settings.ts
-  - apps/server/src/services/calculationSettingsService.ts
+  - solar_mqtt/web/index.html
+  - apps/server/src/services/displayReadinessService.ts
+  - scripts/verify-weather-connectivity.mjs
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/mqtt/MqttClientService.ts
+  - packages/shared/src/displayPageFreshness.ts
   - apps/server/src/db/seed.ts
-  - apps/server/src/services/householdEquivalenceService.ts
+  - solar_mqtt/solar/mosquitto.py
+  - solar_mqtt/solar_config.mosquitto.example.json
+  - apps/server/src/services/weatherService.ts
+  - solar_mqtt/web/app.js
+  - solar_mqtt/solar/storage.py
+  - solar_mqtt/solar_config.single.example.json
+  - apps/web/src/services/api.ts
+  - solar_mqtt/solar/service.py
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/db/migrations/025_cl_kn_generation_summary_topics.sql
+  - solar_mqtt/solar/__init__.py
+  - solar_mqtt/solar/heartbeat.py
+  - solar_mqtt/web/styles.css
+  - apps/server/src/services/cwaWeatherClient.ts
+  - solar_mqtt/solar_config.kn_cl.example.json
+  - solar_mqtt/solar/anomaly.py
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - solar_mqtt/web/vendor/mqtt.min.js
+  - solar_mqtt/solar/display.py
+  - solar_mqtt/scrape_solar.py
+  - solar_mqtt/solar/winsvc.py
+  - packages/shared/src/displayReadiness.ts
+  - solar_mqtt/solar/mqtt_bus.py
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - solar_mqtt/solar/scraper.py
+  - solar_mqtt/solar/discovery.py
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - solar_mqtt/solar/config.py
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - scripts/verify-weather-connectivity.test.mjs
+  - apps/server/src/routes/weather.ts
+  - solar_mqtt/solar/schedule.py
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - packages/shared/src/weather.ts
+  - solar_mqtt/solar_config.json
+  - apps/server/src/routes/settings-mqtt.ts
 tests:
-  - apps/server/src/services/carbonReductionConsistency.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
+  - solar_mqtt/test_mqtt_retain.py
   - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/db/migrations/calculationSettings.test.ts
-  - apps/server/src/services/calculationSettingsService.test.ts
-  - apps/server/src/services/householdEquivalenceService.test.ts
-  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/routes/weather.test.ts
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/weatherService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - solar_mqtt/test_web_assets.py
+  - apps/server/src/services/displayReadinessService.test.ts
+  - apps/server/src/services/cwaWeatherClient.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/server/src/routes/display-readiness.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - solar_mqtt/test_config_path.py
+  - apps/web/src/pages/Sustainability/viewModel.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
 -->
 
 ---
