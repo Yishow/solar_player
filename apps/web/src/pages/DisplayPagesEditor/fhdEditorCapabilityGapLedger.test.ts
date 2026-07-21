@@ -154,7 +154,11 @@ test("live openspec specs do not reference removed runtime field builder anchors
   assert.ok(specMarkdownFiles.length > 0);
 
   for (const specPath of specMarkdownFiles) {
-    const markdown = readFileSync(specPath, "utf8");
+    // spectra @trace blocks are auto-injected historical file lists and may
+    // legitimately reference paths that were later removed; this invariant
+    // only protects the spec body (requirements / scenarios) from phantom
+    // anchors that would mislead readers into citing a deleted module.
+    const markdown = stripSpectraTraceBlocks(readFileSync(specPath, "utf8"));
     assert.equal(
       markdown.includes("apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts"),
       false,
@@ -162,3 +166,7 @@ test("live openspec specs do not reference removed runtime field builder anchors
     );
   }
 });
+
+function stripSpectraTraceBlocks(markdown: string): string {
+  return markdown.replace(/<!-- @trace[\s\S]*?-->/g, "");
+}
