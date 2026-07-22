@@ -12,7 +12,8 @@ import type {
 } from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
-  resolveMonitoringSummaryState
+  resolveMonitoringSummaryState,
+  resolvePlaybackDisplayMetricSourceClass
 } from "@solar-display/shared";
 import type { WeatherCurrentSnapshot } from "@solar-display/shared";
 import { liveMetrics } from "../../mocks/metrics";
@@ -207,6 +208,11 @@ type BuildOverviewViewModelArgs = {
 
 export type OverviewViewModel = ReturnType<typeof buildOverviewViewModel>;
 
+// sourceClass 的單一真相在 @solar-display/shared 的 playback metric contract；
+// 下列 metricKey 皆為 contract 涵蓋鍵，非空斷言由 contract 測試保證。
+const overviewSourceClass = (metricKey: string) =>
+  resolvePlaybackDisplayMetricSourceClass("overview", metricKey)!;
+
 const metricCards: OverviewMetricCard[] = [
   {
     accentColor: false,
@@ -215,7 +221,7 @@ const metricCards: OverviewMetricCard[] = [
     iconKey: "bolt",
     metricKey: "realTimePower",
     label: "即時發電功率",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("realTimePower"),
     unit: "kW"
   },
   {
@@ -225,7 +231,7 @@ const metricCards: OverviewMetricCard[] = [
     iconKey: "sun",
     metricKey: "todayGeneration",
     label: "今日發電量",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("todayGeneration"),
     unit: "kWh"
   },
   {
@@ -235,7 +241,7 @@ const metricCards: OverviewMetricCard[] = [
     iconKey: "bars",
     metricKey: "totalGeneration",
     label: "累積發電量",
-    sourceClass: "cumulative-counter",
+    sourceClass: overviewSourceClass("totalGeneration"),
     unit: "GWh"
   },
   {
@@ -245,7 +251,7 @@ const metricCards: OverviewMetricCard[] = [
     iconKey: "co2",
     metricKey: "todayCo2Reduction",
     label: "今日 CO₂ 減量",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("todayCo2Reduction"),
     unit: "t"
   },
   {
@@ -255,7 +261,7 @@ const metricCards: OverviewMetricCard[] = [
     iconKey: "leaf",
     metricKey: "totalCo2Reduction",
     label: "累積 CO₂ 減量",
-    sourceClass: "cumulative-counter",
+    sourceClass: overviewSourceClass("totalCo2Reduction"),
     unit: "t"
   }
 ];

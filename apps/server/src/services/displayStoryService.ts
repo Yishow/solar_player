@@ -21,6 +21,7 @@ import {
   resolveMonitoringMetricBinding,
   resolveMonitoringSlotBinding,
   resolveMonitoringSummaryState,
+  resolvePlaybackDisplayMetricSourceClass,
   resolveSolarComparison,
   resolveSolarFlowState
 } from "@solar-display/shared";
@@ -47,6 +48,13 @@ type StoryMetricKey =
   | "selfConsumptionRatio"
   | "systemEfficiency";
 
+// sourceClass 的單一真相在 @solar-display/shared 的 playback metric contract；
+// 下列 metricKey 皆為 contract 涵蓋鍵，非空斷言由 contract 測試保證。
+const overviewSourceClass = (metricKey: string) =>
+  resolvePlaybackDisplayMetricSourceClass("overview", metricKey)!;
+const solarSourceClass = (metricKey: string) =>
+  resolvePlaybackDisplayMetricSourceClass("solar", metricKey)!;
+
 type CircuitRow = {
   attention_min: number | null;
   display_slot: string | null;
@@ -71,7 +79,7 @@ const overviewMetrics: OverviewMetricDefinition[] = [
     fallbackValue: "--",
     label: "即時發電功率",
     metricKey: "realTimePower",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("realTimePower"),
     unit: "kW"
   },
   {
@@ -80,7 +88,7 @@ const overviewMetrics: OverviewMetricDefinition[] = [
     fallbackValue: "--",
     label: "今日發電量",
     metricKey: "todayGeneration",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("todayGeneration"),
     unit: "kWh"
   },
   {
@@ -89,7 +97,7 @@ const overviewMetrics: OverviewMetricDefinition[] = [
     fallbackValue: "--",
     label: "累積發電量",
     metricKey: "totalGeneration",
-    sourceClass: "cumulative-counter",
+    sourceClass: overviewSourceClass("totalGeneration"),
     unit: "GWh"
   },
   {
@@ -98,7 +106,7 @@ const overviewMetrics: OverviewMetricDefinition[] = [
     fallbackValue: "--",
     label: "今日 CO₂ 減量",
     metricKey: "todayCo2Reduction",
-    sourceClass: "mqtt-live",
+    sourceClass: overviewSourceClass("todayCo2Reduction"),
     unit: "t"
   },
   {
@@ -107,7 +115,7 @@ const overviewMetrics: OverviewMetricDefinition[] = [
     fallbackValue: "--",
     label: "累積 CO₂ 減量",
     metricKey: "totalCo2Reduction",
-    sourceClass: "cumulative-counter",
+    sourceClass: overviewSourceClass("totalCo2Reduction"),
     unit: "t"
   }
 ];
@@ -118,7 +126,7 @@ const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
     fallbackIndex: 1,
     label: "今日發電量",
     metricKey: "todayGeneration",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("todayGeneration"),
     unit: "kWh"
   },
   {
@@ -128,7 +136,7 @@ const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
     fallbackStrategy: "derive-from-dependencies",
     label: "自發自用比例",
     metricKey: "selfConsumptionRatio",
-    sourceClass: "derived-metric",
+    sourceClass: solarSourceClass("selfConsumptionRatio"),
     unit: "%"
   },
   {
@@ -136,7 +144,7 @@ const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
     fallbackIndex: 3,
     label: "今日減碳量",
     metricKey: "todayCo2Reduction",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("todayCo2Reduction"),
     unit: "t"
   },
   {
@@ -144,7 +152,7 @@ const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
     fallbackIndex: 3,
     label: "累積減碳量",
     metricKey: "totalCo2Reduction",
-    sourceClass: "cumulative-counter",
+    sourceClass: solarSourceClass("totalCo2Reduction"),
     unit: "t"
   },
   {
@@ -152,7 +160,7 @@ const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
     fallbackIndex: 4,
     label: "系統效率",
     metricKey: "systemEfficiency",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("systemEfficiency"),
     unit: "%"
   }
 ];

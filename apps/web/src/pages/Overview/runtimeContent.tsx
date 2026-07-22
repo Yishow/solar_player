@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import {
   displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus
+  resolveDisplayPageCardStatus,
+  resolvePlaybackRuntimeMetricKeys
 } from "@solar-display/shared";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -51,22 +52,7 @@ const overviewCardOrder = [
   }
 ] as const;
 
-const overviewRuntimeMetricKeys = [
-  "phaseRCurrent",
-  "phaseRPower",
-  "phaseRVoltage",
-  "phaseSCurrent",
-  "phaseSPower",
-  "phaseSVoltage",
-  "phaseTCurrent",
-  "phaseTPower",
-  "phaseTVoltage",
-  "realTimePower",
-  "todayCo2Reduction",
-  "todayGeneration",
-  "totalCo2Reduction",
-  "totalGeneration"
-] as const;
+const overviewRuntimeMetricKeys = resolvePlaybackRuntimeMetricKeys("overview");
 
 type OverviewRuntimeSelection = {
   connectionState: SocketConnectionState["status"];

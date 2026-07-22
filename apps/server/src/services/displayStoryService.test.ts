@@ -151,3 +151,42 @@ test("readDisplayStory ignores expired display overrides", () => {
     "42.0"
   );
 });
+
+test("readDisplayStory Overview and Solar bindings use contract-aligned sourceClass values", () => {
+  seedPowerMetric();
+  const story = readDisplayStory();
+
+  assert.equal(
+    story.overview.metrics.find((metric) => metric.metricKey === "realTimePower")?.sourceClass,
+    "mqtt-live"
+  );
+  assert.equal(
+    story.overview.metrics.find((metric) => metric.metricKey === "todayGeneration")?.sourceClass,
+    "derived-metric"
+  );
+  assert.equal(
+    story.overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction")?.sourceClass,
+    "derived-metric"
+  );
+  assert.notEqual(
+    story.overview.metrics.find((metric) => metric.metricKey === "todayGeneration")?.sourceClass,
+    "mqtt-live"
+  );
+
+  assert.equal(
+    story.solar.kpis.find((kpi) => kpi.metricKey === "todayGeneration")?.sourceClass,
+    "derived-metric"
+  );
+  assert.equal(
+    story.solar.kpis.find((kpi) => kpi.metricKey === "selfConsumptionRatio")?.sourceClass,
+    "derived-metric"
+  );
+  assert.equal(
+    story.solar.kpis.find((kpi) => kpi.metricKey === "todayCo2Reduction")?.sourceClass,
+    "derived-metric"
+  );
+  assert.equal(
+    story.solar.kpis.find((kpi) => kpi.metricKey === "systemEfficiency")?.sourceClass,
+    "mqtt-live"
+  );
+});

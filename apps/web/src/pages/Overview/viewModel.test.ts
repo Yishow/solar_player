@@ -90,6 +90,10 @@ test("buildOverviewViewModel surfaces the custom topic name delivered via the st
 
   const fallbackCard = withoutStory.metrics.find((metric) => metric.metricKey === "realTimePower");
   assert.equal(fallbackCard?.label, "即時發電功率");
+  assert.equal(withoutStory.metrics.find((metric) => metric.metricKey === "todayGeneration")?.sourceClass, "derived-metric");
+  assert.equal(withoutStory.metrics.find((metric) => metric.metricKey === "todayCo2Reduction")?.sourceClass, "derived-metric");
+  assert.equal(withoutStory.metrics.find((metric) => metric.metricKey === "realTimePower")?.sourceClass, "mqtt-live");
+  assert.notEqual(withoutStory.metrics.find((metric) => metric.metricKey === "todayGeneration")?.sourceClass, "mqtt-live");
 });
 
 test("buildOverviewViewModel exposes source tooltip metadata for direct KPI cards", () => {
@@ -453,7 +457,7 @@ test("buildOverviewViewModel accepts resolved display-story overview metrics wit
           label: "故事版今日發電量",
           metricKey: "todayGeneration",
           provenance: "fallback",
-          sourceClass: "mqtt-live",
+          sourceClass: "derived-metric",
           unit: "kWh",
           value: "--"
         }

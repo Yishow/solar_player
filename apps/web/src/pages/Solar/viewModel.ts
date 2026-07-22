@@ -6,6 +6,7 @@ import type {
 } from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
+  resolvePlaybackDisplayMetricSourceClass,
   resolveSolarComparison,
   resolveSolarFlowState
 } from "@solar-display/shared";
@@ -75,6 +76,11 @@ type BuildSolarViewModelArgs = {
   };
 };
 
+// sourceClass 的單一真相在 @solar-display/shared 的 playback metric contract；
+// 下列 metricKey 皆為 contract 涵蓋鍵，非空斷言由 contract 測試保證。
+const solarSourceClass = (metricKey: string) =>
+  resolvePlaybackDisplayMetricSourceClass("solar", metricKey)!;
+
 const kpiBindings: SolarMetricBinding[] = [
   {
     dependencyKeys: ["todayGeneration"],
@@ -82,7 +88,7 @@ const kpiBindings: SolarMetricBinding[] = [
     iconKey: "metric-generation-sun",
     metricKey: "todayGeneration",
     label: "今日發電量",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("todayGeneration"),
     unit: "kWh"
   },
   {
@@ -93,7 +99,7 @@ const kpiBindings: SolarMetricBinding[] = [
     iconKey: "metric-self-consumption",
     metricKey: "selfConsumptionRatio",
     label: "自發自用比例",
-    sourceClass: "derived-metric",
+    sourceClass: solarSourceClass("selfConsumptionRatio"),
     unit: "%"
   },
   {
@@ -102,7 +108,7 @@ const kpiBindings: SolarMetricBinding[] = [
     iconKey: "metric-co2-today",
     metricKey: "todayCo2Reduction",
     label: "今日減碳量",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("todayCo2Reduction"),
     unit: "t"
   },
   {
@@ -113,7 +119,7 @@ const kpiBindings: SolarMetricBinding[] = [
     iconKey: "metric-co2-total",
     metricKey: "totalCo2Reduction",
     label: "累積減碳量",
-    sourceClass: "cumulative-counter",
+    sourceClass: solarSourceClass("totalCo2Reduction"),
     unit: "t"
   },
   {
@@ -122,7 +128,7 @@ const kpiBindings: SolarMetricBinding[] = [
     iconKey: "metric-efficiency",
     metricKey: "systemEfficiency",
     label: "系統效率",
-    sourceClass: "mqtt-live",
+    sourceClass: solarSourceClass("systemEfficiency"),
     unit: "%"
   }
 ];

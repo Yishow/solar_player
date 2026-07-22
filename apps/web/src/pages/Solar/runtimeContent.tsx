@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import {
   displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus
+  resolveDisplayPageCardStatus,
+  resolvePlaybackRuntimeMetricKeys
 } from "@solar-display/shared";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -88,14 +89,7 @@ const connectorOrder = [
   }
 ] as const;
 
-const solarRuntimeMetricKeys = [
-  "realTimePower",
-  "systemEfficiency",
-  "selfConsumptionRatio",
-  "todayGeneration",
-  "todayCo2Reduction",
-  "totalCo2Reduction"
-] as const;
+const solarRuntimeMetricKeys = resolvePlaybackRuntimeMetricKeys("solar");
 
 type SolarRuntimeSelection = {
   isSocketConnected: boolean;

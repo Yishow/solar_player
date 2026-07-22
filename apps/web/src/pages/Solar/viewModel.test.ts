@@ -84,6 +84,19 @@ test("buildSolarViewModel centralizes flow nodes and KPI display fields", () => 
   assert.equal(model.kpis[0]?.value, "3,842");
 });
 
+test("buildSolarViewModel fallback bindings use contract-aligned sourceClass values", () => {
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot
+  });
+
+  assert.equal(model.kpis.find((kpi) => kpi.metricKey === "todayGeneration")?.sourceClass, "derived-metric");
+  assert.equal(model.kpis.find((kpi) => kpi.metricKey === "todayCo2Reduction")?.sourceClass, "derived-metric");
+  assert.equal(model.kpis.find((kpi) => kpi.metricKey === "selfConsumptionRatio")?.sourceClass, "derived-metric");
+  assert.equal(model.kpis.find((kpi) => kpi.metricKey === "systemEfficiency")?.sourceClass, "mqtt-live");
+  assert.notEqual(model.kpis.find((kpi) => kpi.metricKey === "todayGeneration")?.sourceClass, "mqtt-live");
+});
+
 test("buildSolarViewModel exposes source tooltip metadata for the self-consumption KPI", () => {
   const model = buildSolarViewModel({
     isSocketConnected: true,
@@ -235,8 +248,8 @@ test("buildSolarViewModel uses solar story KPIs and keeps live power fallback wh
           helper: "共享故事今日發電量",
           metricKey: "todayGeneration",
           label: "故事版今日發電量",
-          provenance: "live",
-          sourceClass: "mqtt-live",
+          provenance: "derived",
+          sourceClass: "derived-metric",
           unit: "kWh",
           value: "4,200",
           comparison: { state: "above-target", delta: "+200", fallbackReason: null, label: "超越目標" }
@@ -263,8 +276,8 @@ test("buildSolarViewModel uses solar story KPIs and keeps live power fallback wh
           helper: "共享故事今日減碳",
           metricKey: "todayCo2Reduction",
           label: "故事版今日減碳",
-          provenance: "live",
-          sourceClass: "mqtt-live",
+          provenance: "derived",
+          sourceClass: "derived-metric",
           unit: "t",
           value: "2.1",
           comparison: { state: "above-target", delta: "+0.16", fallbackReason: null, label: "超越目標" }
