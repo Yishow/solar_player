@@ -28,12 +28,12 @@ type CalculationSettingsNumberKey =
   | "treeEquivalentFactor";
 
 export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
-  carbonEmissionFactor: 0.495,
+  carbonEmissionFactor: 0.467,
   co2AutoConvertSmallToKg: false,
-  estimatedTariffPerKwh: 5,
-  householdDailyUsageKwh: 4,
-  householdMonthlyUsageKwh: 120,
-  treeEquivalentFactor: 2.6
+  estimatedTariffPerKwh: 4.5,
+  householdDailyUsageKwh: 13,
+  householdMonthlyUsageKwh: 400,
+  treeEquivalentFactor: 0.16
 };
 
 export class CalculationSettingsValidationError extends Error {

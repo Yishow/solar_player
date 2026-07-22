@@ -88,11 +88,11 @@ test("seedDatabase bootstraps the singleton calculation settings row with recomm
 
   assert.deepEqual(row, {
     id: 1,
-    carbon_emission_factor: 0.495,
-    tree_equivalent_factor: 2.6,
+    carbon_emission_factor: 0.467,
+    tree_equivalent_factor: 0.16,
     co2_auto_convert_small_to_kg: 0,
-    household_daily_usage_kwh: 4,
-    household_monthly_usage_kwh: 120,
-    estimated_tariff_per_kwh: 5
+    household_daily_usage_kwh: 13,
+    household_monthly_usage_kwh: 400,
+    estimated_tariff_per_kwh: 4.5
   });
 });

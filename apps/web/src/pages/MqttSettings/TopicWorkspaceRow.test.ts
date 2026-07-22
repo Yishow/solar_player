@@ -49,8 +49,11 @@ test("TopicWorkspaceRow renders correctly with metrics, fields, and values", () 
   assert.match(html, /Real-time Power/);
   assert.match(html, /value="kuozui\/plant\/solar\/power"/);
   assert.match(html, /value="kW"/);
-  assert.match(html, /588.8/);
-  assert.match(html, /啟用 \(ON\)/);
+  assert.match(html, /588\.8/);
+  assert.match(html, /aria-label="啟用 \(ON\)"/);
+  assert.match(html, /topic-workspace-row__aside/);
+  assert.match(html, /topic-workspace-row__advanced/);
+  assert.match(html, /進階設定/);
   assert.match(html, /最後收值 2026\/5\/23 17:29:00/);
   assert.match(html, /最後更新 2026\/5\/23 17:28:00/);
   assert.match(html, /Quality: good/);

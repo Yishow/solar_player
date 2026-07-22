@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   OpsActionRow,
   OpsInfoBanner,
@@ -484,41 +483,6 @@ export function DataSourceSettings() {
             </OpsSurface>
           ))}
         </div>
-
-        <OpsSurface family="operations">
-          <OpsSurfaceTitle
-            caption="只導向既有管理功能，不在此頁寫入資料來源設定"
-            title="相關維運入口"
-          />
-          <OpsActionRow className="mt-4">
-            {viewModel.relatedActions.map((action) => (
-              <Link className="mgmt-btn" key={action.path} to={action.path}>
-                {action.label}
-                <small>{action.path}</small>
-              </Link>
-            ))}
-          </OpsActionRow>
-        </OpsSurface>
-
-        <OpsSurface family="operations">
-          <OpsSurfaceTitle
-            caption="推薦項目需另開 change 才會成為可執行控制"
-            title="推薦後續功能"
-          />
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            {viewModel.recommendations.map((recommendation) => (
-              <div className="mgmt-card p-4 flex flex-col gap-2 justify-between" key={recommendation.title}>
-                <div>
-                  <strong className="block text-sm font-semibold text-[#34383a]">{recommendation.title}</strong>
-                  <p className="mt-1 text-xs leading-5 text-[#6e746f]">{recommendation.description}</p>
-                </div>
-                <div className="mt-2">
-                  <span className="mgmt-chip is-accent">Recommendation</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </OpsSurface>
       </div>
     </PageScaffold>
   );

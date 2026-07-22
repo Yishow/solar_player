@@ -319,7 +319,7 @@ export function seedDatabase() {
   database.transaction(() => {
     insertSetting.run("co2_factor", "0.494", "co2_factor");
     insertSetting.run("data_mode", "mqtt", "data_mode");
-    insertCalculationSettings.run(1, 0.495, 2.6, 0, 4, 120, 5, 1);
+    insertCalculationSettings.run(1, 0.467, 0.16, 0, 13, 400, 4.5, 1);
 
     const existingMqttSettings = database
       .prepare(

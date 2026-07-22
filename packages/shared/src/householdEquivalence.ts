@@ -87,9 +87,9 @@ export function createHouseholdEquivalenceCalcProfile(
   overrides: Partial<HouseholdEquivalenceCalcProfile> | null = null
 ) {
   const resolved = {
-    averageDailyUsageKwh: 4,
-    averageMonthlyUsageKwh: 120,
-    estimatedTariffPerKwh: 5,
+    averageDailyUsageKwh: 13,
+    averageMonthlyUsageKwh: 400,
+    estimatedTariffPerKwh: 4.5,
     householdLabel: "戶4口之家",
     id: "default-four-person",
     label: "預設四口之家",

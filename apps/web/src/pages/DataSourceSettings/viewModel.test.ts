@@ -108,12 +108,12 @@ function createCalculationSettings(
   overrides: Partial<CalculationSettings> = {}
 ): CalculationSettings {
   return {
-    carbonEmissionFactor: 0.495,
+    carbonEmissionFactor: 0.467,
     co2AutoConvertSmallToKg: false,
-    estimatedTariffPerKwh: 5,
-    householdDailyUsageKwh: 4,
-    householdMonthlyUsageKwh: 120,
-    treeEquivalentFactor: 2.6,
+    estimatedTariffPerKwh: 4.5,
+    householdDailyUsageKwh: 13,
+    householdMonthlyUsageKwh: 400,
+    treeEquivalentFactor: 0.16,
     ...overrides
   };
 }
@@ -259,11 +259,11 @@ test("buildDataSourceSettingsViewModel exposes synchronized calculation coeffici
   assert.deepEqual(
     viewModel.calculationSettingsCard.fields.map((field) => [field.key, field.value]),
     [
-      ["carbonEmissionFactor", "0.495"],
-      ["treeEquivalentFactor", "2.6"],
-      ["householdDailyUsageKwh", "4"],
-      ["householdMonthlyUsageKwh", "120"],
-      ["estimatedTariffPerKwh", "5"]
+      ["carbonEmissionFactor", "0.467"],
+      ["treeEquivalentFactor", "0.16"],
+      ["householdDailyUsageKwh", "13"],
+      ["householdMonthlyUsageKwh", "400"],
+      ["estimatedTariffPerKwh", "4.5"]
     ]
   );
   const fieldDescriptions = Object.fromEntries(
