@@ -517,6 +517,65 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish sends numeric value to t
   }
 });
 
+test("POST /api/settings/mqtt/topics/:metricKey/publish uses each factory summary mapping value path", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  const insertMapping = database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES (?, 'solar/CL/summary', 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `);
+  insertMapping.run("factoryGeneration.cl.todayMwh", "$.today_mwh");
+  insertMapping.run("factoryGeneration.cl.monthMwh", "$.month_mwh");
+  insertMapping.run("factoryGeneration.cl.totalMwh", "$.total_mwh");
+  database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES
+      ('factoryGeneration.cl.todayMwh', 10, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
+      ('factoryGeneration.cl.monthMwh', 200, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
+      ('factoryGeneration.cl.totalMwh', 3000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
+  `).run();
+
+  const app = await buildApp();
+  const published: Array<{ payload: string; topic: string }> = [];
+
+  try {
+    app.mqttClientService.publish = (topic: string, payload: string) => {
+      published.push({ payload, topic });
+      return Promise.resolve({ mode: "mqtt", payload, success: true, topic });
+    };
+
+    for (const [metricKey, value] of [
+      ["factoryGeneration.cl.todayMwh", 12.3],
+      ["factoryGeneration.cl.monthMwh", 456.7],
+      ["factoryGeneration.cl.totalMwh", 8901.2]
+    ] as const) {
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/settings/mqtt/topics/${metricKey}/publish`,
+        payload: { value }
+      });
+      assert.equal(response.statusCode, 200);
+    }
+
+    assert.deepEqual(published.map(({ payload, topic }) => ({
+      payload: {
+        ...(JSON.parse(payload) as Record<string, unknown>),
+        timestamp: "test timestamp"
+      },
+      topic
+    })), [
+      { payload: { month_mwh: 200, timestamp: "test timestamp", today_mwh: 12.3, total_mwh: 3000 }, topic: "solar/CL/summary" },
+      { payload: { month_mwh: 456.7, timestamp: "test timestamp", today_mwh: 10, total_mwh: 3000 }, topic: "solar/CL/summary" },
+      { payload: { month_mwh: 200, timestamp: "test timestamp", today_mwh: 10, total_mwh: 8901.2 }, topic: "solar/CL/summary" }
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/settings/mqtt/topics/:metricKey/publish rejects invalid values without publishing", async () => {
   migrateDatabase();
   seedDatabase();

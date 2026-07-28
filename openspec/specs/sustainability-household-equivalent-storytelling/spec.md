@@ -8,7 +8,7 @@ TBD - created by archiving change 'add-sustainability-household-equivalent-cards
 
 ### Requirement: Derive household-equivalent cards from measured self-consumption
 
-The system SHALL derive Sustainability household-equivalent cards from measured self-consumption data and a declared calculation profile instead of hand-authored household counts.
+The system SHALL derive Sustainability household-equivalent cards from measured energy data and a declared calculation profile instead of hand-authored household counts.
 
 #### Scenario: Daily household-equivalent card resolves from daily self-consumption
 
@@ -24,92 +24,50 @@ The system SHALL derive Sustainability household-equivalent cards from measured 
 - **THEN** the card outputs a headline in the form `X households of four`
 - **AND** the derived result is tagged with the profile that produced it
 
-#### Scenario: Cumulative household-equivalent card resolves from cumulative self-consumption
+#### Scenario: Cumulative household-equivalent card resolves from active factory cumulative generation
 
-- **WHEN** the Sustainability runtime reads cumulative self-consumption counters
-- **THEN** the `cumulative` household-equivalent card derives its household count from the measured cumulative self-consumption and the selected calculation profile's monthly household bill basis
+- **WHEN** the Sustainability runtime resolves the active factory generation scope and its cumulative MQTT summary is fresh
+- **THEN** the `cumulative` household-equivalent card derives its household count from the scoped measured cumulative generation and the selected calculation profile's daily household usage basis
 - **AND** the card keeps cumulative equivalence separate from the current-day card
+- **AND** the card does not substitute an unrelated global cumulative counter when the scoped summary is unavailable
 
 
 <!-- @trace
-source: add-sustainability-household-equivalent-cards
-updated: 2026-05-22
+source: align-chungli-household-equivalent
+updated: 2026-07-28
 code:
-  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
-  - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.ts
-  - apps/web/src/layouts/LayoutShell.tsx
-  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - apps/web/src/pages/Sustainability/viewModel.ts
-  - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - apps/web/src/pages/shared/displayPageCardRailRenderer.tsx
-  - apps/web/src/pages/shared/liveDisplayPagePreviewState.ts
-  - apps/web/src/pages/PlaybackSettings/LiveRotationPreviewList.tsx
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
-  - packages/shared/src/sustainabilityStory.ts
-  - apps/web/src/app/router.tsx
-  - apps/server/src/server-startup.ts
-  - apps/web/src/hooks/useDisplayPageConfig.ts
-  - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/hooks/useImagesAutoplay.ts
-  - apps/server/src/server.ts
-  - apps/server/src/services/displayPagePublishingService.ts
-  - apps/web/src/components/AppFooterNav.tsx
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - packages/shared/src/displayEditorSchema.ts
-  - scripts/dev.test.mjs
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
-  - apps/web/src/pages/DisplayPagesEditor/cardRailTemplateFields.ts
-  - apps/web/src/pages/Sustainability/sustainability.css
-  - apps/web/src/pages/shared/useLiveDisplayPagePreviewCatalog.ts
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/cardRailInspectorActions.tsx
-  - packages/shared/src/householdEquivalence.ts
-  - apps/web/src/layouts/ManagementShell.tsx
-  - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
-  - scripts/dev.mjs
-  - apps/web/src/pages/DisplayPagesEditor/runtime.tsx
-  - scripts/dev-lib.mjs
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - packages/shared/src/index.ts
-  - apps/web/src/app/playbackRouteMeta.ts
-  - packages/shared/src/cloneValue.ts
-  - packages/shared/src/displayPageCardRail.ts
-  - apps/web/src/pages/DisplayPagesEditor/cardRailAuthoring.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - deploy/install-thin-kiosk.sh
+  - .env.example
+  - apps/server/src/routes/device.ts
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - deploy/solar-device-agent.py
+  - docs/ops/conventions.md
+  - scripts/build-windows-offline-bundle.mjs
+  - apps/server/src/config.ts
+  - deploy/windows-offline/Install-SolarPlayer.ps1
+  - deploy/verify-thin-kiosk.sh
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - deploy/solar-device-agent.service
+  - docs/runbooks/pc-server-deploy.md
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
   - apps/web/src/pages/runtimeRefreshRegistry.ts
-  - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
-  - apps/server/src/services/sustainabilityStoryService.ts
+  - scripts/deploy.test.mjs
+  - .agents/skills/split-deployment/SKILL.md
+  - apps/server/src/routes/settings-mqtt.ts
+  - deploy/windows-offline/Start-SolarPlayer.cmd
   - apps/server/src/services/householdEquivalenceService.ts
-  - apps/web/src/pages/Sustainability/householdEquivalentRuntime.ts
 tests:
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/web/src/pages/SlideshowPreview/index.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.test.tsx
-  - apps/web/src/pages/displayPageSeeds.test.ts
-  - apps/web/src/hooks/useImagesAutoplay.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.test.ts
-  - apps/web/src/pages/Images/viewModel.test.ts
-  - apps/web/src/hooks/useDisplayPageConfig.test.ts
-  - apps/web/src/layouts/LayoutShell.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/cardRailAuthoring.test.ts
-  - packages/shared/test/displayPageCardRail.test.ts
-  - apps/web/src/layouts/offlineRouting.test.ts
-  - apps/web/src/pages/FactoryCircuit/index.test.tsx
-  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
-  - apps/web/src/pages/shared/liveDisplayPagePreviewState.test.ts
-  - apps/web/src/pages/shared/useLiveDisplayPagePreviewCatalog.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
-  - apps/server/src/server-startup.test.ts
-  - apps/web/src/pages/runtimeConfigHydration.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
   - apps/server/src/services/householdEquivalenceService.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/web/src/pages/Sustainability/viewModel.test.ts
-  - apps/web/src/app/playbackRouteMeta.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/EnergyHistory/viewModel.test.ts
+  - apps/server/src/config.test.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
 -->
 
 ---

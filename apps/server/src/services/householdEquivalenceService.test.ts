@@ -82,6 +82,101 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
   assert.equal(cards.cumulative.derivedStatus, "available");
 });
 
+test("readHouseholdEquivalenceCards derives cumulative households from the fresh Chungli summary", () => {
+  const database = getDatabase();
+  const now = new Date();
+  const timestamp = now.toISOString();
+  const summary = JSON.stringify({
+    month_mwh: 2345,
+    timestamp,
+    today_mwh: 123.4,
+    total_mwh: 45678
+  });
+
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key WHEN 'factory-circuit' THEN 1 ELSE 0 END
+        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
+      `
+    )
+    .run();
+  const insertLiveMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, 'MWh', ?, 'good', ?)
+    `
+  );
+  insertLiveMetric.run("factoryGeneration.cl.todayMwh", 123.4, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.cl.monthMwh", 2345, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.cl.totalMwh", 45678, timestamp, summary);
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('generation', 12350, ?, 0)
+      `
+    )
+    .run(timestamp);
+
+  const cards = readHouseholdEquivalenceCards({ now });
+
+  assert.equal(cards.cumulative.householdCountDisplay, "3,513,692");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
+  assert.equal(cards.cumulative.provenance?.updatedAt, timestamp);
+});
+
+test("readHouseholdEquivalenceCards does not fall back to the global counter when Chungli summary is stale", () => {
+  const database = getDatabase();
+  const now = new Date();
+  const timestamp = new Date(now.getTime() - 120_000).toISOString();
+  const summary = JSON.stringify({
+    month_mwh: 2345,
+    timestamp,
+    today_mwh: 123.4,
+    total_mwh: 45678
+  });
+
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("UPDATE mqtt_settings SET message_timeout = 60").run();
+  database
+    .prepare(
+      `
+        UPDATE display_page_registry
+        SET enabled = CASE page_key WHEN 'factory-circuit' THEN 1 ELSE 0 END
+        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
+      `
+    )
+    .run();
+  const insertLiveMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, 'MWh', ?, 'good', ?)
+    `
+  );
+  insertLiveMetric.run("factoryGeneration.cl.todayMwh", 123.4, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.cl.monthMwh", 2345, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.cl.totalMwh", 45678, timestamp, summary);
+  database
+    .prepare(
+      `
+        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        VALUES ('generation', 12350, ?, 0)
+      `
+    )
+    .run(timestamp);
+
+  const cards = readHouseholdEquivalenceCards({ now });
+
+  assert.equal(cards.cumulative.derivedStatus, "unavailable");
+  assert.equal(cards.cumulative.householdCountDisplay, "--");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
+});
+
 test("readHouseholdEquivalenceCards derives cumulative household headline from cumulative generation on the daily usage basis", () => {
   const database = getDatabase();
   const today = "2026-07-09";

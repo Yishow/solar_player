@@ -19,6 +19,7 @@ export type TopicWorkspaceRowProps = {
     value: TopicMapping[Key]
   ) => void;
   handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
+  hasUnsavedChanges?: boolean;
   highlighted?: boolean;
   publishDraftValue?: string;
   publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
@@ -94,6 +95,7 @@ function TopicWorkspaceRowImpl({
   topic,
   handleTopicChange,
   handleTopicPublishDraftChange,
+  hasUnsavedChanges = false,
   highlighted = false,
   publishDraftValue = "",
   publishTopicValue,
@@ -108,6 +110,8 @@ function TopicWorkspaceRowImpl({
     ? "此 mapping 已停用"
     : topic.topic.trim() === ""
       ? "尚未設定 topic"
+      : hasUnsavedChanges
+        ? "請先儲存 topic mapping"
       : !publishValueIsValid
         ? "請輸入 finite number"
         : "";

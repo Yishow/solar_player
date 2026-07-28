@@ -63,6 +63,13 @@ type ExistingTopicMappingRow = {
   offset: number | null;
 };
 
+const factorySummaryMetricKeyPattern = /^factoryGeneration\.(cl|kn)\.(todayMwh|monthMwh|totalMwh)$/u;
+const factorySummaryFieldBySuffix = {
+  monthMwh: "month_mwh",
+  todayMwh: "today_mwh",
+  totalMwh: "total_mwh"
+} as const;
+
 function toBoolean(value: unknown) {
   return value === true || value === 1;
 }
@@ -109,6 +116,55 @@ function canonicalizeMetricUnit(unit: string | undefined) {
     default:
       return trimmed;
   }
+}
+
+function buildTopicPublishPayload(
+  value: number,
+  mapping: { metric_key: string; value_path: string | null }
+) {
+  const factorySummaryMatch = mapping.metric_key.match(factorySummaryMetricKeyPattern);
+  if (factorySummaryMatch) {
+    const [, factory, suffix] = factorySummaryMatch;
+    const prefix = `factoryGeneration.${factory}.`;
+    const rows = getDatabase()
+      .prepare(`
+        SELECT metric_key, value
+        FROM live_metric_values
+        WHERE metric_key IN (?, ?, ?)
+      `)
+      .all(`${prefix}todayMwh`, `${prefix}monthMwh`, `${prefix}totalMwh`) as Array<{
+      metric_key: string;
+      value: number | null;
+    }>;
+    const summary = Object.fromEntries(
+      rows
+        .filter((row): row is { metric_key: string; value: number } => typeof row.value === "number" && Number.isFinite(row.value))
+        .map((row) => [
+          factorySummaryFieldBySuffix[row.metric_key.slice(prefix.length) as keyof typeof factorySummaryFieldBySuffix],
+          row.value
+        ])
+    ) as Partial<Record<(typeof factorySummaryFieldBySuffix)[keyof typeof factorySummaryFieldBySuffix], number>>;
+    const field = factorySummaryFieldBySuffix[suffix as keyof typeof factorySummaryFieldBySuffix];
+    summary[field] = value;
+    return JSON.stringify({ ...summary, timestamp: new Date().toISOString() });
+  }
+
+  const valuePath = mapping.value_path;
+  const path = valuePath?.trim().replace(/^\$\./u, "") ?? "";
+  const keys = path.split(".").filter(Boolean);
+  if (keys.length === 0) {
+    return JSON.stringify({ value });
+  }
+
+  const payload: Record<string, unknown> = {};
+  let target = payload;
+  for (const key of keys.slice(0, -1)) {
+    const nested: Record<string, unknown> = {};
+    target[key] = nested;
+    target = nested;
+  }
+  target[keys[keys.length - 1]!] = value;
+  return JSON.stringify(payload);
 }
 
 function getSettingsRow() {
@@ -246,7 +302,7 @@ function getTopicMappingByMetricKey(metricKey: string) {
   return database
     .prepare(
       `
-        SELECT metric_key, topic, enabled
+        SELECT metric_key, topic, value_path, enabled
         FROM topic_mappings
         WHERE metric_key = ?
         LIMIT 1
@@ -257,6 +313,7 @@ function getTopicMappingByMetricKey(metricKey: string) {
         enabled: number;
         metric_key: string;
         topic: string | null;
+        value_path: string | null;
       }
     | undefined;
 }
@@ -429,7 +486,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const payload = JSON.stringify({ value });
+      const payload = buildTopicPublishPayload(value, mapping);
       const publishResult = await app.mqttClientService.publish(topic, payload);
       if (!publishResult.success) {
         return reply.status(409).send({

@@ -188,6 +188,14 @@ function disconnectClient(client: MqttClient) {
   });
 }
 
+function hasPayloadTimestamp(rawPayload: string) {
+  try {
+    return typeof (JSON.parse(rawPayload) as { timestamp?: unknown }).timestamp === "string";
+  } catch {
+    return false;
+  }
+}
+
 function buildBrokerUrl(settings: Pick<MqttSettingsRecord, "broker_host" | "broker_port">) {
   const host = settings.broker_host?.trim() || "localhost";
   const port = settings.broker_port ?? 1883;
@@ -893,13 +901,18 @@ export class MqttClientService {
 
     const snapshot = readLiveMetricsSnapshot(this.database);
     this.socketService?.emitLiveMetrics(snapshot);
+    const didFactoryGenerationUpdate =
+      hasPayloadTimestamp(rawPayload)
+      && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."));
     if (
       persistedMetricCount > 0
-      && didPlaybackRuntimeAvailabilityChange(previousSnapshot, snapshot)
+      && (didFactoryGenerationUpdate || didPlaybackRuntimeAvailabilityChange(previousSnapshot, snapshot))
     ) {
       this.socketService?.emitDisplaySync({
         generatedAt: new Date().toISOString(),
-        reason: "mqtt-live-runtime-availability-updated",
+        reason: didFactoryGenerationUpdate
+          ? "mqtt-factory-generation-updated"
+          : "mqtt-live-runtime-availability-updated",
         scope: "mqtt"
       });
     }

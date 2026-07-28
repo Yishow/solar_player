@@ -833,6 +833,7 @@ export function MqttSettings() {
       testConnection={testConnection}
       toggleWeatherField={toggleWeatherField}
       topicPublishDrafts={topicPublishDrafts}
+      topicMappingsDirty={draftSections.topic}
       topics={topics}
       handleWeatherSettingChange={handleWeatherSettingChange}
       weatherOptions={weatherOptions}

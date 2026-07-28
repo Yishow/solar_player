@@ -86,6 +86,7 @@ type MqttSettingsContentProps = {
   testConnection: () => Promise<void>;
   toggleWeatherField: (fieldKey: WeatherFieldKey, enabled: boolean) => void;
   topicPublishDrafts?: Record<string, string>;
+  topicMappingsDirty?: boolean;
   overrideDrafts?: Record<string, string>;
   topics: TopicMapping[];
   weatherOptions: WeatherOptionsResponse | null;
@@ -372,6 +373,7 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                     topic={topic}
                     handleTopicChange={props.handleTopicChange}
                     handleTopicPublishDraftChange={props.handleTopicPublishDraftChange}
+                    hasUnsavedChanges={props.topicMappingsDirty}
                     highlighted={props.highlightedTopicMetricKey === topic.metricKey}
                     publishDraftValue={props.topicPublishDrafts?.[topic.metricKey] ?? ""}
                     publishTopicValue={props.publishTopicValue}

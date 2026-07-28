@@ -233,6 +233,78 @@ test("mapped MQTT live metrics publish playback sync only when runtime availabil
   }
 });
 
+test("factory generation summary publishes playback sync when fresh data replaces an existing summary", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("UPDATE mqtt_settings SET message_timeout = 60, data_mode = 'mqtt'").run();
+  const insertTopicMapping = database.prepare(
+    `
+      INSERT INTO topic_mappings (
+        metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+      ) VALUES (?, 'solar/CL/summary', 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `
+  );
+  insertTopicMapping.run("factoryGeneration.cl.todayMwh", "$.today_mwh");
+  insertTopicMapping.run("factoryGeneration.cl.monthMwh", "$.month_mwh");
+  insertTopicMapping.run("factoryGeneration.cl.totalMwh", "$.total_mwh");
+  const client = new FakeMqttClient();
+  const displaySyncEvents: Array<Pick<DisplaySyncEvent, "reason" | "scope">> = [];
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    },
+    socketService: {
+      emitCircuitMetrics: () => undefined,
+      emitDisplaySync: (event) => {
+        displaySyncEvents.push(event);
+      },
+      emitLiveMetrics: () => undefined,
+      emitMqttStatus: () => undefined,
+      emitSystemError: () => undefined,
+      emitSystemRecovered: () => undefined
+    }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      month_mwh: 2345,
+      timestamp: new Date(Date.now() - 120_000).toISOString(),
+      today_mwh: 123.4,
+      total_mwh: 45678
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+    displaySyncEvents.length = 0;
+
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      month_mwh: 2345,
+      timestamp: new Date().toISOString(),
+      today_mwh: 123.4,
+      total_mwh: 45678
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(
+      displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
+      [{ reason: "mqtt-factory-generation-updated", scope: "mqtt" }]
+    );
+  } finally {
+    await service.disconnect();
+  }
+});
+
 test("solar runtime availability accepts derived self consumption inputs", async () => {
   migrateDatabase();
   seedDatabase();

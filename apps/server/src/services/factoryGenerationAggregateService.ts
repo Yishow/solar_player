@@ -118,6 +118,21 @@ function readMessageTimeoutMs(database: Database.Database) {
     : 30_000;
 }
 
+function normalizeFactorySummaryValue(field: SourceField, row: SourceRow) {
+  if (typeof row.value !== "number" || !Number.isFinite(row.value)) {
+    return null;
+  }
+
+  const unit = row.unit?.trim().toLowerCase();
+  if (unit === "mwh") {
+    return row.value;
+  }
+  if (field === "today_mwh" && unit === "kwh") {
+    return row.value / 1_000;
+  }
+  return null;
+}
+
 function readFactorySource(
   database: Database.Database,
   factory: FactoryId,
@@ -143,18 +158,15 @@ function readFactorySource(
     if (!row) {
       return { state: "missing", updatedAt: null, issues: [{ factory, field, reason: "missing" }] };
     }
-    if (
-      typeof row.value !== "number"
-      || !Number.isFinite(row.value)
-      || row.unit?.trim().toLowerCase() !== "mwh"
-    ) {
+    const normalizedValue = normalizeFactorySummaryValue(field, row);
+    if (normalizedValue === null) {
       return { state: "invalid", updatedAt: null, issues: [{ factory, field, reason: "invalid" }] };
     }
     const sourceTimestamp = parseSourceTimestamp(row.raw_payload);
     if (!sourceTimestamp) {
       return { state: "invalid", updatedAt: null, issues: [{ factory, field: "summary", reason: "invalid" }] };
     }
-    values[field] = row.value;
+    values[field] = normalizedValue;
     sourceTimestamps.set(sourceTimestamp.timestampMs, sourceTimestamp.timestamp);
   }
 

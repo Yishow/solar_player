@@ -6,15 +6,15 @@ import {
 import { getDatabase } from "../db/index.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
+import {
+  evaluateFactoryGenerationScope,
+  resolveFactoryGenerationScope
+} from "./factoryGenerationAggregateService.js";
+import { readPlaybackPages } from "./displayRotationService.js";
 
 type DailySummaryRow = {
   date: string;
   self_consumption_total: number | null;
-};
-
-type CounterRow = {
-  last_updated: string | null;
-  total_value: number | null;
 };
 
 type ReadHouseholdEquivalenceCardsOptions = {
@@ -66,33 +66,23 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
     )
     .get(todayDate) as DailySummaryRow | undefined;
   const liveMetrics = readLiveMetricsSnapshot(database).metrics;
-  const cumulativeGeneration = database
-    .prepare(
-      `
-        SELECT total_value, last_updated
-        FROM cumulative_counters
-        WHERE metric_key = 'generation'
-      `
-    )
-    .get() as CounterRow | undefined;
-  const liveGeneration = liveMetrics.totalGeneration;
   const liveTodayGeneration = liveMetrics.todayGeneration;
+  const factoryScope = resolveFactoryGenerationScope(readPlaybackPages());
+  const factoryGeneration =
+    factoryScope === "none"
+      ? null
+      : evaluateFactoryGenerationScope(database, factoryScope, now);
   const cumulativeGenerationValue =
-    typeof cumulativeGeneration?.total_value === "number"
-      ? cumulativeGeneration.total_value
-      : typeof liveGeneration?.value === "number"
-        ? normalizeEnergyToKwh(liveGeneration.value, liveGeneration.unit)
-        : null;
-  const cumulativeGenerationUpdatedAt =
-    cumulativeGeneration?.last_updated ??
-    liveGeneration?.timestamp ??
-    null;
+    factoryGeneration?.state === "ready" && "values" in factoryGeneration
+      ? (factoryGeneration.values as { totalGeneration: number }).totalGeneration * 1_000
+      : null;
+  const cumulativeGenerationUpdatedAt = factoryGeneration?.updatedAt ?? null;
   const cumulativeGenerationSource =
-    typeof cumulativeGeneration?.total_value === "number"
-      ? "cumulative-generation"
-      : typeof liveGeneration?.value === "number"
-        ? "live-generation-fallback"
-        : "cumulative-generation";
+    factoryScope === "none"
+      ? "未選擇廠區"
+      : factoryScope === "CL+KN"
+        ? "CL + KN MQTT aggregate"
+        : `${factoryScope} MQTT`;
   const dailySelfConsumptionValue =
     typeof dailySummary?.self_consumption_total === "number"
       ? dailySummary.self_consumption_total

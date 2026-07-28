@@ -92,6 +92,41 @@ test("complete CL and KN summaries update canonical generation with the older so
   ]);
 });
 
+test("factory summaries normalize today kWh while retaining monthly and cumulative MWh", () => {
+  const database = resetDatabase();
+  const timestamp = "2026-06-26T15:38:10+08:00";
+  const payload = JSON.stringify({
+    month_mwh: 366.93,
+    timestamp,
+    today_mwh: 3490,
+    total_mwh: 9986.306
+  });
+  const insert = database.prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'good', ?)
+  `);
+  insert.run("factoryGeneration.cl.todayMwh", 3490, "kWh", payload);
+  insert.run("factoryGeneration.cl.monthMwh", 366.93, "MWh", payload);
+  insert.run("factoryGeneration.cl.totalMwh", 9986.306, "MWh", payload);
+
+  const result = aggregateService.evaluateFactoryGenerationScope(
+    database,
+    "CL",
+    new Date("2026-06-26T15:38:20+08:00")
+  );
+
+  assert.deepEqual(result, {
+    state: "ready",
+    updatedAt: timestamp,
+    issues: [],
+    values: {
+      monthGeneration: 366.93,
+      todayGeneration: 3.49,
+      totalGeneration: 9986.306
+    }
+  });
+});
+
 test("stale KN summary retains the last complete canonical reading", () => {
   const database = resetDatabase(60);
   database.prepare(`

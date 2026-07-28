@@ -123,6 +123,39 @@ test("buildEnergyHistoryViewModel falls back to cumulative counters for total ra
   assert.equal(model.monitoringState.freshnessLabel, "累積資料");
 });
 
+test("buildEnergyHistoryViewModel uses chronological daily kWh summaries for the monthly consumption curve", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    now: "2026-05-13T10:02:00.000Z",
+    range: "month",
+    snapshots,
+    summaries: [
+      {
+        co2Total: 4210,
+        consumptionTotal: 720,
+        date: "2026-05-12",
+        generationTotal: 480,
+        peakConsumption: 1860,
+        peakConsumptionTime: "13:45",
+        peakGeneration: 1920,
+        peakGenerationTime: "12:30",
+        selfConsumptionTotal: 220
+      },
+      dailySummaries[0]!
+    ]
+  });
+
+  assert.deepEqual(model.chartLines[0]?.points, [
+    { label: "2026-05-12", value: 480 },
+    { label: "2026-05-13", value: 8450 }
+  ]);
+  assert.deepEqual(model.chartLines[2]?.points, [
+    { label: "2026-05-12", value: 720 },
+    { label: "2026-05-13", value: 12680 }
+  ]);
+  assert.equal(model.chartLines[2]?.label, "用電量 (kWh)");
+});
+
 test("buildEnergyHistoryViewModel keeps year distinct from total-only counters and labels", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,

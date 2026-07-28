@@ -297,16 +297,21 @@ export function buildEnergyHistoryViewModel({
               sourceRoleLabel: "History Summary + Trend Snapshot"
             });
 
-  // Single pass over snapshots to build all three chart-line vectors instead of
-  // three independent maps; emitted objects and order match the originals
-  // point-for-point.
   const generationLinePoints: EnergyHistoryLinePoint[] = [];
   const selfConsumptionLinePoints: EnergyHistoryLinePoint[] = [];
   const consumptionLinePoints: EnergyHistoryLinePoint[] = [];
-  for (const snapshot of snapshots) {
-    generationLinePoints.push({ label: snapshot.capturedAt, value: snapshot.generation });
-    selfConsumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.selfConsumption });
-    consumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.consumption });
+  if (range === "month") {
+    for (const summary of [...summaries].sort((left, right) => left.date.localeCompare(right.date))) {
+      generationLinePoints.push({ label: summary.date, value: summary.generationTotal });
+      selfConsumptionLinePoints.push({ label: summary.date, value: summary.selfConsumptionTotal });
+      consumptionLinePoints.push({ label: summary.date, value: summary.consumptionTotal });
+    }
+  } else {
+    for (const snapshot of snapshots) {
+      generationLinePoints.push({ label: snapshot.capturedAt, value: snapshot.generation });
+      selfConsumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.selfConsumption });
+      consumptionLinePoints.push({ label: snapshot.capturedAt, value: snapshot.consumption });
+    }
   }
 
   return {
@@ -340,19 +345,19 @@ export function buildEnergyHistoryViewModel({
       {
         colorToken: "orange",
         key: "generation",
-        label: "發電量 (kW)",
+        label: range === "month" ? "發電量 (kWh)" : "發電量 (kW)",
         points: generationLinePoints
       },
       {
         colorToken: "green",
         key: "selfConsumption",
-        label: "自發自用 (kW)",
+        label: range === "month" ? "自發自用 (kWh)" : "自發自用 (kW)",
         points: selfConsumptionLinePoints
       },
       {
         colorToken: "blue",
         key: "consumption",
-        label: "用電量 (kW)",
+        label: range === "month" ? "用電量 (kWh)" : "用電量 (kW)",
         points: consumptionLinePoints
       }
     ],

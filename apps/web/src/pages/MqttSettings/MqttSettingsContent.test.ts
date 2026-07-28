@@ -217,6 +217,41 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
   assert.match(html, /data-mqtt-publish-row="todayGeneration"[^>]*data-mqtt-publish-disabled="true"/);
 });
 
+test("mqtt settings content requires saving topic mapping drafts before publishing a test value", () => {
+  const html = renderContent({
+    draftSections: {
+      broker: false,
+      topic: true,
+      weather: false
+    },
+    publishTopicValue: async () => undefined,
+    topicMappingsDirty: true,
+    topicPublishDrafts: {
+      selfConsumptionEnergy: "1200"
+    },
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: null,
+        lastValue: null,
+        metricKey: "selfConsumptionEnergy",
+        nameEn: null,
+        nameZh: "自發自用量",
+        quality: null,
+        rawPayload: null,
+        topic: "kuozui/plant/solar/self_consumption",
+        unit: "kWh",
+        updatedAt: null,
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /data-mqtt-publish-row="selfConsumptionEnergy"[^>]*data-mqtt-publish-disabled="true"/);
+  assert.match(html, /請先儲存 topic mapping/);
+});
+
 test("mqtt settings content combines source mode and topic controls into a three-tab workspace", () => {
   const html = renderContent({
     topics: [
