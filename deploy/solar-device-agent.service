@@ -1,0 +1,44 @@
+# Solar Player Pi device-status agent (thin-kiosk split topology)
+# Install: install-thin-kiosk.sh renders __KIOSK_USER__ below to the real kiosk
+#          user, then installs to /etc/systemd/system/ and enables the unit.
+#          sudo install -m 644 deploy/solar-device-agent.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now solar-device-agent
+#
+# Required environment (via drop-in or Environment=):
+#   ALLOWED_SOURCE_IPS=<PC_IP>   # fail-closed when empty
+
+[Unit]
+Description=Solar Player Pi device-status agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Runs unprivileged as the kiosk user; the installer renders this token. The
+# agent reads world-readable /proc and the kiosk launcher log, and reaches
+# journald via `sudo -n` granted by the solar-display-journal sudoers drop-in.
+User=__KIOSK_USER__
+WorkingDirectory=/usr/local/lib/solar-device-agent
+Environment=DEVICE_AGENT_HOST=0.0.0.0
+Environment=DEVICE_AGENT_PORT=3001
+Environment=ALLOWED_SOURCE_IPS=
+Environment=JOURNAL_HELPER_PATH=/usr/local/sbin/read-solar-display-journal.sh
+EnvironmentFile=-/etc/solar-display/device-agent.env
+ExecStart=/usr/bin/python3 /usr/local/lib/solar-device-agent/solar-device-agent.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=solar-device-agent
+
+# NoNewPrivileges stays false on purpose: the agent escalates to the read-only
+# journal helper via `sudo -n` (NOPASSWD, scoped by the sudoers drop-in), which
+# NoNewPrivileges=true would block. The listener itself runs unprivileged.
+NoNewPrivileges=false
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target

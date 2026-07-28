@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { AddressInfo } from "node:net";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import {
@@ -12,6 +14,33 @@ import {
   setDeviceTelemetryRootsForTests
 } from "./device.js";
 import type { JournalRunner } from "../services/deviceLogService.js";
+
+const remoteAgentStats = {
+  disk: { totalMB: 64000, usedMB: 12000, availableMB: 52000, usePercent: 19 },
+  memory: { totalMB: 8192, usedMB: 2048, freeMB: 6144, usePercent: 25 },
+  cpu: { cores: 4, loadAvg: [0.42, 0.31, 0.18] as [number, number, number] },
+  uptimeSeconds: 987654
+};
+
+async function startMockAgent(handler: (req: IncomingMessage, res: ServerResponse) => void): Promise<{
+  baseUrl: string;
+  close: () => Promise<void>;
+  server: Server;
+}> {
+  const server = createServer(handler);
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address() as AddressInfo;
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    server,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
+}
 
 const sampleJsonLine = JSON.stringify({
   __REALTIME_TIMESTAMP: "1716022800000000",
@@ -604,6 +633,205 @@ test("kiosk exit returns a safe unavailable envelope when the helper is missing"
       delete process.env.KIOSK_EXIT_HELPER_PATH;
     } else {
       process.env.KIOSK_EXIT_HELPER_PATH = previousHelperPath;
+    }
+  }
+});
+
+test("GET /api/device/status host-stats reflect remote agent when DEVICE_AGENT_URL is set", async () => {
+  const previousAgentUrl = process.env.DEVICE_AGENT_URL;
+  let statsHits = 0;
+  let logsHits = 0;
+  const agent = await startMockAgent((req, res) => {
+    if (req.url?.startsWith("/stats")) {
+      statsHits += 1;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(remoteAgentStats));
+      return;
+    }
+    if (req.url?.startsWith("/logs")) {
+      logsHits += 1;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ entries: ["should-not-be-used"] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  process.env.DEVICE_AGENT_URL = agent.baseUrl;
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(response.statusCode, 200);
+    const data = response.json().data;
+    assert.equal(statsHits, 1);
+    assert.deepEqual(data.disk, remoteAgentStats.disk);
+    assert.deepEqual(data.memory, remoteAgentStats.memory);
+    assert.deepEqual(data.cpu, remoteAgentStats.cpu);
+    assert.equal(data.uptimeSeconds, remoteAgentStats.uptimeSeconds);
+    assert.equal(data.hostStatsAvailable, true);
+    assert.equal(data.hostStatsUnavailableReason, null);
+    assert.equal(logsHits, 0, "status must not fetch agent /logs");
+  } finally {
+    await app.close();
+    await agent.close();
+    if (previousAgentUrl === undefined) {
+      delete process.env.DEVICE_AGENT_URL;
+    } else {
+      process.env.DEVICE_AGENT_URL = previousAgentUrl;
+    }
+  }
+});
+
+test("GET /api/device/status host-stats fall back to local /proc when DEVICE_AGENT_URL is unset", async () => {
+  const previousAgentUrl = process.env.DEVICE_AGENT_URL;
+  delete process.env.DEVICE_AGENT_URL;
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(response.statusCode, 200);
+    const data = response.json().data;
+    assert.equal(typeof data.cpu.cores, "number");
+    assert.equal(typeof data.memory.totalMB, "number");
+    assert.equal(typeof data.disk.totalMB, "number");
+    assert.equal(typeof data.uptimeSeconds, "number");
+    assert.equal(data.hostStatsAvailable, true);
+    assert.equal(data.hostStatsUnavailableReason, null);
+    // Local path must not invent the remote fixture values.
+    assert.notEqual(data.uptimeSeconds, remoteAgentStats.uptimeSeconds);
+  } finally {
+    await app.close();
+    if (previousAgentUrl === undefined) {
+      delete process.env.DEVICE_AGENT_URL;
+    } else {
+      process.env.DEVICE_AGENT_URL = previousAgentUrl;
+    }
+  }
+});
+
+test("GET /api/device/status returns bounded host-stats unavailable when agent is unreachable", async () => {
+  const previousAgentUrl = process.env.DEVICE_AGENT_URL;
+  process.env.DEVICE_AGENT_URL = "http://127.0.0.1:1";
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({ method: "GET", url: "/api/device/status" });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      success: boolean;
+      data: {
+        hostStatsAvailable: boolean;
+        hostStatsUnavailableReason: string | null;
+        disk: { totalMB: number };
+        memory: { totalMB: number };
+        cpu: { cores: number };
+        uptimeSeconds: number;
+      };
+    };
+    assert.equal(body.success, true);
+    assert.equal(body.data.hostStatsAvailable, false);
+    assert.equal(typeof body.data.hostStatsUnavailableReason, "string");
+    assert.ok((body.data.hostStatsUnavailableReason ?? "").length > 0);
+    assert.equal(body.data.disk.totalMB, 0);
+    assert.equal(body.data.memory.totalMB, 0);
+    assert.equal(body.data.cpu.cores, 0);
+    assert.equal(body.data.uptimeSeconds, 0);
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    assert.equal(health.statusCode, 200);
+  } finally {
+    await app.close();
+    if (previousAgentUrl === undefined) {
+      delete process.env.DEVICE_AGENT_URL;
+    } else {
+      process.env.DEVICE_AGENT_URL = previousAgentUrl;
+    }
+  }
+});
+
+test("GET /api/device/logs stay server-side even when DEVICE_AGENT_URL is set", async () => {
+  const previousAgentUrl = process.env.DEVICE_AGENT_URL;
+  let agentLogsHits = 0;
+  const agent = await startMockAgent((req, res) => {
+    if (req.url?.startsWith("/logs")) {
+      agentLogsHits += 1;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(remoteAgentStats));
+  });
+  process.env.DEVICE_AGENT_URL = agent.baseUrl;
+  setDeviceLogJournalRunnerForTests(availableRunner());
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/device/logs?limit=20"
+    });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      success: boolean;
+      data: { source: string; available: boolean; entries: Array<{ message: string }> };
+    };
+    assert.equal(body.success, true);
+    assert.equal(body.data.source, "journald");
+    assert.equal(body.data.available, true);
+    assert.match(body.data.entries[0]?.message ?? "", /fixture boom/);
+    assert.equal(agentLogsHits, 0, "logs must never call the Pi device-agent");
+  } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
+    await app.close();
+    await agent.close();
+    if (previousAgentUrl === undefined) {
+      delete process.env.DEVICE_AGENT_URL;
+    } else {
+      process.env.DEVICE_AGENT_URL = previousAgentUrl;
+    }
+  }
+});
+
+test("GET /api/device/logs return unavailable on non-journald hosts without agent fallback", async () => {
+  const previousAgentUrl = process.env.DEVICE_AGENT_URL;
+  let agentHits = 0;
+  const agent = await startMockAgent((_req, res) => {
+    agentHits += 1;
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ entries: ["agent-should-not-be-used"] }));
+  });
+  process.env.DEVICE_AGENT_URL = agent.baseUrl;
+  // Simulate Windows / missing journal helper: runner reports journald unavailable.
+  setDeviceLogJournalRunnerForTests(async () => ({
+    exitCode: 1,
+    stdout: "",
+    stderr: "journalctl is not available"
+  }));
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/device/logs?limit=20"
+    });
+    assert.equal(response.statusCode, 503);
+    const body = response.json() as {
+      success: boolean;
+      data: { available: boolean; unavailableReason: string | null; entries: unknown[] };
+      error: string;
+    };
+    assert.equal(body.success, false);
+    assert.equal(body.data.available, false);
+    assert.equal(body.data.entries.length, 0);
+    assert.ok((body.data.unavailableReason ?? "").length > 0);
+    assert.equal(agentHits, 0, "Windows/unavailable logs must not fall back to device-agent");
+  } finally {
+    setDeviceLogJournalRunnerForTests(undefined);
+    await app.close();
+    await agent.close();
+    if (previousAgentUrl === undefined) {
+      delete process.env.DEVICE_AGENT_URL;
+    } else {
+      process.env.DEVICE_AGENT_URL = previousAgentUrl;
     }
   }
 });

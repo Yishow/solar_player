@@ -54,3 +54,8 @@ repo **沒有** lint、e2e、coverage gate、CI policy——不要發明，也�
 - root `deploy.sh`：打包 online/offline bundle 到 `dist/deploy-bundles/`。
 - root `deploy.md`：Pi 5 kiosk 部署 handoff 說明，引用 deploy/ 內腳本（正式 runtime 亦為 `/data/solar-display`）。
 - 改部署路徑時，`deploy/deploy.sh`、service 檔、`deploy.md`、本檔四處一起檢查；勿再描述 `/opt/solar-display` 為正式 service contract（舊 /opt 安裝需 operator 自行備份後改裝 /data）。
+- Split topology（`split-server-to-pc-thin-kiosk`；Pi 不再兼任 server）另有獨立入口，**不**共用 `/data/solar-display`：
+  - `deploy/install-thin-kiosk.sh`（+ `verify-thin-kiosk.sh`）：Pi thin-kiosk 安裝／驗證；**不**安裝 `solar-display.service`、不寫 `/data/solar-display`，沿用既有 `start-solar-kiosk.sh`；device-agent 裝到 `/usr/local/lib/solar-device-agent`，systemd unit 的 `User=` 由安裝器渲染成 `${KIOSK_USER}`（**非 root**；journal 透過 `sudo -n` + `solar-display-journal` sudoers drop-in；`NoNewPrivileges=false` 刻意保留以讓 sudo 生效）。
+  - `deploy/windows-offline/`：Windows PC server — `Install-SolarPlayer.ps1` 以 nssm 安裝 `SolarPlayerServer` 服務到 `ProgramData\SolarPlayer`（預設 port 4000、管理員、不下載）；`Start-SolarPlayer.cmd` 為 portable、免管理員；`scripts/build-windows-offline-bundle.mjs` 輸出 offline/portable ZIP 到 `dist/deploy-bundles/`（與 root `deploy.sh` 同角色，**只打包 runtime 必要檔，不含 repo／macOS node_modules**）。
+  - runbook：`docs/runbooks/pc-server-deploy.md`、`docs/runbooks/pi-thin-kiosk-deploy.md`；skill：`.agents/skills/split-deployment/`。
+  - 改 split 路徑時，`install-thin-kiosk.sh`、`solar-device-agent.service`、`verify-thin-kiosk.sh`、`build-windows-offline-bundle.mjs`、兩份 runbook、本檔一起檢查；既有 co-located 部署（上面三入口）不在此拓樸內，勿混改。

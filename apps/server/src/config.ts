@@ -81,5 +81,14 @@ export const config = {
   },
   get metricRetentionVacuumEnabled() {
     return process.env.METRIC_RETENTION_VACUUM_ENABLED?.trim() !== "false";
+  },
+  /**
+   * Optional URL of a Pi device-status agent (e.g. http://192.168.1.50:3001).
+   * When set, Device Status host-stats (disk/mem/cpu/uptime) are sourced from that agent.
+   * Logs always stay on the server host and ignore this setting. Blank/unset → null (local /proc).
+   */
+  get deviceAgentUrl() {
+    const value = process.env.DEVICE_AGENT_URL?.trim();
+    return value && value.length > 0 ? value : null;
   }
 };

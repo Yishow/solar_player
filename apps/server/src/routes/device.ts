@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { existsSync, readFileSync, readdirSync, statfsSync } from "node:fs";
 import { join } from "node:path";
 import { platform, totalmem, cpus, hostname, arch } from "node:os";
+import { config } from "../config.js";
 import {
   buildUnsupportedDeviceControlResult,
   readDeviceDisplayOpsSummary
@@ -17,6 +18,171 @@ import {
   type JournalRunner
 } from "../services/deviceLogService.js";
 import { readReleaseIdentity } from "../services/releaseIdentityService.js";
+
+type HostStats = {
+  cpu: { cores: number; loadAvg: [number, number, number] };
+  disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
+  memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
+  uptimeSeconds: number;
+};
+
+type HostStatsResult = HostStats & {
+  hostStatsAvailable: boolean;
+  hostStatsUnavailableReason: string | null;
+};
+
+const emptyHostStats: HostStats = {
+  cpu: { cores: 0, loadAvg: [0, 0, 0] },
+  disk: { totalMB: 0, usedMB: 0, availableMB: 0, usePercent: 0 },
+  memory: { totalMB: 0, usedMB: 0, freeMB: 0, usePercent: 0 },
+  uptimeSeconds: 0
+};
+
+const DEVICE_AGENT_FETCH_TIMEOUT_MS = 3_000;
+
+type DeviceAgentFetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+let deviceAgentFetchOverride: DeviceAgentFetch | undefined;
+
+/** Test-only: inject fetch used for DEVICE_AGENT_URL host-stats. */
+export function setDeviceAgentFetchForTests(fetchImpl: DeviceAgentFetch | undefined) {
+  deviceAgentFetchOverride = fetchImpl;
+}
+
+function boundedHostStatsReason(reason: string): string {
+  const compact = reason.replace(/\s+/g, " ").trim();
+  if (compact.length === 0) {
+    return "device agent unreachable";
+  }
+  return compact.length > 200 ? `${compact.slice(0, 197)}...` : compact;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function parseRemoteHostStats(payload: unknown): HostStats | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const body = payload as Record<string, unknown>;
+  const disk = body.disk as Record<string, unknown> | undefined;
+  const memory = body.memory as Record<string, unknown> | undefined;
+  const cpu = body.cpu as Record<string, unknown> | undefined;
+  const loadAvg = Array.isArray(cpu?.loadAvg) ? cpu.loadAvg : null;
+
+  if (
+    !disk
+    || !memory
+    || !cpu
+    || !loadAvg
+    || loadAvg.length < 3
+    || !isFiniteNumber(disk.totalMB)
+    || !isFiniteNumber(disk.usedMB)
+    || !isFiniteNumber(disk.availableMB)
+    || !isFiniteNumber(disk.usePercent)
+    || !isFiniteNumber(memory.totalMB)
+    || !isFiniteNumber(memory.usedMB)
+    || !isFiniteNumber(memory.freeMB)
+    || !isFiniteNumber(memory.usePercent)
+    || !isFiniteNumber(cpu.cores)
+    || !isFiniteNumber(loadAvg[0])
+    || !isFiniteNumber(loadAvg[1])
+    || !isFiniteNumber(loadAvg[2])
+    || !isFiniteNumber(body.uptimeSeconds)
+  ) {
+    return null;
+  }
+
+  return {
+    disk: {
+      totalMB: disk.totalMB,
+      usedMB: disk.usedMB,
+      availableMB: disk.availableMB,
+      usePercent: disk.usePercent
+    },
+    memory: {
+      totalMB: memory.totalMB,
+      usedMB: memory.usedMB,
+      freeMB: memory.freeMB,
+      usePercent: memory.usePercent
+    },
+    cpu: {
+      cores: cpu.cores,
+      loadAvg: [loadAvg[0], loadAvg[1], loadAvg[2]]
+    },
+    uptimeSeconds: body.uptimeSeconds
+  };
+}
+
+async function fetchRemoteHostStats(agentUrl: string): Promise<HostStatsResult> {
+  const base = agentUrl.replace(/\/+$/, "");
+  const url = `${base}/stats`;
+  const fetchImpl = deviceAgentFetchOverride ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEVICE_AGENT_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      return {
+        ...emptyHostStats,
+        hostStatsAvailable: false,
+        hostStatsUnavailableReason: boundedHostStatsReason(
+          `device agent returned HTTP ${response.status}`
+        )
+      };
+    }
+    const payload: unknown = await response.json();
+    const parsed = parseRemoteHostStats(payload);
+    if (!parsed) {
+      return {
+        ...emptyHostStats,
+        hostStatsAvailable: false,
+        hostStatsUnavailableReason: boundedHostStatsReason("device agent returned invalid host stats")
+      };
+    }
+    return {
+      ...parsed,
+      hostStatsAvailable: true,
+      hostStatsUnavailableReason: null
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error && error.name === "AbortError"
+        ? "device agent request timed out"
+        : error instanceof Error
+          ? error.message
+          : "device agent unreachable";
+    return {
+      ...emptyHostStats,
+      hostStatsAvailable: false,
+      hostStatsUnavailableReason: boundedHostStatsReason(message)
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readHostStats(): Promise<HostStatsResult> {
+  const agentUrl = config.deviceAgentUrl;
+  if (agentUrl) {
+    return fetchRemoteHostStats(agentUrl);
+  }
+
+  return {
+    cpu: getCpuUsage(),
+    disk: getDiskUsage(process.env.DATA_DIR ?? "/tmp"),
+    memory: getMemoryUsage(),
+    uptimeSeconds: getUptimeSeconds(),
+    hostStatsAvailable: true,
+    hostStatsUnavailableReason: null
+  };
+}
 
 function getUptimeSeconds(): number {
   if (platform() === "linux") {
@@ -206,9 +372,9 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
       return app.managementAccess.deny(reply);
     }
 
-    const disk = getDiskUsage(process.env.DATA_DIR ?? "/tmp");
-    const memory = getMemoryUsage();
-    const cpu = getCpuUsage();
+    // Host-stats (disk/mem/cpu/uptime) may come from DEVICE_AGENT_URL (Pi agent).
+    // Logs always stay server-side and never consult the agent.
+    const hostStats = await readHostStats();
     const telemetryRoots = deviceTelemetryRootsOverride ?? defaultTelemetryRoots;
     const temperature = platform() === "linux" || deviceTelemetryRootsOverride
       ? getTemperature(telemetryRoots)
@@ -233,10 +399,12 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         platform: platform(),
         arch: arch(),
         nodeVersion: process.version,
-        uptimeSeconds: getUptimeSeconds(),
-        cpu,
-        memory,
-        disk,
+        uptimeSeconds: hostStats.uptimeSeconds,
+        cpu: hostStats.cpu,
+        memory: hostStats.memory,
+        disk: hostStats.disk,
+        hostStatsAvailable: hostStats.hostStatsAvailable,
+        hostStatsUnavailableReason: hostStats.hostStatsUnavailableReason,
         temperature,
         fan,
         displayOps,

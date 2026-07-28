@@ -3,8 +3,9 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const deployScriptPath = path.join(repoRoot, "deploy.sh");
@@ -32,6 +33,12 @@ const deployNotesPath = path.join(repoRoot, "deploy.md");
 const raspiDeployRunbookPath = path.join(repoRoot, "docs/runbooks/raspi-onekey-kiosk-deploy.md");
 const pi5DeploymentSkillPath = path.join(repoRoot, ".agents/skills/pi5-deployment/SKILL.md");
 const pi5DeploymentSkillMetadataPath = path.join(repoRoot, ".agents/skills/pi5-deployment/agents/openai.yaml");
+const windowsOfflineBundleBuilderPath = path.join(repoRoot, "scripts/build-windows-offline-bundle.mjs");
+const windowsOfflineBundleShellPath = path.join(repoRoot, "scripts/build-windows-offline-bundle.sh");
+const windowsOfflineBundleCmdPath = path.join(repoRoot, "scripts/build-windows-offline-bundle.cmd");
+const windowsOfflineInstallerPath = path.join(repoRoot, "deploy/windows-offline/Install-SolarPlayer.ps1");
+const windowsPortableLauncherPath = path.join(repoRoot, "deploy/windows-offline/Start-SolarPlayer.cmd");
+const windowsPortableManagerPath = path.join(repoRoot, "deploy/windows-offline/Manage-SolarPlayer.ps1");
 const bashCommand = process.platform === "win32"
   ? path.join(process.env.WINDIR ?? "C:/Windows", "System32", "bash.exe")
   : "bash";
@@ -3757,6 +3764,65 @@ test("deploy.sh includes journal helper and generates release manifest into bund
   assert.match(source, /release-manifest\.json/);
 });
 
+test("Windows offline bundle builder and installer target x64 port 4000 without target downloads", () => {
+  const builder = readFileSync(windowsOfflineBundleBuilderPath, "utf8");
+  const installer = readFileSync(windowsOfflineInstallerPath, "utf8");
+
+  assert.match(builder, /solar-player-windows-x64-offline\.zip/u);
+  assert.match(builder, /node\.exe/u);
+  assert.match(builder, /nssm\.exe/u);
+  assert.match(builder, /win32-x64\.node/u);
+  assert.match(builder, /apps\/server\/dist\/server\.js/u);
+  assert.match(builder, /apps\/web\/dist/u);
+  assert.match(builder, /rmSync\(join\(serverDir, "data"\)/u);
+  assert.match(builder, /--frozen-lockfile/u);
+  assert.match(builder, /cp", \["-RL", join\(serverDir, "node_modules"\)/u);
+  assert.match(builder, /hoistedDependencies = join\(nodeModules, "\.pnpm", "node_modules"\)/u);
+  assert.match(builder, /readdirSync\(hoistedDependencies\)/u);
+  assert.match(builder, /Portable bundle contains symlinked dependencies/u);
+  assert.match(builder, /runtime\/pnpm.*\*darwin\*/su);
+
+  assert.match(installer, /#Requires -RunAsAdministrator/u);
+  assert.match(installer, /\$Port\s*=\s*4000/u);
+  assert.match(installer, /Get-NetTCPConnection/u);
+  assert.match(installer, /New-NetFirewallRule/u);
+  assert.match(installer, /SolarPlayerServer/u);
+  assert.match(installer, /nssm\.exe/u);
+  assert.doesNotMatch(installer, /pnpm\s+install|Invoke-WebRequest|Start-BitsTransfer|curl\.exe/iu);
+});
+
+test("Windows portable launcher starts on port 4000 without administrator-only operations", () => {
+  const builder = readFileSync(windowsOfflineBundleBuilderPath, "utf8");
+  const launcher = readFileSync(windowsPortableLauncherPath, "utf8");
+  const manager = readFileSync(windowsPortableManagerPath, "utf8");
+
+  assert.match(builder, /solar-player-windows-x64-portable\.zip/u);
+  assert.match(builder, /Start-SolarPlayer\.cmd/u);
+  assert.match(builder, /Manage-SolarPlayer\.ps1/u);
+  assert.match(launcher, /netstat/u);
+  assert.match(launcher, /PORT=4000/u);
+  assert.match(launcher, /runtime\\node\\node\.exe/iu);
+  assert.doesNotMatch(launcher, /nssm|sc\.exe|New-NetFirewallRule|pnpm\s+install|curl|Invoke-WebRequest/iu);
+  assert.match(manager, /背景啟動/u);
+  assert.match(manager, /Stop-Process/u);
+  assert.match(manager, /Get-NetTCPConnection -LocalPort 4000/u);
+  assert.match(manager, /Invoke-WebRequest -UseBasicParsing/u);
+  assert.match(manager, /Get-Item -LiteralPath \$process\.Path/u);
+  assert.match(manager, /StringComparison\]::OrdinalIgnoreCase/u);
+  assert.doesNotMatch(manager, /#Requires -RunAsAdministrator|New-NetFirewallRule|nssm|sc\.exe/iu);
+  assert.equal(readFileSync(windowsPortableManagerPath).subarray(0, 3).toString("hex"), "efbbbf");
+});
+
+test("platform-native bundle entrypoints build before invoking the shared builder", () => {
+  const shell = readFileSync(windowsOfflineBundleShellPath, "utf8");
+  const cmd = readFileSync(windowsOfflineBundleCmdPath, "utf8");
+
+  assert.match(shell, /^#!\/usr\/bin\/env bash/mu);
+  assert.match(shell, /set -euo pipefail/u);
+  assert.match(shell, /pnpm build\nnode scripts\/build-windows-offline-bundle\.mjs/u);
+  assert.match(cmd, /call pnpm build\r?\nif errorlevel 1 exit \/b %errorlevel%\r?\nnode scripts\\build-windows-offline-bundle\.mjs/u);
+});
+
 test("direct deploy copies or generates release-manifest.json", () => {
   const source = readFileSync(path.join(repoRoot, "deploy/deploy.sh"), "utf8");
   assert.match(source, /run_priv node[\s\S]*generate-release-manifest\.mjs/);
@@ -3768,4 +3834,206 @@ test("browser smoke pins server dotenv to an isolated temp file", () => {
 
   assert.match(source, /browser-smoke\.env/u);
   assert.match(source, /SOLAR_DISPLAY_ENV_FILE:\s*envFilePath/u);
+});
+
+// --- split-server-to-pc-thin-kiosk: device-agent + thin-kiosk install ---
+
+const solarDeviceAgentPath = path.join(repoRoot, "deploy/solar-device-agent.py");
+const solarDeviceAgentUnitPath = path.join(repoRoot, "deploy/solar-device-agent.service");
+const installThinKioskPath = path.join(repoRoot, "deploy/install-thin-kiosk.sh");
+const verifyThinKioskPath = path.join(repoRoot, "deploy/verify-thin-kiosk.sh");
+const verifyKioskInstallPath = path.join(repoRoot, "deploy/verify-kiosk-install.sh");
+
+async function waitForHttp(url, { attempts = 40, intervalMs = 50, timeoutMs = 500 } = {}) {
+  let lastError = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      return response;
+    } catch (error) {
+      lastError = error;
+      await delay(intervalMs);
+    }
+  }
+  throw lastError ?? new Error(`Timed out waiting for ${url}`);
+}
+
+test("solar-device-agent unit enables at boot and restarts on failure", () => {
+  const source = readFileSync(solarDeviceAgentUnitPath, "utf8");
+  assert.match(source, /WantedBy=multi-user\.target/);
+  assert.match(source, /Restart=on-failure/);
+  assert.match(source, /solar-device-agent\.py/);
+  assert.match(source, /ExecStart=.*python3/);
+  // Agent must not run as root: the unit carries a placeholder the installer
+  // renders to the kiosk user (read-only /proc + sudo -n journal access).
+  assert.match(source, /User=__KIOSK_USER__/);
+  assert.doesNotMatch(source, /User=root/);
+});
+
+test("solar-device-agent serves /stats, /logs, enforces allowlist and fail-closed", async () => {
+  assert.equal(existsSync(solarDeviceAgentPath), true);
+
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "device-agent-"));
+  const helperPath = path.join(fixtureRoot, "read-solar-display-journal.sh");
+  const launcherLog = path.join(fixtureRoot, "kiosk-launcher.log");
+  writeFileSync(
+    helperPath,
+    "#!/bin/bash\nset -euo pipefail\necho \"2026-05-18T09:00:00+00:00 host solar-display[1]: pi journal line\"\n",
+    "utf8"
+  );
+  chmodSync(helperPath, 0o755);
+  writeFileSync(launcherLog, "kiosk boot ok\n", "utf8");
+
+  const basePort = 31000 + Math.floor(Math.random() * 2000);
+  const baseEnv = {
+    ...process.env,
+    DEVICE_AGENT_HOST: "127.0.0.1",
+    JOURNAL_HELPER_PATH: helperPath,
+    KIOSK_LAUNCHER_LOG: launcherLog,
+    DEVICE_AGENT_DISK_PATH: fixtureRoot
+  };
+
+  async function withAgent(port, allowlist, fn) {
+    const child = spawn("python3", [solarDeviceAgentPath], {
+      env: {
+        ...baseEnv,
+        DEVICE_AGENT_PORT: String(port),
+        ALLOWED_SOURCE_IPS: allowlist
+      },
+      stdio: ["ignore", "ignore", "pipe"]
+    });
+    try {
+      return await fn(port);
+    } finally {
+      child.kill("SIGTERM");
+      await delay(80);
+    }
+  }
+
+  // Fail-closed when allowlist empty.
+  await withAgent(basePort, "", async (port) => {
+    const denied = await waitForHttp(`http://127.0.0.1:${port}/stats`);
+    assert.equal(denied.status, 403);
+    assert.equal(await denied.text(), "");
+  });
+
+  // Allowed source can read stats and logs.
+  await withAgent(basePort + 1, "127.0.0.1", async (port) => {
+    const statsResponse = await waitForHttp(`http://127.0.0.1:${port}/stats`);
+    assert.equal(statsResponse.status, 200);
+    const stats = await statsResponse.json();
+    assert.equal(typeof stats.disk.totalMB, "number");
+    assert.equal(typeof stats.memory.totalMB, "number");
+    assert.equal(typeof stats.cpu.cores, "number");
+    assert.equal(Array.isArray(stats.cpu.loadAvg), true);
+    assert.equal(typeof stats.uptimeSeconds, "number");
+
+    const logsResponse = await fetch(`http://127.0.0.1:${port}/logs?limit=20`);
+    assert.equal(logsResponse.status, 200);
+    const logs = await logsResponse.json();
+    assert.equal(logs.limit, 20);
+    assert.equal(Array.isArray(logs.entries), true);
+    assert.ok(
+      logs.entries.some((entry) => String(entry.message).includes("pi journal line"))
+      || logs.entries.some((entry) => String(entry.message).includes("kiosk boot ok")),
+      "logs should include Pi-local journal or launcher content"
+    );
+  });
+
+  // Non-allowlisted source is rejected with empty body.
+  await withAgent(basePort + 2, "10.255.255.1", async (port) => {
+    const blocked = await waitForHttp(`http://127.0.0.1:${port}/stats`);
+    assert.equal(blocked.status, 403);
+    assert.equal(await blocked.text(), "");
+  });
+
+  rmSync(fixtureRoot, { force: true, recursive: true });
+});
+
+test("install-thin-kiosk.sh renders remote URL, skips solar-display.service, handles migrate gates", () => {
+  assert.equal(existsSync(installThinKioskPath), true);
+  const syntax = spawnSync(bashCommand, ["-n", installThinKioskPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, syntax.stderr || syntax.stdout);
+
+  const source = readFileSync(installThinKioskPath, "utf8");
+
+  // URL / wait rendering
+  assert.match(source, /--kiosk-url/);
+  assert.match(source, /--kiosk-user/);
+  assert.match(source, /KIOSK_URL=/);
+  assert.match(source, /KIOSK_HEALTH_URL=/);
+  assert.match(source, /KIOSK_WAIT_SECONDS/);
+  assert.match(source, /600/);
+  assert.match(source, /start-thin-kiosk\.sh/);
+  assert.match(source, /start-solar-kiosk\.sh/);
+  // Does not install local server unit
+  assert.match(source, /solar-display\.service was NOT installed/i);
+  assert.doesNotMatch(source, /systemctl enable solar-display/);
+  assert.doesNotMatch(source, /systemctl restart solar-display/);
+  assert.doesNotMatch(source, /cp .*solar-display\.service|install -m .*solar-display\.service/);
+
+  // Device-agent unit is rendered to drop root (run as the kiosk user).
+  assert.match(source, /s#__KIOSK_USER__#\$\{KIOSK_USER\}#g/);
+
+  // Existing service requires explicit decision
+  assert.match(source, /Detected existing solar-display\.service/);
+  assert.match(source, /--confirm-existing-service/);
+  assert.match(source, /--confirm-migrate/);
+
+  // Migrate: stop+disable, not delete
+  assert.match(source, /systemctl stop solar-display\.service/);
+  assert.match(source, /systemctl disable solar-display\.service/);
+  assert.doesNotMatch(source, /systemctl disable --now solar-display.*rm /);
+  assert.doesNotMatch(source, /rm -f .*solar-display\.service/);
+  assert.match(source, /files retained for rollback|unit file retained for rollback/i);
+
+  // Unconfirmed migrate aborts
+  assert.match(source, /Migration requires explicit confirmation/);
+  assert.match(source, /exit 2/);
+
+  // Readonly disable schedule reminder
+  assert.match(source, /readonly-system-disable\.sh/);
+  assert.match(source, /readonly-system-enable\.sh/);
+  assert.match(source, /overlay/);
+
+  // Journal helper install (copy existing, visudo)
+  assert.match(source, /read-solar-display-journal\.sh/);
+  assert.match(source, /\/usr\/local\/sbin\/read-solar-display-journal\.sh/);
+  assert.match(source, /visudo -cf/);
+  assert.match(source, /solar-device-agent/);
+
+  // Does not depend on node/pnpm
+  assert.doesNotMatch(source, /command -v node/);
+  assert.doesNotMatch(source, /command -v pnpm/);
+});
+
+test("verify-thin-kiosk.sh checks kiosk URL and device-agent without requiring solar-display.service", () => {
+  assert.equal(existsSync(verifyThinKioskPath), true);
+  const syntax = spawnSync(bashCommand, ["-n", verifyThinKioskPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, syntax.stderr || syntax.stdout);
+
+  const source = readFileSync(verifyThinKioskPath, "utf8");
+  assert.match(source, /--kiosk-url/);
+  assert.match(source, /KIOSK_URL/);
+  assert.match(source, /solar-device-agent/);
+  assert.match(source, /lightdm/);
+  assert.match(source, /firefox/);
+  assert.match(source, /readonly enable launcher/i);
+  // Must not hard-fail when solar-display.service is absent
+  assert.doesNotMatch(source, /systemctl is-active --quiet solar-display/);
+  assert.doesNotMatch(source, /check "solar-display service is active"/);
+  assert.doesNotMatch(source, /\/data\/solar-display\/data/);
+
+  // Existing co-located verifier remains untouched and still requires the service.
+  const colocated = readFileSync(verifyKioskInstallPath, "utf8");
+  assert.match(colocated, /systemctl is-active --quiet solar-display/);
+});
+
+test("migrate path leaves solar-display unit restorable via enable (rollback contract)", () => {
+  const source = readFileSync(installThinKioskPath, "utf8");
+  // stop + disable only; operator can systemctl enable --now later
+  assert.match(source, /systemctl disable solar-display\.service/);
+  assert.match(source, /re-enable solar-display\.service|rollback/i);
+  assert.doesNotMatch(source, /systemctl mask solar-display/);
+  assert.doesNotMatch(source, /rm .*\/etc\/systemd\/system\/solar-display\.service/);
 });

@@ -66,6 +66,26 @@ test("config falls back to retention defaults and accepts explicit overrides", (
   }
 });
 
+test("config.deviceAgentUrl reads DEVICE_AGENT_URL with set/unset/blank cases", () => {
+  const original = process.env.DEVICE_AGENT_URL;
+
+  try {
+    delete process.env.DEVICE_AGENT_URL;
+    assert.equal(config.deviceAgentUrl, null);
+
+    process.env.DEVICE_AGENT_URL = "http://192.168.1.50:3001";
+    assert.equal(config.deviceAgentUrl, "http://192.168.1.50:3001");
+
+    process.env.DEVICE_AGENT_URL = "   ";
+    assert.equal(config.deviceAgentUrl, null);
+
+    process.env.DEVICE_AGENT_URL = "";
+    assert.equal(config.deviceAgentUrl, null);
+  } finally {
+    restoreEnv("DEVICE_AGENT_URL", original);
+  }
+});
+
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[key];
