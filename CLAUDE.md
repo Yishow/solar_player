@@ -61,6 +61,20 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 7. **最小改動**：只做任務直接要求的；規格與現況衝突時回到 root scripts、`apps/`、`packages/shared`、`deploy/`、`openspec/` 查證。
 8. 瀏覽器測試用 `agent-browser` skill；AI 可主導執行，但產品意圖、FHD 品質門檻、intentional difference、launch acceptance 由使用者決定。
 
+## Agent skills
+
+### Issue tracker
+
+Issues 以本地 markdown 存放於 `.scratch/<feature>/`（離線友善，不使用 GitHub Issues）。詳見 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+沿用預設五個角色：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。詳見 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+Single-context：root 一份 `CONTEXT.md` + `docs/adr/`。詳見 `docs/agents/domain.md`。
+
 <!--
 FHD Workflow Entrypoints Reference:
 - docs/reference-match/fhd-workflow-entrypoints.md
