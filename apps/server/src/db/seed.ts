@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { DEFAULT_PLAYBACK_TRANSITION_SPEED_MS } from "@solar-display/shared";
 import {
   getEnvMqttSettings,
   hasExplicitMqttEnvSettings,
@@ -9,6 +8,7 @@ import {
 } from "../mqtt/settings-source.js";
 import { SOLAR_GENERATION_PROFILE_KW } from "../metrics/solarGenerationProfile.js";
 import { bootstrapDisplaySeedAssets } from "../services/displaySeedAssetBootstrapService.js";
+import { attachDisplayPageToDefaultProfile } from "../services/playbackProfileService.js";
 import { closeDatabaseConnection, getDatabase } from "./index.js";
 import { normalizeMetricSnapshotCapturedAt } from "./normalizeMetricSnapshotCapturedAt.js";
 
@@ -311,7 +311,7 @@ export function seedDatabase() {
       created_at,
       updated_at
     )
-    SELECT ?, ?, ?, ?, ?, 1, NULL, ?, 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    SELECT ?, ?, ?, ?, ?, 0, NULL, 0, 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     WHERE NOT EXISTS (
       SELECT 1 FROM display_page_registry WHERE page_key = ?
     )
@@ -420,9 +420,21 @@ export function seedDatabase() {
         page.route.replace(/^\//, ""),
         page.labelZh,
         page.labelEn,
-        page.displayOrder,
         page.pageKey
       );
+
+      const registryPage = database
+        .prepare("SELECT id FROM display_page_registry WHERE page_key = ?")
+        .get(page.pageKey) as { id: number } | undefined;
+      if (!registryPage) {
+        throw new Error(`Failed to seed display page registry instance: ${page.pageKey}`);
+      }
+
+      attachDisplayPageToDefaultProfile(registryPage.id, {
+        displayOrder: page.displayOrder,
+        durationSeconds: 15,
+        enabled: true
+      });
     }
 
     const guanyinConfigJson = JSON.stringify({
@@ -463,41 +475,7 @@ export function seedDatabase() {
       VALUES ('factory-circuit-guanyin', 'live', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'system')
     `).run(guanyinConfigJson);
 
-    database.prepare(`
-      INSERT INTO playback_settings (
-        id,
-        autoplay,
-        loop,
-        start_page,
-        transition_type,
-        transition_speed,
-        schedule_enabled,
-        schedule_start,
-        schedule_end,
-        repeat_days,
-        idle_mode,
-        idle_timeout,
-        brightness,
-        orientation,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(id) DO NOTHING
-    `).run(
-      1,
-      1,
-      1,
-      0,
-      "fade",
-      DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
-      0,
-      "08:00",
-      "18:00",
-      "1,2,3,4,5",
-      0,
-      300,
-      100,
-      "landscape"
-    );
+
 
     const snapshotCount = (
       database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number }

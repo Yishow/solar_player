@@ -17,6 +17,7 @@ import {
   evaluateFactoryGenerationScope,
   resolveFactoryGenerationScope
 } from "./factoryGenerationAggregateService.js";
+import { readDefaultPlaybackPageRows } from "./playbackProfileService.js";
 
 type TopicMappingRow = {
   enabled: number;
@@ -111,19 +112,12 @@ function formatAggregateIssue(
 }
 
 function readSustainabilityFactoryScope() {
-  const pages = getDatabase()
-    .prepare(
-      `
-        SELECT page_key AS pageKey, enabled
-        FROM display_page_registry
-        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
-          AND archived_at IS NULL
-      `
-    )
-    .all() as Array<{ enabled: number; pageKey: string }>;
+  const pages = readDefaultPlaybackPageRows().filter((page) =>
+    page.page_key === "factory-circuit" || page.page_key === "factory-circuit-guanyin"
+  );
 
   return resolveFactoryGenerationScope(
-    pages.map((page) => ({ enabled: toBoolean(page.enabled), pageKey: page.pageKey }))
+    pages.map((page) => ({ enabled: toBoolean(page.enabled), pageKey: page.page_key }))
   );
 }
 

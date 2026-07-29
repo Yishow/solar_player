@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { updateDefaultPlaybackSettingsForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import {
   buildApp,
   getDatabase
@@ -789,9 +790,7 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
   seedPageScopedFactoryCircuitFixture();
   const database = getDatabase();
 
-  database
-    .prepare("UPDATE playback_settings SET enforce_fresh_runtime_data = 0 WHERE id = 1")
-    .run();
+  updateDefaultPlaybackSettingsForTest(database, { enforceFreshRuntimeData: false });
   database
     .prepare(
       `

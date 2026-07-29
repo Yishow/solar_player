@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import { updateDefaultPlaybackPageForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import {
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod,
@@ -506,12 +507,8 @@ test("readSustainabilityStory uses the CL and KN cumulative aggregate and older 
 
 function setFactoryPlaybackSelection(clEnabled: boolean, knEnabled: boolean) {
   const database = getDatabase();
-  database
-    .prepare("UPDATE display_page_registry SET enabled = ? WHERE page_key = 'factory-circuit'")
-    .run(clEnabled ? 1 : 0);
-  database
-    .prepare("UPDATE display_page_registry SET enabled = ? WHERE page_key = 'factory-circuit-guanyin'")
-    .run(knEnabled ? 1 : 0);
+  updateDefaultPlaybackPageForTest(database, "factory-circuit", { enabled: clEnabled });
+  updateDefaultPlaybackPageForTest(database, "factory-circuit-guanyin", { enabled: knEnabled });
 }
 
 function insertFactoryGenerationSources(args: { knTimestamp?: string }) {

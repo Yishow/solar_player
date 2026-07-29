@@ -36,6 +36,29 @@ function bootstrapRegistryTable() {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS playback_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS playback_profile_pages (
+      profile_id INTEGER NOT NULL,
+      page_id INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      display_order INTEGER NOT NULL,
+      duration_seconds INTEGER NOT NULL DEFAULT 15,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (profile_id, page_id)
+    );
+
+    INSERT INTO playback_profiles (id, profile_key, name, is_default)
+    VALUES (1, 'default', 'Default Playback Profile', 1);
+
     CREATE TABLE IF NOT EXISTS display_page_stage_configs (
       page_key TEXT NOT NULL,
       stage TEXT NOT NULL DEFAULT 'draft',
@@ -62,7 +85,25 @@ function bootstrapRegistryTable() {
         duration_seconds
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run("images", "images", "images", "圖庫", "Images", 1, null, 5, 15);
+    .run("images", "images", "images", "圖庫", "Images", 0, null, 0, 15);
+
+  database
+    .prepare(
+      `INSERT INTO playback_profile_pages (
+        profile_id,
+        page_id,
+        enabled,
+        display_order,
+        duration_seconds
+      ) VALUES (
+        1,
+        (SELECT id FROM display_page_registry WHERE page_key = 'images'),
+        1,
+        5,
+        15
+      )`
+    )
+    .run();
 
   database
     .prepare(

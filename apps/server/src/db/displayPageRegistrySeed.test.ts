@@ -37,14 +37,17 @@ test("database migration and seed bootstrap the first five supported display pag
     .prepare(
       `
         SELECT
-          page_key,
-          template_key,
-          route_slug,
-          label_zh,
-          label_en,
-          display_order
-        FROM display_page_registry
-        ORDER BY display_order ASC, id ASC
+          registry.page_key,
+          registry.template_key,
+          registry.route_slug,
+          registry.label_zh,
+          registry.label_en,
+          profile_page.display_order
+        FROM display_page_registry AS registry
+        INNER JOIN playback_profile_pages AS profile_page ON profile_page.page_id = registry.id
+        INNER JOIN playback_profiles AS profile ON profile.id = profile_page.profile_id
+        WHERE profile.profile_key = 'default' AND profile.is_default = 1
+        ORDER BY profile_page.display_order ASC, registry.id ASC
       `
     )
     .all() as Array<{

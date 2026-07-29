@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import { updateDefaultPlaybackPageForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-readiness-test-"));
 process.env.DATA_DIR = tempDir;
@@ -149,9 +150,7 @@ test("readiness warns when the CL and KN cumulative aggregate regresses", () => 
 });
 
 test("CL-only Sustainability readiness ignores stale KN", () => {
-  getDatabase()
-    .prepare("UPDATE display_page_registry SET enabled = 0 WHERE page_key = 'factory-circuit-guanyin'")
-    .run();
+  updateDefaultPlaybackPageForTest(getDatabase(), "factory-circuit-guanyin", { enabled: false });
   insertFactorySummary("cl", {
     month_mwh: 366.93,
     timestamp: "2026-06-26T15:38:10+08:00",
@@ -174,9 +173,8 @@ test("CL-only Sustainability readiness ignores stale KN", () => {
 });
 
 test("Sustainability readiness reports no factory selected when both factory pages are disabled", () => {
-  getDatabase()
-    .prepare("UPDATE display_page_registry SET enabled = 0 WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')")
-    .run();
+  updateDefaultPlaybackPageForTest(getDatabase(), "factory-circuit", { enabled: false });
+  updateDefaultPlaybackPageForTest(getDatabase(), "factory-circuit-guanyin", { enabled: false });
 
   const finding = findSustainabilityGeneration();
 

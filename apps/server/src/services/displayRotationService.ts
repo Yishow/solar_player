@@ -11,7 +11,6 @@ import type {
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
-  DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
   evaluatePageRuntimeFreshnessForRequirements,
   evaluateDisplayRotation,
   normalizePlaybackTransitionSpeed,
@@ -21,40 +20,17 @@ import {
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readImagePlaylist } from "./imagePlaylistService.js";
+import {
+  readDefaultPlaybackPageRows,
+  readDefaultPlaybackSettingsRow,
+  writeDefaultPlaybackSettingsRow,
+  updateDefaultPlaybackPageState,
+  type PlaybackProfilePageRow,
+  type PlaybackProfileSettingsRow
+} from "./playbackProfileService.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
-
-type PlaybackSettingsRow = {
-  autoplay: number;
-  brightness: number;
-  idle_mode: string;
-  idle_timeout: number;
-  loop: number;
-  orientation: string;
-  repeat_days: string;
-  schedule_enabled: number;
-  schedule_end: string | null;
-  schedule_start: string | null;
-  start_page: number;
-  enforce_fresh_runtime_data: number;
-  transition_speed: number;
-  transition_type: string;
-  updated_at: string | null;
-};
-
-type PlaybackPageRow = {
-  archived_at: string | null;
-  display_order: number;
-  duration_seconds: number;
-  enabled: number;
-  id: number;
-  label_en: string;
-  label_zh: string;
-  page_key: string;
-  route_slug: string;
-  template_key: DisplayPageTemplateKey;
-};
 
 type MqttSettingsRow = {
   message_timeout: number | null;
@@ -240,7 +216,7 @@ function serializeRepeatDays(days: number[]): string {
   return days.filter((day) => day >= 0 && day <= 6).join(",");
 }
 
-function serializeSettingsRow(row: PlaybackSettingsRow): PlaybackSettings {
+function serializeSettingsRow(row: PlaybackProfileSettingsRow): PlaybackSettings {
   return {
     autoplay: toBoolean(row.autoplay),
     brightness: row.brightness,
@@ -263,7 +239,7 @@ function serializeSettingsRow(row: PlaybackSettingsRow): PlaybackSettings {
   };
 }
 
-function serializePageRow(row: PlaybackPageRow): PlaybackPage {
+function serializePageRow(row: PlaybackProfilePageRow): PlaybackPage {
   return {
     displayOrder: row.display_order,
     durationSeconds: row.duration_seconds,
@@ -294,51 +270,8 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
-function readPlaybackSettingsRow(): PlaybackSettingsRow {
-  const row = getDatabase()
-    .prepare(
-      `
-        SELECT
-          autoplay,
-          brightness,
-          idle_mode,
-          idle_timeout,
-          loop,
-          orientation,
-          repeat_days,
-          schedule_enabled,
-          schedule_end,
-          schedule_start,
-          start_page,
-          COALESCE(enforce_fresh_runtime_data, 1) AS enforce_fresh_runtime_data,
-          transition_speed,
-          transition_type,
-          updated_at
-        FROM playback_settings
-        LIMIT 1
-      `
-    )
-    .get() as PlaybackSettingsRow | undefined;
-
-  return (
-    row ?? {
-      autoplay: 1,
-      brightness: 100,
-      idle_mode: "disabled",
-      idle_timeout: 300,
-      loop: 1,
-      orientation: "landscape",
-      repeat_days: "",
-      schedule_enabled: 0,
-      schedule_end: null,
-      schedule_start: null,
-      start_page: 0,
-      enforce_fresh_runtime_data: 1,
-      transition_speed: DEFAULT_PLAYBACK_TRANSITION_SPEED_MS,
-      transition_type: "fade",
-      updated_at: null
-    }
-  );
+function readPlaybackSettingsRow() {
+  return readDefaultPlaybackSettingsRow();
 }
 
 export function readPlaybackSettings() {
@@ -346,7 +279,6 @@ export function readPlaybackSettings() {
 }
 
 export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
-  const database = getDatabase();
   const current = readPlaybackSettingsRow();
   const nextTransitionType =
     body.transitionType === "fade" || body.transitionType === "slide" || body.transitionType === "none"
@@ -379,71 +311,28 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
     transitionType: nextTransitionType
   };
 
-  database
-    .prepare(
-      `
-        UPDATE playback_settings SET
-          autoplay = ?,
-          loop = ?,
-          start_page = ?,
-          transition_type = ?,
-          transition_speed = ?,
-          schedule_enabled = ?,
-          schedule_start = ?,
-          schedule_end = ?,
-          repeat_days = ?,
-          idle_mode = ?,
-          idle_timeout = ?,
-          brightness = ?,
-          orientation = ?,
-          enforce_fresh_runtime_data = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = (SELECT id FROM playback_settings LIMIT 1)
-      `
-    )
-    .run(
-      nextSettings.autoplay ? 1 : 0,
-      nextSettings.loop ? 1 : 0,
-      nextSettings.startPage,
-      nextSettings.transitionType,
-      nextSettings.transitionSpeed,
-      nextSettings.scheduleEnabled ? 1 : 0,
-      nextSettings.scheduleStart,
-      nextSettings.scheduleEnd,
-      serializeRepeatDays(nextSettings.repeatDays),
-      nextSettings.idleMode,
-      nextSettings.idleTimeout,
-      nextSettings.brightness,
-      nextSettings.orientation,
-      nextSettings.enforceFreshRuntimeData ? 1 : 0
-    );
+  writeDefaultPlaybackSettingsRow({
+    autoplay: nextSettings.autoplay ? 1 : 0,
+    brightness: nextSettings.brightness,
+    enforce_fresh_runtime_data: nextSettings.enforceFreshRuntimeData ? 1 : 0,
+    idle_mode: nextSettings.idleMode,
+    idle_timeout: nextSettings.idleTimeout,
+    loop: nextSettings.loop ? 1 : 0,
+    orientation: nextSettings.orientation,
+    repeat_days: serializeRepeatDays(nextSettings.repeatDays),
+    schedule_enabled: nextSettings.scheduleEnabled ? 1 : 0,
+    schedule_end: nextSettings.scheduleEnd,
+    schedule_start: nextSettings.scheduleStart,
+    start_page: nextSettings.startPage,
+    transition_speed: nextSettings.transitionSpeed,
+    transition_type: nextSettings.transitionType
+  });
 
   return readPlaybackSettings();
 }
 
 export function readPlaybackPages() {
-  return (
-    getDatabase()
-      .prepare(
-        `
-          SELECT
-            id,
-            page_key,
-            template_key,
-            route_slug,
-            label_zh,
-            label_en,
-            enabled,
-            archived_at,
-            display_order,
-            duration_seconds
-          FROM display_page_registry
-          WHERE archived_at IS NULL
-          ORDER BY display_order ASC, id ASC
-        `
-      )
-      .all() as PlaybackPageRow[]
-  ).map(serializePageRow);
+  return readDefaultPlaybackPageRows().map(serializePageRow);
 }
 
 function readMessageTimeoutSeconds() {
@@ -564,26 +453,23 @@ function buildPageConditions(
 
 export function updatePlaybackPages(pages: PlaybackPageUpdateInput[]) {
   const database = getDatabase();
-  const updatePage = database.prepare(
-    `
-      UPDATE display_page_registry
-      SET
-        display_order = ?,
-        duration_seconds = ?,
-        enabled = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `
+  const pageKeysById = new Map(
+    readDefaultPlaybackPageRows({ includeArchived: true }).map((page) => [page.id, page.page_key])
   );
 
   database.transaction((inputs: PlaybackPageUpdateInput[]) => {
     for (const page of inputs) {
-      updatePage.run(
-        typeof page.displayOrder === "number" ? page.displayOrder : 0,
-        typeof page.durationSeconds === "number" ? Math.max(1, page.durationSeconds) : 15,
-        page.enabled === false ? 0 : 1,
-        page.id
-      );
+      const pageKey = pageKeysById.get(page.id);
+      if (!pageKey) {
+        continue;
+      }
+
+      updateDefaultPlaybackPageState(pageKey, {
+        displayOrder: typeof page.displayOrder === "number" ? page.displayOrder : 0,
+        durationSeconds:
+          typeof page.durationSeconds === "number" ? Math.max(1, page.durationSeconds) : 15,
+        enabled: page.enabled !== false
+      });
     }
   })(pages);
 

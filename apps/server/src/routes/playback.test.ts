@@ -17,6 +17,10 @@ import {
   type PlaybackPage,
   type PlaybackSettings
 } from "@solar-display/shared";
+import {
+  attachDefaultPlaybackPageForTest,
+  setOnlyDefaultPlaybackPagesEnabledForTest
+} from "../testing/defaultPlaybackProfileTestSupport.js";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-playback-test-"));
 process.env.DATA_DIR = tempDir;
@@ -312,6 +316,11 @@ test("GET /api/playback/pages resolves duplicate display pages from the registry
       `
     )
     .run("images-2", "images", "images-secondary", "綠能影像副本", "Images Secondary", 1, 6, 22);
+  attachDefaultPlaybackPageForTest(database, "images-2", {
+    displayOrder: 6,
+    durationSeconds: 22,
+    enabled: true
+  });
 
   const app = await buildApp();
 
@@ -664,19 +673,7 @@ test("GET /api/display-pages/rotation-preview keeps a previously-seen live-data 
   const originalSolarStaleDataPolicy = displayPageFallbackPolicyByTemplateKey.solar.staleData;
   displayPageFallbackPolicyByTemplateKey.solar.staleData = "hide";
   database.prepare("DELETE FROM live_metric_values").run();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key
-          WHEN 'overview' THEN 1
-          WHEN 'solar' THEN 1
-          WHEN 'images' THEN 0
-          ELSE 0
-        END
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["overview", "solar"]);
 
   const freshTimestamp = new Date().toISOString();
   const staleTimestamp = new Date(Date.now() - 60_000).toISOString();
@@ -732,18 +729,7 @@ test("GET /api/display-pages/rotation-preview keeps solar playable when self con
 
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key
-          WHEN 'solar' THEN 1
-          WHEN 'images' THEN 0
-          ELSE 0
-        END
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["solar"]);
 
   const freshTimestamp = new Date().toISOString();
   for (const metricKey of [
@@ -793,18 +779,7 @@ test("GET /api/display-pages/rotation-preview keeps Factory Circuit playable whe
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryPeakMultiplier");
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key
-          WHEN 'factory-circuit' THEN 1
-          WHEN 'images' THEN 0
-          ELSE 0
-        END
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
 
   const freshTimestamp = new Date().toISOString();
   for (const metricKey of [
@@ -853,19 +828,7 @@ test("GET /api/display-pages/rotation-preview still skips a live-data page that 
   seedDatabase();
 
   const database = getDatabase();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key
-          WHEN 'overview' THEN 1
-          WHEN 'solar' THEN 1
-          WHEN 'images' THEN 0
-          ELSE 0
-        END
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["overview", "solar"]);
 
   const freshTimestamp = new Date().toISOString();
   for (const metricKey of [
@@ -925,18 +888,7 @@ test("GET /api/display-pages/rotation-preview can keep live-data pages in rotati
 
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key
-          WHEN 'solar' THEN 1
-          WHEN 'images' THEN 0
-          ELSE 0
-        END
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["solar"]);
 
   const app = await buildApp();
 
