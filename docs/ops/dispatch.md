@@ -26,7 +26,7 @@
 |---|---|---|
 | 找「X 在哪實作/誰呼叫」 | codebase-memory graph 或派 `Explore` | 省略或 `sonnet` |
 | Spectra change 實作 | 主對話跑 `/spectra-apply`（`.spectra.yaml` 已為各 spectra 階段設好 effort，不用另調） | 依 skill |
-| 一般 server/web 修改 | `general-purpose` 實作，驗收條件必含 conventions.md 的正確測試指令（含頂層 glob 直跑條款） | `sonnet` |
+| 一般 server/web 修改 | `general-purpose` 實作，驗收條件引用 conventions.md 的現行測試入口 | `sonnet` |
 | SQLite migration、MQTT runtime、playback shell、跨 app 資料流的診斷 | 難題，直接高階處理 | `opus` |
 | playback 頁 FHD polish | 實作 `sonnet`；驗收 = witness 流程（見下節），不是純 code review | `sonnet` + witness |
 | 批次機械修改（rename、改 import、套已定模式） | 模式先由 sonnet/opus 定案並附 before/after 範例，再批次套用 | `haiku` |
@@ -43,8 +43,8 @@ playback 頁的視覺「對不對」**不能只靠模型看 code 判斷**，任�
 
 ## 驗收指令速查（派工 prompt 直接抄）
 
-- server：`pnpm --filter @solar-display/server test`；改 `apps/server/src/` 頂層檔另加 `pnpm --filter @solar-display/server exec tsx --test src/<檔名>.test.ts`
+- server：`pnpm --filter @solar-display/server test`（需要聚焦時可把 explicit target 傳給 runner）
 - web：`pnpm --filter @solar-display/web test`
 - shared：`pnpm run build` + 受影響 app 測試
 - root deploy.sh：`node --test scripts/deploy.test.mjs`
-- 全部：`pnpm run test`（記得它不含 server 頂層測試與 deploy 測試）
+- 全部交付：`pnpm verify`

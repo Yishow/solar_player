@@ -9,19 +9,17 @@
 |---|---|---|
 | `CLAUDE.md`、`AGENTS.md` | 每 session 載入的同源分眾路由 | 小修（更正事實、路由增減）可自行；**共用內容必同步、同 commit**；加新硬規則要先問使用者 |
 | `docs/ops/conventions.md`、`fhd-closeout.md` | 事實描述 | 發現與程式碼不符即修（程式碼是真相），改完 read-back |
-| `docs/ops/dispatch.md`、`judgment.md` | 規則 | 更正事實、補正反例可自行；改規則本身先問使用者 |
+| `docs/ops/workflow.md`、`dispatch.md`、`judgment.md` | 規則 | 更正事實、補正反例可自行；改規則本身先問使用者 |
 | `docs/ops/delegation.md` | 模板 | 可自行改，改完 read-back 驗證 |
 | `docs/ops/diagnosis.md`、`letter.md` | 歷史快照 | 不改寫正文，只能文末加日期章節 |
-| `<SPECTRA:START>...<SPECTRA:END>` 區塊 | 工具管理 | 不手改，由 Spectra 工具維護 |
 | `openspec/**` | Spectra artifacts | 只透過 spectra-* skills 操作，不手改結構 |
 | `~/.claude/projects/-Users-yishow-prj-solar-player/memory/` | Claude 專案記憶 | 自由追加與更新（Claude 專用，不進 git） |
 
 ## CLAUDE.md ↔ AGENTS.md：允許的分眾差異（除此之外的分歧 = 漂移缺陷，發現即修）
 
-- SPECTRA 區塊：兩檔各自由工具維護（`/spectra-*` vs `$spectra-*`、wording 小異），不手動對齊。
-- AGENTS.md 獨有：路由表兩行的「（Claude Code 特有機制）」標註、以及「非 Claude 工具跳過 dispatch/delegation」那一段。
-- CLAUDE.md 獨有：硬規則 8 的「瀏覽器測試用 `agent-browser` skill」句（Claude 專屬 skill）。
-- 其餘所有內容（快覽、路由表、硬規則 1–7）視為共用內容，逐條語意一致，只允許 `/spectra-*` 與 `$spectra-*` 的前綴差異。
+- 標題、互相指向對方入口的名稱可以不同。
+- CLAUDE.md 路由到 Claude Code 專用的 `dispatch.md`／`delegation.md`；AGENTS.md 只提醒其他工具遵循自身能力與上位規則。
+- Repo 快覽、共用路由與四條硬規則必須逐條語意一致；工具命令盡量留在 `workflow.md`，避免兩個入口只因前綴不同而漂移。
 
 ## 修改程序（每次都做）
 
@@ -38,15 +36,15 @@
 
 ## 精簡門檻（任一超標，先合併刪除再新增）
 
-- `CLAUDE.md`、`AGENTS.md` 各 > 80 行（不含 SPECTRA 區塊）。
+- `CLAUDE.md`、`AGENTS.md` 各 > 80 行。
 - `docs/ops/` 單檔 > 200 行。
 - 判準過時即刪的觸發器：**照文件做卻失敗的瞬間 = 修文件**；引用的指令/路徑消失 = 刪該條或更新。
 - 精簡方法是合併與刪除，不是壓縮句子；新增一條核心規則時優先找一條可刪的。
 
-## 已知的「待回收」條款（修好根因後要記得收掉）
+## 根入口的收錄門檻
 
-- server 測試 glob 陷阱：若 `apps/server/package.json` 的 test script 修好（glob 加引號並驗證頂層 5 檔真的被跑到），要同步收掉 conventions.md「glob 陷阱」節、CLAUDE.md/AGENTS.md 硬規則 2、judgment.md §1 特別條款、dispatch.md 速查表的直跑條款。留著過時的繞路條款會讓弱模型做白工。
-- changes 積壓：43 個未歸檔 change 清理完成後，CLAUDE.md/AGENTS.md 硬規則 1 括號內的「大量全勾目錄」警語可簡化。
+- 只收錄 repo 特有、每個 session 都需要、且不易隨工具版本漂移的路由或硬規則。
+- 指令、workflow、工具能力、數量與日期等易變事實放在對應 `docs/ops/` 文件；入口只連過去，不複製細節。
 
 ## 衝突處理
 

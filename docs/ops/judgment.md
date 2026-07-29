@@ -1,16 +1,16 @@
 # 判斷力 Rubric（repo 層）
 
 > 讀者：任何等級的模型。每節是可執行判準，附正例（✅）與反例（❌）。
-> 通用判準（升級模型、換路訊號、品味題處理）見 `~/.claude/ops/judgment.md`；本檔只寫 solar_player 特有的判斷。拿不準時走保守側。
+> Claude Code 的通用判準見 `~/.claude/ops/judgment.md`；其他工具遵循自身上位規則。本檔只寫 solar_player 特有的判斷，拿不準時走保守側。
 
 ## 1. 何時算「真的完成」（按產物類型）
 
 ### 程式碼（server / web / shared）
 
-完成 = 對應測試指令真的跑過、輸出真的看過（指令見 `docs/ops/conventions.md`）。特別條款：改 `apps/server/src/` 頂層檔案時，`pnpm test` 綠燈**不構成證據**，必須直跑該檔測試。
+完成 = 依 `docs/ops/conventions.md` 跑過受影響測試，並實際看過輸出。
 
-✅ 正例：「改了 `serverRuntimeGuard.ts`。`pnpm --filter @solar-display/server test` 通過，另直跑 `exec tsx --test src/serverRuntimeGuard.test.ts` 通過（4 tests, 0 fail）。」
-❌ 反例：「改了 `serverRuntimeGuard.ts`，`pnpm test` 全綠。」——該檔測試根本不在 `pnpm test` 的 glob 內，這個綠燈驗證了零行相關程式。
+✅ 正例：「改了 `serverRuntimeGuard.ts`。`pnpm --filter @solar-display/server test` 通過，輸出包含對應測試。」
+❌ 反例：「測試應該有跑到。」——沒有指令與輸出，不能證明受影響路徑已驗證。
 
 ### Playback 頁視覺（/overview /solar /factory-circuit /images /sustainability）
 
@@ -21,10 +21,10 @@
 
 ### Spectra change
 
-完成 = tasks 全部做完 **且** 驗證跑過 **且** 已 `/spectra-archive`。checkbox 全勾只是中間狀態。
+完成 = tasks 全部做完 **且** 驗證跑過 **且** 已 archive。Checkbox 全勾只是中間狀態。
 
-✅ 正例：tasks 全勾 → 跑 `/spectra-verify` 或對應驗證 → `/spectra-archive` → 回報「已歸檔」。
-❌ 反例：把 checkbox 全勾就回報完成，change 留在 `openspec/changes/`。——這正是 repo 積壓 43 個目錄的成因，別再加一個。
+✅ 正例：tasks 全勾 → 跑對應驗證 → archive → 回報「已歸檔」。
+❌ 反例：把 checkbox 全勾就回報完成，change 仍留在 `openspec/changes/`。
 
 ## 2. 何時停下來問使用者（repo 特有清單）
 
@@ -53,10 +53,9 @@
 
 ## 4. Spectra 流程判斷
 
-- 「繼續做 / 續作某個 change」一律 = `/spectra-apply`。`/spectra-ingest` 只有一個用途：需求在中途變動、要把外部 context 回補進 artifacts。SPECTRA 區塊把 "in-progress change to continue" 對到 ingest，指的是「需求變動後接續」的情境，不是單純續作——分不清時選 apply。
-- 使用者沒指名 change 就要 apply → 先列出你認為的目標 change 與依據，確認後再動工。`openspec/changes/` 有大量全勾未歸檔目錄，「存在」不等於「進行中」。
-- 需求在 apply 中途變了 → 走 `/spectra-ingest` 回補 artifacts，不要直接改 code 讓 artifacts 落後。
-- 新需求 vs 既有 change 分不清 → 查 `openspec/changes/` 有沒有涵蓋；沒有就 `/spectra-propose` 開新的，不要塞進不相關的 change。
+- `docs/ops/workflow.md` 是 lifecycle 的唯一規則；單純續作走 apply，只有需求中途改變、需要回補 artifacts 時才 ingest。
+- 使用者沒指名 change 且無法從上下文唯一判定時，先列出目標與依據；不要只因 change 存在就視為進行中。
+- 新需求不屬於既有 change 時另開有界 change，不把無關工作塞入目前 scope。
 
 ## 5. 品質底線的最低成本驗法
 
@@ -64,4 +63,4 @@
 - **視覺**：witness 三件套（fresh 截圖、gap notes、evidence bundle）。
 - **文件/制度檔**：派 fresh agent read-back「只根據這份檔案，你會怎麼做 X」，答錯處就是寫模糊了。
 - **批次修改**：抽樣 ≥3 + 全量 grep 確認無漏網。
-- **刪除/歸檔**：先全量搜引用，後跑完整檢查（`pnpm run test` + 涉及頂層時的直跑條款）。
+- **刪除/歸檔**：先全量搜引用，再依 `conventions.md` 跑受影響測試與必要交付 gate。

@@ -15,7 +15,7 @@
 | `pnpm db:migrate` / `pnpm db:seed` | SQLite migration / seed |
 | `pnpm run fhd:witness -- --base-url <url>` | 擷取五個 playback 頁 1920x1080 witness（`fhd:witness:dry-run` 可先演練） |
 
-repo **沒有** lint、e2e、coverage gate、CI policy——不要發明，也不要在回報中假設它們存在。
+repo 目前沒有 lint 或 coverage script；`browser:smoke` 是可用的瀏覽器 smoke 入口，但不在 `pnpm verify` 內。`.github/workflows/agent-source-artifact.yml` 只跑特定 branch／PR checks，不代表完整 repo-wide CI gate。驗證能力以當下的 root scripts、package scripts 與 workflow 為準。
 
 ## 測試入口：`test` vs `verify`
 

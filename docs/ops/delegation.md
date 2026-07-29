@@ -54,7 +54,7 @@
 邊界規則：遇到不符範例的變體不要硬改，列入「跳過清單」回報。注意 server（.js import）與 web（extensionless）風格不同，不要跨界統一。
 驗收條件：
 - 全量 grep [pattern A] 為 0（跳過清單除外）。
-- pnpm run test 通過；若目標含 apps/server/src/ 頂層檔，另跑對應直跑指令（見 docs/ops/conventions.md）。
+- 依 docs/ops/conventions.md 跑受影響測試；交付驗收時跑 pnpm verify。
 回報格式：改動檔數、跳過清單（檔案:行號 + 原因）、檢查指令結果。
 ```
 
@@ -80,7 +80,7 @@
 - [條件 1]
 - [條件 2]
 檢查方式：
-- 程式碼：實際跑 [conventions.md 對照表的指令]，引用真實輸出。注意：pnpm test 不含 apps/server/src/ 頂層測試與 scripts/deploy.test.mjs，涉及時要直跑。
+- 程式碼：實際跑 [conventions.md 對照表的受影響測試]，引用真實輸出；交付驗收使用 pnpm verify。
 - 文件：只根據文件內容回答「照這份文件你會怎麼做 [X]」，答不出來處即缺陷。
 - playback 頁視覺：比對 witness 截圖與 docs/reference/FHD/ 對應 PNG，只回報可觀察差異清單（位置/元素/差在哪），不下「可接受」結論——那是使用者的判定。
 特別注意：[已知風險點]。
