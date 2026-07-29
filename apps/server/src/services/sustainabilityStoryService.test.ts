@@ -300,6 +300,17 @@ test("readSustainabilityStory applies and clears household display overrides wit
   const timestamp = "2026-07-08T09:00:00.000Z";
   const today = "2026-07-08";
 
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET household_daily_usage_kwh = 4,
+            household_monthly_usage_kwh = 120,
+            estimated_tariff_per_kwh = 5
+        WHERE id = 1
+      `
+    )
+    .run();
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(

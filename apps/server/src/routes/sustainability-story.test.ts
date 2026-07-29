@@ -7,6 +7,20 @@ import {
 
 function seedSustainabilityCounters() {
   const database = getDatabase();
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET carbon_emission_factor = 0.467,
+            tree_equivalent_factor = 0.16,
+            household_daily_usage_kwh = 13,
+            household_monthly_usage_kwh = 400,
+            estimated_tariff_per_kwh = 4.5,
+            co2_auto_convert_small_to_kg = 0
+        WHERE id = 1
+      `
+    )
+    .run();
   database.prepare("DELETE FROM cumulative_counters").run();
   database
     .prepare(
@@ -101,7 +115,7 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     assert.match(body.story.period.comparison.label, /未提供|無法/);
     assert.equal(body.story.period.provenance.source, "cumulative-counters");
     assert.equal(body.story.period.provenance.syncState, "fresh");
-    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "18");
+    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "6");
     assert.equal(body.story.householdEquivalents.today.calcProfile?.label, "預設四口之家");
     assert.equal(body.story.householdEquivalents.today.derivedStatus, "available");
     assert.match(body.story.householdEquivalents.today.disclaimer ?? "", /估算/);
@@ -213,7 +227,7 @@ test("PUT /api/sustainability-story persists editorial modules without overridin
 
     assert.equal(body.story.selectedPeriod, "year");
     assert.equal(body.story.period.bigNumbers.accumulatedGenerationGwh, 18.6);
-    assert.equal(body.story.period.bigNumbers.accumulatedCarbonReductionTons, 9207);
+    assert.equal(body.story.period.bigNumbers.accumulatedCarbonReductionTons, 8686.2);
     assert.equal(body.story.modules[0]?.type, "project-outcome");
     assert.match(body.story.modules[0]?.description ?? "", /綠色採購/);
     assert.equal(body.story.modules[0]?.provenance.sourceClass, "manual-module");

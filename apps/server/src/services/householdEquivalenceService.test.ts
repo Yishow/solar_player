@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import type Database from "better-sqlite3";
 import { setOnlyDefaultPlaybackPagesEnabledForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import { createDefaultHouseholdEquivalenceCalcProfile } from "@solar-display/shared";
 
@@ -33,10 +34,64 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
-test("readHouseholdEquivalenceCards derives today from self-consumption and cumulative from generation bases", () => {
+function setHouseholdCalculationSettings(
+  database: Database.Database,
+  settings: {
+    dailyUsageKwh: number;
+    monthlyUsageKwh: number;
+    tariffPerKwh: number;
+  }
+) {
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET household_daily_usage_kwh = ?,
+            household_monthly_usage_kwh = ?,
+            estimated_tariff_per_kwh = ?
+        WHERE id = 1
+      `
+    )
+    .run(settings.dailyUsageKwh, settings.monthlyUsageKwh, settings.tariffPerKwh);
+}
+
+function arrangeChungliFactorySummary(
+  database: Database.Database,
+  summary: {
+    monthMwh: number;
+    timestamp: string;
+    todayMwh: number;
+    totalMwh: number;
+  }
+) {
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
+  database.prepare("DELETE FROM live_metric_values WHERE metric_key LIKE 'factoryGeneration.%'").run();
+  const rawPayload = JSON.stringify({
+    month_mwh: summary.monthMwh,
+    timestamp: summary.timestamp,
+    today_mwh: summary.todayMwh,
+    total_mwh: summary.totalMwh
+  });
+  const insertLiveMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, 'MWh', ?, 'good', ?)
+    `
+  );
+  insertLiveMetric.run("factoryGeneration.cl.todayMwh", summary.todayMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run("factoryGeneration.cl.monthMwh", summary.monthMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run("factoryGeneration.cl.totalMwh", summary.totalMwh, summary.timestamp, rawPayload);
+}
+
+test("readHouseholdEquivalenceCards derives today from self-consumption and cumulative from the active factory summary", () => {
   const database = getDatabase();
   const today = "2026-05-21";
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 4,
+    monthlyUsageKwh: 120,
+    tariffPerKwh: 5
+  });
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -66,6 +121,12 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
       `
     )
     .run();
+  arrangeChungliFactorySummary(database, {
+    monthMwh: 1.2,
+    timestamp: `${today}T12:00:00.000Z`,
+    todayMwh: 0.12,
+    totalMwh: 4.2
+  });
 
   const profile = createDefaultHouseholdEquivalenceCalcProfile();
   const cards = readHouseholdEquivalenceCards({
@@ -79,7 +140,8 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
 
   assert.equal(cards.cumulative.householdCountDisplay, "1,050");
   assert.equal(cards.cumulative.calcProfile?.label, profile.label);
-  assert.equal(cards.cumulative.provenance?.source, "cumulative-generation");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
+  assert.equal(cards.cumulative.provenance?.updatedAt, `${today}T12:00:00.000Z`);
   assert.equal(cards.cumulative.derivedStatus, "available");
 });
 
@@ -94,6 +156,11 @@ test("readHouseholdEquivalenceCards derives cumulative households from the fresh
     total_mwh: 45678
   });
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 13,
+    monthlyUsageKwh: 400,
+    tariffPerKwh: 4.5
+  });
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM cumulative_counters").run();
   setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
@@ -133,6 +200,11 @@ test("readHouseholdEquivalenceCards does not fall back to the global counter whe
     total_mwh: 45678
   });
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 13,
+    monthlyUsageKwh: 400,
+    tariffPerKwh: 4.5
+  });
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM cumulative_counters").run();
   database.prepare("UPDATE mqtt_settings SET message_timeout = 60").run();
@@ -166,16 +238,11 @@ test("readHouseholdEquivalenceCards derives cumulative household headline from c
   const database = getDatabase();
   const today = "2026-07-09";
 
-  database
-    .prepare(
-      `
-        UPDATE calculation_settings
-        SET household_daily_usage_kwh = 13,
-            household_monthly_usage_kwh = 400
-        WHERE id = 1
-      `
-    )
-    .run();
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 13,
+    monthlyUsageKwh: 400,
+    tariffPerKwh: 4.5
+  });
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -200,6 +267,12 @@ test("readHouseholdEquivalenceCards derives cumulative household headline from c
       `
     )
     .run();
+  arrangeChungliFactorySummary(database, {
+    monthMwh: 100,
+    timestamp: "2026-07-09T12:00:00.000Z",
+    todayMwh: 1,
+    totalMwh: 114.82
+  });
 
   const cards = readHouseholdEquivalenceCards({
     now: new Date(`${today}T12:00:00.000Z`)
@@ -207,23 +280,19 @@ test("readHouseholdEquivalenceCards derives cumulative household headline from c
 
   assert.equal(cards.cumulative.householdCountDisplay, "8,832");
   assert.equal(cards.cumulative.basisSourceLabel, "累積發電量");
-  assert.equal(cards.cumulative.provenance?.source, "cumulative-generation");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
+  assert.equal(cards.cumulative.provenance?.updatedAt, "2026-07-09T12:00:00.000Z");
   assert.equal(cards.cumulative.supportingLine, "約相當於累積日用電");
 });
 
 test("readHouseholdEquivalenceCards falls back to live today generation when daily self-consumption is stale zero", () => {
   const database = getDatabase();
 
-  database
-    .prepare(
-      `
-        UPDATE calculation_settings
-        SET household_daily_usage_kwh = 13,
-            household_monthly_usage_kwh = 400
-        WHERE id = 1
-      `
-    )
-    .run();
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 13,
+    monthlyUsageKwh: 400,
+    tariffPerKwh: 4.5
+  });
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -270,6 +339,11 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
   const database = getDatabase();
   const today = "2026-05-21";
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 4,
+    monthlyUsageKwh: 120,
+    tariffPerKwh: 5
+  });
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -299,6 +373,12 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
       `
     )
     .run();
+  arrangeChungliFactorySummary(database, {
+    monthMwh: 1.2,
+    timestamp: `${today}T12:00:00.000Z`,
+    todayMwh: 0.12,
+    totalMwh: 4.2
+  });
 
   const cards = readHouseholdEquivalenceCards({
     now: new Date(`${today}T12:00:00.000Z`)
@@ -308,12 +388,18 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
   assert.equal(cards.today.householdCountDisplay, "--");
   assert.match(cards.today.supportingLine, /資料不足|不可用/);
   assert.equal(cards.cumulative.derivedStatus, "available");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
 });
 
 test("readHouseholdEquivalenceCards falls back to the latest daily summary when today has no row yet", () => {
   const database = getDatabase();
   const latestAvailable = "2026-05-21";
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 4,
+    monthlyUsageKwh: 120,
+    tariffPerKwh: 5
+  });
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -362,10 +448,16 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
   assert.equal(cards.today.provenance?.updatedAt, `${latestAvailable}T00:00:00.000Z`);
 });
 
-test("readHouseholdEquivalenceCards falls back to live total generation when the cumulative counter has not flushed yet", () => {
+test("readHouseholdEquivalenceCards does not fall back to live total generation when the factory summary is missing", () => {
   const database = getDatabase();
   const today = "2026-05-21";
 
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 4,
+    monthlyUsageKwh: 120,
+    tariffPerKwh: 5
+  });
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -399,28 +491,21 @@ test("readHouseholdEquivalenceCards falls back to live total generation when the
     now: new Date(`${today}T12:00:00.000Z`)
   });
 
-  assert.equal(cards.cumulative.derivedStatus, "available");
-  assert.equal(cards.cumulative.householdCountDisplay, "1,050");
-  assert.equal(cards.cumulative.provenance?.source, "live-generation-fallback");
-  assert.equal(cards.cumulative.provenance?.updatedAt, `${today}T10:00:00.000Z`);
+  assert.equal(cards.cumulative.derivedStatus, "unavailable");
+  assert.equal(cards.cumulative.householdCountDisplay, "--");
+  assert.equal(cards.cumulative.provenance?.source, "CL MQTT");
+  assert.equal(cards.cumulative.provenance?.updatedAt, null);
 });
 
 test("readHouseholdEquivalenceCards uses configured household usage and tariff coefficients in the profile", () => {
   const database = getDatabase();
   const today = "2026-05-21";
 
-  database
-    .prepare(
-      `
-        UPDATE calculation_settings
-        SET
-          household_daily_usage_kwh = 6,
-          household_monthly_usage_kwh = 210,
-          estimated_tariff_per_kwh = 6.5
-        WHERE id = 1
-      `
-    )
-    .run();
+  setHouseholdCalculationSettings(database, {
+    dailyUsageKwh: 6,
+    monthlyUsageKwh: 210,
+    tariffPerKwh: 6.5
+  });
 
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
@@ -450,6 +535,12 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
       `
     )
     .run();
+  arrangeChungliFactorySummary(database, {
+    monthMwh: 1.2,
+    timestamp: `${today}T12:00:00.000Z`,
+    todayMwh: 0.12,
+    totalMwh: 4.2
+  });
 
   const cards = readHouseholdEquivalenceCards({
     now: new Date(`${today}T12:00:00.000Z`)

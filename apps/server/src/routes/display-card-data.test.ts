@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { updateDefaultPlaybackPageForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import {
   buildApp,
   getDatabase
@@ -10,10 +11,67 @@ function toLocalDateKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function seedFactoryGenerationSummary(
+  database: ReturnType<typeof getDatabase>,
+  factory: "cl" | "kn",
+  summary: {
+    monthMwh: number;
+    timestamp: string;
+    todayMwh: number;
+    totalMwh: number;
+  }
+) {
+  const rawPayload = JSON.stringify({
+    month_mwh: summary.monthMwh,
+    timestamp: summary.timestamp,
+    today_mwh: summary.todayMwh,
+    total_mwh: summary.totalMwh
+  });
+  const insertLiveMetric = database.prepare(
+    `
+      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, 'MWh', ?, 'good', ?)
+    `
+  );
+  insertLiveMetric.run(`factoryGeneration.${factory}.todayMwh`, summary.todayMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run(`factoryGeneration.${factory}.monthMwh`, summary.monthMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run(`factoryGeneration.${factory}.totalMwh`, summary.totalMwh, summary.timestamp, rawPayload);
+}
+
 function seedCardDataFixture() {
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
+  const timestamp = `${today}T09:00:00.000Z`;
   database.prepare("DELETE FROM live_metric_values").run();
+  database
+    .prepare(
+      `
+        UPDATE calculation_settings
+        SET carbon_emission_factor = 0.467,
+            tree_equivalent_factor = 0.16,
+            household_daily_usage_kwh = 13,
+            household_monthly_usage_kwh = 400,
+            estimated_tariff_per_kwh = 4.5,
+            co2_auto_convert_small_to_kg = 0
+        WHERE id = 1
+      `
+    )
+    .run();
+  database.prepare("UPDATE mqtt_settings SET message_timeout = 86400").run();
+  updateDefaultPlaybackPageForTest(database, "factory-circuit", { enabled: true });
+  updateDefaultPlaybackPageForTest(database, "factory-circuit-guanyin", { enabled: true });
+  seedFactoryGenerationSummary(database, "cl", {
+    monthMwh: 1000,
+    timestamp,
+    todayMwh: 100,
+    totalMwh: 10000
+  });
+  seedFactoryGenerationSummary(database, "kn", {
+    monthMwh: 860,
+    timestamp,
+    todayMwh: 86,
+    totalMwh: 8600
+  });
   database
     .prepare("UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?")
     .run("kuozui/plant/solar/power", "realTimePower");
@@ -279,7 +337,7 @@ test("GET /api/display-card-data exposes household-equivalent derivation diagnos
     );
 
     assert.equal(cumulativeHousehold?.sourceClassification, "cumulative-counter");
-    assert.equal(cumulativeHousehold?.aggregateSource, "cumulative-generation");
+    assert.equal(cumulativeHousehold?.aggregateSource, "CL + KN MQTT aggregate");
     assert.deepEqual(cumulativeHousehold?.calculationFields, ["householdDailyUsageKwh"]);
   } finally {
     await app.close();
@@ -333,7 +391,7 @@ test("GET /api/display-card-data identifies live today generation fallback for t
       (row) => row.cardId === "sustainability.household.today"
     );
 
-    assert.equal(todayHousehold?.displayValue, "1,998");
+    assert.equal(todayHousehold?.displayValue, "615");
     assert.equal(todayHousehold?.sourceClassification, "mqtt-live");
     assert.equal(todayHousehold?.aggregateSource, "live-today-generation-fallback");
     assert.equal(todayHousehold?.formula, "todayGeneration / householdDailyUsageKwh");
@@ -433,13 +491,13 @@ test("GET /api/display-card-data exposes sustainability numeric card diagnostics
     assert.equal(generation?.displayValue, "18,600");
     assert.equal(generation?.originalValue, "18,600");
     assert.equal(generation?.unit, "MWh");
-    assert.equal(generation?.aggregateSource, "CL + KN MQTT aggregate (CL today_mwh missing)");
+    assert.equal(generation?.aggregateSource, "CL + KN MQTT aggregate");
     assert.equal(generation?.status, "ready");
 
     const trees = body.rows.find(
       (row) => row.cardId === "sustainability.big-number.plantedTreeEquivalent"
     );
-    assert.equal(trees?.displayValue, "57,544");
+    assert.equal(trees?.displayValue, "54,288");
     assert.equal(trees?.unit, "trees");
   } finally {
     await app.close();
@@ -576,7 +634,8 @@ test("GET /api/display-card-data exposes page-scoped Factory Circuit slot diagno
 test("GET /api/display-card-data classifies missing topics and formula inputs", async () => {
   seedCardDataFixture();
   const database = getDatabase();
-  database.prepare("UPDATE topic_mappings SET topic = '', enabled = 1 WHERE metric_key = ?").run("todayGeneration");
+  database.prepare("UPDATE topic_mappings SET topic = '', enabled = 1 WHERE metric_key = ?").run("realTimePower");
+  database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("realTimePower");
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("consumptionEnergy");
   const app = await buildApp();
 
@@ -596,10 +655,10 @@ test("GET /api/display-card-data classifies missing topics and formula inputs", 
       }>;
     };
 
-    const todayGeneration = body.rows.find(
-      (row) => row.pageId === "overview" && row.metricKey === "todayGeneration"
+    const realTimePower = body.rows.find(
+      (row) => row.pageId === "overview" && row.metricKey === "realTimePower"
     );
-    assert.equal(todayGeneration?.status, "missing-topic");
+    assert.equal(realTimePower?.status, "missing-topic");
 
     const solarRatio = body.rows.find(
       (row) => row.pageId === "solar" && row.metricKey === "selfConsumptionRatio"
