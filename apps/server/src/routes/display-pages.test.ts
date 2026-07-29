@@ -3,6 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import {
+  attachDefaultPlaybackPageForTest,
+  updateDefaultPlaybackPageForTest
+} from "../testing/defaultPlaybackProfileTestSupport.js";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-display-pages-test-"));
 process.env.DATA_DIR = tempDir;
@@ -199,6 +203,11 @@ test("GET /api/display-pages/:pageId/draft accepts registry-backed duplicate pag
       `
     )
     .run("images-2", "images", "images-secondary", "綠能影像副本", "Images Secondary", 1, 6, 22);
+  attachDefaultPlaybackPageForTest(database, "images-2", {
+    displayOrder: 6,
+    durationSeconds: 22,
+    enabled: true
+  });
   database
     .prepare(
       `
@@ -399,9 +408,7 @@ test("GET /api/display-pages/:pageId/live exposes the shared fallback policy met
 test("GET /api/display-pages/rotation-preview derives the images page duration from enabled playable playlist entries", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM image_assets").run();
-  database
-    .prepare("UPDATE display_page_registry SET duration_seconds = 5 WHERE page_key = 'images'")
-    .run();
+  updateDefaultPlaybackPageForTest(database, "images", { durationSeconds: 5 });
   seedImagePlaylistEntry({ durationSeconds: 10, enabled: true, entryId: "IMG-10", order: 1 });
   seedImagePlaylistEntry({ durationSeconds: 15, enabled: true, entryId: "IMG-15", order: 2 });
   seedImagePlaylistEntry({ durationSeconds: 5, enabled: true, entryId: "IMG-05", order: 3 });
@@ -441,9 +448,7 @@ test("GET /api/display-pages/rotation-preview derives the images page duration f
 test("GET /api/display-pages/rotation-preview keeps the images registry duration when the playlist has no playable entries", async () => {
   const database = getDatabase();
   database.prepare("DELETE FROM image_assets").run();
-  database
-    .prepare("UPDATE display_page_registry SET duration_seconds = 5 WHERE page_key = 'images'")
-    .run();
+  updateDefaultPlaybackPageForTest(database, "images", { durationSeconds: 5 });
   seedImagePlaylistEntry({ durationSeconds: 20, enabled: false, entryId: "IMG-20", order: 1 });
   seedImagePlaylistEntry({
     durationSeconds: 15,

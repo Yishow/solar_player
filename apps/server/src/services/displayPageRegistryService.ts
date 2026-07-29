@@ -1,6 +1,12 @@
 import type { DisplayPageInstance, DisplayPageTemplateKey } from "@solar-display/shared";
 import { isDisplayPageTemplateKey } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import {
+  attachDisplayPageToDefaultProfile,
+  countOtherActiveDefaultPlaybackPagesForTemplate,
+  readNextDefaultPlaybackDisplayOrder,
+  updateDefaultPlaybackPageState
+} from "./playbackProfileService.js";
 
 type DisplayPageRegistryRow = {
   id: number;
@@ -103,11 +109,7 @@ function assertTemplateKeySupported(templateKey: string): asserts templateKey is
 }
 
 function resolveNextDisplayOrder() {
-  const row = getDatabase()
-    .prepare("SELECT COALESCE(MAX(display_order), 0) AS max_display_order FROM display_page_registry")
-    .get() as { max_display_order: number | null } | undefined;
-
-  return Math.max(1, (row?.max_display_order ?? 0) + 1);
+  return readNextDefaultPlaybackDisplayOrder();
 }
 
 function readDisplayPageRegistryRow(pageKey: string) {
@@ -121,12 +123,15 @@ function readDisplayPageRegistryRow(pageKey: string) {
           registry.route_slug,
           registry.label_zh,
           registry.label_en,
-          registry.enabled,
+          profile_page.enabled,
           registry.archived_at,
-          registry.display_order,
-          registry.duration_seconds,
+          profile_page.display_order,
+          profile_page.duration_seconds,
           registry.created_at,
-          registry.updated_at,
+          CASE
+            WHEN profile_page.updated_at > registry.updated_at THEN profile_page.updated_at
+            ELSE registry.updated_at
+          END AS updated_at,
           draft.version AS draft_version,
           live.version AS live_version,
           live.published_at AS last_published_at,
@@ -136,6 +141,11 @@ function readDisplayPageRegistryRow(pageKey: string) {
             ELSE 0
           END AS has_draft_changes
         FROM display_page_registry AS registry
+        INNER JOIN playback_profile_pages AS profile_page ON profile_page.page_id = registry.id
+        INNER JOIN playback_profiles AS profile
+          ON profile.id = profile_page.profile_id
+          AND profile.profile_key = 'default'
+          AND profile.is_default = 1
         LEFT JOIN display_page_stage_configs AS draft
           ON draft.page_key = registry.page_key AND draft.stage = 'draft'
         LEFT JOIN display_page_stage_configs AS live
@@ -210,20 +220,7 @@ function allocateDisplayPageInstanceKey(templateKey: DisplayPageTemplateKey) {
 }
 
 function assertCanDisableTemplateInstance(templateKey: DisplayPageTemplateKey, pageKey: string) {
-  const remainingActive = getDatabase()
-    .prepare(
-      `
-        SELECT COUNT(*) AS total
-        FROM display_page_registry
-        WHERE template_key = ?
-          AND page_key != ?
-          AND enabled = 1
-          AND archived_at IS NULL
-      `
-    )
-    .get(templateKey, pageKey) as { total: number } | undefined;
-
-  if ((remainingActive?.total ?? 0) > 0) {
+  if (countOtherActiveDefaultPlaybackPagesForTemplate(templateKey, pageKey) > 0) {
     return;
   }
 
@@ -245,12 +242,15 @@ export function listDisplayPageInstances() {
             registry.route_slug,
             registry.label_zh,
             registry.label_en,
-            registry.enabled,
+            profile_page.enabled,
             registry.archived_at,
-            registry.display_order,
-            registry.duration_seconds,
+            profile_page.display_order,
+            profile_page.duration_seconds,
             registry.created_at,
-            registry.updated_at,
+            CASE
+              WHEN profile_page.updated_at > registry.updated_at THEN profile_page.updated_at
+              ELSE registry.updated_at
+            END AS updated_at,
             draft.version AS draft_version,
             live.version AS live_version,
             live.published_at AS last_published_at,
@@ -260,11 +260,16 @@ export function listDisplayPageInstances() {
               ELSE 0
             END AS has_draft_changes
           FROM display_page_registry AS registry
+          INNER JOIN playback_profile_pages AS profile_page ON profile_page.page_id = registry.id
+          INNER JOIN playback_profiles AS profile
+            ON profile.id = profile_page.profile_id
+            AND profile.profile_key = 'default'
+            AND profile.is_default = 1
           LEFT JOIN display_page_stage_configs AS draft
             ON draft.page_key = registry.page_key AND draft.stage = 'draft'
           LEFT JOIN display_page_stage_configs AS live
             ON live.page_key = registry.page_key AND live.stage = 'live'
-          ORDER BY registry.display_order ASC, registry.id ASC
+          ORDER BY profile_page.display_order ASC, registry.id ASC
         `
       )
       .all() as DisplayPageRegistryRow[]
@@ -289,40 +294,42 @@ export function createDisplayPageInstance(input: CreateDisplayPageInstanceInput)
       : 15;
 
   const database = getDatabase();
-  const result = database
-    .prepare(
-      `
-        INSERT INTO display_page_registry (
-          page_key,
-          template_key,
-          route_slug,
-          label_zh,
-          label_en,
-          enabled,
-          archived_at,
-          display_order,
-          duration_seconds,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `
-    )
-    .run(
-      pageKey,
-      input.templateKey,
-      routeSlug,
-      displayNameZh,
-      displayNameEn,
-      input.enabled === false ? 0 : 1,
+  let createdPageId: number | null = null;
+
+  database.transaction(() => {
+    const result = database
+      .prepare(
+        `
+          INSERT INTO display_page_registry (
+            page_key,
+            template_key,
+            route_slug,
+            label_zh,
+            label_en,
+            enabled,
+            archived_at,
+            display_order,
+            duration_seconds,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, 0, NULL, 0, 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `
+      )
+      .run(pageKey, input.templateKey, routeSlug, displayNameZh, displayNameEn);
+
+    createdPageId = Number(result.lastInsertRowid);
+    attachDisplayPageToDefaultProfile(createdPageId, {
       displayOrder,
-      durationSeconds
-    );
+      durationSeconds,
+      enabled: input.enabled !== false
+    });
+  })();
 
   const row = readDisplayPageRegistryRow(pageKey);
 
   if (!row) {
-    throw new Error(`Failed to create display page instance: ${pageKey} (${String(result.lastInsertRowid)})`);
+    throw new Error(`Failed to create display page instance: ${pageKey} (${String(createdPageId)})`);
   }
 
   return serializeDisplayPageInstance(row);
@@ -363,30 +370,28 @@ export function updateDisplayPageInstance(pageKey: string, input: UpdateDisplayP
     assertCanDisableTemplateInstance(current.template_key as DisplayPageTemplateKey, pageKey);
   }
 
-  getDatabase()
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET
-          route_slug = ?,
-          label_zh = ?,
-          label_en = ?,
-          enabled = ?,
-          display_order = ?,
-          duration_seconds = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE page_key = ?
-      `
-    )
-    .run(
-      nextRouteSlug,
-      nextDisplayNameZh,
-      nextDisplayNameEn,
-      nextEnabled,
-      nextDisplayOrder,
-      nextDurationSeconds,
-      pageKey
-    );
+  const database = getDatabase();
+  database.transaction(() => {
+    database
+      .prepare(
+        `
+          UPDATE display_page_registry
+          SET
+            route_slug = ?,
+            label_zh = ?,
+            label_en = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE page_key = ?
+        `
+      )
+      .run(nextRouteSlug, nextDisplayNameZh, nextDisplayNameEn, pageKey);
+
+    updateDefaultPlaybackPageState(pageKey, {
+      displayOrder: nextDisplayOrder,
+      durationSeconds: nextDurationSeconds,
+      enabled: nextEnabled === 1
+    });
+  })();
 
   const updated = readDisplayPageRegistryRow(pageKey);
   if (!updated) {
@@ -406,18 +411,21 @@ export function archiveDisplayPageInstance(pageKey: string) {
     assertCanDisableTemplateInstance(current.template_key as DisplayPageTemplateKey, pageKey);
   }
 
-  getDatabase()
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET
-          enabled = 0,
-          archived_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE page_key = ?
-      `
-    )
-    .run(pageKey);
+  const database = getDatabase();
+  database.transaction(() => {
+    updateDefaultPlaybackPageState(pageKey, { enabled: false });
+    database
+      .prepare(
+        `
+          UPDATE display_page_registry
+          SET
+            archived_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE page_key = ?
+        `
+      )
+      .run(pageKey);
+  })();
 
   const archived = readDisplayPageRegistryRow(pageKey);
   if (!archived) {

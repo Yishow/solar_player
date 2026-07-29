@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import { updateDefaultPlaybackSettingsForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-seed-persistence-test-"));
 process.env.DATA_DIR = tempDir;
@@ -52,18 +53,12 @@ test("seedDatabase preserves operator-saved data source, playback, and calculati
       `
     )
     .run();
-  database
-    .prepare(
-      `
-        UPDATE playback_settings
-        SET autoplay = 0,
-            transition_type = 'slide',
-            transition_speed = 180,
-            brightness = 72
-        WHERE id = 1
-      `
-    )
-    .run();
+  updateDefaultPlaybackSettingsForTest(database, {
+    autoplay: false,
+    brightness: 72,
+    transitionSpeed: 180,
+    transitionType: "slide"
+  });
 
   seedDatabase();
 
@@ -77,7 +72,13 @@ test("seedDatabase preserves operator-saved data source, playback, and calculati
     .prepare("SELECT carbon_emission_factor, co2_auto_convert_small_to_kg FROM calculation_settings WHERE id = 1")
     .get() as { carbon_emission_factor: number; co2_auto_convert_small_to_kg: number };
   const playback = database
-    .prepare("SELECT autoplay, transition_type, transition_speed, brightness FROM playback_settings WHERE id = 1")
+    .prepare(`
+      SELECT autoplay, transition_type, transition_speed, brightness
+      FROM playback_profile_settings
+      WHERE profile_id = (
+        SELECT id FROM playback_profiles WHERE profile_key = 'default' AND is_default = 1
+      )
+    `)
     .get() as { autoplay: number; brightness: number; transition_speed: number; transition_type: string };
 
   assert.deepEqual(topic, { enabled: 0, topic: "custom/solar/power" });

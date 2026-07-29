@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import { setOnlyDefaultPlaybackPagesEnabledForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import { createDefaultHouseholdEquivalenceCalcProfile } from "@solar-display/shared";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-household-equivalence-test-"));
@@ -95,15 +96,7 @@ test("readHouseholdEquivalenceCards derives cumulative households from the fresh
 
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM cumulative_counters").run();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key WHEN 'factory-circuit' THEN 1 ELSE 0 END
-        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
   const insertLiveMetric = database.prepare(
     `
       INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
@@ -143,15 +136,7 @@ test("readHouseholdEquivalenceCards does not fall back to the global counter whe
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM cumulative_counters").run();
   database.prepare("UPDATE mqtt_settings SET message_timeout = 60").run();
-  database
-    .prepare(
-      `
-        UPDATE display_page_registry
-        SET enabled = CASE page_key WHEN 'factory-circuit' THEN 1 ELSE 0 END
-        WHERE page_key IN ('factory-circuit', 'factory-circuit-guanyin')
-      `
-    )
-    .run();
+  setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
   const insertLiveMetric = database.prepare(
     `
       INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
