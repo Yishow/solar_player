@@ -6,7 +6,6 @@ export const DEFAULT_PLAYBACK_PROFILE_KEY = "default";
 export type PlaybackProfileSettingsRow = {
   autoplay: number;
   brightness: number;
-  enforce_fresh_runtime_data: number;
   idle_mode: string;
   idle_timeout: number;
   loop: number;
@@ -16,8 +15,6 @@ export type PlaybackProfileSettingsRow = {
   schedule_end: string | null;
   schedule_start: string | null;
   start_page: number;
-  transition_speed: number;
-  transition_type: string;
   updated_at: string | null;
 };
 
@@ -79,9 +76,6 @@ export function readDefaultPlaybackSettingsRow(): PlaybackProfileSettingsRow {
           settings.schedule_end,
           settings.schedule_start,
           settings.start_page,
-          settings.enforce_fresh_runtime_data,
-          settings.transition_speed,
-          settings.transition_type,
           settings.updated_at
         FROM playback_profile_settings AS settings
         INNER JOIN playback_profiles AS profile ON profile.id = settings.profile_id
@@ -107,8 +101,6 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
           autoplay = ?,
           loop = ?,
           start_page = ?,
-          transition_type = ?,
-          transition_speed = ?,
           schedule_enabled = ?,
           schedule_start = ?,
           schedule_end = ?,
@@ -117,7 +109,6 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
           idle_timeout = ?,
           brightness = ?,
           orientation = ?,
-          enforce_fresh_runtime_data = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE profile_id = ?
       `
@@ -126,8 +117,6 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
       settings.autoplay,
       settings.loop,
       settings.start_page,
-      settings.transition_type,
-      settings.transition_speed,
       settings.schedule_enabled,
       settings.schedule_start,
       settings.schedule_end,
@@ -136,7 +125,6 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
       settings.idle_timeout,
       settings.brightness,
       settings.orientation,
-      settings.enforce_fresh_runtime_data,
       readDefaultPlaybackProfileId()
     );
 
@@ -146,6 +134,8 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
 }
 
 export function readDefaultPlaybackPageRows(options: { includeArchived?: boolean } = {}) {
+  const defaultProfileId = readDefaultPlaybackProfileId();
+
   return getDatabase()
     .prepare(
       `
@@ -163,13 +153,12 @@ export function readDefaultPlaybackPageRows(options: { includeArchived?: boolean
         FROM playback_profile_pages AS profile_page
         INNER JOIN playback_profiles AS profile ON profile.id = profile_page.profile_id
         INNER JOIN display_page_registry AS registry ON registry.id = profile_page.page_id
-        WHERE profile.profile_key = ?
-          AND profile.is_default = 1
+        WHERE profile.id = ?
           AND (? = 1 OR registry.archived_at IS NULL)
         ORDER BY profile_page.display_order ASC, registry.id ASC
       `
     )
-    .all(DEFAULT_PLAYBACK_PROFILE_KEY, options.includeArchived ? 1 : 0) as PlaybackProfilePageRow[];
+    .all(defaultProfileId, options.includeArchived ? 1 : 0) as PlaybackProfilePageRow[];
 }
 
 export function readDefaultPlaybackPageState(pageKey: string) {

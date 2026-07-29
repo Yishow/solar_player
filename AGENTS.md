@@ -24,5 +24,5 @@ Claude Code 專用的模型調度與派工文件不套用於本入口；其他�
 
 1. **有界交付**：行為變更依 `docs/ops/workflow.md` 使用一個有界 named Spectra change；純問答、研究、review、診斷與無行為影響的制度小修不建立 change。每階段結束須回報目前狀態、下一步與原因；使用者回覆「繼續」即接續執行。Archive 後仍須取得使用者確認才 commit。
 2. **真實驗證**：依 `docs/ops/conventions.md` 的現行 scripts 跑受影響測試；交付 gate 是 `pnpm verify`。必須看過實際輸出，不從舊文件或不存在的 gate 推測成功。
-3. **Playback／FHD 邊界**：五個 playback 頁依 `docs/reference-match/fhd-workflow-entrypoints.md` 使用 visual canonicals、fresh witness batch、evidence bundle 與 launch witness gates 才算完成；展示設定必須由 `/display-pages/editor` 表達，不做 page-local hardcode、management-surface drift，亦不為視覺 polish 擴張到 route shell、API 或資料架構。
+3. **Playback／FHD 邊界**：五個 playback 頁依 `docs/reference-match/fhd-workflow-entrypoints.md` 使用 visual canonicals、fresh witness batch、evidence bundle 與 launch witness gates 才算完成；驗收矩陣與模板是 `docs/fhd-witness/playback-closeout-matrix.md`、`docs/fhd-witness/evidence-template.md`，AI 執行 `pnpm run fhd:witness` 與 editor capability 差距整理，人工 acceptance 仍由使用者決定。展示設定必須由 `/display-pages/editor` 表達，不做 page-local hardcode、management-surface drift，亦不為視覺 polish 擴張到 route shell、API 或資料架構。
 4. **事實與決策權**：程式碼、root scripts 與實際設定高於文件；只做任務直接要求的最小改動。產品意圖、intentional difference、FHD 品質與 deployment／launch acceptance 由使用者決定。

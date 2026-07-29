@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
-import type { PlaybackPage, PlaybackSettings } from "@solar-display/shared";
+import type {
+  DisplayRotationPreview,
+  PlaybackPage,
+  PlaybackSettings
+} from "@solar-display/shared";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-default-profile-api-test-"));
 process.env.DATA_DIR = tempDir;
@@ -60,6 +64,17 @@ test("legacy Playback APIs read Default Profile state when legacy rows diverge",
   database
     .prepare(
       `
+        UPDATE playback_runtime_policy
+        SET transition_type = 'slide',
+            transition_speed = 180,
+            enforce_fresh_runtime_data = 0
+        WHERE id = 1
+      `
+    )
+    .run();
+  database
+    .prepare(
+      `
         UPDATE playback_profile_pages
         SET enabled = CASE
               WHEN page_id = (SELECT id FROM display_page_registry WHERE page_key = 'overview') THEN 1
@@ -77,7 +92,17 @@ test("legacy Playback APIs read Default Profile state when legacy rows diverge",
     .run(defaultProfile.id);
 
   database
-    .prepare("UPDATE playback_settings SET autoplay = 1, brightness = 12 WHERE id = 1")
+    .prepare(
+      `
+        UPDATE playback_settings
+        SET autoplay = 1,
+            brightness = 12,
+            transition_type = 'fade',
+            transition_speed = 50,
+            enforce_fresh_runtime_data = 1
+        WHERE id = 1
+      `
+    )
     .run();
   database
     .prepare(
@@ -93,26 +118,34 @@ test("legacy Playback APIs read Default Profile state when legacy rows diverge",
   const app = await buildApp();
 
   try {
-    const [settingsResponse, pagesResponse, rotationResponse] = await Promise.all([
+    const [settingsResponse, pagesResponse, rotationResponse, previewResponse] = await Promise.all([
       app.inject({ method: "GET", url: "/api/playback/settings" }),
       app.inject({ method: "GET", url: "/api/playback/pages" }),
-      app.inject({ method: "GET", url: "/api/playback/rotation-plan" })
+      app.inject({ method: "GET", url: "/api/playback/rotation-plan" }),
+      app.inject({ method: "GET", url: "/api/display-pages/rotation-preview" })
     ]);
 
     assert.equal(settingsResponse.statusCode, 200);
     assert.equal(pagesResponse.statusCode, 200);
     assert.equal(rotationResponse.statusCode, 200);
+    assert.equal(previewResponse.statusCode, 200);
 
     const settings = (settingsResponse.json() as { settings: PlaybackSettings }).settings;
     const pages = (pagesResponse.json() as { pages: PlaybackPage[] }).pages;
     const rotationPages = (
       rotationResponse.json() as { rotationPlan: { pages: PlaybackPage[] } }
     ).rotationPlan.pages;
+    const preview = (
+      previewResponse.json() as { preview: DisplayRotationPreview }
+    ).preview;
     const overview = pages.find((page) => page.pageKey === "overview");
     const solar = pages.find((page) => page.pageKey === "solar");
 
     assert.equal(settings.autoplay, false);
     assert.equal(settings.brightness, 77);
+    assert.equal(settings.enforceFreshRuntimeData, false);
+    assert.equal(settings.transitionSpeed, 180);
+    assert.equal(settings.transitionType, "slide");
     assert.deepEqual(
       { durationSeconds: overview?.durationSeconds, enabled: overview?.enabled },
       { durationSeconds: 31, enabled: true }
@@ -133,6 +166,19 @@ test("legacy Playback APIs read Default Profile state when legacy rows diverge",
         pageKey: page.pageKey
       }))
     );
+    const previewOverview = [...preview.playablePages, ...preview.skippedPages]
+      .find((page) => page.pageKey === "overview");
+    const previewSolar = [...preview.playablePages, ...preview.skippedPages]
+      .find((page) => page.pageKey === "solar");
+
+    assert.deepEqual(
+      { durationSeconds: previewOverview?.durationSeconds, enabled: previewOverview?.enabled },
+      { durationSeconds: 31, enabled: true }
+    );
+    assert.deepEqual(
+      { durationSeconds: previewSolar?.durationSeconds, enabled: previewSolar?.enabled },
+      { durationSeconds: 32, enabled: false }
+    );
   } finally {
     await app.close();
   }
@@ -144,8 +190,20 @@ test("legacy Playback update APIs write only Default Profile state", async () =>
 
   const database = getDatabase();
   const legacySettingsBefore = database
-    .prepare("SELECT autoplay, brightness FROM playback_settings WHERE id = 1")
-    .get() as { autoplay: number; brightness: number };
+    .prepare(
+      `
+        SELECT autoplay, brightness, transition_type, transition_speed, enforce_fresh_runtime_data
+        FROM playback_settings
+        WHERE id = 1
+      `
+    )
+    .get() as {
+      autoplay: number;
+      brightness: number;
+      enforce_fresh_runtime_data: number;
+      transition_speed: number;
+      transition_type: string;
+    };
   const legacyOverviewBefore = database
     .prepare(
       "SELECT enabled, display_order, duration_seconds FROM display_page_registry WHERE page_key = 'overview'"
@@ -164,7 +222,13 @@ test("legacy Playback update APIs write only Default Profile state", async () =>
     const settingsUpdate = await app.inject({
       method: "PUT",
       url: "/api/playback/settings",
-      payload: { autoplay: false, brightness: 66 }
+      payload: {
+        autoplay: false,
+        brightness: 66,
+        enforceFreshRuntimeData: false,
+        transitionSpeed: 180,
+        transitionType: "slide"
+      }
     });
     const pagesUpdate = await app.inject({
       method: "PUT",
@@ -206,9 +270,34 @@ test("legacy Playback update APIs write only Default Profile state", async () =>
         `
       )
       .get() as { display_order: number; duration_seconds: number; enabled: number };
+    const runtimePolicy = database
+      .prepare(
+        `
+          SELECT transition_type, transition_speed, enforce_fresh_runtime_data
+          FROM playback_runtime_policy
+          WHERE id = 1
+        `
+      )
+      .get() as {
+        enforce_fresh_runtime_data: number;
+        transition_speed: number;
+        transition_type: string;
+      };
     const legacySettingsAfter = database
-      .prepare("SELECT autoplay, brightness FROM playback_settings WHERE id = 1")
-      .get() as { autoplay: number; brightness: number };
+      .prepare(
+        `
+          SELECT autoplay, brightness, transition_type, transition_speed, enforce_fresh_runtime_data
+          FROM playback_settings
+          WHERE id = 1
+        `
+      )
+      .get() as {
+        autoplay: number;
+        brightness: number;
+        enforce_fresh_runtime_data: number;
+        transition_speed: number;
+        transition_type: string;
+      };
     const legacyOverviewAfter = database
       .prepare(
         "SELECT enabled, display_order, duration_seconds FROM display_page_registry WHERE page_key = 'overview'"
@@ -216,6 +305,11 @@ test("legacy Playback update APIs write only Default Profile state", async () =>
       .get() as { display_order: number; duration_seconds: number; enabled: number };
 
     assert.deepEqual(profileSettings, { autoplay: 0, brightness: 66 });
+    assert.deepEqual(runtimePolicy, {
+      enforce_fresh_runtime_data: 0,
+      transition_speed: 180,
+      transition_type: "slide"
+    });
     assert.deepEqual(profileOverview, {
       display_order: overview.displayOrder,
       duration_seconds: 41,

@@ -136,7 +136,7 @@ export function updateDefaultPlaybackSettingsForTest(
   const current = database
     .prepare(
       `
-        SELECT autoplay, brightness, enforce_fresh_runtime_data, transition_speed, transition_type
+        SELECT autoplay, brightness
         FROM playback_profile_settings
         WHERE profile_id = (
           SELECT id FROM playback_profiles WHERE profile_key = 'default' AND is_default = 1
@@ -146,6 +146,16 @@ export function updateDefaultPlaybackSettingsForTest(
     .get() as {
       autoplay: number;
       brightness: number;
+    } | undefined;
+  const currentRuntimePolicy = database
+    .prepare(
+      `
+        SELECT enforce_fresh_runtime_data, transition_speed, transition_type
+        FROM playback_runtime_policy
+        WHERE id = 1
+      `
+    )
+    .get() as {
       enforce_fresh_runtime_data: number;
       transition_speed: number;
       transition_type: "fade" | "slide" | "none";
@@ -154,31 +164,46 @@ export function updateDefaultPlaybackSettingsForTest(
   if (!current) {
     throw new Error("Default Playback Profile settings fixture is missing");
   }
+  if (!currentRuntimePolicy) {
+    throw new Error("Global Playback Runtime Policy fixture is missing");
+  }
 
-  database
-    .prepare(
-      `
-        UPDATE playback_profile_settings
-        SET autoplay = ?,
-            brightness = ?,
-            enforce_fresh_runtime_data = ?,
-            transition_speed = ?,
-            transition_type = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE profile_id = (
-          SELECT id FROM playback_profiles WHERE profile_key = 'default' AND is_default = 1
-        )
-      `
-    )
-    .run(
-      update.autoplay === undefined ? current.autoplay : update.autoplay ? 1 : 0,
-      update.brightness ?? current.brightness,
-      update.enforceFreshRuntimeData === undefined
-        ? current.enforce_fresh_runtime_data
-        : update.enforceFreshRuntimeData
-          ? 1
-          : 0,
-      update.transitionSpeed ?? current.transition_speed,
-      update.transitionType ?? current.transition_type
-    );
+  database.transaction(() => {
+    database
+      .prepare(
+        `
+          UPDATE playback_profile_settings
+          SET autoplay = ?,
+              brightness = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE profile_id = (
+            SELECT id FROM playback_profiles WHERE profile_key = 'default' AND is_default = 1
+          )
+        `
+      )
+      .run(
+        update.autoplay === undefined ? current.autoplay : update.autoplay ? 1 : 0,
+        update.brightness ?? current.brightness
+      );
+    database
+      .prepare(
+        `
+          UPDATE playback_runtime_policy
+          SET enforce_fresh_runtime_data = ?,
+              transition_speed = ?,
+              transition_type = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = 1
+        `
+      )
+      .run(
+        update.enforceFreshRuntimeData === undefined
+          ? currentRuntimePolicy.enforce_fresh_runtime_data
+          : update.enforceFreshRuntimeData
+            ? 1
+            : 0,
+        update.transitionSpeed ?? currentRuntimePolicy.transition_speed,
+        update.transitionType ?? currentRuntimePolicy.transition_type
+      );
+  })();
 }

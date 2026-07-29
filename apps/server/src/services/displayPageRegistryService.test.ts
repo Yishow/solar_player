@@ -223,15 +223,20 @@ test("display page registry reports draft changes when draft and live content di
 
 test("display page registry updates and archives an instance without changing its stable page key", () => {
   const created = createDisplayPageInstance({
+    displayOrder: 8,
     displayNameEn: "Images Secondary",
     displayNameZh: "圖庫副本",
+    durationSeconds: 29,
+    enabled: true,
     routeSlug: "images-secondary",
     templateKey: "images"
   });
 
   const updated = updateDisplayPageInstance(created.pageKey, {
+    displayOrder: 9,
     displayNameEn: "Images Gallery",
     displayNameZh: "圖庫展區",
+    durationSeconds: 31,
     enabled: false,
     routeSlug: "images-gallery"
   });
@@ -243,8 +248,56 @@ test("display page registry updates and archives an instance without changing it
   assert.equal(updated.displayNameEn, "Images Gallery");
   assert.equal(updated.enabled, false);
 
+  const persistedState = getDatabase()
+    .prepare(
+      `
+        SELECT
+          registry.enabled AS registry_enabled,
+          registry.display_order AS registry_display_order,
+          registry.duration_seconds AS registry_duration_seconds,
+          profile_page.enabled AS profile_enabled,
+          profile_page.display_order AS profile_display_order,
+          profile_page.duration_seconds AS profile_duration_seconds
+        FROM display_page_registry AS registry
+        INNER JOIN playback_profile_pages AS profile_page ON profile_page.page_id = registry.id
+        WHERE registry.page_key = ?
+      `
+    )
+    .get(created.pageKey);
+
+  assert.deepEqual(persistedState, {
+    profile_display_order: 9,
+    profile_duration_seconds: 31,
+    profile_enabled: 0,
+    registry_display_order: 0,
+    registry_duration_seconds: 15,
+    registry_enabled: 0
+  });
+
   const archived = archiveDisplayPageInstance(created.pageKey);
   assert.equal(archived.pageKey, "images-2");
   assert.equal(archived.enabled, false);
   assert.ok(archived.archivedAt);
+});
+
+test("display page registry creation rolls back when Default Profile membership cannot be created", () => {
+  getDatabase()
+    .prepare("DELETE FROM playback_profiles WHERE profile_key = 'default'")
+    .run();
+
+  assert.throws(
+    () => createDisplayPageInstance({
+      displayNameEn: "Images Secondary",
+      displayNameZh: "圖庫副本",
+      routeSlug: "images-secondary",
+      templateKey: "images"
+    }),
+    /Default Playback Profile is not initialized/
+  );
+  assert.deepEqual(
+    getDatabase()
+      .prepare("SELECT COUNT(*) AS total FROM display_page_registry WHERE page_key = 'images-2'")
+      .get(),
+    { total: 0 }
+  );
 });

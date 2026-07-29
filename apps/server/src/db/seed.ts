@@ -424,17 +424,19 @@ export function seedDatabase() {
       );
 
       const registryPage = database
-        .prepare("SELECT id FROM display_page_registry WHERE page_key = ?")
-        .get(page.pageKey) as { id: number } | undefined;
+        .prepare("SELECT id, archived_at FROM display_page_registry WHERE page_key = ?")
+        .get(page.pageKey) as { archived_at: string | null; id: number } | undefined;
       if (!registryPage) {
         throw new Error(`Failed to seed display page registry instance: ${page.pageKey}`);
       }
 
-      attachDisplayPageToDefaultProfile(registryPage.id, {
-        displayOrder: page.displayOrder,
-        durationSeconds: 15,
-        enabled: true
-      });
+      if (registryPage.archived_at === null) {
+        attachDisplayPageToDefaultProfile(registryPage.id, {
+          displayOrder: page.displayOrder,
+          durationSeconds: 15,
+          enabled: true
+        });
+      }
     }
 
     const guanyinConfigJson = JSON.stringify({

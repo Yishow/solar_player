@@ -28,6 +28,11 @@ import {
   type PlaybackProfilePageRow,
   type PlaybackProfileSettingsRow
 } from "./playbackProfileService.js";
+import {
+  readGlobalPlaybackRuntimePolicyRow,
+  writeGlobalPlaybackRuntimePolicyRow,
+  type PlaybackRuntimePolicyRow
+} from "./playbackRuntimePolicyService.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
@@ -216,26 +221,34 @@ function serializeRepeatDays(days: number[]): string {
   return days.filter((day) => day >= 0 && day <= 6).join(",");
 }
 
-function serializeSettingsRow(row: PlaybackProfileSettingsRow): PlaybackSettings {
+function serializeSettingsRows(
+  profile: PlaybackProfileSettingsRow,
+  runtimePolicy: PlaybackRuntimePolicyRow
+): PlaybackSettings {
   return {
-    autoplay: toBoolean(row.autoplay),
-    brightness: row.brightness,
-    idleMode: row.idle_mode === "return-to-start" ? "return-to-start" : "disabled",
-    idleTimeout: row.idle_timeout,
-    loop: toBoolean(row.loop),
-    orientation: row.orientation === "portrait" ? "portrait" : "landscape",
-    repeatDays: parseRepeatDays(row.repeat_days),
-    scheduleEnabled: toBoolean(row.schedule_enabled),
-    scheduleEnd: row.schedule_end,
-    scheduleStart: row.schedule_start,
-    startPage: row.start_page,
-    enforceFreshRuntimeData: toBoolean(row.enforce_fresh_runtime_data),
+    autoplay: toBoolean(profile.autoplay),
+    brightness: profile.brightness,
+    idleMode: profile.idle_mode === "return-to-start" ? "return-to-start" : "disabled",
+    idleTimeout: profile.idle_timeout,
+    loop: toBoolean(profile.loop),
+    orientation: profile.orientation === "portrait" ? "portrait" : "landscape",
+    repeatDays: parseRepeatDays(profile.repeat_days),
+    scheduleEnabled: toBoolean(profile.schedule_enabled),
+    scheduleEnd: profile.schedule_end,
+    scheduleStart: profile.schedule_start,
+    startPage: profile.start_page,
+    enforceFreshRuntimeData: toBoolean(runtimePolicy.enforce_fresh_runtime_data),
     transitionSpeed: normalizePlaybackTransitionSpeed(
-      row.transition_speed,
-      row.transition_type === "none"
+      runtimePolicy.transition_speed,
+      runtimePolicy.transition_type === "none"
     ),
-    transitionType: row.transition_type as PlaybackSettings["transitionType"],
-    updatedAt: row.updated_at
+    transitionType: runtimePolicy.transition_type,
+    updatedAt:
+      profile.updated_at === null || runtimePolicy.updated_at === null
+        ? profile.updated_at ?? runtimePolicy.updated_at
+        : profile.updated_at > runtimePolicy.updated_at
+          ? profile.updated_at
+          : runtimePolicy.updated_at
   };
 }
 
@@ -270,40 +283,58 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
-function readPlaybackSettingsRow() {
-  return readDefaultPlaybackSettingsRow();
-}
-
 export function readPlaybackSettings() {
-  return serializeSettingsRow(readPlaybackSettingsRow());
+  return serializeSettingsRows(
+    readDefaultPlaybackSettingsRow(),
+    readGlobalPlaybackRuntimePolicyRow()
+  );
 }
 
 export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
-  const current = readPlaybackSettingsRow();
+  const currentProfile = readDefaultPlaybackSettingsRow();
+  const currentRuntimePolicy = readGlobalPlaybackRuntimePolicyRow();
   const nextTransitionType =
     body.transitionType === "fade" || body.transitionType === "slide" || body.transitionType === "none"
       ? body.transitionType
-      : current.transition_type;
+      : currentRuntimePolicy.transition_type;
   const requestedTransitionSpeed =
-    typeof body.transitionSpeed === "number" ? body.transitionSpeed : current.transition_speed;
+    typeof body.transitionSpeed === "number"
+      ? body.transitionSpeed
+      : currentRuntimePolicy.transition_speed;
   const nextSettings = {
-    autoplay: body.autoplay ?? toBoolean(current.autoplay),
+    autoplay: body.autoplay ?? toBoolean(currentProfile.autoplay),
     brightness:
-      typeof body.brightness === "number" ? Math.min(100, Math.max(0, body.brightness)) : current.brightness,
+      typeof body.brightness === "number"
+        ? Math.min(100, Math.max(0, body.brightness))
+        : currentProfile.brightness,
     idleMode:
-      body.idleMode === "return-to-start" ? "return-to-start" : body.idleMode === undefined ? current.idle_mode : "disabled",
+      body.idleMode === "return-to-start"
+        ? "return-to-start"
+        : body.idleMode === undefined
+          ? currentProfile.idle_mode
+          : "disabled",
     idleTimeout:
-      typeof body.idleTimeout === "number" ? Math.max(1, body.idleTimeout) : current.idle_timeout,
-    loop: body.loop ?? toBoolean(current.loop),
+      typeof body.idleTimeout === "number"
+        ? Math.max(1, body.idleTimeout)
+        : currentProfile.idle_timeout,
+    loop: body.loop ?? toBoolean(currentProfile.loop),
     orientation:
-      body.orientation === "portrait" ? "portrait" : body.orientation === undefined ? current.orientation : "landscape",
-    repeatDays: body.repeatDays ?? parseRepeatDays(current.repeat_days),
-    scheduleEnabled: body.scheduleEnabled ?? toBoolean(current.schedule_enabled),
-    scheduleEnd: body.scheduleEnd === undefined ? current.schedule_end : body.scheduleEnd,
-    scheduleStart: body.scheduleStart === undefined ? current.schedule_start : body.scheduleStart,
-    startPage: typeof body.startPage === "number" ? body.startPage : current.start_page,
+      body.orientation === "portrait"
+        ? "portrait"
+        : body.orientation === undefined
+          ? currentProfile.orientation
+          : "landscape",
+    repeatDays: body.repeatDays ?? parseRepeatDays(currentProfile.repeat_days),
+    scheduleEnabled: body.scheduleEnabled ?? toBoolean(currentProfile.schedule_enabled),
+    scheduleEnd:
+      body.scheduleEnd === undefined ? currentProfile.schedule_end : body.scheduleEnd,
+    scheduleStart:
+      body.scheduleStart === undefined ? currentProfile.schedule_start : body.scheduleStart,
+    startPage:
+      typeof body.startPage === "number" ? body.startPage : currentProfile.start_page,
     enforceFreshRuntimeData:
-      body.enforceFreshRuntimeData ?? toBoolean(current.enforce_fresh_runtime_data),
+      body.enforceFreshRuntimeData ??
+      toBoolean(currentRuntimePolicy.enforce_fresh_runtime_data),
     transitionSpeed: normalizePlaybackTransitionSpeed(
       requestedTransitionSpeed,
       nextTransitionType === "none"
@@ -311,22 +342,26 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
     transitionType: nextTransitionType
   };
 
-  writeDefaultPlaybackSettingsRow({
-    autoplay: nextSettings.autoplay ? 1 : 0,
-    brightness: nextSettings.brightness,
-    enforce_fresh_runtime_data: nextSettings.enforceFreshRuntimeData ? 1 : 0,
-    idle_mode: nextSettings.idleMode,
-    idle_timeout: nextSettings.idleTimeout,
-    loop: nextSettings.loop ? 1 : 0,
-    orientation: nextSettings.orientation,
-    repeat_days: serializeRepeatDays(nextSettings.repeatDays),
-    schedule_enabled: nextSettings.scheduleEnabled ? 1 : 0,
-    schedule_end: nextSettings.scheduleEnd,
-    schedule_start: nextSettings.scheduleStart,
-    start_page: nextSettings.startPage,
-    transition_speed: nextSettings.transitionSpeed,
-    transition_type: nextSettings.transitionType
-  });
+  getDatabase().transaction(() => {
+    writeDefaultPlaybackSettingsRow({
+      autoplay: nextSettings.autoplay ? 1 : 0,
+      brightness: nextSettings.brightness,
+      idle_mode: nextSettings.idleMode,
+      idle_timeout: nextSettings.idleTimeout,
+      loop: nextSettings.loop ? 1 : 0,
+      orientation: nextSettings.orientation,
+      repeat_days: serializeRepeatDays(nextSettings.repeatDays),
+      schedule_enabled: nextSettings.scheduleEnabled ? 1 : 0,
+      schedule_end: nextSettings.scheduleEnd,
+      schedule_start: nextSettings.scheduleStart,
+      start_page: nextSettings.startPage
+    });
+    writeGlobalPlaybackRuntimePolicyRow({
+      enforce_fresh_runtime_data: nextSettings.enforceFreshRuntimeData ? 1 : 0,
+      transition_speed: nextSettings.transitionSpeed,
+      transition_type: nextSettings.transitionType
+    });
+  })();
 
   return readPlaybackSettings();
 }
