@@ -20,4 +20,5 @@ export * from "./managementAccess.js";
 export * from "./managementDraftSave.js";
 export * from "./sustainabilityStory.js";
 export * from "./displayClientLiveness.js";
+export * from "./deviceIdentity.js";
 export * from "./weather.js";

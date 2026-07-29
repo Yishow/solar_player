@@ -30,6 +30,8 @@ import calculationSettingsRoute from "./routes/calculation-settings.js";
 import circuitsRoute from "./routes/circuits.js";
 import dataSourceRoute from "./routes/data-source.js";
 import deviceRoute from "./routes/device.js";
+import deviceGroupsRoute from "./routes/device-groups.js";
+import devicesRoute from "./routes/devices.js";
 import deviceDisplayOpsRoute from "./routes/device-display-ops.js";
 import displayOpsRoute from "./routes/display-ops.js";
 import displayCardDataRoute from "./routes/display-card-data.js";
@@ -159,6 +161,8 @@ export async function buildApp() {
   await app.register(circuitsRoute);
   await app.register(dataSourceRoute);
   await app.register(deviceRoute);
+  await app.register(deviceGroupsRoute);
+  await app.register(devicesRoute);
   await app.register(deviceDisplayOpsRoute);
   await app.register(displayOpsRoute);
   await app.register(displayCardDataRoute);
