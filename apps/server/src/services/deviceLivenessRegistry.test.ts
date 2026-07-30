@@ -11,13 +11,43 @@ const identity = {
   siteScope: "cl" as const
 };
 
-function heartbeat(route: string, isPlaying: boolean) {
+function heartbeat(
+  route: string,
+  isPlaying: boolean,
+  timeSyncState: "stale" | "synced" | "time-untrusted" | "waiting" = "synced"
+) {
   return {
     isPlaying,
     pageKey: route.slice(1),
-    route
+    route,
+    timeSyncState
   };
 }
+
+test("DeviceLivenessRegistry exposes the latest valid heartbeat Time Sync State", () => {
+  const registry = new DeviceLivenessRegistry();
+  registry.connect({
+    connectionId: "socket-1",
+    identity,
+    sourceFingerprint: "source-a"
+  });
+
+  for (const timeSyncState of [
+    "waiting",
+    "synced",
+    "stale",
+    "time-untrusted"
+  ] as const) {
+    registry.heartbeat(
+      "socket-1",
+      heartbeat("/overview", true, timeSyncState)
+    );
+    assert.equal(
+      registry.snapshot().clients[0]?.timeSyncState,
+      timeSyncState
+    );
+  }
+});
 
 test("DeviceLivenessRegistry retains latest valid state while child connections come and go", () => {
   let now = new Date("2026-05-22T12:00:00.000Z");

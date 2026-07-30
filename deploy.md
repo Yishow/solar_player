@@ -1,6 +1,6 @@
 # Solar Player Raspberry Pi 5 Deploy Notes
 
-Last updated: 2026-07-16
+Last updated: 2026-07-30
 
 This file is the handoff entry for the Raspberry Pi 5 kiosk deployment work. Read this first before continuing deployment discussion or running scripts.
 
@@ -23,6 +23,18 @@ $PiHost = "<pi-host-or-magicdns>"
 ```
 
 `192.168.31.62` below is MQTT dependency configuration, not the Raspberry Pi connection target.
+
+## Server Clock Responsibility
+
+The Server host clock is the authority for App Time. Before launch, verify the
+Server clock and its operator-selected NTP/time-sync service with
+`timedatectl status`. If the clock is corrected forward or backward, restart
+`solar-display` so Clients receive a new Server Time instance.
+
+Solar Player does not modify the Server or Client OS Clock, OS time zone, NTP
+configuration, or host time-sync services. See
+[`docs/architecture/server-app-time.md`](docs/architecture/server-app-time.md)
+for the App Time states and recovery contract.
 
 ## Tailscale Deployment Prerequisite
 

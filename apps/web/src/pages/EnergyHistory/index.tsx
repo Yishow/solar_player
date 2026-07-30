@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
+import { useAbsoluteAppTimeEpoch } from "../../hooks/useAppTime";
 import { requestJson } from "../../services/api";
 import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
 import {
@@ -106,6 +107,7 @@ function TrendChart({
 
 export function EnergyHistory() {
   const [range, setRange] = useState<EnergyHistoryRange>("day");
+  const absoluteAppTimeEpoch = useAbsoluteAppTimeEpoch();
   const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
   const cachedHistoryPayload = readCachedMonitoringHistoryPayload<EnergyHistorySnapshot>(range);
   const historySnapshotsRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
@@ -156,11 +158,15 @@ export function EnergyHistory() {
     () =>
       buildEnergyHistoryViewModel({
         counters,
+        now:
+          absoluteAppTimeEpoch === null
+            ? null
+            : new Date(absoluteAppTimeEpoch),
         range,
         snapshots,
         summaries
       }),
-    [counters, range, snapshots, summaries]
+    [absoluteAppTimeEpoch, counters, range, snapshots, summaries]
   );
 
   const validChartPoints = viewModel.chartLines

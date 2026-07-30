@@ -3,6 +3,7 @@ import { useBodyClass } from "../../hooks/useBodyClass";
 import { requestJson } from "../../services/api";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { useAbsoluteAppTimeEpoch } from "../../hooks/useAppTime";
 import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
 import {
   readCachedMonitoringHistoryPayload,
@@ -108,6 +109,7 @@ export function EnergyTrend() {
   useBodyClass("page-hero-shell");
   const { snapshot } = useLiveMetrics();
   const [range, setRange] = useState<EnergyTrendRange>("day");
+  const absoluteAppTimeEpoch = useAbsoluteAppTimeEpoch();
   const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
   const cachedHistoryPayload = readCachedMonitoringHistoryPayload<EnergyTrendSnapshot>(range);
   const historyRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
@@ -136,10 +138,14 @@ export function EnergyTrend() {
     () =>
       buildEnergyTrendViewModel({
         liveSnapshot: snapshot,
+        now:
+          absoluteAppTimeEpoch === null
+            ? null
+            : new Date(absoluteAppTimeEpoch),
         range,
         snapshots
       }),
-    [range, snapshot, snapshots]
+    [absoluteAppTimeEpoch, range, snapshot, snapshots]
   );
 
   const refreshState = errorMessage ? "is-error" : isLoading ? "is-loading" : "";

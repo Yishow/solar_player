@@ -28,7 +28,7 @@ function formatUpdatedLabel(lastUpdatedAt: string) {
 export function isMonitoringSourceStale(
   lastUpdatedAt: string | null,
   options?: {
-    now?: Date | string;
+    now?: Date | string | null;
     staleAfterMs?: number;
   }
 ) {
@@ -37,6 +37,10 @@ export function isMonitoringSourceStale(
   }
 
   const staleAfterMs = options?.staleAfterMs ?? 30 * 60 * 1000;
+  if (options?.now === null) {
+    return false;
+  }
+
   const nowTime =
     options?.now instanceof Date
       ? options.now.getTime()

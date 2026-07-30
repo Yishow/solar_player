@@ -163,14 +163,16 @@ test("SocketService aggregates child connections under the credential-bound Devi
   firstSocket.trigger("client:heartbeat", {
     isPlaying: false,
     pageKey: "overview",
-    route: "/overview"
+    route: "/overview",
+    timeSyncState: "waiting"
   });
   currentNow = new Date("2026-05-22T12:00:20.000Z");
   secondSocket.trigger("client:heartbeat", {
     clientId: "claimed-other-device",
     isPlaying: true,
     pageKey: "solar",
-    route: "/solar"
+    route: "/solar",
+    timeSyncState: "synced"
   });
 
   const snapshot = service.getDisplayClientLivenessSnapshot(currentNow) as {
@@ -219,6 +221,41 @@ test("SocketService aggregates child connections under the credential-bound Devi
   assert.equal(disconnected.state, "offline");
 });
 
+test("SocketService emits an immediate ordered Server Time Signal on connection", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => new Date("2026-07-30T08:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const socket = new FakeSocket();
+
+  io.connect(socket);
+
+  const timeSignal = socket.emitted.find(
+    (entry) => entry.event === "server:time"
+  )?.payload as Record<string, unknown>;
+  assert.deepEqual(
+    {
+      broadcastIntervalMs: timeSignal.broadcastIntervalMs,
+      epochMs: timeSignal.epochMs,
+      sequence: timeSignal.sequence,
+      timeZone: timeSignal.timeZone
+    },
+    {
+      broadcastIntervalMs: 30_000,
+      epochMs: Date.parse("2026-07-30T08:00:00.000Z"),
+      sequence: 1,
+      timeZone: "Asia/Taipei"
+    }
+  );
+  assert.equal(typeof timeSignal.instanceId, "string");
+
+  void service.close();
+});
+
 test("SocketService rejects unknown credentials and disconnects a connection revoked before heartbeat", () => {
   const io = new FakeIo();
   const logger = createLogger();
@@ -249,7 +286,8 @@ test("SocketService rejects unknown credentials and disconnects a connection rev
   socket.trigger("client:heartbeat", {
     isPlaying: true,
     pageKey: "solar",
-    route: "/solar"
+    route: "/solar",
+    timeSyncState: "synced"
   });
   socket.trigger("client:heartbeat", {
     isPlaying: "yes",
@@ -385,6 +423,7 @@ test("SocketService tracks a connected display client heartbeat and retains Devi
     pageKey: "solar",
     route: "/solar",
     sessionClass: "playback-safe",
+    timeSyncState: "stale",
     viewport: {
       height: 1080,
       width: 1920
@@ -414,6 +453,7 @@ test("SocketService tracks a connected display client heartbeat and retains Devi
   assert.equal(snapshot.clients[0]?.isPlaying, true);
   assert.equal(snapshot.clients[0]?.isIdle, false);
   assert.equal(snapshot.clients[0]?.lastSeenAt, "2026-05-22T12:00:10.000Z");
+  assert.equal(snapshot.clients[0]?.timeSyncState, "stale");
 
   socket.trigger("disconnect");
 
@@ -424,6 +464,45 @@ test("SocketService tracks a connected display client heartbeat and retains Devi
     total: 1
   });
   assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.route, "/solar");
+});
+
+test("SocketService accepts only the four required heartbeat Time Sync States", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const socket = new FakeSocket();
+  io.connect(socket);
+
+  for (const timeSyncState of [
+    undefined,
+    "unknown",
+    "waiting",
+    "synced",
+    "stale",
+    "time-untrusted"
+  ]) {
+    socket.trigger("client:heartbeat", {
+      isPlaying: true,
+      pageKey: "overview",
+      route: `/time/${String(timeSyncState)}`,
+      ...(timeSyncState === undefined ? {} : { timeSyncState })
+    });
+  }
+
+  assert.equal(
+    service.getDisplayClientLivenessSnapshot().clients[0]?.route,
+    "/time/time-untrusted"
+  );
+  assert.equal(
+    service.getDisplayClientLivenessSnapshot().clients[0]?.timeSyncState,
+    "time-untrusted"
+  );
+  assert.equal(logger.warnCalls.length, 2);
 });
 
 test("SocketService ignores heartbeats from an unknown socket and warns on invalid payloads", () => {

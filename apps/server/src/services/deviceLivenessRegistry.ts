@@ -30,6 +30,7 @@ type DeviceRecord = {
   multiSourceSince: string | null;
   pageKey: string | null;
   route: string;
+  timeSyncState: DisplayClientHeartbeat["timeSyncState"];
   viewport: {
     height: number;
     width: number;
@@ -86,6 +87,7 @@ export class DeviceLivenessRegistry {
       multiSourceSince: null,
       pageKey: null,
       route: "/",
+      timeSyncState: "waiting",
       viewport: {
         height: 0,
         width: 0
@@ -130,6 +132,7 @@ export class DeviceLivenessRegistry {
     device.lastSeenAt = heartbeatAt;
     device.pageKey = payload.pageKey;
     device.route = payload.route;
+    device.timeSyncState = payload.timeSyncState;
     return true;
   }
 
@@ -216,6 +219,7 @@ export class DeviceLivenessRegistry {
       route: device.route,
       siteScope: device.identity.siteScope,
       sourceStatus,
+      timeSyncState: device.timeSyncState,
       viewport: device.viewport
     };
   }

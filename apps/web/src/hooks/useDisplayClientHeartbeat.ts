@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS,
-  type DisplayClientHeartbeat
+  type DisplayClientHeartbeat,
+  type TimeSyncState
 } from "@solar-display/shared";
 export { DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS } from "@solar-display/shared";
 import {
@@ -11,6 +12,7 @@ import {
   subscribeConnectionState,
   type SocketConnectionState
 } from "../services/socket";
+import { getAppTimeSnapshot } from "../services/appTime";
 
 export type DisplayClientHeartbeatLoopOptions = {
   connected: boolean;
@@ -27,11 +29,13 @@ export function buildDisplayClientHeartbeatPayload(args: {
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
+  timeSyncState: TimeSyncState;
 }): DisplayClientHeartbeat {
   return {
     isPlaying: args.isPlaying,
     pageKey: args.pageKey,
-    route: args.route
+    route: args.route,
+    timeSyncState: args.timeSyncState
   };
 }
 
@@ -94,7 +98,10 @@ export function useDisplayClientHeartbeat(args: {
       connected: connectionState.status === "connected",
       emitHeartbeat: emitClientHeartbeat,
       emitImmediately,
-      payloadFactory: () => buildDisplayClientHeartbeatPayload(args)
+      payloadFactory: () => buildDisplayClientHeartbeatPayload({
+        ...args,
+        timeSyncState: getAppTimeSnapshot().state
+      })
     });
   }, [args.isPlaying, args.pageKey, args.route, connectionState.status]);
 }

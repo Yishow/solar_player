@@ -5,6 +5,41 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 
+test("AppHeader waits for App Time without falling back to the Client OS Clock", () => {
+  const headerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/overview"] },
+      React.createElement(AppHeader)
+    )
+  );
+
+  assert.match(headerHtml, /data-time-state="waiting"/);
+  assert.match(headerHtml, />--:--</);
+  assert.match(headerHtml, /伺服器時間/);
+  assert.match(headerHtml, /等待同步/);
+});
+
+test("AppHeader preserves explicit clock metadata overrides for previews and tests", () => {
+  const headerHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/overview"] },
+      React.createElement(AppHeader, {
+        meta: {
+          date: "PREVIEW DATE",
+          time: "12:34",
+          weekday: "PREVIEW WEEKDAY"
+        }
+      })
+    )
+  );
+
+  assert.match(headerHtml, />12:34</);
+  assert.match(headerHtml, /PREVIEW DATE/);
+  assert.match(headerHtml, /PREVIEW WEEKDAY/);
+});
+
 test("AppHeader renders a weather slot with caller-provided copy", () => {
   const headerHtml = renderToStaticMarkup(
     React.createElement(
@@ -133,4 +168,3 @@ test("AppHeader optimizes weather spin animation, clock meta color, and right cl
   assert.match(headerHtml, /data-shell-primitive="header-weather"[^>]*style="[^"]*text-shadow:0 1px 3px rgba\(0,\s*0,\s*0,\s*0\.12\),\s*0 2px 8px rgba\(0,\s*0,\s*0,\s*0\.05\)/);
   assert.match(headerHtml, /data-shell-primitive="status-pill"[^>]*style="[^"]*text-shadow:0 1px 3px rgba\(0,\s*0,\s*0,\s*0\.12\),\s*0 2px 8px rgba\(0,\s*0,\s*0,\s*0\.05\)/);
 });
-

@@ -254,7 +254,8 @@ function buildDisplayClientSummary(
       groupLabel: `Group ${client.groupId}`,
       routeLabel: client.route,
       siteLabel: `Site ${client.siteScope.toUpperCase()}`,
-      stateLabel: client.state
+      stateLabel: client.state,
+      timeSyncLabel: `App Time ${client.timeSyncState}`
     })),
     totalLabel: `${summary.total} clients`
   };

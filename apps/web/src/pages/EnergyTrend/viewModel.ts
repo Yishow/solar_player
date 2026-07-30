@@ -18,7 +18,7 @@ export type EnergyTrendSnapshot = {
 
 type BuildEnergyTrendViewModelArgs = {
   liveSnapshot: LiveMetricsSnapshot;
-  now?: Date | string;
+  now?: Date | string | null;
   range: EnergyTrendRange;
   snapshots: EnergyTrendSnapshot[];
 };

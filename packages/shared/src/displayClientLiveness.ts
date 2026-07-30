@@ -1,4 +1,5 @@
 import type { DisplayClientContext } from "./displayClientContext.js";
+import type { TimeSyncState } from "./appTime.js";
 
 export const DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DISPLAY_CLIENT_STALENESS_WINDOW_SECONDS = 30;
@@ -7,6 +8,7 @@ export type DisplayClientHeartbeat = {
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
+  timeSyncState: TimeSyncState;
 };
 
 export type DisplayClientLivenessState = "online" | "stale" | "offline";
@@ -31,6 +33,7 @@ export type DisplayClientLivenessEntry = {
   route: string;
   siteScope: DisplayClientContext["siteScope"];
   sourceStatus: DisplayClientLivenessSourceStatus;
+  timeSyncState: TimeSyncState;
   viewport: {
     height: number;
     width: number;
@@ -99,6 +102,7 @@ export function buildDisplayClientLivenessSnapshot(
         lastSeenAt: entry.lastSeenAt,
         now
       }),
+      timeSyncState: entry.timeSyncState,
       viewport: entry.viewport
     }))
     .sort((left, right) => left.deviceId - right.deviceId);

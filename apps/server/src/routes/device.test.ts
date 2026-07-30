@@ -399,6 +399,7 @@ test("trusted device status responses include display client liveness while untr
         siteScope: "cl",
         sourceStatus: "same-source",
         state: "online",
+        timeSyncState: "synced",
         viewport: {
           height: 1080,
           width: 1920

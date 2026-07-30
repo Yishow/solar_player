@@ -23,24 +23,27 @@ function createLoopOptions(
     payloadFactory: () => ({
       isPlaying: true,
       pageKey: "overview",
-      route: "/overview"
+      route: "/overview",
+      timeSyncState: "synced"
     }),
     ...overrides
   };
 }
 
-test("buildDisplayClientHeartbeatPayload sends only current playback state", () => {
+test("buildDisplayClientHeartbeatPayload reports playback and Time Sync State", () => {
   assert.deepEqual(
     buildDisplayClientHeartbeatPayload({
       isIdle: false,
       isPlaying: true,
       pageKey: "overview",
-      route: "/overview"
+      route: "/overview",
+      timeSyncState: "stale"
     }),
     {
       isPlaying: true,
       pageKey: "overview",
-      route: "/overview"
+      route: "/overview",
+      timeSyncState: "stale"
     }
   );
 });
@@ -83,7 +86,8 @@ test("startDisplayClientHeartbeatLoop emits immediately when the playback page c
       payloadFactory: () => ({
         isPlaying: true,
         pageKey: "solar",
-        route: "/solar"
+        route: "/solar",
+        timeSyncState: "time-untrusted"
       })
     })
   );

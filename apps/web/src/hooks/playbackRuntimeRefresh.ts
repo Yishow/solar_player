@@ -17,6 +17,7 @@ type ReconcilePlaybackRuntimeAfterRefreshInput = {
   nowMs: number;
   previousPages: PlaybackPage[];
   resumeAutoplay?: boolean;
+  scheduleAllowed?: boolean;
   settings: PlaybackSettings;
 };
 
@@ -27,12 +28,14 @@ export function reconcilePlaybackRuntimeAfterRefresh({
   nowMs,
   previousPages,
   resumeAutoplay = false,
+  scheduleAllowed,
   settings
 }: ReconcilePlaybackRuntimeAfterRefreshInput): PlaybackRuntime {
   if (!currentRuntime) {
     return createPlaybackRuntime(settings, nextPages, {
       nowMs,
-      route: currentPath
+      route: currentPath,
+      scheduleAllowed
     });
   }
 
@@ -42,7 +45,8 @@ export function reconcilePlaybackRuntimeAfterRefresh({
     return createPlaybackRuntime(settings, nextPages, {
       isIdle: currentRuntime.isIdle,
       lastInteractionAt: currentRuntime.lastInteractionAt,
-      nowMs
+      nowMs,
+      scheduleAllowed
     });
   }
 
@@ -63,10 +67,13 @@ export function reconcilePlaybackRuntimeAfterRefresh({
     currentPageId: nextCurrentPage?.id ?? null,
     isIdle: currentRuntime.isIdle,
     lastInteractionAt: currentRuntime.lastInteractionAt,
-    nowMs
+    nowMs,
+    scheduleAllowed
   });
   const preservePlaying =
-    !baselineRuntime.isIdle && isPlaybackAllowedBySchedule(settings, new Date(nowMs)) && settings.autoplay
+    !baselineRuntime.isIdle
+    && (scheduleAllowed ?? isPlaybackAllowedBySchedule(settings, new Date(nowMs)))
+    && settings.autoplay
       ? resumeAutoplay || currentRuntime.isPlaying
       : false;
 

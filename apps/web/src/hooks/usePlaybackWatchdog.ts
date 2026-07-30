@@ -50,7 +50,7 @@ export function usePlaybackWatchdog(input: {
   currentPageKey: string | null;
   expectedDurationMs: number;
 }) {
-  const lastPageChangeAtRef = useRef(Date.now());
+  const lastPageChangeAtRef = useRef(performance.now());
   const previousPageKeyRef = useRef<string | null>(input.currentPageKey);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function usePlaybackWatchdog(input: {
     }
 
     previousPageKeyRef.current = input.currentPageKey;
-    lastPageChangeAtRef.current = Date.now();
+    lastPageChangeAtRef.current = performance.now();
   }, [input.currentPageKey]);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export function usePlaybackWatchdog(input: {
       expectedDurationMs: input.expectedDurationMs,
       isPlaying: input.isPlaying,
       lastPageChangeAt: lastPageChangeAtRef.current,
-      now: Date.now,
+      now: () => performance.now(),
       onReload: () => {
         window.location.reload();
       },

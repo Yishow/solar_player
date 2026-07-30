@@ -9,6 +9,7 @@ import {
 type ResolveRouteRuntimeSyncInput = {
   currentPath?: string;
   lastSyncedPath?: string;
+  nowMs: number;
   pages: PlaybackPage[];
   runtime: PlaybackRuntime | null;
 };
@@ -16,6 +17,7 @@ type ResolveRouteRuntimeSyncInput = {
 export function resolveRouteRuntimeSync({
   currentPath,
   lastSyncedPath,
+  nowMs,
   pages,
   runtime
 }: ResolveRouteRuntimeSyncInput): PlaybackRuntime | null {
@@ -37,6 +39,6 @@ export function resolveRouteRuntimeSync({
     countdownMs: getPlaybackDurationMs(nextPage),
     currentIndex: routeIndex,
     isIdle: false,
-    lastInteractionAt: Date.now()
+    lastInteractionAt: nowMs
   };
 }

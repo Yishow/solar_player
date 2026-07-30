@@ -92,11 +92,25 @@ function resolveIdleModeEnabled(idleMode: PlaybackIdleMode) {
 }
 
 export function isPlaybackAllowedBySchedule(settings: PlaybackSettings, now: Date) {
+  return isPlaybackAllowedByScheduleParts(
+    settings,
+    getPlaybackDay(now),
+    now.getHours(),
+    now.getMinutes()
+  );
+}
+
+function isPlaybackAllowedByScheduleParts(
+  settings: PlaybackSettings,
+  day: number,
+  hours: number,
+  minutes: number
+) {
   if (!settings.scheduleEnabled) {
     return true;
   }
 
-  if (settings.repeatDays.length > 0 && !settings.repeatDays.includes(getPlaybackDay(now))) {
+  if (settings.repeatDays.length > 0 && !settings.repeatDays.includes(day)) {
     return false;
   }
 
@@ -107,7 +121,7 @@ export function isPlaybackAllowedBySchedule(settings: PlaybackSettings, now: Dat
     return true;
   }
 
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentMinutes = hours * 60 + minutes;
 
   if (startMinutes === endMinutes) {
     return true;
@@ -118,6 +132,31 @@ export function isPlaybackAllowedBySchedule(settings: PlaybackSettings, now: Dat
   }
 
   return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+}
+
+export function isPlaybackAllowedByScheduleAtEpoch(
+  settings: PlaybackSettings,
+  epochMs: number,
+  timeZone: string
+) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    timeZone,
+    weekday: "short"
+  }).formatToParts(new Date(epochMs));
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
+    values.get("weekday") ?? ""
+  );
+
+  return isPlaybackAllowedByScheduleParts(
+    settings,
+    day,
+    Number(values.get("hour")),
+    Number(values.get("minute"))
+  );
 }
 
 export function shouldEnterIdleMode(
@@ -143,6 +182,7 @@ export function createPlaybackRuntime(
     lastInteractionAt?: number;
     nowMs?: number;
     route?: string;
+    scheduleAllowed?: boolean;
   }
 ) {
   const playablePages = getEnabledPlaybackPages(pages);
@@ -171,7 +211,9 @@ export function createPlaybackRuntime(
         ? currentPageIndex
         : resolvePlaybackStartIndex(playablePages, settings.startPage);
   const currentPage = playablePages[currentIndex] ?? playablePages[0] ?? null;
-  const scheduleAllowsPlayback = isPlaybackAllowedBySchedule(settings, new Date(nowMs));
+  const scheduleAllowsPlayback =
+    options?.scheduleAllowed
+    ?? isPlaybackAllowedBySchedule(settings, new Date(nowMs));
   const isIdle = options?.isIdle ?? false;
   const autoplayAllowed = settings.autoplay && scheduleAllowsPlayback && !isIdle;
 
@@ -218,6 +260,7 @@ export function resolveSafePlaybackBoundaryRuntime(input: {
   nextPages: PlaybackPage[];
   nowMs: number;
   plan: SafePlaybackBoundaryPlan;
+  scheduleAllowed?: boolean;
   settings: PlaybackSettings;
 }): PlaybackRuntime | null {
   if (input.nowMs < input.plan.applyAtMs) {
@@ -256,10 +299,9 @@ export function resolveSafePlaybackBoundaryRuntime(input: {
           )
         ] ?? startPage
       : startPage;
-  const scheduleAllowsPlayback = isPlaybackAllowedBySchedule(
-    input.settings,
-    new Date(input.nowMs)
-  );
+  const scheduleAllowsPlayback =
+    input.scheduleAllowed
+    ?? isPlaybackAllowedBySchedule(input.settings, new Date(input.nowMs));
 
   return createPlaybackRuntime(input.settings, input.nextPages, {
     currentPageId: targetPage?.id ?? null,
@@ -270,7 +312,8 @@ export function resolveSafePlaybackBoundaryRuntime(input: {
       scheduleAllowsPlayback &&
       !atNonLoopEdge,
     lastInteractionAt: input.current.lastInteractionAt,
-    nowMs: input.nowMs
+    nowMs: input.nowMs,
+    scheduleAllowed: scheduleAllowsPlayback
   });
 }
 

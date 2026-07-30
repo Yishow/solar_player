@@ -2,7 +2,8 @@ import type {
   DisplayClientHeartbeat,
   DisplaySyncEvent,
   ManagementSocketSessionClass,
-  PlaybackSettingsUpdatedEvent
+  PlaybackSettingsUpdatedEvent,
+  ServerTimeSignal
 } from "@solar-display/shared";
 import {
   io,
@@ -17,6 +18,7 @@ import {
   replaceLiveMetricsSnapshot
 } from "../hooks/liveMetricsStore";
 import { isViteDevRuntime } from "./api";
+import { acceptServerTimeSignal } from "./appTime";
 import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
 export type LiveMetricReading = {
@@ -54,6 +56,7 @@ type ServerToClientEvents = {
   "liveMetrics:update": LiveMetricsSnapshot;
   "mqtt:status": MqttConnectionStatus;
   "playback:settingsUpdated": PlaybackSettingsUpdatedEvent;
+  "server:time": ServerTimeSignal;
   "system:error": unknown;
   "system:recovered": unknown;
 };
@@ -229,9 +232,14 @@ function createSocketClient(sessionClass: ManagementSocketSessionClass) {
     cachedMqttStatus = status;
   });
 
+  client.on("server:time", handleServerTimeSignal);
   attachHeartbeat(client);
 
   return client;
+}
+
+export function handleServerTimeSignal(payload: unknown) {
+  return acceptServerTimeSignal(payload);
 }
 
 function ensureSocketClient() {

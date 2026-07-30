@@ -63,6 +63,7 @@ function createLiveness(
     siteScope: device.group?.siteScope ?? "cl",
     sourceStatus: "same-source" as const,
     state: "online" as const,
+    timeSyncState: "synced" as const,
     viewport: { height: 1080, width: 1920 },
     ...overrides[device.id]
   }));

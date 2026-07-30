@@ -263,7 +263,7 @@ export function DeviceStatusContent({
                 <div key={client.deviceId} className={`mgmt-status ${client.badgeTone}`}>
                   <strong>{client.clientId}</strong> · {client.groupLabel} · {client.siteLabel} · {client.connectionLabel}
                   <small style={{ display: "block", opacity: 0.72 }}>
-                    {client.pageLabel} · {client.playbackLabel} · {client.lastSeenLabel} · {client.stateLabel} · {client.routeLabel}
+                    {client.pageLabel} · {client.playbackLabel} · {client.lastSeenLabel} · {client.stateLabel} · {client.timeSyncLabel} · {client.routeLabel}
                   </small>
                   {client.duplicateWarningLabel ? (
                     <span

@@ -12,6 +12,7 @@ import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readDeviceCredentialCookie } from "../plugins/deviceContext.js";
 import { DeviceLivenessRegistry } from "../services/deviceLivenessRegistry.js";
 import { resolveDisplayClientContext } from "../services/displayClientContextService.js";
+import { createServerTimeSignal } from "./serverTimeSignal.js";
 
 export type MqttStatus = {
   broker: string;
@@ -94,7 +95,12 @@ function isDisplayClientHeartbeat(payload: unknown): payload is DisplayClientHea
   if (typeof candidate.isPlaying !== "boolean") {
     return false;
   }
-  return true;
+  return (
+    candidate.timeSyncState === "waiting"
+    || candidate.timeSyncState === "synced"
+    || candidate.timeSyncState === "stale"
+    || candidate.timeSyncState === "time-untrusted"
+  );
 }
 
 function readHandshakeCookie(
@@ -126,6 +132,7 @@ export class SocketService {
     new WeakMap<SocketClientLike, DisplayClientContext>();
   private readonly displayClientRegistry: DeviceLivenessRegistry;
   private readonly resolveDisplayClientContext;
+  private readonly stopServerTimeSignalBroadcast: () => void;
   private liveMetricsSnapshot: LiveMetricsSnapshot;
   private mqttStatus: MqttStatus;
 
@@ -152,6 +159,14 @@ export class SocketService {
         pingInterval: 25000,
         pingTimeout: 20000
       });
+    const serverTimeSignal = createServerTimeSignal({
+      nowEpochMs: () => this.now().getTime()
+    });
+    this.stopServerTimeSignalBroadcast = serverTimeSignal.startBroadcast(
+      (payload) => {
+        this.io.emit("server:time", payload);
+      }
+    );
 
     const authenticateSocket = (
       socket: SocketClientLike,
@@ -286,6 +301,9 @@ export class SocketService {
       });
 
       this.logger.debug?.({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
+      serverTimeSignal.emitImmediately((payload) => {
+        socket.emit("server:time", payload);
+      });
       socket.emit("mqtt:status", this.mqttStatus);
       socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
     });
@@ -347,6 +365,7 @@ export class SocketService {
   }
 
   async close() {
+    this.stopServerTimeSignalBroadcast();
     await new Promise<void>((resolve, reject) => {
       const finalize = (error?: Error) => {
         if (error && error.message !== "Server is not running.") {

@@ -38,7 +38,7 @@ export type CumulativeCounter = {
 
 type BuildEnergyHistoryViewModelArgs = {
   counters: CumulativeCounter[];
-  now?: Date | string;
+  now?: Date | string | null;
   range: EnergyHistoryRange;
   snapshots: EnergyHistorySnapshot[];
   summaries: DailyEnergySummary[];

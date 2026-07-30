@@ -1311,11 +1311,18 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
 
   assert.deepEqual(
     playbackEvents.map(({ event }) => event),
-    ["mqtt:status", "liveMetrics:update", "mqtt:status", "liveMetrics:update"]
+    [
+      "server:time",
+      "mqtt:status",
+      "liveMetrics:update",
+      "mqtt:status",
+      "liveMetrics:update"
+    ]
   );
   assert.deepEqual(
     managementEvents.map(({ event }) => event),
     [
+      "server:time",
       "mqtt:status",
       "liveMetrics:update",
       "system:error",

@@ -387,6 +387,7 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
             siteScope: "cl",
             sourceStatus: "same-source",
             state: "online",
+            timeSyncState: "synced",
             viewport: {
               height: 1080,
               width: 1920
@@ -408,6 +409,7 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
             siteScope: "cl",
             sourceStatus: "same-source",
             state: "stale",
+            timeSyncState: "stale",
             viewport: {
               height: 1080,
               width: 1920
@@ -429,6 +431,7 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
             siteScope: "kn",
             sourceStatus: "source-unknown",
             state: "offline",
+            timeSyncState: "time-untrusted",
             viewport: {
               height: 1080,
               width: 1920
@@ -467,14 +470,20 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
   assert.equal(model.displayClientSummary.rows[0]?.playbackLabel, "播放中");
   assert.equal(model.displayClientSummary.rows[0]?.lastSeenLabel, "5 秒前");
   assert.equal(model.displayClientSummary.rows[0]?.badgeTone, "is-good");
+  assert.equal(model.displayClientSummary.rows[0]?.timeSyncLabel, "App Time synced");
   assert.equal(model.displayClientSummary.rows[1]?.pageLabel, "Route /offline");
   assert.equal(model.displayClientSummary.rows[1]?.playbackLabel, "閒置中");
   assert.equal(model.displayClientSummary.rows[1]?.lastSeenLabel, "45 秒前");
   assert.equal(model.displayClientSummary.rows[1]?.badgeTone, "is-warning");
+  assert.equal(model.displayClientSummary.rows[1]?.timeSyncLabel, "App Time stale");
   assert.equal(model.displayClientSummary.rows[2]?.pageLabel, "Solar");
   assert.equal(model.displayClientSummary.rows[2]?.playbackLabel, "已離線");
   assert.equal(model.displayClientSummary.rows[2]?.lastSeenLabel, "50 秒前");
   assert.equal(model.displayClientSummary.rows[2]?.badgeTone, "is-error");
+  assert.equal(
+    model.displayClientSummary.rows[2]?.timeSyncLabel,
+    "App Time time-untrusted"
+  );
 });
 
 test("buildDeviceStatusViewModel presents stable Device identity and duplicate diagnostics without raw source data", () => {
@@ -510,6 +519,7 @@ test("buildDeviceStatusViewModel presents stable Device identity and duplicate d
             siteScope: "kn",
             sourceStatus: "multi-source",
             state: "online",
+            timeSyncState: "synced",
             ...unsafeLivenessFields,
             viewport: {
               height: 1080,

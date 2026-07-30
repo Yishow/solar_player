@@ -39,6 +39,7 @@ test("does not sync runtime back to the same path during autoplay ticks", () => 
     resolveRouteRuntimeSync({
       currentPath: "/overview",
       lastSyncedPath: "/overview",
+      nowMs: 456,
       pages,
       runtime
     }),
@@ -58,6 +59,7 @@ test("syncs runtime to the new route when pathname actually changes", () => {
   const nextRuntime = resolveRouteRuntimeSync({
     currentPath: "/solar",
     lastSyncedPath: "/overview",
+    nowMs: 456,
     pages,
     runtime
   });
@@ -67,5 +69,5 @@ test("syncs runtime to the new route when pathname actually changes", () => {
   assert.equal(nextRuntime.currentIndex, 1);
   assert.equal(nextRuntime.isIdle, false);
   assert.equal(nextRuntime.isPlaying, true);
-  assert.ok(nextRuntime.lastInteractionAt >= runtime.lastInteractionAt);
+  assert.equal(nextRuntime.lastInteractionAt, 456);
 });

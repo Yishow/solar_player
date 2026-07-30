@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  handleServerTimeSignal,
   buildSocketConnectionOptions,
   emitClientHeartbeatViaClient,
   resolveSocketOriginFromLocation,
   resolveSocketOrigin,
   resolveSocketSessionClass
 } from "./socket";
+import {
+  SERVER_TIME_BROADCAST_INTERVAL_MS,
+  SERVER_TIME_ZONE
+} from "@solar-display/shared";
 import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
 test("resolveSocketOrigin maps loopback Vite dev ports back to the backend port", () => {
@@ -96,7 +101,8 @@ test("emitClientHeartbeatViaClient emits only when the socket client is connecte
   const payload = {
     isPlaying: true,
     pageKey: "overview",
-    route: "/overview"
+    route: "/overview",
+    timeSyncState: "synced" as const
   };
 
   assert.equal(
@@ -134,4 +140,27 @@ test("emitClientHeartbeatViaClient emits only when the socket client is connecte
   assert.equal(emitCount, 1);
   assert.equal(emittedEvent, "client:heartbeat");
   assert.deepEqual(emittedPayload, payload);
+});
+
+test("handleServerTimeSignal accepts only the shared Server Time contract", () => {
+  assert.equal(
+    handleServerTimeSignal({
+      broadcastIntervalMs: SERVER_TIME_BROADCAST_INTERVAL_MS,
+      epochMs: 1_785_364_800_000,
+      instanceId: "server-process-a",
+      sequence: 1,
+      timeZone: SERVER_TIME_ZONE
+    }),
+    true
+  );
+  assert.equal(
+    handleServerTimeSignal({
+      broadcastIntervalMs: SERVER_TIME_BROADCAST_INTERVAL_MS,
+      epochMs: 1_785_364_800_000,
+      instanceId: "server-process-a",
+      sequence: 2,
+      timeZone: "UTC"
+    }),
+    false
+  );
 });

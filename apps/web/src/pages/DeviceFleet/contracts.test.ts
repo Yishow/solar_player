@@ -223,6 +223,7 @@ test("Device Fleet contract keeps disabled, unpaired, offline, stale, and duplic
         siteScope: "cl",
         sourceStatus: "source-unknown",
         state: "offline",
+        timeSyncState: "waiting",
         viewport: { height: 0, width: 0 }
       },
       {
@@ -241,6 +242,7 @@ test("Device Fleet contract keeps disabled, unpaired, offline, stale, and duplic
         siteScope: "cl",
         sourceStatus: "multi-source",
         state: "stale",
+        timeSyncState: "stale",
         viewport: { height: 1080, width: 1920 }
       }
     ],

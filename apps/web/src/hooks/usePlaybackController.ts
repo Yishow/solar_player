@@ -2,6 +2,8 @@ import {
   createSafePlaybackBoundaryPlan,
   createPlaybackRuntime,
   resolveSafePlaybackBoundaryRuntime,
+  SERVER_TIME_ZONE,
+  type AppTimeSnapshot,
   type DisplayClientContext,
   type DisplayPageTemplateKey,
   type DisplayPlaybackRuntimeResponse,
@@ -11,7 +13,7 @@ import {
   getPlaybackDurationMs,
   getPlaybackPage,
   isDisplayPageTemplateKey,
-  isPlaybackAllowedBySchedule,
+  isPlaybackAllowedByScheduleAtEpoch,
   isPlaybackAtEdge,
   resolveDisplayPageTemplateKeyFromPageId,
   shouldEnterIdleMode,
@@ -22,6 +24,7 @@ import {
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { ApiRequestError, getPlaybackRuntime } from "../services/api";
+import { getAppTimeSnapshot } from "../services/appTime";
 import { prefetchDisplayPageTemplate } from "../pages/shared/displayPageTemplateLoaders";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
@@ -65,6 +68,8 @@ type UsePlaybackControllerOptions = {
   settings?: PlaybackSettings | null;
   tickMs?: number;
   tickMode?: PlaybackRuntimeTickMode;
+  monotonicNow?: () => number;
+  readAppTimeSnapshot?: () => AppTimeSnapshot;
 };
 
 export type PlaybackRuntimeTickMode = "countdown" | "boundary";
@@ -108,6 +113,125 @@ type FormalPlaybackAccessState = {
   settings: PlaybackSettings | null;
 };
 
+type PlaybackScheduleGate = {
+  activeAllowed: boolean;
+  pendingAllowed: boolean | null;
+};
+
+export function isAbsoluteTimeFrozen(snapshot: AppTimeSnapshot) {
+  return snapshot.state === "waiting" || snapshot.state === "time-untrusted";
+}
+
+export function resolvePlaybackScheduleGate({
+  atSafeBoundary,
+  current,
+  settings,
+  snapshot
+}: {
+  atSafeBoundary: boolean;
+  current: PlaybackScheduleGate;
+  settings: PlaybackSettings;
+  snapshot: AppTimeSnapshot;
+}): PlaybackScheduleGate {
+  if (isAbsoluteTimeFrozen(snapshot) || snapshot.nowEpochMs === null) {
+    return current;
+  }
+
+  const candidate = isPlaybackAllowedByScheduleAtEpoch(
+    settings,
+    snapshot.nowEpochMs,
+    SERVER_TIME_ZONE
+  );
+  if (candidate === current.activeAllowed) {
+    return {
+      activeAllowed: current.activeAllowed,
+      pendingAllowed: null
+    };
+  }
+
+  if (candidate || atSafeBoundary) {
+    return {
+      activeAllowed: candidate,
+      pendingAllowed: null
+    };
+  }
+
+  return {
+    activeAllowed: current.activeAllowed,
+    pendingAllowed: candidate
+  };
+}
+
+export function createInitialPlaybackScheduleGate(
+  settings: PlaybackSettings,
+  snapshot: AppTimeSnapshot
+): PlaybackScheduleGate {
+  if (isAbsoluteTimeFrozen(snapshot) || snapshot.nowEpochMs === null) {
+    return {
+      activeAllowed: true,
+      pendingAllowed: null
+    };
+  }
+
+  return {
+    activeAllowed: isPlaybackAllowedByScheduleAtEpoch(
+      settings,
+      snapshot.nowEpochMs,
+      SERVER_TIME_ZONE
+    ),
+    pendingAllowed: null
+  };
+}
+
+export function resolvePendingRuntimeAtTrustedBoundary<T>(
+  snapshot: AppTimeSnapshot,
+  resolveBoundary: () => T
+): T | null {
+  return isAbsoluteTimeFrozen(snapshot) ? null : resolveBoundary();
+}
+
+export function shouldMarkSchedulePaused(
+  current: PlaybackRuntime,
+  next: PlaybackRuntime,
+  scheduleAllowed: boolean
+) {
+  return !scheduleAllowed && current.isPlaying && !next.isPlaying;
+}
+
+export function preparePendingScheduleBoundaryCurrent(
+  current: PlaybackRuntime,
+  input: {
+    autoplay: boolean;
+    scheduleAllowed: boolean;
+    schedulePaused: boolean;
+  }
+) {
+  return input.autoplay && input.scheduleAllowed && input.schedulePaused
+    ? {
+        ...current,
+        isPlaying: true
+      }
+    : current;
+}
+
+export function resolvePendingSchedulePausedMarker(
+  current: PlaybackRuntime,
+  next: PlaybackRuntime,
+  input: {
+    scheduleAllowed: boolean;
+    schedulePaused: boolean;
+  }
+) {
+  if (input.scheduleAllowed) {
+    return false;
+  }
+
+  return (
+    input.schedulePaused
+    || shouldMarkSchedulePaused(current, next, input.scheduleAllowed)
+  );
+}
+
 export function isDisplayContextAccessError(error: unknown) {
   return (
     error instanceof ApiRequestError &&
@@ -143,6 +267,8 @@ export function resolvePlaybackRuntimeTick({
   elapsedMs,
   nowMs,
   pages,
+  resumeAutoplay = false,
+  scheduleAllowed,
   settings,
   tickMode,
   tickMs
@@ -151,6 +277,8 @@ export function resolvePlaybackRuntimeTick({
   elapsedMs: number;
   nowMs: number;
   pages: PlaybackPage[];
+  resumeAutoplay?: boolean;
+  scheduleAllowed?: boolean;
   settings: PlaybackSettings;
   tickMode: PlaybackRuntimeTickMode;
   tickMs: number;
@@ -161,25 +289,25 @@ export function resolvePlaybackRuntimeTick({
       isIdle: true,
       isPlaying: false,
       lastInteractionAt: nowMs,
-      nowMs
+      nowMs,
+      scheduleAllowed
     });
   }
 
-  if (!isPlaybackAllowedBySchedule(settings, new Date(nowMs))) {
-    return current.isPlaying
+  if (!current.isPlaying) {
+    return resumeAutoplay && settings.autoplay
       ? {
           ...current,
-          isPlaying: false
+          isPlaying: true
         }
       : current;
   }
 
-  if (!current.isPlaying) {
-    return current;
-  }
-
   const elapsedCountdownMs = tickMode === "boundary" ? elapsedMs : tickMs;
   const nextCountdownMs = current.countdownMs - elapsedCountdownMs;
+  if (scheduleAllowed === false && nextCountdownMs > 0) {
+    return current;
+  }
   if (nextCountdownMs > 0) {
     return tickMode === "boundary"
       ? current
@@ -197,7 +325,10 @@ export function resolvePlaybackRuntimeTick({
     ...current,
     countdownMs: getPlaybackDurationMs(nextPage),
     currentIndex: nextIndex,
-    isPlaying: atEdge && !settings.loop ? false : current.isPlaying
+    isPlaying:
+      scheduleAllowed === false || (atEdge && !settings.loop)
+        ? false
+        : current.isPlaying
   };
 }
 
@@ -223,7 +354,18 @@ export function usePlaybackController(
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
   const lastSyncedPathRef = useRef<string | undefined>(undefined);
   const runtimeTickSignatureRef = useRef<string | null>(null);
-  const runtimeTickStartedAtRef = useRef(Date.now());
+  const monotonicNowRef = useRef(
+    options.monotonicNow ?? (() => performance.now())
+  );
+  const readAppTimeSnapshotRef = useRef(
+    options.readAppTimeSnapshot ?? getAppTimeSnapshot
+  );
+  const runtimeTickStartedAtRef = useRef(monotonicNowRef.current());
+  const playbackScheduleGateRef = useRef<PlaybackScheduleGate>({
+    activeAllowed: true,
+    pendingAllowed: null
+  });
+  const schedulePausedPlaybackRef = useRef(false);
   const appliedRuntimeIdentityRef = useRef<string | null>(null);
   const pendingRuntimeUpdateRef = useRef<PendingRuntimeUpdate | null>(null);
   const latestLoadRequestRef = useRef(0);
@@ -260,7 +402,7 @@ export function usePlaybackController(
 
     if (runtimeTickSignatureRef.current !== nextSignature) {
       runtimeTickSignatureRef.current = nextSignature;
-      runtimeTickStartedAtRef.current = Date.now();
+      runtimeTickStartedAtRef.current = monotonicNowRef.current();
     }
   }, [runtime]);
 
@@ -300,7 +442,7 @@ export function usePlaybackController(
           ])
         : [runtimeResponse!.settings, runtimeResponse!.preview];
       const runtimePages = rotationPreview.playablePages;
-      const nowMs = Date.now();
+      const nowMs = monotonicNowRef.current();
       const currentRuntime =
         tickMode === "boundary" && runtimeRef.current?.isPlaying
           ? {
@@ -312,6 +454,13 @@ export function usePlaybackController(
               )
             }
           : runtimeRef.current;
+      if (!currentRuntime) {
+        playbackScheduleGateRef.current =
+          createInitialPlaybackScheduleGate(
+            nextSettings,
+            readAppTimeSnapshotRef.current()
+          );
+      }
       const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
         currentPath: options.currentPath,
         currentRuntime,
@@ -319,6 +468,7 @@ export function usePlaybackController(
         nowMs,
         previousPages: pagesRef.current,
         resumeAutoplay: reloadOptions?.resumeAutoplay,
+        scheduleAllowed: playbackScheduleGateRef.current.activeAllowed,
         settings: nextSettings
       });
 
@@ -357,6 +507,9 @@ export function usePlaybackController(
       settingsRef.current = nextSettings;
       pagesRef.current = runtimePages;
       runtimeRef.current = nextRuntime;
+      schedulePausedPlaybackRef.current =
+        !playbackScheduleGateRef.current.activeAllowed
+        && nextSettings.autoplay;
       startTransition(() => {
         setSettings(nextSettings);
         setPages(runtimePages);
@@ -441,6 +594,7 @@ export function usePlaybackController(
     const nextRuntime = resolveRouteRuntimeSync({
       currentPath: options.currentPath,
       lastSyncedPath: lastSyncedPathRef.current,
+      nowMs: monotonicNowRef.current(),
       pages,
       runtime: runtimeRef.current
     });
@@ -463,22 +617,58 @@ export function usePlaybackController(
         return;
       }
 
-      const nowMs = Date.now();
+      const nowMs = monotonicNowRef.current();
+      const snapshot = readAppTimeSnapshotRef.current();
+      const elapsedMs = nowMs - runtimeTickStartedAtRef.current;
+      const previousScheduleGate = playbackScheduleGateRef.current;
+      playbackScheduleGateRef.current = resolvePlaybackScheduleGate({
+        atSafeBoundary:
+          tickMode === "boundary"
+            ? elapsedMs >= currentRuntime.countdownMs
+            : currentRuntime.countdownMs <= tickMs,
+        current: previousScheduleGate,
+        settings: nextSettings,
+        snapshot
+      });
       const pendingUpdate = pendingRuntimeUpdateRef.current;
       if (pendingUpdate) {
-        const boundaryRuntime = resolveSafePlaybackBoundaryRuntime({
-          current: currentRuntime,
-          nextPages: pendingUpdate.response.preview.playablePages,
-          nowMs,
-          plan: pendingUpdate.plan,
-          settings: pendingUpdate.response.settings
-        });
+        const pendingScheduleGate = createInitialPlaybackScheduleGate(
+          pendingUpdate.response.settings,
+          snapshot
+        );
+        const pendingBoundaryCurrent =
+          preparePendingScheduleBoundaryCurrent(currentRuntime, {
+            autoplay: pendingUpdate.response.settings.autoplay,
+            scheduleAllowed: pendingScheduleGate.activeAllowed,
+            schedulePaused: schedulePausedPlaybackRef.current
+          });
+        const boundaryRuntime = resolvePendingRuntimeAtTrustedBoundary(
+          snapshot,
+          () => resolveSafePlaybackBoundaryRuntime({
+            current: pendingBoundaryCurrent,
+            nextPages: pendingUpdate.response.preview.playablePages,
+            nowMs,
+            plan: pendingUpdate.plan,
+            scheduleAllowed: pendingScheduleGate.activeAllowed,
+            settings: pendingUpdate.response.settings
+          })
+        );
 
         if (boundaryRuntime) {
           const nextPages = pendingUpdate.response.preview.playablePages;
           const nextSettings = pendingUpdate.response.settings;
           pendingRuntimeUpdateRef.current = null;
           appliedRuntimeIdentityRef.current = pendingUpdate.identity;
+          playbackScheduleGateRef.current = pendingScheduleGate;
+          schedulePausedPlaybackRef.current =
+            resolvePendingSchedulePausedMarker(
+            currentRuntime,
+            boundaryRuntime,
+            {
+              scheduleAllowed: pendingScheduleGate.activeAllowed,
+              schedulePaused: schedulePausedPlaybackRef.current
+            }
+          );
           settingsRef.current = nextSettings;
           pagesRef.current = nextPages;
           runtimeRef.current = boundaryRuntime;
@@ -497,15 +687,44 @@ export function usePlaybackController(
         }
       }
 
+      const shouldResumeSchedulePausedPlayback =
+        schedulePausedPlaybackRef.current
+        && (
+          isAbsoluteTimeFrozen(snapshot)
+          || (
+            !previousScheduleGate.activeAllowed
+            && playbackScheduleGateRef.current.activeAllowed
+          )
+        );
+      const effectiveScheduleAllowed = isAbsoluteTimeFrozen(snapshot)
+        ? true
+        : playbackScheduleGateRef.current.activeAllowed;
       const nextRuntime = resolvePlaybackRuntimeTick({
         current: currentRuntime,
-        elapsedMs: nowMs - runtimeTickStartedAtRef.current,
+        elapsedMs,
         nowMs,
         pages: pagesRef.current,
+        resumeAutoplay: shouldResumeSchedulePausedPlayback,
+        scheduleAllowed: effectiveScheduleAllowed,
         settings: nextSettings,
         tickMode,
         tickMs
       });
+
+      if (
+        shouldMarkSchedulePaused(
+          currentRuntime,
+          nextRuntime,
+          effectiveScheduleAllowed
+        )
+      ) {
+        schedulePausedPlaybackRef.current = true;
+      } else if (
+        shouldResumeSchedulePausedPlayback
+        && nextRuntime.isPlaying
+      ) {
+        schedulePausedPlaybackRef.current = false;
+      }
 
       if (nextRuntime !== currentRuntime) {
         setRuntime(nextRuntime);
@@ -522,7 +741,7 @@ export function usePlaybackController(
       return;
     }
 
-    if (!isPlaybackAllowedBySchedule(settings, new Date())) {
+    if (!playbackScheduleGateRef.current.activeAllowed) {
       return;
     }
 
@@ -547,7 +766,7 @@ export function usePlaybackController(
         return;
       }
 
-      const nowMs = Date.now();
+      const nowMs = monotonicNowRef.current();
 
       setRuntime((current) => {
         if (!current) {
@@ -566,7 +785,8 @@ export function usePlaybackController(
           isIdle: false,
           isPlaying: nextSettings.autoplay,
           lastInteractionAt: nowMs,
-          nowMs
+          nowMs,
+          scheduleAllowed: playbackScheduleGateRef.current.activeAllowed
         });
       });
     };
@@ -605,7 +825,7 @@ export function usePlaybackController(
         currentIndex: nextIndex,
         isIdle: false,
         isPlaying: atEdge && !nextSettings.loop ? false : current.isPlaying,
-        lastInteractionAt: Date.now()
+        lastInteractionAt: monotonicNowRef.current()
       };
     });
   };
@@ -630,7 +850,7 @@ export function usePlaybackController(
         countdownMs: getPlaybackDurationMs(nextPlaybackPage),
         currentIndex: nextIndex,
         isIdle: false,
-        lastInteractionAt: Date.now()
+        lastInteractionAt: monotonicNowRef.current()
       };
     });
   };
@@ -647,9 +867,9 @@ export function usePlaybackController(
         return current;
       }
 
-      const nowMs = Date.now();
+      const nowMs = monotonicNowRef.current();
       const canPlay =
-        isPlaybackAllowedBySchedule(nextSettings, new Date(nowMs)) && playablePages.length > 0;
+        playbackScheduleGateRef.current.activeAllowed && playablePages.length > 0;
 
       if (current.isIdle) {
         return createPlaybackRuntime(nextSettings, pagesRef.current, {
@@ -657,7 +877,8 @@ export function usePlaybackController(
           isIdle: false,
           isPlaying: canPlay,
           lastInteractionAt: nowMs,
-          nowMs
+          nowMs,
+          scheduleAllowed: playbackScheduleGateRef.current.activeAllowed
         });
       }
 

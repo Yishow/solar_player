@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import type { HeaderWeatherMeta } from "@solar-display/shared";
 import type { ShellDecorationObject } from "@solar-display/shared";
 import { Link } from "react-router-dom";
+import {
+  buildAppTimeHeaderView,
+  useAppTime
+} from "../hooks/useAppTime";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
 import { SHELL_CHROME_CONTENT_Z_INDEX, ShellDecorationLayer } from "./ShellDecorationLayer";
 import { StatusBadge } from "./StatusBadge";
@@ -26,25 +30,6 @@ const DEFAULT_WEATHER_META: HeaderWeatherMeta = {
   state: "loading"
 };
 
-function pad(value: number) {
-  return value.toString().padStart(2, "0");
-}
-
-function formatTime(now: Date) {
-  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
-function formatDate(now: Date) {
-  return `${now.getFullYear()} / ${pad(now.getMonth() + 1)} / ${pad(now.getDate())}`;
-}
-
-const WEEKDAY_ZH = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-const WEEKDAY_EN = ["Sun.", "Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat."];
-
-function defaultWeekday(now: Date) {
-  return `${WEEKDAY_ZH[now.getDay()]}  ${WEEKDAY_EN[now.getDay()]}`;
-}
-
 type AppHeaderProps = {
   brandView?: BrandView;
   decorationObjects?: ShellDecorationObject[];
@@ -52,21 +37,16 @@ type AppHeaderProps = {
 };
 
 function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const timeLabel = meta?.time ?? formatTime(now);
-  const dateLabel = meta?.date ?? formatDate(now);
-  const weekdayLabel = meta?.weekday ?? defaultWeekday(now);
+  const appTime = buildAppTimeHeaderView(useAppTime());
+  const timeLabel = meta?.time ?? appTime.time;
+  const dateLabel = meta?.date ?? appTime.date;
+  const weekdayLabel = meta?.weekday ?? appTime.weekday;
+  const stateTone =
+    appTime.state === "synced"
+      ? "text-[var(--color-status-success-500)]"
+      : appTime.state === "time-untrusted"
+        ? "text-[var(--color-status-error-500)]"
+        : "text-[var(--color-status-warning-500)]";
 
   return (
     <div className="flex items-center gap-x-[40px]">
@@ -85,7 +65,16 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
         style={{ color: "var(--shell-kicker-muted)" }}
       >
         <div>{dateLabel}</div>
-        <div>{weekdayLabel}</div>
+        <div>
+          {weekdayLabel}
+          <span
+            aria-label={`App Time ${appTime.stateLabel}`}
+            className={`ml-[8px] text-[12px] ${stateTone}`}
+            data-time-state={appTime.state}
+          >
+            · {appTime.stateLabel}
+          </span>
+        </div>
       </div>
     </div>
   );

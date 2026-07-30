@@ -27,6 +27,7 @@ function buildEntry(overrides: Partial<DisplayClientLivenessEntry>): DisplayClie
     route: "/overview",
     siteScope: "cl",
     sourceStatus: "same-source",
+    timeSyncState: "waiting",
     viewport: {
       height: 1080,
       width: 1920
@@ -39,15 +40,33 @@ test("display liveness keeps the 10 second heartbeat interval and a server-owned
   const heartbeat: DisplayClientHeartbeat = {
     isPlaying: true,
     pageKey: "overview",
-    route: "/overview"
+    route: "/overview",
+    timeSyncState: "synced"
   };
 
   assert.equal(DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS, 10_000);
   assert.deepEqual(heartbeat, {
     isPlaying: true,
     pageKey: "overview",
-    route: "/overview"
+    route: "/overview",
+    timeSyncState: "synced"
   });
+});
+
+test("display liveness exposes exactly one valid Time Sync State per Device", () => {
+  const states = [
+    "waiting",
+    "synced",
+    "stale",
+    "time-untrusted"
+  ] as const;
+
+  for (const timeSyncState of states) {
+    const client = buildDisplayClientLivenessSnapshot([
+      buildEntry({ timeSyncState })
+    ], now).clients[0];
+    assert.equal(client?.timeSyncState, timeSyncState);
+  }
 });
 
 test("classifyDisplayClientLiveness returns online when last-seen age is within the window", () => {
@@ -178,6 +197,7 @@ test("buildDisplayClientLivenessSnapshot exposes Device context without credenti
     siteScope: "kn",
     sourceStatus: "multi-source",
     state: "online",
+    timeSyncState: "waiting",
     viewport: {
       height: 1080,
       width: 1920

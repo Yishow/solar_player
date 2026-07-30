@@ -2,15 +2,26 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import type { PlaybackPage, PlaybackRuntime, PlaybackSettings } from "@solar-display/shared";
+import {
+  resolveSafePlaybackBoundaryRuntime,
+  type PlaybackPage,
+  type PlaybackRuntime,
+  type PlaybackSettings
+} from "@solar-display/shared";
 import { ApiRequestError } from "../services/api";
 import {
   failClosedFormalPlaybackAccess,
+  createInitialPlaybackScheduleGate,
   isDisplayContextAccessError,
   isLatestPlaybackLoadRequest,
+  preparePendingScheduleBoundaryCurrent,
   resolveNextEffectivePlaybackTemplateKey,
+  resolvePendingRuntimeAtTrustedBoundary,
+  resolvePendingSchedulePausedMarker,
+  resolvePlaybackScheduleGate,
   resolvePlaybackPageTemplateKey,
-  resolvePlaybackRuntimeTick
+  resolvePlaybackRuntimeTick,
+  shouldMarkSchedulePaused
 } from "./usePlaybackController";
 
 const hookDir = path.resolve(import.meta.dirname);
@@ -134,7 +145,7 @@ test("usePlaybackController prefetches the next effective playback template afte
 test("usePlaybackController does not prefetch the next template when the playback schedule blocks it", () => {
   assert.match(
     controllerSource,
-    /isPlaybackAllowedBySchedule\(settings, new Date\(\)\)[\s\S]*?prefetchDisplayPageTemplate\(nextTemplateKey\)/
+    /playbackScheduleGateRef\.current\.activeAllowed[\s\S]*?prefetchDisplayPageTemplate\(nextTemplateKey\)/
   );
 });
 
@@ -216,6 +227,385 @@ test("boundary playback ticks advance only when the page boundary is reached", (
   assert.equal(nextRuntime.currentIndex, 1);
   assert.equal(nextRuntime.countdownMs, 20_000);
   assert.equal(nextRuntime.isPlaying, true);
+});
+
+test("waiting and time-untrusted freeze the last schedule result", () => {
+  const waiting = resolvePlaybackScheduleGate({
+    atSafeBoundary: false,
+    current: {
+      activeAllowed: true,
+      pendingAllowed: null
+    },
+    settings: {
+      ...playbackSettings,
+      scheduleEnabled: true,
+      scheduleStart: "09:00",
+      scheduleEnd: "17:00"
+    },
+    snapshot: {
+      lastSignalMonotonicMs: null,
+      nowEpochMs: null,
+      state: "waiting"
+    }
+  });
+  const untrusted = resolvePlaybackScheduleGate({
+    atSafeBoundary: true,
+    current: waiting,
+    settings: playbackSettings,
+    snapshot: {
+      lastSignalMonotonicMs: 0,
+      nowEpochMs: 1_800_000,
+      state: "time-untrusted"
+    }
+  });
+
+  assert.deepEqual(waiting, {
+    activeAllowed: true,
+    pendingAllowed: null
+  });
+  assert.deepEqual(untrusted, waiting);
+});
+
+test("trusted App Time defers a blocking schedule change until the page boundary", () => {
+  const settings = {
+    ...playbackSettings,
+    repeatDays: [4],
+    scheduleEnabled: true,
+    scheduleStart: "09:00",
+    scheduleEnd: "17:00"
+  };
+  const outsideSchedule = {
+    lastSignalMonotonicMs: 0,
+    nowEpochMs: Date.parse("2026-07-30T18:00:00+08:00"),
+    state: "synced" as const
+  };
+
+  const beforeBoundary = resolvePlaybackScheduleGate({
+    atSafeBoundary: false,
+    current: {
+      activeAllowed: true,
+      pendingAllowed: null
+    },
+    settings,
+    snapshot: outsideSchedule
+  });
+  const atBoundary = resolvePlaybackScheduleGate({
+    atSafeBoundary: true,
+    current: beforeBoundary,
+    settings,
+    snapshot: outsideSchedule
+  });
+
+  assert.deepEqual(beforeBoundary, {
+    activeAllowed: true,
+    pendingAllowed: false
+  });
+  assert.deepEqual(atBoundary, {
+    activeAllowed: false,
+    pendingAllowed: null
+  });
+});
+
+test("relative rotation uses monotonic elapsed time while App Time is waiting", () => {
+  const gate = resolvePlaybackScheduleGate({
+    atSafeBoundary: true,
+    current: {
+      activeAllowed: true,
+      pendingAllowed: null
+    },
+    settings: playbackSettings,
+    snapshot: {
+      lastSignalMonotonicMs: null,
+      nowEpochMs: null,
+      state: "waiting"
+    }
+  });
+  const nextRuntime = resolvePlaybackRuntimeTick({
+    current: runtime,
+    elapsedMs: 15_000,
+    pages: playbackPages,
+    scheduleAllowed: gate.activeAllowed,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250,
+    nowMs: 123_456
+  });
+
+  assert.equal(nextRuntime.currentIndex, 1);
+  assert.equal(nextRuntime.countdownMs, 20_000);
+});
+
+test("initial trusted App Time blocks autoplay before the first runtime is created", () => {
+  const gate = createInitialPlaybackScheduleGate(
+    {
+      ...playbackSettings,
+      repeatDays: [4],
+      scheduleEnabled: true,
+      scheduleStart: "09:00",
+      scheduleEnd: "17:00"
+    },
+    {
+      lastSignalMonotonicMs: 0,
+      nowEpochMs: Date.parse("2026-07-30T18:00:00+08:00"),
+      state: "synced"
+    }
+  );
+
+  assert.deepEqual(gate, {
+    activeAllowed: false,
+    pendingAllowed: null
+  });
+});
+
+test("a blocking schedule transition leaves the page at the boundary and can resume autoplay", () => {
+  const stopped = resolvePlaybackRuntimeTick({
+    current: runtime,
+    elapsedMs: 15_000,
+    nowMs: 16_000,
+    pages: playbackPages,
+    scheduleAllowed: false,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+  const resumed = resolvePlaybackRuntimeTick({
+    current: stopped,
+    elapsedMs: 0,
+    nowMs: 16_001,
+    pages: playbackPages,
+    resumeAutoplay: true,
+    scheduleAllowed: true,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+
+  assert.equal(stopped.currentIndex, 1);
+  assert.equal(stopped.isPlaying, false);
+  assert.equal(resumed.currentIndex, 1);
+  assert.equal(resumed.isPlaying, true);
+});
+
+test("time-untrusted resumes schedule-paused relative rotation without applying absolute updates", () => {
+  const snapshot = {
+    lastSignalMonotonicMs: 0,
+    nowEpochMs: 1_800_000,
+    state: "time-untrusted" as const
+  };
+  let boundaryCalls = 0;
+  const pendingResult = resolvePendingRuntimeAtTrustedBoundary(
+    snapshot,
+    () => {
+      boundaryCalls += 1;
+      return "applied";
+    }
+  );
+  const resumed = resolvePlaybackRuntimeTick({
+    current: {
+      ...runtime,
+      isPlaying: false
+    },
+    elapsedMs: 0,
+    nowMs: 1_800_000,
+    pages: playbackPages,
+    resumeAutoplay: true,
+    scheduleAllowed: true,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+
+  assert.equal(pendingResult, null);
+  assert.equal(boundaryCalls, 0);
+  assert.equal(resumed.isPlaying, true);
+});
+
+test("pending absolute runtime updates recover only after App Time is trusted", () => {
+  let boundaryCalls = 0;
+  const result = resolvePendingRuntimeAtTrustedBoundary(
+    {
+      lastSignalMonotonicMs: 0,
+      nowEpochMs: 90_000,
+      state: "stale"
+    },
+    () => {
+      boundaryCalls += 1;
+      return "applied";
+    }
+  );
+
+  assert.equal(result, "applied");
+  assert.equal(boundaryCalls, 1);
+});
+
+test("pending runtime uses its own schedule eligibility at the safe boundary", () => {
+  const snapshot = {
+    lastSignalMonotonicMs: 0,
+    nowEpochMs: Date.parse("2026-07-30T18:00:00+08:00"),
+    state: "synced" as const
+  };
+  const pendingSettings = {
+    ...playbackSettings,
+    repeatDays: [4],
+    scheduleEnabled: true,
+    scheduleStart: "09:00",
+    scheduleEnd: "17:00"
+  };
+  const pendingGate = createInitialPlaybackScheduleGate(
+    pendingSettings,
+    snapshot
+  );
+  const boundaryRuntime = resolveSafePlaybackBoundaryRuntime({
+    current: runtime,
+    nextPages: playbackPages,
+    nowMs: 15_000,
+    plan: {
+      applyAtMs: 15_000,
+      applyByMs: 15_000,
+      currentPageId: 1,
+      currentPageRemainsValid: true,
+      receivedAtMs: 0
+    },
+    scheduleAllowed: pendingGate.activeAllowed,
+    settings: pendingSettings
+  });
+
+  assert.equal(pendingGate.activeAllowed, false);
+  assert.equal(boundaryRuntime?.currentIndex, 1);
+  assert.equal(boundaryRuntime?.isPlaying, false);
+});
+
+test("schedule pause marker survives blocked to untrusted to blocked to allowed", () => {
+  const firstBlocked = resolvePlaybackRuntimeTick({
+    current: runtime,
+    elapsedMs: 15_000,
+    nowMs: 15_000,
+    pages: playbackPages,
+    scheduleAllowed: false,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+  let schedulePaused = shouldMarkSchedulePaused(
+    runtime,
+    firstBlocked,
+    false
+  );
+  const untrustedResumed = resolvePlaybackRuntimeTick({
+    current: firstBlocked,
+    elapsedMs: 0,
+    nowMs: 15_001,
+    pages: playbackPages,
+    resumeAutoplay: schedulePaused,
+    scheduleAllowed: true,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+  schedulePaused = false;
+  const trustedStillBlocked = resolvePlaybackRuntimeTick({
+    current: untrustedResumed,
+    elapsedMs: 20_000,
+    nowMs: 35_001,
+    pages: playbackPages,
+    scheduleAllowed: false,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+  schedulePaused = shouldMarkSchedulePaused(
+    untrustedResumed,
+    trustedStillBlocked,
+    false
+  );
+  const allowedAgain = resolvePlaybackRuntimeTick({
+    current: trustedStillBlocked,
+    elapsedMs: 0,
+    nowMs: 35_002,
+    pages: playbackPages,
+    resumeAutoplay: schedulePaused,
+    scheduleAllowed: true,
+    settings: playbackSettings,
+    tickMode: "boundary",
+    tickMs: 250
+  });
+
+  assert.equal(firstBlocked.isPlaying, false);
+  assert.equal(untrustedResumed.isPlaying, true);
+  assert.equal(trustedStillBlocked.isPlaying, false);
+  assert.equal(schedulePaused, true);
+  assert.equal(allowedAgain.isPlaying, true);
+});
+
+test("pending allowed settings resume a schedule-paused runtime and clear its marker", () => {
+  const schedulePausedRuntime = {
+    ...runtime,
+    isPlaying: false
+  };
+  const pendingCurrent = preparePendingScheduleBoundaryCurrent(
+    schedulePausedRuntime,
+    {
+      autoplay: true,
+      scheduleAllowed: true,
+      schedulePaused: true
+    }
+  );
+  const boundaryRuntime = resolveSafePlaybackBoundaryRuntime({
+    current: pendingCurrent,
+    nextPages: playbackPages,
+    nowMs: 15_000,
+    plan: {
+      applyAtMs: 15_000,
+      applyByMs: 15_000,
+      currentPageId: 1,
+      currentPageRemainsValid: true,
+      receivedAtMs: 0
+    },
+    scheduleAllowed: true,
+    settings: playbackSettings
+  });
+  assert.ok(boundaryRuntime);
+
+  assert.equal(boundaryRuntime.isPlaying, true);
+  assert.equal(
+    resolvePendingSchedulePausedMarker(
+      schedulePausedRuntime,
+      boundaryRuntime,
+      {
+        scheduleAllowed: true,
+        schedulePaused: true
+      }
+    ),
+    false
+  );
+});
+
+test("pending blocked settings retain schedule-paused provenance", () => {
+  const schedulePausedRuntime = {
+    ...runtime,
+    isPlaying: false
+  };
+  const pendingCurrent = preparePendingScheduleBoundaryCurrent(
+    schedulePausedRuntime,
+    {
+      autoplay: true,
+      scheduleAllowed: false,
+      schedulePaused: true
+    }
+  );
+
+  assert.equal(pendingCurrent, schedulePausedRuntime);
+  assert.equal(
+    resolvePendingSchedulePausedMarker(
+      schedulePausedRuntime,
+      schedulePausedRuntime,
+      {
+        scheduleAllowed: false,
+        schedulePaused: true
+      }
+    ),
+    true
+  );
 });
 
 const rotationPages: PlaybackPage[] = [
