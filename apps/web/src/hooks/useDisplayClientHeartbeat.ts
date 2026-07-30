@@ -8,7 +8,6 @@ import {
   emitClientHeartbeat,
   getSocketClient,
   getSocketConnectionState,
-  resolveSocketSessionClass,
   subscribeConnectionState,
   type SocketConnectionState
 } from "../services/socket";
@@ -23,20 +22,6 @@ export type DisplayClientHeartbeatLoopOptions = {
   scheduleInterval?: (callback: () => void, intervalMs: number) => unknown;
 };
 
-function resolveHeartbeatViewport() {
-  if (typeof window === "undefined") {
-    return {
-      height: 0,
-      width: 0
-    };
-  }
-
-  return {
-    height: window.innerHeight,
-    width: window.innerWidth
-  };
-}
-
 export function buildDisplayClientHeartbeatPayload(args: {
   isIdle: boolean;
   isPlaying: boolean;
@@ -44,13 +29,9 @@ export function buildDisplayClientHeartbeatPayload(args: {
   route: string;
 }): DisplayClientHeartbeat {
   return {
-    clientTime: new Date().toISOString(),
-    isIdle: args.isIdle,
     isPlaying: args.isPlaying,
     pageKey: args.pageKey,
-    route: args.route,
-    sessionClass: resolveSocketSessionClass(args.route),
-    viewport: resolveHeartbeatViewport()
+    route: args.route
   };
 }
 
@@ -115,5 +96,5 @@ export function useDisplayClientHeartbeat(args: {
       emitImmediately,
       payloadFactory: () => buildDisplayClientHeartbeatPayload(args)
     });
-  }, [args.isIdle, args.isPlaying, args.pageKey, args.route, connectionState.status]);
+  }, [args.isPlaying, args.pageKey, args.route, connectionState.status]);
 }

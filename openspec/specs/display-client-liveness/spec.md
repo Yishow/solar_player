@@ -481,3 +481,119 @@ tests:
   - packages/shared/src/displayClientLiveness.test.ts
   - apps/server/src/routes/brand.test.ts
 -->
+
+---
+### Requirement: Server-authenticated Device Identity owns liveness state
+
+Display Client liveness SHALL use the Device Identity established during Socket authentication. Socket ID SHALL identify only a child connection, and client-supplied identity fields SHALL NOT create or select a Device entry.
+
+#### Scenario: Heartbeat claims another clientId
+
+- **WHEN** an authenticated Device heartbeat includes a clientId different from its credential-bound Device
+- **THEN** the Server ignores the claimed identity
+- **AND** updates only the credential-bound Device or rejects the invalid payload
+
+<!-- @trace
+source: identity-aware-display-client-liveness
+updated: 2026-07-30
+code:
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/services/displayRotationService.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - apps/server/src/fastify.ts
+  - apps/server/src/routes/device-pairing.ts
+  - AGENTS.md
+  - .github/workflows/agent-source-artifact.yml
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - CLAUDE.md
+  - apps/server/src/routes/devices.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - docs/ops/workflow.md
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/routes/playback.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - docs/ops/delegation.md
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/hooks/usePlaybackController.ts
+  - docs/architecture/default-playback-profile.md
+  - apps/server/src/config.ts
+  - scripts/fhd-witness-config.mjs
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - packages/shared/src/deviceIdentity.ts
+  - deploy/install-thin-kiosk.sh
+  - apps/server/src/services/displayStoryService.ts
+  - docs/agents/issue-tracker.md
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - apps/server/src/services/deviceCredentialService.ts
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/server/src/db/seed.ts
+  - docs/ops/dispatch.md
+  - .env.example
+  - apps/server/src/realtime/SocketService.ts
+  - apps/server/src/services/playbackProfileService.ts
+  - docs/ops/judgment.md
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/server/src/services/effectiveRotationCache.ts
+  - packages/shared/src/index.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - packages/shared/src/deviceIdentity.contract.ts
+  - packages/shared/src/playback.ts
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/routes/display-story.ts
+  - apps/server/src/services/displayClientContextService.ts
+  - deploy/verify-thin-kiosk.sh
+  - apps/server/src/app.ts
+  - scripts/deploy.test.mjs
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - packages/shared/src/displayClientLiveness.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - docs/ops/maintenance.md
+  - packages/shared/src/displayReadiness.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/server/src/services/displayReadinessService.ts
+  - docs/ops/conventions.md
+  - apps/server/src/routes/display-readiness.ts
+  - apps/web/src/services/socket.ts
+  - packages/shared/src/displayClientContext.ts
+  - apps/web/src/services/api.ts
+tests:
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - apps/web/src/services/socket.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+-->

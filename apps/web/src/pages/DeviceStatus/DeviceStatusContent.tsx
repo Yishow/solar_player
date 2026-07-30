@@ -260,7 +260,7 @@ export function DeviceStatusContent({
             </div>
             <div className="ds-triage-list">
               {viewModel.displayClientSummary.rows.map((client) => (
-                <div key={client.socketId} className={`mgmt-status ${client.badgeTone}`}>
+                <div key={client.deviceId} className={`mgmt-status ${client.badgeTone}`}>
                   <strong>{client.pageLabel}</strong> · {client.playbackLabel} · {client.lastSeenLabel}
                   <small style={{ display: "block", opacity: 0.72 }}>
                     {client.stateLabel} · {client.routeLabel}

@@ -5,11 +5,20 @@ import { SocketService, type MqttStatus } from "./SocketService.js";
 type FakeSocketListener = (payload?: unknown) => void;
 
 class FakeSocket {
+  disconnectCalls = 0;
   emitted: Array<{ event: string; payload: unknown }> = [];
-  handshake = {
+  handshake: {
+    address: string;
+    auth: Record<string, unknown>;
+    headers: {
+      cookie?: string;
+    };
+  } = {
     address: "10.0.0.42",
     auth: {},
-    headers: {}
+    headers: {
+      cookie: "solar_device_credential=credential-a"
+    }
   };
   id = "socket-1";
   joinedRooms: string[] = [];
@@ -17,6 +26,11 @@ class FakeSocket {
 
   emit(event: string, payload: unknown) {
     this.emitted.push({ event, payload });
+  }
+
+  disconnect() {
+    this.disconnectCalls += 1;
+    this.trigger("disconnect");
   }
 
   join(room: string) {
@@ -35,6 +49,10 @@ class FakeSocket {
 class FakeIo {
   connectionListener: ((socket: FakeSocket) => void) | null = null;
   emitted: Array<{ event: string; payload: unknown }> = [];
+  middleware:
+    | ((socket: FakeSocket, next: (error?: Error) => void) => void)
+    | null = null;
+  rejectedErrors: Error[] = [];
 
   emit(event: string, payload: unknown) {
     this.emitted.push({ event, payload });
@@ -45,12 +63,27 @@ class FakeIo {
     this.connectionListener = listener;
   }
 
+  use(middleware: (socket: FakeSocket, next: (error?: Error) => void) => void) {
+    this.middleware = middleware;
+  }
+
   close(callback?: (error?: Error) => void) {
     callback?.();
   }
 
   connect(socket: FakeSocket) {
-    this.connectionListener?.(socket);
+    if (!this.middleware) {
+      this.connectionListener?.(socket);
+      return;
+    }
+
+    this.middleware(socket, (error) => {
+      if (error) {
+        this.rejectedErrors.push(error);
+        return;
+      }
+      this.connectionListener?.(socket);
+    });
   }
 }
 
@@ -82,7 +115,251 @@ function createMqttStatus(): MqttStatus {
   };
 }
 
-test("SocketService tracks a connected display client heartbeat and removes it on disconnect", () => {
+function createDeviceContext(deviceId = 1) {
+  return {
+    clientId: `display-${deviceId}`,
+    contextRevision: `revision-${deviceId}`,
+    deviceId,
+    groupId: 10,
+    profileId: 20,
+    siteScope: "cl" as const
+  };
+}
+
+function createIdentityAwareService(options: {
+  classifySession?: () => "management-trusted" | "playback-safe";
+  io: FakeIo;
+  logger: ReturnType<typeof createLogger>;
+  now: () => Date;
+  resolveDisplayClientContext: (credential: unknown) => ReturnType<typeof createDeviceContext>;
+}) {
+  return new SocketService({
+    getLiveMetricsSnapshot: () => ({
+      metrics: {},
+      timestamp: "2026-05-22T12:00:00.000Z"
+    }),
+    getMqttStatus: createMqttStatus,
+    ...options
+  } as ConstructorParameters<typeof SocketService>[0]);
+}
+
+test("SocketService aggregates child connections under the credential-bound Device identity", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  let currentNow = new Date("2026-05-22T12:00:00.000Z");
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => currentNow,
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const firstSocket = new FakeSocket();
+  const secondSocket = new FakeSocket();
+  secondSocket.id = "socket-2";
+
+  io.connect(firstSocket);
+  io.connect(secondSocket);
+  currentNow = new Date("2026-05-22T12:00:10.000Z");
+  firstSocket.trigger("client:heartbeat", {
+    isPlaying: false,
+    pageKey: "overview",
+    route: "/overview"
+  });
+  currentNow = new Date("2026-05-22T12:00:20.000Z");
+  secondSocket.trigger("client:heartbeat", {
+    clientId: "claimed-other-device",
+    isPlaying: true,
+    pageKey: "solar",
+    route: "/solar"
+  });
+
+  const snapshot = service.getDisplayClientLivenessSnapshot(currentNow) as {
+    clients: Array<Record<string, unknown>>;
+  };
+  assert.equal(snapshot.clients.length, 1);
+  assert.deepEqual(
+    {
+      clientId: snapshot.clients[0]?.clientId,
+      connectedCount: snapshot.clients[0]?.connectedCount,
+      deviceId: snapshot.clients[0]?.deviceId,
+      isPlaying: snapshot.clients[0]?.isPlaying,
+      pageKey: snapshot.clients[0]?.pageKey,
+      route: snapshot.clients[0]?.route,
+      sourceStatus: snapshot.clients[0]?.sourceStatus
+    },
+    {
+      clientId: "display-1",
+      connectedCount: 2,
+      deviceId: 1,
+      isPlaying: true,
+      pageKey: "solar",
+      route: "/solar",
+      sourceStatus: "same-source"
+    }
+  );
+  assert.equal("remoteAddress" in (snapshot.clients[0] ?? {}), false);
+  assert.equal("socketId" in (snapshot.clients[0] ?? {}), false);
+
+  firstSocket.trigger("disconnect");
+  assert.equal(
+    (service.getDisplayClientLivenessSnapshot(currentNow).clients[0] as unknown as {
+      connectedCount: number;
+    }).connectedCount,
+    1
+  );
+
+  secondSocket.trigger("disconnect");
+  const disconnected = service.getDisplayClientLivenessSnapshot(currentNow).clients[0] as unknown as {
+    connectedCount: number;
+    route: string;
+    state: string;
+  };
+  assert.equal(disconnected.connectedCount, 0);
+  assert.equal(disconnected.route, "/solar");
+  assert.equal(disconnected.state, "offline");
+});
+
+test("SocketService rejects unknown credentials and disconnects a connection revoked before heartbeat", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  let revoked = false;
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: (credential) => {
+      if (credential !== "credential-a" || revoked) {
+        throw new Error("credential_revoked");
+      }
+      return createDeviceContext();
+    }
+  });
+  const unknownSocket = new FakeSocket();
+  unknownSocket.id = "unknown";
+  unknownSocket.handshake.headers.cookie = "solar_device_credential=unknown";
+
+  io.connect(unknownSocket);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+  assert.equal(io.rejectedErrors.length, 1);
+  assert.deepEqual(unknownSocket.joinedRooms, []);
+  assert.deepEqual(unknownSocket.emitted, []);
+
+  const socket = new FakeSocket();
+  io.connect(socket);
+  socket.trigger("client:heartbeat", {
+    isPlaying: true,
+    pageKey: "solar",
+    route: "/solar"
+  });
+  socket.trigger("client:heartbeat", {
+    isPlaying: "yes",
+    pageKey: "overview",
+    route: "/overview"
+  });
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.route, "/solar");
+
+  revoked = true;
+  socket.trigger("client:heartbeat", {
+    isPlaying: false,
+    pageKey: "overview",
+    route: "/overview"
+  });
+
+  assert.equal(socket.disconnectCalls, 1);
+  assert.equal(
+    (service.getDisplayClientLivenessSnapshot().clients[0] as unknown as {
+      connectedCount: number;
+      route: string;
+    }).connectedCount,
+    0
+  );
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.route, "/solar");
+});
+
+test("SocketService rejects an unpaired playback socket before the connection event", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => {
+      throw new Error("device_unpaired");
+    }
+  });
+  const socket = new FakeSocket();
+  delete socket.handshake.headers.cookie;
+
+  io.connect(socket);
+
+  assert.equal(io.rejectedErrors.length, 1);
+  assert.deepEqual(socket.joinedRooms, []);
+  assert.deepEqual(socket.emitted, []);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+});
+
+test("SocketService keeps management sockets available when a stale Device cookie is present", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const service = createIdentityAwareService({
+    classifySession: () => "management-trusted",
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => {
+      throw new Error("credential_revoked");
+    }
+  });
+  const socket = new FakeSocket();
+
+  io.connect(socket);
+
+  assert.equal(io.rejectedErrors.length, 0);
+  assert.deepEqual(socket.joinedRooms, [
+    "playback-safe",
+    "management-trusted"
+  ]);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+});
+
+test("SocketService warns only after 30 seconds of different-source credential overlap", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  let currentNow = new Date("2026-05-22T12:00:00.000Z");
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => currentNow,
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const firstSocket = new FakeSocket();
+  const secondSocket = new FakeSocket();
+  secondSocket.id = "socket-2";
+  secondSocket.handshake.address = "10.0.0.99";
+
+  io.connect(firstSocket);
+  io.connect(secondSocket);
+
+  currentNow = new Date("2026-05-22T12:00:29.999Z");
+  assert.equal(
+    (service.getDisplayClientLivenessSnapshot(currentNow).clients[0] as unknown as {
+      duplicateIdentity: boolean;
+    }).duplicateIdentity,
+    false
+  );
+
+  currentNow = new Date("2026-05-22T12:00:30.000Z");
+  const duplicate = service.getDisplayClientLivenessSnapshot(currentNow).clients[0] as unknown as {
+    duplicateDetectedAt: string | null;
+    duplicateIdentity: boolean;
+    sourceStatus: string;
+  };
+  assert.equal(duplicate.duplicateIdentity, true);
+  assert.equal(duplicate.duplicateDetectedAt, "2026-05-22T12:00:30.000Z");
+  assert.equal(duplicate.sourceStatus, "multi-source");
+});
+
+test("SocketService tracks a connected display client heartbeat and retains Device state on disconnect", () => {
   const io = new FakeIo();
   const logger = createLogger();
   let currentNow = new Date("2026-05-22T12:00:00.000Z");
@@ -94,7 +371,8 @@ test("SocketService tracks a connected display client heartbeat and removes it o
     getMqttStatus: createMqttStatus,
     io,
     logger,
-    now: () => currentNow
+    now: () => currentNow,
+    resolveDisplayClientContext: () => createDeviceContext()
   });
   const socket = new FakeSocket();
 
@@ -123,24 +401,29 @@ test("SocketService tracks a connected display client heartbeat and removes it o
     stale: 0,
     total: 1
   });
-  assert.equal(snapshot.clients[0]?.socketId, "socket-1");
-  assert.equal(snapshot.clients[0]?.remoteAddress, "10.0.0.42");
+  assert.equal(
+    (snapshot.clients[0] as unknown as { connectedCount: number }).connectedCount,
+    1
+  );
+  assert.equal(
+    (snapshot.clients[0] as unknown as { deviceId: number }).deviceId,
+    1
+  );
   assert.equal(snapshot.clients[0]?.route, "/solar");
   assert.equal(snapshot.clients[0]?.pageKey, "solar");
   assert.equal(snapshot.clients[0]?.isPlaying, true);
   assert.equal(snapshot.clients[0]?.isIdle, false);
   assert.equal(snapshot.clients[0]?.lastSeenAt, "2026-05-22T12:00:10.000Z");
-  assert.equal(snapshot.clients[0]?.clientTime, "2026-05-22T12:00:05.000Z");
 
   socket.trigger("disconnect");
 
   assert.deepEqual(service.getDisplayClientLivenessSnapshot().summary, {
-    offline: 0,
+    offline: 1,
     online: 0,
     stale: 0,
-    total: 0
+    total: 1
   });
-  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.route, "/solar");
 });
 
 test("SocketService ignores heartbeats from an unknown socket and warns on invalid payloads", () => {
@@ -154,7 +437,8 @@ test("SocketService ignores heartbeats from an unknown socket and warns on inval
     getMqttStatus: createMqttStatus,
     io,
     logger,
-    now: () => new Date("2026-05-22T12:00:00.000Z")
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
   });
   const socket = new FakeSocket();
 
@@ -175,14 +459,15 @@ test("SocketService ignores heartbeats from an unknown socket and warns on inval
       }
     });
   });
-  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 1);
+  assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.pageKey, null);
 
   const invalidSocket = new FakeSocket();
   invalidSocket.id = "socket-2";
   io.connect(invalidSocket);
   invalidSocket.trigger("client:heartbeat", {
     isIdle: false,
-    isPlaying: true,
+    isPlaying: "yes",
     pageKey: "overview",
     route: "/overview",
     sessionClass: "playback-safe",
@@ -208,7 +493,8 @@ test("SocketService keeps routine client connections out of info logs", () => {
     getMqttStatus: createMqttStatus,
     io,
     logger,
-    now: () => new Date("2026-05-22T12:00:00.000Z")
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
   });
   const socket = new FakeSocket();
 

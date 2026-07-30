@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildSocketConnectionOptions,
   emitClientHeartbeatViaClient,
   resolveSocketOriginFromLocation,
   resolveSocketOrigin,
@@ -77,21 +78,25 @@ test("resolveSocketSessionClass keeps playback routes public-safe and upgrades m
   assert.equal(resolveSocketSessionClass("/settings/mqtt"), "management-trusted");
 });
 
+test("buildSocketConnectionOptions authenticates with HttpOnly cookies while preserving management session class", () => {
+  const options = buildSocketConnectionOptions("management-trusted");
+
+  assert.equal(options.withCredentials, true);
+  assert.deepEqual(options.auth, {
+    sessionClass: "management-trusted"
+  });
+  assert.equal("credential" in options.auth, false);
+  assert.equal("deviceId" in options.auth, false);
+});
+
 test("emitClientHeartbeatViaClient emits only when the socket client is connected", () => {
   let emittedEvent: string | null = null;
   let emittedPayload: unknown = null;
   let emitCount = 0;
   const payload = {
-    clientTime: "2026-05-22T12:00:05.000Z",
-    isIdle: false,
     isPlaying: true,
     pageKey: "overview",
-    route: "/overview",
-    sessionClass: "playback-safe" as const,
-    viewport: {
-      height: 1080,
-      width: 1920
-    }
+    route: "/overview"
   };
 
   assert.equal(

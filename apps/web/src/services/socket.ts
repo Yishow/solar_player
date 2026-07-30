@@ -4,7 +4,12 @@ import type {
   ManagementSocketSessionClass,
   PlaybackSettingsUpdatedEvent
 } from "@solar-display/shared";
-import { io, type Socket } from "socket.io-client";
+import {
+  io,
+  type ManagerOptions,
+  type Socket,
+  type SocketOptions
+} from "socket.io-client";
 import { routeMetaMap } from "../app/routeMeta";
 import {
   getLiveMetricsStoreState,
@@ -158,8 +163,10 @@ function attachHeartbeat(client: Socket) {
   });
 }
 
-function createSocketClient(sessionClass: ManagementSocketSessionClass) {
-  const client = io(resolveSocketOrigin(), {
+export function buildSocketConnectionOptions(
+  sessionClass: ManagementSocketSessionClass
+): Partial<ManagerOptions & SocketOptions> {
+  return {
     auth: {
       sessionClass
     },
@@ -169,8 +176,13 @@ function createSocketClient(sessionClass: ManagementSocketSessionClass) {
     reconnectionDelay: 1500,
     reconnectionDelayMax: 8000,
     timeout: 10000,
-    transports: ["websocket", "polling"]
-  });
+    transports: ["websocket", "polling"],
+    withCredentials: true
+  };
+}
+
+function createSocketClient(sessionClass: ManagementSocketSessionClass) {
+  const client = io(resolveSocketOrigin(), buildSocketConnectionOptions(sessionClass));
 
   client.on("connect", () => {
     setConnectionState({

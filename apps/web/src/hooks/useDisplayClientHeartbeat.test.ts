@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildDisplayClientHeartbeatPayload,
   DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS,
   startDisplayClientHeartbeatLoop,
   type DisplayClientHeartbeatLoopOptions
@@ -20,20 +21,29 @@ function createLoopOptions(
     emitImmediately: false,
     intervalMs: DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS,
     payloadFactory: () => ({
-      clientTime: "2026-05-22T12:00:05.000Z",
-      isIdle: false,
       isPlaying: true,
       pageKey: "overview",
-      route: "/overview",
-      sessionClass: "playback-safe",
-      viewport: {
-        height: 1080,
-        width: 1920
-      }
+      route: "/overview"
     }),
     ...overrides
   };
 }
+
+test("buildDisplayClientHeartbeatPayload sends only current playback state", () => {
+  assert.deepEqual(
+    buildDisplayClientHeartbeatPayload({
+      isIdle: false,
+      isPlaying: true,
+      pageKey: "overview",
+      route: "/overview"
+    }),
+    {
+      isPlaying: true,
+      pageKey: "overview",
+      route: "/overview"
+    }
+  );
+});
 
 test("startDisplayClientHeartbeatLoop emits once after a heartbeat interval when connected", () => {
   const scheduled: ScheduledTimer[] = [];
@@ -44,6 +54,7 @@ test("startDisplayClientHeartbeatLoop emits once after a heartbeat interval when
       emitHeartbeat(payload) {
         emitted.push(payload);
       },
+      intervalMs: undefined,
       scheduleInterval(callback, ms) {
         scheduled.push({ callback, ms });
         return scheduled.length;
@@ -70,16 +81,9 @@ test("startDisplayClientHeartbeatLoop emits immediately when the playback page c
       },
       emitImmediately: true,
       payloadFactory: () => ({
-        clientTime: "2026-05-22T12:00:10.000Z",
-        isIdle: false,
         isPlaying: true,
         pageKey: "solar",
-        route: "/solar",
-        sessionClass: "playback-safe",
-        viewport: {
-          height: 1080,
-          width: 1920
-        }
+        route: "/solar"
       })
     })
   );

@@ -1,14 +1,17 @@
 import type { IncomingMessage, Server as HttpServer } from "node:http";
+import { createHash } from "node:crypto";
 import { Server as SocketIoServer } from "socket.io";
 import {
-  buildDisplayClientLivenessSnapshot,
+  type DisplayClientContext,
   type DisplayClientHeartbeat,
-  type DisplayClientLivenessEntry,
   type DisplayClientLivenessSnapshot,
   type DisplaySyncEvent,
   type ManagementSocketSessionClass
 } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readDeviceCredentialCookie } from "../plugins/deviceContext.js";
+import { DeviceLivenessRegistry } from "../services/deviceLivenessRegistry.js";
+import { resolveDisplayClientContext } from "../services/displayClientContextService.js";
 
 export type MqttStatus = {
   broker: string;
@@ -35,6 +38,7 @@ type SocketClientLike = {
   id?: string;
   join?: (room: string) => void;
   on?: (event: string, listener: (payload?: unknown) => void) => void;
+  disconnect?: (close?: boolean) => void;
 };
 
 type SocketServerLike = {
@@ -43,6 +47,12 @@ type SocketServerLike = {
   to?: (room: string) => {
     emit: (event: string, payload: unknown) => boolean;
   };
+  use?: (
+    middleware: (
+      socket: SocketClientLike,
+      next: (error?: Error) => void
+    ) => void
+  ) => unknown;
   close: (callback?: (error?: Error) => void) => void;
 };
 
@@ -65,6 +75,7 @@ type SocketServiceOptions = {
   io?: SocketServerLike;
   logger: LoggerLike;
   now?: () => Date;
+  resolveDisplayClientContext?: (credential: unknown) => DisplayClientContext;
   server?: HttpServer;
 };
 
@@ -80,27 +91,30 @@ function isDisplayClientHeartbeat(payload: unknown): payload is DisplayClientHea
   if (candidate.pageKey !== null && typeof candidate.pageKey !== "string") {
     return false;
   }
-  if (typeof candidate.isPlaying !== "boolean" || typeof candidate.isIdle !== "boolean") {
+  if (typeof candidate.isPlaying !== "boolean") {
     return false;
   }
-  if (
-    candidate.sessionClass !== "playback-safe"
-    && candidate.sessionClass !== "management-trusted"
-  ) {
-    return false;
-  }
-  if (typeof candidate.clientTime !== "string") {
-    return false;
+  return true;
+}
+
+function readHandshakeCookie(
+  headers: NonNullable<SocketClientLike["handshake"]>["headers"]
+) {
+  const cookie = headers.cookie;
+  return Array.isArray(cookie) ? cookie.join(";") : cookie;
+}
+
+function createSourceFingerprint(address: string | undefined) {
+  if (!address) {
+    return null;
   }
 
-  const viewport = candidate.viewport;
-  if (typeof viewport !== "object" || viewport === null) {
-    return false;
+  const normalized = address.trim().toLowerCase().replace(/^::ffff:/, "");
+  if (!normalized) {
+    return null;
   }
 
-  const viewportWidth = (viewport as Record<string, unknown>).width;
-  const viewportHeight = (viewport as Record<string, unknown>).height;
-  return typeof viewportWidth === "number" && typeof viewportHeight === "number";
+  return createHash("sha256").update(normalized, "utf8").digest("hex");
 }
 
 export class SocketService {
@@ -108,7 +122,10 @@ export class SocketService {
   private readonly classifySession;
   private readonly logger: LoggerLike;
   private readonly now: () => Date;
-  private readonly displayClientRegistry = new Map<string, DisplayClientLivenessEntry>();
+  private readonly authenticatedSocketIdentities =
+    new WeakMap<SocketClientLike, DisplayClientContext>();
+  private readonly displayClientRegistry: DeviceLivenessRegistry;
+  private readonly resolveDisplayClientContext;
   private liveMetricsSnapshot: LiveMetricsSnapshot;
   private mqttStatus: MqttStatus;
 
@@ -116,6 +133,11 @@ export class SocketService {
     this.classifySession = options.classifySession;
     this.logger = options.logger;
     this.now = options.now ?? (() => new Date());
+    this.displayClientRegistry = new DeviceLivenessRegistry({
+      now: this.now
+    });
+    this.resolveDisplayClientContext =
+      options.resolveDisplayClientContext ?? resolveDisplayClientContext;
     this.liveMetricsSnapshot = options.getLiveMetricsSnapshot();
     this.mqttStatus = options.getMqttStatus();
     this.io =
@@ -131,46 +153,112 @@ export class SocketService {
         pingTimeout: 20000
       });
 
+    const authenticateSocket = (
+      socket: SocketClientLike,
+      sessionClass: ManagementSocketSessionClass
+    ) => {
+      if (sessionClass === "management-trusted") {
+        return null;
+      }
+
+      if (!socket.handshake) {
+        throw new Error("Display client Socket handshake is unavailable");
+      }
+
+      const cookieHeader = readHandshakeCookie(socket.handshake.headers);
+      if (!cookieHeader) {
+        throw new Error("Display client Device Credential is required");
+      }
+
+      return this.resolveDisplayClientContext(
+        readDeviceCredentialCookie(cookieHeader)
+      );
+    };
+
+    this.io.use?.((socket, next) => {
+      const sessionClass = socket.handshake
+        ? this.classifySession?.(socket.handshake) ?? "playback-safe"
+        : "playback-safe";
+      try {
+        const identity = authenticateSocket(socket, sessionClass);
+        if (identity) {
+          this.authenticatedSocketIdentities.set(socket, identity);
+        }
+        next();
+      } catch (error) {
+        this.logger.warn(
+          { error, socketId: socket.id },
+          "Display client Socket identity authentication failed"
+        );
+        next(new Error("Display client authentication failed"));
+      }
+    });
+
     this.io.on("connection", (socket) => {
       const sessionClass = socket.handshake
         ? this.classifySession?.(socket.handshake) ?? "playback-safe"
         : "playback-safe";
-      const connectedAt = this.now().toISOString();
       const socketId = socket.id;
+      let identity = this.authenticatedSocketIdentities.get(socket) ?? null;
+
+      if (!this.io.use) {
+        try {
+          identity = authenticateSocket(socket, sessionClass);
+        } catch (error) {
+          this.logger.warn(
+            { error, socketId },
+            "Display client Socket identity authentication failed"
+          );
+          socket.disconnect?.(true);
+          return;
+        }
+      }
 
       socket.join?.("playback-safe");
       if (sessionClass === "management-trusted") {
         socket.join?.("management-trusted");
       }
 
-      if (socketId) {
-        this.displayClientRegistry.set(socketId, {
-          clientTime: null,
-          connected: true,
-          connectedAt,
-          isIdle: false,
-          isPlaying: false,
-          lastSeenAt: connectedAt,
-          pageKey: null,
-          remoteAddress: socket.handshake?.address ?? null,
-          route: "/",
-          sessionClass,
-          socketId,
-          viewport: {
-            height: 0,
-            width: 0
-          }
+      let authenticatedDeviceId = identity?.deviceId ?? null;
+      if (socketId && identity) {
+        this.displayClientRegistry.connect({
+          connectionId: socketId,
+          identity,
+          sourceFingerprint: createSourceFingerprint(
+            socket.handshake?.address
+          )
         });
+        socket.join?.(`device:${identity.deviceId}`);
       }
 
       socket.on?.("client:heartbeat", (payload) => {
         const heartbeatSocketId = socket.id;
-        if (!heartbeatSocketId) {
+        if (
+          !heartbeatSocketId
+          || authenticatedDeviceId === null
+          || !socket.handshake
+        ) {
           return;
         }
 
-        const entry = this.displayClientRegistry.get(heartbeatSocketId);
-        if (!entry) {
+        try {
+          const currentIdentity = this.resolveDisplayClientContext(
+            readDeviceCredentialCookie(
+              readHandshakeCookie(socket.handshake.headers)
+            )
+          );
+          if (currentIdentity.deviceId !== authenticatedDeviceId) {
+            throw new Error("Socket Device identity changed");
+          }
+          identity = currentIdentity;
+        } catch (error) {
+          this.logger.warn(
+            { error, socketId: heartbeatSocketId },
+            "Display client Socket credential is no longer valid"
+          );
+          this.displayClientRegistry.disconnect(heartbeatSocketId);
+          authenticatedDeviceId = null;
+          socket.disconnect?.(true);
           return;
         }
 
@@ -182,16 +270,11 @@ export class SocketService {
           return;
         }
 
-        this.displayClientRegistry.set(heartbeatSocketId, {
-          ...entry,
-          clientTime: payload.clientTime,
-          isIdle: payload.isIdle,
-          isPlaying: payload.isPlaying,
-          lastSeenAt: this.now().toISOString(),
-          pageKey: payload.pageKey,
-          route: payload.route,
-          viewport: payload.viewport
-        });
+        this.displayClientRegistry.heartbeat(
+          heartbeatSocketId,
+          payload,
+          identity ?? undefined
+        );
       });
 
       socket.on?.("disconnect", () => {
@@ -199,7 +282,7 @@ export class SocketService {
           return;
         }
 
-        this.displayClientRegistry.delete(socket.id);
+        this.displayClientRegistry.disconnect(socket.id);
       });
 
       this.logger.debug?.({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
@@ -252,10 +335,7 @@ export class SocketService {
   }
 
   getDisplayClientLivenessSnapshot(now = this.now()): DisplayClientLivenessSnapshot {
-    return buildDisplayClientLivenessSnapshot(
-      [...this.displayClientRegistry.values()],
-      now
-    );
+    return this.displayClientRegistry.snapshot(now);
   }
 
   emitSystemError(data: SystemNotification) {

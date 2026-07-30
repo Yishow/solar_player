@@ -1,29 +1,40 @@
-import type { ManagementSocketSessionClass } from "./managementAccess.js";
+import type { DisplayClientContext } from "./displayClientContext.js";
 
 export const DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DISPLAY_CLIENT_STALENESS_WINDOW_SECONDS = 30;
 
 export type DisplayClientHeartbeat = {
-  clientTime: string | null;
-  isIdle: boolean;
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
-  sessionClass: ManagementSocketSessionClass;
-  viewport: {
-    height: number;
-    width: number;
-  };
 };
 
 export type DisplayClientLivenessState = "online" | "stale" | "offline";
 
-export type DisplayClientLivenessEntry = DisplayClientHeartbeat & {
-  connected: boolean;
-  connectedAt: string;
+export type DisplayClientLivenessSourceStatus =
+  | "multi-source"
+  | "same-source"
+  | "source-unknown";
+
+export type DisplayClientLivenessEntry = {
+  clientId: string;
+  connectedCount: number;
+  deviceId: number;
+  duplicateDetectedAt: string | null;
+  duplicateIdentity: boolean;
+  groupId: number;
+  isIdle: boolean;
+  isPlaying: boolean;
   lastSeenAt: string;
-  remoteAddress: string | null;
-  socketId: string;
+  pageKey: string | null;
+  profileId: number;
+  route: string;
+  siteScope: DisplayClientContext["siteScope"];
+  sourceStatus: DisplayClientLivenessSourceStatus;
+  viewport: {
+    height: number;
+    width: number;
+  };
 };
 
 export type DisplayClientLivenessSnapshot = {
@@ -67,14 +78,30 @@ export function buildDisplayClientLivenessSnapshot(
   entries: DisplayClientLivenessEntry[],
   now = new Date()
 ): DisplayClientLivenessSnapshot {
-  const clients = entries.map((entry) => ({
-    ...entry,
-    state: classifyDisplayClientLiveness({
-      connected: entry.connected,
+  const clients = entries
+    .map((entry) => ({
+      clientId: entry.clientId,
+      connectedCount: entry.connectedCount,
+      deviceId: entry.deviceId,
+      duplicateDetectedAt: entry.duplicateDetectedAt,
+      duplicateIdentity: entry.duplicateIdentity,
+      groupId: entry.groupId,
+      isIdle: entry.isIdle,
+      isPlaying: entry.isPlaying,
       lastSeenAt: entry.lastSeenAt,
-      now
-    })
-  }));
+      pageKey: entry.pageKey,
+      profileId: entry.profileId,
+      route: entry.route,
+      siteScope: entry.siteScope,
+      sourceStatus: entry.sourceStatus,
+      state: classifyDisplayClientLiveness({
+        connected: entry.connectedCount > 0,
+        lastSeenAt: entry.lastSeenAt,
+        now
+      }),
+      viewport: entry.viewport
+    }))
+    .sort((left, right) => left.deviceId - right.deviceId);
 
   const summary = clients.reduce(
     (totals, client) => {

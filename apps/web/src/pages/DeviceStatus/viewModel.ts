@@ -247,8 +247,8 @@ function buildDisplayClientSummary(
             : client.isPlaying
               ? "播放中"
               : "待命中",
+      deviceId: client.deviceId,
       routeLabel: client.route,
-      socketId: client.socketId,
       stateLabel: client.state
     })),
     totalLabel: `${summary.total} clients`

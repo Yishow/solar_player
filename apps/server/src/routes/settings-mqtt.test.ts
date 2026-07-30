@@ -1230,7 +1230,15 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
       error: () => undefined,
       info: () => undefined,
       warn: () => undefined
-    }
+    },
+    resolveDisplayClientContext: () => ({
+      clientId: "display-1",
+      contextRevision: "revision-1",
+      deviceId: 1,
+      groupId: 1,
+      profileId: 1,
+      siteScope: "cl"
+    })
   });
 
   const connectSocket = (socketId: string, sessionClass: "management-trusted" | "playback-safe") => {
@@ -1252,7 +1260,10 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
           sessionClass
         },
         headers: {
-          origin: "http://127.0.0.1:5177"
+          origin: "http://127.0.0.1:5177",
+          ...(sessionClass === "playback-safe"
+            ? { cookie: "solar_device_credential=credential-a" }
+            : {})
         }
       },
       id: socketId,
