@@ -12,6 +12,7 @@ MODEL_PATH="${MODEL_PATH:-/proc/device-tree/model}"
 AGENT_UNIT="solar-device-agent"
 LIGHTDM_AUTOLOGIN_CONF="${LIGHTDM_AUTOLOGIN_CONF:-/etc/lightdm/lightdm.conf.d/50-solar-kiosk-autologin.conf}"
 JOURNAL_HELPER_PATH="${JOURNAL_HELPER_PATH:-/usr/local/sbin/read-solar-display-journal.sh}"
+PHASE1_MANAGEMENT_TOKEN_FILE="${PHASE1_MANAGEMENT_TOKEN_FILE:-}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -20,10 +21,12 @@ while [[ "$#" -gt 0 ]]; do
     --kiosk-url) EXPECTED_KIOSK_URL="${2:-}"; shift 2 ;;
     --fan-config-path) FAN_CONFIG_PATH="${2:-}"; shift 2 ;;
     --model-path) MODEL_PATH="${2:-}"; shift 2 ;;
+    --management-token-file) PHASE1_MANAGEMENT_TOKEN_FILE="${2:-}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
+KIOSK_URL="${EXPECTED_KIOSK_URL:-${KIOSK_URL}}"
 KIOSK_HOME="${KIOSK_HOME:-/home/${KIOSK_USER}}"
 KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
 WRAPPER_PATH="${KIOSK_BIN_DIR}/start-thin-kiosk.sh"
@@ -50,6 +53,179 @@ check() {
 is_raspberry_pi_5() {
   [[ -f "${MODEL_PATH}" ]] || return 1
   tr -d '\0' < "${MODEL_PATH}" | grep -qi "Raspberry Pi 5"
+}
+
+run_default_phase1_probe() {
+  python3 - "${KIOSK_FIREFOX_PROFILE}" "${KIOSK_URL}" \
+    "${PHASE1_MANAGEMENT_TOKEN_FILE}" <<'PY'
+import json
+import pathlib
+import sqlite3
+import sys
+import time
+import urllib.parse
+import urllib.request
+
+profile_path = pathlib.Path(sys.argv[1])
+kiosk_url = sys.argv[2]
+token_file = pathlib.Path(sys.argv[3]) if sys.argv[3] else None
+origin_parts = urllib.parse.urlsplit(kiosk_url)
+origin = f"{origin_parts.scheme}://{origin_parts.netloc}"
+secure_credential_transport = (
+    origin_parts.scheme == "https"
+    or origin_parts.hostname in {"127.0.0.1", "::1", "localhost"}
+)
+result = {
+    "cookiePersisted": False,
+    "serverReachable": False,
+    "timeSignalReceived": False,
+    "heartbeatDeviceId": False,
+    "heartbeatTimeSyncState": False,
+}
+
+def request(url, *, body=None, cookie=None, management_token=None):
+    headers = {"Origin": origin}
+    if cookie:
+        headers["Cookie"] = cookie
+    if management_token:
+        headers["x-solar-management-token"] = management_token
+    if body is not None:
+        headers["Content-Type"] = "text/plain;charset=UTF-8"
+    return urllib.request.urlopen(
+        urllib.request.Request(url, data=body, headers=headers),
+        timeout=5,
+    )
+
+credential = None
+device_id = None
+try:
+    with request(f"{origin}/health") as response:
+        result["serverReachable"] = response.status == 200
+except Exception:
+    pass
+
+if secure_credential_transport:
+    try:
+        database_uri = (profile_path / "cookies.sqlite").resolve().as_uri() + "?mode=ro"
+        with sqlite3.connect(database_uri, uri=True, timeout=1) as database:
+            row = database.execute(
+                """
+                SELECT value
+                FROM moz_cookies
+                WHERE name = 'solar_device_credential'
+                  AND (host = ? OR host = ?)
+                ORDER BY lastAccessed DESC
+                LIMIT 1
+                """,
+                (origin_parts.hostname, f".{origin_parts.hostname}"),
+            ).fetchone()
+        credential = row[0] if row and isinstance(row[0], str) and row[0] else None
+        result["cookiePersisted"] = credential is not None
+    except Exception:
+        pass
+
+cookie = f"solar_device_credential={credential}" if credential else None
+if cookie:
+    try:
+        with request(f"{origin}/api/device-pairing/status", cookie=cookie) as response:
+            pairing_status = json.load(response)
+        device_id = pairing_status.get("data", {}).get("deviceId")
+    except Exception:
+        pass
+
+sid = None
+if cookie and device_id:
+    try:
+        polling_url = f"{origin}/socket.io/?EIO=4&transport=polling"
+        with request(polling_url, cookie=cookie) as response:
+            open_packet = response.read().decode("utf-8")
+        sid = json.loads(open_packet[1:])["sid"] if open_packet.startswith("0") else None
+        if sid:
+            session_url = f"{polling_url}&sid={urllib.parse.quote(sid)}"
+            with request(session_url, body=b"40", cookie=cookie):
+                pass
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                with request(session_url, cookie=cookie) as response:
+                    packets = response.read().decode("utf-8").split("\x1e")
+                for packet in packets:
+                    if not packet.startswith("42"):
+                        continue
+                    event = json.loads(packet[2:])
+                    if (
+                        isinstance(event, list)
+                        and len(event) == 2
+                        and event[0] == "server:time"
+                        and isinstance(event[1], dict)
+                        and event[1].get("timeZone") == "Asia/Taipei"
+                        and isinstance(event[1].get("sequence"), int)
+                    ):
+                        result["timeSignalReceived"] = True
+                if result["timeSignalReceived"]:
+                    break
+            heartbeat = json.dumps(
+                [
+                    "client:heartbeat",
+                    {
+                        "isPlaying": True,
+                        "pageKey": "overview",
+                        "route": "/overview",
+                        "timeSyncState": "synced",
+                    },
+                ],
+                separators=(",", ":"),
+            ).encode()
+            with request(session_url, body=b"42" + heartbeat, cookie=cookie):
+                pass
+    except Exception:
+        pass
+
+management_token = None
+try:
+    if token_file and secure_credential_transport:
+        management_token = token_file.read_text(encoding="utf-8").strip()
+except Exception:
+    pass
+
+if device_id and management_token:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            with request(
+                f"{origin}/api/device/status",
+                management_token=management_token,
+            ) as response:
+                status = json.load(response)
+            clients = status.get("data", {}).get("displayClients", {}).get("clients", [])
+            client = next(
+                (candidate for candidate in clients if candidate.get("deviceId") == device_id),
+                None,
+            )
+            result["heartbeatDeviceId"] = client is not None
+            result["heartbeatTimeSyncState"] = (
+                client is not None and client.get("timeSyncState") == "synced"
+            )
+            if result["heartbeatDeviceId"] and result["heartbeatTimeSyncState"]:
+                break
+        except Exception:
+            pass
+        time.sleep(0.1)
+
+if sid and cookie:
+    try:
+        session_url = f"{origin}/socket.io/?EIO=4&transport=polling&sid={urllib.parse.quote(sid)}"
+        with request(session_url, body=b"41", cookie=cookie):
+            pass
+    except Exception:
+        pass
+
+for key, value in result.items():
+    print(f"{key}={1 if value else 0}")
+PY
+}
+
+probe_reports() {
+  grep -qx "${1}=1" <<< "${phase1_probe_output}"
 }
 
 echo "Solar Player thin-kiosk verification"
@@ -190,6 +366,21 @@ if is_raspberry_pi_5; then
 else
   echo "SKIP: Pi 5 fan checks not applicable"
 fi
+
+phase1_probe_output=""
+if command -v python3 >/dev/null 2>&1; then
+  phase1_probe_output="$(run_default_phase1_probe || true)"
+fi
+check "Phase 1 cookie persists across Browser restart" \
+  probe_reports "cookiePersisted"
+check "Phase 1 remote Server is reachable" \
+  probe_reports "serverReachable"
+check "Phase 1 immediate Time Signal received" \
+  probe_reports "timeSignalReceived"
+check "Phase 1 heartbeat includes Device identity" \
+  probe_reports "heartbeatDeviceId"
+check "Phase 1 heartbeat includes Time Sync State" \
+  probe_reports "heartbeatTimeSyncState"
 
 echo ""
 if [[ "${failures}" -gt 0 ]]; then

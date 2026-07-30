@@ -655,6 +655,10 @@ export type EffectiveDisplayRotationSnapshot = {
 const effectiveRotationCache =
   new EffectiveRotationCache<EffectiveDisplayRotationSnapshot>();
 
+export function readEffectiveRotationEvaluationCount() {
+  return effectiveRotationCache.getEvaluationCount();
+}
+
 function createRevision(value: unknown) {
   return createHash("sha256")
     .update(JSON.stringify(value), "utf8")

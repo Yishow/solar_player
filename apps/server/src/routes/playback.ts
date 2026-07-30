@@ -4,6 +4,7 @@ import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js
 import { readDisplayOpsSummary } from "../services/displayOpsService.js";
 import {
   readEffectiveDisplayRotationSnapshot,
+  readEffectiveRotationEvaluationCount,
   readDisplayRotationPreview,
   readDisplayRotationPlan,
   readPlaybackPages,
@@ -24,13 +25,19 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
   app.get(
     "/api/playback/runtime",
     { preHandler: app.requireDisplayClientContext },
-    async (request) => {
+    async (request, reply) => {
       const context = requireResolvedDisplayClientContext(request);
       const snapshot = readEffectiveDisplayRotationSnapshot({
         mqttStatus: app.mqttClientService.getStatus(),
         profileId: context.profileId,
         siteScope: context.siteScope
       });
+      if (process.env.PHASE1_ACCEPTANCE_METRICS === "1") {
+        reply.header(
+          "x-solar-rotation-evaluations",
+          readEffectiveRotationEvaluationCount()
+        );
+      }
 
       return {
         context,

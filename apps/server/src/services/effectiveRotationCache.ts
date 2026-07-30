@@ -18,6 +18,7 @@ export function createEffectiveRotationCacheKey(
 
 export class EffectiveRotationCache<T> {
   private readonly entries = new Map<string, T>();
+  private evaluationCount = 0;
 
   constructor(private readonly maxEntries = 64) {}
 
@@ -26,6 +27,7 @@ export class EffectiveRotationCache<T> {
       return this.entries.get(key) as T;
     }
 
+    this.evaluationCount += 1;
     const value = evaluate();
     this.entries.set(key, value);
     if (this.entries.size > this.maxEntries) {
@@ -37,7 +39,12 @@ export class EffectiveRotationCache<T> {
     return value;
   }
 
+  getEvaluationCount() {
+    return this.evaluationCount;
+  }
+
   clear() {
     this.entries.clear();
+    this.evaluationCount = 0;
   }
 }

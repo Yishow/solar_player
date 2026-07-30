@@ -28,13 +28,62 @@ $PiHost = "<pi-host-or-magicdns>"
 
 The Server host clock is the authority for App Time. Before launch, verify the
 Server clock and its operator-selected NTP/time-sync service with
-`timedatectl status`. If the clock is corrected forward or backward, restart
-`solar-display` so Clients receive a new Server Time instance.
+`timedatectl status` on Linux or the Windows Date & Time / time-service status.
+If the clock is corrected forward or backward, restart the actual Server
+process so Clients receive a new Server Time instance:
+
+- split Windows Server: `nssm restart SolarPlayerServer`
+- co-located Linux/Pi Server: `sudo systemctl restart solar-display`
+
+Do not restart `solar-display` on a thin kiosk; split topology intentionally has
+no local `solar-display.service`.
 
 Solar Player does not modify the Server or Client OS Clock, OS time zone, NTP
 configuration, or host time-sync services. See
 [`docs/architecture/server-app-time.md`](docs/architecture/server-app-time.md)
 for the App Time states and recovery contract.
+
+## Phase 1 Multi-site Playback Handoff
+
+For one Server serving paired CL and KN displays, use these documents together:
+
+- Architecture, migration, compatibility, Site isolation, and App Time:
+  [`docs/architecture/device-scoped-multisite-playback.md`](docs/architecture/device-scoped-multisite-playback.md)
+- Exact pairing, credential recovery, disabled/offline diagnosis:
+  [`docs/ops/device-pairing-and-recovery.md`](docs/ops/device-pairing-and-recovery.md)
+- Repeatable 50-Client thresholds and evidence matrix:
+  [`docs/ops/device-scoped-playback-test-matrix.md`](docs/ops/device-scoped-playback-test-matrix.md)
+- Windows Server:
+  [`docs/runbooks/pc-server-deploy.md`](docs/runbooks/pc-server-deploy.md)
+- Pi thin kiosk:
+  [`docs/runbooks/pi-thin-kiosk-deploy.md`](docs/runbooks/pi-thin-kiosk-deploy.md)
+
+The capacity gate is explicit and is not part of the fast `pnpm test` loop:
+
+```bash
+pnpm run verify:device-scoped-playback
+```
+
+The command is fixed at 50 Clients, 600 seconds, and five reconnects; runtime
+overrides fail closed so a shorter run cannot be recorded as Phase 1 evidence.
+
+After a Pi Browser restart or reboot witness, create a temporary
+`MANAGEMENT_ACCESS_TOKEN` file with mode 600 and run the installed read-back:
+
+```bash
+sudo ~/solar-player-thin/deploy/verify-thin-kiosk.sh \
+  --kiosk-user "<kiosk-user>" \
+  --kiosk-url "https://<windows-server-tls-host>/overview" \
+  --management-token-file "/run/solar-phase1-management-token"
+sudo rm -f /run/solar-phase1-management-token
+```
+
+Expected named checks include the wrapper URL matching the exact supplied
+Server URL, Cookie restart persistence, remote Server reachability, immediate
+Time Signal, heartbeat Device identity, and heartbeat Time Sync State. Any
+missing check exits non-zero. The verifier reads the dedicated Firefox Cookie
+database without printing the Device Credential and does not send the
+Device Credential or management token over non-loopback HTTP.
 
 ## Tailscale Deployment Prerequisite
 

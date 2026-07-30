@@ -28,6 +28,7 @@ test("25 CL and 25 KN clients perform one full evaluation per Site cohort", () =
   );
 
   assert.equal(evaluationCount, 2);
+  assert.equal(cache.getEvaluationCount(), 2);
   assert.equal(new Set(snapshots.slice(0, 25)).size, 1);
   assert.equal(new Set(snapshots.slice(25)).size, 1);
   assert.equal(snapshots[0]?.siteScope, "cl");
@@ -60,4 +61,5 @@ test("Profile, Readiness, and Freshness revision changes invalidate snapshots", 
   }
 
   assert.equal(evaluationCount, 4);
+  assert.equal(cache.getEvaluationCount(), 4);
 });

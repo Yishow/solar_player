@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { VERIFY_STAGES, runVerifyStages } from "./verify.mjs";
+
+const rootScripts = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8")
+).scripts;
+
+test("device-scoped playback acceptance has an explicit opt-in root command", () => {
+  const acceptanceCommand = "node scripts/device-scoped-playback-load.mjs";
+
+  assert.equal(
+    rootScripts["verify:device-scoped-playback"],
+    acceptanceCommand
+  );
+  assert.doesNotMatch(rootScripts.test, /device-scoped-playback-load/);
+  assert.doesNotMatch(
+    JSON.stringify(VERIFY_STAGES),
+    /device-scoped-playback-load/
+  );
+});
 
 test("root verify stages are build → bundle-budget → server → web → deploy → server-runner", () => {
   assert.deepEqual(

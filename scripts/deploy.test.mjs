@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -4118,6 +4119,14 @@ test("thin-kiosk verifier reads back a dedicated Firefox profile and rejects pri
   assert.doesNotMatch(installSource, /private-window/);
   assert.match(verifySource, /dedicated Firefox profile selected/);
   assert.match(verifySource, /launcher does not use private-window/);
+  assert.match(
+    verifySource,
+    /if secure_credential_transport:[\s\S]*cookies\.sqlite/u
+  );
+  assert.match(
+    verifySource,
+    /if token_file and secure_credential_transport:/u
+  );
 
   const fixtureRoot = mkdtempSync(path.join(tmpdir(), "thin-kiosk-profile-"));
   const kioskHome = path.join(fixtureRoot, "home");
@@ -4128,6 +4137,7 @@ test("thin-kiosk verifier reads back a dedicated Firefox profile and rejects pri
   const desktopDir = path.join(kioskHome, "Desktop");
   const lightdmConfig = path.join(fixtureRoot, "lightdm.conf");
   const journalHelper = path.join(fixtureRoot, "read-solar-display-journal.sh");
+  const phase1Probe = path.join(binDir, "python3");
   const kioskUrl = "http://192.0.2.10:3000/overview";
 
   mkdirSync(binDir, { recursive: true });
@@ -4201,6 +4211,19 @@ exec '${launcherPath}'
   writeFileSync(lightdmConfig, "[Seat:*]\nautologin-user=pi\n", "utf8");
   writeFileSync(journalHelper, "#!/bin/bash\n", "utf8");
   chmodSync(journalHelper, 0o755);
+  writeFileSync(
+    phase1Probe,
+    `#!/bin/bash
+printf '%s\\n' \
+  "cookiePersisted=\${MOCK_COOKIE_PERSISTED:-1}" \
+  "serverReachable=\${MOCK_SERVER_REACHABLE:-1}" \
+  "timeSignalReceived=\${MOCK_TIME_SIGNAL_RECEIVED:-1}" \
+  "heartbeatDeviceId=\${MOCK_HEARTBEAT_DEVICE_ID:-1}" \
+  "heartbeatTimeSyncState=\${MOCK_HEARTBEAT_TIME_SYNC_STATE:-1}"
+`,
+    "utf8"
+  );
+  chmodSync(phase1Probe, 0o755);
 
   const env = {
     ...process.env,
@@ -4217,6 +4240,27 @@ exec '${launcherPath}'
   assert.match(verified.stdout, /OK: dedicated Firefox profile selected/);
   assert.match(verified.stdout, /OK: dedicated Firefox profile owner matches kiosk user/);
   assert.match(verified.stdout, /OK: dedicated Firefox profile mode is 700/);
+  assert.match(verified.stdout, /OK: Phase 1 cookie persists across Browser restart/);
+  assert.match(verified.stdout, /OK: Phase 1 remote Server is reachable/);
+  assert.match(verified.stdout, /OK: Phase 1 immediate Time Signal received/);
+  assert.match(verified.stdout, /OK: Phase 1 heartbeat includes Device identity/);
+  assert.match(verified.stdout, /OK: Phase 1 heartbeat includes Time Sync State/);
+
+  for (const [variable, label] of [
+    ["MOCK_COOKIE_PERSISTED", "cookie persists across Browser restart"],
+    ["MOCK_SERVER_REACHABLE", "remote Server is reachable"],
+    ["MOCK_TIME_SIGNAL_RECEIVED", "immediate Time Signal received"],
+    ["MOCK_HEARTBEAT_DEVICE_ID", "heartbeat includes Device identity"],
+    ["MOCK_HEARTBEAT_TIME_SYNC_STATE", "heartbeat includes Time Sync State"]
+  ]) {
+    const failed = spawnSync(
+      bashCommand,
+      [verifyThinKioskPath, "--kiosk-user", "pi", "--kiosk-home", kioskHome, "--kiosk-url", kioskUrl],
+      { encoding: "utf8", env: { ...env, [variable]: "0" } }
+    );
+    assert.notEqual(failed.status, 0);
+    assert.match(failed.stderr, new RegExp(`FAIL: Phase 1 ${label}`));
+  }
 
   const wrongOwner = spawnSync(
     bashCommand,
@@ -4250,6 +4294,93 @@ setsid firefox -kiosk -private-window --profile "\${KIOSK_FIREFOX_PROFILE}" "\${
   assert.match(privateWindow.stderr, /FAIL: launcher does not use private-window/);
 
   rmSync(fixtureRoot, { force: true, recursive: true });
+});
+
+test("thin-kiosk Phase 1 probe never sends credentials over remote HTTP", async () => {
+  const verifySource = readFileSync(verifyThinKioskPath, "utf8");
+  const probeSource = verifySource.match(
+    /<<'PY'\n(?<source>[\s\S]*?)\nPY\n/u
+  )?.groups?.source;
+  assert.ok(probeSource, "embedded Phase 1 Python probe must exist");
+
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "thin-kiosk-http-"));
+  const profilePath = path.join(fixtureRoot, "profile");
+  const cookieDbPath = path.join(profilePath, "cookies.sqlite");
+  const tokenPath = path.join(fixtureRoot, "management-token");
+  mkdirSync(profilePath, { recursive: true });
+  writeFileSync(tokenPath, "phase1-secret-management-token\n", {
+    encoding: "utf8",
+    mode: 0o600
+  });
+  const created = spawnSync(
+    "sqlite3",
+    [
+      cookieDbPath,
+      "CREATE TABLE moz_cookies (host TEXT, name TEXT, value TEXT, lastAccessed INTEGER);"
+      + " INSERT INTO moz_cookies VALUES ('2130706433',"
+      + " 'solar_device_credential','phase1-secret-device-cookie',1);"
+    ],
+    { encoding: "utf8" }
+  );
+  assert.equal(created.status, 0, created.stderr || created.stdout);
+
+  const received = [];
+  const server = createServer((request, response) => {
+    received.push({
+      cookie: request.headers.cookie,
+      managementToken: request.headers["x-solar-management-token"],
+      url: request.url
+    });
+    response.writeHead(request.url === "/health" ? 200 : 404, {
+      "content-type": "application/json"
+    });
+    response.end(request.url === "/health" ? "{}" : '{"error":"not found"}');
+  });
+  await new Promise((resolveListen, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const kioskUrl = `http://2130706433:${address.port}/overview`;
+
+  try {
+    const probe = spawn("python3", [
+      "-",
+      profilePath,
+      kioskUrl,
+      tokenPath
+    ], {
+      env: {
+        ...process.env,
+        NO_PROXY: "2130706433",
+        no_proxy: "2130706433"
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    probe.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    probe.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    probe.stdin.end(probeSource);
+    const status = await new Promise((resolveExit) => {
+      probe.once("exit", resolveExit);
+    });
+    assert.equal(status, 0, stderr || stdout);
+    assert.match(stdout, /cookiePersisted=0/u);
+    assert.deepEqual(received, [{
+      cookie: undefined,
+      managementToken: undefined,
+      url: "/health"
+    }]);
+  } finally {
+    await new Promise((resolveClose) => server.close(resolveClose));
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
 });
 
 test("migrate path leaves solar-display unit restorable via enable (rollback contract)", () => {
