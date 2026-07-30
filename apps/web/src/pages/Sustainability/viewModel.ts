@@ -5,6 +5,7 @@ import type {
 } from "@solar-display/shared";
 import {
   normalizeSustainabilityStory,
+  resolveFreshnessPresentation,
   resolveSustainabilityStoryPeriod
 } from "@solar-display/shared";
 import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
@@ -179,6 +180,15 @@ function buildSustainabilitySourceTooltip(args: {
   });
 }
 
+function buildFreshnessView(provenance: SustainabilityProvenance) {
+  const state = provenance.freshness?.state ?? "live";
+  return {
+    ...resolveFreshnessPresentation(state),
+    sourceTimestamp:
+      provenance.freshness?.sourceTimestamp ?? provenance.updatedAt
+  };
+}
+
 function buildModuleCard(
   module:
     | ReturnType<typeof normalizeSustainabilityStory>["modules"][number]
@@ -235,6 +245,7 @@ export function buildSustainabilityViewModel({
         iconKey: "bars" as const,
         label: "累積發電量",
         provenance: generationProvenance,
+        freshnessView: buildFreshnessView(generationProvenance),
         sourceTooltip: buildSustainabilitySourceTooltip({
           label: "累積發電量",
           metricKey: "accumulatedGenerationGwh",
@@ -249,6 +260,7 @@ export function buildSustainabilityViewModel({
         iconKey: "co2" as const,
         label: "累積 CO₂ 減量",
         provenance: carbonProvenance,
+        freshnessView: buildFreshnessView(carbonProvenance),
         sourceTooltip: buildSustainabilitySourceTooltip({
           label: "累積 CO₂ 減量",
           metricKey: "accumulatedCarbonReductionTons",
@@ -263,6 +275,7 @@ export function buildSustainabilityViewModel({
         iconKey: "leaf" as const,
         label: "年度節能成效",
         provenance: savingProvenance,
+        freshnessView: buildFreshnessView(savingProvenance),
         sourceTooltip: buildSustainabilitySourceTooltip({
           label: "年度節能成效",
           metricKey: "annualEnergySavingPercent",
@@ -312,8 +325,14 @@ export function buildSustainabilityViewModel({
     },
     highlights:
       resolved.period.highlights.length > 0
-        ? resolved.period.highlights
-        : buildDerivedHighlights(resolved.period),
+        ? resolved.period.highlights.map((highlight) => ({
+            ...highlight,
+            freshnessView: buildFreshnessView(highlight.provenance)
+          }))
+        : buildDerivedHighlights(resolved.period).map((highlight) => ({
+            ...highlight,
+            freshnessView: buildFreshnessView(highlight.provenance)
+          })),
     householdEquivalents: normalized.householdEquivalents,
     periodOptions: normalized.availablePeriods,
     provenance: resolved.period.provenance,

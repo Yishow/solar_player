@@ -1,5 +1,6 @@
 import type { DisplayCircuitSlotKey, DisplayReadinessFinding, FactoryCircuitPageKey } from "./displayReadiness.js";
 import type { MetricKey } from "./types.js";
+import type { FreshnessPolicy, FreshnessResult } from "./freshnessPolicy.js";
 
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
 export type MonitoringAlertTone = "danger" | "normal" | "warning";
@@ -39,6 +40,7 @@ export type MonitoringStoryState = {
 };
 
 export type MonitoringMetricReading = {
+  freshness?: FreshnessResult;
   quality: string | null;
   timestamp: string;
   unit: string | null;
@@ -67,6 +69,7 @@ export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> 
   MonitoringStoryState & {
     dependencyKeys: string[];
     fallbackStrategy: MonitoringFallbackStrategy;
+    freshness?: FreshnessResult;
     helper: string;
     label: string;
     metricKey: TMetric;
@@ -88,6 +91,7 @@ export type FactoryCircuitKpiKey =
 
 export type FactoryCircuitStorySlot = MonitoringStoryState & {
   circuitId: number | null;
+  freshness?: FreshnessResult;
   label: string;
   labelEn?: string;
   labelZh?: string;
@@ -97,6 +101,7 @@ export type FactoryCircuitStorySlot = MonitoringStoryState & {
 };
 
 export type FactoryCircuitStoryPayload = {
+  freshnessPolicy?: FreshnessPolicy;
   kpis: Array<ResolvedMonitoringMetricBinding<FactoryCircuitKpiKey>>;
   slots: FactoryCircuitStorySlot[];
   summary: MonitoringSummaryState;
@@ -169,8 +174,6 @@ export type MonitoringDisplayValueOptions = {
   preferKilogramsForSubTonCo2?: boolean;
 };
 
-const defaultStaleAfterMs = 15 * 60 * 1000;
-
 export function formatMonitoringValue(value: number, unit: string | null) {
   const digits = unit === "%" ? 1 : Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
 
@@ -205,10 +208,27 @@ export function formatMonitoringDisplayValue(
 
 function resolveFreshnessState(args: {
   isConnected: boolean;
-  now?: string;
   reading: MonitoringMetricReading | null;
-  staleAfterMs: number;
 }): MonitoringStoryState {
+  if (args.reading?.freshness) {
+    if (args.reading.freshness.state === "live") {
+      return {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      };
+    }
+    if (args.reading.freshness.state !== "unavailable") {
+      return {
+        alertTone: "warning",
+        bindingState: "bound",
+        fallbackReason: "stale-data",
+        freshnessState: "stale"
+      };
+    }
+  }
+
   if (!args.isConnected) {
     return {
       alertTone: "warning",
@@ -227,36 +247,6 @@ function resolveFreshnessState(args: {
     };
   }
 
-  if (!args.now) {
-    return {
-      alertTone: "normal",
-      bindingState: "bound",
-      fallbackReason: null,
-      freshnessState: "fresh"
-    };
-  }
-
-  const nowValue = new Date(args.now).getTime();
-  const readingValue = new Date(args.reading.timestamp).getTime();
-
-  if (!Number.isFinite(nowValue) || !Number.isFinite(readingValue)) {
-    return {
-      alertTone: "normal",
-      bindingState: "bound",
-      fallbackReason: null,
-      freshnessState: "fresh"
-    };
-  }
-
-  if (nowValue - readingValue > args.staleAfterMs) {
-    return {
-      alertTone: "warning",
-      bindingState: "bound",
-      fallbackReason: "stale-data",
-      freshnessState: "stale"
-    };
-  }
-
   return {
     alertTone: "normal",
     bindingState: "bound",
@@ -269,7 +259,6 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   binding: MonitoringMetricBinding<TMetric>;
   displayValueOptions?: MonitoringDisplayValueOptions;
   isConnected: boolean;
-  now?: string;
   reading: MonitoringMetricReading | null;
 }) {
   const dependencyKeys = args.binding.dependencyKeys ?? [args.binding.metricKey];
@@ -277,9 +266,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   const sourceClass = args.binding.sourceClass ?? "mqtt-live";
   const state = resolveFreshnessState({
     isConnected: args.isConnected,
-    now: args.now,
-    reading: args.reading,
-    staleAfterMs: args.binding.staleAfterMs ?? defaultStaleAfterMs
+    reading: args.reading
   });
 
   if (state.bindingState !== "bound" || !args.reading) {
@@ -287,6 +274,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
       ...state,
       dependencyKeys,
       fallbackStrategy,
+      freshness: args.reading?.freshness,
       helper: args.binding.fallbackHelper ?? "顯示 fallback 資料",
       label: args.binding.label,
       metricKey: args.binding.metricKey,
@@ -307,6 +295,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
     ...state,
     dependencyKeys,
     fallbackStrategy,
+    freshness: args.reading.freshness,
     helper: `最後更新 ${args.reading.timestamp}`,
     label: args.binding.label,
     metricKey: args.binding.metricKey,

@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import {
   displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus,
-  resolvePlaybackRuntimeMetricKeys
+  resolveDisplayPageCardStatus
 } from "@solar-display/shared";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -11,9 +10,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
-import { useLiveMetricsSelector } from "../../hooks/useLiveMetrics";
-import type { LiveMetricsStoreState } from "../../hooks/liveMetricsStore";
-import type { LiveMetricReading, LiveMetricsSnapshot } from "../../services/socket";
+import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import {
   buildFlowConnectorTreatmentStyle,
@@ -89,71 +86,10 @@ const connectorOrder = [
   }
 ] as const;
 
-const solarRuntimeMetricKeys = resolvePlaybackRuntimeMetricKeys("solar");
-
-type SolarRuntimeSelection = {
-  isSocketConnected: boolean;
-  readings: Array<LiveMetricReading | null>;
-};
-
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
     top: layout.top - CONTENT_TOP_OFFSET
-  };
-}
-
-function isLiveMetricReadingEqual(current: LiveMetricReading | null, next: LiveMetricReading | null) {
-  if (current === next) {
-    return true;
-  }
-
-  if (current === null || next === null) {
-    return false;
-  }
-
-  return (
-    current.quality === next.quality
-    && current.timestamp === next.timestamp
-    && current.unit === next.unit
-    && current.value === next.value
-  );
-}
-
-function selectSolarRuntimeSelection(state: LiveMetricsStoreState): SolarRuntimeSelection {
-  return {
-    isSocketConnected: state.connectionState.status === "connected",
-    readings: solarRuntimeMetricKeys.map((key) => state.snapshot.metrics[key] ?? null)
-  };
-}
-
-function isSolarRuntimeSelectionEqual(
-  current: SolarRuntimeSelection,
-  next: SolarRuntimeSelection
-) {
-  return (
-    current.isSocketConnected === next.isSocketConnected
-    && current.readings.length === next.readings.length
-    && current.readings.every((reading, index) => {
-      return isLiveMetricReadingEqual(reading, next.readings[index] ?? null);
-    })
-  );
-}
-
-function buildSolarRuntimeSnapshot(readings: SolarRuntimeSelection["readings"]): LiveMetricsSnapshot {
-  const metrics: LiveMetricsSnapshot["metrics"] = {};
-
-  solarRuntimeMetricKeys.forEach((metricKey, index) => {
-    const reading = readings[index];
-
-    if (reading) {
-      metrics[metricKey] = reading;
-    }
-  });
-
-  return {
-    metrics,
-    timestamp: null
   };
 }
 
@@ -166,22 +102,16 @@ export function SolarRuntimeContent({
   seedConfig: ReturnType<typeof import("./displayPageConfig").createSolarDisplayPageSeedConfig>;
   solarStoryPayload: Parameters<typeof buildSolarViewModel>[0]["solarStory"];
 }) {
-  const solarRuntimeSelection = useLiveMetricsSelector(
-    selectSolarRuntimeSelection,
-    isSolarRuntimeSelectionEqual
-  );
-  const snapshot = useMemo(
-    () => buildSolarRuntimeSnapshot(solarRuntimeSelection.readings),
-    [solarRuntimeSelection.readings]
-  );
+  const liveMetrics = useLiveMetrics();
+  const snapshot = liveMetrics.snapshot;
   const viewModel = useMemo(
     () =>
       buildSolarViewModel({
-        isSocketConnected: solarRuntimeSelection.isSocketConnected,
+        isSocketConnected: liveMetrics.isSocketConnected,
         snapshot,
         solarStory: solarStoryPayload
       }),
-    [solarRuntimeSelection.isSocketConnected, snapshot, solarStoryPayload]
+    [liveMetrics.isSocketConnected, snapshot, solarStoryPayload]
   );
   const flowNodeItems = useMemo(
     () =>
@@ -300,7 +230,7 @@ export function SolarRuntimeContent({
               viewBox={`0 0 ${width} 16`}
             >
               <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-1" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className={viewModel.story.flowState.state === "normal" ? "solar-flow-line-1" : undefined} />
               <circle cx={0} cy={8} r={5} fill="#527d3b" />
               <circle cx={width} cy={8} r={5} fill="#527d3b" />
             </svg>
@@ -325,7 +255,7 @@ export function SolarRuntimeContent({
               viewBox={`0 0 ${width} 16`}
             >
               <line x1={0} y1={8} x2={width} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="solar-flow-line-2" />
+              <line x1={0} y1={8} x2={width} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className={viewModel.story.flowState.state === "normal" ? "solar-flow-line-2" : undefined} />
               <circle cx={0} cy={8} r={5} fill="#527d3b" />
               <circle cx={width} cy={8} r={5} fill="#527d3b" />
             </svg>
@@ -367,7 +297,7 @@ export function SolarRuntimeContent({
                 strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="solar-flow-line-orange"
+                className={viewModel.story.flowState.state === "normal" ? "solar-flow-line-orange" : undefined}
               />
               <circle cx={1.25} cy={0} r={5} fill="#eaa11e" />
               <circle cx={width} cy={vHeight} r={5} fill="#eaa11e" />
@@ -409,7 +339,11 @@ export function SolarRuntimeContent({
               value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
             />
             <DisplayCardFooter>
-              <p className="solar-kpi-helper">{metric.helper}</p>
+              <p className="solar-kpi-helper">
+                {metric.freshnessView && !metric.freshnessView.liveVisuals
+                  ? `${metric.freshnessView.labelZh} · ${metric.freshnessView.sourceTimestamp ?? ""}`
+                  : metric.helper}
+              </p>
             </DisplayCardFooter>
           </DisplayCardFrame>
         );

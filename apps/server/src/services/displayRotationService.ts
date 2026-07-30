@@ -12,7 +12,6 @@ import type {
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
-  evaluatePageRuntimeFreshnessForRequirements,
   evaluateDisplayRotation,
   isPlaybackAllowedBySchedule,
   normalizePlaybackTransitionSpeed,
@@ -41,15 +40,12 @@ import {
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
+import { evaluatePageFreshnessForRequirements } from "./freshnessPolicyService.js";
 import {
   createEffectiveRotationCacheKey,
   EffectiveRotationCache
 } from "./effectiveRotationCache.js";
 import { createHash } from "node:crypto";
-
-type MqttSettingsRow = {
-  message_timeout: number | null;
-};
 
 type StageConfigRow = {
   config_json: string;
@@ -387,20 +383,6 @@ export function readPlaybackPages(
   return readPlaybackProfilePageRows(profileId).map(serializePageRow);
 }
 
-function readMessageTimeoutSeconds() {
-  const row = getDatabase()
-    .prepare(
-      `
-        SELECT message_timeout
-        FROM mqtt_settings
-        LIMIT 1
-      `
-    )
-    .get() as MqttSettingsRow | undefined;
-
-  return Math.max(1, row?.message_timeout ?? 30);
-}
-
 function readLiveStageRows() {
   return getDatabase()
     .prepare(
@@ -427,12 +409,11 @@ function buildPageConditions(
   const liveStageByPage = new Map(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
-  const liveMetrics = readLiveMetricsSnapshot();
+  const liveMetrics = readLiveMetricsSnapshot(getDatabase());
   const readinessFindingsByPageKey = buildReadinessFindingsByPageKey(
     siteScope,
     readinessReport
   );
-  const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
   const pageConditions: Record<number, DisplayRotationPageCondition> = {};
 
   for (const page of pages) {
@@ -456,11 +437,11 @@ function buildPageConditions(
       ? {
           fresh: true,
           hasRequiredData: true,
-          stalestMetricKey: null,
-          stalestTimestamp: null
+          metricKey: null,
+          sourceTimestamp: null,
+          state: "live" as const
         }
-      : evaluatePageRuntimeFreshnessForRequirements({
-          freshnessWindowMs: freshMetricsDeadlineMs,
+      : evaluatePageFreshnessForRequirements({
           metrics: liveMetrics.metrics,
           nowMs: now.getTime(),
           requirements: requiredMetricRequirements
@@ -478,8 +459,8 @@ function buildPageConditions(
       mqttStatus,
       pageFresh: runtimeFreshness.fresh,
       pageRequiresLiveData,
-      stalestMetricKey: runtimeFreshness.stalestMetricKey,
-      stalestTimestamp: runtimeFreshness.stalestTimestamp
+      stalestMetricKey: runtimeFreshness.metricKey,
+      stalestTimestamp: runtimeFreshness.sourceTimestamp
     });
     const assetCondition = resolveAssetCondition({
       assetMessage: assetFindings[0]?.message ?? null,
@@ -715,8 +696,7 @@ function readFreshnessRevision(options: {
   settings: PlaybackSettings;
   siteScope: SiteScope;
 }) {
-  const freshnessWindowMs = readMessageTimeoutSeconds() * 1000;
-  const metrics = readLiveMetricsSnapshot().metrics;
+  const metrics = readLiveMetricsSnapshot(getDatabase()).metrics;
 
   return createRevision({
     enforceFreshRuntimeData: options.settings.enforceFreshRuntimeData,
@@ -725,8 +705,7 @@ function readFreshnessRevision(options: {
       freshness:
         page.templateKey === undefined
           ? null
-          : evaluatePageRuntimeFreshnessForRequirements({
-              freshnessWindowMs,
+          : evaluatePageFreshnessForRequirements({
               metrics,
               nowMs: options.now.getTime(),
               requirements: resolveLiveMetricRequirementsForPage(

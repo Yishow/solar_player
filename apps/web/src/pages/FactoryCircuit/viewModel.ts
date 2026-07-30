@@ -4,7 +4,10 @@ import type {
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload
 } from "@solar-display/shared";
-import { resolveMonitoringSlotBinding } from "@solar-display/shared";
+import {
+  resolveFreshnessPresentation,
+  resolveMonitoringSlotBinding
+} from "@solar-display/shared";
 import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import { buildMonitoringSourceTooltip } from "../shared/monitoringSourceTooltip";
 
@@ -228,9 +231,16 @@ function withFactoryCircuitKpiSourceTooltip<T extends {
   sourceClass: string;
   sourceTopics?: Array<{ metricKey: string; topic: string }>;
   unit: string;
+  freshness?: FactoryCircuitStoryPayload["kpis"][number]["freshness"];
 }>(kpi: T) {
   return {
     ...kpi,
+    freshnessView: kpi.freshness
+      ? {
+          ...resolveFreshnessPresentation(kpi.freshness.state),
+          sourceTimestamp: kpi.freshness.sourceTimestamp
+        }
+      : null,
     sourceTooltip: buildMonitoringSourceTooltip({
       dependencyKeys: kpi.dependencyKeys,
       label: kpi.label,

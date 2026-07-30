@@ -11,3 +11,9 @@ test("FactoryCircuit remounts safely under StrictMode before guarding async stat
     /useEffect\(\(\) => \{\s*mountedRef\.current = true;[\s\S]*return \(\) => \{\s*mountedRef\.current = false;/
   );
 });
+
+test("FactoryCircuit stops routing animation when aggregate freshness is not live", () => {
+  assert.match(source, /shouldAnimateFactoryFlow/);
+  assert.match(source, /className=\{shouldAnimateFactoryFlow \? "fc-flow-60" : undefined\}/);
+  assert.match(source, /animation: shouldAnimateFactoryFlow[\s\S]*: "none"/);
+});

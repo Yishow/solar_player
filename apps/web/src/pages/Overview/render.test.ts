@@ -15,6 +15,11 @@ test("overview KPI cards use fixed pixel geometry inside the FHD canvas", () => 
   assert.doesNotMatch(overviewRuntimeSource, /width:\s*toPctX\(layout\.width\)/);
 });
 
+test("overview consumes the freshness-aware live metrics hook", () => {
+  assert.match(overviewRuntimeSource, /useLiveMetrics\(\)/);
+  assert.match(overviewRuntimeSource, /snapshot = liveMetrics\.snapshot/);
+});
+
 test("overview applies density widget internal styles via inline card style vars", () => {
   for (const key of ["weather", "phasePower", "generationTrend", "alertNotifications"]) {
     assert.match(

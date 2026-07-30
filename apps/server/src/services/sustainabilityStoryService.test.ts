@@ -522,9 +522,12 @@ function setFactoryPlaybackSelection(clEnabled: boolean, knEnabled: boolean) {
   updateDefaultPlaybackPageForTest(database, "factory-circuit-guanyin", { enabled: knEnabled });
 }
 
-function insertFactoryGenerationSources(args: { knTimestamp?: string }) {
+function insertFactoryGenerationSources(args: {
+  clTimestamp?: string;
+  knTimestamp?: string;
+}) {
   const database = getDatabase();
-  const clTimestamp = "2026-06-26T15:38:10+08:00";
+  const clTimestamp = args.clTimestamp ?? "2026-06-26T15:38:10+08:00";
   const knTimestamp = args.knTimestamp ?? "2026-06-26T15:37:55+08:00";
   const insert = database.prepare(`
     INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
@@ -606,6 +609,30 @@ test("CL-only Sustainability remains fresh when KN is stale", () => {
   assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, 9.986306);
   assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.syncState, "fresh");
   assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt, "2026-06-26T15:38:10+08:00");
+});
+
+test("Sustainability marks an old cumulative value as a historical snapshot", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  insertFactoryGenerationSources({
+    clTimestamp: "2026-07-28T00:00:00.000Z",
+    knTimestamp: "2026-07-28T00:00:00.000Z"
+  });
+
+  const result = readSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date("2026-07-30T12:00:00.000Z")
+  });
+  const provenance =
+    result.period.bigNumberProvenance.accumulatedGenerationGwh;
+
+  assert.equal(provenance.freshness?.state, "historical");
+  assert.equal(
+    provenance.freshness?.sourceTimestamp,
+    "2026-07-28T00:00:00.000Z"
+  );
+  assert.equal(provenance.syncState, "stale");
 });
 
 test("no factory selection does not fall back to the combined generation counter", () => {

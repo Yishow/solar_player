@@ -84,6 +84,34 @@ test("buildSolarViewModel centralizes flow nodes and KPI display fields", () => 
   assert.equal(model.kpis[0]?.value, "3,842");
 });
 
+test("buildSolarViewModel labels non-live KPIs and stops live flow semantics", () => {
+  const nonLiveSnapshot = structuredClone(snapshot);
+  nonLiveSnapshot.metrics.realTimePower!.freshness = {
+    ageFrozen: false,
+    ageMs: 90_000,
+    category: "realtime",
+    nextTransitionAt: "2026-05-13T10:30:00.000Z",
+    sourceTimestamp: "2026-05-13T10:00:00.000Z",
+    state: "stale"
+  };
+  nonLiveSnapshot.metrics.todayGeneration!.freshness = {
+    ageFrozen: false,
+    ageMs: 172_800_000,
+    category: "daily",
+    nextTransitionAt: "2026-05-20T10:00:00.000Z",
+    sourceTimestamp: "2026-05-13T10:00:00.000Z",
+    state: "stale"
+  };
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot: nonLiveSnapshot
+  });
+
+  assert.equal(model.story.flowState.state, "standby");
+  assert.equal(model.kpis[0]?.freshnessView?.label, "Non-live data");
+  assert.equal(model.kpis[0]?.freshnessView?.liveVisuals, false);
+});
+
 test("buildSolarViewModel fallback bindings use contract-aligned sourceClass values", () => {
   const model = buildSolarViewModel({
     isSocketConnected: true,

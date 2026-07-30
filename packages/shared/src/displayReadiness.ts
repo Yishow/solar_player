@@ -1,5 +1,6 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
 import type { SiteScope } from "./deviceIdentity.js";
+import type { FreshnessResult } from "./freshnessPolicy.js";
 
 export const displayCircuitSlotKeys = [
   "stamping",
@@ -74,6 +75,7 @@ export type DisplayRequirementDescriptor = {
 
 export type DisplayReadinessFinding = {
   blocking: boolean;
+  freshness?: FreshnessResult;
   pageId: DisplayPageKey;
   reason: string;
   requirementKey: string;

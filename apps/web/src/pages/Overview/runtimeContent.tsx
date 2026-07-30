@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import {
   displayPageCardConfiguringLabel,
-  resolveDisplayPageCardStatus,
-  resolvePlaybackRuntimeMetricKeys
+  resolveDisplayPageCardStatus
 } from "@solar-display/shared";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
@@ -10,9 +9,7 @@ import {
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
-import { useLiveMetricsSelector } from "../../hooks/useLiveMetrics";
-import type { LiveMetricsStoreState } from "../../hooks/liveMetricsStore";
-import type { LiveMetricReading, LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { buildOverviewViewModel } from "./viewModel";
 import { OverviewKpiFooter } from "./OverviewKpiFooter";
@@ -52,76 +49,10 @@ const overviewCardOrder = [
   }
 ] as const;
 
-const overviewRuntimeMetricKeys = resolvePlaybackRuntimeMetricKeys("overview");
-
-type OverviewRuntimeSelection = {
-  connectionState: SocketConnectionState["status"];
-  isSocketConnected: boolean;
-  readings: Array<LiveMetricReading | null>;
-};
-
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
     top: layout.top - CONTENT_TOP_OFFSET
-  };
-}
-
-function isLiveMetricReadingEqual(current: LiveMetricReading | null, next: LiveMetricReading | null) {
-  if (current === next) {
-    return true;
-  }
-
-  if (current === null || next === null) {
-    return false;
-  }
-
-  return (
-    current.quality === next.quality
-    && current.timestamp === next.timestamp
-    && current.unit === next.unit
-    && current.value === next.value
-  );
-}
-
-function selectOverviewRuntimeSelection(state: LiveMetricsStoreState): OverviewRuntimeSelection {
-  return {
-    connectionState: state.connectionState.status,
-    isSocketConnected: state.connectionState.status === "connected",
-    readings: overviewRuntimeMetricKeys.map((key) => state.snapshot.metrics[key] ?? null)
-  };
-}
-
-function isOverviewRuntimeSelectionEqual(
-  current: OverviewRuntimeSelection,
-  next: OverviewRuntimeSelection
-) {
-  return (
-    current.connectionState === next.connectionState
-    && current.isSocketConnected === next.isSocketConnected
-    && current.readings.length === next.readings.length
-    && current.readings.every((reading, index) => {
-      return isLiveMetricReadingEqual(reading, next.readings[index] ?? null);
-    })
-  );
-}
-
-function buildOverviewRuntimeSnapshot(
-  readings: OverviewRuntimeSelection["readings"]
-): LiveMetricsSnapshot {
-  const metrics: LiveMetricsSnapshot["metrics"] = {};
-
-  overviewRuntimeMetricKeys.forEach((metricKey, index) => {
-    const reading = readings[index];
-
-    if (reading) {
-      metrics[metricKey] = reading;
-    }
-  });
-
-  return {
-    metrics,
-    timestamp: null
   };
 }
 
@@ -138,26 +69,20 @@ export function OverviewRuntimeContent({
   seedConfig: ReturnType<typeof import("./displayPageConfig").createOverviewDisplayPageSeedConfig>;
   storyOverviewPayload: Parameters<typeof buildOverviewViewModel>[0]["storyOverview"];
 }) {
-  const overviewRuntimeSelection = useLiveMetricsSelector(
-    selectOverviewRuntimeSelection,
-    isOverviewRuntimeSelectionEqual
-  );
-  const snapshot = useMemo(
-    () => buildOverviewRuntimeSnapshot(overviewRuntimeSelection.readings),
-    [overviewRuntimeSelection.readings]
-  );
+  const liveMetrics = useLiveMetrics();
+  const snapshot = liveMetrics.snapshot;
   const viewModel = useMemo(
     () =>
       buildOverviewViewModel({
-        connectionState: overviewRuntimeSelection.connectionState,
-        isSocketConnected: overviewRuntimeSelection.isSocketConnected,
+        connectionState: liveMetrics.connectionState,
+        isSocketConnected: liveMetrics.isSocketConnected,
         snapshot,
         storyOverview: storyOverviewPayload,
         weatherSnapshot: resolvedWeatherSnapshot
       }),
     [
-      overviewRuntimeSelection.connectionState,
-      overviewRuntimeSelection.isSocketConnected,
+      liveMetrics.connectionState,
+      liveMetrics.isSocketConnected,
       resolvedWeatherSnapshot,
       snapshot,
       storyOverviewPayload
@@ -181,7 +106,14 @@ export function OverviewRuntimeContent({
     [resolvedConfig.dashboardWidgets.phasePower]
   );
   const generationTrendSeries = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendSeries ?? [],
+    () => {
+      const metric = viewModel.metrics.find(
+        (candidate) => candidate.metricKey === "realTimePower"
+      );
+      return metric?.freshness && metric.freshness.state !== "live"
+        ? []
+        : metric?.trendSeries ?? [];
+    },
     [viewModel.metrics]
   );
   const generationTrendHours = useMemo(

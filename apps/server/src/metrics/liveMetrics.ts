@@ -1,7 +1,15 @@
 import type Database from "better-sqlite3";
+import {
+  evaluateFreshness,
+  resolveFreshnessCategoryForMetric,
+  type FreshnessPolicy,
+  type FreshnessResult
+} from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { readFreshnessPolicy } from "../services/freshnessPolicyService.js";
 
 export type LiveMetricReading = {
+  freshness?: FreshnessResult;
   quality: string | null;
   timestamp: string;
   unit: string | null;
@@ -9,6 +17,7 @@ export type LiveMetricReading = {
 };
 
 export type LiveMetricsSnapshot = {
+  freshnessPolicy?: FreshnessPolicy;
   metrics: Record<string, LiveMetricReading>;
   timestamp: string | null;
 };
@@ -21,7 +30,9 @@ type LiveMetricRow = {
   value: number | null;
 };
 
-export function readLiveMetricsSnapshot(database: Database.Database = getDatabase()): LiveMetricsSnapshot {
+export function readLiveMetricsSnapshot(
+  database: Database.Database = getDatabase()
+): LiveMetricsSnapshot {
   const rows = database
     .prepare(
       `
@@ -61,5 +72,42 @@ export function readLiveMetricsSnapshot(database: Database.Database = getDatabas
   return {
     metrics,
     timestamp: latestTimestamp
+  };
+}
+
+export function readAuthoritativeLiveMetricsSnapshot(
+  database: Database.Database = getDatabase(),
+  nowMs = Date.now()
+): LiveMetricsSnapshot {
+  return applyFreshnessToLiveMetricsSnapshot(
+    readLiveMetricsSnapshot(database),
+    database,
+    nowMs
+  );
+}
+
+export function applyFreshnessToLiveMetricsSnapshot(
+  snapshot: LiveMetricsSnapshot,
+  database: Database.Database = getDatabase(),
+  nowMs = Date.now()
+): LiveMetricsSnapshot {
+  const policy = readFreshnessPolicy(database).policy;
+  return {
+    freshnessPolicy: policy,
+    metrics: Object.fromEntries(
+      Object.entries(snapshot.metrics).map(([metricKey, reading]) => [
+        metricKey,
+        {
+          ...reading,
+          freshness: evaluateFreshness({
+            category: resolveFreshnessCategoryForMetric(metricKey),
+            nowMs,
+            policy,
+            sourceTimestamp: reading.timestamp
+          })
+        }
+      ])
+    ),
+    timestamp: snapshot.timestamp
   };
 }

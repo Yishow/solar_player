@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { closeDatabaseConnection } from "./db/index.js";
 import { createLoggerOptions } from "./logger.js";
-import { readLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
+import { readAuthoritativeLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
 import { getWeatherService } from "./services/weatherService.js";
 import managementAuthPlugin, {
@@ -45,6 +45,7 @@ import displayPagesRoute from "./routes/display-pages.js";
 import displayReadinessRoute from "./routes/display-readiness.js";
 import displayStoryRoute from "./routes/display-story.js";
 import imagePlaylistRoute from "./routes/image-playlist.js";
+import freshnessPolicyRoute from "./routes/freshness-policy.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 import shellDecorationsRoute from "./routes/shell-decorations.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
@@ -118,7 +119,7 @@ export async function buildApp() {
     allowRequest: managementCorsRequestGate,
     classifySession: managementAccess.classifySocketSession,
     corsOrigin: managementCorsOrigin,
-    getLiveMetricsSnapshot: () => readLiveMetricsSnapshot(),
+    getLiveMetricsSnapshot: () => readAuthoritativeLiveMetricsSnapshot(),
     getMqttStatus: () =>
       mqttClientService?.getStatus() ?? {
         broker: "",
@@ -197,6 +198,7 @@ export async function buildApp() {
   await app.register(displayReadinessRoute);
   await app.register(displayStoryRoute);
   await app.register(imagePlaylistRoute);
+  await app.register(freshnessPolicyRoute);
   await app.register(settingsMqttRoute);
   await app.register(shellDecorationsRoute);
   await app.register(sustainabilityStoryRoute);

@@ -1,9 +1,14 @@
-import { co2TreeEquivalentFactor } from "@solar-display/shared";
+import {
+    co2TreeEquivalentFactor,
+    resolveFreshnessPresentation,
+    type FreshnessResult
+} from "@solar-display/shared";
 import { Sparkline } from "../../components/Sparkline";
 import { DisplayCardFooter } from "../../components/displayPageCards";
 import type { OverviewKpiCardConfig } from "./displayPageConfig";
 
 type OverviewKpiFooterMetric = {
+    freshness?: FreshnessResult;
     trendSeries?: number[];
     unit: string;
     value: string;
@@ -25,6 +30,17 @@ export function OverviewKpiFooter({
     footer: Pick<OverviewKpiCardConfig, "footerText" | "footerType" | "targetValue">;
     metric: OverviewKpiFooterMetric;
 }) {
+    if (metric.freshness && metric.freshness.state !== "live") {
+        const presentation = resolveFreshnessPresentation(metric.freshness.state);
+        return (
+            <DisplayCardFooter className="overview-kpi-footer overview-kpi-footer-note">
+                <span className="overview-kpi-footer-note-text">
+                    {presentation.labelZh} · {metric.freshness.sourceTimestamp}
+                </span>
+            </DisplayCardFooter>
+        );
+    }
+
     switch (footer.footerType) {
         case "none":
             return null;

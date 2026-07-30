@@ -11,7 +11,11 @@ import {
   type MqttClient
 } from "mqtt";
 import { getDatabase } from "../db/index.js";
-import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import {
+  type LiveMetricsSnapshot,
+  readAuthoritativeLiveMetricsSnapshot,
+  readLiveMetricsSnapshot
+} from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
 import { updateFactoryGenerationAggregate } from "../services/factoryGenerationAggregateService.js";
 import { parse } from "./PayloadParser.js";
@@ -900,7 +904,9 @@ export class MqttClientService {
     }
 
     const snapshot = readLiveMetricsSnapshot(this.database);
-    this.socketService?.emitLiveMetrics(snapshot);
+    this.socketService?.emitLiveMetrics(
+      readAuthoritativeLiveMetricsSnapshot(this.database)
+    );
     const didFactoryGenerationUpdate =
       hasPayloadTimestamp(rawPayload)
       && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."));
@@ -937,6 +943,7 @@ export class MqttClientService {
     }
 
     return {
+      freshnessPolicy: snapshot.freshnessPolicy,
       metrics: Object.fromEntries(circuitEntries),
       timestamp: snapshot.timestamp
     };

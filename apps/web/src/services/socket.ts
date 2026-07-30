@@ -1,6 +1,8 @@
 import type {
   DisplayClientHeartbeat,
   DisplaySyncEvent,
+  FreshnessResult,
+  FreshnessPolicy,
   ManagementSocketSessionClass,
   PlaybackSettingsUpdatedEvent,
   ServerTimeSignal
@@ -22,6 +24,7 @@ import { acceptServerTimeSignal } from "./appTime";
 import { resolveRuntimeSocketOrigin } from "./runtimeOrigin";
 
 export type LiveMetricReading = {
+  freshness?: FreshnessResult;
   quality: string | null;
   timestamp: string;
   unit: string | null;
@@ -29,6 +32,7 @@ export type LiveMetricReading = {
 };
 
 export type LiveMetricsSnapshot = {
+  freshnessPolicy?: FreshnessPolicy;
   metrics: Record<string, LiveMetricReading>;
   timestamp: string | null;
 };

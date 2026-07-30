@@ -7,6 +7,7 @@ import type {
   FactoryCircuitPageKey,
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload,
+  FreshnessResult,
   MonitoringMetricBinding,
   MonitoringMetricSourceTopic,
   MonitoringStoryState,
@@ -16,6 +17,7 @@ import type {
   SolarComparisonTarget
 } from "@solar-display/shared";
 import {
+  aggregateFreshnessResults,
   formatMonitoringValue,
   resolveFactoryCircuitSlotKeys,
   resolveFactoryCircuitSlotMetricKey,
@@ -30,12 +32,16 @@ import { getDatabase } from "../db/index.js";
 import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readPlaybackSettings } from "./displayRotationService.js";
+import { evaluateMetricFreshness } from "./freshnessPolicyService.js";
 import { evaluateFactoryGenerationScope } from "./factoryGenerationAggregateService.js";
 import {
   type HourlyGenerationTrendRow,
   selectHourlyGenerationTrendProfile
 } from "./generationTrendSeries.js";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import {
+  applyFreshnessToLiveMetricsSnapshot,
+  readLiveMetricsSnapshot
+} from "../metrics/liveMetrics.js";
 import {
   formatDisplayOverrideValue,
   readActiveDisplayValueOverrides
@@ -259,6 +265,7 @@ function buildDerivedCarbonReductionReading(
   }
 
   return {
+    freshness: generationReading.freshness,
     quality: generationReading.quality,
     timestamp: generationReading.timestamp,
     unit: "t",
@@ -271,7 +278,8 @@ function buildDerivedCarbonReductionReading(
 
 function buildCumulativeGenerationReading(
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
-  preferSnapshot = false
+  preferSnapshot = false,
+  nowMs = Date.now()
 ) {
   if (preferSnapshot) {
     return snapshot.metrics.totalGeneration ?? null;
@@ -284,6 +292,11 @@ function buildCumulativeGenerationReading(
     && cumulativeGeneration.last_updated
   ) {
     return {
+      freshness: evaluateMetricFreshness({
+        metricKey: "totalGeneration",
+        nowMs,
+        sourceTimestamp: cumulativeGeneration.last_updated
+      }),
       quality: null,
       timestamp: cumulativeGeneration.last_updated,
       unit: "kWh",
@@ -307,7 +320,11 @@ function resolveStoryMetricReading(
 
   if (metricKey === "totalCo2Reduction") {
     return buildDerivedCarbonReductionReading(
-      buildCumulativeGenerationReading(context.snapshot, context.siteScope !== null),
+      buildCumulativeGenerationReading(
+        context.snapshot,
+        context.siteScope !== null,
+        Date.parse(context.generatedAt)
+      ),
       context.calculationSettings.carbonEmissionFactor
     );
   }
@@ -448,7 +465,7 @@ function resolveSolarKpiBinding(args: {
   binding: MonitoringMetricBinding<StoryMetricKey>;
   calculationSettings: CalculationSettings;
   isConnected: boolean;
-  now?: string;
+  nowMs: number;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
 }) {
   if (args.binding.metricKey !== "selfConsumptionRatio") {
@@ -461,7 +478,6 @@ function resolveSolarKpiBinding(args: {
             args.binding.metricKey === "totalCo2Reduction")
       },
       isConnected: args.isConnected,
-      now: args.now,
       reading:
         args.binding.metricKey === "todayCo2Reduction"
           ? buildDerivedCarbonReductionReading(
@@ -470,7 +486,11 @@ function resolveSolarKpiBinding(args: {
           )
           : args.binding.metricKey === "totalCo2Reduction"
             ? buildDerivedCarbonReductionReading(
-              buildCumulativeGenerationReading(args.snapshot),
+              buildCumulativeGenerationReading(
+                args.snapshot,
+                false,
+                args.nowMs
+              ),
               args.calculationSettings.carbonEmissionFactor
             )
             : args.snapshot.metrics[args.binding.metricKey] ?? null
@@ -482,7 +502,6 @@ function resolveSolarKpiBinding(args: {
     return resolveMonitoringMetricBinding({
       binding: args.binding,
       isConnected: args.isConnected,
-      now: args.now,
       reading: directReading
     });
   }
@@ -495,15 +514,36 @@ function resolveSolarKpiBinding(args: {
     consumptionReading &&
     consumptionReading.value > 0
   ) {
+    const dependencyFreshness: Array<{
+      freshness: FreshnessResult;
+      metricKey: string;
+    }> = [];
+    if (selfConsumptionReading.freshness) {
+      dependencyFreshness.push({
+        freshness: selfConsumptionReading.freshness,
+        metricKey: "selfConsumptionEnergy"
+      });
+    }
+    if (consumptionReading.freshness) {
+      dependencyFreshness.push({
+        freshness: consumptionReading.freshness,
+        metricKey: "consumptionEnergy"
+      });
+    }
+    const aggregateFreshness = aggregateFreshnessResults(dependencyFreshness);
+    const freshness = dependencyFreshness.find(
+      (result) => result.metricKey === aggregateFreshness.metricKey
+    )?.freshness;
     const observedAt =
-      selfConsumptionReading.timestamp > consumptionReading.timestamp
+      freshness?.sourceTimestamp
+      ?? (selfConsumptionReading.timestamp < consumptionReading.timestamp
         ? selfConsumptionReading.timestamp
-        : consumptionReading.timestamp;
+        : consumptionReading.timestamp);
     const resolved = resolveMonitoringMetricBinding({
       binding: args.binding,
       isConnected: true,
-      now: args.now,
       reading: {
+        freshness,
         quality: selfConsumptionReading.quality ?? consumptionReading.quality,
         timestamp: observedAt,
         unit: "%",
@@ -521,7 +561,6 @@ function resolveSolarKpiBinding(args: {
   return resolveMonitoringMetricBinding({
     binding: args.binding,
     isConnected: args.isConnected,
-    now: args.now,
     reading: null
   });
 }
@@ -532,7 +571,7 @@ function resolveFactoryMetricBinding(args: {
   isConnected: boolean;
   label: string;
   metricKey: string;
-  now?: string;
+  nowMs: number;
   reading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null;
   unit: string;
 }) {
@@ -546,19 +585,27 @@ function resolveFactoryMetricBinding(args: {
       unit: args.unit
     },
     isConnected: args.isConnected,
-    now: args.now,
     reading: args.reading
+  });
+  const freshness = args.reading?.freshness ?? evaluateMetricFreshness({
+    metricKey: args.metricKey,
+    nowMs: args.nowMs,
+    sourceTimestamp: args.reading?.timestamp ?? null
   });
 
   if (args.allowStaleRuntimeData && resolved.bindingState === "bound" && resolved.freshnessState === "stale") {
     return {
       ...resolved,
+      freshness,
       fallbackStrategy: "retain-last-reading" as const,
       helper: "顯示最近一次有效讀值"
     };
   }
 
-  return resolved;
+  return {
+    ...resolved,
+    freshness
+  };
 }
 
 function buildFactoryFallbackKpi(args: {
@@ -567,6 +614,7 @@ function buildFactoryFallbackKpi(args: {
   fallbackReason: MonitoringStoryState["fallbackReason"];
   fallbackStrategy: "derive-from-dependencies" | "placeholder";
   freshnessState: MonitoringStoryState["freshnessState"];
+  freshness?: FreshnessResult;
   helper: string;
   label: string;
   metricKey: FactoryCircuitKpiKey;
@@ -582,6 +630,7 @@ function buildFactoryFallbackKpi(args: {
     fallbackReason: args.fallbackReason,
     fallbackStrategy: args.fallbackStrategy,
     freshnessState: args.freshnessState,
+    freshness: args.freshness,
     helper: args.helper,
     label: args.label,
     metricKey: args.metricKey,
@@ -599,6 +648,7 @@ function buildFactoryResolvedKpi(args: {
   fallbackReason?: MonitoringStoryState["fallbackReason"];
   fallbackStrategy: "derive-from-dependencies" | "placeholder";
   freshnessState?: MonitoringStoryState["freshnessState"];
+  freshness?: FreshnessResult;
   helper: string;
   label: string;
   metricKey: FactoryCircuitKpiKey;
@@ -615,6 +665,7 @@ function buildFactoryResolvedKpi(args: {
     fallbackReason: args.fallbackReason ?? null,
     fallbackStrategy: args.fallbackStrategy,
     freshnessState: args.freshnessState ?? "fresh" as const,
+    freshness: args.freshness,
     helper: args.helper,
     label: args.label,
     metricKey: args.metricKey,
@@ -664,12 +715,32 @@ function resolveFactoryCircuitKpis(args: {
   allowStaleRuntimeData: boolean;
   pageKey: FactoryCircuitPageKey;
   isConnected: boolean;
+  nowMs: number;
   slots: FactoryCircuitStoryPayload["slots"];
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
   summary: FactoryCircuitStoryPayload["summary"];
   topicNames: Map<string, TopicDisplayName>;
 }) {
+  const resolveWorstFreshness = (
+    entries: Array<{ freshness?: FreshnessResult; metricKey: string }>
+  ) => {
+    const available = entries.filter(
+      (entry): entry is { freshness: FreshnessResult; metricKey: string } =>
+        entry.freshness !== undefined
+    );
+    if (available.length === 0) {
+      return undefined;
+    }
+    const worst = aggregateFreshnessResults(available);
+    return available.find((entry) => entry.metricKey === worst.metricKey)?.freshness;
+  };
   const aggregateDependencyKeys = args.slots.flatMap((slot) => slot.metricKey ? [slot.metricKey] : []);
+  const aggregateFreshness = resolveWorstFreshness(
+    args.slots.map((slot) => ({
+      freshness: slot.freshness,
+      metricKey: slot.metricKey ?? slot.slotKey
+    }))
+  );
   const aggregateFailure = args.slots.find(
     (slot) =>
       !isUsableFactoryMetric(slot, args.allowStaleRuntimeData) ||
@@ -692,8 +763,9 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: aggregateFailure?.fallbackReason ?? args.summary.fallbackReason,
         fallbackStrategy: "placeholder",
         freshnessState: aggregateFailure?.freshnessState ?? args.summary.freshnessState,
+        freshness: aggregateFailure?.freshness ?? aggregateFreshness,
         helper: aggregateHelper,
-        label: "目前廠區總用電",
+        label: aggregateFreshness?.state === "live" ? "目前廠區總用電" : "廠區總用電",
         metricKey: "totalPower",
         sourceClass: "slot-aggregate",
         unit: "kW"
@@ -704,11 +776,12 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: aggregateFallbackReason,
         fallbackStrategy: "placeholder",
         freshnessState: aggregateFreshnessState,
+        freshness: aggregateFreshness,
         helper:
           aggregateFreshnessState === "stale"
             ? resolveRetainedReadingHelper(`${args.slots.length} 個迴路來源`)
             : `${args.slots.length} 個迴路來源`,
-        label: "目前廠區總用電",
+        label: aggregateFreshness?.state === "live" ? "目前廠區總用電" : "廠區總用電",
         metricKey: "totalPower",
         provenance: "aggregate",
         sourceClass: "slot-aggregate",
@@ -722,7 +795,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "太陽能供應占比",
     metricKey: "realTimePower",
-    now: args.snapshot.timestamp ?? undefined,
+    nowMs: args.nowMs,
     reading: args.snapshot.metrics.realTimePower ?? null,
     unit: "kW"
   });
@@ -733,6 +806,7 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: totalPower.fallbackReason,
         fallbackStrategy: "derive-from-dependencies",
         freshnessState: totalPower.freshnessState,
+        freshness: totalPower.freshness,
         helper: aggregateHelper,
         label: "太陽能供應占比",
         metricKey: "solarShare",
@@ -751,6 +825,7 @@ function resolveFactoryCircuitKpis(args: {
           fallbackReason: solarPower.fallbackReason,
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: solarPower.freshnessState,
+          freshness: solarPower.freshness,
           helper: solarPower.helper,
           label: "太陽能供應占比",
           metricKey: "solarShare",
@@ -777,6 +852,10 @@ function resolveFactoryCircuitKpis(args: {
             totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
               ? "stale"
               : "fresh",
+          freshness: resolveWorstFreshness([
+            { freshness: totalPower.freshness, metricKey: "totalPower" },
+            { freshness: solarPower.freshness, metricKey: "realTimePower" }
+          ]),
           helper:
             totalPower.freshnessState === "stale" || solarPower.freshnessState === "stale"
               ? resolveRetainedReadingHelper("Solar Supply Share")
@@ -800,7 +879,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "今日自發自用電量",
     metricKey: "selfConsumptionEnergy",
-    now: args.snapshot.timestamp ?? undefined,
+    nowMs: args.nowMs,
     reading: args.snapshot.metrics.selfConsumptionEnergy ?? null,
     unit: "kWh"
   });
@@ -810,7 +889,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "今日自發自用電量",
     metricKey: "todayGeneration",
-    now: args.snapshot.timestamp ?? undefined,
+    nowMs: args.nowMs,
     reading: args.snapshot.metrics.todayGeneration ?? null,
     unit: args.snapshot.metrics.todayGeneration?.unit ?? "kWh"
   });
@@ -822,6 +901,7 @@ function resolveFactoryCircuitKpis(args: {
           fallbackReason: todayGenerationFallback.freshnessState === "stale" ? "stale-data" : null,
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: todayGenerationFallback.freshnessState,
+          freshness: todayGenerationFallback.freshness,
           helper:
             todayGenerationFallback.freshnessState === "stale"
               ? resolveRetainedReadingHelper("以今日發電量替代自發自用量")
@@ -844,6 +924,7 @@ function resolveFactoryCircuitKpis(args: {
           fallbackReason: selfConsumption.fallbackReason,
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: selfConsumption.freshnessState,
+          freshness: selfConsumption.freshness,
           helper: selfConsumption.helper,
           label: "今日自發自用電量",
           metricKey: "selfConsumption",
@@ -861,6 +942,7 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: selfConsumption.freshnessState === "stale" ? "stale-data" : null,
         fallbackStrategy: "placeholder",
         freshnessState: selfConsumption.freshnessState,
+        freshness: selfConsumption.freshness,
         helper:
           selfConsumption.freshnessState === "stale"
             ? resolveRetainedReadingHelper(selfConsumption.helper)
@@ -884,7 +966,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "尖峰倍率",
     metricKey: "factoryPeakMultiplier",
-    now: args.snapshot.timestamp ?? undefined,
+    nowMs: args.nowMs,
     reading: args.snapshot.metrics.factoryPeakMultiplier ?? null,
     unit: "x"
   });
@@ -902,6 +984,7 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: totalPower.fallbackReason,
         fallbackStrategy: "derive-from-dependencies",
         freshnessState: totalPower.freshnessState,
+        freshness: totalPower.freshness,
         helper: aggregateHelper,
         label: "尖峰負載",
         metricKey: "peak",
@@ -920,6 +1003,7 @@ function resolveFactoryCircuitKpis(args: {
           fallbackReason: peakMultiplier.fallbackReason ?? "metric-unavailable",
           fallbackStrategy: "derive-from-dependencies",
           freshnessState: peakMultiplier.freshnessState,
+          freshness: peakMultiplier.freshness,
           helper: peakMultiplier.helper,
           label: "尖峰負載",
           metricKey: "peak",
@@ -946,9 +1030,13 @@ function resolveFactoryCircuitKpis(args: {
           totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
             ? "stale"
             : "fresh",
+        freshness: resolveWorstFreshness([
+          { freshness: totalPower.freshness, metricKey: "totalPower" },
+          { freshness: peakMultiplier.freshness, metricKey: "factoryPeakMultiplier" }
+        ]),
         helper:
           totalPower.freshnessState === "stale" || peakMultiplier.freshnessState === "stale"
-            ? resolveRetainedReadingHelper(`依目前總負載與倍率 ${peakMultiplierValue} 推估`)
+            ? resolveRetainedReadingHelper(`依最近總負載與倍率 ${peakMultiplierValue} 推估`)
             : `依目前總負載與倍率 ${peakMultiplierValue} 推估`,
         label: "尖峰負載",
         metricKey: "peak",
@@ -970,8 +1058,9 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: totalPower.fallbackReason,
         fallbackStrategy: "placeholder",
         freshnessState: totalPower.freshnessState,
+        freshness: totalPower.freshness,
         helper: aggregateHelper,
-        label: "目前綠電流向",
+        label: "綠電流向",
         metricKey: "flow",
         sourceClass: "derived-metric",
         unit: "Fallback",
@@ -983,11 +1072,12 @@ function resolveFactoryCircuitKpis(args: {
         fallbackReason: totalPower.freshnessState === "stale" ? "stale-data" : null,
         fallbackStrategy: "placeholder",
         freshnessState: totalPower.freshnessState,
+        freshness: totalPower.freshness,
         helper:
           totalPower.freshnessState === "stale"
             ? resolveRetainedReadingHelper("Green Energy Routing")
             : "Green Energy Routing",
-        label: "目前綠電流向",
+        label: totalPower.freshness?.state === "live" ? "目前綠電流向" : "綠電流向",
         metricKey: "flow",
         provenance: "derived",
         sourceClass: "derived-metric",
@@ -1055,9 +1145,14 @@ function createDisplayStorySourceContext(
     liveSnapshot.timestamp && Number.isFinite(Date.parse(liveSnapshot.timestamp))
       ? new Date(liveSnapshot.timestamp)
       : now;
-  const snapshot = siteScope
+  const projectedSnapshot = siteScope
     ? projectSiteGenerationSnapshot(liveSnapshot, siteScope, snapshotNow)
     : liveSnapshot;
+  const snapshot = applyFreshnessToLiveMetricsSnapshot(
+    projectedSnapshot,
+    getDatabase(),
+    now.getTime()
+  );
   const isConnected = snapshot.timestamp !== null;
   const power = snapshot.metrics.realTimePower?.value ?? null;
   const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
@@ -1148,7 +1243,6 @@ export function readOverviewDisplayStory(
               binding.metricKey === "totalCo2Reduction")
         },
         isConnected: context.isConnected,
-        now: context.snapshot.timestamp ?? undefined,
         reading
       }),
       label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
@@ -1195,7 +1289,7 @@ export function readSolarDisplayStory(
         binding,
         calculationSettings: context.calculationSettings,
         isConnected: context.isConnected,
-        now: context.snapshot.timestamp ?? undefined,
+        nowMs: Date.parse(context.generatedAt),
         snapshot: context.snapshot
       });
       const comparisonActualValue =
@@ -1208,7 +1302,8 @@ export function readSolarDisplayStory(
             ? buildDerivedCarbonReductionReading(
               buildCumulativeGenerationReading(
                 context.snapshot,
-                context.siteScope !== null
+                context.siteScope !== null,
+                Date.parse(context.generatedAt)
               ),
               context.calculationSettings.carbonEmissionFactor
             )?.value ?? null
@@ -1301,7 +1396,7 @@ export function readFactoryCircuitDisplayStory(
               isConnected: context.isConnected,
               label: slotLabel,
               metricKey,
-              now: context.snapshot.timestamp ?? undefined,
+              nowMs: Date.parse(context.generatedAt),
               reading,
               unit: "kW"
             });
@@ -1342,6 +1437,11 @@ export function readFactoryCircuitDisplayStory(
     return {
       ...state,
       circuitId: circuit?.id ?? null,
+      freshness: reading?.freshness ?? evaluateMetricFreshness({
+        metricKey,
+        nowMs: Date.parse(context.generatedAt),
+        sourceTimestamp: null
+      }),
       label: slotLabel,
       labelEn: slotLabels.labelEn,
       labelZh: slotLabels.labelZh,
@@ -1357,10 +1457,12 @@ export function readFactoryCircuitDisplayStory(
   const factorySummary = resolveMonitoringSummaryState(slotStates);
 
   return {
+    freshnessPolicy: context.snapshot.freshnessPolicy,
     kpis: applyMonitoringDisplayOverrides(pageKey, resolveFactoryCircuitKpis({
       allowStaleRuntimeData: context.allowStaleRuntimeData,
       pageKey,
       isConnected: context.isConnected,
+      nowMs: Date.parse(context.generatedAt),
       slots: factorySlots,
       snapshot: context.snapshot,
       summary: factorySummary,

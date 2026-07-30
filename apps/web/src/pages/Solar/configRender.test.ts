@@ -105,11 +105,11 @@ test("solar display page seed config captures the current default hero and layou
 });
 
 test("solar runtime keeps story hydration staged behind visible config and socket metrics", () => {
-  assert.match(solarRuntimeSource, /useLiveMetricsSelector\(/);
+  assert.match(solarRuntimeSource, /useLiveMetrics\(\)/);
   assert.match(solarSource, /useDisplayStoryRuntime\("solar",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(solarSource, /solarStoryRuntime\.payload \?\? undefined/);
   assert.match(solarRuntimeSource, /solarStory: solarStoryPayload/);
-  assert.match(solarRuntimeSource, /isSocketConnected: solarRuntimeSelection\.isSocketConnected/);
+  assert.match(solarRuntimeSource, /isSocketConnected: liveMetrics\.isSocketConnected/);
   assert.match(solarSource, /runtimeErrorMessage: runtimeHydrationEnabled \? solarStoryRuntime\.errorMessage : ""/);
   assert.match(solarSource, /usesRuntimeFallback: solarStoryRuntime\.usesFallback/);
 });

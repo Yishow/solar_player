@@ -19,13 +19,15 @@ const [
   { migrateDatabase },
   { seedDatabase },
   { readDisplayStory },
-  { saveDisplayValueOverride }
+  { saveDisplayValueOverride },
+  { readFreshnessPolicy, updateFreshnessPolicy }
 ] = await Promise.all([
   import("../db/index.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
   import("./displayStoryService.js"),
-  import("./displayValueOverrideService.js")
+  import("./displayValueOverrideService.js"),
+  import("./freshnessPolicyService.js")
 ]);
 
 beforeEach(() => {
@@ -42,15 +44,18 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
-function seedPowerMetric(value = 42) {
+function seedPowerMetric(
+  value = 42,
+  timestamp = "2026-07-08T09:00:00.000Z"
+) {
   getDatabase()
     .prepare(
       `
         INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('realTimePower', ?, 'kW', '2026-07-08T09:00:00.000Z', 'good', '{}')
+        VALUES ('realTimePower', ?, 'kW', ?, 'good', '{}')
       `
     )
-    .run(value);
+    .run(value, timestamp);
 }
 
 test("shared monitoring story model keeps fallback diagnostics inspectable", () => {
@@ -62,7 +67,6 @@ test("shared monitoring story model keeps fallback diagnostics inspectable", () 
       unit: "kW"
     },
     isConnected: false,
-    now: "2026-05-13T10:30:00.000Z",
     reading: null
   });
 
@@ -100,6 +104,62 @@ test("shared monitoring summary state elevates stale bindings into warning tone"
   assert.equal(summary.alertTone, "warning");
   assert.equal(summary.fallbackReason, "stale-data");
   assert.equal(summary.freshnessState, "stale");
+});
+
+test("Display Story consumes the updated Server Freshness Policy", () => {
+  seedPowerMetric(42, new Date(Date.now() - 40_000).toISOString());
+  const readPower = () =>
+    readDisplayStory().overview.metrics.find(
+      (metric) => metric.metricKey === "realTimePower"
+    );
+
+  assert.equal(readPower()?.freshness?.state, "delayed");
+  const current = readFreshnessPolicy().policy;
+  updateFreshnessPolicy({
+    ...current,
+    realtime: {
+      ...current.realtime,
+      delayedAfterMs: 45_000
+    }
+  });
+  assert.equal(readPower()?.freshness?.state, "live");
+});
+
+test("Factory Circuit Story preserves authoritative freshness for slots and aggregate KPIs", () => {
+  const timestamp = new Date(Date.now() - 40_000).toISOString();
+  const metricKeys = [
+    "factoryStampingPower",
+    "factoryBodyPower",
+    "factoryPaintingPower",
+    "factoryAssemblyPower",
+    "factoryUtilityPower",
+    "factoryOfficePower"
+  ];
+  getDatabase()
+    .prepare(`DELETE FROM live_metric_values WHERE metric_key IN (${metricKeys.map(() => "?").join(", ")})`)
+    .run(...metricKeys);
+  assert.equal(
+    readDisplayStory().factoryCircuit.slots[0]?.freshness?.state,
+    "unavailable"
+  );
+
+  const insert = getDatabase().prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, 10, 'kW', ?, 'good', '{}')
+  `);
+  for (const metricKey of metricKeys) {
+    insert.run(metricKey, timestamp);
+  }
+
+  const factoryStory = readDisplayStory().factoryCircuit;
+  const totalPower = factoryStory.kpis.find(
+    (metric) => metric.metricKey === "totalPower"
+  );
+
+  assert.ok(factoryStory.freshnessPolicy);
+  assert.equal(factoryStory.slots[0]?.freshness?.state, "delayed");
+  assert.equal(totalPower?.freshness?.state, "delayed");
+  assert.equal(totalPower?.label, "廠區總用電");
 });
 
 test("readDisplayStory applies active display overrides after monitoring source resolution", () => {

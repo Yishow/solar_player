@@ -4,6 +4,7 @@ import {
   type DisplayPageHouseholdEquivalentCard,
   type DisplayPageHouseholdEquivalentCardPayload,
   resolveDisplayPageCardStatus,
+  resolveFreshnessPresentation,
   resolveDisplayPageMediaSource,
   type DisplayPageCardStatus,
   type DisplayPageMetricHighlightCard,
@@ -502,6 +503,16 @@ export function Sustainability({
                   </strong>
                   <span>{card.payload.unit}</span>
                   <small>{card.payload.label}</small>
+                  {card.payload.provenance?.freshness
+                    && card.payload.provenance.freshness.state !== "live" ? (
+                      <small>
+                        {resolveFreshnessPresentation(
+                          card.payload.provenance.freshness.state
+                        ).labelZh}
+                        {" · "}
+                        {card.payload.provenance.freshness.sourceTimestamp}
+                      </small>
+                    ) : null}
                 </>
               )}
             </article>
@@ -550,7 +561,15 @@ export function Sustainability({
               unit={isConfiguring ? "" : item.unit}
               value={isConfiguring ? displayPageCardConfiguringLabel : item.value}
             />
-            {index === 2 ? (
+            {!item.freshnessView.liveVisuals ? (
+              <DisplayCardFooter className="sustainability-card-footer">
+                <span>
+                  {item.freshnessView.labelZh}
+                  {" · "}
+                  {item.freshnessView.sourceTimestamp}
+                </span>
+              </DisplayCardFooter>
+            ) : index === 2 ? (
               <DisplayCardFooter className="sustainability-card-footer">
                 <div className="sustainability-growth-note">
                   <span>{viewModel.comparison.label}</span>

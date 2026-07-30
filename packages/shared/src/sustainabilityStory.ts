@@ -1,3 +1,5 @@
+import type { FreshnessResult } from "./freshnessPolicy.js";
+
 export const sustainabilityPeriodKeys = ["month", "quarter", "year", "lifetime"] as const;
 export const co2TreeEquivalentFactor = 6.25;
 
@@ -32,6 +34,7 @@ import {
 } from "./householdEquivalence.js";
 
 export type SustainabilityProvenance = {
+  freshness?: FreshnessResult;
   label: string;
   source: string;
   sourceClass: SustainabilitySourceClass;
@@ -132,6 +135,7 @@ function buildProvenance(
   defaults: SustainabilityProvenance
 ) {
   return {
+    freshness: input?.freshness ?? defaults.freshness,
     label: input?.label?.trim() || defaults.label,
     source: input?.source?.trim() || defaults.source,
     sourceClass: input?.sourceClass ?? defaults.sourceClass,

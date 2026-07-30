@@ -17,6 +17,7 @@ info:
     - MQTT settings (`/api/settings/mqtt`)
     - Image catalog list/upload (`/api/images`)
     - Display readiness (`/api/display-readiness`)
+    - Global freshness policy (`/api/freshness-policy`)
     - Device status diagnostics (`/api/device/status`)
 
     ## Explicitly excluded (non-exhaustive)
@@ -49,6 +50,8 @@ tags:
     description: Image asset catalog
   - name: Readiness
     description: Display readiness diagnostics
+  - name: Freshness
+    description: Server-authoritative runtime freshness policy
   - name: Device
     description: Device status diagnostics
 paths:
@@ -716,6 +719,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /api/freshness-policy:
+    get:
+      operationId: getFreshnessPolicy
+      summary: Read the global Freshness Policy
+      tags: [Freshness]
+      x-solar-access-class: trusted-management-read
+      responses:
+        "200":
+          description: Four-category Freshness Policy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policy, updatedAt]
+                properties:
+                  policy:
+                    type: object
+                  updatedAt:
+                    type: string
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
+    put:
+      operationId: updateFreshnessPolicy
+      summary: Replace the global Freshness Policy
+      tags: [Freshness]
+      x-solar-access-class: trusted-management-mutation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated four-category Freshness Policy
+        "400":
+          description: Invalid or non-increasing boundaries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Management access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagementAccessDenied"
 
   /api/device/status:
     get:

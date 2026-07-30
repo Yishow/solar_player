@@ -941,6 +941,11 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
       metrics: Record<
         string,
         {
+          freshness: {
+            category: string;
+            sourceTimestamp: string | null;
+            state: string;
+          };
           quality: string | null;
           timestamp: string;
           unit: string | null;
@@ -951,18 +956,40 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
     };
 
     assert.equal(body.timestamp, "2026-05-13T09:05:00.000Z");
-    assert.deepEqual(body.metrics.realTimePower, {
+    assert.deepEqual(
+      {
+        quality: body.metrics.realTimePower?.quality,
+        timestamp: body.metrics.realTimePower?.timestamp,
+        unit: body.metrics.realTimePower?.unit,
+        value: body.metrics.realTimePower?.value
+      },
+      {
       quality: "good",
       timestamp: "2026-05-13T09:00:00.000Z",
       unit: "kW",
       value: 586.2
-    });
-    assert.deepEqual(body.metrics.todayGeneration, {
+      }
+    );
+    assert.equal(body.metrics.realTimePower?.freshness.category, "realtime");
+    assert.equal(
+      body.metrics.realTimePower?.freshness.sourceTimestamp,
+      "2026-05-13T09:00:00.000Z"
+    );
+    assert.deepEqual(
+      {
+        quality: body.metrics.todayGeneration?.quality,
+        timestamp: body.metrics.todayGeneration?.timestamp,
+        unit: body.metrics.todayGeneration?.unit,
+        value: body.metrics.todayGeneration?.value
+      },
+      {
       quality: "good",
       timestamp: "2026-05-13T09:05:00.000Z",
       unit: "kWh",
       value: 2340
-    });
+      }
+    );
+    assert.equal(body.metrics.todayGeneration?.freshness.category, "daily");
   } finally {
     await app.close();
   }

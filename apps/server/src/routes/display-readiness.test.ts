@@ -158,7 +158,8 @@ test("GET /api/display-readiness keeps solar self-consumption ready through deri
           /self_consumption/i.test(finding.reason) &&
           /consumption/i.test(finding.reason)
       ),
-      true
+      true,
+      JSON.stringify(body.readiness.findings.filter((finding) => finding.pageId === "solar"))
     );
   } finally {
     await app.close();

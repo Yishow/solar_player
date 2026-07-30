@@ -29,6 +29,8 @@ import {
   type FactoryPlaybackPage
 } from "./factoryGenerationAggregateService.js";
 import { readPlaybackPages } from "./displayRotationService.js";
+import { evaluateMetricFreshness } from "./freshnessPolicyService.js";
+import { readFreshnessPolicy } from "./freshnessPolicyService.js";
 
 const settingKey = "sustainability_story";
 
@@ -661,7 +663,7 @@ export function readSustainabilityStory(
       mergePeriod(periodKey, storyConfig.periods[periodKey], counterMap, options)
     ])
   ) as SustainabilityStoryInput["periods"];
-  const story = normalizeSustainabilityStory({
+  const normalizedStory = normalizeSustainabilityStory({
     ...storyConfig,
     householdEquivalents:
       options.applyDisplayOverrides === false
@@ -669,11 +671,74 @@ export function readSustainabilityStory(
         : applyHouseholdDisplayOverrides(householdEquivalents),
     periods: derivedPeriods
   });
+  const now = options.now ?? new Date();
+  const withFreshness = (
+    provenance: SustainabilityProvenance,
+    metricKey: string
+  ): SustainabilityProvenance => {
+    const freshness = evaluateMetricFreshness({
+      metricKey,
+      nowMs: now.getTime(),
+      sourceTimestamp: provenance.updatedAt
+    });
+    return {
+      ...provenance,
+      freshness,
+      syncState:
+        freshness.state === "live"
+          ? provenance.syncState
+          : freshness.state === "unavailable"
+            ? "missing"
+            : freshness.state === "delayed"
+              ? "warning"
+              : "stale"
+    };
+  };
+  const story = {
+    ...normalizedStory,
+    periods: Object.fromEntries(
+      Object.entries(normalizedStory.periods).map(([periodKey, period]) => {
+        if (!period) {
+          return [periodKey, period];
+        }
+        return [
+          periodKey,
+          {
+            ...period,
+            bigNumberProvenance: {
+              accumulatedCarbonReductionTons: withFreshness(
+                period.bigNumberProvenance.accumulatedCarbonReductionTons,
+                "accumulatedCarbonReductionTons"
+              ),
+              accumulatedGenerationGwh: withFreshness(
+                period.bigNumberProvenance.accumulatedGenerationGwh,
+                "accumulatedGenerationGwh"
+              ),
+              annualEnergySavingPercent: withFreshness(
+                period.bigNumberProvenance.annualEnergySavingPercent,
+                "annualEnergySavingPercent"
+              ),
+              plantedTreeEquivalent: withFreshness(
+                period.bigNumberProvenance.plantedTreeEquivalent,
+                "plantedTreeEquivalent"
+              )
+            },
+            highlights: period.highlights.map((highlight) => ({
+              ...highlight,
+              provenance: withFreshness(highlight.provenance, "totalGeneration")
+            })),
+            provenance: withFreshness(period.provenance, "totalGeneration")
+          }
+        ];
+      })
+    ) as typeof normalizedStory.periods
+  };
   const resolved = resolveSustainabilityStoryPeriod(story, period);
 
   return {
     ...story,
-    generatedAt: (options.now ?? new Date()).toISOString(),
+    freshnessPolicy: readFreshnessPolicy().policy,
+    generatedAt: now.toISOString(),
     period: resolved.period,
     selectedPeriod: resolved.selectedPeriod
   };

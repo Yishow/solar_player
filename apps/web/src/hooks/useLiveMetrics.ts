@@ -9,6 +9,8 @@ import {
   useLiveMetricsStoreSelector,
   type LiveMetricsStoreState
 } from "./liveMetricsStore";
+import { useAppTime } from "./useAppTime";
+import { resolveClientFreshnessState } from "./useFreshnessState";
 
 export type UseLiveMetricsOptions = {
   enabled?: boolean;
@@ -19,6 +21,7 @@ export type LiveMetricsSelection = {
   isSocketConnected: boolean;
   lastUpdatedAt: LiveMetricsSnapshot["timestamp"];
   snapshot: LiveMetricsSnapshot;
+  snapshotReceivedAtMonotonicMs: number;
 };
 
 let initialSnapshotRequest: Promise<void> | null = null;
@@ -28,7 +31,8 @@ export function selectLiveMetricsSelection(state: LiveMetricsStoreState): LiveMe
     connectionState: state.connectionState.status,
     isSocketConnected: state.connectionState.status === "connected",
     lastUpdatedAt: state.snapshot.timestamp,
-    snapshot: state.snapshot
+    snapshot: state.snapshot,
+    snapshotReceivedAtMonotonicMs: state.snapshotReceivedAtMonotonicMs ?? 0
   };
 }
 
@@ -41,6 +45,7 @@ export function isLiveMetricsSelectionEqual(
     && current.isSocketConnected === next.isSocketConnected
     && current.lastUpdatedAt === next.lastUpdatedAt
     && current.snapshot === next.snapshot
+    && current.snapshotReceivedAtMonotonicMs === next.snapshotReceivedAtMonotonicMs
   );
 }
 
@@ -85,9 +90,47 @@ export function useLiveMetricsSelector<T>(
 }
 
 export function useLiveMetrics(options: UseLiveMetricsOptions = {}) {
-  return useLiveMetricsSelector(
+  const selection = useLiveMetricsSelector(
     selectLiveMetricsSelection,
     isLiveMetricsSelectionEqual,
     options
   );
+  const appTime = useAppTime();
+  if (
+    selection.isSocketConnected
+    || !selection.snapshot.freshnessPolicy
+  ) {
+    return selection;
+  }
+  const monotonicNow =
+    typeof performance === "undefined"
+      ? selection.snapshotReceivedAtMonotonicMs
+      : performance.now();
+  const elapsedMs = Math.max(
+    0,
+    monotonicNow - selection.snapshotReceivedAtMonotonicMs
+  );
+  return {
+    ...selection,
+    snapshot: {
+      ...selection.snapshot,
+      metrics: Object.fromEntries(
+        Object.entries(selection.snapshot.metrics).map(([metricKey, reading]) => [
+          metricKey,
+          reading.freshness
+            ? {
+                ...reading,
+                freshness: resolveClientFreshnessState({
+                  connected: false,
+                  elapsedMonotonicMs: elapsedMs,
+                  policy: selection.snapshot.freshnessPolicy!,
+                  serverFreshness: reading.freshness,
+                  timeSyncState: appTime.state
+                })
+              }
+            : reading
+        ])
+      )
+    }
+  };
 }

@@ -174,7 +174,7 @@ function seedDisplayStoryFixture() {
 
 function seedPageScopedFactoryCircuitFixture() {
   const database = getDatabase();
-  const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database.prepare("DELETE FROM circuit_configs").run();
   database.prepare("DELETE FROM live_metric_values").run();
   database
@@ -284,7 +284,7 @@ function seedPageScopedFactoryCircuitFixture() {
       1
     );
     insertTopic.run(metricKey, `factory/jungli/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
-    insertMetric.run(metricKey, value, "kW", `${today}T09:00:00.000Z`, "good", `{"value":${value}}`);
+    insertMetric.run(metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
   }
 
   for (const [index, [slotKey, label, metricKey, value]] of guanyinSlots.entries()) {
@@ -307,7 +307,7 @@ function seedPageScopedFactoryCircuitFixture() {
       1
     );
     insertTopic.run(metricKey, `factory/guanyin/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
-    insertMetric.run(metricKey, value, "kW", `${today}T09:00:00.000Z`, "good", `{"value":${value}}`);
+    insertMetric.run(metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
   }
 
   return { guanyinSlots, jungliSlots };
@@ -707,7 +707,7 @@ test("GET /api/display-story resolves Factory Circuit circuit data by page key",
 test("GET /api/display-story derives Factory Circuit peak from the configured multiplier metric", async () => {
   seedPageScopedFactoryCircuitFixture();
   const database = getDatabase();
-  const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database
     .prepare(
       `
@@ -728,7 +728,7 @@ test("GET /api/display-story derives Factory Circuit peak from the configured mu
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryPeakMultiplier", 1.2, "x", `${today}T09:00:00.000Z`, "good", "{\"value\":1.2}");
+    .run("factoryPeakMultiplier", 1.2, "x", observedAt, "good", "{\"value\":1.2}");
   const app = await buildApp();
 
   try {
@@ -995,9 +995,24 @@ test("GET /api/display-story remains compatible with page-scoped readers during 
     assert.equal(overviewBody.pageId, "overview");
     assert.equal(solarBody.pageId, "solar");
     assert.equal(factoryBody.pageId, "factory-circuit");
-    assert.deepEqual(overviewBody.payload, aggregateBody.overview);
-    assert.deepEqual(solarBody.payload, aggregateBody.solar);
-    assert.deepEqual(factoryBody.payload, aggregateBody.factoryCircuit);
+    const withoutEvaluationClock = (payload: unknown) =>
+      JSON.parse(
+        JSON.stringify(payload, (key, value) =>
+          key === "ageMs" || key === "nextTransitionAt" ? undefined : value
+        )
+      );
+    assert.deepEqual(
+      withoutEvaluationClock(overviewBody.payload),
+      withoutEvaluationClock(aggregateBody.overview)
+    );
+    assert.deepEqual(
+      withoutEvaluationClock(solarBody.payload),
+      withoutEvaluationClock(aggregateBody.solar)
+    );
+    assert.deepEqual(
+      withoutEvaluationClock(factoryBody.payload),
+      withoutEvaluationClock(aggregateBody.factoryCircuit)
+    );
   } finally {
     await app.close();
   }

@@ -4,6 +4,7 @@ import type { LiveMetricsSnapshot, SocketConnectionState } from "../services/soc
 export type LiveMetricsStoreState = {
   connectionState: SocketConnectionState;
   snapshot: LiveMetricsSnapshot;
+  snapshotReceivedAtMonotonicMs?: number;
 };
 
 type EqualityFn<T> = (current: T, next: T) => boolean;
@@ -192,7 +193,9 @@ export function createLiveMetricsStore(
 
       state = {
         ...state,
-        snapshot: nextSnapshot
+        snapshot: nextSnapshot,
+        snapshotReceivedAtMonotonicMs:
+          typeof performance === "undefined" ? 0 : performance.now()
       };
       emitChange();
       return true;

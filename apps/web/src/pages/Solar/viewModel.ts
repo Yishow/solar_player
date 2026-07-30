@@ -6,6 +6,7 @@ import type {
 } from "@solar-display/shared";
 import {
   resolveMonitoringMetricBinding,
+  resolveFreshnessPresentation,
   resolvePlaybackDisplayMetricSourceClass,
   resolveSolarComparison,
   resolveSolarFlowState
@@ -150,6 +151,18 @@ function resolveMetricValue(
   });
 }
 
+function buildFreshnessView(
+  freshness: LiveMetricsSnapshot["metrics"][string]["freshness"]
+) {
+  if (!freshness) {
+    return null;
+  }
+  return {
+    ...resolveFreshnessPresentation(freshness.state),
+    sourceTimestamp: freshness.sourceTimestamp
+  };
+}
+
 export function buildSolarViewModel({
   comparisonTargets,
   isSocketConnected,
@@ -195,6 +208,12 @@ export function buildSolarViewModel({
         dependencyKeys: resolved.dependencyKeys,
         fallbackReason: resolved.fallbackReason,
         fallbackStrategy: resolved.fallbackStrategy,
+        freshness: snapshot.metrics[binding.metricKey]?.freshness
+          ?? ("freshness" in resolved ? resolved.freshness : undefined),
+        freshnessView: buildFreshnessView(
+          snapshot.metrics[binding.metricKey]?.freshness
+            ?? ("freshness" in resolved ? resolved.freshness : undefined)
+        ),
         freshnessState: resolved.freshnessState,
         helper: resolved.helper,
         iconKey: binding.iconKey,
@@ -238,7 +257,11 @@ export function buildSolarViewModel({
       },
       kpis,
       story: {
-        flowState: solarStory.story.flowState
+        flowState:
+          snapshot.metrics.realTimePower?.freshness
+          && snapshot.metrics.realTimePower.freshness.state !== "live"
+            ? { reason: "socket-disconnected" as const, state: "standby" as const }
+            : solarStory.story.flowState
       }
     };
   }
@@ -263,9 +286,12 @@ export function buildSolarViewModel({
     isSocketConnected,
     snapshot
   );
+  const powerIsLive =
+    snapshot.metrics.realTimePower?.freshness?.state === undefined
+    || snapshot.metrics.realTimePower.freshness.state === "live";
   const flowState = resolveSolarFlowState({
     efficiencyPercent: isSocketConnected ? snapshot.metrics.systemEfficiency?.value ?? null : null,
-    isConnected: isSocketConnected,
+    isConnected: isSocketConnected && powerIsLive,
     powerKw: isSocketConnected ? snapshot.metrics.realTimePower?.value ?? null : null
   });
 
@@ -294,6 +320,8 @@ export function buildSolarViewModel({
         dependencyKeys: resolved.dependencyKeys,
         fallbackReason: resolved.fallbackReason,
         fallbackStrategy: resolved.fallbackStrategy,
+        freshness: resolved.freshness,
+        freshnessView: buildFreshnessView(resolved.freshness),
         freshnessState: resolved.freshnessState,
         helper: resolved.helper,
         iconKey: binding.iconKey,

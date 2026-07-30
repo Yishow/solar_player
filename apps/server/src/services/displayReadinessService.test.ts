@@ -13,12 +13,14 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readDisplayReadinessReport }
+  { readDisplayReadinessReport },
+  { readFreshnessPolicy, updateFreshnessPolicy }
 ] = await Promise.all([
   import("../db/index.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
-  import("./displayReadinessService.js")
+  import("./displayReadinessService.js"),
+  import("./freshnessPolicyService.js")
 ]);
 
 function insertFactorySummary(
@@ -181,4 +183,30 @@ test("Sustainability readiness reports no factory selected when both factory pag
   assert.equal(finding?.status, "blocking");
   assert.equal(finding?.reason, "no factory selected in playback settings");
   assert.equal(finding?.sourceId, null);
+});
+
+test("Readiness consumes the same updated Freshness Policy boundary", () => {
+  getDatabase().prepare(`
+    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('factoryStampingPower', 120, 'kW', '2026-07-30T11:59:20.000Z', 'good', '{}')
+  `).run();
+  const now = new Date("2026-07-30T12:00:00.000Z");
+  const readFinding = () =>
+    readDisplayReadinessReport({ now, siteScope: "cl" }).findings.find(
+      (finding) =>
+        finding.pageId === "factory-circuit"
+        && finding.requirementKey === "factoryStampingPower"
+    );
+
+  assert.equal(readFinding()?.freshness?.state, "delayed");
+  const current = readFreshnessPolicy().policy;
+  updateFreshnessPolicy({
+    ...current,
+    realtime: {
+      delayedAfterMs: 45_000,
+      staleAfterMs: current.realtime.staleAfterMs,
+      historicalAfterMs: current.realtime.historicalAfterMs
+    }
+  });
+  assert.equal(readFinding()?.freshness?.state, "live");
 });

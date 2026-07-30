@@ -294,6 +294,11 @@ export function FactoryCircuit({
     dependencyKey: circuitsRuntimeSource.dependencyKey,
     enabled: runtimeHydrationEnabled
   });
+  const totalPowerFreshness = factoryStoryRuntime.payload?.kpis.find(
+    (kpi) => kpi.metricKey === "totalPower"
+  )?.freshness;
+  const shouldAnimateFactoryFlow =
+    totalPowerFreshness?.state === "live";
 
   const runtimeResolvedConfig = config ?? runtimeConfig.config;
   const resolvedConfig = useMemo<FactoryCircuitDisplayPageConfig>(() => {
@@ -560,7 +565,7 @@ export function FactoryCircuit({
           viewBox="0 0 60 16"
         >
           <line x1={0} y1={8} x2={60} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={0} y1={8} x2={60} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-60" />
+          <line x1={0} y1={8} x2={60} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className={shouldAnimateFactoryFlow ? "fc-flow-60" : undefined} />
         </svg>
 
         {/* 逆變器到配電盤向量連線 */}
@@ -575,7 +580,7 @@ export function FactoryCircuit({
           viewBox="0 0 78 16"
         >
           <line x1={0} y1={8} x2={78} y2={8} stroke="rgba(82, 125, 59, 0.25)" strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className="fc-flow-78" />
+          <line x1={0} y1={8} x2={78} y2={8} stroke="#527d3b" strokeWidth={2.5} strokeLinecap="round" className={shouldAnimateFactoryFlow ? "fc-flow-78" : undefined} />
         </svg>
 
         <svg
@@ -619,7 +624,9 @@ export function FactoryCircuit({
                 strokeLinejoin="round"
                 style={{
                   strokeDasharray: `24 ${pathLength - 24}`,
-                  animation: `factory-energy-flow-generic ${duration}s linear infinite`,
+                  animation: shouldAnimateFactoryFlow
+                    ? `factory-energy-flow-generic ${duration}s linear infinite`
+                    : "none",
                   "--fc-offset-target": `-${pathLength}px`,
                   filter: "drop-shadow(0 0 2px rgba(82, 125, 59, 0.6)) drop-shadow(0 0 4px rgba(82, 125, 59, 0.4))"
                 } as CSSProperties & Record<"--fc-offset-target", string>}

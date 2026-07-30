@@ -20,6 +20,9 @@ import {
   resolveFactoryGenerationScope
 } from "./factoryGenerationAggregateService.js";
 import { readDefaultPlaybackPageRows } from "./playbackProfileService.js";
+import { resolveLiveMetricRequirementsForPage } from "@solar-display/shared";
+import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { evaluatePageFreshnessForRequirements } from "./freshnessPolicyService.js";
 
 type TopicMappingRow = {
   enabled: number;
@@ -335,10 +338,64 @@ export function readDisplayReadinessReport(
   options: { now?: Date; siteScope?: SiteScope } = {}
 ): DisplayReadinessReport {
   const now = options.now ?? new Date();
-  const findings = [
+  const rawFindings = [
     ...buildMetricFindings(now, options.siteScope),
     ...buildSlotFindings(options.siteScope)
   ];
+  const liveMetrics = readLiveMetricsSnapshot(getDatabase()).metrics;
+  const findings = rawFindings.map((finding) => {
+    if (finding.sourceType === "circuit-slot") {
+      return finding;
+    }
+    const factoryScope = options.siteScope
+      ? options.siteScope
+      : finding.pageId === "sustainability"
+        ? readSustainabilityFactoryScope().toLowerCase()
+        : "cl+kn";
+    const factoryMetricKeys = factoryGenerationRequirementKeys.has(
+      finding.requirementKey
+    )
+      ? factoryGenerationDependencyKeys.filter(
+          (metricKey) =>
+            factoryScope === "cl+kn"
+            || metricKey.startsWith(`factoryGeneration.${factoryScope}.`)
+        )
+      : [];
+    const requirement =
+      factoryMetricKeys.length > 0
+        ? {
+            alternatives: [factoryMetricKeys],
+            requirementKey: finding.requirementKey
+          }
+        : resolveLiveMetricRequirementsForPage(
+            finding.pageId,
+            options.siteScope
+          ).find((candidate) => candidate.requirementKey === finding.requirementKey);
+    if (!requirement) {
+      return finding;
+    }
+    const freshness = evaluatePageFreshnessForRequirements({
+      metrics: liveMetrics,
+      nowMs: now.getTime(),
+      requirements: [requirement]
+    });
+    const metricFreshness = freshness.freshness;
+    if (!metricFreshness) {
+      return finding;
+    }
+    return {
+      ...finding,
+      freshness: metricFreshness,
+      ...(finding.status === "ready"
+        && metricFreshness.state !== "live"
+        && metricFreshness.state !== "unavailable"
+        ? {
+            reason: `${finding.reason}; freshness=${metricFreshness.state}`,
+            status: "warning" as const
+          }
+        : {})
+    };
+  });
   const pageIds = [...new Set(findings.map((finding) => finding.pageId))];
   const pages = pageIds.map((pageId) =>
     toPageSummary(

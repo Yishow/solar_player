@@ -42,7 +42,7 @@ function seedFactoryGenerationSummary(
 function seedCardDataFixture() {
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
-  const timestamp = `${today}T09:00:00.000Z`;
+  const timestamp = new Date().toISOString();
   database.prepare("DELETE FROM live_metric_values").run();
   database
     .prepare(
@@ -89,7 +89,7 @@ function seedCardDataFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("realTimePower", 42, "kW", `${today}T09:00:00.000Z`, "good", "{\"value\":42}");
+    .run("realTimePower", 42, "kW", timestamp, "good", "{\"value\":42}");
   database
     .prepare(
       `
@@ -97,7 +97,7 @@ function seedCardDataFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("selfConsumptionEnergy", 30, "kWh", `${today}T09:00:00.000Z`, "good", "{\"value\":30}");
+    .run("selfConsumptionEnergy", 30, "kWh", timestamp, "good", "{\"value\":30}");
   database
     .prepare(
       `
@@ -105,7 +105,7 @@ function seedCardDataFixture() {
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("consumptionEnergy", 40, "kWh", `${today}T09:00:00.000Z`, "good", "{\"value\":40}");
+    .run("consumptionEnergy", 40, "kWh", timestamp, "good", "{\"value\":40}");
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -129,7 +129,7 @@ function seedCardDataFixture() {
           last_updated = excluded.last_updated
       `
     )
-    .run("selfConsumption", 360, `${today}T09:00:00.000Z`);
+    .run("selfConsumption", 360, timestamp);
   database
     .prepare(
       `
@@ -140,7 +140,7 @@ function seedCardDataFixture() {
           last_updated = excluded.last_updated
       `
     )
-    .run("generation", 18600000, `${today}T09:00:00.000Z`);
+    .run("generation", 18600000, timestamp);
   database
     .prepare(
       `
@@ -151,13 +151,14 @@ function seedCardDataFixture() {
           last_updated = excluded.last_updated
       `
     )
-    .run("consumption", 6000, `${today}T09:00:00.000Z`);
+    .run("consumption", 6000, timestamp);
 }
 
 function seedPageScopedFactoryCardDataFixture() {
   seedCardDataFixture();
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database.prepare("DELETE FROM circuit_configs").run();
   const insertCircuit = database.prepare(
     `
@@ -243,8 +244,8 @@ function seedPageScopedFactoryCardDataFixture() {
   );
   insertTopic.run("factoryStampingPower", "factory/jungli/stamping", "kW", "$.value", 1, 0, 2, 1);
   insertTopic.run("factoryCircuit.guanyin.stampingPower", "factory/guanyin/stamping", "kW", "$.value", 1, 0, 2, 1);
-  insertMetric.run("factoryStampingPower", 10, "kW", `${today}T09:00:00.000Z`, "good", "{\"value\":10}");
-  insertMetric.run("factoryCircuit.guanyin.stampingPower", 20, "kW", `${today}T09:00:00.000Z`, "good", "{\"value\":20}");
+  insertMetric.run("factoryStampingPower", 10, "kW", observedAt, "good", "{\"value\":10}");
+  insertMetric.run("factoryCircuit.guanyin.stampingPower", 20, "kW", observedAt, "good", "{\"value\":20}");
 }
 
 test("GET /api/display-card-data exposes monitoring card diagnostics", async () => {
@@ -349,6 +350,7 @@ test("GET /api/display-card-data identifies live today generation fallback for t
   seedCardDataFixture();
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database
     .prepare(
@@ -369,7 +371,7 @@ test("GET /api/display-card-data identifies live today generation fallback for t
         VALUES ('todayGeneration', 7.99, 'MWh', ?, 'good', '{}')
       `
     )
-    .run(`${today}T09:00:00.000Z`);
+    .run(observedAt);
   const app = await buildApp();
 
   try {
@@ -404,7 +406,7 @@ test("GET /api/display-card-data identifies live today generation fallback for t
 test("GET /api/display-card-data marks factory self-consumption ready when today generation fallback is active", async () => {
   seedCardDataFixture();
   const database = getDatabase();
-  const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database
     .prepare("UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?")
     .run("solar/KN/today_mwh", "todayGeneration");
@@ -424,7 +426,7 @@ test("GET /api/display-card-data marks factory self-consumption ready when today
           raw_payload = excluded.raw_payload
       `
     )
-    .run(`${today}T09:00:00.000Z`);
+    .run(observedAt);
   const app = await buildApp();
 
   try {
@@ -508,7 +510,7 @@ test("GET /api/display-card-data exposes sustainability numeric card diagnostics
 test("GET /api/display-card-data exposes Factory Circuit slot power diagnostics", async () => {
   seedCardDataFixture();
   const database = getDatabase();
-  const today = toLocalDateKey(new Date());
+  const observedAt = new Date().toISOString();
   database
     .prepare(
       `
@@ -516,7 +518,7 @@ test("GET /api/display-card-data exposes Factory Circuit slot power diagnostics"
         VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryStampingPower", 790, "kW", `${today}T09:00:00.000Z`, "good", "{\"value\":790}");
+    .run("factoryStampingPower", 790, "kW", observedAt, "good", "{\"value\":790}");
   const app = await buildApp();
 
   try {

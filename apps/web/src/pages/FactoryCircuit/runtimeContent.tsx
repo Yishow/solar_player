@@ -263,7 +263,15 @@ export function FactoryCircuitRuntimeContent({
               value={isConfiguring ? displayPageCardConfiguringLabel : metric.value}
             />
             <DisplayCardFooter>
-              <Sparkline className="factory-circuit-kpi-sparkline" values={kpiSparklineValues[index]!} />
+              {metric.freshnessView && !metric.freshnessView.liveVisuals ? (
+                <span>
+                  {metric.freshnessView.labelZh}
+                  {" · "}
+                  {metric.freshnessView.sourceTimestamp}
+                </span>
+              ) : (
+                <Sparkline className="factory-circuit-kpi-sparkline" values={kpiSparklineValues[index]!} />
+              )}
             </DisplayCardFooter>
           </DisplayCardFrame>
         );

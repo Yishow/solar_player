@@ -502,7 +502,6 @@ export function buildOverviewViewModel({
   connectionState,
   isSocketConnected,
   metricBindings = metricCards,
-  now,
   snapshot,
   storyOverview,
   summaryMetricKeys,
@@ -525,6 +524,7 @@ export function buildOverviewViewModel({
         dependencyKeys: metricCard.dependencyKeys,
         fallbackStrategy: metricCard.fallbackStrategy,
         fallbackReason: metricCard.fallbackReason,
+        freshness: snapshot.metrics[metricCard.metricKey]?.freshness,
         freshnessState: metricCard.freshnessState,
         helper: metricCard.helper,
         iconKey,
@@ -557,7 +557,6 @@ export function buildOverviewViewModel({
         fallbackValue: fallbackMetric.value
       },
       isConnected: isSocketConnected,
-      now,
       reading: snapshot.metrics[binding.metricKey] ?? null
     });
 
@@ -568,6 +567,7 @@ export function buildOverviewViewModel({
       dependencyKeys: resolved.dependencyKeys,
       fallbackStrategy: resolved.fallbackStrategy,
       fallbackReason: resolved.fallbackReason,
+      freshness: resolved.freshness,
       freshnessState: resolved.freshnessState,
       helper: resolved.helper,
       iconKey,

@@ -323,6 +323,39 @@ test("buildSustainabilityViewModel exposes source tooltip metadata for aggregate
   assert.match(accumulatedGeneration?.sourceTooltip ?? "", /Topic: --/);
 });
 
+test("historical Sustainability values expose provenance and disable live visuals", () => {
+  const historicalStory = structuredClone(periodStory);
+  historicalStory.periods.lifetime!.bigNumberProvenance!.accumulatedGenerationGwh = {
+    label: "累積發電",
+    source: "CL + KN MQTT aggregate",
+    sourceClass: "runtime-aggregate",
+    syncState: "stale",
+    updatedAt: "2026-07-29T00:00:00.000Z",
+    freshness: {
+      ageFrozen: false,
+      ageMs: 86_400_000,
+      category: "cumulative",
+      nextTransitionAt: null,
+      sourceTimestamp: "2026-07-29T00:00:00.000Z",
+      state: "historical"
+    }
+  };
+
+  const model = buildSustainabilityViewModel({
+    selectedPeriod: "lifetime",
+    story: historicalStory
+  });
+  const generation = model.bigNumbers[0]!;
+
+  assert.equal(generation.freshnessView.label, "Historical snapshot");
+  assert.equal(generation.freshnessView.labelZh, "歷史快照");
+  assert.equal(generation.freshnessView.liveVisuals, false);
+  assert.equal(
+    generation.freshnessView.sourceTimestamp,
+    "2026-07-29T00:00:00.000Z"
+  );
+});
+
 test("buildSustainabilityViewModel provides reference-like fallback values for display playback", () => {
   const model = buildSustainabilityViewModel({});
 

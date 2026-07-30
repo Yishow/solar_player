@@ -21,6 +21,7 @@ import type {
   DisplayPageFreeformObject,
   DisplayPageId,
   DisplayReadinessReport,
+  FreshnessPolicy,
   ImageAsset,
   ManagementDraftSaveConflict,
   ManagementDraftSavePrecondition,
@@ -265,6 +266,22 @@ export async function getPlaybackSettings() {
     settings: PlaybackSettings;
   }>("/api/playback/settings");
   return response.settings;
+}
+
+export async function getFreshnessPolicy() {
+  return requestJson<{ policy: FreshnessPolicy; updatedAt: string }>(
+    "/api/freshness-policy"
+  );
+}
+
+export async function updateFreshnessPolicy(policy: FreshnessPolicy) {
+  return requestJson<{ policy: FreshnessPolicy; updatedAt: string }>(
+    "/api/freshness-policy",
+    {
+      body: JSON.stringify(policy),
+      method: "PUT"
+    }
+  );
 }
 
 export async function getPlaybackProfiles() {
@@ -813,7 +830,13 @@ export async function fetchSustainabilityStory(period?: SustainabilityPeriodKey)
       period
     }).toString()}`
     : "";
-  return requestJson<{ story: SustainabilityStory & { generatedAt: string; period: SustainabilityPeriodStory } }>(
+  return requestJson<{
+    story: SustainabilityStory & {
+      freshnessPolicy: FreshnessPolicy;
+      generatedAt: string;
+      period: SustainabilityPeriodStory;
+    };
+  }>(
     `/api/sustainability-story${query}`
   );
 }

@@ -156,6 +156,29 @@ test("buildOverviewViewModel prefers live metrics when socket data is available"
   assert.equal(model.metrics[1]?.value, "3,842");
 });
 
+test("buildOverviewViewModel preserves Server-authoritative non-live provenance", () => {
+  const nonLiveSnapshot = structuredClone(snapshot);
+  nonLiveSnapshot.metrics.realTimePower!.freshness = {
+    ageFrozen: false,
+    ageMs: 90_000,
+    category: "realtime",
+    nextTransitionAt: "2026-05-13T10:30:00.000Z",
+    sourceTimestamp: "2026-05-13T10:00:00.000Z",
+    state: "stale"
+  };
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot: nonLiveSnapshot
+  });
+
+  const power = model.metrics.find(
+    (metric) => metric.metricKey === "realTimePower"
+  );
+  assert.equal(power?.freshness?.state, "stale");
+  assert.equal(power?.freshnessState, "stale");
+});
+
 test("buildOverviewViewModel falls back to mock presentation when live metrics are unavailable", () => {
   const model = buildOverviewViewModel({
     connectionState: "disconnected",
@@ -176,16 +199,31 @@ test("buildOverviewViewModel supports declarative KPI bindings and summary diagn
   const model = buildOverviewViewModel({
     connectionState: "connected",
     isSocketConnected: true,
-    now: "2026-05-13T10:30:00.000Z",
     snapshot: {
       metrics: {
         totalGeneration: {
+          freshness: {
+            ageFrozen: false,
+            ageMs: 4_800_000,
+            category: "cumulative",
+            nextTransitionAt: "2026-05-14T09:10:00.000Z",
+            sourceTimestamp: "2026-05-13T09:10:00.000Z",
+            state: "stale"
+          },
           quality: "good",
           timestamp: "2026-05-13T09:10:00.000Z",
           unit: "kWh",
           value: 18642
         },
         todayGeneration: {
+          freshness: {
+            ageFrozen: false,
+            ageMs: 120_000,
+            category: "daily",
+            nextTransitionAt: "2026-05-14T12:28:00.000Z",
+            sourceTimestamp: "2026-05-13T10:28:00.000Z",
+            state: "live"
+          },
           quality: "good",
           timestamp: "2026-05-13T10:28:00.000Z",
           unit: "kWh",

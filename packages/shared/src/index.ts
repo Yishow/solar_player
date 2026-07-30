@@ -11,6 +11,7 @@ export * from "./householdEquivalence.js";
 export * from "./displayOps.js";
 export * from "./displayReadiness.js";
 export * from "./displayPageFreshness.js";
+export * from "./freshnessPolicy.js";
 export * from "./playbackMetricContract.js";
 export * from "./deviceDisplayOps.js";
 export * from "./displayStory.js";
