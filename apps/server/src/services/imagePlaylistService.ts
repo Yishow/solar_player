@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   resolveActiveImagePlaylistEntry,
@@ -267,6 +268,14 @@ function fileSource(filename: string | null) {
   return existsSync(resolve(config.uploadsDir, filename)) ? `/uploads/images/${filename}` : null;
 }
 
+function fileHash(source: string | null) {
+  if (!source?.startsWith("/uploads/images/")) return null;
+  const filename = source.slice("/uploads/images/".length);
+  const filePath = resolve(config.uploadsDir, filename);
+  if (!existsSync(filePath)) return null;
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
 function ensureBootstrappedEntries() {
   ensurePlaylistTable();
   const database = getDatabase();
@@ -469,7 +478,10 @@ function buildResolvedImagePlaylist(activeIndex = 0) {
     assets: resolveAssets(),
     coverAssetSource: coverAssetSource(),
     entries: runtimeEntries.entries
-  });
+  }).map((entry) => ({
+    ...entry,
+    assetHash: fileHash(entry.assetSource)
+  }));
 
   return {
     activeEntry: resolveActiveImagePlaylistEntry(entries, activeIndex),

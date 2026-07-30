@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -287,8 +288,8 @@ test("POST /api/images can mark an uploaded image as playable in the runtime pla
     assert.equal(playlistResponse.statusCode, 200);
     const playlistBody = playlistResponse.json() as {
       playlist: {
-        activeEntry: { assetId: string | null; assetSource: string | null; enabled: boolean } | null;
-        entries: Array<{ assetId: string | null; assetSource: string | null; enabled: boolean }>;
+        activeEntry: { assetHash: string | null; assetId: string | null; assetSource: string | null; enabled: boolean } | null;
+        entries: Array<{ assetHash: string | null; assetId: string | null; assetSource: string | null; enabled: boolean }>;
       };
     };
 
@@ -296,6 +297,10 @@ test("POST /api/images can mark an uploaded image as playable in the runtime pla
     assert.equal(playlistBody.playlist.entries[0]?.assetId, String(uploadBody.data.id));
     assert.equal(playlistBody.playlist.entries[0]?.enabled, true);
     assert.match(playlistBody.playlist.entries[0]?.assetSource ?? "", /\/uploads\/images\//);
+    assert.equal(
+      playlistBody.playlist.entries[0]?.assetHash,
+      createHash("sha256").update(pngBuffer).digest("hex")
+    );
     assert.equal(playlistBody.playlist.activeEntry?.assetId, String(uploadBody.data.id));
 
     const governanceResponse = await app.inject({

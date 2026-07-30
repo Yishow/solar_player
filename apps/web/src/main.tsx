@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { installReactGrabDevtools } from "@devtools/react-grab-bootstrap";
 import { router } from "./app/router";
+import { useSafeAppUpdate } from "./hooks/useSafeAppUpdate";
 import { installCrashRecovery } from "./recovery/installCrashRecovery";
 import "./styles/global.css";
 import "./styles/management.css";
@@ -19,8 +20,20 @@ if (import.meta.env.DEV) {
 
 installCrashRecovery();
 
+function AppUpdateManager() {
+  useSafeAppUpdate();
+  return null;
+}
+
+if ("serviceWorker" in navigator && !import.meta.env.DEV) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js", { type: "module" });
+  }, { once: true });
+}
+
 createRoot(rootElement).render(
   <StrictMode>
+    <AppUpdateManager />
     <RouterProvider router={router} />
   </StrictMode>
 );

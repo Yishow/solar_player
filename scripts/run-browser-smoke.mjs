@@ -100,20 +100,21 @@ async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 250 } = {})
   );
 }
 
-async function loadChromiumExecutable() {
+async function loadBrowserExecutable(browserName) {
   try {
     const playwright = await import("playwright");
-    const executablePath = playwright.chromium.executablePath();
+    const browserType = playwright[browserName];
+    const executablePath = browserType.executablePath();
     if (!executablePath || !existsSync(executablePath)) {
-      throw new Error(`Chromium executable missing at ${executablePath ?? "(unknown)"}`);
+      throw new Error(`${browserName} executable missing at ${executablePath ?? "(unknown)"}`);
     }
     return executablePath;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       [
-        "Playwright Chromium is unavailable for browser smoke.",
-        "Run `pnpm install`, then `pnpm exec playwright install chromium`, and retry `pnpm browser:smoke`.",
+        `Playwright ${browserName} is unavailable for browser smoke.`,
+        `Run \`pnpm install\`, then \`pnpm exec playwright install ${browserName}\`, and retry \`pnpm browser:smoke\`.`,
         detail
       ].join(" ")
     );
@@ -281,6 +282,8 @@ async function main() {
   const envFilePath = path.join(workRoot, "browser-smoke.env");
   const networkLogPath = path.join(workRoot, "network-summary.json");
   const runtimeManifestPath = path.join(runtimeDir, "runtime-manifest.json");
+  const serverControlPath = path.join(runtimeDir, "server-control.json");
+  const serverControlStatusPath = path.join(runtimeDir, "server-control-status.json");
 
   await mkdir(dataDir, { recursive: true });
   await mkdir(uploadsDir, { recursive: true });
@@ -305,6 +308,7 @@ async function main() {
   let exitCode = 1;
   let failureEvidence = null;
   let originalError = null;
+  let serverControlTimer = null;
 
   try {
     if (!(await isPortFree(SMOKE_HOST, SMOKE_PORT))) {
@@ -313,8 +317,11 @@ async function main() {
       );
     }
 
-    const chromiumPath = await loadChromiumExecutable();
-    console.log(`[browser-smoke] chromium=${chromiumPath}`);
+    const browserName = process.env.BROWSER_SMOKE_ENGINE === "firefox"
+      ? "firefox"
+      : "chromium";
+    const browserPath = await loadBrowserExecutable(browserName);
+    console.log(`[browser-smoke] ${browserName}=${browserPath}`);
 
     if (!skipBuild) {
       // Emit the same production assets as `pnpm build` (shared → web dist → server dist).
@@ -364,6 +371,8 @@ async function main() {
       networkLogPath,
       port: SMOKE_PORT,
       runId,
+      serverControlPath,
+      serverControlStatusPath,
       uploadsDir,
       workRoot
     };
@@ -399,6 +408,44 @@ async function main() {
       );
     }
 
+    let handledControlId = null;
+    let handlingControl = false;
+    serverControlTimer = setInterval(async () => {
+      if (handlingControl || !existsSync(serverControlPath)) return;
+      handlingControl = true;
+      try {
+        const command = JSON.parse(
+          await readFile(serverControlPath, "utf8")
+        );
+        if (!command?.id || command.id === handledControlId) return;
+        if (command.action === "stop") {
+          await serverHandle?.stop();
+          serverHandle = null;
+        } else if (command.action === "start") {
+          if (!serverHandle) {
+            serverHandle = spawnServer({ env: serverEnv, logPath: serverLogPath });
+            await waitForHealth(`${BASE_URL}/health`);
+          }
+        } else {
+          throw new Error(`Unknown server control action: ${command.action}`);
+        }
+        handledControlId = command.id;
+        await writeFile(serverControlStatusPath, JSON.stringify({
+          action: command.action,
+          id: command.id,
+          status: "completed"
+        }));
+      } catch (error) {
+        await writeFile(serverControlStatusPath, JSON.stringify({
+          error: error instanceof Error ? error.message : String(error),
+          status: "failed"
+        }));
+      } finally {
+        handlingControl = false;
+      }
+    }, 100);
+    serverControlTimer.unref?.();
+
     console.log("[browser-smoke] health ok; launching Playwright (workers=1)...");
     const playwrightEnv = {
       ...process.env,
@@ -411,19 +458,23 @@ async function main() {
       PLAYWRIGHT_HTML_REPORT: path.join(workRoot, "playwright-report")
     };
 
+    const browserSmokeArgs = [
+      "exec",
+      "playwright",
+      "test",
+      "--config",
+      "playwright.config.ts",
+      "--output",
+      playwrightOutputDir,
+      "--workers=1",
+      "--reporter=line"
+    ];
+    if (process.env.BROWSER_SMOKE_GREP) {
+      browserSmokeArgs.push("--grep", process.env.BROWSER_SMOKE_GREP);
+    }
     exitCode = await runCommand(
       "pnpm",
-      [
-        "exec",
-        "playwright",
-        "test",
-        "--config",
-        "playwright.config.ts",
-        "--output",
-        playwrightOutputDir,
-        "--workers=1",
-        "--reporter=line"
-      ],
+      browserSmokeArgs,
       {
         env: playwrightEnv
       }
@@ -471,6 +522,9 @@ async function main() {
       `[browser-smoke] ${originalError.stack ?? originalError.message}`
     );
   } finally {
+    if (serverControlTimer) {
+      clearInterval(serverControlTimer);
+    }
     let cleanupError = null;
     try {
       if (serverHandle) {

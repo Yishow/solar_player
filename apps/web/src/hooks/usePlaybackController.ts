@@ -9,6 +9,7 @@ import {
   type DisplayPlaybackRuntimeResponse,
   type DisplayRotationPreview,
   type DeviceProfileRolloutStatus,
+  type FreshnessPolicy,
   getEnabledPlaybackPages,
   getNextPlaybackIndex,
   getPlaybackDurationMs,
@@ -24,7 +25,11 @@ import {
   type PlaybackSettings
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
-import { ApiRequestError, getPlaybackRuntime } from "../services/api";
+import {
+  ApiRequestError,
+  getFreshnessPolicy,
+  getPlaybackRuntime
+} from "../services/api";
 import { getAppTimeSnapshot } from "../services/appTime";
 import { prefetchDisplayPageTemplate } from "../pages/shared/displayPageTemplateLoaders";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
@@ -36,6 +41,15 @@ import {
   type StagedProfileRollout,
   validateProfileRolloutCandidate
 } from "../services/profileRollout";
+import {
+  commitOfflinePlaybackRuntimeSnapshot,
+  createBrowserOfflinePlaybackRepository,
+  readActiveOfflineCacheIdentity,
+  readOfflinePlaybackSnapshotForRelease,
+  type OfflinePlaybackRepository
+} from "../services/offlinePlaybackStore";
+import { createOfflinePlaybackSnapshot } from "./useOfflinePlaybackSnapshot";
+import { announceSafePlaybackBoundary } from "./useSafeAppUpdate";
 
 export function resolvePlaybackPageTemplateKey(page: PlaybackPage | null): DisplayPageTemplateKey | null {
   if (!page) {
@@ -137,6 +151,43 @@ type PlaybackScheduleGate = {
   activeAllowed: boolean;
   pendingAllowed: boolean | null;
 };
+
+export async function loadPlaybackRuntimeWithOfflineFallback(options: {
+  fetchFreshnessPolicy?: typeof getFreshnessPolicy;
+  fetchRuntime?: typeof getPlaybackRuntime;
+  readActiveCache?: typeof readActiveOfflineCacheIdentity;
+  readSnapshotForRelease?: typeof readOfflinePlaybackSnapshotForRelease;
+  repository: OfflinePlaybackRepository;
+}) {
+  try {
+    const [runtime, freshness] = await Promise.all([
+      (options.fetchRuntime ?? getPlaybackRuntime)(),
+      (options.fetchFreshnessPolicy ?? getFreshnessPolicy)()
+    ]);
+    return {
+      freshnessPolicy: freshness.policy,
+      offline: false,
+      runtime,
+      savedAtServerEpoch: Date.parse(freshness.updatedAt)
+    };
+  } catch (error) {
+    if (isDisplayContextAccessError(error)) throw error;
+    const activeCache = await (
+      options.readActiveCache ?? readActiveOfflineCacheIdentity
+    )();
+    if (!activeCache) throw error;
+    const snapshot = await (
+      options.readSnapshotForRelease ?? readOfflinePlaybackSnapshotForRelease
+    )(activeCache.appRelease);
+    if (!snapshot) throw error;
+    return {
+      freshnessPolicy: snapshot.freshnessPolicy,
+      offline: true,
+      runtime: snapshot.runtime,
+      savedAtServerEpoch: snapshot.savedAtServerEpoch
+    };
+  }
+}
 
 export function isAbsoluteTimeFrozen(snapshot: AppTimeSnapshot) {
   return snapshot.state === "waiting" || snapshot.state === "time-untrusted";
@@ -397,9 +448,16 @@ export function usePlaybackController(
   const schedulePausedPlaybackRef = useRef(false);
   const appliedRuntimeIdentityRef = useRef<string | null>(null);
   const pendingRuntimeUpdateRef = useRef<PendingRuntimeUpdate | null>(null);
+  const offlineRepositoryRef = useRef<OfflinePlaybackRepository | null>(null);
+  const freshnessPolicyRef = useRef<FreshnessPolicy | null>(null);
+  const lastBoundaryPageIdRef = useRef<number | null>(null);
   const latestLoadRequestRef = useRef(0);
   const tickMs = options.tickMs ?? 250;
   const tickMode = options.tickMode ?? "countdown";
+
+  if (offlineRepositoryRef.current === null && typeof indexedDB !== "undefined") {
+    offlineRepositoryRef.current = createBrowserOfflinePlaybackRepository();
+  }
 
   useEffect(() => {
     providedSettingsRef.current = options.settings ?? null;
@@ -444,6 +502,16 @@ export function usePlaybackController(
       ? Math.min(100, Math.max(0, ((currentDurationMs - runtime.countdownMs) / currentDurationMs) * 100))
       : 0;
 
+  useEffect(() => {
+    if (!currentPage || lastBoundaryPageIdRef.current === currentPage.id) {
+      return;
+    }
+    if (lastBoundaryPageIdRef.current !== null) {
+      announceSafePlaybackBoundary();
+    }
+    lastBoundaryPageIdRef.current = currentPage.id;
+  }, [currentPage?.id]);
+
   const loadPlayback = async (reloadOptions?: PlaybackRuntimeReloadOptions) => {
     if (!enabled) {
       setIsLoading(false);
@@ -458,9 +526,19 @@ export function usePlaybackController(
       const providedRotationPreview = providedRotationPreviewRef.current;
       const providedManagementPreview =
         providedSettings !== null && providedRotationPreview !== null;
+      const loadedRuntime =
+        providedManagementPreview
+        || offlineRepositoryRef.current === null
+          ? null
+          : await loadPlaybackRuntimeWithOfflineFallback({
+              repository: offlineRepositoryRef.current
+            });
       const runtimeResponse = providedManagementPreview
         ? null
-        : await getPlaybackRuntime();
+        : loadedRuntime?.runtime ?? await getPlaybackRuntime();
+      if (loadedRuntime) {
+        freshnessPolicyRef.current = loadedRuntime.freshnessPolicy;
+      }
       if (!isLatestPlaybackLoadRequest(requestId, latestLoadRequestRef.current)) {
         return;
       }
@@ -483,6 +561,48 @@ export function usePlaybackController(
         });
         setErrorMessage(rolloutValidationError);
         return;
+      }
+      if (
+        runtimeResponse
+        && loadedRuntime
+        && !loadedRuntime.offline
+        && offlineRepositoryRef.current
+      ) {
+        const appTime = readAppTimeSnapshotRef.current();
+        const savedAtServerEpoch =
+          appTime.nowEpochMs !== null && !isAbsoluteTimeFrozen(appTime)
+            ? appTime.nowEpochMs
+            : loadedRuntime.savedAtServerEpoch;
+        if (Number.isFinite(savedAtServerEpoch)) {
+          const runtimeAtStartupBoundary =
+            runtimeResponse.profileRollout.appliedVersion === null
+            && runtimeRef.current === null
+            && runtimeResponse.profileRollout.desiredVersion !== null
+              ? {
+                  ...runtimeResponse,
+                  profileRollout: {
+                    ...runtimeResponse.profileRollout,
+                    appliedVersion: runtimeResponse.profileRollout.desiredVersion
+                  }
+                }
+              : runtimeResponse;
+          const offlineSnapshot = createOfflinePlaybackSnapshot({
+            appRelease:
+              (await readActiveOfflineCacheIdentity())?.appRelease
+              ?? __SOLAR_APP_RELEASE__,
+            freshnessPolicy: loadedRuntime.freshnessPolicy,
+            runtime: runtimeAtStartupBoundary,
+            savedAtServerEpoch
+          });
+          if (offlineSnapshot) {
+            void commitOfflinePlaybackRuntimeSnapshot(
+              offlineSnapshot,
+              offlineRepositoryRef.current
+            ).catch(() => {
+              // Keep the previous last-known-good snapshot on quota/corruption.
+            });
+          }
+        }
       }
       const [nextSettings, rotationPreview] = providedManagementPreview
         ? await Promise.all([
@@ -640,6 +760,9 @@ export function usePlaybackController(
         setEffectiveRotationRevision(failedClosed.effectiveRotationRevision);
         setFallbackRoute(failedClosed.fallbackRoute);
       }
+      if (!runtimeRef.current && !isDisplayContextAccessError(error)) {
+        setFallbackRoute("/offline");
+      }
       setRotationPreview(null);
       setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
     } finally {
@@ -793,6 +916,41 @@ export function usePlaybackController(
           settingsRef.current = nextSettings;
           pagesRef.current = nextPages;
           runtimeRef.current = boundaryRuntime;
+          const appliedVersion =
+            pendingUpdate.response.profileRollout.desiredVersion
+            ?? pendingUpdate.response.profileRollout.appliedVersion;
+          const currentAppTime = readAppTimeSnapshotRef.current();
+          if (
+            appliedVersion !== null
+            && freshnessPolicyRef.current
+            && offlineRepositoryRef.current
+            && currentAppTime.nowEpochMs !== null
+            && !isAbsoluteTimeFrozen(currentAppTime)
+          ) {
+            void readActiveOfflineCacheIdentity().then((activeCache) => {
+              const offlineSnapshot = createOfflinePlaybackSnapshot({
+                appRelease: activeCache?.appRelease ?? __SOLAR_APP_RELEASE__,
+                freshnessPolicy: freshnessPolicyRef.current!,
+                runtime: {
+                  ...pendingUpdate.response,
+                  profileRollout: {
+                    ...pendingUpdate.response.profileRollout,
+                    appliedVersion
+                  }
+                },
+                savedAtServerEpoch: currentAppTime.nowEpochMs!
+              });
+              return offlineSnapshot
+                ? commitOfflinePlaybackRuntimeSnapshot(
+                    offlineSnapshot,
+                    offlineRepositoryRef.current!
+                  )
+                : undefined;
+            }).catch(() => {
+              // The last-known-good snapshot remains active after write failure.
+            });
+          }
+          announceSafePlaybackBoundary();
           startTransition(() => {
             setSettings(nextSettings);
             setPages(nextPages);

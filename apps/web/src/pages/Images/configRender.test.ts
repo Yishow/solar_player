@@ -38,7 +38,7 @@ test("images runtime reads resolved display config for copy, main stage, info pa
   assert.match(imagesSource, /resolvedConfig\.arrows\.right/);
   assert.match(imagesSource, /resolvedConfig\.thumbnailSlots\[thumbSlotOrder\[thumbIndex\]!\]/);
   assert.match(imagesSource, /const playbackActiveEntry =/);
-  assert.match(imagesSource, /runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
+  assert.match(imagesSource, /applyImagesAssetFailures\(runtimePlaylistEntries, unavailableOfflineSources\)/);
   assert.match(imagesSource, /resolveActiveImagePlaylistEntry\(viewModelEntries,\s*autoplay\.activeIndex\)/);
   assert.doesNotMatch(imagesSource, /playlistRuntime\.payload\?\.activeEntry/);
   assert.doesNotMatch(imagesSource, /runtimePlaylistEntries\.length > 0\s*\?/);
@@ -129,7 +129,7 @@ test("images editor exposes stage and thumbnail framing fields", () => {
 test("images runtime keeps playlist hydration staged while preserving autoplay and controls", () => {
   assert.match(imagesSource, /useImagePlaylistRuntime\(\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
   assert.match(imagesSource, /const runtimePlaylistEntries = playlistRuntime\.payload\?\.entries \?\? \[\]/);
-  assert.match(imagesSource, /const playbackEntries = runtimeHydrationEnabled \? runtimePlaylistEntries : imagesReferencePlaylistEntries/);
+  assert.match(imagesSource, /const playbackEntries = runtimeHydrationEnabled\s*\?\s*applyImagesAssetFailures\(runtimePlaylistEntries, unavailableOfflineSources\)\s*:\s*imagesReferencePlaylistEntries/);
   assert.match(imagesSource, /const localRequestedActiveEntry = resolveActiveImagePlaylistEntry\(viewModelEntries,\s*requestedIndex\)/);
   assert.match(imagesSource, /const playbackActiveEntry = resolveActiveImagePlaylistEntry\(viewModelEntries,\s*autoplay\.activeIndex\)/);
   assert.match(imagesSource, /shuffleEnabled = runtimeHydrationEnabled/);

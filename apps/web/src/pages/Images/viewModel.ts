@@ -33,6 +33,28 @@ export type ImagesViewModelThumbnail = ResolvedImagePlaylistEntry & {
   orderLabel: string;
 };
 
+export function applyImagesAssetFailures(
+  entries: ResolvedImagePlaylistEntry[],
+  failedAssetSources: ReadonlySet<string>
+) {
+  return entries.flatMap((entry) => {
+    if (!entry.assetSource || !failedAssetSources.has(entry.assetSource)) {
+      return [entry];
+    }
+    if (entry.fallbackMode === "skip") {
+      return [];
+    }
+    return [{
+      ...entry,
+      assetSource: null,
+      fallbackActive: true,
+      fallbackReason: "asset-missing" as const,
+      hasAsset: false,
+      isPlayable: true
+    }];
+  });
+}
+
 function padCounter(value: number) {
   return value.toString().padStart(2, "0");
 }

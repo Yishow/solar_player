@@ -64,7 +64,7 @@ function createFakeWindow(options: {
   };
 }
 
-test("installCrashRecovery reloads chunk failures within budget and unregisters listeners on dispose", () => {
+test("installCrashRecovery reloads chunk failures within budget and unregisters listeners on dispose", async () => {
   const fake = createFakeWindow();
   const dispose = installCrashRecoveryWithEnvironment(fake.fakeWindow, {
     now: () => 1_000_000
@@ -73,6 +73,7 @@ test("installCrashRecovery reloads chunk failures within budget and unregisters 
   fake.dispatch("unhandledrejection", {
     reason: "Failed to fetch dynamically imported module: /assets/x.js"
   });
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(fake.reloadCount, 1);
   assert.match(fake.storedValue ?? "", /1000000/);
@@ -99,7 +100,7 @@ test("installCrashRecovery ignores unhandled rejections that are not chunk failu
   assert.equal(fake.reloadCount, 0);
 });
 
-test("installCrashRecovery tolerates sessionStorage failures without throwing", () => {
+test("installCrashRecovery tolerates sessionStorage failures without throwing", async () => {
   const fake = createFakeWindow({
     storageThrows: true
   });
@@ -114,6 +115,23 @@ test("installCrashRecovery tolerates sessionStorage failures without throwing", 
     });
     dispose();
   });
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(fake.reloadCount, 1);
+});
+
+test("active cached shell recovery reloads without consuming the bounded budget", async () => {
+  const fake = createFakeWindow();
+  installCrashRecoveryWithEnvironment(fake.fakeWindow, {
+    now: () => 1_000_000,
+    recoverFromActiveCache: async () => true
+  });
+
+  fake.dispatch("vite:preloadError", {
+    preventDefault() {}
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(fake.reloadCount, 1);
+  assert.equal(fake.storedValue, "1");
 });

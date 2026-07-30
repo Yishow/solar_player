@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { DisplayPageFreeformObject } from "@solar-display/shared";
 import {
   displayPageCardConfiguringLabel,
@@ -54,10 +54,15 @@ import { resolveRuntimeMediaUrl } from "../shared/runtimeMediaUrl";
 import "../../components/displayPageCards.css";
 import "./images.css";
 import {
+  applyImagesAssetFailures,
   resolveImagesActiveViewModel,
   resolveImagesViewModelEntries,
   resolveVisibleImagesThumbnails
 } from "./viewModel";
+import {
+  OFFLINE_CACHE_STATE_EVENT,
+  readVerifiedOfflineAssetUrls
+} from "../../services/offlinePlaybackStore";
 
 const CONTENT_TOP_OFFSET = imagesContentTopOffset;
 
@@ -97,11 +102,54 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     stage: runtimeStage
   });
   const [requestedIndex, setRequestedIndex] = useState(0);
+  const [failedAssetSources, setFailedAssetSources] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [verifiedOfflineUrls, setVerifiedOfflineUrls] =
+    useState<Set<string> | null>(() => navigator.onLine ? null : new Set());
+  const [offlineFallbackActive, setOfflineFallbackActive] =
+    useState(() => !navigator.onLine);
   const playlistRuntime = useImagePlaylistRuntime({
     enabled: runtimeHydrationEnabled
   });
   const runtimePlaylistEntries = playlistRuntime.payload?.entries ?? [];
-  const playbackEntries = runtimeHydrationEnabled ? runtimePlaylistEntries : imagesReferencePlaylistEntries;
+  useEffect(() => {
+    const readVerified = () => {
+      void readVerifiedOfflineAssetUrls().then(setVerifiedOfflineUrls);
+    };
+    const handleCacheState = (event: Event) => {
+      const offline = Boolean(
+        (event as CustomEvent<{ offline?: boolean }>).detail?.offline
+      );
+      setOfflineFallbackActive(offline);
+      if (offline) readVerified();
+    };
+    if (!navigator.onLine) readVerified();
+    window.addEventListener(OFFLINE_CACHE_STATE_EVENT, handleCacheState);
+    return () => {
+      window.removeEventListener(OFFLINE_CACHE_STATE_EVENT, handleCacheState);
+    };
+  }, []);
+  const unavailableOfflineSources = useMemo(() => {
+    if (!offlineFallbackActive || verifiedOfflineUrls === null) {
+      return failedAssetSources;
+    }
+    const unavailable = new Set(failedAssetSources);
+    for (const entry of runtimePlaylistEntries) {
+      if (entry.assetSource && !verifiedOfflineUrls.has(entry.assetSource)) {
+        unavailable.add(entry.assetSource);
+      }
+    }
+    return unavailable;
+  }, [
+    failedAssetSources,
+    offlineFallbackActive,
+    runtimePlaylistEntries,
+    verifiedOfflineUrls
+  ]);
+  const playbackEntries = runtimeHydrationEnabled
+    ? applyImagesAssetFailures(runtimePlaylistEntries, unavailableOfflineSources)
+    : imagesReferencePlaylistEntries;
   const viewModelEntries = useMemo(
     () => resolveImagesViewModelEntries({
       assets: [],
@@ -343,6 +391,15 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
           <img
             alt={resolvedConfig.mainStage.alt || viewModel.active.title}
             key={viewModel.active.entryId}
+            onError={() => {
+              if (viewModel.active.assetSource) {
+                setFailedAssetSources((current) => {
+                  const next = new Set(current);
+                  next.add(viewModel.active.assetSource!);
+                  return next;
+                });
+              }
+            }}
             src={activeMainStageSource}
             style={mainStageMediaPresentation.mediaStyle}
           />
@@ -463,7 +520,17 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
             type="button"
           >
             {thumbnail.assetSource ? (
-              <img alt={thumbnail.infoPanel.title} src={resolveRuntimeMediaUrl(thumbnail.assetSource)} />
+              <img
+                alt={thumbnail.infoPanel.title}
+                onError={() => {
+                  setFailedAssetSources((current) => {
+                    const next = new Set(current);
+                    next.add(thumbnail.assetSource!);
+                    return next;
+                  });
+                }}
+                src={resolveRuntimeMediaUrl(thumbnail.assetSource)}
+              />
             ) : (
               <div className="images-thumb-placeholder">
                 {renderDisplayPageIcon({

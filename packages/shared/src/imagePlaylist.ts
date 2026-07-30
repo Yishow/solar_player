@@ -29,6 +29,7 @@ export type ImagePlaylistAssetInput = {
 };
 
 export type ResolvedImagePlaylistEntry = ImagePlaylistEntryInput & {
+  assetHash?: string | null;
   assetSource: string | null;
   fallbackActive: boolean;
   fallbackReason: ImagePlaylistFallbackReason | null;

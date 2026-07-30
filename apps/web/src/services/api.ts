@@ -51,6 +51,12 @@ import {
   buildRuntimeApiUrl,
   resolveBrowserApiOrigin as resolveRuntimeBrowserApiOrigin
 } from "./runtimeOrigin";
+import {
+  announceOfflineCacheState,
+  cacheOfflineMetricResponse,
+  isOfflineMetricPath,
+  readOfflineMetricResponse
+} from "./offlinePlaybackStore";
 
 export function buildApiUrl(path: string) {
   const env = (
@@ -197,17 +203,44 @@ function parseErrorBody(rawBody: string): ParsedErrorBody | null {
 
 export async function requestJson<T>(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
+  const method = init?.method ?? "GET";
 
   if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(buildApiUrl(path), {
-    ...init,
-    headers
-  });
+  let response: Response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      ...init,
+      headers
+    });
+  } catch (error) {
+    if (
+      typeof indexedDB !== "undefined"
+      && isOfflineMetricPath(path, method)
+    ) {
+      const cached = await readOfflineMetricResponse<T>(path);
+      if (cached !== undefined) {
+        announceOfflineCacheState(true);
+        return cached;
+      }
+    }
+    throw error;
+  }
 
   if (!response.ok) {
+    if (
+      response.status >= 500
+      && typeof indexedDB !== "undefined"
+      && isOfflineMetricPath(path, method)
+    ) {
+      const cached = await readOfflineMetricResponse<T>(path);
+      if (cached !== undefined) {
+        announceOfflineCacheState(true);
+        return cached;
+      }
+    }
     const rawBody = await response.text();
     const parsedBody = rawBody ? parseErrorBody(rawBody) : null;
     const message = rawBody ? extractErrorMessage(rawBody) : `Request failed with status ${response.status}`;
@@ -249,7 +282,17 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
     throw new ApiRequestError(message, response.status, parsedBody);
   }
 
-  return (await response.json()) as T;
+  const value = (await response.json()) as T;
+  if (
+    typeof indexedDB !== "undefined"
+    && isOfflineMetricPath(path, method)
+  ) {
+    announceOfflineCacheState(false);
+    void cacheOfflineMetricResponse(path, value).catch(() => {
+      // Quota or corruption must not turn a successful online response into failure.
+    });
+  }
+  return value;
 }
 
 let playbackRuntimeCache: {

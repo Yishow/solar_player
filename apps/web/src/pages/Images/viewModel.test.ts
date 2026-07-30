@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyImagesAssetFailures,
   buildImagesViewModel,
   resolveImagesViewModelEntries,
   resolveVisibleImagesThumbnails
@@ -269,4 +270,26 @@ test("resolveVisibleImagesThumbnails marks active thumbnails by active entry ide
     thumbnails
   });
   assert.equal(missingActive.visibleThumbnails.some((thumbnail) => thumbnail.isActive), false);
+});
+
+test("failed offline Images assets use each slide's explicit fallback", () => {
+  const entries = resolveImagesViewModelEntries({
+    assets,
+    coverAssetSource: "/brand-logo.png",
+    entries: playlistEntries
+  });
+  const source = entries[0]!.assetSource!;
+  const recovered = applyImagesAssetFailures([
+    entries[0]!,
+    {
+      ...entries[0]!,
+      entryId: "skip-me",
+      fallbackMode: "skip"
+    }
+  ], new Set([source]));
+
+  assert.equal(recovered.some((entry) => entry.entryId === "skip-me"), false);
+  assert.equal(recovered[0]?.assetSource, null);
+  assert.equal(recovered[0]?.fallbackReason, "asset-missing");
+  assert.equal(recovered[0]?.isPlayable, true);
 });

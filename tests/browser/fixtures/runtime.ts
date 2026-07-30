@@ -14,6 +14,8 @@ export type BrowserSmokeRuntimeManifest = {
   networkLogPath: string;
   port: number;
   runId: string;
+  serverControlPath: string;
+  serverControlStatusPath: string;
   uploadsDir: string;
   workRoot: string;
 };

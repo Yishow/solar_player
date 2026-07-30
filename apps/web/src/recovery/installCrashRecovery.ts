@@ -1,5 +1,9 @@
 import { isChunkLoadError } from "./crashRecovery";
 import { createPlaybackReloadBudgetController } from "./reloadController";
+import {
+  readActiveOfflineCacheIdentity,
+  readOfflinePlaybackSnapshotForRelease
+} from "../services/offlinePlaybackStore";
 
 type StorageLike = {
   getItem: (key: string) => string | null;
@@ -19,12 +23,37 @@ export type CrashRecoveryWindowLike = {
 
 type InstallCrashRecoveryOptions = {
   now?: () => number;
+  recoverFromActiveCache?: () => Promise<boolean>;
 };
 
-function tryReload(
+const OFFLINE_RECOVERY_ATTEMPT_KEY = "solar:offline-chunk-recovery-attempted";
+
+async function hasActiveOfflineCache() {
+  if (typeof caches === "undefined" || typeof indexedDB === "undefined") return false;
+  const active = await readActiveOfflineCacheIdentity();
+  return Boolean(
+    active
+    && await readOfflinePlaybackSnapshotForRelease(active.appRelease)
+  );
+}
+
+async function tryReload(
   windowLike: CrashRecoveryWindowLike,
   options: InstallCrashRecoveryOptions = {}
 ) {
+  try {
+    if (
+      windowLike.sessionStorage?.getItem(OFFLINE_RECOVERY_ATTEMPT_KEY) !== "1"
+      && await (options.recoverFromActiveCache ?? hasActiveOfflineCache)()
+    ) {
+      windowLike.sessionStorage?.setItem(OFFLINE_RECOVERY_ATTEMPT_KEY, "1");
+      windowLike.location.reload();
+      return true;
+    }
+  } catch {
+    // Fall through to the bounded network recovery path.
+  }
+
   const controller = createPlaybackReloadBudgetController({
     now: options.now,
     storage: windowLike.sessionStorage ?? null
@@ -48,7 +77,7 @@ export function installCrashRecoveryWithEnvironment(
     };
 
     candidate.preventDefault?.();
-    tryReload(windowLike, options);
+    void tryReload(windowLike, options);
   };
 
   const handleUnhandledRejection = (event: unknown) => {
@@ -60,7 +89,7 @@ export function installCrashRecoveryWithEnvironment(
       return;
     }
 
-    tryReload(windowLike, options);
+    void tryReload(windowLike, options);
   };
 
   windowLike.addEventListener("vite:preloadError", handlePreloadError);
