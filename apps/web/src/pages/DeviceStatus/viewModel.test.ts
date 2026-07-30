@@ -477,6 +477,83 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
   assert.equal(model.displayClientSummary.rows[2]?.badgeTone, "is-error");
 });
 
+test("buildDeviceStatusViewModel presents stable Device identity and duplicate diagnostics without raw source data", () => {
+  const unsafeLivenessFields = {
+    credential: "must-not-leak",
+    rawSourceAddress: "10.0.0.17"
+  };
+  const model = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    now: new Date("2026-05-22T12:00:10.000Z"),
+    status: {
+      arch: "arm64",
+      cpu: { cores: 4, loadAvg: [0.18, 0.32, 0.4] },
+      disk: { availableMB: 40000, totalMB: 64000, usePercent: 35, usedMB: 24000 },
+      displayClients: {
+        clients: [
+          {
+            clientId: "display-kn-17",
+            connectedCount: 2,
+            deviceId: 17,
+            duplicateDetectedAt: "2026-05-22T12:00:00.000Z",
+            duplicateIdentity: true,
+            groupId: 7,
+            isIdle: false,
+            isPlaying: true,
+            lastSeenAt: "2026-05-22T12:00:05.000Z",
+            pageKey: "overview",
+            profileId: 100,
+            route: "/overview",
+            siteScope: "kn",
+            sourceStatus: "multi-source",
+            state: "online",
+            ...unsafeLivenessFields,
+            viewport: {
+              height: 1080,
+              width: 1920
+            }
+          }
+        ],
+        summary: {
+          offline: 0,
+          online: 1,
+          stale: 0,
+          total: 1
+        }
+      },
+      hostname: "KZ-Display-17",
+      memory: { freeMB: 4600, totalMB: 8000, usePercent: 42, usedMB: 3400 },
+      nodeVersion: "v24.15.0",
+      pid: 1234,
+      platform: "linux",
+      uptimeSeconds: 1315800
+    }
+  });
+
+  const row = model.displayClientSummary.rows[0];
+  assert.deepEqual(
+    {
+      clientId: row?.clientId,
+      connectionLabel: row?.connectionLabel,
+      duplicateWarningLabel: row?.duplicateWarningLabel,
+      groupLabel: row?.groupLabel,
+      siteLabel: row?.siteLabel
+    },
+    {
+      clientId: "display-kn-17",
+      connectionLabel: "2 connections",
+      duplicateWarningLabel: "疑似重複身份",
+      groupLabel: "Group 7",
+      siteLabel: "Site KN"
+    }
+  );
+  assert.equal("credential" in (row ?? {}), false);
+  assert.equal("rawSourceAddress" in (row ?? {}), false);
+});
+
 test("buildDeviceStatusViewModel keeps configuration-readiness distinct from operational health", () => {
   const model = buildDeviceStatusViewModel({
     actionFeedback: null,

@@ -1,6 +1,8 @@
 import type {
   BrandProfile,
   ConfigStage,
+  Device,
+  DeviceGroup,
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
   DisplayClientLivenessSnapshot,
@@ -23,6 +25,7 @@ import type {
   ManagementDraftSaveConflict,
   ManagementDraftSavePrecondition,
   MonitoringMetricBinding,
+  PairingTokenIssue,
   PlaybackPage,
   PlaybackSettings,
   ImagePlaylistEntryInput,
@@ -214,6 +217,98 @@ export async function getPlaybackSettings() {
     settings: PlaybackSettings;
   }>("/api/playback/settings");
   return response.settings;
+}
+
+export type FleetDeviceWrite = {
+  clientId?: string;
+  displayName?: string;
+  enabled?: boolean;
+  groupId?: number | null;
+};
+
+export type DeviceGroupWrite = {
+  enabled?: boolean;
+  name?: string;
+  playbackProfileId?: number;
+  siteScope?: DeviceGroup["siteScope"];
+};
+
+export async function getFleetDevices() {
+  const response = await requestJson<{ data: Device[]; success: boolean }>(
+    "/api/devices"
+  );
+  return response.data;
+}
+
+export async function createFleetDevice(payload: Required<FleetDeviceWrite>) {
+  const response = await requestJson<{ data: Device; success: boolean }>(
+    "/api/devices",
+    {
+      body: JSON.stringify(payload),
+      method: "POST"
+    }
+  );
+  return response.data;
+}
+
+export async function updateFleetDevice(
+  id: number,
+  payload: FleetDeviceWrite
+) {
+  const response = await requestJson<{ data: Device; success: boolean }>(
+    `/api/devices/${id}`,
+    {
+      body: JSON.stringify(payload),
+      method: "PUT"
+    }
+  );
+  return response.data;
+}
+
+export async function getDeviceGroups() {
+  const response = await requestJson<{
+    data: DeviceGroup[];
+    success: boolean;
+  }>("/api/device-groups");
+  return response.data;
+}
+
+export async function createDeviceGroup(
+  payload: Required<Pick<DeviceGroupWrite, "enabled" | "name" | "siteScope">>
+    & Pick<DeviceGroupWrite, "playbackProfileId">
+) {
+  const response = await requestJson<{
+    data: DeviceGroup;
+    success: boolean;
+  }>("/api/device-groups", {
+    body: JSON.stringify(payload),
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function updateDeviceGroup(
+  id: number,
+  payload: DeviceGroupWrite
+) {
+  const response = await requestJson<{
+    data: DeviceGroup;
+    success: boolean;
+  }>(`/api/device-groups/${id}`, {
+    body: JSON.stringify(payload),
+    method: "PUT"
+  });
+  return response.data;
+}
+
+export async function issueDevicePairingToken(deviceId: number) {
+  const response = await requestJson<{
+    data: PairingTokenIssue;
+    success: boolean;
+  }>(`/api/devices/${deviceId}/pairing-tokens`, {
+    method: "POST"
+  });
+  return response.data;
 }
 
 export async function getPlaybackRuntime() {

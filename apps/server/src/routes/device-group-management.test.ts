@@ -14,12 +14,14 @@ const [
   { buildApp },
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
-  { seedDatabase }
+  { seedDatabase },
+  { exchangePairingToken, issuePairingToken }
 ] = await Promise.all([
   import("../app.js"),
   import("../db/index.js"),
   import("../db/migrate.js"),
-  import("../db/seed.js")
+  import("../db/seed.js"),
+  import("../services/deviceCredentialService.js")
 ]);
 
 beforeEach(() => {
@@ -177,6 +179,53 @@ test("deleting a referenced Group returns group_in_use without changing state", 
         .get("lobby-cl-01"),
       { existing_group_id: groupId, group_id: groupId }
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/devices exposes only a safe paired boolean", async () => {
+  const app = await buildApp();
+
+  try {
+    const groupResponse = await app.inject({
+      method: "POST",
+      payload: {
+        enabled: true,
+        name: "中壢展示群組",
+        siteScope: "cl"
+      },
+      url: "/api/device-groups"
+    });
+    const groupId = groupResponse.json<{ data: { id: number } }>().data.id;
+    const deviceResponse = await app.inject({
+      method: "POST",
+      payload: {
+        clientId: "lobby-cl-01",
+        displayName: "中壢大廳",
+        enabled: true,
+        groupId
+      },
+      url: "/api/devices"
+    });
+    const deviceId = deviceResponse.json<{ data: { id: number } }>().data.id;
+
+    const before = await app.inject({ method: "GET", url: "/api/devices" });
+    assert.equal(
+      before.json<{ data: Array<{ paired: boolean }> }>().data[0]?.paired,
+      false
+    );
+
+    const issue = issuePairingToken(deviceId);
+    exchangePairingToken(issue.token);
+    const after = await app.inject({ method: "GET", url: "/api/devices" });
+    const serialized = JSON.stringify(after.json());
+
+    assert.equal(
+      after.json<{ data: Array<{ paired: boolean }> }>().data[0]?.paired,
+      true
+    );
+    assert.doesNotMatch(serialized, /credential_hash|credentialHash|token/u);
   } finally {
     await app.close();
   }

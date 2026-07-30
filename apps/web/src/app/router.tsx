@@ -195,6 +195,21 @@ export const router = createBrowserRouter([
           const { DeviceStatus } = await import("../pages/DeviceStatus");
           return { Component: DeviceStatus };
         }
+      },
+      {
+        path: "device-fleet",
+        loader: createLazyManagementRouteLoader(
+          "device-fleet",
+          async () => {
+            const { loadDeviceFleetRoute } = await import("../pages/DeviceFleet/route");
+            return loadDeviceFleetRoute;
+          }
+        ),
+        hydrateFallbackElement: <></>,
+        lazy: async () => {
+          const { DeviceFleet } = await import("../pages/DeviceFleet");
+          return { Component: DeviceFleet };
+        }
       }
     ]
   },

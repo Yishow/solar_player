@@ -1,0 +1,151 @@
+.device-fleet-page {
+  display: grid;
+  gap: 24px;
+  padding: 28px 32px 48px;
+}
+
+.device-fleet-page__header,
+.device-fleet-page__forms,
+.device-fleet-group-list article {
+  display: flex;
+  gap: 16px;
+}
+
+.device-fleet-page__header {
+  align-items: end;
+  justify-content: space-between;
+}
+
+.device-fleet-page__header h1 {
+  margin: 4px 0 8px;
+}
+
+.device-fleet-page__header p,
+.device-fleet-page__header small,
+.device-fleet-page__summary span,
+.device-fleet-table-wrap small,
+.device-fleet-group-list small {
+  display: block;
+  color: var(--muted);
+}
+
+.device-fleet-page__summary {
+  min-width: 144px;
+  padding: 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--ops-surface-bg);
+}
+
+.device-fleet-page__summary strong {
+  display: block;
+  font-size: 2rem;
+}
+
+.device-fleet-page__forms > * {
+  flex: 1;
+}
+
+.device-fleet-page form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.device-fleet-page label {
+  display: grid;
+  gap: 6px;
+}
+
+.device-fleet-page input,
+.device-fleet-page select,
+.device-fleet-page button {
+  min-height: 40px;
+}
+
+.device-fleet-page form button {
+  align-self: end;
+}
+
+.device-fleet-group-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.device-fleet-group-list article {
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--ops-surface-border);
+}
+
+.device-fleet-group-list article > div {
+  flex: 1;
+}
+
+.device-fleet-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.device-fleet-filter {
+  max-width: 360px;
+  margin-top: 16px;
+}
+
+.device-fleet-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.device-fleet-table-wrap th,
+.device-fleet-table-wrap td {
+  padding: 12px;
+  border-bottom: 1px solid var(--ops-surface-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.device-fleet-table-wrap td:last-child {
+  min-width: 260px;
+}
+
+.device-fleet-table-wrap button + button,
+.device-fleet-table-wrap .mgmt-chip + .mgmt-chip {
+  margin-left: 8px;
+}
+
+.device-fleet-dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 55%);
+}
+
+.device-fleet-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(640px, 100%);
+  padding: 24px;
+  background: var(--ops-surface-bg);
+  border: 1px solid var(--workspace-surface-border);
+}
+
+.device-fleet-dialog code {
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: var(--workspace-surface-muted);
+}
+
+@media (max-width: 900px) {
+  .device-fleet-page__forms {
+    flex-direction: column;
+  }
+
+  .device-fleet-page {
+    padding-inline: 16px;
+  }
+}

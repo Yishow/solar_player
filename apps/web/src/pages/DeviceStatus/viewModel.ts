@@ -247,8 +247,13 @@ function buildDisplayClientSummary(
             : client.isPlaying
               ? "播放中"
               : "待命中",
+      clientId: client.clientId,
+      connectionLabel: `${client.connectedCount} connections`,
       deviceId: client.deviceId,
+      duplicateWarningLabel: client.duplicateIdentity ? "疑似重複身份" : null,
+      groupLabel: `Group ${client.groupId}`,
       routeLabel: client.route,
+      siteLabel: `Site ${client.siteScope.toUpperCase()}`,
       stateLabel: client.state
     })),
     totalLabel: `${summary.total} clients`

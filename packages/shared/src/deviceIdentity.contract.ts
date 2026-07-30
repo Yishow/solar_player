@@ -36,7 +36,8 @@ const device = {
   enabled: true,
   group,
   groupId: group.id,
-  id: 3
+  id: 3,
+  paired: false
 } satisfies Device;
 
 const disabledDevice = {

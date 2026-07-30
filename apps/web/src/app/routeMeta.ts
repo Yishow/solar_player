@@ -196,6 +196,15 @@ export const routeMetaList: RouteMeta[] = [
     group: "management",
     order: 19,
     shellDensity: "device-detail"
+  },
+  {
+    path: "/device-fleet",
+    navLabel: "裝置管理",
+    title: "裝置與群組",
+    subtitle: "Device Fleet",
+    group: "management",
+    order: 20,
+    shellDensity: "management"
   }
 ];
 

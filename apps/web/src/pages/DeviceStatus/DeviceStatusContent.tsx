@@ -261,10 +261,18 @@ export function DeviceStatusContent({
             <div className="ds-triage-list">
               {viewModel.displayClientSummary.rows.map((client) => (
                 <div key={client.deviceId} className={`mgmt-status ${client.badgeTone}`}>
-                  <strong>{client.pageLabel}</strong> · {client.playbackLabel} · {client.lastSeenLabel}
+                  <strong>{client.clientId}</strong> · {client.groupLabel} · {client.siteLabel} · {client.connectionLabel}
                   <small style={{ display: "block", opacity: 0.72 }}>
-                    {client.stateLabel} · {client.routeLabel}
+                    {client.pageLabel} · {client.playbackLabel} · {client.lastSeenLabel} · {client.stateLabel} · {client.routeLabel}
                   </small>
+                  {client.duplicateWarningLabel ? (
+                    <span
+                      className="mgmt-status is-warning"
+                      style={{ display: "inline-block", marginTop: 8 }}
+                    >
+                      {client.duplicateWarningLabel}
+                    </span>
+                  ) : null}
                 </div>
               ))}
               {viewModel.displayClientSummary.rows.length === 0 ? (

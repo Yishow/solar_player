@@ -23,4 +23,5 @@ export type Device = {
   group: DeviceGroup | null;
   groupId: number | null;
   id: number;
+  paired: boolean;
 };

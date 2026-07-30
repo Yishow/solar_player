@@ -26,6 +26,7 @@ type DeviceRow = {
   group_playback_profile_id: number | null;
   group_site_scope: SiteScope | null;
   id: number;
+  paired: number;
   profile_is_default: number | null;
   profile_key: string | null;
   profile_name: string | null;
@@ -85,7 +86,14 @@ const DEVICE_SELECT = `
     groups.playback_profile_id AS group_playback_profile_id,
     profiles.profile_key,
     profiles.name AS profile_name,
-    profiles.is_default AS profile_is_default
+    profiles.is_default AS profile_is_default,
+    EXISTS (
+      SELECT 1
+      FROM device_credentials AS credentials
+      WHERE credentials.device_id = devices.id
+        AND credentials.revoked_at IS NULL
+        AND datetime(credentials.expires_at) > CURRENT_TIMESTAMP
+    ) AS paired
   FROM devices
   LEFT JOIN device_groups AS groups ON groups.id = devices.group_id
   LEFT JOIN playback_profiles AS profiles ON profiles.id = groups.playback_profile_id
@@ -176,7 +184,8 @@ function serializeDevice(row: DeviceRow): Device {
     enabled: row.enabled === 1,
     group,
     groupId: row.group_id,
-    id: row.id
+    id: row.id,
+    paired: row.paired === 1
   };
 }
 
