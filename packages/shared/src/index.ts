@@ -25,3 +25,4 @@ export * from "./devicePairing.js";
 export * from "./displayClientContext.js";
 export * from "./weather.js";
 export * from "./appTime.js";
+export * from "./playbackProfileVersion.js";

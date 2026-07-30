@@ -591,6 +591,27 @@ export function readDisplayRotationPreview(options: {
   });
 }
 
+export function evaluatePlaybackSnapshot(options: {
+  mqttStatus: MqttStatusLike;
+  now?: Date;
+  pages: PlaybackPage[];
+  settings: PlaybackSettings;
+  siteScope?: SiteScope;
+}): DisplayRotationPreview {
+  const now = options.now ?? new Date();
+  return evaluateResolvedDisplayRotation({
+    mqttStatus: options.mqttStatus,
+    now,
+    pages: options.pages,
+    readinessReport: readDisplayReadinessReport({
+      now,
+      siteScope: options.siteScope
+    }),
+    settings: options.settings,
+    siteScope: options.siteScope
+  });
+}
+
 function evaluateResolvedDisplayRotation(options: {
   mqttStatus: MqttStatusLike;
   now: Date;

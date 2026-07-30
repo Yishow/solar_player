@@ -11,7 +11,11 @@ import {
   fetchImagePlaylist,
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
+  getPlaybackProfiles,
   getDeviceLogs,
+  isPlaybackProfileDraftConflictError,
+  publishPlaybackProfile,
+  rollbackPlaybackProfile,
   runDeviceKioskExit,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
@@ -19,7 +23,8 @@ import {
   updateAllImagePlaylistDurations,
   updateDisplayPageConfig,
   updateImagePlaylistSettings,
-  requestJson
+  requestJson,
+  savePlaybackProfileDraft
 } from "./api";
 import { buildRuntimeApiUrl } from "./runtimeOrigin";
 
@@ -870,6 +875,96 @@ test("bootstrapImagePlaylistGovernance targets the explicit governance bootstrap
     assert.equal(response.playlist.hasPlaylistRows, true);
     assert.equal(seenMethod, "POST");
     assert.match(seenUrl, /\/api\/image-playlist\/governance\/bootstrap$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Playback Profile API client saves Drafts and surfaces typed stale conflicts", async () => {
+  const originalFetch = globalThis.fetch;
+  const seen: Array<{ body: string; method: string; url: string }> = [];
+  let requestCount = 0;
+  globalThis.fetch = async (input, init) => {
+    requestCount += 1;
+    seen.push({
+      body: String(init?.body ?? ""),
+      method: init?.method ?? "GET",
+      url: String(input)
+    });
+    if (requestCount === 1) {
+      return new Response(JSON.stringify({ data: [], success: true }), {
+        headers: { "content-type": "application/json" },
+        status: 200
+      });
+    }
+    return new Response(
+      JSON.stringify({
+        code: "profile_draft_conflict",
+        currentRevision: 7,
+        error: "Playback Profile Draft changed since it was loaded",
+        success: false
+      }),
+      {
+        headers: { "content-type": "application/json" },
+        status: 409
+      }
+    );
+  };
+
+  try {
+    assert.deepEqual(await getPlaybackProfiles(), []);
+    await assert.rejects(
+      async () => {
+        try {
+          await savePlaybackProfileDraft(3, {
+            expectedRevision: 6,
+            pages: [],
+            settings: {} as never
+          });
+        } catch (error) {
+          assert.equal(isPlaybackProfileDraftConflictError(error), true);
+          throw error;
+        }
+      },
+      /changed since it was loaded/
+    );
+    assert.deepEqual(seen.map(({ method }) => method), ["GET", "PUT"]);
+    assert.match(seen[0]!.url, /\/api\/playback-profiles$/u);
+    assert.match(seen[1]!.url, /\/api\/playback-profiles\/3\/draft$/u);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Playback Profile publish and rollback send server-attributed payloads", async () => {
+  const originalFetch = globalThis.fetch;
+  const seenBodies: string[] = [];
+  globalThis.fetch = async (_input, init) => {
+    seenBodies.push(String(init?.body ?? ""));
+    return new Response(JSON.stringify({
+      data: {
+        createdAt: "2026-07-30T00:00:00.000Z",
+        createdBy: "management-trusted",
+        id: 1,
+        profileId: 3,
+        rollbackFromVersionId: null,
+        schemaVersion: 1,
+        snapshot: { pages: [], settings: {} },
+        versionNumber: 1
+      },
+      success: true
+    }), {
+      headers: { "content-type": "application/json" },
+      status: 200
+    });
+  };
+  try {
+    await publishPlaybackProfile(3, 7);
+    await rollbackPlaybackProfile(3, 11);
+    assert.deepEqual(seenBodies.map((body) => JSON.parse(body)), [
+      { expectedRevision: 7 },
+      { versionId: 11 }
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

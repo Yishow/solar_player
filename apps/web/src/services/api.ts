@@ -27,6 +27,10 @@ import type {
   MonitoringMetricBinding,
   PairingTokenIssue,
   PlaybackPage,
+  PlaybackProfileDraft,
+  PlaybackProfilePreview,
+  PlaybackProfileSummary,
+  PlaybackProfileVersion,
   PlaybackSettings,
   ImagePlaylistEntryInput,
   WeatherHeaderContract,
@@ -106,6 +110,7 @@ type ParsedErrorBody = {
   access?: string;
   code?: string;
   conflict?: ManagementDraftSaveConflict<Record<string, unknown>>;
+  currentRevision?: number;
   error?: string;
   message?: string;
   requiredRole?: string;
@@ -159,6 +164,27 @@ export function isManagementDraftConflictError(
   return error instanceof ManagementDraftConflictError;
 }
 
+export class PlaybackProfileDraftConflictError extends ApiRequestError {
+  readonly currentRevision: number;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    body: ParsedErrorBody,
+    currentRevision: number
+  ) {
+    super(message, statusCode, body);
+    this.name = "PlaybackProfileDraftConflictError";
+    this.currentRevision = currentRevision;
+  }
+}
+
+export function isPlaybackProfileDraftConflictError(
+  error: unknown
+): error is PlaybackProfileDraftConflictError {
+  return error instanceof PlaybackProfileDraftConflictError;
+}
+
 function parseErrorBody(rawBody: string): ParsedErrorBody | null {
   try {
     const parsed = JSON.parse(rawBody) as ParsedErrorBody;
@@ -206,6 +232,19 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
       );
     }
 
+    if (
+      response.status === 409
+      && parsedBody?.code === "profile_draft_conflict"
+      && Number.isInteger(parsedBody.currentRevision)
+    ) {
+      throw new PlaybackProfileDraftConflictError(
+        message,
+        response.status,
+        parsedBody,
+        parsedBody.currentRevision as number
+      );
+    }
+
     throw new ApiRequestError(message, response.status, parsedBody);
   }
 
@@ -217,6 +256,108 @@ export async function getPlaybackSettings() {
     settings: PlaybackSettings;
   }>("/api/playback/settings");
   return response.settings;
+}
+
+export async function getPlaybackProfiles() {
+  const response = await requestJson<{
+    data: PlaybackProfileSummary[];
+    success: boolean;
+  }>("/api/playback-profiles");
+  return response.data;
+}
+
+export async function createPlaybackProfile(name: string) {
+  const response = await requestJson<{
+    data: PlaybackProfileSummary;
+    success: boolean;
+  }>("/api/playback-profiles", {
+    body: JSON.stringify({ name }),
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function renamePlaybackProfile(id: number, name: string) {
+  const response = await requestJson<{
+    data: PlaybackProfileSummary;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}`, {
+    body: JSON.stringify({ name }),
+    method: "PUT"
+  });
+  return response.data;
+}
+
+export async function archivePlaybackProfile(id: number) {
+  const response = await requestJson<{
+    data: PlaybackProfileSummary;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/archive`, { method: "POST" });
+  return response.data;
+}
+
+export async function getPlaybackProfileDraft(id: number) {
+  const response = await requestJson<{
+    data: PlaybackProfileDraft;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/draft`);
+  return response.data;
+}
+
+export async function savePlaybackProfileDraft(
+  id: number,
+  input: Pick<PlaybackProfileDraft, "pages" | "settings">
+    & { expectedRevision: number }
+) {
+  const response = await requestJson<{
+    data: PlaybackProfileDraft;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/draft`, {
+    body: JSON.stringify(input),
+    method: "PUT"
+  });
+  return response.data;
+}
+
+export async function previewPlaybackProfile(id: number) {
+  const response = await requestJson<{
+    data: PlaybackProfilePreview;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/preview`, { method: "POST" });
+  return response.data;
+}
+
+export async function publishPlaybackProfile(id: number, expectedRevision: number) {
+  const response = await requestJson<{
+    data: PlaybackProfileVersion;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/publish`, {
+    body: JSON.stringify({ expectedRevision }),
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function rollbackPlaybackProfile(
+  id: number,
+  versionId: number
+) {
+  const response = await requestJson<{
+    data: PlaybackProfileVersion;
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/rollback`, {
+    body: JSON.stringify({ versionId }),
+    method: "POST"
+  });
+  return response.data;
+}
+
+export async function getPlaybackProfileVersions(id: number) {
+  const response = await requestJson<{
+    data: PlaybackProfileVersion[];
+    success: boolean;
+  }>(`/api/playback-profiles/${id}/versions`);
+  return response.data;
 }
 
 export type FleetDeviceWrite = {

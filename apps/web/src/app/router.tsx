@@ -93,6 +93,21 @@ export const router = createBrowserRouter([
         }
       },
       {
+        path: "settings/playback-profiles",
+        loader: createLazyManagementRouteLoader(
+          "settings/playback-profiles",
+          async () => {
+            const { loadPlaybackProfilesRoute } = await import("../pages/PlaybackProfiles");
+            return loadPlaybackProfilesRoute;
+          }
+        ),
+        hydrateFallbackElement: <></>,
+        lazy: async () => {
+          const { PlaybackProfiles } = await import("../pages/PlaybackProfiles");
+          return { Component: PlaybackProfiles };
+        }
+      },
+      {
         path: "settings/data-source",
         loader: createLazyManagementRouteLoader(
           "settings/data-source",

@@ -14,6 +14,7 @@ import {
   updatePlaybackPages,
   updatePlaybackSettings
 } from "../services/displayRotationService.js";
+import { synchronizeDefaultPlaybackProfileDraft } from "../services/playbackProfileGovernanceService.js";
 
 type PlaybackSettingsUpdateBody = Partial<PlaybackSettings>;
 
@@ -59,6 +60,7 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
     "/api/playback/settings",
     async (request) => {
       const updatedSettings = updatePlaybackSettings(request.body ?? {});
+      synchronizeDefaultPlaybackProfileDraft();
 
       app.socketService.emitPlaybackSettingsUpdated({ settings: updatedSettings });
       app.socketService.emitDisplaySync({
@@ -89,6 +91,7 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
     "/api/playback/pages",
     async (request) => {
       const updatedPages = updatePlaybackPages(request.body?.pages ?? []);
+      synchronizeDefaultPlaybackProfileDraft();
 
       app.socketService.emitPlaybackSettingsUpdated({ pages: updatedPages });
       app.socketService.emitDisplaySync({
@@ -110,9 +113,11 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
     rotationPlan: readDisplayRotationPlan()
   }));
 
-  app.put<{ Body: PlaybackPagesUpdateBody }>("/api/playback/rotation-plan", async (request) => ({
-    rotationPlan: updateDisplayRotationPlan(request.body?.pages ?? [])
-  }));
+  app.put<{ Body: PlaybackPagesUpdateBody }>("/api/playback/rotation-plan", async (request) => {
+    const rotationPlan = updateDisplayRotationPlan(request.body?.pages ?? []);
+    synchronizeDefaultPlaybackProfileDraft();
+    return { rotationPlan };
+  });
 };
 
 export default playbackRoute;

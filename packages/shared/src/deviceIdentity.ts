@@ -1,6 +1,7 @@
 export type SiteScope = "cl" | "kn";
 
 export type PlaybackProfileSummary = {
+  archivedAt?: string | null;
   id: number;
   isDefault: boolean;
   name: string;

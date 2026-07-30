@@ -26,6 +26,7 @@ import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
 import metricsHistoryRoute from "./routes/metrics-history.js";
 import playbackRoute from "./routes/playback.js";
+import playbackProfilesRoute from "./routes/playback-profiles.js";
 import imagesRoute from "./routes/images.js";
 import brandRoute from "./routes/brand.js";
 import calculationSettingsRoute from "./routes/calculation-settings.js";
@@ -176,6 +177,7 @@ export async function buildApp() {
   await app.register(metricsRoute);
   await app.register(metricsHistoryRoute);
   await app.register(playbackRoute);
+  await app.register(playbackProfilesRoute);
   await app.register(imagesRoute);
   await app.register(brandRoute);
   await app.register(calculationSettingsRoute);

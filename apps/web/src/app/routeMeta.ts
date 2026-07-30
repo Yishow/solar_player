@@ -117,6 +117,15 @@ export const routeMetaList: RouteMeta[] = [
     shellDensity: "management"
   },
   {
+    path: "/settings/playback-profiles",
+    navLabel: "策略版本",
+    title: "播放策略版本",
+    subtitle: "Playback Profile Governance",
+    group: "management",
+    order: 11,
+    shellDensity: "management"
+  },
+  {
     path: "/settings/data-source",
     navLabel: "資料來源",
     title: "資料來源",
