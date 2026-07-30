@@ -27,17 +27,36 @@ and five reconnects. It rejects Client, duration, and reconnect overrides so a
 short smoke run cannot be mistaken for Phase 1 acceptance. Use the fast
 self-tests above for development feedback.
 
-The final stdout line is JSON and always includes:
+Prerequisite: the run drives one real browser Client through the published
+Profile Version rollout, so `playwright` must be installed with its Chromium
+browser available. Without it the acceptance command fails; it does not skip
+that evidence.
+
+The final stdout line is JSON and always includes every metric below. All of
+them are required — a missing or non-finite value fails the run:
 
 ```json
 {
+  "boundaryWaitMs": 5000,
+  "browserClients": 1,
+  "browserConditionalHits": 1,
   "clients": 50,
+  "conditionalHits": 50,
+  "durationMs": 600000,
+  "heartbeatCoverage": 50,
   "heartbeats": 3000,
-  "timeSignals": 1055,
-  "rotationEvaluations": 2,
+  "peakConnections": 50,
   "reconnects": 5,
-  "failures": 0,
-  "peakConnections": 50
+  "reloads": 0,
+  "rolloutApplied": 50,
+  "rolloutWaiting": 50,
+  "rotationEvaluations": 2,
+  "rotationEvaluationsAfterPublish": 4,
+  "rotationEvaluationsAtRest": 4,
+  "runtimeFetches": 152,
+  "timeSignalCoverage": 50,
+  "timeSignals": 1055,
+  "failures": 0
 }
 ```
 
@@ -52,16 +71,31 @@ non-zero `failures` makes the process exit non-zero.
 For fixed `clients=C=50`, duration `D=600,000` milliseconds, and
 `reconnects=R=5`:
 
-- Heartbeats: at most `C × (1 + floor(D / 10,000))`.
+- Heartbeats: at most `C × (1 + floor(D / 10,000)) + 2C`. The first term is the
+  spec cadence bound (one immediate heartbeat plus at most one per 10 seconds).
+  The `2C` is the harness driving every Client through the waiting-to-applied
+  Profile Version rollout, which is protocol exercise rather than cadence.
 - Time Signals: at most `C + R + C × ceil(D / 30,000)`; the first `C + R`
   accounts for an immediate signal on initial/reconnected sockets.
 - Minimum heartbeat evidence: at least `C`, one from every Client.
 - Minimum Time Signal evidence: at least `C + R`, one from every initial and
   reconnected Socket.
-- Full rotation evaluations: exactly 2, one unchanged Profile cohort for CL
-  and one for KN.
+- Time Signal coverage: `timeSignalCoverage` must equal `C`. Aggregate totals
+  are not sufficient — every connected Client must be attributed at least one
+  Signal, so one Client receiving many cannot mask another receiving none.
+- Heartbeat coverage: `heartbeatCoverage` must equal `C`, read back from the
+  Server liveness surface after the steady-state window.
+- Full rotation evaluations: exactly 2 for the baseline cohort sweep, one
+  unchanged Profile cohort for CL and one for KN.
+- Rotation evaluation growth after publishing a Profile Version: at least 1 and
+  at most 2, one per Site cohort. Growth of `C` means the cohort is being
+  re-evaluated per Device instead of per revision.
+- Rotation evaluation growth across the steady-state window and the final
+  all-Client sweep: at most 2.
 - Peak active connections: exactly `C`.
 - Settled active connections after reconnect: exactly `C`.
+- Runtime fetches: at most `3C + 10`, covering the rollout sweep, the
+  conditional sweep, and the final at-rest measurement sweep.
 
 The baseline is 25 CL plus 25 KN Devices sharing two Site cohorts and a common
 Default Profile. Do not lower the Client or duration values and call it Phase 1

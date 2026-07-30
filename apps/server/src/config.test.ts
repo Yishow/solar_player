@@ -86,6 +86,29 @@ test("config.deviceAgentUrl reads DEVICE_AGENT_URL with set/unset/blank cases", 
   }
 });
 
+test("config.phase1AcceptanceMetricsEnabled stays off unless explicitly set to 1", () => {
+  const original = process.env.PHASE1_ACCEPTANCE_METRICS;
+
+  try {
+    delete process.env.PHASE1_ACCEPTANCE_METRICS;
+    assert.equal(config.phase1AcceptanceMetricsEnabled, false);
+
+    process.env.PHASE1_ACCEPTANCE_METRICS = "1";
+    assert.equal(config.phase1AcceptanceMetricsEnabled, true);
+
+    process.env.PHASE1_ACCEPTANCE_METRICS = " 1 ";
+    assert.equal(config.phase1AcceptanceMetricsEnabled, true);
+
+    process.env.PHASE1_ACCEPTANCE_METRICS = "true";
+    assert.equal(config.phase1AcceptanceMetricsEnabled, false);
+
+    process.env.PHASE1_ACCEPTANCE_METRICS = "0";
+    assert.equal(config.phase1AcceptanceMetricsEnabled, false);
+  } finally {
+    restoreEnv("PHASE1_ACCEPTANCE_METRICS", original);
+  }
+});
+
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[key];

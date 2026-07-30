@@ -4,6 +4,11 @@ export type EffectiveRotationCacheKeyParts = {
   freshnessRevision: string;
   profileId: number;
   profileRevision: string;
+  /**
+   * Set when the cohort is served from a published Playback Profile Version.
+   * Left undefined for the Default Profile path so its key stays unchanged.
+   */
+  profileVersionId?: number;
   readinessRevision: string;
   siteScope: "cl" | "kn";
 };

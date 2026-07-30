@@ -14,6 +14,8 @@
 | `pnpm verify` | **交付 gate**：序列執行 build → server → web → deploy → server-runner（`scripts/verify.mjs`） |
 | `pnpm db:migrate` / `pnpm db:seed` | SQLite migration / seed |
 | `pnpm run fhd:witness -- --base-url <url>` | 擷取五個 playback 頁 1920x1080 witness（`fhd:witness:dry-run` 可先演練） |
+| `pnpm run verify:device-scoped-playback` | Phase 1 50-Client 驗收 run（固定 50 clients／600 秒／5 reconnects，需要 playwright + Chromium；不在 `pnpm test` 內） |
+| `pnpm run test:offline-playback-browser` | 離線播放的瀏覽器測試入口（不在 `pnpm test` 內） |
 
 repo 目前沒有 lint、coverage script 或 CI policy；`browser:smoke` 是可用的瀏覽器 smoke 入口，但不在 `pnpm verify` 內。驗證能力以當下的 root scripts 與 package scripts 為準。
 

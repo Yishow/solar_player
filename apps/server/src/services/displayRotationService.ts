@@ -663,7 +663,16 @@ export function readEffectiveRotationEvaluationCount() {
 
 function createRevision(value: unknown) {
   return createHash("sha256")
-    .update(JSON.stringify(value), "utf8")
+    .update(
+      // Freshness snapshots carry ageMs, which advances every millisecond. The
+      // rotation outcome depends on the freshness state, its source timestamp,
+      // and its next transition — all of which are hashed. Including the raw
+      // age would give every request a distinct key and defeat the cache.
+      JSON.stringify(value, (key, entry) =>
+        key === "ageMs" ? undefined : entry
+      ),
+      "utf8"
+    )
     .digest("hex");
 }
 
@@ -700,7 +709,13 @@ function readFreshnessRevision(options: {
 
   return createRevision({
     enforceFreshRuntimeData: options.settings.enforceFreshRuntimeData,
-    mqttStatus: options.mqttStatus,
+    // Only the fields that affect freshness. The concrete MqttStatus also
+    // carries updatedAt, which churns on every reconnect attempt and would
+    // otherwise invalidate the Effective Rotation cache on an unchanged cohort.
+    mqttStatus: {
+      connected: options.mqttStatus.connected,
+      reason: options.mqttStatus.reason
+    },
     pages: options.pages.map((page) => ({
       freshness:
         page.templateKey === undefined
@@ -718,15 +733,16 @@ function readFreshnessRevision(options: {
   });
 }
 
-export function readEffectiveDisplayRotationSnapshot(options: {
+function readCachedRotationSnapshot(options: {
   mqttStatus: MqttStatusLike;
-  now?: Date;
+  now: Date;
+  pages: PlaybackPage[];
   profileId: number;
+  profileVersionId?: number;
+  settings: PlaybackSettings;
   siteScope: SiteScope;
 }): EffectiveDisplayRotationSnapshot {
-  const now = options.now ?? new Date();
-  const settings = readPlaybackSettings(options.profileId);
-  const pages = resolveRotationPages(options.profileId);
+  const { now, pages, settings } = options;
   const readinessReport = readDisplayReadinessReport({
     now,
     siteScope: options.siteScope
@@ -753,6 +769,7 @@ export function readEffectiveDisplayRotationSnapshot(options: {
     freshnessRevision,
     profileId: options.profileId,
     profileRevision,
+    profileVersionId: options.profileVersionId,
     readinessRevision,
     siteScope: options.siteScope
   });
@@ -772,4 +789,40 @@ export function readEffectiveDisplayRotationSnapshot(options: {
       settings
     })
   );
+}
+
+export function readEffectiveDisplayRotationSnapshot(options: {
+  mqttStatus: MqttStatusLike;
+  now?: Date;
+  profileId: number;
+  siteScope: SiteScope;
+}): EffectiveDisplayRotationSnapshot {
+  return readCachedRotationSnapshot({
+    mqttStatus: options.mqttStatus,
+    now: options.now ?? new Date(),
+    pages: resolveRotationPages(options.profileId),
+    profileId: options.profileId,
+    settings: readPlaybackSettings(options.profileId),
+    siteScope: options.siteScope
+  });
+}
+
+export function readEffectiveProfileVersionRotationSnapshot(options: {
+  mqttStatus: MqttStatusLike;
+  now?: Date;
+  pages: PlaybackPage[];
+  profileId: number;
+  profileVersionId: number;
+  settings: PlaybackSettings;
+  siteScope: SiteScope;
+}): EffectiveDisplayRotationSnapshot {
+  return readCachedRotationSnapshot({
+    mqttStatus: options.mqttStatus,
+    now: options.now ?? new Date(),
+    pages: options.pages,
+    profileId: options.profileId,
+    profileVersionId: options.profileVersionId,
+    settings: options.settings,
+    siteScope: options.siteScope
+  });
 }

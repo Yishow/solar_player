@@ -870,3 +870,126 @@ test("a Device assigned to an incomplete Profile receives profile_missing", asyn
     await app.close();
   }
 });
+
+async function publishProfileVersion(app: FastifyInstance, profileId: number) {
+  const draft = await app.inject({
+    method: "GET",
+    url: `/api/playback-profiles/${profileId}/draft`
+  });
+  assert.equal(draft.statusCode, 200);
+  const loaded = draft.json<{
+    data: {
+      pages: Array<{ id: number }>;
+      revision: number;
+      settings: { brightness: number };
+    };
+  }>().data;
+  const saved = await app.inject({
+    method: "PUT",
+    payload: {
+      expectedRevision: loaded.revision,
+      pages: loaded.pages,
+      settings: {
+        ...loaded.settings,
+        brightness: loaded.settings.brightness === 71 ? 72 : 71,
+        startPage: loaded.pages[0]!.id
+      }
+    },
+    url: `/api/playback-profiles/${profileId}/draft`
+  });
+  assert.equal(saved.statusCode, 200);
+  const published = await app.inject({
+    method: "POST",
+    payload: {
+      expectedRevision: saved.json<{ data: { revision: number } }>().data.revision
+    },
+    url: `/api/playback-profiles/${profileId}/publish`
+  });
+  assert.equal(published.statusCode, 201);
+  return published.json<{ data: { id: number } }>().data.id;
+}
+
+test("published Profile Version cohort evaluates Effective Rotation once per revision", async () => {
+  const { readEffectiveRotationEvaluationCount } = await import(
+    "../services/displayRotationService.js"
+  );
+  const app = await buildApp();
+
+  try {
+    const cohort: Awaited<ReturnType<typeof createPairedDevice>>[] = [];
+    for (let index = 0; index < 25; index += 1) {
+      cohort.push(await createPairedDevice(app, "kn", `rotation-cohort-${index}`));
+    }
+
+    const first = await app.inject({
+      cookies: { solar_device_credential: cohort[0]!.credential },
+      method: "GET",
+      url: "/api/playback/runtime"
+    });
+    assert.equal(first.statusCode, 200);
+    const profileId = first.json<{ context: { profileId: number } }>()
+      .context.profileId;
+
+    const desiredVersion = await publishProfileVersion(app, profileId);
+
+    const before = readEffectiveRotationEvaluationCount();
+    for (let sweep = 0; sweep < 2; sweep += 1) {
+      for (const device of cohort) {
+        const response = await app.inject({
+          cookies: { solar_device_credential: device.credential },
+          method: "GET",
+          url: "/api/playback/runtime"
+        });
+        assert.equal(response.statusCode, 200);
+        assert.equal(
+          response.json<{ profileRollout: { desiredVersion: number } }>()
+            .profileRollout.desiredVersion,
+          desiredVersion
+        );
+      }
+    }
+    const after = readEffectiveRotationEvaluationCount();
+
+    assert.equal(
+      after - before,
+      1,
+      `expected one full Effective Rotation evaluation for the cohort, observed ${after - before}`
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("acceptance metrics header is present on a conditional 304 response", async () => {
+  process.env.PHASE1_ACCEPTANCE_METRICS = "1";
+  const app = await buildApp();
+
+  try {
+    const paired = await createPairedDevice(app, "cl", "metrics-304");
+    const first = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
+      method: "GET",
+      url: "/api/playback/runtime"
+    });
+    assert.equal(first.statusCode, 200);
+    assert.ok(first.headers["x-solar-rotation-evaluations"]);
+    const etag = first.headers.etag;
+    assert.ok(etag);
+
+    const conditional = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
+      headers: { "if-none-match": etag },
+      method: "GET",
+      url: "/api/playback/runtime"
+    });
+
+    assert.equal(conditional.statusCode, 304);
+    assert.ok(
+      conditional.headers["x-solar-rotation-evaluations"],
+      "conditional 304 response did not carry the acceptance metrics header"
+    );
+  } finally {
+    delete process.env.PHASE1_ACCEPTANCE_METRICS;
+    await app.close();
+  }
+});

@@ -62,6 +62,13 @@ export const config = {
   get trustProxyIps() {
     return process.env.TRUST_PROXY_IPS;
   },
+  /**
+   * Opt-in only. Exposes Effective Rotation evaluation counts on playback
+   * runtime responses so the Phase 1 acceptance harness can observe them.
+   */
+  get phase1AcceptanceMetricsEnabled() {
+    return process.env.PHASE1_ACCEPTANCE_METRICS?.trim() === "1";
+  },
   get managementAccessToken() {
     const value = process.env.MANAGEMENT_ACCESS_TOKEN?.trim();
     return value && value.length > 0 ? value : null;

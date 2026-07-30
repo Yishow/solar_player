@@ -1,11 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createHash } from "node:crypto";
 import type { PlaybackSettings } from "@solar-display/shared";
+import { config } from "../config.js";
 import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
 import { readDisplayOpsSummary } from "../services/displayOpsService.js";
 import {
   readEffectiveDisplayRotationSnapshot,
-  evaluatePlaybackSnapshot,
+  readEffectiveProfileVersionRotationSnapshot,
   readEffectiveRotationEvaluationCount,
   readDisplayRotationPreview,
   readDisplayRotationPlan,
@@ -33,17 +34,14 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
       const context = requireResolvedDisplayClientContext(request);
       const profileRollout = readDeviceProfileRollout(context.deviceId);
       const snapshot = profileRollout.desired
-        ? {
-            effectiveRotationRevision:
-              `profile-version:${profileRollout.desired.id}:${context.siteScope}`,
-            preview: evaluatePlaybackSnapshot({
-              mqttStatus: app.mqttClientService.getStatus(),
-              pages: profileRollout.desired.snapshot.pages,
-              settings: profileRollout.desired.snapshot.settings,
-              siteScope: context.siteScope
-            }),
-            settings: profileRollout.desired.snapshot.settings
-          }
+        ? readEffectiveProfileVersionRotationSnapshot({
+            mqttStatus: app.mqttClientService.getStatus(),
+            pages: profileRollout.desired.snapshot.pages,
+            profileId: context.profileId,
+            profileVersionId: profileRollout.desired.id,
+            settings: profileRollout.desired.snapshot.settings,
+            siteScope: context.siteScope
+          })
         : readEffectiveDisplayRotationSnapshot({
             mqttStatus: app.mqttClientService.getStatus(),
             profileId: context.profileId,
@@ -67,14 +65,14 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
       reply.header("cache-control", "private, no-cache");
       reply.header("etag", etag);
       reply.header("vary", "Cookie");
-      if (request.headers["if-none-match"] === etag) {
-        return reply.status(304).send();
-      }
-      if (process.env.PHASE1_ACCEPTANCE_METRICS === "1") {
+      if (config.phase1AcceptanceMetricsEnabled) {
         reply.header(
           "x-solar-rotation-evaluations",
           readEffectiveRotationEvaluationCount()
         );
+      }
+      if (request.headers["if-none-match"] === etag) {
+        return reply.status(304).send();
       }
 
       return response;

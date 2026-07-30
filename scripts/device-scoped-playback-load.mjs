@@ -14,6 +14,12 @@ const { io } = requireFromWeb("socket.io-client");
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const TIME_SIGNAL_INTERVAL_MS = 30_000;
+// cl and kn. One unchanged Profile/Site cohort may evaluate the Effective
+// Rotation once per revision, so a cohort-wide sweep may add at most this many.
+const SITE_COHORT_COUNT = 2;
+// The harness sends one "waiting" and one "applied" heartbeat per Client while
+// exercising the published Profile Version rollout.
+const ROLLOUT_LIFECYCLE_HEARTBEATS_PER_CLIENT = 2;
 
 function wait(ms) {
   return new Promise((resolveWait) => setTimeout(resolveWait, ms));
@@ -293,9 +299,9 @@ async function assertConnectedDevices(baseUrl, devices) {
   }
 }
 
-async function hasHeartbeatReadBack(baseUrl, devices) {
+async function countHeartbeatReadBack(baseUrl, devices) {
   const liveness = await readLivenessSnapshot(baseUrl);
-  return devices.every((device) => {
+  return devices.filter((device) => {
     const client = liveness.find(
       (candidate) => candidate.deviceId === device.deviceId
     );
@@ -304,7 +310,29 @@ async function hasHeartbeatReadBack(baseUrl, devices) {
       && client.pageKey === "overview"
       && client.route === "/overview"
     );
-  });
+  }).length;
+}
+
+async function hasHeartbeatReadBack(baseUrl, devices) {
+  return (await countHeartbeatReadBack(baseUrl, devices)) === devices.length;
+}
+
+function readRotationEvaluationHeader(response) {
+  const value = response.headers.get("x-solar-rotation-evaluations");
+  return value === null ? null : Number(value);
+}
+
+async function sweepRotationEvaluationCount(baseUrl, devices) {
+  const counts = [];
+  for (const device of devices) {
+    const runtime = await request(baseUrl, "/api/playback/runtime", {
+      cookie: device.cookie
+    });
+    counts.push(readRotationEvaluationHeader(runtime.response));
+  }
+  return counts.every((count) => count !== null)
+    ? Math.max(...counts)
+    : null;
 }
 
 async function assertHealthyIdentityState(baseUrl, devices) {
@@ -542,10 +570,12 @@ async function exerciseVersionedProfileRollout(
     runtimeEvidence[0].profileId
   );
   let conditionalHits = 0;
+  const rotationEvaluationCounts = [];
   for (const device of devices) {
     const runtime = await request(baseUrl, "/api/playback/runtime", {
       cookie: device.cookie
     });
+    rotationEvaluationCounts.push(readRotationEvaluationHeader(runtime.response));
     if (runtime.payload.profileRollout.desiredVersion !== desiredVersion) {
       throw new Error("published Profile Version did not reach every Device");
     }
@@ -620,6 +650,9 @@ async function exerciseVersionedProfileRollout(
     heartbeats: devices.length * 2,
     rolloutApplied: devices.length,
     rolloutWaiting: devices.length,
+    rotationEvaluations: rotationEvaluationCounts.every((count) => count !== null)
+      ? Math.max(...rotationEvaluationCounts)
+      : null,
     runtimeFetches: devices.length * 2
   };
 }
@@ -739,13 +772,17 @@ export function evaluateAcceptanceThresholds(metrics) {
     "clients",
     "conditionalHits",
     "durationMs",
+    "heartbeatCoverage",
     "heartbeats",
     "reloads",
     "rolloutApplied",
     "rolloutWaiting",
     "runtimeFetches",
+    "timeSignalCoverage",
     "timeSignals",
     "rotationEvaluations",
+    "rotationEvaluationsAfterPublish",
+    "rotationEvaluationsAtRest",
     "reconnects",
     "peakConnections"
   ];
@@ -758,8 +795,12 @@ export function evaluateAcceptanceThresholds(metrics) {
     return failures;
   }
 
+  // Spec cadence bound: one immediate heartbeat plus at most one per interval.
+  // On top of that the harness itself drives each Client through the
+  // waiting -> applied Profile rollout, which costs two more heartbeats each.
   const heartbeatLimit =
-    metrics.clients * (3 + Math.floor(metrics.durationMs / HEARTBEAT_INTERVAL_MS));
+    metrics.clients * (1 + Math.floor(metrics.durationMs / HEARTBEAT_INTERVAL_MS))
+    + metrics.clients * ROLLOUT_LIFECYCLE_HEARTBEATS_PER_CLIENT;
   const timeSignalLimit =
     metrics.clients
     + metrics.reconnects
@@ -783,6 +824,16 @@ export function evaluateAcceptanceThresholds(metrics) {
   if (metrics.peakConnections < metrics.clients) {
     failures.push(
       `peakConnections ${metrics.peakConnections} are below ${metrics.clients}`
+    );
+  }
+  if (metrics.timeSignalCoverage !== metrics.clients) {
+    failures.push(
+      `timeSignalCoverage ${metrics.timeSignalCoverage} does not equal ${metrics.clients}`
+    );
+  }
+  if (metrics.heartbeatCoverage !== metrics.clients) {
+    failures.push(
+      `heartbeatCoverage ${metrics.heartbeatCoverage} does not equal ${metrics.clients}`
     );
   }
   if (metrics.conditionalHits !== metrics.clients) {
@@ -809,9 +860,9 @@ export function evaluateAcceptanceThresholds(metrics) {
   if (metrics.reloads !== 0) {
     failures.push(`reloads ${metrics.reloads} exceed 0`);
   }
-  if (metrics.runtimeFetches > metrics.clients * 2 + 10) {
+  if (metrics.runtimeFetches > metrics.clients * 3 + 10) {
     failures.push(
-      `runtimeFetches ${metrics.runtimeFetches} exceed ${metrics.clients * 2 + 10}`
+      `runtimeFetches ${metrics.runtimeFetches} exceed ${metrics.clients * 3 + 10}`
     );
   }
   if (metrics.heartbeats > heartbeatLimit) {
@@ -826,6 +877,25 @@ export function evaluateAcceptanceThresholds(metrics) {
   if (metrics.peakConnections > metrics.clients) {
     failures.push(
       `peakConnections ${metrics.peakConnections} exceed ${metrics.clients}`
+    );
+  }
+  const publishGrowth =
+    metrics.rotationEvaluationsAfterPublish - metrics.rotationEvaluations;
+  if (publishGrowth < 1) {
+    failures.push(
+      `rotation evaluations grew by ${publishGrowth} after publishing a Profile Version, below 1`
+    );
+  }
+  if (publishGrowth > SITE_COHORT_COUNT) {
+    failures.push(
+      `rotation evaluations grew by ${publishGrowth} after publishing a Profile Version, exceeding ${SITE_COHORT_COUNT}`
+    );
+  }
+  const steadyStateGrowth =
+    metrics.rotationEvaluationsAtRest - metrics.rotationEvaluationsAfterPublish;
+  if (steadyStateGrowth > SITE_COHORT_COUNT) {
+    failures.push(
+      `rotation evaluations grew by ${steadyStateGrowth} during the steady-state window, exceeding ${SITE_COHORT_COUNT}`
     );
   }
   return failures;
@@ -918,17 +988,26 @@ export async function runDeviceScopedPlaybackAcceptance({
       async () => (await readActiveConnections(isolated.baseUrl)) === 0,
       { label: "production browser disconnect", timeoutMs: 5_000 }
     );
-    const onTimeSignal = () => {
+    const timeSignalsByDevice = new Map();
+    const trackTimeSignal = (device) => () => {
       timeSignals += 1;
+      timeSignalsByDevice.set(
+        device.deviceId,
+        (timeSignalsByDevice.get(device.deviceId) ?? 0) + 1
+      );
     };
     for (const device of devices) {
       sockets.push(
-        await connectDeviceSocket(isolated.baseUrl, device, onTimeSignal)
+        await connectDeviceSocket(
+          isolated.baseUrl,
+          device,
+          trackTimeSignal(device)
+        )
       );
     }
     await waitFor(
-      () => timeSignals >= clients,
-      { label: "immediate Server Time Signals", timeoutMs: 5_000 }
+      () => timeSignalsByDevice.size >= clients,
+      { label: "immediate Server Time Signals for every Client", timeoutMs: 5_000 }
     );
 
     peakConnections = await readActiveConnections(isolated.baseUrl);
@@ -966,7 +1045,7 @@ export async function runDeviceScopedPlaybackAcceptance({
       reconnectIndexes.map((index) => connectDeviceSocket(
         isolated.baseUrl,
         devices[index],
-        onTimeSignal
+        trackTimeSignal(devices[index])
       ))
     );
     reconnectIndexes.forEach((index, position) => {
@@ -1027,6 +1106,15 @@ export async function runDeviceScopedPlaybackAcceptance({
     clearInterval(statusTimer);
     statusTimer = undefined;
 
+    const heartbeatCoverage = await countHeartbeatReadBack(
+      isolated.baseUrl,
+      devices
+    );
+    const rotationEvaluationsAtRest = await sweepRotationEvaluationCount(
+      isolated.baseUrl,
+      devices
+    );
+
     if (statusPollError) {
       throw statusPollError;
     }
@@ -1042,12 +1130,18 @@ export async function runDeviceScopedPlaybackAcceptance({
       heartbeats,
       peakConnections,
       reconnects,
+      heartbeatCoverage,
       reloads: browserMetrics.reloads,
       rolloutApplied: rolloutMetrics.rolloutApplied,
       rolloutWaiting: rolloutMetrics.rolloutWaiting,
       rotationEvaluations,
+      rotationEvaluationsAfterPublish: rolloutMetrics.rotationEvaluations,
+      rotationEvaluationsAtRest,
       runtimeFetches:
-        rolloutMetrics.runtimeFetches + browserMetrics.runtimeFetches,
+        rolloutMetrics.runtimeFetches
+        + browserMetrics.runtimeFetches
+        + devices.length,
+      timeSignalCoverage: timeSignalsByDevice.size,
       timeSignals
     };
     const failureDetails = evaluateAcceptanceThresholds(metrics);
