@@ -1851,8 +1851,544 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   assert.match(source, /xset -dpms/);
   assert.match(source, /export XMODIFIERS="\$\{XMODIFIERS:-@im=fcitx\}"/);
   assert.match(source, /SESSION_KEY="\$\{XDG_SESSION_ID:-\$\{WAYLAND_DISPLAY:-\$\{DISPLAY:-default\}\}\}"/);
-  assert.match(source, /FIREFOX_PID_FILE="\$\{LOG_DIR\}\/firefox-\$\{SESSION_KEY\}\.pid"/);
-  assert.match(source, /firefox already running for this session/);
+  assert.match(source, /KIOSK_MONITOR_PID_FILE="\$\{LOG_DIR\}\/firefox-\$\{SESSION_KEY\}\.pid"/);
+  assert.match(source, /flock -n 9/);
+  assert.match(source, /flock 8/);
+  assert.match(source, /firefox -kiosk -private-window.*8>&- 9>&-/);
+  assert.match(source, /kiosk already managed for this session/);
+  assert.match(source, /trap cleanup EXIT/);
+  assert.match(source, /trap 'exit 0' INT TERM HUP/);
+  assert.ok(
+    source.indexOf('rm -f "${STOP_REQUEST_FILE}"') <
+      source.indexOf('printf \'%s\\n\' "$$" > "${KIOSK_MONITOR_PID_FILE}"')
+  );
+});
+
+function makeKioskLifecycleFixture() {
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-kiosk-lifecycle-"));
+  const fakeBinDir = path.join(fixtureDir, "fake-bin");
+  const homeDir = path.join(fixtureDir, "home");
+  const stateDir = path.join(fixtureDir, "state");
+  const launchCountPath = path.join(fixtureDir, "firefox-launch-count");
+  const curlCountPath = path.join(fixtureDir, "curl-count");
+  const markerObservationPath = path.join(fixtureDir, "marker-observation");
+  const stopMarkerPath = path.join(stateDir, "solar-display", "kiosk-stop-requested");
+  const browserPidPath = path.join(stateDir, "solar-display", "kiosk-browser.pid");
+  const sleepEnteredPath = path.join(fixtureDir, "sleep-entered");
+  const sleepReleasePath = path.join(fixtureDir, "sleep-release");
+  const firefoxLaunchDir = path.join(fixtureDir, "firefox-launches");
+  const firefoxReleasePath = path.join(fixtureDir, "firefox-release");
+  const monitorLockDir = path.join(fixtureDir, "monitor-lock");
+  const browserActionLockDir = path.join(fixtureDir, "browser-action-lock");
+  const prelaunchEnteredPath = path.join(fixtureDir, "prelaunch-entered");
+  const prelaunchReleasePath = path.join(fixtureDir, "prelaunch-release");
+
+  mkdirSync(fakeBinDir, { recursive: true });
+  mkdirSync(homeDir, { recursive: true });
+  mkdirSync(path.dirname(stopMarkerPath), { recursive: true });
+  writeFileSync(
+    path.join(fixtureDir, "start-solar-kiosk.sh"),
+    readFileSync(path.join(repoRoot, "deploy/start-solar-kiosk.sh"), "utf8")
+  );
+  writeFileSync(
+    path.join(fixtureDir, "stop-solar-kiosk.sh"),
+    readFileSync(path.join(repoRoot, "deploy/stop-solar-kiosk.sh"), "utf8")
+  );
+  markBashExecutable(path.join(fixtureDir, "start-solar-kiosk.sh"));
+  markBashExecutable(path.join(fixtureDir, "stop-solar-kiosk.sh"));
+
+  writeFileSync(path.join(fakeBinDir, "curl"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'count="$(cat "${TEST_CURL_COUNT}" 2>/dev/null || echo 0)"',
+    "count=$((count + 1))",
+    'printf "%s\\n" "${count}" > "${TEST_CURL_COUNT}"',
+    'if (( count <= ${FAKE_CURL_FAILURES:-0} )); then exit 1; fi',
+    "exit 0",
+    ""
+  ].join("\n"));
+  writeFileSync(path.join(fakeBinDir, "setsid"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'count="$(cat "${TEST_LAUNCH_COUNT}" 2>/dev/null || echo 0)"',
+    "count=$((count + 1))",
+    'printf "%s\\n" "${count}" > "${TEST_LAUNCH_COUNT}"',
+    'if [[ -n "${TEST_FIREFOX_LAUNCH_DIR:-}" ]]; then',
+    '  mkdir -p "${TEST_FIREFOX_LAUNCH_DIR}"',
+    '  : > "${TEST_FIREFOX_LAUNCH_DIR}/launch-${PPID}"',
+    "fi",
+    'if [[ -n "${TEST_FIREFOX_RELEASE:-}" ]]; then',
+    '  while [[ ! -e "${TEST_FIREFOX_RELEASE}" ]]; do /bin/sleep 0.01; done',
+    "fi",
+    'if [[ -n "${TEST_MARKER_OBSERVATION:-}" ]]; then',
+    '  if [[ -e "${TEST_STOP_MARKER}" ]]; then echo present; else echo absent; fi > "${TEST_MARKER_OBSERVATION}"',
+    "fi",
+    'if (( count >= ${FAKE_STOP_ON_LAUNCH:-999} )); then',
+    '  mkdir -p "$(dirname "${TEST_STOP_MARKER}")"',
+    '  : > "${TEST_STOP_MARKER}"',
+    "fi",
+    'exit "${FAKE_FIREFOX_EXIT_STATUS:-17}"',
+    ""
+  ].join("\n"));
+  writeFileSync(path.join(fakeBinDir, "sleep"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'if [[ -n "${TEST_SLEEP_ENTERED:-}" ]]; then',
+    '  : > "${TEST_SLEEP_ENTERED}"',
+    '  while [[ ! -e "${TEST_SLEEP_RELEASE}" ]]; do /bin/sleep 0.01; done',
+    "fi",
+    "exit 0",
+    ""
+  ].join("\n"));
+  writeFileSync(path.join(fakeBinDir, "flock"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'case "$*" in',
+    '  "-n 9")',
+    '    if [[ -n "${TEST_MONITOR_LOCK_DIR:-}" ]]; then mkdir "${TEST_MONITOR_LOCK_DIR}"; fi',
+    "    ;;",
+    '  "8")',
+    '    if [[ -n "${TEST_BROWSER_ACTION_LOCK_DIR:-}" ]]; then',
+    '      until mkdir "${TEST_BROWSER_ACTION_LOCK_DIR}" 2>/dev/null; do /bin/sleep 0.01; done',
+    "    fi",
+    "    ;;",
+    '  "-u 8")',
+    '    if [[ -n "${TEST_BROWSER_ACTION_LOCK_DIR:-}" ]]; then rmdir "${TEST_BROWSER_ACTION_LOCK_DIR}"; fi',
+    "    ;;",
+    "esac",
+    ""
+  ].join("\n"));
+  writeFileSync(path.join(fakeBinDir, "tee"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'input="$(/bin/cat)"',
+    'if [[ -n "${TEST_PRELAUNCH_ENTERED:-}" && "${input}" == *"server healthy; launching firefox kiosk"* ]]; then',
+    '  : > "${TEST_PRELAUNCH_ENTERED}"',
+    '  while [[ ! -e "${TEST_PRELAUNCH_RELEASE}" ]]; do /bin/sleep 0.01; done',
+    "fi",
+    'printf "%s\\n" "${input}" | /usr/bin/tee "$@"',
+    ""
+  ].join("\n"));
+  writeFileSync(path.join(fakeBinDir, "ps"), [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    'process_id="${@: -1}"',
+    'printf " %s\\n" "${TEST_PROCESS_START_TIME:-Thu Jul 31 00:00:00 2026}"',
+    'if [[ "${TEST_EXIT_AFTER_IDENTITY_PID:-}" == "${process_id}" ]]; then',
+    '  kill "${process_id}"',
+    "  /bin/sleep 0.05",
+    "fi",
+    ""
+  ].join("\n"));
+
+  for (const command of ["curl", "setsid", "sleep", "flock", "tee", "ps"]) {
+    markBashExecutable(path.join(fakeBinDir, command));
+  }
+
+  return {
+    fixtureDir,
+    fakeBinDir,
+    homeDir,
+    stateDir,
+    launchCountPath,
+    curlCountPath,
+    markerObservationPath,
+    stopMarkerPath,
+    browserPidPath,
+    sleepEnteredPath,
+    sleepReleasePath,
+    firefoxLaunchDir,
+    firefoxReleasePath,
+    monitorLockDir,
+    browserActionLockDir,
+    prelaunchEnteredPath,
+    prelaunchReleasePath
+  };
+}
+
+function kioskLifecycleEnv(fixture, overrides = {}) {
+  return {
+    ...process.env,
+    HOME: fixture.homeDir,
+    XDG_STATE_HOME: fixture.stateDir,
+    XDG_SESSION_ID: "test-session",
+    KIOSK_START_DELAY: "0",
+    KIOSK_RESTART_DELAY: "0",
+    KIOSK_WAIT_SECONDS: "2",
+    TEST_LAUNCH_COUNT: fixture.launchCountPath,
+    TEST_CURL_COUNT: fixture.curlCountPath,
+    TEST_STOP_MARKER: fixture.stopMarkerPath,
+    ...overrides
+  };
+}
+
+function spawnKioskLifecycleScript(scriptName, fixture, overrides = {}) {
+  return spawn(bashCommand, [scriptName], {
+    cwd: fixture.fixtureDir,
+    env: buildBashEnv(kioskLifecycleEnv(fixture, overrides), {
+      prependPathDirs: [fixture.fakeBinDir]
+    }),
+    stdio: "ignore"
+  });
+}
+
+function waitForChildExit(child) {
+  return new Promise((resolve, reject) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve({ status: child.exitCode, signal: child.signalCode });
+      return;
+    }
+
+    child.once("error", reject);
+    child.once("exit", (status, signal) => {
+      resolve({ status, signal });
+    });
+  });
+}
+
+test("kiosk launcher restarts Firefox after an unexpected exit", () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    const result = runBashScript("start-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, {
+        FAKE_STOP_ON_LAUNCH: "2"
+      }),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8",
+      timeout: 2_000
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(fixture.launchCountPath, "utf8").trim(), "2");
+    assert.equal(readFileSync(fixture.curlCountPath, "utf8").trim(), "2");
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk launcher starts another health window after timeout", () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    const result = runBashScript("start-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, {
+        KIOSK_WAIT_SECONDS: "1",
+        FAKE_CURL_FAILURES: "1",
+        FAKE_STOP_ON_LAUNCH: "1"
+      }),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8",
+      timeout: 2_000
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(fixture.curlCountPath, "utf8").trim(), "2");
+    assert.equal(readFileSync(fixture.launchCountPath, "utf8").trim(), "1");
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk stop helper writes the intentional-exit marker before killing Firefox", () => {
+  const fixture = makeKioskLifecycleFixture();
+  const pkillObservationPath = path.join(fixture.fixtureDir, "pkill-observation");
+
+  try {
+    writeFileSync(path.join(fixture.fakeBinDir, "pgrep"), "#!/bin/bash\nexit 0\n");
+    writeFileSync(path.join(fixture.fakeBinDir, "pkill"), [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      'test -f "${TEST_STOP_MARKER}"',
+      'printf "marker-present\\n" > "${TEST_PKILL_OBSERVATION}"',
+      ""
+    ].join("\n"));
+    markBashExecutable(path.join(fixture.fakeBinDir, "pgrep"));
+    markBashExecutable(path.join(fixture.fakeBinDir, "pkill"));
+
+    const result = runBashScript("stop-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, {
+        TEST_PKILL_OBSERVATION: pkillObservationPath
+      }),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(pkillObservationPath, "utf8").trim(), "marker-present");
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("a new kiosk launcher clears a stale intentional-exit marker", () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    writeFileSync(fixture.stopMarkerPath, "stale\n");
+
+    const result = runBashScript("start-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, {
+        FAKE_STOP_ON_LAUNCH: "1",
+        TEST_MARKER_OBSERVATION: fixture.markerObservationPath
+      }),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8",
+      timeout: 2_000
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(fixture.markerObservationPath, "utf8").trim(), "absent");
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk stop request during the start delay prevents Firefox launch", async () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    writeFileSync(path.join(fixture.fakeBinDir, "pgrep"), "#!/bin/bash\nexit 1\n");
+    markBashExecutable(path.join(fixture.fakeBinDir, "pgrep"));
+
+    const launcher = spawnKioskLifecycleScript("start-solar-kiosk.sh", fixture, {
+      KIOSK_START_DELAY: "5",
+      TEST_SLEEP_ENTERED: fixture.sleepEnteredPath,
+      TEST_SLEEP_RELEASE: fixture.sleepReleasePath
+    });
+    assert.equal(waitForPathExists(fixture.sleepEnteredPath, 2_000), true);
+
+    const stopped = runBashScript("stop-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8"
+    });
+    assert.equal(stopped.status, 0, stopped.stderr);
+
+    writeFileSync(fixture.sleepReleasePath, "release\n");
+    const launcherExit = await waitForChildExit(launcher);
+
+    assert.equal(launcherExit.status, 0);
+    assert.equal(existsSync(fixture.launchCountPath), false);
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk launcher preserves a live legacy PID guard during lock migration", () => {
+  const fixture = makeKioskLifecycleFixture();
+  const monitorPidPath = path.join(
+    fixture.stateDir,
+    "solar-display",
+    "firefox-test-session.pid"
+  );
+
+  try {
+    writeFileSync(monitorPidPath, `${process.pid}\n`);
+
+    const result = runBashScript("start-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, {
+        FAKE_STOP_ON_LAUNCH: "1"
+      }),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8",
+      timeout: 2_000
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(fixture.launchCountPath), false);
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk stop cannot slip between the final marker check and Firefox launch", async () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    const sharedEnv = {
+      TEST_BROWSER_ACTION_LOCK_DIR: fixture.browserActionLockDir,
+      TEST_FIREFOX_LAUNCH_DIR: fixture.firefoxLaunchDir,
+      TEST_FIREFOX_RELEASE: fixture.firefoxReleasePath
+    };
+    const launcher = spawnKioskLifecycleScript("start-solar-kiosk.sh", fixture, {
+      ...sharedEnv,
+      TEST_PRELAUNCH_ENTERED: fixture.prelaunchEnteredPath,
+      TEST_PRELAUNCH_RELEASE: fixture.prelaunchReleasePath
+    });
+    assert.equal(waitForPathExists(fixture.prelaunchEnteredPath), true);
+
+    const stopper = spawnKioskLifecycleScript(
+      "stop-solar-kiosk.sh",
+      fixture,
+      sharedEnv
+    );
+    await delay(100);
+    assert.equal(existsSync(fixture.stopMarkerPath), false);
+
+    writeFileSync(fixture.prelaunchReleasePath, "release\n");
+    const [launcherExit, stopperExit] = await Promise.all([
+      waitForChildExit(launcher),
+      waitForChildExit(stopper)
+    ]);
+
+    assert.equal(launcherExit.status, 0);
+    assert.equal(stopperExit.status, 0);
+    assert.equal(existsSync(fixture.stopMarkerPath), true);
+    assert.equal(existsSync(fixture.browserPidPath), false);
+    assert.ok(
+      !existsSync(fixture.firefoxLaunchDir) ||
+        readdirSync(fixture.firefoxLaunchDir).length <= 1
+    );
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("concurrent kiosk launchers acquire only one monitor slot", async () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    const launchers = Array.from({ length: 2 }, () => spawnKioskLifecycleScript(
+      "start-solar-kiosk.sh",
+      fixture,
+      {
+        TEST_MONITOR_LOCK_DIR: fixture.monitorLockDir,
+        TEST_FIREFOX_LAUNCH_DIR: fixture.firefoxLaunchDir,
+        TEST_FIREFOX_RELEASE: fixture.firefoxReleasePath
+      }
+    ));
+
+    assert.equal(waitForPathExists(fixture.firefoxLaunchDir), true);
+    await delay(100);
+    writeFileSync(fixture.stopMarkerPath, "stop\n");
+    writeFileSync(fixture.firefoxReleasePath, "release\n");
+
+    const exits = await Promise.all(launchers.map(waitForChildExit));
+    assert.deepEqual(exits.map(({ status }) => status), [0, 0]);
+    assert.equal(readdirSync(fixture.firefoxLaunchDir).length, 1);
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk stop ignores a stale tracked PID reused by another process", () => {
+  const fixture = makeKioskLifecycleFixture();
+
+  try {
+    writeFileSync(
+      fixture.browserPidPath,
+      `${process.pid} stale_process_identity\n`
+    );
+    writeFileSync(path.join(fixture.fakeBinDir, "pgrep"), "#!/bin/bash\nexit 1\n");
+    markBashExecutable(path.join(fixture.fakeBinDir, "pgrep"));
+
+    const result = runBashScript("stop-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotThrow(() => process.kill(process.pid, 0));
+    assert.equal(existsSync(fixture.browserPidPath), false);
+  } finally {
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+test("kiosk stop stays idempotent when the tracked browser exits before kill", async () => {
+  const fixture = makeKioskLifecycleFixture();
+  const browser = spawn("sleep", ["30"], { stdio: "ignore" });
+  const processStartTime = "Thu Jul 31 00:01:00 2026";
+
+  try {
+    writeFileSync(
+      fixture.browserPidPath,
+      `${browser.pid} ${processStartTime.replaceAll(" ", "_")}\n`
+    );
+    writeFileSync(path.join(fixture.fakeBinDir, "pgrep"), "#!/bin/bash\nexit 1\n");
+    markBashExecutable(path.join(fixture.fakeBinDir, "pgrep"));
+
+    const stopper = spawnKioskLifecycleScript("stop-solar-kiosk.sh", fixture, {
+      TEST_PROCESS_START_TIME: processStartTime,
+      TEST_EXIT_AFTER_IDENTITY_PID: String(browser.pid)
+    });
+    const [stopperExit] = await Promise.all([
+      waitForChildExit(stopper),
+      waitForChildExit(browser)
+    ]);
+
+    assert.equal(stopperExit.status, 0);
+    assert.equal(existsSync(fixture.browserPidPath), false);
+  } finally {
+    browser.kill("SIGTERM");
+    removeTempDir(fixture.fixtureDir);
+  }
+});
+
+const hasRealFlock = spawnSync("flock", ["--version"], {
+  stdio: "ignore"
+}).status === 0;
+
+test("real flock releases the monitor slot without leaking it to Firefox", {
+  skip: !hasRealFlock
+}, async () => {
+  const fixture = makeKioskLifecycleFixture();
+  let firstLauncher;
+  let thirdLauncher;
+
+  try {
+    rmSync(path.join(fixture.fakeBinDir, "flock"));
+    const sharedEnv = {
+      TEST_FIREFOX_LAUNCH_DIR: fixture.firefoxLaunchDir,
+      TEST_FIREFOX_RELEASE: fixture.firefoxReleasePath
+    };
+    firstLauncher = spawnKioskLifecycleScript(
+      "start-solar-kiosk.sh",
+      fixture,
+      sharedEnv
+    );
+    assert.equal(waitForPathExists(fixture.firefoxLaunchDir), true);
+
+    const second = runBashScript("start-solar-kiosk.sh", [], {
+      cwd: fixture.fixtureDir,
+      env: kioskLifecycleEnv(fixture, sharedEnv),
+      bashPrependPathDirs: [fixture.fakeBinDir],
+      encoding: "utf8",
+      timeout: 2_000
+    });
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(readdirSync(fixture.firefoxLaunchDir).length, 1);
+
+    firstLauncher.kill("SIGTERM");
+    assert.equal((await waitForChildExit(firstLauncher)).status, 0);
+
+    thirdLauncher = spawnKioskLifecycleScript(
+      "start-solar-kiosk.sh",
+      fixture,
+      sharedEnv
+    );
+    while (readdirSync(fixture.firefoxLaunchDir).length < 2) {
+      await delay(10);
+    }
+
+    writeFileSync(fixture.stopMarkerPath, "stop\n");
+    writeFileSync(fixture.firefoxReleasePath, "release\n");
+    assert.equal((await waitForChildExit(thirdLauncher)).status, 0);
+  } finally {
+    writeFileSync(fixture.firefoxReleasePath, "release\n");
+    firstLauncher?.kill("SIGTERM");
+    thirdLauncher?.kill("SIGTERM");
+    removeTempDir(fixture.fixtureDir);
+  }
 });
 
 test("deploy bundle includes the db reset helper", () => {
