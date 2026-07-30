@@ -59,6 +59,9 @@ export const config = {
   get managementTrustedOrigins() {
     return process.env.MANAGEMENT_TRUSTED_ORIGINS;
   },
+  get trustProxyIps() {
+    return process.env.TRUST_PROXY_IPS;
+  },
   get managementAccessToken() {
     const value = process.env.MANAGEMENT_ACCESS_TOKEN?.trim();
     return value && value.length > 0 ? value : null;

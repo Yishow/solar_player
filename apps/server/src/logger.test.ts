@@ -8,6 +8,23 @@ test("createFastifyOptions disables automatic 2xx request access logs", () => {
   assert.equal(createFastifyOptions().disableRequestLogging, true);
 });
 
+test("createFastifyOptions trusts only configured valid proxy IPs", () => {
+  const original = process.env.TRUST_PROXY_IPS;
+  try {
+    process.env.TRUST_PROXY_IPS = "127.0.0.1, ::1,127.0.0.1";
+    assert.deepEqual(createFastifyOptions().trustProxy, ["127.0.0.1", "::1"]);
+
+    process.env.TRUST_PROXY_IPS = "127.0.0.1,not-an-ip";
+    assert.throws(() => createFastifyOptions(), /invalid IP address/u);
+  } finally {
+    if (original === undefined) {
+      delete process.env.TRUST_PROXY_IPS;
+    } else {
+      process.env.TRUST_PROXY_IPS = original;
+    }
+  }
+});
+
 test("createLoggerOptions uses pino-pretty outside production", () => {
   const originalNodeTestContext = process.env.NODE_TEST_CONTEXT;
   const originalNodeTestWorkerId = process.env.NODE_TEST_WORKER_ID;

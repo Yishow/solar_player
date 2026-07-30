@@ -1,11 +1,11 @@
 #!/bin/bash
 # Install Solar Player as a browser-only thin kiosk pointing at a remote PC server.
 # Does NOT install solar-display.service, node, or pnpm.
-# Reuses deploy/start-solar-kiosk.sh (unmodified) via KIOSK_URL / KIOSK_HEALTH_URL env.
+# Reuses deploy/start-solar-kiosk.sh with a thin-kiosk-specific Firefox command.
 set -euo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Please run as root: sudo ./deploy/install-thin-kiosk.sh --kiosk-url http://<PC_IP>:3000/overview" >&2
+  echo "Please run as root: sudo ./deploy/install-thin-kiosk.sh --kiosk-url http://<PC_IP>:4000/overview" >&2
   exit 1
 fi
 
@@ -34,15 +34,13 @@ AGENT_ENV_PATH="${AGENT_ENV_DIR}/device-agent.env"
 FAN_CONTROL_HELPER="${BUNDLE_ROOT}/deploy/configure-pi5-fan-control.sh"
 NO_SLEEP_HELPER="${BUNDLE_ROOT}/deploy/disable-display-sleep.sh"
 LAUNCHER_NAME="Solar Display Kiosk.desktop"
-READONLY_ENABLE_LAUNCHER_NAME="Enable Read Only System.desktop"
-READONLY_DISABLE_LAUNCHER_NAME="Temporarily Disable Read Only System.desktop"
 
 usage() {
   cat <<'EOF'
 Usage: install-thin-kiosk.sh --kiosk-url URL [options]
 
 Required:
-  --kiosk-url URL          Remote overview URL, e.g. http://192.168.1.10:3000/overview
+  --kiosk-url URL          Remote overview URL, e.g. http://192.168.1.10:4000/overview
 
 Options:
   --kiosk-user USER        Kiosk desktop user (default: pi)
@@ -58,7 +56,7 @@ Options:
 Notes:
   - Does NOT install solar-display.service or require node/pnpm.
   - On a fresh Pi, run deploy/configure-lightweight-desktop.sh first for the desktop stack.
-  - Disable readonly root before install (deploy/readonly-system-disable.sh), re-enable after.
+  - Thin-kiosk mode requires a writable root; co-located readonly helpers are not installed.
   - PC server should be powered on before or alongside the Pi (extended health wait applied).
 EOF
 }
@@ -110,6 +108,7 @@ KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
 KIOSK_AUTOSTART_DIR="${KIOSK_HOME}/.config/autostart"
 KIOSK_DESKTOP_DIR="${KIOSK_HOME}/Desktop"
 KIOSK_STATE_DIR="${KIOSK_HOME}/.local/state/solar-display"
+KIOSK_FIREFOX_PROFILE="${KIOSK_HOME}/.mozilla/firefox/solar-display-kiosk"
 LAUNCHER_LOG_PATH="${KIOSK_STATE_DIR}/kiosk-launcher.log"
 
 # Derive health URL from kiosk overview URL (scheme://host:port/health).
@@ -119,6 +118,14 @@ u = urlparse("${KIOSK_URL}")
 print(f"{u.scheme}://{u.netloc}/health")
 PY
 )"
+
+# This must run before migrate stops/disables the existing service.
+ROOT_SOURCE="$(findmnt -no SOURCE / 2>/dev/null || true)"
+if [[ "${ROOT_SOURCE}" == "overlayroot" || "${ROOT_SOURCE}" == "overlay" ]]; then
+  echo "ERROR: thin-kiosk install requires a writable root." >&2
+  echo "Disable the existing readonly overlay and reboot before retrying." >&2
+  exit 1
+fi
 
 existing_service=0
 if [[ -f "${SYSTEMD_UNIT_PATH}" ]] || systemctl cat solar-display.service >/dev/null 2>&1; then
@@ -179,13 +186,6 @@ fi
 if [[ ! -f "${BUNDLE_ROOT}/deploy/start-solar-kiosk.sh" ]]; then
   echo "Missing kiosk launcher: ${BUNDLE_ROOT}/deploy/start-solar-kiosk.sh" >&2
   exit 1
-fi
-
-# Remind operator about readonly root (do not auto-run disable/enable — reboot required).
-if findmnt -n -o OPTIONS / 2>/dev/null | grep -q overlay; then
-  echo "WARNING: root looks like an overlay (readonly). Disable readonly first:" >&2
-  echo "  sudo ${BUNDLE_ROOT}/deploy/readonly-system-disable.sh && sudo reboot" >&2
-  echo "Then re-run this installer; after success re-enable with readonly-system-enable.sh." >&2
 fi
 
 ensure_dir() {
@@ -268,19 +268,27 @@ ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_BIN_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_AUTOSTART_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_DESKTOP_DIR}"
 ensure_dir 755 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_STATE_DIR}"
+ensure_dir 700 "${KIOSK_USER}" "${KIOSK_GROUP}" "${KIOSK_FIREFOX_PROFILE}"
 
+# Remove readonly launchers owned by older thin-kiosk installer versions.
+rm -f \
+  "${KIOSK_BIN_DIR}/readonly-system-enable.sh" \
+  "${KIOSK_BIN_DIR}/readonly-system-disable.sh" \
+  "${KIOSK_DESKTOP_DIR}/Enable Read Only System.desktop" \
+  "${KIOSK_DESKTOP_DIR}/Temporarily Disable Read Only System.desktop"
+
+rendered_kiosk_helper="$(mktemp)"
+sed \
+  '/^setsid firefox /c\
+setsid firefox -kiosk --profile "${KIOSK_FIREFOX_PROFILE}" "${KIOSK_URL}" >> "${LOG_FILE}" 2>\&1 \&' \
+  "${BUNDLE_ROOT}/deploy/start-solar-kiosk.sh" > "${rendered_kiosk_helper}"
 install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${BUNDLE_ROOT}/deploy/start-solar-kiosk.sh" \
+  "${rendered_kiosk_helper}" \
   "${KIOSK_BIN_DIR}/start-solar-kiosk.sh"
+rm -f "${rendered_kiosk_helper}"
 install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${BUNDLE_ROOT}/deploy/stop-solar-kiosk.sh" \
   "${KIOSK_BIN_DIR}/stop-solar-kiosk.sh"
-install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${BUNDLE_ROOT}/deploy/readonly-system-enable.sh" \
-  "${KIOSK_BIN_DIR}/readonly-system-enable.sh"
-install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${BUNDLE_ROOT}/deploy/readonly-system-disable.sh" \
-  "${KIOSK_BIN_DIR}/readonly-system-disable.sh"
 
 # Wrapper sets KIOSK_URL / health / extended wait without modifying start-solar-kiosk.sh.
 WRAPPER_PATH="${KIOSK_BIN_DIR}/start-thin-kiosk.sh"
@@ -290,6 +298,7 @@ set -euo pipefail
 export KIOSK_URL='${KIOSK_URL}'
 export KIOSK_HEALTH_URL='${KIOSK_HEALTH_URL}'
 export KIOSK_WAIT_SECONDS='${KIOSK_WAIT_SECONDS}'
+export KIOSK_FIREFOX_PROFILE='${KIOSK_FIREFOX_PROFILE}'
 exec '${KIOSK_BIN_DIR}/start-solar-kiosk.sh'
 EOF
 chown "${KIOSK_USER}:${KIOSK_GROUP}" "${WRAPPER_PATH}"
@@ -314,28 +323,8 @@ install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
   "${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"
 rm -f "${rendered_launcher}"
 
-rendered_readonly_enable="$(mktemp)"
-sed \
-  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/readonly-system-enable.sh#" \
-  "${BUNDLE_ROOT}/deploy/enable-readonly-system.desktop" > "${rendered_readonly_enable}"
-install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${rendered_readonly_enable}" \
-  "${KIOSK_DESKTOP_DIR}/${READONLY_ENABLE_LAUNCHER_NAME}"
-rm -f "${rendered_readonly_enable}"
-
-rendered_readonly_disable="$(mktemp)"
-sed \
-  -e "s#^Exec=.*#Exec=${KIOSK_BIN_DIR}/readonly-system-disable.sh#" \
-  "${BUNDLE_ROOT}/deploy/disable-readonly-system.desktop" > "${rendered_readonly_disable}"
-install -m 755 -o "${KIOSK_USER}" -g "${KIOSK_GROUP}" \
-  "${rendered_readonly_disable}" \
-  "${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}"
-rm -f "${rendered_readonly_disable}"
-
 if command -v gio >/dev/null 2>&1; then
   su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
-  su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_ENABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
-  su - "${KIOSK_USER}" -c "gio set '${KIOSK_DESKTOP_DIR}/${READONLY_DISABLE_LAUNCHER_NAME}' metadata::trusted true" >/dev/null 2>&1 || true
 fi
 
 echo "[6/7] Configuring lightdm autologin for ${KIOSK_USER}..."
@@ -356,6 +345,7 @@ echo "KIOSK_WAIT_SECONDS: ${KIOSK_WAIT_SECONDS}"
 echo "Autostart:          ${KIOSK_AUTOSTART_DIR}/firefox-kiosk.desktop"
 echo "Desktop launcher:   ${KIOSK_DESKTOP_DIR}/${LAUNCHER_NAME}"
 echo "Wrapper:            ${WRAPPER_PATH}"
+echo "Firefox profile:    ${KIOSK_FIREFOX_PROFILE}"
 echo "Device agent unit:  solar-device-agent.service"
 echo "Device agent env:   ${AGENT_ENV_PATH}"
 echo "Journal helper:     ${JOURNAL_HELPER_PATH}"
@@ -370,6 +360,5 @@ echo "Next:"
 echo "  1) Ensure PC server is reachable: curl -fsS ${KIOSK_HEALTH_URL}"
 echo "  2) Verify: sudo ${BUNDLE_ROOT}/deploy/verify-thin-kiosk.sh --kiosk-url '${KIOSK_URL}'"
 echo "  3) Reboot witness: sudo reboot  (then check Firefox opens ${KIOSK_URL})"
-echo "  4) After success, re-enable readonly if desired: sudo ${BUNDLE_ROOT}/deploy/readonly-system-enable.sh"
 echo ""
 echo "PC server DEVICE_AGENT_URL example: http://<Pi_IP>:${DEVICE_AGENT_PORT}"

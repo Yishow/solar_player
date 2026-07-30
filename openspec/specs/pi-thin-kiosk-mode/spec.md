@@ -421,3 +421,85 @@ tests:
   - apps/server/src/routes/device.test.ts
   - apps/server/src/config.test.ts
 -->
+
+---
+### Requirement: Persist the Device Cookie in a dedicated Firefox Profile
+
+The thin-kiosk installer SHALL create a dedicated Firefox Profile owned by the kiosk user with mode 0700 and SHALL launch the remote Solar Player HTTPS URL with that Profile without private-window mode. The Profile SHALL NOT be shared with general browsing. Because the Profile is persistent runtime state, install SHALL reject an active overlayroot before migration mutations and SHALL remove stale co-located readonly launchers previously created by the thin-kiosk installer.
+
+#### Scenario: Pair a newly installed thin kiosk
+
+- **WHEN** an operator opens the one-time fragment pairing path with the dedicated Firefox Profile
+- **THEN** the Browser exchanges the Pairing Token and stores the Device Credential only as an HttpOnly Cookie in that Profile
+- **AND** subsequent kiosk launches use the configured playback URL without retaining the Pairing Token
+
+#### Scenario: Restart a paired thin kiosk
+
+- **WHEN** a paired thin kiosk restarts Firefox or reboots the Pi
+- **THEN** the solar_device_credential cookie remains available to Server requests
+- **AND** the Client does not require re-pairing
+
+#### Scenario: Verify the installed launcher
+
+- **WHEN** the thin-kiosk verifier inspects the installed browser command and Profile
+- **THEN** it confirms the dedicated Profile is selected
+- **AND** it confirms the Profile owner is the kiosk user and mode is 0700
+- **AND** it fails if private-window mode is present
+- **AND** it fails if stale readonly launchers remain
+
+<!-- @trace
+source: secure-device-pairing
+updated: 2026-07-30
+code:
+  - apps/server/src/services/playbackProfileService.ts
+  - packages/shared/src/deviceIdentity.ts
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - packages/shared/src/deviceIdentity.contract.ts
+  - .env.example
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - docs/ops/conventions.md
+  - docs/architecture/default-playback-profile.md
+  - deploy/install-thin-kiosk.sh
+  - apps/server/src/routes/device-pairing.ts
+  - docs/ops/delegation.md
+  - docs/ops/dispatch.md
+  - apps/server/src/db/seed.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - apps/server/src/services/displayRotationService.ts
+  - apps/server/src/app.ts
+  - AGENTS.md
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - CLAUDE.md
+  - apps/server/src/routes/devices.ts
+  - docs/agents/issue-tracker.md
+  - deploy/verify-thin-kiosk.sh
+  - scripts/deploy.test.mjs
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - packages/shared/src/index.ts
+  - apps/server/src/services/deviceGroupService.ts
+  - docs/ops/maintenance.md
+  - apps/server/src/config.ts
+  - .github/workflows/agent-source-artifact.yml
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - docs/ops/workflow.md
+  - docs/ops/judgment.md
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+tests:
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+-->

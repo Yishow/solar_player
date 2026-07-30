@@ -4,6 +4,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyError, type FastifyServerOptions } from "fastify";
 import { existsSync, mkdirSync } from "node:fs";
+import { isIP } from "node:net";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
@@ -32,6 +33,7 @@ import dataSourceRoute from "./routes/data-source.js";
 import deviceRoute from "./routes/device.js";
 import deviceGroupsRoute from "./routes/device-groups.js";
 import devicesRoute from "./routes/devices.js";
+import devicePairingRoute from "./routes/device-pairing.js";
 import deviceDisplayOpsRoute from "./routes/device-display-ops.js";
 import displayOpsRoute from "./routes/display-ops.js";
 import displayCardDataRoute from "./routes/display-card-data.js";
@@ -74,10 +76,27 @@ function shouldServeSpaFallback(request: { headers: { accept?: string }; method:
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
 }
 
+export function parseTrustedProxyIps(value: string | undefined): string[] {
+  if (!value || value.trim().length === 0) {
+    return [];
+  }
+
+  return Array.from(new Set(value.split(",").map((entry) => entry.trim()))).map(
+    (entry) => {
+      if (isIP(entry) === 0) {
+        throw new Error(`TRUST_PROXY_IPS contains an invalid IP address: ${entry}`);
+      }
+      return entry;
+    }
+  );
+}
+
 export function createFastifyOptions(): FastifyServerOptions {
+  const trustedProxyIps = parseTrustedProxyIps(config.trustProxyIps);
   return {
     disableRequestLogging: true,
-    logger: createLoggerOptions()
+    logger: createLoggerOptions(),
+    trustProxy: trustedProxyIps.length > 0 ? trustedProxyIps : false
   };
 }
 
@@ -163,6 +182,7 @@ export async function buildApp() {
   await app.register(deviceRoute);
   await app.register(deviceGroupsRoute);
   await app.register(devicesRoute);
+  await app.register(devicePairingRoute);
   await app.register(deviceDisplayOpsRoute);
   await app.register(displayOpsRoute);
   await app.register(displayCardDataRoute);

@@ -31,6 +31,7 @@ const tailscaleInstallScriptPath = path.join(repoRoot, "deploy/install-tailscale
 const fanControlScriptPath = path.join(repoRoot, "deploy/configure-pi5-fan-control.sh");
 const deployNotesPath = path.join(repoRoot, "deploy.md");
 const raspiDeployRunbookPath = path.join(repoRoot, "docs/runbooks/raspi-onekey-kiosk-deploy.md");
+const piThinKioskRunbookPath = path.join(repoRoot, "docs/runbooks/pi-thin-kiosk-deploy.md");
 const pi5DeploymentSkillPath = path.join(repoRoot, ".agents/skills/pi5-deployment/SKILL.md");
 const pi5DeploymentSkillMetadataPath = path.join(repoRoot, ".agents/skills/pi5-deployment/agents/openai.yaml");
 const windowsOfflineBundleBuilderPath = path.join(repoRoot, "scripts/build-windows-offline-bundle.mjs");
@@ -3991,9 +3992,17 @@ test("install-thin-kiosk.sh renders remote URL, skips solar-display.service, han
   assert.match(source, /Migration requires explicit confirmation/);
   assert.match(source, /exit 2/);
 
-  // Readonly disable schedule reminder
-  assert.match(source, /readonly-system-disable\.sh/);
+  // Thin-kiosk has no co-located /data runtime for readonly helpers.
+  assert.match(source, /requires a writable root/);
+  assert.match(source, /findmnt -no SOURCE \//);
+  assert.match(source, /overlayroot/);
+  assert.ok(
+    source.indexOf("findmnt -no SOURCE /") <
+      source.indexOf("systemctl stop solar-display.service")
+  );
   assert.match(source, /readonly-system-enable\.sh/);
+  assert.match(source, /Temporarily Disable Read Only System\.desktop/);
+  assert.doesNotMatch(source, /BUNDLE_ROOT\}\/deploy\/readonly-system-/);
   assert.match(source, /overlay/);
 
   // Journal helper install (copy existing, visudo)
@@ -4018,7 +4027,8 @@ test("verify-thin-kiosk.sh checks kiosk URL and device-agent without requiring s
   assert.match(source, /solar-device-agent/);
   assert.match(source, /lightdm/);
   assert.match(source, /firefox/);
-  assert.match(source, /readonly enable launcher/i);
+  assert.match(source, /stale readonly enable launcher is absent/i);
+  assert.match(source, /stale readonly disable launcher is absent/i);
   // Must not hard-fail when solar-display.service is absent
   assert.doesNotMatch(source, /systemctl is-active --quiet solar-display/);
   assert.doesNotMatch(source, /check "solar-display service is active"/);
@@ -4027,6 +4037,219 @@ test("verify-thin-kiosk.sh checks kiosk URL and device-agent without requiring s
   // Existing co-located verifier remains untouched and still requires the service.
   const colocated = readFileSync(verifyKioskInstallPath, "utf8");
   assert.match(colocated, /systemctl is-active --quiet solar-display/);
+});
+
+test("thin-kiosk runbook provides observable pairing and recovery steps without printing credentials", () => {
+  const runbook = readFileSync(piThinKioskRunbookPath, "utf8");
+  const recovery = runbook.slice(runbook.indexOf("## Revoke and re-pair recovery"));
+
+  assert.match(runbook, /\/api\/devices\/\$DeviceId\/pairing-tokens/u);
+  assert.match(runbook, /PC_BACKEND_PORT="4000"/u);
+  assert.match(runbook, /PC_ORIGIN="https:\/\/<windows-server-tls-host>"/u);
+  assert.match(runbook, /TRUST_PROXY_IPS=127\.0\.0\.1,::1/u);
+  assert.match(runbook, /pairing_https_required/u);
+  assert.match(runbook, /\$PcPort = 4000/u);
+  assert.match(runbook, /solar-player-thin/u);
+  assert.doesNotMatch(runbook, /rsync[^\n]*--exclude node_modules/u);
+  assert.match(runbook, /\/data\/solar-display\/deploy\/install-kiosk\.sh/u);
+  assert.match(runbook, /\/data\/solar-display\/deploy\/verify-kiosk-install\.sh/u);
+  assert.match(runbook, /Do not re-enable the co-located readonly overlay/u);
+  assert.match(runbook, /pairingPath/u);
+  assert.match(runbook, /\/device-pairing#token=/u);
+  assert.match(runbook, /DISPLAY=:0/u);
+  assert.match(runbook, /\.mozilla\/firefox\/solar-display-kiosk/u);
+  assert.match(runbook, /\/api\/device-pairing\/status/u);
+  assert.match(runbook, /\/api\/devices\/\$DeviceId\/credentials\/revoke/u);
+  assert.match(runbook, /data\.paired: true/u);
+  assert.match(runbook, /Read-Host "Management token" -AsSecureString/u);
+  assert.match(runbook, /Set-Clipboard -Value \$Pairing\.data\.token/u);
+  assert.match(runbook, /mstsc\.exe \/v:\$PiHost/u);
+  assert.match(runbook, /Local Resources.*Clipboard.*enabled/iu);
+  assert.equal(
+    (runbook.match(/function New-SolarManagementHeaders/gu) ?? []).length,
+    2
+  );
+  assert.equal(
+    (runbook.match(/launch_kiosk_url\(\)/gu) ?? []).length,
+    2
+  );
+  assert.equal(
+    (runbook.match(/Test-NetConnection -ComputerName \$PiHost -Port 3389/gu) ?? []).length,
+    2
+  );
+  assert.match(runbook, /systemctl is-enabled --quiet xrdp/u);
+  assert.match(runbook, /configure-lightweight-desktop\.sh[\s\S]*--user "\$\{KIOSK_USER\}"[\s\S]*--rdp-auth system-password/u);
+  assert.match(runbook, /Invoke-RestMethod -Method Get -Headers \$Headers/u);
+  assert.match(runbook, /groupEnabled/u);
+  assert.match(runbook, /playbackProfile/u);
+  assert.match(runbook, /credential_missing/u);
+  assert.match(runbook, /credential_invalid/u);
+  assert.match(runbook, /credential_expired/u);
+  assert.match(runbook, /credential_revoked/u);
+  assert.match(runbook, /Device id to revoke and re-pair/u);
+  assert.match(runbook, /KIOSK_USER="pi"/u);
+  assert.match(runbook, /id -gn "\$\{KIOSK_USER\}"/u);
+  assert.match(runbook, /KIOSK_USER="<same-kiosk-user-used-at-install>"/u);
+  assert.match(runbook, /--kiosk-user "\$\{KIOSK_USER\}"/u);
+  assert.equal(
+    (runbook.match(/getent passwd '\$\{KIOSK_USER\}'/gu) ?? []).length,
+    2
+  );
+  assert.equal(
+    (runbook.match(/firefox -kiosk --profile "\$\{FIREFOX_PROFILE\}" "\$\{PAIRING_PAGE\}"/gu) ?? []).length,
+    2
+  );
+  assert.ok(recovery.indexOf("/pairing-tokens") < recovery.indexOf("/credentials/revoke"));
+  assert.match(recovery, /revokedCount -notin @\(0, 1\)/u);
+  assert.match(runbook, /verify_reboot_witness/u);
+  assert.match(runbook, /verify-thin-kiosk\.sh[\s\S]*--kiosk-url '\$\{PC_ORIGIN\}\/overview'/u);
+  assert.match(runbook, /same[\s\S]*`deviceId`\/`clientId`/u);
+  assert.match(runbook, /\|\| return 1/u);
+  assert.doesNotMatch(runbook, /launch_kiosk_url "\$\{PAIRING_PAGE\}"/u);
+  assert.doesNotMatch(runbook, /PAIRING_URL=.*#token/u);
+  assert.doesNotMatch(runbook, /firefox[^\n]*#token/u);
+  assert.doesNotMatch(runbook, /SELECT\s+value\s+FROM\s+moz_cookies/iu);
+});
+
+test("thin-kiosk verifier reads back a dedicated Firefox profile and rejects private-window", () => {
+  const installSource = readFileSync(installThinKioskPath, "utf8");
+  const verifySource = readFileSync(verifyThinKioskPath, "utf8");
+  assert.match(installSource, /KIOSK_FIREFOX_PROFILE/);
+  assert.doesNotMatch(installSource, /private-window/);
+  assert.match(verifySource, /dedicated Firefox profile selected/);
+  assert.match(verifySource, /launcher does not use private-window/);
+
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "thin-kiosk-profile-"));
+  const kioskHome = path.join(fixtureRoot, "home");
+  const binDir = path.join(fixtureRoot, "bin");
+  const profilePath = path.join(kioskHome, ".mozilla/firefox/solar-display-kiosk");
+  const kioskBinDir = path.join(kioskHome, "bin");
+  const autostartDir = path.join(kioskHome, ".config/autostart");
+  const desktopDir = path.join(kioskHome, "Desktop");
+  const lightdmConfig = path.join(fixtureRoot, "lightdm.conf");
+  const journalHelper = path.join(fixtureRoot, "read-solar-display-journal.sh");
+  const kioskUrl = "http://192.0.2.10:3000/overview";
+
+  mkdirSync(binDir, { recursive: true });
+  mkdirSync(profilePath, { recursive: true });
+  mkdirSync(kioskBinDir, { recursive: true });
+  mkdirSync(autostartDir, { recursive: true });
+  mkdirSync(desktopDir, { recursive: true });
+
+  for (const command of ["firefox", "lightdm"]) {
+    const commandPath = path.join(binDir, command);
+    writeFileSync(commandPath, "#!/bin/bash\nexit 0\n", "utf8");
+    chmodSync(commandPath, 0o755);
+  }
+  const systemctlPath = path.join(binDir, "systemctl");
+  writeFileSync(
+    systemctlPath,
+    `#!/bin/bash
+if [[ "$1" == "cat" ]]; then exit 1; fi
+if [[ "$1" == "is-enabled" && "$*" == *"solar-device-agent"* ]]; then exit 0; fi
+if [[ "$1" == "is-active" && "$*" == *"solar-device-agent"* ]]; then exit 0; fi
+exit 1
+`,
+    "utf8"
+  );
+  chmodSync(systemctlPath, 0o755);
+  const statPath = path.join(binDir, "stat");
+  writeFileSync(
+    statPath,
+    `#!/bin/bash
+if [[ "$2" == "%U" ]]; then
+  printf '%s\\n' "\${MOCK_PROFILE_OWNER:-pi}"
+elif [[ "$2" == "%a" ]]; then
+  printf '%s\\n' "\${MOCK_PROFILE_MODE:-700}"
+else
+  exit 1
+fi
+`,
+    "utf8"
+  );
+  chmodSync(statPath, 0o755);
+
+  const launcherPath = path.join(kioskBinDir, "start-solar-kiosk.sh");
+  writeFileSync(
+    launcherPath,
+    `#!/bin/bash
+setsid firefox -kiosk --profile "\${KIOSK_FIREFOX_PROFILE}" "\${KIOSK_URL}"
+`,
+    "utf8"
+  );
+  chmodSync(launcherPath, 0o755);
+  const wrapperPath = path.join(kioskBinDir, "start-thin-kiosk.sh");
+  writeFileSync(
+    wrapperPath,
+    `#!/bin/bash
+export KIOSK_URL='${kioskUrl}'
+export KIOSK_WAIT_SECONDS='600'
+export KIOSK_FIREFOX_PROFILE='${profilePath}'
+exec '${launcherPath}'
+`,
+    "utf8"
+  );
+  chmodSync(wrapperPath, 0o755);
+
+  for (const launcher of [
+    path.join(autostartDir, "firefox-kiosk.desktop"),
+    path.join(desktopDir, "Solar Display Kiosk.desktop")
+  ]) {
+    writeFileSync(launcher, "[Desktop Entry]\n", "utf8");
+    chmodSync(launcher, 0o755);
+  }
+  writeFileSync(lightdmConfig, "[Seat:*]\nautologin-user=pi\n", "utf8");
+  writeFileSync(journalHelper, "#!/bin/bash\n", "utf8");
+  chmodSync(journalHelper, 0o755);
+
+  const env = {
+    ...process.env,
+    PATH: `${binDir}:${process.env.PATH}`,
+    LIGHTDM_AUTOLOGIN_CONF: lightdmConfig,
+    JOURNAL_HELPER_PATH: journalHelper
+  };
+  const verified = spawnSync(
+    bashCommand,
+    [verifyThinKioskPath, "--kiosk-user", "pi", "--kiosk-home", kioskHome, "--kiosk-url", kioskUrl],
+    { encoding: "utf8", env }
+  );
+  assert.equal(verified.status, 0, verified.stderr || verified.stdout);
+  assert.match(verified.stdout, /OK: dedicated Firefox profile selected/);
+  assert.match(verified.stdout, /OK: dedicated Firefox profile owner matches kiosk user/);
+  assert.match(verified.stdout, /OK: dedicated Firefox profile mode is 700/);
+
+  const wrongOwner = spawnSync(
+    bashCommand,
+    [verifyThinKioskPath, "--kiosk-user", "pi", "--kiosk-home", kioskHome, "--kiosk-url", kioskUrl],
+    { encoding: "utf8", env: { ...env, MOCK_PROFILE_OWNER: "root" } }
+  );
+  assert.notEqual(wrongOwner.status, 0);
+  assert.match(wrongOwner.stderr, /FAIL: dedicated Firefox profile owner matches kiosk user/);
+
+  const wrongMode = spawnSync(
+    bashCommand,
+    [verifyThinKioskPath, "--kiosk-user", "pi", "--kiosk-home", kioskHome, "--kiosk-url", kioskUrl],
+    { encoding: "utf8", env: { ...env, MOCK_PROFILE_MODE: "755" } }
+  );
+  assert.notEqual(wrongMode.status, 0);
+  assert.match(wrongMode.stderr, /FAIL: dedicated Firefox profile mode is 700/);
+
+  writeFileSync(
+    launcherPath,
+    `#!/bin/bash
+setsid firefox -kiosk -private-window --profile "\${KIOSK_FIREFOX_PROFILE}" "\${KIOSK_URL}"
+`,
+    "utf8"
+  );
+  const privateWindow = spawnSync(
+    bashCommand,
+    [verifyThinKioskPath, "--kiosk-user", "pi", "--kiosk-home", kioskHome, "--kiosk-url", kioskUrl],
+    { encoding: "utf8", env }
+  );
+  assert.notEqual(privateWindow.status, 0);
+  assert.match(privateWindow.stderr, /FAIL: launcher does not use private-window/);
+
+  rmSync(fixtureRoot, { force: true, recursive: true });
 });
 
 test("migrate path leaves solar-display unit restorable via enable (rollback contract)", () => {

@@ -11,6 +11,7 @@ FAN_CONFIG_PATH="${FAN_CONFIG_PATH:-/boot/firmware/config.txt}"
 MODEL_PATH="${MODEL_PATH:-/proc/device-tree/model}"
 AGENT_UNIT="solar-device-agent"
 LIGHTDM_AUTOLOGIN_CONF="${LIGHTDM_AUTOLOGIN_CONF:-/etc/lightdm/lightdm.conf.d/50-solar-kiosk-autologin.conf}"
+JOURNAL_HELPER_PATH="${JOURNAL_HELPER_PATH:-/usr/local/sbin/read-solar-display-journal.sh}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -26,10 +27,12 @@ done
 KIOSK_HOME="${KIOSK_HOME:-/home/${KIOSK_USER}}"
 KIOSK_BIN_DIR="${KIOSK_HOME}/bin"
 WRAPPER_PATH="${KIOSK_BIN_DIR}/start-thin-kiosk.sh"
+KIOSK_HELPER_PATH="${KIOSK_BIN_DIR}/start-solar-kiosk.sh"
+KIOSK_FIREFOX_PROFILE="${KIOSK_HOME}/.mozilla/firefox/solar-display-kiosk"
 AUTOSTART_LAUNCHER="${KIOSK_HOME}/.config/autostart/firefox-kiosk.desktop"
 DESKTOP_LAUNCHER="${KIOSK_HOME}/Desktop/Solar Display Kiosk.desktop"
-READONLY_ENABLE_LAUNCHER="${KIOSK_HOME}/Desktop/Enable Read Only System.desktop"
-READONLY_DISABLE_LAUNCHER="${KIOSK_HOME}/Desktop/Temporarily Disable Read Only System.desktop"
+STALE_READONLY_ENABLE_LAUNCHER="${KIOSK_HOME}/Desktop/Enable Read Only System.desktop"
+STALE_READONLY_DISABLE_LAUNCHER="${KIOSK_HOME}/Desktop/Temporarily Disable Read Only System.desktop"
 
 failures=0
 
@@ -73,8 +76,13 @@ check "thin-kiosk wrapper exists" test -x "${WRAPPER_PATH}"
 check "autostart launcher exists" test -f "${AUTOSTART_LAUNCHER}"
 check "desktop re-entry launcher exists" test -f "${DESKTOP_LAUNCHER}"
 check "desktop re-entry launcher is executable" test -x "${DESKTOP_LAUNCHER}"
-check "readonly enable launcher exists" test -f "${READONLY_ENABLE_LAUNCHER}"
-check "readonly disable launcher exists" test -f "${READONLY_DISABLE_LAUNCHER}"
+check "stale readonly enable launcher is absent" test ! -e "${STALE_READONLY_ENABLE_LAUNCHER}"
+check "stale readonly disable launcher is absent" test ! -e "${STALE_READONLY_DISABLE_LAUNCHER}"
+check "dedicated Firefox profile exists" test -d "${KIOSK_FIREFOX_PROFILE}"
+check "dedicated Firefox profile owner matches kiosk user" \
+  test "$(stat -c '%U' "${KIOSK_FIREFOX_PROFILE}" 2>/dev/null)" = "${KIOSK_USER}"
+check "dedicated Firefox profile mode is 700" \
+  test "$(stat -c '%a' "${KIOSK_FIREFOX_PROFILE}" 2>/dev/null)" = "700"
 
 if [[ -f "${WRAPPER_PATH}" ]]; then
   if grep -q "KIOSK_URL=" "${WRAPPER_PATH}"; then
@@ -99,6 +107,28 @@ if [[ -f "${WRAPPER_PATH}" ]]; then
     echo "FAIL: wrapper missing KIOSK_WAIT_SECONDS" >&2
     failures=$((failures + 1))
   fi
+  if grep -Fq "KIOSK_FIREFOX_PROFILE='${KIOSK_FIREFOX_PROFILE}'" "${WRAPPER_PATH}" \
+    || grep -Fq "KIOSK_FIREFOX_PROFILE=\"${KIOSK_FIREFOX_PROFILE}\"" "${WRAPPER_PATH}"; then
+    echo "OK: dedicated Firefox profile selected"
+  else
+    echo "FAIL: dedicated Firefox profile selected" >&2
+    failures=$((failures + 1))
+  fi
+fi
+
+if [[ -f "${KIOSK_HELPER_PATH}" ]]; then
+  if grep -Fq -- "--profile \"\${KIOSK_FIREFOX_PROFILE}\"" "${KIOSK_HELPER_PATH}"; then
+    echo "OK: launcher uses the configured Firefox profile"
+  else
+    echo "FAIL: launcher uses the configured Firefox profile" >&2
+    failures=$((failures + 1))
+  fi
+  if grep -Fq -- "-private-window" "${KIOSK_HELPER_PATH}"; then
+    echo "FAIL: launcher does not use private-window" >&2
+    failures=$((failures + 1))
+  else
+    echo "OK: launcher does not use private-window"
+  fi
 fi
 
 if [[ -f "${LIGHTDM_AUTOLOGIN_CONF}" ]] && grep -q "autologin-user=${KIOSK_USER}" "${LIGHTDM_AUTOLOGIN_CONF}"; then
@@ -122,10 +152,10 @@ else
   failures=$((failures + 1))
 fi
 
-if [[ -x /usr/local/sbin/read-solar-display-journal.sh ]]; then
+if [[ -x "${JOURNAL_HELPER_PATH}" ]]; then
   echo "OK: journal helper installed"
 else
-  echo "FAIL: journal helper missing at /usr/local/sbin/read-solar-display-journal.sh" >&2
+  echo "FAIL: journal helper missing at ${JOURNAL_HELPER_PATH}" >&2
   failures=$((failures + 1))
 fi
 
