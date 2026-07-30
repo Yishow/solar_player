@@ -4,6 +4,7 @@ import type {
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
   DisplayClientLivenessSnapshot,
+  DisplayPlaybackRuntimeResponse,
   DisplayCardDataResponse,
   DisplayStoryPageId,
   DisplayStoryPagePayload,
@@ -213,6 +214,10 @@ export async function getPlaybackSettings() {
     settings: PlaybackSettings;
   }>("/api/playback/settings");
   return response.settings;
+}
+
+export async function getPlaybackRuntime() {
+  return requestJson<DisplayPlaybackRuntimeResponse>("/api/playback/runtime");
 }
 
 export async function getDisplayCardData() {

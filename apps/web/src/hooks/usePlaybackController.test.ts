@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import type { PlaybackPage, PlaybackRuntime, PlaybackSettings } from "@solar-display/shared";
+import { ApiRequestError } from "../services/api";
 import {
+  failClosedFormalPlaybackAccess,
+  isDisplayContextAccessError,
+  isLatestPlaybackLoadRequest,
   resolveNextEffectivePlaybackTemplateKey,
   resolvePlaybackPageTemplateKey,
   resolvePlaybackRuntimeTick
@@ -12,18 +16,113 @@ import {
 const hookDir = path.resolve(import.meta.dirname);
 const controllerSource = fs.readFileSync(path.join(hookDir, "usePlaybackController.ts"), "utf8");
 
-test("usePlaybackController reuses the server rotation preview for runtime page selection", () => {
-  assert.match(controllerSource, /getDisplayRotationPreview\(\)/);
+test("usePlaybackController uses the authenticated Server runtime as the only formal page selection", () => {
+  assert.match(controllerSource, /await getPlaybackRuntime\(\)/);
+  assert.match(
+    controllerSource,
+    /runtimeResponse!\.settings, runtimeResponse!\.preview/
+  );
   assert.match(controllerSource, /const runtimePages = rotationPreview\.playablePages;/);
   assert.match(controllerSource, /setFallbackRoute\(rotationPreview\.fallbackRoute\)/);
   assert.match(controllerSource, /setPages\(runtimePages\)/);
+  assert.doesNotMatch(controllerSource, /getDisplayRotationPreview\(\)/);
+  assert.doesNotMatch(
+    controllerSource,
+    /playablePages\.filter\([\s\S]{0,200}siteScope/
+  );
 });
 
 test("usePlaybackController can defer management diagnostics with injected settings and preview", () => {
   assert.match(controllerSource, /enabled = options\.enabled \?\? true/);
-  assert.match(controllerSource, /providedSettings \? Promise\.resolve\(providedSettings\) : getPlaybackSettings\(\)/);
-  assert.match(controllerSource, /providedRotationPreview \? Promise\.resolve\(providedRotationPreview\) : getDisplayRotationPreview\(\)/);
+  assert.match(
+    controllerSource,
+    /providedSettings !== null && providedRotationPreview !== null/
+  );
+  assert.match(controllerSource, /Promise\.resolve\(providedSettings\)/);
+  assert.match(controllerSource, /Promise\.resolve\(providedRotationPreview\)/);
   assert.match(controllerSource, /\[enabled, options\.rotationPreview, options\.settings\]/);
+});
+
+test("usePlaybackController applies changed context through the shared safe boundary", () => {
+  assert.match(controllerSource, /createSafePlaybackBoundaryPlan\(/);
+  assert.match(controllerSource, /resolveSafePlaybackBoundaryRuntime\(/);
+  assert.match(
+    controllerSource,
+    /runtimeResponse\.context\.contextRevision[\s\S]*runtimeResponse\.effectiveRotationRevision/
+  );
+  assert.match(controllerSource, /pendingRuntimeUpdateRef\.current\?\.identity !== identity/);
+  assert.match(
+    controllerSource,
+    /window\.setInterval\(\(\) => \{[\s\S]*void loadPlayback\(\);[\s\S]*DISPLAY_RUNTIME_REFRESH_MS/
+  );
+});
+
+test("usePlaybackController fails closed when Device context access is rejected", () => {
+  assert.equal(
+    isDisplayContextAccessError(
+      new ApiRequestError("credential revoked", 403, {
+        code: "credential_revoked"
+      })
+    ),
+    true
+  );
+  assert.equal(
+    isDisplayContextAccessError(new ApiRequestError("server error", 500, null)),
+    false
+  );
+  const failedClosed = failClosedFormalPlaybackAccess({
+    appliedRuntimeIdentity: "old-context:old-rotation",
+    displayClientContext: {
+      clientId: "display-1",
+      contextRevision: "old-context",
+      deviceId: 1,
+      groupId: 1,
+      profileId: 1,
+      siteScope: "cl"
+    },
+    effectiveRotationRevision: "old-rotation",
+    fallbackRoute: "/offline",
+    pages: playbackPages,
+    pendingRuntimeUpdate: {} as never,
+    rotationPreview: {} as never,
+    runtime: {} as never,
+    settings: playbackSettings
+  });
+  assert.deepEqual(failedClosed, {
+    appliedRuntimeIdentity: null,
+    displayClientContext: null,
+    effectiveRotationRevision: null,
+    fallbackRoute: null,
+    pages: [],
+    pendingRuntimeUpdate: null,
+    rotationPreview: null,
+    runtime: null,
+    settings: null
+  });
+});
+
+test("usePlaybackController ignores a response that resolves after a newer request", async () => {
+  let latestRequestId = 0;
+  let applied = "";
+  let resolveFirst!: (value: string) => void;
+  const first = new Promise<string>((resolve) => {
+    resolveFirst = resolve;
+  });
+  const apply = async (requestId: number, response: Promise<string>) => {
+    const value = await response;
+    if (isLatestPlaybackLoadRequest(requestId, latestRequestId)) {
+      applied = value;
+    }
+  };
+
+  const firstRequestId = ++latestRequestId;
+  const firstApply = apply(firstRequestId, first);
+  const secondRequestId = ++latestRequestId;
+  await apply(secondRequestId, Promise.resolve("new"));
+  resolveFirst("old");
+  await firstApply;
+
+  assert.equal(applied, "new");
 });
 
 test("usePlaybackController prefetches the next effective playback template after rotation is known", () => {

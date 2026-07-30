@@ -4,7 +4,8 @@ import type {
   SustainabilityPeriodStoryInput,
   SustainabilityProvenance,
   SustainabilityStoryComparison,
-  SustainabilityStoryInput
+  SustainabilityStoryInput,
+  SiteScope
 } from "@solar-display/shared";
 import {
   co2TreeEquivalentFactor,
@@ -48,6 +49,7 @@ type CounterMap = Map<string, CounterSnapshot>;
 type SustainabilityStoryReadOptions = {
   applyDisplayOverrides?: boolean;
   now?: Date;
+  siteScope?: SiteScope;
 };
 
 export function resolveSustainabilityFactoryScope(
@@ -361,8 +363,16 @@ function buildFactoryGenerationProvenance(
   } satisfies SustainabilityProvenance;
 }
 
-function resolveScopedGeneration(counterMap: CounterMap, now: Date) {
-  const scope = resolveSustainabilityFactoryScope(readPlaybackPages());
+function resolveScopedGeneration(
+  counterMap: CounterMap,
+  now: Date,
+  siteScope?: SiteScope
+) {
+  const scope = siteScope
+    ? siteScope === "cl"
+      ? "CL"
+      : "KN"
+    : resolveSustainabilityFactoryScope(readPlaybackPages());
   const combinedFallback = scope === "CL+KN"
     ? readCounter(counterMap, "generation")
     : { updatedAt: null, value: null } satisfies CounterSnapshot;
@@ -390,11 +400,19 @@ function resolveScopedGeneration(counterMap: CounterMap, now: Date) {
   };
 }
 
-function buildBigNumbers(counterMap: CounterMap, now: Date) {
-  const scopedGeneration = resolveScopedGeneration(counterMap, now);
+function buildBigNumbers(
+  counterMap: CounterMap,
+  now: Date,
+  siteScope?: SiteScope
+) {
+  const scopedGeneration = resolveScopedGeneration(counterMap, now, siteScope);
   const generation = scopedGeneration.generation;
-  const consumption = readCounter(counterMap, "consumption");
-  const selfConsumption = readCounter(counterMap, "selfConsumption");
+  const consumption = siteScope
+    ? { updatedAt: null, value: null }
+    : readCounter(counterMap, "consumption");
+  const selfConsumption = siteScope
+    ? { updatedAt: null, value: null }
+    : readCounter(counterMap, "selfConsumption");
   const calculationSettings = readCalculationSettings();
   const accumulatedCarbonReductionTons =
     typeof generation.value === "number"
@@ -537,7 +555,11 @@ function mergePeriod(
   counterMap: CounterMap,
   options: SustainabilityStoryReadOptions
 ) {
-  const derived = buildBigNumbers(counterMap, options.now ?? new Date());
+  const derived = buildBigNumbers(
+    counterMap,
+    options.now ?? new Date(),
+    options.siteScope
+  );
   const bigNumbers =
     options.applyDisplayOverrides === false
       ? derived.values
@@ -629,7 +651,10 @@ export function readSustainabilityStory(
 ) {
   const storyConfig = readStoredStory();
   const counterMap = readCounterSnapshots();
-  const householdEquivalents = readHouseholdEquivalenceCards();
+  const householdEquivalents = readHouseholdEquivalenceCards({
+    now: options.now,
+    siteScope: options.siteScope
+  });
   const derivedPeriods = Object.fromEntries(
     storyConfig.availablePeriods.map((periodKey) => [
       periodKey,

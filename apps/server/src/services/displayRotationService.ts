@@ -7,12 +7,14 @@ import type {
   DisplayRotationPreview,
   FallbackPolicy,
   PlaybackPage,
-  PlaybackSettings
+  PlaybackSettings,
+  SiteScope
 } from "@solar-display/shared";
 import {
   buildDisplayRotationPlan,
   evaluatePageRuntimeFreshnessForRequirements,
   evaluateDisplayRotation,
+  isPlaybackAllowedBySchedule,
   normalizePlaybackTransitionSpeed,
   resolveImagesPlaylistTotalDurationSeconds,
   resolveLiveMetricRequirementsForPage,
@@ -21,8 +23,11 @@ import {
 import { getDatabase } from "../db/index.js";
 import { readImagePlaylist } from "./imagePlaylistService.js";
 import {
+  readDefaultPlaybackProfileId,
   readDefaultPlaybackPageRows,
   readDefaultPlaybackSettingsRow,
+  readPlaybackProfilePageRows,
+  readPlaybackProfileSettingsRow,
   writeDefaultPlaybackSettingsRow,
   updateDefaultPlaybackPageState,
   type PlaybackProfilePageRow,
@@ -36,6 +41,11 @@ import {
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
+import {
+  createEffectiveRotationCacheKey,
+  EffectiveRotationCache
+} from "./effectiveRotationCache.js";
+import { createHash } from "node:crypto";
 
 type MqttSettingsRow = {
   message_timeout: number | null;
@@ -60,10 +70,13 @@ const liveDataPageKeys = new Set<DisplayPageKey>([
   "sustainability"
 ]);
 
-function buildReadinessFindingsByPageKey() {
+function buildReadinessFindingsByPageKey(
+  siteScope?: SiteScope,
+  readinessReport = readDisplayReadinessReport({ siteScope })
+) {
   const byPageKey = new Map<DisplayPageKey, DisplayReadinessFinding[]>();
 
-  for (const finding of readDisplayReadinessReport().findings) {
+  for (const finding of readinessReport.findings) {
     if (!finding.blocking || !liveDataPageKeys.has(finding.pageId)) {
       continue;
     }
@@ -283,9 +296,11 @@ function parseRegions(raw: string | null | undefined) {
   return {};
 }
 
-export function readPlaybackSettings() {
+export function readPlaybackSettings(
+  profileId = readDefaultPlaybackProfileId()
+) {
   return serializeSettingsRows(
-    readDefaultPlaybackSettingsRow(),
+    readPlaybackProfileSettingsRow(profileId),
     readGlobalPlaybackRuntimePolicyRow()
   );
 }
@@ -366,8 +381,10 @@ export function updatePlaybackSettings(body: Partial<PlaybackSettings>) {
   return readPlaybackSettings();
 }
 
-export function readPlaybackPages() {
-  return readDefaultPlaybackPageRows().map(serializePageRow);
+export function readPlaybackPages(
+  profileId = readDefaultPlaybackProfileId()
+) {
+  return readPlaybackProfilePageRows(profileId).map(serializePageRow);
 }
 
 function readMessageTimeoutSeconds() {
@@ -403,13 +420,18 @@ function buildPageConditions(
   pages: PlaybackPage[],
   mqttStatus: MqttStatusLike,
   now: Date,
-  settings: PlaybackSettings
+  settings: PlaybackSettings,
+  siteScope?: SiteScope,
+  readinessReport = readDisplayReadinessReport({ now, siteScope })
 ) {
   const liveStageByPage = new Map(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
   const liveMetrics = readLiveMetricsSnapshot();
-  const readinessFindingsByPageKey = buildReadinessFindingsByPageKey();
+  const readinessFindingsByPageKey = buildReadinessFindingsByPageKey(
+    siteScope,
+    readinessReport
+  );
   const freshMetricsDeadlineMs = readMessageTimeoutSeconds() * 1000;
   const pageConditions: Record<number, DisplayRotationPageCondition> = {};
 
@@ -424,7 +446,12 @@ function buildPageConditions(
     );
     const pageRequiresLiveData = liveDataPageKeys.has(page.pageKey as DisplayPageKey);
     const requiredMetricRequirements =
-      page.templateKey === undefined ? [] : resolveLiveMetricRequirementsForPage(page.pageKey as DisplayPageKey);
+      page.templateKey === undefined
+        ? []
+        : resolveLiveMetricRequirementsForPage(
+            page.pageKey as DisplayPageKey,
+            siteScope
+          );
     const runtimeFreshness = page.templateKey === undefined
       ? {
           fresh: true,
@@ -520,8 +547,8 @@ export function updateDisplayRotationPlan(pages: PlaybackPageUpdateInput[]) {
   return readDisplayRotationPlan();
 }
 
-function resolveRotationPages() {
-  const pages = readPlaybackPages();
+function resolveRotationPages(profileId = readDefaultPlaybackProfileId()) {
+  const pages = readPlaybackPages(profileId);
   const imagesDurationSeconds = resolveImagesPlaylistTotalDurationSeconds(
     readImagePlaylist().entries
   );
@@ -543,16 +570,202 @@ function resolveRotationPages() {
 export function readDisplayRotationPreview(options: {
   mqttStatus: MqttStatusLike;
   now?: Date;
+  profileId?: number;
+  siteScope?: SiteScope;
 }): DisplayRotationPreview {
   const now = options.now ?? new Date();
-  const settings = readPlaybackSettings();
-  const pages = resolveRotationPages();
-
-  return evaluateDisplayRotation({
-    fallbackRoute: "/offline",
+  const settings = readPlaybackSettings(options.profileId);
+  const pages = resolveRotationPages(options.profileId);
+  const readinessReport = readDisplayReadinessReport({
     now,
-    pageConditions: buildPageConditions(pages, options.mqttStatus, now, settings),
+    siteScope: options.siteScope
+  });
+
+  return evaluateResolvedDisplayRotation({
+    mqttStatus: options.mqttStatus,
+    now,
     pages,
+    readinessReport,
+    settings,
+    siteScope: options.siteScope
+  });
+}
+
+function evaluateResolvedDisplayRotation(options: {
+  mqttStatus: MqttStatusLike;
+  now: Date;
+  pages: PlaybackPage[];
+  readinessReport: ReturnType<typeof readDisplayReadinessReport>;
+  settings: PlaybackSettings;
+  siteScope?: SiteScope;
+}): DisplayRotationPreview {
+  const pages = options.pages;
+  const excludedPages = options.siteScope
+    ? pages.filter(
+        (page) =>
+          (page.pageKey === "factory-circuit" && options.siteScope !== "cl") ||
+          (page.pageKey === "factory-circuit-guanyin" &&
+            options.siteScope !== "kn")
+      )
+    : [];
+  const scopedPages =
+    excludedPages.length === 0
+      ? pages
+      : pages.filter(
+          (page) =>
+            !excludedPages.some((excluded) => excluded.id === page.id)
+        );
+
+  const preview = evaluateDisplayRotation({
+    fallbackRoute: "/offline",
+    now: options.now,
+    pageConditions: buildPageConditions(
+      scopedPages,
+      options.mqttStatus,
+      options.now,
+      options.settings,
+      options.siteScope,
+      options.readinessReport
+    ),
+    pages: scopedPages,
+    settings: options.settings
+  });
+
+  return excludedPages.length === 0
+    ? preview
+    : {
+        ...preview,
+        skippedPages: [
+          ...preview.skippedPages,
+          ...excludedPages.map((page) => ({
+            ...page,
+            detail: `Page does not apply to ${options.siteScope} Site Scope`,
+            skipReason: "site-scope"
+          }))
+        ].sort((left, right) => left.displayOrder - right.displayOrder)
+      };
+}
+
+export type EffectiveDisplayRotationSnapshot = {
+  effectiveRotationRevision: string;
+  preview: DisplayRotationPreview;
+  settings: PlaybackSettings;
+};
+
+const effectiveRotationCache =
+  new EffectiveRotationCache<EffectiveDisplayRotationSnapshot>();
+
+function createRevision(value: unknown) {
+  return createHash("sha256")
+    .update(JSON.stringify(value), "utf8")
+    .digest("hex");
+}
+
+function readAssetRevision(pages: PlaybackPage[]) {
+  const liveStageByPage = new Map(
+    readLiveStageRows().map((row) => [row.page_key, row])
+  );
+
+  return createRevision(
+    pages.map((page) => {
+      const liveStage = liveStageByPage.get(page.pageKey);
+      return {
+        findings: liveStage
+          ? collectDisplayPageAssetFindings(
+              page.pageKey,
+              parseRegions(liveStage.config_json)
+            )
+          : [],
+        pageKey: page.pageKey,
+        publishedAt: liveStage?.published_at ?? null
+      };
+    })
+  );
+}
+
+function readFreshnessRevision(options: {
+  mqttStatus: MqttStatusLike;
+  now: Date;
+  pages: PlaybackPage[];
+  settings: PlaybackSettings;
+  siteScope: SiteScope;
+}) {
+  const freshnessWindowMs = readMessageTimeoutSeconds() * 1000;
+  const metrics = readLiveMetricsSnapshot().metrics;
+
+  return createRevision({
+    enforceFreshRuntimeData: options.settings.enforceFreshRuntimeData,
+    mqttStatus: options.mqttStatus,
+    pages: options.pages.map((page) => ({
+      freshness:
+        page.templateKey === undefined
+          ? null
+          : evaluatePageRuntimeFreshnessForRequirements({
+              freshnessWindowMs,
+              metrics,
+              nowMs: options.now.getTime(),
+              requirements: resolveLiveMetricRequirementsForPage(
+                page.pageKey as DisplayPageKey,
+                options.siteScope
+              )
+            }),
+      pageKey: page.pageKey
+    }))
+  });
+}
+
+export function readEffectiveDisplayRotationSnapshot(options: {
+  mqttStatus: MqttStatusLike;
+  now?: Date;
+  profileId: number;
+  siteScope: SiteScope;
+}): EffectiveDisplayRotationSnapshot {
+  const now = options.now ?? new Date();
+  const settings = readPlaybackSettings(options.profileId);
+  const pages = resolveRotationPages(options.profileId);
+  const readinessReport = readDisplayReadinessReport({
+    now,
+    siteScope: options.siteScope
+  });
+  const profileRevision = createRevision({
+    pages,
+    scheduleAllowed: isPlaybackAllowedBySchedule(settings, now),
     settings
   });
+  const readinessRevision = createRevision({
+    assetRevision: readAssetRevision(pages),
+    findings: readinessReport.findings,
+    pages: readinessReport.pages,
+    summary: readinessReport.summary
+  });
+  const freshnessRevision = readFreshnessRevision({
+    mqttStatus: options.mqttStatus,
+    now,
+    pages,
+    settings,
+    siteScope: options.siteScope
+  });
+  const effectiveRotationRevision = createEffectiveRotationCacheKey({
+    freshnessRevision,
+    profileId: options.profileId,
+    profileRevision,
+    readinessRevision,
+    siteScope: options.siteScope
+  });
+
+  return effectiveRotationCache.getOrEvaluate(
+    effectiveRotationRevision,
+    () => ({
+      effectiveRotationRevision,
+      preview: evaluateResolvedDisplayRotation({
+        mqttStatus: options.mqttStatus,
+        now,
+        pages,
+        readinessReport,
+        settings,
+        siteScope: options.siteScope
+      }),
+      settings
+    })
+  );
 }

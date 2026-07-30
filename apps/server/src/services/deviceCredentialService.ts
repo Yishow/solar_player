@@ -248,10 +248,17 @@ export function authenticateDeviceCredential(value: unknown): AuthenticatedDevic
   }
   if (
     row.group_id === null ||
-    row.group_enabled !== 1 ||
+    row.group_enabled === null ||
     row.site_scope === null ||
     row.playback_profile_id === null
   ) {
+    throw new DeviceCredentialServiceError(
+      "group_missing",
+      "Device Group is unavailable",
+      403
+    );
+  }
+  if (row.group_enabled !== 1) {
     throw new DeviceCredentialServiceError(
       "group_disabled",
       "Device Group is disabled",

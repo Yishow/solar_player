@@ -8,6 +8,7 @@ export type DevicePairingErrorCode =
   | "device_disabled"
   | "device_not_found"
   | "group_disabled"
+  | "group_missing"
   | "pairing_token_expired"
   | "pairing_token_invalid"
   | "pairing_token_used"

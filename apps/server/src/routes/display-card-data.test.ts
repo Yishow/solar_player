@@ -5,6 +5,7 @@ import {
   buildApp,
   getDatabase
 } from "./display-pages-asset-governance.test-support.js";
+import { createPairedDeviceTestContext } from "../testing/deviceContextTestSupport.js";
 
 function toLocalDateKey(date: Date) {
   const pad = (value: number) => `${value}`.padStart(2, "0");
@@ -712,7 +713,9 @@ test("PUT and DELETE /api/display-card-data/overrides/:targetId apply display-on
       .get("realTimePower") as { value: number } | undefined;
     assert.equal(liveMetric?.value, 42);
 
+    const paired = createPairedDeviceTestContext("cl");
     const storyResponse = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
       method: "GET",
       url: "/api/display-story"
     });

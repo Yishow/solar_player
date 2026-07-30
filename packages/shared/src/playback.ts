@@ -8,6 +8,14 @@ export type PlaybackRuntime = {
   lastInteractionAt: number;
 };
 
+export type SafePlaybackBoundaryPlan = {
+  applyAtMs: number;
+  applyByMs: number;
+  currentPageId: number | null;
+  currentPageRemainsValid: boolean;
+  receivedAtMs: number;
+};
+
 const DEFAULT_PAGE_DURATION_SECONDS = 15;
 export const PLAYBACK_TRANSITION_SPEED_MIN_MS = 120;
 export const PLAYBACK_TRANSITION_SPEED_MAX_MS = 250;
@@ -179,6 +187,91 @@ export function createPlaybackRuntime(
 export function getPlaybackPage(runtime: PlaybackRuntime, pages: PlaybackPage[]) {
   const playablePages = getEnabledPlaybackPages(pages);
   return playablePages[runtime.currentIndex] ?? null;
+}
+
+export function createSafePlaybackBoundaryPlan(input: {
+  current: PlaybackRuntime;
+  nextPages: PlaybackPage[];
+  previousPages: PlaybackPage[];
+  receivedAtMs: number;
+}): SafePlaybackBoundaryPlan {
+  const currentPage = getPlaybackPage(input.current, input.previousPages);
+  const currentPageRemainsValid =
+    currentPage !== null &&
+    getEnabledPlaybackPages(input.nextPages).some(
+      (page) => page.id === currentPage.id
+    );
+  const applyByMs =
+    input.receivedAtMs + Math.max(0, input.current.countdownMs);
+
+  return {
+    applyAtMs: currentPageRemainsValid ? applyByMs : input.receivedAtMs,
+    applyByMs,
+    currentPageId: currentPage?.id ?? null,
+    currentPageRemainsValid,
+    receivedAtMs: input.receivedAtMs
+  };
+}
+
+export function resolveSafePlaybackBoundaryRuntime(input: {
+  current: PlaybackRuntime;
+  nextPages: PlaybackPage[];
+  nowMs: number;
+  plan: SafePlaybackBoundaryPlan;
+  settings: PlaybackSettings;
+}): PlaybackRuntime | null {
+  if (input.nowMs < input.plan.applyAtMs) {
+    return null;
+  }
+
+  const nextPlayablePages = getEnabledPlaybackPages(input.nextPages);
+  if (nextPlayablePages.length === 0) {
+    return createPlaybackRuntime(input.settings, input.nextPages, {
+      isIdle: input.current.isIdle,
+      isPlaying: false,
+      lastInteractionAt: input.current.lastInteractionAt,
+      nowMs: input.nowMs
+    });
+  }
+
+  const currentIndex = nextPlayablePages.findIndex(
+    (page) => page.id === input.plan.currentPageId
+  );
+  const startPage =
+    nextPlayablePages.find((page) => page.id === input.settings.startPage) ??
+    nextPlayablePages[0] ??
+    null;
+  const atNonLoopEdge =
+    input.plan.currentPageRemainsValid &&
+    !input.settings.loop &&
+    currentIndex === nextPlayablePages.length - 1;
+  const targetPage =
+    input.plan.currentPageRemainsValid && currentIndex >= 0
+      ? nextPlayablePages[
+          getNextPlaybackIndex(
+            currentIndex,
+            input.nextPages,
+            input.settings.loop,
+            1
+          )
+        ] ?? startPage
+      : startPage;
+  const scheduleAllowsPlayback = isPlaybackAllowedBySchedule(
+    input.settings,
+    new Date(input.nowMs)
+  );
+
+  return createPlaybackRuntime(input.settings, input.nextPages, {
+    currentPageId: targetPage?.id ?? null,
+    isIdle: input.current.isIdle,
+    isPlaying:
+      input.current.isPlaying &&
+      !input.current.isIdle &&
+      scheduleAllowsPlayback &&
+      !atNonLoopEdge,
+    lastInteractionAt: input.current.lastInteractionAt,
+    nowMs: input.nowMs
+  });
 }
 
 export function getNextPlaybackIndex(

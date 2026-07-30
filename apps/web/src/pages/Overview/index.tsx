@@ -450,6 +450,7 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
         eyebrowStyle={eyebrowStyle}
       />
       <OverviewRuntimeContent
+        allowUnscopedMetrics={!runtimeHydrationEnabled}
         resolvedConfig={resolvedConfig}
         resolvedWeatherSnapshot={resolvedWeatherSnapshot}
         seedConfig={seedConfig}

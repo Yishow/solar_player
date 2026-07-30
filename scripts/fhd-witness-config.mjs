@@ -118,7 +118,8 @@ export function createEvidenceBundle({
   baseUrl,
   generatedAt,
   playbackResults,
-  editorResults
+  editorResults,
+  siteContextResults = []
 }) {
   const lines = [
     `# FHD Witness Evidence Bundle - ${runId}`,
@@ -154,6 +155,21 @@ export function createEvidenceBundle({
     lines.push(
       `| ${result.routeKey} | ${result.liveRouteUrl} | ${result.currentScreenshot} | Proves the corresponding page can be reviewed from /display-pages/editor. |`
     );
+  }
+
+  if (siteContextResults.length > 0) {
+    lines.push(
+      "",
+      "## Site Context Witnesses",
+      "",
+      "| site | route key | live route URL | current screenshot | purpose |",
+      "| --- | --- | --- | --- | --- |"
+    );
+    for (const result of siteContextResults) {
+      lines.push(
+        `| ${result.siteScope} | ${result.routeKey} | ${result.liveRouteUrl} | ${result.currentScreenshot} | Proves the shared Site-sensitive page under the paired ${result.siteScope.toUpperCase()} Device context. |`
+      );
+    }
   }
 
   lines.push(

@@ -1055,3 +1055,104 @@ tests:
   - apps/web/src/pages/DisplayPagesEditor/displayEditorGeometry.test.ts
   - apps/server/src/services/displayStoryService.test.ts
 -->
+
+---
+### Requirement: Evaluate rotation with Profile and Site context on the Server
+
+Formal runtime rotation SHALL combine the assigned Profile, Context Site Scope, Site-scoped Readiness, and Site-scoped Freshness before returning effective pages. The Client SHALL NOT perform a second Site filter.
+
+#### Scenario: Site-irrelevant page is configured in a shared Profile
+
+- **WHEN** a shared Profile contains both CL and KN Factory Circuit pages
+- **THEN** a CL runtime response excludes the KN page with a Site Scope diagnostic
+- **AND** the Server response is the authoritative rotation used by the Client
+
+<!-- @trace
+source: device-context-site-scoped-playback
+updated: 2026-07-30
+code:
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - apps/server/src/services/effectiveRotationCache.ts
+  - apps/server/src/db/seed.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - apps/server/src/routes/device-pairing.ts
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - packages/shared/src/deviceIdentity.ts
+  - packages/shared/src/displayReadiness.ts
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - apps/web/src/services/api.ts
+  - apps/server/src/services/displayReadinessService.ts
+  - apps/server/src/routes/playback.ts
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - docs/ops/workflow.md
+  - apps/server/src/app.ts
+  - docs/ops/maintenance.md
+  - apps/server/src/routes/display-story.ts
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - packages/shared/src/index.ts
+  - apps/server/src/fastify.ts
+  - scripts/fhd-witness-config.mjs
+  - packages/shared/src/playback.ts
+  - apps/server/src/routes/display-readiness.ts
+  - docs/agents/issue-tracker.md
+  - apps/server/src/services/playbackProfileService.ts
+  - packages/shared/src/displayClientContext.ts
+  - .env.example
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - CLAUDE.md
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - docs/ops/conventions.md
+  - deploy/install-thin-kiosk.sh
+  - apps/server/src/services/displayRotationService.ts
+  - apps/server/src/services/displayClientContextService.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/server/src/config.ts
+  - docs/architecture/default-playback-profile.md
+  - scripts/deploy.test.mjs
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - deploy/verify-thin-kiosk.sh
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - docs/ops/delegation.md
+  - apps/server/src/routes/device-groups.ts
+  - .github/workflows/agent-source-artifact.yml
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/routes/devices.ts
+  - docs/ops/dispatch.md
+  - docs/ops/judgment.md
+  - packages/shared/src/deviceIdentity.contract.ts
+  - apps/server/src/services/displayStoryService.ts
+  - AGENTS.md
+  - scripts/capture-fhd-witness.mjs
+  - .scratch/device-scoped-multisite-playback/spec.md
+tests:
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+-->

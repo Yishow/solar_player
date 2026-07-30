@@ -199,6 +199,14 @@ test("overview runtime keeps story hydration staged behind visible config and li
   assert.match(overviewRuntimeSource, /storyOverview: storyOverviewPayload/);
   assert.match(overviewRuntimeSource, /connectionState: overviewRuntimeSelection\.connectionState/);
   assert.match(overviewRuntimeSource, /isSocketConnected: overviewRuntimeSelection\.isSocketConnected/);
+  assert.match(
+    overviewSource,
+    /allowUnscopedMetrics=\{!runtimeHydrationEnabled\}/
+  );
+  assert.match(
+    overviewRuntimeSource,
+    /<PhasePowerTableWidget[\s\S]*enabled=\{allowUnscopedMetrics\}/
+  );
   assert.match(overviewSource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
   assert.match(overviewSource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
 });

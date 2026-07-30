@@ -79,15 +79,17 @@ function formatTick(value: number) {
 }
 
 export function PhasePowerTableWidget({
+  enabled = true,
   style
 }: {
+  enabled?: boolean;
   phasePower?: any; // kept to avoid compilation errors elsewhere
   style?: CSSProperties;
 }) {
   const monthlyConsumptionRuntime = useRuntimeRefreshLifecycle<{
     summaries: MonthlyConsumptionSummary[];
   }>({
-    enabled: true,
+    enabled,
     load: () => requestJson("/api/metrics/daily-summary?range=month"),
     refreshKey: monthlyConsumptionRefresh.refreshKey,
     shouldRefresh: shouldRefreshMonthlyConsumption

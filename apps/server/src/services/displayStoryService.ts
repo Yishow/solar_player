@@ -12,6 +12,7 @@ import type {
   MonitoringStoryState,
   OverviewStoryPayload,
   ResolvedMonitoringMetricBinding,
+  SiteScope,
   SolarComparisonTarget
 } from "@solar-display/shared";
 import {
@@ -29,6 +30,7 @@ import { getDatabase } from "../db/index.js";
 import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readPlaybackSettings } from "./displayRotationService.js";
+import { evaluateFactoryGenerationScope } from "./factoryGenerationAggregateService.js";
 import {
   type HourlyGenerationTrendRow,
   selectHourlyGenerationTrendProfile
@@ -122,6 +124,14 @@ const overviewMetrics: OverviewMetricDefinition[] = [
 
 const solarKpis: Array<MonitoringMetricBinding<StoryMetricKey>> = [
   {
+    dependencyKeys: ["realTimePower"],
+    fallbackIndex: 0,
+    label: "即時功率",
+    metricKey: "realTimePower",
+    sourceClass: solarSourceClass("realTimePower"),
+    unit: "kW"
+  },
+  {
     dependencyKeys: ["todayGeneration"],
     fallbackIndex: 1,
     label: "今日發電量",
@@ -196,12 +206,15 @@ type DisplayStorySourceContext = {
   flowState: ReturnType<typeof resolveSolarFlowState>;
   generatedAt: string;
   isConnected: boolean;
+  siteScope: SiteScope | null;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
   topicNames: Map<string, TopicDisplayName>;
 };
 
 type DisplayStoryReadOptions = {
   applyDisplayOverrides?: boolean;
+  profileId?: number;
+  siteScope?: SiteScope;
 };
 
 function toBoolean(value: unknown) {
@@ -257,8 +270,13 @@ function buildDerivedCarbonReductionReading(
 }
 
 function buildCumulativeGenerationReading(
-  snapshot: ReturnType<typeof readLiveMetricsSnapshot>
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
+  preferSnapshot = false
 ) {
+  if (preferSnapshot) {
+    return snapshot.metrics.totalGeneration ?? null;
+  }
+
   const cumulativeGeneration = readCumulativeCounter("generation");
 
   if (
@@ -289,7 +307,7 @@ function resolveStoryMetricReading(
 
   if (metricKey === "totalCo2Reduction") {
     return buildDerivedCarbonReductionReading(
-      buildCumulativeGenerationReading(context.snapshot),
+      buildCumulativeGenerationReading(context.snapshot, context.siteScope !== null),
       context.calculationSettings.carbonEmissionFactor
     );
   }
@@ -352,9 +370,15 @@ function resolveTopicDisplayLabels(args: {
 function resolveSourceTopics(args: {
   dependencyKeys?: string[];
   metricKey: string;
+  siteScope?: SiteScope;
   topicNames: Map<string, TopicDisplayName>;
 }): MonitoringMetricSourceTopic[] | undefined {
-  const keys = args.dependencyKeys?.length ? args.dependencyKeys : [args.metricKey];
+  const sourceKeys = args.dependencyKeys?.length ? args.dependencyKeys : [args.metricKey];
+  const keys = args.siteScope
+    ? sourceKeys.filter((metricKey) =>
+        metricKey.startsWith(`factoryGeneration.${args.siteScope}.`)
+      )
+    : sourceKeys;
   const sourceTopics = keys.flatMap((metricKey) => {
     const topic = args.topicNames.get(metricKey)?.topic;
     return topic ? [{ metricKey, topic }] : [];
@@ -974,12 +998,70 @@ function resolveFactoryCircuitKpis(args: {
   return [totalPower, solarShare, selfConsumptionKpi, peak, flow];
 }
 
-function createDisplayStorySourceContext(): DisplayStorySourceContext {
-  const snapshot = readLiveMetricsSnapshot();
+function projectSiteGenerationSnapshot(
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
+  siteScope: SiteScope,
+  now: Date
+) {
+  const metrics = { ...snapshot.metrics };
+  for (const metricKey of [
+    "consumptionEnergy",
+    "realTimePower",
+    "selfConsumptionEnergy",
+    "selfConsumptionRatio",
+    "systemEfficiency",
+    "todayCo2Reduction",
+    "todayGeneration",
+    "totalCo2Reduction",
+    "totalGeneration"
+  ]) {
+    delete metrics[metricKey];
+  }
+
+  const evaluation = evaluateFactoryGenerationScope(
+    getDatabase(),
+    siteScope === "cl" ? "CL" : "KN",
+    now
+  );
+  if (
+    evaluation.state === "ready" &&
+    "values" in evaluation &&
+    evaluation.updatedAt
+  ) {
+    metrics.todayGeneration = {
+      quality: "good",
+      timestamp: evaluation.updatedAt,
+      unit: "kWh",
+      value: evaluation.values.todayGeneration * 1_000
+    };
+    metrics.totalGeneration = {
+      quality: "good",
+      timestamp: evaluation.updatedAt,
+      unit: "kWh",
+      value: evaluation.values.totalGeneration * 1_000
+    };
+  }
+
+  return { ...snapshot, metrics };
+}
+
+function createDisplayStorySourceContext(
+  siteScope?: SiteScope,
+  profileId?: number
+): DisplayStorySourceContext {
+  const now = new Date();
+  const liveSnapshot = readLiveMetricsSnapshot();
+  const snapshotNow =
+    liveSnapshot.timestamp && Number.isFinite(Date.parse(liveSnapshot.timestamp))
+      ? new Date(liveSnapshot.timestamp)
+      : now;
+  const snapshot = siteScope
+    ? projectSiteGenerationSnapshot(liveSnapshot, siteScope, snapshotNow)
+    : liveSnapshot;
   const isConnected = snapshot.timestamp !== null;
   const power = snapshot.metrics.realTimePower?.value ?? null;
   const efficiency = snapshot.metrics.systemEfficiency?.value ?? null;
-  const playbackSettings = readPlaybackSettings();
+  const playbackSettings = readPlaybackSettings(profileId);
 
   return {
     allowStaleRuntimeData: !playbackSettings.enforceFreshRuntimeData,
@@ -990,8 +1072,9 @@ function createDisplayStorySourceContext(): DisplayStorySourceContext {
       isConnected,
       powerKw: isConnected ? power : null
     }),
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
     isConnected,
+    siteScope: siteScope ?? null,
     snapshot,
     topicNames: readTopicDisplayNames()
   };
@@ -1049,7 +1132,10 @@ export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): OverviewStoryPayload {
-  const trendProfile = readOverviewGenerationTrendSeries();
+  const trendProfile =
+    context.siteScope === null
+      ? readOverviewGenerationTrendSeries()
+      : { hours: [], series: [], unit: "kW" };
   const overview = overviewMetrics.map((binding) => {
     const reading = resolveStoryMetricReading(binding.metricKey, context);
     const resolved = {
@@ -1069,6 +1155,7 @@ export function readOverviewDisplayStory(
       sourceTopics: resolveSourceTopics({
         dependencyKeys: binding.dependencyKeys,
         metricKey: binding.metricKey,
+        siteScope: context.siteScope ?? undefined,
         topicNames: context.topicNames
       })
     };
@@ -1089,7 +1176,9 @@ export function readOverviewDisplayStory(
 
   return {
     metrics,
-    readinessFindings: readDisplayReadinessReport().findings.filter(
+    readinessFindings: readDisplayReadinessReport({
+      siteScope: context.siteScope ?? undefined
+    }).findings.filter(
       (finding) => finding.pageId === "overview" && finding.status !== "ready"
     ),
     summary: resolveMonitoringSummaryState(metrics)
@@ -1117,7 +1206,10 @@ export function readSolarDisplayStory(
           )?.value ?? null
           : binding.metricKey === "totalCo2Reduction"
             ? buildDerivedCarbonReductionReading(
-              buildCumulativeGenerationReading(context.snapshot),
+              buildCumulativeGenerationReading(
+                context.snapshot,
+                context.siteScope !== null
+              ),
               context.calculationSettings.carbonEmissionFactor
             )?.value ?? null
             : context.isConnected
@@ -1129,6 +1221,7 @@ export function readSolarDisplayStory(
         sourceTopics: resolveSourceTopics({
           dependencyKeys: resolved.dependencyKeys,
           metricKey: binding.metricKey,
+          siteScope: context.siteScope ?? undefined,
           topicNames: context.topicNames
         }),
         comparison: resolveSolarComparison({
@@ -1305,13 +1398,31 @@ export function readDisplayStoryPage<PageId extends DisplayStoryPageId>(
 }
 
 export function readDisplayStory(options: DisplayStoryReadOptions = {}): DisplayStoryPayload {
-  const context = createDisplayStorySourceContext();
+  const context = createDisplayStorySourceContext(options.siteScope, options.profileId);
   const pages = readDisplayStoryPages(context, options);
+  const factoryPageId =
+    options.siteScope === "kn"
+      ? "factory-circuit-guanyin"
+      : "factory-circuit";
 
   return {
-    factoryCircuit: pages["factory-circuit"],
+    factoryCircuit: pages[factoryPageId],
     generatedAt: context.generatedAt,
     overview: pages.overview,
     solar: pages.solar
   };
+}
+
+export function readSiteScopedDisplayStoryPage<
+  PageId extends DisplayStoryPageId
+>(
+  pageId: PageId,
+  siteScope: SiteScope,
+  profileId?: number
+): DisplayStoryPagePayload<PageId> {
+  return readDisplayStoryPage(
+    pageId,
+    createDisplayStorySourceContext(siteScope, profileId),
+    { profileId, siteScope }
+  );
 }

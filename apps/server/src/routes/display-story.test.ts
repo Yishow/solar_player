@@ -5,6 +5,20 @@ import {
   buildApp,
   getDatabase
 } from "./display-pages-asset-governance.test-support.js";
+const {
+  createPairedDeviceTestContext,
+  mirrorLegacyGenerationIntoSiteSummaryForTest
+} = await import(
+  "../testing/deviceContextTestSupport.js"
+);
+
+function deviceCookies(siteScope: "cl" | "kn" = "cl") {
+  mirrorLegacyGenerationIntoSiteSummaryForTest(siteScope);
+  return {
+    solar_device_credential:
+      createPairedDeviceTestContext(siteScope).credential
+  };
+}
 
 function toLocalDateKey(date: Date) {
   const pad = (value: number) => `${value}`.padStart(2, "0");
@@ -300,12 +314,13 @@ function seedPageScopedFactoryCircuitFixture() {
 }
 
 test("GET /api/display-story exposes monitoring semantics for overview, solar, and factory slots", async () => {
-  const { today } = seedDisplayStoryFixture();
+  seedDisplayStoryFixture();
 
   const app = await buildApp();
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story"
     });
@@ -368,8 +383,8 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       };
     };
 
-    assert.equal(body.overview.summary.bindingState, "bound");
-    assert.equal(body.overview.summary.alertTone, "normal");
+    assert.equal(body.overview.summary.bindingState, "missing");
+    assert.equal(body.overview.summary.alertTone, "warning");
     assert.ok(Array.isArray(body.overview.readinessFindings));
     assert.equal(body.overview.readinessFindings.every((finding) => finding.pageId === "overview"), true);
     assert.equal(body.overview.readinessFindings.every((finding) => finding.status !== "ready"), true);
@@ -381,34 +396,26 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
-    assert.deepEqual(realTimePowerMetric?.sourceTopics, [
-      { metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }
-    ]);
-    const expectedTrendHours = ["08", "09", "10", "11"].map((hour) =>
-      new Date(`${today}T${hour}:00:00.000Z`).getHours()
-    );
-    assert.deepEqual(realTimePowerMetric?.trendHours, expectedTrendHours);
-    assert.deepEqual(realTimePowerMetric?.trendSeries, [82, 95, 101, 108]);
+    assert.equal(realTimePowerMetric?.sourceTopics, undefined);
+    assert.equal(realTimePowerMetric?.trendHours, undefined);
+    assert.equal(realTimePowerMetric?.trendSeries, undefined);
 
     const selfConsumptionMetric = body.solar.kpis.find(
       (metric) => metric.metricKey === "selfConsumptionRatio"
     );
     assert.ok(selfConsumptionMetric);
-    assert.equal(selfConsumptionMetric.bindingState, "bound");
-    assert.equal(selfConsumptionMetric.fallbackReason, null);
-    assert.equal(selfConsumptionMetric.provenance, "derived");
+    assert.equal(selfConsumptionMetric.bindingState, "missing");
+    assert.equal(selfConsumptionMetric.fallbackReason, "metric-unavailable");
+    assert.equal(selfConsumptionMetric.provenance, "fallback");
     assert.equal(selfConsumptionMetric.sourceClass, "derived-metric");
     assert.deepEqual(selfConsumptionMetric.dependencyKeys, [
       "selfConsumptionRatio",
       "selfConsumptionEnergy",
       "consumptionEnergy"
     ]);
-    assert.deepEqual(selfConsumptionMetric.sourceTopics, [
-      { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption" },
-      { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption" }
-    ]);
-    assert.equal(body.solar.story.flowState.state, "degraded");
-    assert.equal(body.solar.story.flowState.reason, "reduced-efficiency");
+    assert.equal(selfConsumptionMetric.sourceTopics, undefined);
+    assert.equal(body.solar.story.flowState.state, "normal");
+    assert.equal(body.solar.story.flowState.reason, "ready");
     assert.equal(
       body.factoryCircuit.slots.some(
         (slot) =>
@@ -435,15 +442,15 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.ok(selfConsumptionKpi);
     assert.equal(selfConsumptionKpi.bindingState, "bound");
     assert.equal(selfConsumptionKpi.fallbackReason, null);
-    assert.equal(selfConsumptionKpi.provenance, "live");
-    assert.equal(selfConsumptionKpi.sourceClass, "mqtt-live");
-    assert.equal(selfConsumptionKpi.value, "30.0");
+    assert.equal(selfConsumptionKpi.provenance, "derived");
+    assert.equal(selfConsumptionKpi.sourceClass, "derived-metric");
+    assert.equal(selfConsumptionKpi.value, "3,842");
   } finally {
     await app.close();
   }
 });
 
-test("MQTT restart exposes persisted Overview history before a new live reading arrives", async () => {
+test("Site-scoped Overview does not expose global persisted history after MQTT restart", async () => {
   const { today } = seedDisplayStoryFixture();
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
@@ -470,7 +477,11 @@ test("MQTT restart exposes persisted Overview history before a new live reading 
 
   try {
     const [storyResponse, summaryResponse] = await Promise.all([
-      app.inject({ method: "GET", url: "/api/display-story" }),
+      app.inject({
+        cookies: deviceCookies(),
+        method: "GET",
+        url: "/api/display-story"
+      }),
       app.inject({ method: "GET", url: "/api/metrics/daily-summary?range=month" })
     ]);
 
@@ -483,7 +494,7 @@ test("MQTT restart exposes persisted Overview history before a new live reading 
     const realTimePower = story.overview.metrics.find(
       (metric) => metric.metricKey === "realTimePower"
     );
-    assert.deepEqual(realTimePower?.trendSeries, [82, 95, 101, 108]);
+    assert.equal(realTimePower?.trendSeries, undefined);
 
     assert.equal(summaryResponse.statusCode, 200);
     const summary = summaryResponse.json() as {
@@ -513,6 +524,7 @@ test("GET /api/display-story falls back factory self-consumption KPI to today ge
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });
@@ -537,8 +549,8 @@ test("GET /api/display-story falls back factory self-consumption KPI to today ge
       (metric) => metric.metricKey === "selfConsumption"
     );
 
-    assert.equal(selfConsumption?.value, "7.99");
-    assert.equal(selfConsumption?.unit, "MWh");
+    assert.equal(selfConsumption?.value, "7,990");
+    assert.equal(selfConsumption?.unit, "kWh");
     assert.equal(selfConsumption?.fallbackReason, null);
     assert.equal(selfConsumption?.freshnessState, "fresh");
     assert.equal(selfConsumption?.provenance, "derived");
@@ -559,6 +571,7 @@ test("GET /api/display-story/:pageId returns only the requested page payload wra
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/overview"
     });
@@ -582,7 +595,7 @@ test("GET /api/display-story/:pageId returns only the requested page payload wra
 
     assert.equal(body.pageId, "overview");
     assert.equal(typeof body.generatedAt, "string");
-    assert.equal(body.payload.summary.bindingState, "bound");
+    assert.equal(body.payload.summary.bindingState, "missing");
     assert.equal(body.payload.metrics.some((metric) => metric.metricKey === "totalGeneration"), true);
     assert.equal("overview" in body, false);
     assert.equal("solar" in body, false);
@@ -602,6 +615,7 @@ test("GET /api/display-story/factory-circuit exposes bilingual slot labels for p
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });
@@ -635,10 +649,12 @@ test("GET /api/display-story resolves Factory Circuit circuit data by page key",
 
   try {
     const jungliResponse = await app.inject({
+      cookies: deviceCookies("cl"),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });
     const guanyinResponse = await app.inject({
+      cookies: deviceCookies("kn"),
       method: "GET",
       url: "/api/display-story/factory-circuit-guanyin"
     });
@@ -717,6 +733,7 @@ test("GET /api/display-story derives Factory Circuit peak from the configured mu
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });
@@ -761,6 +778,7 @@ test("GET /api/display-story falls back when Factory Circuit peak multiplier is 
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });
@@ -852,6 +870,7 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies("kn"),
       method: "GET",
       url: "/api/display-story/factory-circuit-guanyin"
     });
@@ -889,8 +908,8 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
     assert.equal(totalPower?.freshnessState, "stale");
     assert.equal(totalPower?.fallbackReason, "stale-data");
     assert.match(totalPower?.helper ?? "", /最近一次有效讀值/);
-    assert.equal(selfConsumption?.value, "9.2");
-    assert.equal(selfConsumption?.freshnessState, "stale");
+    assert.equal(selfConsumption?.value, "--");
+    assert.equal(selfConsumption?.freshnessState, "fallback");
     assert.equal(stamping?.livePowerKw, 1);
     assert.equal(stamping?.freshnessState, "stale");
     assert.equal(stamping?.fallbackReason, "stale-data");
@@ -906,6 +925,7 @@ test("GET /api/display-story/:pageId rejects unsupported monitoring pages", asyn
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/images"
     });
@@ -929,18 +949,22 @@ test("GET /api/display-story remains compatible with page-scoped readers during 
 
   try {
     const aggregateResponse = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story"
     });
     const overviewResponse = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/overview"
     });
     const solarResponse = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/solar"
     });
     const factoryResponse = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/display-story/factory-circuit"
     });

@@ -22,4 +22,5 @@ export * from "./sustainabilityStory.js";
 export * from "./displayClientLiveness.js";
 export * from "./deviceIdentity.js";
 export * from "./devicePairing.js";
+export * from "./displayClientContext.js";
 export * from "./weather.js";

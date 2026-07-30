@@ -4,6 +4,20 @@ import {
   buildApp,
   getDatabase
 } from "./display-pages-asset-governance.test-support.js";
+const {
+  createPairedDeviceTestContext,
+  mirrorLegacyGenerationIntoSiteSummaryForTest
+} = await import(
+  "../testing/deviceContextTestSupport.js"
+);
+
+function deviceCookies() {
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  return {
+    solar_device_credential:
+      createPairedDeviceTestContext("cl").credential
+  };
+}
 
 function seedSustainabilityCounters() {
   const database = getDatabase();
@@ -61,6 +75,7 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/sustainability-story?period=year"
     });
@@ -115,7 +130,7 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     assert.match(body.story.period.comparison.label, /未提供|無法/);
     assert.equal(body.story.period.provenance.source, "cumulative-counters");
     assert.equal(body.story.period.provenance.syncState, "fresh");
-    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "6");
+    assert.equal(body.story.householdEquivalents.today.householdCountDisplay, "9");
     assert.equal(body.story.householdEquivalents.today.calcProfile?.label, "預設四口之家");
     assert.equal(body.story.householdEquivalents.today.derivedStatus, "available");
     assert.match(body.story.householdEquivalents.today.disclaimer ?? "", /估算/);
@@ -199,6 +214,7 @@ test("PUT /api/sustainability-story persists editorial modules without overridin
     assert.equal(saveResponse.statusCode, 200);
 
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/sustainability-story?period=year"
     });
@@ -247,6 +263,7 @@ test("GET /api/sustainability-story marks missing aggregate dependencies explici
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/sustainability-story?period=lifetime"
     });

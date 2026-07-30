@@ -21,8 +21,10 @@ function parseArgs(argv) {
   const options = {
     baseUrl: process.env.FHD_WITNESS_BASE_URL ?? "http://localhost:5173",
     dryRun: false,
+    guanyinPairingUrl: process.env.FHD_WITNESS_GUANYIN_PAIRING_URL ?? "",
     includeEditor: true,
     outputDir: defaultEvidenceRoot,
+    pairingUrl: process.env.FHD_WITNESS_PAIRING_URL ?? "",
     runId: process.env.FHD_WITNESS_RUN_ID ?? createRunId()
   };
 
@@ -80,6 +82,10 @@ Options:
   --run-id <id>        Deterministic run directory name. Defaults to UTC timestamp.
   --dry-run            Print route/reference mapping without launching a browser.
   --skip-editor        Capture playback routes only.
+
+Environment:
+  FHD_WITNESS_PAIRING_URL          Required one-time CL pairing URL.
+  FHD_WITNESS_GUANYIN_PAIRING_URL Required one-time KN pairing URL.
 `);
 }
 
@@ -123,7 +129,28 @@ async function capturePage({ page, baseUrl, runDir, target }) {
   };
 }
 
+async function pairPage(page, pairingUrl) {
+  const exchangeResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/device-pairing/exchange"),
+    { timeout: 30_000 }
+  );
+  await page.goto(pairingUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000
+  });
+  const response = await exchangeResponse;
+  if (response.status() !== 204) {
+    throw new Error(`Device pairing failed with HTTP ${response.status()}.`);
+  }
+}
+
 async function captureWitness(options) {
+  if (!options.pairingUrl || !options.guanyinPairingUrl) {
+    throw new Error(
+      "FHD witness requires both FHD_WITNESS_PAIRING_URL and FHD_WITNESS_GUANYIN_PAIRING_URL."
+    );
+  }
+
   const chromium = await loadChromium();
   const browser = await launchChromium(chromium);
   const runDir = path.resolve(repoRoot, options.outputDir, options.runId);
@@ -132,10 +159,44 @@ async function captureWitness(options) {
 
   try {
     const page = await browser.newPage({ viewport: fhdViewport });
+    await pairPage(page, options.pairingUrl);
+    const guanyinContext = await browser.newContext({ viewport: fhdViewport });
+    const guanyinPage = await guanyinContext.newPage();
+    await pairPage(guanyinPage, options.guanyinPairingUrl);
+
     const playbackResults = [];
     for (const target of fhdPlaybackRoutes) {
-      playbackResults.push(await capturePage({ page, baseUrl, runDir, target }));
+      playbackResults.push(
+        await capturePage({
+          page:
+            target.routeKey === "factory-circuit-guanyin"
+              ? guanyinPage
+              : page,
+          baseUrl,
+          runDir,
+          target
+        })
+      );
     }
+
+    const siteContextResults = [];
+    for (const target of fhdPlaybackRoutes.filter((route) =>
+      ["overview", "solar", "sustainability"].includes(route.routeKey)
+    )) {
+      siteContextResults.push({
+        ...(await capturePage({
+          page: guanyinPage,
+          baseUrl,
+          runDir,
+          target: {
+            ...target,
+            screenshotFile: `playback/site-context/kn-${target.routeKey}.png`
+          }
+        })),
+        siteScope: "kn"
+      });
+    }
+    await guanyinContext.close();
 
     const editorResults = [];
     if (options.includeEditor) {
@@ -152,7 +213,8 @@ async function captureWitness(options) {
         baseUrl,
         generatedAt,
         playbackResults,
-        editorResults
+        editorResults,
+        siteContextResults
       })
     );
 

@@ -1,7 +1,10 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { PlaybackSettings } from "@solar-display/shared";
+import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
 import { readDisplayOpsSummary } from "../services/displayOpsService.js";
 import {
+  readEffectiveDisplayRotationSnapshot,
+  readDisplayRotationPreview,
   readDisplayRotationPlan,
   readPlaybackPages,
   readPlaybackSettings,
@@ -18,6 +21,24 @@ type PlaybackPagesUpdateBody = {
 };
 
 const playbackRoute: FastifyPluginAsync = async (app) => {
+  app.get(
+    "/api/playback/runtime",
+    { preHandler: app.requireDisplayClientContext },
+    async (request) => {
+      const context = requireResolvedDisplayClientContext(request);
+      const snapshot = readEffectiveDisplayRotationSnapshot({
+        mqttStatus: app.mqttClientService.getStatus(),
+        profileId: context.profileId,
+        siteScope: context.siteScope
+      });
+
+      return {
+        context,
+        ...snapshot
+      };
+    }
+  );
+
   // ---------- GET /api/playback/settings ----------
   app.get("/api/playback/settings", async () => ({
     settings: readPlaybackSettings(),

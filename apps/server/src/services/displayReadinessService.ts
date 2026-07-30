@@ -2,14 +2,16 @@ import type {
   CircuitConfig,
   DisplayReadinessFinding,
   DisplayReadinessPageSummary,
-  DisplayReadinessReport
+  DisplayReadinessReport,
+  SiteScope
 } from "@solar-display/shared";
 import {
   displayCircuitSlotKeys,
   displayMetricRequirements,
   displaySlotRequirements,
   factoryGenerationDependencyKeys,
-  factoryGenerationDerivedRequirementKeys
+  factoryGenerationDerivedRequirementKeys,
+  resolveDisplayReadinessRequirementsForSite
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import {
@@ -121,11 +123,19 @@ function readSustainabilityFactoryScope() {
   );
 }
 
-function buildMetricFindings(now: Date): DisplayReadinessFinding[] {
+function buildMetricFindings(
+  now: Date,
+  siteScope?: SiteScope
+): DisplayReadinessFinding[] {
   const mappings = new Map(readTopicMappings().map((row) => [row.metric_key, row]));
   const aggregate = evaluateFactoryGenerationAggregate(getDatabase(), now);
+  const metricRequirements = siteScope
+    ? resolveDisplayReadinessRequirementsForSite(siteScope).filter(
+        (requirement) => requirement.sourceType !== "circuit-slot"
+      )
+    : displayMetricRequirements;
 
-  return displayMetricRequirements.map((requirement) => {
+  return metricRequirements.map((requirement) => {
     const metricKeys = requirement.dependencyKeys ?? [requirement.requirementKey];
     const directMapping = mappings.get(requirement.requirementKey);
     const directTopic = directMapping?.topic?.trim() ?? "";
@@ -151,9 +161,13 @@ function buildMetricFindings(now: Date): DisplayReadinessFinding[] {
       .join(", ");
 
     if (factoryGenerationRequirementKeys.has(requirement.requirementKey)) {
-      const scope = requirement.pageId === "sustainability"
-        ? readSustainabilityFactoryScope()
-        : "CL+KN";
+      const scope = siteScope
+        ? siteScope === "cl"
+          ? "CL"
+          : "KN"
+        : requirement.pageId === "sustainability"
+          ? readSustainabilityFactoryScope()
+          : "CL+KN";
       if (scope === "none") {
         return {
           blocking: true,
@@ -249,10 +263,15 @@ function buildMetricFindings(now: Date): DisplayReadinessFinding[] {
   });
 }
 
-function buildSlotFindings(): DisplayReadinessFinding[] {
+function buildSlotFindings(siteScope?: SiteScope): DisplayReadinessFinding[] {
   const enabledCircuits = readCircuits().filter((circuit) => circuit.enabled);
+  const slotRequirements = siteScope
+    ? resolveDisplayReadinessRequirementsForSite(siteScope).filter(
+        (requirement) => requirement.sourceType === "circuit-slot"
+      )
+    : displaySlotRequirements;
 
-  return displaySlotRequirements.map((requirement) => {
+  return slotRequirements.map((requirement) => {
     const matches = enabledCircuits.filter(
       (circuit) =>
         circuit.pageKey === requirement.pageId &&
@@ -312,9 +331,14 @@ function toPageSummary(
   };
 }
 
-export function readDisplayReadinessReport(options: { now?: Date } = {}): DisplayReadinessReport {
+export function readDisplayReadinessReport(
+  options: { now?: Date; siteScope?: SiteScope } = {}
+): DisplayReadinessReport {
   const now = options.now ?? new Date();
-  const findings = [...buildMetricFindings(now), ...buildSlotFindings()];
+  const findings = [
+    ...buildMetricFindings(now, options.siteScope),
+    ...buildSlotFindings(options.siteScope)
+  ];
   const pageIds = [...new Set(findings.map((finding) => finding.pageId))];
   const pages = pageIds.map((pageId) =>
     toPageSummary(
@@ -342,7 +366,7 @@ export function readDisplayReadinessReport(options: { now?: Date } = {}): Displa
       readyCount: findings.filter((finding) => finding.status === "ready").length,
       slotCoverage: {
         blockingCount: slotFindings.filter((finding) => finding.status === "blocking").length,
-        readyCount: displayCircuitSlotKeys.length -
+        readyCount: (options.siteScope ? slotFindings.length : displayCircuitSlotKeys.length) -
           slotFindings.filter((finding) => finding.status === "blocking").length
       },
       warningCount: findings.filter((finding) => finding.status === "warning").length

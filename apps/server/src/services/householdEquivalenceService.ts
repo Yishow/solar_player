@@ -1,7 +1,8 @@
 import type Database from "better-sqlite3";
 import {
   createHouseholdEquivalenceCalcProfile,
-  deriveHouseholdEquivalenceCard
+  deriveHouseholdEquivalenceCard,
+  type SiteScope
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
@@ -20,6 +21,7 @@ type DailySummaryRow = {
 type ReadHouseholdEquivalenceCardsOptions = {
   database?: Database.Database;
   now?: Date;
+  siteScope?: SiteScope;
 };
 
 function toDateKey(date: Date) {
@@ -67,7 +69,11 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
     .get(todayDate) as DailySummaryRow | undefined;
   const liveMetrics = readLiveMetricsSnapshot(database).metrics;
   const liveTodayGeneration = liveMetrics.todayGeneration;
-  const factoryScope = resolveFactoryGenerationScope(readPlaybackPages());
+  const factoryScope = options.siteScope
+    ? options.siteScope === "cl"
+      ? "CL"
+      : "KN"
+    : resolveFactoryGenerationScope(readPlaybackPages());
   const factoryGeneration =
     factoryScope === "none"
       ? null
@@ -91,23 +97,37 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
     typeof liveTodayGeneration?.value === "number"
       ? normalizeEnergyToKwh(liveTodayGeneration.value, liveTodayGeneration.unit)
       : null;
+  const siteTodayGenerationValue =
+    options.siteScope &&
+    factoryGeneration?.state === "ready" &&
+    "values" in factoryGeneration
+      ? (factoryGeneration.values as { todayGeneration: number }).todayGeneration *
+        1_000
+      : null;
   const shouldUseDailySelfConsumption =
+    !options.siteScope &&
     dailySelfConsumptionValue !== null &&
     (dailySummary?.date === todayDate
       ? dailySelfConsumptionValue > 0 || liveTodayGenerationValue === null
       : liveTodayGenerationValue === null);
-  const todayBasisValue = shouldUseDailySelfConsumption
-    ? dailySelfConsumptionValue
-    : liveTodayGenerationValue;
-  const todayBasisSourceLabel = shouldUseDailySelfConsumption ? "今日自發自用量" : "今日發電量";
-  const todayBasisSource = shouldUseDailySelfConsumption
-    ? "daily-self-consumption"
-    : "live-today-generation-fallback";
-  const todayBasisUpdatedAt = shouldUseDailySelfConsumption
-    ? dailySummary
-      ? `${dailySummary.date}T00:00:00.000Z`
-      : null
-    : liveTodayGeneration?.timestamp ?? null;
+  const todayBasisValue = options.siteScope
+    ? siteTodayGenerationValue
+    : shouldUseDailySelfConsumption
+      ? dailySelfConsumptionValue
+      : liveTodayGenerationValue;
+  const todayBasisSourceLabel = "今日發電量";
+  const todayBasisSource = options.siteScope
+    ? `${factoryScope} MQTT`
+    : shouldUseDailySelfConsumption
+      ? "daily-self-consumption"
+      : "live-today-generation-fallback";
+  const todayBasisUpdatedAt = options.siteScope
+    ? factoryGeneration?.updatedAt ?? null
+    : shouldUseDailySelfConsumption
+      ? dailySummary
+        ? `${dailySummary.date}T00:00:00.000Z`
+        : null
+      : liveTodayGeneration?.timestamp ?? null;
 
   return {
     cumulative: deriveHouseholdEquivalenceCard({

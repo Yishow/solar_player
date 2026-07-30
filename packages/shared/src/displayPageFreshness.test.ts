@@ -11,11 +11,18 @@ test("resolveLiveMetricKeysForPage expands solar requirements into the live metr
   assert.deepEqual(resolveLiveMetricKeysForPage("solar"), [
     "realTimePower",
     "todayGeneration",
+    "factoryGeneration.cl.todayMwh",
+    "factoryGeneration.cl.monthMwh",
+    "factoryGeneration.cl.totalMwh",
+    "factoryGeneration.kn.todayMwh",
+    "factoryGeneration.kn.monthMwh",
+    "factoryGeneration.kn.totalMwh",
     "selfConsumptionRatio",
     "selfConsumptionEnergy",
     "consumptionEnergy",
     "todayCo2Reduction",
     "totalCo2Reduction",
+    "totalGeneration",
     "systemEfficiency"
   ]);
   assert.deepEqual(resolveLiveMetricKeysForPage("images"), []);
@@ -24,7 +31,20 @@ test("resolveLiveMetricKeysForPage expands solar requirements into the live metr
 test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use runtime alternatives", () => {
   assert.deepEqual(resolveLiveMetricRequirementsForPage("solar"), [
     { alternatives: [["realTimePower"]], requirementKey: "realTimePower" },
-    { alternatives: [["todayGeneration"]], requirementKey: "todayGeneration" },
+    {
+      alternatives: [
+        ["todayGeneration"],
+        [
+          "factoryGeneration.cl.todayMwh",
+          "factoryGeneration.cl.monthMwh",
+          "factoryGeneration.cl.totalMwh",
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]
+      ],
+      requirementKey: "todayGeneration"
+    },
     {
       alternatives: [
         ["selfConsumptionRatio"],
@@ -32,10 +52,116 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
       ],
       requirementKey: "selfConsumptionRatio"
     },
-    { alternatives: [["todayCo2Reduction"], ["todayGeneration"]], requirementKey: "todayCo2Reduction" },
-    { alternatives: [["totalCo2Reduction"], ["totalGeneration"]], requirementKey: "totalCo2Reduction" },
+    {
+      alternatives: [
+        ["todayCo2Reduction"],
+        ["todayGeneration"],
+        [
+          "factoryGeneration.cl.todayMwh",
+          "factoryGeneration.cl.monthMwh",
+          "factoryGeneration.cl.totalMwh",
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]
+      ],
+      requirementKey: "todayCo2Reduction"
+    },
+    {
+      alternatives: [
+        ["totalCo2Reduction"],
+        ["totalGeneration"],
+        [
+          "factoryGeneration.cl.todayMwh",
+          "factoryGeneration.cl.monthMwh",
+          "factoryGeneration.cl.totalMwh",
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]
+      ],
+      requirementKey: "totalCo2Reduction"
+    },
     { alternatives: [["systemEfficiency"]], requirementKey: "systemEfficiency" }
   ]);
+});
+
+test("Site-scoped Overview and Solar freshness excludes unscoped global metrics", () => {
+  assert.deepEqual(resolveLiveMetricRequirementsForPage("overview", "cl"), [
+    {
+      alternatives: [[
+        "factoryGeneration.cl.todayMwh",
+        "factoryGeneration.cl.monthMwh",
+        "factoryGeneration.cl.totalMwh"
+      ]],
+      requirementKey: "todayGeneration"
+    },
+    {
+      alternatives: [[
+        "factoryGeneration.cl.todayMwh",
+        "factoryGeneration.cl.monthMwh",
+        "factoryGeneration.cl.totalMwh"
+      ]],
+      requirementKey: "totalGeneration"
+    },
+    {
+      alternatives: [[
+        "factoryGeneration.cl.todayMwh",
+        "factoryGeneration.cl.monthMwh",
+        "factoryGeneration.cl.totalMwh"
+      ]],
+      requirementKey: "todayCo2Reduction"
+    },
+    {
+      alternatives: [[
+        "factoryGeneration.cl.todayMwh",
+        "factoryGeneration.cl.monthMwh",
+        "factoryGeneration.cl.totalMwh"
+      ]],
+      requirementKey: "totalCo2Reduction"
+    }
+  ]);
+  assert.equal(
+    resolveLiveMetricKeysForPage("solar", "kn").some((metricKey) =>
+      [
+        "consumptionEnergy",
+        "realTimePower",
+        "selfConsumptionEnergy",
+        "selfConsumptionRatio",
+        "systemEfficiency"
+      ].includes(metricKey)
+    ),
+    false
+  );
+  assert.deepEqual(
+    resolveLiveMetricRequirementsForPage("sustainability", "kn"),
+    [
+      {
+        alternatives: [[
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]],
+        requirementKey: "accumulatedGenerationGwh"
+      },
+      {
+        alternatives: [[
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]],
+        requirementKey: "accumulatedCarbonReductionTons"
+      },
+      {
+        alternatives: [[
+          "factoryGeneration.kn.todayMwh",
+          "factoryGeneration.kn.monthMwh",
+          "factoryGeneration.kn.totalMwh"
+        ]],
+        requirementKey: "plantedTreeEquivalent"
+      }
+    ]
+  );
 });
 
 test("resolveLiveMetricRequirementsForPage uses Guanyin Factory Circuit metric keys", () => {

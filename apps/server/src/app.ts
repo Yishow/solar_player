@@ -20,6 +20,7 @@ import managementAuthPlugin, {
   createManagementCorsRequestGate,
   parseManagementTrustedOrigins
 } from "./plugins/managementAuth.js";
+import { deviceContextPlugin } from "./plugins/deviceContext.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
@@ -151,6 +152,7 @@ export async function buildApp() {
     managementAccessToken: config.managementAccessToken,
     trustedOrigins: trustedManagementOrigins
   });
+  await deviceContextPlugin(app);
 
   if (existsSync(config.openapiPath)) {
     await app.register(swagger, {

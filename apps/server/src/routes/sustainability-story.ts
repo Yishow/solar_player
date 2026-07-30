@@ -4,13 +4,20 @@ import {
   readSustainabilityStory,
   saveSustainabilityStory
 } from "../services/sustainabilityStoryService.js";
+import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
 
 const sustainabilityStoryRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: { period?: SustainabilityPeriodKey } }>(
     "/api/sustainability-story",
-    async (request) => ({
-      story: readSustainabilityStory(request.query.period)
-    })
+    { preHandler: app.requireDisplayClientContext },
+    async (request) => {
+      const context = requireResolvedDisplayClientContext(request);
+      return {
+        story: readSustainabilityStory(request.query.period, {
+          siteScope: context.siteScope
+        })
+      };
+    }
   );
 
   app.put<{ Body: SustainabilityStoryInput }>("/api/sustainability-story", async (request) => {

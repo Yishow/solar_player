@@ -1,5 +1,10 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
-import { displayMetricRequirements, type DisplayRequirementDescriptor } from "./displayReadiness.js";
+import type { SiteScope } from "./deviceIdentity.js";
+import {
+  displayMetricRequirements,
+  resolveDisplayReadinessRequirementsForSite,
+  type DisplayRequirementDescriptor
+} from "./displayReadiness.js";
 
 export type LiveMetricRuntimeRequirement = {
   alternatives: string[][];
@@ -13,10 +18,16 @@ type MetricFreshnessState = {
   timestamp: string;
 };
 
-export function resolveLiveMetricKeysForPage(pageKey: DisplayPageKey) {
+export function resolveLiveMetricKeysForPage(
+  pageKey: DisplayPageKey,
+  siteScope?: SiteScope
+) {
   const metricKeys: string[] = [];
+  const requirements = siteScope
+    ? resolveDisplayReadinessRequirementsForSite(siteScope)
+    : displayMetricRequirements;
 
-  for (const requirement of displayMetricRequirements) {
+  for (const requirement of requirements) {
     if (requirement.pageId !== pageKey) {
       continue;
     }
@@ -45,6 +56,21 @@ function resolveRequirementAlternatives(requirement: DisplayRequirementDescripto
   const derivedDependencyKeys = dependencyKeys.filter(
     (metricKey) => metricKey !== requirement.requirementKey
   );
+  const factoryDependencyKeys = derivedDependencyKeys.filter((metricKey) =>
+    metricKey.startsWith("factoryGeneration.")
+  );
+  if (factoryDependencyKeys.length > 0) {
+    const canonicalDependencyKeys = derivedDependencyKeys.filter(
+      (metricKey) => !metricKey.startsWith("factoryGeneration.")
+    );
+    return [
+      ...(dependencyKeys.includes(requirement.requirementKey)
+        ? [[requirement.requirementKey]]
+        : []),
+      ...canonicalDependencyKeys.map((metricKey) => [metricKey]),
+      factoryDependencyKeys
+    ];
+  }
 
   if (derivedDependencyKeys.length === 0) {
     return [[requirement.requirementKey]];
@@ -58,9 +84,14 @@ function resolveRequirementAlternatives(requirement: DisplayRequirementDescripto
 }
 
 export function resolveLiveMetricRequirementsForPage(
-  pageKey: DisplayPageKey
+  pageKey: DisplayPageKey,
+  siteScope?: SiteScope
 ): LiveMetricRuntimeRequirement[] {
-  return displayMetricRequirements
+  const requirements = siteScope
+    ? resolveDisplayReadinessRequirementsForSite(siteScope)
+    : displayMetricRequirements;
+
+  return requirements
     .filter((requirement) => requirement.pageId === pageKey)
     .map((requirement) => ({
       alternatives: resolveRequirementAlternatives(requirement),

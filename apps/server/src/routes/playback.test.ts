@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import {
   createPlaybackRuntime,
+  createSafePlaybackBoundaryPlan,
   PLAYBACK_TRANSITION_SPEED_MAX_MS,
   PLAYBACK_TRANSITION_SPEED_MIN_MS,
   displayPageFallbackPolicyByTemplateKey,
@@ -12,6 +13,9 @@ import {
   getEnabledPlaybackPages,
   getPlaybackPage,
   isPlaybackAllowedBySchedule,
+  resolveDisplayReadinessRequirementsForSite,
+  resolveLiveMetricRequirementsForPage,
+  resolveSafePlaybackBoundaryRuntime,
   shouldEnterIdleMode,
   type DisplayRotationSkipReason,
   type PlaybackPage,
@@ -188,6 +192,39 @@ test("display rotation evaluator skips disabled and not-ready pages while preser
   assert.equal(preview.fallbackRoute, null);
 });
 
+test("shared readiness and freshness evaluators project only the selected Site", () => {
+  const clRequirements = resolveDisplayReadinessRequirementsForSite("cl");
+  const overviewFreshness = resolveLiveMetricRequirementsForPage(
+    "overview",
+    "cl"
+  );
+
+  assert.equal(
+    clRequirements.some(
+      (requirement) => requirement.pageId === "factory-circuit-guanyin"
+    ),
+    false
+  );
+  assert.equal(
+    clRequirements
+      .flatMap((requirement) => requirement.dependencyKeys ?? [])
+      .some((metricKey) => metricKey.startsWith("factoryGeneration.kn.")),
+    false
+  );
+  assert.equal(
+    overviewFreshness
+      .flatMap((requirement) => requirement.alternatives.flat())
+      .some((metricKey) => metricKey.startsWith("factoryGeneration.cl.")),
+    true
+  );
+  assert.equal(
+    overviewFreshness
+      .flatMap((requirement) => requirement.alternatives.flat())
+      .some((metricKey) => metricKey.startsWith("factoryGeneration.kn.")),
+    false
+  );
+});
+
 test("display rotation evaluator falls back when schedule blocks every enabled page", () => {
   const preview = evaluateDisplayRotation({
     fallbackRoute: "/offline",
@@ -249,6 +286,130 @@ test("display rotation evaluator reports unpublished and asset-unhealthy pages w
     preview.skippedPages.find((page) => page.id === 3)?.skipReason,
     "disabled"
   );
+});
+
+test("safe playback boundary keeps a valid current page until its remaining duration ends", () => {
+  const nextPages = basePages.filter((page) => page.id !== 3);
+  const plan = createSafePlaybackBoundaryPlan({
+    current: {
+      countdownMs: 5_000,
+      currentIndex: 0,
+      isIdle: false,
+      isPlaying: true,
+      lastInteractionAt: 500
+    },
+    nextPages,
+    previousPages: basePages,
+    receivedAtMs: 1_000
+  });
+
+  assert.equal(
+    resolveSafePlaybackBoundaryRuntime({
+      current: {
+        countdownMs: 5_000,
+        currentIndex: 0,
+        isIdle: false,
+        isPlaying: true,
+        lastInteractionAt: 500
+      },
+      nextPages,
+      nowMs: 5_999,
+      plan,
+      settings: baseSettings
+    }),
+    null
+  );
+  const applied = resolveSafePlaybackBoundaryRuntime({
+    current: {
+      countdownMs: 0,
+      currentIndex: 0,
+      isIdle: false,
+      isPlaying: true,
+      lastInteractionAt: 500
+    },
+    nextPages,
+    nowMs: 6_000,
+    plan,
+    settings: baseSettings
+  });
+
+  assert.equal(applied?.currentIndex, 1);
+  assert.equal(applied?.countdownMs, 20_000);
+});
+
+test("safe playback boundary replaces an invalid current page at the next tick via start page", () => {
+  const previousPages = [
+    ...basePages,
+    {
+      displayOrder: 4,
+      durationSeconds: 12,
+      enabled: true,
+      id: 4,
+      labelEn: "Factory CL",
+      labelZh: "中壢廠迴路",
+      pageKey: "factory-circuit",
+      route: "/factory-circuit"
+    }
+  ];
+  const nextPages = basePages.filter((page) => page.enabled);
+  const current = {
+    countdownMs: 8_000,
+    currentIndex: 2,
+    isIdle: false,
+    isPlaying: true,
+    lastInteractionAt: 500
+  };
+  const plan = createSafePlaybackBoundaryPlan({
+    current,
+    nextPages,
+    previousPages,
+    receivedAtMs: 10_000
+  });
+  const applied = resolveSafePlaybackBoundaryRuntime({
+    current,
+    nextPages,
+    nowMs: 10_250,
+    plan,
+    settings: {
+      ...baseSettings,
+      startPage: 2
+    }
+  });
+
+  assert.equal(plan.currentPageRemainsValid, false);
+  assert.ok(plan.applyAtMs <= plan.applyByMs);
+  assert.equal(applied?.currentIndex, 1);
+  assert.equal(applied?.countdownMs, 20_000);
+});
+
+test("safe playback boundary falls back to the first valid page when start page is absent", () => {
+  const nextPages = basePages.filter((page) => page.id === 1);
+  const current = {
+    countdownMs: 3_000,
+    currentIndex: 1,
+    isIdle: false,
+    isPlaying: true,
+    lastInteractionAt: 500
+  };
+  const plan = createSafePlaybackBoundaryPlan({
+    current,
+    nextPages,
+    previousPages: basePages,
+    receivedAtMs: 20_000
+  });
+  const applied = resolveSafePlaybackBoundaryRuntime({
+    current,
+    nextPages,
+    nowMs: 20_250,
+    plan,
+    settings: {
+      ...baseSettings,
+      startPage: 99
+    }
+  });
+
+  assert.equal(applied?.currentIndex, 0);
+  assert.equal(applied?.countdownMs, 10_000);
 });
 
 test("GET /api/playback/settings and /api/playback/pages expose seeded playback data", async () => {

@@ -126,11 +126,13 @@ function buildOverviewRuntimeSnapshot(
 }
 
 export function OverviewRuntimeContent({
+  allowUnscopedMetrics,
   resolvedConfig,
   resolvedWeatherSnapshot,
   seedConfig,
   storyOverviewPayload
 }: {
+  allowUnscopedMetrics: boolean;
   resolvedConfig: OverviewDisplayPageConfig;
   resolvedWeatherSnapshot: Parameters<typeof buildOverviewViewModel>[0]["weatherSnapshot"];
   seedConfig: ReturnType<typeof import("./displayPageConfig").createOverviewDisplayPageSeedConfig>;
@@ -309,6 +311,7 @@ export function OverviewRuntimeContent({
       ) : null}
       {shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.phasePower) ? (
         <PhasePowerTableWidget
+          enabled={allowUnscopedMetrics}
           phasePower={viewModel.phasePower}
           style={phasePowerWidgetStyle}
         />

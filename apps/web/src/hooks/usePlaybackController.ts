@@ -1,6 +1,10 @@
 import {
+  createSafePlaybackBoundaryPlan,
   createPlaybackRuntime,
+  resolveSafePlaybackBoundaryRuntime,
+  type DisplayClientContext,
   type DisplayPageTemplateKey,
+  type DisplayPlaybackRuntimeResponse,
   type DisplayRotationPreview,
   getEnabledPlaybackPages,
   getNextPlaybackIndex,
@@ -13,10 +17,11 @@ import {
   shouldEnterIdleMode,
   type PlaybackPage,
   type PlaybackRuntime,
+  type SafePlaybackBoundaryPlan,
   type PlaybackSettings
 } from "@solar-display/shared";
 import { startTransition, useEffect, useRef, useState } from "react";
-import { getDisplayRotationPreview, getPlaybackSettings } from "../services/api";
+import { ApiRequestError, getPlaybackRuntime } from "../services/api";
 import { prefetchDisplayPageTemplate } from "../pages/shared/displayPageTemplateLoaders";
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
@@ -63,10 +68,13 @@ type UsePlaybackControllerOptions = {
 };
 
 export type PlaybackRuntimeTickMode = "countdown" | "boundary";
+const DISPLAY_RUNTIME_REFRESH_MS = 5_000;
 
 type PlaybackControllerState = {
   countdown: number;
   currentPage: PlaybackPage | null;
+  displayClientContext: DisplayClientContext | null;
+  effectiveRotationRevision: string | null;
   errorMessage: string;
   fallbackRoute: string | null;
   isIdle: boolean;
@@ -81,6 +89,54 @@ type PlaybackControllerState = {
   prevPage: () => void;
   togglePlay: () => void;
 };
+
+type PendingRuntimeUpdate = {
+  identity: string;
+  plan: SafePlaybackBoundaryPlan;
+  response: DisplayPlaybackRuntimeResponse;
+};
+
+type FormalPlaybackAccessState = {
+  appliedRuntimeIdentity: string | null;
+  displayClientContext: DisplayClientContext | null;
+  effectiveRotationRevision: string | null;
+  fallbackRoute: string | null;
+  pages: PlaybackPage[];
+  pendingRuntimeUpdate: PendingRuntimeUpdate | null;
+  rotationPreview: DisplayRotationPreview | null;
+  runtime: PlaybackRuntime | null;
+  settings: PlaybackSettings | null;
+};
+
+export function isDisplayContextAccessError(error: unknown) {
+  return (
+    error instanceof ApiRequestError &&
+    (error.statusCode === 401 || error.statusCode === 403)
+  );
+}
+
+export function isLatestPlaybackLoadRequest(
+  requestId: number,
+  latestRequestId: number
+) {
+  return requestId === latestRequestId;
+}
+
+export function failClosedFormalPlaybackAccess(
+  _current: FormalPlaybackAccessState
+): FormalPlaybackAccessState {
+  return {
+    appliedRuntimeIdentity: null,
+    displayClientContext: null,
+    effectiveRotationRevision: null,
+    fallbackRoute: null,
+    pages: [],
+    pendingRuntimeUpdate: null,
+    rotationPreview: null,
+    runtime: null,
+    settings: null
+  };
+}
 
 export function resolvePlaybackRuntimeTick({
   current,
@@ -154,6 +210,10 @@ export function usePlaybackController(
   const [runtime, setRuntime] = useState<PlaybackRuntime | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState("");
+  const [displayClientContext, setDisplayClientContext] =
+    useState<DisplayClientContext | null>(null);
+  const [effectiveRotationRevision, setEffectiveRotationRevision] =
+    useState<string | null>(null);
   const [fallbackRoute, setFallbackRoute] = useState<string | null>(null);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(() => options.rotationPreview ?? null);
   const providedSettingsRef = useRef<PlaybackSettings | null>(options.settings ?? null);
@@ -164,6 +224,9 @@ export function usePlaybackController(
   const lastSyncedPathRef = useRef<string | undefined>(undefined);
   const runtimeTickSignatureRef = useRef<string | null>(null);
   const runtimeTickStartedAtRef = useRef(Date.now());
+  const appliedRuntimeIdentityRef = useRef<string | null>(null);
+  const pendingRuntimeUpdateRef = useRef<PendingRuntimeUpdate | null>(null);
+  const latestLoadRequestRef = useRef(0);
   const tickMs = options.tickMs ?? 250;
   const tickMode = options.tickMode ?? "countdown";
 
@@ -216,29 +279,42 @@ export function usePlaybackController(
       return;
     }
 
+    const requestId = ++latestLoadRequestRef.current;
     setIsLoading(true);
 
     try {
       const providedSettings = providedSettingsRef.current;
       const providedRotationPreview = providedRotationPreviewRef.current;
-      const [nextSettings, rotationPreview] = await Promise.all([
-        providedSettings ? Promise.resolve(providedSettings) : getPlaybackSettings(),
-        providedRotationPreview ? Promise.resolve(providedRotationPreview) : getDisplayRotationPreview()
-      ]);
+      const providedManagementPreview =
+        providedSettings !== null && providedRotationPreview !== null;
+      const runtimeResponse = providedManagementPreview
+        ? null
+        : await getPlaybackRuntime();
+      if (!isLatestPlaybackLoadRequest(requestId, latestLoadRequestRef.current)) {
+        return;
+      }
+      const [nextSettings, rotationPreview] = providedManagementPreview
+        ? await Promise.all([
+            Promise.resolve(providedSettings),
+            Promise.resolve(providedRotationPreview)
+          ])
+        : [runtimeResponse!.settings, runtimeResponse!.preview];
       const runtimePages = rotationPreview.playablePages;
       const nowMs = Date.now();
+      const currentRuntime =
+        tickMode === "boundary" && runtimeRef.current?.isPlaying
+          ? {
+              ...runtimeRef.current,
+              countdownMs: Math.max(
+                0,
+                runtimeRef.current.countdownMs -
+                  (nowMs - runtimeTickStartedAtRef.current)
+              )
+            }
+          : runtimeRef.current;
       const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
         currentPath: options.currentPath,
-        currentRuntime:
-          tickMode === "boundary" && runtimeRef.current?.isPlaying
-            ? {
-                ...runtimeRef.current,
-                countdownMs: Math.max(
-                  0,
-                  runtimeRef.current.countdownMs - (nowMs - runtimeTickStartedAtRef.current)
-                )
-              }
-            : runtimeRef.current,
+        currentRuntime,
         nextPages: runtimePages,
         nowMs,
         previousPages: pagesRef.current,
@@ -246,29 +322,119 @@ export function usePlaybackController(
         settings: nextSettings
       });
 
+      if (runtimeResponse && currentRuntime) {
+        const identity = [
+          runtimeResponse.context.contextRevision,
+          runtimeResponse.effectiveRotationRevision
+        ].join(":");
+        if (identity !== appliedRuntimeIdentityRef.current) {
+          if (pendingRuntimeUpdateRef.current?.identity !== identity) {
+            pendingRuntimeUpdateRef.current = {
+              identity,
+              plan: createSafePlaybackBoundaryPlan({
+                current: currentRuntime,
+                nextPages: runtimePages,
+                previousPages: pagesRef.current,
+                receivedAtMs: nowMs
+              }),
+              response: runtimeResponse
+            };
+          }
+        } else {
+          pendingRuntimeUpdateRef.current = null;
+        }
+        setErrorMessage("");
+        return;
+      }
+
+      pendingRuntimeUpdateRef.current = null;
+      if (runtimeResponse) {
+        appliedRuntimeIdentityRef.current = [
+          runtimeResponse.context.contextRevision,
+          runtimeResponse.effectiveRotationRevision
+        ].join(":");
+      }
+      settingsRef.current = nextSettings;
+      pagesRef.current = runtimePages;
+      runtimeRef.current = nextRuntime;
       startTransition(() => {
         setSettings(nextSettings);
         setPages(runtimePages);
         setFallbackRoute(rotationPreview.fallbackRoute);
         setRotationPreview(rotationPreview);
         setRuntime(nextRuntime);
+        setDisplayClientContext(runtimeResponse?.context ?? null);
+        setEffectiveRotationRevision(
+          runtimeResponse?.effectiveRotationRevision ?? null
+        );
         setErrorMessage("");
       });
     } catch (error) {
+      if (!isLatestPlaybackLoadRequest(requestId, latestLoadRequestRef.current)) {
+        return;
+      }
+      if (isDisplayContextAccessError(error)) {
+        const failedClosed = failClosedFormalPlaybackAccess({
+          appliedRuntimeIdentity: appliedRuntimeIdentityRef.current,
+          displayClientContext,
+          effectiveRotationRevision,
+          fallbackRoute,
+          pages: pagesRef.current,
+          pendingRuntimeUpdate: pendingRuntimeUpdateRef.current,
+          rotationPreview,
+          runtime: runtimeRef.current,
+          settings: settingsRef.current
+        });
+        pendingRuntimeUpdateRef.current = failedClosed.pendingRuntimeUpdate;
+        appliedRuntimeIdentityRef.current = failedClosed.appliedRuntimeIdentity;
+        settingsRef.current = failedClosed.settings;
+        pagesRef.current = failedClosed.pages;
+        runtimeRef.current = failedClosed.runtime;
+        setSettings(failedClosed.settings);
+        setPages(failedClosed.pages);
+        setRuntime(failedClosed.runtime);
+        setDisplayClientContext(failedClosed.displayClientContext);
+        setEffectiveRotationRevision(failedClosed.effectiveRotationRevision);
+        setFallbackRoute(failedClosed.fallbackRoute);
+      }
       setRotationPreview(null);
       setErrorMessage(error instanceof Error ? error.message : "載入播放設定失敗。");
     } finally {
-      setIsLoading(false);
+      if (isLatestPlaybackLoadRequest(requestId, latestLoadRequestRef.current)) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     if (!enabled) {
+      latestLoadRequestRef.current += 1;
       setIsLoading(false);
       return;
     }
 
     void loadPlayback();
+    return () => {
+      latestLoadRequestRef.current += 1;
+    };
+  }, [enabled, options.rotationPreview, options.settings]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      options.settings !== undefined ||
+      options.rotationPreview !== undefined
+    ) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      void loadPlayback();
+    }, DISPLAY_RUNTIME_REFRESH_MS);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
   }, [enabled, options.rotationPreview, options.settings]);
 
   useEffect(() => {
@@ -298,6 +464,39 @@ export function usePlaybackController(
       }
 
       const nowMs = Date.now();
+      const pendingUpdate = pendingRuntimeUpdateRef.current;
+      if (pendingUpdate) {
+        const boundaryRuntime = resolveSafePlaybackBoundaryRuntime({
+          current: currentRuntime,
+          nextPages: pendingUpdate.response.preview.playablePages,
+          nowMs,
+          plan: pendingUpdate.plan,
+          settings: pendingUpdate.response.settings
+        });
+
+        if (boundaryRuntime) {
+          const nextPages = pendingUpdate.response.preview.playablePages;
+          const nextSettings = pendingUpdate.response.settings;
+          pendingRuntimeUpdateRef.current = null;
+          appliedRuntimeIdentityRef.current = pendingUpdate.identity;
+          settingsRef.current = nextSettings;
+          pagesRef.current = nextPages;
+          runtimeRef.current = boundaryRuntime;
+          startTransition(() => {
+            setSettings(nextSettings);
+            setPages(nextPages);
+            setFallbackRoute(pendingUpdate.response.preview.fallbackRoute);
+            setRotationPreview(pendingUpdate.response.preview);
+            setRuntime(boundaryRuntime);
+            setDisplayClientContext(pendingUpdate.response.context);
+            setEffectiveRotationRevision(
+              pendingUpdate.response.effectiveRotationRevision
+            );
+          });
+          return;
+        }
+      }
+
       const nextRuntime = resolvePlaybackRuntimeTick({
         current: currentRuntime,
         elapsedMs: nowMs - runtimeTickStartedAtRef.current,
@@ -474,6 +673,8 @@ export function usePlaybackController(
   return {
     countdown,
     currentPage,
+    displayClientContext,
+    effectiveRotationRevision,
     errorMessage,
     fallbackRoute,
     isIdle: runtime?.isIdle ?? false,

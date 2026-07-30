@@ -60,7 +60,9 @@ export function readDefaultPlaybackProfileId() {
   return row.id;
 }
 
-export function readDefaultPlaybackSettingsRow(): PlaybackProfileSettingsRow {
+export function readPlaybackProfileSettingsRow(
+  profileId: number
+): PlaybackProfileSettingsRow {
   const row = getDatabase()
     .prepare(
       `
@@ -78,18 +80,32 @@ export function readDefaultPlaybackSettingsRow(): PlaybackProfileSettingsRow {
           settings.start_page,
           settings.updated_at
         FROM playback_profile_settings AS settings
-        INNER JOIN playback_profiles AS profile ON profile.id = settings.profile_id
-        WHERE profile.profile_key = ? AND profile.is_default = 1
+        WHERE settings.profile_id = ?
         LIMIT 1
       `
     )
-    .get(DEFAULT_PLAYBACK_PROFILE_KEY) as PlaybackProfileSettingsRow | undefined;
+    .get(profileId) as PlaybackProfileSettingsRow | undefined;
 
   if (!row) {
-    throw new Error("Default Playback Profile settings are not initialized");
+    throw new Error(`Playback Profile settings are not initialized: ${profileId}`);
   }
 
   return row;
+}
+
+export function readDefaultPlaybackSettingsRow(): PlaybackProfileSettingsRow {
+  try {
+    return readPlaybackProfileSettingsRow(readDefaultPlaybackProfileId());
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      (!error.message.startsWith("Default Playback Profile is not initialized") &&
+        !error.message.startsWith("Playback Profile settings are not initialized"))
+    ) {
+      throw error;
+    }
+    throw new Error("Default Playback Profile settings are not initialized");
+  }
 }
 
 export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSettingsWrite) {
@@ -133,9 +149,10 @@ export function writeDefaultPlaybackSettingsRow(settings: PlaybackProfileSetting
   }
 }
 
-export function readDefaultPlaybackPageRows(options: { includeArchived?: boolean } = {}) {
-  const defaultProfileId = readDefaultPlaybackProfileId();
-
+export function readPlaybackProfilePageRows(
+  profileId: number,
+  options: { includeArchived?: boolean } = {}
+) {
   return getDatabase()
     .prepare(
       `
@@ -158,7 +175,11 @@ export function readDefaultPlaybackPageRows(options: { includeArchived?: boolean
         ORDER BY profile_page.display_order ASC, registry.id ASC
       `
     )
-    .all(defaultProfileId, options.includeArchived ? 1 : 0) as PlaybackProfilePageRow[];
+    .all(profileId, options.includeArchived ? 1 : 0) as PlaybackProfilePageRow[];
+}
+
+export function readDefaultPlaybackPageRows(options: { includeArchived?: boolean } = {}) {
+  return readPlaybackProfilePageRows(readDefaultPlaybackProfileId(), options);
 }
 
 export function readDefaultPlaybackPageState(pageKey: string) {

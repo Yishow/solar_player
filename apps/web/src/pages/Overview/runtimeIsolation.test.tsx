@@ -58,6 +58,7 @@ test("overview runtime output stays stable when an unrelated metric changes", ()
 
   const before = renderToStaticMarkup(
     <OverviewRuntimeContent
+      allowUnscopedMetrics
       resolvedConfig={resolvedConfig}
       resolvedWeatherSnapshot={undefined}
       seedConfig={seedConfig}
@@ -79,6 +80,7 @@ test("overview runtime output stays stable when an unrelated metric changes", ()
 
   const after = renderToStaticMarkup(
     <OverviewRuntimeContent
+      allowUnscopedMetrics
       resolvedConfig={resolvedConfig}
       resolvedWeatherSnapshot={undefined}
       seedConfig={seedConfig}

@@ -1,4 +1,5 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
+import type { SiteScope } from "./deviceIdentity.js";
 
 export const displayCircuitSlotKeys = [
   "stamping",
@@ -192,3 +193,45 @@ export const displayReadinessRequirements: DisplayRequirementDescriptor[] = [
   ...displayMetricRequirements,
   ...displaySlotRequirements
 ];
+
+export function resolveDisplayReadinessRequirementsForSite(
+  siteScope: SiteScope
+): DisplayRequirementDescriptor[] {
+  const factoryPageId =
+    siteScope === "cl" ? "factory-circuit" : "factory-circuit-guanyin";
+  const generationPrefix = `factoryGeneration.${siteScope}.`;
+  const unscopedRequirementKeys = new Set([
+    "annualEnergySavingPercent",
+    "realTimePower",
+    "selfConsumptionRatio",
+    "systemEfficiency"
+  ]);
+
+  return displayReadinessRequirements
+    .filter(
+      (requirement) =>
+        !unscopedRequirementKeys.has(requirement.requirementKey) &&
+        (!isFactoryCircuitPageKey(requirement.pageId) ||
+          requirement.pageId === factoryPageId)
+    )
+    .map((requirement) => {
+      if (!requirement.dependencyKeys) {
+        return requirement;
+      }
+
+      return {
+        ...requirement,
+        dependencyKeys: factoryGenerationDerivedRequirementKeys.includes(
+          requirement.requirementKey
+        )
+          ? factoryGenerationDependencyKeys.filter((metricKey) =>
+              metricKey.startsWith(generationPrefix)
+            )
+          : requirement.dependencyKeys.filter(
+              (metricKey) =>
+                !factoryGenerationDependencyKeys.includes(metricKey) ||
+                metricKey.startsWith(generationPrefix)
+            )
+      };
+    });
+}
