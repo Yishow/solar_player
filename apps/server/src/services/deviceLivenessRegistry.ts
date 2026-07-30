@@ -26,11 +26,15 @@ type DeviceRecord = {
   identity: DisplayClientContext;
   isIdle: boolean;
   isPlaying: boolean;
+  appliedVersion: number | null;
+  desiredVersion: number | null;
   lastSeenAt: string;
   multiSourceSince: string | null;
   pageKey: string | null;
   route: string;
+  profileUpdateError: string | null;
   timeSyncState: DisplayClientHeartbeat["timeSyncState"];
+  updateState: DisplayClientHeartbeat["updateState"];
   viewport: {
     height: number;
     width: number;
@@ -78,16 +82,20 @@ export class DeviceLivenessRegistry {
     const connectedAt = this.now().toISOString();
     const device = this.devices.get(args.identity.deviceId) ?? {
       connections: new Map<string, DeviceConnection>(),
+      appliedVersion: null,
       duplicateDetectedAt: null,
       duplicateEpisodeDetected: false,
+      desiredVersion: null,
       identity: args.identity,
       isIdle: false,
       isPlaying: false,
       lastSeenAt: connectedAt,
       multiSourceSince: null,
       pageKey: null,
+      profileUpdateError: null,
       route: "/",
       timeSyncState: "waiting",
+      updateState: "waiting",
       viewport: {
         height: 0,
         width: 0
@@ -129,10 +137,14 @@ export class DeviceLivenessRegistry {
       device.identity = identity;
     }
     device.isPlaying = payload.isPlaying;
+    device.appliedVersion = payload.appliedVersion;
+    device.desiredVersion = payload.desiredVersion;
     device.lastSeenAt = heartbeatAt;
     device.pageKey = payload.pageKey;
     device.route = payload.route;
+    device.profileUpdateError = payload.updateError ?? null;
     device.timeSyncState = payload.timeSyncState;
+    device.updateState = payload.updateState;
     return true;
   }
 
@@ -206,20 +218,24 @@ export class DeviceLivenessRegistry {
 
     return {
       clientId: device.identity.clientId,
+      appliedVersion: device.appliedVersion,
       connectedCount: device.connections.size,
       deviceId: device.identity.deviceId,
       duplicateDetectedAt: device.duplicateDetectedAt,
       duplicateIdentity,
+      desiredVersion: device.desiredVersion,
       groupId: device.identity.groupId,
       isIdle: device.isIdle,
       isPlaying: device.isPlaying,
       lastSeenAt: device.lastSeenAt,
       pageKey: device.pageKey,
       profileId: device.identity.profileId,
+      profileUpdateError: device.profileUpdateError,
       route: device.route,
       siteScope: device.identity.siteScope,
       sourceStatus,
       timeSyncState: device.timeSyncState,
+      updateState: device.updateState,
       viewport: device.viewport
     };
   }

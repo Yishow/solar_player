@@ -21,10 +21,14 @@ function createLoopOptions(
     emitImmediately: false,
     intervalMs: DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS,
     payloadFactory: () => ({
+      appliedVersion: 1,
+      desiredVersion: 1,
       isPlaying: true,
       pageKey: "overview",
       route: "/overview",
-      timeSyncState: "synced"
+      timeSyncState: "synced",
+      updateError: null,
+      updateState: "applied"
     }),
     ...overrides
   };
@@ -33,17 +37,25 @@ function createLoopOptions(
 test("buildDisplayClientHeartbeatPayload reports playback and Time Sync State", () => {
   assert.deepEqual(
     buildDisplayClientHeartbeatPayload({
+      appliedVersion: 1,
+      desiredVersion: 2,
       isIdle: false,
       isPlaying: true,
       pageKey: "overview",
       route: "/overview",
-      timeSyncState: "stale"
+      timeSyncState: "stale",
+      updateError: null,
+      updateState: "waiting"
     }),
     {
+      appliedVersion: 1,
+      desiredVersion: 2,
       isPlaying: true,
       pageKey: "overview",
       route: "/overview",
-      timeSyncState: "stale"
+      timeSyncState: "stale",
+      updateError: null,
+      updateState: "waiting"
     }
   );
 });
@@ -84,10 +96,14 @@ test("startDisplayClientHeartbeatLoop emits immediately when the playback page c
       },
       emitImmediately: true,
       payloadFactory: () => ({
+        appliedVersion: 1,
+        desiredVersion: 2,
         isPlaying: true,
         pageKey: "solar",
         route: "/solar",
-        timeSyncState: "time-untrusted"
+        timeSyncState: "time-untrusted",
+        updateError: null,
+        updateState: "waiting"
       })
     })
   );
@@ -103,6 +119,29 @@ test("startDisplayClientHeartbeatLoop stays quiet while disconnected", () => {
   const cleanup = startDisplayClientHeartbeatLoop(
     createLoopOptions({
       connected: false,
+      emitHeartbeat(payload) {
+        emitted.push(payload);
+      },
+      emitImmediately: true,
+      scheduleInterval(callback, ms) {
+        scheduled.push({ callback, ms });
+        return scheduled.length;
+      }
+    })
+  );
+
+  assert.deepEqual(emitted, []);
+  assert.deepEqual(scheduled, []);
+  cleanup();
+});
+
+test("startDisplayClientHeartbeatLoop stays quiet until Profile rollout is hydrated", () => {
+  const scheduled: ScheduledTimer[] = [];
+  const emitted: unknown[] = [];
+
+  const cleanup = startDisplayClientHeartbeatLoop(
+    createLoopOptions({
+      enabled: false,
       emitHeartbeat(payload) {
         emitted.push(payload);
       },

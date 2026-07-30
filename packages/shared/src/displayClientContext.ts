@@ -1,6 +1,7 @@
 import type { SiteScope } from "./deviceIdentity.js";
 import type { DisplayRotationPreview } from "./displayRotation.js";
 import type { PlaybackSettings } from "./types.js";
+import type { DeviceProfileRolloutSnapshot } from "./deviceProfileRollout.js";
 
 export type DisplayClientContext = {
   clientId: string;
@@ -25,5 +26,6 @@ export type DisplayPlaybackRuntimeResponse = {
   context: DisplayClientContext;
   effectiveRotationRevision: string;
   preview: DisplayRotationPreview;
+  profileRollout: DeviceProfileRolloutSnapshot;
   settings: PlaybackSettings;
 };

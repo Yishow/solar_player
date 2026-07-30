@@ -17,10 +17,14 @@ function heartbeat(
   timeSyncState: "stale" | "synced" | "time-untrusted" | "waiting" = "synced"
 ) {
   return {
+    appliedVersion: 1,
+    desiredVersion: 1,
     isPlaying,
     pageKey: route.slice(1),
     route,
-    timeSyncState
+    timeSyncState,
+    updateError: null,
+    updateState: "applied" as const
   };
 }
 

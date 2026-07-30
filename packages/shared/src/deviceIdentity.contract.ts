@@ -22,6 +22,7 @@ const playbackProfile = {
 } satisfies PlaybackProfileSummary;
 
 const group = {
+  desiredVersion: null,
   enabled: true,
   id: 2,
   name: "Lobby CL",
@@ -31,13 +32,16 @@ const group = {
 } satisfies DeviceGroup;
 
 const device = {
+  appliedVersion: null,
   clientId: "lobby-cl-01",
   displayName: "Lobby display",
   enabled: true,
   group,
   groupId: group.id,
   id: 3,
-  paired: false
+  paired: false,
+  profileUpdateError: null,
+  profileUpdateState: "waiting"
 } satisfies Device;
 
 const disabledDevice = {

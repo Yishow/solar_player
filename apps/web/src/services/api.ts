@@ -251,6 +251,15 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
   return (await response.json()) as T;
 }
 
+let playbackRuntimeCache: {
+  etag: string;
+  value: DisplayPlaybackRuntimeResponse;
+} | null = null;
+
+export function resetPlaybackRuntimeCacheForTest() {
+  playbackRuntimeCache = null;
+}
+
 export async function getPlaybackSettings() {
   const response = await requestJson<{
     settings: PlaybackSettings;
@@ -453,7 +462,30 @@ export async function issueDevicePairingToken(deviceId: number) {
 }
 
 export async function getPlaybackRuntime() {
-  return requestJson<DisplayPlaybackRuntimeResponse>("/api/playback/runtime");
+  const headers = new Headers();
+  if (playbackRuntimeCache) {
+    headers.set("If-None-Match", playbackRuntimeCache.etag);
+  }
+  const response = await fetch(buildApiUrl("/api/playback/runtime"), {
+    headers
+  });
+  if (response.status === 304 && playbackRuntimeCache) {
+    return playbackRuntimeCache.value;
+  }
+  if (!response.ok) {
+    const rawBody = await response.text();
+    const parsedBody = rawBody ? parseErrorBody(rawBody) : null;
+    const message = rawBody
+      ? extractErrorMessage(rawBody)
+      : `Request failed with status ${response.status}`;
+    throw new ApiRequestError(message, response.status, parsedBody);
+  }
+  const value = await response.json() as DisplayPlaybackRuntimeResponse;
+  const etag = response.headers.get("etag");
+  if (etag) {
+    playbackRuntimeCache = { etag, value };
+  }
+  return value;
 }
 
 export async function getDisplayCardData() {

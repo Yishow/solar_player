@@ -20,10 +20,12 @@ export type DeviceFleetOperationalState =
   | "unpaired";
 
 export type DeviceFleetRow = {
+  appliedVersion: number | null;
   clientId: string;
   connectedCount: number;
   displayName: string;
   duplicateIdentity: boolean;
+  desiredVersion: number | null;
   enabled: boolean;
   groupId: number | null;
   groupName: string | null;
@@ -36,6 +38,8 @@ export type DeviceFleetRow = {
   paired: boolean;
   pairingAction: "pair" | "re-pair";
   route: string | null;
+  rolloutState: "applied" | "failed" | "offline" | "waiting";
+  rolloutError: string | null;
   siteScope: DeviceGroup["siteScope"] | null;
 };
 
@@ -71,6 +75,23 @@ function resolveOperationalState(
   return liveness?.state ?? "offline";
 }
 
+function resolveRolloutState(
+  device: Device,
+  liveness: DisplayClientLivenessSnapshot["clients"][number] | undefined,
+  livenessUnavailable: boolean
+): DeviceFleetRow["rolloutState"] {
+  if (!liveness && !livenessUnavailable) return "offline";
+  const updateState = liveness?.updateState ?? device.profileUpdateState;
+  if (updateState === "failed") return "failed";
+  const desiredVersion =
+    liveness?.desiredVersion ?? device.group?.desiredVersion ?? null;
+  const appliedVersion =
+    liveness?.appliedVersion ?? device.appliedVersion;
+  return updateState === "applied" && appliedVersion === desiredVersion
+    ? "applied"
+    : "waiting";
+}
+
 export function buildDeviceFleetViewModel(args: {
   devices: Device[];
   filter: string;
@@ -93,11 +114,16 @@ export function buildDeviceFleetViewModel(args: {
     })
     .map((device) => {
       const liveness = livenessByDeviceId.get(device.id);
+      const livenessUnavailable = args.unavailable.includes("liveness");
       return {
+        appliedVersion:
+          liveness?.appliedVersion ?? device.appliedVersion,
         clientId: device.clientId,
         connectedCount: liveness?.connectedCount ?? 0,
         displayName: device.displayName,
         duplicateIdentity: liveness?.duplicateIdentity ?? false,
+        desiredVersion:
+          liveness?.desiredVersion ?? device.group?.desiredVersion ?? null,
         enabled: device.enabled,
         groupId: device.groupId,
         groupName: device.group?.name ?? null,
@@ -108,18 +134,37 @@ export function buildDeviceFleetViewModel(args: {
         operationalState: resolveOperationalState(
           device,
           liveness,
-          args.unavailable.includes("liveness")
+          livenessUnavailable
         ),
         pageKey: liveness?.pageKey ?? null,
         paired: device.paired,
         pairingAction: device.paired ? "re-pair" : "pair",
         route: liveness?.route ?? null,
+        rolloutError:
+          liveness?.profileUpdateError ?? device.profileUpdateError,
+        rolloutState:
+          liveness?.state === "offline"
+            ? "offline"
+            : resolveRolloutState(device, liveness, livenessUnavailable),
         siteScope: device.group?.siteScope ?? null
       };
     });
 
+  const rolloutSummary = rows.reduce((summary, row) => {
+    summary[row.rolloutState] += 1;
+    summary.total += 1;
+    return summary;
+  }, {
+    applied: 0,
+    failed: 0,
+    offline: 0,
+    total: 0,
+    waiting: 0
+  });
+
   return {
     groups: args.groups,
+    rolloutSummary,
     rows,
     state: args.loading ? "loading" as const : rows.length === 0 ? "empty" as const : "ready" as const,
     unavailable: args.unavailable

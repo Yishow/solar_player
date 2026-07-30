@@ -11,6 +11,7 @@ import {
   fetchImagePlaylist,
   fetchImagePlaylistGovernance,
   fetchSustainabilityStory,
+  getPlaybackRuntime,
   getPlaybackProfiles,
   getDeviceLogs,
   isPlaybackProfileDraftConflictError,
@@ -24,9 +25,60 @@ import {
   updateDisplayPageConfig,
   updateImagePlaylistSettings,
   requestJson,
+  resetPlaybackRuntimeCacheForTest,
   savePlaybackProfileDraft
 } from "./api";
 import { buildRuntimeApiUrl } from "./runtimeOrigin";
+
+test("getPlaybackRuntime reuses the cached payload after an ETag 304", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Headers[] = [];
+  const payload = {
+    context: { contextRevision: "ctx-1" },
+    effectiveRotationRevision: "rotation-1",
+    preview: {
+      evaluatedAt: "2026-07-30T00:00:00.000Z",
+      fallbackRoute: null,
+      playablePages: [],
+      skippedPages: []
+    },
+    profileRollout: {
+      appliedVersion: null,
+      desired: null,
+      desiredVersion: null,
+      lastError: null,
+      updatedAt: null,
+      updateState: "waiting"
+    },
+    settings: {}
+  } as never;
+  resetPlaybackRuntimeCacheForTest();
+  globalThis.fetch = async (_input, init) => {
+    const headers = new Headers(init?.headers);
+    calls.push(headers);
+    return calls.length === 1
+      ? new Response(JSON.stringify(payload), {
+          headers: {
+            "content-type": "application/json",
+            etag: "\"runtime-1\""
+          },
+          status: 200
+        })
+      : new Response(null, { status: 304 });
+  };
+
+  try {
+    const first = await getPlaybackRuntime();
+    const second = await getPlaybackRuntime();
+    assert.deepEqual(first, payload);
+    assert.equal(second, first);
+    assert.equal(calls[0]?.has("if-none-match"), false);
+    assert.equal(calls[1]?.get("if-none-match"), "\"runtime-1\"");
+  } finally {
+    resetPlaybackRuntimeCacheForTest();
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("buildRuntimeApiUrl keeps Vite dev browser requests same-origin", () => {
   assert.equal(

@@ -93,6 +93,37 @@ async function createPairedDevice(
   return { credential, deviceId, groupId };
 }
 
+test("formal playback runtime returns 304 for an unchanged ETag", async () => {
+  const app = await buildApp();
+
+  try {
+    const paired = await createPairedDevice(app, "cl", "etag");
+    const first = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
+      method: "GET",
+      url: "/api/playback/runtime"
+    });
+    const etag = first.headers.etag;
+    assert.equal(first.statusCode, 200);
+    assert.ok(etag);
+    assert.equal(first.headers["cache-control"], "private, no-cache");
+    assert.equal(first.headers.vary, "Cookie");
+
+    const unchanged = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
+      headers: { "if-none-match": etag },
+      method: "GET",
+      url: "/api/playback/runtime"
+    });
+    assert.equal(unchanged.statusCode, 304);
+    assert.equal(unchanged.body, "");
+    assert.equal(unchanged.headers["cache-control"], "private, no-cache");
+    assert.equal(unchanged.headers.vary, "Cookie");
+  } finally {
+    await app.close();
+  }
+});
+
 function seedFactoryGenerationSources() {
   const database = getDatabase();
   const timestamp = new Date().toISOString();

@@ -12,6 +12,7 @@ import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readDeviceCredentialCookie } from "../plugins/deviceContext.js";
 import { DeviceLivenessRegistry } from "../services/deviceLivenessRegistry.js";
 import { resolveDisplayClientContext } from "../services/displayClientContextService.js";
+import { recordDeviceProfileRolloutHeartbeat } from "../services/deviceProfileRolloutService.js";
 import { createServerTimeSignal } from "./serverTimeSignal.js";
 
 export type MqttStatus = {
@@ -76,6 +77,7 @@ type SocketServiceOptions = {
   io?: SocketServerLike;
   logger: LoggerLike;
   now?: () => Date;
+  recordDeviceProfileRolloutHeartbeat?: typeof recordDeviceProfileRolloutHeartbeat;
   resolveDisplayClientContext?: (credential: unknown) => DisplayClientContext;
   server?: HttpServer;
 };
@@ -93,6 +95,34 @@ function isDisplayClientHeartbeat(payload: unknown): payload is DisplayClientHea
     return false;
   }
   if (typeof candidate.isPlaying !== "boolean") {
+    return false;
+  }
+  if (
+    !(
+      candidate.desiredVersion === null
+      || (
+        Number.isInteger(candidate.desiredVersion)
+        && (candidate.desiredVersion as number) > 0
+      )
+    )
+    || !(
+      candidate.appliedVersion === null
+      || (
+        Number.isInteger(candidate.appliedVersion)
+        && (candidate.appliedVersion as number) > 0
+      )
+    )
+    || !(
+      candidate.updateState === "waiting"
+      || candidate.updateState === "applied"
+      || candidate.updateState === "failed"
+    )
+    || !(
+      candidate.updateError === undefined
+      || candidate.updateError === null
+      || typeof candidate.updateError === "string"
+    )
+  ) {
     return false;
   }
   return (
@@ -128,6 +158,7 @@ export class SocketService {
   private readonly classifySession;
   private readonly logger: LoggerLike;
   private readonly now: () => Date;
+  private readonly recordDeviceProfileRolloutHeartbeat;
   private readonly authenticatedSocketIdentities =
     new WeakMap<SocketClientLike, DisplayClientContext>();
   private readonly displayClientRegistry: DeviceLivenessRegistry;
@@ -140,6 +171,16 @@ export class SocketService {
     this.classifySession = options.classifySession;
     this.logger = options.logger;
     this.now = options.now ?? (() => new Date());
+    this.recordDeviceProfileRolloutHeartbeat =
+      options.recordDeviceProfileRolloutHeartbeat
+      ?? ((_deviceId, heartbeat) => ({
+        appliedVersion: heartbeat.appliedVersion,
+        desired: null,
+        desiredVersion: heartbeat.desiredVersion,
+        lastError: heartbeat.updateError ?? null,
+        updatedAt: null,
+        updateState: heartbeat.updateState
+      }));
     this.displayClientRegistry = new DeviceLivenessRegistry({
       now: this.now
     });
@@ -285,11 +326,28 @@ export class SocketService {
           return;
         }
 
-        this.displayClientRegistry.heartbeat(
-          heartbeatSocketId,
-          payload,
-          identity ?? undefined
-        );
+        try {
+          const rollout = this.recordDeviceProfileRolloutHeartbeat(
+            authenticatedDeviceId,
+            payload
+          );
+          this.displayClientRegistry.heartbeat(
+            heartbeatSocketId,
+            {
+              ...payload,
+              appliedVersion: rollout.appliedVersion,
+              desiredVersion: rollout.desiredVersion,
+              updateError: rollout.lastError,
+              updateState: rollout.updateState
+            },
+            identity ?? undefined
+          );
+        } catch (error) {
+          this.logger.warn(
+            { error, socketId: heartbeatSocketId },
+            "Ignored invalid Profile rollout heartbeat state"
+          );
+        }
       });
 
       socket.on?.("disconnect", () => {

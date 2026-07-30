@@ -6,6 +6,7 @@ import type {
 import { getDatabase } from "../db/index.js";
 
 type DeviceGroupRow = {
+  desired_profile_version_id: number | null;
   enabled: number;
   id: number;
   name: string;
@@ -17,7 +18,9 @@ type DeviceGroupRow = {
 };
 
 type DeviceRow = {
+  applied_profile_version_id: number | null;
   client_id: string;
+  desired_profile_version_id: number | null;
   display_name: string;
   enabled: number;
   group_enabled: number | null;
@@ -30,6 +33,8 @@ type DeviceRow = {
   profile_is_default: number | null;
   profile_key: string | null;
   profile_name: string | null;
+  profile_update_error: string | null;
+  profile_update_state: "waiting" | "applied" | "failed";
 };
 
 type ServiceErrorCode =
@@ -66,6 +71,7 @@ const GROUP_SELECT = `
     groups.enabled,
     groups.site_scope,
     groups.playback_profile_id,
+    groups.desired_profile_version_id,
     profiles.profile_key,
     profiles.name AS profile_name,
     profiles.is_default AS profile_is_default
@@ -84,6 +90,10 @@ const DEVICE_SELECT = `
     groups.enabled AS group_enabled,
     groups.site_scope AS group_site_scope,
     groups.playback_profile_id AS group_playback_profile_id,
+    groups.desired_profile_version_id,
+    devices.applied_profile_version_id,
+    devices.profile_update_state,
+    devices.profile_update_error,
     profiles.profile_key,
     profiles.name AS profile_name,
     profiles.is_default AS profile_is_default,
@@ -149,6 +159,7 @@ function normalizeNullableId(value: unknown, fieldName: string): number | null {
 
 function serializeGroup(row: DeviceGroupRow): DeviceGroup {
   return {
+    desiredVersion: row.desired_profile_version_id,
     enabled: row.enabled === 1,
     id: row.id,
     name: row.name,
@@ -168,6 +179,7 @@ function serializeDevice(row: DeviceRow): Device {
     row.group_id === null
       ? null
       : serializeGroup({
+          desired_profile_version_id: row.desired_profile_version_id,
           enabled: row.group_enabled!,
           id: row.group_id,
           name: row.group_name!,
@@ -179,13 +191,16 @@ function serializeDevice(row: DeviceRow): Device {
         });
 
   return {
+    appliedVersion: row.applied_profile_version_id,
     clientId: row.client_id,
     displayName: row.display_name,
     enabled: row.enabled === 1,
     group,
     groupId: row.group_id,
     id: row.id,
-    paired: row.paired === 1
+    paired: row.paired === 1,
+    profileUpdateError: row.profile_update_error,
+    profileUpdateState: row.profile_update_state
   };
 }
 
@@ -296,10 +311,21 @@ export function createDeviceGroup(input: {
       const result = database
         .prepare(
           `INSERT INTO device_groups (
-             name, enabled, site_scope, playback_profile_id, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+             name, enabled, site_scope, playback_profile_id,
+             desired_profile_version_id, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, (
+             SELECT id FROM playback_profile_versions
+             WHERE profile_id = ?
+             ORDER BY version_number DESC LIMIT 1
+           ), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
         )
-        .run(name, enabled ? 1 : 0, siteScope, playbackProfileId);
+        .run(
+          name,
+          enabled ? 1 : 0,
+          siteScope,
+          playbackProfileId,
+          playbackProfileId
+        );
 
       return readDeviceGroup(Number(result.lastInsertRowid));
     })();
@@ -349,10 +375,22 @@ export function updateDeviceGroup(
         .prepare(
           `UPDATE device_groups
            SET name = ?, enabled = ?, site_scope = ?, playback_profile_id = ?,
+               desired_profile_version_id = (
+                 SELECT id FROM playback_profile_versions
+                 WHERE profile_id = ?
+                 ORDER BY version_number DESC LIMIT 1
+               ),
                updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`
         )
-        .run(name, enabled ? 1 : 0, siteScope, playbackProfileId, id);
+        .run(
+          name,
+          enabled ? 1 : 0,
+          siteScope,
+          playbackProfileId,
+          playbackProfileId,
+          id
+        );
 
       return readDeviceGroup(id);
     })();

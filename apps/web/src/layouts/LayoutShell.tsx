@@ -69,10 +69,15 @@ export function LayoutShell({
   });
   routeChangeHandlerRef.current = transition.onRouteChange;
   useDisplayClientHeartbeat({
+    appliedVersion: controller.appliedVersion,
+    desiredVersion: controller.desiredVersion,
     isIdle: controller.isIdle,
     isPlaying: controller.isPlaying,
     pageKey: controller.currentPage?.pageKey ?? null,
-    route: location.pathname
+    rolloutReady: controller.profileRolloutHydrated,
+    route: location.pathname,
+    updateError: controller.profileUpdateError,
+    updateState: controller.profileUpdateState
   });
   usePlaybackWatchdog({
     currentPageKey: controller.currentPage?.pageKey ?? null,

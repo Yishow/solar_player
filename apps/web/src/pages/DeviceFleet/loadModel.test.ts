@@ -8,6 +8,7 @@ import {
 
 test("loadDeviceFleetModel preserves successful resources when one request fails", async () => {
   const groups = [{
+    desiredVersion: 1,
     enabled: true,
     id: 7,
     name: "CL Lobby",

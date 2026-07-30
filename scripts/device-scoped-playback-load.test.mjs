@@ -11,27 +11,43 @@ import {
 
 test("threshold evaluation fails closed when a required metric is missing or exceeds its bound", () => {
   const missing = evaluateAcceptanceThresholds({
+    boundaryWaitMs: 5_000,
+    browserClients: 1,
+    browserConditionalHits: 1,
     clients: 50,
+    conditionalHits: 50,
     durationMs: 600_000,
     heartbeats: 3_000,
     peakConnections: 50,
     reconnects: 5,
+    reloads: 0,
+    rolloutApplied: 50,
+    rolloutWaiting: 50,
     rotationEvaluations: null,
+    runtimeFetches: 100,
     timeSignals: 1_050
   });
   assert.deepEqual(missing, ["rotationEvaluations metric unavailable"]);
 
   const excessive = evaluateAcceptanceThresholds({
+    boundaryWaitMs: 5_000,
+    browserClients: 1,
+    browserConditionalHits: 1,
     clients: 50,
+    conditionalHits: 50,
     durationMs: 600_000,
-    heartbeats: 3_051,
+    heartbeats: 3_151,
     peakConnections: 51,
     reconnects: 5,
+    reloads: 0,
+    rolloutApplied: 50,
+    rolloutWaiting: 50,
     rotationEvaluations: 3,
+    runtimeFetches: 100,
     timeSignals: 1_056
   });
   assert.deepEqual(excessive, [
-    "heartbeats 3051 exceed 3050",
+    "heartbeats 3151 exceed 3150",
     "timeSignals 1056 exceed 1055",
     "rotationEvaluations 3 exceed 2",
     "peakConnections 51 exceed 50"
@@ -41,12 +57,20 @@ test("threshold evaluation fails closed when a required metric is missing or exc
 test("threshold evaluation rejects zero-work counters", () => {
   assert.deepEqual(
     evaluateAcceptanceThresholds({
+      boundaryWaitMs: 5_000,
+      browserClients: 1,
+      browserConditionalHits: 1,
       clients: 50,
+      conditionalHits: 50,
       durationMs: 600_000,
       heartbeats: 0,
       peakConnections: 0,
       reconnects: 5,
+      reloads: 0,
+      rolloutApplied: 50,
+      rolloutWaiting: 50,
       rotationEvaluations: 0,
+      runtimeFetches: 100,
       timeSignals: 0
     }),
     [
@@ -60,6 +84,15 @@ test("threshold evaluation rejects zero-work counters", () => {
 
 test("isolated harness exercises Management API → Pairing → Story/Rotation/Socket", async () => {
   const result = await runDeviceScopedPlaybackAcceptance({
+    browserRolloutProbe: async (_baseUrl, _device, _profileId) => ({
+      appliedOnServer: false,
+      boundaryWaitMs: 5_000,
+      browserClients: 1,
+      conditionalHits: 1,
+      desiredVersion: 1,
+      reloads: 0,
+      runtimeFetches: 2
+    }),
     clients: 2,
     durationMs: 200,
     reconnects: 1
@@ -67,7 +100,14 @@ test("isolated harness exercises Management API → Pairing → Story/Rotation/S
 
   assert.equal(result.clients, 2);
   assert.equal(result.failures, 0);
-  assert.equal(result.heartbeats, 2);
+  assert.equal(result.browserClients, 1);
+  assert.equal(result.browserConditionalHits >= 1, true);
+  assert.equal(result.boundaryWaitMs >= 5_000, true);
+  assert.equal(result.heartbeats, 6);
+  assert.equal(result.conditionalHits, 2);
+  assert.equal(result.rolloutWaiting, 2);
+  assert.equal(result.rolloutApplied, 2);
+  assert.equal(result.reloads, 0);
   assert.equal(result.timeSignals >= 3, true);
   assert.equal(result.rotationEvaluations, 2);
   assert.equal(result.peakConnections, 2);

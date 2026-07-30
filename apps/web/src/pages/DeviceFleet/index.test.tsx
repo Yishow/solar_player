@@ -8,10 +8,12 @@ import { DeviceFleetContent } from "./DeviceFleetContent";
 import type { DeviceFleetRow } from "./viewModel";
 
 const row: DeviceFleetRow = {
+  appliedVersion: 1,
   clientId: "cl-lobby-01",
   connectedCount: 2,
   displayName: "中壢大廳",
   duplicateIdentity: true,
+  desiredVersion: 1,
   enabled: true,
   groupId: 7,
   groupName: "CL Lobby",
@@ -24,6 +26,8 @@ const row: DeviceFleetRow = {
   paired: true,
   pairingAction: "re-pair",
   route: "/overview",
+  rolloutError: null,
+  rolloutState: "applied",
   siteScope: "cl"
 };
 
@@ -33,6 +37,13 @@ function createProps(overrides: Record<string, unknown> = {}) {
     filter: "",
     model: {
       groups: [],
+      rolloutSummary: {
+        applied: 1,
+        failed: 0,
+        offline: 0,
+        total: 1,
+        waiting: 0
+      },
       rows: [row],
       state: "ready" as const,
       unavailable: []

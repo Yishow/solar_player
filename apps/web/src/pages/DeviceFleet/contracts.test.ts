@@ -6,6 +6,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { JSDOM } from "jsdom";
 import type {
+  Device,
   DeviceGroup,
   DisplayClientLivenessSnapshot
 } from "@solar-display/shared";
@@ -40,6 +41,7 @@ const profile = {
 
 function createGroup(id: number): DeviceGroup {
   return {
+    desiredVersion: 1,
     enabled: true,
     id,
     name: `Group ${id}`,
@@ -51,6 +53,7 @@ function createGroup(id: number): DeviceGroup {
 
 function createRow(overrides: Partial<DeviceFleetRow> = {}): DeviceFleetRow {
   return {
+    appliedVersion: 1,
     clientId: "cl-lobby-01",
     connectedCount: 1,
     displayName: "中壢大廳",
@@ -65,6 +68,9 @@ function createRow(overrides: Partial<DeviceFleetRow> = {}): DeviceFleetRow {
     operationalState: "online",
     pageKey: "overview",
     paired: true,
+    rolloutError: null,
+    rolloutState: "applied",
+    desiredVersion: 1,
     pairingAction: "re-pair",
     route: "/overview",
     siteScope: "cl",
@@ -80,6 +86,13 @@ function createContentProps(
     filter: "",
     model: {
       groups: [],
+      rolloutSummary: {
+        applied: 1,
+        failed: 0,
+        offline: 0,
+        total: 1,
+        waiting: 0
+      },
       rows: [createRow()],
       state: "ready",
       unavailable: []
@@ -167,82 +180,102 @@ test("Device Fleet contract keeps Device, Group, and pairing mutations on truste
 
 test("Device Fleet contract keeps disabled, unpaired, offline, stale, and duplicate states explicit", () => {
   const group = createGroup(1);
-  const devices = [
+  const devices: Device[] = [
     {
+      appliedVersion: 1,
       clientId: "disabled",
       displayName: "Disabled",
       enabled: false,
       group,
       groupId: group.id,
       id: 1,
-      paired: true
+      paired: true,
+      profileUpdateError: null,
+      profileUpdateState: "applied"
     },
     {
+      appliedVersion: 1,
       clientId: "unpaired",
       displayName: "Unpaired",
       enabled: true,
       group,
       groupId: group.id,
       id: 2,
-      paired: false
+      paired: false,
+      profileUpdateError: null,
+      profileUpdateState: "applied"
     },
     {
+      appliedVersion: 1,
       clientId: "offline",
       displayName: "Offline",
       enabled: true,
       group,
       groupId: group.id,
       id: 3,
-      paired: true
+      paired: true,
+      profileUpdateError: null,
+      profileUpdateState: "applied"
     },
     {
+      appliedVersion: 1,
       clientId: "stale-duplicate",
       displayName: "Stale Duplicate",
       enabled: true,
       group,
       groupId: group.id,
       id: 4,
-      paired: true
+      paired: true,
+      profileUpdateError: null,
+      profileUpdateState: "applied"
     }
   ];
   const liveness: DisplayClientLivenessSnapshot = {
     clients: [
       {
+        appliedVersion: 1,
         clientId: "offline",
         connectedCount: 0,
         deviceId: 3,
         duplicateDetectedAt: null,
         duplicateIdentity: false,
+        desiredVersion: 1,
         groupId: group.id,
         isIdle: false,
         isPlaying: false,
         lastSeenAt: "2026-07-30T07:59:00.000Z",
         pageKey: null,
         profileId: profile.id,
+        profileUpdateError: null,
         route: "/",
         siteScope: "cl",
         sourceStatus: "source-unknown",
         state: "offline",
         timeSyncState: "waiting",
+        updateState: "applied",
         viewport: { height: 0, width: 0 }
       },
       {
+        appliedVersion: 1,
         clientId: "stale-duplicate",
         connectedCount: 2,
         deviceId: 4,
         duplicateDetectedAt: "2026-07-30T08:00:30.000Z",
         duplicateIdentity: true,
+        desiredVersion: 1,
         groupId: group.id,
         isIdle: false,
         isPlaying: true,
         lastSeenAt: "2026-07-30T08:00:00.000Z",
         pageKey: "solar",
         profileId: profile.id,
+        profileUpdateError: null,
         route: "/solar",
         siteScope: "cl",
         sourceStatus: "multi-source",
         state: "stale",
         timeSyncState: "stale",
+        updateState: "applied",
         viewport: { height: 1080, width: 1920 }
       }
     ],

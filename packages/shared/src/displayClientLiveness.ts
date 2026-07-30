@@ -1,10 +1,14 @@
 import type { DisplayClientContext } from "./displayClientContext.js";
 import type { TimeSyncState } from "./appTime.js";
+import type {
+  DeviceProfileRolloutHeartbeat,
+  ProfileUpdateState
+} from "./deviceProfileRollout.js";
 
 export const DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DISPLAY_CLIENT_STALENESS_WINDOW_SECONDS = 30;
 
-export type DisplayClientHeartbeat = {
+export type DisplayClientHeartbeat = DeviceProfileRolloutHeartbeat & {
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
@@ -30,6 +34,10 @@ export type DisplayClientLivenessEntry = {
   lastSeenAt: string;
   pageKey: string | null;
   profileId: number;
+  appliedVersion: number | null;
+  desiredVersion: number | null;
+  profileUpdateError: string | null;
+  updateState: ProfileUpdateState;
   route: string;
   siteScope: DisplayClientContext["siteScope"];
   sourceStatus: DisplayClientLivenessSourceStatus;
@@ -94,6 +102,9 @@ export function buildDisplayClientLivenessSnapshot(
       lastSeenAt: entry.lastSeenAt,
       pageKey: entry.pageKey,
       profileId: entry.profileId,
+      appliedVersion: entry.appliedVersion,
+      desiredVersion: entry.desiredVersion,
+      profileUpdateError: entry.profileUpdateError,
       route: entry.route,
       siteScope: entry.siteScope,
       sourceStatus: entry.sourceStatus,
@@ -103,6 +114,7 @@ export function buildDisplayClientLivenessSnapshot(
         now
       }),
       timeSyncState: entry.timeSyncState,
+      updateState: entry.updateState,
       viewport: entry.viewport
     }))
     .sort((left, right) => left.deviceId - right.deviceId);

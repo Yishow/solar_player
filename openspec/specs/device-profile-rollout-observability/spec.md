@@ -1,0 +1,771 @@
+# device-profile-rollout-observability Specification
+
+## Purpose
+
+TBD - created by archiving change 'device-profile-rollout-observability'. Update Purpose after archive.
+
+## Requirements
+
+### Requirement: Assign a Desired Version to target Groups
+
+Publishing a Profile Version SHALL assign that Version as desiredVersion to every enabled Group that references the Profile. The assignment SHALL NOT overwrite any Device's appliedVersion.
+
+#### Scenario: Publish to online and offline Devices
+
+- **WHEN** a Profile Version is published to a Group containing online and offline Devices
+- **THEN** the Group desiredVersion changes immediately
+- **AND** each Device retains its prior appliedVersion until it reports a successful application
+
+##### Example: Two Devices retain Version 7
+
+- **GIVEN** an enabled Group has one online Device and one offline Device, both appliedVersion=7
+- **WHEN** Version 8 is published for that Group's Profile
+- **THEN** the Group becomes desiredVersion=8
+- **AND** both Devices remain appliedVersion=7
+
+
+<!-- @trace
+source: device-profile-rollout-observability
+updated: 2026-07-30
+code:
+  - apps/web/src/pages/energyMonitoringState.ts
+  - apps/server/src/services/playbackProfileGovernanceService.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - apps/server/src/routes/display-story.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - deploy/install-thin-kiosk.sh
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/pages/DeviceFleet/index.tsx
+  - apps/web/src/components/AppHeader.tsx
+  - docs/architecture/device-scoped-multisite-playback.md
+  - docs/architecture/default-playback-profile.md
+  - apps/server/src/services/displayRotationService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/db/migrations/031_playback_profile_versions.sql
+  - .env.example
+  - packages/shared/src/appTime.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - docs/ops/delegation.md
+  - apps/server/src/routes/devices.ts
+  - deploy/verify-thin-kiosk.sh
+  - deploy/stop-solar-kiosk.sh
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - docs/ops/conventions.md
+  - apps/web/src/app/router.tsx
+  - scripts/fhd-witness-config.mjs
+  - scripts/device-scoped-playback-load.mjs
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/web/src/hooks/playbackRouteSync.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - packages/shared/src/deviceProfileRollout.ts
+  - apps/server/src/services/playbackProfileService.ts
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/web/src/pages/PlaybackProfiles/index.tsx
+  - packages/shared/src/deviceIdentity.contract.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - apps/web/src/hooks/usePlaybackWatchdog.ts
+  - packages/shared/src/displayClientContext.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.ts
+  - CLAUDE.md
+  - packages/shared/src/playbackProfileVersion.ts
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilesContent.tsx
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - packages/shared/src/deviceIdentity.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/config.ts
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - apps/server/src/services/displayClientContextService.ts
+  - docs/agents/issue-tracker.md
+  - packages/shared/src/displayClientLiveness.ts
+  - packages/shared/src/playback.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy.md
+  - apps/web/src/services/profileRollout.ts
+  - apps/server/src/fastify.ts
+  - apps/server/src/db/seed.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/services/api.ts
+  - apps/web/src/pages/EnergyHistory/index.tsx
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/services/displayReadinessService.ts
+  - .github/workflows/agent-source-artifact.yml
+  - docs/ops/workflow.md
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - docs/ops/judgment.md
+  - scripts/device-scoped-playback-load.test.mjs
+  - apps/web/src/hooks/useAppTime.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/services/appTime.ts
+  - docs/ops/dispatch.md
+  - apps/server/src/routes/playback-profiles.ts
+  - apps/web/src/pages/DeviceFleet/route.ts
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/services/deviceProfileRolloutService.ts
+  - apps/web/src/pages/PlaybackProfiles/playbackProfiles.css
+  - docs/ops/device-pairing-and-recovery.md
+  - apps/server/src/app.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - docs/ops/device-scoped-playback-test-matrix.md
+  - apps/server/src/realtime/SocketService.ts
+  - scripts/verify.test.mjs
+  - apps/server/src/db/migrations/032_device_profile_rollout.sql
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - package.json
+  - apps/server/src/routes/display-readiness.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/EnergyTrend/viewModel.ts
+  - docs/architecture/server-app-time.md
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilePreviewPanel.tsx
+  - docs/ops/maintenance.md
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.ts
+  - apps/web/src/hooks/playbackRuntimeRefresh.ts
+  - apps/server/src/realtime/serverTimeSignal.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/server/src/services/effectiveRotationCache.ts
+  - AGENTS.md
+  - apps/web/src/pages/DeviceFleet/deviceFleet.css
+  - apps/server/src/routes/playback.ts
+  - deploy/start-solar-kiosk.sh
+  - apps/server/src/routes/device-pairing.ts
+tests:
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/DeviceFleet/index.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/web/src/hooks/playbackRouteSync.test.ts
+  - apps/web/src/services/profileRollout.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/services/socket.test.ts
+  - apps/server/src/routes/playback-profiles.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/web/src/pages/DeviceFleet/route.test.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/services/deviceFleetApi.test.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/DeviceFleet/contracts.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/realtime/serverTimeSignal.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/web/src/pages/PlaybackProfiles/index.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/playbackProfileGovernanceService.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.test.ts
+  - apps/server/src/services/deviceProfileRolloutService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/services/appTime.test.ts
+  - apps/web/src/hooks/useAppTime.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+-->
+
+---
+### Requirement: Apply Profile Versions at a Safe Playback Boundary
+
+A Client SHALL download and validate its Desired Version before marking updateState=waiting. It SHALL apply the Version after the current valid page duration, or at the next transition tick when the current page is invalid in the new rotation.
+
+#### Scenario: Current page remains valid
+
+- **WHEN** a waiting Version still contains the current page
+- **THEN** the Client completes the current page duration
+- **AND** the next page uses the new Version
+
+##### Example: Solar finishes before Version 8 applies
+
+- **GIVEN** Version 7 is playing Solar with 12 seconds remaining
+- **WHEN** validated Version 8 also contains Solar
+- **THEN** the Client waits 12 seconds
+- **AND** the next page is selected from Version 8
+
+#### Scenario: Candidate validation fails
+
+- **WHEN** the Desired Version snapshot fails schema or asset-reference validation
+- **THEN** the Client retains the prior Applied Version
+- **AND** reports updateState=failed with a bounded diagnostic
+
+##### Example: Unsupported snapshot schema
+
+- **GIVEN** a Device has appliedVersion=7
+- **WHEN** desiredVersion=8 carries schemaVersion=2
+- **THEN** appliedVersion remains 7
+- **AND** updateState is failed with a diagnostic no longer than 160 characters
+
+
+<!-- @trace
+source: device-profile-rollout-observability
+updated: 2026-07-30
+code:
+  - apps/web/src/pages/energyMonitoringState.ts
+  - apps/server/src/services/playbackProfileGovernanceService.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - apps/server/src/routes/display-story.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - deploy/install-thin-kiosk.sh
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/pages/DeviceFleet/index.tsx
+  - apps/web/src/components/AppHeader.tsx
+  - docs/architecture/device-scoped-multisite-playback.md
+  - docs/architecture/default-playback-profile.md
+  - apps/server/src/services/displayRotationService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/db/migrations/031_playback_profile_versions.sql
+  - .env.example
+  - packages/shared/src/appTime.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - docs/ops/delegation.md
+  - apps/server/src/routes/devices.ts
+  - deploy/verify-thin-kiosk.sh
+  - deploy/stop-solar-kiosk.sh
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - docs/ops/conventions.md
+  - apps/web/src/app/router.tsx
+  - scripts/fhd-witness-config.mjs
+  - scripts/device-scoped-playback-load.mjs
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/web/src/hooks/playbackRouteSync.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - packages/shared/src/deviceProfileRollout.ts
+  - apps/server/src/services/playbackProfileService.ts
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/web/src/pages/PlaybackProfiles/index.tsx
+  - packages/shared/src/deviceIdentity.contract.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - apps/web/src/hooks/usePlaybackWatchdog.ts
+  - packages/shared/src/displayClientContext.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.ts
+  - CLAUDE.md
+  - packages/shared/src/playbackProfileVersion.ts
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilesContent.tsx
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - packages/shared/src/deviceIdentity.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/config.ts
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - apps/server/src/services/displayClientContextService.ts
+  - docs/agents/issue-tracker.md
+  - packages/shared/src/displayClientLiveness.ts
+  - packages/shared/src/playback.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy.md
+  - apps/web/src/services/profileRollout.ts
+  - apps/server/src/fastify.ts
+  - apps/server/src/db/seed.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/services/api.ts
+  - apps/web/src/pages/EnergyHistory/index.tsx
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/services/displayReadinessService.ts
+  - .github/workflows/agent-source-artifact.yml
+  - docs/ops/workflow.md
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - docs/ops/judgment.md
+  - scripts/device-scoped-playback-load.test.mjs
+  - apps/web/src/hooks/useAppTime.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/services/appTime.ts
+  - docs/ops/dispatch.md
+  - apps/server/src/routes/playback-profiles.ts
+  - apps/web/src/pages/DeviceFleet/route.ts
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/services/deviceProfileRolloutService.ts
+  - apps/web/src/pages/PlaybackProfiles/playbackProfiles.css
+  - docs/ops/device-pairing-and-recovery.md
+  - apps/server/src/app.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - docs/ops/device-scoped-playback-test-matrix.md
+  - apps/server/src/realtime/SocketService.ts
+  - scripts/verify.test.mjs
+  - apps/server/src/db/migrations/032_device_profile_rollout.sql
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - package.json
+  - apps/server/src/routes/display-readiness.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/EnergyTrend/viewModel.ts
+  - docs/architecture/server-app-time.md
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilePreviewPanel.tsx
+  - docs/ops/maintenance.md
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.ts
+  - apps/web/src/hooks/playbackRuntimeRefresh.ts
+  - apps/server/src/realtime/serverTimeSignal.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/server/src/services/effectiveRotationCache.ts
+  - AGENTS.md
+  - apps/web/src/pages/DeviceFleet/deviceFleet.css
+  - apps/server/src/routes/playback.ts
+  - deploy/start-solar-kiosk.sh
+  - apps/server/src/routes/device-pairing.ts
+tests:
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/DeviceFleet/index.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/web/src/hooks/playbackRouteSync.test.ts
+  - apps/web/src/services/profileRollout.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/services/socket.test.ts
+  - apps/server/src/routes/playback-profiles.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/web/src/pages/DeviceFleet/route.test.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/services/deviceFleetApi.test.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/DeviceFleet/contracts.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/realtime/serverTimeSignal.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/web/src/pages/PlaybackProfiles/index.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/playbackProfileGovernanceService.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.test.ts
+  - apps/server/src/services/deviceProfileRolloutService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/services/appTime.test.ts
+  - apps/web/src/hooks/useAppTime.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+-->
+
+---
+### Requirement: Report desired, applied, and update state per Device
+
+Each heartbeat SHALL report desiredVersion, appliedVersion, and exactly one updateState of waiting, applied, or failed. The Server SHALL compare those values with its assignment and SHALL NOT accept a Client-reported desired version as authoritative.
+
+#### Scenario: Offline Client reconnects
+
+- **WHEN** a Device reconnects with appliedVersion lower than its Group desiredVersion
+- **THEN** the Server exposes the Desired Version
+- **AND** the Client resumes validation and safe application without blocking other Devices
+
+##### Example: Version 7 reconnects to Desired Version 9
+
+- **GIVEN** an offline Device last applied Version 7 while its Group now desires Version 9
+- **WHEN** the Device reconnects
+- **THEN** the Server returns desiredVersion=9 and appliedVersion=7
+- **AND** other Devices continue reporting and applying independently
+
+
+<!-- @trace
+source: device-profile-rollout-observability
+updated: 2026-07-30
+code:
+  - apps/web/src/pages/energyMonitoringState.ts
+  - apps/server/src/services/playbackProfileGovernanceService.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - apps/server/src/routes/display-story.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - deploy/install-thin-kiosk.sh
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/pages/DeviceFleet/index.tsx
+  - apps/web/src/components/AppHeader.tsx
+  - docs/architecture/device-scoped-multisite-playback.md
+  - docs/architecture/default-playback-profile.md
+  - apps/server/src/services/displayRotationService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/db/migrations/031_playback_profile_versions.sql
+  - .env.example
+  - packages/shared/src/appTime.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - docs/ops/delegation.md
+  - apps/server/src/routes/devices.ts
+  - deploy/verify-thin-kiosk.sh
+  - deploy/stop-solar-kiosk.sh
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - docs/ops/conventions.md
+  - apps/web/src/app/router.tsx
+  - scripts/fhd-witness-config.mjs
+  - scripts/device-scoped-playback-load.mjs
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/web/src/hooks/playbackRouteSync.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - packages/shared/src/deviceProfileRollout.ts
+  - apps/server/src/services/playbackProfileService.ts
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/web/src/pages/PlaybackProfiles/index.tsx
+  - packages/shared/src/deviceIdentity.contract.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - apps/web/src/hooks/usePlaybackWatchdog.ts
+  - packages/shared/src/displayClientContext.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.ts
+  - CLAUDE.md
+  - packages/shared/src/playbackProfileVersion.ts
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilesContent.tsx
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - packages/shared/src/deviceIdentity.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/config.ts
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - apps/server/src/services/displayClientContextService.ts
+  - docs/agents/issue-tracker.md
+  - packages/shared/src/displayClientLiveness.ts
+  - packages/shared/src/playback.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy.md
+  - apps/web/src/services/profileRollout.ts
+  - apps/server/src/fastify.ts
+  - apps/server/src/db/seed.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/services/api.ts
+  - apps/web/src/pages/EnergyHistory/index.tsx
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/services/displayReadinessService.ts
+  - .github/workflows/agent-source-artifact.yml
+  - docs/ops/workflow.md
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - docs/ops/judgment.md
+  - scripts/device-scoped-playback-load.test.mjs
+  - apps/web/src/hooks/useAppTime.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/services/appTime.ts
+  - docs/ops/dispatch.md
+  - apps/server/src/routes/playback-profiles.ts
+  - apps/web/src/pages/DeviceFleet/route.ts
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/services/deviceProfileRolloutService.ts
+  - apps/web/src/pages/PlaybackProfiles/playbackProfiles.css
+  - docs/ops/device-pairing-and-recovery.md
+  - apps/server/src/app.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - docs/ops/device-scoped-playback-test-matrix.md
+  - apps/server/src/realtime/SocketService.ts
+  - scripts/verify.test.mjs
+  - apps/server/src/db/migrations/032_device_profile_rollout.sql
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - package.json
+  - apps/server/src/routes/display-readiness.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/EnergyTrend/viewModel.ts
+  - docs/architecture/server-app-time.md
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilePreviewPanel.tsx
+  - docs/ops/maintenance.md
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.ts
+  - apps/web/src/hooks/playbackRuntimeRefresh.ts
+  - apps/server/src/realtime/serverTimeSignal.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/server/src/services/effectiveRotationCache.ts
+  - AGENTS.md
+  - apps/web/src/pages/DeviceFleet/deviceFleet.css
+  - apps/server/src/routes/playback.ts
+  - deploy/start-solar-kiosk.sh
+  - apps/server/src/routes/device-pairing.ts
+tests:
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/DeviceFleet/index.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/web/src/hooks/playbackRouteSync.test.ts
+  - apps/web/src/services/profileRollout.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/services/socket.test.ts
+  - apps/server/src/routes/playback-profiles.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/web/src/pages/DeviceFleet/route.test.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/services/deviceFleetApi.test.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/DeviceFleet/contracts.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/realtime/serverTimeSignal.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/web/src/pages/PlaybackProfiles/index.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/playbackProfileGovernanceService.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.test.ts
+  - apps/server/src/services/deviceProfileRolloutService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/services/appTime.test.ts
+  - apps/web/src/hooks/useAppTime.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+-->
+
+---
+### Requirement: Derive fleet rollout summaries
+
+The management surface SHALL derive applied, waiting, offline, and failed counts from Device desired/applied state and liveness. It SHALL preserve each Device's last applied version while offline.
+
+#### Scenario: One of fifty Devices fails
+
+- **WHEN** 49 Devices report the Desired Version applied and one reports failed
+- **THEN** the fleet summary reports applied=49 and failed=1
+- **AND** the failed Device continues to identify its previous Applied Version
+
+<!-- @trace
+source: device-profile-rollout-observability
+updated: 2026-07-30
+code:
+  - apps/web/src/pages/energyMonitoringState.ts
+  - apps/server/src/services/playbackProfileGovernanceService.ts
+  - apps/web/src/layouts/LayoutShell.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
+  - apps/server/src/routes/display-story.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - deploy/install-thin-kiosk.sh
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/pages/DeviceFleet/index.tsx
+  - apps/web/src/components/AppHeader.tsx
+  - docs/architecture/device-scoped-multisite-playback.md
+  - docs/architecture/default-playback-profile.md
+  - apps/server/src/services/displayRotationService.ts
+  - docs/runbooks/pi-thin-kiosk-deploy.md
+  - packages/shared/src/devicePairing.ts
+  - apps/server/src/db/migrations/031_playback_profile_versions.sql
+  - .env.example
+  - packages/shared/src/appTime.ts
+  - .scratch/device-scoped-multisite-playback/spec.md
+  - docs/ops/delegation.md
+  - apps/server/src/routes/devices.ts
+  - deploy/verify-thin-kiosk.sh
+  - deploy/stop-solar-kiosk.sh
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - docs/ops/conventions.md
+  - apps/web/src/app/router.tsx
+  - scripts/fhd-witness-config.mjs
+  - scripts/device-scoped-playback-load.mjs
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/web/src/hooks/playbackRouteSync.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - packages/shared/src/deviceProfileRollout.ts
+  - apps/server/src/services/playbackProfileService.ts
+  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/web/src/pages/PlaybackProfiles/index.tsx
+  - packages/shared/src/deviceIdentity.contract.ts
+  - apps/server/src/services/playbackRuntimePolicyService.ts
+  - apps/web/src/hooks/usePlaybackWatchdog.ts
+  - packages/shared/src/displayClientContext.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.ts
+  - CLAUDE.md
+  - packages/shared/src/playbackProfileVersion.ts
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilesContent.tsx
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/services/deviceCredentialService.ts
+  - packages/shared/src/deviceIdentity.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/server/src/config.ts
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.ts
+  - packages/shared/src/displayReadiness.ts
+  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
+  - apps/server/src/services/displayClientContextService.ts
+  - docs/agents/issue-tracker.md
+  - packages/shared/src/displayClientLiveness.ts
+  - packages/shared/src/playback.ts
+  - apps/web/src/app/routeMeta.ts
+  - deploy.md
+  - apps/web/src/services/profileRollout.ts
+  - apps/server/src/fastify.ts
+  - apps/server/src/db/seed.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/web/src/services/api.ts
+  - apps/web/src/pages/EnergyHistory/index.tsx
+  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
+  - apps/server/src/services/displayReadinessService.ts
+  - .github/workflows/agent-source-artifact.yml
+  - docs/ops/workflow.md
+  - apps/server/src/db/migrations/029_device_group_management.sql
+  - docs/ops/judgment.md
+  - scripts/device-scoped-playback-load.test.mjs
+  - apps/web/src/hooks/useAppTime.ts
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/web/src/services/appTime.ts
+  - docs/ops/dispatch.md
+  - apps/server/src/routes/playback-profiles.ts
+  - apps/web/src/pages/DeviceFleet/route.ts
+  - apps/server/src/routes/device-groups.ts
+  - apps/server/src/services/deviceProfileRolloutService.ts
+  - apps/web/src/pages/PlaybackProfiles/playbackProfiles.css
+  - docs/ops/device-pairing-and-recovery.md
+  - apps/server/src/app.ts
+  - apps/server/src/routes/sustainability-story.ts
+  - docs/ops/device-scoped-playback-test-matrix.md
+  - apps/server/src/realtime/SocketService.ts
+  - scripts/verify.test.mjs
+  - apps/server/src/db/migrations/032_device_profile_rollout.sql
+  - apps/server/src/services/deviceGroupService.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - package.json
+  - apps/server/src/routes/display-readiness.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/web/src/pages/EnergyTrend/viewModel.ts
+  - docs/architecture/server-app-time.md
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilePreviewPanel.tsx
+  - docs/ops/maintenance.md
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.ts
+  - apps/web/src/hooks/playbackRuntimeRefresh.ts
+  - apps/server/src/realtime/serverTimeSignal.ts
+  - scripts/capture-fhd-witness.mjs
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/server/src/services/effectiveRotationCache.ts
+  - AGENTS.md
+  - apps/web/src/pages/DeviceFleet/deviceFleet.css
+  - apps/server/src/routes/playback.ts
+  - deploy/start-solar-kiosk.sh
+  - apps/server/src/routes/device-pairing.ts
+tests:
+  - packages/shared/src/displayPageFreshness.test.ts
+  - apps/web/src/pages/DeviceFleet/index.test.tsx
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/playbackProfileService.test.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/web/src/hooks/playbackRouteSync.test.ts
+  - apps/web/src/services/profileRollout.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/services/socket.test.ts
+  - apps/server/src/routes/playback-profiles.test.ts
+  - apps/server/src/services/effectiveRotationCache.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/web/src/pages/DeviceFleet/route.test.ts
+  - apps/web/src/pages/DeviceFleet/loadModel.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/services/deviceFleetApi.test.ts
+  - apps/web/src/pages/DeviceFleet/mutationError.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/web/src/pages/DeviceFleet/contracts.test.ts
+  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
+  - apps/server/src/realtime/serverTimeSignal.test.ts
+  - apps/server/src/logger.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/web/src/pages/PlaybackProfiles/index.test.ts
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/pages/DeviceFleet/viewModel.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/server/src/services/playbackProfileGovernanceService.test.ts
+  - apps/web/src/services/api.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/web/src/pages/PlaybackProfiles/viewModel.test.ts
+  - apps/server/src/services/deviceProfileRolloutService.test.ts
+  - apps/server/src/routes/device-pairing.test.ts
+  - apps/server/src/services/displayPageRegistryService.test.ts
+  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/services/appTime.test.ts
+  - apps/web/src/hooks/useAppTime.test.ts
+  - apps/server/src/services/playbackRuntimePolicyService.test.ts
+  - apps/server/src/db/seedPersistence.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/device-group-management.test.ts
+-->

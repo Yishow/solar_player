@@ -8,6 +8,7 @@ import {
   type DisplayPageTemplateKey,
   type DisplayPlaybackRuntimeResponse,
   type DisplayRotationPreview,
+  type DeviceProfileRolloutStatus,
   getEnabledPlaybackPages,
   getNextPlaybackIndex,
   getPlaybackDurationMs,
@@ -29,6 +30,12 @@ import { prefetchDisplayPageTemplate } from "../pages/shared/displayPageTemplate
 import { resolveRouteRuntimeSync } from "./playbackRouteSync";
 import { reconcilePlaybackRuntimeAfterRefresh } from "./playbackRuntimeRefresh";
 import type { PlaybackRuntimeReloadOptions } from "./displaySyncPlaybackReload";
+import {
+  applyStagedProfileRollout,
+  stageProfileRollout,
+  type StagedProfileRollout,
+  validateProfileRolloutCandidate
+} from "../services/profileRollout";
 
 export function resolvePlaybackPageTemplateKey(page: PlaybackPage | null): DisplayPageTemplateKey | null {
   if (!page) {
@@ -74,19 +81,31 @@ type UsePlaybackControllerOptions = {
 
 export type PlaybackRuntimeTickMode = "countdown" | "boundary";
 const DISPLAY_RUNTIME_REFRESH_MS = 5_000;
+const DISPLAY_RUNTIME_REFRESH_JITTER_MS = 2_000;
+
+export function resolveDisplayRuntimeRefreshDelay(randomValue: number) {
+  const boundedRandom = Math.min(1, Math.max(0, randomValue));
+  return DISPLAY_RUNTIME_REFRESH_MS
+    + Math.round(boundedRandom * DISPLAY_RUNTIME_REFRESH_JITTER_MS);
+}
 
 type PlaybackControllerState = {
+  appliedVersion: number | null;
   countdown: number;
   currentPage: PlaybackPage | null;
   displayClientContext: DisplayClientContext | null;
+  desiredVersion: number | null;
   effectiveRotationRevision: string | null;
   errorMessage: string;
   fallbackRoute: string | null;
   isIdle: boolean;
   isLoading: boolean;
   isPlaying: boolean;
+  profileRolloutHydrated: boolean;
   pages: PlaybackPage[];
   progress: number;
+  profileUpdateError: string | null;
+  profileUpdateState: DeviceProfileRolloutStatus["updateState"];
   reload: (options?: PlaybackRuntimeReloadOptions) => Promise<void>;
   rotationPreview: DisplayRotationPreview | null;
   settings: PlaybackSettings | null;
@@ -99,6 +118,7 @@ type PendingRuntimeUpdate = {
   identity: string;
   plan: SafePlaybackBoundaryPlan;
   response: DisplayPlaybackRuntimeResponse;
+  stagedProfileRollout: StagedProfileRollout | null;
 };
 
 type FormalPlaybackAccessState = {
@@ -346,6 +366,15 @@ export function usePlaybackController(
   const [effectiveRotationRevision, setEffectiveRotationRevision] =
     useState<string | null>(null);
   const [fallbackRoute, setFallbackRoute] = useState<string | null>(null);
+  const [profileRolloutStatus, setProfileRolloutStatus] =
+    useState<DeviceProfileRolloutStatus>({
+      appliedVersion: null,
+      desiredVersion: null,
+      lastError: null,
+      updatedAt: null,
+      updateState: "waiting"
+    });
+  const [profileRolloutHydrated, setProfileRolloutHydrated] = useState(false);
   const [rotationPreview, setRotationPreview] = useState<DisplayRotationPreview | null>(() => options.rotationPreview ?? null);
   const providedSettingsRef = useRef<PlaybackSettings | null>(options.settings ?? null);
   const providedRotationPreviewRef = useRef<DisplayRotationPreview | null>(options.rotationPreview ?? null);
@@ -435,6 +464,26 @@ export function usePlaybackController(
       if (!isLatestPlaybackLoadRequest(requestId, latestLoadRequestRef.current)) {
         return;
       }
+      const rolloutValidationError =
+        runtimeResponse?.profileRollout.desired
+          ? validateProfileRolloutCandidate(
+              runtimeResponse.profileRollout.desired,
+              runtimeResponse.preview
+            )
+          : null;
+      if (runtimeResponse && rolloutValidationError) {
+        pendingRuntimeUpdateRef.current = null;
+        setProfileRolloutHydrated(true);
+        setProfileRolloutStatus({
+          appliedVersion: runtimeResponse.profileRollout.appliedVersion,
+          desiredVersion: runtimeResponse.profileRollout.desiredVersion,
+          lastError: rolloutValidationError.slice(0, 160),
+          updatedAt: runtimeResponse.profileRollout.updatedAt,
+          updateState: "failed"
+        });
+        setErrorMessage(rolloutValidationError);
+        return;
+      }
       const [nextSettings, rotationPreview] = providedManagementPreview
         ? await Promise.all([
             Promise.resolve(providedSettings),
@@ -479,30 +528,70 @@ export function usePlaybackController(
         ].join(":");
         if (identity !== appliedRuntimeIdentityRef.current) {
           if (pendingRuntimeUpdateRef.current?.identity !== identity) {
+            const stagedProfileRollout =
+              runtimeResponse.profileRollout.desired
+                ? stageProfileRollout({
+                    appliedVersion:
+                      runtimeResponse.profileRollout.appliedVersion,
+                    currentRuntime,
+                    desired: runtimeResponse.profileRollout.desired,
+                    nextPages: runtimePages,
+                    previousPages: pagesRef.current,
+                    preview: rotationPreview,
+                    receivedAtMs: nowMs
+                  })
+                : null;
             pendingRuntimeUpdateRef.current = {
               identity,
-              plan: createSafePlaybackBoundaryPlan({
-                current: currentRuntime,
-                nextPages: runtimePages,
-                previousPages: pagesRef.current,
-                receivedAtMs: nowMs
-              }),
-              response: runtimeResponse
+              plan:
+                stagedProfileRollout?.plan
+                ?? createSafePlaybackBoundaryPlan({
+                  current: currentRuntime,
+                  nextPages: runtimePages,
+                  previousPages: pagesRef.current,
+                  receivedAtMs: nowMs
+                }),
+              response: runtimeResponse,
+              stagedProfileRollout
             };
+            setProfileRolloutStatus(
+              stagedProfileRollout?.status
+              ?? {
+                appliedVersion: runtimeResponse.profileRollout.appliedVersion,
+                desiredVersion: runtimeResponse.profileRollout.desiredVersion,
+                lastError: null,
+                updatedAt: runtimeResponse.profileRollout.updatedAt,
+                updateState: "waiting"
+              }
+            );
           }
         } else {
           pendingRuntimeUpdateRef.current = null;
         }
+        setProfileRolloutHydrated(true);
         setErrorMessage("");
         return;
       }
 
       pendingRuntimeUpdateRef.current = null;
       if (runtimeResponse) {
+        setProfileRolloutHydrated(true);
         appliedRuntimeIdentityRef.current = [
           runtimeResponse.context.contextRevision,
           runtimeResponse.effectiveRotationRevision
         ].join(":");
+        setProfileRolloutStatus({
+          appliedVersion:
+            runtimeResponse.profileRollout.desiredVersion
+            ?? runtimeResponse.profileRollout.appliedVersion,
+          desiredVersion: runtimeResponse.profileRollout.desiredVersion,
+          lastError: null,
+          updatedAt: runtimeResponse.profileRollout.updatedAt,
+          updateState:
+            runtimeResponse.profileRollout.desiredVersion === null
+              ? runtimeResponse.profileRollout.updateState
+              : "applied"
+        });
       }
       settingsRef.current = nextSettings;
       pagesRef.current = runtimePages;
@@ -527,6 +616,7 @@ export function usePlaybackController(
         return;
       }
       if (isDisplayContextAccessError(error)) {
+        setProfileRolloutHydrated(false);
         const failedClosed = failClosedFormalPlaybackAccess({
           appliedRuntimeIdentity: appliedRuntimeIdentityRef.current,
           displayClientContext,
@@ -581,12 +671,23 @@ export function usePlaybackController(
       return;
     }
 
-    const timerId = window.setInterval(() => {
-      void loadPlayback();
-    }, DISPLAY_RUNTIME_REFRESH_MS);
+    let cancelled = false;
+    let timerId: number | null = null;
+    const schedule = () => {
+      timerId = window.setTimeout(async () => {
+        await loadPlayback();
+        if (!cancelled) {
+          schedule();
+        }
+      }, resolveDisplayRuntimeRefreshDelay(Math.random()));
+    };
+    schedule();
 
     return () => {
-      window.clearInterval(timerId);
+      cancelled = true;
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
     };
   }, [enabled, options.rotationPreview, options.settings]);
 
@@ -644,14 +745,25 @@ export function usePlaybackController(
           });
         const boundaryRuntime = resolvePendingRuntimeAtTrustedBoundary(
           snapshot,
-          () => resolveSafePlaybackBoundaryRuntime({
-            current: pendingBoundaryCurrent,
-            nextPages: pendingUpdate.response.preview.playablePages,
-            nowMs,
-            plan: pendingUpdate.plan,
-            scheduleAllowed: pendingScheduleGate.activeAllowed,
-            settings: pendingUpdate.response.settings
-          })
+          () => (
+            pendingUpdate.stagedProfileRollout
+              ? applyStagedProfileRollout(
+                  pendingUpdate.stagedProfileRollout,
+                  nowMs,
+                  {
+                    currentRuntime: pendingBoundaryCurrent,
+                    scheduleAllowed: pendingScheduleGate.activeAllowed
+                  }
+                )?.runtime ?? null
+              : resolveSafePlaybackBoundaryRuntime({
+                  current: pendingBoundaryCurrent,
+                  nextPages: pendingUpdate.response.preview.playablePages,
+                  nowMs,
+                  plan: pendingUpdate.plan,
+                  scheduleAllowed: pendingScheduleGate.activeAllowed,
+                  settings: pendingUpdate.response.settings
+                })
+          )
         );
 
         if (boundaryRuntime) {
@@ -659,6 +771,15 @@ export function usePlaybackController(
           const nextSettings = pendingUpdate.response.settings;
           pendingRuntimeUpdateRef.current = null;
           appliedRuntimeIdentityRef.current = pendingUpdate.identity;
+          setProfileRolloutStatus({
+            appliedVersion:
+              pendingUpdate.response.profileRollout.desiredVersion,
+            desiredVersion:
+              pendingUpdate.response.profileRollout.desiredVersion,
+            lastError: null,
+            updatedAt: pendingUpdate.response.profileRollout.updatedAt,
+            updateState: "applied"
+          });
           playbackScheduleGateRef.current = pendingScheduleGate;
           schedulePausedPlaybackRef.current =
             resolvePendingSchedulePausedMarker(
@@ -892,19 +1013,24 @@ export function usePlaybackController(
   };
 
   return {
+    appliedVersion: profileRolloutStatus.appliedVersion,
     countdown,
     currentPage,
     displayClientContext,
+    desiredVersion: profileRolloutStatus.desiredVersion,
     effectiveRotationRevision,
     errorMessage,
     fallbackRoute,
     isIdle: runtime?.isIdle ?? false,
     isLoading,
     isPlaying: runtime?.isPlaying ?? false,
+    profileRolloutHydrated,
     nextPage,
     pages,
     prevPage,
     progress,
+    profileUpdateError: profileRolloutStatus.lastError,
+    profileUpdateState: profileRolloutStatus.updateState,
     reload: loadPlayback,
     rotationPreview,
     settings,

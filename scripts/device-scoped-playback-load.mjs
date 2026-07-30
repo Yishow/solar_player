@@ -138,13 +138,15 @@ async function request(baseUrl, path, {
   body,
   cookie,
   expectedStatus = 200,
+  headers,
   method = "GET"
 } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
-      ...(cookie ? { cookie } : {})
+      ...(cookie ? { cookie } : {}),
+      ...headers
     },
     method
   });
@@ -256,6 +258,8 @@ async function assertPublicPlayback(baseUrl, device) {
     runtime.response.headers.get("x-solar-rotation-evaluations")
   );
   return {
+    appliedVersion: runtime.payload.profileRollout?.appliedVersion ?? null,
+    desiredVersion: runtime.payload.profileRollout?.desiredVersion ?? null,
     evaluationCount: Number.isInteger(evaluationCount) && evaluationCount > 0
       ? evaluationCount
       : null,
@@ -356,6 +360,268 @@ async function exerciseProfileSync(baseUrl, sockets, currentSettings) {
       socket.off("playback:settingsUpdated", handlers[index]);
     });
   }
+}
+
+async function publishChangedProfileVersion(baseUrl, profileId) {
+  const draft = await request(
+    baseUrl,
+    `/api/playback-profiles/${profileId}/draft`
+  );
+  const saved = await request(
+    baseUrl,
+    `/api/playback-profiles/${profileId}/draft`,
+    {
+      body: {
+        expectedRevision: draft.payload.data.revision,
+        pages: draft.payload.data.pages,
+        settings: {
+          ...draft.payload.data.settings,
+          brightness:
+            draft.payload.data.settings.brightness === 71 ? 72 : 71,
+          startPage: draft.payload.data.pages[0].id
+        }
+      },
+      method: "PUT"
+    }
+  );
+  const published = await request(
+    baseUrl,
+    `/api/playback-profiles/${profileId}/publish`,
+    {
+      body: { expectedRevision: saved.payload.data.revision },
+      expectedStatus: 201,
+      method: "POST"
+    }
+  );
+  return published.payload.data.id;
+}
+
+async function prepareBrowserBoundaryProbe(baseUrl) {
+  const plan = await request(baseUrl, "/api/playback/rotation-plan");
+  const overview = plan.payload.rotationPlan.pages.find(
+    (page) => page.pageKey === "overview"
+  );
+  if (!overview) {
+    throw new Error("browser boundary probe could not find Overview");
+  }
+  await request(baseUrl, "/api/playback/rotation-plan", {
+    body: {
+      pages: plan.payload.rotationPlan.pages.map((page) => ({
+        displayOrder: page.displayOrder,
+        durationSeconds: page.id === overview.id ? 8 : page.durationSeconds,
+        enabled: page.enabled,
+        id: page.id
+      }))
+    },
+    method: "PUT"
+  });
+  await request(baseUrl, "/api/playback/settings", {
+    body: {
+      autoplay: true,
+      startPage: overview.id
+    },
+    method: "PUT"
+  });
+}
+
+async function exerciseProductionBrowserRollout(baseUrl, device, profileId) {
+  await prepareBrowserBoundaryProbe(baseUrl);
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const [cookieName, cookieValue] = device.cookie.split("=", 2);
+  await context.addCookies([{
+    domain: "127.0.0.1",
+    httpOnly: true,
+    name: cookieName,
+    path: "/",
+    sameSite: "Lax",
+    secure: false,
+    value: cookieValue
+  }]);
+  const page = await context.newPage();
+  let documentRequests = 0;
+  let runtimeFetches = 0;
+  let conditionalHits = 0;
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") {
+      documentRequests += 1;
+    }
+  });
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname !== "/api/playback/runtime") {
+      return;
+    }
+    runtimeFetches += 1;
+    if (response.status() === 304) {
+      conditionalHits += 1;
+    }
+  });
+
+  try {
+    await page.goto(`${baseUrl}/overview`, { waitUntil: "networkidle" });
+    await waitFor(async () => {
+      const clients = await readLivenessSnapshot(baseUrl);
+      return clients.some(
+        (client) => (
+          client.deviceId === device.deviceId
+          && client.route === "/overview"
+        )
+      );
+    }, { label: "production browser rollout hydration", timeoutMs: 10_000 });
+
+    const publishedAt = Date.now();
+    const desiredVersion = await publishChangedProfileVersion(
+      baseUrl,
+      profileId
+    );
+    await waitFor(async () => {
+      const clients = await readLivenessSnapshot(baseUrl);
+      const client = clients.find(
+        (candidate) => candidate.deviceId === device.deviceId
+      );
+      return (
+        client?.desiredVersion === desiredVersion
+        && client?.updateState === "waiting"
+      );
+    }, { label: "production browser waiting state", timeoutMs: 15_000 });
+    let appliedAt = 0;
+    await waitFor(async () => {
+      const clients = await readLivenessSnapshot(baseUrl);
+      const client = clients.find(
+        (candidate) => candidate.deviceId === device.deviceId
+      );
+      if (
+        client?.appliedVersion !== desiredVersion
+        || client?.updateState !== "applied"
+      ) {
+        return false;
+      }
+      appliedAt = Date.now();
+      return true;
+    }, { label: "production browser applied state", timeoutMs: 20_000 });
+
+    const boundaryWaitMs = appliedAt - publishedAt;
+    if (boundaryWaitMs < 5_000) {
+      throw new Error(
+        `production browser applied before the safe boundary (${boundaryWaitMs}ms)`
+      );
+    }
+    if (documentRequests !== 1) {
+      throw new Error(
+        `production browser performed ${documentRequests - 1} unexpected reloads`
+      );
+    }
+    await waitFor(
+      () => conditionalHits >= 1,
+      { label: "production browser conditional runtime fetch", timeoutMs: 10_000 }
+    );
+    return {
+      appliedOnServer: true,
+      boundaryWaitMs,
+      browserClients: 1,
+      conditionalHits,
+      desiredVersion,
+      reloads: documentRequests - 1,
+      runtimeFetches
+    };
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function exerciseVersionedProfileRollout(
+  baseUrl,
+  devices,
+  sockets,
+  runtimeEvidence
+) {
+  const desiredVersion = await publishChangedProfileVersion(
+    baseUrl,
+    runtimeEvidence[0].profileId
+  );
+  let conditionalHits = 0;
+  for (const device of devices) {
+    const runtime = await request(baseUrl, "/api/playback/runtime", {
+      cookie: device.cookie
+    });
+    if (runtime.payload.profileRollout.desiredVersion !== desiredVersion) {
+      throw new Error("published Profile Version did not reach every Device");
+    }
+    const etag = runtime.response.headers.get("etag");
+    if (!etag) {
+      throw new Error("playback runtime did not return an ETag");
+    }
+    await request(baseUrl, "/api/playback/runtime", {
+      cookie: device.cookie,
+      expectedStatus: 304,
+      headers: { "if-none-match": etag }
+    });
+    conditionalHits += 1;
+  }
+
+  sockets.forEach((socket, index) => {
+    socket.emit("client:heartbeat", {
+      appliedVersion: runtimeEvidence[index].appliedVersion,
+      desiredVersion,
+      isPlaying: true,
+      pageKey: "overview",
+      route: "/overview",
+      timeSyncState: "synced",
+      updateError: null,
+      updateState: "waiting"
+    });
+  });
+  await waitFor(async () => {
+    const clients = await readLivenessSnapshot(baseUrl);
+    return devices.every((device) => {
+      const client = clients.find(
+        (candidate) => candidate.deviceId === device.deviceId
+      );
+      return (
+        client?.desiredVersion === desiredVersion
+        && client?.updateState === "waiting"
+      );
+    });
+  }, { label: "waiting Profile rollout state", timeoutMs: 5_000 });
+
+  sockets.forEach((socket) => {
+    socket.emit("client:heartbeat", {
+      appliedVersion: desiredVersion,
+      desiredVersion,
+      isPlaying: true,
+      pageKey: "overview",
+      route: "/overview",
+      timeSyncState: "synced",
+      updateError: null,
+      updateState: "applied"
+    });
+  });
+  await waitFor(async () => {
+    const clients = await readLivenessSnapshot(baseUrl);
+    return devices.every((device) => {
+      const client = clients.find(
+        (candidate) => candidate.deviceId === device.deviceId
+      );
+      return (
+        client?.appliedVersion === desiredVersion
+        && client?.updateState === "applied"
+      );
+    });
+  }, { label: "applied Profile rollout state", timeoutMs: 5_000 });
+
+  runtimeEvidence.forEach((evidence) => {
+    evidence.appliedVersion = desiredVersion;
+    evidence.desiredVersion = desiredVersion;
+  });
+  return {
+    conditionalHits,
+    heartbeats: devices.length * 2,
+    rolloutApplied: devices.length,
+    rolloutWaiting: devices.length,
+    runtimeFetches: devices.length * 2
+  };
 }
 
 async function exerciseIdentityLifecycle(
@@ -467,9 +733,17 @@ async function readActiveConnections(baseUrl) {
 export function evaluateAcceptanceThresholds(metrics) {
   const failures = [];
   const required = [
+    "boundaryWaitMs",
+    "browserClients",
+    "browserConditionalHits",
     "clients",
+    "conditionalHits",
     "durationMs",
     "heartbeats",
+    "reloads",
+    "rolloutApplied",
+    "rolloutWaiting",
+    "runtimeFetches",
     "timeSignals",
     "rotationEvaluations",
     "reconnects",
@@ -485,7 +759,7 @@ export function evaluateAcceptanceThresholds(metrics) {
   }
 
   const heartbeatLimit =
-    metrics.clients * (1 + Math.floor(metrics.durationMs / HEARTBEAT_INTERVAL_MS));
+    metrics.clients * (3 + Math.floor(metrics.durationMs / HEARTBEAT_INTERVAL_MS));
   const timeSignalLimit =
     metrics.clients
     + metrics.reconnects
@@ -511,6 +785,35 @@ export function evaluateAcceptanceThresholds(metrics) {
       `peakConnections ${metrics.peakConnections} are below ${metrics.clients}`
     );
   }
+  if (metrics.conditionalHits !== metrics.clients) {
+    failures.push(
+      `conditionalHits ${metrics.conditionalHits} do not equal ${metrics.clients}`
+    );
+  }
+  if (metrics.browserClients < 1 || metrics.browserConditionalHits < 1) {
+    failures.push("production browser conditional-fetch evidence is unavailable");
+  }
+  if (metrics.boundaryWaitMs < 5_000) {
+    failures.push(
+      `boundaryWaitMs ${metrics.boundaryWaitMs} is below 5000`
+    );
+  }
+  if (
+    metrics.rolloutWaiting !== metrics.clients
+    || metrics.rolloutApplied !== metrics.clients
+  ) {
+    failures.push(
+      "waiting-to-applied Profile rollout did not cover every Client"
+    );
+  }
+  if (metrics.reloads !== 0) {
+    failures.push(`reloads ${metrics.reloads} exceed 0`);
+  }
+  if (metrics.runtimeFetches > metrics.clients * 2 + 10) {
+    failures.push(
+      `runtimeFetches ${metrics.runtimeFetches} exceed ${metrics.clients * 2 + 10}`
+    );
+  }
   if (metrics.heartbeats > heartbeatLimit) {
     failures.push(`heartbeats ${metrics.heartbeats} exceed ${heartbeatLimit}`);
   }
@@ -529,6 +832,7 @@ export function evaluateAcceptanceThresholds(metrics) {
 }
 
 export async function runDeviceScopedPlaybackAcceptance({
+  browserRolloutProbe = exerciseProductionBrowserRollout,
   clients = 50,
   durationMs = 600_000,
   reconnects = 5
@@ -599,6 +903,21 @@ export async function runDeviceScopedPlaybackAcceptance({
         "CL and KN cohorts did not share one Playback Profile and settings"
       );
     }
+    const browserMetrics = await browserRolloutProbe(
+      isolated.baseUrl,
+      devices[0],
+      runtimeEvidence[0].profileId
+    );
+    runtimeEvidence.forEach((evidence) => {
+      evidence.desiredVersion = browserMetrics.desiredVersion;
+    });
+    if (browserMetrics.appliedOnServer) {
+      runtimeEvidence[0].appliedVersion = browserMetrics.desiredVersion;
+    }
+    await waitFor(
+      async () => (await readActiveConnections(isolated.baseUrl)) === 0,
+      { label: "production browser disconnect", timeoutMs: 5_000 }
+    );
     const onTimeSignal = () => {
       timeSignals += 1;
     };
@@ -659,22 +978,38 @@ export async function runDeviceScopedPlaybackAcceptance({
     );
 
     const emitHeartbeats = () => {
-      for (const socket of sockets) {
+      sockets.forEach((socket, index) => {
+        const desiredVersion = runtimeEvidence[index]?.desiredVersion ?? null;
+        const appliedVersion = runtimeEvidence[index]?.appliedVersion ?? null;
         socket.emit("client:heartbeat", {
+          appliedVersion,
+          desiredVersion,
           isPlaying: true,
           pageKey: "overview",
           route: "/overview",
-          timeSyncState: "synced"
+          timeSyncState: "synced",
+          updateError: null,
+          updateState:
+            desiredVersion !== null && appliedVersion === desiredVersion
+              ? "applied"
+              : "waiting"
         });
         heartbeats += 1;
-      }
+      });
     };
     emitHeartbeats();
-    heartbeatTimer = setInterval(emitHeartbeats, HEARTBEAT_INTERVAL_MS);
     await waitFor(
       () => hasHeartbeatReadBack(isolated.baseUrl, devices),
       { label: "Device/time heartbeat read-back", timeoutMs: 5_000 }
     );
+    const rolloutMetrics = await exerciseVersionedProfileRollout(
+      isolated.baseUrl,
+      devices,
+      sockets,
+      runtimeEvidence
+    );
+    heartbeats += rolloutMetrics.heartbeats;
+    heartbeatTimer = setInterval(emitHeartbeats, HEARTBEAT_INTERVAL_MS);
     await assertHealthyIdentityState(isolated.baseUrl, devices);
     peakConnections = Math.max(
       peakConnections,
@@ -698,12 +1033,21 @@ export async function runDeviceScopedPlaybackAcceptance({
     const settledConnections = await readActiveConnections(isolated.baseUrl);
     peakConnections = Math.max(peakConnections, settledConnections);
     const metrics = {
+      boundaryWaitMs: browserMetrics.boundaryWaitMs,
+      browserClients: browserMetrics.browserClients,
+      browserConditionalHits: browserMetrics.conditionalHits,
       clients,
+      conditionalHits: rolloutMetrics.conditionalHits,
       durationMs,
       heartbeats,
       peakConnections,
       reconnects,
+      reloads: browserMetrics.reloads,
+      rolloutApplied: rolloutMetrics.rolloutApplied,
+      rolloutWaiting: rolloutMetrics.rolloutWaiting,
       rotationEvaluations,
+      runtimeFetches:
+        rolloutMetrics.runtimeFetches + browserMetrics.runtimeFetches,
       timeSignals
     };
     const failureDetails = evaluateAcceptanceThresholds(metrics);

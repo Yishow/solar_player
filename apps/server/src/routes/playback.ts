@@ -1,9 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
+import { createHash } from "node:crypto";
 import type { PlaybackSettings } from "@solar-display/shared";
 import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
 import { readDisplayOpsSummary } from "../services/displayOpsService.js";
 import {
   readEffectiveDisplayRotationSnapshot,
+  evaluatePlaybackSnapshot,
   readEffectiveRotationEvaluationCount,
   readDisplayRotationPreview,
   readDisplayRotationPlan,
@@ -15,6 +17,7 @@ import {
   updatePlaybackSettings
 } from "../services/displayRotationService.js";
 import { synchronizeDefaultPlaybackProfileDraft } from "../services/playbackProfileGovernanceService.js";
+import { readDeviceProfileRollout } from "../services/deviceProfileRolloutService.js";
 
 type PlaybackSettingsUpdateBody = Partial<PlaybackSettings>;
 
@@ -28,11 +31,45 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
     { preHandler: app.requireDisplayClientContext },
     async (request, reply) => {
       const context = requireResolvedDisplayClientContext(request);
-      const snapshot = readEffectiveDisplayRotationSnapshot({
-        mqttStatus: app.mqttClientService.getStatus(),
-        profileId: context.profileId,
-        siteScope: context.siteScope
-      });
+      const profileRollout = readDeviceProfileRollout(context.deviceId);
+      const snapshot = profileRollout.desired
+        ? {
+            effectiveRotationRevision:
+              `profile-version:${profileRollout.desired.id}:${context.siteScope}`,
+            preview: evaluatePlaybackSnapshot({
+              mqttStatus: app.mqttClientService.getStatus(),
+              pages: profileRollout.desired.snapshot.pages,
+              settings: profileRollout.desired.snapshot.settings,
+              siteScope: context.siteScope
+            }),
+            settings: profileRollout.desired.snapshot.settings
+          }
+        : readEffectiveDisplayRotationSnapshot({
+            mqttStatus: app.mqttClientService.getStatus(),
+            profileId: context.profileId,
+            siteScope: context.siteScope
+          });
+      const response = {
+        context,
+        profileRollout,
+        ...snapshot
+      };
+      const etagPayload = {
+        ...response,
+        preview: {
+          ...response.preview,
+          evaluatedAt: undefined
+        }
+      };
+      const etag = `"${createHash("sha256")
+        .update(JSON.stringify(etagPayload))
+        .digest("base64url")}"`;
+      reply.header("cache-control", "private, no-cache");
+      reply.header("etag", etag);
+      reply.header("vary", "Cookie");
+      if (request.headers["if-none-match"] === etag) {
+        return reply.status(304).send();
+      }
       if (process.env.PHASE1_ACCEPTANCE_METRICS === "1") {
         reply.header(
           "x-solar-rotation-evaluations",
@@ -40,10 +77,7 @@ const playbackRoute: FastifyPluginAsync = async (app) => {
         );
       }
 
-      return {
-        context,
-        ...snapshot
-      };
+      return response;
     }
   );
 

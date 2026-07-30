@@ -384,22 +384,26 @@ test("trusted device status responses include display client liveness while untr
   app.socketService.getDisplayClientLivenessSnapshot = () => ({
     clients: [
       {
+        appliedVersion: 1,
         clientId: "display-1",
         connectedCount: 1,
         deviceId: 1,
         duplicateDetectedAt: null,
         duplicateIdentity: false,
+        desiredVersion: 1,
         groupId: 10,
         isIdle: false,
         isPlaying: true,
         lastSeenAt: "2026-05-22T12:00:10.000Z",
         pageKey: "overview",
         profileId: 100,
+        profileUpdateError: null,
         route: "/overview",
         siteScope: "cl",
         sourceStatus: "same-source",
         state: "online",
         timeSyncState: "synced",
+        updateState: "applied",
         viewport: {
           height: 1080,
           width: 1920

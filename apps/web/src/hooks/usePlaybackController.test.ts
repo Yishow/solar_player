@@ -17,12 +17,19 @@ import {
   preparePendingScheduleBoundaryCurrent,
   resolveNextEffectivePlaybackTemplateKey,
   resolvePendingRuntimeAtTrustedBoundary,
+  resolveDisplayRuntimeRefreshDelay,
   resolvePendingSchedulePausedMarker,
   resolvePlaybackScheduleGate,
   resolvePlaybackPageTemplateKey,
   resolvePlaybackRuntimeTick,
   shouldMarkSchedulePaused
 } from "./usePlaybackController";
+
+test("runtime refresh delay spreads clients across a bounded jitter window", () => {
+  assert.equal(resolveDisplayRuntimeRefreshDelay(-1), 5_000);
+  assert.equal(resolveDisplayRuntimeRefreshDelay(0.5), 6_000);
+  assert.equal(resolveDisplayRuntimeRefreshDelay(2), 7_000);
+});
 
 const hookDir = path.resolve(import.meta.dirname);
 const controllerSource = fs.readFileSync(path.join(hookDir, "usePlaybackController.ts"), "utf8");
@@ -64,7 +71,15 @@ test("usePlaybackController applies changed context through the shared safe boun
   assert.match(controllerSource, /pendingRuntimeUpdateRef\.current\?\.identity !== identity/);
   assert.match(
     controllerSource,
-    /window\.setInterval\(\(\) => \{[\s\S]*void loadPlayback\(\);[\s\S]*DISPLAY_RUNTIME_REFRESH_MS/
+    /window\.setTimeout\(async \(\) => \{[\s\S]*await loadPlayback\(\);[\s\S]*resolveDisplayRuntimeRefreshDelay\(Math\.random\(\)\)/
+  );
+  assert.doesNotMatch(controllerSource, /window\.location\.reload|location\.reload/);
+});
+
+test("a newer invalid Desired Version cancels an older pending rollout", () => {
+  assert.match(
+    controllerSource,
+    /if \(runtimeResponse && rolloutValidationError\) \{\s*pendingRuntimeUpdateRef\.current = null;/
   );
 });
 

@@ -9,6 +9,7 @@ export type PlaybackProfileSummary = {
 };
 
 export type DeviceGroup = {
+  desiredVersion: number | null;
   enabled: boolean;
   id: number;
   name: string;
@@ -18,6 +19,7 @@ export type DeviceGroup = {
 };
 
 export type Device = {
+  appliedVersion: number | null;
   clientId: string;
   displayName: string;
   enabled: boolean;
@@ -25,4 +27,6 @@ export type Device = {
   groupId: number | null;
   id: number;
   paired: boolean;
+  profileUpdateError: string | null;
+  profileUpdateState: import("./deviceProfileRollout.js").ProfileUpdateState;
 };

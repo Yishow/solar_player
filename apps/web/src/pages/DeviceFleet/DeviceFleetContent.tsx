@@ -31,6 +31,13 @@ export type DeviceFleetContentProps = {
   model: {
     groups: DeviceGroup[];
     rows: DeviceFleetRow[];
+    rolloutSummary: {
+      applied: number;
+      failed: number;
+      offline: number;
+      total: number;
+      waiting: number;
+    };
     state: "empty" | "loading" | "ready";
     unavailable: string[];
   };
@@ -172,6 +179,10 @@ export function DeviceFleetContent({
         <div className="device-fleet-page__summary">
           <strong>{model.rows.length}</strong>
           <span>目前裝置</span>
+          <small>
+            已套用 {model.rolloutSummary.applied} · 等待 {model.rolloutSummary.waiting}
+            {" "}· 離線 {model.rolloutSummary.offline} · 失敗 {model.rolloutSummary.failed}
+          </small>
         </div>
       </header>
 
@@ -312,6 +323,7 @@ export function DeviceFleetContent({
                   <th>群組 / 廠區</th>
                   <th>狀態</th>
                   <th>播放診斷</th>
+                  <th>Profile rollout</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -347,6 +359,13 @@ export function DeviceFleetContent({
                         {row.pageKey ?? "無頁面"} · {row.isPlaying ? "播放中" : "未播放"}
                       </small>
                       <small>最後上線：{row.lastSeenAt ?? "尚無紀錄"}</small>
+                    </td>
+                    <td>
+                      <strong>{row.rolloutState}</strong>
+                      <small>
+                        desired {row.desiredVersion ?? "—"} · applied {row.appliedVersion ?? "—"}
+                      </small>
+                      {row.rolloutError ? <small>{row.rolloutError}</small> : null}
                     </td>
                     <td>
                       <button

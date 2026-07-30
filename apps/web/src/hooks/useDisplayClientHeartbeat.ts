@@ -16,6 +16,7 @@ import { getAppTimeSnapshot } from "../services/appTime";
 
 export type DisplayClientHeartbeatLoopOptions = {
   connected: boolean;
+  enabled?: boolean;
   emitHeartbeat: (payload: DisplayClientHeartbeat) => void;
   emitImmediately: boolean;
   intervalMs?: number;
@@ -25,22 +26,30 @@ export type DisplayClientHeartbeatLoopOptions = {
 };
 
 export function buildDisplayClientHeartbeatPayload(args: {
+  appliedVersion: number | null;
+  desiredVersion: number | null;
   isIdle: boolean;
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
   timeSyncState: TimeSyncState;
+  updateError: string | null;
+  updateState: DisplayClientHeartbeat["updateState"];
 }): DisplayClientHeartbeat {
   return {
+    appliedVersion: args.appliedVersion,
+    desiredVersion: args.desiredVersion,
     isPlaying: args.isPlaying,
     pageKey: args.pageKey,
     route: args.route,
-    timeSyncState: args.timeSyncState
+    timeSyncState: args.timeSyncState,
+    updateError: args.updateError,
+    updateState: args.updateState
   };
 }
 
 export function startDisplayClientHeartbeatLoop(options: DisplayClientHeartbeatLoopOptions) {
-  if (!options.connected) {
+  if (!options.connected || options.enabled === false) {
     return () => {};
   }
 
@@ -64,10 +73,15 @@ export function startDisplayClientHeartbeatLoop(options: DisplayClientHeartbeatL
 }
 
 export function useDisplayClientHeartbeat(args: {
+  appliedVersion: number | null;
+  desiredVersion: number | null;
   isIdle: boolean;
   isPlaying: boolean;
   pageKey: string | null;
+  rolloutReady: boolean;
   route: string;
+  updateError: string | null;
+  updateState: DisplayClientHeartbeat["updateState"];
 }) {
   const [connectionState, setConnectionState] = useState<SocketConnectionState>(
     getSocketConnectionState()
@@ -85,7 +99,18 @@ export function useDisplayClientHeartbeat(args: {
   }, []);
 
   useEffect(() => {
-    const heartbeatKey = `${args.route}::${args.pageKey ?? ""}`;
+    if (!args.rolloutReady) {
+      previousHeartbeatKeyRef.current = null;
+      return;
+    }
+    const heartbeatKey = [
+      args.route,
+      args.pageKey ?? "",
+      args.desiredVersion ?? "",
+      args.appliedVersion ?? "",
+      args.updateState,
+      args.updateError ?? ""
+    ].join("::");
     const becameConnected =
       previousConnectionStatusRef.current !== "connected" && connectionState.status === "connected";
     const emitImmediately =
@@ -96,6 +121,7 @@ export function useDisplayClientHeartbeat(args: {
 
     return startDisplayClientHeartbeatLoop({
       connected: connectionState.status === "connected",
+      enabled: args.rolloutReady,
       emitHeartbeat: emitClientHeartbeat,
       emitImmediately,
       payloadFactory: () => buildDisplayClientHeartbeatPayload({
@@ -103,5 +129,15 @@ export function useDisplayClientHeartbeat(args: {
         timeSyncState: getAppTimeSnapshot().state
       })
     });
-  }, [args.isPlaying, args.pageKey, args.route, connectionState.status]);
+  }, [
+    args.appliedVersion,
+    args.desiredVersion,
+    args.isPlaying,
+    args.pageKey,
+    args.rolloutReady,
+    args.route,
+    args.updateError,
+    args.updateState,
+    connectionState.status
+  ]);
 }

@@ -20,6 +20,7 @@ const defaultProfile = {
 
 function createGroup(id: number, siteScope: "cl" | "kn" = "cl"): DeviceGroup {
   return {
+    desiredVersion: 1,
     enabled: true,
     id,
     name: `Group ${id}`,
@@ -32,6 +33,7 @@ function createGroup(id: number, siteScope: "cl" | "kn" = "cl"): DeviceGroup {
 function createDevice(index: number, overrides: Partial<Device> = {}): Device {
   const group = createGroup(index + 1, index % 2 === 0 ? "cl" : "kn");
   return {
+    appliedVersion: 1,
     clientId: `display-${String(index + 1).padStart(2, "0")}`,
     displayName: `Display ${index + 1}`,
     enabled: true,
@@ -39,6 +41,8 @@ function createDevice(index: number, overrides: Partial<Device> = {}): Device {
     groupId: group.id,
     id: index + 1,
     paired: true,
+    profileUpdateError: null,
+    profileUpdateState: "applied",
     ...overrides
   };
 }
@@ -48,22 +52,26 @@ function createLiveness(
   overrides: Record<number, Partial<DisplayClientLivenessSnapshot["clients"][number]>> = {}
 ): DisplayClientLivenessSnapshot {
   const clients = devices.map((device) => ({
+    appliedVersion: device.appliedVersion,
     clientId: device.clientId,
     connectedCount: 1,
     deviceId: device.id,
     duplicateDetectedAt: null,
     duplicateIdentity: false,
+    desiredVersion: device.group?.desiredVersion ?? null,
     groupId: device.groupId ?? 0,
     isIdle: false,
     isPlaying: true,
     lastSeenAt: "2026-07-30T08:00:00.000Z",
     pageKey: "overview",
     profileId: defaultProfile.id,
+    profileUpdateError: device.profileUpdateError,
     route: "/overview",
     siteScope: device.group?.siteScope ?? "cl",
     sourceStatus: "same-source" as const,
     state: "online" as const,
     timeSyncState: "synced" as const,
+    updateState: device.profileUpdateState,
     viewport: { height: 1080, width: 1920 },
     ...overrides[device.id]
   }));
@@ -81,24 +89,37 @@ function createLiveness(
 
 test("buildDeviceFleetViewModel keeps 50 stable rows and filters by identity", () => {
   const devices = Array.from({ length: 50 }, (_, index) => createDevice(index));
+  const liveness = createLiveness(devices, {
+    [devices[49]!.id]: {
+      profileUpdateError: "snapshot validation failed",
+      updateState: "failed"
+    }
+  });
   const model = buildDeviceFleetViewModel({
     devices,
     filter: "",
     groups: devices.map((device) => device.group!),
-    liveness: createLiveness(devices),
+    liveness,
     loading: false,
     unavailable: []
   });
 
   assert.equal(model.rows.length, 50);
   assert.equal(new Set(model.rows.map((row) => row.key)).size, 50);
+  assert.deepEqual(model.rolloutSummary, {
+    applied: 49,
+    failed: 1,
+    offline: 0,
+    total: 50,
+    waiting: 0
+  });
   assert.equal(model.rows[0]?.groupId, devices[0]?.groupId);
   assert.equal(
     buildDeviceFleetViewModel({
       devices,
       filter: "display-50",
       groups: [],
-      liveness: createLiveness(devices),
+      liveness,
       loading: false,
       unavailable: []
     }).rows[0]?.clientId,

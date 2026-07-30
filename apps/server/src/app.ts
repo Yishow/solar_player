@@ -22,6 +22,7 @@ import managementAuthPlugin, {
 } from "./plugins/managementAuth.js";
 import { deviceContextPlugin } from "./plugins/deviceContext.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
+import { recordDeviceProfileRolloutHeartbeat } from "./services/deviceProfileRolloutService.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
 import metricsHistoryRoute from "./routes/metrics-history.js";
@@ -127,6 +128,7 @@ export async function buildApp() {
         updatedAt: new Date().toISOString()
       } satisfies MqttStatus,
     logger: app.log,
+    recordDeviceProfileRolloutHeartbeat,
     server: app.server
   });
   mqttClientService = new MqttClientService({

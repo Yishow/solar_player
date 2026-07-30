@@ -126,11 +126,21 @@ function createDeviceContext(deviceId = 1) {
   };
 }
 
+const appliedProfileRolloutHeartbeat = {
+  appliedVersion: 1,
+  desiredVersion: 1,
+  updateError: null,
+  updateState: "applied" as const
+};
+
 function createIdentityAwareService(options: {
   classifySession?: () => "management-trusted" | "playback-safe";
   io: FakeIo;
   logger: ReturnType<typeof createLogger>;
   now: () => Date;
+  recordDeviceProfileRolloutHeartbeat?: ConstructorParameters<
+    typeof SocketService
+  >[0]["recordDeviceProfileRolloutHeartbeat"];
   resolveDisplayClientContext: (credential: unknown) => ReturnType<typeof createDeviceContext>;
 }) {
   return new SocketService({
@@ -142,6 +152,59 @@ function createIdentityAwareService(options: {
     ...options
   } as ConstructorParameters<typeof SocketService>[0]);
 }
+
+test("SocketService stores the Server-authoritative rollout heartbeat state", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const received: unknown[] = [];
+  const service = createIdentityAwareService({
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    recordDeviceProfileRolloutHeartbeat(deviceId, heartbeat) {
+      received.push({ deviceId, heartbeat });
+      return {
+        appliedVersion: 1,
+        desired: null,
+        desiredVersion: 2,
+        lastError: "desired version mismatch",
+        updatedAt: "2026-05-22T12:00:00.000Z",
+        updateState: "failed"
+      };
+    },
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const socket = new FakeSocket();
+  io.connect(socket);
+  socket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
+    isPlaying: true,
+    pageKey: "overview",
+    route: "/overview",
+    timeSyncState: "synced"
+  });
+
+  assert.equal(received.length, 1);
+  assert.equal(received[0] && (received[0] as { deviceId: number }).deviceId, 1);
+  assert.deepEqual(
+    {
+      appliedVersion:
+        service.getDisplayClientLivenessSnapshot().clients[0]?.appliedVersion,
+      desiredVersion:
+        service.getDisplayClientLivenessSnapshot().clients[0]?.desiredVersion,
+      profileUpdateError:
+        service.getDisplayClientLivenessSnapshot().clients[0]?.profileUpdateError,
+      updateState:
+        service.getDisplayClientLivenessSnapshot().clients[0]?.updateState
+    },
+    {
+      appliedVersion: 1,
+      desiredVersion: 2,
+      profileUpdateError: "desired version mismatch",
+      updateState: "failed"
+    }
+  );
+});
 
 test("SocketService aggregates child connections under the credential-bound Device identity", () => {
   const io = new FakeIo();
@@ -161,6 +224,7 @@ test("SocketService aggregates child connections under the credential-bound Devi
   io.connect(secondSocket);
   currentNow = new Date("2026-05-22T12:00:10.000Z");
   firstSocket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
     isPlaying: false,
     pageKey: "overview",
     route: "/overview",
@@ -168,6 +232,7 @@ test("SocketService aggregates child connections under the credential-bound Devi
   });
   currentNow = new Date("2026-05-22T12:00:20.000Z");
   secondSocket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
     clientId: "claimed-other-device",
     isPlaying: true,
     pageKey: "solar",
@@ -284,6 +349,7 @@ test("SocketService rejects unknown credentials and disconnects a connection rev
   const socket = new FakeSocket();
   io.connect(socket);
   socket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
     isPlaying: true,
     pageKey: "solar",
     route: "/solar",
@@ -417,6 +483,7 @@ test("SocketService tracks a connected display client heartbeat and retains Devi
   io.connect(socket);
   currentNow = new Date("2026-05-22T12:00:10.000Z");
   socket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
     clientTime: "2026-05-22T12:00:05.000Z",
     isIdle: false,
     isPlaying: true,
@@ -487,6 +554,7 @@ test("SocketService accepts only the four required heartbeat Time Sync States", 
     "time-untrusted"
   ]) {
     socket.trigger("client:heartbeat", {
+      ...appliedProfileRolloutHeartbeat,
       isPlaying: true,
       pageKey: "overview",
       route: `/time/${String(timeSyncState)}`,

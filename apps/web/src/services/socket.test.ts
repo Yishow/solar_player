@@ -99,10 +99,14 @@ test("emitClientHeartbeatViaClient emits only when the socket client is connecte
   let emittedPayload: unknown = null;
   let emitCount = 0;
   const payload = {
+    appliedVersion: 1,
+    desiredVersion: 2,
     isPlaying: true,
     pageKey: "overview",
     route: "/overview",
-    timeSyncState: "synced" as const
+    timeSyncState: "synced" as const,
+    updateError: null,
+    updateState: "waiting" as const
   };
 
   assert.equal(

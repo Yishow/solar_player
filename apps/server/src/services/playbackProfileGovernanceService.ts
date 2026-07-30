@@ -20,6 +20,7 @@ import {
   readPlaybackSettings
 } from "./displayRotationService.js";
 import { readDefaultPlaybackProfileId } from "./playbackProfileService.js";
+import { assignDesiredProfileVersion } from "./deviceProfileRolloutService.js";
 
 type DraftRow = {
   pages_json: string;
@@ -598,7 +599,9 @@ function appendVersion(input: {
         createdBy,
         input.rollbackFromVersionId
       );
-    return Number(result.lastInsertRowid);
+    const versionId = Number(result.lastInsertRowid);
+    assignDesiredProfileVersion(input.profileId, versionId, db);
+    return versionId;
   })();
   return readPlaybackProfileVersion(input.profileId, id);
 }
