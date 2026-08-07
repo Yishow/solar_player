@@ -1864,6 +1864,31 @@ test("kiosk launcher waits for health and launches Firefox in kiosk mode", () =>
   );
 });
 
+// The launcher spawns roughly a dozen helper processes per monitor iteration,
+// so a two-iteration run costs well over a second on an idle machine and more
+// under full-suite load. Give it headroom rather than letting scheduling noise
+// decide the result.
+const KIOSK_SCRIPT_TIMEOUT_MS = 20_000;
+
+/**
+ * Assert a kiosk helper run finished on its own.
+ *
+ * `start-solar-kiosk.sh` traps TERM and exits 0, so the SIGTERM that spawnSync
+ * sends on timeout is indistinguishable from a clean exit by status alone — the
+ * launch/curl counters simply stop wherever the kill happened to land. Checking
+ * `result.error` first turns a timeout into a timeout failure instead of a
+ * misleading counter mismatch.
+ */
+function assertKioskRunCompleted(result, label) {
+  if (result.error) {
+    assert.fail(
+      `${label} did not complete on its own: ${result.error.code ?? result.error.message}\n${result.stderr ?? ""}`
+    );
+  }
+
+  assert.equal(result.status, 0, result.stderr);
+}
+
 function makeKioskLifecycleFixture() {
   const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-kiosk-lifecycle-"));
   const fakeBinDir = path.join(fixtureDir, "fake-bin");
@@ -2057,10 +2082,10 @@ test("kiosk launcher restarts Firefox after an unexpected exit", () => {
       }),
       bashPrependPathDirs: [fixture.fakeBinDir],
       encoding: "utf8",
-      timeout: 2_000
+      timeout: KIOSK_SCRIPT_TIMEOUT_MS
     });
 
-    assert.equal(result.status, 0, result.stderr);
+    assertKioskRunCompleted(result, "kiosk launcher restart run");
     assert.equal(readFileSync(fixture.launchCountPath, "utf8").trim(), "2");
     assert.equal(readFileSync(fixture.curlCountPath, "utf8").trim(), "2");
   } finally {
@@ -2081,10 +2106,10 @@ test("kiosk launcher starts another health window after timeout", () => {
       }),
       bashPrependPathDirs: [fixture.fakeBinDir],
       encoding: "utf8",
-      timeout: 2_000
+      timeout: KIOSK_SCRIPT_TIMEOUT_MS
     });
 
-    assert.equal(result.status, 0, result.stderr);
+    assertKioskRunCompleted(result, "kiosk launcher health-window run");
     assert.equal(readFileSync(fixture.curlCountPath, "utf8").trim(), "2");
     assert.equal(readFileSync(fixture.launchCountPath, "utf8").trim(), "1");
   } finally {
@@ -2138,10 +2163,10 @@ test("a new kiosk launcher clears a stale intentional-exit marker", () => {
       }),
       bashPrependPathDirs: [fixture.fakeBinDir],
       encoding: "utf8",
-      timeout: 2_000
+      timeout: KIOSK_SCRIPT_TIMEOUT_MS
     });
 
-    assert.equal(result.status, 0, result.stderr);
+    assertKioskRunCompleted(result, "stale-marker launcher run");
     assert.equal(readFileSync(fixture.markerObservationPath, "utf8").trim(), "absent");
   } finally {
     removeTempDir(fixture.fixtureDir);
@@ -2198,10 +2223,10 @@ test("kiosk launcher preserves a live legacy PID guard during lock migration", (
       }),
       bashPrependPathDirs: [fixture.fakeBinDir],
       encoding: "utf8",
-      timeout: 2_000
+      timeout: KIOSK_SCRIPT_TIMEOUT_MS
     });
 
-    assert.equal(result.status, 0, result.stderr);
+    assertKioskRunCompleted(result, "legacy-PID-guard launcher run");
     assert.equal(existsSync(fixture.launchCountPath), false);
   } finally {
     removeTempDir(fixture.fixtureDir);
@@ -2363,9 +2388,9 @@ test("real flock releases the monitor slot without leaking it to Firefox", {
       env: kioskLifecycleEnv(fixture, sharedEnv),
       bashPrependPathDirs: [fixture.fakeBinDir],
       encoding: "utf8",
-      timeout: 2_000
+      timeout: KIOSK_SCRIPT_TIMEOUT_MS
     });
-    assert.equal(second.status, 0, second.stderr);
+    assertKioskRunCompleted(second, "second launcher run");
     assert.equal(readdirSync(fixture.firefoxLaunchDir).length, 1);
 
     firstLauncher.kill("SIGTERM");
