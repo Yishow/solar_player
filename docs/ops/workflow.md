@@ -61,6 +61,22 @@ spectra-archive
 - archive 完成後 → 顯示精準 commit 範圍，提示使用者是否提交；取得確認後才精準 staging 與 commit。
 - blocked 時不要假裝有可執行下一步；只提示解除 blocker 所需的單一輸入或外部動作。
 
+## 主線之外的 Spectra 指令
+
+主線流程之外還有三個隨時可用的指令，它們不推進 change 狀態，不取代上面的完成門檻：
+
+- `spectra-discuss <topic>`：需求需要先收斂結構時使用；需求已清楚可直接跳到 `spectra-propose`。
+- `spectra-ask <question>`：查詢 `openspec/specs/` 與 `openspec/changes/` 並回答問題，不改動任何檔案。
+- `spectra-commit <change>`：只 stage 與 commit 該 change 相關檔案；仍受完成門檻 6 的使用者確認約束。
+
+## Parked changes（暫存）
+
+change 可以被 park——暫時移出 `openspec/changes/`。
+
+- parked change 不會出現在 `spectra list`，要用 `spectra list --parked` 才看得到。
+- 還原：`spectra unpark <change>`。
+- `spectra-apply` 與 `spectra-ingest` 會自行處理 parked change，不需先手動 unpark。
+
 ## 何時才使用 `.scratch`
 
 一般功能、功能修改與 bug fix 不先建立 `.scratch`；直接走 Spectra。
