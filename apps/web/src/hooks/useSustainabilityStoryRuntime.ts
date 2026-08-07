@@ -108,7 +108,8 @@ export function useSustainabilityStoryRuntime(
       return response.story;
     },
     refreshKey: spec.refreshKey,
-    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope)
+    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope),
+    runtimeSyncPageKey: "sustainability"
   });
 
   useEffect(() => {

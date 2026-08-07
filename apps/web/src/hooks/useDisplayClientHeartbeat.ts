@@ -13,6 +13,7 @@ import {
   type SocketConnectionState
 } from "../services/socket";
 import { getAppTimeSnapshot } from "../services/appTime";
+import { readDisplayRuntimeSyncSnapshot } from "../services/displayRuntimeSyncReporter";
 
 export type DisplayClientHeartbeatLoopOptions = {
   connected: boolean;
@@ -35,6 +36,10 @@ export function buildDisplayClientHeartbeatPayload(args: {
   timeSyncState: TimeSyncState;
   updateError: string | null;
   updateState: DisplayClientHeartbeat["updateState"];
+  runtimeSyncState?: DisplayClientHeartbeat["runtimeSyncState"];
+  runtimeSyncPageKey?: string | null;
+  runtimeSyncResolvedAt?: string | null;
+  runtimeSyncError?: string | null;
 }): DisplayClientHeartbeat {
   return {
     appliedVersion: args.appliedVersion,
@@ -44,7 +49,14 @@ export function buildDisplayClientHeartbeatPayload(args: {
     route: args.route,
     timeSyncState: args.timeSyncState,
     updateError: args.updateError,
-    updateState: args.updateState
+    updateState: args.updateState,
+    ...readDisplayRuntimeSyncSnapshot(),
+    ...(args.runtimeSyncState ? {
+      runtimeSyncState: args.runtimeSyncState,
+      runtimeSyncPageKey: args.runtimeSyncPageKey ?? null,
+      runtimeSyncResolvedAt: args.runtimeSyncResolvedAt ?? null,
+      runtimeSyncError: args.runtimeSyncError ?? null
+    } : {})
   };
 }
 

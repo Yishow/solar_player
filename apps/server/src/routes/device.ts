@@ -409,6 +409,7 @@ const deviceRoute: FastifyPluginAsync = async (app) => {
         fan,
         displayOps,
         displayClients: app.socketService.getDisplayClientLivenessSnapshot(),
+        unpairedDisplayAccess: app.unpairedDisplayAccessRegistry.getSummary(),
         pid: process.pid,
         release
       }

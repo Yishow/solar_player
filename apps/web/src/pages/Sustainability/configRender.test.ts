@@ -125,10 +125,7 @@ test("sustainability runtime resolves the shared story adapter and clears back t
   assert.match(sustainabilitySource, /const periodBoundContent = useMemo\(/);
   assert.match(sustainabilitySource, /const resolvedHighlightCards = resolveDisplayPageCardRailCards/);
   assert.match(sustainabilitySource, /\}, \[resolvedConfig\.highlightRail,\s*viewModel\]\)/);
-  assert.match(sustainabilitySource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
-  assert.match(sustainabilitySource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
   assert.match(sustainabilitySource, /shouldDeferDisplayPageRuntimeRender\(/);
-  assert.match(sustainabilitySource, /<RuntimeConfigFallbackBanner \{\.\.\.runtimeFallbackBanner\} \/>/);
 });
 
 test("sustainability runtime resolves duplicated household cards by basis metadata instead of exact ids", () => {

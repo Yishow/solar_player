@@ -18,10 +18,6 @@ import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
 import {
   overviewHeroMediaEffectResolverOptions
 } from "../shared/displayPageMediaEffectConfig";
-import {
-  resolveRuntimeFallbackBannerState,
-  RuntimeConfigFallbackBanner
-} from "../runtimeConfigHydration";
 import { overviewAssetRuntimeMap } from "./assets";
 import { pickOverviewBackground } from "./backgroundPool";
 import {
@@ -416,11 +412,6 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
     }),
     [heroMediaPresentation.stageStyle, heroLayout]
   );
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
-    usesRuntimeFallback: storyRuntime.usesFallback
-  });
 
   if (
     shouldDeferDisplayPageRuntimeRender({
@@ -435,7 +426,6 @@ export function Overview({ config, pageId = "overview" }: { config?: OverviewDis
 
   return (
     <section className="overview-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <OverviewStaticShell
         bgTransition={bgTransition}
         goldLineStyle={goldLineStyle}

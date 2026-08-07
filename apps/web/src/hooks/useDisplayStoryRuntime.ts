@@ -139,7 +139,8 @@ export function useDisplayStoryRuntime<PageKey extends DisplayStoryPageId>(
     initialPayload: options?.initialPayload,
     load: () => loadDisplayStoryRuntimePayload(pageKey),
     refreshKey: spec.refreshKey,
-    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope)
+    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope),
+    runtimeSyncPageKey: pageKey
   });
   const isFactoryCircuit =
     pageKey === "factory-circuit" || pageKey === "factory-circuit-guanyin";

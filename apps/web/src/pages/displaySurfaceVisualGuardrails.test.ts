@@ -75,6 +75,12 @@ const pageSources = [
   "Images/index.tsx",
   "Sustainability/index.tsx"
 ].map((relativePath) => readFileSync(path.join(import.meta.dirname, relativePath), "utf8"));
+
+test("playback pages do not import runtime fallback overlays", () => {
+  for (const source of pageSources) {
+    assert.doesNotMatch(source, /RuntimeConfigFallbackBanner|resolveRuntimeFallbackBannerState/);
+  }
+});
 const splitRuntimeSources = [
   readFileSync(path.join(import.meta.dirname, "Overview/runtimeContent.tsx"), "utf8"),
   readFileSync(path.join(import.meta.dirname, "Solar/runtimeContent.tsx"), "utf8"),

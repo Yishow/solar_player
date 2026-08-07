@@ -147,3 +147,17 @@ test("same-host cross-port browser requests stay trusted by CORS gating", () => 
     true
   );
 });
+
+test("password gate adds a second condition without changing origin trust", () => {
+  const accessControl = createManagementAccessControl({
+    managementAccessToken: "secret-token",
+    trustedOrigins: [],
+    passwordGateEnabled: () => true,
+    isManagementSessionValid: (request) => request.headers.cookie === "solar_management_session=valid"
+  });
+  const base = { headers: { host: "player.example", origin: "https://player.example" }, ip: "10.0.0.8" };
+  assert.equal(accessControl.isTrustedManagementOriginRequest(base), true);
+  assert.equal(accessControl.isTrustedManagementRequestLike(base), false);
+  assert.equal(accessControl.isTrustedManagementRequestLike({ ...base, headers: { ...base.headers, cookie: "solar_management_session=valid" } }), true);
+  assert.equal(accessControl.isTrustedManagementRequestLike({ headers: { "x-solar-management-token": "secret-token" }, ip: "198.51.100.2" }), true);
+});

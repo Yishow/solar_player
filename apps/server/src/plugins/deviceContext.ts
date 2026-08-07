@@ -62,6 +62,16 @@ export async function deviceContextPlugin(app: FastifyInstance) {
           readDeviceCredentialCookie(request.headers.cookie)
         );
       } catch (error) {
+        if (error instanceof DisplayClientContextServiceError) {
+          try {
+            app.unpairedDisplayAccessRegistry.record(
+              error.code,
+              new URL(request.url, "http://localhost").pathname
+            );
+          } catch (recordingError) {
+            app.log.warn({ err: recordingError }, "Unable to record denied display access");
+          }
+        }
         return sendContextError(reply, error);
       }
     }

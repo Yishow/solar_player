@@ -110,8 +110,6 @@ test("solar runtime keeps story hydration staged behind visible config and socke
   assert.match(solarSource, /solarStoryRuntime\.payload \?\? undefined/);
   assert.match(solarRuntimeSource, /solarStory: solarStoryPayload/);
   assert.match(solarRuntimeSource, /isSocketConnected: liveMetrics\.isSocketConnected/);
-  assert.match(solarSource, /runtimeErrorMessage: runtimeHydrationEnabled \? solarStoryRuntime\.errorMessage : ""/);
-  assert.match(solarSource, /usesRuntimeFallback: solarStoryRuntime\.usesFallback/);
 });
 
 test("solar KPI editor regions expose visibility toggle and configuring status select", () => {

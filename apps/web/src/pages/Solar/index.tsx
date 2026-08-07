@@ -25,10 +25,6 @@ import {
   type SolarIconAssetSources
 } from "./displayPageConfig";
 import {
-  resolveRuntimeFallbackBannerState,
-  RuntimeConfigFallbackBanner
-} from "../runtimeConfigHydration";
-import {
   solarContentTopOffset,
   solarTitleLayout
 } from "./layout";
@@ -333,11 +329,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
     };
   }, [runtimeResolvedConfig, seedConfig]);
   const solarStoryPayload = solarStoryRuntime.payload ?? undefined;
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? solarStoryRuntime.errorMessage : "",
-    usesRuntimeFallback: solarStoryRuntime.usesFallback
-  });
   const solarTitleLine2 = useMemo(
     () => splitSolarTitleLine(resolvedConfig.heroCopy.titleLines[1]),
     [resolvedConfig.heroCopy.titleLines]
@@ -393,7 +384,6 @@ export function Solar({ config, pageId = "solar" }: { config?: SolarDisplayPageC
 
   return (
     <section className="solar-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <SolarStaticShell
         goldLineLayout={goldLineLayout}
         heroLayout={heroLayout}

@@ -135,8 +135,6 @@ test("images runtime keeps playlist hydration staged while preserving autoplay a
   assert.match(imagesSource, /shuffleEnabled = runtimeHydrationEnabled/);
   assert.match(imagesSource, /activeEntry: localRequestedActiveEntry/);
   assert.match(imagesSource, /entries: viewModelEntries/);
-  assert.match(imagesSource, /runtimeErrorMessage: runtimeHydrationEnabled \? playlistRuntime\.errorMessage : ""/);
-  assert.match(imagesSource, /usesRuntimeFallback: playlistRuntime\.usesFallback/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.prev\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.next\(\)\}/);
   assert.match(imagesSource, /onClick=\{\(\) => autoplay\.selectIndex\(visibleStart \+ thumbIndex\)\}/);

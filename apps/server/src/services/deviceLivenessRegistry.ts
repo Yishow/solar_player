@@ -34,6 +34,10 @@ type DeviceRecord = {
   route: string;
   profileUpdateError: string | null;
   timeSyncState: DisplayClientHeartbeat["timeSyncState"];
+  runtimeSyncState: DisplayClientHeartbeat["runtimeSyncState"];
+  runtimeSyncPageKey: string | null;
+  runtimeSyncResolvedAt: string | null;
+  runtimeSyncError: string | null;
   updateState: DisplayClientHeartbeat["updateState"];
   viewport: {
     height: number;
@@ -95,6 +99,10 @@ export class DeviceLivenessRegistry {
       profileUpdateError: null,
       route: "/",
       timeSyncState: "waiting",
+      runtimeSyncState: "unknown",
+      runtimeSyncPageKey: null,
+      runtimeSyncResolvedAt: null,
+      runtimeSyncError: null,
       updateState: "waiting",
       viewport: {
         height: 0,
@@ -144,6 +152,10 @@ export class DeviceLivenessRegistry {
     device.route = payload.route;
     device.profileUpdateError = payload.updateError ?? null;
     device.timeSyncState = payload.timeSyncState;
+    device.runtimeSyncState = payload.runtimeSyncState ?? "unknown";
+    device.runtimeSyncPageKey = payload.runtimeSyncPageKey ?? null;
+    device.runtimeSyncResolvedAt = payload.runtimeSyncResolvedAt ?? null;
+    device.runtimeSyncError = payload.runtimeSyncError ?? null;
     device.updateState = payload.updateState;
     return true;
   }
@@ -235,6 +247,10 @@ export class DeviceLivenessRegistry {
       siteScope: device.identity.siteScope,
       sourceStatus,
       timeSyncState: device.timeSyncState,
+      runtimeSyncState: device.runtimeSyncState,
+      runtimeSyncPageKey: device.runtimeSyncPageKey,
+      runtimeSyncResolvedAt: device.runtimeSyncResolvedAt,
+      runtimeSyncError: device.runtimeSyncError,
       updateState: device.updateState,
       viewport: device.viewport
     };

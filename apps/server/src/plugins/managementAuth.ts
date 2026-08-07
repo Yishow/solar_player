@@ -10,6 +10,7 @@ import {
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export const MANAGEMENT_ACCESS_TOKEN_HEADER = "x-solar-management-token";
+export const MANAGEMENT_SESSION_COOKIE = "solar_management_session";
 
 type RequestLike = {
   headers: IncomingHttpHeaders;
@@ -35,12 +36,14 @@ type ManagementAccessDecision = {
     | "trusted-origin"
     | "untrusted";
   trusted: boolean;
+  passwordGateSatisfied: boolean;
 };
 
 export type ManagementAccessControl = {
   classifySocketSession: (handshake: SocketHandshakeLike) => ManagementSocketSessionClass;
   createDeniedEnvelope: () => ManagementAccessDeniedEnvelope;
   deny: (reply: FastifyReply) => unknown;
+  isTrustedManagementOriginRequest: (request: RequestLike) => boolean;
   isTrustedManagementMutationRequest: (request: FastifyRequest) => boolean;
   isTrustedManagementReadRequest: (request: FastifyRequest) => boolean;
   isTrustedManagementRequestLike: (request: RequestLike) => boolean;
@@ -57,6 +60,18 @@ function readHeaderValue(value: string | string[] | undefined): string | null {
   }
 
   return null;
+}
+
+export function readManagementSessionCookie(headers: IncomingHttpHeaders): string | null {
+  const cookie = readHeaderValue(headers.cookie);
+  if (!cookie) return null;
+  const entry = cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${MANAGEMENT_SESSION_COOKIE}=`));
+  if (!entry) return null;
+  try {
+    return decodeURIComponent(entry.slice(MANAGEMENT_SESSION_COOKIE.length + 1));
+  } catch {
+    return null;
+  }
 }
 
 function normalizeOrigin(origin: string): string | null {
@@ -158,7 +173,7 @@ function isManagementMutationRequest(request: FastifyRequest): boolean {
   }
 
   const pathname = new URL(request.url, "http://localhost").pathname;
-  return pathname.startsWith("/api/");
+  return pathname.startsWith("/api/") && !pathname.startsWith("/api/management-auth/");
 }
 
 export function parseManagementTrustedOrigins(value: string | undefined): string[] {
@@ -216,13 +231,16 @@ export function isTrustedManagementCorsRequest(
 function classifyManagementRequest(
   request: RequestLike,
   trustedOrigins: string[],
-  managementAccessToken: string | null
+  managementAccessToken: string | null,
+  passwordGateEnabled = () => false,
+  isManagementSessionValid = (_request: RequestLike) => false
 ): ManagementAccessDecision {
   if (matchesHeaderAccessToken(request.headers, managementAccessToken)) {
     return {
       normalizedOrigin: null,
       reason: "access-token",
-      trusted: true
+      trusted: true,
+      passwordGateSatisfied: true
     };
   }
 
@@ -233,15 +251,17 @@ function classifyManagementRequest(
       return {
         normalizedOrigin: null,
         reason: "same-host-referer",
-        trusted: true
+        trusted: true,
+        passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
       };
     }
 
-    const trusted = isLoopbackRemoteAddress(request.ip);
+    const trusted = isSameHostReferer(request.headers, readHeaderValue(request.headers.host)) || isLoopbackRemoteAddress(request.ip);
     return {
       normalizedOrigin: null,
       reason: trusted ? "loopback-remote" : "untrusted",
-      trusted
+      trusted,
+      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
     };
   }
 
@@ -250,7 +270,8 @@ function classifyManagementRequest(
     return {
       normalizedOrigin: null,
       reason: "untrusted",
-      trusted: false
+      trusted: false,
+      passwordGateSatisfied: false
     };
   }
 
@@ -258,7 +279,8 @@ function classifyManagementRequest(
     return {
       normalizedOrigin,
       reason: "loopback-origin",
-      trusted: true
+      trusted: true,
+      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
     };
   }
 
@@ -266,7 +288,8 @@ function classifyManagementRequest(
     return {
       normalizedOrigin,
       reason: "trusted-origin",
-      trusted: true
+      trusted: true,
+      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
     };
   }
 
@@ -274,14 +297,16 @@ function classifyManagementRequest(
     return {
       normalizedOrigin,
       reason: "same-host-origin",
-      trusted: true
+      trusted: true,
+      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
     };
   }
 
   return {
     normalizedOrigin,
     reason: "untrusted",
-    trusted: false
+    trusted: false,
+    passwordGateSatisfied: false
   };
 }
 
@@ -305,7 +330,12 @@ export function createManagementAccessDeniedEnvelope(): ManagementAccessDeniedEn
 export function createManagementAccessControl(options: {
   managementAccessToken: string | null;
   trustedOrigins: string[];
+  passwordGateEnabled?: () => boolean;
+  isManagementSessionValid?: (request: RequestLike) => boolean;
 }): ManagementAccessControl {
+  const passwordGateEnabled = options.passwordGateEnabled ?? (() => false);
+  const isManagementSessionValid = options.isManagementSessionValid ?? (() => false);
+  const classify = (request: RequestLike) => classifyManagementRequest(request, options.trustedOrigins, options.managementAccessToken, passwordGateEnabled, isManagementSessionValid);
   return {
     classifySocketSession(handshake) {
       const requestedClass = resolveRequestedSocketSessionClass(handshake.auth);
@@ -326,8 +356,17 @@ export function createManagementAccessControl(options: {
           ip: handshake.address
         },
         options.trustedOrigins,
-        options.managementAccessToken
+        options.managementAccessToken,
+        passwordGateEnabled,
+        isManagementSessionValid
       ).trusted
+        && classifyManagementRequest(
+          { headers: handshake.headers, ip: handshake.address },
+          options.trustedOrigins,
+          options.managementAccessToken,
+          passwordGateEnabled,
+          isManagementSessionValid
+        ).passwordGateSatisfied
         ? "management-trusted"
         : "playback-safe";
     },
@@ -337,26 +376,20 @@ export function createManagementAccessControl(options: {
     deny(reply) {
       return reply.status(403).send(createManagementAccessDeniedEnvelope());
     },
+    isTrustedManagementOriginRequest(request) {
+      return classify(request).trusted;
+    },
     isTrustedManagementMutationRequest(request) {
-      return classifyManagementRequest(
-        request,
-        options.trustedOrigins,
-        options.managementAccessToken
-      ).trusted;
+      const decision = classify(request);
+      return decision.trusted && decision.passwordGateSatisfied;
     },
     isTrustedManagementReadRequest(request) {
-      return classifyManagementRequest(
-        request,
-        options.trustedOrigins,
-        options.managementAccessToken
-      ).trusted;
+      const decision = classify(request);
+      return decision.trusted && decision.passwordGateSatisfied;
     },
     isTrustedManagementRequestLike(request) {
-      return classifyManagementRequest(
-        request,
-        options.trustedOrigins,
-        options.managementAccessToken
-      ).trusted;
+      const decision = classify(request);
+      return decision.trusted && decision.passwordGateSatisfied;
     }
   };
 }
@@ -406,6 +439,8 @@ type ManagementAuthPluginOptions = {
   accessControl?: ManagementAccessControl;
   managementAccessToken: string | null;
   trustedOrigins: string[];
+  passwordGateEnabled?: () => boolean;
+  isManagementSessionValid?: (request: RequestLike) => boolean;
 };
 
 const managementAuthPlugin: FastifyPluginAsync<ManagementAuthPluginOptions> = async (

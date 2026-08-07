@@ -35,10 +35,6 @@ import {
 import {
   imagesMainStageMediaEffectResolverOptions
 } from "../shared/displayPageMediaEffectConfig";
-import {
-  resolveRuntimeFallbackBannerState,
-  RuntimeConfigFallbackBanner
-} from "../runtimeConfigHydration";
 import { imagesAssetRuntimeMap, imagesReferencePlaylistEntries } from "./assets";
 import {
   createImagesDisplayPageSeedConfig,
@@ -223,11 +219,6 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
     activeIndex: autoplay.activeIndex,
     thumbnails: viewModelEntries
   });
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? playlistRuntime.errorMessage : "",
-    usesRuntimeFallback: playlistRuntime.usesFallback
-  });
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
@@ -263,7 +254,6 @@ export function Images({ config, pageId = "images" }: { config?: ImagesDisplayPa
 
   return (
     <section className="images-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="images-title-group display-surface-hero-group"
         style={{

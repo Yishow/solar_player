@@ -45,10 +45,6 @@ import {
 } from "../shared/displayPageFhdRhythmConfig";
 import { sustainabilityHeroMediaEffectResolverOptions } from "../shared/displayPageMediaEffectConfig";
 import { DisplayLeafOrnament } from "../shared/DisplayLeafOrnament";
-import {
-  resolveRuntimeFallbackBannerState,
-  RuntimeConfigFallbackBanner
-} from "../runtimeConfigHydration";
 import { resolveDisplayPageCardRailCards } from "../shared/displayPageCardRailRenderer";
 import {
   createSustainabilityDisplayPageSeedConfig,
@@ -183,11 +179,6 @@ export function Sustainability({
       }),
     [selectedPeriod, storyRuntime.payload]
   );
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? storyRuntime.errorMessage : "",
-    usesRuntimeFallback: storyRuntime.usesFallback
-  });
   const heroMediaSource = resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src);
   const heroMediaPresentation = buildDisplayPageMediaPresentation(
     resolvedConfig.heroMedia,
@@ -300,7 +291,6 @@ export function Sustainability({
 
   return (
     <section className="sustainability-display-page" style={paletteVars}>
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="sustainability-title display-surface-hero-group"
         style={{

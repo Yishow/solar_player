@@ -1,6 +1,7 @@
 import {
   resolveDisplayFaultTriageSummaryFromAlerts,
   type DisplayClientLivenessSnapshot,
+  type UnpairedDisplayAccessSummary,
   type DeviceDisplayOpsSummary,
   type DeviceSafeOpsGuidance,
   type DisplayFaultTriageSummary
@@ -24,6 +25,7 @@ type DeviceRouteStatus = {
   temperature?: DeviceTemperatureTelemetry;
   fan?: DeviceFanTelemetry;
   displayClients?: DisplayClientLivenessSnapshot;
+  unpairedDisplayAccess?: UnpairedDisplayAccessSummary;
   pid: number;
   release?: DeviceReleaseIdentity;
 };
@@ -236,6 +238,14 @@ function buildDisplayClientSummary(
             ? "is-warning"
             : "is-error",
       lastSeenLabel: formatRelativeTime(client.lastSeenAt, now),
+      runtimeSyncStateLabel: client.runtimeSyncState === "synced"
+        ? "同步正常"
+        : client.runtimeSyncState === "loading"
+          ? "同步中"
+          : client.runtimeSyncState === "degraded"
+            ? "同步異常"
+            : "未回報",
+      runtimeSyncResolvedAtLabel: formatTimestamp(client.runtimeSyncResolvedAt),
       pageLabel: client.pageKey
         ? displayClientPageLabels[client.pageKey] ?? client.pageKey
         : `Route ${client.route}`,
@@ -258,6 +268,16 @@ function buildDisplayClientSummary(
       timeSyncLabel: `App Time ${client.timeSyncState}`
     })),
     totalLabel: `${summary.total} clients`
+  };
+}
+
+function buildUnpairedDisplayAccessSummary(summary: UnpairedDisplayAccessSummary | undefined, now: Date) {
+  const totalCount = summary?.totalCount ?? 0;
+  return {
+    totalCount,
+    totalLabel: totalCount === 0 ? "無未配對存取" : `${totalCount} 次未配對存取`,
+    lastSeenLabel: formatRelativeTime(summary?.lastSeenAt, now),
+    lastDeniedRouteLabel: summary?.lastDeniedRoute ?? "--"
   };
 }
 
@@ -451,6 +471,7 @@ export function buildDeviceStatusViewModel({
   );
   const releaseRows = buildReleaseRows(status, statusAccessDenied);
   const displayClientSummary = buildDisplayClientSummary(status?.displayClients, now);
+  const unpairedDisplayAccessSummary = buildUnpairedDisplayAccessSummary(status?.unpairedDisplayAccess, now);
   const alerts = displayOpsSummary?.alerts.map((alert) => ({
     ...alert,
     domainLabel: alert.domain,
@@ -602,6 +623,7 @@ export function buildDeviceStatusViewModel({
       summaryTitle: logsSummary.statusTitle
     },
     displayClientSummary,
+    unpairedDisplayAccessSummary,
     livenessTriage: {
       helper: displayClientSummary.badges.map((badge) => `${badge.label} ${badge.count}`).join(" · "),
       items: displayClientSummary.rows,

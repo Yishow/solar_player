@@ -28,6 +28,10 @@ function buildEntry(overrides: Partial<DisplayClientLivenessEntry>): DisplayClie
     siteScope: "cl",
     sourceStatus: "same-source",
     timeSyncState: "waiting",
+    runtimeSyncState: "unknown",
+    runtimeSyncPageKey: null,
+    runtimeSyncResolvedAt: null,
+    runtimeSyncError: null,
     viewport: {
       height: 1080,
       width: 1920
@@ -42,6 +46,10 @@ test("display liveness keeps the 10 second heartbeat interval and a server-owned
     pageKey: "overview",
     route: "/overview",
     timeSyncState: "synced"
+    ,runtimeSyncState: "unknown",
+    runtimeSyncPageKey: null,
+    runtimeSyncResolvedAt: null,
+    runtimeSyncError: null
   };
 
   assert.equal(DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS, 10_000);
@@ -198,6 +206,10 @@ test("buildDisplayClientLivenessSnapshot exposes Device context without credenti
     sourceStatus: "multi-source",
     state: "online",
     timeSyncState: "waiting",
+    runtimeSyncState: "unknown",
+    runtimeSyncPageKey: null,
+    runtimeSyncResolvedAt: null,
+    runtimeSyncError: null,
     viewport: {
       height: 1080,
       width: 1920

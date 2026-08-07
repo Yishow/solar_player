@@ -10,6 +10,9 @@ import { useMqttStatus } from "../hooks/useMqttStatus";
 import { useShellDecorations } from "../hooks/useShellDecorations";
 import type { ShellDecorationObject } from "@solar-display/shared";
 import type { ShellBootstrap } from "./shellBootstrap";
+import { ManagementUnlockScreen } from "../components/ManagementUnlockScreen";
+import { MANAGEMENT_ACCESS_DENIED_EVENT } from "../services/api";
+import { useManagementPasswordGate } from "../hooks/useManagementPasswordGate";
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
@@ -43,6 +46,7 @@ export function ManagementShellFrame({
   hideChrome?: boolean;
   initialBrandView?: BrandView;
 }) {
+  const gate = useManagementPasswordGate();
   const [layout, setLayout] = useState(() => computeCanvasLayout(
     getViewportSize(),
     { height: DESIGN_HEIGHT, width: DESIGN_WIDTH }
@@ -65,6 +69,12 @@ export function ManagementShellFrame({
       window.visualViewport?.removeEventListener("resize", updateLayout);
     };
   }, []);
+
+  useEffect(() => {
+    const handleDenied = () => { void gate.refresh(); };
+    window.addEventListener(MANAGEMENT_ACCESS_DENIED_EVENT, handleDenied);
+    return () => window.removeEventListener(MANAGEMENT_ACCESS_DENIED_EVENT, handleDenied);
+  }, [gate.refresh]);
 
   return (
     <div
@@ -104,7 +114,13 @@ export function ManagementShellFrame({
               data-shell-primitive="management-scroll"
               className="h-full w-full overflow-y-auto overflow-x-hidden"
             >
-              {children}
+              {typeof window !== "undefined" && gate.requiresUnlock ? (
+                <ManagementUnlockScreen
+                  errorMessage={gate.errorMessage}
+                  lockedUntil={gate.lockedUntil}
+                  onUnlock={gate.unlock}
+                />
+              ) : children}
             </div>
           </main>
           {!hideChrome ? <AppFooterNav brandView={initialBrandView} decorationObjects={footerDecorationObjects} /> : null}

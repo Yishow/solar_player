@@ -258,12 +258,22 @@ export function DeviceStatusContent({
               ))}
               <div className="mgmt-status">{viewModel.displayClientSummary.totalLabel}</div>
             </div>
+            <div className="mgmt-status" style={{ marginTop: 12 }}>
+              此展示端清單僅涵蓋已配對且連線中的 client；未出現在清單不代表該展示機正常。
+            </div>
+            <div className="mgmt-status" style={{ marginTop: 12 }}>
+              未配對存取：{viewModel.unpairedDisplayAccessSummary.totalLabel}
+              <small style={{ display: "block", opacity: 0.72 }}>
+                最近發生：{viewModel.unpairedDisplayAccessSummary.lastSeenLabel} · 被拒路由：{viewModel.unpairedDisplayAccessSummary.lastDeniedRouteLabel}
+              </small>
+            </div>
             <div className="ds-triage-list">
               {viewModel.displayClientSummary.rows.map((client) => (
                 <div key={client.deviceId} className={`mgmt-status ${client.badgeTone}`}>
                   <strong>{client.clientId}</strong> · {client.groupLabel} · {client.siteLabel} · {client.connectionLabel}
                   <small style={{ display: "block", opacity: 0.72 }}>
                     {client.pageLabel} · {client.playbackLabel} · {client.lastSeenLabel} · {client.stateLabel} · {client.timeSyncLabel} · {client.routeLabel}
+                    <br />展示同步：{client.runtimeSyncStateLabel} · 最後同步：{client.runtimeSyncResolvedAtLabel === "--" ? "未回報" : client.runtimeSyncResolvedAtLabel}
                   </small>
                   {client.duplicateWarningLabel ? (
                     <span

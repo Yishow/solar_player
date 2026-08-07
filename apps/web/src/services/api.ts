@@ -144,6 +144,8 @@ export class ManagementAccessDeniedError extends ApiRequestError {
   }
 }
 
+export const MANAGEMENT_ACCESS_DENIED_EVENT = "solar:management-access-denied";
+
 export function isManagementAccessDeniedError(error: unknown): error is ManagementAccessDeniedError {
   return error instanceof ManagementAccessDeniedError;
 }
@@ -213,6 +215,7 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
   try {
     response = await fetch(buildApiUrl(path), {
       ...init,
+      credentials: "include",
       headers
     });
   } catch (error) {
@@ -250,6 +253,9 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
       && parsedBody?.access === "denied"
       && parsedBody.code === "management_access_denied"
     ) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(MANAGEMENT_ACCESS_DENIED_EVENT));
+      }
       throw new ManagementAccessDeniedError(message, response.status, parsedBody);
     }
 
@@ -293,6 +299,27 @@ export async function requestJson<T>(path: string, init?: RequestInit) {
     });
   }
   return value;
+}
+
+export type ManagementPasswordState = {
+  enabled: boolean;
+  authenticated: boolean;
+  lockedUntil: string | null;
+};
+
+export function getManagementPasswordState() {
+  return requestJson<ManagementPasswordState>("/api/management-auth/state");
+}
+
+export function updateManagementPassword(input: {
+  enabled: boolean;
+  newPassword?: string;
+  currentPassword?: string;
+}) {
+  return requestJson<{ enabled: boolean; authenticated: boolean }>("/api/management-auth/password", {
+    method: "PUT",
+    body: JSON.stringify(input)
+  });
 }
 
 let playbackRuntimeCache: {

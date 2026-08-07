@@ -1,4 +1,7 @@
-import type { DisplayClientContext } from "./displayClientContext.js";
+import type {
+  DisplayClientContext,
+  DisplayClientContextErrorCode
+} from "./displayClientContext.js";
 import type { TimeSyncState } from "./appTime.js";
 import type {
   DeviceProfileRolloutHeartbeat,
@@ -8,11 +11,23 @@ import type {
 export const DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DISPLAY_CLIENT_STALENESS_WINDOW_SECONDS = 30;
 
+export type UnpairedDisplayAccessSummary = {
+  counts: Record<DisplayClientContextErrorCode, number>;
+  totalCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+  lastDeniedRoute: string | null;
+};
+
 export type DisplayClientHeartbeat = DeviceProfileRolloutHeartbeat & {
   isPlaying: boolean;
   pageKey: string | null;
   route: string;
   timeSyncState: TimeSyncState;
+  runtimeSyncState?: "unknown" | "loading" | "synced" | "degraded";
+  runtimeSyncPageKey?: string | null;
+  runtimeSyncResolvedAt?: string | null;
+  runtimeSyncError?: string | null;
 };
 
 export type DisplayClientLivenessState = "online" | "stale" | "offline";
@@ -42,6 +57,10 @@ export type DisplayClientLivenessEntry = {
   siteScope: DisplayClientContext["siteScope"];
   sourceStatus: DisplayClientLivenessSourceStatus;
   timeSyncState: TimeSyncState;
+  runtimeSyncState?: NonNullable<DisplayClientHeartbeat["runtimeSyncState"]>;
+  runtimeSyncPageKey?: string | null;
+  runtimeSyncResolvedAt?: string | null;
+  runtimeSyncError?: string | null;
   viewport: {
     height: number;
     width: number;
@@ -114,6 +133,10 @@ export function buildDisplayClientLivenessSnapshot(
         now
       }),
       timeSyncState: entry.timeSyncState,
+      runtimeSyncState: entry.runtimeSyncState ?? "unknown",
+      runtimeSyncPageKey: entry.runtimeSyncPageKey ?? null,
+      runtimeSyncResolvedAt: entry.runtimeSyncResolvedAt ?? null,
+      runtimeSyncError: entry.runtimeSyncError ?? null,
       updateState: entry.updateState,
       viewport: entry.viewport
     }))

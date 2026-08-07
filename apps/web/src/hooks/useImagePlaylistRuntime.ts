@@ -28,6 +28,7 @@ export function useImagePlaylistRuntime(
       return response.playlist;
     },
     refreshKey: spec.refreshKey,
-    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope)
+    shouldRefresh: (event) => spec.refreshScopes.includes(event.scope),
+    runtimeSyncPageKey: "images"
   });
 }

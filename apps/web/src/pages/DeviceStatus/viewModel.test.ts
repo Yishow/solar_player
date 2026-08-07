@@ -498,6 +498,59 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
   );
 });
 
+test("buildDeviceStatusViewModel renders unpaired display access for zero and non-zero summaries", () => {
+  const baseStatus = {
+    arch: "arm64",
+    cpu: { cores: 4, loadAvg: [0, 0, 0] as [number, number, number] },
+    disk: { availableMB: 1, totalMB: 2, usePercent: 50, usedMB: 1 },
+    hostname: "display",
+    memory: { freeMB: 1, totalMB: 2, usePercent: 50, usedMB: 1 },
+    nodeVersion: "v24",
+    pid: 1,
+    platform: "linux",
+    uptimeSeconds: 1
+  };
+  const empty = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    status: { ...baseStatus, unpairedDisplayAccess: undefined }
+  });
+  assert.equal(empty.unpairedDisplayAccessSummary.totalLabel, "無未配對存取");
+  assert.equal(empty.unpairedDisplayAccessSummary.lastSeenLabel, "--");
+
+  const active = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    now: new Date("2026-05-22T12:00:10.000Z"),
+    status: {
+      ...baseStatus,
+      unpairedDisplayAccess: {
+        counts: {
+          credential_expired: 0,
+          credential_revoked: 0,
+          device_disabled: 0,
+          device_unpaired: 2,
+          group_disabled: 0,
+          group_missing: 0,
+          profile_missing: 0,
+          site_scope_mismatch: 0
+        },
+        firstSeenAt: "2026-05-22T11:58:00.000Z",
+        lastDeniedRoute: "/api/playback/runtime",
+        lastSeenAt: "2026-05-22T12:00:05.000Z",
+        totalCount: 2
+      }
+    }
+  });
+  assert.equal(active.unpairedDisplayAccessSummary.totalLabel, "2 次未配對存取");
+  assert.equal(active.unpairedDisplayAccessSummary.lastSeenLabel, "5 秒前");
+  assert.equal(active.unpairedDisplayAccessSummary.lastDeniedRouteLabel, "/api/playback/runtime");
+});
+
 test("buildDeviceStatusViewModel presents stable Device identity and duplicate diagnostics without raw source data", () => {
   const unsafeLivenessFields = {
     credential: "must-not-leak",

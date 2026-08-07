@@ -34,34 +34,64 @@ The Server Time Signal SHALL be delivered to every connected Client regardless o
 
 <!-- @trace
 source: narrow-display-socket-gate-to-identity-scoped-feeds
-updated: 2026-08-07
+updated: 2026-08-08
 code:
-  - apps/web/src/sw.ts
-  - apps/server/src/metrics/metricTimestamp.ts
-  - apps/server/src/routes/imagesSupport.ts
-  - docs/ops/workflow.md
-  - apps/server/src/realtime/SocketService.ts
-  - docs/ops/conventions.md
-  - apps/server/src/metrics/liveMetrics.ts
-  - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
   - apps/server/src/app.ts
-  - packages/shared/src/managementAccess.ts
-  - apps/server/src/routes/images.ts
-  - apps/web/src/hooks/usePlaybackController.ts
-  - apps/server/src/services/MetricsAccumulatorService.ts
+  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
+  - apps/server/src/routes/device.ts
+  - apps/server/src/services/unpairedDisplayAccessRegistry.ts
+  - apps/web/src/pages/Overview/index.tsx
+  - apps/web/src/pages/Sustainability/index.tsx
+  - apps/web/src/pages/Images/index.tsx
+  - apps/web/src/components/ManagementUnlockScreen.tsx
+  - apps/web/src/hooks/useManagementPasswordGate.ts
+  - apps/web/src/app/routeMeta.ts
+  - packages/shared/src/displayClientLiveness.ts
+  - apps/server/src/plugins/deviceContext.ts
+  - apps/server/src/services/deviceLivenessRegistry.ts
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/Solar/index.tsx
+  - apps/web/src/services/displayRuntimeSyncReporter.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - apps/server/src/realtime/SocketService.ts
+  - apps/server/src/plugins/managementAuth.ts
+  - apps/web/src/pages/runtimeConfigHydration.tsx
+  - apps/web/src/hooks/useDisplayStoryRuntime.ts
+  - apps/server/src/services/managementPasswordService.ts
+  - apps/server/src/routes/management-auth.ts
+  - apps/web/src/pages/SecuritySettings/index.tsx
+  - apps/web/src/pages/SecuritySettings/viewModel.ts
+  - apps/web/src/pages/FactoryCircuit/index.tsx
+  - apps/web/src/hooks/useImagePlaylistRuntime.ts
+  - apps/server/src/fastify.ts
+  - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
+  - apps/server/src/db/migrations/034_management_password_gate.sql
+  - apps/web/src/services/api.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
+  - apps/server/src/services/managementSessionService.ts
 tests:
-  - apps/server/src/realtime/SocketService.broadcastGuardrails.test.ts
-  - apps/web/src/hooks/usePageRotation.test.ts
-  - apps/server/src/metrics/metricTimestamp.test.ts
-  - apps/server/src/routes/uploadsSecurityHeaders.test.ts
-  - apps/server/src/services/MetricsAccumulatorService.test.ts
-  - apps/web/src/hooks/usePlaybackController.test.ts
-  - apps/web/src/sw.test.ts
-  - apps/server/src/routes/settings-mqtt.test.ts
-  - apps/server/src/routes/images.test.ts
-  - tests/browser/critical-journeys.spec.ts
-  - apps/server/src/realtime/SocketService.test.ts
-  - apps/server/src/metrics/liveMetrics.test.ts
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/web/src/services/displayRuntimeSyncReporter.test.ts
+  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
+  - apps/web/src/pages/runtimeConfigHydration.test.ts
+  - apps/web/src/pages/SecuritySettings/viewModel.test.ts
+  - apps/server/src/services/unpairedDisplayAccessRegistry.test.ts
+  - apps/web/src/pages/Images/configRender.test.ts
+  - apps/server/src/plugins/deviceContext.test.ts
+  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
+  - apps/server/src/routes/device.test.ts
+  - apps/server/src/services/managementSessionService.test.ts
+  - apps/web/src/components/ManagementUnlockScreen.test.tsx
+  - apps/server/src/routes/management-auth.test.ts
+  - apps/server/src/services/deviceLivenessRegistry.test.ts
+  - apps/web/src/hooks/useManagementPasswordGate.test.ts
+  - apps/server/src/services/managementPasswordService.test.ts
 -->
 
 ---

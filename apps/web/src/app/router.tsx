@@ -93,6 +93,14 @@ export const router = createBrowserRouter([
         }
       },
       {
+        path: "settings/security",
+        loader: createManagementRouteLoader("settings/security"),
+        lazy: async () => {
+          const { SecuritySettings } = await import("../pages/SecuritySettings");
+          return { Component: SecuritySettings };
+        }
+      },
+      {
         path: "settings/playback-profiles",
         loader: createLazyManagementRouteLoader(
           "settings/playback-profiles",

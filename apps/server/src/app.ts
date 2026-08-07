@@ -23,6 +23,7 @@ import managementAuthPlugin, {
 import { deviceContextPlugin } from "./plugins/deviceContext.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import { recordDeviceProfileRolloutHeartbeat } from "./services/deviceProfileRolloutService.js";
+import { createUnpairedDisplayAccessRegistry } from "./services/unpairedDisplayAccessRegistry.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
 import metricsHistoryRoute from "./routes/metrics-history.js";
@@ -50,6 +51,10 @@ import settingsMqttRoute from "./routes/settings-mqtt.js";
 import shellDecorationsRoute from "./routes/shell-decorations.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
 import weatherRoute from "./routes/weather.js";
+import managementAuthRoute from "./routes/management-auth.js";
+import { readManagementPasswordState } from "./services/managementPasswordService.js";
+import { verifyManagementSession } from "./services/managementSessionService.js";
+import { readManagementSessionCookie } from "./plugins/managementAuth.js";
 
 function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -130,8 +135,11 @@ export async function buildApp() {
   const managementCorsRequestGate = createManagementCorsRequestGate(trustedManagementOrigins);
   const managementAccess = createManagementAccessControl({
     managementAccessToken: config.managementAccessToken,
-    trustedOrigins: trustedManagementOrigins
+    trustedOrigins: trustedManagementOrigins,
+    passwordGateEnabled: () => readManagementPasswordState().enabled,
+    isManagementSessionValid: (request) => verifyManagementSession(readManagementSessionCookie(request.headers))
   });
+  const unpairedDisplayAccessRegistry = createUnpairedDisplayAccessRegistry();
   let mqttClientService: MqttClientService | null = null;
   const socketService = new SocketService({
     allowRequest: managementCorsRequestGate,
@@ -164,6 +172,7 @@ export async function buildApp() {
   app.decorate("managementAccess", managementAccess);
   app.decorate("mqttClientService", mqttClientService);
   app.decorate("socketService", socketService);
+  app.decorate("unpairedDisplayAccessRegistry", unpairedDisplayAccessRegistry);
 
   await app.register(cors, {
     delegator: managementCorsOptions
@@ -174,6 +183,7 @@ export async function buildApp() {
     managementAccessToken: config.managementAccessToken,
     trustedOrigins: trustedManagementOrigins
   });
+  await app.register(managementAuthRoute);
   await deviceContextPlugin(app);
 
   if (existsSync(config.openapiPath)) {

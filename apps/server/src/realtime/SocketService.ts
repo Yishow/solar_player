@@ -135,6 +135,19 @@ function isDisplayClientHeartbeat(payload: unknown): payload is DisplayClientHea
   );
 }
 
+function normalizeRuntimeSync(payload: Record<string, unknown>) {
+  const state = payload.runtimeSyncState;
+  if (state !== "unknown" && state !== "loading" && state !== "synced" && state !== "degraded") {
+    return { runtimeSyncState: "unknown" as const, runtimeSyncPageKey: null, runtimeSyncResolvedAt: null, runtimeSyncError: null };
+  }
+  return {
+    runtimeSyncState: state as "unknown" | "loading" | "synced" | "degraded",
+    runtimeSyncPageKey: typeof payload.runtimeSyncPageKey === "string" ? payload.runtimeSyncPageKey : null,
+    runtimeSyncResolvedAt: typeof payload.runtimeSyncResolvedAt === "string" ? payload.runtimeSyncResolvedAt : null,
+    runtimeSyncError: state === "synced" ? null : typeof payload.runtimeSyncError === "string" ? payload.runtimeSyncError : null
+  };
+}
+
 function readHandshakeCookie(
   headers: NonNullable<SocketClientLike["handshake"]>["headers"]
 ) {
@@ -364,6 +377,7 @@ export class SocketService {
             heartbeatSocketId,
             {
               ...payload,
+              ...normalizeRuntimeSync(payload as unknown as Record<string, unknown>),
               appliedVersion: rollout.appliedVersion,
               desiredVersion: rollout.desiredVersion,
               updateError: rollout.lastError,

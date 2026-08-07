@@ -14,10 +14,6 @@ import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useDisplayStoryRuntime } from "../../hooks/useDisplayStoryRuntime";
 import { requestJson } from "../../services/api";
 import {
-  resolveRuntimeFallbackBannerState,
-  RuntimeConfigFallbackBanner
-} from "../runtimeConfigHydration";
-import {
   buildCopyTypographyStyleVars,
   createCopyTypographyConfig,
   createLeafOrnamentChromeConfig
@@ -394,11 +390,6 @@ export function FactoryCircuit({
     return <DisplayPageLoadingState />;
   }
 
-  const runtimeFallbackBanner = resolveRuntimeFallbackBannerState({
-    configErrorMessage: runtimeHydrationEnabled ? runtimeConfig.errorMessage : "",
-    runtimeErrorMessage: runtimeHydrationEnabled ? factoryStoryRuntime.errorMessage : "",
-    usesRuntimeFallback: factoryStoryRuntime.usesFallback
-  });
   const heroTypography = resolvedConfig.chrome.heroTypography;
   const copyTypographyVars = buildCopyTypographyStyleVars(resolvedConfig.chrome.copyTypography);
   const freeformObjects =
@@ -410,7 +401,6 @@ export function FactoryCircuit({
 
   return (
     <section className="factory-circuit-display-page">
-      <RuntimeConfigFallbackBanner {...runtimeFallbackBanner} />
       <section
         className="factory-circuit-title display-surface-hero-group"
         style={{

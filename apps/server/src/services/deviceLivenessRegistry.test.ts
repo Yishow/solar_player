@@ -23,6 +23,10 @@ function heartbeat(
     pageKey: route.slice(1),
     route,
     timeSyncState,
+    runtimeSyncState: "unknown" as const,
+    runtimeSyncPageKey: null,
+    runtimeSyncResolvedAt: null,
+    runtimeSyncError: null,
     updateError: null,
     updateState: "applied" as const
   };

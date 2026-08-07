@@ -758,6 +758,28 @@ test("GET /api/device/status returns bounded host-stats unavailable when agent i
   }
 });
 
+test("device status exposes denied display access without changing display client liveness", async () => {
+  const app = await buildApp();
+  try {
+    const before = await app.inject({ method: "GET", url: "/api/device/status" });
+    const beforeData = before.json().data;
+    const denied = await app.inject({
+      method: "GET",
+      url: "/api/display-story/overview?refresh=1"
+    });
+    assert.equal(denied.statusCode, 401);
+
+    const after = await app.inject({ method: "GET", url: "/api/device/status" });
+    const afterData = after.json().data;
+    assert.equal(afterData.unpairedDisplayAccess.totalCount, 1);
+    assert.equal(afterData.unpairedDisplayAccess.counts.device_unpaired, 1);
+    assert.equal(afterData.unpairedDisplayAccess.lastDeniedRoute, "/api/display-story/overview");
+    assert.deepEqual(afterData.displayClients, beforeData.displayClients);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/device/logs stay server-side even when DEVICE_AGENT_URL is set", async () => {
   const previousAgentUrl = process.env.DEVICE_AGENT_URL;
   let agentLogsHits = 0;
