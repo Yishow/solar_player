@@ -1180,3 +1180,41 @@ test("Full lifecycle: upload, update, list, reorder, delete", async () => {
     await app.close();
   }
 });
+
+test("upload rejection message matches the accepted extension list", async () => {
+  const { ALLOWED_EXTENSIONS } = await import("./imagesSupport.js");
+  const app = await buildApp();
+
+  try {
+    const upload = buildMultipartBody(
+      "notes.txt",
+      "text/plain",
+      Buffer.from("not an image")
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": upload.contentType },
+      payload: upload.payload
+    });
+
+    assert.equal(response.statusCode, 400);
+    const message = (response.json() as { error?: string }).error ?? "";
+
+    // Derived from the allowlist, so the two cannot drift apart again.
+    for (const extension of ALLOWED_EXTENSIONS) {
+      assert.ok(
+        message.includes(extension),
+        `message must enumerate accepted extension ${extension}, got: ${message}`
+      );
+    }
+    for (const rejected of [".txt", ".gif", ".bmp", ".pdf"]) {
+      assert.ok(
+        !message.includes(rejected),
+        `message must not enumerate rejected extension ${rejected}, got: ${message}`
+      );
+    }
+  } finally {
+    await app.close();
+  }
+});

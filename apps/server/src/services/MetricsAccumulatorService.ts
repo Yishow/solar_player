@@ -110,10 +110,29 @@ function readEnergyMetricValue(snapshot: LiveMetricsSnapshot, metricKey: string)
   return normalizeEnergyToKwh(reading.value, reading.unit);
 }
 
-function sumConsumptionPower(snapshot: LiveMetricsSnapshot) {
-  return Object.entries(snapshot.metrics)
-    .filter(([metricKey, reading]) => metricKey.startsWith("factory") && reading.unit === "kW")
-    .reduce((total, [, reading]) => total + reading.value, 0);
+/**
+ * Sum the contributing factory power readings.
+ *
+ * Returns `null` when no contributing reading exists at all — an empty reduce
+ * would otherwise yield 0, making "no observation source" indistinguishable from
+ * a genuinely idle plant measuring 0 kW.
+ */
+function sumConsumptionPower(snapshot: LiveMetricsSnapshot): number | null {
+  // A single non-finite reading must not poison the sum into NaN: that would
+  // report null while observation sources plainly exist, and the spec allows
+  // null only when there is no source at all. Drop the bad reading instead.
+  const contributing = Object.entries(snapshot.metrics).filter(
+    ([metricKey, reading]) =>
+      metricKey.startsWith("factory")
+      && normalizeUnit(reading.unit) === "kw"
+      && isFiniteNumber(reading.value)
+  );
+
+  if (contributing.length === 0) {
+    return null;
+  }
+
+  return contributing.reduce((total, [, reading]) => total + reading.value, 0);
 }
 
 export class MetricsAccumulatorService {
@@ -340,7 +359,7 @@ export class MetricsAccumulatorService {
   private buildAggregateSnapshot(
     observation: {
       capturedAt: string;
-      consumptionPower: number;
+      consumptionPower: number | null;
       efficiency: number | null;
       generationPower: number | null;
     } | null
@@ -354,8 +373,12 @@ export class MetricsAccumulatorService {
       capturedAt: observation?.capturedAt ?? this.latestSnapshot.capturedAt,
       co2: roundTo(this.counters.co2, 3),
       consumption: roundTo(this.counters.consumption, 3),
+      // A measured zero is a real reading (idle plant), not an absent one. Only
+      // the lack of an observation — or a non-finite sum — reports null.
       consumptionPower:
-        observation && observation.consumptionPower > 0 ? roundTo(observation.consumptionPower, 3) : null,
+        observation && isFiniteNumber(observation.consumptionPower)
+          ? roundTo(observation.consumptionPower, 3)
+          : null,
       efficiency: isFiniteNumber(observation?.efficiency) ? roundTo(observation.efficiency, 2) : null,
       generation: roundTo(this.counters.generation, 3),
       generationPower: isFiniteNumber(observation?.generationPower) ? roundTo(observation.generationPower, 3) : null,

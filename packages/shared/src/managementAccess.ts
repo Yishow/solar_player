@@ -1,7 +1,10 @@
 export const MANAGEMENT_ACCESS_DENIED_CODE = "management_access_denied";
 export const MANAGEMENT_ACCESS_DENIED_MESSAGE = "Management access denied";
 
-export type ManagementSocketSessionClass = "playback-safe" | "management-trusted";
+export type ManagementSocketSessionClass =
+  | "playback-safe"
+  | "management-trusted"
+  | "unidentified";
 
 export type ManagementAccessDeniedEnvelope = {
   access: "denied";

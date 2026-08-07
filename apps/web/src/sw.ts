@@ -11,6 +11,8 @@ const CANDIDATE_READY = "SOLAR_APP_CANDIDATE_READY";
 const ACTIVATE_CANDIDATE = "SOLAR_ACTIVATE_CANDIDATE";
 const CACHE_RUNTIME_ASSETS = "SOLAR_CACHE_RUNTIME_ASSETS";
 const COMMIT_ACTIVE_CACHE = "SOLAR_COMMIT_ACTIVE_CACHE";
+/** Present only in release-scoped App Shell cache names, per stageAppShell. */
+const APP_SHELL_CACHE_MARKER = ":candidate:";
 
 type OfflineAssetManifest = {
   appRelease: string;
@@ -138,6 +140,32 @@ async function stageAppShell() {
   }
 }
 
+/**
+ * Delete App Shell caches that are neither active nor the current candidate.
+ *
+ * Without this, every release leaves its shell cache behind forever and a
+ * long-running kiosk grows until it hits the storage quota, at which point
+ * offline caching starts failing. Only caches carrying the App Shell marker are
+ * touched — the metadata cache and the install-error debug cache share the
+ * prefix but are not release-scoped shells.
+ */
+async function reclaimSupersededCaches(keepCacheNames: Array<string | null | undefined>) {
+  const keep = new Set(
+    keepCacheNames.filter((name): name is string => typeof name === "string" && name.length > 0)
+  );
+
+  for (const cacheName of await caches.keys()) {
+    if (
+      !cacheName.startsWith(CACHE_PREFIX)
+      || !cacheName.includes(APP_SHELL_CACHE_MARKER)
+      || keep.has(cacheName)
+    ) {
+      continue;
+    }
+    await caches.delete(cacheName);
+  }
+}
+
 async function validateCandidate() {
   const candidate = await readIdentity(CANDIDATE_CACHE_KEY);
   if (!candidate) throw new Error("Offline candidate metadata is unavailable.");
@@ -224,6 +252,18 @@ self.addEventListener("message", (event) => {
         await serializeMetadataMutation(() =>
           writeIdentity(ACTIVE_CACHE_KEY, candidate)
         );
+        // Reclaim only after the commit succeeded, so a complete usable cache
+        // exists at every moment. Best-effort: a reclamation failure must not
+        // turn a successful commit into a reported failure.
+        try {
+          const stagedCandidate = await readIdentity(CANDIDATE_CACHE_KEY);
+          await reclaimSupersededCaches([
+            candidate.cacheName,
+            stagedCandidate?.cacheName
+          ]);
+        } catch {
+          // Storage remains larger than necessary; playback is unaffected.
+        }
         event.ports[0]?.postMessage({ ok: true });
       } catch (error) {
         event.ports[0]?.postMessage({

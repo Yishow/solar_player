@@ -379,3 +379,101 @@ test("MetricsAccumulatorService preserves a newer persisted reset during an imme
 
   database.close();
 });
+
+// Spec example table: metrics-aggregate-fidelity
+// "Distinguish a measured zero from an absent aggregate"
+test("consumption power distinguishes a measured zero from an absent aggregate", () => {
+  const observedAt = "2026-08-06T10:00:00.000Z";
+  const cases: Array<{
+    entries: Array<[string, number, string]>;
+    expected: number | null;
+    note: string;
+  }> = [
+    {
+      entries: [
+        ["factoryProductionPower", 0, "kW"],
+        ["factoryHvacPower", 0, "kW"]
+      ],
+      expected: 0,
+      note: "measured zero, plant idle"
+    },
+    {
+      entries: [
+        ["factoryProductionPower", 12, "kW"],
+        ["factoryHvacPower", 8, "kW"]
+      ],
+      expected: 20,
+      note: "normal case"
+    },
+    { entries: [], expected: null, note: "source unavailable" }
+  ];
+
+  for (const { entries, expected, note } of cases) {
+    const database = createDatabase();
+    const service = new MetricsAccumulatorService({
+      database,
+      readSnapshot: () =>
+        entries.length === 0
+          ? { metrics: {}, timestamp: null }
+          : buildSnapshot(entries, observedAt)
+    });
+
+    service.processAt(new Date(observedAt));
+
+    assert.equal(
+      service.getLatestSnapshot().consumptionPower,
+      expected,
+      `expected ${expected} for: ${note}`
+    );
+    database.close();
+  }
+});
+
+// Spec example table: metrics-aggregate-fidelity
+// "Match power units without case sensitivity"
+test("consumption power matches power units without case sensitivity", () => {
+  const observedAt = "2026-08-06T10:00:00.000Z";
+  const database = createDatabase();
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["factoryProductionPower", 10, "kW"],
+          ["factoryHvacPower", 20, "kw"],
+          ["factoryLightingPower", 30, "KW"],
+          ["factoryOfficePower", 40, "kWh"]
+        ],
+        observedAt
+      )
+  });
+
+  service.processAt(new Date(observedAt));
+
+  // kW + kw + KW are included; kWh is an energy unit and stays excluded.
+  assert.equal(service.getLatestSnapshot().consumptionPower, 60);
+  database.close();
+});
+
+test("a non-finite reading does not turn a present aggregate into null", () => {
+  const observedAt = "2026-08-06T10:00:00.000Z";
+  const database = createDatabase();
+  const service = new MetricsAccumulatorService({
+    database,
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["factoryProductionPower", 12, "kW"],
+          ["factoryHvacPower", Number.NaN, "kW"]
+        ],
+        observedAt
+      )
+  });
+
+  service.processAt(new Date(observedAt));
+
+  // Observation sources exist, so null is not permitted; the unusable reading
+  // is dropped rather than poisoning the sum.
+  assert.equal(service.getLatestSnapshot().consumptionPower, 12);
+  database.close();
+});

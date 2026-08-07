@@ -46,7 +46,7 @@ type SocketClientLike = {
 type SocketServerLike = {
   emit: (event: string, payload: unknown) => boolean;
   on: (event: "connection", listener: (socket: SocketClientLike) => void) => unknown;
-  to?: (room: string) => {
+  to: (room: string) => {
     emit: (event: string, payload: unknown) => boolean;
   };
   use?: (
@@ -79,6 +79,8 @@ type SocketServiceOptions = {
   now?: () => Date;
   recordDeviceProfileRolloutHeartbeat?: typeof recordDeviceProfileRolloutHeartbeat;
   resolveDisplayClientContext?: (credential: unknown) => DisplayClientContext;
+  scheduleInterval?: (callback: () => void, intervalMs: number) => unknown;
+  clearScheduledInterval?: (timer: unknown) => void;
   server?: HttpServer;
 };
 
@@ -161,6 +163,8 @@ export class SocketService {
   private readonly recordDeviceProfileRolloutHeartbeat;
   private readonly authenticatedSocketIdentities =
     new WeakMap<SocketClientLike, DisplayClientContext>();
+  private readonly socketSessionClasses =
+    new WeakMap<SocketClientLike, ManagementSocketSessionClass>();
   private readonly displayClientRegistry: DeviceLivenessRegistry;
   private readonly resolveDisplayClientContext;
   private readonly stopServerTimeSignalBroadcast: () => void;
@@ -201,11 +205,13 @@ export class SocketService {
         pingTimeout: 20000
       });
     const serverTimeSignal = createServerTimeSignal({
-      nowEpochMs: () => this.now().getTime()
+      clearScheduledInterval: options.clearScheduledInterval,
+      nowEpochMs: () => this.now().getTime(),
+      scheduleInterval: options.scheduleInterval
     });
     this.stopServerTimeSignalBroadcast = serverTimeSignal.startBroadcast(
       (payload) => {
-        this.io.emit("server:time", payload);
+        this.broadcastToAll("server:time", payload);
       }
     );
 
@@ -214,6 +220,10 @@ export class SocketService {
       sessionClass: ManagementSocketSessionClass
     ) => {
       if (sessionClass === "management-trusted") {
+        return null;
+      }
+
+      if (sessionClass === "unidentified") {
         return null;
       }
 
@@ -240,20 +250,23 @@ export class SocketService {
         if (identity) {
           this.authenticatedSocketIdentities.set(socket, identity);
         }
+        this.socketSessionClasses.set(socket, sessionClass);
         next();
       } catch (error) {
         this.logger.warn(
           { error, socketId: socket.id },
           "Display client Socket identity authentication failed"
         );
-        next(new Error("Display client authentication failed"));
+        this.socketSessionClasses.set(socket, "unidentified");
+        next();
       }
     });
 
     this.io.on("connection", (socket) => {
-      const sessionClass = socket.handshake
+      const sessionClass = this.socketSessionClasses.get(socket)
+        ?? (socket.handshake
         ? this.classifySession?.(socket.handshake) ?? "playback-safe"
-        : "playback-safe";
+        : "playback-safe");
       const socketId = socket.id;
       let identity = this.authenticatedSocketIdentities.get(socket) ?? null;
 
@@ -265,13 +278,26 @@ export class SocketService {
             { error, socketId },
             "Display client Socket identity authentication failed"
           );
-          socket.disconnect?.(true);
-          return;
+          this.socketSessionClasses.set(socket, "unidentified");
+          identity = null;
         }
       }
 
-      socket.join?.("playback-safe");
-      if (sessionClass === "management-trusted") {
+      if (identity && sessionClass === "unidentified") {
+        identity = null;
+      }
+
+      if (!identity && sessionClass === "playback-safe") {
+        this.socketSessionClasses.set(socket, "unidentified");
+      }
+
+      const effectiveSessionClass = this.socketSessionClasses.get(socket)
+        ?? sessionClass;
+
+      if (effectiveSessionClass !== "unidentified") {
+        socket.join?.("identified");
+      }
+      if (effectiveSessionClass === "management-trusted") {
         socket.join?.("management-trusted");
       }
 
@@ -288,6 +314,9 @@ export class SocketService {
       }
 
       socket.on?.("client:heartbeat", (payload) => {
+        if (effectiveSessionClass === "unidentified") {
+          return;
+        }
         const heartbeatSocketId = socket.id;
         if (
           !heartbeatSocketId
@@ -358,48 +387,53 @@ export class SocketService {
         this.displayClientRegistry.disconnect(socket.id);
       });
 
-      this.logger.debug?.({ sessionClass, socketId: socket.id }, "Socket.IO client connected");
+      this.logger.debug?.({ sessionClass: effectiveSessionClass, socketId: socket.id }, "Socket.IO client connected");
       serverTimeSignal.emitImmediately((payload) => {
         socket.emit("server:time", payload);
       });
-      socket.emit("mqtt:status", this.mqttStatus);
-      socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
+      if (effectiveSessionClass !== "unidentified") {
+        socket.emit("mqtt:status", this.mqttStatus);
+        socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
+      }
     });
   }
 
-  private emitManagementOnly(event: string, payload: unknown) {
-    if (this.io.to) {
-      this.io.to("management-trusted").emit(event, payload);
-      return;
-    }
-
+  private broadcastToAll(event: string, payload: unknown) {
     this.io.emit(event, payload);
+  }
+
+  private broadcastToIdentified(event: string, payload: unknown) {
+    this.io.to("identified").emit(event, payload);
+  }
+
+  private emitManagementOnly(event: string, payload: unknown) {
+    this.io.to("management-trusted").emit(event, payload);
   }
 
   emitLiveMetrics(data: LiveMetricsSnapshot) {
     this.liveMetricsSnapshot = data;
-    this.io.emit("liveMetrics:update", data);
+    this.broadcastToIdentified("liveMetrics:update", data);
   }
 
   emitMqttStatus(status: MqttStatus) {
     this.mqttStatus = status;
-    this.io.emit("mqtt:status", status);
+    this.broadcastToIdentified("mqtt:status", status);
   }
 
   emitCircuitMetrics(data: LiveMetricsSnapshot) {
-    this.io.emit("circuitMetrics:update", data);
+    this.broadcastToIdentified("circuitMetrics:update", data);
   }
 
   emitCircuitSettingsUpdated(data: unknown) {
-    this.io.emit("circuit:settingsUpdated", data);
+    this.broadcastToIdentified("circuit:settingsUpdated", data);
   }
 
   emitPlaybackSettingsUpdated(data: unknown) {
-    this.io.emit("playback:settingsUpdated", data);
+    this.broadcastToIdentified("playback:settingsUpdated", data);
   }
 
   emitImagesUpdated(data: unknown) {
-    this.io.emit("images:updated", data);
+    this.broadcastToIdentified("images:updated", data);
   }
 
   emitDeviceStatusUpdate(data: unknown) {
@@ -407,7 +441,7 @@ export class SocketService {
   }
 
   emitDisplaySync(data: DisplaySyncEvent) {
-    this.io.emit("display:sync", data);
+    this.broadcastToIdentified("display:sync", data);
   }
 
   getDisplayClientLivenessSnapshot(now = this.now()): DisplayClientLivenessSnapshot {

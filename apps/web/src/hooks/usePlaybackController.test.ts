@@ -96,24 +96,7 @@ test("usePlaybackController fails closed when Device context access is rejected"
     isDisplayContextAccessError(new ApiRequestError("server error", 500, null)),
     false
   );
-  const failedClosed = failClosedFormalPlaybackAccess({
-    appliedRuntimeIdentity: "old-context:old-rotation",
-    displayClientContext: {
-      clientId: "display-1",
-      contextRevision: "old-context",
-      deviceId: 1,
-      groupId: 1,
-      profileId: 1,
-      siteScope: "cl"
-    },
-    effectiveRotationRevision: "old-rotation",
-    fallbackRoute: "/offline",
-    pages: playbackPages,
-    pendingRuntimeUpdate: {} as never,
-    rotationPreview: {} as never,
-    runtime: {} as never,
-    settings: playbackSettings
-  });
+  const failedClosed = failClosedFormalPlaybackAccess();
   assert.deepEqual(failedClosed, {
     appliedRuntimeIdentity: null,
     displayClientContext: null,
@@ -727,5 +710,29 @@ test("next effective playback template returns null when no playable pages remai
       pages: rotationPages.map((page) => ({ ...page, enabled: false }))
     }),
     null
+  );
+});
+
+test("scheduled refresh reconciles against the route active at call time", () => {
+  // The periodic refresh effect is not re-created when the route changes, so a
+  // reload that captured `options.currentPath` would keep reconciling against
+  // the route that was active when the loop was established — snapping playback
+  // back to it on every refresh. Reading through a ref removes that capture.
+  // Synced in an effect, not during render: a ref written while rendering can
+  // retain the route of a render that concurrent React later discards.
+  assert.match(
+    controllerSource,
+    /useEffect\(\(\) => \{\s*currentPathRef\.current = options\.currentPath;\s*\}, \[options\.currentPath\]\);/,
+    "the route ref must be synced in an effect, not during render"
+  );
+  assert.match(
+    controllerSource,
+    /currentPath: currentPathRef\.current/,
+    "refresh reconciliation must read the route at call time"
+  );
+  assert.doesNotMatch(
+    controllerSource,
+    /currentPath: options\.currentPath,\s*\n\s*currentRuntime/,
+    "refresh reconciliation must not capture the render-time route"
   );
 });

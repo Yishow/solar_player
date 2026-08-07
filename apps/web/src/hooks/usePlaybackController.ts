@@ -24,7 +24,7 @@ import {
   type SafePlaybackBoundaryPlan,
   type PlaybackSettings
 } from "@solar-display/shared";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiRequestError,
   getFreshnessPolicy,
@@ -317,9 +317,7 @@ export function isLatestPlaybackLoadRequest(
   return requestId === latestRequestId;
 }
 
-export function failClosedFormalPlaybackAccess(
-  _current: FormalPlaybackAccessState
-): FormalPlaybackAccessState {
+export function failClosedFormalPlaybackAccess(): FormalPlaybackAccessState {
   return {
     appliedRuntimeIdentity: null,
     displayClientContext: null,
@@ -433,6 +431,12 @@ export function usePlaybackController(
   const pagesRef = useRef<PlaybackPage[]>([]);
   const runtimeRef = useRef<PlaybackRuntime | null>(null);
   const lastSyncedPathRef = useRef<string | undefined>(undefined);
+  // Read at call time rather than captured per render, so the memoized reload
+  // reconciles against the route that is active when it actually runs. Synced in
+  // an effect like the other mirrors here — writing a ref during render is unsafe
+  // under concurrent rendering, where a discarded render would still leave its
+  // route behind.
+  const currentPathRef = useRef<string | undefined>(options.currentPath);
   const runtimeTickSignatureRef = useRef<string | null>(null);
   const monotonicNowRef = useRef(
     options.monotonicNow ?? (() => performance.now())
@@ -466,6 +470,10 @@ export function usePlaybackController(
   useEffect(() => {
     providedRotationPreviewRef.current = options.rotationPreview ?? null;
   }, [options.rotationPreview]);
+
+  useEffect(() => {
+    currentPathRef.current = options.currentPath;
+  }, [options.currentPath]);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -512,7 +520,11 @@ export function usePlaybackController(
     lastBoundaryPageIdRef.current = currentPage.id;
   }, [currentPage?.id]);
 
-  const loadPlayback = async (reloadOptions?: PlaybackRuntimeReloadOptions) => {
+  // Memoized because consumers use it as an effect dependency. A fresh closure
+  // per render tears down the display-sync coordinator on every render, which
+  // drops events debounced inside that window and wipes its coalescing state.
+  // Everything mutable it reads comes from a ref, so the identity can stay stable.
+  const loadPlayback = useCallback(async (reloadOptions?: PlaybackRuntimeReloadOptions) => {
     if (!enabled) {
       setIsLoading(false);
       return;
@@ -631,7 +643,7 @@ export function usePlaybackController(
           );
       }
       const nextRuntime = reconcilePlaybackRuntimeAfterRefresh({
-        currentPath: options.currentPath,
+        currentPath: currentPathRef.current,
         currentRuntime,
         nextPages: runtimePages,
         nowMs,
@@ -737,17 +749,7 @@ export function usePlaybackController(
       }
       if (isDisplayContextAccessError(error)) {
         setProfileRolloutHydrated(false);
-        const failedClosed = failClosedFormalPlaybackAccess({
-          appliedRuntimeIdentity: appliedRuntimeIdentityRef.current,
-          displayClientContext,
-          effectiveRotationRevision,
-          fallbackRoute,
-          pages: pagesRef.current,
-          pendingRuntimeUpdate: pendingRuntimeUpdateRef.current,
-          rotationPreview,
-          runtime: runtimeRef.current,
-          settings: settingsRef.current
-        });
+        const failedClosed = failClosedFormalPlaybackAccess();
         pendingRuntimeUpdateRef.current = failedClosed.pendingRuntimeUpdate;
         appliedRuntimeIdentityRef.current = failedClosed.appliedRuntimeIdentity;
         settingsRef.current = failedClosed.settings;
@@ -770,7 +772,7 @@ export function usePlaybackController(
         setIsLoading(false);
       }
     }
-  };
+  }, [enabled, tickMode]);
 
   useEffect(() => {
     if (!enabled) {

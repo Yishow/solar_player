@@ -20,6 +20,7 @@ import {
 } from "../services/imageContentValidation.js";
 import {
   ALLOWED_EXTENSIONS,
+  INVALID_FILE_TYPE_MESSAGE,
   deleteImageFile,
   ensureUploadsDir,
   generateUniqueFilename,
@@ -127,7 +128,7 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return reply
         .status(400)
-        .send(errorResponse("Invalid file type. Only .jpg, .jpeg, .png, .webp are allowed."));
+        .send(errorResponse(INVALID_FILE_TYPE_MESSAGE));
     }
 
     const buffer = await data.toBuffer();

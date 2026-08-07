@@ -53,14 +53,33 @@ class FakeIo {
     | ((socket: FakeSocket, next: (error?: Error) => void) => void)
     | null = null;
   rejectedErrors: Error[] = [];
+  connectedSockets = new Set<FakeSocket>();
+  socketsByRoom = new Map<string, Set<FakeSocket>>();
 
   emit(event: string, payload: unknown) {
     this.emitted.push({ event, payload });
+    // Real socket.io fans `io.emit` out to every connected socket regardless of
+    // room membership; without this the fake cannot tell a broadcast that
+    // reaches unidentified sessions from one that silently drops.
+    for (const socket of this.connectedSockets) {
+      socket.emit(event, payload);
+    }
     return true;
   }
 
   on(event: "connection", listener: (socket: FakeSocket) => void) {
     this.connectionListener = listener;
+  }
+
+  to(room: string) {
+    return {
+      emit: (event: string, payload: unknown) => {
+        for (const socket of this.socketsByRoom.get(room) ?? []) {
+          socket.emit(event, payload);
+        }
+        return true;
+      }
+    };
   }
 
   use(middleware: (socket: FakeSocket, next: (error?: Error) => void) => void) {
@@ -72,7 +91,15 @@ class FakeIo {
   }
 
   connect(socket: FakeSocket) {
+    const join = socket.join.bind(socket);
+    socket.join = (room: string) => {
+      join(room);
+      const sockets = this.socketsByRoom.get(room) ?? new Set<FakeSocket>();
+      sockets.add(socket);
+      this.socketsByRoom.set(room, sockets);
+    };
     if (!this.middleware) {
+      this.connectedSockets.add(socket);
       this.connectionListener?.(socket);
       return;
     }
@@ -82,6 +109,7 @@ class FakeIo {
         this.rejectedErrors.push(error);
         return;
       }
+      this.connectedSockets.add(socket);
       this.connectionListener?.(socket);
     });
   }
@@ -142,6 +170,8 @@ function createIdentityAwareService(options: {
     typeof SocketService
   >[0]["recordDeviceProfileRolloutHeartbeat"];
   resolveDisplayClientContext: (credential: unknown) => ReturnType<typeof createDeviceContext>;
+  scheduleInterval?: ConstructorParameters<typeof SocketService>[0]["scheduleInterval"];
+  clearScheduledInterval?: ConstructorParameters<typeof SocketService>[0]["clearScheduledInterval"];
 }) {
   return new SocketService({
     getLiveMetricsSnapshot: () => ({
@@ -321,7 +351,39 @@ test("SocketService emits an immediate ordered Server Time Signal on connection"
   void service.close();
 });
 
-test("SocketService rejects unknown credentials and disconnects a connection revoked before heartbeat", () => {
+test("SocketService broadcasts server time immediately and every 30000 milliseconds", () => {
+  const io = new FakeIo();
+  let scheduled: (() => void) | undefined;
+  const service = createIdentityAwareService({
+    io,
+    logger: createLogger(),
+    now: () => new Date("2026-07-30T08:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(),
+    scheduleInterval(callback, intervalMs) {
+      assert.equal(intervalMs, 30_000);
+      scheduled = callback;
+      return "timer";
+    },
+    clearScheduledInterval: () => undefined
+  });
+  const socket = new FakeSocket();
+  delete socket.handshake.headers.cookie;
+  io.connect(socket);
+  assert.equal(socket.emitted.filter(({ event }) => event === "server:time").length, 1);
+  assert.deepEqual(socket.joinedRooms, []);
+
+  scheduled?.();
+  assert.equal(io.emitted.filter(({ event }) => event === "server:time").length, 1);
+  // The unidentified socket joins no room, so only a genuine all-connections
+  // broadcast can deliver the periodic signal to it.
+  assert.equal(socket.emitted.filter(({ event }) => event === "server:time").length, 2);
+
+  scheduled?.();
+  assert.equal(socket.emitted.filter(({ event }) => event === "server:time").length, 3);
+  void service.close();
+});
+
+test("SocketService identifies invalid credentials as unidentified and disconnects a later revocation", () => {
   const io = new FakeIo();
   const logger = createLogger();
   let revoked = false;
@@ -342,9 +404,9 @@ test("SocketService rejects unknown credentials and disconnects a connection rev
 
   io.connect(unknownSocket);
   assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
-  assert.equal(io.rejectedErrors.length, 1);
+  assert.equal(io.rejectedErrors.length, 0);
   assert.deepEqual(unknownSocket.joinedRooms, []);
-  assert.deepEqual(unknownSocket.emitted, []);
+  assert.equal(unknownSocket.emitted[0]?.event, "server:time");
 
   const socket = new FakeSocket();
   io.connect(socket);
@@ -380,7 +442,7 @@ test("SocketService rejects unknown credentials and disconnects a connection rev
   assert.equal(service.getDisplayClientLivenessSnapshot().clients[0]?.route, "/solar");
 });
 
-test("SocketService rejects an unpaired playback socket before the connection event", () => {
+test("SocketService accepts an unpaired playback socket as unidentified", () => {
   const io = new FakeIo();
   const logger = createLogger();
   const service = createIdentityAwareService({
@@ -396,10 +458,115 @@ test("SocketService rejects an unpaired playback socket before the connection ev
 
   io.connect(socket);
 
-  assert.equal(io.rejectedErrors.length, 1);
+  assert.equal(io.rejectedErrors.length, 0);
   assert.deepEqual(socket.joinedRooms, []);
-  assert.deepEqual(socket.emitted, []);
+  assert.equal(socket.emitted[0]?.event, "server:time");
+  assert.doesNotThrow(() => {
+    socket.trigger("client:heartbeat", {
+      ...appliedProfileRolloutHeartbeat,
+      isPlaying: true,
+      pageKey: "overview",
+      route: "/overview",
+      timeSyncState: "synced"
+    });
+  });
+  assert.equal(socket.disconnectCalls, 0);
   assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);
+});
+
+test("SocketService downgrades every credential resolution failure to unidentified", () => {
+  for (const failure of [
+    "credential_revoked",
+    "credential_disabled",
+    "device_missing",
+    "unexpected_failure"
+  ]) {
+    const io = new FakeIo();
+    const service = createIdentityAwareService({
+      io,
+      logger: createLogger(),
+      now: () => new Date("2026-05-22T12:00:00.000Z"),
+      resolveDisplayClientContext: () => {
+        throw new Error(failure);
+      }
+    });
+    const socket = new FakeSocket();
+    io.connect(socket);
+
+    assert.equal(io.rejectedErrors.length, 0, failure);
+    assert.deepEqual(socket.joinedRooms, [], failure);
+    assert.equal(socket.disconnectCalls, 0, failure);
+    assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0, failure);
+  }
+});
+
+test("SocketService puts only identified sessions in the shared broadcast room", () => {
+  const io = new FakeIo();
+  const service = createIdentityAwareService({
+    io,
+    logger: createLogger(),
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const identified = new FakeSocket();
+  const unidentified = new FakeSocket();
+  unidentified.id = "unidentified";
+  delete unidentified.handshake.headers.cookie;
+  io.connect(identified);
+  io.connect(unidentified);
+
+  assert.deepEqual(identified.joinedRooms, ["identified", "device:1"]);
+  assert.deepEqual(unidentified.joinedRooms, []);
+  service.close();
+});
+
+test("SocketService sends only server time to unidentified sessions", () => {
+  const io = new FakeIo();
+  const service = createIdentityAwareService({
+    io,
+    logger: createLogger(),
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const unidentified = new FakeSocket();
+  delete unidentified.handshake.headers.cookie;
+  io.connect(unidentified);
+  unidentified.emitted = [];
+
+  service.emitLiveMetrics({ metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitMqttStatus(createMqttStatus());
+  service.emitCircuitMetrics({ metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitCircuitSettingsUpdated({});
+  service.emitPlaybackSettingsUpdated({});
+  service.emitImagesUpdated({});
+  service.emitDisplaySync({} as never);
+  service.emitDeviceStatusUpdate({});
+  service.emitSystemError({ message: "boom", timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitSystemRecovered({ message: "ok", timestamp: "2026-05-22T12:00:00.000Z" });
+
+  assert.deepEqual(unidentified.emitted, []);
+  service.close();
+});
+
+test("SocketService keeps management-only events out of playback-safe sessions", () => {
+  const io = new FakeIo();
+  const service = createIdentityAwareService({
+    io,
+    logger: createLogger(),
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext()
+  });
+  const playbackSafe = new FakeSocket();
+  io.connect(playbackSafe);
+  assert.deepEqual(playbackSafe.joinedRooms, ["identified", "device:1"]);
+  playbackSafe.emitted = [];
+
+  service.emitDeviceStatusUpdate({});
+  service.emitSystemError({ message: "boom", timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitSystemRecovered({ message: "ok", timestamp: "2026-05-22T12:00:00.000Z" });
+
+  assert.deepEqual(playbackSafe.emitted, []);
+  service.close();
 });
 
 test("SocketService keeps management sockets available when a stale Device cookie is present", () => {
@@ -420,7 +587,7 @@ test("SocketService keeps management sockets available when a stale Device cooki
 
   assert.equal(io.rejectedErrors.length, 0);
   assert.deepEqual(socket.joinedRooms, [
-    "playback-safe",
+    "identified",
     "management-trusted"
   ]);
   assert.equal(service.getDisplayClientLivenessSnapshot().clients.length, 0);

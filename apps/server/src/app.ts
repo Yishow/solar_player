@@ -80,6 +80,24 @@ function shouldServeSpaFallback(request: { headers: { accept?: string }; method:
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
 }
 
+/**
+ * Neutralize script execution for anything served out of the uploads roots.
+ *
+ * Uploaded SVG is accepted but carries no byte-level content validation, so a
+ * direct navigation to `/uploads/.../x.svg` would otherwise run embedded script
+ * in the application origin — and the management mutation gate trusts same-host
+ * requests. `sandbox` without `allow-scripts` drops the response into an opaque
+ * origin with scripting disabled; `nosniff` stops a mislabeled asset from being
+ * re-interpreted as HTML. Neither affects the asset when embedded as an image,
+ * and both apply to assets uploaded before this was added.
+ */
+export function setUploadAssetSecurityHeaders(response: {
+  setHeader: (name: string, value: string) => void;
+}) {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("Content-Security-Policy", "sandbox");
+}
+
 export function parseTrustedProxyIps(value: string | undefined): string[] {
   if (!value || value.trim().length === 0) {
     return [];
@@ -209,7 +227,8 @@ export async function buildApp() {
     root: config.uploadsDir,
     prefix: "/uploads/images/",
     decorateReply: false,
-    index: false
+    index: false,
+    setHeaders: setUploadAssetSecurityHeaders
   });
 
   mkdirSync(config.brandUploadsDir, { recursive: true });
@@ -217,7 +236,8 @@ export async function buildApp() {
     root: config.brandUploadsDir,
     prefix: "/uploads/brand/",
     decorateReply: false,
-    index: false
+    index: false,
+    setHeaders: setUploadAssetSecurityHeaders
   });
 
   // Serve frontend static files

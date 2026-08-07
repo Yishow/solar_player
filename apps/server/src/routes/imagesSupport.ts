@@ -67,6 +67,16 @@ export type ImageReorderBody = {
 export const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".svg"]);
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+/**
+ * Derived from ALLOWED_EXTENSIONS rather than written out, so the rejection
+ * message cannot drift away from what the route actually accepts. It previously
+ * claimed only the four raster formats were allowed while `.svg` was accepted —
+ * which is part of why the unvalidated SVG path went unnoticed.
+ */
+export const INVALID_FILE_TYPE_MESSAGE = `Invalid file type. Only ${[
+  ...ALLOWED_EXTENSIONS
+].join(", ")} are allowed.`;
+
 export function serializeImageRow(row: ImageAssetRow): ImageAsset {
   return {
     id: row.id,

@@ -7,6 +7,7 @@ import {
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readFreshnessPolicy } from "../services/freshnessPolicyService.js";
+import { normalizeMetricTimestamp } from "./metricTimestamp.js";
 
 export type LiveMetricReading = {
   freshness?: FreshnessResult;
@@ -51,21 +52,39 @@ export function readLiveMetricsSnapshot(
 
   const metrics: Record<string, LiveMetricReading> = {};
   let latestTimestamp: string | null = null;
+  let latestTimestampMs = Number.NEGATIVE_INFINITY;
 
   for (const row of rows) {
     if (row.value === null || row.timestamp === null) {
       continue;
     }
 
+    // Normalize at the storage read boundary so every downstream freshness
+    // consumer receives a timestamp carrying an explicit zone designator.
+    const timestamp = normalizeMetricTimestamp(row.timestamp);
+
     metrics[row.metric_key] = {
       quality: row.quality,
-      timestamp: row.timestamp,
+      timestamp,
       unit: row.unit,
       value: row.value
     };
 
-    if (latestTimestamp === null || row.timestamp > latestTimestamp) {
-      latestTimestamp = row.timestamp;
+    // Compare instants rather than strings: normalization leaves the column
+    // holding a mix of `Z` and numeric-offset forms, which do not order
+    // lexicographically. An unparseable row only seeds the value when nothing
+    // else has been seen, and any parseable row later replaces it.
+    const timestampMs = Date.parse(timestamp);
+    if (Number.isNaN(timestampMs)) {
+      if (latestTimestamp === null) {
+        latestTimestamp = timestamp;
+      }
+      continue;
+    }
+
+    if (timestampMs > latestTimestampMs) {
+      latestTimestampMs = timestampMs;
+      latestTimestamp = timestamp;
     }
   }
 

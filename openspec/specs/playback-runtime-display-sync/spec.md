@@ -2744,3 +2744,105 @@ tests:
   - apps/web/src/hooks/usePlaybackController.test.ts
   - apps/server/src/routes/device-group-management.test.ts
 -->
+
+---
+### Requirement: Sync coalescing survives client re-renders
+
+The system SHALL preserve display sync coalescing state across client re-renders. A pending debounce window or an in-flight reload SHALL NOT be discarded merely because the consuming component re-rendered.
+
+The playback runtime reload entry point SHALL keep a stable identity across renders, so that consumers using it as an effect dependency do not tear down and rebuild the coordinator on every render.
+
+#### Scenario: A sync event arrives and the component re-renders before the debounce elapses
+
+- **WHEN** a relevant display sync event has been received
+- **AND** the consuming component re-renders before the debounce window elapses
+- **THEN** the pending reload SHALL still occur
+- **AND** it SHALL NOT be silently dropped
+
+#### Scenario: A burst of sync events spans several re-renders
+
+- **WHEN** multiple relevant display sync events arrive while the component re-renders repeatedly
+- **THEN** the client SHALL complete at most one additional reload cycle for that burst
+- **AND** it SHALL NOT spawn overlapping runtime refreshes
+
+#### Scenario: Reload identity is stable between renders
+
+- **WHEN** the playback controller renders repeatedly without a change to its inputs
+- **THEN** the reload entry point it exposes SHALL retain the same identity across those renders
+
+
+<!-- @trace
+source: repair-freshness-upload-and-playback-runtime-defects
+updated: 2026-08-07
+code:
+  - docs/ops/workflow.md
+  - apps/server/src/realtime/SocketService.ts
+  - apps/server/src/app.ts
+  - apps/server/src/metrics/metricTimestamp.ts
+  - apps/server/src/routes/imagesSupport.ts
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - packages/shared/src/managementAccess.ts
+  - apps/server/src/metrics/liveMetrics.ts
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/sw.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/routes/images.ts
+  - docs/ops/conventions.md
+tests:
+  - tests/browser/critical-journeys.spec.ts
+  - apps/server/src/metrics/metricTimestamp.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/images.test.ts
+  - apps/server/src/realtime/SocketService.broadcastGuardrails.test.ts
+  - apps/web/src/sw.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/uploadsSecurityHeaders.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/server/src/metrics/liveMetrics.test.ts
+-->
+
+---
+### Requirement: Runtime refresh reconciles against the current route
+
+The system SHALL reconcile playback runtime after a scheduled refresh using the route active at the moment the refresh runs, not the route captured when the refresh loop was established.
+
+#### Scenario: The route changes between refresh cycles
+
+- **WHEN** playback rotation changes the active route after the periodic refresh loop was established
+- **AND** a scheduled runtime refresh then runs
+- **THEN** route reconciliation SHALL use the route active at refresh time
+- **AND** it SHALL NOT reset playback to the route captured when the loop was established
+
+<!-- @trace
+source: repair-freshness-upload-and-playback-runtime-defects
+updated: 2026-08-07
+code:
+  - docs/ops/workflow.md
+  - apps/server/src/realtime/SocketService.ts
+  - apps/server/src/app.ts
+  - apps/server/src/metrics/metricTimestamp.ts
+  - apps/server/src/routes/imagesSupport.ts
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - packages/shared/src/managementAccess.ts
+  - apps/server/src/metrics/liveMetrics.ts
+  - apps/web/src/hooks/usePlaybackController.ts
+  - apps/web/src/sw.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/routes/images.ts
+  - docs/ops/conventions.md
+tests:
+  - tests/browser/critical-journeys.spec.ts
+  - apps/server/src/metrics/metricTimestamp.test.ts
+  - apps/web/src/hooks/usePlaybackController.test.ts
+  - apps/server/src/routes/images.test.ts
+  - apps/server/src/realtime/SocketService.broadcastGuardrails.test.ts
+  - apps/web/src/sw.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/uploadsSecurityHeaders.test.ts
+  - apps/web/src/hooks/usePageRotation.test.ts
+  - apps/server/src/metrics/liveMetrics.test.ts
+-->

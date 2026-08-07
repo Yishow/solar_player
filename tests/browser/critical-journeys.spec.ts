@@ -23,6 +23,17 @@ type ImageAsset = {
 
 test.describe.configure({ mode: "serial" });
 
+test("unpaired playback pages receive server time and keep all five shells renderable", async ({ page }) => {
+  for (const route of ["/overview", "/solar", "/factory-circuit", "/images", "/sustainability"]) {
+    await page.goto(`${route}?autoplay=0`, { waitUntil: "domcontentloaded" });
+    await waitForPlaybackShell(page);
+    await expect(page.locator("[data-time-state]")).toHaveAttribute("data-time-state", "synced", {
+      timeout: 10_000
+    });
+    await expect(page.locator("body.page-hero-shell")).toBeVisible();
+  }
+});
+
 test("draft conflict and publish refresh journey", async ({ browser, api, runtime }) => {
   const marker = `SMOKE-PUBLISH-${runtime.runId.slice(-10)}`;
   const editorA = await browser.newContext({ baseURL: runtime.baseUrl });

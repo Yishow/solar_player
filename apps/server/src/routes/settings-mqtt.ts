@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { RuntimeMqttStatus } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
@@ -276,7 +277,13 @@ function serializeTopicMappings(): TopicMappingResponse[] {
   return readTopicMappings().map((mapping) => ({
     enabled: toBoolean(mapping.enabled),
     id: mapping.id,
-    lastReceivedAt: mapping.last_received_at,
+    // Same normalization as the live metrics read path: the MQTT settings view
+    // compares this against a live reading as a string, so a mixed form would
+    // make that comparison independent of the actual instant.
+    lastReceivedAt:
+      mapping.last_received_at === null
+        ? null
+        : normalizeMetricTimestamp(mapping.last_received_at),
     lastValue: mapping.last_value,
     metricKey: mapping.metric_key,
     multiplier: mapping.multiplier ?? 1,

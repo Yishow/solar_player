@@ -1363,8 +1363,51 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
     [
       "management-trusted:system:error",
       "management-trusted:system:recovered",
-      "mqtt:status",
-      "liveMetrics:update"
+      "identified:mqtt:status",
+      "identified:liveMetrics:update"
     ]
   );
+});
+
+test("topic lastReceivedAt uses the same timestamp form as the live metrics API", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  const mapping = database
+    .prepare("SELECT metric_key FROM topic_mappings LIMIT 1")
+    .get() as { metric_key: string };
+
+  // Written the way MQTT ingestion writes it: a zone-less UTC wall clock.
+  database
+    .prepare(
+      `INSERT INTO live_metric_values
+         (metric_key, value, unit, timestamp, quality, raw_payload)
+       VALUES (?, 1, 'kW', CURRENT_TIMESTAMP, 'good', '{}')
+       ON CONFLICT(metric_key) DO UPDATE SET timestamp = CURRENT_TIMESTAMP`
+    )
+    .run(mapping.metric_key);
+
+  const app = await buildApp();
+
+  try {
+    const topics = await app.inject({ method: "GET", url: "/api/settings/mqtt/topics" });
+    const live = await app.inject({ method: "GET", url: "/api/metrics/live" });
+
+    const lastReceivedAt = (topics.json() as { topics: Array<{ metricKey: string; lastReceivedAt: string | null }> })
+      .topics.find((topic) => topic.metricKey === mapping.metric_key)?.lastReceivedAt;
+    const liveTimestamp = (live.json() as { metrics: Record<string, { timestamp: string }> })
+      .metrics[mapping.metric_key]?.timestamp;
+
+    assert.ok(lastReceivedAt, "expected a lastReceivedAt for the seeded topic");
+    assert.ok(liveTimestamp, "expected a live metric timestamp");
+    // The MQTT settings view compares these two as strings. If only one carries
+    // a zone designator, that comparison stops depending on the actual instant.
+    assert.equal(
+      lastReceivedAt,
+      liveTimestamp,
+      "both surfaces must expose the same timestamp form for the same reading"
+    );
+  } finally {
+    await app.close();
+  }
 });
