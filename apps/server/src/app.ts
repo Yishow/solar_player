@@ -174,6 +174,20 @@ export async function buildApp() {
   app.decorate("socketService", socketService);
   app.decorate("unpairedDisplayAccessRegistry", unpairedDisplayAccessRegistry);
 
+  // Must precede every `register` below. A plugin registered before this call
+  // creates its encapsulated context carrying whatever error handler existed at
+  // that moment — the framework default — so errors raised inside it would
+  // bypass this envelope and answer with the raw exception message.
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
+    const statusCode = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
+
+    reply.status(statusCode).send({
+      success: false,
+      error: statusCode >= 500 ? "Internal Server Error" : error.message,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   await app.register(cors, {
     delegator: managementCorsOptions
   });
@@ -266,16 +280,6 @@ export async function buildApp() {
     }
 
     reply.sendFile("index.html");
-  });
-
-  app.setErrorHandler((error: FastifyError, _request, reply) => {
-    const statusCode = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
-
-    reply.status(statusCode).send({
-      success: false,
-      error: statusCode >= 500 ? "Internal Server Error" : error.message,
-      timestamp: new Date().toISOString()
-    });
   });
 
   app.addHook("onClose", async () => {

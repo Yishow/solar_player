@@ -5,7 +5,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { BrandProfile, DisplaySyncEvent, RuntimeBrandProfile } from "@solar-display/shared";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
-import { ALLOWED_EXTENSIONS } from "./imagesSupport.js";
+import { ALLOWED_EXTENSIONS, isFileTooLargeError, megabytesOf } from "./imagesSupport.js";
 
 type BrandProfileRow = {
   id: number;
@@ -52,7 +52,7 @@ const ALLOWED_MIME = new Set([
 export const BRAND_MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 const INVALID_EXTENSION_MESSAGE = `僅支援 ${[...ALLOWED_EXTENSIONS].join("、")}`;
-const FILE_TOO_LARGE_MESSAGE = `檔案需小於 ${BRAND_MAX_FILE_SIZE / 1024 / 1024} MB`;
+const FILE_TOO_LARGE_MESSAGE = `檔案需小於 ${megabytesOf(BRAND_MAX_FILE_SIZE)} MB`;
 
 function serializeRow(row: BrandProfileRow): BrandProfile {
   return {
@@ -381,9 +381,18 @@ const brandRoute: FastifyPluginAsync = async (app) => {
         return badRequest(reply, `不支援的 MIME 類型：${data.mimetype}`);
       }
 
-      const buffer = await data.toBuffer();
-      if (buffer.length > BRAND_MAX_FILE_SIZE) {
-        return badRequest(reply, FILE_TOO_LARGE_MESSAGE);
+      let buffer: Buffer;
+      try {
+        buffer = await data.toBuffer();
+      } catch (error) {
+        if (isFileTooLargeError(error)) {
+          return reply.status(413).send({
+            success: false,
+            error: FILE_TOO_LARGE_MESSAGE,
+            timestamp: new Date().toISOString()
+          });
+        }
+        throw error;
       }
 
       ensureBrandDir();

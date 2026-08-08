@@ -21,6 +21,8 @@ import {
 import {
   ALLOWED_EXTENSIONS,
   INVALID_FILE_TYPE_MESSAGE,
+  isFileTooLargeError,
+  megabytesOf,
   deleteImageFile,
   ensureUploadsDir,
   generateUniqueFilename,
@@ -108,6 +110,8 @@ function normalizeBooleanField(value: string | null, fallback: boolean) {
   return fallback;
 }
 
+const FILE_TOO_LARGE_MESSAGE = `File too large. Maximum size is ${megabytesOf(MAX_FILE_SIZE)}MB.`;
+
 const imagesRoute: FastifyPluginAsync = async (app) => {
   await app.register(import("@fastify/multipart"), {
     limits: {
@@ -131,9 +135,14 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
         .send(errorResponse(INVALID_FILE_TYPE_MESSAGE));
     }
 
-    const buffer = await data.toBuffer();
-    if (buffer.length > MAX_FILE_SIZE) {
-      return reply.status(400).send(errorResponse("File too large. Maximum size is 10MB."));
+    let buffer: Buffer;
+    try {
+      buffer = await data.toBuffer();
+    } catch (error) {
+      if (isFileTooLargeError(error)) {
+        return reply.status(413).send(errorResponse(FILE_TOO_LARGE_MESSAGE));
+      }
+      throw error;
     }
 
     // PNG/JPEG/WebP: byte-level signature, container bounds, dimensions, and type agreement

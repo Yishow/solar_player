@@ -40,6 +40,8 @@ repo 目前沒有 lint、coverage script 或 CI policy；`browser:smoke` 是可�
 
 - `apps/server/src/server.ts` 啟動順序：`migrateDatabase()` → `seedDatabase()` → Fastify app + 背景服務；MQTT 初次連線失敗只記 warn，不中止 server。
 - `apps/server/src/app.ts` 統一處理未命中路由與未捕捉錯誤。常見錯誤形狀 `{ success: false, error, timestamp }`；500 回 `Internal Server Error`，不暴露內部例外。
+- **`app.setErrorHandler` 必須寫在所有 `app.register(...)` 之前。** Fastify plugin 在 `register` 當下就捕捉「此刻的」error handler，之後才設定的不會回溯套用——結果是那些 route 的例外走框架預設處理，訊息原封不動外洩，而且從 route 本身看不出任何異常。這個順序由 `apps/server/src/app.test.ts` 的結構斷言守住，不要只靠註解。
+- 例外：已經要求可信管理來源的讀取（目前是 `/api/shell-decorations/live` 與 `/draft`）可以自行回 500 並帶上儲存內容損壞的細節，讓 operator 能診斷。這種細節必須由路由自己產生，不可以靠錯誤外殼沒生效；同一份內容的公開路由一律只回外殼。
 - 成功回應形狀**不一致是現況**：有的 route 回 `{ success: true, data, timestamp }`，有的直接回 `{ settings, status }` 或 `{ topics }`。改 API 時跟隨該 route 既有形狀，不要硬套新 envelope。
 - logger 由 `apps/server/src/logger.ts` 決定（production 用 Fastify 預設、其他用 pino-pretty）；程式內用 `app.log`，`console.error` 只准出現在 app 建立前的啟動失敗路徑。
 
@@ -48,7 +50,7 @@ repo 目前沒有 lint、coverage script 或 CI policy；`browser:smoke` 是可�
 - `.env` 由 `resolveEnvFilePath()` 從 repo root 載入；預設路徑與 runtime 位置（`data/`、`uploads/images`、`docs/openapi.yaml`）定義在 `apps/server/src/config.ts`。新增環境變數要確認 server/web 真的有讀，並同步 `.env.example`。
 - 上傳副檔名允許清單**只有一份**：`imagesSupport.ts` 的 `ALLOWED_EXTENSIONS`（`.jpg/.jpeg/.png/.webp/.svg`）。`images.ts` 與 `brand.ts` 都引用它，改一次兩邊同時生效，不要在任一路由另建副本。拒絕訊息由該清單推導（`buildInvalidFileTypeMessage`），不要另外寫死字串。改動時程式與文件要同步。
 - 兩個上傳路由刻意保留的差異：`images.ts` 上限 10MB、無 MIME 檢查；`brand.ts` 上限 2MB（`BRAND_MAX_FILE_SIZE`）、另加 `ALLOWED_MIME` 檢查。這些不共用。
-- 已知缺陷：兩個路由自己的 `buffer.length > 上限` 檢查都執行不到——`@fastify/multipart` 的 `limits.fileSize` 會先以 413 拒絕。超過大小的上傳因此拿到 413 而非路由的 400 訊息。
+- 超過大小上限的上傳由路由捕捉 `@fastify/multipart` 的 `FST_REQ_FILE_TOO_LARGE`，回 413 與統一錯誤外殼，訊息由該路由的上限推導。不要在路由裡另寫 `buffer.length > 上限` 的比較——`limits.fileSize` 才是實際執行點，那種比較永遠不會為真。
 - `/uploads/images/` 與 `/uploads/brand/` 由 `app.ts` 的 `setUploadAssetSecurityHeaders` 一律加上 `X-Content-Type-Options: nosniff` 與 `Content-Security-Policy: sandbox`。上傳的 SVG 沒有 byte-level 內容驗證，這兩個 header 是它不能在應用 origin 執行 script 的唯一依據；不要為了讓某個資產「直接開得起來」而放寬。
 - `apps/server/src/routes/settings-mqtt.ts`：對外序列化 MQTT 密碼回 `****`，不回真值。
 - `apps/server/src/routes/device.ts`：reboot API 預設停用，提示改用 `systemctl restart solar-display`。這是刻意的安全邊界，不要「順手啟用」。

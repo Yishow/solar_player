@@ -1218,3 +1218,36 @@ test("upload rejection message matches the accepted extension list", async () =>
     await app.close();
   }
 });
+
+test("an oversized image upload is rejected through the standard envelope with the enforced ceiling", async () => {
+  migrateDatabase();
+  const { MAX_FILE_SIZE } = await import("./imagesSupport.js");
+  const app = await buildApp();
+
+  try {
+    const { payload, contentType } = buildMultipartBody(
+      "huge.png",
+      "image/png",
+      Buffer.alloc(MAX_FILE_SIZE + 1, 0)
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/images",
+      headers: { "content-type": contentType },
+      payload
+    });
+
+    assert.equal(response.statusCode, 413);
+    const body = response.json() as { success: boolean; error: string; timestamp: string };
+    assert.equal(body.success, false);
+    assert.equal(typeof body.timestamp, "string");
+    assert.ok(
+      body.error.includes(String(MAX_FILE_SIZE / 1024 / 1024)),
+      `expected ${body.error} to state the enforced ${MAX_FILE_SIZE / 1024 / 1024}MB ceiling`
+    );
+    assert.equal("code" in body, false);
+  } finally {
+    await app.close();
+  }
+});

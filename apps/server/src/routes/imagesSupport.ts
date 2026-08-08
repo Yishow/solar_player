@@ -85,6 +85,24 @@ export function buildInvalidFileTypeMessage(extensions: Iterable<string>) {
 
 export const INVALID_FILE_TYPE_MESSAGE = buildInvalidFileTypeMessage(ALLOWED_EXTENSIONS);
 
+/**
+ * `@fastify/multipart` enforces `limits.fileSize` and throws while the body is
+ * read, so a route's own length comparison can never run. Routes detect that
+ * error here and answer with their own limit, which the global error envelope
+ * could not do — it does not know which route's ceiling was hit.
+ */
+const FILE_TOO_LARGE_CODE = "FST_REQ_FILE_TOO_LARGE";
+
+export function isFileTooLargeError(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && (error as { code?: unknown }).code === FILE_TOO_LARGE_CODE;
+}
+
+export function megabytesOf(maxFileSize: number) {
+  return maxFileSize / 1024 / 1024;
+}
+
 export function serializeImageRow(row: ImageAssetRow): ImageAsset {
   return {
     id: row.id,

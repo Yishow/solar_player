@@ -50,6 +50,25 @@ function assertChannelBody(body: ShellDecorationDraftBody | undefined): ShellDec
   };
 }
 
+/**
+ * Management-only reads deliberately disclose how stored content is corrupt so
+ * an operator can diagnose it. That has to be produced here: the global error
+ * envelope replaces a server-error message with a fixed string, and relying on
+ * it not reaching this route would make the diagnosability an accident.
+ */
+function replyWithStageReadFailure(
+  request: { log: { error: (context: unknown, message: string) => void } },
+  reply: { status: (code: number) => { send: (body: unknown) => unknown } },
+  error: unknown
+) {
+  request.log.error({ err: error }, "Failed to read shell decoration stage for management");
+  return reply.status(500).send({
+    error: error instanceof Error ? error.message : "Failed to read shell decoration stage",
+    success: false,
+    timestamp: new Date().toISOString()
+  });
+}
+
 const shellDecorationsRoute: FastifyPluginAsync = async (app) => {
   // Public-safe runtime read. Corruption details stay server-side only.
   app.get("/api/shell-decorations", async (request, reply) => {
@@ -70,7 +89,11 @@ const shellDecorationsRoute: FastifyPluginAsync = async (app) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
     }
-    return { config: readShellDecorationStage("draft") };
+    try {
+      return { config: readShellDecorationStage("draft") };
+    } catch (error) {
+      return replyWithStageReadFailure(request, reply, error);
+    }
   });
 
   app.put<{ Body: ShellDecorationDraftBody }>("/api/shell-decorations/draft", async (request, reply) => {
@@ -97,7 +120,11 @@ const shellDecorationsRoute: FastifyPluginAsync = async (app) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
     }
-    return { config: readShellDecorationStage("live") };
+    try {
+      return { config: readShellDecorationStage("live") };
+    } catch (error) {
+      return replyWithStageReadFailure(request, reply, error);
+    }
   });
 
   // Publish draft to live

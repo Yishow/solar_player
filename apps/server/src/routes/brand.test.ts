@@ -518,10 +518,6 @@ test("brand logo rejection messages are derived from the limits the route enforc
     }
     assert.equal(typeMessage.includes(".gif"), false);
 
-    // The multipart `limits.fileSize` rejects with 413 before the route's own
-    // size check can run, so that check — and its message — is unreachable on
-    // this path. Asserted here so the dead branch is recorded rather than
-    // mistaken for coverage.
     const oversized = buildMultipartBody(
       "brand.png",
       "image/png",
@@ -535,6 +531,14 @@ test("brand logo rejection messages are derived from the limits the route enforc
     });
 
     assert.equal(sizeResponse.statusCode, 413);
+    const sizeBody = sizeResponse.json() as { success: boolean; error: string; timestamp: string };
+    assert.equal(sizeBody.success, false);
+    assert.equal(typeof sizeBody.timestamp, "string");
+    assert.ok(
+      sizeBody.error.includes(String(BRAND_MAX_FILE_SIZE / 1024 / 1024)),
+      `expected ${sizeBody.error} to state the enforced ${BRAND_MAX_FILE_SIZE / 1024 / 1024} MB ceiling`
+    );
+    assert.equal("code" in sizeBody, false);
   } finally {
     await app.close();
   }
