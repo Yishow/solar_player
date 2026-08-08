@@ -5,6 +5,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { BrandProfile, DisplaySyncEvent, RuntimeBrandProfile } from "@solar-display/shared";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
+import { ALLOWED_EXTENSIONS } from "./imagesSupport.js";
 
 type BrandProfileRow = {
   id: number;
@@ -39,14 +40,19 @@ type BrandUpdateBody = Partial<{
 
 type BrandCreateBody = BrandUpdateBody & { name: string };
 
-const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".svg"]);
+// The declared-type check and the smaller ceiling are deliberately stricter
+// than the image library route; the accepted extensions are the same set, so
+// they come from the one allowlist rather than a copy that could drift.
 const ALLOWED_MIME = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/svg+xml"
 ]);
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+export const BRAND_MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+const INVALID_EXTENSION_MESSAGE = `僅支援 ${[...ALLOWED_EXTENSIONS].join("、")}`;
+const FILE_TOO_LARGE_MESSAGE = `檔案需小於 ${BRAND_MAX_FILE_SIZE / 1024 / 1024} MB`;
 
 function serializeRow(row: BrandProfileRow): BrandProfile {
   return {
@@ -194,7 +200,7 @@ function emitBrandDisplaySync(app: {
 
 const brandRoute: FastifyPluginAsync = async (app) => {
   await app.register(import("@fastify/multipart"), {
-    limits: { fileSize: MAX_FILE_SIZE, files: 1 }
+    limits: { fileSize: BRAND_MAX_FILE_SIZE, files: 1 }
   });
 
   // ---------- GET /api/brand/profiles ----------
@@ -369,15 +375,15 @@ const brandRoute: FastifyPluginAsync = async (app) => {
 
       const ext = extname(data.filename).toLowerCase();
       if (!ALLOWED_EXTENSIONS.has(ext)) {
-        return badRequest(reply, "僅支援 .png、.jpg、.jpeg、.webp、.svg");
+        return badRequest(reply, INVALID_EXTENSION_MESSAGE);
       }
       if (data.mimetype && !ALLOWED_MIME.has(data.mimetype)) {
         return badRequest(reply, `不支援的 MIME 類型：${data.mimetype}`);
       }
 
       const buffer = await data.toBuffer();
-      if (buffer.length > MAX_FILE_SIZE) {
-        return badRequest(reply, "檔案需小於 2 MB");
+      if (buffer.length > BRAND_MAX_FILE_SIZE) {
+        return badRequest(reply, FILE_TOO_LARGE_MESSAGE);
       }
 
       ensureBrandDir();

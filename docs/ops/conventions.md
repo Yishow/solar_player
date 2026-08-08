@@ -46,7 +46,9 @@ repo 目前沒有 lint、coverage script 或 CI policy；`browser:smoke` 是可�
 ## 安全與設定邊界
 
 - `.env` 由 `resolveEnvFilePath()` 從 repo root 載入；預設路徑與 runtime 位置（`data/`、`uploads/images`、`docs/openapi.yaml`）定義在 `apps/server/src/config.ts`。新增環境變數要確認 server/web 真的有讀，並同步 `.env.example`。
-- `apps/server/src/routes/images.ts`：副檔名限 `.jpg/.jpeg/.png/.webp/.svg`、上限 10MB。允許清單是 `imagesSupport.ts` 的 `ALLOWED_EXTENSIONS`，拒絕訊息 `INVALID_FILE_TYPE_MESSAGE` 由該清單推導，不要另外寫死字串。改動時程式與文件要同步。`apps/server/src/routes/brand.ts` 目前另有一份自己的 `ALLOWED_EXTENSIONS`（同五種副檔名、另加 MIME 檢查、上限 2MB），兩份尚未合併——改其中一份時要確認另一份是否也該跟著改。
+- 上傳副檔名允許清單**只有一份**：`imagesSupport.ts` 的 `ALLOWED_EXTENSIONS`（`.jpg/.jpeg/.png/.webp/.svg`）。`images.ts` 與 `brand.ts` 都引用它，改一次兩邊同時生效，不要在任一路由另建副本。拒絕訊息由該清單推導（`buildInvalidFileTypeMessage`），不要另外寫死字串。改動時程式與文件要同步。
+- 兩個上傳路由刻意保留的差異：`images.ts` 上限 10MB、無 MIME 檢查；`brand.ts` 上限 2MB（`BRAND_MAX_FILE_SIZE`）、另加 `ALLOWED_MIME` 檢查。這些不共用。
+- 已知缺陷：兩個路由自己的 `buffer.length > 上限` 檢查都執行不到——`@fastify/multipart` 的 `limits.fileSize` 會先以 413 拒絕。超過大小的上傳因此拿到 413 而非路由的 400 訊息。
 - `/uploads/images/` 與 `/uploads/brand/` 由 `app.ts` 的 `setUploadAssetSecurityHeaders` 一律加上 `X-Content-Type-Options: nosniff` 與 `Content-Security-Policy: sandbox`。上傳的 SVG 沒有 byte-level 內容驗證，這兩個 header 是它不能在應用 origin 執行 script 的唯一依據；不要為了讓某個資產「直接開得起來」而放寬。
 - `apps/server/src/routes/settings-mqtt.ts`：對外序列化 MQTT 密碼回 `****`，不回真值。
 - `apps/server/src/routes/device.ts`：reboot API 預設停用，提示改用 `systemctl restart solar-display`。這是刻意的安全邊界，不要「順手啟用」。

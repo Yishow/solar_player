@@ -487,3 +487,55 @@ test("DELETE /api/brand/profiles/:id/logo clears database fields and removes the
     await app.close();
   }
 });
+
+test("brand logo rejection messages are derived from the limits the route enforces", async () => {
+  migrateDatabase();
+  seedDatabase();
+  clearBrandProfiles();
+
+  const [{ ALLOWED_EXTENSIONS }, { BRAND_MAX_FILE_SIZE }] = await Promise.all([
+    import("./imagesSupport.js"),
+    import("./brand.js")
+  ]);
+
+  const db = getDatabase();
+  const activeId = (db.prepare("SELECT id FROM brand_profiles WHERE is_active = 1").get() as { id: number }).id;
+  const app = await buildApp();
+
+  try {
+    const unsupported = buildMultipartBody("brand.gif", "image/gif", Buffer.from("not-an-image"));
+    const typeResponse = await app.inject({
+      method: "POST",
+      url: `/api/brand/profiles/${activeId}/logo`,
+      headers: { "content-type": unsupported.contentType },
+      payload: unsupported.payload
+    });
+
+    assert.equal(typeResponse.statusCode, 400);
+    const typeMessage = (typeResponse.json() as { error: string }).error;
+    for (const extension of ALLOWED_EXTENSIONS) {
+      assert.ok(typeMessage.includes(extension), `expected ${typeMessage} to enumerate ${extension}`);
+    }
+    assert.equal(typeMessage.includes(".gif"), false);
+
+    // The multipart `limits.fileSize` rejects with 413 before the route's own
+    // size check can run, so that check — and its message — is unreachable on
+    // this path. Asserted here so the dead branch is recorded rather than
+    // mistaken for coverage.
+    const oversized = buildMultipartBody(
+      "brand.png",
+      "image/png",
+      Buffer.alloc(BRAND_MAX_FILE_SIZE + 1, 0)
+    );
+    const sizeResponse = await app.inject({
+      method: "POST",
+      url: `/api/brand/profiles/${activeId}/logo`,
+      headers: { "content-type": oversized.contentType },
+      payload: oversized.payload
+    });
+
+    assert.equal(sizeResponse.statusCode, 413);
+  } finally {
+    await app.close();
+  }
+});

@@ -64,18 +64,26 @@ export type ImageReorderBody = {
   images: ImageReorderItem[];
 };
 
+/**
+ * The one allowlist. `brand.ts` accepts the same extensions and imports this
+ * rather than keeping a copy, so the set cannot be changed on one upload route
+ * and missed on the other. The limits the two routes deliberately differ on —
+ * brand's declared-type check and its smaller size ceiling — stay in brand.
+ */
 export const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".svg"]);
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 /**
- * Derived from ALLOWED_EXTENSIONS rather than written out, so the rejection
- * message cannot drift away from what the route actually accepts. It previously
- * claimed only the four raster formats were allowed while `.svg` was accepted —
- * which is part of why the unvalidated SVG path went unnoticed.
+ * Rejection messages are derived from the limit that is actually enforced,
+ * never written out separately. This one previously claimed only the four
+ * raster formats were allowed while `.svg` was accepted — which is part of why
+ * the unvalidated SVG path went unnoticed.
  */
-export const INVALID_FILE_TYPE_MESSAGE = `Invalid file type. Only ${[
-  ...ALLOWED_EXTENSIONS
-].join(", ")} are allowed.`;
+export function buildInvalidFileTypeMessage(extensions: Iterable<string>) {
+  return `Invalid file type. Only ${[...extensions].join(", ")} are allowed.`;
+}
+
+export const INVALID_FILE_TYPE_MESSAGE = buildInvalidFileTypeMessage(ALLOWED_EXTENSIONS);
 
 export function serializeImageRow(row: ImageAssetRow): ImageAsset {
   return {
