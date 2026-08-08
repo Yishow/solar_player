@@ -1709,6 +1709,12 @@ tests:
 
 The system SHALL surface common stale, error, and fallback semantics after runtime refresh failure. Playback display surfaces SHALL NOT render any banner, overlay, or other status layer for a failed runtime refresh; the failure SHALL be reported to management through the display client heartbeat instead.
 
+Runtime outcomes SHALL be recorded per display page runtime source, keyed by that source's page key, so that a later outcome from a different page does not overwrite an earlier one. A source that reports without a page key SHALL leave every recorded outcome unchanged.
+
+Because the heartbeat carries a single runtime sync state, the recorded outcomes SHALL be reduced to one reported value in this order: the most recently recorded `degraded` outcome if any page is degraded; otherwise the most recently recorded `loading` outcome if any page is loading; otherwise the most recently recorded `synced` outcome; otherwise `unknown` with a null page key, null timestamp, and null error message. The reported page key SHALL always be the page key of the outcome that was selected, so that management reads the page that is actually failing rather than the page that loaded last.
+
+A `loading` outcome SHALL NOT carry an error message from an earlier failure. Both `loading` and `degraded` outcomes SHALL retain the timestamp of that page's last successful sync, because that timestamp remains true regardless of the current state.
+
 #### Scenario: Refresh failure preserves fallback-safe rendering
 
 - **WHEN** a page-specific runtime refresh fails after the page has already rendered once
@@ -1737,38 +1743,41 @@ The system SHALL surface common stale, error, and fallback semantics after runti
 | Load resolved successfully | `synced` | ISO timestamp of that success | null |
 | Load failed and the page fell back | `degraded` | ISO timestamp of the last prior success, or null | the failure message |
 
+#### Scenario: A rotating client keeps reporting the page that failed
+
+- **GIVEN** one display page runtime source has failed and recorded a `degraded` outcome
+- **WHEN** rotation moves to a different display page whose runtime source then resolves successfully
+- **THEN** the reported runtime sync state SHALL remain `degraded`
+- **AND** the reported page key SHALL be the page key of the failing source, not the page that resolved last
+- **AND** the reported error message SHALL be the failing source's error message
+
+#### Scenario: A recovered page stops being reported as degraded
+
+- **GIVEN** a display page runtime source has recorded a `degraded` outcome and no other page is degraded
+- **WHEN** that same source later resolves successfully
+- **THEN** the reported runtime sync state SHALL be `synced`
+- **AND** the reported error message SHALL be null
+
+#### Scenario: A load in flight does not carry an earlier error message
+
+- **GIVEN** a display page runtime source has recorded a `degraded` outcome with an error message
+- **WHEN** that source starts another load and no other page is degraded
+- **THEN** the reported runtime sync state SHALL be `loading`
+- **AND** the reported error message SHALL be null
+- **AND** the reported timestamp SHALL still be that source's last successful sync timestamp
+
 
 <!-- @trace
-source: relocate-display-runtime-sync-status-to-management
+source: repair-management-session-delivery-and-runtime-sync-reporting
 updated: 2026-08-08
 code:
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/web/src/hooks/useImagePlaylistRuntime.ts
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/pages/runtimeConfigHydration.tsx
-  - packages/shared/src/displayClientLiveness.ts
-  - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
-  - apps/server/src/realtime/SocketService.ts
-  - apps/web/src/hooks/useDisplayStoryRuntime.ts
-  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/server/src/services/deviceLivenessRegistry.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
+  - apps/server/src/plugins/managementAuth.ts
   - apps/web/src/services/displayRuntimeSyncReporter.ts
+  - apps/server/src/routes/management-auth.ts
 tests:
-  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/web/src/pages/runtimeConfigHydration.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
+  - apps/server/src/routes/management-auth.test.ts
   - apps/web/src/services/displayRuntimeSyncReporter.test.ts
-  - apps/server/src/services/deviceLivenessRegistry.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - packages/shared/src/displayClientLiveness.test.ts
 -->
 
 ---

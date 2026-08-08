@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildManagementSessionCookie,
   createManagementAccessControl,
-  isTrustedManagementCorsRequest
+  createManagementCorsOptionsDelegate,
+  isTrustedManagementCorsRequest,
+  resolveManagementSessionCookieSameSite
 } from "./managementAuth.js";
 
 test("trusted same-host and token callers satisfy management read gating", () => {
@@ -160,4 +163,100 @@ test("password gate adds a second condition without changing origin trust", () =
   assert.equal(accessControl.isTrustedManagementRequestLike(base), false);
   assert.equal(accessControl.isTrustedManagementRequestLike({ ...base, headers: { ...base.headers, cookie: "solar_management_session=valid" } }), true);
   assert.equal(accessControl.isTrustedManagementRequestLike({ headers: { "x-solar-management-token": "secret-token" }, ip: "198.51.100.2" }), true);
+});
+
+test("session cookie SameSite is derived from the issuing request", () => {
+  assert.equal(
+    resolveManagementSessionCookieSameSite({ headers: { host: "player.example" } }),
+    "Strict"
+  );
+
+  assert.equal(
+    resolveManagementSessionCookieSameSite({
+      headers: { host: "player.example", origin: "https://player.example" },
+      protocol: "https"
+    }),
+    "Strict"
+  );
+
+  assert.equal(
+    resolveManagementSessionCookieSameSite({
+      headers: { host: "player.example", origin: "https://ops.example" },
+      protocol: "https"
+    }),
+    "None"
+  );
+
+  assert.equal(
+    resolveManagementSessionCookieSameSite({
+      headers: { host: "player.example", origin: "http://ops.example" },
+      protocol: "http"
+    }),
+    "Strict"
+  );
+});
+
+test("a forwarded https protocol counts as a secure connection", () => {
+  assert.equal(
+    resolveManagementSessionCookieSameSite({
+      headers: {
+        host: "player.example",
+        origin: "https://ops.example",
+        "x-forwarded-proto": "https"
+      },
+      protocol: "http"
+    }),
+    "None"
+  );
+});
+
+test("setting and clearing a session cookie share the same attributes", () => {
+  const request = {
+    headers: { host: "player.example", origin: "https://ops.example" },
+    protocol: "https"
+  };
+
+  const set = buildManagementSessionCookie(request, { maxAgeSeconds: 3600, value: "token-value" });
+  const cleared = buildManagementSessionCookie(request, { value: null });
+
+  assert.match(set, /SameSite=None/);
+  assert.match(set, /Secure/);
+  assert.match(cleared, /SameSite=None/);
+  assert.match(cleared, /Secure/);
+  assert.match(set, /^solar_management_session=token-value;/);
+  assert.match(cleared, /^solar_management_session=;/);
+  assert.match(set, /Max-Age=3600/);
+  assert.doesNotMatch(cleared, /Max-Age=[1-9]/);
+});
+
+test("a strictly scoped session cookie carries no Secure attribute", () => {
+  const cookie = buildManagementSessionCookie(
+    { headers: { host: "player.example", origin: "http://player.example" }, protocol: "http" },
+    { maxAgeSeconds: 3600, value: "token-value" }
+  );
+
+  assert.match(cookie, /SameSite=Strict/);
+  assert.doesNotMatch(cookie, /Secure/);
+});
+
+test("management CORS delegate allows credentials only for allowed origins", async () => {
+  const delegate = createManagementCorsOptionsDelegate(["https://ops.example"]);
+
+  const allowed = await new Promise<{ credentials?: boolean; origin: boolean } | undefined>((resolve) => {
+    delegate(
+      { headers: { host: "player.example", origin: "https://ops.example" }, ip: "198.51.100.8", method: "GET", url: "/api/device/status" } as never,
+      (_error, corsOptions) => resolve(corsOptions)
+    );
+  });
+
+  const denied = await new Promise<{ credentials?: boolean; origin: boolean } | undefined>((resolve) => {
+    delegate(
+      { headers: { host: "player.example", origin: "https://evil.example" }, ip: "198.51.100.8", method: "GET", url: "/api/device/status" } as never,
+      (_error, corsOptions) => resolve(corsOptions)
+    );
+  });
+
+  assert.equal(allowed?.origin, true);
+  assert.equal(allowed?.credentials, true);
+  assert.equal(denied?.origin, false);
 });

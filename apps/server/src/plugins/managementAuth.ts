@@ -16,8 +16,11 @@ type RequestLike = {
   headers: IncomingHttpHeaders;
   ip?: string;
   method?: string;
+  protocol?: string;
   url?: string;
 };
+
+export type ManagementSessionCookieSameSite = "None" | "Strict";
 
 type SocketHandshakeLike = {
   address?: string;
@@ -125,6 +128,72 @@ function isSameHostOrigin(
   } catch {
     return false;
   }
+}
+
+function isSecureRequest(request: RequestLike): boolean {
+  const forwardedProto = readHeaderValue(request.headers["x-forwarded-proto"]);
+  const protocol = forwardedProto?.split(",")[0]?.trim() ?? request.protocol;
+  return protocol?.toLowerCase() === "https";
+}
+
+/**
+ * A management origin the server already trusts may live on another host. A
+ * `SameSite=Strict` cookie is never returned on those requests, so the gate
+ * could never open for them. `None` is the only attribute a browser will send
+ * cross-site, and it requires `Secure` — so an insecure cross-host caller keeps
+ * `Strict` and is reported by the caller instead of being silently broken.
+ */
+export function resolveManagementSessionCookieSameSite(
+  request: RequestLike
+): ManagementSessionCookieSameSite {
+  const origin = readHeaderValue(request.headers.origin);
+  if (!origin) {
+    return "Strict";
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin || isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))) {
+    return "Strict";
+  }
+
+  return isSecureRequest(request) ? "None" : "Strict";
+}
+
+export function isUndeliverableCrossHostManagementSession(request: RequestLike): boolean {
+  const origin = readHeaderValue(request.headers.origin);
+  if (!origin) {
+    return false;
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin || isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))) {
+    return false;
+  }
+
+  return !isSecureRequest(request);
+}
+
+export function buildManagementSessionCookie(
+  request: RequestLike,
+  session: { maxAgeSeconds?: number; value: string | null }
+): string {
+  const sameSite = resolveManagementSessionCookieSameSite(request);
+  const parts = [
+    `${MANAGEMENT_SESSION_COOKIE}=${session.value === null ? "" : encodeURIComponent(session.value)}`,
+    "Path=/",
+    "HttpOnly",
+    `SameSite=${sameSite}`
+  ];
+
+  if (sameSite === "None") {
+    parts.push("Secure");
+  }
+
+  // Clearing reuses the same attributes so the replacement cookie actually
+  // overwrites the stored one instead of sitting beside it.
+  parts.push(`Max-Age=${session.value === null ? 0 : Math.max(0, Math.floor(session.maxAgeSeconds ?? 0))}`);
+
+  return parts.join("; ");
 }
 
 function isSameHostReferer(
@@ -406,22 +475,29 @@ export function createManagementCorsOptionsDelegate(trustedOrigins: string[]) {
     callback: (
       error: Error | null,
       corsOptions?: {
+        credentials: boolean;
         methods: string[];
         origin: boolean;
       }
     ) => void
   ) => {
+    const origin = isTrustedManagementCorsRequest(
+      {
+        headers: request.headers,
+        ip: request.ip,
+        method: request.method,
+        url: request.url
+      },
+      trustedOrigins
+    );
+
     callback(null, {
+      // Without this the browser discards a credentialed cross-origin response,
+      // so the management session cookie could never reach a trusted origin on
+      // another host. The allowed origin set itself is unchanged.
+      credentials: origin,
       methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
-      origin: isTrustedManagementCorsRequest(
-        {
-          headers: request.headers,
-          ip: request.ip,
-          method: request.method,
-          url: request.url
-        },
-        trustedOrigins
-      )
+      origin
     });
   };
 }

@@ -1,10 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 import { config } from "../config.js";
-import { MANAGEMENT_ACCESS_TOKEN_HEADER, MANAGEMENT_SESSION_COOKIE, readManagementSessionCookie } from "../plugins/managementAuth.js";
+import { MANAGEMENT_ACCESS_TOKEN_HEADER, buildManagementSessionCookie, isUndeliverableCrossHostManagementSession, readManagementSessionCookie } from "../plugins/managementAuth.js";
 import { disableManagementPassword, readManagementPasswordState, setManagementPassword, verifyManagementPassword } from "../services/managementPasswordService.js";
 import { issueManagementSession, revokeAllManagementSessions, revokeManagementSession, verifyManagementSession } from "../services/managementSessionService.js";
 
-const COOKIE_BASE = `${MANAGEMENT_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict`;
 function hasAccessToken(request: { headers: Record<string, string | string[] | undefined> }) {
   const value = request.headers[MANAGEMENT_ACCESS_TOKEN_HEADER];
   return typeof value === "string" && Boolean(config.managementAccessToken) && value.trim() === config.managementAccessToken;
@@ -24,13 +23,26 @@ const managementAuthRoute: FastifyPluginAsync = async (app) => {
     if (result.locked) return reply.status(429).send({ authenticated: false, locked: true, lockedUntil: result.lockedUntil });
     if (!result.ok) return reply.status(401).send({ authenticated: false, error: "Authentication failed" });
     const session = issueManagementSession();
-    reply.header("Set-Cookie", `${MANAGEMENT_SESSION_COOKIE}=${encodeURIComponent(session.token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000)}`);
+    if (isUndeliverableCrossHostManagementSession(request)) {
+      // The cookie is still issued because a cross-host origin may nonetheless
+      // be same-site, where Strict works. Where it is genuinely cross-site the
+      // browser will drop it and the gate will never open — say so rather than
+      // leaving the operator to guess.
+      request.log.warn(
+        { origin: request.headers.origin },
+        "Management session cookie issued to a cross-host origin over an insecure connection; SameSite=None requires HTTPS"
+      );
+    }
+    reply.header("Set-Cookie", buildManagementSessionCookie(request, {
+      maxAgeSeconds: Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000),
+      value: session.token
+    }));
     return { authenticated: true };
   });
 
   app.post("/api/management-auth/lock", async (request, reply) => {
     revokeManagementSession(readManagementSessionCookie(request.headers));
-    reply.header("Set-Cookie", COOKIE_BASE);
+    reply.header("Set-Cookie", buildManagementSessionCookie(request, { value: null }));
     return { authenticated: false };
   });
 
@@ -44,11 +56,17 @@ const managementAuthRoute: FastifyPluginAsync = async (app) => {
     // caller; once enabled, only a session or the recovery token may change it.
     if (!tokenAccess && !sessionAccess && readManagementPasswordState().enabled) return app.managementAccess.deny(reply);
     if (body.enabled && (typeof body.newPassword !== "string" || body.newPassword.trim().length < 8)) return reply.status(400).send({ error: "New password is required" });
-    if (!tokenAccess && readManagementPasswordState().enabled && !verifyManagementPassword(body.currentPassword).ok) return reply.status(401).send({ error: "Authentication failed" });
+    if (!tokenAccess && readManagementPasswordState().enabled) {
+      // This verification advances the same failure count and cooldown as an
+      // unlock, so it has to report a cooldown the same way unlock does.
+      const current = verifyManagementPassword(body.currentPassword);
+      if (current.locked) return reply.status(429).send({ authenticated: false, locked: true, lockedUntil: current.lockedUntil });
+      if (!current.ok) return reply.status(401).send({ error: "Authentication failed" });
+    }
     if (body.enabled) setManagementPassword(body.newPassword as string, true);
     else disableManagementPassword();
     revokeAllManagementSessions();
-    reply.header("Set-Cookie", COOKIE_BASE);
+    reply.header("Set-Cookie", buildManagementSessionCookie(request, { value: null }));
     return { enabled: body.enabled, authenticated: false };
   });
 };
