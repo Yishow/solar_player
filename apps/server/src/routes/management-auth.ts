@@ -1,27 +1,87 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { IncomingHttpHeaders } from "node:http";
 import { config } from "../config.js";
-import { MANAGEMENT_ACCESS_TOKEN_HEADER, buildManagementSessionCookie, isUndeliverableCrossHostManagementSession, readManagementSessionCookie } from "../plugins/managementAuth.js";
-import { disableManagementPassword, readManagementPasswordState, setManagementPassword, verifyManagementPassword } from "../services/managementPasswordService.js";
-import { issueManagementSession, revokeAllManagementSessions, revokeManagementSession, verifyManagementSession } from "../services/managementSessionService.js";
+import {
+  buildManagementSessionCookie,
+  isUndeliverableCrossHostManagementSession,
+  matchesManagementAccessTokenHeader,
+  readManagementSessionCookie
+} from "../plugins/managementAuth.js";
+import {
+  disableManagementPassword,
+  readManagementPasswordState,
+  setManagementPassword,
+  verifyManagementPassword
+} from "../services/managementPasswordService.js";
+import {
+  issueManagementSession,
+  revokeAllManagementSessions,
+  revokeManagementSession,
+  verifyManagementSession
+} from "../services/managementSessionService.js";
 
-function hasAccessToken(request: { headers: Record<string, string | string[] | undefined> }) {
-  const value = request.headers[MANAGEMENT_ACCESS_TOKEN_HEADER];
-  return typeof value === "string" && Boolean(config.managementAccessToken) && value.trim() === config.managementAccessToken;
+function hasAccessToken(request: { headers: IncomingHttpHeaders }) {
+  return matchesManagementAccessTokenHeader(request.headers, config.managementAccessToken);
 }
-function validSession(request: { headers: Record<string, string | string[] | undefined> }) {
+
+function validSession(request: { headers: IncomingHttpHeaders }) {
   return verifyManagementSession(readManagementSessionCookie(request.headers));
 }
+
+/**
+ * These endpoints sit outside the shared management mutation boundary — that
+ * boundary would deny the very requests needed to unlock — so each one carries
+ * its own condition. Failures still report the common management failure fields
+ * on top of whatever the endpoint already told the caller.
+ */
+function fail(
+  reply: FastifyReply,
+  statusCode: number,
+  error: string,
+  extra: Record<string, unknown> = {}
+) {
+  return reply.status(statusCode).send({
+    success: false,
+    error,
+    timestamp: new Date().toISOString(),
+    ...extra
+  });
+}
+
 const managementAuthRoute: FastifyPluginAsync = async (app) => {
-  app.get("/api/management-auth/state", async (request) => {
+  app.get("/api/management-auth/state", async (request, reply) => {
+    // Readable without a management session — the unlock surface needs it to
+    // decide whether to present itself — but not to arbitrary callers, who
+    // would otherwise learn whether the gate is on and when a cooldown ends.
+    if (!app.managementAccess.isTrustedManagementOriginRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     const state = readManagementPasswordState();
-    return { enabled: state.enabled, authenticated: hasAccessToken(request) || validSession(request), lockedUntil: state.lockedUntil };
+    return {
+      enabled: state.enabled,
+      authenticated: hasAccessToken(request) || validSession(request),
+      lockedUntil: state.lockedUntil
+    };
   });
 
   app.post<{ Body: { password?: unknown } }>("/api/management-auth/unlock", async (request, reply) => {
-    if (!app.managementAccess.isTrustedManagementOriginRequest(request)) return app.managementAccess.deny(reply);
+    if (!app.managementAccess.isTrustedManagementOriginRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     const result = verifyManagementPassword(request.body?.password);
-    if (result.locked) return reply.status(429).send({ authenticated: false, locked: true, lockedUntil: result.lockedUntil });
-    if (!result.ok) return reply.status(401).send({ authenticated: false, error: "Authentication failed" });
+    if (result.locked) {
+      return fail(reply, 429, "Locked out", {
+        authenticated: false,
+        locked: true,
+        lockedUntil: result.lockedUntil
+      });
+    }
+    if (!result.ok) {
+      return fail(reply, 401, "Authentication failed", { authenticated: false });
+    }
+
     const session = issueManagementSession();
     if (isUndeliverableCrossHostManagementSession(request)) {
       // The cookie is still issued because a cross-host origin may nonetheless
@@ -41,6 +101,12 @@ const managementAuthRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/api/management-auth/lock", async (request, reply) => {
+    // Trusted origin only — a session is deliberately not required, because
+    // locking has to stay available to a caller whose session already expired.
+    if (!app.managementAccess.isTrustedManagementOriginRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     revokeManagementSession(readManagementSessionCookie(request.headers));
     reply.header("Set-Cookie", buildManagementSessionCookie(request, { value: null }));
     return { authenticated: false };
@@ -48,26 +114,51 @@ const managementAuthRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Body: { enabled?: unknown; newPassword?: unknown; currentPassword?: unknown } }>("/api/management-auth/password", async (request, reply) => {
     const body = request.body ?? {};
-    if (typeof body.enabled !== "boolean") return reply.status(400).send({ error: "Invalid request" });
+    if (typeof body.enabled !== "boolean") {
+      return fail(reply, 400, "Invalid request");
+    }
+
     const tokenAccess = hasAccessToken(request);
     const sessionAccess = validSession(request);
-    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) return app.managementAccess.deny(reply);
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
     // The dormant gate must be enable-able by an already trusted management
     // caller; once enabled, only a session or the recovery token may change it.
-    if (!tokenAccess && !sessionAccess && readManagementPasswordState().enabled) return app.managementAccess.deny(reply);
-    if (body.enabled && (typeof body.newPassword !== "string" || body.newPassword.trim().length < 8)) return reply.status(400).send({ error: "New password is required" });
+    if (!tokenAccess && !sessionAccess && readManagementPasswordState().enabled) {
+      return app.managementAccess.deny(reply);
+    }
+
+    if (body.enabled && (typeof body.newPassword !== "string" || body.newPassword.trim().length < 8)) {
+      return fail(reply, 400, "New password is required");
+    }
+
     if (!tokenAccess && readManagementPasswordState().enabled) {
       // This verification advances the same failure count and cooldown as an
       // unlock, so it has to report a cooldown the same way unlock does.
       const current = verifyManagementPassword(body.currentPassword);
-      if (current.locked) return reply.status(429).send({ authenticated: false, locked: true, lockedUntil: current.lockedUntil });
-      if (!current.ok) return reply.status(401).send({ error: "Authentication failed" });
+      if (current.locked) {
+        return fail(reply, 429, "Locked out", {
+          authenticated: false,
+          locked: true,
+          lockedUntil: current.lockedUntil
+        });
+      }
+      if (!current.ok) {
+        return fail(reply, 401, "Authentication failed", { authenticated: false });
+      }
     }
-    if (body.enabled) setManagementPassword(body.newPassword as string, true);
-    else disableManagementPassword();
+
+    if (body.enabled) {
+      setManagementPassword(body.newPassword as string, true);
+    } else {
+      disableManagementPassword();
+    }
     revokeAllManagementSessions();
     reply.header("Set-Cookie", buildManagementSessionCookie(request, { value: null }));
     return { enabled: body.enabled, authenticated: false };
   });
 };
+
 export default managementAuthRoute;

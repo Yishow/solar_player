@@ -178,11 +178,7 @@ export async function buildApp() {
     delegator: managementCorsOptions
   });
 
-  await managementAuthPlugin(app, {
-    accessControl: managementAccess,
-    managementAccessToken: config.managementAccessToken,
-    trustedOrigins: trustedManagementOrigins
-  });
+  await managementAuthPlugin(app, { accessControl: managementAccess });
   await app.register(managementAuthRoute);
   await deviceContextPlugin(app);
 

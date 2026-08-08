@@ -6,6 +6,7 @@ import {
   type DisplayClientHeartbeat,
   type DisplayClientLivenessSnapshot,
   type DisplaySyncEvent,
+  type DisplaySocketSessionClass,
   type ManagementSocketSessionClass
 } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
@@ -177,7 +178,7 @@ export class SocketService {
   private readonly authenticatedSocketIdentities =
     new WeakMap<SocketClientLike, DisplayClientContext>();
   private readonly socketSessionClasses =
-    new WeakMap<SocketClientLike, ManagementSocketSessionClass>();
+    new WeakMap<SocketClientLike, DisplaySocketSessionClass>();
   private readonly displayClientRegistry: DeviceLivenessRegistry;
   private readonly resolveDisplayClientContext;
   private readonly stopServerTimeSignalBroadcast: () => void;
@@ -230,7 +231,7 @@ export class SocketService {
 
     const authenticateSocket = (
       socket: SocketClientLike,
-      sessionClass: ManagementSocketSessionClass
+      sessionClass: DisplaySocketSessionClass
     ) => {
       if (sessionClass === "management-trusted") {
         return null;

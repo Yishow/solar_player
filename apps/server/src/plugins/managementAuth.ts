@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { IncomingHttpHeaders } from "node:http";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import {
@@ -185,7 +186,11 @@ export function buildManagementSessionCookie(
     `SameSite=${sameSite}`
   ];
 
-  if (sameSite === "None") {
+  // `Secure` keeps the cookie off plaintext connections; `SameSite=None` also
+  // requires it, and that combination is only reachable on a secure connection,
+  // so the two conditions never disagree. A plaintext connection must not get
+  // `Secure` or the browser discards the cookie outright.
+  if (sameSite === "None" || isSecureRequest(request)) {
     parts.push("Secure");
   }
 
@@ -213,7 +218,14 @@ function isSameHostReferer(
   return isSameHostOrigin(normalizedRefererOrigin, requestHost);
 }
 
-function matchesHeaderAccessToken(
+/**
+ * The single place a presented management access token is compared. A second
+ * implementation elsewhere could admit a caller this one would reject, so every
+ * examination of the header routes through here. The comparison is constant
+ * time: the token is high-entropy, but a divergent-timing compare costs nothing
+ * to avoid and the password path already uses `timingSafeEqual`.
+ */
+export function matchesManagementAccessTokenHeader(
   headers: IncomingHttpHeaders,
   managementAccessToken: string | null
 ): boolean {
@@ -221,7 +233,15 @@ function matchesHeaderAccessToken(
     return false;
   }
 
-  return readHeaderValue(headers[MANAGEMENT_ACCESS_TOKEN_HEADER]) === managementAccessToken;
+  const presented = readHeaderValue(headers[MANAGEMENT_ACCESS_TOKEN_HEADER]);
+  if (presented === null) {
+    return false;
+  }
+
+  const presentedBytes = Buffer.from(presented, "utf8");
+  const expectedBytes = Buffer.from(managementAccessToken, "utf8");
+  return presentedBytes.length === expectedBytes.length
+    && timingSafeEqual(presentedBytes, expectedBytes);
 }
 
 function matchesSocketAuthAccessToken(
@@ -304,7 +324,15 @@ function classifyManagementRequest(
   passwordGateEnabled = () => false,
   isManagementSessionValid = (_request: RequestLike) => false
 ): ManagementAccessDecision {
-  if (matchesHeaderAccessToken(request.headers, managementAccessToken)) {
+  // The gate is satisfied when it is off, or when this request carries a valid
+  // management session. Every trusted-origin outcome below shares this one
+  // answer so the condition cannot drift between them. The access-token and
+  // untrusted outcomes deliberately do not use it: the token is the recovery
+  // path and always satisfies, and an untrusted caller never does.
+  const satisfiesPasswordGate = () =>
+    !passwordGateEnabled() || isManagementSessionValid(request);
+
+  if (matchesManagementAccessTokenHeader(request.headers, managementAccessToken)) {
     return {
       normalizedOrigin: null,
       reason: "access-token",
@@ -313,24 +341,19 @@ function classifyManagementRequest(
     };
   }
 
+  const requestHost = readHeaderValue(request.headers.host);
   const origin = readHeaderValue(request.headers.origin);
 
   if (!origin) {
-    if (isSameHostReferer(request.headers, readHeaderValue(request.headers.host))) {
-      return {
-        normalizedOrigin: null,
-        reason: "same-host-referer",
-        trusted: true,
-        passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
-      };
-    }
-
-    const trusted = isSameHostReferer(request.headers, readHeaderValue(request.headers.host)) || isLoopbackRemoteAddress(request.ip);
+    const sameHostReferer = isSameHostReferer(request.headers, requestHost);
+    const trusted = sameHostReferer || isLoopbackRemoteAddress(request.ip);
     return {
       normalizedOrigin: null,
-      reason: trusted ? "loopback-remote" : "untrusted",
+      reason: sameHostReferer
+        ? "same-host-referer"
+        : trusted ? "loopback-remote" : "untrusted",
       trusted,
-      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
+      passwordGateSatisfied: satisfiesPasswordGate()
     };
   }
 
@@ -349,7 +372,7 @@ function classifyManagementRequest(
       normalizedOrigin,
       reason: "loopback-origin",
       trusted: true,
-      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
+      passwordGateSatisfied: satisfiesPasswordGate()
     };
   }
 
@@ -358,16 +381,16 @@ function classifyManagementRequest(
       normalizedOrigin,
       reason: "trusted-origin",
       trusted: true,
-      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
+      passwordGateSatisfied: satisfiesPasswordGate()
     };
   }
 
-  if (isSameHostOrigin(normalizedOrigin, readHeaderValue(request.headers.host))) {
+  if (isSameHostOrigin(normalizedOrigin, requestHost)) {
     return {
       normalizedOrigin,
       reason: "same-host-origin",
       trusted: true,
-      passwordGateSatisfied: !passwordGateEnabled() || isManagementSessionValid(request)
+      passwordGateSatisfied: satisfiesPasswordGate()
     };
   }
 
@@ -404,7 +427,22 @@ export function createManagementAccessControl(options: {
 }): ManagementAccessControl {
   const passwordGateEnabled = options.passwordGateEnabled ?? (() => false);
   const isManagementSessionValid = options.isManagementSessionValid ?? (() => false);
-  const classify = (request: RequestLike) => classifyManagementRequest(request, options.trustedOrigins, options.managementAccessToken, passwordGateEnabled, isManagementSessionValid);
+  const classify = (request: RequestLike) => classifyManagementRequest(
+    request,
+    options.trustedOrigins,
+    options.managementAccessToken,
+    passwordGateEnabled,
+    isManagementSessionValid
+  );
+
+  // Trusted origin AND password gate satisfied. The three exposed names below
+  // share this one body; they stay distinct so call sites keep saying whether
+  // they are guarding a mutation, a read, or a non-Fastify request object.
+  const isFullyTrusted = (request: RequestLike) => {
+    const decision = classify(request);
+    return decision.trusted && decision.passwordGateSatisfied;
+  };
+
   return {
     classifySocketSession(handshake) {
       const requestedClass = resolveRequestedSocketSessionClass(handshake.auth);
@@ -413,29 +451,13 @@ export function createManagementAccessControl(options: {
       }
 
       if (
-        matchesHeaderAccessToken(handshake.headers, options.managementAccessToken)
+        matchesManagementAccessTokenHeader(handshake.headers, options.managementAccessToken)
         || matchesSocketAuthAccessToken(handshake.auth, options.managementAccessToken)
       ) {
         return "management-trusted";
       }
 
-      return classifyManagementRequest(
-        {
-          headers: handshake.headers,
-          ip: handshake.address
-        },
-        options.trustedOrigins,
-        options.managementAccessToken,
-        passwordGateEnabled,
-        isManagementSessionValid
-      ).trusted
-        && classifyManagementRequest(
-          { headers: handshake.headers, ip: handshake.address },
-          options.trustedOrigins,
-          options.managementAccessToken,
-          passwordGateEnabled,
-          isManagementSessionValid
-        ).passwordGateSatisfied
+      return isFullyTrusted({ headers: handshake.headers, ip: handshake.address })
         ? "management-trusted"
         : "playback-safe";
     },
@@ -448,18 +470,9 @@ export function createManagementAccessControl(options: {
     isTrustedManagementOriginRequest(request) {
       return classify(request).trusted;
     },
-    isTrustedManagementMutationRequest(request) {
-      const decision = classify(request);
-      return decision.trusted && decision.passwordGateSatisfied;
-    },
-    isTrustedManagementReadRequest(request) {
-      const decision = classify(request);
-      return decision.trusted && decision.passwordGateSatisfied;
-    },
-    isTrustedManagementRequestLike(request) {
-      const decision = classify(request);
-      return decision.trusted && decision.passwordGateSatisfied;
-    }
+    isTrustedManagementMutationRequest: isFullyTrusted,
+    isTrustedManagementReadRequest: isFullyTrusted,
+    isTrustedManagementRequestLike: isFullyTrusted
   };
 }
 
@@ -511,24 +524,20 @@ export function createManagementCorsRequestGate(trustedOrigins: string[]) {
   };
 }
 
+/**
+ * The already-built access control is the only option. It carries the trusted
+ * origins, the token, and the password gate hooks; letting the plugin build its
+ * own would make it possible to register a gate-less instance by omission.
+ */
 type ManagementAuthPluginOptions = {
-  accessControl?: ManagementAccessControl;
-  managementAccessToken: string | null;
-  trustedOrigins: string[];
-  passwordGateEnabled?: () => boolean;
-  isManagementSessionValid?: (request: RequestLike) => boolean;
+  accessControl: ManagementAccessControl;
 };
 
 const managementAuthPlugin: FastifyPluginAsync<ManagementAuthPluginOptions> = async (
   app,
   options
 ) => {
-  const accessControl =
-    options.accessControl
-    ?? createManagementAccessControl({
-      managementAccessToken: options.managementAccessToken,
-      trustedOrigins: options.trustedOrigins
-    });
+  const accessControl = options.accessControl;
 
   app.addHook("onRequest", async (request, reply) => {
     if (!isManagementMutationRequest(request)) {

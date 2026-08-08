@@ -6,7 +6,7 @@ import { disableManagementPassword, readManagementPasswordState, setManagementPa
 import { revokeAllManagementSessions } from "../services/managementSessionService.js";
 
 migrateDatabase();
-test("management-auth state is public but never exposes stored secrets", async () => {
+test("management-auth state is readable without a session but never exposes stored secrets", async () => {
   disableManagementPassword();
   revokeAllManagementSessions();
   const app = await buildApp();
@@ -15,6 +15,107 @@ test("management-auth state is public but never exposes stored secrets", async (
     assert.equal(response.statusCode, 200);
     assert.deepEqual(Object.keys(response.json()).sort(), ["authenticated", "enabled", "lockedUntil"]);
   } finally {
+    await app.close();
+  }
+});
+
+test("an untrusted caller cannot read the management-auth gate state", async () => {
+  setManagementPassword("trusted-password");
+  revokeAllManagementSessions();
+  const app = await buildApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/management-auth/state",
+      headers: { origin: "https://evil.example", host: "player.example" }
+    });
+
+    assert.equal(response.statusCode, 403);
+    const body = response.json();
+    assert.equal("enabled" in body, false);
+    assert.equal("lockedUntil" in body, false);
+  } finally {
+    disableManagementPassword();
+    revokeAllManagementSessions();
+    await app.close();
+  }
+});
+
+test("an untrusted caller cannot revoke a trusted management session", async () => {
+  setManagementPassword("trusted-password");
+  revokeAllManagementSessions();
+  const app = await buildApp();
+  const trusted = { origin: "http://localhost", host: "localhost" };
+  try {
+    const unlocked = await app.inject({
+      method: "POST",
+      url: "/api/management-auth/unlock",
+      headers: trusted,
+      payload: { password: "trusted-password" }
+    });
+    const sessionCookie = (unlocked.headers["set-cookie"] as string).split(";")[0];
+
+    const attack = await app.inject({
+      method: "POST",
+      url: "/api/management-auth/lock",
+      headers: { origin: "https://evil.example", host: "player.example", cookie: sessionCookie }
+    });
+    assert.equal(attack.statusCode, 403);
+
+    const stillUnlocked = await app.inject({
+      method: "GET",
+      url: "/api/management-auth/state",
+      headers: { ...trusted, cookie: sessionCookie }
+    });
+    assert.equal(stillUnlocked.json().authenticated, true);
+  } finally {
+    disableManagementPassword();
+    revokeAllManagementSessions();
+    await app.close();
+  }
+});
+
+test("management-auth error responses carry the common management failure fields", async () => {
+  setManagementPassword("trusted-password");
+  revokeAllManagementSessions();
+  const app = await buildApp();
+  const trusted = { origin: "http://localhost", host: "localhost" };
+  try {
+    const badRequest = await app.inject({
+      method: "PUT",
+      url: "/api/management-auth/password",
+      headers: trusted,
+      payload: { newPassword: "another-password" }
+    });
+    assert.equal(badRequest.statusCode, 400);
+    assert.equal(badRequest.json().success, false);
+    assert.equal(typeof badRequest.json().timestamp, "string");
+    assert.equal(typeof badRequest.json().error, "string");
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await app.inject({
+        method: "POST",
+        url: "/api/management-auth/unlock",
+        headers: trusted,
+        payload: { password: "wrong-password" }
+      });
+    }
+
+    const locked = await app.inject({
+      method: "POST",
+      url: "/api/management-auth/unlock",
+      headers: trusted,
+      payload: { password: "trusted-password" }
+    });
+    assert.equal(locked.statusCode, 429);
+    assert.equal(locked.json().success, false);
+    assert.equal(typeof locked.json().timestamp, "string");
+    assert.equal(locked.json().locked, true);
+    assert.equal(locked.json().authenticated, false);
+    assert.equal(typeof locked.json().lockedUntil, "string");
+  } finally {
+    disableManagementPassword();
+    revokeAllManagementSessions();
     await app.close();
   }
 });

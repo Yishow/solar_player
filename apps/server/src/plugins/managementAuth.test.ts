@@ -5,6 +5,7 @@ import {
   createManagementAccessControl,
   createManagementCorsOptionsDelegate,
   isTrustedManagementCorsRequest,
+  matchesManagementAccessTokenHeader,
   resolveManagementSessionCookieSameSite
 } from "./managementAuth.js";
 
@@ -135,6 +136,23 @@ test("socket sessions stay playback-safe unless a trusted caller explicitly requ
   );
 });
 
+test("management origin classification never yields unidentified", () => {
+  const accessControl = createManagementAccessControl({
+    managementAccessToken: "secret-token",
+    trustedOrigins: ["https://ops.example"]
+  });
+
+  // No Device Credential and no management intent — the class SocketService
+  // would later downgrade to unidentified is not one this function can produce.
+  const sessionClass = accessControl.classifySocketSession({
+    address: "198.51.100.24",
+    headers: { host: "player.example" }
+  });
+
+  assert.equal(sessionClass, "playback-safe");
+  assert.notEqual(sessionClass as string, "unidentified");
+});
+
 test("same-host cross-port browser requests stay trusted by CORS gating", () => {
   assert.equal(
     isTrustedManagementCorsRequest(
@@ -229,7 +247,7 @@ test("setting and clearing a session cookie share the same attributes", () => {
   assert.doesNotMatch(cleared, /Max-Age=[1-9]/);
 });
 
-test("a strictly scoped session cookie carries no Secure attribute", () => {
+test("a strictly scoped session cookie carries no Secure attribute over plaintext", () => {
   const cookie = buildManagementSessionCookie(
     { headers: { host: "player.example", origin: "http://player.example" }, protocol: "http" },
     { maxAgeSeconds: 3600, value: "token-value" }
@@ -237,6 +255,24 @@ test("a strictly scoped session cookie carries no Secure attribute", () => {
 
   assert.match(cookie, /SameSite=Strict/);
   assert.doesNotMatch(cookie, /Secure/);
+});
+
+test("a strictly scoped session cookie is marked Secure over a secure connection", () => {
+  const cookie = buildManagementSessionCookie(
+    { headers: { host: "player.example", origin: "https://player.example" }, protocol: "https" },
+    { maxAgeSeconds: 3600, value: "token-value" }
+  );
+
+  assert.match(cookie, /SameSite=Strict/);
+  assert.match(cookie, /Secure/);
+});
+
+test("the management access token header is recognised by a single comparison", () => {
+  assert.equal(matchesManagementAccessTokenHeader({ "x-solar-management-token": "secret-token" }, null), false);
+  assert.equal(matchesManagementAccessTokenHeader({}, "secret-token"), false);
+  assert.equal(matchesManagementAccessTokenHeader({ "x-solar-management-token": "secret-token" }, "secret-token"), true);
+  assert.equal(matchesManagementAccessTokenHeader({ "x-solar-management-token": "secret-tokeX" }, "secret-token"), false);
+  assert.equal(matchesManagementAccessTokenHeader({ "x-solar-management-token": "secret-toke" }, "secret-token"), false);
 });
 
 test("management CORS delegate allows credentials only for allowed origins", async () => {

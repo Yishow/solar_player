@@ -11,6 +11,8 @@ The system SHALL classify each Socket.IO session at handshake time so the server
 
 A playback-safe handshake that does not resolve a valid Display Client Context SHALL be classified as unidentified rather than rejected. An unidentified session SHALL be allowed to connect and SHALL receive only the allowlisted feeds that carry no Device identity and no Site Scope. An unidentified session SHALL NEVER be classified as management-trusted.
 
+Management origin classification and connection identification are separate determinations and SHALL be represented separately. Management origin classification SHALL yield only playback-safe or management-trusted; it SHALL NOT be able to yield unidentified. The unidentified class SHALL be assigned only by Display Client Context resolution, and only to a session that management origin classification already placed in playback-safe.
+
 #### Scenario: Playback session connects without management credentials
 - **WHEN** a socket client connects without a trusted management origin or valid management access token
 - **THEN** the server SHALL classify that session as playback-safe
@@ -34,67 +36,41 @@ A playback-safe handshake that does not resolve a valid Display Client Context S
 - **THEN** the server SHALL classify that session as unidentified
 - **AND** the server SHALL NOT classify it as an identified session
 
+#### Scenario: Management origin classification never yields unidentified
+
+- **WHEN** management origin classification runs on a handshake that presents no Device Credential
+- **THEN** it SHALL yield playback-safe
+- **AND** it SHALL NOT yield unidentified, which only Display Client Context resolution assigns
+
+##### Example: Where each class comes from
+
+| Class | Assigned by |
+| ----- | ----------- |
+| `management-trusted` | management origin classification |
+| `playback-safe` | management origin classification |
+| `unidentified` | Display Client Context resolution, over a playback-safe session |
+
 
 <!-- @trace
-source: narrow-display-socket-gate-to-identity-scoped-feeds
+source: remove-management-access-control-duplication
 updated: 2026-08-08
 code:
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/server/src/app.ts
-  - apps/web/src/layouts/ManagementShell.tsx
-  - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
-  - apps/server/src/routes/device.ts
-  - apps/server/src/services/unpairedDisplayAccessRegistry.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/components/ManagementUnlockScreen.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
-  - apps/web/src/app/routeMeta.ts
-  - packages/shared/src/displayClientLiveness.ts
-  - apps/server/src/plugins/deviceContext.ts
-  - apps/server/src/services/deviceLivenessRegistry.ts
-  - apps/web/src/app/router.tsx
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/services/displayRuntimeSyncReporter.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/server/src/realtime/SocketService.ts
-  - apps/server/src/plugins/managementAuth.ts
-  - apps/web/src/pages/runtimeConfigHydration.tsx
-  - apps/web/src/hooks/useDisplayStoryRuntime.ts
+  - packages/shared/src/managementAccess.ts
   - apps/server/src/services/managementPasswordService.ts
+  - apps/server/src/plugins/managementAuth.ts
+  - apps/server/src/app.ts
+  - apps/server/src/services/managementSessionService.ts
+  - apps/server/src/routes/imagesSupport.ts
+  - apps/server/src/routes/brand.ts
+  - apps/server/src/realtime/SocketService.ts
   - apps/server/src/routes/management-auth.ts
   - apps/web/src/pages/SecuritySettings/index.tsx
-  - apps/web/src/pages/SecuritySettings/viewModel.ts
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/hooks/useImagePlaylistRuntime.ts
-  - apps/server/src/fastify.ts
-  - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
-  - apps/server/src/db/migrations/034_management_password_gate.sql
-  - apps/web/src/services/api.ts
-  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
-  - apps/server/src/services/managementSessionService.ts
+  - docs/ops/conventions.md
 tests:
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/services/displayRuntimeSyncReporter.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/server/src/plugins/managementAuth.test.ts
-  - apps/web/src/pages/runtimeConfigHydration.test.ts
-  - apps/web/src/pages/SecuritySettings/viewModel.test.ts
-  - apps/server/src/services/unpairedDisplayAccessRegistry.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/server/src/plugins/deviceContext.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - packages/shared/src/displayClientLiveness.test.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
-  - apps/server/src/routes/device.test.ts
-  - apps/server/src/services/managementSessionService.test.ts
-  - apps/web/src/components/ManagementUnlockScreen.test.tsx
   - apps/server/src/routes/management-auth.test.ts
-  - apps/server/src/services/deviceLivenessRegistry.test.ts
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/server/src/services/managementPasswordService.test.ts
+  - apps/server/src/routes/brand.test.ts
+  - apps/server/src/services/managementSessionService.test.ts
+  - apps/server/src/plugins/managementAuth.test.ts
 -->
 
 ---
