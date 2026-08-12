@@ -33,6 +33,41 @@ type CircuitThresholdCandidate = {
   warningMax: number;
 };
 
+type CircuitCreateBody = {
+  pageKey?: string;
+  nameZh: string;
+  nameEn?: string;
+  icon?: string;
+  unit?: string;
+  mqttTopic?: string;
+  ratedCapacity?: number;
+  normalMin?: number;
+  normalMax?: number;
+  attentionMin?: number;
+  attentionMax?: number;
+  warningMin?: number;
+  warningMax?: number;
+  displayOrder?: number;
+  displaySlot?: string | null;
+  enabled?: boolean;
+};
+
+type CircuitUpdateBody = Partial<CircuitCreateBody>;
+type ReorderItem = { id: number; displayOrder: number };
+type ReorderBody = { circuits: ReorderItem[] };
+
+const thresholdFields = [
+  "ratedCapacity",
+  "normalMin",
+  "normalMax",
+  "attentionMin",
+  "attentionMax",
+  "warningMin",
+  "warningMax"
+] as const;
+
+const optionalStringFields = ["pageKey", "nameEn", "icon", "unit", "mqttTopic"] as const;
+
 function toBoolean(value: unknown): boolean {
   return value === true || value === 1;
 }
@@ -73,29 +108,10 @@ function getAllCircuits(pageKey?: string): CircuitConfig[] {
   return rows.map(serializeCircuit);
 }
 
-type CircuitCreateBody = {
-  pageKey?: string;
-  nameZh: string;
-  nameEn?: string;
-  icon?: string;
-  unit?: string;
-  mqttTopic?: string;
-  ratedCapacity?: number;
-  normalMin?: number;
-  normalMax?: number;
-  attentionMin?: number;
-  attentionMax?: number;
-  warningMin?: number;
-  warningMax?: number;
-  displayOrder?: number;
-  displaySlot?: string | null;
-  enabled?: boolean;
-};
-
-type CircuitUpdateBody = Partial<CircuitCreateBody>;
-
-type ReorderItem = { id: number; displayOrder: number };
-type ReorderBody = { circuits: ReorderItem[] };
+function parseCircuitId(value: string) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
 
 function validateThresholdCandidate(candidate: CircuitThresholdCandidate) {
   const values = Object.values(candidate);
@@ -112,6 +128,56 @@ function validateThresholdCandidate(candidate: CircuitThresholdCandidate) {
     || candidate.warningMax > candidate.ratedCapacity
   ) {
     return "Circuit thresholds must be ordered within rated capacity";
+  }
+
+  return null;
+}
+
+function validateCircuitBody(body: unknown, options: { requireName: boolean }) {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return "Circuit body must be an object";
+  }
+
+  const input = body as Record<string, unknown>;
+  if (options.requireName || input.nameZh !== undefined) {
+    if (typeof input.nameZh !== "string" || input.nameZh.trim().length === 0) {
+      return "nameZh must be a non-empty string";
+    }
+  }
+
+  for (const field of optionalStringFields) {
+    if (input[field] !== undefined && typeof input[field] !== "string") {
+      return `${field} must be a string`;
+    }
+  }
+
+  if (
+    input.displaySlot !== undefined
+    && input.displaySlot !== null
+    && typeof input.displaySlot !== "string"
+  ) {
+    return "displaySlot must be a string or null";
+  }
+
+  if (input.enabled !== undefined && typeof input.enabled !== "boolean") {
+    return "enabled must be a boolean";
+  }
+
+  if (
+    input.displayOrder !== undefined
+    && (!Number.isInteger(input.displayOrder) || (input.displayOrder as number) < 0)
+  ) {
+    return "displayOrder must be a non-negative integer";
+  }
+
+  for (const field of thresholdFields) {
+    const value = input[field];
+    if (
+      value !== undefined
+      && (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    ) {
+      return `${field} must be a finite non-negative number`;
+    }
   }
 
   return null;
@@ -146,24 +212,47 @@ function updateThresholdCandidate(
   };
 }
 
+function validateReorderBody(body: unknown): body is ReorderBody {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const circuits = (body as { circuits?: unknown }).circuits;
+  if (!Array.isArray(circuits)) {
+    return false;
+  }
+
+  return circuits.every((item) => (
+    item !== null
+    && typeof item === "object"
+    && Number.isInteger((item as { id?: unknown }).id)
+    && ((item as { id: number }).id > 0)
+    && Number.isInteger((item as { displayOrder?: unknown }).displayOrder)
+    && ((item as { displayOrder: number }).displayOrder >= 0)
+  ));
+}
+
 const circuitsRoute: FastifyPluginAsync = async (app) => {
-  // GET /api/circuits
   app.get<{ Querystring: { pageKey?: string } }>("/api/circuits", async (request) => ({
     success: true,
     data: getAllCircuits(request.query.pageKey?.trim() || undefined),
     readiness: readDisplayReadinessReport()
   }));
 
-  // POST /api/circuits
   app.post<{ Body: CircuitCreateBody }>("/api/circuits", async (request, reply) => {
-    const db = getDatabase();
-    const body = request.body;
-    const thresholds = createThresholdCandidate(body);
-    const validationError = validateThresholdCandidate(thresholds);
-    if (validationError) {
-      return reply.status(400).send({ success: false, error: validationError });
+    const bodyValidationError = validateCircuitBody(request.body, { requireName: true });
+    if (bodyValidationError) {
+      return reply.status(400).send({ success: false, error: bodyValidationError });
     }
 
+    const body = request.body;
+    const thresholds = createThresholdCandidate(body);
+    const thresholdValidationError = validateThresholdCandidate(thresholds);
+    if (thresholdValidationError) {
+      return reply.status(400).send({ success: false, error: thresholdValidationError });
+    }
+
+    const db = getDatabase();
     const result = db
       .prepare(
         `INSERT INTO circuit_configs (
@@ -174,7 +263,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       )
       .run(
         body.pageKey?.trim() || "factory-circuit",
-        body.nameZh ?? null,
+        body.nameZh.trim(),
         body.nameEn ?? null,
         body.icon ?? null,
         body.unit ?? "kW",
@@ -212,14 +301,21 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  // PUT /api/circuits/:id
   app.put<{ Params: { id: string }; Body: CircuitUpdateBody }>(
     "/api/circuits/:id",
     async (request, reply) => {
-      const db = getDatabase();
-      const id = Number.parseInt(request.params.id, 10);
-      const body = request.body;
+      const id = parseCircuitId(request.params.id);
+      if (id === null) {
+        return reply.status(400).send({ success: false, error: "Invalid circuit ID" });
+      }
 
+      const bodyValidationError = validateCircuitBody(request.body, { requireName: false });
+      if (bodyValidationError) {
+        return reply.status(400).send({ success: false, error: bodyValidationError });
+      }
+
+      const db = getDatabase();
+      const body = request.body;
       const existing = db
         .prepare("SELECT * FROM circuit_configs WHERE id = ?")
         .get(id) as CircuitRow | undefined;
@@ -229,9 +325,9 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       }
 
       const thresholds = updateThresholdCandidate(existing, body);
-      const validationError = validateThresholdCandidate(thresholds);
-      if (validationError) {
-        return reply.status(400).send({ success: false, error: validationError });
+      const thresholdValidationError = validateThresholdCandidate(thresholds);
+      if (thresholdValidationError) {
+        return reply.status(400).send({ success: false, error: thresholdValidationError });
       }
 
       db.prepare(
@@ -255,7 +351,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`
       ).run(
-        body.nameZh ?? null,
+        body.nameZh?.trim() ?? null,
         body.pageKey?.trim() || null,
         body.nameEn ?? null,
         body.icon ?? null,
@@ -296,11 +392,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
-  // DELETE /api/circuits/:id
   app.delete<{ Params: { id: string } }>("/api/circuits/:id", async (request, reply) => {
-    const db = getDatabase();
-    const id = Number.parseInt(request.params.id, 10);
+    const id = parseCircuitId(request.params.id);
+    if (id === null) {
+      return reply.status(400).send({ success: false, error: "Invalid circuit ID" });
+    }
 
+    const db = getDatabase();
     const existing = db
       .prepare("SELECT * FROM circuit_configs WHERE id = ?")
       .get(id) as CircuitRow | undefined;
@@ -325,11 +423,12 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
     return { success: true, data: { id }, readiness: readDisplayReadinessReport() };
   });
 
-  // PUT /api/circuits/reorder
-  app.put<{ Body: ReorderBody }>("/api/circuits/reorder", async (request) => {
-    const db = getDatabase();
-    const body = request.body;
+  app.put<{ Body: ReorderBody }>("/api/circuits/reorder", async (request, reply) => {
+    if (!validateReorderBody(request.body)) {
+      return reply.status(400).send({ success: false, error: "Invalid circuit reorder payload" });
+    }
 
+    const db = getDatabase();
     const updateStmt = db.prepare(
       "UPDATE circuit_configs SET display_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     );
@@ -340,7 +439,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
       }
     });
 
-    transaction(body.circuits ?? []);
+    transaction(request.body.circuits);
 
     app.socketService.emitCircuitSettingsUpdated({ action: "reordered" });
     app.socketService.emitDisplaySync({
