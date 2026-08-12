@@ -31,6 +31,7 @@ import {
   getStorageUsage,
   MAX_FILE_SIZE,
   serializeImageRow,
+  stageImageFileDeletion,
   type ImageReorderBody,
   type ImageUpdateBody
 } from "./imagesSupport.js";
@@ -323,10 +324,40 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    deleteImagePlaylistEntriesForAsset(id);
-    getDatabase().prepare("DELETE FROM image_assets WHERE id = ?").run(id);
-    if (existing.filename) {
-      deleteImageFile(existing.filename);
+    let stagedFile: ReturnType<typeof stageImageFileDeletion> | null = null;
+    try {
+      stagedFile = existing.filename ? stageImageFileDeletion(existing.filename) : null;
+    } catch (error) {
+      app.log.error({ error, imageId: id }, "Failed to stage image file for deletion");
+      return reply.status(500).send(errorResponse("Failed to stage image file for deletion"));
+    }
+
+    const database = getDatabase();
+    try {
+      database.transaction(() => {
+        deleteImagePlaylistEntriesForAsset(id);
+        database.prepare("DELETE FROM image_assets WHERE id = ?").run(id);
+      })();
+    } catch (error) {
+      try {
+        stagedFile?.rollback();
+      } catch (rollbackError) {
+        app.log.error(
+          { error: rollbackError, imageId: id },
+          "Failed to restore staged image after database deletion failure"
+        );
+      }
+      app.log.error({ error, imageId: id }, "Failed to delete image metadata");
+      return reply.status(500).send(errorResponse("Failed to delete image metadata"));
+    }
+
+    try {
+      stagedFile?.commit();
+    } catch (error) {
+      // The original public asset path is already gone and the DB transaction
+      // succeeded. Leave the isolated file for later cleanup rather than turning
+      // a logically successful delete into a misleading API failure.
+      app.log.warn({ error, imageId: id }, "Failed to purge staged image file");
     }
 
     app.socketService.emitImagesUpdated({
