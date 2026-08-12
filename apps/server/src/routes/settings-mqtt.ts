@@ -5,6 +5,7 @@ import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
+import { MockMetricsFeedService } from "../services/MockMetricsFeedService.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -205,7 +206,9 @@ function serializeSettings(row: MqttSettingsRow): MqttSettingsResponse {
 }
 
 function resolveSettingsBody(body: SettingsBody | undefined, current: MqttSettingsRow) {
-  const nextDataMode = body?.dataMode === "mock" ? "mock" : "mqtt";
+  const nextDataMode = body?.dataMode === undefined
+    ? current.data_mode === "mock" ? "mock" : "mqtt"
+    : body.dataMode === "mock" ? "mock" : "mqtt";
   const nextPassword =
     body?.password === undefined || body.password === "****"
       ? current.password ?? ""
@@ -386,6 +389,13 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         )
         .run(next.dataMode);
     })();
+
+    if (next.dataMode === "mock") {
+      // The long-lived mock feed will continue on its next scheduled tick; seed
+      // one reading immediately so MQTT -> mock takes effect without a restart
+      // or a one-minute empty window.
+      new MockMetricsFeedService({ database }).writeReading();
+    }
 
     void app.mqttClientService.connect().catch(() => undefined);
     app.socketService.emitDisplaySync({
