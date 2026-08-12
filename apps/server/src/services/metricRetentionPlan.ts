@@ -9,6 +9,12 @@ function toDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function assertPositiveRetentionDays(value: number, label: string) {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new RangeError(`${label} must be a positive integer`);
+  }
+}
+
 export function resolveRetentionCutoffs(
   now: Date,
   opts: {
@@ -16,6 +22,12 @@ export function resolveRetentionCutoffs(
     summaryRetentionDays: number;
   }
 ) {
+  // Defense in depth: configuration normally falls back to safe defaults, but
+  // direct service construction or future callers must never turn a negative
+  // retention value into a cutoff in the future and delete current history.
+  assertPositiveRetentionDays(opts.snapshotRetentionDays, "snapshotRetentionDays");
+  assertPositiveRetentionDays(opts.summaryRetentionDays, "summaryRetentionDays");
+
   return {
     snapshotCutoffIso: new Date(now.getTime() - (opts.snapshotRetentionDays * DAY_IN_MS)).toISOString(),
     summaryCutoffDate: toDateKey(
