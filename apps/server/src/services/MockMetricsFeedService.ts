@@ -142,12 +142,9 @@ type MockMetricsFeedServiceOptions = {
   now?: () => Date;
 };
 
-// Development-only feed: in mock mode the MQTT client never connects, so the
-// live-metrics store stays empty and the snapshot pipeline would flatten the
-// Overview trend. This service periodically upserts a simulated instantaneous
-// `realTimePower` reading into `live_metric_values`, letting the existing
-// accumulator + snapshot-writer pipeline build the trend history from runtime
-// data without bypassing it.
+// Development-only feed: the lifecycle stays active so runtime mode changes do
+// not require a process restart, but scheduled writes are allowed only while the
+// persisted MQTT settings explicitly select mock mode.
 export class MockMetricsFeedService {
   private readonly database: Database.Database;
   private readonly intervalMs: number;
@@ -165,8 +162,8 @@ export class MockMetricsFeedService {
       return;
     }
 
-    this.writeReading();
-    this.timer = setInterval(() => this.writeReading(), this.intervalMs);
+    this.writeReadingIfMockMode();
+    this.timer = setInterval(() => this.writeReadingIfMockMode(), this.intervalMs);
     this.timer.unref?.();
   }
 
@@ -175,6 +172,19 @@ export class MockMetricsFeedService {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  writeReadingIfMockMode() {
+    const row = this.database
+      .prepare("SELECT data_mode FROM mqtt_settings LIMIT 1")
+      .get() as { data_mode: string | null } | undefined;
+
+    if (row?.data_mode !== "mock") {
+      return false;
+    }
+
+    this.writeReading();
+    return true;
   }
 
   writeReading() {
