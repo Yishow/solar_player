@@ -323,6 +323,18 @@ export class MqttClientService {
       await this.syncSubscriptions();
       this.notifySystemRecovered("MQTT connection restored");
     } catch (error) {
+      // The MQTT.js client is configured with reconnectPeriod, so merely
+      // releasing the local runtime lease here can leave a live client that
+      // reconnects later without owning the lease. Detach this instance from
+      // the service and fully end it before releasing ownership.
+      this.reconnectsEnabled = false;
+      if (this.client === client) {
+        this.client = null;
+      }
+      this.activeTopics.clear();
+      await disconnectClient(client);
+      this.stopLeaseRenewal();
+      this.releaseRuntimeLease();
       this.setStatus({
         connected: false,
         reason: error instanceof Error ? error.message : "error"
@@ -332,8 +344,6 @@ export class MqttClientService {
         clientId: this.status.clientId,
         error: error instanceof Error ? error.message : String(error)
       });
-      this.stopLeaseRenewal();
-      this.releaseRuntimeLease();
       throw error;
     }
   }
