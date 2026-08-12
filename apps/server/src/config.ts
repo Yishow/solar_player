@@ -13,6 +13,15 @@ function readNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readPositiveInteger(value: string | undefined, fallback: number) {
+  if (!value || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function resolveDataDir() {
   return resolveEnvPath(process.env.DATA_DIR, resolve(projectRoot, "data"));
 }
@@ -84,10 +93,10 @@ export const config = {
     return readNumber(process.env.WEATHER_REQUEST_TIMEOUT_MS, 5_000);
   },
   get metricSnapshotRetentionDays() {
-    return readNumber(process.env.METRIC_SNAPSHOT_RETENTION_DAYS, 90);
+    return readPositiveInteger(process.env.METRIC_SNAPSHOT_RETENTION_DAYS, 90);
   },
   get dailySummaryRetentionDays() {
-    return readNumber(process.env.DAILY_SUMMARY_RETENTION_DAYS, 1_825);
+    return readPositiveInteger(process.env.DAILY_SUMMARY_RETENTION_DAYS, 1_825);
   },
   get metricRetentionVacuumEnabled() {
     return process.env.METRIC_RETENTION_VACUUM_ENABLED?.trim() !== "false";
