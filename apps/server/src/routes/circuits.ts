@@ -23,6 +23,16 @@ type CircuitRow = {
   enabled: number;
 };
 
+type CircuitThresholdCandidate = {
+  ratedCapacity: number;
+  normalMin: number;
+  normalMax: number;
+  attentionMin: number;
+  attentionMax: number;
+  warningMin: number;
+  warningMax: number;
+};
+
 function toBoolean(value: unknown): boolean {
   return value === true || value === 1;
 }
@@ -87,6 +97,55 @@ type CircuitUpdateBody = Partial<CircuitCreateBody>;
 type ReorderItem = { id: number; displayOrder: number };
 type ReorderBody = { circuits: ReorderItem[] };
 
+function validateThresholdCandidate(candidate: CircuitThresholdCandidate) {
+  const values = Object.values(candidate);
+  if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+    return "Circuit capacity and thresholds must be finite non-negative numbers";
+  }
+
+  if (
+    candidate.normalMin > candidate.normalMax
+    || candidate.normalMax > candidate.attentionMin
+    || candidate.attentionMin > candidate.attentionMax
+    || candidate.attentionMax > candidate.warningMin
+    || candidate.warningMin > candidate.warningMax
+    || candidate.warningMax > candidate.ratedCapacity
+  ) {
+    return "Circuit thresholds must be ordered within rated capacity";
+  }
+
+  return null;
+}
+
+function createThresholdCandidate(body: CircuitCreateBody): CircuitThresholdCandidate {
+  const ratedCapacity = body.ratedCapacity ?? 0;
+  return {
+    ratedCapacity,
+    normalMin: body.normalMin ?? 0,
+    normalMax: body.normalMax ?? ratedCapacity * 0.7,
+    attentionMin: body.attentionMin ?? ratedCapacity * 0.7,
+    attentionMax: body.attentionMax ?? ratedCapacity * 0.9,
+    warningMin: body.warningMin ?? ratedCapacity * 0.9,
+    warningMax: body.warningMax ?? ratedCapacity
+  };
+}
+
+function updateThresholdCandidate(
+  existing: CircuitRow,
+  body: CircuitUpdateBody
+): CircuitThresholdCandidate {
+  const ratedCapacity = body.ratedCapacity ?? existing.rated_capacity ?? 0;
+  return {
+    ratedCapacity,
+    normalMin: body.normalMin ?? existing.normal_min ?? 0,
+    normalMax: body.normalMax ?? existing.normal_max ?? ratedCapacity * 0.7,
+    attentionMin: body.attentionMin ?? existing.attention_min ?? ratedCapacity * 0.7,
+    attentionMax: body.attentionMax ?? existing.attention_max ?? ratedCapacity * 0.9,
+    warningMin: body.warningMin ?? existing.warning_min ?? ratedCapacity * 0.9,
+    warningMax: body.warningMax ?? existing.warning_max ?? ratedCapacity
+  };
+}
+
 const circuitsRoute: FastifyPluginAsync = async (app) => {
   // GET /api/circuits
   app.get<{ Querystring: { pageKey?: string } }>("/api/circuits", async (request) => ({
@@ -96,11 +155,15 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
   }));
 
   // POST /api/circuits
-  app.post<{ Body: CircuitCreateBody }>("/api/circuits", async (request) => {
+  app.post<{ Body: CircuitCreateBody }>("/api/circuits", async (request, reply) => {
     const db = getDatabase();
     const body = request.body;
+    const thresholds = createThresholdCandidate(body);
+    const validationError = validateThresholdCandidate(thresholds);
+    if (validationError) {
+      return reply.status(400).send({ success: false, error: validationError });
+    }
 
-    const rc = body.ratedCapacity ?? 0;
     const result = db
       .prepare(
         `INSERT INTO circuit_configs (
@@ -117,13 +180,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         body.unit ?? "kW",
         body.mqttTopic ?? null,
         body.displaySlot ?? null,
-        rc,
-        body.normalMin ?? 0,
-        body.normalMax ?? rc * 0.7,
-        body.attentionMin ?? rc * 0.7,
-        body.attentionMax ?? rc * 0.9,
-        body.warningMin ?? rc * 0.9,
-        body.warningMax ?? rc,
+        thresholds.ratedCapacity,
+        thresholds.normalMin,
+        thresholds.normalMax,
+        thresholds.attentionMin,
+        thresholds.attentionMax,
+        thresholds.warningMin,
+        thresholds.warningMax,
         body.displayOrder ?? 0,
         body.enabled === false ? 0 : 1
       );
@@ -152,7 +215,7 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
   // PUT /api/circuits/:id
   app.put<{ Params: { id: string }; Body: CircuitUpdateBody }>(
     "/api/circuits/:id",
-    async (request) => {
+    async (request, reply) => {
       const db = getDatabase();
       const id = Number.parseInt(request.params.id, 10);
       const body = request.body;
@@ -162,10 +225,15 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         .get(id) as CircuitRow | undefined;
 
       if (!existing) {
-        return { success: false, error: "Circuit not found" };
+        return reply.status(404).send({ success: false, error: "Circuit not found" });
       }
 
-      const rc = body.ratedCapacity ?? existing.rated_capacity;
+      const thresholds = updateThresholdCandidate(existing, body);
+      const validationError = validateThresholdCandidate(thresholds);
+      if (validationError) {
+        return reply.status(400).send({ success: false, error: validationError });
+      }
+
       db.prepare(
         `UPDATE circuit_configs SET
           name_zh = COALESCE(?, name_zh),
@@ -176,12 +244,12 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
           mqtt_topic = COALESCE(?, mqtt_topic),
           display_slot = ?,
           rated_capacity = ?,
-          normal_min = COALESCE(?, normal_min),
-          normal_max = COALESCE(?, normal_max),
-          attention_min = COALESCE(?, attention_min),
-          attention_max = COALESCE(?, attention_max),
-          warning_min = COALESCE(?, warning_min),
-          warning_max = COALESCE(?, warning_max),
+          normal_min = ?,
+          normal_max = ?,
+          attention_min = ?,
+          attention_max = ?,
+          warning_min = ?,
+          warning_max = ?,
           display_order = COALESCE(?, display_order),
           enabled = COALESCE(?, enabled),
           updated_at = CURRENT_TIMESTAMP
@@ -194,13 +262,13 @@ const circuitsRoute: FastifyPluginAsync = async (app) => {
         body.unit ?? null,
         body.mqttTopic ?? null,
         body.displaySlot === undefined ? existing.display_slot : body.displaySlot,
-        rc,
-        body.normalMin,
-        body.normalMax,
-        body.attentionMin,
-        body.attentionMax,
-        body.warningMin,
-        body.warningMax,
+        thresholds.ratedCapacity,
+        thresholds.normalMin,
+        thresholds.normalMax,
+        thresholds.attentionMin,
+        thresholds.attentionMax,
+        thresholds.warningMin,
+        thresholds.warningMax,
         body.displayOrder,
         body.enabled === undefined ? undefined : (body.enabled ? 1 : 0),
         id
