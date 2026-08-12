@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync
 } from "node:fs";
@@ -37,6 +38,7 @@ export type ImageAssetRow = {
 };
 
 const DISPLAY_SEED_ORIGINAL_NAME_PREFIX = "display-seed:";
+const IMAGE_TRASH_DIRECTORY = ".trash";
 
 function resolveSeedKey(originalName: string | null) {
   return originalName?.startsWith(DISPLAY_SEED_ORIGINAL_NAME_PREFIX)
@@ -62,6 +64,12 @@ export type ImageReorderItem = {
 
 export type ImageReorderBody = {
   images: ImageReorderItem[];
+};
+
+export type StagedImageFileDeletion = {
+  commit: () => void;
+  rollback: () => void;
+  staged: boolean;
 };
 
 /**
@@ -190,6 +198,49 @@ export function deleteImageFile(filename: string) {
   if (existsSync(filePath)) {
     rmSync(filePath);
   }
+}
+
+export function stageImageFileDeletion(filename: string): StagedImageFileDeletion {
+  ensureUploadsDir();
+  const sourcePath = resolve(config.uploadsDir, filename);
+  if (!existsSync(sourcePath)) {
+    return {
+      commit: () => undefined,
+      rollback: () => undefined,
+      staged: false
+    };
+  }
+
+  const trashDir = resolve(config.uploadsDir, IMAGE_TRASH_DIRECTORY);
+  mkdirSync(trashDir, { recursive: true });
+  const stagedPath = resolve(
+    trashDir,
+    `${Date.now()}-${createHash("sha256").update(`${filename}-${Math.random()}`).digest("hex").slice(0, 12)}-${filename}`
+  );
+  renameSync(sourcePath, stagedPath);
+  let finalized = false;
+
+  return {
+    commit() {
+      if (finalized) {
+        return;
+      }
+      if (existsSync(stagedPath)) {
+        rmSync(stagedPath, { force: true });
+      }
+      finalized = true;
+    },
+    rollback() {
+      if (finalized) {
+        return;
+      }
+      if (existsSync(stagedPath)) {
+        renameSync(stagedPath, sourcePath);
+      }
+      finalized = true;
+    },
+    staged: true
+  };
 }
 
 export function generateUniqueFilename(originalName: string) {
