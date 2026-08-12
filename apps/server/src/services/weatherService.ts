@@ -25,6 +25,8 @@ type CachedWeatherEntry = {
   snapshot: WeatherCurrentSnapshot;
 };
 
+const MAX_WEATHER_SELECTION_CACHE_ENTRIES = 64;
+
 function buildEmptySnapshot(fetchState: WeatherCurrentSnapshot["fetchState"]): WeatherCurrentSnapshot {
   return {
     airPressure: null,
@@ -120,6 +122,19 @@ function weatherCacheKey(settings: WeatherSettings) {
   ]);
 }
 
+function rememberBounded<K, V>(map: Map<K, V>, key: K, value: V) {
+  map.delete(key);
+  map.set(key, value);
+
+  while (map.size > MAX_WEATHER_SELECTION_CACHE_ENTRIES) {
+    const oldestKey = map.keys().next().value as K | undefined;
+    if (oldestKey === undefined) {
+      break;
+    }
+    map.delete(oldestKey);
+  }
+}
+
 export class WeatherService {
   private readonly authorizationConfigured: boolean;
   private readonly client: WeatherClientLike;
@@ -195,6 +210,7 @@ export class WeatherService {
     const cacheKey = weatherCacheKey(settings);
     const cached = this.cachedSnapshots.get(cacheKey);
     if (cached && nowTime < cached.expiresAt) {
+      rememberBounded(this.cachedSnapshots, cacheKey, cached);
       if (cached.snapshot.fetchState === "fresh") {
         this.diagnostic = {
           ...this.diagnostic,
@@ -214,11 +230,11 @@ export class WeatherService {
         fetchState: "fresh",
         staleAt: null
       } satisfies WeatherCurrentSnapshot;
-      this.lastSuccessfulSnapshots.set(cacheKey, freshSnapshot);
+      rememberBounded(this.lastSuccessfulSnapshots, cacheKey, freshSnapshot);
       this.recordSuccess("current", nowTime.toISOString());
 
       const intervalMinutes = settings.updateIntervalMinutes > 0 ? settings.updateIntervalMinutes : 30;
-      this.cachedSnapshots.set(cacheKey, {
+      rememberBounded(this.cachedSnapshots, cacheKey, {
         expiresAt: new Date(nowTime.getTime() + intervalMinutes * 60 * 1000),
         snapshot: freshSnapshot
       });
@@ -234,6 +250,9 @@ export class WeatherService {
       return freshSnapshot;
     } catch (error) {
       const lastSuccessfulSnapshot = this.lastSuccessfulSnapshots.get(cacheKey) ?? null;
+      if (lastSuccessfulSnapshot) {
+        rememberBounded(this.lastSuccessfulSnapshots, cacheKey, lastSuccessfulSnapshot);
+      }
       this.diagnostic = buildFailureDiagnostic(
         error,
         "current",
@@ -253,7 +272,7 @@ export class WeatherService {
         staleAt: nowTime.toISOString()
       } satisfies WeatherCurrentSnapshot;
 
-      this.cachedSnapshots.set(cacheKey, {
+      rememberBounded(this.cachedSnapshots, cacheKey, {
         expiresAt: new Date(nowTime.getTime() + 5 * 60 * 1000),
         snapshot: staleSnapshot
       });
