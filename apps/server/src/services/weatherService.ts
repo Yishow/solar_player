@@ -20,6 +20,11 @@ type WeatherServiceOptions = {
   now?: () => Date;
 };
 
+type CachedWeatherEntry = {
+  expiresAt: Date;
+  snapshot: WeatherCurrentSnapshot;
+};
+
 function buildEmptySnapshot(fetchState: WeatherCurrentSnapshot["fetchState"]): WeatherCurrentSnapshot {
   return {
     airPressure: null,
@@ -107,14 +112,21 @@ function buildFailureDiagnostic(
   };
 }
 
+function weatherCacheKey(settings: WeatherSettings) {
+  return JSON.stringify([
+    settings.locationMode,
+    settings.countyName ?? "",
+    settings.locationMode === "station" ? settings.stationId ?? "" : ""
+  ]);
+}
+
 export class WeatherService {
   private readonly authorizationConfigured: boolean;
   private readonly client: WeatherClientLike;
   private logger: LoggerLike | null;
   private readonly now: () => Date;
-  private lastSuccessfulSnapshot: WeatherCurrentSnapshot | null = null;
-  private cachedSnapshot: WeatherCurrentSnapshot | null = null;
-  private cacheExpiredAt: Date | null = null;
+  private readonly lastSuccessfulSnapshots = new Map<string, WeatherCurrentSnapshot>();
+  private readonly cachedSnapshots = new Map<string, CachedWeatherEntry>();
   private diagnostic: WeatherDiagnostic = initialDiagnostic;
   private mqttPublish: ((topic: string, payload: string) => void) | null = null;
 
@@ -138,7 +150,7 @@ export class WeatherService {
   }
 
   clearCache() {
-    this.cacheExpiredAt = null;
+    this.cachedSnapshots.clear();
   }
 
   getDiagnostic(): WeatherDiagnostic {
@@ -180,18 +192,16 @@ export class WeatherService {
     }
 
     const nowTime = this.now();
-    if (
-      this.cachedSnapshot
-      && this.cacheExpiredAt
-      && nowTime < this.cacheExpiredAt
-    ) {
-      if (this.cachedSnapshot.fetchState === "fresh") {
+    const cacheKey = weatherCacheKey(settings);
+    const cached = this.cachedSnapshots.get(cacheKey);
+    if (cached && nowTime < cached.expiresAt) {
+      if (cached.snapshot.fetchState === "fresh") {
         this.diagnostic = {
           ...this.diagnostic,
           source: "cache"
         };
       }
-      return this.cachedSnapshot;
+      return cached.snapshot;
     }
 
     try {
@@ -199,49 +209,56 @@ export class WeatherService {
         countyName: settings.countyName,
         stationId: settings.locationMode === "station" ? settings.stationId : null
       });
-      this.lastSuccessfulSnapshot = {
+      const freshSnapshot = {
         ...current,
         fetchState: "fresh",
         staleAt: null
-      };
-      this.cachedSnapshot = this.lastSuccessfulSnapshot;
+      } satisfies WeatherCurrentSnapshot;
+      this.lastSuccessfulSnapshots.set(cacheKey, freshSnapshot);
       this.recordSuccess("current", nowTime.toISOString());
 
       const intervalMinutes = settings.updateIntervalMinutes > 0 ? settings.updateIntervalMinutes : 30;
-      this.cacheExpiredAt = new Date(nowTime.getTime() + intervalMinutes * 60 * 1000);
+      this.cachedSnapshots.set(cacheKey, {
+        expiresAt: new Date(nowTime.getTime() + intervalMinutes * 60 * 1000),
+        snapshot: freshSnapshot
+      });
 
       if (this.mqttPublish) {
         try {
-          this.mqttPublish("solar/weather/current", JSON.stringify(this.lastSuccessfulSnapshot));
+          this.mqttPublish("solar/weather/current", JSON.stringify(freshSnapshot));
         } catch {
           // Keep CWA logic resilient to MQTT broadcast failures
         }
       }
 
-      return this.lastSuccessfulSnapshot;
+      return freshSnapshot;
     } catch (error) {
+      const lastSuccessfulSnapshot = this.lastSuccessfulSnapshots.get(cacheKey) ?? null;
       this.diagnostic = buildFailureDiagnostic(
         error,
         "current",
         nowTime.toISOString(),
         this.diagnostic.lastSuccessAt,
-        this.lastSuccessfulSnapshot ? "stale" : "unavailable"
+        lastSuccessfulSnapshot ? "stale" : "unavailable"
       );
       this.logger?.warn({ error: serializeWeatherFetchError(error) }, "CWA weather fetch failed");
 
-      if (!this.lastSuccessfulSnapshot) {
+      if (!lastSuccessfulSnapshot) {
         return buildEmptySnapshot("unavailable");
       }
 
-      this.cachedSnapshot = {
-        ...this.lastSuccessfulSnapshot,
+      const staleSnapshot = {
+        ...lastSuccessfulSnapshot,
         fetchState: "stale",
         staleAt: nowTime.toISOString()
-      };
+      } satisfies WeatherCurrentSnapshot;
 
-      this.cacheExpiredAt = new Date(nowTime.getTime() + 5 * 60 * 1000);
+      this.cachedSnapshots.set(cacheKey, {
+        expiresAt: new Date(nowTime.getTime() + 5 * 60 * 1000),
+        snapshot: staleSnapshot
+      });
 
-      return this.cachedSnapshot;
+      return staleSnapshot;
     }
   }
 
