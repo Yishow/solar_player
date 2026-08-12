@@ -78,6 +78,7 @@ type FileHashCacheEntry = {
   size: number;
 };
 
+const MAX_FILE_HASH_CACHE_ENTRIES = 256;
 const fileHashCache = new Map<string, FileHashCacheEntry>();
 
 function ensurePlaylistTable() {
@@ -276,6 +277,21 @@ function fileSource(filename: string | null) {
   return existsSync(resolve(config.uploadsDir, filename)) ? `/uploads/images/${filename}` : null;
 }
 
+function rememberFileHash(filePath: string, entry: FileHashCacheEntry) {
+  // Refresh insertion order on both writes and hits so the bounded Map behaves
+  // like a tiny LRU cache instead of retaining long-dead upload paths forever.
+  fileHashCache.delete(filePath);
+  fileHashCache.set(filePath, entry);
+
+  while (fileHashCache.size > MAX_FILE_HASH_CACHE_ENTRIES) {
+    const oldestKey = fileHashCache.keys().next().value as string | undefined;
+    if (!oldestKey) {
+      break;
+    }
+    fileHashCache.delete(oldestKey);
+  }
+}
+
 function fileHash(source: string | null) {
   if (!source?.startsWith("/uploads/images/")) {
     return null;
@@ -292,16 +308,17 @@ function fileHash(source: string | null) {
 
     const cached = fileHashCache.get(filePath);
     if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      rememberFileHash(filePath, cached);
       return cached.hash;
     }
 
-    const hash = createHash("sha256").update(readFileSync(filePath)).digest("hex");
-    fileHashCache.set(filePath, {
-      hash,
+    const entry = {
+      hash: createHash("sha256").update(readFileSync(filePath)).digest("hex"),
       mtimeMs: stat.mtimeMs,
       size: stat.size
-    });
-    return hash;
+    } satisfies FileHashCacheEntry;
+    rememberFileHash(filePath, entry);
+    return entry.hash;
   } catch {
     fileHashCache.delete(filePath);
     return null;
@@ -612,7 +629,9 @@ export function updateImagePlaylistEntry(entryId: string, input: PlaylistUpdateI
       input.assetId === undefined ? previousRow.asset_id : input.assetId,
       input.enabled === undefined ? previousRow.enabled : input.enabled ? 1 : 0,
       input.displayOrder ?? previousRow.display_order,
-      input.durationSeconds ?? previousRow.duration_seconds,
+      input.durationSeconds === undefined
+        ? previousRow.duration_seconds
+        : normalizePlaylistDurationSeconds(input.durationSeconds),
       input.title === undefined ? previousRow.title : input.title,
       input.area === undefined ? previousRow.area : input.area,
       input.capturedAt === undefined ? previousRow.captured_at : input.capturedAt,
@@ -653,7 +672,9 @@ export function reorderImagePlaylist(entries: ReorderInput) {
       update.run(
         item.displayOrder,
         item.enabled === undefined ? undefined : item.enabled ? 1 : 0,
-        item.durationSeconds ?? undefined,
+        item.durationSeconds === undefined
+          ? undefined
+          : normalizePlaylistDurationSeconds(item.durationSeconds),
         item.entryId
       );
     }
