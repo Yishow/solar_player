@@ -75,14 +75,9 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Body: PlaylistDurationAllBody }>("/api/image-playlist/duration-all", async (request, reply) => {
     const durationSeconds = request.body?.durationSeconds;
-    if (
-      typeof durationSeconds !== "number"
-      || !Number.isFinite(durationSeconds)
-      || !Number.isInteger(durationSeconds)
-      || durationSeconds <= 0
-    ) {
+    if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) {
       return reply.status(400).send({
-        error: "durationSeconds must be a positive integer",
+        error: "durationSeconds must be a finite number",
         success: false,
         timestamp: new Date().toISOString()
       });
