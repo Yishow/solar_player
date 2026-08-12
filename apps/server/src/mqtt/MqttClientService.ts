@@ -323,18 +323,22 @@ export class MqttClientService {
       await this.syncSubscriptions();
       this.notifySystemRecovered("MQTT connection restored");
     } catch (error) {
-      // The MQTT.js client is configured with reconnectPeriod, so merely
-      // releasing the local runtime lease here can leave a live client that
-      // reconnects later without owning the lease. Detach this instance from
-      // the service and fully end it before releasing ownership.
+      // A client configured with reconnectPeriod must be fully shut down before
+      // this process releases its local lease, otherwise it may reconnect after
+      // another process has legitimately acquired ownership.
       this.reconnectsEnabled = false;
       if (this.client === client) {
         this.client = null;
       }
       this.activeTopics.clear();
-      await disconnectClient(client);
       this.stopLeaseRenewal();
-      this.releaseRuntimeLease();
+      try {
+        await disconnectClient(client);
+      } catch (disconnectError) {
+        this.logger.warn({ error: disconnectError }, "Failed to close MQTT client after initial connect failure");
+      } finally {
+        this.releaseRuntimeLease();
+      }
       this.setStatus({
         connected: false,
         reason: error instanceof Error ? error.message : "error"
@@ -401,18 +405,21 @@ export class MqttClientService {
     this.activeTopics.clear();
     this.stopLeaseRenewal();
     this.clearLeaseRetry();
-    this.releaseRuntimeLease();
-
-    if (!this.client) {
-      if (options?.broadcast !== false) {
-        this.publishStatus();
-      }
-      return;
-    }
 
     const client = this.client;
     this.client = null;
-    await disconnectClient(client);
+    if (client) {
+      try {
+        await disconnectClient(client);
+      } catch (error) {
+        this.logger.warn({ error }, "Failed to close MQTT client while disconnecting");
+      }
+    }
+
+    // Keep the lease while the network client can still be alive. Only release
+    // it after end() has completed (or failed), so a second local process cannot
+    // overlap the old client's shutdown window.
+    this.releaseRuntimeLease();
 
     if (options?.broadcast !== false) {
       this.publishStatus();
