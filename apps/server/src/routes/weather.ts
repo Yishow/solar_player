@@ -92,6 +92,7 @@ const weatherRoute: FastifyPluginAsync = async (app) => {
       await validateWeatherSelection(nextSettings);
 
       saveWeatherSettings(nextSettings);
+      getWeatherService().clearCache();
 
       app.socketService.emitDisplaySync({
         generatedAt: new Date().toISOString(),
