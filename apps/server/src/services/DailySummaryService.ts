@@ -34,6 +34,15 @@ function clampDelta(total: number, baseline: number) {
   return Number(Math.max(total - baseline, 0).toFixed(3));
 }
 
+function emptyPeaks(): PeakSnapshot {
+  return {
+    peakConsumption: null,
+    peakConsumptionTime: null,
+    peakGeneration: null,
+    peakGenerationTime: null
+  };
+}
+
 export class DailySummaryService {
   private readonly database: Database.Database;
   private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
@@ -41,12 +50,8 @@ export class DailySummaryService {
   private readonly metricsAccumulatorService: MetricsAccumulatorService;
   private currentDateKey: string | null = null;
   private baselineCounters: CumulativeCounters | null = null;
-  private peaks: PeakSnapshot = {
-    peakConsumption: null,
-    peakConsumptionTime: null,
-    peakGeneration: null,
-    peakGenerationTime: null
-  };
+  private lastProcessedCounters: CumulativeCounters | null = null;
+  private peaks: PeakSnapshot = emptyPeaks();
   private timer: NodeJS.Timeout | null = null;
 
   constructor(options: DailySummaryServiceOptions) {
@@ -81,16 +86,20 @@ export class DailySummaryService {
     const snapshot = this.metricsAccumulatorService.getLatestSnapshot();
     const counters = this.metricsAccumulatorService.getCounters();
 
-    if (this.currentDateKey !== null && this.baselineCounters !== null && nextDateKey !== this.currentDateKey) {
-      this.persistSummary(this.currentDateKey, counters, this.baselineCounters);
+    if (
+      this.currentDateKey !== null
+      && this.baselineCounters !== null
+      && this.lastProcessedCounters !== null
+      && nextDateKey !== this.currentDateKey
+    ) {
+      // Close the previous day with the last counters actually observed on that
+      // day. The delta that appeared between the final old-day sample and the
+      // first new-day sample belongs to the new day rather than being backfilled
+      // into yesterday.
+      this.persistSummary(this.currentDateKey, this.lastProcessedCounters, this.baselineCounters);
       this.currentDateKey = nextDateKey;
-      this.baselineCounters = counters;
-      this.peaks = {
-        peakConsumption: null,
-        peakConsumptionTime: null,
-        peakGeneration: null,
-        peakGenerationTime: null
-      };
+      this.baselineCounters = this.lastProcessedCounters;
+      this.peaks = emptyPeaks();
     }
 
     if (snapshot.capturedAt !== null && snapshot.generationPower !== null) {
@@ -115,6 +124,8 @@ export class DailySummaryService {
         scope: "monitoring-history"
       });
     }
+
+    this.lastProcessedCounters = counters;
   }
 
   private initialize(now: Date) {
@@ -150,6 +161,7 @@ export class DailySummaryService {
           selfConsumption: counters.selfConsumption - existing.selfConsumptionTotal
         }
       : counters;
+    this.lastProcessedCounters = counters;
 
     if (existing) {
       this.peaks = {
@@ -198,6 +210,5 @@ export class DailySummaryService {
         this.peaks.peakConsumption,
         this.peaks.peakConsumptionTime
       );
-
   }
 }
