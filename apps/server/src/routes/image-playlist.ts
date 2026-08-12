@@ -73,8 +73,22 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
     return { playlist };
   });
 
-  app.put<{ Body: PlaylistDurationAllBody }>("/api/image-playlist/duration-all", async (request) => {
-    updateAllImagePlaylistDurations(Number(request.body?.durationSeconds));
+  app.put<{ Body: PlaylistDurationAllBody }>("/api/image-playlist/duration-all", async (request, reply) => {
+    const durationSeconds = request.body?.durationSeconds;
+    if (
+      typeof durationSeconds !== "number"
+      || !Number.isFinite(durationSeconds)
+      || !Number.isInteger(durationSeconds)
+      || durationSeconds <= 0
+    ) {
+      return reply.status(400).send({
+        error: "durationSeconds must be a positive integer",
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    updateAllImagePlaylistDurations(durationSeconds);
     const playlist = readImagePlaylist();
     app.socketService.emitImagesUpdated({ action: "playlist-duration-all-updated", playlist });
     app.socketService.emitDisplaySync({
