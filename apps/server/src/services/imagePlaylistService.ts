@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   resolveActiveImagePlaylistEntry,
@@ -71,6 +71,14 @@ type ReorderInput = Array<{
   enabled?: boolean;
   entryId: string;
 }>;
+
+type FileHashCacheEntry = {
+  hash: string;
+  mtimeMs: number;
+  size: number;
+};
+
+const fileHashCache = new Map<string, FileHashCacheEntry>();
 
 function ensurePlaylistTable() {
   getDatabase().exec(`
@@ -269,11 +277,35 @@ function fileSource(filename: string | null) {
 }
 
 function fileHash(source: string | null) {
-  if (!source?.startsWith("/uploads/images/")) return null;
+  if (!source?.startsWith("/uploads/images/")) {
+    return null;
+  }
+
   const filename = source.slice("/uploads/images/".length);
   const filePath = resolve(config.uploadsDir, filename);
-  if (!existsSync(filePath)) return null;
-  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+  try {
+    const stat = statSync(filePath);
+    if (!stat.isFile()) {
+      fileHashCache.delete(filePath);
+      return null;
+    }
+
+    const cached = fileHashCache.get(filePath);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      return cached.hash;
+    }
+
+    const hash = createHash("sha256").update(readFileSync(filePath)).digest("hex");
+    fileHashCache.set(filePath, {
+      hash,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size
+    });
+    return hash;
+  } catch {
+    fileHashCache.delete(filePath);
+    return null;
+  }
 }
 
 function ensureBootstrappedEntries() {
