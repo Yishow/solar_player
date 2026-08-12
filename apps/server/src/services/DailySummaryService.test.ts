@@ -15,7 +15,7 @@ function createDatabase() {
   return database;
 }
 
-test("DailySummaryService emits monitoring-history invalidation when a daily summary is persisted", () => {
+test("DailySummaryService attributes the first post-midnight counter delta to the new day", () => {
   const database = createDatabase();
   const emitted: DisplaySyncEvent[] = [];
   let counters = {
@@ -68,15 +68,27 @@ test("DailySummaryService emits monitoring-history invalidation when a daily sum
 
   service.processAt(afterMidnight);
 
-  const row = database
+  const previousDay = database
     .prepare("SELECT generation_total, consumption_total, self_consumption_total FROM daily_energy_summaries WHERE date = ?")
     .get("2026-05-13") as {
       consumption_total: number;
       generation_total: number;
       self_consumption_total: number;
     };
+  const newDay = database
+    .prepare("SELECT generation_total, consumption_total, self_consumption_total FROM daily_energy_summaries WHERE date = ?")
+    .get("2026-05-14") as {
+      consumption_total: number;
+      generation_total: number;
+      self_consumption_total: number;
+    };
 
-  assert.deepEqual(row, {
+  assert.deepEqual(previousDay, {
+    consumption_total: 0,
+    generation_total: 0,
+    self_consumption_total: 0
+  });
+  assert.deepEqual(newDay, {
     consumption_total: 1,
     generation_total: 3,
     self_consumption_total: 1
