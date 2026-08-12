@@ -8,6 +8,20 @@ function acquireNoopServerRuntimeGuard() {
   return () => undefined;
 }
 
+const noopLifecycleFactories = {
+  createDailySummaryService: () => ({ start: () => undefined, stop: () => undefined }),
+  createMetricHistoryRetentionService: () => ({ start: () => undefined, stop: () => undefined }),
+  createMetricsAccumulatorService: () => ({
+    initialize: () => undefined,
+    start: () => undefined,
+    stop: () => undefined
+  }),
+  createMockMetricsFeedService: () => ({ start: () => undefined, stop: () => undefined }),
+  createSnapshotWriterService: () => ({ start: () => undefined, stop: () => undefined }),
+  migrateDatabase: () => undefined,
+  seedDatabase: () => undefined
+};
+
 test("startServer starts listening before awaiting MQTT initial connection", async () => {
   const connectResolvers: Array<() => void> = [];
   let listenCalled = false;
@@ -40,23 +54,9 @@ test("startServer starts listening before awaiting MQTT initial connection", asy
   } as unknown as Awaited<ReturnType<typeof import("./app.js").buildApp>>;
 
   const startPromise = startServer({
+    ...noopLifecycleFactories,
     acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
-    buildApp: async () => app,
-    createDailySummaryService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createMetricsAccumulatorService: () => ({
-      initialize: () => undefined,
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createSnapshotWriterService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    migrateDatabase: () => undefined,
-    seedDatabase: () => undefined
+    buildApp: async () => app
   });
 
   await new Promise((resolve) => {
@@ -100,12 +100,9 @@ test("startServer wires MetricHistoryRetentionService into server lifecycle", as
   let stopped = 0;
 
   await startServer({
+    ...noopLifecycleFactories,
     acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
     buildApp: async () => app,
-    createDailySummaryService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
     createMetricHistoryRetentionService: (options) => {
       assert.equal(options.logger, app.log);
       assert.equal(options.snapshotRetentionDays, config.metricSnapshotRetentionDays);
@@ -120,18 +117,7 @@ test("startServer wires MetricHistoryRetentionService into server lifecycle", as
           stopped += 1;
         }
       };
-    },
-    createMetricsAccumulatorService: () => ({
-      initialize: () => undefined,
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createSnapshotWriterService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    migrateDatabase: () => undefined,
-    seedDatabase: () => undefined
+    }
   });
 
   assert.equal(started, 1);
@@ -168,29 +154,11 @@ test("startServer releases the backend runtime guard on close", async () => {
   } as unknown as Awaited<ReturnType<typeof import("./app.js").buildApp>>;
 
   await startServer({
+    ...noopLifecycleFactories,
     acquireServerRuntimeGuard: () => () => {
       released += 1;
     },
-    buildApp: async () => app,
-    createDailySummaryService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createMetricHistoryRetentionService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createMetricsAccumulatorService: () => ({
-      initialize: () => undefined,
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    createSnapshotWriterService: () => ({
-      start: () => undefined,
-      stop: () => undefined
-    }),
-    migrateDatabase: () => undefined,
-    seedDatabase: () => undefined
+    buildApp: async () => app
   });
 
   assert.ok(onCloseHook);
@@ -229,21 +197,9 @@ function buildLifecycleApp(): {
   return { app, getCloseHook: () => onCloseHook };
 }
 
-const noopLifecycleFactories = {
-  createDailySummaryService: () => ({ start: () => undefined, stop: () => undefined }),
-  createMetricHistoryRetentionService: () => ({ start: () => undefined, stop: () => undefined }),
-  createMetricsAccumulatorService: () => ({
-    initialize: () => undefined,
-    start: () => undefined,
-    stop: () => undefined
-  }),
-  createSnapshotWriterService: () => ({ start: () => undefined, stop: () => undefined }),
-  migrateDatabase: () => undefined,
-  seedDatabase: () => undefined
-};
-
-test("startServer starts the mock metrics feed in mock mode and stops it on close", async () => {
+test("startServer keeps the mock feed lifecycle active so runtime mode switches do not require restart", async () => {
   const { app, getCloseHook } = buildLifecycleApp();
+  let created = 0;
   let started = 0;
   let stopped = 0;
 
@@ -251,39 +207,24 @@ test("startServer starts the mock metrics feed in mock mode and stops it on clos
     ...noopLifecycleFactories,
     acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
     buildApp: async () => app,
-    resolveDataMode: () => "mock",
-    createMockMetricsFeedService: () => ({
-      start: () => {
-        started += 1;
-      },
-      stop: () => {
-        stopped += 1;
-      }
-    })
+    createMockMetricsFeedService: () => {
+      created += 1;
+      return {
+        start: () => {
+          started += 1;
+        },
+        stop: () => {
+          stopped += 1;
+        }
+      };
+    }
   });
 
+  assert.equal(created, 1);
   assert.equal(started, 1);
 
   const closeHook = getCloseHook();
   assert.ok(closeHook);
   await (closeHook as () => Promise<void> | void)();
   assert.equal(stopped, 1);
-});
-
-test("startServer does not start the mock metrics feed outside mock mode", async () => {
-  const { app } = buildLifecycleApp();
-  let created = 0;
-
-  await startServer({
-    ...noopLifecycleFactories,
-    acquireServerRuntimeGuard: acquireNoopServerRuntimeGuard,
-    buildApp: async () => app,
-    resolveDataMode: () => "mqtt",
-    createMockMetricsFeedService: () => {
-      created += 1;
-      return { start: () => undefined, stop: () => undefined };
-    }
-  });
-
-  assert.equal(created, 0);
 });
