@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import test, { after } from "node:test";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-staged-image-delete-"));
+const trashDir = join(dirname(tempDir), `.${basename(tempDir)}-trash`);
 process.env.UPLOADS_DIR = tempDir;
 
 const { stageImageFileDeletion } = await import("./imagesSupport.js");
 
 after(() => {
   rmSync(tempDir, { force: true, recursive: true });
+  rmSync(trashDir, { force: true, recursive: true });
 });
 
 test("stageImageFileDeletion removes the public path and rollback restores it", () => {
@@ -22,6 +24,8 @@ test("stageImageFileDeletion removes the public path and rollback restores it", 
   const staged = stageImageFileDeletion(filename);
   assert.equal(staged.staged, true);
   assert.equal(existsSync(sourcePath), false);
+  assert.equal(existsSync(join(tempDir, ".trash")), false);
+  assert.equal(existsSync(trashDir), true);
 
   staged.rollback();
   assert.equal(existsSync(sourcePath), true);
@@ -38,6 +42,6 @@ test("stageImageFileDeletion commit permanently removes the staged file", () => 
   staged.commit();
 
   assert.equal(existsSync(sourcePath), false);
-  const trashPath = join(tempDir, ".trash");
-  assert.equal(existsSync(trashPath), true);
+  assert.equal(existsSync(trashDir), true);
+  assert.equal(existsSync(join(tempDir, ".trash")), false);
 });
