@@ -1,10 +1,8 @@
 import { pathToFileURL } from "node:url";
 import { config } from "./config.js";
 import { buildApp } from "./app.js";
-import { getDatabase } from "./db/index.js";
 import { migrateDatabase } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
-import { type MqttSettingsRow, resolveMqttSettings } from "./mqtt/settings-source.js";
 import { acquireServerRuntimeGuard } from "./serverRuntimeGuard.js";
 import { DailySummaryService } from "./services/DailySummaryService.js";
 import { MetricHistoryRetentionService } from "./services/MetricHistoryRetentionService.js";
@@ -47,31 +45,8 @@ type StartServerOptions = {
   host?: string;
   migrateDatabase?: typeof migrateDatabase;
   port?: number;
-  resolveDataMode?: () => "mqtt" | "mock";
   seedDatabase?: typeof seedDatabase;
 };
-
-function readStoredDataMode(): "mqtt" | "mock" {
-  const row = getDatabase()
-    .prepare(
-      `
-        SELECT
-          broker_host,
-          broker_port,
-          username,
-          password,
-          client_id,
-          reconnect_interval,
-          message_timeout,
-          data_mode
-        FROM mqtt_settings
-        LIMIT 1
-      `
-    )
-    .get() as MqttSettingsRow | undefined;
-
-  return resolveMqttSettings(process.env, row).data_mode === "mock" ? "mock" : "mqtt";
-}
 
 export async function startServer(options: StartServerOptions = {}) {
   const buildAppImpl = options.buildApp ?? buildApp;
@@ -89,7 +64,6 @@ export async function startServer(options: StartServerOptions = {}) {
     ((serviceOptions) => new MetricHistoryRetentionService(serviceOptions));
   const createMockMetricsFeedService =
     options.createMockMetricsFeedService ?? (() => new MockMetricsFeedService());
-  const resolveDataMode = options.resolveDataMode ?? readStoredDataMode;
   const acquireRuntimeGuard =
     options.acquireServerRuntimeGuard ??
     ((guardOptions) => acquireServerRuntimeGuard(guardOptions));
@@ -134,14 +108,14 @@ export async function startServer(options: StartServerOptions = {}) {
     });
     metricHistoryRetentionService.start();
 
-    let mockMetricsFeedService: LifecycleService | null = null;
-    if (resolveDataMode() === "mock") {
-      mockMetricsFeedService = createMockMetricsFeedService();
-      mockMetricsFeedService.start();
-    }
+    // Keep the mock feed lifecycle alive regardless of the startup mode. The
+    // service gates every scheduled write against the persisted data mode, so
+    // a later MQTT <-> mock switch can take effect without a server restart.
+    const mockMetricsFeedService = createMockMetricsFeedService();
+    mockMetricsFeedService.start();
 
     app.addHook("onClose", async () => {
-      mockMetricsFeedService?.stop();
+      mockMetricsFeedService.stop();
       metricHistoryRetentionService.stop();
       dailySummaryService.stop();
       snapshotWriterService.stop();
