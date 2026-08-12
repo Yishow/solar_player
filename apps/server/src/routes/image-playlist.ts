@@ -39,6 +39,22 @@ type PlaylistDurationAllBody = {
   durationSeconds?: unknown;
 };
 
+function validationError(error: string) {
+  return {
+    error,
+    success: false,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function isFiniteDuration(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isValidDisplayOrder(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: { activeIndex?: string } }>("/api/image-playlist", async (request) => ({
     playlist: readImagePlaylist(Number.parseInt(request.query.activeIndex ?? "0", 10) || 0)
@@ -75,12 +91,8 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Body: PlaylistDurationAllBody }>("/api/image-playlist/duration-all", async (request, reply) => {
     const durationSeconds = request.body?.durationSeconds;
-    if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) {
-      return reply.status(400).send({
-        error: "durationSeconds must be a finite number",
-        success: false,
-        timestamp: new Date().toISOString()
-      });
+    if (!isFiniteDuration(durationSeconds)) {
+      return reply.status(400).send(validationError("durationSeconds must be a finite number"));
     }
 
     updateAllImagePlaylistDurations(durationSeconds);
@@ -96,8 +108,16 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
 
   app.put<{ Params: { entryId: string }; Body: PlaylistEntryBody }>(
     "/api/image-playlist/:entryId",
-    async (request) => {
-      updateImagePlaylistEntry(request.params.entryId, request.body ?? {});
+    async (request, reply) => {
+      const body = request.body ?? {};
+      if (body.durationSeconds !== undefined && !isFiniteDuration(body.durationSeconds)) {
+        return reply.status(400).send(validationError("durationSeconds must be a finite number"));
+      }
+      if (body.displayOrder !== undefined && !isValidDisplayOrder(body.displayOrder)) {
+        return reply.status(400).send(validationError("displayOrder must be a non-negative integer"));
+      }
+
+      updateImagePlaylistEntry(request.params.entryId, body);
       const playlist = readImagePlaylist();
       app.socketService.emitImagesUpdated({ action: "playlist-updated", playlist });
       app.socketService.emitDisplaySync({
@@ -109,8 +129,26 @@ const imagePlaylistRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.put<{ Body: ReorderBody }>("/api/image-playlist/reorder", async (request) => {
-    reorderImagePlaylist(request.body?.entries ?? []);
+  app.put<{ Body: ReorderBody }>("/api/image-playlist/reorder", async (request, reply) => {
+    const entries = request.body?.entries;
+    if (!Array.isArray(entries)) {
+      return reply.status(400).send(validationError("entries must be an array"));
+    }
+
+    const invalidEntry = entries.find((entry) => (
+      !entry
+      || typeof entry !== "object"
+      || typeof entry.entryId !== "string"
+      || entry.entryId.trim().length === 0
+      || !isValidDisplayOrder(entry.displayOrder)
+      || (entry.durationSeconds !== undefined && !isFiniteDuration(entry.durationSeconds))
+      || (entry.enabled !== undefined && typeof entry.enabled !== "boolean")
+    ));
+    if (invalidEntry) {
+      return reply.status(400).send(validationError("Invalid playlist reorder entry"));
+    }
+
+    reorderImagePlaylist(entries);
     const playlist = readImagePlaylist();
     app.socketService.emitImagesUpdated({ action: "playlist-reordered", playlist });
     app.socketService.emitDisplaySync({
