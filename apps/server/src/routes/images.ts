@@ -111,6 +111,51 @@ function normalizeBooleanField(value: string | null, fallback: boolean) {
   return fallback;
 }
 
+function parseImageId(value: string) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function validateImageUpdateBody(body: ImageUpdateBody) {
+  if (
+    body.category !== undefined
+    && !MANAGED_ASSET_CATEGORY_SET.has(body.category as ManagedAssetCategory)
+  ) {
+    return "Invalid image category";
+  }
+  if (
+    body.usageScope !== undefined
+    && !MANAGED_ASSET_USAGE_SCOPE_SET.has(body.usageScope as ManagedAssetUsageScope)
+  ) {
+    return "Invalid image usage scope";
+  }
+  if (
+    body.aspectRatio !== undefined
+    && (typeof body.aspectRatio !== "number" || !Number.isFinite(body.aspectRatio) || body.aspectRatio <= 0)
+  ) {
+    return "aspectRatio must be a positive finite number";
+  }
+  if (
+    body.displayDuration !== undefined
+    && (
+      typeof body.displayDuration !== "number"
+      || !Number.isFinite(body.displayDuration)
+      || !Number.isInteger(body.displayDuration)
+      || body.displayDuration < 1
+    )
+  ) {
+    return "displayDuration must be a positive integer";
+  }
+  if (body.includedInSlideshow !== undefined && typeof body.includedInSlideshow !== "boolean") {
+    return "includedInSlideshow must be a boolean";
+  }
+  if (body.isCover !== undefined && typeof body.isCover !== "boolean") {
+    return "isCover must be a boolean";
+  }
+
+  return null;
+}
+
 const FILE_TOO_LARGE_MESSAGE = `File too large. Maximum size is ${megabytesOf(MAX_FILE_SIZE)}MB.`;
 
 const imagesRoute: FastifyPluginAsync = async (app) => {
@@ -174,8 +219,16 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     }
 
     ensureUploadsDir();
-    const category = normalizeAssetCategory(readMultipartFieldValue(data.fields.category));
-    const usageScope = normalizeAssetUsageScope(readMultipartFieldValue(data.fields.usageScope));
+    const rawCategory = readMultipartFieldValue(data.fields.category);
+    if (rawCategory && !MANAGED_ASSET_CATEGORY_SET.has(rawCategory as ManagedAssetCategory)) {
+      return reply.status(400).send(errorResponse("Invalid image category"));
+    }
+    const rawUsageScope = readMultipartFieldValue(data.fields.usageScope);
+    if (rawUsageScope && !MANAGED_ASSET_USAGE_SCOPE_SET.has(rawUsageScope as ManagedAssetUsageScope)) {
+      return reply.status(400).send(errorResponse("Invalid image usage scope"));
+    }
+    const category = normalizeAssetCategory(rawCategory);
+    const usageScope = normalizeAssetUsageScope(rawUsageScope);
     const includedInSlideshow = normalizeBooleanField(
       readMultipartFieldValue(data.fields.includedInSlideshow),
       false
@@ -239,8 +292,8 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.put<{ Params: { id: string }; Body: ImageUpdateBody }>("/api/images/:id", async (request, reply) => {
-    const id = Number.parseInt(request.params.id, 10);
-    if (!Number.isFinite(id)) {
+    const id = parseImageId(request.params.id);
+    if (id === null) {
       return reply.status(400).send(errorResponse("Invalid image ID"));
     }
 
@@ -250,6 +303,11 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     }
 
     const body = request.body ?? {};
+    const validationError = validateImageUpdateBody(body);
+    if (validationError) {
+      return reply.status(400).send(errorResponse(validationError));
+    }
+
     const database = getDatabase();
     const updateImage = database.prepare(
       `
@@ -306,8 +364,8 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.delete<{ Params: { id: string } }>("/api/images/:id", async (request, reply) => {
-    const id = Number.parseInt(request.params.id, 10);
-    if (!Number.isFinite(id)) {
+    const id = parseImageId(request.params.id);
+    if (id === null) {
       return reply.status(400).send(errorResponse("Invalid image ID"));
     }
 
@@ -373,17 +431,34 @@ const imagesRoute: FastifyPluginAsync = async (app) => {
     return successResponse({ id });
   });
 
-  app.put<{ Body: ImageReorderBody }>("/api/images/reorder", async (request) => {
+  app.put<{ Body: ImageReorderBody }>("/api/images/reorder", async (request, reply) => {
+    const items = request.body?.images ?? [];
+    if (!Array.isArray(items)) {
+      return reply.status(400).send(errorResponse("images must be an array"));
+    }
+    if (
+      items.some((item) => (
+        !item
+        || typeof item !== "object"
+        || !Number.isInteger(item.id)
+        || item.id <= 0
+        || !Number.isInteger(item.displayOrder)
+        || item.displayOrder < 0
+      ))
+    ) {
+      return reply.status(400).send(errorResponse("Invalid image reorder entry"));
+    }
+
     const database = getDatabase();
     const updateOrder = database.prepare(
       "UPDATE image_assets SET display_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     );
 
-    database.transaction((items) => {
-      for (const item of items) {
+    database.transaction((reorderItems) => {
+      for (const item of reorderItems) {
         updateOrder.run(item.displayOrder, item.id);
       }
-    })(request.body?.images ?? []);
+    })(items);
 
     const updated = getAllImages().map(serializeImageCatalogRow);
     app.socketService.emitImagesUpdated({
