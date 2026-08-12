@@ -7,7 +7,7 @@ import {
   rmSync,
   statSync
 } from "node:fs";
-import { extname, resolve } from "node:path";
+import { basename, dirname, extname, resolve } from "node:path";
 import type {
   ImageAsset,
   ManagedAssetCategory,
@@ -38,7 +38,6 @@ export type ImageAssetRow = {
 };
 
 const DISPLAY_SEED_ORIGINAL_NAME_PREFIX = "display-seed:";
-const IMAGE_TRASH_DIRECTORY = ".trash";
 
 function resolveSeedKey(originalName: string | null) {
   return originalName?.startsWith(DISPLAY_SEED_ORIGINAL_NAME_PREFIX)
@@ -194,15 +193,21 @@ export function getStorageUsage() {
 }
 
 export function deleteImageFile(filename: string) {
-  const filePath = resolve(config.uploadsDir, filename);
+  const filePath = resolve(config.uploadsDir, basename(filename));
   if (existsSync(filePath)) {
     rmSync(filePath);
   }
 }
 
+function resolveImageTrashDir() {
+  const uploadsBaseName = basename(config.uploadsDir) || "images";
+  return resolve(dirname(config.uploadsDir), `.${uploadsBaseName}-trash`);
+}
+
 export function stageImageFileDeletion(filename: string): StagedImageFileDeletion {
   ensureUploadsDir();
-  const sourcePath = resolve(config.uploadsDir, filename);
+  const safeFilename = basename(filename);
+  const sourcePath = resolve(config.uploadsDir, safeFilename);
   if (!existsSync(sourcePath)) {
     return {
       commit: () => undefined,
@@ -211,11 +216,14 @@ export function stageImageFileDeletion(filename: string): StagedImageFileDeletio
     };
   }
 
-  const trashDir = resolve(config.uploadsDir, IMAGE_TRASH_DIRECTORY);
+  // Keep quarantined files on the same parent filesystem for atomic rename,
+  // but outside the Fastify static root so a staged deletion cannot be fetched
+  // through /uploads/images while the DB transaction is being finalized.
+  const trashDir = resolveImageTrashDir();
   mkdirSync(trashDir, { recursive: true });
   const stagedPath = resolve(
     trashDir,
-    `${Date.now()}-${createHash("sha256").update(`${filename}-${Math.random()}`).digest("hex").slice(0, 12)}-${filename}`
+    `${Date.now()}-${createHash("sha256").update(`${safeFilename}-${Math.random()}`).digest("hex").slice(0, 12)}-${safeFilename}`
   );
   renameSync(sourcePath, stagedPath);
   let finalized = false;
