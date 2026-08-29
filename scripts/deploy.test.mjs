@@ -42,7 +42,6 @@ const windowsOfflineInstallerPath = path.join(repoRoot, "deploy/windows-offline/
 const windowsPortableLauncherPath = path.join(repoRoot, "deploy/windows-offline/Start-SolarPlayer.cmd");
 const windowsPortableManagerPath = path.join(repoRoot, "deploy/windows-offline/Manage-SolarPlayer.ps1");
 const pcServerRunbookPath = path.join(repoRoot, "docs/runbooks/pc-server-deploy.md");
-const collectorControlAclPath = path.join(repoRoot, "deploy/mosquitto/solar-collector-control.acl.example");
 const collectorStartScriptPath = path.join(repoRoot, "solar_mqtt_go/start.sh");
 const collectorStartPowerShellScriptPath = path.join(repoRoot, "solar_mqtt_go/start.ps1");
 const bashCommand = process.platform === "win32"
@@ -67,51 +66,32 @@ function createSqliteDatabase(dbPath, { schemaVersions = ["001_init"], sentinel 
   }
 }
 
-test("collector control ACL and PC runbook keep control access narrow and secret-free", () => {
-  const acl = readFileSync(collectorControlAclPath, "utf8");
-  const aclRules = acl
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("#"))
-    .join("\n");
+test("PC runbook documents the trusted-LAN collector control contract", () => {
   const runbook = readFileSync(pcServerRunbookPath, "utf8");
 
-  assert.match(acl, /user solar-control/u);
-  assert.match(acl, /topic write solar\/\+\/cmd\/get-config/u);
-  assert.match(acl, /topic write solar\/\+\/cmd\/set/u);
-  assert.match(acl, /user solar-collector/u);
-  assert.match(acl, /topic read solar\/CL\/cmd\/#/u);
-  assert.match(acl, /topic read solar\/KN\/cmd\/#/u);
-  assert.match(acl, /user solar-observer/u);
-  assert.doesNotMatch(acl, /user solar-observer[\s\S]*?topic write solar\/\+\/cmd\/#/u);
-  assert.doesNotMatch(aclRules, /solar\/\+\/(?:config|set)/u);
-  assert.doesNotMatch(acl, /(?:password|secret|private[_ -]?key)\s*[=:]\s*[^\s<#]/iu);
-
-  assert.match(runbook, /deploy\/mosquitto\/solar-collector-control\.acl\.example/u);
-  assert.match(runbook, /listener 1883 127\.0\.0\.1/u);
-  assert.match(runbook, /allow_anonymous false/u);
-  assert.match(runbook, /mosquitto_passwd/u);
-  assert.match(runbook, /icacls/u);
-  assert.match(runbook, /SOLAR_MQTT_USERNAME/u);
-  assert.match(runbook, /SOLAR_MQTT_PASSWORD/u);
-  assert.match(runbook, /SOLAR_MQTT_TLS_CA_FILE/u);
-  assert.match(runbook, /SOLAR_MQTT_TLS_SERVER_NAME/u);
-  assert.match(runbook, /TLS listener/iu);
-  assert.match(runbook, /server certificate verification/iu);
-  assert.doesNotMatch(runbook, /service manager's protected environment/iu);
-  assert.doesNotMatch(runbook, /Update the service's protected runtime configuration/iu);
-  assert.match(runbook, /Import-Clixml/u);
-  assert.match(runbook, /Get-Credential/u);
+  assert.match(runbook, /192\.168\.31\.62:1883/u);
+  assert.match(runbook, /可信任內網/u);
+  assert.match(runbook, /不要求 MQTT 帳號、密碼或 TLS/u);
   assert.match(runbook, /solar_mqtt_go_windows_amd64_(?:tray|console)\.exe/u);
+  const collectorDirDefinition = runbook.indexOf('$CollectorDir = "C:\\Program Files\\SolarPlayer"');
+  const collectorDirUse = runbook.indexOf('& "$CollectorDir\\solar_mqtt_go_windows_amd64_console.exe" run');
+  assert.ok(collectorDirDefinition >= 0 && collectorDirDefinition < collectorDirUse, "$CollectorDir must be defined before the launch example uses it");
   assert.match(runbook, /solar_config\.json[\s\S]{0,120}binary directory/iu);
-  assert.match(runbook, /foreground console launch/iu);
-  assert.match(runbook, /authorized command/iu);
-  assert.match(runbook, /ordinary producer\/observer identity/iu);
+  assert.match(runbook, /RESTART_UNSUPPORTED/u);
+  assert.match(runbook, /requestId/u);
+  assert.match(runbook, /ttlSeconds/u);
+  assert.match(runbook, /allowlist/iu);
   assert.match(runbook, /solar\/CL\/config/u);
   assert.match(runbook, /solar\/KN\/config/u);
-  assert.match(runbook, /solar-migration-scrub/u);
-  assert.match(runbook, /hardened post-cutover ACL/u);
   assert.match(runbook, /(?:fresh|new) clean subscriber/iu);
-  assert.match(runbook, /hardened ACL/iu);
+  assert.match(runbook, /state\/config[\s\S]{0,120}(?:sanitized|去敏)/iu);
+  assert.match(runbook, /state\/control-result[\s\S]{0,120}(?:non-retained|不保留)/iu);
+  assert.match(runbook, /任何能連到 broker 的 LAN client[\s\S]{0,160}publish/iu);
+  assert.doesNotMatch(runbook, /solar-collector-control\.acl\.example/u);
+  assert.doesNotMatch(runbook, /allow_anonymous false/u);
+  assert.doesNotMatch(runbook, /mosquitto_passwd/u);
+  assert.doesNotMatch(runbook, /Get-Credential|Import-Clixml/u);
+  assert.doesNotMatch(runbook, /Credential rotation|WinRM|post-cutover ACL/iu);
   assert.doesNotMatch(runbook, /(?:MQTT_.*PASSWORD|LOGIN_PASS|PRIVATE_KEY)\s*=\s*["'][^<\n]/iu);
   assert.doesNotMatch(runbook, /mosquitto_pub[^\n]*solar\/\+\/config/u);
 });
@@ -127,7 +107,7 @@ test("PC runbook does not assign a supervisor contract to the Go collector", () 
   assert.match(runbook, /## 5\. Install as a Windows service with nssm/u);
 });
 
-test("Go collector start wrapper fails closed without broker credentials", () => {
+test("Go collector start wrappers do not require optional broker credentials", () => {
   const script = readFileSync(collectorStartScriptPath, "utf8");
   const powershellScript = readFileSync(collectorStartPowerShellScriptPath, "utf8");
   assert.doesNotMatch(script, /SOLAR_MQTT_(?:USERNAME|PASSWORD)[^\n]*solar-collector/iu);
@@ -135,34 +115,13 @@ test("Go collector start wrapper fails closed without broker credentials", () =>
   for (const source of [script, powershellScript]) {
     assert.doesNotMatch(source, /(?:echo|Write-Host)[^\n]*(?:\$\{?SOLAR_MQTT_(?:USERNAME|PASSWORD)|\$env:SOLAR_MQTT_(?:USERNAME|PASSWORD)|MQTT User)/iu);
   }
-  assert.match(powershellScript, /IsNullOrWhiteSpace\(\$env:SOLAR_MQTT_USERNAME\)/u);
-  assert.match(powershellScript, /IsNullOrWhiteSpace\(\$env:SOLAR_MQTT_PASSWORD\)/u);
-  assert.match(powershellScript, /\[Console\]::Error\.WriteLine\([^\n]*SOLAR_MQTT_(?:USERNAME|PASSWORD)/u);
-  assert.match(powershellScript, /exit 1/u);
-  const shellGuard = script.indexOf('[ -z "${SOLAR_MQTT_USERNAME:-}" ]');
-  const shellSideEffect = Math.min(script.indexOf('cp "../solar_mqtt/solar_config.json"'), script.indexOf('nc -z 127.0.0.1 1883'), script.indexOf('exec go run .'));
-  assert.ok(shellGuard >= 0 && shellGuard < shellSideEffect, "shell credential guard must precede side effects");
-  const powershellGuard = powershellScript.indexOf('IsNullOrWhiteSpace($env:SOLAR_MQTT_USERNAME)');
-  const powershellSideEffect = Math.min(powershellScript.indexOf('Copy-Item "..\\solar_mqtt\\solar_config.json"'), powershellScript.indexOf('BeginConnect'), powershellScript.indexOf('Start-Process'), powershellScript.indexOf('go run .'));
-  assert.ok(powershellGuard >= 0 && powershellGuard < powershellSideEffect, "PowerShell credential guard must precede side effects");
-
-  for (const missing of ["SOLAR_MQTT_USERNAME", "SOLAR_MQTT_PASSWORD"]) {
-    const env = {
-      ...process.env,
-      SOLAR_MQTT_USERNAME: "fixture-user",
-      SOLAR_MQTT_PASSWORD: "fixture-password"
-    };
-    delete env[missing];
-    const result = spawnSync(bashCommand, [collectorStartScriptPath, "run"], {
-      env,
-      encoding: "utf8"
-    });
-
-    const output = `${result.stdout}${result.stderr}`;
-    assert.notEqual(result.status, 0, `${missing} must stop startup`);
-    assert.match(output, new RegExp(missing));
-    assert.doesNotMatch(output, /fixture-(?:user|password)/u);
+  for (const source of [script, powershellScript]) {
+    assert.doesNotMatch(source, /required before starting|must be set before starting/iu);
   }
+  assert.match(script, /solar_config\.json/u);
+  assert.match(script, /exec go run/u);
+  assert.match(powershellScript, /solar_config\.json/u);
+  assert.match(powershellScript, /go run/u);
 });
 
 function fileMode(filePath) {

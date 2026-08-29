@@ -229,14 +229,18 @@ func TestHistoryReadsRecordedRows(t *testing.T) {
 
 func TestTrayDispatch(t *testing.T) {
 	origTray := runTrayFn
+	origDefault := runDefaultFn
 	origGOOS := defaultGOOS
 	t.Cleanup(func() {
 		runTrayFn = origTray
+		runDefaultFn = origDefault
 		defaultGOOS = origGOOS
 	})
 
 	trayCalled := 0
+	defaultCalled := 0
 	runTrayFn = func() int { trayCalled++; return 0 }
+	runDefaultFn = func() int { defaultCalled++; return 0 }
 
 	// tray 子命令（任何平台）
 	if code := runCLI([]string{"tray"}); code != 0 || trayCalled != 1 {
@@ -251,9 +255,8 @@ func TestTrayDispatch(t *testing.T) {
 
 	// 非 Windows 無參數 → run（不觸發 tray）
 	defaultGOOS = func() string { return "linux" }
-	// run 會嘗試連線 broker：設定不存在 → 用 config 預設 localhost → 快速失敗 exit 1
-	if code := runCLI(nil); code != 1 {
-		t.Errorf("linux no-args should fall through to run (exit 1 without broker), got %d", code)
+	if code := runCLI(nil); code != 0 || defaultCalled != 1 {
+		t.Errorf("linux no-args should dispatch run: code=%d calls=%d", code, defaultCalled)
 	}
 	if trayCalled != 2 {
 		t.Errorf("linux no-args must not dispatch tray, calls=%d", trayCalled)

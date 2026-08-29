@@ -11,18 +11,17 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-func TestConnectionOptionsFailClosedForControlTransport(t *testing.T) {
-	if err := (ConnectionOptions{
-		Host: "127.0.0.1", Port: 1883, Prefix: "solar",
-	}).Validate(); err == nil {
-		t.Fatal("missing external broker credentials must be rejected")
+func TestConnectionOptionsAllowTrustedLANWithoutCredentialsOrTLS(t *testing.T) {
+	for _, host := range []string{"127.0.0.1", "192.168.31.62"} {
+		if err := (ConnectionOptions{
+			Host: host, Port: 1883, Prefix: "solar",
+		}).Validate(); err != nil {
+			t.Fatalf("trusted LAN host %s should work without credentials or TLS: %v", host, err)
+		}
 	}
-	if err := (ConnectionOptions{
-		Host: "broker.example", Port: 1883, Prefix: "solar",
-		Username: "solar-control", Password: "fixture-password",
-	}).Validate(); err == nil {
-		t.Fatal("remote plaintext control transport must be rejected")
-	}
+}
+
+func TestConnectionOptionsRejectInvalidExplicitTLS(t *testing.T) {
 	if err := (ConnectionOptions{
 		Host: "broker.example", Port: 8883, Prefix: "solar",
 		Username: "solar-control", Password: "fixture-password",

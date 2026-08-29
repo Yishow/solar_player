@@ -22,16 +22,6 @@ elif [ -f ".env" ]; then
   set +a
 fi
 
-# MQTT 憑證必須由環境提供；缺少或僅空白時在任何啟動副作用前停止
-if [ -z "${SOLAR_MQTT_USERNAME:-}" ] || [[ "${SOLAR_MQTT_USERNAME:-}" =~ ^[[:space:]]*$ ]]; then
-  echo "缺少 SOLAR_MQTT_USERNAME" >&2
-  exit 1
-fi
-if [ -z "${SOLAR_MQTT_PASSWORD:-}" ] || [[ "${SOLAR_MQTT_PASSWORD:-}" =~ ^[[:space:]]*$ ]]; then
-  echo "缺少 SOLAR_MQTT_PASSWORD" >&2
-  exit 1
-fi
-
 # 若當前目錄無 solar_config.json，自動從 solar_mqtt 複製
 if [ ! -f "solar_config.json" ] && [ -f "../solar_mqtt/solar_config.json" ]; then
   cp "../solar_mqtt/solar_config.json" "solar_config.json"

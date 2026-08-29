@@ -33,8 +33,8 @@ type ConnectionOptions struct {
 	TLSConfig *tls.Config
 }
 
-// Validate enforces authenticated local transport or verified TLS remotely.
-// A missing credential or unsafe TLS option fails closed before paho connects.
+// Validate checks the configured broker target and any explicitly requested
+// TLS transport. Authentication and TLS are optional for the trusted LAN mode.
 func (o ConnectionOptions) Validate() error {
 	host := strings.TrimSpace(o.Host)
 	if host == "" {
@@ -46,19 +46,11 @@ func (o ConnectionOptions) Validate() error {
 	if strings.TrimSpace(o.Prefix) == "" {
 		return fmt.Errorf("mqtt prefix is required")
 	}
-	if strings.TrimSpace(o.Username) == "" || o.Password == "" {
-		return fmt.Errorf("external mqtt credentials are required")
-	}
 	if o.TLSConfig != nil && o.TLSConfig.InsecureSkipVerify {
 		return fmt.Errorf("mqtt TLS certificate verification is required")
 	}
-	if !isLoopbackHost(host) {
-		if o.TLSConfig == nil {
-			return fmt.Errorf("remote mqtt transport requires TLS")
-		}
-		if strings.TrimSpace(o.TLSConfig.ServerName) == "" {
-			return fmt.Errorf("remote mqtt TLS server name is required")
-		}
+	if o.TLSConfig != nil && !isLoopbackHost(host) && strings.TrimSpace(o.TLSConfig.ServerName) == "" {
+		return fmt.Errorf("remote mqtt TLS server name is required")
 	}
 	return nil
 }

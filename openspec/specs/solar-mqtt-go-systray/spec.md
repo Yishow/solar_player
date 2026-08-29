@@ -92,7 +92,6 @@ code:
   - solar_mqtt_go/go.mod
   - .agents/skills/openspec-apply-change/SKILL.md
   - solar_mqtt_go/internal/service/service.go
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.ps1
   - solar_mqtt_go/internal/schedule/schedule.go
   - packages/shared/src/metricScope.ts
@@ -220,7 +219,6 @@ code:
   - solar_mqtt_go/go.mod
   - .agents/skills/openspec-apply-change/SKILL.md
   - solar_mqtt_go/internal/service/service.go
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.ps1
   - solar_mqtt_go/internal/schedule/schedule.go
   - packages/shared/src/metricScope.ts
@@ -342,7 +340,6 @@ code:
   - solar_mqtt_go/go.mod
   - .agents/skills/openspec-apply-change/SKILL.md
   - solar_mqtt_go/internal/service/service.go
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.ps1
   - solar_mqtt_go/internal/schedule/schedule.go
   - packages/shared/src/metricScope.ts
@@ -473,7 +470,6 @@ code:
   - solar_mqtt_go/go.mod
   - .agents/skills/openspec-apply-change/SKILL.md
   - solar_mqtt_go/internal/service/service.go
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.ps1
   - solar_mqtt_go/internal/schedule/schedule.go
   - packages/shared/src/metricScope.ts
@@ -599,7 +595,6 @@ code:
   - solar_mqtt_go/go.mod
   - .agents/skills/openspec-apply-change/SKILL.md
   - solar_mqtt_go/internal/service/service.go
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.ps1
   - solar_mqtt_go/internal/schedule/schedule.go
   - packages/shared/src/metricScope.ts

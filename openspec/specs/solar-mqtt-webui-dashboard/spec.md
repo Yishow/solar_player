@@ -74,7 +74,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1
@@ -184,7 +183,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1
@@ -290,7 +288,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1
@@ -400,7 +397,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1
@@ -506,7 +502,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1
@@ -615,7 +610,6 @@ code:
   - scripts/deploy.test.mjs
   - solar_mqtt_go/go.mod
   - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/internal/webui/web/js/app.js
   - apps/server/src/routes/settings-mqtt.ts
   - start.ps1

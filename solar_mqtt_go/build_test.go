@@ -73,14 +73,17 @@ func TestStartPowerShellScriptMatchesContract(t *testing.T) {
 	}
 	source := string(script)
 	for _, want := range []string{
-		`$env:SOLAR_MQTT_USERNAME`,
-		`$env:SOLAR_MQTT_PASSWORD`,
 		"solar_config.json",
 		"18868",
 		"go run .",
 	} {
 		if !strings.Contains(source, want) {
 			t.Errorf("start.ps1 missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", "IsNullOrWhiteSpace($env:SOLAR_MQTT_"} {
+		if strings.Contains(source, forbidden) {
+			t.Errorf("start.ps1 must not require optional MQTT credentials: %q", forbidden)
 		}
 	}
 
@@ -90,14 +93,17 @@ func TestStartPowerShellScriptMatchesContract(t *testing.T) {
 	}
 	shellSource := string(shellScript)
 	for _, want := range []string{
-		`SOLAR_MQTT_USERNAME`,
-		`SOLAR_MQTT_PASSWORD`,
 		"solar_config.json",
 		"18868",
 		"go run .",
 	} {
 		if !strings.Contains(shellSource, want) {
 			t.Errorf("start.sh missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", `[ -z "${SOLAR_MQTT_`} {
+		if strings.Contains(shellSource, forbidden) {
+			t.Errorf("start.sh must not require optional MQTT credentials: %q", forbidden)
 		}
 	}
 }

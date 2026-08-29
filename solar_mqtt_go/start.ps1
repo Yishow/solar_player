@@ -10,16 +10,6 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $ScriptDir
 
-# MQTT 憑證必須由環境提供；缺少或僅空白時在任何啟動副作用前停止
-if ([string]::IsNullOrWhiteSpace($env:SOLAR_MQTT_USERNAME)) {
-    [Console]::Error.WriteLine("缺少 SOLAR_MQTT_USERNAME")
-    exit 1
-}
-if ([string]::IsNullOrWhiteSpace($env:SOLAR_MQTT_PASSWORD)) {
-    [Console]::Error.WriteLine("缺少 SOLAR_MQTT_PASSWORD")
-    exit 1
-}
-
 # 若當前目錄無 solar_config.json，自動從 solar_mqtt 複製
 if (-not (Test-Path "solar_config.json") -and (Test-Path "..\solar_mqtt\solar_config.json")) {
     Copy-Item "..\solar_mqtt\solar_config.json" "solar_config.json"

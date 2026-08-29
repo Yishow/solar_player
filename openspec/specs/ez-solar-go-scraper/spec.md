@@ -70,7 +70,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -212,7 +211,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -337,7 +335,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -460,7 +457,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -616,7 +612,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -746,7 +741,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -876,7 +870,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -999,7 +992,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1129,7 +1121,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1259,7 +1250,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1387,7 +1377,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1510,7 +1499,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1628,7 +1616,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
@@ -1756,7 +1743,6 @@ code:
   - solar_mqtt_go/internal/webui/webui.go
   - start.sh
   - .agents/skills/openspec-apply-change/SKILL.md
-  - deploy/mosquitto/solar-collector-control.acl.example
   - solar_mqtt_go/build.sh
   - solar_mqtt_go/internal/tray/instance_unix.go
   - .agents/skills/openspec-sync-specs/SKILL.md
