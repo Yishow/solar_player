@@ -18,6 +18,7 @@ The system SHALL register two separate playback pages using the `factory-circuit
 - **THEN** the system SHALL render the Factory Circuit page representing the Guanyin site
 
 ---
+
 ### Requirement: Slot Keys Expansion and Rename
 The system MUST support exactly 8 circuit slots representing the actual factory departments:
 - `stamping`: Stamping Shop (沖壓工程)
@@ -34,6 +35,7 @@ The system MUST support exactly 8 circuit slots representing the actual factory 
 - **THEN** the options MUST include `stamping`, `body`, `painting`, `assembly`, `utility`, `office`, `heavy_vehicle`, and `ed_coating`
 
 ---
+
 ### Requirement: Site-Specific Load Visibility and Geometry Configuration
 The system MUST support site-specific configurations and data scope for load rows:
 - The Jungli site (page key `factory-circuit`) SHALL have `stamping`, `body`, `painting`, `assembly`, `utility`, and `office` slots visible and data-scoped, while `heavy_vehicle` and `ed_coating` are hidden and SHALL NOT be required for Jungli aggregate power.
@@ -63,7 +65,6 @@ The system MUST support site-specific configurations and data scope for load row
 - **WHEN** the Guanyin Factory Circuit story is resolved
 - **THEN** current factory total power SHALL be `36` kW
 
-
 <!-- @trace
 source: scope-factory-circuit-data-by-page-key
 updated: 2026-07-08
@@ -107,6 +108,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Dynamic SVG Routing Line Calculation
 The SVG power routing path and circles in `/factory-circuit` pages MUST be calculated dynamically based on the vertical position (top) and height of currently visible load rows.
 
@@ -116,6 +118,7 @@ The SVG power routing path and circles in `/factory-circuit` pages MUST be calcu
 - **AND** the system MUST NOT use hardcoded static path coordinates for load row endpoints
 
 ---
+
 ### Requirement: Factory Circuit story resolves by page key
 The system SHALL resolve Factory Circuit story payloads by Factory Circuit page key.
 
@@ -125,7 +128,6 @@ The system SHALL resolve Factory Circuit story payloads by Factory Circuit page 
 - **WHEN** the browser or playback runtime requests `/api/display-story/factory-circuit-guanyin`
 - **THEN** the returned Factory Circuit story SHALL use only circuits scoped to `factory-circuit-guanyin`
 
-
 <!-- @trace
 source: scope-factory-circuit-data-by-page-key
 updated: 2026-07-08
@@ -169,58 +171,23 @@ tests:
 -->
 
 ---
+
 ### Requirement: Factory Circuit metric keys are page-scoped
-The system SHALL resolve Factory Circuit slot metric keys by Factory Circuit page key and slot key.
+
+The system SHALL resolve Factory Circuit slot data by the combination of Context Site Scope and a site-independent semantic slot metric key. The Factory Circuit page key SHALL select the page instance/layout and allowed slot set, but CL and KN MAY use the same semantic metric key for the same engineering measurement because the scoped metric identity prevents collisions.
 
 #### Scenario: Same engineering slot exists in multiple sites
 - **WHEN** Jungli and Guanyin both bind a `stamping` slot
-- **THEN** the Jungli slot SHALL use a Jungli metric key
-- **AND** the Guanyin slot SHALL use a distinct Guanyin metric key
-- **AND** MQTT live values for the two slots SHALL NOT overwrite each other
+- **THEN** both slots MAY use the same canonical semantic stamping power metric key
+- **AND** the Jungli reading SHALL resolve under `metricScope = cl`
+- **AND** the Guanyin reading SHALL resolve under `metricScope = kn`
+- **AND** MQTT live values for the two scoped identities SHALL NOT overwrite each other
 
-<!-- @trace
-source: scope-factory-circuit-data-by-page-key
-updated: 2026-07-08
-code:
-  - packages/shared/src/index.ts
-  - apps/server/src/db/migrations/019_circuit_page_scope.sql
-  - apps/server/src/db/migrations/020_fix_factory_circuit_site_counts.sql
-  - packages/shared/src/displayCardData.ts
-  - packages/shared/src/displayPageFreshness.ts
-  - apps/server/src/db/migrations/018_display_value_overrides.sql
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - packages/shared/src/displayStory.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/server/src/db/seed.ts
-  - packages/shared/src/displayPageConfig.ts
-  - apps/web/src/pages/runtimeRefreshRegistry.ts
-  - apps/server/src/services/displayValueOverrideService.ts
-  - apps/server/src/services/displayRotationService.ts
-  - apps/web/src/services/api.ts
-  - apps/server/src/routes/circuits.ts
-  - apps/server/src/routes/display-story.ts
-  - packages/shared/src/types.ts
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/server/src/app.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/server/src/services/displayReadinessService.ts
-  - packages/shared/src/displayReadiness.ts
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/services/displayCardDataService.ts
-  - apps/server/src/routes/display-card-data.ts
-  - apps/web/src/pages/MqttSettings/index.tsx
-tests:
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/routes/display-card-data.test.ts
-  - packages/shared/src/displayPageFreshness.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/server/src/routes/circuits.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
--->
+#### Scenario: Site page identity remains distinct
+- **WHEN** playback resolves `factory-circuit` for CL and `factory-circuit-guanyin` for KN
+- **THEN** each page keeps its existing page identity, layout, visible-slot rules, and route
+- **AND** page identity SHALL NOT be required as part of the semantic metric key
 
----
 ### Requirement: Device-scoped Factory Circuit routing overrides global playback enablement
 
 For an authenticated Display Client Context, Factory Circuit page selection, story data, slot keys, and metric keys SHALL derive from the Context Site Scope. Global playback page enablement SHALL NOT select the Client Site.

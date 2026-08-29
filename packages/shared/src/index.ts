@@ -28,3 +28,4 @@ export * from "./weather.js";
 export * from "./appTime.js";
 export * from "./playbackProfileVersion.js";
 export * from "./deviceProfileRollout.js";
+export * from "./metricScope.js";

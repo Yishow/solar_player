@@ -1,11 +1,32 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { buildApp } from "../app.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { disableManagementPassword, readManagementPasswordState, setManagementPassword } from "../services/managementPasswordService.js";
-import { revokeAllManagementSessions } from "../services/managementSessionService.js";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-management-auth-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+
+const [
+  { buildApp },
+  { closeDatabaseConnection },
+  { migrateDatabase },
+  { disableManagementPassword, readManagementPasswordState, setManagementPassword },
+  { revokeAllManagementSessions }
+] = await Promise.all([
+  import("../app.js"),
+  import("../db/index.js"),
+  import("../db/migrate.js"),
+  import("../services/managementPasswordService.js"),
+  import("../services/managementSessionService.js")
+]);
 
 migrateDatabase();
+test.after(() => {
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
+});
 test("management-auth state is readable without a session but never exposes stored secrets", async () => {
   disableManagementPassword();
   revokeAllManagementSessions();

@@ -3,9 +3,15 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { config } from "../config.js";
 import { closeDatabaseConnection, getDatabase } from "./index.js";
+import {
+  migrateScopedMetricIdentity,
+  normalizeLegacySiteScope,
+  type MigrationOptions
+} from "./scopedMetricMigration.js";
 
-export function migrateDatabase() {
+export function migrateDatabase(options: MigrationOptions = {}) {
   const database = getDatabase();
+  const legacySiteScope = normalizeLegacySiteScope(options.legacySiteScope);
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -38,15 +44,25 @@ export function migrateDatabase() {
     const sql = readFileSync(resolve(config.migrationsDir, fileName), "utf8");
 
     database.transaction(() => {
-      database.exec(sql);
+      if (version === "035_scoped_metric_identity") {
+        migrateScopedMetricIdentity(database, { legacySiteScope });
+      } else {
+        database.exec(sql);
+      }
       insertMigration.run({ version });
     })();
   }
 }
 
+export function migrateDatabaseFromEnvironment() {
+  migrateDatabase({
+    legacySiteScope: normalizeLegacySiteScope(process.env.LEGACY_METRIC_SITE_SCOPE)
+  });
+}
+
 async function runFromCli() {
   try {
-    migrateDatabase();
+    migrateDatabaseFromEnvironment();
   } finally {
     closeDatabaseConnection();
   }

@@ -11,6 +11,7 @@ function buildTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping 
     lastReceivedAt: "2026-06-26T07:00:00.000Z",
     lastValue: 100,
     metricKey: "realTimePower",
+    metricScope: "cl" as const,
     multiplier: 1,
     nameZh: null,
     nameEn: null,
@@ -63,6 +64,7 @@ test("mergePolledTopicMappings preserves local editable topic drafts while refre
       ...polled,
       enabled: false,
       metricKey: "realTimePower",
+      metricScope: "cl" as const,
       topic: "kuozui/plant/solar/custom-power",
       unit: "W",
       valuePath: "$.custom.value"
@@ -100,6 +102,7 @@ test("mergePolledTopicMappings preserves local drafts and appends new polled top
     lastReceivedAt: "2026-06-26T07:06:00.000Z",
     lastValue: 88.6,
     metricKey: "gridPower",
+    metricScope: "cl" as const,
     quality: "fresh",
     rawPayload: '{"value":88.6}',
     topic: "kuozui/grid/power",
@@ -114,6 +117,7 @@ test("mergePolledTopicMappings preserves local drafts and appends new polled top
         ...refreshedDraftTopic,
         enabled: false,
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         topic: "kuozui/plant/solar/custom-power",
         unit: "kW",
         valuePath: "$.value"
@@ -128,6 +132,7 @@ test("mergePolledTopicMappings drops remotely deleted synced topics while preser
   const syncedDeletedTopic = buildTopicMapping({
     id: 2,
     metricKey: "gridPower",
+    metricScope: "cl" as const,
     topic: "kuozui/grid/power"
   });
   const currentDraft = buildTopicMapping({
@@ -137,6 +142,7 @@ test("mergePolledTopicMappings drops remotely deleted synced topics while preser
   const currentDeletedTopic = buildTopicMapping({
     id: 2,
     metricKey: "gridPower",
+    metricScope: "cl" as const,
     topic: "kuozui/grid/power"
   });
   const refreshedDraftTopic = buildTopicMapping({
@@ -158,6 +164,7 @@ test("mergePolledTopicMappings drops remotely deleted synced topics while preser
         ...refreshedDraftTopic,
         enabled: false,
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         topic: "kuozui/plant/solar/custom-power",
         unit: "kW",
         valuePath: "$.value"
@@ -171,6 +178,7 @@ test("mergePolledTopicMappings only preserves editable fields for the rows that 
   const syncedCleanTopic = buildTopicMapping({
     id: 2,
     metricKey: "gridPower",
+    metricScope: "cl" as const,
     topic: "kuozui/grid/power",
     unit: "kW"
   });
@@ -181,6 +189,7 @@ test("mergePolledTopicMappings only preserves editable fields for the rows that 
   const currentCleanTopic = buildTopicMapping({
     id: 2,
     metricKey: "gridPower",
+    metricScope: "cl" as const,
     topic: "kuozui/grid/power",
     unit: "kW"
   });
@@ -196,6 +205,7 @@ test("mergePolledTopicMappings only preserves editable fields for the rows that 
     lastReceivedAt: "2026-06-26T07:06:00.000Z",
     lastValue: 88.6,
     metricKey: "gridPowerUpdated",
+    metricScope: "cl" as const,
     quality: "fresh",
     rawPayload: '{"value":88.6}',
     topic: "kuozui/grid/power/updated",
@@ -215,6 +225,7 @@ test("mergePolledTopicMappings only preserves editable fields for the rows that 
         ...refreshedDraftTopic,
         enabled: false,
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         topic: "kuozui/plant/solar/custom-power",
         unit: "kW",
         valuePath: "$.value"

@@ -1,11 +1,25 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { buildApp } from "./app.js";
-import { migrateDatabase } from "./db/migrate.js";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-app-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+
+const [{ buildApp }, { closeDatabaseConnection }, { migrateDatabase }] = await Promise.all([
+  import("./app.js"),
+  import("./db/index.js"),
+  import("./db/migrate.js")
+]);
 
 migrateDatabase();
+test.after(() => {
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
+});
 
 const INTERNAL_DETAIL = "internal-detail-that-must-not-escape";
 

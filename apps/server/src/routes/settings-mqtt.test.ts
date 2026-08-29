@@ -14,6 +14,11 @@ const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = a
   import("../db/seed.js"),
   import("../db/index.js")
 ]);
+const { createPairedDeviceTestContext } = await import("../testing/deviceContextTestSupport.js");
+
+function deviceCookies() {
+  return { solar_device_credential: createPairedDeviceTestContext("cl").credential };
+}
 
 after(() => {
   rmSync(tempDir, { force: true, recursive: true });
@@ -94,19 +99,19 @@ test("POST factory generation baseline reset requires trusted access and exact c
 
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
-  database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+  database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('totalGeneration', 2000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', 'totalGeneration', 2000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
   `).run();
   database.prepare(`
-    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-    VALUES ('generation', 2000000, CURRENT_TIMESTAMP, 0)
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES ('global', 'generation', 2000000, CURRENT_TIMESTAMP, 0)
   `).run();
   const sourceTimestamp = new Date().toISOString();
   const insertSource = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
   `);
   for (const [factory, values] of [
     ["cl", { month: 20, today: 2, total: 800 }],
@@ -118,9 +123,9 @@ test("POST factory generation baseline reset requires trusted access and exact c
       today_mwh: values.today,
       total_mwh: values.total
     });
-    insertSource.run(`factoryGeneration.${factory}.todayMwh`, values.today, sourceTimestamp, rawPayload);
-    insertSource.run(`factoryGeneration.${factory}.monthMwh`, values.month, sourceTimestamp, rawPayload);
-    insertSource.run(`factoryGeneration.${factory}.totalMwh`, values.total, sourceTimestamp, rawPayload);
+    insertSource.run(factory, "factoryGeneration.todayMwh", values.today, sourceTimestamp, rawPayload);
+    insertSource.run(factory, "factoryGeneration.monthMwh", values.month, sourceTimestamp, rawPayload);
+    insertSource.run(factory, "factoryGeneration.totalMwh", values.total, sourceTimestamp, rawPayload);
   }
 
   const app = await buildApp();
@@ -136,7 +141,7 @@ test("POST factory generation baseline reset requires trusted access and exact c
     });
     assert.equal(denied.statusCode, 403);
     assert.equal(
-      database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
       2000
     );
 
@@ -148,7 +153,7 @@ test("POST factory generation baseline reset requires trusted access and exact c
     assert.equal(mismatch.statusCode, 409);
     assert.equal(mismatch.json<{ reason: string }>().reason, "confirmation-mismatch");
     assert.equal(
-      database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
       2000
     );
 
@@ -168,7 +173,7 @@ test("POST factory generation baseline reset requires trusted access and exact c
     });
   } finally {
     database.prepare("DELETE FROM live_metric_values").run();
-    database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+    database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
     await app.close();
   }
 });
@@ -181,6 +186,7 @@ test("GET /api/settings/mqtt/topics exposes broker status alongside topic and re
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/settings/mqtt/topics"
     });
@@ -279,12 +285,14 @@ test("PUT /api/settings/mqtt/topics persists custom names and preserves them whe
         topics: [
           {
             metricKey: "realTimePower",
+            metricScope: "cl",
             topic: "solar/power/realtime",
             nameZh: "一號廠輸出",
             nameEn: "Plant A Output"
           },
           {
             metricKey: "todayGeneration",
+            metricScope: "cl",
             topic: "solar/energy/today"
           }
         ]
@@ -307,6 +315,7 @@ test("PUT /api/settings/mqtt/topics persists custom names and preserves them whe
         topics: [
           {
             metricKey: "realTimePower",
+            metricScope: "cl",
             topic: "solar/power/realtime"
           }
         ]
@@ -341,6 +350,7 @@ test("PUT /api/settings/mqtt/topics stores multiplier from mapping payload", asy
         topics: [
           {
             metricKey: "factoryPeakMultiplier",
+            metricScope: "global",
             multiplier: 1.2,
             topic: "factory/peak_multiplier",
             unit: "x",
@@ -378,8 +388,8 @@ test("PUT /api/settings/mqtt/topics canonicalizes units and updates existing liv
     getDatabase()
       .prepare(
         `
-          INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-          VALUES ('todayGeneration', 2.72, 'kWh', ?, 'good', '{"value":2.72}')
+          INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+          VALUES ('cl', 'todayGeneration', 2.72, 'kWh', ?, 'good', '{"value":2.72}')
         `
       )
       .run(timestamp);
@@ -391,6 +401,7 @@ test("PUT /api/settings/mqtt/topics canonicalizes units and updates existing liv
         topics: [
           {
             metricKey: "todayGeneration",
+            metricScope: "cl",
             topic: "kuozui/plant/solar/today_energy",
             unit: "mWh"
           }
@@ -492,7 +503,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish sends numeric value to t
     const response = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
-      payload: { value: 1200 }
+      payload: { metricScope: "cl", value: 1200 }
     });
 
     assert.equal(response.statusCode, 200);
@@ -524,18 +535,18 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish uses each factory summar
   const database = getDatabase();
   const insertMapping = database.prepare(`
     INSERT INTO topic_mappings (
-      metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
-    ) VALUES (?, 'solar/CL/summary', 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES ('cl', ?, 'solar/CL/summary', 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `);
-  insertMapping.run("factoryGeneration.cl.todayMwh", "$.today_mwh");
-  insertMapping.run("factoryGeneration.cl.monthMwh", "$.month_mwh");
-  insertMapping.run("factoryGeneration.cl.totalMwh", "$.total_mwh");
+  insertMapping.run("factoryGeneration.todayMwh", "$.today_mwh");
+  insertMapping.run("factoryGeneration.monthMwh", "$.month_mwh");
+  insertMapping.run("factoryGeneration.totalMwh", "$.total_mwh");
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
     VALUES
-      ('factoryGeneration.cl.todayMwh', 10, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
-      ('factoryGeneration.cl.monthMwh', 200, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
-      ('factoryGeneration.cl.totalMwh', 3000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
+      ('cl', 'factoryGeneration.todayMwh', 10, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
+      ('cl', 'factoryGeneration.monthMwh', 200, 'MWh', CURRENT_TIMESTAMP, 'good', '{}'),
+      ('cl', 'factoryGeneration.totalMwh', 3000, 'MWh', CURRENT_TIMESTAMP, 'good', '{}')
   `).run();
 
   const app = await buildApp();
@@ -548,14 +559,14 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish uses each factory summar
     };
 
     for (const [metricKey, value] of [
-      ["factoryGeneration.cl.todayMwh", 12.3],
-      ["factoryGeneration.cl.monthMwh", 456.7],
-      ["factoryGeneration.cl.totalMwh", 8901.2]
+      ["factoryGeneration.todayMwh", 12.3],
+      ["factoryGeneration.monthMwh", 456.7],
+      ["factoryGeneration.totalMwh", 8901.2]
     ] as const) {
       const response = await app.inject({
         method: "POST",
         url: `/api/settings/mqtt/topics/${metricKey}/publish`,
-        payload: { value }
+        payload: { metricScope: "cl", value }
       });
       assert.equal(response.statusCode, 200);
     }
@@ -576,7 +587,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish uses each factory summar
   }
 });
 
-test("POST /api/settings/mqtt/topics/:metricKey/publish rejects invalid values without publishing", async () => {
+test("POST /api/settings/mqtt/topics/:metricKey/publish requires scope and rejects invalid values without publishing", async () => {
   migrateDatabase();
   seedDatabase();
 
@@ -594,12 +605,25 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish rejects invalid values w
       });
     };
 
+    const missingScope = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { value: 1200 }
+    });
+    const invalidScope = await app.inject({
+      method: "POST",
+      url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
+      payload: { metricScope: "all", value: 1200 }
+    });
     const response = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
-      payload: { value: "1200" }
+      payload: { metricScope: "cl", value: "1200" }
     });
 
+    assert.equal(missingScope.statusCode, 400);
+    assert.equal(invalidScope.statusCode, 400);
+    assert.match(missingScope.json<{ error: string }>().error, /metricScope/);
     assert.equal(response.statusCode, 400);
     assert.equal(response.json<{ success: boolean }>().success, false);
     assert.equal(publishCalls, 0);
@@ -629,7 +653,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish rejects missing mappings
     const response = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/notARealMetric/publish",
-      payload: { value: 1200 }
+      payload: { metricScope: "cl", value: 1200 }
     });
 
     assert.equal(response.statusCode, 404);
@@ -668,7 +692,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish rejects disabled and emp
     const disabledResponse = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
-      payload: { value: 1200 }
+      payload: { metricScope: "cl", value: 1200 }
     });
 
     restore.run("kuozui/plant/solar/self_consumption", 1, "selfConsumptionEnergy");
@@ -676,7 +700,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish rejects disabled and emp
     const emptyTopicResponse = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
-      payload: { value: 1200 }
+      payload: { metricScope: "cl", value: 1200 }
     });
 
     assert.equal(disabledResponse.statusCode, 409);
@@ -710,7 +734,7 @@ test("POST /api/settings/mqtt/topics/:metricKey/publish rejects disconnected pub
     const response = await app.inject({
       method: "POST",
       url: "/api/settings/mqtt/topics/selfConsumptionEnergy/publish",
-      payload: { value: 1200 }
+      payload: { metricScope: "cl", value: 1200 }
     });
 
     assert.equal(response.statusCode, 409);
@@ -913,16 +937,16 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
     .run("realTimePower", 586.2, "kW", "2026-05-13T09:00:00.000Z", "good", '{"value":586.2}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
     .run("todayGeneration", 2340, "kWh", "2026-05-13T09:05:00.000Z", "good", '{"value":2340}');
@@ -931,6 +955,7 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
 
   try {
     const response = await app.inject({
+      cookies: deviceCookies(),
       method: "GET",
       url: "/api/metrics/live"
     });
@@ -1008,6 +1033,7 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -1015,7 +1041,7 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('cl', ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(120.5, 90.1, 66.2, 59.5, 54.94, 97.3, "2026-05-13T09:00:00.000Z");
@@ -1023,6 +1049,7 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -1032,7 +1059,7 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('cl', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(
@@ -1049,12 +1076,12 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 120.5, '2026-05-13T09:00:00.000Z', 0),
-          ('consumption', 90.1, '2026-05-13T09:00:00.000Z', 0),
-          ('selfConsumption', 66.2, '2026-05-13T09:00:00.000Z', 0),
-          ('co2', 59.5, '2026-05-13T09:00:00.000Z', 0)
+          ('cl', 'generation', 120.5, '2026-05-13T09:00:00.000Z', 0),
+          ('cl', 'consumption', 90.1, '2026-05-13T09:00:00.000Z', 0),
+          ('cl', 'selfConsumption', 66.2, '2026-05-13T09:00:00.000Z', 0),
+          ('cl', 'co2', 59.5, '2026-05-13T09:00:00.000Z', 0)
       `
     )
     .run();
@@ -1064,14 +1091,17 @@ test("GET /api/metrics/history, /daily-summary, and /cumulative expose persisted
   try {
     const [historyResponse, dailySummaryResponse, cumulativeResponse] = await Promise.all([
       app.inject({
+        cookies: deviceCookies(),
         method: "GET",
         url: "/api/metrics/history?range=total"
       }),
       app.inject({
+        cookies: deviceCookies(),
         method: "GET",
         url: "/api/metrics/daily-summary"
       }),
       app.inject({
+        cookies: deviceCookies(),
         method: "GET",
         url: "/api/metrics/cumulative"
       })
@@ -1324,7 +1354,7 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
     updatedAt: "2026-05-13T09:06:00.000Z"
   });
 
-  service.emitLiveMetrics({
+  service.emitLiveMetrics("cl", {
     metrics: {
       todayGeneration: {
         quality: "good",
@@ -1342,6 +1372,7 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
       "server:time",
       "mqtt:status",
       "liveMetrics:update",
+      "liveMetrics:update",
       "mqtt:status",
       "liveMetrics:update"
     ]
@@ -1351,7 +1382,6 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
     [
       "server:time",
       "mqtt:status",
-      "liveMetrics:update",
       "system:error",
       "system:recovered",
       "mqtt:status",
@@ -1364,7 +1394,8 @@ test("SocketService emits playback-safe snapshots to all sessions and keeps diag
       "management-trusted:system:error",
       "management-trusted:system:recovered",
       "identified:mqtt:status",
-      "identified:liveMetrics:update"
+      "site:cl:liveMetrics:update",
+      "management-trusted:liveMetrics:update"
     ]
   );
 });
@@ -1374,24 +1405,24 @@ test("topic lastReceivedAt uses the same timestamp form as the live metrics API"
   seedDatabase();
   const database = getDatabase();
   const mapping = database
-    .prepare("SELECT metric_key FROM topic_mappings LIMIT 1")
-    .get() as { metric_key: string };
+    .prepare("SELECT metric_scope, metric_key FROM topic_mappings WHERE metric_scope = 'cl' LIMIT 1")
+    .get() as { metric_scope: string; metric_key: string };
 
   // Written the way MQTT ingestion writes it: a zone-less UTC wall clock.
   database
     .prepare(
       `INSERT INTO live_metric_values
-         (metric_key, value, unit, timestamp, quality, raw_payload)
-       VALUES (?, 1, 'kW', CURRENT_TIMESTAMP, 'good', '{}')
-       ON CONFLICT(metric_key) DO UPDATE SET timestamp = CURRENT_TIMESTAMP`
+         (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+       VALUES (?, ?, 1, 'kW', CURRENT_TIMESTAMP, 'good', '{}')
+       ON CONFLICT(metric_scope, metric_key) DO UPDATE SET timestamp = CURRENT_TIMESTAMP`
     )
-    .run(mapping.metric_key);
+    .run(mapping.metric_scope, mapping.metric_key);
 
   const app = await buildApp();
 
   try {
     const topics = await app.inject({ method: "GET", url: "/api/settings/mqtt/topics" });
-    const live = await app.inject({ method: "GET", url: "/api/metrics/live" });
+    const live = await app.inject({ cookies: deviceCookies(), method: "GET", url: "/api/metrics/live" });
 
     const lastReceivedAt = (topics.json() as { topics: Array<{ metricKey: string; lastReceivedAt: string | null }> })
       .topics.find((topic) => topic.metricKey === mapping.metric_key)?.lastReceivedAt;
@@ -1406,6 +1437,80 @@ test("topic lastReceivedAt uses the same timestamp form as the live metrics API"
       lastReceivedAt,
       liveTimestamp,
       "both surfaces must expose the same timestamp form for the same reading"
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics requires metricScope and permits CL and KN semantic twins", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          { metricKey: "sharedPower", topic: "solar/cl/power", enabled: true, metricScope: "cl" },
+          { metricKey: "sharedPower", topic: "solar/kn/power", enabled: true, metricScope: "kn" }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(
+      (response.json() as { topics: Array<{ metricKey: string; metricScope: string; topic: string }> }).topics
+        .filter((topic) => topic.metricKey === "sharedPower")
+        .map(({ metricKey, metricScope, topic }) => ({ metricKey, metricScope, topic })),
+      [
+        { metricKey: "sharedPower", metricScope: "cl", topic: "solar/cl/power" },
+        { metricKey: "sharedPower", metricScope: "kn", topic: "solar/kn/power" }
+      ]
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics rejects invalid scopes and duplicate scoped identities without mutation", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  const before = database.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number };
+  const app = await buildApp();
+
+  try {
+    for (const payload of [
+      { topics: [{ metricKey: "missingScope", topic: "solar/power", enabled: true }] },
+      { topics: [{ metricKey: "allScope", topic: "solar/power", enabled: true, metricScope: "all" }] }
+    ]) {
+      const response = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload });
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json<{ code: string }>().code, "INVALID_METRIC_SCOPE");
+    }
+
+    const duplicateResponse = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          { metricKey: "duplicateScope", topic: "solar/a", enabled: true, metricScope: "cl" },
+          { metricKey: "duplicateScope", topic: "solar/b", enabled: true, metricScope: "cl" }
+        ]
+      }
+    });
+    assert.equal(duplicateResponse.statusCode, 400);
+    assert.equal(
+      duplicateResponse.json<{ code: string }>().code,
+      "DUPLICATE_METRIC_IDENTITY"
+    );
+
+    assert.equal(
+      (database.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count,
+      before.count
     );
   } finally {
     await app.close();

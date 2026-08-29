@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import type { MetricScope } from "@solar-display/shared";
 import {
   evaluateFreshness,
   resolveFreshnessCategoryForMetric,
@@ -31,6 +32,41 @@ type LiveMetricRow = {
   value: number | null;
 };
 
+function buildLiveMetricsSnapshot(rows: LiveMetricRow[]): LiveMetricsSnapshot {
+  const metrics: Record<string, LiveMetricReading> = {};
+  let latestTimestamp: string | null = null;
+  let latestTimestampMs = Number.NEGATIVE_INFINITY;
+
+  for (const row of rows) {
+    if (row.value === null || row.timestamp === null) {
+      continue;
+    }
+
+    const timestamp = normalizeMetricTimestamp(row.timestamp);
+    metrics[row.metric_key] = {
+      quality: row.quality,
+      timestamp,
+      unit: row.unit,
+      value: row.value
+    };
+
+    const timestampMs = Date.parse(timestamp);
+    if (Number.isNaN(timestampMs)) {
+      if (latestTimestamp === null) {
+        latestTimestamp = timestamp;
+      }
+      continue;
+    }
+
+    if (timestampMs > latestTimestampMs) {
+      latestTimestampMs = timestampMs;
+      latestTimestamp = timestamp;
+    }
+  }
+
+  return { metrics, timestamp: latestTimestamp };
+}
+
 export function readLiveMetricsSnapshot(
   database: Database.Database = getDatabase()
 ): LiveMetricsSnapshot {
@@ -50,48 +86,25 @@ export function readLiveMetricsSnapshot(
     )
     .all() as LiveMetricRow[];
 
-  const metrics: Record<string, LiveMetricReading> = {};
-  let latestTimestamp: string | null = null;
-  let latestTimestampMs = Number.NEGATIVE_INFINITY;
+  return buildLiveMetricsSnapshot(rows);
+}
 
-  for (const row of rows) {
-    if (row.value === null || row.timestamp === null) {
-      continue;
-    }
+export function readScopedLiveMetricsSnapshot(
+  metricScope: MetricScope,
+  database: Database.Database = getDatabase()
+): LiveMetricsSnapshot {
+  const rows = database
+    .prepare(
+      `
+        SELECT metric_key, value, unit, timestamp, quality
+        FROM live_metric_values
+        WHERE metric_scope = ? AND value IS NOT NULL AND timestamp IS NOT NULL
+        ORDER BY timestamp DESC, metric_key ASC
+      `
+    )
+    .all(metricScope) as LiveMetricRow[];
 
-    // Normalize at the storage read boundary so every downstream freshness
-    // consumer receives a timestamp carrying an explicit zone designator.
-    const timestamp = normalizeMetricTimestamp(row.timestamp);
-
-    metrics[row.metric_key] = {
-      quality: row.quality,
-      timestamp,
-      unit: row.unit,
-      value: row.value
-    };
-
-    // Compare instants rather than strings: normalization leaves the column
-    // holding a mix of `Z` and numeric-offset forms, which do not order
-    // lexicographically. An unparseable row only seeds the value when nothing
-    // else has been seen, and any parseable row later replaces it.
-    const timestampMs = Date.parse(timestamp);
-    if (Number.isNaN(timestampMs)) {
-      if (latestTimestamp === null) {
-        latestTimestamp = timestamp;
-      }
-      continue;
-    }
-
-    if (timestampMs > latestTimestampMs) {
-      latestTimestampMs = timestampMs;
-      latestTimestamp = timestamp;
-    }
-  }
-
-  return {
-    metrics,
-    timestamp: latestTimestamp
-  };
+  return buildLiveMetricsSnapshot(rows);
 }
 
 export function readAuthoritativeLiveMetricsSnapshot(
@@ -100,6 +113,18 @@ export function readAuthoritativeLiveMetricsSnapshot(
 ): LiveMetricsSnapshot {
   return applyFreshnessToLiveMetricsSnapshot(
     readLiveMetricsSnapshot(database),
+    database,
+    nowMs
+  );
+}
+
+export function readAuthoritativeScopedLiveMetricsSnapshot(
+  metricScope: MetricScope,
+  database: Database.Database = getDatabase(),
+  nowMs = Date.now()
+): LiveMetricsSnapshot {
+  return applyFreshnessToLiveMetricsSnapshot(
+    readScopedLiveMetricsSnapshot(metricScope, database),
     database,
     nowMs
   );

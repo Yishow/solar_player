@@ -37,7 +37,7 @@ import {
   writeGlobalPlaybackRuntimePolicyRow,
   type PlaybackRuntimePolicyRow
 } from "./playbackRuntimePolicyService.js";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { collectDisplayPageAssetFindings } from "./displayPageAssetService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { evaluatePageFreshnessForRequirements } from "./freshnessPolicyService.js";
@@ -409,7 +409,7 @@ function buildPageConditions(
   const liveStageByPage = new Map(
     readLiveStageRows().map((row) => [row.page_key, row] satisfies [string, StageConfigRow])
   );
-  const liveMetrics = readLiveMetricsSnapshot(getDatabase());
+  const liveMetrics = readScopedLiveMetricsSnapshot(siteScope ?? "cl", getDatabase());
   const readinessFindingsByPageKey = buildReadinessFindingsByPageKey(
     siteScope,
     readinessReport
@@ -705,7 +705,7 @@ function readFreshnessRevision(options: {
   settings: PlaybackSettings;
   siteScope: SiteScope;
 }) {
-  const metrics = readLiveMetricsSnapshot(getDatabase()).metrics;
+  const metrics = readScopedLiveMetricsSnapshot(options.siteScope, getDatabase()).metrics;
 
   return createRevision({
     enforceFreshRuntimeData: options.settings.enforceFreshRuntimeData,

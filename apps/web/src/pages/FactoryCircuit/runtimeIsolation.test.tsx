@@ -81,6 +81,7 @@ test("factory circuit runtime output stays stable when an unrelated metric chang
 
   replaceLiveMetricsConnectionState(connectedState);
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       phaseRVoltage: createReading(220.5, "V", "2026-07-05T10:00:00.000Z"),
       realTimePower: createReading(410, "kW", "2026-07-05T10:00:00.000Z"),
@@ -101,6 +102,7 @@ test("factory circuit runtime output stays stable when an unrelated metric chang
   );
 
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       phaseRVoltage: createReading(224.1, "V", "2026-07-05T10:00:05.000Z"),
       realTimePower: createReading(410, "kW", "2026-07-05T10:00:00.000Z"),

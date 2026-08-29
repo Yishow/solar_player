@@ -22,7 +22,6 @@ The system SHALL resolve, for each live-data display page, the set of underlying
 - **WHEN** the live metric keys for `solar` are resolved
 - **THEN** the result SHALL include `realTimePower`, `todayGeneration`, `selfConsumptionEnergy`, and `consumptionEnergy`
 
-
 <!-- @trace
 source: refine-rotation-per-metric-freshness
 updated: 2026-05-23
@@ -124,6 +123,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Evaluate page runtime freshness over the page's required metrics
 
 The system SHALL evaluate runtime freshness for a page using only the live metrics that page requires. A page SHALL be fresh when every required metric that is present in the live snapshot has a timestamp within the freshness window. A page SHALL be stale when any present required metric is older than the freshness window, or when none of its required metrics are present in the snapshot. The evaluation SHALL report the oldest (stalest) present required metric key and timestamp for use in skip detail. The evaluation SHALL also report whether every required metric is present in the live snapshot (required-data presence), so callers can distinguish a page that has prior data but is stale from a page that has never received a required metric.
@@ -166,7 +166,6 @@ The system SHALL evaluate runtime freshness for a page using only the live metri
 - **WHEN** at least one required metric for the page is absent from the snapshot
 - **THEN** the page freshness evaluation SHALL report required-data presence as false
 - **AND** it SHALL report the page as stale
-
 
 <!-- @trace
 source: playback-broker-failure-resilience
@@ -246,6 +245,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Rotation uses per-page freshness instead of the global latest timestamp
 
 The display rotation evaluation SHALL determine each live-data page's freshness from that page's own required-metric freshness, not from a single global latest timestamp across all metrics. A page SHALL NOT be treated as fresh solely because unrelated metrics updated recently. A live-data page whose required metrics are all present but stale (transient outage) SHALL remain in the playable pages and render last-known values. Rotation SHALL skip a live-data page for runtime-data reasons only when at least one of its required metrics has never been received; the `stale-runtime` skip reason SHALL be reserved for that never-had-data case.
@@ -356,6 +356,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Resolve per-metric freshness through the global category Policy
 
 Each required display metric SHALL map to one Freshness Policy category. Page freshness SHALL aggregate the Server-authoritative states of its required metrics and SHALL NOT apply an independent Client threshold.
@@ -575,3 +576,17 @@ tests:
   - apps/web/src/services/socket.test.ts
   - apps/web/src/hooks/useDisplayStoryRuntime.test.ts
 -->
+
+### Requirement: Per-metric freshness is evaluated on scoped metric identity
+
+Freshness evaluation for a playback page SHALL use the resolved `(metricScope, metricKey)` identity for each underlying live metric. A healthy reading from another site MUST NOT satisfy or refresh a stale dependency for the current site.
+
+#### Scenario: CL metric is stale while KN is fresh
+- **WHEN** a CL page requires `realTimePower`, the CL reading is stale, and the KN reading with the same semantic metric key is fresh
+- **THEN** the CL requirement remains stale
+- **AND** the KN timestamp SHALL NOT refresh the CL freshness result
+
+#### Scenario: Page uses an explicit global dependency
+- **WHEN** a page requirement explicitly resolves a dependency under `global`
+- **THEN** freshness is evaluated against the global reading for that dependency
+- **AND** the result remains labeled with `metricScope = global`

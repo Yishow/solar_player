@@ -1,6 +1,6 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
-import type { DisplaySyncEvent } from "@solar-display/shared";
+import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import type { MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
@@ -8,6 +8,7 @@ type SnapshotWriterServiceOptions = {
   database?: Database.Database;
   emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   intervalMs?: number;
+  metricScope: MetricScope;
   metricsAccumulatorService: MetricsAccumulatorService;
 };
 
@@ -16,6 +17,7 @@ export class SnapshotWriterService {
   private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly intervalMs: number;
   private readonly metricsAccumulatorService: MetricsAccumulatorService;
+  private readonly metricScope: MetricScope;
   private timer: NodeJS.Timeout | null = null;
 
   constructor(options: SnapshotWriterServiceOptions) {
@@ -23,6 +25,7 @@ export class SnapshotWriterService {
     this.emitDisplaySync = options.emitDisplaySync;
     this.intervalMs = options.intervalMs ?? 60_000;
     this.metricsAccumulatorService = options.metricsAccumulatorService;
+    this.metricScope = options.metricScope;
   }
 
   start() {
@@ -53,6 +56,7 @@ export class SnapshotWriterService {
       .prepare(
         `
           INSERT INTO metric_snapshots (
+            metric_scope,
             generation,
             generation_power,
             consumption,
@@ -61,10 +65,11 @@ export class SnapshotWriterService {
             ratio,
             efficiency,
             captured_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
+        this.metricScope,
         snapshot.generation,
         snapshot.generationPower,
         snapshot.consumption,
@@ -77,6 +82,7 @@ export class SnapshotWriterService {
 
     this.emitDisplaySync?.({
       generatedAt: capturedAt.toISOString(),
+      metricScope: this.metricScope,
       reason: "metric-snapshot-written",
       scope: "monitoring-history"
     });

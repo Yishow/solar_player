@@ -20,7 +20,6 @@ The Overview KPI cards SHALL render a trend sparkline only from runtime-provided
 - **WHEN** the Overview page renders
 - **THEN** it SHALL NOT import or render the mock `trendSeries` fixture for KPI sparklines
 
-
 <!-- @trace
 source: replace-overview-sparkline-mock-with-runtime-data
 updated: 2026-05-23
@@ -122,6 +121,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Missing runtime trend hides the sparkline
 
 When the view model does not provide a trend series for a KPI metric, the Overview card SHALL omit the sparkline rather than display fabricated data.
@@ -232,6 +232,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Overview generation trend reflects instantaneous generation power
 
 The Overview generation trend series SHALL represent instantaneous generation power (the time-series of generation power readings), not cumulative generation energy, so the chart forms a daily solar profile (rising after sunrise, peaking around midday, falling toward sunset). The server SHALL persist instantaneous generation power into the metric snapshot history, and the Overview trend reader SHALL source the series from that instantaneous-power history. When instantaneous-power history is absent, the reader SHALL fall back to the existing stored series rather than failing.
@@ -259,7 +260,6 @@ The Overview generation trend series SHALL represent instantaneous generation po
 - **WHEN** the Overview trend reader resolves the series
 - **THEN** it returns the legacy `generation` series
 - **AND** the widget continues rendering a chart instead of failing
-
 
 <!-- @trace
 source: align-overview-cards-to-better-reference
@@ -347,6 +347,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Development mock feed drives runtime metrics without bypassing the runtime path
 
 In development mock mode (no real broker), the system SHALL feed simulated instantaneous metric readings into the runtime live-metrics store on an interval, so the standard accumulator and snapshot-writer pipeline produces the trend history from real runtime data. The simulated generation power SHALL follow a time-of-day solar profile. This mock feed SHALL run only in mock mode and SHALL NOT alter the production accumulator or snapshot-writer behavior.
@@ -461,6 +462,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Overview trend data is limited to the current local day
 The system SHALL build the Overview trend profile only from the current local calendar day's monitoring snapshots.
 
@@ -489,3 +491,17 @@ tests:
   - apps/server/src/routes/settings-mqtt.test.ts
   - apps/server/src/services/generationTrendSeries.test.ts
 -->
+
+### Requirement: Overview runtime trend uses the same effective site scope as its KPI
+
+An Overview KPI trend series SHALL be read from the same effective metric scope as the KPI value it accompanies. A site-specific Overview MUST NOT display a trend assembled from another site or from a global aggregate unless that KPI binding explicitly targets global data.
+
+#### Scenario: CL Overview renders generation power and trend
+- **WHEN** a CL display renders a generation KPI with a runtime trend series
+- **THEN** both the current KPI value and every trend point are resolved from CL-scoped monitoring data
+- **AND** KN or global generation points are excluded from that CL trend
+
+#### Scenario: Selected site has no current-day trend
+- **WHEN** KN has no current-day trend points but CL has valid points
+- **THEN** the KN Overview uses the existing empty or degraded trend presentation
+- **AND** it SHALL NOT reuse the CL trend as a fallback

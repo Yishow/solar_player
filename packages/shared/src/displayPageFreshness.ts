@@ -92,7 +92,11 @@ export function resolveLiveMetricRequirementsForPage(
     : displayMetricRequirements;
 
   return requirements
-    .filter((requirement) => requirement.pageId === pageKey)
+    .filter(
+      (requirement) =>
+        requirement.pageId === pageKey
+        && requirement.sourceType !== "circuit-slot"
+    )
     .map((requirement) => ({
       alternatives: resolveRequirementAlternatives(requirement),
       requirementKey: requirement.requirementKey

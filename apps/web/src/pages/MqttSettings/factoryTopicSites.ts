@@ -1,3 +1,5 @@
+import type { MetricScope } from "@solar-display/shared";
+
 export type FactoryTopicSite = "jungli" | "guanyin";
 
 export const factoryTopicSiteOptions: Array<{ label: string; value: FactoryTopicSite }> = [
@@ -5,57 +7,48 @@ export const factoryTopicSiteOptions: Array<{ label: string; value: FactoryTopic
   { label: "觀音廠", value: "guanyin" }
 ];
 
-export const jungliFactoryTopicMetricKeys = [
-  "factoryStampingPower",
-  "factoryBodyPower",
-  "factoryPaintingPower",
-  "factoryAssemblyPower",
-  "factoryUtilityPower",
-  "factoryOfficePower"
+const semanticFactoryTopicMetricKeys = [
+  "factoryCircuit.stampingPower",
+  "factoryCircuit.bodyPower",
+  "factoryCircuit.paintingPower",
+  "factoryCircuit.assemblyPower",
+  "factoryCircuit.utilityPower",
+  "factoryCircuit.officePower",
+  "factoryCircuit.heavyVehiclePower",
+  "factoryCircuit.edCoatingPower"
 ] as const;
 
-export const guanyinFactoryTopicMetricKeys = [
-  "factoryCircuit.guanyin.stampingPower",
-  "factoryCircuit.guanyin.bodyPower",
-  "factoryCircuit.guanyin.paintingPower",
-  "factoryCircuit.guanyin.assemblyPower",
-  "factoryCircuit.guanyin.utilityPower",
-  "factoryCircuit.guanyin.officePower",
-  "factoryCircuit.guanyin.heavyVehiclePower",
-  "factoryCircuit.guanyin.edCoatingPower"
-] as const;
+export const jungliFactoryTopicMetricKeys = semanticFactoryTopicMetricKeys;
+export const guanyinFactoryTopicMetricKeys = semanticFactoryTopicMetricKeys;
 
-const hiddenLegacyFactoryTopicMetricKeys = [
-  "factoryHeavyVehiclePower",
-  "factoryEdCoatingPower"
-] as const;
-
-const jungliFactoryTopicMetricKeySet = new Set<string>(jungliFactoryTopicMetricKeys);
-const guanyinFactoryTopicMetricKeySet = new Set<string>(guanyinFactoryTopicMetricKeys);
-const hiddenLegacyFactoryTopicMetricKeySet = new Set<string>(hiddenLegacyFactoryTopicMetricKeys);
+const semanticFactoryTopicMetricKeySet = new Set<string>(semanticFactoryTopicMetricKeys);
 
 export const factoryTopicMetricKeysBySite: Record<FactoryTopicSite, readonly string[]> = {
   guanyin: guanyinFactoryTopicMetricKeys,
   jungli: jungliFactoryTopicMetricKeys
 };
 
-export function resolveFactoryTopicMetricSite(metricKey: string): FactoryTopicSite | "hidden" | null {
-  if (jungliFactoryTopicMetricKeySet.has(metricKey)) {
+export function resolveFactoryTopicMetricSite(
+  metricKey: string,
+  metricScope: MetricScope
+): FactoryTopicSite | "hidden" | null {
+  if (!semanticFactoryTopicMetricKeySet.has(metricKey)) {
+    return null;
+  }
+  if (metricScope === "cl") {
     return "jungli";
   }
-
-  if (guanyinFactoryTopicMetricKeySet.has(metricKey)) {
+  if (metricScope === "kn") {
     return "guanyin";
   }
-
-  if (hiddenLegacyFactoryTopicMetricKeySet.has(metricKey)) {
-    return "hidden";
-  }
-
-  return null;
+  return "hidden";
 }
 
-export function isTopicMetricVisibleForFactorySite(metricKey: string, site: FactoryTopicSite) {
-  const metricSite = resolveFactoryTopicMetricSite(metricKey);
+export function isTopicMetricVisibleForFactorySite(
+  metricKey: string,
+  metricScope: MetricScope,
+  site: FactoryTopicSite
+) {
+  const metricSite = resolveFactoryTopicMetricSite(metricKey, metricScope);
   return metricSite === null || metricSite === site;
 }

@@ -112,13 +112,14 @@ function buildSettingsPayload(settings: MqttSettingsForm) {
   };
 }
 
-function createEmptyMapping(metricKey: string): TopicMapping {
+function createEmptyMapping(metricKey: string, metricScope: TopicMapping["metricScope"]): TopicMapping {
   return {
     enabled: true,
     id: -Date.now(),
     lastReceivedAt: null,
     lastValue: null,
     metricKey,
+    metricScope,
     multiplier: 1,
     nameZh: null,
     nameEn: null,
@@ -607,13 +608,13 @@ export function MqttSettings() {
     }
   }, [settings]);
 
-  const publishTopicValue = useCallback(async (metricKey: string, value: number) => {
+  const publishTopicValue = useCallback(async (metricScope: TopicMapping["metricScope"], metricKey: string, value: number) => {
     setPublishingTopicKey(metricKey);
     try {
       const response = await requestJson<{
         status: MqttStatus;
       }>(`/api/settings/mqtt/topics/${encodeURIComponent(metricKey)}/publish`, {
-        body: JSON.stringify({ value }),
+        body: JSON.stringify({ metricScope, value }),
         method: "POST"
       });
       setStatus(response.status);
@@ -721,8 +722,9 @@ export function MqttSettings() {
   }, [reloadReadiness]);
 
   const addTopicMapping = useCallback(() => {
+    const metricScope = activeCardDataSite === "jungli" ? "cl" : "kn";
     const activeMetricOptions = metricOptions.filter((option) =>
-      isTopicMetricVisibleForFactorySite(option, activeCardDataSite)
+      isTopicMetricVisibleForFactorySite(option, metricScope, activeCardDataSite)
     );
     const activeFactoryMetricOptions = factoryTopicMetricKeysBySite[activeCardDataSite].filter((option) =>
       activeMetricOptions.includes(option)
@@ -731,11 +733,13 @@ export function MqttSettings() {
       (option) => !activeFactoryMetricOptions.includes(option)
     )];
     const nextMetricKey =
-      addableMetricOptions.find((option) => !topics.some((topic) => topic.metricKey === option)) ??
+      addableMetricOptions.find((option) => !topics.some(
+        (topic) => topic.metricScope === metricScope && topic.metricKey === option
+      )) ??
       addableMetricOptions[0];
     if (!nextMetricKey) return;
     markDirty("已新增一筆 topic mapping，尚未儲存。");
-    setTopics((current) => [...current, createEmptyMapping(nextMetricKey)]);
+    setTopics((current) => [...current, createEmptyMapping(nextMetricKey, metricScope)]);
   }, [activeCardDataSite, metricOptions, topics, markDirty]);
 
   const removeTopicMapping = useCallback((rowId: number) => {

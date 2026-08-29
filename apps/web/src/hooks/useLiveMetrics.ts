@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { requestJson } from "../services/api";
 import {
   getSocketClient,
-  type LiveMetricsSnapshot
+  type LiveMetricsSnapshot,
+  type ScopedLiveMetricsSnapshot
 } from "../services/socket";
 import {
   replaceLiveMetricsSnapshot,
@@ -50,9 +51,13 @@ export function isLiveMetricsSelectionEqual(
 }
 
 export async function loadInitialLiveMetricsSnapshot(
-  loadSnapshot: () => Promise<LiveMetricsSnapshot> = () => requestJson<LiveMetricsSnapshot>("/api/metrics/live")
+  loadSnapshot: () => Promise<ScopedLiveMetricsSnapshot & { globalSnapshot?: ScopedLiveMetricsSnapshot }> = () =>
+    requestJson<ScopedLiveMetricsSnapshot & { globalSnapshot?: ScopedLiveMetricsSnapshot }>("/api/metrics/live")
 ) {
   const response = await loadSnapshot();
+  if (response.globalSnapshot) {
+    replaceLiveMetricsSnapshot(response.globalSnapshot);
+  }
   replaceLiveMetricsSnapshot(response);
 }
 

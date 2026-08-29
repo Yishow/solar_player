@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { RuntimeMqttStatus } from "@solar-display/shared";
+import { isMetricScope, type MetricScope, type RuntimeMqttStatus } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
@@ -19,6 +19,7 @@ type MqttSettingsResponse = {
 
 type TopicMappingResponse = {
   id: number;
+  metricScope: MetricScope;
   metricKey: string;
   topic: string;
   nameZh: string | null;
@@ -37,6 +38,7 @@ type TopicMappingResponse = {
 type SettingsBody = Partial<MqttSettingsResponse>;
 type TestConnectionBody = SettingsBody;
 type PublishTopicValueBody = {
+  metricScope?: unknown;
   value?: unknown;
 };
 type ResetFactoryGenerationBaselineBody = {
@@ -45,6 +47,7 @@ type ResetFactoryGenerationBaselineBody = {
 
 type TopicMappingInput = {
   metricKey: string;
+  metricScope?: unknown;
   topic: string;
   nameZh?: string;
   nameEn?: string;
@@ -58,13 +61,14 @@ type ExistingTopicMappingRow = {
   created_at: string | null;
   decimal_places: number | null;
   metric_key: string;
+  metric_scope: MetricScope;
   multiplier: number | null;
   name_en: string | null;
   name_zh: string | null;
   offset: number | null;
 };
 
-const factorySummaryMetricKeyPattern = /^factoryGeneration\.(cl|kn)\.(todayMwh|monthMwh|totalMwh)$/u;
+const factorySummaryMetricKeyPattern = /^factoryGeneration\.(todayMwh|monthMwh|totalMwh)$/u;
 const factorySummaryFieldBySuffix = {
   monthMwh: "month_mwh",
   todayMwh: "today_mwh",
@@ -121,19 +125,19 @@ function canonicalizeMetricUnit(unit: string | undefined) {
 
 function buildTopicPublishPayload(
   value: number,
-  mapping: { metric_key: string; value_path: string | null }
+  mapping: { metric_key: string; metric_scope: MetricScope; value_path: string | null }
 ) {
   const factorySummaryMatch = mapping.metric_key.match(factorySummaryMetricKeyPattern);
   if (factorySummaryMatch) {
-    const [, factory, suffix] = factorySummaryMatch;
-    const prefix = `factoryGeneration.${factory}.`;
+    const [, suffix] = factorySummaryMatch;
+    const prefix = "factoryGeneration.";
     const rows = getDatabase()
       .prepare(`
         SELECT metric_key, value
         FROM live_metric_values
-        WHERE metric_key IN (?, ?, ?)
+        WHERE metric_scope = ? AND metric_key IN (?, ?, ?)
       `)
-      .all(`${prefix}todayMwh`, `${prefix}monthMwh`, `${prefix}totalMwh`) as Array<{
+      .all(mapping.metric_scope, `${prefix}todayMwh`, `${prefix}monthMwh`, `${prefix}totalMwh`) as Array<{
       metric_key: string;
       value: number | null;
     }>;
@@ -236,6 +240,7 @@ function readTopicMappings() {
       `
         SELECT
           topic_mappings.id,
+          topic_mappings.metric_scope,
           topic_mappings.metric_key,
           topic_mappings.topic,
           topic_mappings.name_zh,
@@ -251,12 +256,14 @@ function readTopicMappings() {
           live_metric_values.raw_payload
         FROM topic_mappings
         LEFT JOIN live_metric_values
-          ON live_metric_values.metric_key = topic_mappings.metric_key
+          ON live_metric_values.metric_scope = topic_mappings.metric_scope
+         AND live_metric_values.metric_key = topic_mappings.metric_key
         ORDER BY topic_mappings.id ASC
       `
     )
     .all() as Array<{
     id: number;
+    metric_scope: MetricScope;
     metric_key: string;
     topic: string;
     name_zh: string | null;
@@ -277,6 +284,7 @@ function serializeTopicMappings(): TopicMappingResponse[] {
   return readTopicMappings().map((mapping) => ({
     enabled: toBoolean(mapping.enabled),
     id: mapping.id,
+    metricScope: mapping.metric_scope,
     // Same normalization as the live metrics read path: the MQTT settings view
     // compares this against a live reading as a string, so a mixed form would
     // make that comparison independent of the actual instant.
@@ -304,21 +312,22 @@ function getEnabledTopics() {
     .map((mapping) => mapping.topic);
 }
 
-function getTopicMappingByMetricKey(metricKey: string) {
+function getTopicMapping(metricScope: MetricScope, metricKey: string) {
   const database = getDatabase();
   return database
     .prepare(
       `
-        SELECT metric_key, topic, value_path, enabled
+        SELECT metric_scope, metric_key, topic, value_path, enabled
         FROM topic_mappings
-        WHERE metric_key = ?
+        WHERE metric_scope = ? AND metric_key = ?
         LIMIT 1
       `
     )
-    .get(metricKey) as
+    .get(metricScope, metricKey) as
     | {
         enabled: number;
         metric_key: string;
+        metric_scope: MetricScope;
         topic: string | null;
         value_path: string | null;
       }
@@ -467,6 +476,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     "/api/settings/mqtt/topics/:metricKey/publish",
     async (request, reply) => {
       const value = request.body?.value;
+      const metricScope = request.body?.metricScope;
+      if (!isMetricScope(metricScope)) {
+        return reply.status(400).send({
+          error: "Publish metricScope must be cl, kn, or global",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
       if (typeof value !== "number" || !Number.isFinite(value)) {
         return reply.status(400).send({
           error: "Publish value must be a finite number",
@@ -475,7 +492,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const mapping = getTopicMappingByMetricKey(request.params.metricKey);
+      const mapping = getTopicMapping(metricScope, request.params.metricKey);
       if (!mapping) {
         return reply.status(404).send({
           error: "MQTT topic mapping not found",
@@ -513,7 +530,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request) => {
+  app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request, reply) => {
     const database = getDatabase();
     const topics = request.body?.topics ?? [];
     const existingMappings = new Map<string, ExistingTopicMappingRow>(
@@ -523,6 +540,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
             `
               SELECT
                 metric_key,
+                metric_scope,
                 multiplier,
                 offset,
                 decimal_places,
@@ -533,14 +551,42 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
             `
           )
           .all() as ExistingTopicMappingRow[]
-      ).map((mapping) => [mapping.metric_key, mapping])
+      ).map((mapping) => [`${mapping.metric_scope}:${mapping.metric_key}`, mapping])
     );
+
+    const resolvedTopics: Array<TopicMappingInput & { metricScope: MetricScope }> = [];
+    const seen = new Set<string>();
+    for (const topic of topics) {
+      const candidates = [...existingMappings.values()].filter(
+        (mapping) => mapping.metric_key === topic.metricKey
+      );
+      const metricScope = topic.metricScope === undefined && candidates.length === 1
+        ? candidates[0]?.metric_scope
+        : topic.metricScope;
+      if (!isMetricScope(metricScope)) {
+        return reply.status(400).send({
+          code: "INVALID_METRIC_SCOPE",
+          success: false
+        });
+      }
+      const identity = `${metricScope}:${topic.metricKey}`;
+      if (seen.has(identity)) {
+        return reply.status(400).send({
+          code: "DUPLICATE_METRIC_IDENTITY",
+          error: `Duplicate topic mapping identity: ${identity}`,
+          success: false
+        });
+      }
+      seen.add(identity);
+      resolvedTopics.push({ ...topic, metricScope });
+    }
 
     database.transaction(() => {
       database.prepare("DELETE FROM topic_mappings").run();
 
       const insertMapping = database.prepare(`
         INSERT INTO topic_mappings (
+          metric_scope,
           metric_key,
           topic,
           name_zh,
@@ -553,13 +599,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           enabled,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `);
 
-      for (const topic of topics) {
-        const existingMapping = existingMappings.get(topic.metricKey);
+      for (const topic of resolvedTopics) {
+        const existingMapping = existingMappings.get(`${topic.metricScope}:${topic.metricKey}`);
         const unit = canonicalizeMetricUnit(topic.unit);
         insertMapping.run(
+          topic.metricScope,
           topic.metricKey,
           topic.topic,
           resolveCustomName(topic.nameZh, existingMapping?.name_zh ?? null),
@@ -577,10 +624,10 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
             `
               UPDATE live_metric_values
               SET unit = ?
-              WHERE metric_key = ?
+              WHERE metric_scope = ? AND metric_key = ?
             `
           )
-          .run(unit, topic.metricKey);
+          .run(unit, topic.metricScope, topic.metricKey);
       }
     })();
 

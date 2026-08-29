@@ -11,6 +11,7 @@ import type {
   MonitoringMetricBinding,
   MonitoringMetricSourceTopic,
   MonitoringStoryState,
+  MetricScope,
   OverviewStoryPayload,
   ResolvedMonitoringMetricBinding,
   SiteScope,
@@ -33,6 +34,7 @@ import { readCalculationSettings, type CalculationSettings } from "./calculation
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readPlaybackSettings } from "./displayRotationService.js";
 import { evaluateMetricFreshness } from "./freshnessPolicyService.js";
+import { resolveMetric } from "./MetricResolver.js";
 import { evaluateFactoryGenerationScope } from "./factoryGenerationAggregateService.js";
 import {
   type HourlyGenerationTrendRow,
@@ -40,11 +42,11 @@ import {
 } from "./generationTrendSeries.js";
 import {
   applyFreshnessToLiveMetricsSnapshot,
-  readLiveMetricsSnapshot
+  readLiveMetricsSnapshot,
+  readScopedLiveMetricsSnapshot
 } from "../metrics/liveMetrics.js";
 import {
-  formatDisplayOverrideValue,
-  readActiveDisplayValueOverrides
+  formatDisplayOverrideValue
 } from "./displayValueOverrideService.js";
 
 type StoryMetricKey =
@@ -244,16 +246,16 @@ function normalizeGenerationKwh(value: number, unit: string | null) {
   }
 }
 
-function readCumulativeCounter(metricKey: string) {
+function readCumulativeCounter(metricKey: string, metricScope: "cl" | "kn" | "global") {
   return getDatabase()
     .prepare(
       `
         SELECT total_value, last_updated
         FROM cumulative_counters
-        WHERE metric_key = ?
+        WHERE metric_scope = ? AND metric_key = ?
       `
     )
-    .get(metricKey) as { last_updated: string | null; total_value: number | null } | undefined;
+    .get(metricScope, metricKey) as { last_updated: string | null; total_value: number | null } | undefined;
 }
 
 function buildDerivedCarbonReductionReading(
@@ -278,6 +280,7 @@ function buildDerivedCarbonReductionReading(
 
 function buildCumulativeGenerationReading(
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
+  metricScope: "cl" | "kn" | "global",
   preferSnapshot = false,
   nowMs = Date.now()
 ) {
@@ -285,7 +288,7 @@ function buildCumulativeGenerationReading(
     return snapshot.metrics.totalGeneration ?? null;
   }
 
-  const cumulativeGeneration = readCumulativeCounter("generation");
+  const cumulativeGeneration = readCumulativeCounter("generation", metricScope);
 
   if (
     typeof cumulativeGeneration?.total_value === "number"
@@ -322,11 +325,29 @@ function resolveStoryMetricReading(
     return buildDerivedCarbonReductionReading(
       buildCumulativeGenerationReading(
         context.snapshot,
+        context.siteScope ?? "global",
         context.siteScope !== null,
         Date.parse(context.generatedAt)
       ),
       context.calculationSettings.carbonEmissionFactor
     );
+  }
+
+  if (context.siteScope) {
+    const resolved = resolveMetric(
+      getDatabase(),
+      { metricKey, metricScope: context.siteScope },
+      Date.parse(context.generatedAt)
+    );
+    if (resolved.value !== null && resolved.timestamp) {
+      return {
+        freshness: resolved.freshness ?? undefined,
+        quality: resolved.quality,
+        timestamp: resolved.timestamp,
+        unit: resolved.unit,
+        value: resolved.value
+      };
+    }
   }
 
   return context.snapshot.metrics[metricKey] ?? null;
@@ -336,10 +357,10 @@ function resolveStoryMetricReading(
  * 讀取 topic_mappings 的自訂中英文名稱,以 metric_key 為鍵,
  * 供 playback story label 解析使用。空字串視同未設定(null)。
  */
-function readTopicDisplayNames(): Map<string, TopicDisplayName> {
+function readTopicDisplayNames(metricScope?: "cl" | "kn" | "global"): Map<string, TopicDisplayName> {
   const rows = getDatabase()
-    .prepare("SELECT metric_key, name_zh, name_en, topic FROM topic_mappings")
-    .all() as Array<{
+    .prepare(`SELECT metric_key, name_zh, name_en, topic FROM topic_mappings${metricScope ? " WHERE metric_scope = ?" : ""}`)
+    .all(...(metricScope ? [metricScope] : [])) as Array<{
       metric_key: string;
       name_en: string | null;
       name_zh: string | null;
@@ -391,11 +412,12 @@ function resolveSourceTopics(args: {
   topicNames: Map<string, TopicDisplayName>;
 }): MonitoringMetricSourceTopic[] | undefined {
   const sourceKeys = args.dependencyKeys?.length ? args.dependencyKeys : [args.metricKey];
-  const keys = args.siteScope
-    ? sourceKeys.filter((metricKey) =>
-        metricKey.startsWith(`factoryGeneration.${args.siteScope}.`)
-      )
-    : sourceKeys;
+  const keys = sourceKeys.flatMap((metricKey) => {
+    const factoryMatch = /^factoryGeneration\.(cl|kn)\.(.+)$/u.exec(metricKey);
+    if (!factoryMatch) return [metricKey];
+    if (!args.siteScope || factoryMatch[1] !== args.siteScope) return [];
+    return [`factoryGeneration.${factoryMatch[2]}`];
+  });
   const sourceTopics = keys.flatMap((metricKey) => {
     const topic = args.topicNames.get(metricKey)?.topic;
     return topic ? [{ metricKey, topic }] : [];
@@ -465,6 +487,7 @@ function resolveSolarKpiBinding(args: {
   binding: MonitoringMetricBinding<StoryMetricKey>;
   calculationSettings: CalculationSettings;
   isConnected: boolean;
+  metricScope: MetricScope;
   nowMs: number;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
 }) {
@@ -478,6 +501,7 @@ function resolveSolarKpiBinding(args: {
             args.binding.metricKey === "totalCo2Reduction")
       },
       isConnected: args.isConnected,
+      metricScope: args.metricScope,
       reading:
         args.binding.metricKey === "todayCo2Reduction"
           ? buildDerivedCarbonReductionReading(
@@ -488,6 +512,7 @@ function resolveSolarKpiBinding(args: {
             ? buildDerivedCarbonReductionReading(
               buildCumulativeGenerationReading(
                 args.snapshot,
+                "global",
                 false,
                 args.nowMs
               ),
@@ -502,6 +527,7 @@ function resolveSolarKpiBinding(args: {
     return resolveMonitoringMetricBinding({
       binding: args.binding,
       isConnected: args.isConnected,
+      metricScope: args.metricScope,
       reading: directReading
     });
   }
@@ -542,6 +568,7 @@ function resolveSolarKpiBinding(args: {
     const resolved = resolveMonitoringMetricBinding({
       binding: args.binding,
       isConnected: true,
+      metricScope: args.metricScope,
       reading: {
         freshness,
         quality: selfConsumptionReading.quality ?? consumptionReading.quality,
@@ -561,6 +588,7 @@ function resolveSolarKpiBinding(args: {
   return resolveMonitoringMetricBinding({
     binding: args.binding,
     isConnected: args.isConnected,
+    metricScope: args.metricScope,
     reading: null
   });
 }
@@ -571,6 +599,7 @@ function resolveFactoryMetricBinding(args: {
   isConnected: boolean;
   label: string;
   metricKey: string;
+  metricScope: MetricScope;
   nowMs: number;
   reading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null;
   unit: string;
@@ -585,6 +614,7 @@ function resolveFactoryMetricBinding(args: {
       unit: args.unit
     },
     isConnected: args.isConnected,
+    metricScope: args.metricScope,
     reading: args.reading
   });
   const freshness = args.reading?.freshness ?? evaluateMetricFreshness({
@@ -735,6 +765,7 @@ function resolveFactoryCircuitKpis(args: {
     return available.find((entry) => entry.metricKey === worst.metricKey)?.freshness;
   };
   const aggregateDependencyKeys = args.slots.flatMap((slot) => slot.metricKey ? [slot.metricKey] : []);
+  const siteMetricScope: SiteScope = args.pageKey === "factory-circuit" ? "cl" : "kn";
   const aggregateFreshness = resolveWorstFreshness(
     args.slots.map((slot) => ({
       freshness: slot.freshness,
@@ -795,6 +826,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "太陽能供應占比",
     metricKey: "realTimePower",
+    metricScope: siteMetricScope,
     nowMs: args.nowMs,
     reading: args.snapshot.metrics.realTimePower ?? null,
     unit: "kW"
@@ -879,6 +911,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "今日自發自用電量",
     metricKey: "selfConsumptionEnergy",
+    metricScope: siteMetricScope,
     nowMs: args.nowMs,
     reading: args.snapshot.metrics.selfConsumptionEnergy ?? null,
     unit: "kWh"
@@ -889,6 +922,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "今日自發自用電量",
     metricKey: "todayGeneration",
+    metricScope: siteMetricScope,
     nowMs: args.nowMs,
     reading: args.snapshot.metrics.todayGeneration ?? null,
     unit: args.snapshot.metrics.todayGeneration?.unit ?? "kWh"
@@ -966,6 +1000,7 @@ function resolveFactoryCircuitKpis(args: {
     isConnected: args.isConnected,
     label: "尖峰倍率",
     metricKey: "factoryPeakMultiplier",
+    metricScope: "global",
     nowMs: args.nowMs,
     reading: args.snapshot.metrics.factoryPeakMultiplier ?? null,
     unit: "x"
@@ -1088,26 +1123,12 @@ function resolveFactoryCircuitKpis(args: {
   return [totalPower, solarShare, selfConsumptionKpi, peak, flow];
 }
 
-function projectSiteGenerationSnapshot(
+function addDerivedSiteGeneration(
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
   siteScope: SiteScope,
   now: Date
 ) {
   const metrics = { ...snapshot.metrics };
-  for (const metricKey of [
-    "consumptionEnergy",
-    "realTimePower",
-    "selfConsumptionEnergy",
-    "selfConsumptionRatio",
-    "systemEfficiency",
-    "todayCo2Reduction",
-    "todayGeneration",
-    "totalCo2Reduction",
-    "totalGeneration"
-  ]) {
-    delete metrics[metricKey];
-  }
-
   const evaluation = evaluateFactoryGenerationScope(
     getDatabase(),
     siteScope === "cl" ? "CL" : "KN",
@@ -1135,19 +1156,75 @@ function projectSiteGenerationSnapshot(
   return { ...snapshot, metrics };
 }
 
+function addGlobalFactoryDependencies(
+  snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
+  nowMs: number
+) {
+  const peakMultiplier = resolveMetric(
+    getDatabase(),
+    { metricKey: "factoryPeakMultiplier", metricScope: "global" },
+    nowMs
+  );
+  if (peakMultiplier.value === null || peakMultiplier.timestamp === null) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    metrics: {
+      ...snapshot.metrics,
+      factoryPeakMultiplier: {
+        freshness: peakMultiplier.freshness ?? undefined,
+        quality: peakMultiplier.quality,
+        timestamp: peakMultiplier.timestamp,
+        unit: peakMultiplier.unit,
+        value: peakMultiplier.value
+      }
+    }
+  };
+}
+
+function addGlobalFactoryTopicName(topicNames: Map<string, TopicDisplayName>) {
+  const row = getDatabase()
+    .prepare(`
+      SELECT name_zh, name_en, topic
+      FROM topic_mappings
+      WHERE metric_scope = 'global' AND metric_key = 'factoryPeakMultiplier'
+      LIMIT 1
+    `)
+    .get() as {
+      name_en: string | null;
+      name_zh: string | null;
+      topic: string | null;
+    } | undefined;
+  if (row) {
+    topicNames.set("factoryPeakMultiplier", {
+      nameEn: row.name_en?.trim() || null,
+      nameZh: row.name_zh?.trim() || null,
+      topic: row.topic?.trim() || null
+    });
+  }
+  return topicNames;
+}
+
 function createDisplayStorySourceContext(
   siteScope?: SiteScope,
   profileId?: number
 ): DisplayStorySourceContext {
   const now = new Date();
-  const liveSnapshot = readLiveMetricsSnapshot();
+  const liveSnapshot = siteScope
+    ? readScopedLiveMetricsSnapshot(siteScope)
+    : readLiveMetricsSnapshot();
   const snapshotNow =
     liveSnapshot.timestamp && Number.isFinite(Date.parse(liveSnapshot.timestamp))
       ? new Date(liveSnapshot.timestamp)
       : now;
-  const projectedSnapshot = siteScope
-    ? projectSiteGenerationSnapshot(liveSnapshot, siteScope, snapshotNow)
+  const siteSnapshot = siteScope
+    ? addDerivedSiteGeneration(liveSnapshot, siteScope, snapshotNow)
     : liveSnapshot;
+  const projectedSnapshot = siteScope
+    ? addGlobalFactoryDependencies(siteSnapshot, now.getTime())
+    : siteSnapshot;
   const snapshot = applyFreshnessToLiveMetricsSnapshot(
     projectedSnapshot,
     getDatabase(),
@@ -1171,11 +1248,13 @@ function createDisplayStorySourceContext(
     isConnected,
     siteScope: siteScope ?? null,
     snapshot,
-    topicNames: readTopicDisplayNames()
+    topicNames: siteScope
+      ? addGlobalFactoryTopicName(readTopicDisplayNames(siteScope))
+      : readTopicDisplayNames()
   };
 }
 
-function readOverviewGenerationTrendSeries() {
+function readOverviewGenerationTrendSeries(metricScope: MetricScope) {
   const database = getDatabase();
   // Pull a bounded recent window (≈ a day-plus at the 60s snapshot cadence) and
   // let the hourly bucketing collapse it to one point per hour. Using a row limit
@@ -1186,12 +1265,13 @@ function readOverviewGenerationTrendSeries() {
       `
         SELECT generation, generation_power, captured_at
         FROM metric_snapshots
-        WHERE generation IS NOT NULL OR generation_power IS NOT NULL
+        WHERE metric_scope = ?
+          AND (generation IS NOT NULL OR generation_power IS NOT NULL)
         ORDER BY captured_at DESC
         LIMIT 2000
       `
     )
-    .all() as HourlyGenerationTrendRow[];
+    .all(metricScope) as HourlyGenerationTrendRow[];
 
   return selectHourlyGenerationTrendProfile(rows, { now: new Date() });
 }
@@ -1208,10 +1288,18 @@ function applyMonitoringDisplayOverrides<
     return metrics;
   }
 
-  const overrides = readActiveDisplayValueOverrides();
+  const metricScope = pageId === "factory-circuit"
+    ? "cl"
+    : pageId === "factory-circuit-guanyin"
+      ? "kn"
+      : options.siteScope ?? "cl";
 
   return metrics.map((metric) => {
-    const override = overrides.get(`${pageId}.${metric.metricKey}`);
+    const override = resolveMetric(getDatabase(), {
+      metricKey: metric.metricKey,
+      metricScope,
+      targetId: `${pageId}.${metric.metricKey}`
+    }).override;
     if (!override) {
       return metric;
     }
@@ -1227,10 +1315,9 @@ export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): OverviewStoryPayload {
-  const trendProfile =
-    context.siteScope === null
-      ? readOverviewGenerationTrendSeries()
-      : { hours: [], series: [], unit: "kW" };
+  const trendProfile = readOverviewGenerationTrendSeries(
+    context.siteScope ?? "global"
+  );
   const overview = overviewMetrics.map((binding) => {
     const reading = resolveStoryMetricReading(binding.metricKey, context);
     const resolved = {
@@ -1243,15 +1330,16 @@ export function readOverviewDisplayStory(
               binding.metricKey === "totalCo2Reduction")
         },
         isConnected: context.isConnected,
+        metricScope: context.siteScope ?? "global",
         reading
       }),
       label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
-      sourceTopics: resolveSourceTopics({
+      sourceTopics: reading ? resolveSourceTopics({
         dependencyKeys: binding.dependencyKeys,
         metricKey: binding.metricKey,
         siteScope: context.siteScope ?? undefined,
         topicNames: context.topicNames
-      })
+      }) : undefined
     };
 
     if (binding.metricKey === "realTimePower" && trendProfile.series.length > 0) {
@@ -1289,6 +1377,7 @@ export function readSolarDisplayStory(
         binding,
         calculationSettings: context.calculationSettings,
         isConnected: context.isConnected,
+        metricScope: context.siteScope ?? "global",
         nowMs: Date.parse(context.generatedAt),
         snapshot: context.snapshot
       });
@@ -1302,6 +1391,7 @@ export function readSolarDisplayStory(
             ? buildDerivedCarbonReductionReading(
               buildCumulativeGenerationReading(
                 context.snapshot,
+                context.siteScope ?? "global",
                 context.siteScope !== null,
                 Date.parse(context.generatedAt)
               ),
@@ -1313,12 +1403,12 @@ export function readSolarDisplayStory(
       return {
         ...resolved,
         label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
-        sourceTopics: resolveSourceTopics({
+        sourceTopics: resolved.bindingState === "bound" ? resolveSourceTopics({
           dependencyKeys: resolved.dependencyKeys,
           metricKey: binding.metricKey,
           siteScope: context.siteScope ?? undefined,
           topicNames: context.topicNames
-        }),
+        }) : undefined,
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: comparisonActualValue,
@@ -1367,6 +1457,7 @@ export function readFactoryCircuitDisplayStory(
     const binding = resolveMonitoringSlotBinding({
       circuitId: matches.length === 1 ? matches[0]!.id : null,
       conflictingCircuitIds: matches.map((circuit) => circuit.id),
+      metricScope: pageKey === "factory-circuit" ? "cl" : "kn",
       slotKey
     });
     const circuit = matches.length === 1 ? matches[0]! : null;
@@ -1396,6 +1487,7 @@ export function readFactoryCircuitDisplayStory(
               isConnected: context.isConnected,
               label: slotLabel,
               metricKey,
+              metricScope: pageKey === "factory-circuit" ? "cl" : "kn",
               nowMs: Date.parse(context.generatedAt),
               reading,
               unit: "kW"
@@ -1451,6 +1543,7 @@ export function readFactoryCircuitDisplayStory(
           ? reading?.value ?? null
           : null,
       metricKey,
+      metricScope: pageKey === "factory-circuit" ? "cl" as const : "kn" as const,
       slotKey
     };
   });
@@ -1467,7 +1560,10 @@ export function readFactoryCircuitDisplayStory(
       snapshot: context.snapshot,
       summary: factorySummary,
       topicNames: context.topicNames
-    }), options),
+    }).map((kpi) => ({
+      ...kpi,
+      metricScope: pageKey === "factory-circuit" ? "cl" as const : "kn" as const
+    })), options),
     slots: factorySlots,
     summary: factorySummary
   };

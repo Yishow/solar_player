@@ -31,6 +31,7 @@ function createResolvedStoryMetric(args: {
   helper?: string;
   label: string;
   metricKey: string;
+  metricScope?: "cl" | "global" | "kn";
   provenance?: "cumulative" | "derived" | "fallback" | "live";
   sourceClass?: "cumulative-counter" | "derived-metric" | "mqtt-live";
   sourceTopics?: Array<{ metricKey: string; topic: string }>;
@@ -50,6 +51,7 @@ function createResolvedStoryMetric(args: {
     helper: args.helper ?? `共享故事 ${args.label}`,
     label: args.label,
     metricKey: args.metricKey,
+    metricScope: args.metricScope ?? "cl",
     provenance: args.provenance ?? "live",
     sourceClass: args.sourceClass ?? "mqtt-live",
     sourceTopics: args.sourceTopics,
@@ -361,6 +363,7 @@ test("buildOverviewViewModel flows the realTimePower runtime trend series throug
         createResolvedStoryMetric({
           label: "故事版即時功率",
           metricKey: "realTimePower",
+          metricScope: "cl",
           trendHours: [8, 9, 10, 11],
           trendSeries: runtimeTrend,
           trendUnit: "kW",
@@ -442,6 +445,7 @@ test("buildOverviewViewModel keeps shared story metrics when the summary is in f
           helper: "共享故事缺少今日發電量",
           label: "故事版今日發電量",
           metricKey: "todayGeneration",
+          metricScope: "cl",
           unit: "kWh",
           value: "--"
         })
@@ -479,6 +483,7 @@ test("buildOverviewViewModel accepts resolved display-story overview metrics wit
           helper: "共享故事即時功率",
           label: "故事版即時功率",
           metricKey: "realTimePower",
+          metricScope: "cl",
           provenance: "live",
           sourceClass: "mqtt-live",
           unit: "kW",
@@ -494,6 +499,7 @@ test("buildOverviewViewModel accepts resolved display-story overview metrics wit
           helper: "共享故事缺少今日發電量",
           label: "故事版今日發電量",
           metricKey: "todayGeneration",
+          metricScope: "cl",
           provenance: "fallback",
           sourceClass: "derived-metric",
           unit: "kWh",
@@ -536,6 +542,7 @@ test("buildOverviewViewModel tolerates incomplete shared story payloads and fall
         helper: string;
         label: string;
         metricKey: string;
+        metricScope: "cl" | "kn" | "global";
         provenance: "cumulative" | "derived" | "fallback" | "live";
         sourceClass: "cumulative-counter" | "derived-metric" | "mqtt-live";
         unit: string;
@@ -570,6 +577,7 @@ test("buildOverviewViewModel rejects invalid shared story state enums and falls 
         helper: string;
         label: string;
         metricKey: string;
+        metricScope: "cl" | "kn" | "global";
         provenance: "cumulative" | "derived" | "fallback" | "live";
         sourceClass: "cumulative-counter" | "derived-metric" | "mqtt-live";
         unit: string;
@@ -675,6 +683,7 @@ test("buildOverviewViewModel exposes alert items from story metrics and readines
       readinessFindings: [
         {
           blocking: true,
+          metricScope: "cl" as const,
           pageId: "overview",
           reason: "尚未綁定即時發電功率 MQTT topic",
           requirementKey: "realTimePower",
@@ -684,6 +693,7 @@ test("buildOverviewViewModel exposes alert items from story metrics and readines
         },
         {
           blocking: true,
+          metricScope: "cl" as const,
           pageId: "solar",
           reason: "其他頁面 finding 不應出現在 Overview",
           requirementKey: "todayGeneration",

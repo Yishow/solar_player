@@ -63,19 +63,19 @@ test("overview and solar carbon cards derive the same values from generation and
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('realTimePower', 512, 'kW', ?, 'good', '{}'),
-          ('todayGeneration', 990, 'kWh', ?, 'good', '{}')
+          ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
+          ('global', 'todayGeneration', 990, 'kWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 2000, ?, 0)
+          ('global', 'generation', 2000, ?, 0)
       `
     )
     .run(timestamp);
@@ -113,19 +113,19 @@ test("overview and solar carbon cards switch sub-ton displays to kilograms when 
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('realTimePower', 512, 'kW', ?, 'good', '{}'),
-          ('todayGeneration', 990, 'kWh', ?, 'good', '{}')
+          ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
+          ('global', 'todayGeneration', 990, 'kWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 2000, ?, 0)
+          ('global', 'generation', 2000, ?, 0)
       `
     )
     .run(timestamp);
@@ -167,19 +167,19 @@ test("overview and solar carbon cards preserve precision before converting small
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('realTimePower', 538.64, 'kW', ?, 'good', '{}'),
-          ('todayGeneration', 2.716, 'kWh', ?, 'good', '{}')
+          ('global', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
+          ('global', 'todayGeneration', 2.716, 'kWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 109.551, ?, 0)
+          ('global', 'generation', 109.551, ?, 0)
       `
     )
     .run(timestamp);
@@ -221,19 +221,19 @@ test("overview and solar carbon cards treat lower-case mWh as megawatt-hours", (
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('realTimePower', 538.64, 'kW', ?, 'good', '{}'),
-          ('todayGeneration', 2.716, 'mWh', ?, 'good', '{}')
+          ('global', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
+          ('global', 'todayGeneration', 2.716, 'mWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 2716, ?, 0)
+          ('global', 'generation', 2716, ?, 0)
       `
     )
     .run(timestamp);
@@ -264,8 +264,8 @@ test("overview and solar carbon cards fail closed when the generation basis is u
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('realTimePower', 512, 'kW', ?, 'good', '{}')
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}')
       `
     )
     .run(timestamp);

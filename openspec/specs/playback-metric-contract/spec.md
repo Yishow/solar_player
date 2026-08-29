@@ -32,7 +32,6 @@ The system SHALL define a single shared playback metric contract for the `overvi
 - **AND** runtime subscription keys include every live key the Solar client value subtree actually reads
 - **AND** display sourceClass for `selfConsumptionRatio` is `derived-metric`
 
-
 <!-- @trace
 source: playback-metric-contract-single-source
 updated: 2026-07-23
@@ -52,6 +51,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Derived and aggregate metrics MUST NOT be labeled mqtt-live
 
 For Overview and Solar display bindings covered by the playback metric contract, the system SHALL assign `sourceClass` values that match the real resolution path. Metrics that are derived, aggregated from factory summaries, or cumulative counters SHALL NOT use `sourceClass` `mqtt-live`.
@@ -94,7 +94,6 @@ For Overview and Solar display bindings covered by the playback metric contract,
 | totalCo2Reduction | cumulative-counter |
 | systemEfficiency | mqtt-live |
 
-
 <!-- @trace
 source: playback-metric-contract-single-source
 updated: 2026-07-23
@@ -114,6 +113,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Runtime subscription keys are exported for Overview and Solar consumers
 
 The shared package SHALL export a stable resolver for Overview and Solar runtime subscription metric keys. Unknown page keys SHALL yield an empty key list without throwing.
@@ -137,7 +137,6 @@ The shared package SHALL export a stable resolver for Overview and Solar runtime
 - **THEN** the resolver returns an empty list
 - **AND** the resolver does not throw
 
-
 <!-- @trace
 source: playback-metric-contract-single-source
 updated: 2026-07-23
@@ -157,6 +156,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Materialized upstream dependencies remain explicit in the contract
 
 When Overview or Solar gate requirements depend on upstream factory generation keys that the server materializes into canonical live metrics before browser consumption, the shared contract SHALL still expose those upstream dependency keys on the gate requirement layer even when the runtime subscription layer only lists the canonical materialized keys.
@@ -191,3 +191,26 @@ tests:
   - apps/web/src/pages/Solar/viewModel.test.ts
   - apps/web/src/pages/shared/playbackMetricContract.test.ts
 -->
+
+### Requirement: Playback metric keys are semantic and site-independent
+
+The shared playback metric contract SHALL describe semantic metric keys independently from factory identity. CL and KN versions of the same measurement SHALL use the same semantic `metricKey` and SHALL be distinguished by resolved metric scope instead of site names embedded in the key.
+
+#### Scenario: Same KPI is rendered at both sites
+- **WHEN** Overview at CL and Overview at KN both render real-time power
+- **THEN** both page contracts use the semantic metric key `realTimePower`
+- **AND** runtime resolution distinguishes the readings by `cl` and `kn` scope
+
+#### Scenario: Factory Circuit slot exists at both sites
+- **WHEN** CL and KN both expose a stamping power slot
+- **THEN** the shared metric vocabulary uses one stamping semantic metric key for that measurement family
+- **AND** the contract SHALL NOT require a `guanyin`, `jungli`, `cl`, or `kn` suffix inside that semantic key to prevent collisions
+
+### Requirement: Runtime subscription contracts carry semantic keys, not raw topics
+
+Runtime subscription key lists SHALL remain lists of semantic metric keys. MQTT topic selection and site routing SHALL occur upstream of the playback contract.
+
+#### Scenario: MQTT topic changes without a page contract change
+- **WHEN** the MQTT topic that supplies a semantic metric is changed while the metric identity and meaning remain the same
+- **THEN** the playback metric contract remains unchanged
+- **AND** playback consumers continue to subscribe by semantic metric key

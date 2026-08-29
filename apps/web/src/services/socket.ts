@@ -4,6 +4,7 @@ import type {
   FreshnessResult,
   FreshnessPolicy,
   ManagementSocketSessionClass,
+  MetricScope,
   PlaybackSettingsUpdatedEvent,
   ServerTimeSignal
 } from "@solar-display/shared";
@@ -37,6 +38,10 @@ export type LiveMetricsSnapshot = {
   timestamp: string | null;
 };
 
+export type ScopedLiveMetricsSnapshot = LiveMetricsSnapshot & {
+  metricScope: MetricScope;
+};
+
 export type MqttConnectionStatus = {
   broker: string;
   clientId: string;
@@ -53,11 +58,11 @@ export type SocketConnectionState = {
 };
 
 type ServerToClientEvents = {
-  "circuitMetrics:update": LiveMetricsSnapshot;
+  "circuitMetrics:update": ScopedLiveMetricsSnapshot;
   "deviceStatus:update": unknown;
   "display:sync": DisplaySyncEvent;
   "images:updated": unknown;
-  "liveMetrics:update": LiveMetricsSnapshot;
+  "liveMetrics:update": ScopedLiveMetricsSnapshot;
   "mqtt:status": MqttConnectionStatus;
   "playback:settingsUpdated": PlaybackSettingsUpdatedEvent;
   "server:time": ServerTimeSignal;
@@ -228,8 +233,8 @@ function createSocketClient(sessionClass: ManagementSocketSessionClass) {
   });
 
   client.on("liveMetrics:update", (snapshot) => {
-    cachedLiveMetrics = snapshot;
     replaceLiveMetricsSnapshot(snapshot);
+    cachedLiveMetrics = getLiveMetricsStoreState().snapshot;
   });
 
   client.on("mqtt:status", (status) => {

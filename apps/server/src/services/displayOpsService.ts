@@ -107,7 +107,7 @@ function buildPageSummaries(
   pages: PlaybackPage[],
   mqttStatus: MqttStatusLike
 ): DisplayOpsPageSummary[] {
-  const preview = readDisplayRotationPreview({ mqttStatus });
+  const preview = readDisplayRotationPreview({ mqttStatus, siteScope: "cl" });
   const skippedByPageId = new Map(preview.skippedPages.map((page) => [page.id, page]));
   const stageByKey = new Map<string, Partial<Record<"draft" | "live", StageConfigRow>>>();
 

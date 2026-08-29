@@ -79,7 +79,7 @@ test("GET /api/display-readiness reports blocking findings for missing MQTT mapp
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "factoryStampingPower" &&
+          finding.requirementKey === "factoryCircuit.stampingPower" &&
           finding.sourceType === "mqtt-metric"
       ),
       true
@@ -282,7 +282,7 @@ test("GET /api/display-readiness tracks rendered sustainability indicators inste
 
 test("GET /api/display-readiness reports factory metric mapping gaps alongside slot bindings", async () => {
   const database = getDatabase();
-  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryStampingPower");
+  database.prepare("DELETE FROM topic_mappings WHERE metric_key = ?").run("factoryCircuit.stampingPower");
 
   const app = await buildApp();
 
@@ -310,7 +310,7 @@ test("GET /api/display-readiness reports factory metric mapping gaps alongside s
       body.readiness.findings.some(
         (finding) =>
           finding.pageId === "factory-circuit" &&
-          finding.requirementKey === "factoryStampingPower" &&
+          finding.requirementKey === "factoryCircuit.stampingPower" &&
           finding.sourceType === "mqtt-metric" &&
           finding.status === "blocking" &&
           finding.blocking &&

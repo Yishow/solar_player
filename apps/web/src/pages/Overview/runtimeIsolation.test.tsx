@@ -45,6 +45,7 @@ test("overview runtime output stays stable when an unrelated metric changes", ()
 
   replaceLiveMetricsConnectionState(connectedState);
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       factoryCircuitHeavyVehiclePower: createReading(91.2, "2026-07-05T10:00:00.000Z"),
       realTimePower: createReading(812.4, "2026-07-05T10:00:00.000Z"),
@@ -67,6 +68,7 @@ test("overview runtime output stays stable when an unrelated metric changes", ()
   );
 
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       factoryCircuitHeavyVehiclePower: createReading(108.6, "2026-07-05T10:00:05.000Z"),
       realTimePower: createReading(812.4, "2026-07-05T10:00:00.000Z"),

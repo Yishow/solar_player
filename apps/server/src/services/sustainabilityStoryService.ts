@@ -5,16 +5,18 @@ import type {
   SustainabilityProvenance,
   SustainabilityStoryComparison,
   SustainabilityStoryInput,
+  MetricScope,
   SiteScope
 } from "@solar-display/shared";
 import {
   co2TreeEquivalentFactor,
   formatMonitoringValue,
   normalizeSustainabilityStory,
-  resolveSustainabilityStoryPeriod
+  resolveSustainabilityStoryPeriod,
+  scopedIdentityKey
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
 import {
   formatDisplayOverrideValue,
@@ -162,15 +164,16 @@ function readStoredStory() {
   }
 }
 
-function readCounterSnapshots() {
+function readCounterSnapshots(metricScope: MetricScope) {
   const rows = getDatabase()
     .prepare(
       `
         SELECT metric_key, total_value, last_updated
         FROM cumulative_counters
+        WHERE metric_scope = ?
       `
     )
-    .all() as CounterRow[];
+    .all(metricScope) as CounterRow[];
   const counterMap = new Map(
     rows.map((row) => [
       row.metric_key,
@@ -180,7 +183,7 @@ function readCounterSnapshots() {
       } satisfies CounterSnapshot
     ])
   ) satisfies CounterMap;
-  const liveMetricsSnapshot = readLiveMetricsSnapshot();
+  const liveMetricsSnapshot = readScopedLiveMetricsSnapshot(metricScope);
 
   for (const [counterKey, liveMetricKey] of Object.entries(liveMetricCounterFallbackMap)) {
     if (counterMap.has(counterKey)) {
@@ -533,14 +536,18 @@ function buildSustainabilityBigNumberCardId(metricKey: SustainabilityBigNumberKe
 }
 
 function applyBigNumberDisplayOverrides(
-  values: Record<SustainabilityBigNumberKey, number | null>
+  values: Record<SustainabilityBigNumberKey, number | null>,
+  metricScope: MetricScope
 ) {
   const overrides = readActiveDisplayValueOverrides();
 
   return Object.fromEntries(
     Object.entries(values).map(([metricKey, value]) => {
       const override = overrides.get(
-        buildSustainabilityBigNumberCardId(metricKey as SustainabilityBigNumberKey)
+        scopedIdentityKey(
+          metricScope,
+          buildSustainabilityBigNumberCardId(metricKey as SustainabilityBigNumberKey)
+        )
       );
 
       return [
@@ -565,7 +572,10 @@ function mergePeriod(
   const bigNumbers =
     options.applyDisplayOverrides === false
       ? derived.values
-      : applyBigNumberDisplayOverrides(derived.values);
+      : applyBigNumberDisplayOverrides(
+        derived.values,
+        options.siteScope ?? "global"
+      );
   const periodDefaults = buildPeriodDefaults(periodKey);
   const anyRuntimeValuePresent = Object.values(bigNumbers).some(
     (value) => value !== null
@@ -615,13 +625,16 @@ function mergePeriod(
 }
 
 function applyHouseholdDisplayOverrides(
-  householdEquivalents: ReturnType<typeof readHouseholdEquivalenceCards>
+  householdEquivalents: ReturnType<typeof readHouseholdEquivalenceCards>,
+  metricScope: MetricScope
 ) {
   const overrides = readActiveDisplayValueOverrides();
 
   return {
     cumulative: (() => {
-      const override = overrides.get("sustainability.household.cumulative");
+      const override = overrides.get(
+        scopedIdentityKey(metricScope, "sustainability.household.cumulative")
+      );
       return override
         ? {
             ...householdEquivalents.cumulative,
@@ -633,7 +646,9 @@ function applyHouseholdDisplayOverrides(
         : householdEquivalents.cumulative;
     })(),
     today: (() => {
-      const override = overrides.get("sustainability.household.today");
+      const override = overrides.get(
+        scopedIdentityKey(metricScope, "sustainability.household.today")
+      );
       return override
         ? {
             ...householdEquivalents.today,
@@ -652,7 +667,8 @@ export function readSustainabilityStory(
   options: SustainabilityStoryReadOptions = {}
 ) {
   const storyConfig = readStoredStory();
-  const counterMap = readCounterSnapshots();
+  const metricScope = options.siteScope ?? "global";
+  const counterMap = readCounterSnapshots(metricScope);
   const householdEquivalents = readHouseholdEquivalenceCards({
     now: options.now,
     siteScope: options.siteScope
@@ -668,7 +684,7 @@ export function readSustainabilityStory(
     householdEquivalents:
       options.applyDisplayOverrides === false
         ? householdEquivalents
-        : applyHouseholdDisplayOverrides(householdEquivalents),
+        : applyHouseholdDisplayOverrides(householdEquivalents, metricScope),
     periods: derivedPeriods
   });
   const now = options.now ?? new Date();

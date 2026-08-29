@@ -72,7 +72,7 @@ type MqttSettingsContentProps = {
   readiness: DisplayReadinessReport | null;
   readinessErrorMessage: string;
   removeTopicMapping: (rowId: number) => void;
-  publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
+  publishTopicValue?: (metricScope: DisplayCardDataRow["metricScope"], metricKey: string, value: number) => Promise<void>;
   publishingTopicKey?: string | null;
   clearDisplayOverride?: (targetId: string) => Promise<void>;
   reloadTopics: () => Promise<void>;
@@ -205,10 +205,10 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
     enabledCardDataSites.includes(option.value)
   );
   const visibleTopicWorkspaceRows = viewModel.topicWorkspaceRows.filter((topic) =>
-    isTopicMetricVisibleForFactorySite(topic.metricKey, activeCardDataSite)
+    isTopicMetricVisibleForFactorySite(topic.metricKey, topic.metricScope, activeCardDataSite)
   );
   const visibleCoverageRows = viewModel.coverageRows.filter((row) =>
-    isTopicMetricVisibleForFactorySite(row.requirementKey, activeCardDataSite)
+    isTopicMetricVisibleForFactorySite(row.requirementKey, row.metricScope, activeCardDataSite)
   );
   const visibleCardDataRows = (props.cardDataRows ?? []).filter((row) =>
     row.pageId === "factory-circuit"
@@ -577,7 +577,7 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                               title="發佈數字到此 metric 對應的 MQTT topic，會走真實資料流程"
                               onClick={() => {
                                 if (!canPublish || !props.publishTopicValue) return;
-                                void props.publishTopicValue(action.metricKey, numericValue);
+                                void props.publishTopicValue(action.metricScope, action.metricKey, numericValue);
                               }}
                             >
                               {props.publishingTopicKey === action.metricKey ? "發佈中..." : "發佈到 MQTT"}

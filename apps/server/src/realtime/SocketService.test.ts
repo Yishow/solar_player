@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { SiteScope } from "@solar-display/shared";
 import { SocketService, type MqttStatus } from "./SocketService.js";
 
 type FakeSocketListener = (payload?: unknown) => void;
@@ -22,6 +23,7 @@ class FakeSocket {
   };
   id = "socket-1";
   joinedRooms: string[] = [];
+  leftRooms: string[] = [];
   listeners = new Map<string, FakeSocketListener>();
 
   emit(event: string, payload: unknown) {
@@ -35,6 +37,10 @@ class FakeSocket {
 
   join(room: string) {
     this.joinedRooms.push(room);
+  }
+
+  leave(room: string) {
+    this.leftRooms.push(room);
   }
 
   on(event: string, listener: FakeSocketListener) {
@@ -98,6 +104,11 @@ class FakeIo {
       sockets.add(socket);
       this.socketsByRoom.set(room, sockets);
     };
+    const leave = socket.leave.bind(socket);
+    socket.leave = (room: string) => {
+      leave(room);
+      this.socketsByRoom.get(room)?.delete(socket);
+    };
     if (!this.middleware) {
       this.connectedSockets.add(socket);
       this.connectionListener?.(socket);
@@ -143,14 +154,14 @@ function createMqttStatus(): MqttStatus {
   };
 }
 
-function createDeviceContext(deviceId = 1) {
+function createDeviceContext(deviceId = 1, siteScope: SiteScope = "cl") {
   return {
     clientId: `display-${deviceId}`,
-    contextRevision: `revision-${deviceId}`,
+    contextRevision: `revision-${siteScope}-${deviceId}`,
     deviceId,
     groupId: 10,
     profileId: 20,
-    siteScope: "cl" as const
+    siteScope
   };
 }
 
@@ -515,8 +526,100 @@ test("SocketService puts only identified sessions in the shared broadcast room",
   io.connect(identified);
   io.connect(unidentified);
 
-  assert.deepEqual(identified.joinedRooms, ["identified", "device:1"]);
+  assert.deepEqual(identified.joinedRooms, ["identified", "device:1", "site:cl"]);
   assert.deepEqual(unidentified.joinedRooms, []);
+  service.close();
+});
+
+test("SocketService routes site and global live metrics without cross-site leakage", () => {
+  const io = new FakeIo();
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => ({
+      metrics: { bootstrap: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: null, value: metricScope === "cl" ? 1 : metricScope === "kn" ? 2 : 3 } },
+      timestamp: "2026-05-22T12:00:00.000Z"
+    }),
+    getMqttStatus: createMqttStatus,
+    io,
+    logger: createLogger(),
+    resolveDisplayClientContext: (credential) =>
+      credential === "credential-kn"
+        ? createDeviceContext(2, "kn")
+        : createDeviceContext(1, "cl")
+  });
+  const cl = new FakeSocket();
+  cl.handshake.headers.cookie = "solar_device_credential=credential-cl";
+  const kn = new FakeSocket();
+  kn.id = "socket-kn";
+  kn.handshake.headers.cookie = "solar_device_credential=credential-kn";
+  io.connect(cl);
+  io.connect(kn);
+
+  const bootstrapScopes = (socket: FakeSocket) => socket.emitted
+    .filter((event) => event.event === "liveMetrics:update")
+    .map((event) => (event.payload as { metricScope: string }).metricScope);
+  assert.deepEqual(bootstrapScopes(cl), ["cl", "global"]);
+  assert.deepEqual(bootstrapScopes(kn), ["kn", "global"]);
+
+  cl.emitted = [];
+  kn.emitted = [];
+  service.emitLiveMetrics("cl", { metrics: {}, timestamp: "2026-05-22T12:01:00.000Z" });
+  assert.deepEqual(bootstrapScopes(cl), ["cl"]);
+  assert.deepEqual(bootstrapScopes(kn), []);
+
+  service.emitLiveMetrics("global", { metrics: {}, timestamp: "2026-05-22T12:02:00.000Z" });
+  assert.deepEqual(bootstrapScopes(cl), ["cl", "global"]);
+  assert.deepEqual(bootstrapScopes(kn), ["global"]);
+
+  service.emitLiveMetricsToDevice(2, "cl", {
+    metrics: { authorizedCrossSite: { quality: "good", timestamp: "2026-05-22T12:03:00.000Z", unit: "kW", value: 9 } },
+    timestamp: "2026-05-22T12:03:00.000Z"
+  });
+  assert.equal(cl.emitted.some((event) => JSON.stringify(event.payload).includes("authorizedCrossSite")), false);
+  assert.equal(kn.emitted.some((event) => JSON.stringify(event.payload).includes("authorizedCrossSite")), true);
+
+  cl.emitted = [];
+  kn.emitted = [];
+  service.emitCircuitMetrics("cl", {
+    metrics: { stampingPower: { quality: "good", timestamp: "2026-05-22T12:04:00.000Z", unit: "kW", value: 12 } },
+    timestamp: "2026-05-22T12:04:00.000Z"
+  });
+  assert.deepEqual(
+    cl.emitted
+      .filter((event) => event.event === "circuitMetrics:update")
+      .map((event) => (event.payload as { metricScope: string }).metricScope),
+    ["cl"]
+  );
+  assert.equal(kn.emitted.some((event) => event.event === "circuitMetrics:update"), false);
+  service.close();
+});
+
+test("SocketService changes site rooms and sends a fresh scoped bootstrap when context changes", () => {
+  const io = new FakeIo();
+  let currentSite: SiteScope = "cl";
+  const service = createIdentityAwareService({
+    io,
+    logger: createLogger(),
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, currentSite)
+  });
+  const socket = new FakeSocket();
+  io.connect(socket);
+  socket.emitted = [];
+  currentSite = "kn";
+  socket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
+    isPlaying: true,
+    pageKey: "overview",
+    route: "/overview",
+    timeSyncState: "synced"
+  });
+
+  assert.deepEqual(socket.leftRooms, ["site:cl"]);
+  assert.equal(socket.joinedRooms.at(-1), "site:kn");
+  assert.deepEqual(
+    socket.emitted.filter((event) => event.event === "liveMetrics:update").map((event) => (event.payload as { metricScope: string }).metricScope),
+    ["kn", "global"]
+  );
   service.close();
 });
 
@@ -533,9 +636,9 @@ test("SocketService sends only server time to unidentified sessions", () => {
   io.connect(unidentified);
   unidentified.emitted = [];
 
-  service.emitLiveMetrics({ metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitLiveMetrics("cl", { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
   service.emitMqttStatus(createMqttStatus());
-  service.emitCircuitMetrics({ metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
+  service.emitCircuitMetrics("cl", { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" });
   service.emitCircuitSettingsUpdated({});
   service.emitPlaybackSettingsUpdated({});
   service.emitImagesUpdated({});
@@ -558,7 +661,7 @@ test("SocketService keeps management-only events out of playback-safe sessions",
   });
   const playbackSafe = new FakeSocket();
   io.connect(playbackSafe);
-  assert.deepEqual(playbackSafe.joinedRooms, ["identified", "device:1"]);
+  assert.deepEqual(playbackSafe.joinedRooms, ["identified", "device:1", "site:cl"]);
   playbackSafe.emitted = [];
 
   service.emitDeviceStatusUpdate({});

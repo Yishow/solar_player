@@ -1,6 +1,6 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
-import type { DisplaySyncEvent } from "@solar-display/shared";
+import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import type { CumulativeCounters, MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
@@ -8,6 +8,7 @@ type DailySummaryServiceOptions = {
   database?: Database.Database;
   emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   intervalMs?: number;
+  metricScope: MetricScope;
   metricsAccumulatorService: MetricsAccumulatorService;
 };
 
@@ -39,6 +40,7 @@ export class DailySummaryService {
   private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly intervalMs: number;
   private readonly metricsAccumulatorService: MetricsAccumulatorService;
+  private readonly metricScope: MetricScope;
   private currentDateKey: string | null = null;
   private baselineCounters: CumulativeCounters | null = null;
   private peaks: PeakSnapshot = {
@@ -54,6 +56,7 @@ export class DailySummaryService {
     this.emitDisplaySync = options.emitDisplaySync;
     this.intervalMs = options.intervalMs ?? 60_000;
     this.metricsAccumulatorService = options.metricsAccumulatorService;
+    this.metricScope = options.metricScope;
   }
 
   start() {
@@ -111,6 +114,7 @@ export class DailySummaryService {
       this.persistSummary(this.currentDateKey, counters, this.baselineCounters);
       this.emitDisplaySync?.({
         generatedAt: new Date().toISOString(),
+        metricScope: this.metricScope,
         reason: "daily-summary-updated",
         scope: "monitoring-history"
       });
@@ -137,10 +141,10 @@ export class DailySummaryService {
             peak_consumption AS peakConsumption,
             peak_consumption_time AS peakConsumptionTime
           FROM daily_energy_summaries
-          WHERE date = ?
+          WHERE metric_scope = ? AND date = ?
         `
       )
-      .get(this.currentDateKey) as DailySummaryRow | undefined;
+      .get(this.metricScope, this.currentDateKey) as DailySummaryRow | undefined;
 
     this.baselineCounters = existing
       ? {
@@ -166,6 +170,7 @@ export class DailySummaryService {
       .prepare(
         `
           INSERT INTO daily_energy_summaries (
+            metric_scope,
             date,
             generation_total,
             consumption_total,
@@ -175,8 +180,8 @@ export class DailySummaryService {
             peak_generation_time,
             peak_consumption,
             peak_consumption_time
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(date) DO UPDATE SET
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(metric_scope, date) DO UPDATE SET
             generation_total = excluded.generation_total,
             consumption_total = excluded.consumption_total,
             self_consumption_total = excluded.self_consumption_total,
@@ -188,6 +193,7 @@ export class DailySummaryService {
         `
       )
       .run(
+        this.metricScope,
         date,
         clampDelta(totals.generation, baseline.generation),
         clampDelta(totals.consumption, baseline.consumption),

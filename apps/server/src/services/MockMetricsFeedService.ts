@@ -1,4 +1,5 @@
 import { clearInterval, setInterval } from "node:timers";
+import type { MetricScope } from "@solar-display/shared";
 import type Database from "better-sqlite3";
 import { getDatabase } from "../db/index.js";
 import {
@@ -14,12 +15,14 @@ const TOTAL_SELF_CONSUMPTION_BASELINE_KWH = 19_600_000;
 const MOCK_ACCUMULATION_EPOCH = new Date(2026, 0, 1);
 const TOTAL_CO2_BASELINE_TONS = 9_842;
 const FACTORY_SLOT_WEIGHTS = [
-  ["factoryProductionPower", 0.38],
-  ["factoryHvacPower", 0.2],
-  ["factoryLightingPower", 0.11],
-  ["factoryOfficePower", 0.09],
-  ["factoryEvGreenPower", 0.07],
-  ["factoryInfrastructurePower", 0.15]
+  ["factoryCircuit.stampingPower", 0.18],
+  ["factoryCircuit.bodyPower", 0.16],
+  ["factoryCircuit.paintingPower", 0.15],
+  ["factoryCircuit.assemblyPower", 0.16],
+  ["factoryCircuit.utilityPower", 0.12],
+  ["factoryCircuit.officePower", 0.08],
+  ["factoryCircuit.heavyVehiclePower", 0.08],
+  ["factoryCircuit.edCoatingPower", 0.07]
 ] as const;
 
 type MockMetricReading = {
@@ -139,6 +142,7 @@ function buildMockMetricReadings(date: Date): MockMetricReading[] {
 type MockMetricsFeedServiceOptions = {
   database?: Database.Database;
   intervalMs?: number;
+  metricScope: MetricScope;
   now?: () => Date;
 };
 
@@ -151,12 +155,14 @@ type MockMetricsFeedServiceOptions = {
 export class MockMetricsFeedService {
   private readonly database: Database.Database;
   private readonly intervalMs: number;
+  private readonly metricScope: MetricScope;
   private readonly now: () => Date;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(options: MockMetricsFeedServiceOptions = {}) {
+  constructor(options: MockMetricsFeedServiceOptions) {
     this.database = options.database ?? getDatabase();
     this.intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
+    this.metricScope = options.metricScope;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -182,14 +188,15 @@ export class MockMetricsFeedService {
     const upsert = this.database.prepare(
       `
         INSERT INTO live_metric_values (
+          metric_scope,
           metric_key,
           value,
           unit,
           timestamp,
           quality,
           raw_payload
-        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           value = excluded.value,
           unit = excluded.unit,
           timestamp = CURRENT_TIMESTAMP,
@@ -200,7 +207,14 @@ export class MockMetricsFeedService {
 
     const transaction = this.database.transaction((metricReadings: MockMetricReading[]) => {
       for (const reading of metricReadings) {
-        upsert.run(reading.metricKey, reading.value, reading.unit, "good", reading.rawPayload);
+        upsert.run(
+          this.metricScope,
+          reading.metricKey,
+          reading.value,
+          reading.unit,
+          "good",
+          reading.rawPayload
+        );
       }
     });
 

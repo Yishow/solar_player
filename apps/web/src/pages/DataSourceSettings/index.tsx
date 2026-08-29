@@ -277,7 +277,7 @@ export function DataSourceSettings() {
     setMonitoringResetErrorMessage("");
 
     try {
-      await resetTodayTrend();
+      await resetTodayTrend("global");
       const nextOverview = await getDataSourceOverview();
       cachedDataSourceOverview = nextOverview;
       cachedDataSourceErrorMessage = "";
@@ -297,7 +297,7 @@ export function DataSourceSettings() {
     setMonitoringMonthResetErrorMessage("");
 
     try {
-      await resetMonthTrend();
+      await resetMonthTrend("global");
       const nextOverview = await getDataSourceOverview();
       cachedDataSourceOverview = nextOverview;
       cachedDataSourceErrorMessage = "";

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
+import { migrateScopedMetricIdentity } from "../db/scopedMetricMigration.js";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
@@ -24,11 +25,17 @@ function createDatabase() {
     resolve(process.cwd(), "src/db/migrations/016_co2_display_preference.sql"),
     "utf8"
   );
+  const migration018 = readFileSync(
+    resolve(process.cwd(), "src/db/migrations/018_display_value_overrides.sql"),
+    "utf8"
+  );
 
   database.exec(migration001);
   database.exec(migration003);
   database.exec(migration015);
   database.exec(migration016);
+  database.exec(migration018);
+  migrateScopedMetricIdentity(database, { legacySiteScope: "cl" });
   database
     .prepare(
       `
@@ -73,15 +80,15 @@ function buildSnapshot(
 
 test("MetricsAccumulatorService prefers total metrics, integrates power fallback, skips long gaps, and throttles DB writes", () => {
   const database = createDatabase();
-  const emitted: Array<{ reason: string; scope: string }> = [];
+  const emitted: Array<{ metricScope?: string; reason: string; scope: string }> = [];
 
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 100, '2026-05-13T00:00:00.000Z', 0),
-          ('co2', 50, '2026-05-13T00:00:00.000Z', 0)
+          ('cl', 'generation', 100, '2026-05-13T00:00:00.000Z', 0),
+          ('cl', 'co2', 50, '2026-05-13T00:00:00.000Z', 0)
       `
     )
     .run();
@@ -118,8 +125,9 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
 
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     emitDisplaySync: (payload) => {
-      emitted.push({ reason: payload.reason, scope: payload.scope });
+      emitted.push({ metricScope: payload.metricScope, reason: payload.reason, scope: payload.scope });
     },
     flushIntervalMs: 30_000,
     readSnapshot: () => snapshots[snapshotIndex]!
@@ -136,7 +144,7 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
   });
 
   const afterFirstProcess = database
-    .prepare("SELECT total_value FROM cumulative_counters WHERE metric_key = 'generation'")
+    .prepare("SELECT total_value FROM cumulative_counters WHERE metric_scope = 'cl' AND metric_key = 'generation'")
     .get() as { total_value: number };
   assert.equal(afterFirstProcess.total_value, 100);
 
@@ -178,7 +186,7 @@ test("MetricsAccumulatorService prefers total metrics, integrates power fallback
     { metric_key: "generation", reset_count: 0, total_value: 140 },
     { metric_key: "selfConsumption", reset_count: 0, total_value: 31 }
   ]);
-  assert.deepEqual(emitted, [{ reason: "metrics-counters-flushed", scope: "monitoring-history" }]);
+  assert.deepEqual(emitted, [{ metricScope: "cl", reason: "metrics-counters-flushed", scope: "monitoring-history" }]);
 
   database.close();
 });
@@ -189,6 +197,7 @@ test("MetricsAccumulatorService normalizes energy totals to kWh before persistin
 
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () =>
       buildSnapshot(
         [
@@ -233,6 +242,7 @@ test("MetricsAccumulatorService persists the canonical CL plus KN total and deri
 
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () =>
       buildSnapshot(
         [
@@ -269,6 +279,7 @@ test("MetricsAccumulatorService derives cumulative CO2 from normalized generatio
 
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () =>
       buildSnapshot(
         [
@@ -288,7 +299,7 @@ test("MetricsAccumulatorService derives cumulative CO2 from normalized generatio
       `
         SELECT metric_key, total_value
         FROM cumulative_counters
-        WHERE metric_key IN ('generation', 'co2')
+        WHERE metric_scope = 'cl' AND metric_key IN ('generation', 'co2')
         ORDER BY metric_key ASC
       `
     )
@@ -307,18 +318,19 @@ test("MetricsAccumulatorService restores persisted counters before a new MQTT re
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 12346, '2026-07-16T06:00:00.000Z', 0),
-          ('consumption', 2100, '2026-07-16T06:00:00.000Z', 1),
-          ('selfConsumption', 2234, '2026-07-16T06:00:00.000Z', 1),
-          ('co2', 6111.27, '2026-07-16T06:00:00.000Z', 1)
+          ('cl', 'generation', 12346, '2026-07-16T06:00:00.000Z', 0),
+          ('cl', 'consumption', 2100, '2026-07-16T06:00:00.000Z', 1),
+          ('cl', 'selfConsumption', 2234, '2026-07-16T06:00:00.000Z', 1),
+          ('cl', 'co2', 6111.27, '2026-07-16T06:00:00.000Z', 1)
       `
     )
     .run();
 
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () => ({ metrics: {}, timestamp: null })
   });
 
@@ -345,14 +357,60 @@ test("MetricsAccumulatorService restores persisted counters before a new MQTT re
   database.close();
 });
 
+test("MetricsAccumulatorService restores and advances CL and KN counters independently", () => {
+  const database = createDatabase();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES
+      ('cl', 'generation', 100, '2026-08-29T00:00:00.000Z', 0),
+      ('kn', 'generation', 200, '2026-08-29T00:00:00.000Z', 0),
+      ('global', 'generation', 300, '2026-08-29T00:00:00.000Z', 0)
+  `).run();
+
+  const cl = new MetricsAccumulatorService({
+    database,
+    metricScope: "cl",
+    readSnapshot: () => buildSnapshot([["totalGeneration", 125, "kWh"]], "2026-08-29T01:00:00.000Z")
+  });
+  const kn = new MetricsAccumulatorService({
+    database,
+    metricScope: "kn",
+    readSnapshot: () => ({ metrics: {}, timestamp: null })
+  });
+
+  cl.initialize();
+  kn.initialize();
+  assert.equal(cl.getCounters().generation, 100);
+  assert.equal(kn.getCounters().generation, 200);
+
+  cl.processAt(new Date("2026-08-29T01:00:00.000Z"));
+  cl.flush(true);
+
+  const rows = database.prepare(`
+    SELECT metric_scope, total_value
+    FROM cumulative_counters
+    WHERE metric_key = 'generation'
+    ORDER BY metric_scope
+  `).all();
+  assert.deepEqual(rows, [
+    { metric_scope: "cl", total_value: 125 },
+    { metric_scope: "global", total_value: 300 },
+    { metric_scope: "kn", total_value: 200 }
+  ]);
+  assert.equal(kn.getCounters().generation, 200);
+
+  database.close();
+});
+
 test("MetricsAccumulatorService preserves a newer persisted reset during an immediate forced flush", () => {
   const database = createDatabase();
   database.prepare(`
-    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-    VALUES ('generation', 2000000, '2026-07-17T05:00:00.000Z', 4)
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES ('cl', 'generation', 2000000, '2026-07-17T05:00:00.000Z', 4)
   `).run();
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () => ({ metrics: {}, timestamp: null })
   });
   service.initialize();
@@ -362,7 +420,7 @@ test("MetricsAccumulatorService preserves a newer persisted reset during an imme
     SET total_value = 1100000,
         last_updated = '2026-07-17T05:01:00.000Z',
         reset_count = 5
-    WHERE metric_key = 'generation'
+    WHERE metric_scope = 'cl' AND metric_key = 'generation'
   `).run();
 
   service.flush(true);
@@ -371,7 +429,7 @@ test("MetricsAccumulatorService preserves a newer persisted reset during an imme
     database.prepare(`
       SELECT total_value, reset_count
       FROM cumulative_counters
-      WHERE metric_key = 'generation'
+      WHERE metric_scope = 'cl' AND metric_key = 'generation'
     `).get(),
     { reset_count: 5, total_value: 1100000 }
   );
@@ -412,6 +470,7 @@ test("consumption power distinguishes a measured zero from an absent aggregate",
     const database = createDatabase();
     const service = new MetricsAccumulatorService({
       database,
+      metricScope: "cl",
       readSnapshot: () =>
         entries.length === 0
           ? { metrics: {}, timestamp: null }
@@ -436,6 +495,7 @@ test("consumption power matches power units without case sensitivity", () => {
   const database = createDatabase();
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () =>
       buildSnapshot(
         [
@@ -460,6 +520,7 @@ test("a non-finite reading does not turn a present aggregate into null", () => {
   const database = createDatabase();
   const service = new MetricsAccumulatorService({
     database,
+    metricScope: "cl",
     readSnapshot: () =>
       buildSnapshot(
         [

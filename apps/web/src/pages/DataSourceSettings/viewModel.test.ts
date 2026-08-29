@@ -27,7 +27,8 @@ function createOverview(overrides: Partial<DataSourceOverviewResponse> = {}): Da
       hasCurrentDaySnapshots: true,
       latestSnapshotAt: "2026-06-16T09:00:00.000Z",
       latestSnapshotDate: "2026-06-16",
-      localDate: "2026-06-16"
+      localDate: "2026-06-16",
+      metricScope: "global"
     },
     recommendations: [
       {
@@ -170,7 +171,8 @@ test("buildDataSourceSettingsViewModel surfaces monitoring anomalies and reset a
         hasCurrentDaySnapshots: false,
         latestSnapshotAt: "2026-06-15T02:00:00.000Z",
         latestSnapshotDate: "2026-06-15",
-        localDate: "2026-06-16"
+        localDate: "2026-06-16",
+        metricScope: "global"
       }
     }),
     state: "ready"

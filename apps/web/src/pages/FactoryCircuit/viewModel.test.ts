@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CircuitConfig } from "@solar-display/shared";
+import type { CircuitConfig, FactoryCircuitStoryPayload } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../../services/socket";
 import {
   buildFactoryCircuitRuntimes,
@@ -24,6 +24,21 @@ const snapshot: LiveMetricsSnapshot = {
   },
   timestamp: "2026-05-13T10:00:00.000Z"
 };
+
+type UnscopedFactoryCircuitStoryPayload = Omit<FactoryCircuitStoryPayload, "kpis" | "slots"> & {
+  kpis: Array<Omit<FactoryCircuitStoryPayload["kpis"][number], "metricScope">>;
+  slots: Array<Omit<FactoryCircuitStoryPayload["slots"][number], "metricScope">>;
+};
+
+function scopeFactoryCircuitStory(
+  payload: UnscopedFactoryCircuitStoryPayload
+): FactoryCircuitStoryPayload {
+  return {
+    ...payload,
+    kpis: payload.kpis.map((kpi) => ({ ...kpi, metricScope: "cl" })),
+    slots: payload.slots.map((slot) => ({ ...slot, metricScope: "cl" }))
+  };
+}
 
 const circuitConfigs: CircuitConfig[] = [
   {
@@ -226,7 +241,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
     connectionState: "connected",
     loadState: "ready",
     snapshot,
-    factoryCircuitStory: {
+    factoryCircuitStory: scopeFactoryCircuitStory({
       kpis: [
         {
           alertTone: "warning",
@@ -318,7 +333,7 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
         { slotKey: "ed_coating", label: "故事版ED電著", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
-    }
+    })
   });
 
   assert.equal(model.loadRows.length, 8);
@@ -349,7 +364,7 @@ test("buildFactoryCircuitViewModel keeps stale story slots visible instead of tr
     connectionState: "connected",
     loadState: "ready",
     snapshot,
-    factoryCircuitStory: {
+    factoryCircuitStory: scopeFactoryCircuitStory({
       kpis: [
         {
           alertTone: "warning",
@@ -438,7 +453,7 @@ test("buildFactoryCircuitViewModel keeps stale story slots visible instead of tr
         { slotKey: "ed_coating", label: "故事版ED電著", bindingState: "missing", fallbackReason: "missing-slot-binding", freshnessState: "fallback", alertTone: "warning", livePowerKw: null, circuitId: null }
       ],
       summary: { alertTone: "warning", bindingState: "bound", fallbackReason: "stale-data", freshnessState: "stale" }
-    }
+    })
   });
 
   assert.equal(model.loadRows[0]?.isEmpty, false);
@@ -457,7 +472,7 @@ test("buildFactoryCircuitViewModel surfaces the custom topic name via the story 
     connectionState: "connected",
     loadState: "ready",
     snapshot,
-    factoryCircuitStory: {
+    factoryCircuitStory: scopeFactoryCircuitStory({
       kpis: [
         { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "目前廠區總用電", metricKey: "totalPower", provenance: "live", sourceClass: "slot-aggregate", unit: "kW", value: "920" },
         { alertTone: "normal", bindingState: "bound", dependencyKeys: [], fallbackReason: null, fallbackStrategy: "placeholder", freshnessState: "fresh", helper: "", label: "太陽能供應占比", metricKey: "solarShare", provenance: "derived", sourceClass: "derived-metric", unit: "%", value: "40" },
@@ -476,7 +491,7 @@ test("buildFactoryCircuitViewModel surfaces the custom topic name via the story 
         { ...baseSlot, slotKey: "ed_coating", label: "ED電著", labelZh: "ED電著", labelEn: "ED Coating", circuitId: 8 }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
-    }
+    })
   });
 
   assert.equal(model.loadRows[0]?.labelZh, "一號產線");
@@ -490,13 +505,13 @@ test("buildFactoryCircuitViewModel falls back to circuits when factoryCircuitSto
     connectionState: "connected",
     loadState: "ready",
     snapshot,
-    factoryCircuitStory: {
+    factoryCircuitStory: scopeFactoryCircuitStory({
       kpis: [],
       slots: [
         { slotKey: "stamping", label: "單一", bindingState: "bound", fallbackReason: null, freshnessState: "fresh", alertTone: "normal", livePowerKw: 520, circuitId: 1 }
       ],
       summary: { alertTone: "normal", bindingState: "bound", fallbackReason: null, freshnessState: "fresh" }
-    }
+    })
   });
 
   assert.equal(model.loadRows[0]?.labelZh, "沖壓工程");

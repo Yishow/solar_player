@@ -36,14 +36,14 @@ function insertFactorySummary(
 ) {
   const database = getDatabase();
   const insert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', CURRENT_TIMESTAMP, 'good', ?)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', CURRENT_TIMESTAMP, 'good', ?)
   `);
   const rawPayload = JSON.stringify(summary);
-  insert.run(`factoryGeneration.${factory}.todayMwh`, summary.today_mwh, rawPayload);
-  insert.run(`factoryGeneration.${factory}.monthMwh`, summary.month_mwh, rawPayload);
+  insert.run(factory, "factoryGeneration.todayMwh", summary.today_mwh, rawPayload);
+  insert.run(factory, "factoryGeneration.monthMwh", summary.month_mwh, rawPayload);
   if (summary.total_mwh !== undefined) {
-    insert.run(`factoryGeneration.${factory}.totalMwh`, summary.total_mwh, rawPayload);
+    insert.run(factory, "factoryGeneration.totalMwh", summary.total_mwh, rawPayload);
   }
 }
 
@@ -53,7 +53,8 @@ function readCanonicalRows() {
       `
         SELECT metric_key, value, unit, timestamp, quality
         FROM live_metric_values
-        WHERE metric_key IN ('todayGeneration', 'monthGeneration', 'totalGeneration')
+        WHERE metric_scope = 'global'
+          AND metric_key IN ('todayGeneration', 'monthGeneration', 'totalGeneration')
         ORDER BY metric_key
       `
     )
@@ -102,12 +103,12 @@ test("factory summaries normalize today kWh while retaining monthly and cumulati
     total_mwh: 9986.306
   });
   const insert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'good', ?)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('cl', ?, ?, ?, CURRENT_TIMESTAMP, 'good', ?)
   `);
-  insert.run("factoryGeneration.cl.todayMwh", 3490, "kWh", payload);
-  insert.run("factoryGeneration.cl.monthMwh", 366.93, "MWh", payload);
-  insert.run("factoryGeneration.cl.totalMwh", 9986.306, "MWh", payload);
+  insert.run("factoryGeneration.todayMwh", 3490, "kWh", payload);
+  insert.run("factoryGeneration.monthMwh", 366.93, "MWh", payload);
+  insert.run("factoryGeneration.totalMwh", 9986.306, "MWh", payload);
 
   const result = aggregateService.evaluateFactoryGenerationScope(
     database,
@@ -130,8 +131,8 @@ test("factory summaries normalize today kWh while retaining monthly and cumulati
 test("stale KN summary retains the last complete canonical reading", () => {
   const database = resetDatabase(60);
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:00+08:00', 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', 'totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:00+08:00', 'good', '{}')
   `).run();
   insertFactorySummary("cl", {
     today_mwh: 3.49,
@@ -154,10 +155,10 @@ test("stale KN summary retains the last complete canonical reading", () => {
   assert.equal(result.state, "stale");
   assert.deepEqual(result.issues, [{ factory: "KN", field: "summary", reason: "stale" }]);
   assert.equal(
-    database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+    database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
     13645.876
   );
-  assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'todayGeneration'").get(), undefined);
+  assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'todayGeneration'").get(), undefined);
 });
 
 test("missing factory total blocks partial canonical generation", () => {
@@ -187,8 +188,8 @@ test("missing factory total blocks partial canonical generation", () => {
 test("lower combined cumulative total is rejected as a regression", () => {
   const database = resetDatabase();
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', 'totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
   `).run();
   insertFactorySummary("cl", {
     today_mwh: 1,
@@ -211,17 +212,17 @@ test("lower combined cumulative total is rejected as a regression", () => {
   assert.equal(result.state, "regression");
   assert.deepEqual(result.issues, [{ factory: "CL+KN", field: "total_mwh", reason: "regression" }]);
   assert.equal(
-    database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+    database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
     13645.876
   );
-  assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'todayGeneration'").get(), undefined);
+  assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'todayGeneration'").get(), undefined);
 });
 
 test("persisted cumulative counter rejects a lower aggregate when the canonical live row is absent", () => {
   const database = resetDatabase();
   database.prepare(`
-    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-    VALUES ('generation', 13645876, '2026-06-26T15:37:55+08:00', 0)
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES ('global', 'generation', 13645876, '2026-06-26T15:37:55+08:00', 0)
   `).run();
   insertFactorySummary("cl", {
     today_mwh: 1,
@@ -245,7 +246,7 @@ test("persisted cumulative counter rejects a lower aggregate when the canonical 
   assert.deepEqual(result.issues, [{ factory: "CL+KN", field: "total_mwh", reason: "regression" }]);
   assert.deepEqual(readCanonicalRows(), []);
   assert.equal(
-    database.prepare("SELECT total_value FROM cumulative_counters WHERE metric_key = 'generation'").pluck().get(),
+    database.prepare("SELECT total_value FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").pluck().get(),
     13645876
   );
 });
@@ -277,12 +278,12 @@ test("a lower single-factory cumulative total is rejected against its last accep
     total_mwh: 9000
   });
   for (const [metricKey, value] of [
-    ["factoryGeneration.cl.todayMwh", 4],
-    ["factoryGeneration.cl.monthMwh", 370],
-    ["factoryGeneration.cl.totalMwh", 9000]
+    ["factoryGeneration.todayMwh", 4],
+    ["factoryGeneration.monthMwh", 370],
+    ["factoryGeneration.totalMwh", 9000]
   ] as const) {
     database
-      .prepare("UPDATE live_metric_values SET value = ?, raw_payload = ? WHERE metric_key = ?")
+      .prepare("UPDATE live_metric_values SET value = ?, raw_payload = ? WHERE metric_scope = 'cl' AND metric_key = ?")
       .run(value, lowerPayload, metricKey);
   }
 
@@ -298,7 +299,7 @@ test("a lower single-factory cumulative total is rejected against its last accep
   ]);
   assert.equal(
     database
-      .prepare("SELECT value FROM live_metric_values WHERE metric_key = 'factoryGeneration.cl.acceptedTotalMwh'")
+      .prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.acceptedTotalMwh'")
       .pluck()
       .get(),
     9986.306
@@ -307,14 +308,14 @@ test("a lower single-factory cumulative total is rejected against its last accep
 
 test("explicit baseline reset atomically accepts the confirmed current regression", () => {
   const database = resetDatabase();
-  database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+  database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', 'totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
   `).run();
   database.prepare(`
-    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-    VALUES ('generation', 13645876, '2026-06-26T15:37:55+08:00', 2)
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES ('global', 'generation', 13645876, '2026-06-26T15:37:55+08:00', 2)
   `).run();
   insertFactorySummary("cl", {
     today_mwh: 1,
@@ -348,19 +349,19 @@ test("explicit baseline reset atomically accepts the confirmed current regressio
   ]);
   assert.deepEqual(
     database.prepare(
-      "SELECT total_value, reset_count FROM cumulative_counters WHERE metric_key = 'generation'"
+      "SELECT total_value, reset_count FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'"
     ).get(),
     { reset_count: 3, total_value: 11659570 }
   );
   assert.equal(
     database.prepare(
-      "SELECT value FROM live_metric_values WHERE metric_key = 'factoryGeneration.cl.acceptedTotalMwh'"
+      "SELECT value FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.acceptedTotalMwh'"
     ).pluck().get(),
     8000
   );
   assert.equal(
     database.prepare(
-      "SELECT value FROM live_metric_values WHERE metric_key = 'factoryGeneration.kn.acceptedTotalMwh'"
+      "SELECT value FROM live_metric_values WHERE metric_scope = 'kn' AND metric_key = 'factoryGeneration.acceptedTotalMwh'"
     ).pluck().get(),
     3659.57
   );
@@ -368,14 +369,14 @@ test("explicit baseline reset atomically accepts the confirmed current regressio
 
 test("explicit baseline reset rejects a stale confirmation without mutating accepted values", () => {
   const database = resetDatabase();
-  database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+  database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
   database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', 'totalGeneration', 13645.876, 'MWh', '2026-06-26T15:37:55+08:00', 'good', '{}')
   `).run();
   database.prepare(`
-    INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-    VALUES ('generation', 13645876, '2026-06-26T15:37:55+08:00', 2)
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+    VALUES ('global', 'generation', 13645876, '2026-06-26T15:37:55+08:00', 2)
   `).run();
   insertFactorySummary("cl", {
     today_mwh: 1,
@@ -402,12 +403,12 @@ test("explicit baseline reset rejects a stale confirmation without mutating acce
     reason: "confirmation-mismatch"
   });
   assert.equal(
-    database.prepare("SELECT value FROM live_metric_values WHERE metric_key = 'totalGeneration'").pluck().get(),
+    database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
     13645.876
   );
   assert.deepEqual(
     database.prepare(
-      "SELECT total_value, reset_count FROM cumulative_counters WHERE metric_key = 'generation'"
+      "SELECT total_value, reset_count FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'"
     ).get(),
     { reset_count: 2, total_value: 13645876 }
   );
@@ -415,7 +416,7 @@ test("explicit baseline reset rejects a stale confirmation without mutating acce
 
 test("explicit baseline reset rejects non-regression and unavailable source states", () => {
   const database = resetDatabase();
-  database.prepare("DELETE FROM cumulative_counters WHERE metric_key = 'generation'").run();
+  database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
   insertFactorySummary("cl", {
     today_mwh: 3.49,
     month_mwh: 366.93,
@@ -451,7 +452,7 @@ test("explicit baseline reset rejects non-regression and unavailable source stat
   database.prepare(`
     UPDATE live_metric_values
     SET raw_payload = ?
-    WHERE metric_key LIKE 'factoryGeneration.kn.%'
+    WHERE metric_scope = 'kn' AND metric_key LIKE 'factoryGeneration.%'
   `).run(stalePayload);
 
   assert.deepEqual(

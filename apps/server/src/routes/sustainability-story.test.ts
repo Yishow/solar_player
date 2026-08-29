@@ -39,12 +39,12 @@ function seedSustainabilityCounters() {
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 18600000, '2026-05-13T10:00:00.000Z', 0),
-          ('co2', 9842, '2026-05-13T10:00:00.000Z', 0),
-          ('consumption', 6000, '2026-05-13T10:00:00.000Z', 0),
-          ('selfConsumption', 4200, '2026-05-13T10:00:00.000Z', 0)
+          ('cl', 'generation', 18600000, '2026-05-13T10:00:00.000Z', 0),
+          ('cl', 'co2', 9842, '2026-05-13T10:00:00.000Z', 0),
+          ('cl', 'consumption', 6000, '2026-05-13T10:00:00.000Z', 0),
+          ('cl', 'selfConsumption', 4200, '2026-05-13T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -58,6 +58,7 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -67,7 +68,7 @@ test("GET /api/sustainability-story derives periodized aggregates and exposes un
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('cl', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);

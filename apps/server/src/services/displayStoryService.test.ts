@@ -51,8 +51,8 @@ function seedPowerMetric(
   getDatabase()
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('realTimePower', ?, 'kW', ?, 'good', '{}')
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', 'realTimePower', ?, 'kW', ?, 'good', '{}')
       `
     )
     .run(value, timestamp);
@@ -67,6 +67,7 @@ test("shared monitoring story model keeps fallback diagnostics inspectable", () 
       unit: "kW"
     },
     isConnected: false,
+    metricScope: "cl",
     reading: null
   });
 
@@ -78,6 +79,7 @@ test("shared monitoring story model keeps fallback diagnostics inspectable", () 
 test("shared monitoring slot binding preserves missing-slot diagnostics", () => {
   const binding = resolveMonitoringSlotBinding({
     circuitId: null,
+    metricScope: "cl",
     slotKey: "stamping"
   });
 
@@ -109,7 +111,7 @@ test("shared monitoring summary state elevates stale bindings into warning tone"
 test("Display Story consumes the updated Server Freshness Policy", () => {
   seedPowerMetric(42, new Date(Date.now() - 40_000).toISOString());
   const readPower = () =>
-    readDisplayStory().overview.metrics.find(
+    readDisplayStory({ siteScope: "cl" }).overview.metrics.find(
       (metric) => metric.metricKey === "realTimePower"
     );
 
@@ -128,30 +130,30 @@ test("Display Story consumes the updated Server Freshness Policy", () => {
 test("Factory Circuit Story preserves authoritative freshness for slots and aggregate KPIs", () => {
   const timestamp = new Date(Date.now() - 40_000).toISOString();
   const metricKeys = [
-    "factoryStampingPower",
-    "factoryBodyPower",
-    "factoryPaintingPower",
-    "factoryAssemblyPower",
-    "factoryUtilityPower",
-    "factoryOfficePower"
+    "factoryCircuit.stampingPower",
+    "factoryCircuit.bodyPower",
+    "factoryCircuit.paintingPower",
+    "factoryCircuit.assemblyPower",
+    "factoryCircuit.utilityPower",
+    "factoryCircuit.officePower"
   ];
   getDatabase()
     .prepare(`DELETE FROM live_metric_values WHERE metric_key IN (${metricKeys.map(() => "?").join(", ")})`)
     .run(...metricKeys);
   assert.equal(
-    readDisplayStory().factoryCircuit.slots[0]?.freshness?.state,
+    readDisplayStory({ siteScope: "cl" }).factoryCircuit.slots[0]?.freshness?.state,
     "unavailable"
   );
 
   const insert = getDatabase().prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, 10, 'kW', ?, 'good', '{}')
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('cl', ?, 10, 'kW', ?, 'good', '{}')
   `);
   for (const metricKey of metricKeys) {
     insert.run(metricKey, timestamp);
   }
 
-  const factoryStory = readDisplayStory().factoryCircuit;
+  const factoryStory = readDisplayStory({ siteScope: "cl" }).factoryCircuit;
   const totalPower = factoryStory.kpis.find(
     (metric) => metric.metricKey === "totalPower"
   );
@@ -166,6 +168,7 @@ test("readDisplayStory applies active display overrides after monitoring source 
   seedPowerMetric();
   saveDisplayValueOverride(
     {
+      metricScope: "cl",
       cardId: "overview.realTimePower",
       metricKey: "realTimePower",
       pageId: "overview",
@@ -175,8 +178,8 @@ test("readDisplayStory applies active display overrides after monitoring source 
     { displayValue: 60 }
   );
 
-  const story = readDisplayStory();
-  const rawStory = readDisplayStory({ applyDisplayOverrides: false });
+  const story = readDisplayStory({ siteScope: "cl" });
+  const rawStory = readDisplayStory({ applyDisplayOverrides: false, siteScope: "cl" });
 
   assert.equal(
     story.overview.metrics.find((metric) => metric.metricKey === "realTimePower")?.value,
@@ -192,6 +195,7 @@ test("readDisplayStory ignores expired display overrides", () => {
   seedPowerMetric();
   saveDisplayValueOverride(
     {
+      metricScope: "cl",
       cardId: "overview.realTimePower",
       metricKey: "realTimePower",
       pageId: "overview",
@@ -204,7 +208,7 @@ test("readDisplayStory ignores expired display overrides", () => {
     }
   );
 
-  const story = readDisplayStory();
+  const story = readDisplayStory({ siteScope: "cl" });
 
   assert.equal(
     story.overview.metrics.find((metric) => metric.metricKey === "realTimePower")?.value,
@@ -214,7 +218,7 @@ test("readDisplayStory ignores expired display overrides", () => {
 
 test("readDisplayStory Overview and Solar bindings use contract-aligned sourceClass values", () => {
   seedPowerMetric();
-  const story = readDisplayStory();
+  const story = readDisplayStory({ siteScope: "cl" });
 
   assert.equal(
     story.overview.metrics.find((metric) => metric.metricKey === "realTimePower")?.sourceClass,

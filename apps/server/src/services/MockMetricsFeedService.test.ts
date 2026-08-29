@@ -12,7 +12,7 @@ const databasePath = process.env.DATABASE_PATH;
 const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
-  { readLiveMetricsSnapshot },
+  { readScopedLiveMetricsSnapshot },
   { MockMetricsFeedService, computeMockSolarPowerAt }
 ] = await Promise.all([
   import("../db/index.js"),
@@ -54,12 +54,13 @@ test("writeReading upserts a realTimePower reading into live_metric_values", () 
   const database = getDatabase();
   const service = new MockMetricsFeedService({
     database,
+    metricScope: "cl",
     now: () => at(12)
   });
 
   service.writeReading();
 
-  const reading = readLiveMetricsSnapshot(database).metrics.realTimePower;
+  const reading = readScopedLiveMetricsSnapshot("cl", database).metrics.realTimePower;
   assert.ok(reading, "expected a realTimePower reading to be written");
   assert.equal(reading.unit, "kW");
   assert.equal(reading.value, computeMockSolarPowerAt(at(12)));
@@ -71,12 +72,13 @@ test("writeReading seeds a runtime-complete mock metric set for playback surface
   const database = getDatabase();
   const service = new MockMetricsFeedService({
     database,
+    metricScope: "cl",
     now: () => at(12)
   });
 
   service.writeReading();
 
-  const snapshot = readLiveMetricsSnapshot(database).metrics;
+  const snapshot = readScopedLiveMetricsSnapshot("cl", database).metrics;
   const requiredMetricKeys = [
     "realTimePower",
     "todayGeneration",
@@ -86,12 +88,14 @@ test("writeReading seeds a runtime-complete mock metric set for playback surface
     "consumptionEnergy",
     "selfConsumptionEnergy",
     "systemEfficiency",
-    "factoryProductionPower",
-    "factoryHvacPower",
-    "factoryLightingPower",
-    "factoryOfficePower",
-    "factoryEvGreenPower",
-    "factoryInfrastructurePower"
+    "factoryCircuit.stampingPower",
+    "factoryCircuit.bodyPower",
+    "factoryCircuit.paintingPower",
+    "factoryCircuit.assemblyPower",
+    "factoryCircuit.utilityPower",
+    "factoryCircuit.officePower",
+    "factoryCircuit.heavyVehiclePower",
+    "factoryCircuit.edCoatingPower"
   ] as const;
 
   for (const metricKey of requiredMetricKeys) {
@@ -114,12 +118,14 @@ test("writeReading seeds a runtime-complete mock metric set for playback surface
   const consumptionEnergy = snapshot.consumptionEnergy!.value;
   const selfConsumptionEnergy = snapshot.selfConsumptionEnergy!.value;
   const totalFactoryPower =
-    snapshot.factoryProductionPower!.value +
-    snapshot.factoryHvacPower!.value +
-    snapshot.factoryLightingPower!.value +
-    snapshot.factoryOfficePower!.value +
-    snapshot.factoryEvGreenPower!.value +
-    snapshot.factoryInfrastructurePower!.value;
+    snapshot["factoryCircuit.stampingPower"]!.value +
+    snapshot["factoryCircuit.bodyPower"]!.value +
+    snapshot["factoryCircuit.paintingPower"]!.value +
+    snapshot["factoryCircuit.assemblyPower"]!.value +
+    snapshot["factoryCircuit.utilityPower"]!.value +
+    snapshot["factoryCircuit.officePower"]!.value +
+    snapshot["factoryCircuit.heavyVehiclePower"]!.value +
+    snapshot["factoryCircuit.edCoatingPower"]!.value;
 
   assert.ok(todayGeneration > 0, "expected daytime generation to be positive");
   assert.ok(totalGeneration > todayGeneration / 1000, "expected cumulative generation to exceed today's contribution");
@@ -137,30 +143,30 @@ test("writeReading seeds a runtime-complete mock metric set for playback surface
 test("writeReading keeps a single realTimePower row across repeated writes", () => {
   migrateDatabase();
   const database = getDatabase();
-  const service = new MockMetricsFeedService({ database, now: () => at(12) });
+  const service = new MockMetricsFeedService({ database, metricScope: "cl", now: () => at(12) });
 
   service.writeReading();
   service.writeReading();
 
   const realTimePowerCount = (
     database
-      .prepare("SELECT COUNT(*) AS count FROM live_metric_values WHERE metric_key = 'realTimePower'")
+      .prepare("SELECT COUNT(*) AS count FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'realTimePower'")
       .get() as { count: number }
   ).count;
   const totalCount = (
     database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number }
   ).count;
   assert.equal(realTimePowerCount, 1);
-  assert.equal(totalCount, 14);
+  assert.equal(totalCount, 16);
 });
 
 test("mock cumulative energy advances within a day and does not reset across local days", () => {
   migrateDatabase();
   const database = getDatabase();
   let current = new Date(2026, 5, 9, 12, 0, 0);
-  const service = new MockMetricsFeedService({ database, now: () => current });
+  const service = new MockMetricsFeedService({ database, metricScope: "cl", now: () => current });
   const readCumulativeEnergy = () => {
-    const metrics = readLiveMetricsSnapshot(database).metrics;
+    const metrics = readScopedLiveMetricsSnapshot("cl", database).metrics;
     return {
       consumption: metrics.consumptionEnergy!.value,
       generation: metrics.totalGeneration!.value,

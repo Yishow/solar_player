@@ -142,11 +142,11 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence with
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 2000, ?, 0),
-          ('consumption', 1000, ?, 0),
-          ('selfConsumption', 600, ?, 0)
+          ('global', 'generation', 2000, ?, 0),
+          ('global', 'consumption', 1000, ?, 0),
+          ('global', 'selfConsumption', 600, ?, 0)
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -184,11 +184,11 @@ test("readSustainabilityStory derives tree equivalence from the same rounded CO2
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 53520, ?, 0),
-          ('consumption', 1000, ?, 0),
-          ('selfConsumption', 600, ?, 0)
+          ('global', 'generation', 53520, ?, 0),
+          ('global', 'consumption', 1000, ?, 0),
+          ('global', 'selfConsumption', 600, ?, 0)
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -219,11 +219,11 @@ test("readSustainabilityStory falls back to live metrics when cumulative counter
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('totalGeneration', 18600000, 'kWh', ?, 'good', '{}'),
-          ('consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
-          ('selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
+          ('global', 'totalGeneration', 18600000, 'kWh', ?, 'good', '{}'),
+          ('global', 'consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
+          ('global', 'selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -266,11 +266,11 @@ test("readSustainabilityStory normalizes GWh live metrics before deriving sustai
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('totalGeneration', 18.6, 'GWh', ?, 'good', '{}'),
-          ('consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
-          ('selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
+          ('global', 'totalGeneration', 18.6, 'GWh', ?, 'good', '{}'),
+          ('global', 'consumptionEnergy', 6000, 'kWh', ?, 'good', '{}'),
+          ('global', 'selfConsumptionEnergy', 4200, 'kWh', ?, 'good', '{}')
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -316,20 +316,21 @@ test("readSustainabilityStory applies and clears household display overrides wit
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
           self_consumption_total
-        ) VALUES (?, 100, 80, 16)
+        ) VALUES ('global', ?, 100, 80, 16)
       `
     )
     .run(today);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('selfConsumption', 360, ?, 0)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'selfConsumption', 360, ?, 0)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           total_value = excluded.total_value,
           last_updated = excluded.last_updated
       `
@@ -341,6 +342,7 @@ test("readSustainabilityStory applies and clears household display overrides wit
 
   saveDisplayValueOverride(
     {
+      metricScope: "global",
       cardId: "sustainability.household.today",
       metricKey: "householdEquivalent.today",
       pageId: "sustainability",
@@ -356,7 +358,7 @@ test("readSustainabilityStory applies and clears household display overrides wit
   assert.equal(overriddenStory.householdEquivalents.today.householdCountDisplay, "9.0");
   assert.equal(rawStory.householdEquivalents.today.householdCountDisplay, "4");
 
-  clearDisplayValueOverride("sustainability.household.today");
+  clearDisplayValueOverride("global", "sustainability.household.today");
 
   const restoredStory = readSustainabilityStory();
   assert.equal(restoredStory.householdEquivalents.today.householdCountDisplay, "4");
@@ -370,11 +372,11 @@ test("readSustainabilityStory applies and clears big number display overrides wi
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 114820, ?, 0),
-          ('consumption', 38647, ?, 0),
-          ('selfConsumption', 22584, ?, 0)
+          ('global', 'generation', 114820, ?, 0),
+          ('global', 'consumption', 38647, ?, 0),
+          ('global', 'selfConsumption', 22584, ?, 0)
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -392,6 +394,7 @@ test("readSustainabilityStory applies and clears big number display overrides wi
 
   saveDisplayValueOverride(
     {
+      metricScope: "global",
       cardId: "sustainability.big-number.annualEnergySavingPercent",
       metricKey: "annualEnergySavingPercent",
       pageId: "sustainability",
@@ -402,6 +405,7 @@ test("readSustainabilityStory applies and clears big number display overrides wi
   );
   saveDisplayValueOverride(
     {
+      metricScope: "global",
       cardId: "sustainability.big-number.plantedTreeEquivalent",
       metricKey: "plantedTreeEquivalent",
       pageId: "sustainability",
@@ -427,8 +431,8 @@ test("readSustainabilityStory applies and clears big number display overrides wi
     "18"
   );
 
-  clearDisplayValueOverride("sustainability.big-number.annualEnergySavingPercent");
-  clearDisplayValueOverride("sustainability.big-number.plantedTreeEquivalent");
+  clearDisplayValueOverride("global", "sustainability.big-number.annualEnergySavingPercent");
+  clearDisplayValueOverride("global", "sustainability.big-number.plantedTreeEquivalent");
 
   const restoredStory = readSustainabilityStory("lifetime");
   assert.equal(restoredStory.period.bigNumbers.annualEnergySavingPercent, 58.4);
@@ -443,11 +447,11 @@ test("readSustainabilityStory rounds MWh highlights to whole numbers", () => {
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 18654321, ?, 0),
-          ('consumption', 6000, ?, 0),
-          ('selfConsumption', 4200, ?, 0)
+          ('global', 'generation', 18654321, ?, 0),
+          ('global', 'consumption', 6000, ?, 0),
+          ('global', 'selfConsumption', 4200, ?, 0)
       `
     )
     .run(timestamp, timestamp, timestamp);
@@ -469,23 +473,23 @@ test("readSustainabilityStory uses the CL and KN cumulative aggregate and older 
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 13645876, ?, 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 13645876, ?, 0)
       `
     )
     .run(knTimestamp);
   const insert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
   `);
   for (const [factory, timestamp, today, month, total] of [
     ["cl", clTimestamp, 3.49, 366.93, 9986.306],
     ["kn", knTimestamp, 2.92, 265.77, 3659.57]
   ] as const) {
     const rawPayload = JSON.stringify({ month_mwh: month, timestamp, today_mwh: today, total_mwh: total });
-    insert.run(`factoryGeneration.${factory}.todayMwh`, today, timestamp, rawPayload);
-    insert.run(`factoryGeneration.${factory}.monthMwh`, month, timestamp, rawPayload);
-    insert.run(`factoryGeneration.${factory}.totalMwh`, total, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.todayMwh", today, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.monthMwh", month, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.totalMwh", total, timestamp, rawPayload);
   }
   database
     .prepare("UPDATE calculation_settings SET carbon_emission_factor = 0.495 WHERE id = 1")
@@ -530,8 +534,8 @@ function insertFactoryGenerationSources(args: {
   const clTimestamp = args.clTimestamp ?? "2026-06-26T15:38:10+08:00";
   const knTimestamp = args.knTimestamp ?? "2026-06-26T15:37:55+08:00";
   const insert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
   `);
 
   for (const [factory, timestamp, today, month, total] of [
@@ -539,9 +543,9 @@ function insertFactoryGenerationSources(args: {
     ["kn", knTimestamp, 2.92, 265.77, 3659.57]
   ] as const) {
     const rawPayload = JSON.stringify({ month_mwh: month, timestamp, today_mwh: today, total_mwh: total });
-    insert.run(`factoryGeneration.${factory}.todayMwh`, today, timestamp, rawPayload);
-    insert.run(`factoryGeneration.${factory}.monthMwh`, month, timestamp, rawPayload);
-    insert.run(`factoryGeneration.${factory}.totalMwh`, total, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.todayMwh", today, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.monthMwh", month, timestamp, rawPayload);
+    insert.run(factory, "factoryGeneration.totalMwh", total, timestamp, rawPayload);
   }
 }
 
@@ -641,8 +645,8 @@ test("no factory selection does not fall back to the combined generation counter
   database.prepare("DELETE FROM cumulative_counters").run();
   database
     .prepare(`
-      INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-      VALUES ('generation', 13645876, '2026-06-26T15:37:55+08:00', 0)
+      INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+      VALUES ('global', 'generation', 13645876, '2026-06-26T15:37:55+08:00', 0)
     `)
     .run();
   setFactoryPlaybackSelection(false, false);

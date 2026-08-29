@@ -48,7 +48,6 @@ The system SHALL present card-centric data diagnostics in the `Card Data Managem
 - **THEN** the row status is `waiting-aggregate`
 - **AND** the row names the upstream self-consumption metric that feeds the aggregate
 
-
 <!-- @trace
 source: expand-card-data-numeric-coverage
 updated: 2026-07-08
@@ -109,6 +108,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Provide data completion actions from card diagnostics
 
 The system SHALL provide data completion actions from each card diagnostic row according to the row source classification.
@@ -125,7 +125,6 @@ The system SHALL provide data completion actions from each card diagnostic row a
 - **WHEN** the operator publishes `168` from the stamping slot diagnostic row
 - **THEN** the system publishes payload `168` to `kuozui/factory/stamping/power`
 
-
 <!-- @trace
 source: expand-card-data-numeric-coverage
 updated: 2026-07-08
@@ -186,6 +185,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Persist display-only card value overrides separately from true data
 
 The system SHALL persist display-only card value overrides separately from MQTT messages, live metric values, daily summaries, and cumulative counters.
@@ -290,6 +290,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Keep Card Data Management input labels readable
 
 The system SHALL render Card Data Management numeric input labels horizontally.
@@ -360,60 +361,34 @@ tests:
 -->
 
 ---
+
 ### Requirement: Factory Circuit card diagnostics are page-scoped
-The system SHALL list Factory Circuit card diagnostics separately for each Factory Circuit page instance.
+
+The system SHALL list Factory Circuit card diagnostics separately for each Factory Circuit page instance while identifying runtime data by metric scope plus semantic metric key.
 
 #### Scenario: Operator reviews Factory Circuit card data across sites
-- **WHEN** the operator opens the `Card Data Management` tab
-- **THEN** the system SHALL list Jungli Factory Circuit rows with `factory-circuit` identity
-- **AND** the system SHALL list Guanyin Factory Circuit rows with `factory-circuit-guanyin` identity
-- **AND** each Factory Circuit slot row SHALL expose the page-scoped metric key used by that site
+- **WHEN** the operator opens card-centric data diagnostics
+- **THEN** the system SHALL list Jungli Factory Circuit rows with `factory-circuit` identity and `metricScope = cl`
+- **AND** the system SHALL list Guanyin Factory Circuit rows with `factory-circuit-guanyin` identity and `metricScope = kn`
+- **AND** each Factory Circuit slot row SHALL expose the semantic metric key, effective metric scope, source topic state, and latest scoped value
 
-##### Example: Same slot name appears as distinct card rows
+##### Example: Same slot name appears as distinct scoped card rows
 - **GIVEN** Jungli and Guanyin both have a `stamping` slot
 - **WHEN** card diagnostics are generated
-- **THEN** Jungli stamping SHALL be identified as `factory-circuit.slot.stamping`
-- **AND** Guanyin stamping SHALL be identified as `factory-circuit-guanyin.slot.stamping`
-- **AND** the two rows SHALL use distinct metric keys
+- **THEN** both rows MAY use the same semantic stamping power metric key
+- **AND** one row is identified by `cl` scope while the other is identified by `kn` scope
+- **AND** the two rows remain independently diagnosable and overridable
 
-<!-- @trace
-source: scope-factory-circuit-data-by-page-key
-updated: 2026-07-08
-code:
-  - packages/shared/src/index.ts
-  - apps/server/src/db/migrations/019_circuit_page_scope.sql
-  - apps/server/src/db/migrations/020_fix_factory_circuit_site_counts.sql
-  - packages/shared/src/displayCardData.ts
-  - packages/shared/src/displayPageFreshness.ts
-  - apps/server/src/db/migrations/018_display_value_overrides.sql
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - packages/shared/src/displayStory.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/server/src/db/seed.ts
-  - packages/shared/src/displayPageConfig.ts
-  - apps/web/src/pages/runtimeRefreshRegistry.ts
-  - apps/server/src/services/displayValueOverrideService.ts
-  - apps/server/src/services/displayRotationService.ts
-  - apps/web/src/services/api.ts
-  - apps/server/src/routes/circuits.ts
-  - apps/server/src/routes/display-story.ts
-  - packages/shared/src/types.ts
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/server/src/app.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/server/src/services/displayReadinessService.ts
-  - packages/shared/src/displayReadiness.ts
-  - apps/server/src/services/displayStoryService.ts
-  - apps/server/src/services/displayCardDataService.ts
-  - apps/server/src/routes/display-card-data.ts
-  - apps/web/src/pages/MqttSettings/index.tsx
-tests:
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/routes/display-card-data.test.ts
-  - packages/shared/src/displayPageFreshness.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/server/src/routes/circuits.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
--->
+### Requirement: Card data overrides include effective metric scope
+
+A display-only override exposed through card data management SHALL include the effective metric scope of its target. The system MUST NOT match an override solely by page id, card id, or semantic metric key when the same target can render site-specific data.
+
+#### Scenario: Same Overview card is used by both factories
+- **WHEN** an operator creates an override for the CL instance of a shared Overview card
+- **THEN** diagnostics identify the override as CL-scoped
+- **AND** the corresponding KN card continues to display its KN source value unless it has its own override
+
+#### Scenario: Operator clears one site override
+- **WHEN** CL and KN each have an override for the same shared card target and the operator clears the CL override
+- **THEN** only the CL override is removed or disabled
+- **AND** the KN override remains active

@@ -92,6 +92,7 @@ test("Factory Circuit Story advances Server freshness while offline", () => {
       helper: "依目前總負載推估",
       label: "目前廠區總用電",
       metricKey: "totalPower",
+      metricScope: "cl",
       provenance: "aggregate",
       sourceClass: "slot-aggregate",
       unit: "kW",
@@ -107,6 +108,7 @@ test("Factory Circuit Story advances Server freshness while offline", () => {
       label: "沖壓工程",
       livePowerKw: 42,
       metricKey: "factoryStampingPower",
+      metricScope: "cl",
       slotKey: "stamping"
     }],
     summary: {

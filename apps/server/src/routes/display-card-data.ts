@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { isMetricScope } from "@solar-display/shared";
 import { readDisplayCardData } from "../services/displayCardDataService.js";
 import {
   clearDisplayValueOverride,
@@ -6,14 +7,18 @@ import {
 } from "../services/displayValueOverrideService.js";
 
 type SaveDisplayOverrideBody = {
+  metricScope?: unknown;
   displayValue?: unknown;
   expiresAt?: unknown;
   reason?: unknown;
   unit?: unknown;
 };
 
-function readTargetRow(targetId: string) {
-  return readDisplayCardData().rows.find((row) => row.cardId === targetId) ?? null;
+function readTargetRow(targetId: string, metricScope: "cl" | "kn" | "global") {
+  const sharedSiteScope = metricScope === "kn" ? "kn" : "cl";
+  return readDisplayCardData(sharedSiteScope).rows.find(
+    (row) => row.cardId === targetId && row.metricScope === metricScope
+  ) ?? null;
 }
 
 function emitOverrideSync(app: FastifyInstance) {
@@ -40,6 +45,13 @@ const displayCardDataRoute: FastifyPluginAsync = async (app) => {
         return app.managementAccess.deny(reply);
       }
 
+      if (!isMetricScope(request.body?.metricScope)) {
+        return reply.status(400).send({
+          code: "INVALID_METRIC_SCOPE",
+          error: "Display override metricScope must be cl, kn, or global",
+          success: false
+        });
+      }
       if (typeof request.body?.displayValue !== "number" || !Number.isFinite(request.body.displayValue)) {
         return reply.status(400).send({
           error: "Display override value must be a finite number"
@@ -56,7 +68,7 @@ const displayCardDataRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const target = readTargetRow(request.params.targetId);
+      const target = readTargetRow(request.params.targetId, request.body.metricScope);
       if (!target) {
         return reply.status(404).send({
           error: "Display card target not found"
@@ -69,7 +81,8 @@ const displayCardDataRoute: FastifyPluginAsync = async (app) => {
           metricKey: target.metricKey,
           pageId: target.pageId,
           targetId: target.cardId,
-          unit: target.unit
+          unit: target.unit,
+          metricScope: request.body.metricScope
         },
         {
           displayValue: request.body.displayValue,
@@ -80,7 +93,7 @@ const displayCardDataRoute: FastifyPluginAsync = async (app) => {
       );
       emitOverrideSync(app);
 
-      const row = readTargetRow(request.params.targetId);
+      const row = readTargetRow(request.params.targetId, request.body.metricScope);
       return {
         row,
         success: true
@@ -88,25 +101,32 @@ const displayCardDataRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.delete<{ Params: { targetId: string } }>(
+  app.delete<{ Params: { targetId: string }; Querystring: { metricScope?: unknown } }>(
     "/api/display-card-data/overrides/:targetId",
     async (request, reply) => {
       if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
         return app.managementAccess.deny(reply);
       }
 
-      const target = readTargetRow(request.params.targetId);
+      if (!isMetricScope(request.query.metricScope)) {
+        return reply.status(400).send({
+          code: "INVALID_METRIC_SCOPE",
+          error: "Display override metricScope must be cl, kn, or global",
+          success: false
+        });
+      }
+      const target = readTargetRow(request.params.targetId, request.query.metricScope);
       if (!target) {
         return reply.status(404).send({
           error: "Display card target not found"
         });
       }
 
-      clearDisplayValueOverride(request.params.targetId);
+      clearDisplayValueOverride(request.query.metricScope, request.params.targetId);
       emitOverrideSync(app);
 
       return {
-        row: readTargetRow(request.params.targetId),
+        row: readTargetRow(request.params.targetId, request.query.metricScope),
         success: true
       };
     }

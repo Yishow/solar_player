@@ -1,13 +1,29 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { getDatabase } from "../db/index.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { resetManagementPasswordClockForTests, setManagementPassword, verifyManagementPassword } from "./managementPasswordService.js";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-management-password-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+
+const [
+  { closeDatabaseConnection, getDatabase },
+  { migrateDatabase },
+  { resetManagementPasswordClockForTests, setManagementPassword, verifyManagementPassword }
+] = await Promise.all([
+  import("../db/index.js"),
+  import("../db/migrate.js"),
+  import("./managementPasswordService.js")
+]);
 
 migrateDatabase();
 test.after(() => {
   getDatabase().prepare("UPDATE management_password_settings SET enabled=0,password_hash=NULL,password_salt=NULL,kdf_name=NULL,kdf_cost=NULL,kdf_block_size=NULL,kdf_parallelization=NULL,failed_attempts=0,locked_until=NULL").run();
   resetManagementPasswordClockForTests();
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
 });
 
 test("management passwords use independent salts and verify only the original text", () => {

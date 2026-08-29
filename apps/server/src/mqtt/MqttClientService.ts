@@ -5,6 +5,7 @@ import {
   resolveLiveMetricRequirementsForPage,
   type DisplayPageTemplateKey
 } from "@solar-display/shared";
+import type { MetricScope } from "@solar-display/shared";
 import {
   connect,
   type IClientOptions,
@@ -13,8 +14,8 @@ import {
 import { getDatabase } from "../db/index.js";
 import {
   type LiveMetricsSnapshot,
-  readAuthoritativeLiveMetricsSnapshot,
-  readLiveMetricsSnapshot
+  readAuthoritativeScopedLiveMetricsSnapshot,
+  readScopedLiveMetricsSnapshot
 } from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
 import { updateFactoryGenerationAggregate } from "../services/factoryGenerationAggregateService.js";
@@ -31,6 +32,7 @@ type LoggerLike = {
 type MqttSettingsRecord = MqttSettingsRow;
 
 type TopicMappingRecord = {
+  metric_scope: MetricScope;
   metric_key: string;
   topic: string;
   unit: string | null;
@@ -828,6 +830,7 @@ export class MqttClientService {
       .prepare(
         `
           SELECT
+            metric_scope,
             metric_key,
             topic,
             unit,
@@ -845,17 +848,27 @@ export class MqttClientService {
       return;
     }
 
-    const previousSnapshot = readLiveMetricsSnapshot(this.database);
+    const affectedMetricScopes = new Set(mappings.map((mapping) => mapping.metric_scope));
+    if (mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."))) {
+      affectedMetricScopes.add("global");
+    }
+    const previousSnapshots = new Map(
+      [...affectedMetricScopes].map((metricScope) => [
+        metricScope,
+        readScopedLiveMetricsSnapshot(metricScope, this.database)
+      ])
+    );
     const upsertLiveValue = this.database.prepare(`
       INSERT INTO live_metric_values (
+        metric_scope,
         metric_key,
         value,
         unit,
         timestamp,
         quality,
         raw_payload
-      ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
-      ON CONFLICT(metric_key) DO UPDATE SET
+      ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
         value = excluded.value,
         unit = excluded.unit,
         timestamp = CURRENT_TIMESTAMP,
@@ -871,6 +884,7 @@ export class MqttClientService {
           parsedPayload.value * (mapping.multiplier ?? 1) + (mapping.offset ?? 0);
 
         upsertLiveValue.run(
+          mapping.metric_scope,
           mapping.metric_key,
           roundValue(adjustedValue, mapping.decimal_places),
           mapping.unit,
@@ -883,6 +897,7 @@ export class MqttClientService {
           {
             error,
             metricKey: mapping.metric_key,
+            metricScope: mapping.metric_scope,
             topic
           },
           "Failed to parse MQTT payload"
@@ -890,11 +905,13 @@ export class MqttClientService {
       }
     }
 
+    let didWriteGlobalAggregate = false;
     if (
       persistedMetricCount > 0
       && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."))
     ) {
       const aggregateStatus = updateFactoryGenerationAggregate(this.database);
+      didWriteGlobalAggregate = aggregateStatus.state === "ready";
       if (aggregateStatus.state !== "ready") {
         this.logger.warn(
           { issues: aggregateStatus.issues, state: aggregateStatus.state },
@@ -903,16 +920,33 @@ export class MqttClientService {
       }
     }
 
-    const snapshot = readLiveMetricsSnapshot(this.database);
-    this.socketService?.emitLiveMetrics(
-      readAuthoritativeLiveMetricsSnapshot(this.database)
-    );
+    const updatedMetricScopes = new Set(mappings.map((mapping) => mapping.metric_scope));
+    if (didWriteGlobalAggregate) updatedMetricScopes.add("global");
+    for (const metricScope of updatedMetricScopes) {
+      const snapshot = readAuthoritativeScopedLiveMetricsSnapshot(metricScope, this.database);
+      this.socketService?.emitLiveMetrics(metricScope, snapshot);
+      const circuitMetrics = this.buildCircuitMetricsSnapshot(
+        snapshot,
+        mappings
+          .filter((mapping) => mapping.metric_scope === metricScope)
+          .map((mapping) => mapping.metric_key)
+      );
+      if (circuitMetrics !== null) {
+        this.socketService?.emitCircuitMetrics(metricScope, circuitMetrics);
+      }
+    }
     const didFactoryGenerationUpdate =
       hasPayloadTimestamp(rawPayload)
       && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."));
+    const didRuntimeAvailabilityChange = [...affectedMetricScopes].some((metricScope) =>
+      didPlaybackRuntimeAvailabilityChange(
+        previousSnapshots.get(metricScope) ?? { metrics: {}, timestamp: null },
+        readScopedLiveMetricsSnapshot(metricScope, this.database)
+      )
+    );
     if (
       persistedMetricCount > 0
-      && (didFactoryGenerationUpdate || didPlaybackRuntimeAvailabilityChange(previousSnapshot, snapshot))
+      && (didFactoryGenerationUpdate || didRuntimeAvailabilityChange)
     ) {
       this.socketService?.emitDisplaySync({
         generatedAt: new Date().toISOString(),
@@ -923,10 +957,6 @@ export class MqttClientService {
       });
     }
 
-    const circuitMetrics = this.buildCircuitMetricsSnapshot(snapshot, mappings.map((mapping) => mapping.metric_key));
-    if (circuitMetrics !== null) {
-      this.socketService?.emitCircuitMetrics(circuitMetrics);
-    }
   }
 
   private buildCircuitMetricsSnapshot(

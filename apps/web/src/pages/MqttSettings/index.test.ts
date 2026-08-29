@@ -111,17 +111,17 @@ test("mqtt settings lists three-phase metric keys as creatable, manageable topic
   }
 });
 
-test("mqtt settings lists page-scoped Factory Circuit metric keys as creatable topic mappings", () => {
+test("mqtt settings lists semantic Factory Circuit metric keys as creatable scoped topic mappings", () => {
   const optionsBlock = mqttSettingsSource.slice(
     mqttSettingsSource.indexOf("const defaultMetricOptions = ["),
     mqttSettingsSource.indexOf("] as const;", mqttSettingsSource.indexOf("const defaultMetricOptions = ["))
   );
 
   for (const metricKey of [
-    "factoryStampingPower",
-    "factoryOfficePower",
-    "factoryCircuit.guanyin.stampingPower",
-    "factoryCircuit.guanyin.edCoatingPower"
+    "factoryCircuit.stampingPower",
+    "factoryCircuit.officePower",
+    "factoryCircuit.heavyVehiclePower",
+    "factoryCircuit.edCoatingPower"
   ]) {
     assert.ok(factoryTopicSitesSource.includes(metricKey), `expected ${metricKey} to be a Factory Circuit metric key`);
   }
@@ -129,7 +129,7 @@ test("mqtt settings lists page-scoped Factory Circuit metric keys as creatable t
   assert.match(optionsBlock, /\.\.\.jungliFactoryTopicMetricKeys/);
   assert.match(optionsBlock, /\.\.\.guanyinFactoryTopicMetricKeys/);
   assert.match(mqttSettingsSource, /factoryTopicMetricKeysBySite\[activeCardDataSite\]/);
-  assert.match(mqttSettingsSource, /isTopicMetricVisibleForFactorySite\(option,\s*activeCardDataSite\)/);
+  assert.match(mqttSettingsSource, /isTopicMetricVisibleForFactorySite\(option,\s*metricScope,\s*activeCardDataSite\)/);
 });
 
 test("mqtt settings defers diagnostics polling and weather preview until persisted controls load", () => {
@@ -180,15 +180,15 @@ test("mqtt settings polling merges runtime topic snapshots without overwriting l
 });
 
 test("mqtt settings publishes transient numeric test values through the mapped metric key", () => {
-  assert.match(mqttSettingsSource, /const publishTopicValue = useCallback\(async \(metricKey: string, value: number\) => \{/);
+  assert.match(mqttSettingsSource, /const publishTopicValue = useCallback\(async \(metricScope: TopicMapping\["metricScope"\], metricKey: string, value: number\) => \{/);
 
   const publishSource = mqttSettingsSource.slice(
-    mqttSettingsSource.indexOf("const publishTopicValue = useCallback(async (metricKey: string, value: number) => {"),
+    mqttSettingsSource.indexOf('const publishTopicValue = useCallback(async (metricScope: TopicMapping["metricScope"], metricKey: string, value: number) => {'),
     mqttSettingsSource.indexOf("const saveTopicMappings = useCallback(async () => {")
   );
 
   assert.match(publishSource, /`\/api\/settings\/mqtt\/topics\/\$\{encodeURIComponent\(metricKey\)\}\/publish`/);
-  assert.match(publishSource, /body:\s*JSON\.stringify\(\{\s*value\s*\}\)/);
+  assert.match(publishSource, /body:\s*JSON\.stringify\(\{\s*metricScope,\s*value\s*\}\)/);
   assert.match(publishSource, /method:\s*"POST"/);
   assert.match(publishSource, /await loadTopics\(\{\s*isPolling:\s*true\s*\}\)/);
   assert.doesNotMatch(publishSource, /setTopics\(\(current\).*value/);

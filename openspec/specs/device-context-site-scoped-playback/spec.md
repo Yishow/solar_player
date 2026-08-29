@@ -21,7 +21,6 @@ Formal playback requests SHALL resolve Device, Group, Site Scope, Playback Profi
 - **THEN** the system ignores the claim
 - **AND** all formal playback data remains scoped to kn
 
-
 <!-- @trace
 source: device-context-site-scoped-playback
 updated: 2026-07-30
@@ -113,6 +112,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Fail closed when Device context is unavailable
 
 The system SHALL return explicit unpaired, revoked, disabled, group-disabled, group-missing, or profile-missing states. It SHALL NOT fall back to cl, kn, or a global factory scope.
@@ -136,7 +136,6 @@ Each such failure SHALL additionally be recorded in a bounded in-process unpaire
 - **WHEN** recording an occurrence raises an error
 - **THEN** the system SHALL still return the denial response
 - **AND** the error SHALL NOT propagate as an unhandled failure
-
 
 <!-- @trace
 source: surface-unpaired-display-access-in-management
@@ -201,6 +200,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Produce Site-scoped Story, Readiness, and Effective Rotation
 
 The Server SHALL apply Site Scope before Story aggregation, Readiness evaluation, Freshness evaluation, and Effective Rotation. Common Profile pages SHALL remain shared, while Factory Circuit, Sustainability, Overview, and Solar data SHALL use only the Context Site.
@@ -212,7 +212,6 @@ The Server SHALL apply Site Scope before Story aggregation, Readiness evaluation
 - **AND** each Device receives only its own Site-specific Factory Circuit and data sources
 - **AND** missing data in the other Site does not block its rotation
 
-
 <!-- @trace
 source: device-context-site-scoped-playback
 updated: 2026-07-30
@@ -304,6 +303,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Reuse equivalent Effective Rotation snapshots
 
 The system SHALL reuse a complete Effective Rotation result for requests with the same Profile revision, Site Scope, Readiness revision, and Freshness revision. A relevant revision change SHALL invalidate that result.
@@ -314,7 +314,6 @@ The system SHALL reuse a complete Effective Rotation result for requests with th
 - **THEN** the system performs at most one full evaluation for cl and one for kn
 - **AND** all Devices receive the correct cohort result
 
-
 <!-- @trace
 source: device-context-site-scoped-playback
 updated: 2026-07-30
@@ -406,6 +405,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Apply Site changes at a Safe Playback Boundary
 
 A Client SHALL NOT interrupt a valid current page when contextRevision changes. It SHALL finish the current page duration when that page remains valid, or SHALL switch at the next transition tick when the current page is invalid.
@@ -505,3 +505,18 @@ tests:
   - apps/server/src/services/playbackProfileService.test.ts
   - apps/web/src/pages/Overview/configRender.test.tsx
 -->
+
+### Requirement: Display Client Context scopes all formal playback metric families
+
+The system SHALL use the resolved Display Client Context Site Scope consistently as the default scope for formal playback live metrics, monitoring history, page-scoped stories, freshness, and data-derived readiness. Explicitly global metrics MAY be included when required by the page contract. A trusted server-authored published binding MAY explicitly select another metric scope for that bound value, but a metric from another site MUST NOT be used as an implicit substitute for a missing inherited-site metric.
+
+#### Scenario: CL device reads a monitoring page
+- **WHEN** a paired device in a `cl` Group requests a monitoring playback page and its runtime data
+- **THEN** inherited bindings resolve page value, freshness, trend/history, and provenance from CL-scoped inputs plus any explicitly global dependencies
+- **AND** no KN-scoped input is used as a fallback for a missing CL metric
+- **AND** any KN value present on the page must come from a trusted binding that explicitly selects KN scope
+
+#### Scenario: Site-specific data is missing
+- **WHEN** a KN playback context requires a KN-scoped metric that is missing while the corresponding CL metric is healthy
+- **THEN** the KN page reports the existing degraded or unavailable state for the KN dependency
+- **AND** the system SHALL NOT fill the gap with the CL reading

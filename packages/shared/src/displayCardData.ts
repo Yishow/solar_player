@@ -1,3 +1,5 @@
+import type { MetricScope } from "./metricScope.js";
+
 export type DisplayCardDataPageId =
   | "factory-circuit"
   | "factory-circuit-guanyin"
@@ -17,6 +19,7 @@ export type DisplayCardDataStatus =
 export type DisplayCardDataDependency = {
   latestValue: string | null;
   metricKey: string;
+  metricScope: MetricScope;
   status: DisplayCardDataStatus;
   topic: string | null;
 };
@@ -24,6 +27,7 @@ export type DisplayCardDataDependency = {
 export type DisplayCardDataAction =
   | {
       metricKey: string;
+      metricScope: MetricScope;
       type: "configure-topic" | "publish-test-value";
     }
   | {
@@ -41,6 +45,7 @@ export type DisplayCardValueOverride = {
   enabled: boolean;
   expiresAt: string | null;
   metricKey: string;
+  metricScope: MetricScope;
   pageId: DisplayCardDataPageId;
   reason: string | null;
   targetId: string;
@@ -59,12 +64,14 @@ export type DisplayCardDataRow = {
   label: string;
   lastUpdatedAt: string | null;
   metricKey: string;
+  metricScope: MetricScope;
   originalValue: string | null;
   override: DisplayCardValueOverride | null;
   pageId: DisplayCardDataPageId;
   sourceClassification: string;
   sourceTopics: Array<{
     metricKey: string;
+    metricScope: MetricScope;
     topic: string;
   }>;
   status: DisplayCardDataStatus;

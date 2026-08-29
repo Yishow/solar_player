@@ -1,5 +1,6 @@
 import { useRef, useSyncExternalStore } from "react";
-import type { LiveMetricsSnapshot, SocketConnectionState } from "../services/socket";
+import type { MetricScope } from "@solar-display/shared";
+import type { LiveMetricsSnapshot, ScopedLiveMetricsSnapshot, SocketConnectionState } from "../services/socket";
 
 export type LiveMetricsStoreState = {
   connectionState: SocketConnectionState;
@@ -14,7 +15,7 @@ type Selector<T> = (state: LiveMetricsStoreState) => T;
 export type LiveMetricsStore = {
   getState: () => LiveMetricsStoreState;
   setConnectionState: (nextConnectionState: SocketConnectionState) => boolean;
-  setSnapshot: (nextSnapshot: LiveMetricsSnapshot) => boolean;
+  setSnapshot: (nextSnapshot: ScopedLiveMetricsSnapshot) => boolean;
   subscribe: (listener: StoreListener) => () => void;
 };
 
@@ -51,6 +52,25 @@ function shouldReplaceSnapshot(current: LiveMetricsSnapshot, next: LiveMetricsSn
   }
 
   return next.timestamp >= current.timestamp;
+}
+
+function composeScopedSnapshot(
+  activeSiteScope: "cl" | "kn" | null,
+  snapshots: Map<MetricScope, ScopedLiveMetricsSnapshot>
+): LiveMetricsSnapshot {
+  const globalSnapshot = snapshots.get("global");
+  const siteSnapshot = activeSiteScope ? snapshots.get(activeSiteScope) : undefined;
+  const timestamps = [globalSnapshot?.timestamp, siteSnapshot?.timestamp].filter(
+    (timestamp): timestamp is string => timestamp !== null && timestamp !== undefined
+  );
+  return {
+    freshnessPolicy: siteSnapshot?.freshnessPolicy ?? globalSnapshot?.freshnessPolicy,
+    metrics: {
+      ...(globalSnapshot?.metrics ?? {}),
+      ...(siteSnapshot?.metrics ?? {})
+    },
+    timestamp: timestamps.length > 0 ? timestamps.sort().at(-1)! : null
+  };
 }
 
 function createSelectorSubscription<T>(
@@ -162,6 +182,8 @@ export function createLiveMetricsStore(
   }
 ): LiveMetricsStore {
   let state = initialState;
+  let activeSiteScope: "cl" | "kn" | null = null;
+  const scopedSnapshots = new Map<MetricScope, ScopedLiveMetricsSnapshot>();
   const listeners = new Set<StoreListener>();
 
   const emitChange = () => {
@@ -187,13 +209,20 @@ export function createLiveMetricsStore(
       return true;
     },
     setSnapshot(nextSnapshot) {
-      if (!shouldReplaceSnapshot(state.snapshot, nextSnapshot)) {
+      const currentScopedSnapshot = scopedSnapshots.get(nextSnapshot.metricScope);
+      if (currentScopedSnapshot && !shouldReplaceSnapshot(currentScopedSnapshot, nextSnapshot)) {
         return false;
       }
 
+      if (nextSnapshot.metricScope !== "global") {
+        activeSiteScope = nextSnapshot.metricScope;
+        scopedSnapshots.delete(nextSnapshot.metricScope === "cl" ? "kn" : "cl");
+      }
+      scopedSnapshots.set(nextSnapshot.metricScope, nextSnapshot);
+
       state = {
         ...state,
-        snapshot: nextSnapshot,
+        snapshot: composeScopedSnapshot(activeSiteScope, scopedSnapshots),
         snapshotReceivedAtMonotonicMs:
           typeof performance === "undefined" ? 0 : performance.now()
       };
@@ -216,7 +245,7 @@ export function getLiveMetricsStoreState() {
   return sharedLiveMetricsStore.getState();
 }
 
-export function replaceLiveMetricsSnapshot(nextSnapshot: LiveMetricsSnapshot) {
+export function replaceLiveMetricsSnapshot(nextSnapshot: ScopedLiveMetricsSnapshot) {
   return sharedLiveMetricsStore.setSnapshot(nextSnapshot);
 }
 

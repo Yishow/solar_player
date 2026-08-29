@@ -7,6 +7,7 @@ import {
   type DisplayClientLivenessSnapshot,
   type DisplaySyncEvent,
   type DisplaySocketSessionClass,
+  type MetricScope,
   type ManagementSocketSessionClass
 } from "@solar-display/shared";
 import type { LiveMetricsSnapshot } from "../metrics/liveMetrics.js";
@@ -40,6 +41,7 @@ type SocketClientLike = {
   };
   id?: string;
   join?: (room: string) => void;
+  leave?: (room: string) => void;
   on?: (event: string, listener: (payload?: unknown) => void) => void;
   disconnect?: (close?: boolean) => void;
 };
@@ -73,7 +75,7 @@ type SocketServiceOptions = {
   ) => void;
   classifySession?: (handshake: NonNullable<SocketClientLike["handshake"]>) => ManagementSocketSessionClass;
   corsOrigin?: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => void;
-  getLiveMetricsSnapshot: () => LiveMetricsSnapshot;
+  getLiveMetricsSnapshot: (metricScope: MetricScope) => LiveMetricsSnapshot;
   getMqttStatus: () => MqttStatus;
   io?: SocketServerLike;
   logger: LoggerLike;
@@ -182,7 +184,7 @@ export class SocketService {
   private readonly displayClientRegistry: DeviceLivenessRegistry;
   private readonly resolveDisplayClientContext;
   private readonly stopServerTimeSignalBroadcast: () => void;
-  private liveMetricsSnapshot: LiveMetricsSnapshot;
+  private readonly liveMetricsSnapshots = new Map<MetricScope, LiveMetricsSnapshot>();
   private mqttStatus: MqttStatus;
 
   constructor(options: SocketServiceOptions) {
@@ -204,7 +206,9 @@ export class SocketService {
     });
     this.resolveDisplayClientContext =
       options.resolveDisplayClientContext ?? resolveDisplayClientContext;
-    this.liveMetricsSnapshot = options.getLiveMetricsSnapshot();
+    for (const metricScope of ["cl", "kn", "global"] as const) {
+      this.liveMetricsSnapshots.set(metricScope, options.getLiveMetricsSnapshot(metricScope));
+    }
     this.mqttStatus = options.getMqttStatus();
     this.io =
       options.io ??
@@ -325,6 +329,7 @@ export class SocketService {
           )
         });
         socket.join?.(`device:${identity.deviceId}`);
+        socket.join?.(`site:${identity.siteScope}`);
       }
 
       socket.on?.("client:heartbeat", (payload) => {
@@ -348,6 +353,13 @@ export class SocketService {
           );
           if (currentIdentity.deviceId !== authenticatedDeviceId) {
             throw new Error("Socket Device identity changed");
+          }
+          if (identity && currentIdentity.contextRevision !== identity.contextRevision) {
+            if (currentIdentity.siteScope !== identity.siteScope) {
+              socket.leave?.(`site:${identity.siteScope}`);
+              socket.join?.(`site:${currentIdentity.siteScope}`);
+            }
+            this.emitSnapshotToSocket(socket, currentIdentity.siteScope);
           }
           identity = currentIdentity;
         } catch (error) {
@@ -408,7 +420,9 @@ export class SocketService {
       });
       if (effectiveSessionClass !== "unidentified") {
         socket.emit("mqtt:status", this.mqttStatus);
-        socket.emit("liveMetrics:update", this.liveMetricsSnapshot);
+        if (identity) {
+          this.emitSnapshotToSocket(socket, identity.siteScope);
+        }
       }
     });
   }
@@ -425,9 +439,31 @@ export class SocketService {
     this.io.to("management-trusted").emit(event, payload);
   }
 
-  emitLiveMetrics(data: LiveMetricsSnapshot) {
-    this.liveMetricsSnapshot = data;
-    this.broadcastToIdentified("liveMetrics:update", data);
+  private emitSnapshotToSocket(socket: SocketClientLike, siteScope: "cl" | "kn") {
+    socket.emit("liveMetrics:update", {
+      ...this.liveMetricsSnapshots.get(siteScope),
+      metricScope: siteScope
+    });
+    socket.emit("liveMetrics:update", {
+      ...this.liveMetricsSnapshots.get("global"),
+      metricScope: "global"
+    });
+  }
+
+  emitLiveMetrics(metricScope: MetricScope, data: LiveMetricsSnapshot) {
+    this.liveMetricsSnapshots.set(metricScope, data);
+    const payload = { ...data, metricScope };
+    if (metricScope === "global") {
+      this.io.to("site:cl").emit("liveMetrics:update", payload);
+      this.io.to("site:kn").emit("liveMetrics:update", payload);
+    } else {
+      this.io.to(`site:${metricScope}`).emit("liveMetrics:update", payload);
+    }
+    this.emitManagementOnly("liveMetrics:update", payload);
+  }
+
+  emitLiveMetricsToDevice(deviceId: number, metricScope: MetricScope, data: LiveMetricsSnapshot) {
+    this.io.to(`device:${deviceId}`).emit("liveMetrics:update", { ...data, metricScope });
   }
 
   emitMqttStatus(status: MqttStatus) {
@@ -435,8 +471,15 @@ export class SocketService {
     this.broadcastToIdentified("mqtt:status", status);
   }
 
-  emitCircuitMetrics(data: LiveMetricsSnapshot) {
-    this.broadcastToIdentified("circuitMetrics:update", data);
+  emitCircuitMetrics(metricScope: MetricScope, data: LiveMetricsSnapshot) {
+    const payload = { ...data, metricScope };
+    if (metricScope === "global") {
+      this.io.to("site:cl").emit("circuitMetrics:update", payload);
+      this.io.to("site:kn").emit("circuitMetrics:update", payload);
+    } else {
+      this.io.to(`site:${metricScope}`).emit("circuitMetrics:update", payload);
+    }
+    this.emitManagementOnly("circuitMetrics:update", payload);
   }
 
   emitCircuitSettingsUpdated(data: unknown) {

@@ -147,6 +147,7 @@ function resolveMetricValue(
       fallbackValue: binding.fallbackValue ?? fallbackMetric.value
     },
     isConnected: isSocketConnected,
+    metricScope: "global",
     reading: snapshot.metrics[binding.metricKey] ?? null
   });
 }

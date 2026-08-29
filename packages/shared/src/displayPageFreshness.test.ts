@@ -11,12 +11,9 @@ test("resolveLiveMetricKeysForPage expands solar requirements into the live metr
   assert.deepEqual(resolveLiveMetricKeysForPage("solar"), [
     "realTimePower",
     "todayGeneration",
-    "factoryGeneration.cl.todayMwh",
-    "factoryGeneration.cl.monthMwh",
-    "factoryGeneration.cl.totalMwh",
-    "factoryGeneration.kn.todayMwh",
-    "factoryGeneration.kn.monthMwh",
-    "factoryGeneration.kn.totalMwh",
+    "factoryGeneration.todayMwh",
+    "factoryGeneration.monthMwh",
+    "factoryGeneration.totalMwh",
     "selfConsumptionRatio",
     "selfConsumptionEnergy",
     "consumptionEnergy",
@@ -35,12 +32,9 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
       alternatives: [
         ["todayGeneration"],
         [
-          "factoryGeneration.cl.todayMwh",
-          "factoryGeneration.cl.monthMwh",
-          "factoryGeneration.cl.totalMwh",
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
+          "factoryGeneration.todayMwh",
+          "factoryGeneration.monthMwh",
+          "factoryGeneration.totalMwh"
         ]
       ],
       requirementKey: "todayGeneration"
@@ -57,12 +51,9 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
         ["todayCo2Reduction"],
         ["todayGeneration"],
         [
-          "factoryGeneration.cl.todayMwh",
-          "factoryGeneration.cl.monthMwh",
-          "factoryGeneration.cl.totalMwh",
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
+          "factoryGeneration.todayMwh",
+          "factoryGeneration.monthMwh",
+          "factoryGeneration.totalMwh"
         ]
       ],
       requirementKey: "todayCo2Reduction"
@@ -72,12 +63,9 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
         ["totalCo2Reduction"],
         ["totalGeneration"],
         [
-          "factoryGeneration.cl.todayMwh",
-          "factoryGeneration.cl.monthMwh",
-          "factoryGeneration.cl.totalMwh",
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
+          "factoryGeneration.todayMwh",
+          "factoryGeneration.monthMwh",
+          "factoryGeneration.totalMwh"
         ]
       ],
       requirementKey: "totalCo2Reduction"
@@ -86,38 +74,37 @@ test("resolveLiveMetricRequirementsForPage allows solar derived metrics to use r
   ]);
 });
 
-test("Site-scoped Overview and Solar freshness excludes unscoped global metrics", () => {
+test("Site-scoped freshness uses semantic keys against an already scoped snapshot", () => {
   assert.deepEqual(resolveLiveMetricRequirementsForPage("overview", "cl"), [
+    { alternatives: [["realTimePower"]], requirementKey: "realTimePower" },
     {
-      alternatives: [[
-        "factoryGeneration.cl.todayMwh",
-        "factoryGeneration.cl.monthMwh",
-        "factoryGeneration.cl.totalMwh"
-      ]],
+      alternatives: [
+        ["todayGeneration"],
+        ["factoryGeneration.todayMwh", "factoryGeneration.monthMwh", "factoryGeneration.totalMwh"]
+      ],
       requirementKey: "todayGeneration"
     },
     {
-      alternatives: [[
-        "factoryGeneration.cl.todayMwh",
-        "factoryGeneration.cl.monthMwh",
-        "factoryGeneration.cl.totalMwh"
-      ]],
+      alternatives: [
+        ["totalGeneration"],
+        ["factoryGeneration.todayMwh", "factoryGeneration.monthMwh", "factoryGeneration.totalMwh"]
+      ],
       requirementKey: "totalGeneration"
     },
     {
-      alternatives: [[
-        "factoryGeneration.cl.todayMwh",
-        "factoryGeneration.cl.monthMwh",
-        "factoryGeneration.cl.totalMwh"
-      ]],
+      alternatives: [
+        ["todayCo2Reduction"],
+        ["todayGeneration"],
+        ["factoryGeneration.todayMwh", "factoryGeneration.monthMwh", "factoryGeneration.totalMwh"]
+      ],
       requirementKey: "todayCo2Reduction"
     },
     {
-      alternatives: [[
-        "factoryGeneration.cl.todayMwh",
-        "factoryGeneration.cl.monthMwh",
-        "factoryGeneration.cl.totalMwh"
-      ]],
+      alternatives: [
+        ["totalCo2Reduction"],
+        ["totalGeneration"],
+        ["factoryGeneration.todayMwh", "factoryGeneration.monthMwh", "factoryGeneration.totalMwh"]
+      ],
       requirementKey: "totalCo2Reduction"
     }
   ]);
@@ -131,60 +118,52 @@ test("Site-scoped Overview and Solar freshness excludes unscoped global metrics"
         "systemEfficiency"
       ].includes(metricKey)
     ),
-    false
+    true
   );
   assert.deepEqual(
     resolveLiveMetricRequirementsForPage("sustainability", "kn"),
     [
       {
-        alternatives: [[
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
-        ]],
+        alternatives: [["totalGeneration"]],
         requirementKey: "accumulatedGenerationGwh"
       },
       {
-        alternatives: [[
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
-        ]],
+        alternatives: [["totalGeneration"]],
         requirementKey: "accumulatedCarbonReductionTons"
       },
       {
-        alternatives: [[
-          "factoryGeneration.kn.todayMwh",
-          "factoryGeneration.kn.monthMwh",
-          "factoryGeneration.kn.totalMwh"
-        ]],
+        alternatives: [["selfConsumptionEnergy", "consumptionEnergy"]],
+        requirementKey: "annualEnergySavingPercent"
+      },
+      {
+        alternatives: [["totalGeneration"]],
         requirementKey: "plantedTreeEquivalent"
       }
     ]
   );
 });
 
-test("resolveLiveMetricRequirementsForPage uses Guanyin Factory Circuit metric keys", () => {
+test("Factory Circuit page instances share semantic slot metric keys", () => {
   assert.deepEqual(resolveLiveMetricRequirementsForPage("factory-circuit-guanyin"), [
-    { alternatives: [["factoryCircuit.guanyin.stampingPower"]], requirementKey: "factoryCircuit.guanyin.stampingPower" },
-    { alternatives: [["factoryCircuit.guanyin.bodyPower"]], requirementKey: "factoryCircuit.guanyin.bodyPower" },
-    { alternatives: [["factoryCircuit.guanyin.paintingPower"]], requirementKey: "factoryCircuit.guanyin.paintingPower" },
-    { alternatives: [["factoryCircuit.guanyin.assemblyPower"]], requirementKey: "factoryCircuit.guanyin.assemblyPower" },
-    { alternatives: [["factoryCircuit.guanyin.utilityPower"]], requirementKey: "factoryCircuit.guanyin.utilityPower" },
-    { alternatives: [["factoryCircuit.guanyin.officePower"]], requirementKey: "factoryCircuit.guanyin.officePower" },
-    { alternatives: [["factoryCircuit.guanyin.heavyVehiclePower"]], requirementKey: "factoryCircuit.guanyin.heavyVehiclePower" },
-    { alternatives: [["factoryCircuit.guanyin.edCoatingPower"]], requirementKey: "factoryCircuit.guanyin.edCoatingPower" }
+    { alternatives: [["factoryCircuit.stampingPower"]], requirementKey: "factoryCircuit.stampingPower" },
+    { alternatives: [["factoryCircuit.bodyPower"]], requirementKey: "factoryCircuit.bodyPower" },
+    { alternatives: [["factoryCircuit.paintingPower"]], requirementKey: "factoryCircuit.paintingPower" },
+    { alternatives: [["factoryCircuit.assemblyPower"]], requirementKey: "factoryCircuit.assemblyPower" },
+    { alternatives: [["factoryCircuit.utilityPower"]], requirementKey: "factoryCircuit.utilityPower" },
+    { alternatives: [["factoryCircuit.officePower"]], requirementKey: "factoryCircuit.officePower" },
+    { alternatives: [["factoryCircuit.heavyVehiclePower"]], requirementKey: "factoryCircuit.heavyVehiclePower" },
+    { alternatives: [["factoryCircuit.edCoatingPower"]], requirementKey: "factoryCircuit.edCoatingPower" }
   ]);
 });
 
 test("resolveLiveMetricRequirementsForPage limits Jungli Factory Circuit to six visible metric keys", () => {
   assert.deepEqual(resolveLiveMetricRequirementsForPage("factory-circuit"), [
-    { alternatives: [["factoryStampingPower"]], requirementKey: "factoryStampingPower" },
-    { alternatives: [["factoryBodyPower"]], requirementKey: "factoryBodyPower" },
-    { alternatives: [["factoryPaintingPower"]], requirementKey: "factoryPaintingPower" },
-    { alternatives: [["factoryAssemblyPower"]], requirementKey: "factoryAssemblyPower" },
-    { alternatives: [["factoryUtilityPower"]], requirementKey: "factoryUtilityPower" },
-    { alternatives: [["factoryOfficePower"]], requirementKey: "factoryOfficePower" }
+    { alternatives: [["factoryCircuit.stampingPower"]], requirementKey: "factoryCircuit.stampingPower" },
+    { alternatives: [["factoryCircuit.bodyPower"]], requirementKey: "factoryCircuit.bodyPower" },
+    { alternatives: [["factoryCircuit.paintingPower"]], requirementKey: "factoryCircuit.paintingPower" },
+    { alternatives: [["factoryCircuit.assemblyPower"]], requirementKey: "factoryCircuit.assemblyPower" },
+    { alternatives: [["factoryCircuit.utilityPower"]], requirementKey: "factoryCircuit.utilityPower" },
+    { alternatives: [["factoryCircuit.officePower"]], requirementKey: "factoryCircuit.officePower" }
   ]);
 });
 

@@ -56,14 +56,14 @@ test("GET /api/data-source/overview returns read-only diagnostics for trusted ma
 
   const database = getDatabase();
   database.prepare("DELETE FROM metric_snapshots").run();
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(42, `${today} 00:00:00`);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(42, `${today} 00:00:00`);
 
   const app = await buildApp();
 
   try {
     const response = await app.inject({
       method: "GET",
-      url: "/api/data-source/overview"
+      url: "/api/data-source/overview?metricScope=global"
     });
 
     assert.equal(response.statusCode, 200);
@@ -75,6 +75,7 @@ test("GET /api/data-source/overview returns read-only diagnostics for trusted ma
         latestSnapshotAt: string | null;
         latestSnapshotDate: string | null;
         localDate: string;
+        metricScope: string;
       };
       mqtt: { dataMode: string; password: string };
       relatedRoutes: Array<{ path: string }>;
@@ -104,6 +105,7 @@ test("GET /api/data-source/overview returns read-only diagnostics for trusted ma
     assert.equal(body.retention.dailySummaryRetentionDays, 1825);
     assert.equal(body.browserLocalCache.status, "browser-managed");
     assert.equal(body.monitoring.hasCurrentDaySnapshots, true);
+    assert.equal(body.monitoring.metricScope, "global");
     assert.equal(body.monitoring.latestSnapshotAt, `${today} 00:00:00`);
     assert.equal(body.monitoring.latestSnapshotDate, today);
     assert.equal(body.monitoring.anomalyMessages.length, 0);
@@ -142,6 +144,56 @@ test("GET /api/data-source/overview denies untrusted management callers without 
     const serialized = JSON.stringify(body);
     assert.equal(serialized.includes(tempDir), false);
     assert.equal(serialized.includes("metric_snapshots"), false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/data-source/overview requires and isolates an explicit diagnostics scope", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at)
+    VALUES
+      ('cl', 100, ?),
+      ('kn', 200, ?)
+  `).run(toLocalTimestamp(now, 10), toLocalTimestamp(yesterday, 10));
+  const app = await buildApp();
+
+  try {
+    const missingScope = await app.inject({
+      method: "GET",
+      url: "/api/data-source/overview"
+    });
+    assert.equal(missingScope.statusCode, 400);
+
+    const cl = await app.inject({
+      method: "GET",
+      url: "/api/data-source/overview?metricScope=cl"
+    });
+    const kn = await app.inject({
+      method: "GET",
+      url: "/api/data-source/overview?metricScope=kn"
+    });
+    assert.deepEqual(
+      {
+        hasCurrentDaySnapshots: cl.json().monitoring.hasCurrentDaySnapshots,
+        metricScope: cl.json().monitoring.metricScope
+      },
+      { hasCurrentDaySnapshots: true, metricScope: "cl" }
+    );
+    assert.deepEqual(
+      {
+        hasCurrentDaySnapshots: kn.json().monitoring.hasCurrentDaySnapshots,
+        metricScope: kn.json().monitoring.metricScope
+      },
+      { hasCurrentDaySnapshots: false, metricScope: "kn" }
+    );
   } finally {
     await app.close();
   }
@@ -188,15 +240,15 @@ test("GET /api/data-source/overview reports stale-day and suspicious nighttime g
 
   const database = getDatabase();
   database.prepare("DELETE FROM metric_snapshots").run();
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(2100, `${toLocalDateKey(yesterday)} 18:00:00`);
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(2000, `${toLocalDateKey(yesterday)} 02:00:00`);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(2100, `${toLocalDateKey(yesterday)} 18:00:00`);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(2000, `${toLocalDateKey(yesterday)} 02:00:00`);
 
   const app = await buildApp();
 
   try {
     const response = await app.inject({
       method: "GET",
-      url: "/api/data-source/overview"
+      url: "/api/data-source/overview?metricScope=global"
     });
 
     assert.equal(response.statusCode, 200);
@@ -235,17 +287,18 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
   database.prepare("DELETE FROM cumulative_counters").run();
   database.prepare("DELETE FROM live_metric_values").run();
 
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(1800, `${toLocalDateKey(yesterday)} 23:50:00`);
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(600, toLocalTimestamp(today, 1));
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(2400, toLocalTimestamp(today, 9));
-  database.prepare("INSERT INTO daily_energy_summaries (date, generation_total) VALUES (?, ?)").run(toLocalDateKey(today), 3200);
-  database.prepare("INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count) VALUES (?, ?, ?, ?)").run(
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(1800, `${toLocalDateKey(yesterday)} 23:50:00`);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(600, toLocalTimestamp(today, 1));
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(2400, toLocalTimestamp(today, 9));
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('cl', ?, ?)").run(1200, toLocalTimestamp(today, 10));
+  database.prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total) VALUES ('global', ?, ?)").run(toLocalDateKey(today), 3200);
+  database.prepare("INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count) VALUES ('global', ?, ?, ?, ?)").run(
     "generation",
     12000,
     `${toLocalDateKey(today)}T09:00:00.000Z`,
     0
   );
-  database.prepare("INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload) VALUES (?, ?, ?, ?, ?, ?)").run(
+  database.prepare("INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload) VALUES ('global', ?, ?, ?, ?, ?, ?)").run(
     "realTimePower",
     2400,
     "kW",
@@ -258,6 +311,7 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
 
   try {
     const response = await app.inject({
+      body: { metricScope: "global" },
       method: "POST",
       url: "/api/data-source/reset-today-trend",
       headers: {
@@ -279,9 +333,12 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
     assert.equal(body.data.resetDate, toLocalDateKey(today));
 
     const remainingSnapshots = database
-      .prepare("SELECT captured_at FROM metric_snapshots ORDER BY captured_at ASC")
-      .all() as Array<{ captured_at: string }>;
-    assert.deepEqual(remainingSnapshots, [{ captured_at: `${toLocalDateKey(yesterday)} 23:50:00` }]);
+      .prepare("SELECT metric_scope, captured_at FROM metric_snapshots ORDER BY captured_at ASC")
+      .all() as Array<{ captured_at: string; metric_scope: string }>;
+    assert.deepEqual(remainingSnapshots, [
+      { captured_at: `${toLocalDateKey(yesterday)} 23:50:00`, metric_scope: "global" },
+      { captured_at: toLocalTimestamp(today, 10), metric_scope: "cl" }
+    ]);
 
     const dailySummaryCount = database.prepare("SELECT COUNT(*) AS count FROM daily_energy_summaries").get() as { count: number };
     const counterCount = database.prepare("SELECT COUNT(*) AS count FROM cumulative_counters").get() as { count: number };
@@ -289,6 +346,37 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
     assert.equal(dailySummaryCount.count, 1);
     assert.equal(counterCount.count, 1);
     assert.equal(liveValueCount.count, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("trend reset requires an explicit valid metric scope before deleting history", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at)
+    VALUES ('cl', 100, CURRENT_TIMESTAMP)
+  `).run();
+  const app = await buildApp();
+
+  try {
+    for (const body of [{}, { metricScope: "all" }]) {
+      const response = await app.inject({
+        body,
+        headers: { "x-solar-management-token": "management-secret-value" },
+        method: "POST",
+        url: "/api/data-source/reset-today-trend"
+      });
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json<{ code: string }>().code, "INVALID_METRIC_SCOPE");
+    }
+
+    const count = database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number };
+    assert.equal(count.count, 1);
   } finally {
     await app.close();
   }
@@ -310,26 +398,32 @@ test("POST /api/data-source/reset-month-trend deletes only current calendar-mont
   database.prepare("DELETE FROM cumulative_counters").run();
   database.prepare("DELETE FROM live_metric_values").run();
 
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(1800, `${toLocalDateKey(previousMonth)} 23:50:00`);
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(600, toLocalTimestamp(currentMonth, 1));
-  database.prepare("INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)").run(2400, toLocalTimestamp(now, 9));
-  database.prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)").run(
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(1800, `${toLocalDateKey(previousMonth)} 23:50:00`);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(600, toLocalTimestamp(currentMonth, 1));
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('global', ?, ?)").run(2400, toLocalTimestamp(now, 9));
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('kn', ?, ?)").run(1200, toLocalTimestamp(now, 10));
+  database.prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES ('global', ?, ?, ?)").run(
     toLocalDateKey(previousMonth),
     100,
     1000
   );
-  database.prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)").run(
+  database.prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES ('global', ?, ?, ?)").run(
     toLocalDateKey(currentMonth),
     200,
     2000
   );
-  database.prepare("INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count) VALUES (?, ?, ?, ?)").run(
+  database.prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES ('kn', ?, ?, ?)").run(
+    toLocalDateKey(currentMonth),
+    300,
+    3000
+  );
+  database.prepare("INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count) VALUES ('global', ?, ?, ?, ?)").run(
     "generation",
     12000,
     `${toLocalDateKey(now)}T09:00:00.000Z`,
     0
   );
-  database.prepare("INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload) VALUES (?, ?, ?, ?, ?, ?)").run(
+  database.prepare("INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload) VALUES ('global', ?, ?, ?, ?, ?, ?)").run(
     "realTimePower",
     2400,
     "kW",
@@ -342,6 +436,7 @@ test("POST /api/data-source/reset-month-trend deletes only current calendar-mont
 
   try {
     const response = await app.inject({
+      body: { metricScope: "global" },
       method: "POST",
       url: "/api/data-source/reset-month-trend",
       headers: {
@@ -365,14 +460,20 @@ test("POST /api/data-source/reset-month-trend deletes only current calendar-mont
     assert.equal(body.data.resetMonthStart, toLocalDateKey(currentMonth));
 
     const remainingSnapshots = database
-      .prepare("SELECT captured_at FROM metric_snapshots ORDER BY captured_at ASC")
-      .all() as Array<{ captured_at: string }>;
-    assert.deepEqual(remainingSnapshots, [{ captured_at: `${toLocalDateKey(previousMonth)} 23:50:00` }]);
+      .prepare("SELECT metric_scope, captured_at FROM metric_snapshots ORDER BY captured_at ASC")
+      .all() as Array<{ captured_at: string; metric_scope: string }>;
+    assert.deepEqual(remainingSnapshots, [
+      { captured_at: `${toLocalDateKey(previousMonth)} 23:50:00`, metric_scope: "global" },
+      { captured_at: toLocalTimestamp(now, 10), metric_scope: "kn" }
+    ]);
 
     const remainingSummaries = database
-      .prepare("SELECT date FROM daily_energy_summaries ORDER BY date ASC")
-      .all() as Array<{ date: string }>;
-    assert.deepEqual(remainingSummaries, [{ date: toLocalDateKey(previousMonth) }]);
+      .prepare("SELECT metric_scope, date FROM daily_energy_summaries ORDER BY date ASC, metric_scope ASC")
+      .all() as Array<{ date: string; metric_scope: string }>;
+    assert.deepEqual(remainingSummaries, [
+      { date: toLocalDateKey(previousMonth), metric_scope: "global" },
+      { date: toLocalDateKey(currentMonth), metric_scope: "kn" }
+    ]);
 
     const counterCount = database.prepare("SELECT COUNT(*) AS count FROM cumulative_counters").get() as { count: number };
     const liveValueCount = database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number };

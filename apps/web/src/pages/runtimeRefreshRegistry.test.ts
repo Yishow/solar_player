@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   resolveDisplayPageRuntimeRefreshSpec,
-  resolveMonitoringHistoryRuntimeRefreshSpec
+  resolveMonitoringHistoryRuntimeRefreshSpec,
+  shouldRefreshMonitoringHistory
 } from "./runtimeRefreshRegistry";
 
 test("runtime refresh registry maps each display page to the expected runtime source", () => {
@@ -51,4 +52,14 @@ test("runtime refresh registry assigns dedicated refresh scopes for sustainabili
     ["sustainability", "playback", "mqtt"]
   );
   assert.deepEqual(resolveMonitoringHistoryRuntimeRefreshSpec("month").refreshScopes, ["monitoring-history"]);
+});
+
+test("monitoring history consumers refresh only for their own metric scope", () => {
+  const clEvent = {
+    metricScope: "cl" as const,
+    scope: "monitoring-history" as const
+  };
+  assert.equal(shouldRefreshMonitoringHistory(clEvent, "cl"), true);
+  assert.equal(shouldRefreshMonitoringHistory(clEvent, "kn"), false);
+  assert.equal(shouldRefreshMonitoringHistory({ ...clEvent, metricScope: "global" }, "global"), true);
 });

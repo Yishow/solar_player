@@ -68,6 +68,7 @@ test("resolveMonitoringMetricBinding applies the shared kilogram preference only
       preferKilogramsForSubTonCo2: true
     },
     isConnected: true,
+    metricScope: "cl",
     reading: {
       quality: "good",
       timestamp: "2026-06-29T10:00:00.000Z",
@@ -91,6 +92,7 @@ test("resolveMonitoringMetricBinding applies the shared kilogram preference only
       preferKilogramsForSubTonCo2: true
     },
     isConnected: false,
+    metricScope: "cl",
     reading: null
   });
 

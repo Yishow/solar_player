@@ -264,7 +264,10 @@ test("getDataSourceOverview requests the read-only diagnostics endpoint", async 
 
   try {
     await getDataSourceOverview();
-    assert.equal(requestedUrls[0], buildApiUrl("/api/data-source/overview"));
+    assert.equal(
+      requestedUrls[0],
+      buildApiUrl("/api/data-source/overview?metricScope=global")
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

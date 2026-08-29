@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
+import { migrateScopedMetricIdentity } from "../db/scopedMetricMigration.js";
 import {
   DEFAULT_RETENTION_SWEEP_INTERVAL_MS,
   DEFAULT_RETENTION_VACUUM_INTERVAL_MS
@@ -13,8 +14,11 @@ function createDatabase() {
   const database = new Database(":memory:");
   const migration001 = readFileSync(resolve(process.cwd(), "src/db/migrations/001_init.sql"), "utf8");
   const migration003 = readFileSync(resolve(process.cwd(), "src/db/migrations/003_history.sql"), "utf8");
+  const migration018 = readFileSync(resolve(process.cwd(), "src/db/migrations/018_display_value_overrides.sql"), "utf8");
   database.exec(migration001);
   database.exec(migration003);
+  database.exec(migration018);
+  migrateScopedMetricIdentity(database, { legacySiteScope: "cl" });
   return database;
 }
 
@@ -23,6 +27,7 @@ function seedHistoryRows(database: Database.Database) {
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -30,14 +35,15 @@ function seedHistoryRows(database: Database.Database) {
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(1, 1, 1, 1, 0.5, 90, "2026-02-20T23:59:59.000Z");
+    .run("cl", 1, 1, 1, 1, 0.5, 90, "2026-02-20T23:59:59.000Z");
   database
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -45,15 +51,16 @@ function seedHistoryRows(database: Database.Database) {
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(2, 2, 2, 2, 0.5, 91, "2026-02-21T00:00:01.000Z");
+    .run("cl", 2, 2, 2, 2, 0.5, 91, "2026-02-21T00:00:01.000Z");
 
   database
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -63,14 +70,15 @@ function seedHistoryRows(database: Database.Database) {
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("2021-05-22", 1, 1, 1, 1, 1, "2021-05-22T12:00:00.000Z", 1, "2021-05-22T12:00:00.000Z");
+    .run("cl", "2021-05-22", 1, 1, 1, 1, 1, "2021-05-22T12:00:00.000Z", 1, "2021-05-22T12:00:00.000Z");
   database
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -80,18 +88,18 @@ function seedHistoryRows(database: Database.Database) {
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("2021-05-23", 2, 2, 2, 2, 2, "2021-05-23T12:00:00.000Z", 2, "2021-05-23T12:00:00.000Z");
+    .run("cl", "2021-05-23", 2, 2, 2, 2, 2, "2021-05-23T12:00:00.000Z", 2, "2021-05-23T12:00:00.000Z");
 
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 100, '2026-05-22T00:00:00.000Z', 0),
-          ('consumption', 80, '2026-05-22T00:00:00.000Z', 0)
+          ('cl', 'generation', 100, '2026-05-22T00:00:00.000Z', 0),
+          ('cl', 'consumption', 80, '2026-05-22T00:00:00.000Z', 0)
       `
     )
     .run();
@@ -162,6 +170,7 @@ test("MetricHistoryRetentionService compares mixed timestamp formats by actual t
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -169,14 +178,15 @@ test("MetricHistoryRetentionService compares mixed timestamp formats by actual t
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(1, 1, 1, 1, 0.5, 90, "2026-02-20 23:59:59");
+    .run("cl", 1, 1, 1, 1, 0.5, 90, "2026-02-20 23:59:59");
   database
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -184,10 +194,10 @@ test("MetricHistoryRetentionService compares mixed timestamp formats by actual t
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(2, 2, 2, 2, 0.5, 91, "2026-02-21T00:00:01.000Z");
+    .run("cl", 2, 2, 2, 2, 0.5, 91, "2026-02-21T00:00:01.000Z");
 
   const service = new MetricHistoryRetentionService({
     database,
@@ -245,6 +255,7 @@ test("MetricHistoryRetentionService runs VACUUM only after a prune and only once
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -252,10 +263,10 @@ test("MetricHistoryRetentionService runs VACUUM only after a prune and only once
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(3, 3, 3, 3, 0.5, 92, "2026-02-19T00:00:00.000Z");
+    .run("cl", 3, 3, 3, 3, 0.5, 92, "2026-02-19T00:00:00.000Z");
 
   const secondSweep = service.sweep(new Date("2026-05-22T00:00:01.000Z"));
   assert.deepEqual(secondSweep, {

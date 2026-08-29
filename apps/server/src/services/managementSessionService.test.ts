@@ -1,17 +1,35 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { getDatabase } from "../db/index.js";
-import { migrateDatabase } from "../db/migrate.js";
-import {
-  issueManagementSession,
-  resetManagementSessionClockForTests,
-  revokeAllManagementSessions,
-  setManagementSessionClockForTests,
-  verifyManagementSession
-} from "./managementSessionService.js";
+
+const tempDir = mkdtempSync(join(tmpdir(), "solar-display-management-session-test-"));
+process.env.DATA_DIR = tempDir;
+process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
+
+const [
+  { closeDatabaseConnection, getDatabase },
+  { migrateDatabase },
+  {
+    issueManagementSession,
+    resetManagementSessionClockForTests,
+    revokeAllManagementSessions,
+    setManagementSessionClockForTests,
+    verifyManagementSession
+  }
+] = await Promise.all([
+  import("../db/index.js"),
+  import("../db/migrate.js"),
+  import("./managementSessionService.js")
+]);
 
 migrateDatabase();
-test.after(() => revokeAllManagementSessions());
+test.after(() => {
+  revokeAllManagementSessions();
+  closeDatabaseConnection();
+  rmSync(tempDir, { force: true, recursive: true });
+});
 test("management sessions are opaque, verifiable, and revocable", () => {
   const issued = issueManagementSession();
   assert.equal(verifyManagementSession(issued.token), true);

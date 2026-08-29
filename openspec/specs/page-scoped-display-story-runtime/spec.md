@@ -29,7 +29,6 @@ The system SHALL expose `GET /api/display-story/:pageId` for the monitoring page
 - **THEN** the route rejects the request with the existing API error conventions
 - **AND** no monitoring story payload is returned
 
-
 <!-- @trace
 source: split-display-story-runtime-into-page-scoped-endpoints
 updated: 2026-05-23
@@ -158,6 +157,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Keep aggregate display story route compatible during migration
 
 The system SHALL keep `GET /api/display-story` available during the migration to page-scoped runtime endpoints, and the aggregate route SHALL remain equivalent to composing the page-scoped readers for `overview`, `solar`, and `factory-circuit`.
@@ -296,6 +296,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Page-scoped Story runtime enforces Display Client Context
 
 Page-scoped Story runtime endpoints SHALL resolve Site-sensitive sources from the authenticated Display Client Context. A page identifier SHALL NOT authorize access to another Site's data.
@@ -395,3 +396,17 @@ tests:
   - apps/server/src/services/playbackProfileService.test.ts
   - apps/web/src/pages/Overview/configRender.test.tsx
 -->
+
+### Requirement: Page-scoped stories resolve all metric facets from one effective scope
+
+A page-scoped monitoring story SHALL resolve displayed value, source value, freshness, fallback state, provenance, trend/history references, and display override from the same effective metric scope. A story MUST NOT combine a value from one site with freshness, source topics, history, or override state from another site.
+
+#### Scenario: CL Overview story is built
+- **WHEN** a CL display requests the `overview` story
+- **THEN** every site-dependent story metric resolves from CL-scoped inputs
+- **AND** each metric's freshness and provenance describe those same CL-scoped inputs
+
+#### Scenario: Global dependency is part of a site story
+- **WHEN** a page contract explicitly declares a global dependency for a CL or KN story
+- **THEN** the story MAY include that global dependency
+- **AND** its provenance SHALL identify the dependency scope as `global` rather than relabeling it as the device site

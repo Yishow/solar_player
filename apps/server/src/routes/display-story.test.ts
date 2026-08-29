@@ -28,8 +28,9 @@ function toLocalDateKey(date: Date) {
 function seedDisplayStoryFixture() {
   const database = getDatabase();
   const today = toLocalDateKey(new Date());
+  const staleObservedAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
   const updateTopic = database.prepare(
-    "UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_key = ?"
+    "UPDATE topic_mappings SET topic = ?, enabled = 1 WHERE metric_scope = 'cl' AND metric_key = ?"
   );
   updateTopic.run("kuozui/plant/solar/power", "realTimePower");
   updateTopic.run("kuozui/plant/solar/self_consumption", "selfConsumptionEnergy");
@@ -38,107 +39,107 @@ function seedDisplayStoryFixture() {
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("realTimePower", 586.2, "kW", `${today}T09:00:00.000Z`, "good", '{"value":586.2}');
+    .run("realTimePower", 586.2, "kW", staleObservedAt, "good", '{"value":586.2}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("todayGeneration", 3842, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":3842}');
+    .run("todayGeneration", 3842, "kWh", staleObservedAt, "good", '{"value":3842}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("totalGeneration", 18642, "GWh", `${today}T09:00:00.000Z`, "good", '{"value":18642}');
+    .run("totalGeneration", 18642, "GWh", staleObservedAt, "good", '{"value":18642}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("todayCo2Reduction", 1.94, "t", `${today}T09:00:00.000Z`, "good", '{"value":1.94}');
+    .run("todayCo2Reduction", 1.94, "t", staleObservedAt, "good", '{"value":1.94}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("totalCo2Reduction", 9842, "t", `${today}T09:00:00.000Z`, "good", '{"value":9842}');
+    .run("totalCo2Reduction", 9842, "t", staleObservedAt, "good", '{"value":9842}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("systemEfficiency", 88.6, "%", `${today}T09:00:00.000Z`, "good", '{"value":88.6}');
+    .run("systemEfficiency", 88.6, "%", staleObservedAt, "good", '{"value":88.6}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("selfConsumptionEnergy", 30, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":30}');
+    .run("selfConsumptionEnergy", 30, "kWh", staleObservedAt, "good", '{"value":30}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("consumptionEnergy", 40, "kWh", `${today}T09:00:00.000Z`, "good", '{"value":40}');
+    .run("consumptionEnergy", 40, "kWh", staleObservedAt, "good", '{"value":40}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryStampingPower", 790, "kW", `${today}T09:00:00.000Z`, "good", '{"value":790}');
+    .run("factoryCircuit.stampingPower", 790, "kW", staleObservedAt, "good", '{"value":790}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryBodyPower", 120, "kW", `${today}T09:00:00.000Z`, "good", '{"value":120}');
+    .run("factoryCircuit.bodyPower", 120, "kW", staleObservedAt, "good", '{"value":120}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryOfficePower", 90, "kW", `${today}T09:00:00.000Z`, "good", '{"value":90}');
+    .run("factoryCircuit.officePower", 90, "kW", staleObservedAt, "good", '{"value":90}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryHeavyVehiclePower", 45, "kW", `${today}T09:00:00.000Z`, "good", '{"value":45}');
+    .run("factoryCircuit.heavyVehiclePower", 45, "kW", staleObservedAt, "good", '{"value":45}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('cl', ?, ?, ?, ?, ?, ?)
       `
     )
-    .run("factoryUtilityPower", 35, "kW", `${today}T09:00:00.000Z`, "good", '{"value":35}');
+    .run("factoryCircuit.utilityPower", 35, "kW", staleObservedAt, "good", '{"value":35}');
   database.prepare("DELETE FROM live_metric_values WHERE metric_key = ?").run("selfConsumptionRatio");
   database.prepare("DELETE FROM metric_snapshots").run();
   for (const [generation, capturedAt] of [
@@ -151,6 +152,7 @@ function seedDisplayStoryFixture() {
       .prepare(
         `
           INSERT INTO metric_snapshots (
+            metric_scope,
             generation,
             consumption,
             self_consumption,
@@ -158,7 +160,7 @@ function seedDisplayStoryFixture() {
             ratio,
             efficiency,
             captured_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ) VALUES ('cl', ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(generation, null, null, null, null, null, capturedAt);
@@ -224,13 +226,14 @@ function seedPageScopedFactoryCircuitFixture() {
   );
   const insertMetric = database.prepare(
     `
-      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `
   );
   const insertTopic = database.prepare(
     `
       INSERT INTO topic_mappings (
+        metric_scope,
         metric_key,
         topic,
         unit,
@@ -239,29 +242,29 @@ function seedPageScopedFactoryCircuitFixture() {
         offset,
         decimal_places,
         enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(metric_key) DO UPDATE SET
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
         topic = excluded.topic,
         enabled = excluded.enabled
     `
   );
   const jungliSlots = [
-    ["stamping", "沖壓工程", "factoryStampingPower", 10],
-    ["body", "車身工程", "factoryBodyPower", 20],
-    ["painting", "塗裝工程", "factoryPaintingPower", 30],
-    ["assembly", "裝配工程", "factoryAssemblyPower", 40],
-    ["utility", "原動力", "factoryUtilityPower", 50],
-    ["office", "事務系", "factoryOfficePower", 60]
+    ["stamping", "沖壓工程", "factoryCircuit.stampingPower", 10],
+    ["body", "車身工程", "factoryCircuit.bodyPower", 20],
+    ["painting", "塗裝工程", "factoryCircuit.paintingPower", 30],
+    ["assembly", "裝配工程", "factoryCircuit.assemblyPower", 40],
+    ["utility", "原動力", "factoryCircuit.utilityPower", 50],
+    ["office", "事務系", "factoryCircuit.officePower", 60]
   ] as const;
   const guanyinSlots = [
-    ["stamping", "觀音沖壓", "factoryCircuit.guanyin.stampingPower", 1],
-    ["body", "觀音車身", "factoryCircuit.guanyin.bodyPower", 2],
-    ["painting", "觀音塗裝", "factoryCircuit.guanyin.paintingPower", 3],
-    ["assembly", "觀音裝配", "factoryCircuit.guanyin.assemblyPower", 4],
-    ["utility", "觀音原動力", "factoryCircuit.guanyin.utilityPower", 5],
-    ["office", "觀音事務系", "factoryCircuit.guanyin.officePower", 6],
-    ["heavy_vehicle", "觀音大車工程", "factoryCircuit.guanyin.heavyVehiclePower", 7],
-    ["ed_coating", "觀音ED電著", "factoryCircuit.guanyin.edCoatingPower", 8]
+    ["stamping", "觀音沖壓", "factoryCircuit.stampingPower", 1],
+    ["body", "觀音車身", "factoryCircuit.bodyPower", 2],
+    ["painting", "觀音塗裝", "factoryCircuit.paintingPower", 3],
+    ["assembly", "觀音裝配", "factoryCircuit.assemblyPower", 4],
+    ["utility", "觀音原動力", "factoryCircuit.utilityPower", 5],
+    ["office", "觀音事務系", "factoryCircuit.officePower", 6],
+    ["heavy_vehicle", "觀音大車工程", "factoryCircuit.heavyVehiclePower", 7],
+    ["ed_coating", "觀音ED電著", "factoryCircuit.edCoatingPower", 8]
   ] as const;
 
   for (const [index, [slotKey, label, metricKey, value]] of jungliSlots.entries()) {
@@ -283,8 +286,8 @@ function seedPageScopedFactoryCircuitFixture() {
       index + 1,
       1
     );
-    insertTopic.run(metricKey, `factory/jungli/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
-    insertMetric.run(metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
+    insertTopic.run("cl", metricKey, `factory/jungli/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
+    insertMetric.run("cl", metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
   }
 
   for (const [index, [slotKey, label, metricKey, value]] of guanyinSlots.entries()) {
@@ -306,8 +309,8 @@ function seedPageScopedFactoryCircuitFixture() {
       index + 1,
       1
     );
-    insertTopic.run(metricKey, `factory/guanyin/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
-    insertMetric.run(metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
+    insertTopic.run("kn", metricKey, `factory/guanyin/${slotKey}`, "kW", "$.value", 1, 0, 2, 1);
+    insertMetric.run("kn", metricKey, value, "kW", observedAt, "good", `{"value":${value}}`);
   }
 
   return { guanyinSlots, jungliSlots };
@@ -383,7 +386,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       };
     };
 
-    assert.equal(body.overview.summary.bindingState, "missing");
+    assert.equal(body.overview.summary.bindingState, "bound");
     assert.equal(body.overview.summary.alertTone, "warning");
     assert.ok(Array.isArray(body.overview.readinessFindings));
     assert.equal(body.overview.readinessFindings.every((finding) => finding.pageId === "overview"), true);
@@ -396,26 +399,26 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalGenerationMetric.provenance, "cumulative");
     assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
-    assert.equal(realTimePowerMetric?.sourceTopics, undefined);
-    assert.equal(realTimePowerMetric?.trendHours, undefined);
-    assert.equal(realTimePowerMetric?.trendSeries, undefined);
+    assert.ok(realTimePowerMetric?.sourceTopics?.length);
+    assert.ok(realTimePowerMetric?.trendHours?.length);
+    assert.ok(realTimePowerMetric?.trendSeries?.length);
 
     const selfConsumptionMetric = body.solar.kpis.find(
       (metric) => metric.metricKey === "selfConsumptionRatio"
     );
     assert.ok(selfConsumptionMetric);
-    assert.equal(selfConsumptionMetric.bindingState, "missing");
-    assert.equal(selfConsumptionMetric.fallbackReason, "metric-unavailable");
-    assert.equal(selfConsumptionMetric.provenance, "fallback");
+    assert.equal(selfConsumptionMetric.bindingState, "bound");
+    assert.equal(selfConsumptionMetric.fallbackReason, "stale-data");
+    assert.equal(selfConsumptionMetric.provenance, "derived");
     assert.equal(selfConsumptionMetric.sourceClass, "derived-metric");
     assert.deepEqual(selfConsumptionMetric.dependencyKeys, [
       "selfConsumptionRatio",
       "selfConsumptionEnergy",
       "consumptionEnergy"
     ]);
-    assert.equal(selfConsumptionMetric.sourceTopics, undefined);
-    assert.equal(body.solar.story.flowState.state, "normal");
-    assert.equal(body.solar.story.flowState.reason, "ready");
+    assert.ok(selfConsumptionMetric.sourceTopics?.length);
+    assert.equal(body.solar.story.flowState.state, "degraded");
+    assert.equal(body.solar.story.flowState.reason, "reduced-efficiency");
     assert.equal(
       body.factoryCircuit.slots.some(
         (slot) =>
@@ -434,7 +437,7 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(totalPowerKpi.provenance, "fallback");
     assert.equal(totalPowerKpi.sourceClass, "slot-aggregate");
     assert.equal(totalPowerKpi.value, "--");
-    assert.equal(totalPowerKpi.dependencyKeys.includes("factoryStampingPower"), true);
+    assert.equal(totalPowerKpi.dependencyKeys.includes("factoryCircuit.stampingPower"), true);
 
     const selfConsumptionKpi = body.factoryCircuit.kpis.find(
       (metric) => metric.metricKey === "selfConsumption"
@@ -454,17 +457,19 @@ test("Site-scoped Overview does not expose global persisted history after MQTT r
   const { today } = seedDisplayStoryFixture();
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("UPDATE metric_snapshots SET metric_scope = 'global'").run();
   database
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
           self_consumption_total,
           co2_total
-        ) VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(date) DO UPDATE SET
+        ) VALUES ('global', ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, date) DO UPDATE SET
           generation_total = excluded.generation_total,
           consumption_total = excluded.consumption_total,
           self_consumption_total = excluded.self_consumption_total,
@@ -482,7 +487,7 @@ test("Site-scoped Overview does not expose global persisted history after MQTT r
         method: "GET",
         url: "/api/display-story"
       }),
-      app.inject({ method: "GET", url: "/api/metrics/daily-summary?range=month" })
+      app.inject({ cookies: deviceCookies(), method: "GET", url: "/api/metrics/daily-summary?range=month" })
     ]);
 
     assert.equal(storyResponse.statusCode, 200);
@@ -501,8 +506,7 @@ test("Site-scoped Overview does not expose global persisted history after MQTT r
       summaries: Array<{ consumptionTotal: number; date: string }>;
     };
     const todaySummary = summary.summaries.find((row) => row.date === today);
-    assert.equal(todaySummary?.date, today);
-    assert.equal(todaySummary?.consumptionTotal, 123.4);
+    assert.equal(todaySummary, undefined);
   } finally {
     await app.close();
   }
@@ -595,7 +599,7 @@ test("GET /api/display-story/:pageId returns only the requested page payload wra
 
     assert.equal(body.pageId, "overview");
     assert.equal(typeof body.generatedAt, "string");
-    assert.equal(body.payload.summary.bindingState, "missing");
+    assert.equal(body.payload.summary.bindingState, "bound");
     assert.equal(body.payload.metrics.some((metric) => metric.metricKey === "totalGeneration"), true);
     assert.equal("overview" in body, false);
     assert.equal("solar" in body, false);
@@ -609,7 +613,7 @@ test("GET /api/display-story/factory-circuit exposes bilingual slot labels for p
   seedDisplayStoryFixture();
   getDatabase()
     .prepare("UPDATE topic_mappings SET name_zh = ?, name_en = ? WHERE metric_key = ?")
-    .run("一號產線", "Line 1", "factoryStampingPower");
+    .run("一號產線", "Line 1", "factoryCircuit.stampingPower");
 
   const app = await buildApp();
 
@@ -682,22 +686,22 @@ test("GET /api/display-story resolves Factory Circuit circuit data by page key",
     assert.equal(jungliTotal?.value, "210");
     assert.equal(guanyinTotal?.value, "36.0");
     assert.deepEqual(jungliTotal?.dependencyKeys, [
-      "factoryStampingPower",
-      "factoryBodyPower",
-      "factoryPaintingPower",
-      "factoryAssemblyPower",
-      "factoryUtilityPower",
-      "factoryOfficePower"
+      "factoryCircuit.stampingPower",
+      "factoryCircuit.bodyPower",
+      "factoryCircuit.paintingPower",
+      "factoryCircuit.assemblyPower",
+      "factoryCircuit.utilityPower",
+      "factoryCircuit.officePower"
     ]);
     assert.deepEqual(guanyinTotal?.dependencyKeys, [
-      "factoryCircuit.guanyin.stampingPower",
-      "factoryCircuit.guanyin.bodyPower",
-      "factoryCircuit.guanyin.paintingPower",
-      "factoryCircuit.guanyin.assemblyPower",
-      "factoryCircuit.guanyin.utilityPower",
-      "factoryCircuit.guanyin.officePower",
-      "factoryCircuit.guanyin.heavyVehiclePower",
-      "factoryCircuit.guanyin.edCoatingPower"
+      "factoryCircuit.stampingPower",
+      "factoryCircuit.bodyPower",
+      "factoryCircuit.paintingPower",
+      "factoryCircuit.assemblyPower",
+      "factoryCircuit.utilityPower",
+      "factoryCircuit.officePower",
+      "factoryCircuit.heavyVehiclePower",
+      "factoryCircuit.edCoatingPower"
     ]);
   } finally {
     await app.close();
@@ -711,9 +715,9 @@ test("GET /api/display-story derives Factory Circuit peak from the configured mu
   database
     .prepare(
       `
-        INSERT INTO topic_mappings (metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO topic_mappings (metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled)
+        VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           topic = excluded.topic,
           unit = excluded.unit,
           value_path = excluded.value_path,
@@ -724,8 +728,8 @@ test("GET /api/display-story derives Factory Circuit peak from the configured mu
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('global', ?, ?, ?, ?, ?, ?)
       `
     )
     .run("factoryPeakMultiplier", 1.2, "x", observedAt, "good", "{\"value\":1.2}");
@@ -754,12 +758,12 @@ test("GET /api/display-story derives Factory Circuit peak from the configured mu
     assert.equal(peak?.value, "252");
     assert.deepEqual(peak?.dependencyKeys, [
       "factoryPeakMultiplier",
-      "factoryStampingPower",
-      "factoryBodyPower",
-      "factoryPaintingPower",
-      "factoryAssemblyPower",
-      "factoryUtilityPower",
-      "factoryOfficePower"
+      "factoryCircuit.stampingPower",
+      "factoryCircuit.bodyPower",
+      "factoryCircuit.paintingPower",
+      "factoryCircuit.assemblyPower",
+      "factoryCircuit.utilityPower",
+      "factoryCircuit.officePower"
     ]);
     assert.equal(
       peak?.sourceTopics?.some(
@@ -814,15 +818,15 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
       `
         UPDATE live_metric_values
         SET timestamp = ?
-        WHERE metric_key IN (
-          'factoryCircuit.guanyin.stampingPower',
-          'factoryCircuit.guanyin.bodyPower',
-          'factoryCircuit.guanyin.paintingPower',
-          'factoryCircuit.guanyin.assemblyPower',
-          'factoryCircuit.guanyin.utilityPower',
-          'factoryCircuit.guanyin.officePower',
-          'factoryCircuit.guanyin.heavyVehiclePower',
-          'factoryCircuit.guanyin.edCoatingPower',
+        WHERE metric_scope = 'kn' AND metric_key IN (
+          'factoryCircuit.stampingPower',
+          'factoryCircuit.bodyPower',
+          'factoryCircuit.paintingPower',
+          'factoryCircuit.assemblyPower',
+          'factoryCircuit.utilityPower',
+          'factoryCircuit.officePower',
+          'factoryCircuit.heavyVehiclePower',
+          'factoryCircuit.edCoatingPower',
           'selfConsumptionEnergy',
           'todayGeneration'
         )
@@ -832,17 +836,17 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('kn', ?, ?, ?, ?, ?, ?)
       `
     )
     .run("realTimePower", 1200, "kW", "2026-07-09T11:00:00.000Z", "good", '{"value":1200}');
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('kn', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           value = excluded.value,
           unit = excluded.unit,
           timestamp = excluded.timestamp,
@@ -854,9 +858,9 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('kn', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           value = excluded.value,
           unit = excluded.unit,
           timestamp = excluded.timestamp,
@@ -908,8 +912,8 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
     assert.equal(totalPower?.freshnessState, "stale");
     assert.equal(totalPower?.fallbackReason, "stale-data");
     assert.match(totalPower?.helper ?? "", /最近一次有效讀值/);
-    assert.equal(selfConsumption?.value, "--");
-    assert.equal(selfConsumption?.freshnessState, "fallback");
+    assert.equal(selfConsumption?.value, "9.2");
+    assert.equal(selfConsumption?.freshnessState, "stale");
     assert.equal(stamping?.livePowerKw, 1);
     assert.equal(stamping?.freshnessState, "stale");
     assert.equal(stamping?.fallbackReason, "stale-data");

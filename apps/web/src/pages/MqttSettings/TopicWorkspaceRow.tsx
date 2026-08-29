@@ -22,7 +22,7 @@ export type TopicWorkspaceRowProps = {
   hasUnsavedChanges?: boolean;
   highlighted?: boolean;
   publishDraftValue?: string;
-  publishTopicValue?: (metricKey: string, value: number) => Promise<void>;
+  publishTopicValue?: (metricScope: TopicMapping["metricScope"], metricKey: string, value: number) => Promise<void>;
   publishingTopicKey?: string | null;
   /** 移除特定 Topic 對照的事件函式 */
   removeTopicMapping: (rowId: number) => void;
@@ -189,6 +189,18 @@ function TopicWorkspaceRowImpl({
       </div>
 
       <div className="topic-workspace-row__fields">
+        <label className="topic-input-group">
+          <span className="topic-input-group__label">Scope</span>
+          <select
+            aria-label="Metric scope"
+            value={topic.metricScope}
+            onChange={(event) => handleTopicChange(topic.id, "metricScope", event.target.value as TopicMapping["metricScope"])}
+          >
+            <option value="cl">CL</option>
+            <option value="kn">KN</option>
+            <option value="global">Global</option>
+          </select>
+        </label>
         <TopicInputGroup
           rowId={topic.id}
           field="topic"
@@ -259,7 +271,7 @@ function TopicWorkspaceRowImpl({
               disabled={publishDisabled}
               onClick={() => {
                 if (publishDisabled || !publishTopicValue) return;
-                void publishTopicValue(topic.metricKey, publishNumber);
+                void publishTopicValue(topic.metricScope, topic.metricKey, publishNumber);
               }}
             >
               {isPublishing ? "發佈中..." : "發佈測試值"}

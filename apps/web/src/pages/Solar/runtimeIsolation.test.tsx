@@ -29,6 +29,7 @@ test("solar runtime output stays stable when an unrelated metric changes", () =>
 
   replaceLiveMetricsConnectionState(connectedState);
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       phaseRVoltage: createReading(220.5, "V", "2026-07-05T10:00:00.000Z"),
       realTimePower: createReading(812.4, "kW", "2026-07-05T10:00:00.000Z"),
@@ -50,6 +51,7 @@ test("solar runtime output stays stable when an unrelated metric changes", () =>
   );
 
   replaceLiveMetricsSnapshot({
+    metricScope: "cl",
     metrics: {
       phaseRVoltage: createReading(224.1, "V", "2026-07-05T10:00:05.000Z"),
       realTimePower: createReading(812.4, "kW", "2026-07-05T10:00:00.000Z"),

@@ -129,9 +129,9 @@ function seedFactoryGenerationSources() {
   const timestamp = new Date().toISOString();
   const upsert = database.prepare(
     `INSERT INTO live_metric_values (
-       metric_key, value, unit, timestamp, quality, raw_payload
-     ) VALUES (?, ?, ?, ?, 'good', ?)
-     ON CONFLICT(metric_key) DO UPDATE SET
+       metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+     ) VALUES (?, ?, ?, ?, ?, 'good', ?)
+     ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
        value = excluded.value,
        unit = excluded.unit,
        timestamp = excluded.timestamp,
@@ -145,7 +145,8 @@ function seedFactoryGenerationSources() {
   ] as const) {
     for (const [suffix, value] of Object.entries(values)) {
       upsert.run(
-        `factoryGeneration.${site}.${suffix}`,
+        site,
+        `factoryGeneration.${suffix}`,
         value,
         suffix === "todayMwh" ? "MWh" : "MWh",
         timestamp,
@@ -259,17 +260,28 @@ test("paired CL and KN Devices receive only their own Factory Circuit Story", as
   const app = await buildApp();
 
   try {
+    const observedAt = new Date().toISOString();
+    getDatabase().prepare(`
+      INSERT INTO live_metric_values (
+        metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+      ) VALUES
+        ('cl', 'factoryCircuit.stampingPower', 11, 'kW', ?, 'good', '{}'),
+        ('kn', 'factoryCircuit.stampingPower', 22, 'kW', ?, 'good', '{}')
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+        value = excluded.value,
+        timestamp = excluded.timestamp,
+        quality = excluded.quality,
+        raw_payload = excluded.raw_payload
+    `).run(observedAt, observedAt);
     const cases = [
       {
-        forbiddenMetricPrefix: "factoryCircuit.guanyin.",
+        expectedPowerKw: 11,
         pageId: "factory-circuit",
-        requiredMetricPrefix: null,
         siteScope: "cl"
       },
       {
-        forbiddenMetricPrefix: "factoryCircuit.cl.",
+        expectedPowerKw: 22,
         pageId: "factory-circuit-guanyin",
-        requiredMetricPrefix: "factoryCircuit.guanyin.",
         siteScope: "kn"
       }
     ] as const;
@@ -289,24 +301,21 @@ test("paired CL and KN Devices receive only their own Factory Circuit Story", as
       assert.equal(response.statusCode, 200);
       const body = response.json<{
         pageId: string;
-        payload: { slots: Array<{ metricKey: string | null }> };
+        payload: {
+          kpis: Array<{ metricKey: string; metricScope: string }>;
+          slots: Array<{ livePowerKw: number | null; metricKey: string | null; metricScope: string; slotKey: string }>;
+        };
       }>();
       assert.equal(body.pageId, testCase.pageId);
       assert.ok(body.payload.slots.length > 0);
+      const stamping = body.payload.slots.find((slot) => slot.slotKey === "stamping");
+      assert.equal(stamping?.metricKey, "factoryCircuit.stampingPower");
+      assert.equal(stamping?.metricScope, testCase.siteScope);
+      assert.equal(stamping?.livePowerKw, testCase.expectedPowerKw);
       assert.equal(
-        body.payload.slots.some((slot) =>
-          slot.metricKey?.startsWith(testCase.forbiddenMetricPrefix)
-        ),
-        false
+        body.payload.kpis.find((kpi) => kpi.metricKey === "totalPower")?.metricScope,
+        testCase.siteScope
       );
-      if (testCase.requiredMetricPrefix) {
-        assert.equal(
-          body.payload.slots.every((slot) =>
-            slot.metricKey?.startsWith(testCase.requiredMetricPrefix)
-          ),
-          true
-        );
-      }
     }
   } finally {
     await app.close();
@@ -378,9 +387,9 @@ test("paired CL and KN Devices do not receive unscoped Overview or Solar metrics
     const timestamp = new Date().toISOString();
     const upsert = getDatabase().prepare(
       `INSERT INTO live_metric_values (
-         metric_key, value, unit, timestamp, quality, raw_payload
-       ) VALUES (?, ?, ?, ?, 'good', '{}')
-       ON CONFLICT(metric_key) DO UPDATE SET
+         metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+       ) VALUES ('global', ?, ?, ?, ?, 'good', '{}')
+       ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
          value = excluded.value,
          unit = excluded.unit,
          timestamp = excluded.timestamp,
@@ -418,12 +427,14 @@ test("paired CL and KN Devices do not receive unscoped Overview or Solar metrics
       kpis?: Array<{
         bindingState: string;
         metricKey: string;
+        metricScope: string;
         sourceTopics?: Array<{ metricKey: string; topic: string }>;
         value: string;
       }>;
       metrics?: Array<{
         bindingState: string;
         metricKey: string;
+        metricScope: string;
         sourceTopics?: Array<{ metricKey: string; topic: string }>;
         value: string;
       }>;
@@ -443,6 +454,8 @@ test("paired CL and KN Devices do not receive unscoped Overview or Solar metrics
       readMetric(clOverview!, "todayGeneration")?.value,
       readMetric(knOverview!, "todayGeneration")?.value
     );
+    assert.equal(readMetric(clOverview!, "realTimePower")?.metricScope, "cl");
+    assert.equal(readMetric(knOverview!, "realTimePower")?.metricScope, "kn");
     for (const payload of [clOverview!, knOverview!]) {
       assert.equal(readMetric(payload, "realTimePower")?.bindingState, "missing");
       assert.equal(readMetric(payload, "realTimePower")?.value, "--");
@@ -468,13 +481,127 @@ test("paired CL and KN Devices do not receive unscoped Overview or Solar metrics
   }
 });
 
+test("a stale CL story metric never falls back to the fresh KN value or provenance", async () => {
+  const app = await buildApp();
+
+  try {
+    seedFactoryGenerationSources();
+    const stalePayload = JSON.stringify({
+      month_mwh: 40,
+      timestamp: "2020-01-01T00:00:00.000Z",
+      today_mwh: 10,
+      total_mwh: 100
+    });
+    getDatabase().prepare(`
+      UPDATE live_metric_values
+      SET raw_payload = ?
+      WHERE metric_scope = 'cl' AND metric_key LIKE 'factoryGeneration.%'
+    `).run(stalePayload);
+    const cl = await createPairedDevice(app, "cl", "stale-story-cl");
+    const kn = await createPairedDevice(app, "kn", "fresh-story-kn");
+    const [clResponse, knResponse] = await Promise.all([
+      app.inject({ cookies: { solar_device_credential: cl.credential }, method: "GET", url: "/api/display-story/overview" }),
+      app.inject({ cookies: { solar_device_credential: kn.credential }, method: "GET", url: "/api/display-story/overview" })
+    ]);
+    const readToday = (response: typeof clResponse) => response.json<{
+      payload: { metrics: Array<{ bindingState: string; metricKey: string; sourceTopics?: unknown; value: string }> }
+    }>().payload.metrics.find((metric) => metric.metricKey === "todayGeneration");
+    const clToday = readToday(clResponse);
+    const knToday = readToday(knResponse);
+    assert.equal(clToday?.bindingState, "missing");
+    assert.equal(clToday?.value, "--");
+    assert.equal(clToday?.sourceTopics, undefined);
+    assert.notEqual(knToday?.value, "--");
+  } finally {
+    await app.close();
+  }
+});
+
+test("Overview trend uses the paired Device site and never falls back to another site", async () => {
+  const app = await buildApp();
+
+  try {
+    const database = getDatabase();
+    const now = new Date();
+    const today = [
+      now.getFullYear(),
+      `${now.getMonth() + 1}`.padStart(2, "0"),
+      `${now.getDate()}`.padStart(2, "0")
+    ].join("-");
+    database.prepare("DELETE FROM metric_snapshots").run();
+    database.prepare(`
+      INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at)
+      VALUES
+        ('cl', 81, ?),
+        ('cl', 95, ?)
+    `).run(`${today} 08:00:00`, `${today} 09:00:00`);
+
+    const cl = await createPairedDevice(app, "cl", "overview-trend-cl");
+    const kn = await createPairedDevice(app, "kn", "overview-trend-kn");
+    const [clResponse, knResponse] = await Promise.all([
+      app.inject({ cookies: { solar_device_credential: cl.credential }, method: "GET", url: "/api/display-story/overview" }),
+      app.inject({ cookies: { solar_device_credential: kn.credential }, method: "GET", url: "/api/display-story/overview" })
+    ]);
+    const readPower = (response: typeof clResponse) => response.json<{
+      payload: { metrics: Array<{ metricKey: string; trendHours?: number[]; trendSeries?: number[] }> }
+    }>().payload.metrics.find((metric) => metric.metricKey === "realTimePower");
+
+    assert.deepEqual(readPower(clResponse)?.trendHours, [8, 9]);
+    assert.deepEqual(readPower(clResponse)?.trendSeries, [81, 95]);
+    assert.equal(readPower(knResponse)?.trendHours, undefined);
+    assert.equal(readPower(knResponse)?.trendSeries, undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+test("formal live metric bootstrap ignores client scope claims and returns only trusted Device scope", async () => {
+  const app = await buildApp();
+
+  try {
+    const database = getDatabase();
+    database.prepare("DELETE FROM live_metric_values").run();
+    database.prepare(`
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES
+        ('cl', 'realTimePower', 11, 'kW', '2026-08-29T01:00:00.000Z', 'good', '{}'),
+        ('kn', 'realTimePower', 22, 'kW', '2026-08-29T01:00:00.000Z', 'good', '{}'),
+        ('global', 'factoryPeakMultiplier', 1.2, 'x', '2026-08-29T01:00:00.000Z', 'good', '{}')
+    `).run();
+    const denied = await app.inject({ method: "GET", url: "/api/metrics/live" });
+    assert.equal(denied.statusCode, 401);
+    const paired = await createPairedDevice(app, "cl", "live-bootstrap-scope");
+    const response = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
+      headers: { "x-site-scope": "kn" },
+      method: "GET",
+      url: "/api/metrics/live?siteScope=kn&metricScope=kn"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json<{
+      globalSnapshot: { metricScope: string; metrics: Record<string, { value: number }> };
+      metricScope: string;
+      metrics: Record<string, { value: number }>;
+    }>();
+    assert.equal(body.metricScope, "cl");
+    assert.equal(body.globalSnapshot.metricScope, "global");
+    assert.equal(body.globalSnapshot.metrics.factoryPeakMultiplier?.value, 1.2);
+    const metrics = body.metrics;
+    assert.equal(metrics.realTimePower?.value, 11);
+    assert.equal(Object.values(metrics).some((metric) => metric.value === 22), false);
+  } finally {
+    await app.close();
+  }
+});
+
 test("CL runtime Readiness and Rotation ignore missing KN source mappings", async () => {
   const app = await buildApp();
 
   try {
     seedFactoryGenerationSources();
     getDatabase()
-      .prepare("DELETE FROM topic_mappings WHERE metric_key LIKE 'factoryGeneration.kn.%'")
+      .prepare("DELETE FROM topic_mappings WHERE metric_scope = 'kn' AND metric_key LIKE 'factoryGeneration.%'")
       .run();
     const paired = await createPairedDevice(app, "cl", "readiness-cl");
 
@@ -728,18 +855,18 @@ test("Effective Rotation invalidates on Freshness, Profile, and Readiness change
     const timestamp = new Date().toISOString();
     const upsertMetric = getDatabase().prepare(
       `INSERT INTO live_metric_values (
-         metric_key, value, unit, timestamp, quality, raw_payload
-       ) VALUES (?, 96, 'kW', ?, 'good', ?)
-       ON CONFLICT(metric_key) DO UPDATE SET
+         metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+       ) VALUES ('cl', ?, 96, 'kW', ?, 'good', ?)
+       ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
          value = excluded.value,
          timestamp = excluded.timestamp,
          quality = excluded.quality,
          raw_payload = excluded.raw_payload`
     );
     for (const metricKey of [
-      "factoryGeneration.cl.todayMwh",
-      "factoryGeneration.cl.monthMwh",
-      "factoryGeneration.cl.totalMwh"
+      "factoryGeneration.todayMwh",
+      "factoryGeneration.monthMwh",
+      "factoryGeneration.totalMwh"
     ]) {
       upsertMetric.run(metricKey, timestamp, JSON.stringify({ timestamp }));
     }
@@ -762,12 +889,12 @@ test("Effective Rotation invalidates on Freshness, Profile, and Readiness change
 
     getDatabase()
       .prepare(
-        "DELETE FROM topic_mappings WHERE metric_key = 'factoryGeneration.cl.todayMwh'"
+        "DELETE FROM topic_mappings WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.todayMwh'"
       )
       .run();
     getDatabase()
       .prepare(
-        "DELETE FROM live_metric_values WHERE metric_key = 'factoryGeneration.cl.todayMwh'"
+        "DELETE FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.todayMwh'"
       )
       .run();
     const readinessRevision = await readRevision();

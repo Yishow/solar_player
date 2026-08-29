@@ -3,16 +3,17 @@ import type {
   DisplayReadinessFinding,
   DisplayReadinessPageSummary,
   DisplayReadinessReport,
+  MetricScope,
   SiteScope
 } from "@solar-display/shared";
 import {
   displayCircuitSlotKeys,
   displayMetricRequirements,
   displaySlotRequirements,
-  factoryGenerationDependencyKeys,
   factoryGenerationDerivedRequirementKeys,
   resolveDisplayReadinessRequirementsForSite
 } from "@solar-display/shared";
+import { scopedIdentityKey } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import {
   evaluateFactoryGenerationAggregate,
@@ -21,12 +22,13 @@ import {
 } from "./factoryGenerationAggregateService.js";
 import { readDefaultPlaybackPageRows } from "./playbackProfileService.js";
 import { resolveLiveMetricRequirementsForPage } from "@solar-display/shared";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { evaluatePageFreshnessForRequirements } from "./freshnessPolicyService.js";
 
 type TopicMappingRow = {
   enabled: number;
   metric_key: string;
+  metric_scope: MetricScope;
   topic: string | null;
 };
 
@@ -46,7 +48,7 @@ function toBoolean(value: unknown) {
 
 function readTopicMappings() {
   return getDatabase()
-    .prepare("SELECT metric_key, topic, enabled FROM topic_mappings")
+    .prepare("SELECT metric_scope, metric_key, topic, enabled FROM topic_mappings")
     .all() as TopicMappingRow[];
 }
 
@@ -105,7 +107,7 @@ function readCanonicalGenerationValue(requirementKey: string) {
     return false;
   }
   const row = getDatabase()
-    .prepare("SELECT value FROM live_metric_values WHERE metric_key = ?")
+    .prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = ?")
     .get(metricKey) as { value: number | null } | undefined;
   return typeof row?.value === "number" && Number.isFinite(row.value);
 }
@@ -126,11 +128,19 @@ function readSustainabilityFactoryScope() {
   );
 }
 
+function resolveReadinessMetricScope(pageId: string, siteScope?: SiteScope): SiteScope {
+  return siteScope ?? (pageId === "factory-circuit-guanyin" ? "kn" : "cl");
+}
+
 function buildMetricFindings(
   now: Date,
   siteScope?: SiteScope
 ): DisplayReadinessFinding[] {
-  const mappings = new Map(readTopicMappings().map((row) => [row.metric_key, row]));
+  const mappings = new Map(
+    readTopicMappings().map((row) => [scopedIdentityKey(row.metric_scope, row.metric_key), row])
+  );
+  const readMapping = (metricScope: MetricScope, metricKey: string) =>
+    mappings.get(scopedIdentityKey(metricScope, metricKey));
   const aggregate = evaluateFactoryGenerationAggregate(getDatabase(), now);
   const metricRequirements = siteScope
     ? resolveDisplayReadinessRequirementsForSite(siteScope).filter(
@@ -139,15 +149,16 @@ function buildMetricFindings(
     : displayMetricRequirements;
 
   return metricRequirements.map((requirement) => {
+    const metricScope = resolveReadinessMetricScope(requirement.pageId, siteScope);
     const metricKeys = requirement.dependencyKeys ?? [requirement.requirementKey];
-    const directMapping = mappings.get(requirement.requirementKey);
+    const directMapping = readMapping(metricScope, requirement.requirementKey);
     const directTopic = directMapping?.topic?.trim() ?? "";
     const directAvailable =
       Boolean(directMapping && toBoolean(directMapping.enabled) && directTopic.length > 0);
     const derivedDependencyKeys = metricKeys.filter((metricKey) => metricKey !== requirement.requirementKey);
     const derivedMappings = derivedDependencyKeys.map((metricKey) => ({
       metricKey,
-      mapping: mappings.get(metricKey)
+      mapping: readMapping(metricScope, metricKey)
     }));
     const derivedAvailable =
       derivedMappings.length > 0 &&
@@ -174,6 +185,7 @@ function buildMetricFindings(
       if (scope === "none") {
         return {
           blocking: true,
+          metricScope,
           pageId: requirement.pageId,
           reason: "no factory selected in playback settings",
           requirementKey: requirement.requirementKey,
@@ -182,13 +194,13 @@ function buildMetricFindings(
           status: "blocking"
         };
       }
-      const requiredDependencyKeys = factoryGenerationDependencyKeys.filter((metricKey) =>
-        scope === "CL+KN" || metricKey.startsWith(`factoryGeneration.${scope.toLowerCase()}.`)
+      const requiredScopes: SiteScope[] = scope === "CL+KN" ? ["cl", "kn"] : [scope.toLowerCase() as SiteScope];
+      const sourceMappings = requiredScopes.flatMap((metricScope) =>
+        ["todayMwh", "monthMwh", "totalMwh"].map((suffix) => {
+          const metricKey = `factoryGeneration.${suffix}`;
+          return { metricKey: `${metricScope}:${metricKey}`, mapping: readMapping(metricScope, metricKey) };
+        })
       );
-      const sourceMappings = requiredDependencyKeys.map((metricKey) => ({
-        metricKey,
-        mapping: mappings.get(metricKey)
-      }));
       const sourceMappingsAvailable = sourceMappings.every(
         ({ mapping }) =>
           Boolean(mapping && toBoolean(mapping.enabled) && (mapping.topic?.trim().length ?? 0) > 0)
@@ -207,6 +219,7 @@ function buildMetricFindings(
           .join(", ");
         return {
           blocking: true,
+          metricScope,
           pageId: requirement.pageId,
           reason: `missing CL/KN MQTT mapping: ${missingKeys}`,
           requirementKey: requirement.requirementKey,
@@ -224,6 +237,7 @@ function buildMetricFindings(
           && readCanonicalGenerationValue(requirement.requirementKey);
         return {
           blocking: false,
+          metricScope,
           pageId: requirement.pageId,
           reason: `${scopedEvaluation.issues.map(formatAggregateIssue).join(", ")}${hasCanonicalFallback ? "; using last canonical generation" : ""}`,
           requirementKey: requirement.requirementKey,
@@ -235,6 +249,7 @@ function buildMetricFindings(
 
       return {
         blocking: false,
+        metricScope,
         pageId: requirement.pageId,
         reason: scope === "CL+KN" ? "CL + KN MQTT aggregate ready" : `${scope} MQTT ready`,
         requirementKey: requirement.requirementKey,
@@ -246,6 +261,7 @@ function buildMetricFindings(
 
     return {
       blocking: !available,
+      metricScope,
       pageId: requirement.pageId,
       reason: available
         ? directAvailable
@@ -275,6 +291,7 @@ function buildSlotFindings(siteScope?: SiteScope): DisplayReadinessFinding[] {
     : displaySlotRequirements;
 
   return slotRequirements.map((requirement) => {
+    const metricScope = resolveReadinessMetricScope(requirement.pageId, siteScope);
     const matches = enabledCircuits.filter(
       (circuit) =>
         circuit.pageKey === requirement.pageId &&
@@ -284,6 +301,7 @@ function buildSlotFindings(siteScope?: SiteScope): DisplayReadinessFinding[] {
     if (matches.length === 0) {
       return {
         blocking: true,
+        metricScope,
         pageId: requirement.pageId,
         reason: `missing explicit slot binding for ${requirement.requirementKey}`,
         requirementKey: requirement.requirementKey,
@@ -296,6 +314,7 @@ function buildSlotFindings(siteScope?: SiteScope): DisplayReadinessFinding[] {
     if (matches.length > 1) {
       return {
         blocking: true,
+        metricScope,
         pageId: requirement.pageId,
         reason: `slot conflict: ${requirement.requirementKey} is claimed by multiple circuits`,
         requirementKey: requirement.requirementKey,
@@ -307,6 +326,7 @@ function buildSlotFindings(siteScope?: SiteScope): DisplayReadinessFinding[] {
 
     return {
       blocking: false,
+      metricScope,
       pageId: requirement.pageId,
       reason: `bound to ${matches[0]?.nameZh ?? matches[0]?.nameEn ?? matches[0]?.mqttTopic ?? "circuit"}`,
       requirementKey: requirement.requirementKey,
@@ -338,39 +358,25 @@ export function readDisplayReadinessReport(
   options: { now?: Date; siteScope?: SiteScope } = {}
 ): DisplayReadinessReport {
   const now = options.now ?? new Date();
-  const rawFindings = [
-    ...buildMetricFindings(now, options.siteScope),
-    ...buildSlotFindings(options.siteScope)
-  ];
-  const liveMetrics = readLiveMetricsSnapshot(getDatabase()).metrics;
+  const scopes: SiteScope[] = options.siteScope ? [options.siteScope] : ["cl", "kn"];
+  const rawFindings = scopes.flatMap((siteScope) => [
+    ...buildMetricFindings(now, siteScope),
+    ...buildSlotFindings(siteScope)
+  ]);
   const findings = rawFindings.map((finding) => {
     if (finding.sourceType === "circuit-slot") {
       return finding;
     }
-    const factoryScope = options.siteScope
-      ? options.siteScope
-      : finding.pageId === "sustainability"
-        ? readSustainabilityFactoryScope().toLowerCase()
-        : "cl+kn";
-    const factoryMetricKeys = factoryGenerationRequirementKeys.has(
-      finding.requirementKey
-    )
-      ? factoryGenerationDependencyKeys.filter(
-          (metricKey) =>
-            factoryScope === "cl+kn"
-            || metricKey.startsWith(`factoryGeneration.${factoryScope}.`)
-        )
-      : [];
-    const requirement =
-      factoryMetricKeys.length > 0
-        ? {
-            alternatives: [factoryMetricKeys],
-            requirementKey: finding.requirementKey
-          }
-        : resolveLiveMetricRequirementsForPage(
-            finding.pageId,
-            options.siteScope
-          ).find((candidate) => candidate.requirementKey === finding.requirementKey);
+    if (factoryGenerationRequirementKeys.has(finding.requirementKey)) {
+      return finding;
+    }
+    const metricScope = finding.metricScope;
+    const siteScope = metricScope === "global" ? undefined : metricScope;
+    const liveMetrics = readScopedLiveMetricsSnapshot(metricScope, getDatabase()).metrics;
+    const requirement = resolveLiveMetricRequirementsForPage(
+      finding.pageId,
+      siteScope
+    ).find((candidate) => candidate.requirementKey === finding.requirementKey);
     if (!requirement) {
       return finding;
     }

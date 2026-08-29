@@ -1,5 +1,6 @@
 import type {
   DisplayReadinessReport,
+  MetricScope,
   WeatherDiagnostic,
   WeatherFieldKey,
   WeatherHeaderContract,
@@ -37,6 +38,7 @@ export type MqttStatus = {
 export type TopicMapping = {
   id: number;
   metricKey: string;
+  metricScope: MetricScope;
   topic: string;
   nameZh: string | null;
   nameEn: string | null;
@@ -574,12 +576,17 @@ export function buildMqttSettingsViewModel({
         || factoryGenerationDerivedRequirementKeys.includes(finding.requirementKey)
     )
     .map((finding) => {
-      const topic = mappedTopics.find((candidate) => candidate.metricKey === finding.requirementKey);
+      const topic = mappedTopics.find(
+        (candidate) =>
+          candidate.metricScope === finding.metricScope
+          && candidate.metricKey === finding.requirementKey
+      );
       const metric = describeMetric(finding.requirementKey);
 
       if (finding.sourceType === "derived-metric") {
         return {
           detail: finding.reason,
+          metricScope: finding.metricScope,
           metricLabelZh: metric.zh,
           pageId: finding.pageId,
           requirementKey: finding.requirementKey,
@@ -601,6 +608,7 @@ export function buildMqttSettingsViewModel({
       if (!topic || !topic.enabled || topic.topic.trim() === "") {
         return {
           detail: finding.reason,
+          metricScope: finding.metricScope,
           metricLabelZh: metric.zh,
           pageId: finding.pageId,
           requirementKey: finding.requirementKey,
@@ -612,6 +620,7 @@ export function buildMqttSettingsViewModel({
       if (topic.lastReceivedAt === null) {
         return {
           detail: status.connected ? finding.reason : "Broker 目前未連線，topic runtime 無法提供即時收值。",
+          metricScope: finding.metricScope,
           metricLabelZh: metric.zh,
           pageId: finding.pageId,
           requirementKey: finding.requirementKey,
@@ -622,6 +631,7 @@ export function buildMqttSettingsViewModel({
 
       return {
         detail: null,
+        metricScope: finding.metricScope,
         metricLabelZh: metric.zh,
         pageId: finding.pageId,
         requirementKey: finding.requirementKey,
@@ -631,11 +641,11 @@ export function buildMqttSettingsViewModel({
     });
 
   const coverageByMetricKey = new Map(
-    coverageRows.map((row) => [row.requirementKey, row] as const)
+    coverageRows.map((row) => [`${row.metricScope}:${row.requirementKey}`, row] as const)
   );
 
   const topicWorkspaceRows = mappedTopics.map((topic) => {
-    const coverage = coverageByMetricKey.get(topic.metricKey) ?? null;
+    const coverage = coverageByMetricKey.get(`${topic.metricScope}:${topic.metricKey}`) ?? null;
 
     return {
       ...topic,

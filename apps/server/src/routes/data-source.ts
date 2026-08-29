@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { isMetricScope, type MetricScope } from "@solar-display/shared";
 import { readdirSync, statSync } from "node:fs";
 import { config } from "../config.js";
 import { getDatabase } from "../db/index.js";
@@ -47,6 +48,7 @@ type DataSourceOverview = {
     latestSnapshotAt: string | null;
     latestSnapshotDate: string | null;
     localDate: string;
+    metricScope: MetricScope;
   };
   weather: {
     status: "ready";
@@ -202,18 +204,19 @@ function toLocalTimeLabel(date: Date) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function readMonitoringDiagnostics(now: Date) {
+function readMonitoringDiagnostics(now: Date, metricScope: MetricScope) {
   const rows = getDatabase()
     .prepare(
       `
         SELECT captured_at, generation, generation_power
         FROM metric_snapshots
-        WHERE generation IS NOT NULL OR generation_power IS NOT NULL
+        WHERE metric_scope = ?
+          AND (generation IS NOT NULL OR generation_power IS NOT NULL)
         ORDER BY captured_at DESC
         LIMIT 2000
       `
     )
-    .all() as MonitoringSnapshotDiagnosticRow[];
+    .all(metricScope) as MonitoringSnapshotDiagnosticRow[];
 
   const localDate = toLocalDateKey(now);
   const parsedRows = rows.flatMap((row) => {
@@ -259,15 +262,16 @@ function readMonitoringDiagnostics(now: Date) {
     hasCurrentDaySnapshots,
     latestSnapshotAt: latestRow?.capturedAt ?? null,
     latestSnapshotDate,
-    localDate
+    localDate,
+    metricScope
   };
 }
 
-function deleteTodayTrendSnapshots(now: Date) {
+function deleteTodayTrendSnapshots(now: Date, metricScope: MetricScope) {
   const localDate = toLocalDateKey(now);
   const rows = getDatabase()
-    .prepare("SELECT id, captured_at FROM metric_snapshots")
-    .all() as Array<{ captured_at: string; id: number }>;
+    .prepare("SELECT id, captured_at FROM metric_snapshots WHERE metric_scope = ?")
+    .all(metricScope) as Array<{ captured_at: string; id: number }>;
   const rowIds = rows.flatMap((row) => {
     const parsedAt = parseCapturedAt(row.captured_at);
     if (Number.isNaN(parsedAt.getTime()) || toLocalDateKey(parsedAt) !== localDate) {
@@ -291,11 +295,11 @@ function deleteTodayTrendSnapshots(now: Date) {
   };
 }
 
-function deleteMonthTrendData(now: Date) {
+function deleteMonthTrendData(now: Date, metricScope: MetricScope) {
   const monthStart = toLocalDateKey(startOfLocalMonth(now));
   const rows = getDatabase()
-    .prepare("SELECT id, captured_at FROM metric_snapshots")
-    .all() as Array<{ captured_at: string; id: number }>;
+    .prepare("SELECT id, captured_at FROM metric_snapshots WHERE metric_scope = ?")
+    .all(metricScope) as Array<{ captured_at: string; id: number }>;
   const snapshotIds = rows.flatMap((row) => {
     const parsedAt = parseCapturedAt(row.captured_at);
     if (Number.isNaN(parsedAt.getTime()) || toLocalDateKey(parsedAt) < monthStart) {
@@ -306,13 +310,15 @@ function deleteMonthTrendData(now: Date) {
   });
 
   const deleteSnapshot = getDatabase().prepare("DELETE FROM metric_snapshots WHERE id = ?");
-  const deleteSummaries = getDatabase().prepare("DELETE FROM daily_energy_summaries WHERE date >= ?");
+  const deleteSummaries = getDatabase().prepare(
+    "DELETE FROM daily_energy_summaries WHERE metric_scope = ? AND date >= ?"
+  );
   const runDelete = getDatabase().transaction((ids: number[]) => {
     for (const rowId of ids) {
       deleteSnapshot.run(rowId);
     }
 
-    return deleteSummaries.run(monthStart).changes;
+    return deleteSummaries.run(metricScope, monthStart).changes;
   });
   const deletedDailySummaries = runDelete(snapshotIds);
 
@@ -323,7 +329,10 @@ function deleteMonthTrendData(now: Date) {
   };
 }
 
-export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}): DataSourceOverview {
+export function buildDataSourceOverview(
+  deps: BuildDataSourceOverviewDeps = {},
+  metricScope: MetricScope = "global"
+): DataSourceOverview {
   const now = deps.now?.() ?? new Date();
   const warnings: string[] = [];
   const tableCountsReader = deps.readTableCounts ?? readTableCounts;
@@ -353,7 +362,7 @@ export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}):
   const imageUploads = summarizeUploadDir("uploads/images", config.uploadsDir);
   const brandUploads = summarizeUploadDir("uploads/brand", config.brandUploadsDir);
   const mqttSettings = resolveMqttSettings(process.env, readMqttSettingsRow());
-  const monitoring = readMonitoringDiagnostics(now);
+  const monitoring = readMonitoringDiagnostics(now, metricScope);
 
   return {
     browserLocalCache: {
@@ -432,22 +441,39 @@ export function buildDataSourceOverview(deps: BuildDataSourceOverviewDeps = {}):
 }
 
 const dataSourceRoute: FastifyPluginAsync = async (app) => {
-  app.get("/api/data-source/overview", async (request, reply) => {
+  app.get<{ Querystring: { metricScope?: unknown } }>("/api/data-source/overview", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
     }
 
-    return buildDataSourceOverview();
+    if (!isMetricScope(request.query.metricScope)) {
+      return reply.status(400).send({
+        code: "INVALID_METRIC_SCOPE",
+        error: "Data source overview metricScope must be cl, kn, or global",
+        success: false
+      });
+    }
+
+    return buildDataSourceOverview({}, request.query.metricScope);
   });
 
-  app.post("/api/data-source/reset-today-trend", async (request, reply) => {
+  app.post<{ Body: { metricScope?: unknown } }>("/api/data-source/reset-today-trend", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
       return app.managementAccess.deny(reply);
     }
 
-    const result = deleteTodayTrendSnapshots(new Date());
+    if (!isMetricScope(request.body?.metricScope)) {
+      return reply.status(400).send({
+        code: "INVALID_METRIC_SCOPE",
+        error: "Trend reset metricScope must be cl, kn, or global",
+        success: false
+      });
+    }
+
+    const result = deleteTodayTrendSnapshots(new Date(), request.body.metricScope);
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
+      metricScope: request.body.metricScope,
       reason: "today-trend-reset",
       scope: "monitoring-history"
     });
@@ -462,14 +488,23 @@ const dataSourceRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.post("/api/data-source/reset-month-trend", async (request, reply) => {
+  app.post<{ Body: { metricScope?: unknown } }>("/api/data-source/reset-month-trend", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
       return app.managementAccess.deny(reply);
     }
 
-    const result = deleteMonthTrendData(new Date());
+    if (!isMetricScope(request.body?.metricScope)) {
+      return reply.status(400).send({
+        code: "INVALID_METRIC_SCOPE",
+        error: "Trend reset metricScope must be cl, kn, or global",
+        success: false
+      });
+    }
+
+    const result = deleteMonthTrendData(new Date(), request.body.metricScope);
     app.socketService.emitDisplaySync({
       generatedAt: new Date().toISOString(),
+      metricScope: request.body.metricScope,
       reason: "month-trend-reset",
       scope: "monitoring-history"
     });

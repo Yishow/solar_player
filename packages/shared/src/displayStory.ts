@@ -1,6 +1,7 @@
 import type { DisplayCircuitSlotKey, DisplayReadinessFinding, FactoryCircuitPageKey } from "./displayReadiness.js";
 import type { MetricKey } from "./types.js";
 import type { FreshnessPolicy, FreshnessResult } from "./freshnessPolicy.js";
+import type { MetricScope } from "./metricScope.js";
 
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
 export type MonitoringAlertTone = "danger" | "normal" | "warning";
@@ -73,6 +74,7 @@ export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> 
     helper: string;
     label: string;
     metricKey: TMetric;
+    metricScope: MetricScope;
     provenance: MonitoringMetricProvenance;
     sourceClass: MonitoringMetricSourceClass;
     sourceTopics?: MonitoringMetricSourceTopic[];
@@ -97,6 +99,7 @@ export type FactoryCircuitStorySlot = MonitoringStoryState & {
   labelZh?: string;
   livePowerKw: number | null;
   metricKey?: string;
+  metricScope: MetricScope;
   slotKey: DisplayCircuitSlotKey;
 };
 
@@ -259,6 +262,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
   binding: MonitoringMetricBinding<TMetric>;
   displayValueOptions?: MonitoringDisplayValueOptions;
   isConnected: boolean;
+  metricScope: MetricScope;
   reading: MonitoringMetricReading | null;
 }) {
   const dependencyKeys = args.binding.dependencyKeys ?? [args.binding.metricKey];
@@ -278,6 +282,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
       helper: args.binding.fallbackHelper ?? "顯示 fallback 資料",
       label: args.binding.label,
       metricKey: args.binding.metricKey,
+      metricScope: args.metricScope,
       provenance: "fallback",
       sourceClass,
       unit: args.binding.unit,
@@ -299,6 +304,7 @@ export function resolveMonitoringMetricBinding<TMetric extends string>(args: {
     helper: `最後更新 ${args.reading.timestamp}`,
     label: args.binding.label,
     metricKey: args.binding.metricKey,
+    metricScope: args.metricScope,
     provenance:
       sourceClass === "cumulative-counter"
         ? "cumulative"
@@ -340,6 +346,7 @@ export function resolveMonitoringSummaryState(states: MonitoringStoryState[]) {
 export function resolveMonitoringSlotBinding(args: {
   circuitId: number | null;
   conflictingCircuitIds?: number[];
+  metricScope: MetricScope;
   slotKey: DisplayCircuitSlotKey;
 }) {
   if ((args.conflictingCircuitIds?.length ?? 0) > 1) {
@@ -348,6 +355,7 @@ export function resolveMonitoringSlotBinding(args: {
       bindingState: "conflict",
       fallbackReason: "missing-slot-binding",
       freshnessState: "fallback",
+      metricScope: args.metricScope,
       slotKey: args.slotKey
     };
   }
@@ -358,6 +366,7 @@ export function resolveMonitoringSlotBinding(args: {
       bindingState: "missing",
       fallbackReason: "missing-slot-binding",
       freshnessState: "fallback",
+      metricScope: args.metricScope,
       slotKey: args.slotKey
     };
   }
@@ -367,6 +376,7 @@ export function resolveMonitoringSlotBinding(args: {
     bindingState: "bound",
     fallbackReason: null,
     freshnessState: "fresh",
+    metricScope: args.metricScope,
     slotKey: args.slotKey
   };
 }

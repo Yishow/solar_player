@@ -1,6 +1,8 @@
 import type {
   DisplayPageKey,
+  DisplaySyncEvent,
   DisplaySyncEventScope,
+  MetricScope,
   SustainabilityPeriodKey
 } from "@solar-display/shared";
 
@@ -83,4 +85,11 @@ export function resolveMonitoringHistoryRuntimeRefreshSpec(range: MonitoringHist
     refreshScopes: ["monitoring-history"] as DisplaySyncEventScope[],
     sourceKind: "monitoring-history" as const
   };
+}
+
+export function shouldRefreshMonitoringHistory(
+  event: Pick<DisplaySyncEvent, "metricScope" | "scope">,
+  metricScope: MetricScope
+) {
+  return event.scope === "monitoring-history" && event.metricScope === metricScope;
 }

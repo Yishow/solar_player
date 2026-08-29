@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { LiveMetricsSnapshot, SocketConnectionState } from "../services/socket";
+import type { ScopedLiveMetricsSnapshot, SocketConnectionState } from "../services/socket";
 import {
   createLiveMetricsSelectorSubscription,
   createLiveMetricsStore
@@ -19,9 +19,11 @@ const baseConnectionState: SocketConnectionState = {
 
 function createSnapshot(
   values: Record<string, number>,
-  timestamp = "2026-07-05T10:00:00.000Z"
-): LiveMetricsSnapshot {
+  timestamp = "2026-07-05T10:00:00.000Z",
+  metricScope: "cl" | "kn" | "global" = "cl"
+): ScopedLiveMetricsSnapshot {
   return {
+    metricScope,
     metrics: Object.fromEntries(
       Object.entries(values).map(([metricKey, value]) => [
         metricKey,
@@ -36,6 +38,22 @@ function createSnapshot(
     timestamp
   };
 }
+
+test("scoped snapshots merge explicit global metrics and replace stale other-site state", () => {
+  const store = createLiveMetricsStore();
+  store.setSnapshot(createSnapshot({ globalWeather: 30 }, "2026-07-05T10:00:00.000Z", "global"));
+  store.setSnapshot(createSnapshot({ realTimePower: 11 }, "2026-07-05T10:00:01.000Z", "cl"));
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(store.getState().snapshot.metrics).map(([key, reading]) => [key, reading.value])),
+    { globalWeather: 30, realTimePower: 11 }
+  );
+
+  store.setSnapshot(createSnapshot({ realTimePower: 22 }, "2026-07-05T10:00:02.000Z", "kn"));
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(store.getState().snapshot.metrics).map(([key, reading]) => [key, reading.value])),
+    { globalWeather: 30, realTimePower: 22 }
+  );
+});
 
 test("selector subscription updates when the selected metric value changes", () => {
   const store = createLiveMetricsStore({

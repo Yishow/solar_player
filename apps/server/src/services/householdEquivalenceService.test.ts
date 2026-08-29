@@ -74,13 +74,13 @@ function arrangeChungliFactorySummary(
   });
   const insertLiveMetric = database.prepare(
     `
-      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-      VALUES (?, ?, 'MWh', ?, 'good', ?)
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES ('cl', ?, ?, 'MWh', ?, 'good', ?)
     `
   );
-  insertLiveMetric.run("factoryGeneration.cl.todayMwh", summary.todayMwh, summary.timestamp, rawPayload);
-  insertLiveMetric.run("factoryGeneration.cl.monthMwh", summary.monthMwh, summary.timestamp, rawPayload);
-  insertLiveMetric.run("factoryGeneration.cl.totalMwh", summary.totalMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run("factoryGeneration.todayMwh", summary.todayMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run("factoryGeneration.monthMwh", summary.monthMwh, summary.timestamp, rawPayload);
+  insertLiveMetric.run("factoryGeneration.totalMwh", summary.totalMwh, summary.timestamp, rawPayload);
 }
 
 test("readHouseholdEquivalenceCards derives today from self-consumption and cumulative from the active factory summary", () => {
@@ -97,6 +97,7 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -106,7 +107,7 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
@@ -115,9 +116,9 @@ test("readHouseholdEquivalenceCards derives today from self-consumption and cumu
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
+          ('global', 'generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -166,18 +167,18 @@ test("readHouseholdEquivalenceCards derives cumulative households from the fresh
   setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
   const insertLiveMetric = database.prepare(
     `
-      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-      VALUES (?, ?, 'MWh', ?, 'good', ?)
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES ('cl', ?, ?, 'MWh', ?, 'good', ?)
     `
   );
-  insertLiveMetric.run("factoryGeneration.cl.todayMwh", 123.4, timestamp, summary);
-  insertLiveMetric.run("factoryGeneration.cl.monthMwh", 2345, timestamp, summary);
-  insertLiveMetric.run("factoryGeneration.cl.totalMwh", 45678, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.todayMwh", 123.4, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.monthMwh", 2345, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.totalMwh", 45678, timestamp, summary);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 12350, ?, 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 12350, ?, 0)
       `
     )
     .run(timestamp);
@@ -211,18 +212,18 @@ test("readHouseholdEquivalenceCards does not fall back to the global counter whe
   setOnlyDefaultPlaybackPagesEnabledForTest(database, ["factory-circuit"]);
   const insertLiveMetric = database.prepare(
     `
-      INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-      VALUES (?, ?, 'MWh', ?, 'good', ?)
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES ('cl', ?, ?, 'MWh', ?, 'good', ?)
     `
   );
-  insertLiveMetric.run("factoryGeneration.cl.todayMwh", 123.4, timestamp, summary);
-  insertLiveMetric.run("factoryGeneration.cl.monthMwh", 2345, timestamp, summary);
-  insertLiveMetric.run("factoryGeneration.cl.totalMwh", 45678, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.todayMwh", 123.4, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.monthMwh", 2345, timestamp, summary);
+  insertLiveMetric.run("factoryGeneration.totalMwh", 45678, timestamp, summary);
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 12350, ?, 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 12350, ?, 0)
       `
     )
     .run(timestamp);
@@ -248,11 +249,12 @@ test("readHouseholdEquivalenceCards derives cumulative household headline from c
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
           self_consumption_total
-        ) VALUES (?, 100, 80, 16)
+        ) VALUES ('global', ?, 100, 80, 16)
       `
     )
     .run(today);
@@ -260,10 +262,10 @@ test("readHouseholdEquivalenceCards derives cumulative household headline from c
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 114820, '2026-07-09T08:43:30.386Z', 0),
-          ('selfConsumption', 22584, '2026-07-09T08:43:30.386Z', 0)
+          ('global', 'generation', 114820, '2026-07-09T08:43:30.386Z', 0),
+          ('global', 'selfConsumption', 22584, '2026-07-09T08:43:30.386Z', 0)
       `
     )
     .run();
@@ -298,11 +300,12 @@ test("readHouseholdEquivalenceCards falls back to live today generation when dai
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
           self_consumption_total
-        ) VALUES ('2026-07-08', 0, 0, 0)
+        ) VALUES ('global', '2026-07-08', 0, 0, 0)
       `
     )
     .run();
@@ -310,8 +313,8 @@ test("readHouseholdEquivalenceCards falls back to live today generation when dai
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 114820, '2026-07-09T08:43:30.386Z', 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 114820, '2026-07-09T08:43:30.386Z', 0)
       `
     )
     .run();
@@ -319,8 +322,8 @@ test("readHouseholdEquivalenceCards falls back to live today generation when dai
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('todayGeneration', 7.99, 'MWh', '2026-07-09T08:43:14.000Z', 'good', '{}')
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('global', 'todayGeneration', 7.99, 'MWh', '2026-07-09T08:43:14.000Z', 'good', '{}')
       `
     )
     .run();
@@ -349,6 +352,7 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -358,7 +362,7 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(today, 120, 92, null, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
@@ -367,9 +371,9 @@ test("readHouseholdEquivalenceCards fails closed when the daily self-consumption
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
+          ('global', 'generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -405,6 +409,7 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -414,7 +419,7 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(
@@ -433,8 +438,8 @@ test("readHouseholdEquivalenceCards falls back to the latest daily summary when 
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();
@@ -463,6 +468,7 @@ test("readHouseholdEquivalenceCards does not fall back to live total generation 
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -472,7 +478,7 @@ test("readHouseholdEquivalenceCards does not fall back to live total generation 
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
@@ -481,8 +487,8 @@ test("readHouseholdEquivalenceCards does not fall back to live total generation 
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('totalGeneration', 4.2, 'MWh', ?, 'good', '{}')
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES ('global', 'totalGeneration', 4.2, 'MWh', ?, 'good', '{}')
       `
     )
     .run(`${today}T10:00:00.000Z`);
@@ -512,6 +518,7 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -521,7 +528,7 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(today, 120, 92, 72, 18, 30, `${today}T10:00:00.000Z`, 24, `${today}T11:00:00.000Z`);
@@ -530,8 +537,8 @@ test("readHouseholdEquivalenceCards uses configured household usage and tariff c
   database
     .prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES ('generation', 4200, '2026-05-21T10:00:00.000Z', 0)
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES ('global', 'generation', 4200, '2026-05-21T10:00:00.000Z', 0)
       `
     )
     .run();

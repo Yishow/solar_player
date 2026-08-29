@@ -5,7 +5,7 @@ import {
   type SiteScope
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
 import {
   evaluateFactoryGenerationScope,
@@ -50,6 +50,7 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
   const database = options.database ?? getDatabase();
   const now = options.now ?? new Date();
   const todayDate = toDateKey(now);
+  const metricScope = options.siteScope ?? "global";
   const calculationSettings = readCalculationSettings(database);
   const calcProfile = createHouseholdEquivalenceCalcProfile({
     averageDailyUsageKwh: calculationSettings.householdDailyUsageKwh,
@@ -61,13 +62,13 @@ export function readHouseholdEquivalenceCards(options: ReadHouseholdEquivalenceC
       `
         SELECT date, self_consumption_total
         FROM daily_energy_summaries
-        WHERE date <= ?
+        WHERE metric_scope = ? AND date <= ?
         ORDER BY date DESC
         LIMIT 1
       `
     )
-    .get(todayDate) as DailySummaryRow | undefined;
-  const liveMetrics = readLiveMetricsSnapshot(database).metrics;
+    .get(metricScope, todayDate) as DailySummaryRow | undefined;
+  const liveMetrics = readScopedLiveMetricsSnapshot(metricScope, database).metrics;
   const liveTodayGeneration = liveMetrics.todayGeneration;
   const factoryScope = options.siteScope
     ? options.siteScope === "cl"

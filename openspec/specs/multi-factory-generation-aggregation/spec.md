@@ -36,7 +36,6 @@ Solar Player SHALL subscribe to the CL and KN retained factory summaries and SHA
 - **WHEN** aggregation runs
 - **THEN** it retains 13645.876 MWh and readiness identifies KN as stale
 
-
 <!-- @trace
 source: aggregate-cl-kn-total-mwh-for-sustainability
 updated: 2026-07-21
@@ -111,6 +110,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Prevent direct and derived generation sources from competing
 
 Solar Player SHALL use the CL and KN source mappings as the only inputs to the derived canonical generation path and SHALL prevent legacy direct generation mappings from overwriting the derived canonical values.
@@ -121,7 +121,6 @@ Solar Player SHALL use the CL and KN source mappings as the only inputs to the d
 - **THEN** it SHALL NOT replace the canonical derived value
 - **AND** the derived value SHALL remain based on CL and KN factory summaries
 
-
 <!-- @trace
 source: aggregate-cl-kn-total-mwh-for-sustainability
 updated: 2026-07-21
@@ -196,6 +195,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Reject silent cumulative generation regressions
 
 Solar Player SHALL NOT overwrite canonical cumulative generation or the cumulative generation counter when a newly derived CL plus KN total is lower than the last accepted canonical total.
@@ -225,7 +225,6 @@ Solar Player SHALL NOT overwrite canonical cumulative generation or the cumulati
 - **WHEN** the operator submits 11600.000 MWh as the reset confirmation
 - **THEN** Solar Player rejects the reset and retains 13645.876 MWh as the accepted canonical total
 
-
 <!-- @trace
 source: aggregate-cl-kn-total-mwh-for-sustainability
 updated: 2026-07-21
@@ -300,6 +299,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Expose independently validated factory snapshots
 
 Solar Player SHALL retain independently validated CL and KN generation snapshots for factory-scoped consumers while preserving the complete CL plus KN rule for canonical combined generation.
@@ -394,3 +394,26 @@ tests:
   - apps/server/src/services/factoryGenerationAggregateService.test.ts
   - apps/server/src/mqtt/metricKeyIngestion.test.ts
 -->
+
+### Requirement: Canonical multi-factory generation is explicitly global
+
+The canonical generation values derived from complete CL and KN factory sources SHALL use `metricScope = global`. CL and KN source generation SHALL remain independently addressable under their own scopes and MUST NOT be overwritten when the global aggregate is updated.
+
+#### Scenario: Both factory summaries are current
+- **WHEN** current CL and KN generation inputs satisfy the existing completeness rules
+- **THEN** the system updates the canonical aggregate under `global`
+- **AND** the CL and KN source metrics remain available under `cl` and `kn` respectively
+
+#### Scenario: A site playback page requests generation
+- **WHEN** a CL playback binding targets site-scoped generation
+- **THEN** it resolves the CL value rather than the global CL+KN aggregate
+- **AND** the global aggregate is used only by a contract that explicitly requests global scope
+
+### Requirement: Aggregate completeness is evaluated across scoped source identities
+
+The existing complete-both-sites and last-complete-value rules SHALL evaluate CL and KN as two explicit scoped inputs. A reading from one site MUST NOT satisfy the other site's dependency merely because both inputs share the same semantic metric key.
+
+#### Scenario: KN source is stale while CL is current
+- **WHEN** the CL source identity is current and the KN source identity is stale
+- **THEN** the global aggregate is not recomputed from CL alone
+- **AND** the last complete global value is retained according to the existing aggregation contract

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeMetricSnapshotCapturedAt } from "../db/normalizeMetricSnapshotCapturedAt.js";
+import { createPairedDeviceTestContext } from "../testing/deviceContextTestSupport.js";
 import {
   buildApp,
   getDatabase
@@ -20,6 +21,7 @@ test("metrics history routes keep year and total boundaries distinct", async () 
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -27,14 +29,15 @@ test("metrics history routes keep year and total boundaries distinct", async () 
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(120, 90, 60, 55, 50, 91, isoForUtc(currentYear, 5, 10, 9));
+    .run("cl", 120, 90, 60, 55, 50, 91, isoForUtc(currentYear, 5, 10, 9));
   database
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -42,15 +45,16 @@ test("metrics history routes keep year and total boundaries distinct", async () 
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(88, 70, 41, 32, 46, 89, isoForUtc(currentYear - 1, 12, 31, 23));
+    .run("cl", 88, 70, 41, 32, 46, 89, isoForUtc(currentYear - 1, 12, 31, 23));
 
   database
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -60,10 +64,11 @@ test("metrics history routes keep year and total boundaries distinct", async () 
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(
+      "cl",
       `${currentYear}-05-10`,
       120,
       90,
@@ -78,6 +83,7 @@ test("metrics history routes keep year and total boundaries distinct", async () 
     .prepare(
       `
         INSERT INTO daily_energy_summaries (
+          metric_scope,
           date,
           generation_total,
           consumption_total,
@@ -87,10 +93,11 @@ test("metrics history routes keep year and total boundaries distinct", async () 
           peak_generation_time,
           peak_consumption,
           peak_consumption_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .run(
+      "cl",
       `${currentYear - 1}-12-31`,
       88,
       70,
@@ -102,25 +109,30 @@ test("metrics history routes keep year and total boundaries distinct", async () 
       isoForUtc(currentYear - 1, 12, 31, 16)
     );
 
+  const paired = createPairedDeviceTestContext("cl");
   const app = await buildApp();
 
   try {
     const [yearHistoryResponse, totalHistoryResponse, yearSummaryResponse, totalSummaryResponse] = await Promise.all([
       app.inject({
+        cookies: { solar_device_credential: paired.credential },
         method: "GET",
-        url: "/api/metrics/history?range=year"
+        url: "/api/metrics/history?range=year&metricScope=cl"
       }),
       app.inject({
+        cookies: { solar_device_credential: paired.credential },
         method: "GET",
-        url: "/api/metrics/history?range=total"
+        url: "/api/metrics/history?range=total&metricScope=cl"
       }),
       app.inject({
+        cookies: { solar_device_credential: paired.credential },
         method: "GET",
-        url: "/api/metrics/daily-summary?range=year"
+        url: "/api/metrics/daily-summary?range=year&metricScope=cl"
       }),
       app.inject({
+        cookies: { solar_device_credential: paired.credential },
         method: "GET",
-        url: "/api/metrics/daily-summary?range=total"
+        url: "/api/metrics/daily-summary?range=total&metricScope=cl"
       })
     ]);
 
@@ -170,18 +182,20 @@ test("monthly daily summaries start at the first day of the current calendar mon
   database.prepare("DELETE FROM daily_energy_summaries").run();
 
   database
-    .prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)")
-    .run(formatDate(previousMonthDate), 10, 100);
+    .prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES (?, ?, ?, ?)")
+    .run("cl", formatDate(previousMonthDate), 10, 100);
   database
-    .prepare("INSERT INTO daily_energy_summaries (date, generation_total, consumption_total) VALUES (?, ?, ?)")
-    .run(formatDate(currentMonthDate), 20, 200);
+    .prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES (?, ?, ?, ?)")
+    .run("cl", formatDate(currentMonthDate), 20, 200);
 
+  const paired = createPairedDeviceTestContext("cl");
   const app = await buildApp();
 
   try {
     const response = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
       method: "GET",
-      url: "/api/metrics/daily-summary?range=month"
+      url: "/api/metrics/daily-summary?range=month&metricScope=cl"
     });
 
     assert.equal(response.statusCode, 200);
@@ -208,6 +222,7 @@ test("monthly metric history snapshots start at the first moment of the current 
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -215,14 +230,15 @@ test("monthly metric history snapshots start at the first moment of the current 
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(88, 70, 41, 32, 46, 89, previousMonthSnapshot.toISOString());
+    .run("cl", 88, 70, 41, 32, 46, 89, previousMonthSnapshot.toISOString());
   database
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -230,17 +246,19 @@ test("monthly metric history snapshots start at the first moment of the current 
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(120, 90, 60, 55, 50, 91, currentMonthSnapshot.toISOString());
+    .run("cl", 120, 90, 60, 55, 50, 91, currentMonthSnapshot.toISOString());
 
+  const paired = createPairedDeviceTestContext("cl");
   const app = await buildApp();
 
   try {
     const response = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
       method: "GET",
-      url: "/api/metrics/history?range=month"
+      url: "/api/metrics/history?range=month&metricScope=cl"
     });
 
     assert.equal(response.statusCode, 200);
@@ -263,6 +281,7 @@ test("metrics history filters and sorts mixed timestamp formats chronologically"
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -270,14 +289,15 @@ test("metrics history filters and sorts mixed timestamp formats chronologically"
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(10, 9, 8, 7, 0.5, 91, "2026-06-08 23:30:00");
+    .run("cl", 10, 9, 8, 7, 0.5, 91, "2026-06-08 23:30:00");
   database
     .prepare(
       `
         INSERT INTO metric_snapshots (
+          metric_scope,
           generation,
           consumption,
           self_consumption,
@@ -285,18 +305,20 @@ test("metrics history filters and sorts mixed timestamp formats chronologically"
           ratio,
           efficiency,
           captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(11, 10, 9, 8, 0.6, 92, "2026-06-09T00:15:00.000Z");
+    .run("cl", 11, 10, 9, 8, 0.6, 92, "2026-06-09T00:15:00.000Z");
   normalizeMetricSnapshotCapturedAt(database);
 
+  const paired = createPairedDeviceTestContext("cl");
   const app = await buildApp();
 
   try {
     const response = await app.inject({
+      cookies: { solar_device_credential: paired.credential },
       method: "GET",
-      url: "/api/metrics/history?range=total"
+      url: "/api/metrics/history?range=total&metricScope=cl"
     });
 
     assert.equal(response.statusCode, 200);
@@ -309,6 +331,42 @@ test("metrics history filters and sorts mixed timestamp formats chronologically"
       normalize("2026-06-08 23:30:00"),
       "2026-06-09T00:15:00.000Z"
     ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("metrics history range readers return only the requested metric scope", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation, captured_at)
+    VALUES ('cl', 10, '2026-08-29T01:00:00.000Z'), ('kn', 20, '2026-08-29T01:00:00.000Z')
+  `).run();
+  database.prepare(`
+    INSERT INTO daily_energy_summaries (metric_scope, date, generation_total)
+    VALUES ('cl', '2026-08-29', 10), ('kn', '2026-08-29', 20)
+  `).run();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value)
+    VALUES ('cl', 'generation', 10), ('kn', 'generation', 20)
+  `).run();
+  const paired = createPairedDeviceTestContext("cl");
+  const app = await buildApp();
+
+  try {
+    const denied = await app.inject({ method: "GET", url: "/api/metrics/history?range=total" });
+    assert.equal(denied.statusCode, 401);
+    const [history, summaries, cumulative] = await Promise.all([
+      app.inject({ cookies: { solar_device_credential: paired.credential }, method: "GET", url: "/api/metrics/history?range=total&metricScope=kn" }),
+      app.inject({ cookies: { solar_device_credential: paired.credential }, method: "GET", url: "/api/metrics/daily-summary?range=total&metricScope=kn" }),
+      app.inject({ cookies: { solar_device_credential: paired.credential }, method: "GET", url: "/api/metrics/cumulative?metricScope=kn" })
+    ]);
+    assert.deepEqual(history.json().snapshots.map((row: { generation: number }) => row.generation), [10]);
+    assert.deepEqual(summaries.json().summaries.map((row: { generationTotal: number }) => row.generationTotal), [10]);
+    assert.deepEqual(cumulative.json().counters.map((row: { totalValue: number }) => row.totalValue), [10]);
   } finally {
     await app.close();
   }

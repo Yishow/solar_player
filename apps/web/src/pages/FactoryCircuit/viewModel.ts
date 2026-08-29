@@ -346,6 +346,7 @@ export function buildFactoryCircuitViewModel({
       const storySlot = storySlotByKey.get(slot.key);
       const binding = resolveMonitoringSlotBinding({
         circuitId: storySlot?.circuitId ?? null,
+        metricScope: storySlot?.metricScope ?? "global",
         slotKey: slot.key
       });
       const slotIsHealthy =
@@ -455,6 +456,7 @@ export function buildFactoryCircuitViewModel({
     const circuit = circuits.find((entry) => entry.displaySlot === slot.key) ?? null;
     const binding = resolveMonitoringSlotBinding({
       circuitId: circuit?.id ?? null,
+      metricScope: "global",
       slotKey: slot.key
     });
 

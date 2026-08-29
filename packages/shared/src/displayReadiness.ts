@@ -1,6 +1,7 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
 import type { SiteScope } from "./deviceIdentity.js";
 import type { FreshnessResult } from "./freshnessPolicy.js";
+import type { MetricScope } from "./metricScope.js";
 
 export const displayCircuitSlotKeys = [
   "stamping",
@@ -22,26 +23,15 @@ export const factoryCircuitSlotKeysByPageKey: Record<FactoryCircuitPageKey, Disp
   "factory-circuit-guanyin": [...displayCircuitSlotKeys]
 };
 
-const factoryCircuitLegacySlotMetricKeys: Record<DisplayCircuitSlotKey, string> = {
-  stamping: "factoryStampingPower",
-  body: "factoryBodyPower",
-  painting: "factoryPaintingPower",
-  assembly: "factoryAssemblyPower",
-  utility: "factoryUtilityPower",
-  office: "factoryOfficePower",
-  heavy_vehicle: "factoryHeavyVehiclePower",
-  ed_coating: "factoryEdCoatingPower"
-};
-
-const factoryCircuitGuanyinSlotMetricKeys: Record<DisplayCircuitSlotKey, string> = {
-  stamping: "factoryCircuit.guanyin.stampingPower",
-  body: "factoryCircuit.guanyin.bodyPower",
-  painting: "factoryCircuit.guanyin.paintingPower",
-  assembly: "factoryCircuit.guanyin.assemblyPower",
-  utility: "factoryCircuit.guanyin.utilityPower",
-  office: "factoryCircuit.guanyin.officePower",
-  heavy_vehicle: "factoryCircuit.guanyin.heavyVehiclePower",
-  ed_coating: "factoryCircuit.guanyin.edCoatingPower"
+const factoryCircuitSlotMetricKeys: Record<DisplayCircuitSlotKey, string> = {
+  stamping: "factoryCircuit.stampingPower",
+  body: "factoryCircuit.bodyPower",
+  painting: "factoryCircuit.paintingPower",
+  assembly: "factoryCircuit.assemblyPower",
+  utility: "factoryCircuit.utilityPower",
+  office: "factoryCircuit.officePower",
+  heavy_vehicle: "factoryCircuit.heavyVehiclePower",
+  ed_coating: "factoryCircuit.edCoatingPower"
 };
 
 export function isFactoryCircuitPageKey(value: string): value is FactoryCircuitPageKey {
@@ -53,14 +43,10 @@ export function resolveFactoryCircuitSlotKeys(pageKey: FactoryCircuitPageKey): D
 }
 
 export function resolveFactoryCircuitSlotMetricKey(
-  pageKey: FactoryCircuitPageKey,
+  _pageKey: FactoryCircuitPageKey,
   slotKey: DisplayCircuitSlotKey
 ): string {
-  if (pageKey === "factory-circuit-guanyin") {
-    return factoryCircuitGuanyinSlotMetricKeys[slotKey];
-  }
-
-  return factoryCircuitLegacySlotMetricKeys[slotKey];
+  return factoryCircuitSlotMetricKeys[slotKey];
 }
 
 export type DisplayReadinessSourceType = "circuit-slot" | "derived-metric" | "mqtt-metric";
@@ -76,6 +62,7 @@ export type DisplayRequirementDescriptor = {
 export type DisplayReadinessFinding = {
   blocking: boolean;
   freshness?: FreshnessResult;
+  metricScope: MetricScope;
   pageId: DisplayPageKey;
   reason: string;
   requirementKey: string;
@@ -121,12 +108,9 @@ const factoryCircuitMetricRequirements: DisplayRequirementDescriptor[] = factory
 );
 
 export const factoryGenerationDependencyKeys: readonly string[] = [
-  "factoryGeneration.cl.todayMwh",
-  "factoryGeneration.cl.monthMwh",
-  "factoryGeneration.cl.totalMwh",
-  "factoryGeneration.kn.todayMwh",
-  "factoryGeneration.kn.monthMwh",
-  "factoryGeneration.kn.totalMwh"
+  "factoryGeneration.todayMwh",
+  "factoryGeneration.monthMwh",
+  "factoryGeneration.totalMwh"
 ];
 
 export const factoryGenerationDerivedRequirementKeys: readonly string[] = [
@@ -201,39 +185,11 @@ export function resolveDisplayReadinessRequirementsForSite(
 ): DisplayRequirementDescriptor[] {
   const factoryPageId =
     siteScope === "cl" ? "factory-circuit" : "factory-circuit-guanyin";
-  const generationPrefix = `factoryGeneration.${siteScope}.`;
-  const unscopedRequirementKeys = new Set([
-    "annualEnergySavingPercent",
-    "realTimePower",
-    "selfConsumptionRatio",
-    "systemEfficiency"
-  ]);
 
   return displayReadinessRequirements
     .filter(
       (requirement) =>
-        !unscopedRequirementKeys.has(requirement.requirementKey) &&
         (!isFactoryCircuitPageKey(requirement.pageId) ||
           requirement.pageId === factoryPageId)
-    )
-    .map((requirement) => {
-      if (!requirement.dependencyKeys) {
-        return requirement;
-      }
-
-      return {
-        ...requirement,
-        dependencyKeys: factoryGenerationDerivedRequirementKeys.includes(
-          requirement.requirementKey
-        )
-          ? factoryGenerationDependencyKeys.filter((metricKey) =>
-              metricKey.startsWith(generationPrefix)
-            )
-          : requirement.dependencyKeys.filter(
-              (metricKey) =>
-                !factoryGenerationDependencyKeys.includes(metricKey) ||
-                metricKey.startsWith(generationPrefix)
-            )
-      };
-    });
+    );
 }

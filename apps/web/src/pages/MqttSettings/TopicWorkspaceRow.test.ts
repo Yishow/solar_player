@@ -8,6 +8,7 @@ import type { TopicWorkspaceRowModel } from "./TopicWorkspaceRow";
 const baseMockTopic: TopicWorkspaceRowModel = {
   id: 42,
   metricKey: "realTimePower",
+  metricScope: "cl" as const,
   topic: "kuozui/plant/solar/power",
   nameZh: "一號廠輸出",
   nameEn: "Plant A Output",
@@ -49,6 +50,8 @@ test("TopicWorkspaceRow renders correctly with metrics, fields, and values", () 
   assert.match(html, /Real-time Power/);
   assert.match(html, /value="kuozui\/plant\/solar\/power"/);
   assert.match(html, /value="kW"/);
+  assert.match(html, /aria-label="Metric scope"/);
+  assert.match(html, /option value="cl" selected/);
   assert.match(html, /588\.8/);
   assert.match(html, /aria-label="啟用 \(ON\)"/);
   assert.match(html, /topic-workspace-row__aside/);

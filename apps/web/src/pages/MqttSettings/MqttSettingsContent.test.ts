@@ -167,6 +167,7 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "selfConsumptionEnergy",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "自發自用量",
         quality: null,
@@ -182,6 +183,7 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "consumptionEnergy",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "用電量",
         quality: null,
@@ -197,6 +199,7 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "todayGeneration",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "今日發電量",
         quality: null,
@@ -236,6 +239,7 @@ test("mqtt settings content requires saving topic mapping drafts before publishi
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "selfConsumptionEnergy",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "自發自用量",
         quality: null,
@@ -261,6 +265,7 @@ test("mqtt settings content combines source mode and topic controls into a three
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "即時發電功率",
         quality: null,
@@ -292,7 +297,8 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
       id: 1,
       lastReceivedAt: null,
       lastValue: null,
-      metricKey: "factoryStampingPower",
+      metricKey: "factoryCircuit.stampingPower",
+      metricScope: "cl" as const,
       nameEn: null,
       nameZh: "中壢沖壓",
       quality: null,
@@ -307,7 +313,8 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
       id: 2,
       lastReceivedAt: null,
       lastValue: null,
-      metricKey: "factoryHeavyVehiclePower",
+      metricKey: "factoryCircuit.heavyVehiclePower",
+      metricScope: "kn" as const,
       nameEn: null,
       nameZh: "舊大車",
       quality: null,
@@ -322,7 +329,8 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
       id: 3,
       lastReceivedAt: null,
       lastValue: null,
-      metricKey: "factoryCircuit.guanyin.stampingPower",
+      metricKey: "factoryCircuit.stampingPower",
+      metricScope: "kn" as const,
       nameEn: null,
       nameZh: "觀音沖壓",
       quality: null,
@@ -338,6 +346,7 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
       lastReceivedAt: null,
       lastValue: null,
       metricKey: "realTimePower",
+      metricScope: "cl" as const,
       nameEn: null,
       nameZh: "即時發電功率",
       quality: null,
@@ -368,18 +377,20 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
       findings: [
         {
           blocking: true,
+          metricScope: "cl" as const,
           pageId: "factory-circuit",
           reason: "Missing Jungli topic",
-          requirementKey: "factoryStampingPower",
+          requirementKey: "factoryCircuit.stampingPower",
           sourceId: null,
           sourceType: "mqtt-metric",
           status: "blocking"
         },
         {
           blocking: true,
+          metricScope: "kn" as const,
           pageId: "factory-circuit-guanyin",
           reason: "Missing Guanyin topic",
-          requirementKey: "factoryCircuit.guanyin.stampingPower",
+          requirementKey: "factoryCircuit.stampingPower",
           sourceId: null,
           sourceType: "mqtt-metric",
           status: "blocking"
@@ -399,10 +410,10 @@ test("mqtt settings content filters Factory Circuit topic mappings by active fac
   });
 
   assert.match(guanyinHtml, /觀音沖壓/);
+  assert.match(guanyinHtml, /舊大車/);
   assert.match(guanyinHtml, /即時發電功率/);
-  assert.match(guanyinHtml, /factoryCircuit\.guanyin\.stampingPower/);
+  assert.match(guanyinHtml, /factoryCircuit\.stampingPower/);
   assert.doesNotMatch(guanyinHtml, /中壢沖壓/);
-  assert.doesNotMatch(guanyinHtml, /舊大車/);
   assert.doesNotMatch(guanyinHtml, /factoryStampingPower/);
 });
 
@@ -433,6 +444,7 @@ test("mqtt settings content renders source mode controls inside the merged works
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "即時發電功率",
         quality: null,
@@ -463,7 +475,8 @@ test("mqtt settings content renders card data diagnostics in the third workspace
     },
     cardDataRows: [
       {
-        actions: [{ metricKey: "realTimePower", type: "publish-test-value" }, { type: "set-display-override" }],
+        actions: [{ metricKey: "realTimePower", metricScope: "cl" as const,
+ type: "publish-test-value" }, { type: "set-display-override" }],
         aggregateSource: null,
         calculationFields: [],
         cardId: "overview.realTimePower",
@@ -471,6 +484,7 @@ test("mqtt settings content renders card data diagnostics in the third workspace
           {
             latestValue: "42 kW",
             metricKey: "realTimePower",
+            metricScope: "cl" as const,
             status: "ready",
             topic: "kuozui/plant/solar/power"
           }
@@ -480,16 +494,19 @@ test("mqtt settings content renders card data diagnostics in the third workspace
         label: "即時發電功率",
         lastUpdatedAt: "2026-07-08T09:00:00.000Z",
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         originalValue: "42.0",
         override: null,
         pageId: "overview",
         sourceClassification: "mqtt-live",
-        sourceTopics: [{ metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }],
+        sourceTopics: [{ metricKey: "realTimePower", metricScope: "cl" as const,
+ topic: "kuozui/plant/solar/power" }],
         status: "ready",
         unit: "kW"
       },
       {
-        actions: [{ metricKey: "todayGeneration", type: "configure-topic" }],
+        actions: [{ metricKey: "todayGeneration", metricScope: "cl" as const,
+ type: "configure-topic" }],
         aggregateSource: null,
         calculationFields: [],
         cardId: "overview.todayGeneration",
@@ -497,6 +514,7 @@ test("mqtt settings content renders card data diagnostics in the third workspace
           {
             latestValue: null,
             metricKey: "todayGeneration",
+            metricScope: "cl" as const,
             status: "missing-topic",
             topic: null
           }
@@ -506,6 +524,7 @@ test("mqtt settings content renders card data diagnostics in the third workspace
         label: "今日發電量",
         lastUpdatedAt: null,
         metricKey: "todayGeneration",
+        metricScope: "cl" as const,
         originalValue: "--",
         override: null,
         pageId: "overview",
@@ -525,6 +544,7 @@ test("mqtt settings content renders card data diagnostics in the third workspace
         label: "今日綠電效益",
         lastUpdatedAt: "2026-07-08T00:00:00.000Z",
         metricKey: "householdEquivalent.today",
+        metricScope: "cl" as const,
         originalValue: "4",
         override: null,
         pageId: "sustainability",
@@ -557,14 +577,15 @@ test("mqtt settings content labels Guanyin Factory Circuit card diagnostics dist
     activeCardDataSite: "guanyin",
     cardDataRows: [
       {
-        actions: [{ metricKey: "factoryCircuit.guanyin.stampingPower", type: "publish-test-value" }],
+        actions: [{ metricKey: "factoryCircuit.stampingPower", metricScope: "kn", type: "publish-test-value" }],
         aggregateSource: null,
         calculationFields: [],
         cardId: "factory-circuit-guanyin.slot.stamping",
         dependencies: [
           {
             latestValue: "20 kW",
-            metricKey: "factoryCircuit.guanyin.stampingPower",
+            metricKey: "factoryCircuit.stampingPower",
+            metricScope: "kn",
             status: "ready",
             topic: "factory/guanyin/stamping"
           }
@@ -573,14 +594,16 @@ test("mqtt settings content labels Guanyin Factory Circuit card diagnostics dist
         formula: null,
         label: "觀音沖壓",
         lastUpdatedAt: "2026-07-08T09:00:00.000Z",
-        metricKey: "factoryCircuit.guanyin.stampingPower",
+        metricKey: "factoryCircuit.stampingPower",
+        metricScope: "kn",
         originalValue: "20.0",
         override: null,
         pageId: "factory-circuit-guanyin",
         sourceClassification: "mqtt-live",
         sourceTopics: [
           {
-            metricKey: "factoryCircuit.guanyin.stampingPower",
+            metricKey: "factoryCircuit.stampingPower",
+            metricScope: "kn",
             topic: "factory/guanyin/stamping"
           }
         ],
@@ -591,20 +614,22 @@ test("mqtt settings content labels Guanyin Factory Circuit card diagnostics dist
   });
 
   assert.match(html, /Factory Circuit \(Guanyin\)/);
-  assert.match(html, /factoryCircuit\.guanyin\.stampingPower/);
+  assert.match(html, /factoryCircuit\.stampingPower/);
 });
 
 test("mqtt settings content filters card data diagnostics by factory site", () => {
   const cardDataRows: NonNullable<React.ComponentProps<typeof MqttSettingsContent>["cardDataRows"]> = [
     {
-      actions: [{ metricKey: "factoryStampingPower", type: "publish-test-value" }],
+      actions: [{ metricKey: "factoryCircuit.stampingPower", metricScope: "cl" as const,
+ type: "publish-test-value" }],
       aggregateSource: null,
       calculationFields: [],
       cardId: "factory-circuit.slot.stamping",
       dependencies: [
         {
           latestValue: "10 kW",
-          metricKey: "factoryStampingPower",
+          metricKey: "factoryCircuit.stampingPower",
+          metricScope: "cl" as const,
           status: "ready",
           topic: "factory/jungli/stamping"
         }
@@ -613,24 +638,27 @@ test("mqtt settings content filters card data diagnostics by factory site", () =
       formula: null,
       label: "中壢沖壓",
       lastUpdatedAt: "2026-07-08T09:00:00.000Z",
-      metricKey: "factoryStampingPower",
+      metricKey: "factoryCircuit.stampingPower",
+      metricScope: "cl" as const,
       originalValue: "10.0",
       override: null,
       pageId: "factory-circuit",
       sourceClassification: "mqtt-live",
-      sourceTopics: [{ metricKey: "factoryStampingPower", topic: "factory/jungli/stamping" }],
+      sourceTopics: [{ metricKey: "factoryCircuit.stampingPower", metricScope: "cl" as const,
+ topic: "factory/jungli/stamping" }],
       status: "ready",
       unit: "kW"
     },
     {
-      actions: [{ metricKey: "factoryCircuit.guanyin.stampingPower", type: "publish-test-value" }],
+      actions: [{ metricKey: "factoryCircuit.stampingPower", metricScope: "kn", type: "publish-test-value" }],
       aggregateSource: null,
       calculationFields: [],
       cardId: "factory-circuit-guanyin.slot.stamping",
       dependencies: [
         {
           latestValue: "20 kW",
-          metricKey: "factoryCircuit.guanyin.stampingPower",
+          metricKey: "factoryCircuit.stampingPower",
+          metricScope: "kn",
           status: "ready",
           topic: "factory/guanyin/stamping"
         }
@@ -639,17 +667,19 @@ test("mqtt settings content filters card data diagnostics by factory site", () =
       formula: null,
       label: "觀音沖壓",
       lastUpdatedAt: "2026-07-08T09:00:00.000Z",
-      metricKey: "factoryCircuit.guanyin.stampingPower",
+      metricKey: "factoryCircuit.stampingPower",
+      metricScope: "kn",
       originalValue: "20.0",
       override: null,
       pageId: "factory-circuit-guanyin",
       sourceClassification: "mqtt-live",
-      sourceTopics: [{ metricKey: "factoryCircuit.guanyin.stampingPower", topic: "factory/guanyin/stamping" }],
+      sourceTopics: [{ metricKey: "factoryCircuit.stampingPower", metricScope: "kn", topic: "factory/guanyin/stamping" }],
       status: "ready",
       unit: "kW"
     },
     {
-      actions: [{ metricKey: "realTimePower", type: "publish-test-value" }],
+      actions: [{ metricKey: "realTimePower", metricScope: "cl" as const,
+ type: "publish-test-value" }],
       aggregateSource: null,
       calculationFields: [],
       cardId: "overview.realTimePower",
@@ -659,11 +689,13 @@ test("mqtt settings content filters card data diagnostics by factory site", () =
       label: "即時發電功率",
       lastUpdatedAt: "2026-07-08T09:00:00.000Z",
       metricKey: "realTimePower",
+      metricScope: "cl" as const,
       originalValue: "42.0",
       override: null,
       pageId: "overview",
       sourceClassification: "mqtt-live",
-      sourceTopics: [{ metricKey: "realTimePower", topic: "kuozui/plant/solar/power" }],
+      sourceTopics: [{ metricKey: "realTimePower", metricScope: "cl" as const,
+ topic: "kuozui/plant/solar/power" }],
       status: "ready",
       unit: "kW"
     }
@@ -717,7 +749,8 @@ test("mqtt settings content renders display override controls and invalid numeri
     },
     cardDataRows: [
       {
-        actions: [{ metricKey: "realTimePower", type: "publish-test-value" }, { type: "set-display-override" }],
+        actions: [{ metricKey: "realTimePower", metricScope: "cl" as const,
+ type: "publish-test-value" }, { type: "set-display-override" }],
         aggregateSource: null,
         calculationFields: [],
         cardId: "overview.realTimePower",
@@ -727,6 +760,7 @@ test("mqtt settings content renders display override controls and invalid numeri
         label: "即時發電功率",
         lastUpdatedAt: "2026-07-08T09:00:00.000Z",
         metricKey: "realTimePower",
+        metricScope: "cl" as const,
         originalValue: "42.0",
         override: {
           active: true,
@@ -735,6 +769,7 @@ test("mqtt settings content renders display override controls and invalid numeri
           enabled: true,
           expiresAt: null,
           metricKey: "realTimePower",
+          metricScope: "cl" as const,
           pageId: "overview",
           reason: null,
           targetId: "overview.realTimePower",
@@ -790,6 +825,7 @@ test("mqtt settings content marks the topic row highlighted by card data actions
         lastReceivedAt: null,
         lastValue: null,
         metricKey: "todayGeneration",
+        metricScope: "cl" as const,
         nameEn: null,
         nameZh: "今日發電量",
         quality: null,
@@ -832,6 +868,7 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
         findings: [
           {
             blocking: true,
+            metricScope: "cl" as const,
             pageId: "overview",
             reason: "尚未設定 realTimePower mapping。",
             requirementKey: "realTimePower",
@@ -841,6 +878,7 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
           },
           {
             blocking: false,
+            metricScope: "cl" as const,
             pageId: "overview",
             reason: "等待 topic 首次收值。",
             requirementKey: "todayGeneration",
@@ -897,6 +935,7 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
           lastReceivedAt: null,
           lastValue: null,
           metricKey: "realTimePower",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: null,
@@ -912,6 +951,7 @@ test("mqtt settings content renders readiness coverage rows that distinguish map
           lastReceivedAt: null,
           lastValue: null,
           metricKey: "todayGeneration",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: null,
@@ -972,6 +1012,7 @@ test("mqtt settings content merges topic editing, runtime, and coverage into one
         findings: [
           {
             blocking: true,
+            metricScope: "cl" as const,
             pageId: "overview",
             reason: "尚未設定 todayGeneration mapping。",
             requirementKey: "todayGeneration",
@@ -1028,6 +1069,7 @@ test("mqtt settings content merges topic editing, runtime, and coverage into one
           lastReceivedAt: "2026-05-23T09:29:00.000Z",
           lastValue: 580.1,
           metricKey: "realTimePower",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: "good",
@@ -1111,6 +1153,7 @@ test("mqtt settings content keeps editable rows readable when streaming falls ba
           lastReceivedAt: "2026-05-23T09:29:00.000Z",
           lastValue: 580.1,
           metricKey: "realTimePower",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: "good",
@@ -1515,6 +1558,7 @@ test("mqtt settings content keeps draft state in status feedback without renderi
         findings: [
           {
             blocking: true,
+            metricScope: "cl" as const,
             pageId: "overview",
             reason: "尚未設定 todayGeneration mapping。",
             requirementKey: "todayGeneration",
@@ -1524,6 +1568,7 @@ test("mqtt settings content keeps draft state in status feedback without renderi
           },
           {
             blocking: false,
+            metricScope: "cl" as const,
             pageId: "solar",
             reason: "等待 topic 首次收值。",
             requirementKey: "realTimePower",
@@ -1580,6 +1625,7 @@ test("mqtt settings content keeps draft state in status feedback without renderi
           lastReceivedAt: null,
           lastValue: null,
           metricKey: "realTimePower",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: null,
@@ -1595,6 +1641,7 @@ test("mqtt settings content keeps draft state in status feedback without renderi
           lastReceivedAt: "2026-05-23T09:30:00.000Z",
           lastValue: 1280,
           metricKey: "factoryProductionPower",
+          metricScope: "cl" as const,
           nameZh: null,
           nameEn: null,
           quality: "good",

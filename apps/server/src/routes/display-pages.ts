@@ -365,7 +365,8 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   app.get("/api/display-pages/rotation-preview", async () => ({
     preview: readDisplayRotationPreview({
-      mqttStatus: app.mqttClientService.getStatus()
+      mqttStatus: app.mqttClientService.getStatus(),
+      siteScope: "cl"
     })
   }));
 };

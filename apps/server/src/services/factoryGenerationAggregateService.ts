@@ -139,22 +139,22 @@ function readFactorySource(
   nowMs: number,
   timeoutMs: number
 ): FactorySource | FactoryGenerationAggregateStatus {
-  const prefix = `factoryGeneration.${factory.toLowerCase()}.`;
+  const metricScope = factory.toLowerCase();
   const rows = database
     .prepare(
       `
         SELECT metric_key, value, unit, raw_payload
         FROM live_metric_values
-        WHERE metric_key IN (?, ?, ?)
+        WHERE metric_scope = ? AND metric_key IN (?, ?, ?)
       `
     )
-    .all(...sourceFields.map(({ suffix }) => `${prefix}${suffix}`)) as SourceRow[];
+    .all(metricScope, ...sourceFields.map(({ suffix }) => `factoryGeneration.${suffix}`)) as SourceRow[];
   const rowsByKey = new Map(rows.map((row) => [row.metric_key, row]));
   const values: Partial<Record<SourceField, number>> = {};
   const sourceTimestamps = new Map<number, string>();
 
   for (const { field, suffix } of sourceFields) {
-    const row = rowsByKey.get(`${prefix}${suffix}`);
+    const row = rowsByKey.get(`factoryGeneration.${suffix}`);
     if (!row) {
       return { state: "missing", updatedAt: null, issues: [{ factory, field, reason: "missing" }] };
     }
@@ -216,8 +216,8 @@ function readAcceptedFactoryTotalMwh(
   factory: FactoryId
 ) {
   const row = database
-    .prepare("SELECT value, unit FROM live_metric_values WHERE metric_key = ?")
-    .get(`factoryGeneration.${factory.toLowerCase()}.acceptedTotalMwh`) as
+    .prepare("SELECT value, unit FROM live_metric_values WHERE metric_scope = ? AND metric_key = 'factoryGeneration.acceptedTotalMwh'")
+    .get(factory.toLowerCase()) as
       | { unit: string | null; value: number | null }
       | undefined;
 
@@ -228,10 +228,10 @@ function readAcceptedFactoryTotalMwh(
 
 function readLastAcceptedTotalMwh(database: Database.Database) {
   const existing = database
-    .prepare("SELECT value, unit FROM live_metric_values WHERE metric_key = 'totalGeneration'")
+    .prepare("SELECT value, unit FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'")
     .get() as { unit: string | null; value: number | null } | undefined;
   const persistedCounter = database
-    .prepare("SELECT total_value FROM cumulative_counters WHERE metric_key = 'generation'")
+    .prepare("SELECT total_value FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'")
     .get() as { total_value: number | null } | undefined;
   const acceptedTotalsMwh = [
     typeof existing?.value === "number" && Number.isFinite(existing.value)
@@ -332,9 +332,9 @@ export function updateFactoryGenerationAggregate(
   now: Date = new Date()
 ): FactoryGenerationAggregateStatus {
   const acceptedFactoryTotalUpsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_key) DO UPDATE SET
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
       value = excluded.value,
       unit = excluded.unit,
       timestamp = excluded.timestamp,
@@ -349,7 +349,8 @@ export function updateFactoryGenerationAggregate(
       && factoryEvaluation.updatedAt
     ) {
       acceptedFactoryTotalUpsert.run(
-        `factoryGeneration.${factory.toLowerCase()}.acceptedTotalMwh`,
+        factory.toLowerCase(),
+        "factoryGeneration.acceptedTotalMwh",
         factoryEvaluation.values.totalGeneration,
         factoryEvaluation.updatedAt,
         JSON.stringify({ source: `${factory} MQTT`, updatedAt: factoryEvaluation.updatedAt })
@@ -363,9 +364,9 @@ export function updateFactoryGenerationAggregate(
   }
 
   const upsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_key) DO UPDATE SET
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', ?, ?, 'MWh', ?, 'good', ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
       value = excluded.value,
       unit = excluded.unit,
       timestamp = excluded.timestamp,
@@ -432,9 +433,9 @@ export function resetFactoryGenerationBaseline(
 
   const updatedAt = cl.timestampMs <= kn.timestampMs ? cl.timestamp : kn.timestamp;
   const acceptedFactoryTotalUpsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_key) DO UPDATE SET
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
       value = excluded.value,
       unit = excluded.unit,
       timestamp = excluded.timestamp,
@@ -442,9 +443,9 @@ export function resetFactoryGenerationBaseline(
       raw_payload = excluded.raw_payload
   `);
   const canonicalUpsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES (?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_key) DO UPDATE SET
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('global', ?, ?, 'MWh', ?, 'good', ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
       value = excluded.value,
       unit = excluded.unit,
       timestamp = excluded.timestamp,
@@ -452,14 +453,15 @@ export function resetFactoryGenerationBaseline(
       raw_payload = excluded.raw_payload
   `);
   const counter = database
-    .prepare("SELECT reset_count FROM cumulative_counters WHERE metric_key = 'generation'")
+    .prepare("SELECT reset_count FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'")
     .get() as { reset_count: number | null } | undefined;
   const resetAt = now.toISOString();
 
   database.transaction(() => {
     for (const [factory, source] of [["CL", cl], ["KN", kn]] as const) {
       acceptedFactoryTotalUpsert.run(
-        `factoryGeneration.${factory.toLowerCase()}.acceptedTotalMwh`,
+        factory.toLowerCase(),
+        "factoryGeneration.acceptedTotalMwh",
         roundMwh(source.totalMwh),
         source.timestamp,
         JSON.stringify({ source: `${factory} MQTT`, updatedAt: source.timestamp })
@@ -475,9 +477,9 @@ export function resetFactoryGenerationBaseline(
     }
 
     database.prepare(`
-      INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-      VALUES ('generation', ?, ?, ?)
-      ON CONFLICT(metric_key) DO UPDATE SET
+      INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+      VALUES ('global', 'generation', ?, ?, ?)
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
         total_value = excluded.total_value,
         last_updated = excluded.last_updated,
         reset_count = excluded.reset_count

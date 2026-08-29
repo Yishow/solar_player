@@ -102,14 +102,15 @@ after(() => {
 
 function seedMetricReading(
   metricKey = "realTimePower",
-  timestamp = new Date().toISOString()
+  timestamp = new Date().toISOString(),
+  metricScope = "cl"
 ) {
   getDatabase()
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           value = excluded.value,
           unit = excluded.unit,
           timestamp = excluded.timestamp,
@@ -117,7 +118,7 @@ function seedMetricReading(
           raw_payload = excluded.raw_payload
       `
     )
-    .run(metricKey, 586.2, "kW", timestamp, "good", '{"value":586.2}');
+    .run(metricScope, metricKey, 586.2, "kW", timestamp, "good", '{"value":586.2}');
 }
 
 function seedFreshMetricReading(metricKey = "realTimePower") {
@@ -214,7 +215,7 @@ test("shared readiness and freshness evaluators project only the selected Site",
   assert.equal(
     overviewFreshness
       .flatMap((requirement) => requirement.alternatives.flat())
-      .some((metricKey) => metricKey.startsWith("factoryGeneration.cl.")),
+      .includes("factoryGeneration.todayMwh"),
     true
   );
   assert.equal(
@@ -944,12 +945,12 @@ test("GET /api/display-pages/rotation-preview keeps Factory Circuit playable whe
 
   const freshTimestamp = new Date().toISOString();
   for (const metricKey of [
-    "factoryStampingPower",
-    "factoryBodyPower",
-    "factoryPaintingPower",
-    "factoryAssemblyPower",
-    "factoryUtilityPower",
-    "factoryOfficePower"
+    "factoryCircuit.stampingPower",
+    "factoryCircuit.bodyPower",
+    "factoryCircuit.paintingPower",
+    "factoryCircuit.assemblyPower",
+    "factoryCircuit.utilityPower",
+    "factoryCircuit.officePower"
   ]) {
     seedMetricReading(metricKey, freshTimestamp);
   }
@@ -973,7 +974,8 @@ test("GET /api/display-pages/rotation-preview keeps Factory Circuit playable whe
 
     assert.equal(
       body.preview.playablePages.some((page) => page.pageKey === "factory-circuit"),
-      true
+      true,
+      JSON.stringify(body.preview)
     );
     assert.equal(
       body.preview.skippedPages.find((page) => page.pageKey === "factory-circuit"),

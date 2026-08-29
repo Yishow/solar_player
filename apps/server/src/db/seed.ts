@@ -13,27 +13,27 @@ import { closeDatabaseConnection, getDatabase } from "./index.js";
 import { normalizeMetricSnapshotCapturedAt } from "./normalizeMetricSnapshotCapturedAt.js";
 
 const topicMappings = [
-  { metricKey: "realTimePower", topic: "kuozui/plant/solar/power", unit: "kW" },
-  { metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption", unit: "kWh" },
-  { metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption", unit: "kWh" },
-  { metricKey: "systemEfficiency", topic: "kuozui/plant/solar/efficiency", unit: "%" },
-  { metricKey: "factoryPeakMultiplier", topic: "factory/peak_multiplier", unit: "x" },
-  { metricKey: "factoryStampingPower", topic: "factory/power/stamping", unit: "kW" },
-  { metricKey: "factoryBodyPower", topic: "factory/power/body", unit: "kW" },
-  { metricKey: "factoryPaintingPower", topic: "factory/power/painting", unit: "kW" },
-  { metricKey: "factoryAssemblyPower", topic: "factory/power/assembly", unit: "kW" },
-  { metricKey: "factoryUtilityPower", topic: "factory/power/utility", unit: "kW" },
-  { metricKey: "factoryOfficePower", topic: "factory/power/office", unit: "kW" },
-  { metricKey: "factoryHeavyVehiclePower", topic: "factory/power/heavy_vehicle", unit: "kW" },
-  { metricKey: "factoryEdCoatingPower", topic: "factory/power/ed_coating", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.stampingPower", topic: "factory/guanyin/power/stamping", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.bodyPower", topic: "factory/guanyin/power/body", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.paintingPower", topic: "factory/guanyin/power/painting", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.assemblyPower", topic: "factory/guanyin/power/assembly", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.utilityPower", topic: "factory/guanyin/power/utility", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.officePower", topic: "factory/guanyin/power/office", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.heavyVehiclePower", topic: "factory/guanyin/power/heavy_vehicle", unit: "kW" },
-  { metricKey: "factoryCircuit.guanyin.edCoatingPower", topic: "factory/guanyin/power/ed_coating", unit: "kW" }
+  { metricScope: "cl", metricKey: "realTimePower", topic: "kuozui/plant/solar/power", unit: "kW" },
+  { metricScope: "cl", metricKey: "selfConsumptionEnergy", topic: "kuozui/plant/solar/self_consumption", unit: "kWh" },
+  { metricScope: "cl", metricKey: "consumptionEnergy", topic: "kuozui/plant/factory/consumption", unit: "kWh" },
+  { metricScope: "cl", metricKey: "systemEfficiency", topic: "kuozui/plant/solar/efficiency", unit: "%" },
+  { metricScope: "global", metricKey: "factoryPeakMultiplier", topic: "factory/peak_multiplier", unit: "x" },
+  { metricScope: "cl", metricKey: "factoryCircuit.stampingPower", topic: "factory/power/stamping", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.bodyPower", topic: "factory/power/body", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.paintingPower", topic: "factory/power/painting", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.assemblyPower", topic: "factory/power/assembly", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.utilityPower", topic: "factory/power/utility", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.officePower", topic: "factory/power/office", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.heavyVehiclePower", topic: "factory/power/heavy_vehicle", unit: "kW" },
+  { metricScope: "cl", metricKey: "factoryCircuit.edCoatingPower", topic: "factory/power/ed_coating", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.stampingPower", topic: "factory/guanyin/power/stamping", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.bodyPower", topic: "factory/guanyin/power/body", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.paintingPower", topic: "factory/guanyin/power/painting", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.assemblyPower", topic: "factory/guanyin/power/assembly", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.utilityPower", topic: "factory/guanyin/power/utility", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.officePower", topic: "factory/guanyin/power/office", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.heavyVehiclePower", topic: "factory/guanyin/power/heavy_vehicle", unit: "kW" },
+  { metricScope: "kn", metricKey: "factoryCircuit.edCoatingPower", topic: "factory/guanyin/power/ed_coating", unit: "kW" }
 ] as const;
 
 const circuitConfigs = [
@@ -219,6 +219,7 @@ export function seedDatabase() {
 
   const insertTopicMapping = database.prepare(`
     INSERT INTO topic_mappings (
+      metric_scope,
       metric_key,
       topic,
       unit,
@@ -230,9 +231,9 @@ export function seedDatabase() {
       created_at,
       updated_at
     )
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     WHERE NOT EXISTS (
-      SELECT 1 FROM topic_mappings WHERE metric_key = ?
+      SELECT 1 FROM topic_mappings WHERE metric_scope = ? AND metric_key = ?
     )
   `);
 
@@ -369,6 +370,7 @@ export function seedDatabase() {
 
     for (const topicMapping of topicMappings) {
       insertTopicMapping.run(
+        topicMapping.metricScope,
         topicMapping.metricKey,
         topicMapping.topic,
         topicMapping.unit,
@@ -377,6 +379,7 @@ export function seedDatabase() {
         0,
         topicMapping.unit === "%" ? 1 : 2,
         1,
+        topicMapping.metricScope,
         topicMapping.metricKey
       );
     }
@@ -485,14 +488,14 @@ export function seedDatabase() {
 
     if (snapshotCount === 0 && !hasSeededIntradaySnapshots) {
       const insertSnapshot = database.prepare(
-        "INSERT INTO metric_snapshots (generation_power, captured_at) VALUES (?, ?)"
+        "INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)"
       );
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
 
       buildIntradayGenerationCurve().forEach((generationPower, hour) => {
         const capturedAt = new Date(dayStart.getTime() + hour * 60 * 60 * 1000);
-        insertSnapshot.run(generationPower, capturedAt.toISOString());
+        insertSnapshot.run("cl", generationPower, capturedAt.toISOString());
       });
       database
         .prepare(

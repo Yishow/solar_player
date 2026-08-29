@@ -1,0 +1,2 @@
+-- The table rebuild and legacy row mapping run in migrate.ts so an explicit
+-- legacySiteScope can be validated before the migration is recorded.

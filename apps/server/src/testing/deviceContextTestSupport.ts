@@ -31,9 +31,10 @@ export function mirrorLegacyGenerationIntoSiteSummaryForTest(
     .prepare(
       `SELECT metric_key, value, unit, timestamp
        FROM live_metric_values
-       WHERE metric_key IN ('todayGeneration', 'totalGeneration')`
+       WHERE metric_scope = ?
+         AND metric_key IN ('todayGeneration', 'totalGeneration')`
     )
-    .all() as Array<{
+    .all(siteScope) as Array<{
       metric_key: string;
       timestamp: string | null;
       unit: string | null;
@@ -44,17 +45,18 @@ export function mirrorLegacyGenerationIntoSiteSummaryForTest(
     .prepare(
       `SELECT total_value
        FROM cumulative_counters
-       WHERE metric_key = 'generation'`
+       WHERE metric_scope = ? AND metric_key = 'generation'`
     )
-    .get() as { total_value: number | null } | undefined;
+    .get(siteScope) as { total_value: number | null } | undefined;
   const daily = database
     .prepare(
       `SELECT generation_total
        FROM daily_energy_summaries
+       WHERE metric_scope = ?
        ORDER BY date DESC
        LIMIT 1`
     )
-    .get() as { generation_total: number | null } | undefined;
+    .get(siteScope) as { generation_total: number | null } | undefined;
   const totalRow = liveByKey.get("totalGeneration");
   const todayRow = liveByKey.get("todayGeneration");
   const totalMwh =
@@ -82,23 +84,23 @@ export function mirrorLegacyGenerationIntoSiteSummaryForTest(
       .at(-1) ?? new Date().toISOString();
   const upsert = database.prepare(
     `INSERT INTO live_metric_values (
-       metric_key, value, unit, timestamp, quality, raw_payload
-     ) VALUES (?, ?, 'MWh', ?, 'good', ?)
-     ON CONFLICT(metric_key) DO UPDATE SET
+       metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+     ) VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
+     ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
        value = excluded.value,
        unit = excluded.unit,
        timestamp = excluded.timestamp,
        quality = excluded.quality,
        raw_payload = excluded.raw_payload`
   );
-  const prefix = `factoryGeneration.${siteScope}.`;
   for (const [suffix, value] of [
     ["todayMwh", todayMwh],
     ["monthMwh", totalMwh],
     ["totalMwh", totalMwh]
   ] as const) {
     upsert.run(
-      `${prefix}${suffix}`,
+      siteScope,
+      `factoryGeneration.${suffix}`,
       value,
       timestamp,
       JSON.stringify({ timestamp })

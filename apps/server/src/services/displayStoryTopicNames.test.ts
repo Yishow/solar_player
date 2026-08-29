@@ -58,7 +58,7 @@ test("solar story ignores the disabled legacy direct generation topic name", () 
 });
 
 test("factory circuit slot prefers topic name over circuit config name", () => {
-  setTopicName("factoryStampingPower", "一號產線", "Line 1");
+  setTopicName("factoryCircuit.stampingPower", "一號產線", "Line 1");
 
   const story = storyService.readFactoryCircuitDisplayStory();
   const slot = story.slots.find((entry) => entry.slotKey === "stamping");
@@ -67,7 +67,7 @@ test("factory circuit slot prefers topic name over circuit config name", () => {
 });
 
 test("factory circuit slot preserves the custom english topic name for playback", () => {
-  setTopicName("factoryStampingPower", "一號產線", "Line 1");
+  setTopicName("factoryCircuit.stampingPower", "一號產線", "Line 1");
 
   const story = storyService.readFactoryCircuitDisplayStory();
   const slot = story.slots.find((entry) => entry.slotKey === "stamping");
@@ -77,7 +77,7 @@ test("factory circuit slot preserves the custom english topic name for playback"
 });
 
 test("factory circuit slot uses circuit config name when topic name is empty", () => {
-  setTopicName("factoryStampingPower", null, null);
+  setTopicName("factoryCircuit.stampingPower", null, null);
 
   const circuitName = (
     getDatabase()

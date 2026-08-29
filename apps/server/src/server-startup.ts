@@ -1,8 +1,9 @@
 import { pathToFileURL } from "node:url";
+import type { MetricScope } from "@solar-display/shared";
 import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { getDatabase } from "./db/index.js";
-import { migrateDatabase } from "./db/migrate.js";
+import { migrateDatabase, migrateDatabaseFromEnvironment } from "./db/migrate.js";
 import { seedDatabase } from "./db/seed.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "./mqtt/settings-source.js";
 import { acquireServerRuntimeGuard } from "./serverRuntimeGuard.js";
@@ -27,6 +28,7 @@ type StartServerOptions = {
   buildApp?: typeof buildApp;
   createDailySummaryService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
+    metricScope: MetricScope;
     metricsAccumulatorService: MetricsAccumulatorService;
   }) => LifecycleService;
   createMetricHistoryRetentionService?: (options: {
@@ -37,11 +39,13 @@ type StartServerOptions = {
   }) => LifecycleService;
   createMetricsAccumulatorService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
+    metricScope: MetricScope;
   }) => MetricsAccumulatorLifecycleService;
   createMockMetricsFeedService?: () => LifecycleService;
   acquireServerRuntimeGuard?: (options: { dataDir: string }) => () => void;
   createSnapshotWriterService?: (options: {
     emitDisplaySync: AppLike["socketService"]["emitDisplaySync"];
+    metricScope: MetricScope;
     metricsAccumulatorService: MetricsAccumulatorService;
   }) => LifecycleService;
   host?: string;
@@ -88,8 +92,10 @@ export async function startServer(options: StartServerOptions = {}) {
     options.createMetricHistoryRetentionService ??
     ((serviceOptions) => new MetricHistoryRetentionService(serviceOptions));
   const createMockMetricsFeedService =
-    options.createMockMetricsFeedService ?? (() => new MockMetricsFeedService());
+    options.createMockMetricsFeedService ?? (() => new MockMetricsFeedService({ metricScope: "cl" }));
   const resolveDataMode = options.resolveDataMode ?? readStoredDataMode;
+  const migrateDatabaseImpl = options.migrateDatabase
+    ?? migrateDatabaseFromEnvironment;
   const acquireRuntimeGuard =
     options.acquireServerRuntimeGuard ??
     ((guardOptions) => acquireServerRuntimeGuard(guardOptions));
@@ -101,30 +107,37 @@ export async function startServer(options: StartServerOptions = {}) {
     releaseRuntimeGuard = acquireRuntimeGuard({
       dataDir: config.dataDir
     });
-    (options.migrateDatabase ?? migrateDatabase)();
+    migrateDatabaseImpl();
     (options.seedDatabase ?? seedDatabase)();
 
     app = await buildAppImpl();
 
     const emitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
-    const metricsAccumulatorService = createMetricsAccumulatorService({
-      emitDisplaySync
+    const metricScopes: MetricScope[] = ["cl", "kn", "global"];
+    const metricsAccumulatorServices = metricScopes.map((metricScope) => {
+      const service = createMetricsAccumulatorService({ emitDisplaySync, metricScope });
+      service.initialize();
+      service.start();
+      return service;
     });
-
-    metricsAccumulatorService.initialize();
-    metricsAccumulatorService.start();
-
-    const snapshotWriterService = createSnapshotWriterService({
-      emitDisplaySync,
-      metricsAccumulatorService: metricsAccumulatorService as MetricsAccumulatorService
+    const snapshotWriterServices = metricsAccumulatorServices.map((metricsAccumulatorService, index) => {
+      const service = createSnapshotWriterService({
+        emitDisplaySync,
+        metricScope: metricScopes[index]!,
+        metricsAccumulatorService: metricsAccumulatorService as MetricsAccumulatorService
+      });
+      service.start();
+      return service;
     });
-    snapshotWriterService.start();
-
-    const dailySummaryService = createDailySummaryService({
-      emitDisplaySync,
-      metricsAccumulatorService: metricsAccumulatorService as MetricsAccumulatorService
+    const dailySummaryServices = metricsAccumulatorServices.map((metricsAccumulatorService, index) => {
+      const service = createDailySummaryService({
+        emitDisplaySync,
+        metricScope: metricScopes[index]!,
+        metricsAccumulatorService: metricsAccumulatorService as MetricsAccumulatorService
+      });
+      service.start();
+      return service;
     });
-    dailySummaryService.start();
 
     const metricHistoryRetentionService = createMetricHistoryRetentionService({
       logger: app.log,
@@ -143,9 +156,9 @@ export async function startServer(options: StartServerOptions = {}) {
     app.addHook("onClose", async () => {
       mockMetricsFeedService?.stop();
       metricHistoryRetentionService.stop();
-      dailySummaryService.stop();
-      snapshotWriterService.stop();
-      metricsAccumulatorService.stop();
+      for (const service of dailySummaryServices) service.stop();
+      for (const service of snapshotWriterServices) service.stop();
+      for (const service of metricsAccumulatorServices) service.stop();
       releaseRuntimeGuard?.();
       releaseRuntimeGuard = null;
     });

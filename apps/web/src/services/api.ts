@@ -26,6 +26,7 @@ import type {
   ManagementDraftSaveConflict,
   ManagementDraftSavePrecondition,
   MonitoringMetricBinding,
+  MetricScope,
   PairingTokenIssue,
   PlaybackPage,
   PlaybackProfileDraft,
@@ -1027,6 +1028,7 @@ export type DataSourceOverviewResponse = {
     latestSnapshotAt: string | null;
     latestSnapshotDate: string | null;
     localDate: string;
+    metricScope: MetricScope;
   };
   weather: {
     status: "ready";
@@ -1094,11 +1096,13 @@ export async function getDeviceStatus() {
   return response.data;
 }
 
-export async function getDataSourceOverview() {
-  return requestJson<DataSourceOverviewResponse>("/api/data-source/overview");
+export async function getDataSourceOverview(metricScope: MetricScope = "global") {
+  return requestJson<DataSourceOverviewResponse>(
+    `/api/data-source/overview?metricScope=${encodeURIComponent(metricScope)}`
+  );
 }
 
-export async function resetTodayTrend() {
+export async function resetTodayTrend(metricScope: MetricScope) {
   const response = await requestJson<{
     data: {
       deletedSnapshots: number;
@@ -1107,12 +1111,13 @@ export async function resetTodayTrend() {
     };
     success: boolean;
   }>("/api/data-source/reset-today-trend", {
+    body: JSON.stringify({ metricScope }),
     method: "POST"
   });
   return response.data;
 }
 
-export async function resetMonthTrend() {
+export async function resetMonthTrend(metricScope: MetricScope) {
   const response = await requestJson<{
     data: {
       deletedDailySummaries: number;
@@ -1122,6 +1127,7 @@ export async function resetMonthTrend() {
     };
     success: boolean;
   }>("/api/data-source/reset-month-trend", {
+    body: JSON.stringify({ metricScope }),
     method: "POST"
   });
   return response.data;

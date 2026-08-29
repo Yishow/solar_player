@@ -28,7 +28,7 @@ test("025 migration installs CL and KN summary source mappings without enabled d
   const rows = getDatabase()
     .prepare(
       `
-        SELECT metric_key, topic, unit, value_path, multiplier, decimal_places, enabled
+        SELECT metric_scope, metric_key, topic, unit, value_path, multiplier, decimal_places, enabled
         FROM topic_mappings
         WHERE metric_key LIKE 'factoryGeneration.%'
         ORDER BY metric_key
@@ -37,12 +37,12 @@ test("025 migration installs CL and KN summary source mappings without enabled d
     .all();
 
   assert.deepEqual(rows, [
-    { metric_key: "factoryGeneration.cl.monthMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_key: "factoryGeneration.cl.todayMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_key: "factoryGeneration.cl.totalMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_key: "factoryGeneration.kn.monthMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_key: "factoryGeneration.kn.todayMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_key: "factoryGeneration.kn.totalMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 }
+    { metric_scope: "cl", metric_key: "factoryGeneration.monthMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
+    { metric_scope: "kn", metric_key: "factoryGeneration.monthMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
+    { metric_scope: "cl", metric_key: "factoryGeneration.todayMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
+    { metric_scope: "kn", metric_key: "factoryGeneration.todayMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
+    { metric_scope: "cl", metric_key: "factoryGeneration.totalMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
+    { metric_scope: "kn", metric_key: "factoryGeneration.totalMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 }
   ]);
 
   const enabledDirectMappings = getDatabase()

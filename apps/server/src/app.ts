@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { closeDatabaseConnection } from "./db/index.js";
 import { createLoggerOptions } from "./logger.js";
-import { readAuthoritativeLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
+import { readAuthoritativeScopedLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
 import { getWeatherService } from "./services/weatherService.js";
 import managementAuthPlugin, {
@@ -145,7 +145,7 @@ export async function buildApp() {
     allowRequest: managementCorsRequestGate,
     classifySession: managementAccess.classifySocketSession,
     corsOrigin: managementCorsOrigin,
-    getLiveMetricsSnapshot: () => readAuthoritativeLiveMetricsSnapshot(),
+    getLiveMetricsSnapshot: (metricScope) => readAuthoritativeScopedLiveMetricsSnapshot(metricScope),
     getMqttStatus: () =>
       mqttClientService?.getStatus() ?? {
         broker: "",

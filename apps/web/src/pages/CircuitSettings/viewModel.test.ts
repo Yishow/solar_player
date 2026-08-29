@@ -141,6 +141,7 @@ test("buildCircuitSettingsViewModel exposes row-level slot impact readiness risk
       findings: [
         {
           blocking: true,
+          metricScope: "cl" as const,
           pageId: "factory-circuit",
           reason: "slot conflict: body is claimed by multiple circuits",
           requirementKey: "body",

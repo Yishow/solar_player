@@ -1,5 +1,6 @@
 import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
+import type { MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { normalizeMetricSnapshotCapturedAt } from "../db/normalizeMetricSnapshotCapturedAt.js";
 import {
@@ -83,12 +84,21 @@ export class MetricHistoryRetentionService {
         summaryRetentionDays: this.summaryRetentionDays
       });
 
-      const deletedSnapshots = this.database
-        .prepare("DELETE FROM metric_snapshots WHERE datetime(captured_at) < datetime(?)")
-        .run(snapshotCutoffIso).changes;
-      const deletedSummaries = this.database
-        .prepare("DELETE FROM daily_energy_summaries WHERE date < ?")
-        .run(summaryCutoffDate).changes;
+      const scopes: MetricScope[] = ["cl", "kn", "global"];
+      const deleteSnapshots = this.database.prepare(
+        "DELETE FROM metric_snapshots WHERE metric_scope = ? AND datetime(captured_at) < datetime(?)"
+      );
+      const deleteSummaries = this.database.prepare(
+        "DELETE FROM daily_energy_summaries WHERE metric_scope = ? AND date < ?"
+      );
+      const deletedSnapshots = scopes.reduce(
+        (total, metricScope) => total + deleteSnapshots.run(metricScope, snapshotCutoffIso).changes,
+        0
+      );
+      const deletedSummaries = scopes.reduce(
+        (total, metricScope) => total + deleteSummaries.run(metricScope, summaryCutoffDate).changes,
+        0
+      );
       const deletedRows = deletedSnapshots + deletedSummaries;
 
       const vacuumed = shouldRunVacuum({

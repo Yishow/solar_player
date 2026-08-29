@@ -23,7 +23,6 @@ The system SHALL define a shared monitoring story model for `Overview`, `Solar`,
 - **THEN** both pages resolve freshness and alert tone from the shared story model
 - **AND** each page renders that state in its own layout without redefining the underlying contract
 
-
 <!-- @trace
 source: add-display-monitoring-story-semantic-models
 updated: 2026-05-19
@@ -220,6 +219,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Keep shared monitoring story model diagnosable
 
 The system SHALL keep the shared monitoring story model diagnosable to management surfaces and tests.
@@ -433,6 +433,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Expose monitoring card source composition in playback tooltips
 
 The system SHALL expose source composition for playback monitoring cards so operators can inspect the metric keys, MQTT topics, and dependencies behind displayed card values.
@@ -511,6 +512,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Expose monitoring card diagnostics for management surfaces
 
 The system SHALL expose monitoring card diagnostics from shared monitoring story data for management surfaces.
@@ -540,7 +542,6 @@ The system SHALL expose monitoring card diagnostics from shared monitoring story
 - **WHEN** diagnostics are generated for the self-consumption ratio card
 - **THEN** the diagnostic row lists both inputs
 - **AND** the row identifies `consumptionEnergy` as the blocking input
-
 
 <!-- @trace
 source: add-topic-workspace-card-data-management
@@ -602,6 +603,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Apply display overrides after monitoring source resolution
 
 The system SHALL apply display overrides after monitoring source values and fallback states are resolved.
@@ -694,6 +696,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Factory Circuit monitoring story supports page instances
 The system SHALL support Factory Circuit monitoring story payloads for each registered Factory Circuit page instance.
 
@@ -752,6 +755,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Shared monitoring story can apply a display-only sub-ton CO2 unit preference
 
 The system SHALL allow the shared monitoring story output for CO2 metrics to apply a display-only unit preference without changing the underlying carbon reduction calculation basis. When the global CO2 display preference is enabled and a CO2 metric's computed base unit is `t`, any non-zero value whose absolute magnitude is less than 1 SHALL be rendered for display as `kg` using `t * 1000`. Values equal to 0 SHALL remain displayed as `t`, values whose absolute magnitude is 1 or greater SHALL remain displayed as `t`, and unavailable values SHALL keep their existing fallback display.
@@ -1151,6 +1155,7 @@ tests:
 -->
 
 ---
+
 ### Requirement: Overview and Solar monitoring bindings keep sourceClass consistent with readiness semantics
 
 For Overview and Solar metrics that participate in both the shared monitoring story model and display readiness gate requirements, the system SHALL keep display `sourceClass` consistent with the metric resolution path used for readiness. A metric classified as derived for readiness SHALL NOT be presented in monitoring story bindings as `mqtt-live`.
@@ -1196,3 +1201,22 @@ tests:
   - apps/web/src/pages/Solar/viewModel.test.ts
   - apps/web/src/pages/shared/playbackMetricContract.test.ts
 -->
+
+### Requirement: Monitoring bindings expose resolved metric scope
+
+Each resolved monitoring metric binding SHALL identify its effective metric scope together with metric key, source class, freshness, fallback state, and provenance. Management diagnostics and playback tooltips SHALL preserve that scope so identical semantic metric keys from CL and KN remain distinguishable.
+
+#### Scenario: Same semantic metric exists at both sites
+- **WHEN** management diagnostics include CL and KN readings for `realTimePower`
+- **THEN** the CL row identifies `metricScope = cl`
+- **AND** the KN row identifies `metricScope = kn`
+- **AND** their source topics and freshness are resolved independently
+
+### Requirement: Monitoring display overrides preserve binding scope
+
+Display overrides applied after monitoring source resolution SHALL be matched against the resolved binding scope as well as the display target. An override from another site MUST NOT be considered a matching override.
+
+#### Scenario: CL and KN use the same Overview target id
+- **WHEN** a CL override exists for an Overview KPI target and the KN story resolves the same target id and semantic metric key
+- **THEN** the KN story ignores the CL override
+- **AND** diagnostics MAY show the CL override only when the operator explicitly inspects CL or all scopes

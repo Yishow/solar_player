@@ -8,14 +8,17 @@ import type {
   DisplayCardDataStatus,
   DisplayStoryPayloadByPageId,
   FactoryCircuitPageKey,
+  MetricScope,
   ResolvedMonitoringMetricBinding
 } from "@solar-display/shared";
 import {
-  resolveFactoryCircuitSlotMetricKey
+  resolveFactoryCircuitSlotMetricKey,
+  scopedIdentityKey,
+  type SiteScope
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
-import { readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
-import { readDisplayStoryPages } from "./displayStoryService.js";
+import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
+import { readDisplayStory } from "./displayStoryService.js";
 import {
   formatDisplayOverrideValue,
   readDisplayValueOverrides
@@ -25,6 +28,7 @@ import { readSustainabilityStory } from "./sustainabilityStoryService.js";
 type TopicMappingRow = {
   enabled: number;
   metric_key: string;
+  metric_scope: MetricScope;
   topic: string | null;
 };
 
@@ -33,18 +37,25 @@ type TopicMapping = {
   topic: string | null;
 };
 
-type LiveMetricLookup = ReturnType<typeof readLiveMetricsSnapshot>["metrics"];
+type LiveMetricReading = {
+  quality: string | null;
+  timestamp: string;
+  unit: string | null;
+  value: number;
+};
+
+type LiveMetricLookup = Map<string, LiveMetricReading>;
 type OverrideLookup = ReturnType<typeof readDisplayValueOverrides>;
 type SustainabilityStory = ReturnType<typeof readSustainabilityStory>;
 
 function readTopicMappings() {
   const rows = getDatabase()
-    .prepare("SELECT metric_key, topic, enabled FROM topic_mappings")
+    .prepare("SELECT metric_scope, metric_key, topic, enabled FROM topic_mappings")
     .all() as TopicMappingRow[];
 
   return new Map(
     rows.map((row) => [
-      row.metric_key,
+      scopedIdentityKey(row.metric_scope, row.metric_key),
       {
         enabled: row.enabled === 1,
         topic: row.topic?.trim() || null
@@ -53,11 +64,43 @@ function readTopicMappings() {
   );
 }
 
+function readLiveMetrics() {
+  const rows = getDatabase()
+    .prepare(
+      `
+        SELECT metric_scope, metric_key, value, unit, timestamp, quality
+        FROM live_metric_values
+        WHERE value IS NOT NULL AND timestamp IS NOT NULL
+      `
+    )
+    .all() as Array<{
+      metric_key: string;
+      metric_scope: MetricScope;
+      quality: string | null;
+      timestamp: string;
+      unit: string | null;
+      value: number;
+    }>;
+
+  return new Map(
+    rows.map((row) => [
+      scopedIdentityKey(row.metric_scope, row.metric_key),
+      {
+        quality: row.quality,
+        timestamp: normalizeMetricTimestamp(row.timestamp),
+        unit: row.unit,
+        value: row.value
+      } satisfies LiveMetricReading
+    ])
+  );
+}
+
 function formatLatestValue(
+  metricScope: MetricScope,
   metricKey: string,
   liveMetrics: LiveMetricLookup
 ) {
-  const reading = liveMetrics[metricKey];
+  const reading = liveMetrics.get(scopedIdentityKey(metricScope, metricKey));
 
   if (!reading) {
     return null;
@@ -67,31 +110,35 @@ function formatLatestValue(
 }
 
 function statusForDependency(
+  metricScope: MetricScope,
   metricKey: string,
   topics: Map<string, TopicMapping>,
   liveMetrics: LiveMetricLookup
 ): DisplayCardDataStatus {
-  const topic = topics.get(metricKey);
+  const identityKey = scopedIdentityKey(metricScope, metricKey);
+  const topic = topics.get(identityKey);
 
   if (!topic?.topic || !topic.enabled) {
     return "missing-topic";
   }
 
-  return liveMetrics[metricKey] ? "ready" : "idle-topic";
+  return liveMetrics.has(identityKey) ? "ready" : "idle-topic";
 }
 
 function buildDependencies(args: {
   dependencyKeys: string[];
   liveMetrics: LiveMetricLookup;
+  metricScope: MetricScope;
   topics: Map<string, TopicMapping>;
 }) {
   return args.dependencyKeys.map((metricKey) => {
-    const topic = args.topics.get(metricKey);
+    const topic = args.topics.get(scopedIdentityKey(args.metricScope, metricKey));
 
     return {
-      latestValue: formatLatestValue(metricKey, args.liveMetrics),
+      latestValue: formatLatestValue(args.metricScope, metricKey, args.liveMetrics),
       metricKey,
-      status: statusForDependency(metricKey, args.topics, args.liveMetrics),
+      metricScope: args.metricScope,
+      status: statusForDependency(args.metricScope, metricKey, args.topics, args.liveMetrics),
       topic: topic?.enabled ? topic.topic : null
     } satisfies DisplayCardDataDependency;
   });
@@ -128,6 +175,7 @@ function actionsForDependencies(dependencies: DisplayCardDataDependency[]) {
   for (const dependency of dependencies) {
     actions.push({
       metricKey: dependency.metricKey,
+      metricScope: dependency.metricScope,
       type: dependency.topic ? "publish-test-value" : "configure-topic"
     });
   }
@@ -143,7 +191,7 @@ function applyDisplayCardOverride(
   row: DisplayCardDataRow,
   overrides: OverrideLookup
 ): DisplayCardDataRow {
-  const override = overrides.get(row.cardId) ?? null;
+  const override = overrides.get(scopedIdentityKey(row.metricScope, row.cardId)) ?? null;
 
   if (!override?.active) {
     return {
@@ -165,6 +213,7 @@ function monitoringRow(args: {
   cardId: string;
   formula: string | null;
   metric: ResolvedMonitoringMetricBinding<string>;
+  metricScope: MetricScope;
   pageId: DisplayCardDataPageId;
   liveMetrics: LiveMetricLookup;
   overrides: OverrideLookup;
@@ -173,6 +222,7 @@ function monitoringRow(args: {
   const dependencies = buildDependencies({
     dependencyKeys: args.metric.dependencyKeys,
     liveMetrics: args.liveMetrics,
+    metricScope: args.metricScope,
     topics: args.topics
   });
   const status = deriveMonitoringStatus({
@@ -190,14 +240,27 @@ function monitoringRow(args: {
     formula: args.formula,
     label: args.metric.label,
     lastUpdatedAt:
-      dependencies.map((dependency) => args.liveMetrics[dependency.metricKey]?.timestamp ?? null)
+      dependencies.map((dependency) =>
+        args.liveMetrics.get(
+          scopedIdentityKey(dependency.metricScope, dependency.metricKey)
+        )?.timestamp ?? null
+      )
         .find((value) => value !== null) ?? null,
     metricKey: args.metric.metricKey,
+    metricScope: args.metricScope,
     originalValue: args.metric.value,
     override: null,
     pageId: args.pageId,
     sourceClassification: args.metric.sourceClass,
-    sourceTopics: args.metric.sourceTopics ?? [],
+    sourceTopics: dependencies.flatMap((dependency) =>
+      dependency.topic
+        ? [{
+            metricKey: dependency.metricKey,
+            metricScope: dependency.metricScope,
+            topic: dependency.topic
+          }]
+        : []
+    ),
     status,
     unit: args.metric.unit
   } satisfies DisplayCardDataRow, args.overrides);
@@ -207,6 +270,7 @@ function monitoringRows(
   story: DisplayStoryPayloadByPageId,
   topics: Map<string, TopicMapping>,
   liveMetrics: LiveMetricLookup,
+  sharedSiteScope: SiteScope,
   overrides: OverrideLookup
 ) {
   const overviewRows = story.overview.metrics.map((metric) =>
@@ -215,6 +279,7 @@ function monitoringRows(
       formula: null,
       liveMetrics,
       metric,
+      metricScope: sharedSiteScope,
       overrides,
       pageId: "overview",
       topics
@@ -229,6 +294,7 @@ function monitoringRows(
           : null,
       liveMetrics,
       metric,
+      metricScope: sharedSiteScope,
       overrides,
       pageId: "solar",
       topics
@@ -247,6 +313,7 @@ function monitoringRows(
               : null,
         liveMetrics,
         metric,
+        metricScope: pageId === "factory-circuit" ? "cl" : "kn",
         overrides,
         pageId,
         topics
@@ -329,6 +396,7 @@ function sustainabilityNumericRows(
         {
           latestValue: definition.value === null ? null : `${definition.displayValue} ${definition.unit}`,
           metricKey: definition.metricKey,
+          metricScope: "global",
           status: definition.value === null ? "waiting-aggregate" : "ready",
           topic: null
         }
@@ -338,6 +406,7 @@ function sustainabilityNumericRows(
       label: definition.label,
       lastUpdatedAt: definition.provenance.updatedAt,
       metricKey: definition.metricKey,
+      metricScope: "global",
       originalValue: definition.displayValue,
       override: null,
       pageId: "sustainability",
@@ -351,6 +420,7 @@ function sustainabilityNumericRows(
 
 function factorySlotRows(
   pageId: FactoryCircuitPageKey,
+  metricScope: SiteScope,
   story: DisplayStoryPayloadByPageId[FactoryCircuitPageKey],
   topics: Map<string, TopicMapping>,
   liveMetrics: LiveMetricLookup,
@@ -361,6 +431,7 @@ function factorySlotRows(
     const dependencies = buildDependencies({
       dependencyKeys: [metricKey],
       liveMetrics,
+      metricScope,
       topics
     });
     const dependency = dependencies[0]!;
@@ -384,13 +455,17 @@ function factorySlotRows(
       displayValue,
       formula: null,
       label: slot.label,
-      lastUpdatedAt: liveMetrics[metricKey]?.timestamp ?? null,
+      lastUpdatedAt:
+        liveMetrics.get(scopedIdentityKey(metricScope, metricKey))?.timestamp ?? null,
       metricKey,
+      metricScope,
       originalValue: displayValue,
       override: null,
       pageId,
       sourceClassification: "mqtt-live",
-      sourceTopics: dependency.topic ? [{ metricKey, topic: dependency.topic }] : [],
+      sourceTopics: dependency.topic
+        ? [{ metricKey, metricScope, topic: dependency.topic }]
+        : [],
       status,
       unit: "kW"
     } satisfies DisplayCardDataRow, overrides);
@@ -435,6 +510,7 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
               ? `${entry.card.householdCountDisplay} ${entry.card.householdLabel}`
               : null,
           metricKey: entry.metricKey,
+          metricScope: "global",
           status: entry.card.derivedStatus === "available" ? "ready" : "waiting-aggregate",
           topic: null
         }
@@ -449,6 +525,7 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
       label: entry.card.eyebrow,
       lastUpdatedAt: entry.card.provenance.updatedAt,
       metricKey: entry.metricKey,
+      metricScope: "global",
       originalValue: entry.card.householdCountDisplay,
       override: null,
       pageId: "sustainability",
@@ -460,19 +537,34 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
   });
 }
 
-export function readDisplayCardData(): DisplayCardDataResponse {
-  const story = readDisplayStoryPages(undefined, { applyDisplayOverrides: false });
+export function readDisplayCardData(sharedSiteScope: SiteScope = "cl"): DisplayCardDataResponse {
+  const sharedStory = readDisplayStory({
+    applyDisplayOverrides: false,
+    siteScope: sharedSiteScope
+  });
+  const clStory = sharedSiteScope === "cl"
+    ? sharedStory
+    : readDisplayStory({ applyDisplayOverrides: false, siteScope: "cl" });
+  const knStory = sharedSiteScope === "kn"
+    ? sharedStory
+    : readDisplayStory({ applyDisplayOverrides: false, siteScope: "kn" });
+  const story: DisplayStoryPayloadByPageId = {
+    "factory-circuit": clStory.factoryCircuit,
+    "factory-circuit-guanyin": knStory.factoryCircuit,
+    overview: sharedStory.overview,
+    solar: sharedStory.solar
+  };
   const sustainabilityStory = readSustainabilityStory(undefined, { applyDisplayOverrides: false });
-  const snapshot = readLiveMetricsSnapshot();
+  const liveMetrics = readLiveMetrics();
   const topics = readTopicMappings();
   const overrides = readDisplayValueOverrides();
 
   return {
     generatedAt: new Date().toISOString(),
     rows: [
-      ...monitoringRows(story, topics, snapshot.metrics, overrides),
-      ...factorySlotRows("factory-circuit", story["factory-circuit"], topics, snapshot.metrics, overrides),
-      ...factorySlotRows("factory-circuit-guanyin", story["factory-circuit-guanyin"], topics, snapshot.metrics, overrides),
+      ...monitoringRows(story, topics, liveMetrics, sharedSiteScope, overrides),
+      ...factorySlotRows("factory-circuit", "cl", story["factory-circuit"], topics, liveMetrics, overrides),
+      ...factorySlotRows("factory-circuit-guanyin", "kn", story["factory-circuit-guanyin"], topics, liveMetrics, overrides),
       ...sustainabilityNumericRows(sustainabilityStory, overrides),
       ...householdRows(sustainabilityStory, overrides)
     ]

@@ -1,6 +1,7 @@
 import type { DisplayPageKey } from "./displayPageConfig.js";
 import type { DisplayRotationSkipReason } from "./displayRotation.js";
 import type { DisplayFaultTriageSummary } from "./deviceDisplayOps.js";
+import type { MetricScope } from "./metricScope.js";
 
 export type DisplayOpsIssueCode =
   | "asset-unhealthy"
@@ -98,6 +99,7 @@ export type DisplaySyncEventScope =
 
 export type DisplaySyncEvent = {
   generatedAt: string;
+  metricScope?: MetricScope;
   reason: string;
   scope: DisplaySyncEventScope;
 };

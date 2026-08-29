@@ -1,8 +1,8 @@
 import { setInterval, clearInterval } from "node:timers";
 import type Database from "better-sqlite3";
-import type { DisplaySyncEvent } from "@solar-display/shared";
+import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
-import { type LiveMetricsSnapshot, readLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
+import { type LiveMetricsSnapshot, readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
 
 export type CumulativeMetricKey = "generation" | "consumption" | "selfConsumption" | "co2";
@@ -40,6 +40,7 @@ type MetricsAccumulatorServiceOptions = {
   emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   flushIntervalMs?: number;
   maxIntegrationGapSeconds?: number;
+  metricScope: MetricScope;
   pollIntervalMs?: number;
   readSnapshot?: () => LiveMetricsSnapshot;
 };
@@ -140,6 +141,7 @@ export class MetricsAccumulatorService {
   private readonly emitDisplaySync?: (payload: DisplaySyncEvent) => void;
   private readonly flushIntervalMs: number;
   private readonly maxIntegrationGapSeconds: number;
+  readonly metricScope: MetricScope;
   private readonly pollIntervalMs: number;
   private readonly readSnapshot: () => LiveMetricsSnapshot;
   private counters = buildEmptyCounters();
@@ -161,13 +163,14 @@ export class MetricsAccumulatorService {
   private readonly resetCounts = new Map<string, number>();
   private timer: NodeJS.Timeout | null = null;
 
-  constructor(options: MetricsAccumulatorServiceOptions = {}) {
+  constructor(options: MetricsAccumulatorServiceOptions) {
     this.database = options.database ?? getDatabase();
     this.emitDisplaySync = options.emitDisplaySync;
     this.flushIntervalMs = options.flushIntervalMs ?? 30_000;
     this.maxIntegrationGapSeconds = options.maxIntegrationGapSeconds ?? 300;
+    this.metricScope = options.metricScope;
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
-    this.readSnapshot = options.readSnapshot ?? (() => readLiveMetricsSnapshot(this.database));
+    this.readSnapshot = options.readSnapshot ?? (() => readScopedLiveMetricsSnapshot(this.metricScope, this.database));
   }
 
   initialize() {
@@ -180,9 +183,10 @@ export class MetricsAccumulatorService {
         `
           SELECT metric_key, total_value, last_updated, reset_count
           FROM cumulative_counters
+          WHERE metric_scope = ?
         `
       )
-      .all() as CumulativeCounterRow[];
+      .all(this.metricScope) as CumulativeCounterRow[];
 
     for (const row of rows) {
       if (row.metric_key === "generation" && isFiniteNumber(row.total_value)) {
@@ -308,9 +312,9 @@ export class MetricsAccumulatorService {
     const nowIso = new Date().toISOString();
     const upsert = this.database.prepare(
       `
-        INSERT INTO cumulative_counters (metric_key, total_value, last_updated, reset_count)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(metric_key) DO UPDATE SET
+        INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
           total_value = excluded.total_value,
           last_updated = excluded.last_updated,
           reset_count = excluded.reset_count
@@ -318,15 +322,16 @@ export class MetricsAccumulatorService {
     );
 
     this.database.transaction(() => {
-      upsert.run("generation", roundTo(this.counters.generation, 3), nowIso, this.resetCounts.get("generation") ?? 0);
-      upsert.run("consumption", roundTo(this.counters.consumption, 3), nowIso, this.resetCounts.get("consumption") ?? 0);
+      upsert.run(this.metricScope, "generation", roundTo(this.counters.generation, 3), nowIso, this.resetCounts.get("generation") ?? 0);
+      upsert.run(this.metricScope, "consumption", roundTo(this.counters.consumption, 3), nowIso, this.resetCounts.get("consumption") ?? 0);
       upsert.run(
+        this.metricScope,
         "selfConsumption",
         roundTo(this.counters.selfConsumption, 3),
         nowIso,
         this.resetCounts.get("selfConsumption") ?? 0
       );
-      upsert.run("co2", roundTo(this.counters.co2, 3), nowIso, this.resetCounts.get("co2") ?? 0);
+      upsert.run(this.metricScope, "co2", roundTo(this.counters.co2, 3), nowIso, this.resetCounts.get("co2") ?? 0);
     })();
 
     this.dirty = false;
@@ -334,6 +339,7 @@ export class MetricsAccumulatorService {
     if (wroteNewCounters) {
       this.emitDisplaySync?.({
         generatedAt: nowIso,
+        metricScope: this.metricScope,
         reason: "metrics-counters-flushed",
         scope: "monitoring-history"
       });
@@ -421,8 +427,9 @@ export class MetricsAccumulatorService {
       .prepare(`
         SELECT metric_key, total_value, last_updated, reset_count
         FROM cumulative_counters
+        WHERE metric_scope = ?
       `)
-      .all() as CumulativeCounterRow[];
+      .all(this.metricScope) as CumulativeCounterRow[];
     let changed = false;
 
     for (const row of rows) {
