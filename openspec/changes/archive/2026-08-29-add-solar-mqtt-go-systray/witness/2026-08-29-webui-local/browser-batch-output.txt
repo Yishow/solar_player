@@ -1,0 +1,531 @@
+✓ Solar MQTT Web Console - 雙廠發電量監控
+  http://127.0.0.1:18968/
+
+✓ Done
+
+- banner
+  - image "Solar"
+    - StaticText "☀️"
+  - heading "Solar MQTT Web Console KN & CL" [level=1, ref=e1]
+    - StaticText "Solar MQTT Web Console"
+    - StaticText "KN & CL"
+  - paragraph
+    - StaticText "即時發電數據採集・分區監控・全域設定維運"
+  - group "版面配置切換"
+    - button "⊞ 雙欄" [ref=e8]
+    - button "◫ 分頁" [ref=e9]
+  - button "🌙 深色" [ref=e2]
+  - button "⚙️ 維運設定" [ref=e3]
+- main
+  - generic
+    - StaticText "即時總發電功率"
+    - strong
+      - StaticText "-- kW"
+    - StaticText "雙廠今日發電"
+    - strong
+      - StaticText "-- MWh"
+    - StaticText "雙廠本月發電"
+    - strong
+      - StaticText "-- MWh"
+    - StaticText "歷史累積總發電"
+    - strong
+      - StaticText "-- MWh"
+    - StaticText "MQTT 連線狀態"
+    - strong
+      - StaticText "Disconnected"
+  - generic
+    - article
+      - heading "KN 觀音廠 (192.168.80.5)" [level=2, ref=e20]
+        - StaticText "KN 觀音廠 (192.168.80.5)"
+      - StaticText "No Data"
+      - button "🔄 立即擷取" [ref=e21]
+      - button "📊 匯出 CSV" [ref=e22]
+      - StaticText "Never"
+      - generic
+        - StaticText "⚡ 即時總功率"
+        - StaticText "--"
+        - StaticText "kW"
+      - generic
+        - StaticText "☀️ 今日發電量"
+        - StaticText "--"
+        - StaticText "MWh"
+      - generic
+        - StaticText "📅 本月發電量"
+        - StaticText "--"
+        - StaticText "MWh"
+      - generic
+        - StaticText "📈 歷史累積發電"
+        - StaticText "--"
+        - StaticText "MWh"
+      - heading "分區發電明細" [level=3, ref=e23]
+      - StaticText "0 分區"
+      - table
+        - rowgroup
+          - row
+            - columnheader "ZONE" [ref=e34]
+            - columnheader "區域名稱" [ref=e35]
+            - columnheader "即時功率 (KW)" [ref=e36]
+            - columnheader "今日發電 (KWH)" [ref=e37]
+            - columnheader "本月發電 (MWH)" [ref=e38]
+            - columnheader "歷史累積 (MWH)" [ref=e39]
+            - columnheader "裝置容量 (KWP)" [ref=e40]
+            - columnheader "等效時數 (H)" [ref=e41]
+        - rowgroup
+          - row
+            - cell "尚無分區資料" [ref=e42]
+      - group
+        - DisclosureTriangle "📡 MQTT 主題與資料流對照 ▾" [expanded=false]
+          - StaticText "📡 MQTT 主題與資料流對照"
+          - StaticText "▾"
+    - article
+      - heading "CL 中壢廠 (192.168.17.182)" [level=2, ref=e24]
+        - StaticText "CL 中壢廠 (192.168.17.182)"
+      - StaticText "No Data"
+      - button "🔄 立即擷取" [ref=e25]
+      - button "📊 匯出 CSV" [ref=e26]
+      - StaticText "Never"
+      - generic
+        - StaticText "⚡ 即時總功率"
+        - StaticText "--"
+        - StaticText "kW"
+      - generic
+        - StaticText "☀️ 今日發電量"
+        - StaticText "--"
+        - StaticText "MWh"
+      - generic
+        - StaticText "📅 本月發電量"
+        - StaticText "--"
+        - StaticText "MWh"
+      - generic
+        - StaticText "📈 歷史累積發電"
+        - StaticText "--"
+        - StaticText "MWh"
+      - heading "分區發電明細" [level=3, ref=e27]
+      - StaticText "0 分區"
+      - table
+        - rowgroup
+          - row
+            - columnheader "ZONE" [ref=e43]
+            - columnheader "區域名稱" [ref=e44]
+            - columnheader "即時功率 (KW)" [ref=e45]
+            - columnheader "今日發電 (KWH)" [ref=e46]
+            - columnheader "本月發電 (MWH)" [ref=e47]
+            - columnheader "歷史累積 (MWH)" [ref=e48]
+            - columnheader "裝置容量 (KWP)" [ref=e49]
+            - columnheader "等效時數 (H)" [ref=e50]
+        - rowgroup
+          - row
+            - cell "尚無分區資料" [ref=e51]
+      - group
+        - DisclosureTriangle "📡 MQTT 主題與資料流對照 ▾" [expanded=false]
+          - StaticText "📡 MQTT 主題與資料流對照"
+          - StaticText "▾"
+  - region "MQTT Subscriptions" [ref=e4]
+    - heading "MQTT Subscriptions" [level=2, ref=e10]
+    - article
+      - heading "KN 觀音廠" [level=3, ref=e28]
+      - StaticText "not-subscribed"
+      - list
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/summary"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/total_power_kw"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/today_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/month_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/total_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/zone/#"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/status"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/heartbeat"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/alert"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/state/config"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/KN/state/control-result"
+    - article
+      - heading "CL 中壢廠" [level=3, ref=e29]
+      - StaticText "not-subscribed"
+      - list
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/summary"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/total_power_kw"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/today_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/month_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/total_mwh"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/zone/#"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/status"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/heartbeat"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/alert"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/state/config"
+        - listitem [level=1]
+          - ListMarker "• "
+          - StaticText "solar/CL/state/control-result"
+- complementary "Operations & Settings"
+  - heading "⚙️ 維運與設定控制台" [level=2, ref=e5]
+  - paragraph
+    - StaticText "本機設定檔・連線診斷・遠端控制・日誌"
+  - button "✕" [ref=e6]
+  - navigation "維運模組切換" [ref=e7]
+    - button "🏢 廠區與連線" [ref=e11]
+    - button "📝 完整 JSON" [ref=e12]
+    - button "📡 MQTT Broker" [ref=e13]
+    - button "🎛️ 遠端參數" [ref=e14]
+    - button "📋 即時日誌" [ref=e15]
+  - heading "🏢 廠區 IP 與連線管理" [level=3, ref=e16]
+  - button "➕ 新增廠區" [ref=e17]
+  - button "📥 讀取" [ref=e18]
+  - button "💾 儲存生效" [ref=e19]
+  - StaticText "已載入 0 廠區 [] (solar-webui-witness-config.json) ✓"
+  - group "⚙️ 全域採集參數 (GLOBAL PARAMETERS)"
+    - Legend
+      - StaticText "⚙️ 全域採集參數 (GLOBAL PARAMETERS)"
+    - LabelText
+      - StaticText "⏱️ 採集週期 (秒)"
+      - spinbutton "⏱️ 採集週期 (秒)" [ref=e30]: 60
+        - StaticText "60"
+    - LabelText
+      - StaticText "❤️ 心跳週期 (秒)"
+      - spinbutton "❤️ 心跳週期 (秒)" [ref=e31]: 30
+        - StaticText "30"
+    - LabelText
+      - StaticText "⚠️ 歸零警戒 (分)"
+      - spinbutton "⚠️ 歸零警戒 (分)" [ref=e32]: 5
+        - StaticText "5"
+    - LabelText
+      - checkbox "🌙 夜間暫停" [checked=false, ref=e33]
+      - StaticText "🌙 夜間暫停"
+
+☀️
+
+# Solar MQTT Web Console KN & CL
+
+即時發電數據採集・分區監控・全域設定維運
+
+⊞ 雙欄
+◫ 分頁
+
+🌙 深色
+⚙️ 維運設定
+
+即時總發電功率
+-- kW
+
+雙廠今日發電
+-- MWh
+
+雙廠本月發電
+-- MWh
+
+歷史累積總發電
+-- MWh
+
+MQTT 連線狀態
+Disconnected
+
+🏢 KN 觀音廠
+🏢 CL 中壢廠
+
+## KN 觀音廠 (192.168.80.5)
+
+No Data
+
+🔄 立即擷取
+📊 匯出 CSV
+Never
+
+⚡ 即時總功率
+
+--
+kW
+
+☀️ 今日發電量
+
+--
+MWh
+
+📅 本月發電量
+
+--
+MWh
+
+📈 歷史累積發電
+
+--
+MWh
+
+### 分區發電明細
+
+0 分區
+
+Zone
+區域名稱
+即時功率 (kW)
+今日發電 (kWh)
+本月發電 (MWh)
+歷史累積 (MWh)
+裝置容量 (kWp)
+等效時數 (h)
+
+尚無分區資料
+
+📡 MQTT 主題與資料流對照▾
+
+mosquitto_sub -h localhost -p 1883 -v -t 'solar/KN/#'
+複製指令
+
+## CL 中壢廠 (192.168.17.182)
+
+No Data
+
+🔄 立即擷取
+📊 匯出 CSV
+Never
+
+⚡ 即時總功率
+
+--
+kW
+
+☀️ 今日發電量
+
+--
+MWh
+
+📅 本月發電量
+
+--
+MWh
+
+📈 歷史累積發電
+
+--
+MWh
+
+### 分區發電明細
+
+0 分區
+
+Zone
+區域名稱
+即時功率 (kW)
+今日發電 (kWh)
+本月發電 (MWh)
+歷史累積 (MWh)
+裝置容量 (kWp)
+等效時數 (h)
+
+尚無分區資料
+
+📡 MQTT 主題與資料流對照▾
+
+mosquitto_sub -h localhost -p 1883 -v -t 'solar/CL/#'
+複製指令
+
+## MQTT Subscriptions
+
+### KN 觀音廠
+
+not-subscribed
+
+- solar/KN/summary
+
+- solar/KN/total_power_kw
+
+- solar/KN/today_mwh
+
+- solar/KN/month_mwh
+
+- solar/KN/total_mwh
+
+- solar/KN/zone/#
+
+- solar/KN/status
+
+- solar/KN/heartbeat
+
+- solar/KN/alert
+
+- solar/KN/state/config
+
+- solar/KN/state/control-result
+
+### CL 中壢廠
+
+not-subscribed
+
+- solar/CL/summary
+
+- solar/CL/total_power_kw
+
+- solar/CL/today_mwh
+
+- solar/CL/month_mwh
+
+- solar/CL/total_mwh
+
+- solar/CL/zone/#
+
+- solar/CL/status
+
+- solar/CL/heartbeat
+
+- solar/CL/alert
+
+- solar/CL/state/config
+
+- solar/CL/state/control-result
+
+## ⚙️ 維運與設定控制台
+
+本機設定檔・連線診斷・遠端控制・日誌
+
+✕
+
+🏢 廠區與連線
+📝 完整 JSON
+📡 MQTT Broker
+🎛️ 遠端參數
+📋 即時日誌
+
+### 🏢 廠區 IP 與連線管理
+
+➕ 新增廠區
+📥 讀取
+💾 儲存生效
+
+已載入 0 廠區 [] (solar-webui-witness-config.json) ✓
+
+⚙️ 全域採集參數 (Global Parameters)
+
+⏱️ 採集週期 (秒)
+
+❤️ 心跳週期 (秒)
+
+⚠️ 歸零警戒 (分)
+
+🌙 夜間暫停
+
+### 📄 solar_config.json 原生編輯
+
+✨ 格式化排版
+
+直接編輯完整的 JSON 結構，點擊「儲存生效」將直接寫入本機磁碟檔案。
+
+### 🌐 MQTT Broker 連線
+
+disconnected
+
+連線中斷
+
+Host
+WebSocket Port
+Username
+Password
+Client ID
+Active Prefix
+
+連線 (Connect)
+中斷 (Disconnect)
+
+Disconnected
+Connecting
+Connected
+Reconnecting
+Error
+
+### 🎛️ 遠端參數設定 (MQTT Control)
+
+KN 觀音廠
+CL 中壢廠
+
+載入設定
+發送變更
+
+📋 表單模式
+📝 JSON 編輯
+
+請選擇廠別以讀取設定。
+
+Factory ID
+
+Runtime 即時套用
+interval
+heartbeat_interval
+anomaly_daytime_zero_minutes
+night_pause
+night_padding_min
+
+MQTT Retain 即時套用
+mqtt_retain_summary
+mqtt_retain_zone
+mqtt_retain_status
+mqtt_retain_alert
+mqtt_retain_heartbeat
+
+### 🚀 手動發布 (Manual Publish)
+
+Topic
+JSON payload{}
+
+發布 (Publish)
+
+### 📋 即時活動日誌 (Activity Log)
+
+🗑️ 清除日誌
+
+[下午9:59:07] 成功讀取本機設定檔，共 0 廠區 []
+
+系統初始化完成，等待操作...
+
+[F30D10119E1E4E522924395F0EB46B17] GET http://127.0.0.1:18968/ (Document) 200
+[58920.2] GET http://127.0.0.1:18968/styles.css (Stylesheet) 200
+[58920.3] GET http://127.0.0.1:18968/vendor/mqtt.min.js (Script) 200
+[58920.4] GET http://127.0.0.1:18968/js/app.js (Script) 200
+[58920.7] GET http://127.0.0.1:18968/styles/theme.css (Stylesheet) 200
+[58920.8] GET http://127.0.0.1:18968/styles/layout.css (Stylesheet) 200
+[58920.9] GET http://127.0.0.1:18968/styles/components.css (Stylesheet) 200
+[58920.10] GET http://127.0.0.1:18968/styles/forms.css (Stylesheet) 200
+[58920.12] GET http://127.0.0.1:18968/js/factory-view.js (Script) 200
+[58920.13] GET http://127.0.0.1:18968/js/mqtt-manager.js (Script) 200
+[58920.14] GET http://127.0.0.1:18968/js/config-view.js (Script) 200
+[58920.15] GET http://127.0.0.1:18968/js/local-config-view.js (Script) 200
+[58920.16] GET http://127.0.0.1:18968/api/local-config (Fetch) 200
+[58920.18] GET http://127.0.0.1:18968/favicon.ico (Other) 404
+
+✓ Screenshot saved to /Users/yishow/prj/solar_player/openspec/changes/archive/2026-08-29-add-solar-mqtt-go-systray/witness/2026-08-29-webui-local/dashboard-full.png

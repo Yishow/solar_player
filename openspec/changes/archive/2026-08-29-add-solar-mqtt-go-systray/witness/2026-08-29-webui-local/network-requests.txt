@@ -1,0 +1,14 @@
+[F30D10119E1E4E522924395F0EB46B17] GET http://127.0.0.1:18968/ (Document) 200
+[58920.2] GET http://127.0.0.1:18968/styles.css (Stylesheet) 200
+[58920.3] GET http://127.0.0.1:18968/vendor/mqtt.min.js (Script) 200
+[58920.4] GET http://127.0.0.1:18968/js/app.js (Script) 200
+[58920.7] GET http://127.0.0.1:18968/styles/theme.css (Stylesheet) 200
+[58920.8] GET http://127.0.0.1:18968/styles/layout.css (Stylesheet) 200
+[58920.9] GET http://127.0.0.1:18968/styles/components.css (Stylesheet) 200
+[58920.10] GET http://127.0.0.1:18968/styles/forms.css (Stylesheet) 200
+[58920.12] GET http://127.0.0.1:18968/js/factory-view.js (Script) 200
+[58920.13] GET http://127.0.0.1:18968/js/mqtt-manager.js (Script) 200
+[58920.14] GET http://127.0.0.1:18968/js/config-view.js (Script) 200
+[58920.15] GET http://127.0.0.1:18968/js/local-config-view.js (Script) 200
+[58920.16] GET http://127.0.0.1:18968/api/local-config (Fetch) 200
+[58920.18] GET http://127.0.0.1:18968/favicon.ico (Other) 404
