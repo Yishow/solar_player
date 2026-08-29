@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { factoryGenerationDependencyKeys } from "@solar-display/shared";
 import { updateDefaultPlaybackSettingsForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import {
   buildApp,
@@ -397,7 +398,10 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.ok(totalGenerationMetric);
     assert.equal(totalGenerationMetric.sourceClass, "cumulative-counter");
     assert.equal(totalGenerationMetric.provenance, "cumulative");
-    assert.deepEqual(totalGenerationMetric.dependencyKeys, ["totalGeneration"]);
+    assert.deepEqual(totalGenerationMetric.dependencyKeys, [
+      "totalGeneration",
+      ...factoryGenerationDependencyKeys
+    ]);
     const realTimePowerMetric = body.overview.metrics.find((metric) => metric.metricKey === "realTimePower");
     assert.ok(realTimePowerMetric?.sourceTopics?.length);
     assert.ok(realTimePowerMetric?.trendHours?.length);

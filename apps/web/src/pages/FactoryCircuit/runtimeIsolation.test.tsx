@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { CircuitConfig } from "@solar-display/shared";
+import type {
+  CircuitConfig,
+  DisplayCircuitSlotKey,
+  FactoryCircuitKpiKey,
+  FactoryCircuitStoryPayload
+} from "@solar-display/shared";
 import type { ReactNode } from "react";
 import {
   replaceLiveMetricsConnectionState,
@@ -66,6 +71,65 @@ function createReading(value: number, unit: string, timestamp: string) {
   };
 }
 
+function createFormattedFactoryCircuitStory(): FactoryCircuitStoryPayload {
+  const slotKeys: DisplayCircuitSlotKey[] = [
+    "stamping",
+    "body",
+    "painting",
+    "assembly",
+    "utility",
+    "office",
+    "heavy_vehicle",
+    "ed_coating"
+  ];
+  const kpiKeys: FactoryCircuitKpiKey[] = [
+    "totalPower",
+    "solarShare",
+    "selfConsumption",
+    "peak",
+    "flow"
+  ];
+  return {
+    kpis: kpiKeys.map((metricKey) => ({
+      alertTone: "normal",
+      bindingState: "bound",
+      dependencyKeys: [],
+      fallbackReason: null,
+      fallbackStrategy: "placeholder",
+      freshnessState: "fresh",
+      helper: "",
+      label: metricKey,
+      metricKey,
+      metricScope: "cl",
+      provenance: "live",
+      sourceClass: "mqtt-live",
+      unit: "kW",
+      value: "1"
+    })),
+    slots: slotKeys.map((slotKey, index) => ({
+      alertTone: "normal",
+      bindingState: "bound",
+      circuitId: index + 1,
+      fallbackReason: null,
+      ...(slotKey === "stamping"
+        ? { format: { precision: 2, unitDisplay: "hide" as const } }
+        : {}),
+      freshnessState: "fresh",
+      itemId: slotKey,
+      label: slotKey,
+      livePowerKw: 1,
+      metricScope: "cl",
+      slotKey
+    })),
+    summary: {
+      alertTone: "normal",
+      bindingState: "bound",
+      fallbackReason: null,
+      freshnessState: "fresh"
+    }
+  };
+}
+
 test("factory circuit runtime output stays stable when an unrelated metric changes", () => {
   const seedConfig = createFactoryCircuitDisplayPageSeedConfig();
   const runtimes = buildFactoryCircuitRuntimes(circuitConfigs).map((circuit) =>
@@ -123,4 +187,25 @@ test("factory circuit runtime output stays stable when an unrelated metric chang
   );
 
   assert.equal(after, before);
+});
+
+test("factory circuit runtime applies slot precision and hidden unit", () => {
+  const seedConfig = createFactoryCircuitDisplayPageSeedConfig();
+  const emptyIcons = Object.fromEntries(
+    Object.keys(seedConfig.loadRows).map((key) => [key, null])
+  ) as Record<string, ReactNode>;
+
+  const markup = renderToStaticMarkup(
+    <FactoryCircuitRuntimeContent
+      circuits={[]}
+      factoryCircuitStory={createFormattedFactoryCircuitStory()}
+      loadRowIcons={emptyIcons}
+      loadState="ready"
+      resolvedConfig={seedConfig}
+      seedConfig={seedConfig}
+    />
+  );
+
+  assert.match(markup, /<b>13\.00<\/b>/);
+  assert.doesNotMatch(markup, /13\.00%/);
 });

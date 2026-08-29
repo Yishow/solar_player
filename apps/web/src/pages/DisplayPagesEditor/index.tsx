@@ -74,12 +74,14 @@ import {
   toggleCardRailCardVisibility
 } from "./cardRailAuthoring";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
+import { DataInspectorPanel } from "./dataInspector";
 import {
   applyOverviewGroupStyleFieldUpdate,
   resolveOverviewGroupStylePaths
 } from "../Overview/displayPageConfig";
 
 type DisplayEditorWorkspace = "assets" | "editor" | "shell";
+type DisplayEditorRightTab = "data" | "health" | "inspector" | "publish" | "source";
 export type DisplayEditorPageDefinition = {
   createSeedConfig: () => Record<string, unknown>;
   id: string;
@@ -305,6 +307,7 @@ export function DisplayPagesEditor({
   initialEditorState?: {
     editMode?: boolean;
     lockedRegionIds?: string[];
+    rightTab?: DisplayEditorRightTab;
     selectedRegionId?: string | null;
     selectedRegionIds?: string[];
   };
@@ -369,7 +372,7 @@ export function DisplayPagesEditor({
     initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
   );
   const editMode = controlledEditMode ?? internalEditMode;
-  const [rightTab, setRightTab] = useState<"health" | "inspector" | "publish" | "source">("inspector");
+  const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
   const displayEditorProfilingEnabled = useMemo(() => isDisplayEditorProfilingEnabled(), []);
 
   const selectedPage = useMemo(
@@ -501,6 +504,14 @@ export function DisplayPagesEditor({
     () => resolveDisplayPageMediaEffectRegion(selectedRegion, editableItems) ?? selectedRegion,
     [editableItems, selectedRegion]
   );
+  const dataBindingCapability = selectedRegion?.schema.dataBinding ?? null;
+  const dataBindingPageKey = selectedPage.id === "factory-circuit-guanyin"
+    ? "factory-circuit-guanyin"
+    : selectedPage.templateKey === "overview"
+      || selectedPage.templateKey === "solar"
+      || selectedPage.templateKey === "factory-circuit"
+      ? selectedPage.templateKey
+      : null;
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const lockedObjectIds = useMemo(
     () => freeformObjects.filter((object) => object.locked).map((object) => object.id),
@@ -595,6 +606,12 @@ export function DisplayPagesEditor({
       setSelectedRegionIds(resolvedSelectedRegionIds);
     }
   }, [resolvedSelectedRegionIds, selectedRegionIds.length]);
+
+  useEffect(() => {
+    if (rightTab === "data" && (!dataBindingCapability || !dataBindingPageKey)) {
+      setRightTab("inspector");
+    }
+  }, [dataBindingCapability, dataBindingPageKey, rightTab]);
 
   const handleSelectRegion = useCallback(
     (regionId: string, options?: { additive?: boolean }) => {
@@ -1349,8 +1366,11 @@ export function DisplayPagesEditor({
 
         <div className="flex flex-col overflow-hidden border-l border-[var(--shell-divider)]">
           <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
-            {(["inspector", "source", "health", "publish"] as const).map((tab) => {
-              const labels = { inspector: "屬性", source: "來源連接", health: "素材健康", publish: "發布" };
+            {(dataBindingCapability && dataBindingPageKey
+              ? (["inspector", "data", "source", "health", "publish"] as const)
+              : (["inspector", "source", "health", "publish"] as const)
+            ).map((tab) => {
+              const labels = { data: "資料", inspector: "屬性", source: "素材來源", health: "素材健康", publish: "發布" };
               return (
                 <button
                   key={tab}
@@ -1403,6 +1423,17 @@ export function DisplayPagesEditor({
                 isLoading={isAssetHealthLoading}
                 pageId={selectedPage.id}
                 report={assetHealthReport}
+              />
+            )}
+            {rightTab === "data" && dataBindingCapability && dataBindingPageKey && (
+              <DataInspectorPanel
+                capability={dataBindingCapability}
+                config={config}
+                editMode={editMode}
+                onChange={updatePath}
+                onReset={handleResetField}
+                pageId={selectedPage.id}
+                pageKey={dataBindingPageKey}
               />
             )}
             {rightTab === "source" && (

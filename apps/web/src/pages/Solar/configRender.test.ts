@@ -64,8 +64,14 @@ test("solar value-only refresh keeps static geometry output on config-only memo 
   assert.doesNotMatch(connectorSource, /viewModel/);
   assert.doesNotMatch(kpiSource, /viewModel/);
   assert.doesNotMatch(heroSource, /viewModel/);
-  assert.match(solarRuntimeSource, /const node = viewModel\.flowNodes\[index\]!/);
-  assert.match(solarRuntimeSource, /const metric = viewModel\.kpis\[index\]!/);
+  assert.match(
+    solarRuntimeSource,
+    /const node = viewModel\.flowNodes\.find\([\s\S]*candidate\.itemId === `flow\.\$\{item\.key\}`/
+  );
+  assert.match(
+    solarRuntimeSource,
+    /const metric = viewModel\.kpis\.find\([\s\S]*candidate\.itemId === item\.key/
+  );
 });
 
 test("solar display page seed config captures the current default hero and layout contract", () => {

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   factoryGenerationDependencyKeys,
+  resolvePlaybackDefaultMetricBoundItems,
   resolvePlaybackDisplayMetricSourceClass,
   resolvePlaybackGateRequirements,
+  resolvePlaybackMetricCatalog,
   resolvePlaybackRuntimeMetricKeys
 } from "@solar-display/shared";
 
@@ -20,6 +22,58 @@ const OVERVIEW_PHASE_KEYS = [
   "phaseTCurrent", "phaseTPower", "phaseTVoltage"
 ];
 const SOLAR_KPI_KEYS = ["realTimePower", "systemEfficiency", "selfConsumptionRatio", "todayGeneration", "todayCo2Reduction", "totalCo2Reduction"];
+
+test("playback contract owns default item bindings and authoring metric vocabulary", () => {
+  const overviewDefaults = resolvePlaybackDefaultMetricBoundItems("overview");
+  assert.deepEqual(
+    overviewDefaults.map(({ dataBinding, itemId }) => [itemId, dataBinding.metricKey]),
+    [
+      ["power", "realTimePower"],
+      ["today", "todayGeneration"],
+      ["total", "totalGeneration"],
+      ["co2Today", "todayCo2Reduction"],
+      ["co2Total", "totalCo2Reduction"]
+    ]
+  );
+
+  const catalog = resolvePlaybackMetricCatalog("solar");
+  const ratio = catalog.find(({ metricKey }) => metricKey === "selfConsumptionRatio");
+  assert.equal(ratio?.sourceClass, "derived-metric");
+  assert.deepEqual(ratio?.dependencyKeys, [
+    "selfConsumptionRatio",
+    "selfConsumptionEnergy",
+    "consumptionEnergy"
+  ]);
+  assert.equal(ratio?.valueType, "numeric");
+});
+
+test("effective runtime dependencies follow explicit saved bindings instead of page arrays", () => {
+  const inheritedPowerBinding = [{
+    dataBinding: {
+      metricKey: "realTimePower",
+      scope: "inherit-device",
+      sourceType: "metric"
+    },
+    itemId: "generation"
+  }] as const;
+  const derivedGenerationBinding = [{
+    dataBinding: {
+      metricKey: "todayGeneration",
+      scope: "inherit-device",
+      sourceType: "metric"
+    },
+    itemId: "generation"
+  }] as const;
+
+  assert.deepEqual(
+    resolvePlaybackRuntimeMetricKeys("solar", inheritedPowerBinding),
+    ["realTimePower"]
+  );
+  assert.deepEqual(
+    resolvePlaybackRuntimeMetricKeys("solar", derivedGenerationBinding),
+    ["todayGeneration", ...factoryGenerationDependencyKeys]
+  );
+});
 
 test("resolvePlaybackRuntimeMetricKeys Overview covers KPI and phase live keys", () => {
   const keys = [...resolvePlaybackRuntimeMetricKeys("overview")];

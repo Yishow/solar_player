@@ -3,13 +3,15 @@ import {
   displayPageCardConfiguringLabel,
   resolveDisplayPageCardStatus
 } from "@solar-display/shared";
+import type { LiveMetricReading, LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import type { LiveMetricsStoreState } from "../../hooks/liveMetricsStore";
 import { renderDisplayPageIcon } from "../../components/displayPageIconResolver";
 import {
   DisplayCardFrame,
   DisplayCardHeader,
   DisplayCardValueRow
 } from "../../components/displayPageCards";
-import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { useLiveMetricsSelector } from "../../hooks/useLiveMetrics";
 import { buildDisplayCardStyleVars, createDisplayCardStyleConfig } from "../shared/displayCardStyleConfig";
 import { buildOverviewViewModel } from "./viewModel";
 import { OverviewKpiFooter } from "./OverviewKpiFooter";
@@ -49,6 +51,68 @@ const overviewCardOrder = [
   }
 ] as const;
 
+const overviewRuntimeMetricKeys = [
+  "realTimePower",
+  "todayGeneration",
+  "totalGeneration",
+  "todayCo2Reduction",
+  "totalCo2Reduction",
+  "phaseRVoltage",
+  "phaseRCurrent",
+  "phaseRPower",
+  "phaseSVoltage",
+  "phaseSCurrent",
+  "phaseSPower",
+  "phaseTVoltage",
+  "phaseTCurrent",
+  "phaseTPower"
+] as const;
+
+type OverviewRuntimeSelection = {
+  connectionState: SocketConnectionState["status"];
+  isSocketConnected: boolean;
+  readings: Array<LiveMetricReading | null>;
+};
+
+function selectOverviewRuntimeSelection(
+  state: LiveMetricsStoreState
+): OverviewRuntimeSelection {
+  return {
+    connectionState: state.connectionState.status,
+    isSocketConnected: state.connectionState.status === "connected",
+    readings: overviewRuntimeMetricKeys.map(
+      (metricKey) => state.snapshot.metrics[metricKey] ?? null
+    )
+  };
+}
+
+function isOverviewRuntimeSelectionEqual(
+  current: OverviewRuntimeSelection,
+  next: OverviewRuntimeSelection
+) {
+  return (
+    current.connectionState === next.connectionState
+    && current.readings.length === next.readings.length
+    && current.readings.every((reading, index) => reading === next.readings[index])
+  );
+}
+
+function buildOverviewRuntimeSnapshot(
+  readings: OverviewRuntimeSelection["readings"]
+): LiveMetricsSnapshot {
+  const metrics: LiveMetricsSnapshot["metrics"] = {};
+  let timestamp: string | null = null;
+  overviewRuntimeMetricKeys.forEach((metricKey, index) => {
+    const reading = readings[index];
+    if (!reading) return;
+    metrics[metricKey] = reading;
+    if (reading.timestamp && (timestamp === null || reading.timestamp > timestamp)) {
+      timestamp = reading.timestamp;
+    }
+  });
+  return { metrics, timestamp };
+}
+
 function withContentOffset<T extends { top: number }>(layout: T) {
   return {
     ...layout,
@@ -69,20 +133,26 @@ export function OverviewRuntimeContent({
   seedConfig: ReturnType<typeof import("./displayPageConfig").createOverviewDisplayPageSeedConfig>;
   storyOverviewPayload: Parameters<typeof buildOverviewViewModel>[0]["storyOverview"];
 }) {
-  const liveMetrics = useLiveMetrics();
-  const snapshot = liveMetrics.snapshot;
+  const overviewRuntimeSelection = useLiveMetricsSelector(
+    selectOverviewRuntimeSelection,
+    isOverviewRuntimeSelectionEqual
+  );
+  const snapshot = useMemo(
+    () => buildOverviewRuntimeSnapshot(overviewRuntimeSelection.readings),
+    [overviewRuntimeSelection.readings]
+  );
   const viewModel = useMemo(
     () =>
       buildOverviewViewModel({
-        connectionState: liveMetrics.connectionState,
-        isSocketConnected: liveMetrics.isSocketConnected,
+        connectionState: overviewRuntimeSelection.connectionState,
+        isSocketConnected: overviewRuntimeSelection.isSocketConnected,
         snapshot,
         storyOverview: storyOverviewPayload,
         weatherSnapshot: resolvedWeatherSnapshot
       }),
     [
-      liveMetrics.connectionState,
-      liveMetrics.isSocketConnected,
+      overviewRuntimeSelection.connectionState,
+      overviewRuntimeSelection.isSocketConnected,
       resolvedWeatherSnapshot,
       snapshot,
       storyOverviewPayload
@@ -108,7 +178,7 @@ export function OverviewRuntimeContent({
   const generationTrendSeries = useMemo(
     () => {
       const metric = viewModel.metrics.find(
-        (candidate) => candidate.metricKey === "realTimePower"
+        (candidate) => candidate.itemId === "power"
       );
       return metric?.freshness && metric.freshness.state !== "live"
         ? []
@@ -117,11 +187,11 @@ export function OverviewRuntimeContent({
     [viewModel.metrics]
   );
   const generationTrendHours = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendHours,
+    () => viewModel.metrics.find((metric) => metric.itemId === "power")?.trendHours,
     [viewModel.metrics]
   );
   const generationTrendUnit = useMemo(
-    () => viewModel.metrics.find((metric) => metric.metricKey === "realTimePower")?.trendUnit,
+    () => viewModel.metrics.find((metric) => metric.itemId === "power")?.trendUnit,
     [viewModel.metrics]
   );
   const weatherWidgetStyle = useMemo(
@@ -166,7 +236,7 @@ export function OverviewRuntimeContent({
   );
   const kpiCardShells = useMemo(
     () =>
-      overviewCardOrder.map((cardItem, index) => {
+      overviewCardOrder.map((cardItem) => {
         if (!shouldRenderOverviewKpiCard(resolvedConfig.kpiCards[cardItem.key])) {
           return null;
         }
@@ -178,7 +248,6 @@ export function OverviewRuntimeContent({
         return {
           cardItem,
           cardStyle,
-          index,
           status,
           style: {
             height: `${layout.height}px`,
@@ -198,13 +267,18 @@ export function OverviewRuntimeContent({
           return null;
         }
 
-        const metric = viewModel.metrics[shell.index]!;
+        const metric = viewModel.metrics.find(
+          (candidate) => candidate.itemId === shell.cardItem.key
+        );
+        if (!metric) {
+          return null;
+        }
         const isConfiguring = shell.status === "configuring";
 
         return (
           <DisplayCardFrame
             cardStyle={shell.cardStyle}
-            key={metric.metricKey}
+            key={metric.itemId}
             className="overview-kpi-card"
             surface="metric"
             style={shell.style}

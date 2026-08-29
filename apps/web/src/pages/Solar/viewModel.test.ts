@@ -45,6 +45,39 @@ const snapshot: LiveMetricsSnapshot = {
   timestamp: "2026-05-13T10:00:00.000Z"
 };
 
+test("buildSolarViewModel resolves reordered KPI and flow bindings by stable item id", () => {
+  const comparison = {
+    state: "unavailable",
+    delta: null,
+    fallbackReason: null,
+    label: ""
+  };
+  const model = buildSolarViewModel({
+    isSocketConnected: true,
+    snapshot,
+    solarStory: {
+      kpis: [
+        { itemId: "flow.solar", metricKey: "realTimePower", label: "流程功率", unit: "kW", value: "81", comparison },
+        { itemId: "efficiency", metricKey: "realTimePower", label: "效率的新綁定", unit: "kW", value: "55", comparison },
+        { itemId: "inserted-widget", metricKey: "realTimePower", label: "插入項目", unit: "kW", value: "999", comparison },
+        { itemId: "generation", metricKey: "realTimePower", label: "發電量的新綁定", unit: "kW", value: "44", comparison },
+        { itemId: "flow.inverter", metricKey: "systemEfficiency", label: "變流器", unit: "%", value: "96", comparison }
+      ],
+      story: { flowState: { state: "healthy", reason: null, label: "運作正常" } }
+    }
+  });
+
+  assert.deepEqual(
+    model.kpis.slice(0, 2).map(({ itemId, label, value }) => ({ itemId, label, value })),
+    [
+      { itemId: "generation", label: "發電量的新綁定", value: "44" },
+      { itemId: "selfConsumption", label: "自發自用比例", value: "78.2" }
+    ]
+  );
+  assert.equal(model.kpis[4]?.label, "效率的新綁定");
+  assert.equal(model.flowNodes.find(({ itemId }) => itemId === "flow.solar")?.value, "81 kW");
+});
+
 test("buildSolarViewModel surfaces the custom topic name via the story KPI label and falls back without a story", () => {
   const withStory = buildSolarViewModel({
     isSocketConnected: true,

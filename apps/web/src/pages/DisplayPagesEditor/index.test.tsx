@@ -206,7 +206,7 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.match(html, /區域樹/);
   assert.match(html, /主視覺圖片/);
   assert.match(html, />主視覺文案</);
-  assert.match(html, /素材來源/);
+  assert.match(html, />素材來源</);
   assert.match(html, /替代文字/);
   assert.match(html, /填滿模式/);
   assert.match(html, /複製幾何/);
@@ -216,7 +216,7 @@ test("display page editor keeps the region tree selection and inspector in sync"
   assert.match(html, /方向鍵 8px \/ Alt \+ 方向鍵 1px \/ Shift \+ 方向鍵 24px/);
   assert.match(html, /復原/);
   assert.match(html, /重做/);
-  assert.match(html, /來源連接/);
+  assert.match(html, /素材來源/);
   assert.match(html, /點中區域/);
   assert.match(html, /全畫參考/);
   assert.match(html, /吸附/);
@@ -258,6 +258,50 @@ test("display page editor exposes overview family appearance controls in the ins
   assert.match(html, /Surface Blur/);
   assert.match(html, /Shadow Strength/);
   assert.doesNotMatch(html, /Value Font Size/);
+});
+
+test("display page editor exposes Data only for a selected metric-backed region", () => {
+  const pageDefinitions: DisplayEditorPageDefinition[] = [{
+    createSeedConfig: createOverviewDisplayPageSeedConfig,
+    id: "overview-data-test",
+    label: "Overview Data Test",
+    templateKey: "overview"
+  }];
+  const dataHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?page=overview-data-test"] },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          rightTab: "data",
+          selectedRegionId: "overview-kpi-power"
+        },
+        pageDefinitions,
+        renderPreview: false
+      })
+    )
+  );
+  const mediaHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?page=overview-data-test"] },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          selectedRegionId: "overview-hero-media"
+        },
+        pageDefinitions,
+        renderPreview: false
+      })
+    )
+  );
+
+  assert.match(dataHtml, />資料</);
+  assert.match(dataHtml, /Data Inspector/);
+  assert.match(dataHtml, /即時功率/);
+  assert.doesNotMatch(dataHtml, /MQTT Topic|Formula|公式編輯/);
+  assert.doesNotMatch(mediaHtml, />資料</);
 });
 
 test("display page editor routes a visible hero media selection to the owning media effect inspector", () => {

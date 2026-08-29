@@ -4,10 +4,12 @@ import type {
   DisplayStoryPayload,
   DisplayStoryPayloadByPageId,
   DisplayCircuitSlotKey,
+  EffectiveBindingPlan,
   FactoryCircuitPageKey,
   FactoryCircuitKpiKey,
   FactoryCircuitStoryPayload,
   FreshnessResult,
+  MonitoringDisplayValueOptions,
   MonitoringMetricBinding,
   MonitoringMetricSourceTopic,
   MonitoringStoryState,
@@ -19,13 +21,18 @@ import type {
 } from "@solar-display/shared";
 import {
   aggregateFreshnessResults,
+  compileEffectiveBindingPlan,
+  formatMonitoringDisplayValue,
   formatMonitoringValue,
+  normalizeMetricBoundPageConfig,
   resolveFactoryCircuitSlotKeys,
   resolveFactoryCircuitSlotMetricKey,
   resolveMonitoringMetricBinding,
   resolveMonitoringSlotBinding,
   resolveMonitoringSummaryState,
   resolvePlaybackDisplayMetricSourceClass,
+  resolvePlaybackBindingItemConstraints,
+  resolvePlaybackMetricCatalog,
   resolveSolarComparison,
   resolveSolarFlowState
 } from "@solar-display/shared";
@@ -33,6 +40,7 @@ import { getDatabase } from "../db/index.js";
 import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readPlaybackSettings } from "./displayRotationService.js";
+import { readStageConfig } from "./displayPagePublishingService.js";
 import { evaluateMetricFreshness } from "./freshnessPolicyService.js";
 import { resolveMetric } from "./MetricResolver.js";
 import { evaluateFactoryGenerationScope } from "./factoryGenerationAggregateService.js";
@@ -224,6 +232,63 @@ type DisplayStoryReadOptions = {
   profileId?: number;
   siteScope?: SiteScope;
 };
+
+function readPublishedEffectiveBindingPlan(
+  pageKey: "overview" | "solar" | FactoryCircuitPageKey,
+  siteScope: SiteScope | null
+) {
+  const live = readStageConfig(pageKey, "live");
+  const normalized = normalizeMetricBoundPageConfig(pageKey, live.regions);
+  const compiled = compileEffectiveBindingPlan({
+    catalog: resolvePlaybackMetricCatalog(pageKey),
+    context: {
+      contextKey: `site:${siteScope ?? "missing"}:live:${live.version}`,
+      siteScope
+    },
+    itemConstraints: resolvePlaybackBindingItemConstraints(pageKey),
+    items: Object.values(normalized.dataBindings),
+    pageId: pageKey
+  });
+  if (!compiled.ok) {
+    throw new Error(
+      `Invalid published widget binding ${pageKey}.${compiled.error.itemId}: ${compiled.error.code}`
+    );
+  }
+  return compiled.plan;
+}
+
+function readEffectiveOverviewReadinessFindings(plan: EffectiveBindingPlan) {
+  const requiredIdentities = new Set(
+    plan.items.map(({ effectiveScope, metricKey }) => `${effectiveScope}:${metricKey}`)
+  );
+  const scopes = new Set(plan.items.map(({ effectiveScope }) => effectiveScope));
+
+  return [...scopes].flatMap((metricScope) =>
+    readDisplayReadinessReport({
+      siteScope: metricScope === "global" ? undefined : metricScope
+    }).findings.filter((finding) =>
+      finding.pageId === "overview"
+      && finding.status !== "ready"
+      && requiredIdentities.has(`${finding.metricScope}:${finding.requirementKey}`)
+    )
+  );
+}
+
+function applyEffectiveDisplayFormat<T extends { unit: string; value: string }>(
+  metric: T,
+  format: { precision?: number; unitDisplay?: "auto" | "hide" } | undefined
+): T {
+  if (!format) return metric;
+  const numericValue = Number(metric.value.replaceAll(",", ""));
+  if (!Number.isFinite(numericValue)) {
+    return {
+      ...metric,
+      unit: format.unitDisplay === "hide" ? "" : metric.unit
+    };
+  }
+  const display = formatMonitoringDisplayValue(numericValue, metric.unit, format);
+  return { ...metric, ...display };
+}
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
@@ -486,6 +551,7 @@ function resolveCircuitState(args: {
 function resolveSolarKpiBinding(args: {
   binding: MonitoringMetricBinding<StoryMetricKey>;
   calculationSettings: CalculationSettings;
+  displayValueOptions?: MonitoringDisplayValueOptions;
   isConnected: boolean;
   metricScope: MetricScope;
   nowMs: number;
@@ -495,6 +561,7 @@ function resolveSolarKpiBinding(args: {
     return resolveMonitoringMetricBinding({
       binding: args.binding,
       displayValueOptions: {
+        ...args.displayValueOptions,
         preferKilogramsForSubTonCo2:
           args.calculationSettings.co2AutoConvertSmallToKg &&
           (args.binding.metricKey === "todayCo2Reduction" ||
@@ -526,6 +593,7 @@ function resolveSolarKpiBinding(args: {
   if (directReading) {
     return resolveMonitoringMetricBinding({
       binding: args.binding,
+      displayValueOptions: args.displayValueOptions,
       isConnected: args.isConnected,
       metricScope: args.metricScope,
       reading: directReading
@@ -567,6 +635,7 @@ function resolveSolarKpiBinding(args: {
         : consumptionReading.timestamp);
     const resolved = resolveMonitoringMetricBinding({
       binding: args.binding,
+      displayValueOptions: args.displayValueOptions,
       isConnected: true,
       metricScope: args.metricScope,
       reading: {
@@ -587,6 +656,7 @@ function resolveSolarKpiBinding(args: {
 
   return resolveMonitoringMetricBinding({
     binding: args.binding,
+    displayValueOptions: args.displayValueOptions,
     isConnected: args.isConnected,
     metricScope: args.metricScope,
     reading: null
@@ -1254,6 +1324,25 @@ function createDisplayStorySourceContext(
   };
 }
 
+function createScopedStoryContextResolver(
+  baseContext: DisplayStorySourceContext,
+  profileId?: number
+) {
+  const contexts = new Map<MetricScope, DisplayStorySourceContext>();
+  contexts.set(baseContext.siteScope ?? "global", baseContext);
+
+  return (metricScope: MetricScope) => {
+    const existing = contexts.get(metricScope);
+    if (existing) return existing;
+    const context = createDisplayStorySourceContext(
+      metricScope === "global" ? undefined : metricScope,
+      profileId
+    );
+    contexts.set(metricScope, context);
+    return context;
+  };
+}
+
 function readOverviewGenerationTrendSeries(metricScope: MetricScope) {
   const database = getDatabase();
   // Pull a bounded recent window (≈ a day-plus at the 60s snapshot cadence) and
@@ -1288,18 +1377,19 @@ function applyMonitoringDisplayOverrides<
     return metrics;
   }
 
-  const metricScope = pageId === "factory-circuit"
-    ? "cl"
-    : pageId === "factory-circuit-guanyin"
-      ? "kn"
-      : options.siteScope ?? "cl";
-
   return metrics.map((metric) => {
+    const overrideTargetId = `${pageId}.${metric.itemId ?? metric.metricKey}`;
     const override = resolveMetric(getDatabase(), {
       metricKey: metric.metricKey,
-      metricScope,
-      targetId: `${pageId}.${metric.metricKey}`
-    }).override;
+      metricScope: metric.metricScope,
+      targetId: overrideTargetId
+    }).override ?? (overrideTargetId === `${pageId}.${metric.metricKey}`
+      ? null
+      : resolveMetric(getDatabase(), {
+        metricKey: metric.metricKey,
+        metricScope: metric.metricScope,
+        targetId: `${pageId}.${metric.metricKey}`
+      }).override);
     if (!override) {
       return metric;
     }
@@ -1315,34 +1405,52 @@ export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): OverviewStoryPayload {
-  const trendProfile = readOverviewGenerationTrendSeries(
-    context.siteScope ?? "global"
-  );
-  const overview = overviewMetrics.map((binding) => {
-    const reading = resolveStoryMetricReading(binding.metricKey, context);
+  const plan = readPublishedEffectiveBindingPlan("overview", context.siteScope);
+  const resolveContext = createScopedStoryContextResolver(context, options.profileId);
+  const overview = plan.items.map((effectiveBinding) => {
+    const definition = overviewMetrics.find(
+      ({ metricKey }) => metricKey === effectiveBinding.metricKey
+    );
+    if (!definition) {
+      throw new Error(`Missing Overview metric definition: ${effectiveBinding.metricKey}`);
+    }
+    const binding = {
+      ...definition,
+      dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
+      sourceClass: effectiveBinding.sourceClass
+    };
+    const itemContext = resolveContext(effectiveBinding.effectiveScope);
+    const reading = resolveStoryMetricReading(binding.metricKey, itemContext);
     const resolved = {
       ...resolveMonitoringMetricBinding({
         binding,
         displayValueOptions: {
+          ...effectiveBinding.format,
           preferKilogramsForSubTonCo2:
-            context.calculationSettings.co2AutoConvertSmallToKg &&
+            itemContext.calculationSettings.co2AutoConvertSmallToKg &&
             (binding.metricKey === "todayCo2Reduction" ||
               binding.metricKey === "totalCo2Reduction")
         },
-        isConnected: context.isConnected,
-        metricScope: context.siteScope ?? "global",
+        isConnected: itemContext.isConnected,
+        metricScope: effectiveBinding.effectiveScope,
         reading
       }),
-      label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
+      itemId: effectiveBinding.itemId,
+      label: resolveTopicLabel(itemContext.topicNames, binding.metricKey, binding.label),
       sourceTopics: reading ? resolveSourceTopics({
         dependencyKeys: binding.dependencyKeys,
         metricKey: binding.metricKey,
-        siteScope: context.siteScope ?? undefined,
-        topicNames: context.topicNames
+        siteScope: effectiveBinding.effectiveScope === "global"
+          ? undefined
+          : effectiveBinding.effectiveScope,
+        topicNames: itemContext.topicNames
       }) : undefined
     };
 
-    if (binding.metricKey === "realTimePower" && trendProfile.series.length > 0) {
+    const trendProfile = binding.metricKey === "realTimePower"
+      ? readOverviewGenerationTrendSeries(effectiveBinding.effectiveScope)
+      : null;
+    if (trendProfile && trendProfile.series.length > 0) {
       return {
         ...resolved,
         trendHours: trendProfile.hours,
@@ -1358,11 +1466,7 @@ export function readOverviewDisplayStory(
 
   return {
     metrics,
-    readinessFindings: readDisplayReadinessReport({
-      siteScope: context.siteScope ?? undefined
-    }).findings.filter(
-      (finding) => finding.pageId === "overview" && finding.status !== "ready"
-    ),
+    readinessFindings: readEffectiveOverviewReadinessFindings(plan),
     summary: resolveMonitoringSummaryState(metrics)
   };
 }
@@ -1371,43 +1475,61 @@ export function readSolarDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): DisplayStoryPayload["solar"] {
+  const plan = readPublishedEffectiveBindingPlan("solar", context.siteScope);
+  const resolveContext = createScopedStoryContextResolver(context, options.profileId);
   return {
-    kpis: applyMonitoringDisplayOverrides("solar", solarKpis.map((binding) => {
-      const resolved = resolveSolarKpiBinding({
-        binding,
-        calculationSettings: context.calculationSettings,
-        isConnected: context.isConnected,
-        metricScope: context.siteScope ?? "global",
-        nowMs: Date.parse(context.generatedAt),
-        snapshot: context.snapshot
+    kpis: applyMonitoringDisplayOverrides("solar", plan.items.map((effectiveBinding) => {
+      const definition = solarKpis.find(
+        ({ metricKey }) => metricKey === effectiveBinding.metricKey
+      );
+      if (!definition) {
+        throw new Error(`Missing Solar metric definition: ${effectiveBinding.metricKey}`);
+      }
+      const binding = {
+        ...definition,
+        dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
+        sourceClass: effectiveBinding.sourceClass
+      };
+      const itemContext = resolveContext(effectiveBinding.effectiveScope);
+        const resolved = resolveSolarKpiBinding({
+          binding,
+          calculationSettings: itemContext.calculationSettings,
+          displayValueOptions: effectiveBinding.format,
+        isConnected: itemContext.isConnected,
+        metricScope: effectiveBinding.effectiveScope,
+        nowMs: Date.parse(itemContext.generatedAt),
+        snapshot: itemContext.snapshot
       });
       const comparisonActualValue =
         binding.metricKey === "todayCo2Reduction"
           ? buildDerivedCarbonReductionReading(
-            context.snapshot.metrics.todayGeneration ?? null,
-            context.calculationSettings.carbonEmissionFactor
+            itemContext.snapshot.metrics.todayGeneration ?? null,
+            itemContext.calculationSettings.carbonEmissionFactor
           )?.value ?? null
           : binding.metricKey === "totalCo2Reduction"
             ? buildDerivedCarbonReductionReading(
               buildCumulativeGenerationReading(
-                context.snapshot,
-                context.siteScope ?? "global",
-                context.siteScope !== null,
-                Date.parse(context.generatedAt)
+                itemContext.snapshot,
+                effectiveBinding.effectiveScope,
+                effectiveBinding.effectiveScope !== "global",
+                Date.parse(itemContext.generatedAt)
               ),
-              context.calculationSettings.carbonEmissionFactor
+              itemContext.calculationSettings.carbonEmissionFactor
             )?.value ?? null
-            : context.isConnected
-              ? context.snapshot.metrics[binding.metricKey]?.value ?? null
+            : itemContext.isConnected
+              ? itemContext.snapshot.metrics[binding.metricKey]?.value ?? null
               : null;
       return {
         ...resolved,
-        label: resolveTopicLabel(context.topicNames, binding.metricKey, binding.label),
+        itemId: effectiveBinding.itemId,
+        label: resolveTopicLabel(itemContext.topicNames, binding.metricKey, binding.label),
         sourceTopics: resolved.bindingState === "bound" ? resolveSourceTopics({
           dependencyKeys: resolved.dependencyKeys,
           metricKey: binding.metricKey,
-          siteScope: context.siteScope ?? undefined,
-          topicNames: context.topicNames
+          siteScope: effectiveBinding.effectiveScope === "global"
+            ? undefined
+            : effectiveBinding.effectiveScope,
+          topicNames: itemContext.topicNames
         }) : undefined,
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
@@ -1448,24 +1570,36 @@ export function readFactoryCircuitDisplayStory(
     typeof pageKeyOrContext === "string"
       ? maybeOptions
       : (contextOrOptions as DisplayStoryReadOptions | undefined) ?? {};
-  const slotStates: MonitoringStoryState[] = [];
   const scopedSlotKeys = resolveFactoryCircuitSlotKeys(pageKey);
   const scopedCircuits = context.circuits.filter((circuit) => circuit.page_key === pageKey);
+  const pageSiteScope = context.siteScope
+    ?? (pageKey === "factory-circuit" ? "cl" : "kn");
+  const effectivePlan = readPublishedEffectiveBindingPlan(pageKey, pageSiteScope);
+  const resolveContext = createScopedStoryContextResolver(context, options.profileId);
 
-  const factorySlots = scopedSlotKeys.map((slotKey) => {
+  const resolveFactorySlot = (
+    slotKey: DisplayCircuitSlotKey,
+    effectiveBinding: {
+      effectiveScope: MetricScope;
+      format?: { precision?: number; unitDisplay?: "auto" | "hide" };
+      itemId: string;
+      metricKey: string;
+    }
+  ) => {
+    const itemContext = resolveContext(effectiveBinding.effectiveScope);
     const matches = scopedCircuits.filter((circuit) => circuit.display_slot === slotKey);
     const binding = resolveMonitoringSlotBinding({
       circuitId: matches.length === 1 ? matches[0]!.id : null,
       conflictingCircuitIds: matches.map((circuit) => circuit.id),
-      metricScope: pageKey === "factory-circuit" ? "cl" : "kn",
+      metricScope: effectiveBinding.effectiveScope,
       slotKey
     });
     const circuit = matches.length === 1 ? matches[0]! : null;
-    const metricKey = resolveFactoryCircuitSlotMetricKey(pageKey, slotKey);
-    const reading = metricKey ? context.snapshot.metrics[metricKey] ?? null : null;
+    const metricKey = effectiveBinding.metricKey;
+    const reading = itemContext.snapshot.metrics[metricKey] ?? null;
     const slotDefaults = slotDefaultLabels[slotKey];
     const slotLabels = resolveTopicDisplayLabels({
-      topicNames: context.topicNames,
+      topicNames: itemContext.topicNames,
       metricKey,
       defaultEn: circuit?.name_en ?? slotDefaults.en,
       defaultZh: circuit?.name_zh ?? slotDefaults.zh
@@ -1482,18 +1616,18 @@ export function readFactoryCircuitDisplayStory(
           } satisfies MonitoringStoryState)
         : (() => {
             const readingState = resolveFactoryMetricBinding({
-              allowStaleRuntimeData: context.allowStaleRuntimeData,
+              allowStaleRuntimeData: itemContext.allowStaleRuntimeData,
               dependencyKeys: [metricKey],
-              isConnected: context.isConnected,
+              isConnected: itemContext.isConnected,
               label: slotLabel,
               metricKey,
-              metricScope: pageKey === "factory-circuit" ? "cl" : "kn",
-              nowMs: Date.parse(context.generatedAt),
+              metricScope: effectiveBinding.effectiveScope,
+              nowMs: Date.parse(itemContext.generatedAt),
               reading,
               unit: "kW"
             });
 
-            if (!isUsableFactoryMetric(readingState, context.allowStaleRuntimeData)) {
+            if (!isUsableFactoryMetric(readingState, itemContext.allowStaleRuntimeData)) {
               return {
                 alertTone: readingState.alertTone,
                 bindingState: "bound",
@@ -1524,46 +1658,83 @@ export function readFactoryCircuitDisplayStory(
             } satisfies MonitoringStoryState;
           })();
 
-    slotStates.push(state);
-
     return {
       ...state,
       circuitId: circuit?.id ?? null,
       freshness: reading?.freshness ?? evaluateMetricFreshness({
         metricKey,
-        nowMs: Date.parse(context.generatedAt),
+        nowMs: Date.parse(itemContext.generatedAt),
         sourceTimestamp: null
       }),
+      ...(effectiveBinding.format ? { format: effectiveBinding.format } : {}),
+      itemId: effectiveBinding.itemId,
       label: slotLabel,
       labelEn: slotLabels.labelEn,
       labelZh: slotLabels.labelZh,
       livePowerKw:
-        isUsableFactoryMetric(state, context.allowStaleRuntimeData) &&
+        isUsableFactoryMetric(state, itemContext.allowStaleRuntimeData) &&
         state.fallbackReason !== "missing-live-power"
           ? reading?.value ?? null
           : null,
       metricKey,
-      metricScope: pageKey === "factory-circuit" ? "cl" as const : "kn" as const,
+      metricScope: effectiveBinding.effectiveScope,
       slotKey
     };
+  };
+
+  const factorySlots = scopedSlotKeys.map((slotKey) => {
+    const effectiveBinding = effectivePlan.items.find(
+      ({ itemId }) => itemId === slotKey
+    );
+    if (!effectiveBinding) {
+      throw new Error(`Missing published widget binding ${pageKey}.${slotKey}`);
+    }
+    return resolveFactorySlot(slotKey, effectiveBinding);
   });
-  const factorySummary = resolveMonitoringSummaryState(slotStates);
+  const factorySummary = resolveMonitoringSummaryState(factorySlots);
+  const effectiveFactoryKpis = effectivePlan.items
+    .filter(({ itemId }) =>
+      itemId === "totalPower"
+      || itemId === "solarShare"
+      || itemId === "selfConsumption"
+      || itemId === "peak"
+      || itemId === "flow"
+    )
+    .map((binding) => {
+      const itemContext = resolveContext(binding.effectiveScope);
+      const scopedSlots = scopedSlotKeys.map((slotKey) =>
+        resolveFactorySlot(slotKey, {
+          effectiveScope: binding.effectiveScope,
+          itemId: slotKey,
+          metricKey: resolveFactoryCircuitSlotMetricKey(pageKey, slotKey)
+        })
+      );
+      const scopedSummary = resolveMonitoringSummaryState(scopedSlots);
+      const kpi = resolveFactoryCircuitKpis({
+        allowStaleRuntimeData: itemContext.allowStaleRuntimeData,
+        pageKey,
+        isConnected: itemContext.isConnected,
+        nowMs: Date.parse(itemContext.generatedAt),
+        slots: scopedSlots,
+        snapshot: itemContext.snapshot,
+        summary: scopedSummary,
+        topicNames: itemContext.topicNames
+      }).find(
+        (candidate) => candidate.metricKey === binding.metricKey
+      );
+      if (!kpi) {
+        throw new Error(`Missing Factory Circuit metric definition: ${binding.metricKey}`);
+      }
+      return applyEffectiveDisplayFormat({
+        ...kpi,
+        itemId: binding.itemId,
+        metricScope: binding.effectiveScope
+      }, binding.format);
+    });
 
   return {
     freshnessPolicy: context.snapshot.freshnessPolicy,
-    kpis: applyMonitoringDisplayOverrides(pageKey, resolveFactoryCircuitKpis({
-      allowStaleRuntimeData: context.allowStaleRuntimeData,
-      pageKey,
-      isConnected: context.isConnected,
-      nowMs: Date.parse(context.generatedAt),
-      slots: factorySlots,
-      snapshot: context.snapshot,
-      summary: factorySummary,
-      topicNames: context.topicNames
-    }).map((kpi) => ({
-      ...kpi,
-      metricScope: pageKey === "factory-circuit" ? "cl" as const : "kn" as const
-    })), options),
+    kpis: applyMonitoringDisplayOverrides(pageKey, effectiveFactoryKpis, options),
     slots: factorySlots,
     summary: factorySummary
   };

@@ -31,7 +31,7 @@ function setTopicName(metricKey: string, nameZh: string | null, nameEn: string |
 test("overview story uses custom topic name as label when set", () => {
   setTopicName("realTimePower", "一號廠輸出", "Plant A Output");
 
-  const story = storyService.readOverviewDisplayStory();
+  const story = storyService.readSiteScopedDisplayStoryPage("overview", "cl").payload;
   const metric = story.metrics.find((entry) => entry.metricKey === "realTimePower");
 
   assert.equal(metric?.label, "一號廠輸出");
@@ -40,7 +40,7 @@ test("overview story uses custom topic name as label when set", () => {
 test("overview story falls back to built-in default when custom name is empty", () => {
   setTopicName("realTimePower", null, null);
 
-  const story = storyService.readOverviewDisplayStory();
+  const story = storyService.readSiteScopedDisplayStoryPage("overview", "cl").payload;
   const metric = story.metrics.find((entry) => entry.metricKey === "realTimePower");
 
   assert.equal(metric?.label, "即時發電功率");
@@ -49,7 +49,7 @@ test("overview story falls back to built-in default when custom name is empty", 
 test("solar story ignores the disabled legacy direct generation topic name", () => {
   setTopicName("todayGeneration", "今日產出", "Today Output");
 
-  const story = storyService.readSolarDisplayStory();
+  const story = storyService.readSiteScopedDisplayStoryPage("solar", "cl").payload;
   const kpi = story.kpis.find((entry) => entry.metricKey === "todayGeneration");
 
   assert.equal(kpi?.label, "今日發電量");

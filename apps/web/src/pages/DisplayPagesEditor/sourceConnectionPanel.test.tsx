@@ -99,6 +99,8 @@ test("SourceConnectionPanel renders actions and read-only presentation summaries
   assert.match(html, /managed-asset/);
   assert.match(html, /從圖庫替換 \/ 開啟資產庫/);
   assert.match(html, /回復預設素材來源/);
+  assert.match(html, /素材與內容來源/);
+  assert.match(html, /資料指標請使用「資料」頁籤/);
   assert.match(html, /呈現設定摘要/);
   assert.match(html, /填滿模式: cover/);
   assert.match(html, /模糊啟用: 啟用/);

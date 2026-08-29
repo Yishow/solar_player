@@ -56,6 +56,16 @@ test("formatMonitoringDisplayValue keeps tons for zero, full-ton, or disabled pr
   );
 });
 
+test("formatMonitoringDisplayValue applies widget precision and unit visibility", () => {
+  assert.deepEqual(
+    formatMonitoringDisplayValue(12.3456, "kW", {
+      precision: 3,
+      unitDisplay: "hide"
+    }),
+    { unit: "", value: "12.346" }
+  );
+});
+
 test("resolveMonitoringMetricBinding applies the shared kilogram preference only to bound readings", () => {
   const metric = resolveMonitoringMetricBinding({
     binding: {

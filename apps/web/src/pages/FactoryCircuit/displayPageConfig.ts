@@ -1,5 +1,12 @@
-import type { DisplayPageCardStatus } from "@solar-display/shared";
-import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import {
+  normalizeMetricBoundPageConfig,
+  type DisplayPageCardStatus,
+  type MetricBoundItem
+} from "@solar-display/shared";
+import {
+  createMetricDataBindingCapability,
+  type DisplayEditorRegionSchema
+} from "../../../../../packages/shared/src/displayEditorSchema";
 import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
@@ -93,6 +100,7 @@ export type FactoryCircuitDisplayPageConfig = {
   };
   connectorTreatments: Record<FactoryCircuitConnectorKey, FlowConnectorTreatmentConfig>;
   connectors: Record<FactoryCircuitConnectorKey, FactoryCircuitDisplayRect>;
+  dataBindings: Record<string, MetricBoundItem>;
   hero: {
     copyEnLines: [string, string, string, string];
     copyZhLines: [string, string, string];
@@ -159,7 +167,7 @@ function createFactoryCircuitKpiCardStyle(
 }
 
 export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDisplayPageConfig {
-  return {
+  return normalizeMetricBoundPageConfig("factory-circuit", {
     cardStyles: {
       flow: createFactoryCircuitKpiCardStyle({
         titleFontSize: 17,
@@ -297,7 +305,7 @@ export function createFactoryCircuitDisplayPageSeedConfig(): FactoryCircuitDispl
     textBlocks: {
       copy: { ...factoryCircuitCopyLayout, height: 180 }
     }
-  };
+  });
 }
 
 export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
@@ -470,6 +478,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
     presetKey: "factory-load-panel"
   },
   ...Object.keys(createFactoryCircuitDisplayPageSeedConfig().loadRows).map<DisplayEditorRegionSchema>((key) => ({
+    dataBinding: createMetricDataBindingCapability(key),
     id: `factory-load-row-${key}`,
     label: `Factory Load Row ${key}`,
     description: "調整 load row 幾何位置。",
@@ -499,6 +508,7 @@ export const factoryCircuitDisplayPageEditorRegions: DisplayEditorRegionSchema[]
     presetKey: "factory-load-row"
   })),
   ...Object.keys(createFactoryCircuitDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
+    dataBinding: createMetricDataBindingCapability(key),
     id: `factory-kpi-${key}`,
     label: `Factory KPI ${key}`,
     description: "調整 KPI 幾何位置。",

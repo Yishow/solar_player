@@ -1,5 +1,13 @@
-import type { DisplayPageCardStatus, DisplayPageMediaBinding } from "@solar-display/shared";
-import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import {
+  normalizeMetricBoundPageConfig,
+  type DisplayPageCardStatus,
+  type DisplayPageMediaBinding,
+  type MetricBoundItem
+} from "@solar-display/shared";
+import {
+  createMetricDataBindingCapability,
+  type DisplayEditorRegionSchema
+} from "../../../../../packages/shared/src/displayEditorSchema";
 import { buildCardStatusField, buildCardVisibilityField } from "../DisplayPagesEditor/cardStatusField";
 import {
   buildDisplayCardStyleFields,
@@ -72,6 +80,7 @@ export type SolarDisplayPageConfig = {
   };
   connectorTreatments: Record<SolarConnectorKey, FlowConnectorTreatmentConfig>;
   connectors: Record<SolarConnectorKey, SolarDisplayRect>;
+  dataBindings: Record<string, MetricBoundItem>;
   flowNodeTreatments: Record<SolarFlowNodeKey, FlowNodeTreatmentConfig>;
   flowNodes: Record<SolarFlowNodeKey, SolarDisplayRect>;
   heroContainer: SolarDisplayRect;
@@ -118,7 +127,7 @@ export function createSolarDisplayPageSeedConfig(
   heroAlt = "太陽能車棚與綠能展示場域",
   iconAssetSources: SolarIconAssetSources = defaultSolarIconAssetSources
 ): SolarDisplayPageConfig {
-  return {
+  return normalizeMetricBoundPageConfig("solar", {
     cardStyles: {
       co2: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
       efficiency: createDisplayCardStyleConfig({ valueRowAlign: "center" }),
@@ -218,7 +227,7 @@ export function createSolarDisplayPageSeedConfig(
       selfConsumption: {},
       totalCo2: {}
     }
-  };
+  });
 }
 
 export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
@@ -345,6 +354,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     presetKey: "solar-leaf"
   },
   ...Object.keys(createSolarDisplayPageSeedConfig().flowNodes).map<DisplayEditorRegionSchema>((key) => ({
+    dataBinding: createMetricDataBindingCapability(`flow.${key}`),
     id: `solar-flow-${key}`,
     label: `Solar Flow ${key}`,
     description: "調整 flow node 幾何位置。",
@@ -402,6 +412,7 @@ export const solarDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     presetKey: "solar-connector"
   })),
   ...Object.keys(createSolarDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
+    dataBinding: createMetricDataBindingCapability(key),
     id: `solar-kpi-${key}`,
     label: `Solar KPI ${key}`,
     description: "調整 KPI card 幾何。",

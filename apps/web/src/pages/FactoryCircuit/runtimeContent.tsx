@@ -181,17 +181,30 @@ export function FactoryCircuitRuntimeContent({
           width: `${resolvedConfig.loadPanel.width}px`
         }}
       >
-        {viewModel.loadRows.map((row, index) => {
-          const cardState = resolvedConfig.loadRowStates?.[loadRowOrder[index]!];
+        {loadRowOrder.map((slotKey) => {
+          const row = viewModel.loadRows.find(
+            (candidate) => candidate.itemId === slotKey
+          );
+          if (!row) return null;
+          const cardState = resolvedConfig.loadRowStates?.[slotKey];
           if (cardState?.visible === false) {
             return null;
           }
 
-          const layout = withContentOffset(resolvedConfig.loadRows[loadRowOrder[index]!]);
+          const layout = withContentOffset(resolvedConfig.loadRows[slotKey]);
           const isConfiguring = resolveDisplayPageCardStatus(cardState) === "configuring";
+          const storySlot = factoryCircuitStory?.slots.find(
+            (candidate) => candidate.itemId === slotKey
+          );
+          const sharePercent = row.isEmpty ? row.fallbackSharePercent : row.sharePercent;
+          const formattedSharePercent =
+            storySlot?.format?.precision === undefined
+              ? String(sharePercent)
+              : sharePercent.toFixed(storySlot.format.precision);
+          const shareUnit = storySlot?.format?.unitDisplay === "hide" ? "" : "%";
           return (
             <article
-              key={`${row.labelZh}-${index}`}
+              key={slotKey}
               className={`factory-circuit-load-row${layout.height <= 65 ? " is-compact" : ""}`}
               style={{
                 height: `${layout.height}px`,
@@ -201,7 +214,7 @@ export function FactoryCircuitRuntimeContent({
               }}
             >
               <div className="factory-circuit-load-icon">
-                {loadRowIcons[loadRowOrder[index]!] ?? null}
+                {loadRowIcons[slotKey] ?? null}
               </div>
               <div className="factory-circuit-load-copy">
                 <strong>{row.labelZh}</strong>
@@ -211,9 +224,7 @@ export function FactoryCircuitRuntimeContent({
               <b>
                 {isConfiguring
                   ? displayPageCardConfiguringLabel
-                  : row.isEmpty
-                    ? `${row.fallbackSharePercent}%`
-                    : `${row.sharePercent}%`}
+                  : `${formattedSharePercent}${shareUnit}`}
               </b>
             </article>
           );

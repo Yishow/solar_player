@@ -6,7 +6,8 @@ import test, { after, beforeEach } from "node:test";
 import {
   resolveMonitoringMetricBinding,
   resolveMonitoringSlotBinding,
-  resolveMonitoringSummaryState
+  resolveMonitoringSummaryState,
+  resolveFactoryCircuitSlotMetricKey
 } from "@solar-display/shared";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-story-service-test-"));
@@ -19,6 +20,7 @@ const [
   { migrateDatabase },
   { seedDatabase },
   { readDisplayStory },
+  { writeStageConfig },
   { saveDisplayValueOverride },
   { readFreshnessPolicy, updateFreshnessPolicy }
 ] = await Promise.all([
@@ -26,6 +28,7 @@ const [
   import("../db/migrate.js"),
   import("../db/seed.js"),
   import("./displayStoryService.js"),
+  import("./displayPagePublishingService.js"),
   import("./displayValueOverrideService.js"),
   import("./freshnessPolicyService.js")
 ]);
@@ -57,6 +60,179 @@ function seedPowerMetric(
     )
     .run(value, timestamp);
 }
+
+function seedScopedPowerMetric(
+  metricScope: "cl" | "kn",
+  value: number,
+  timestamp = new Date().toISOString()
+) {
+  getDatabase()
+    .prepare(
+      `
+        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES (?, 'realTimePower', ?, 'kW', ?, 'good', '{}')
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+          value = excluded.value,
+          timestamp = excluded.timestamp
+      `
+    )
+    .run(metricScope, value, timestamp);
+}
+
+test("Display Story resolves mixed saved bindings by item id and effective scope", () => {
+  seedScopedPowerMetric("cl", 11);
+  seedScopedPowerMetric("kn", 88);
+  writeStageConfig("overview", "live", {
+    dataBindings: {
+      power: {
+        dataBinding: {
+          format: { precision: 2, unitDisplay: "hide" },
+          metricKey: "realTimePower",
+          scope: "kn",
+          sourceType: "metric"
+        },
+        itemId: "power"
+      },
+      today: {
+        dataBinding: { metricKey: "realTimePower", scope: "inherit-device", sourceType: "metric" },
+        itemId: "today"
+      }
+    }
+  });
+
+  const metrics = readDisplayStory({ siteScope: "cl" }).overview.metrics;
+  const power = metrics.find((metric) => metric.itemId === "power");
+  const today = metrics.find((metric) => metric.itemId === "today");
+
+  assert.equal(power?.metricKey, "realTimePower");
+  assert.equal(power?.metricScope, "kn");
+  assert.equal(power?.value, "88.00");
+  assert.equal(power?.unit, "");
+  assert.equal(today?.metricKey, "realTimePower");
+  assert.equal(today?.metricScope, "cl");
+  assert.equal(today?.value, "11.0");
+  assert.equal(power?.sourceClass, today?.sourceClass);
+});
+
+test("Overview readiness follows effective bindings instead of the previous default metric", () => {
+  writeStageConfig("overview", "live", {
+    dataBindings: {
+      power: {
+        dataBinding: {
+          metricKey: "todayGeneration",
+          scope: "inherit-device",
+          sourceType: "metric"
+        },
+        itemId: "power"
+      }
+    }
+  });
+
+  const findings = readDisplayStory({ siteScope: "cl" }).overview.readinessFindings;
+  assert.equal(findings.some((finding) => finding.requirementKey === "realTimePower"), false);
+  assert.equal(findings.some((finding) => finding.requirementKey === "todayGeneration"), true);
+});
+
+test("Solar Story resolves saved KPI bindings from the same scoped plan", () => {
+  seedScopedPowerMetric("cl", 21);
+  seedScopedPowerMetric("kn", 84);
+  writeStageConfig("solar", "live", {
+    dataBindings: {
+      efficiency: {
+        dataBinding: { metricKey: "realTimePower", scope: "inherit-device", sourceType: "metric" },
+        itemId: "efficiency"
+      },
+      generation: {
+        dataBinding: { metricKey: "realTimePower", scope: "kn", sourceType: "metric" },
+        itemId: "generation"
+      }
+    }
+  });
+
+  const kpis = readDisplayStory({ siteScope: "cl" }).solar.kpis;
+  const generation = kpis.find((metric) => metric.itemId === "generation");
+  const efficiency = kpis.find((metric) => metric.itemId === "efficiency");
+
+  assert.equal(generation?.metricScope, "kn");
+  assert.equal(generation?.value, "84.0");
+  assert.equal(efficiency?.metricScope, "cl");
+  assert.equal(efficiency?.value, "21.0");
+});
+
+test("Factory Circuit preserves semantic slot ids while resolving an explicit foreign scope", () => {
+  const metricKey = resolveFactoryCircuitSlotMetricKey("factory-circuit", "stamping");
+  for (const [metricScope, value] of [["cl", 11], ["kn", 88]] as const) {
+    getDatabase()
+      .prepare(
+        `
+          INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+          VALUES (?, ?, ?, 'kW', ?, 'good', '{}')
+          ON CONFLICT(metric_scope, metric_key) DO UPDATE SET value = excluded.value
+        `
+      )
+      .run(metricScope, metricKey, value, new Date().toISOString());
+  }
+  writeStageConfig("factory-circuit", "live", {
+    dataBindings: {
+      stamping: {
+        dataBinding: {
+          format: { precision: 2, unitDisplay: "hide" },
+          metricKey,
+          scope: "kn",
+          sourceType: "metric"
+        },
+        itemId: "stamping"
+      }
+    }
+  });
+
+  const slot = readDisplayStory({ siteScope: "cl" }).factoryCircuit.slots.find(
+    (candidate) => candidate.itemId === "stamping"
+  );
+  assert.equal(slot?.slotKey, "stamping");
+  assert.equal(slot?.metricScope, "kn");
+  assert.equal(slot?.livePowerKw, 88);
+  assert.deepEqual(slot?.format, { precision: 2, unitDisplay: "hide" });
+});
+
+test("Factory Circuit KPI aggregation reads dependencies from its explicit scope", () => {
+  const slotKeys = [
+    "stamping",
+    "body",
+    "painting",
+    "assembly",
+    "utility",
+    "office",
+    "heavy_vehicle",
+    "ed_coating"
+  ] as const;
+  const insertMetric = getDatabase().prepare(
+    `
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, ?, 'kW', ?, 'good', '{}')
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET value = excluded.value
+    `
+  );
+  for (const [index, slotKey] of slotKeys.entries()) {
+    const metricKey = resolveFactoryCircuitSlotMetricKey("factory-circuit", slotKey);
+    insertMetric.run("cl", metricKey, index + 1, new Date().toISOString());
+    insertMetric.run("kn", metricKey, (index + 1) * 10, new Date().toISOString());
+  }
+  writeStageConfig("factory-circuit", "live", {
+    dataBindings: {
+      totalPower: {
+        dataBinding: { metricKey: "totalPower", scope: "kn", sourceType: "metric" },
+        itemId: "totalPower"
+      }
+    }
+  });
+
+  const totalPower = readDisplayStory({ siteScope: "cl" }).factoryCircuit.kpis.find(
+    (candidate) => candidate.itemId === "totalPower"
+  );
+  assert.equal(totalPower?.metricScope, "kn");
+  assert.equal(Number(totalPower?.value.replaceAll(",", "")), 210);
+});
 
 test("shared monitoring story model keeps fallback diagnostics inspectable", () => {
   const metric = resolveMonitoringMetricBinding({

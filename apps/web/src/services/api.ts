@@ -6,6 +6,8 @@ import type {
   DeviceDisplayDiagnosticResult,
   DeviceDisplayOpsSummary,
   DisplayClientLivenessSnapshot,
+  DisplayDataPreview,
+  DisplayPreviewContextSelection,
   DisplayPlaybackRuntimeResponse,
   DisplayCardDataResponse,
   DisplayStoryPageId,
@@ -669,6 +671,21 @@ export async function getDisplayPageConfig(pageId: DisplayPageId, stage: ConfigS
     config: DisplayPageConfigEnvelope;
   }>(resolveDisplayPageConfigApiPath(pageId, stage));
   return response.config;
+}
+
+export async function getDisplayDataPreview(
+  pageId: DisplayPageId,
+  context: DisplayPreviewContextSelection,
+  stage: ConfigStage = "live"
+) {
+  const response = await requestJson<{ preview: DisplayDataPreview }>(
+    `/api/display-pages/${pageId}/data-preview`,
+    {
+      body: JSON.stringify({ context, stage }),
+      method: "POST"
+    }
+  );
+  return response.preview;
 }
 
 export async function updateDisplayPageConfig(

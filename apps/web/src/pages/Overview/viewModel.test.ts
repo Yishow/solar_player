@@ -29,6 +29,7 @@ function createResolvedStoryMetric(args: {
   fallbackStrategy?: "placeholder" | "retain-last-reading";
   freshnessState?: "fallback" | "fresh" | "stale";
   helper?: string;
+  itemId?: string;
   label: string;
   metricKey: string;
   metricScope?: "cl" | "global" | "kn";
@@ -49,6 +50,7 @@ function createResolvedStoryMetric(args: {
     fallbackReason: args.fallbackReason ?? null,
     freshnessState: args.freshnessState ?? "fresh",
     helper: args.helper ?? `共享故事 ${args.label}`,
+    itemId: args.itemId,
     label: args.label,
     metricKey: args.metricKey,
     metricScope: args.metricScope ?? "cl",
@@ -62,6 +64,59 @@ function createResolvedStoryMetric(args: {
     value: args.value ?? "--"
   };
 }
+
+test("buildOverviewViewModel resolves reordered and duplicate-key story metrics by stable item id", () => {
+  const model = buildOverviewViewModel({
+    connectionState: "connected",
+    isSocketConnected: true,
+    snapshot,
+    storyOverview: {
+      metrics: [
+        createResolvedStoryMetric({
+          itemId: "today",
+          label: "今日卡片的新綁定",
+          metricKey: "realTimePower",
+          provenance: "derived",
+          unit: "kW",
+          value: "22"
+        }),
+        createResolvedStoryMetric({
+          itemId: "inserted-widget",
+          label: "插入項目",
+          metricKey: "realTimePower",
+          unit: "kW",
+          value: "999"
+        }),
+        createResolvedStoryMetric({
+          freshnessState: "stale",
+          itemId: "power",
+          label: "功率卡片",
+          metricKey: "realTimePower",
+          provenance: "live",
+          unit: "kW",
+          value: "11"
+        })
+      ],
+      summary: {
+        alertTone: "normal",
+        bindingState: "bound",
+        fallbackReason: null,
+        freshnessState: "fresh"
+      }
+    }
+  });
+
+  assert.equal(model.metrics.length, 5);
+  assert.deepEqual(
+    model.metrics.slice(0, 2).map(({ itemId, label, value }) => ({ itemId, label, value })),
+    [
+      { itemId: "power", label: "功率卡片", value: "11" },
+      { itemId: "today", label: "今日卡片的新綁定", value: "22" }
+    ]
+  );
+  assert.equal(model.metrics[0]?.freshnessState, "stale");
+  assert.equal(model.metrics[1]?.provenance, "derived");
+});
 
 test("buildOverviewViewModel surfaces the custom topic name delivered via the story label and falls back without a story", () => {
   const withStory = buildOverviewViewModel({

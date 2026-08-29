@@ -268,7 +268,7 @@ export function SourceConnectionPanel({
     Boolean(sourceRegion && selectedRegion && sourceRegion.id !== selectedRegion.id);
 
   if (!editMode) {
-    return <p className="text-[14px] leading-7 text-[var(--shell-copy-ink)]">按 E 啟用編輯模式後可檢視來源連接。</p>;
+    return <p className="text-[14px] leading-7 text-[var(--shell-copy-ink)]">按 E 啟用編輯模式後可檢視素材與內容來源。</p>;
   }
 
   if (!selectedRegion && !freeformObject) {
@@ -279,7 +279,9 @@ export function SourceConnectionPanel({
     <div className="space-y-4">
       <div>
         <h4 className="text-[16px] font-semibold text-[var(--shell-title-ink)]">{panelLabel}</h4>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--shell-copy-ink)]">目前選取項目的來源連接摘要。</p>
+        <p className="mt-1 text-[12px] leading-5 text-[var(--shell-copy-ink)]">
+          目前選取項目的素材與內容來源摘要。資料指標請使用「資料」頁籤。
+        </p>
         {isLinkedFromDifferentSelection ? (
           <p className="mt-1 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]">
             目前畫布選到的是版位容器，來源替換與霧化設定已連到對應的素材區域。

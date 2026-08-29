@@ -14,7 +14,7 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readOverviewDisplayStory, readSolarDisplayStory }
+  { readDisplayStory }
 ] = await Promise.all([
   import("../db/index.js"),
   import("../db/migrate.js"),
@@ -65,23 +65,23 @@ test("overview and solar carbon cards derive the same values from generation and
       `
         INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
-          ('global', 'todayGeneration', 990, 'kWh', ?, 'good', '{}')
+          ('cl', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
+          ('cl', 'todayGeneration', 990, 'kWh', ?, 'good', '{}'),
+          ('cl', 'totalGeneration', 2000, 'kWh', ?, 'good', '{}')
       `
     )
-    .run(timestamp, timestamp);
+    .run(timestamp, timestamp, timestamp);
   database
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('global', 'generation', 2000, ?, 0)
+          ('cl', 'generation', 2000, ?, 0)
       `
     )
     .run(timestamp);
 
-  const overview = readOverviewDisplayStory();
-  const solar = readSolarDisplayStory();
+  const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
   const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
@@ -115,23 +115,23 @@ test("overview and solar carbon cards switch sub-ton displays to kilograms when 
       `
         INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
-          ('global', 'todayGeneration', 990, 'kWh', ?, 'good', '{}')
+          ('cl', 'realTimePower', 512, 'kW', ?, 'good', '{}'),
+          ('cl', 'todayGeneration', 990, 'kWh', ?, 'good', '{}'),
+          ('cl', 'totalGeneration', 2000, 'kWh', ?, 'good', '{}')
       `
     )
-    .run(timestamp, timestamp);
+    .run(timestamp, timestamp, timestamp);
   database
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('global', 'generation', 2000, ?, 0)
+          ('cl', 'generation', 2000, ?, 0)
       `
     )
     .run(timestamp);
 
-  const overview = readOverviewDisplayStory();
-  const solar = readSolarDisplayStory();
+  const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
   const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
@@ -169,23 +169,23 @@ test("overview and solar carbon cards preserve precision before converting small
       `
         INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('global', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
-          ('global', 'todayGeneration', 2.716, 'kWh', ?, 'good', '{}')
+          ('cl', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
+          ('cl', 'todayGeneration', 2.716, 'kWh', ?, 'good', '{}'),
+          ('cl', 'totalGeneration', 109.551, 'kWh', ?, 'good', '{}')
       `
     )
-    .run(timestamp, timestamp);
+    .run(timestamp, timestamp, timestamp);
   database
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('global', 'generation', 109.551, ?, 0)
+          ('cl', 'generation', 109.551, ?, 0)
       `
     )
     .run(timestamp);
 
-  const overview = readOverviewDisplayStory();
-  const solar = readSolarDisplayStory();
+  const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
   const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
@@ -223,23 +223,23 @@ test("overview and solar carbon cards treat lower-case mWh as megawatt-hours", (
       `
         INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
         VALUES
-          ('global', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
-          ('global', 'todayGeneration', 2.716, 'mWh', ?, 'good', '{}')
+          ('cl', 'realTimePower', 538.64, 'kW', ?, 'good', '{}'),
+          ('cl', 'todayGeneration', 2.716, 'mWh', ?, 'good', '{}'),
+          ('cl', 'totalGeneration', 2716, 'kWh', ?, 'good', '{}')
       `
     )
-    .run(timestamp, timestamp);
+    .run(timestamp, timestamp, timestamp);
   database
     .prepare(
       `
         INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
         VALUES
-          ('global', 'generation', 2716, ?, 0)
+          ('cl', 'generation', 2716, ?, 0)
       `
     )
     .run(timestamp);
 
-  const overview = readOverviewDisplayStory();
-  const solar = readSolarDisplayStory();
+  const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
   const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");
@@ -265,13 +265,12 @@ test("overview and solar carbon cards fail closed when the generation basis is u
     .prepare(
       `
         INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('global', 'realTimePower', 512, 'kW', ?, 'good', '{}')
+        VALUES ('cl', 'realTimePower', 512, 'kW', ?, 'good', '{}')
       `
     )
     .run(timestamp);
 
-  const overview = readOverviewDisplayStory();
-  const solar = readSolarDisplayStory();
+  const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
   const solarTodayCarbon = solar.kpis.find((metric) => metric.metricKey === "todayCo2Reduction");

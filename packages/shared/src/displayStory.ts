@@ -72,6 +72,7 @@ export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> 
     fallbackStrategy: MonitoringFallbackStrategy;
     freshness?: FreshnessResult;
     helper: string;
+    itemId?: string;
     label: string;
     metricKey: TMetric;
     metricScope: MetricScope;
@@ -93,7 +94,12 @@ export type FactoryCircuitKpiKey =
 
 export type FactoryCircuitStorySlot = MonitoringStoryState & {
   circuitId: number | null;
+  format?: {
+    precision?: number;
+    unitDisplay?: "auto" | "hide";
+  };
   freshness?: FreshnessResult;
+  itemId?: string;
   label: string;
   labelEn?: string;
   labelZh?: string;
@@ -174,7 +180,9 @@ export type DisplayStoryPagePayload<PageId extends DisplayStoryPageId = DisplayS
 };
 
 export type MonitoringDisplayValueOptions = {
+  precision?: number;
   preferKilogramsForSubTonCo2?: boolean;
+  unitDisplay?: "auto" | "hide";
 };
 
 export function formatMonitoringValue(value: number, unit: string | null) {
@@ -191,21 +199,26 @@ export function formatMonitoringDisplayValue(
   unit: string | null,
   options: MonitoringDisplayValueOptions = {}
 ) {
+  let displayValue = value;
+  let displayUnit = unit;
   if (
     options.preferKilogramsForSubTonCo2 &&
     unit === "t" &&
     value !== 0 &&
     Math.abs(value) < 1
   ) {
-    return {
-      unit: "kg",
-      value: formatMonitoringValue(value * 1000, "kg")
-    };
+    displayValue = value * 1000;
+    displayUnit = "kg";
   }
 
   return {
-    unit,
-    value: formatMonitoringValue(value, unit)
+    unit: options.unitDisplay === "hide" ? "" : displayUnit,
+    value: options.precision === undefined
+      ? formatMonitoringValue(displayValue, displayUnit)
+      : displayValue.toLocaleString("zh-TW", {
+          maximumFractionDigits: options.precision,
+          minimumFractionDigits: options.precision
+        })
   };
 }
 

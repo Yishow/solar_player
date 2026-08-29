@@ -511,6 +511,158 @@ test("POST /api/display-pages/:pageId/publish promotes draft to live", async () 
   }
 });
 
+test("metric binding edits participate in draft diff and publish lifecycle", async () => {
+  const app = await buildApp();
+  const dataBindings = {
+    power: {
+      dataBinding: {
+        metricKey: "todayGeneration",
+        scope: "kn",
+        sourceType: "metric"
+      },
+      itemId: "power"
+    }
+  };
+
+  try {
+    const draftResponse = await saveDraftConfig(app, "overview", { dataBindings });
+    assert.equal(draftResponse.statusCode, 200);
+    const draftBody = draftResponse.json() as {
+      config: { regions: { dataBindings: typeof dataBindings } };
+    };
+    assert.deepEqual(draftBody.config.regions.dataBindings, dataBindings);
+
+    const liveBeforePublish = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/live"
+    });
+    const liveBeforeBody = liveBeforePublish.json() as {
+      config: { regions: { dataBindings?: typeof dataBindings } };
+    };
+    assert.equal(liveBeforeBody.config.regions.dataBindings, undefined);
+
+    const registryWithDraft = await app.inject({
+      method: "GET",
+      url: "/api/display-page-registry"
+    });
+    const registryWithDraftBody = registryWithDraft.json() as {
+      pages: Array<{ hasDraftChanges: boolean; pageKey: string }>;
+    };
+    assert.equal(
+      registryWithDraftBody.pages.find((page) => page.pageKey === "overview")?.hasDraftChanges,
+      true
+    );
+
+    const publishResponse = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/overview/publish",
+      payload: { publishedBy: "test-operator" }
+    });
+    assert.equal(publishResponse.statusCode, 200);
+
+    const liveAfterPublish = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/live"
+    });
+    const liveAfterBody = liveAfterPublish.json() as {
+      config: { regions: { dataBindings: typeof dataBindings } };
+    };
+    assert.deepEqual(liveAfterBody.config.regions.dataBindings, dataBindings);
+
+    const registryAfterPublish = await app.inject({
+      method: "GET",
+      url: "/api/display-page-registry"
+    });
+    const registryAfterPublishBody = registryAfterPublish.json() as {
+      pages: Array<{ hasDraftChanges: boolean; pageKey: string }>;
+    };
+    assert.equal(
+      registryAfterPublishBody.pages.find((page) => page.pageKey === "overview")?.hasDraftChanges,
+      false
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("unknown metric bindings are rejected without changing the published binding", async () => {
+  const app = await buildApp();
+
+  try {
+    const liveBefore = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/live"
+    });
+    const liveBeforeBody = liveBefore.json() as { config: { regions: unknown; version: number } };
+
+    const response = await saveDraftConfig(app, "overview", {
+      dataBindings: {
+        power: {
+          dataBinding: {
+            metricKey: "unknownMetric",
+            scope: "inherit-device",
+            sourceType: "metric"
+          },
+          itemId: "power"
+        }
+      }
+    });
+
+    assert.equal(response.statusCode, 422);
+    const body = response.json() as {
+      validation: { findings: Array<{ code: string; regionId: string }> };
+    };
+    assert.deepEqual(body.validation.findings, [{
+      code: "METRIC_BINDING_UNKNOWN_METRIC",
+      message: "power.metricKey: metric-binding-unknown-metric",
+      regionId: "dataBindings.power",
+      severity: "blocking"
+    }]);
+
+    const liveAfter = await app.inject({
+      method: "GET",
+      url: "/api/display-pages/overview/live"
+    });
+    const liveAfterBody = liveAfter.json() as { config: { regions: unknown; version: number } };
+    assert.deepEqual(liveAfterBody.config, liveBeforeBody.config);
+  } finally {
+    await app.close();
+  }
+});
+
+test("out-of-range metric precision is rejected before publish", async () => {
+  const app = await buildApp();
+
+  try {
+    const response = await saveDraftConfig(app, "overview", {
+      dataBindings: {
+        power: {
+          dataBinding: {
+            format: { precision: 4 },
+            metricKey: "realTimePower",
+            scope: "inherit-device",
+            sourceType: "metric"
+          },
+          itemId: "power"
+        }
+      }
+    });
+
+    assert.equal(response.statusCode, 422);
+    const body = response.json() as {
+      validation: { findings: Array<{ code: string; regionId: string }> };
+    };
+    assert.deepEqual(body.validation.findings, [{
+      code: "METRIC_BINDING_INVALID_FORMAT",
+      message: "power.format: metric-binding-invalid-format",
+      regionId: "dataBindings.power",
+      severity: "blocking"
+    }]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("display page freeform objects roundtrip from draft publish into the live config envelope", async () => {
   const app = await buildApp();
   const freeformObjects = [

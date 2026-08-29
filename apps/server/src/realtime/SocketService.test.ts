@@ -190,6 +190,11 @@ function createIdentityAwareService(options: {
       timestamp: "2026-05-22T12:00:00.000Z"
     }),
     getMqttStatus: createMqttStatus,
+    resolvePlaybackMetricAuthorizationPlan: () => ({
+      foreignSiteIdentities: [],
+      identities: [],
+      revision: "test"
+    }),
     ...options
   } as ConstructorParameters<typeof SocketService>[0]);
 }
@@ -244,6 +249,116 @@ test("SocketService stores the Server-authoritative rollout heartbeat state", ()
       profileUpdateError: "desired version mismatch",
       updateState: "failed"
     }
+  );
+});
+
+test("CL playback receives only the explicitly authorized KN metric bootstrap and deltas", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: { metrics: { localPower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 10 } }, timestamp: "2026-05-22T12:00:00.000Z" },
+    global: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: {
+      metrics: {
+        realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 88 },
+        unrelatedKnMetric: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 999 }
+      },
+      timestamp: "2026-05-22T12:00:00.000Z"
+    }
+  } as const;
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "cl"),
+    resolvePlaybackMetricAuthorizationPlan: () => ({
+      foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "kn" }],
+      identities: [{ metricKey: "realTimePower", metricScope: "kn" }],
+      revision: "revision-cl-1|overview:2"
+    })
+  } as ConstructorParameters<typeof SocketService>[0]);
+  const socket = new FakeSocket();
+  io.connect(socket);
+
+  const knBootstrap = socket.emitted.find(
+    ({ event, payload }) =>
+      event === "liveMetrics:update"
+      && (payload as { metricScope?: string }).metricScope === "kn"
+  )?.payload as { metrics: Record<string, unknown> } | undefined;
+  assert.deepEqual(Object.keys(knBootstrap?.metrics ?? {}), ["realTimePower"]);
+
+  socket.emitted = [];
+  service.emitLiveMetrics("kn", snapshots.kn);
+  const knDelta = socket.emitted.find(
+    ({ event, payload }) =>
+      event === "liveMetrics:update"
+      && (payload as { metricScope?: string }).metricScope === "kn"
+  )?.payload as { metrics: Record<string, unknown> } | undefined;
+  assert.deepEqual(Object.keys(knDelta?.metrics ?? {}), ["realTimePower"]);
+});
+
+test("published binding revision removes foreign delivery and clears its cached scope", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    global: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: {
+      metrics: {
+        realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 88 }
+      },
+      timestamp: "2026-05-22T12:00:00.000Z"
+    }
+  } as const;
+  let authorization = {
+    foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "kn" as const }],
+    identities: [{ metricKey: "realTimePower", metricScope: "kn" as const }],
+    revision: "revision-cl-1|overview:2"
+  };
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "cl"),
+    resolvePlaybackMetricAuthorizationPlan: () => authorization
+  } as ConstructorParameters<typeof SocketService>[0]);
+  const socket = new FakeSocket();
+  io.connect(socket);
+  socket.emitted = [];
+
+  authorization = {
+    foreignSiteIdentities: [],
+    identities: [],
+    revision: "revision-cl-1|overview:3"
+  };
+  socket.trigger("client:heartbeat", {
+    ...appliedProfileRolloutHeartbeat,
+    isPlaying: true,
+    pageKey: "overview",
+    route: "/overview",
+    timeSyncState: "synced"
+  });
+
+  const knReset = socket.emitted.find(
+    ({ event, payload }) =>
+      event === "liveMetrics:update"
+      && (payload as { metricScope?: string }).metricScope === "kn"
+  )?.payload as { metrics: Record<string, unknown> } | undefined;
+  assert.deepEqual(knReset?.metrics, {});
+
+  socket.emitted = [];
+  service.emitLiveMetrics("kn", snapshots.kn);
+  assert.equal(
+    socket.emitted.some(
+      ({ event, payload }) =>
+        event === "liveMetrics:update"
+        && (payload as { metricScope?: string }).metricScope === "kn"
+    ),
+    false
   );
 });
 

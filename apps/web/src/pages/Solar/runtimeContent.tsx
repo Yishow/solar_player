@@ -189,8 +189,11 @@ export function SolarRuntimeContent({
 
   return (
     <>
-      {flowNodeItems.map((item, index) => {
-        const node = viewModel.flowNodes[index]!;
+      {flowNodeItems.map((item) => {
+        const node = viewModel.flowNodes.find(
+          (candidate) => candidate.itemId === `flow.${item.key}`
+        );
+        if (!node) return null;
 
         return (
           <article
@@ -306,12 +309,15 @@ export function SolarRuntimeContent({
         })()}
       </div>
 
-      {kpiCardItems.map((item, index) => {
+      {kpiCardItems.map((item) => {
         if (!item.visible) {
           return null;
         }
 
-        const metric = viewModel.kpis[index]!;
+        const metric = viewModel.kpis.find(
+          (candidate) => candidate.itemId === item.key
+        );
+        if (!metric) return null;
         const isConfiguring = item.status === "configuring";
 
         return (

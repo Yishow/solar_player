@@ -102,8 +102,15 @@ export type DisplayEditorCardRailChildSourceSchema = {
   type: "card-rail";
 };
 
+export type DisplayEditorDataBindingCapability = {
+  bindingPath: DisplayEditorPath;
+  itemId: string;
+  sourceType: "metric";
+};
+
 export type DisplayEditorRegionSchema = {
   childSource?: DisplayEditorCardRailChildSourceSchema;
+  dataBinding?: DisplayEditorDataBindingCapability;
   description?: string;
   fields: DisplayEditorFieldSchema[];
   geometry?: DisplayEditorRegionGeometrySchema;
@@ -117,6 +124,14 @@ export type DisplayEditorRegionSchema = {
   };
   presetKey?: string;
 };
+
+export function createMetricDataBindingCapability(itemId: string): DisplayEditorDataBindingCapability {
+  return {
+    bindingPath: ["dataBindings", itemId],
+    itemId,
+    sourceType: "metric"
+  };
+}
 
 export function displayEditorPathKey(path: DisplayEditorPath) {
   return path.join(".");

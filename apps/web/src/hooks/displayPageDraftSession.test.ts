@@ -148,6 +148,49 @@ test("resetDraftPaths restores only the requested field paths", () => {
   assert.equal(nextSession.config.heroMedia.src, "/custom.png");
 });
 
+test("resetDraftPaths restores one metric binding without discarding unrelated draft edits", () => {
+  const seedConfig = {
+    dataBindings: {
+      power: {
+        dataBinding: {
+          metricKey: "realTimePower",
+          scope: "inherit-device",
+          sourceType: "metric"
+        },
+        itemId: "power"
+      }
+    },
+    heroCopy: {
+      title: "baseline title"
+    }
+  };
+  const session = createDraftSession(
+    {
+      dataBindings: {
+        power: {
+          dataBinding: {
+            metricKey: "todayGeneration",
+            scope: "kn",
+            sourceType: "metric"
+          },
+          itemId: "power"
+        }
+      },
+      heroCopy: {
+        title: "local title"
+      }
+    },
+    null,
+    defaultFallbackPolicy
+  );
+
+  const nextSession = resetDraftPaths(session, seedConfig, [["dataBindings", "power"]]);
+
+  assert.deepEqual(nextSession.config.dataBindings.power, seedConfig.dataBindings.power);
+  assert.equal(nextSession.config.heroCopy.title, "local title");
+  assert.equal(nextSession.dirty, true);
+});
+
 test("undo and redo stay scoped to the current page draft session", () => {
   const overviewSession = applyDraftConfigUpdate(
     createDraftSession({ left: 86, top: 172 }, null, defaultFallbackPolicy),

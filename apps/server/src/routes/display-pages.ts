@@ -2,7 +2,8 @@ import type {
   DisplayPageConfigEnvelope,
   DisplayPageDraftSaveConflictResponse,
   DisplayPageFreeformObject,
-  DisplayPageId
+  DisplayPageId,
+  ValidationFinding
 } from "@solar-display/shared";
 import {
   createEmptyDisplayPageConfig,
@@ -19,7 +20,8 @@ import {
   publishDraft,
   rollbackToVersion,
   getPublishHistory,
-  readFallbackStatus
+  readFallbackStatus,
+  validateDisplayPageMetricBindings
 } from "../services/displayPagePublishingService.js";
 import {
   collectDisplayPageAssetFindings,
@@ -29,6 +31,11 @@ import {
   resolveDisplayPageRegions
 } from "../services/displayPageAssetService.js";
 import { readDisplayRotationPreview } from "../services/displayRotationService.js";
+import {
+  DisplayPreviewContextServiceError,
+  resolveDisplayPreviewContext
+} from "../services/displayPreviewContextService.js";
+import { readDisplayDataPreview } from "../services/displayDataPreviewService.js";
 
 type DisplayPageRouteParams = { pageId: string };
 type DisplayPageConfigBody = {
@@ -97,6 +104,18 @@ function sendPlacementValidationError(
   });
 }
 
+function sendMetricBindingValidationError(
+  reply: { status: (code: number) => { send: (payload: Record<string, unknown>) => unknown } },
+  findings: ValidationFinding[]
+) {
+  return reply.status(422).send({
+    success: false,
+    error: "Metric binding validation failed",
+    validation: { canPublish: false, findings },
+    timestamp: new Date().toISOString()
+  });
+}
+
 function readStoredDisplayPageConfig(pageId: DisplayPageId): DisplayPageConfigEnvelope {
   const database = getDatabase();
   const row = database
@@ -129,6 +148,38 @@ function resolveEnvelope<TRegions extends Record<string, unknown>>(
 }
 
 const displayPagesRoute: FastifyPluginAsync = async (app) => {
+  app.post<{ Body: unknown }>("/api/display-pages/preview-context/resolve", async (request, reply) => {
+    try {
+      return { context: resolveDisplayPreviewContext(request.body) };
+    } catch (error) {
+      if (!(error instanceof DisplayPreviewContextServiceError)) throw error;
+      return reply.status(error.statusCode).send({
+        code: error.code,
+        error: error.message,
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  app.post<{ Body: unknown; Params: DisplayPageRouteParams }>(
+    "/api/display-pages/:pageId/data-preview",
+    async (request, reply) => {
+      const pageId = assertDisplayPageId(request.params.pageId);
+      try {
+        return { preview: readDisplayDataPreview(pageId, request.body) };
+      } catch (error) {
+        if (!(error instanceof DisplayPreviewContextServiceError)) throw error;
+        return reply.status(error.statusCode).send({
+          code: error.code,
+          error: error.message,
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  );
+
   // --- Legacy routes (backward compatible) ---
 
   app.get<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/config", async (request) => {
@@ -163,6 +214,10 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
           reply,
           placementIssues.map((issue) => issue.message)
         );
+      }
+      const metricBindingFindings = validateDisplayPageMetricBindings(pageId, regions);
+      if (metricBindingFindings.length > 0) {
+        return sendMetricBindingValidationError(reply, metricBindingFindings);
       }
 
       const database = getDatabase();
@@ -220,6 +275,10 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
           reply,
           placementIssues.map((issue) => issue.message)
         );
+      }
+      const metricBindingFindings = validateDisplayPageMetricBindings(pageId, regions);
+      if (metricBindingFindings.length > 0) {
+        return sendMetricBindingValidationError(reply, metricBindingFindings);
       }
 
       try {
@@ -293,7 +352,7 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     const pageId = assertDisplayPageId(request.params.pageId);
     const draft = readStageConfig(pageId, "draft");
     const { validateConfigDraft, checkImageReferences } = await import("../services/displayPagePublishingService.js");
-    const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? []);
+    const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
     const imageWarnings = checkImageReferences(draft.regions);
     if (imageWarnings.length > 0) validation.findings.push(...imageWarnings);
     const assetFindings = collectDisplayPageAssetFindings(pageId, draft.regions);

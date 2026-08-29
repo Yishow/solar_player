@@ -157,7 +157,6 @@ tests:
 -->
 
 ---
-
 ### Requirement: Keep aggregate display story route compatible during migration
 
 The system SHALL keep `GET /api/display-story` available during the migration to page-scoped runtime endpoints, and the aggregate route SHALL remain equivalent to composing the page-scoped readers for `overview`, `solar`, and `factory-circuit`.
@@ -296,7 +295,6 @@ tests:
 -->
 
 ---
-
 ### Requirement: Page-scoped Story runtime enforces Display Client Context
 
 Page-scoped Story runtime endpoints SHALL resolve Site-sensitive sources from the authenticated Display Client Context. A page identifier SHALL NOT authorize access to another Site's data.
@@ -397,6 +395,7 @@ tests:
   - apps/web/src/pages/Overview/configRender.test.tsx
 -->
 
+---
 ### Requirement: Page-scoped stories resolve all metric facets from one effective scope
 
 A page-scoped monitoring story SHALL resolve displayed value, source value, freshness, fallback state, provenance, trend/history references, and display override from the same effective metric scope. A story MUST NOT combine a value from one site with freshness, source topics, history, or override state from another site.
@@ -410,3 +409,240 @@ A page-scoped monitoring story SHALL resolve displayed value, source value, fres
 - **WHEN** a page contract explicitly declares a global dependency for a CL or KN story
 - **THEN** the story MAY include that global dependency
 - **AND** its provenance SHALL identify the dependency scope as `global` rather than relabeling it as the device site
+
+---
+### Requirement: Page-scoped story runtime uses effective widget binding plans
+
+For a page with explicit widget data bindings, the page-scoped story runtime SHALL resolve an effective binding plan from the published page configuration, trusted playback/preview context, and shared metric contract before building story values. The story payload MUST NOT keep a hidden page-local static metric list as a second source of truth.
+
+#### Scenario: Shared page is rendered by two sites
+- **WHEN** one published Overview page uses inherited bindings and is requested by CL and KN playback contexts
+- **THEN** the CL story resolves those bindings against CL
+- **AND** the KN story resolves those bindings against KN
+- **AND** both responses are derived from the same page configuration
+
+#### Scenario: Page includes a trusted cross-site binding
+- **WHEN** a published page rendered by CL contains one widget explicitly bound to KN
+- **THEN** the story resolves that widget from the KN-scoped metric identity
+- **AND** other inherited widgets continue to resolve from CL
+- **AND** each story metric retains its own effective scope, freshness, and provenance
+
+<!-- @trace
+source: add-widget-data-bindings
+updated: 2026-08-30
+code:
+  - apps/server/src/routes/display-card-data.ts
+  - solar_mqtt_go/internal/discovery/discovery.go
+  - solar_mqtt_go/internal/mosquitto/proc_windows.go
+  - solar_mqtt_go/internal/tray/run.go
+  - solar_mqtt_go/internal/tray/instance_windows.go
+  - start.sh
+  - packages/shared/src/displayCardData.ts
+  - solar_mqtt_go/internal/webui/web/js/config-view.js
+  - apps/server/src/services/MetricHistoryRetentionService.ts
+  - solar_mqtt_go/build.ps1
+  - solar_mqtt_go/internal/display/display.go
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - solar_mqtt_go/internal/mosquitto/mosquitto.go
+  - .agents/skills/openspec-apply-change/SKILL.md
+  - packages/shared/src/metricScope.ts
+  - packages/shared/src/playbackMetricContract.ts
+  - .agents/skills/openspec-explore/SKILL.md
+  - solar_mqtt_go/commands.go
+  - apps/server/src/services/displayReadinessService.ts
+  - apps/web/src/pages/Overview/viewModel.ts
+  - solar_mqtt_go/internal/tray/app.go
+  - packages/shared/src/displayOps.ts
+  - solar_mqtt_go/assets/tray.ico
+  - apps/server/src/server-startup.ts
+  - solar_mqtt_go/internal/webui/web/js/factory-view.js
+  - .agents/skills/openspec-propose/SKILL.md
+  - apps/server/src/routes/metrics.ts
+  - apps/server/src/realtime/SocketService.ts
+  - solar_mqtt_go/internal/webui/web/styles/layout.css
+  - packages/shared/src/index.ts
+  - apps/server/src/services/MetricsAccumulatorService.ts
+  - apps/server/src/services/SnapshotWriterService.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - solar_mqtt_go/internal/anomaly/anomaly.go
+  - apps/server/src/db/migrations/035_scoped_metric_identity.sql
+  - solar_mqtt_go/internal/webui/web/styles/theme.css
+  - solar_mqtt_go/internal/webui/web/styles/forms.css
+  - solar_mqtt_go/go.sum
+  - apps/web/src/pages/runtimeRefreshRegistry.ts
+  - .agents/skills/openspec-archive-change/SKILL.md
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.tsx
+  - solar_mqtt_go/internal/mosquitto/proc_unix.go
+  - apps/web/src/services/socket.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/server/src/testing/deviceContextTestSupport.ts
+  - apps/server/src/services/displayValueOverrideService.ts
+  - solar_mqtt_go/internal/webui/web/vendor/mqtt.min.js
+  - apps/server/src/services/displayPreviewContextService.ts
+  - apps/web/src/hooks/useLiveMetrics.ts
+  - apps/server/src/services/householdEquivalenceService.ts
+  - apps/server/src/services/displayRotationService.ts
+  - solar_mqtt_go/internal/config/config.go
+  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
+  - apps/server/src/services/displayPagePublishingService.ts
+  - solar_mqtt_go/go.mod
+  - solar_mqtt_go/internal/mqttbus/bus.go
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - solar_mqtt_go/internal/service/service.go
+  - .agents/skills/openspec-sync-specs/SKILL.md
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+  - solar_mqtt_go/build.sh
+  - solar_mqtt_go/internal/heartbeat/heartbeat.go
+  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
+  - scripts/deploy.test.mjs
+  - apps/web/src/pages/Solar/viewModel.ts
+  - apps/web/src/pages/MqttSettings/factoryTopicSites.ts
+  - apps/server/src/app.ts
+  - apps/web/src/pages/Solar/runtimeContent.tsx
+  - apps/server/src/db/migrations/036_remove_managed_solar_topic_mappings.sql
+  - packages/shared/src/displayEditorSchema.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/server/src/db/scopedMetricMigration.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/server/src/db/seed.ts
+  - packages/shared/src/displayReadiness.ts
+  - solar_mqtt_go/internal/tray/instance_unix.go
+  - apps/server/src/services/displayOpsService.ts
+  - apps/web/src/pages/Solar/displayPageConfig.ts
+  - solar_mqtt_go/internal/webui/web/styles/components.css
+  - solar_mqtt_go/internal/webui/web/index.html
+  - packages/shared/src/displayStory.ts
+  - solar_mqtt_go/internal/tray/run_nocgo.go
+  - solar_mqtt_go/start.ps1
+  - solar_mqtt_go/internal/storage/storage.go
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/server/src/routes/data-source.ts
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - apps/web/src/pages/Overview/runtimeContent.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/metrics/liveMetrics.ts
+  - apps/server/src/routes/metrics-history.ts
+  - solar_mqtt_go/internal/webui/web/js/local-config-view.js
+  - solar_mqtt_go/internal/webui/webui.go
+  - start.ps1
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - docs/runbooks/pc-server-deploy.md
+  - solar_mqtt_go/internal/schedule/schedule.go
+  - solar_mqtt_go/internal/webui/web/styles.css
+  - apps/server/src/services/displayStoryService.ts
+  - .agents/skills/.openspec-target
+  - packages/shared/src/displayPageFreshness.ts
+  - apps/server/src/mqtt/ManagedSourceAdapter.ts
+  - solar_mqtt_go/main.go
+  - apps/server/src/mqtt/SolarSourceAdapter.ts
+  - apps/server/src/services/DailySummaryService.ts
+  - apps/server/src/services/MetricResolver.ts
+  - apps/server/src/services/playbackMetricAuthorizationService.ts
+  - solar_mqtt_go/start.sh
+  - solar_mqtt_go/internal/scraper/scraper.go
+  - apps/web/src/services/api.ts
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - solar_mqtt_go/internal/webui/web/js/app.js
+  - solar_mqtt_go/assets/assets.go
+  - apps/server/src/routes/display-pages.ts
+  - .env.example
+  - solar_mqtt_go/internal/service/control.go
+  - apps/server/src/db/migrate.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - packages/shared/src/widgetDataBinding.ts
+  - solar_mqtt_go/internal/tray/logfile.go
+  - solar_mqtt_go/internal/webui/web/js/mqtt-manager.js
+tests:
+  - packages/shared/src/displayPageFreshness.test.ts
+  - solar_mqtt_go/internal/storage/storage_test.go
+  - apps/server/src/routes/management-auth.test.ts
+  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
+  - apps/web/src/pages/Solar/runtimeIsolation.test.tsx
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/Overview/viewModel.test.ts
+  - solar_mqtt_go/internal/tray/instance_windows_test.go
+  - apps/server/src/routes/playback.test.ts
+  - apps/web/src/hooks/displayPageDraftSession.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/server/src/services/householdEquivalenceService.test.ts
+  - solar_mqtt_go/main_test.go
+  - solar_mqtt_go/internal/tray/logfile_test.go
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/pages/shared/widgetDataBinding.test.ts
+  - apps/web/src/pages/shared/playbackMetricContract.test.ts
+  - solar_mqtt_go/internal/tray/app_test.go
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/server/src/services/MetricResolver.test.ts
+  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/web/src/pages/MqttSettings/loadModel.test.ts
+  - solar_mqtt_go/internal/scraper/scraper_test.go
+  - apps/server/src/services/MetricHistoryRetentionService.test.ts
+  - packages/shared/src/displayStory.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - apps/web/src/hooks/useDisplayStoryRuntime.test.ts
+  - apps/server/src/routes/display-pages.test.ts
+  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
+  - apps/server/src/routes/display-preview-context.test.ts
+  - solar_mqtt_go/assets/assets_test.go
+  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
+  - apps/server/src/app.test.ts
+  - solar_mqtt_go/internal/webui/webui_test.go
+  - apps/server/src/services/displayStoryTopicNames.test.ts
+  - solar_mqtt_go/internal/heartbeat/heartbeat_test.go
+  - apps/web/src/pages/Solar/configRender.test.ts
+  - apps/server/src/services/DailySummaryService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.test.tsx
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
+  - solar_mqtt_go/internal/mqttbus/control_contract_test.go
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/Solar/viewModel.test.ts
+  - apps/server/src/mqtt/MqttClientService.test.ts
+  - solar_mqtt_go/internal/display/display_test.go
+  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.test.tsx
+  - solar_mqtt_go/internal/service/control_contract_test.go
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/routes/display-data-preview.test.ts
+  - apps/web/src/pages/Overview/render.test.ts
+  - solar_mqtt_go/internal/mosquitto/mosquitto_test.go
+  - apps/server/src/routes/display-readiness.test.ts
+  - solar_mqtt_go/internal/config/config_test.go
+  - apps/web/src/pages/FactoryCircuit/runtimeIsolation.test.tsx
+  - packages/shared/src/metricScope.test.ts
+  - apps/server/src/db/migrations/scopeLiveMetricsMigration.test.ts
+  - solar_mqtt_go/internal/schedule/schedule_test.go
+  - apps/web/src/pages/DisplayPagesEditor/dataBindingCapability.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - solar_mqtt_go/internal/config/applyset_test.go
+  - apps/server/src/services/sustainabilityStoryService.test.ts
+  - apps/web/src/services/api.test.ts
+  - solar_mqtt_go/build_test.go
+  - apps/server/src/services/displayReadinessService.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/server/src/services/displayStoryService.test.ts
+  - solar_mqtt_go/internal/mqttbus/bus_test.go
+  - solar_mqtt_go/internal/service/service_test.go
+  - apps/server/src/realtime/SocketService.test.ts
+  - solar_mqtt_go/internal/discovery/discovery_test.go
+  - apps/server/src/services/playbackMetricAuthorizationService.test.ts
+  - apps/server/src/mqtt/SolarSourceAdapter.test.ts
+  - apps/server/src/services/SnapshotWriterService.test.ts
+  - apps/server/src/services/managementSessionService.test.ts
+  - apps/server/src/services/MetricsAccumulatorService.test.ts
+  - solar_mqtt_go/internal/anomaly/anomaly_test.go
+  - apps/web/src/pages/Overview/configRender.test.tsx
+  - apps/server/src/routes/device-context-playback.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
+  - apps/web/src/pages/MqttSettings/viewModel.test.ts
+  - apps/server/src/services/managementPasswordService.test.ts
+-->

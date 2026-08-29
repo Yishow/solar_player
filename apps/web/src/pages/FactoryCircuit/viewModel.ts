@@ -323,7 +323,9 @@ export function buildFactoryCircuitViewModel({
     factoryCircuitStory.kpis.length >= 5;
 
   if (shouldUseStory) {
-    const storySlotByKey = new Map(factoryCircuitStory.slots.map((slot) => [slot.slotKey, slot]));
+    const storySlotByKey = new Map(
+      factoryCircuitStory.slots.map((slot) => [slot.itemId ?? slot.slotKey, slot])
+    );
     const toneMap: Record<string, { progressClass: string; textClass: string; tone: string; statusLabel: string }> = {
       normal: { progressClass: "bg-[#5f8c50]", textClass: "text-[#557a43]", tone: "success", statusLabel: "正常" },
       warning: { progressClass: "bg-[#d6a73f]", textClass: "text-[#9b7121]", tone: "warning", statusLabel: "注意" },
@@ -361,6 +363,7 @@ export function buildFactoryCircuitViewModel({
           fallbackReason: storySlot?.fallbackReason ?? binding.fallbackReason,
           fallbackSharePercent: slot.sharePercent,
           iconKey: slot.iconKey,
+          itemId: slot.key,
           isEmpty: true,
           labelEn: storySlot?.labelEn ?? slot.defaultEn,
           labelZh: storySlot?.labelZh ?? storySlot?.label ?? slot.defaultZh,
@@ -386,6 +389,7 @@ export function buildFactoryCircuitViewModel({
         fallbackReason: binding.fallbackReason,
         fallbackSharePercent: slot.sharePercent,
         iconKey: slot.iconKey,
+        itemId: slot.key,
         isEmpty: false,
         labelEn: storySlot.labelEn ?? slot.defaultEn,
         labelZh: storySlot.labelZh ?? storySlot.label,
@@ -467,6 +471,7 @@ export function buildFactoryCircuitViewModel({
         fallbackReason: binding.fallbackReason,
         fallbackSharePercent: slot.sharePercent,
         iconKey: slot.iconKey,
+        itemId: slot.key,
         isEmpty: true,
         labelEn: slot.defaultEn,
         labelZh: slot.defaultZh,
@@ -488,6 +493,7 @@ export function buildFactoryCircuitViewModel({
         fallbackReason: "missing-live-power" as const,
         fallbackSharePercent: slot.sharePercent,
         iconKey: slot.iconKey,
+        itemId: slot.key,
         isEmpty: true,
         labelEn: circuit.nameEn ?? slot.defaultEn,
         labelZh: circuit.nameZh ?? slot.defaultZh,
@@ -507,6 +513,7 @@ export function buildFactoryCircuitViewModel({
       fallbackReason: binding.fallbackReason,
       fallbackSharePercent: slot.sharePercent,
       iconKey: slot.iconKey,
+      itemId: slot.key,
       isEmpty: false,
       labelEn: circuit.nameEn ?? slot.defaultEn,
       labelZh: circuit.nameZh ?? slot.defaultZh,

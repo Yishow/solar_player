@@ -24,7 +24,11 @@ test("factory circuit runtime reads resolved display config for copy, status, no
   assert.match(factoryCircuitPageSource, /resolvedConfig\.connectors\[connectorKey as keyof typeof resolvedConfig\.connectors\]/);
   assert.match(factoryCircuitPageSource, /resolvedConfig\.connectorTreatments\[connectorKey as keyof typeof resolvedConfig\.connectorTreatments\]/);
   assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadPanel/);
-  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadRows\[loadRowOrder\[index\]!\]/);
+  assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.loadRows\[slotKey\]/);
+  assert.match(
+    factoryCircuitRuntimeSource,
+    /candidate\.itemId === slotKey/
+  );
   assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.rhythm\.factoryLoadRows/);
   assert.match(factoryCircuitRuntimeSource, /buildFactoryLoadRowRhythmStyle/);
   assert.match(factoryCircuitRuntimeSource, /resolvedConfig\.kpiCards\[kpiKey\]/);

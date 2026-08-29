@@ -21,6 +21,10 @@ import {
   isDisplayPageCardRailTemplateKey,
   isDisplayPageMediaBinding,
   normalizeDisplayPageFreeformObjects,
+  resolvePlaybackBindingItemConstraints,
+  resolvePlaybackMetricCatalog,
+  resolveWidgetDataBindingPageKey,
+  validateMetricDataBinding,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -33,6 +37,7 @@ import {
   normalizeDisplayPageRegionsForStorage
 } from "./displayPageAssetService.js";
 import { validateDisplayPageObjectDraft } from "./displayPageObjectValidation.js";
+import { readDisplayPageInstance } from "./displayPageRegistryService.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -295,6 +300,61 @@ function pushLayoutRect(layoutRects: LayoutRect[], regionId: string, rect: {
 
 function isPlainObject(value: unknown): value is UnknownRecord {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function metricBindingFinding(
+  code: string,
+  itemId: string,
+  field: string | null = null
+): ValidationFinding {
+  return {
+    severity: "blocking",
+    code: code.toUpperCase().replaceAll("-", "_"),
+    message: `${itemId}${field ? `.${field}` : ""}: ${code}`,
+    regionId: `dataBindings.${itemId}`
+  };
+}
+
+function validateDisplayPageMetricBindings(
+  pageId: DisplayPageId,
+  regions: Record<string, unknown>
+): ValidationFinding[] {
+  if (regions.dataBindings === undefined) return [];
+  if (!isPlainObject(regions.dataBindings)) {
+    return [metricBindingFinding("metric-binding-required", "dataBindings")];
+  }
+
+  const page = readDisplayPageInstance(pageId);
+  const bindingPageKey = page
+    ? resolveWidgetDataBindingPageKey({ pageKey: pageId, templateKey: page.templateKey })
+    : null;
+  if (!bindingPageKey) return [];
+
+  const catalog = resolvePlaybackMetricCatalog(bindingPageKey);
+  const constraints = resolvePlaybackBindingItemConstraints(bindingPageKey);
+  const findings: ValidationFinding[] = [];
+
+  for (const [itemId, value] of Object.entries(regions.dataBindings)) {
+    if (!isPlainObject(value) || value.itemId !== itemId) {
+      findings.push(metricBindingFinding("metric-binding-item-id-invalid", itemId, "itemId"));
+      continue;
+    }
+    const constraint = constraints[itemId];
+    if (!constraint) {
+      findings.push(metricBindingFinding("effective-binding-item-constraint-required", itemId));
+      continue;
+    }
+    const validation = validateMetricDataBinding(value.dataBinding, catalog, constraint);
+    if (!validation.valid) {
+      findings.push(metricBindingFinding(
+        validation.error.code,
+        itemId,
+        validation.error.field
+      ));
+    }
+  }
+
+  return findings;
 }
 
 type NumberBounds = { max?: number; min: number };
@@ -765,7 +825,8 @@ function validateCardRail(
 
 function validateConfigDraft(
   regions: Record<string, unknown>,
-  freeformObjects: DisplayPageFreeformObject[] = []
+  freeformObjects: DisplayPageFreeformObject[] = [],
+  pageId?: DisplayPageId
 ): ValidationResult {
   const findings: ValidationFinding[] = [];
   const placementIssues = collectDisplayPageMediaPlacementIssues(regions);
@@ -783,6 +844,9 @@ function validateConfigDraft(
   }
 
   validateDisplayTreatments(findings, regions);
+  if (pageId) {
+    findings.push(...validateDisplayPageMetricBindings(pageId, regions));
+  }
 
   for (const [regionId, value] of Object.entries(regions)) {
     if (isDisplayPageCardRail(value)) {
@@ -921,7 +985,7 @@ function publishDraft(
   publishedBy?: string
 ): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
   const draft = readStageConfig(pageId, "draft");
-  const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? []);
+  const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
 
   if (!validation.canPublish) {
     return { live: readStageConfig(pageId, "live"), validation };
@@ -1078,6 +1142,7 @@ export {
   readStageConfig,
   writeStageConfig,
   validateConfigDraft,
+  validateDisplayPageMetricBindings,
   checkImageReferences,
   publishDraft,
   rollbackToVersion,

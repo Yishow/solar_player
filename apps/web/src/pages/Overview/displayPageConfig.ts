@@ -1,6 +1,16 @@
-import type { DisplayPageCardStatus, DisplayPageMediaBinding } from "@solar-display/shared";
-import { resolveDisplayPageCardStatus } from "@solar-display/shared";
-import type { DisplayEditorRegionSchema } from "../../../../../packages/shared/src/displayEditorSchema";
+import type {
+  DisplayPageCardStatus,
+  DisplayPageMediaBinding,
+  MetricBoundItem
+} from "@solar-display/shared";
+import {
+  normalizeMetricBoundPageConfig,
+  resolveDisplayPageCardStatus
+} from "@solar-display/shared";
+import {
+  createMetricDataBindingCapability,
+  type DisplayEditorRegionSchema
+} from "../../../../../packages/shared/src/displayEditorSchema";
 import { buildCardStatusField } from "../DisplayPagesEditor/cardStatusField";
 import { setValueAtPath } from "../../hooks/displayPageConfigPaths";
 import {
@@ -257,6 +267,7 @@ export type OverviewDisplayPageConfig = {
   backgroundPool: {
     sources: DisplayPageMediaBinding[];
   };
+  dataBindings: Record<string, MetricBoundItem>;
   heroContainer: OverviewDisplayRect;
   heroCopy: {
     eyebrow: string;
@@ -321,7 +332,7 @@ export function createOverviewDisplayPageSeedConfig(
   heroAlt = "國瑞汽車中廠綠能展示場域",
   backgroundSrcs: readonly string[] = []
 ): OverviewDisplayPageConfig {
-  return {
+  return normalizeMetricBoundPageConfig("overview", {
     backgroundPool: {
       sources: backgroundSrcs.map((src, index) => ({
         alt: `Overview 背景候選 ${index + 1}`,
@@ -523,7 +534,7 @@ export function createOverviewDisplayPageSeedConfig(
     },
     weatherThemeMode: "auto",
     weatherManualTheme: ""
-  };
+  });
 }
 
 export function resolveOverviewModernDefaultConfig(
@@ -604,7 +615,7 @@ export function resolveOverviewModernDefaultConfig(
     })
   ) as OverviewDisplayPageConfig["widgetStyles"];
 
-  return {
+  return normalizeMetricBoundPageConfig("overview", {
     ...config,
     backgroundPool,
     cardStyles,
@@ -625,7 +636,7 @@ export function resolveOverviewModernDefaultConfig(
       : config.heroCopyLayout,
     dashboardWidgets,
     kpiCards
-  };
+  });
 }
 
 const overviewDashboardWidgetRegions = [
@@ -913,6 +924,7 @@ export const overviewDisplayPageEditorRegions: DisplayEditorRegionSchema[] = [
     presetKey: "overview-dashboard-widget"
   })),
   ...Object.keys(createOverviewDisplayPageSeedConfig().kpiCards).map<DisplayEditorRegionSchema>((key) => ({
+    dataBinding: createMetricDataBindingCapability(key),
     id: `overview-kpi-${key}`,
     label: `Overview KPI ${key}`,
     description: "調整 KPI card geometry。",

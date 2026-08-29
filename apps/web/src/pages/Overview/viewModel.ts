@@ -157,6 +157,7 @@ type OverviewMetricIconKey = "bars" | "bolt" | "co2" | "leaf" | "sun";
 type OverviewMetricCard = {
   accentColor?: boolean;
   iconKey: OverviewMetricIconKey;
+  itemId?: string;
   trendHours?: number[];
   trendSeries?: number[];
   trendUnit?: string;
@@ -219,6 +220,7 @@ const metricCards: OverviewMetricCard[] = [
     dependencyKeys: ["realTimePower"],
     fallbackIndex: 0,
     iconKey: "bolt",
+    itemId: "power",
     metricKey: "realTimePower",
     label: "即時發電功率",
     sourceClass: overviewSourceClass("realTimePower"),
@@ -229,6 +231,7 @@ const metricCards: OverviewMetricCard[] = [
     dependencyKeys: ["todayGeneration"],
     fallbackIndex: 1,
     iconKey: "sun",
+    itemId: "today",
     metricKey: "todayGeneration",
     label: "今日發電量",
     sourceClass: overviewSourceClass("todayGeneration"),
@@ -239,6 +242,7 @@ const metricCards: OverviewMetricCard[] = [
     dependencyKeys: ["totalGeneration"],
     fallbackIndex: 2,
     iconKey: "bars",
+    itemId: "total",
     metricKey: "totalGeneration",
     label: "累積發電量",
     sourceClass: overviewSourceClass("totalGeneration"),
@@ -249,6 +253,7 @@ const metricCards: OverviewMetricCard[] = [
     dependencyKeys: ["todayCo2Reduction"],
     fallbackIndex: 3,
     iconKey: "co2",
+    itemId: "co2Today",
     metricKey: "todayCo2Reduction",
     label: "今日 CO₂ 減量",
     sourceClass: overviewSourceClass("todayCo2Reduction"),
@@ -259,6 +264,7 @@ const metricCards: OverviewMetricCard[] = [
     dependencyKeys: ["totalCo2Reduction"],
     fallbackIndex: 4,
     iconKey: "leaf",
+    itemId: "co2Total",
     metricKey: "totalCo2Reduction",
     label: "累積 CO₂ 減量",
     sourceClass: overviewSourceClass("totalCo2Reduction"),
@@ -357,10 +363,23 @@ function resolveStoryMetricCards(
   metricBindings: OverviewMetricCard[],
   storyMetrics: OverviewResolvedStoryMetric[]
 ) {
-  const storyMetricByKey = new Map(storyMetrics.map((metric) => [metric.metricKey, metric]));
+  const storyMetricByItemId = new Map(
+    storyMetrics
+      .filter((metric) => metric.itemId !== undefined)
+      .map((metric) => [metric.itemId!, metric])
+  );
+  const legacyStoryMetricByKey = new Map(
+    storyMetrics
+      .filter((metric) => metric.itemId === undefined)
+      .map((metric) => [metric.metricKey, metric])
+  );
 
   return metricBindings.map((metricCard) => {
-    const storyMetric = storyMetricByKey.get(metricCard.metricKey);
+    const storyMetric =
+      (metricCard.itemId
+        ? storyMetricByItemId.get(metricCard.itemId)
+        : undefined)
+      ?? legacyStoryMetricByKey.get(metricCard.metricKey);
 
     if (!storyMetric) {
       return metricCard;
@@ -376,8 +395,9 @@ function resolveStoryMetricCards(
       freshnessState: storyMetric.freshnessState,
       helper: storyMetric.helper,
       iconKey: metricCard.iconKey,
+      itemId: storyMetric.itemId ?? metricCard.itemId,
       label: storyMetric.label,
-      metricKey: metricCard.metricKey,
+      metricKey: storyMetric.metricKey,
       provenance: storyMetric.provenance,
       sourceClass: storyMetric.sourceClass,
       sourceTopics: storyMetric.sourceTopics,
@@ -528,6 +548,7 @@ export function buildOverviewViewModel({
         freshnessState: metricCard.freshnessState,
         helper: metricCard.helper,
         iconKey,
+        itemId: metricCard.itemId,
         label: metricCard.label,
         metricKey: metricCard.metricKey,
         provenance: metricCard.provenance,
@@ -572,6 +593,7 @@ export function buildOverviewViewModel({
       freshnessState: resolved.freshnessState,
       helper: resolved.helper,
       iconKey,
+      itemId: metricCard.itemId,
       label: resolved.label,
       metricKey: resolved.metricKey,
       provenance: resolved.provenance,

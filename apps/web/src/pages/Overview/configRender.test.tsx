@@ -59,7 +59,10 @@ test("overview value-only refresh keeps KPI card shell output on the config-only
   assert.match(shellSource, /style: \{/);
   assert.match(shellSource, /createDisplayCardStyleConfig\(resolvedConfig\.cardStyles\[cardItem\.key\]\)/);
   assert.match(overviewRuntimeSource, /\{kpiCardShells\.map\(\(shell\) => \{/);
-  assert.match(overviewRuntimeSource, /const metric = viewModel\.metrics\[shell\.index\]!/);
+  assert.match(
+    overviewRuntimeSource,
+    /const metric = viewModel\.metrics\.find\([\s\S]*candidate\.itemId === shell\.cardItem\.key/
+  );
   assert.doesNotMatch(shellSource, /viewModel/);
 });
 
