@@ -110,7 +110,6 @@ tests:
 -->
 
 ---
-
 ### Requirement: Prevent direct and derived generation sources from competing
 
 Solar Player SHALL use the CL and KN source mappings as the only inputs to the derived canonical generation path and SHALL prevent legacy direct generation mappings from overwriting the derived canonical values.
@@ -195,7 +194,6 @@ tests:
 -->
 
 ---
-
 ### Requirement: Reject silent cumulative generation regressions
 
 Solar Player SHALL NOT overwrite canonical cumulative generation or the cumulative generation counter when a newly derived CL plus KN total is lower than the last accepted canonical total.
@@ -299,7 +297,6 @@ tests:
 -->
 
 ---
-
 ### Requirement: Expose independently validated factory snapshots
 
 Solar Player SHALL retain independently validated CL and KN generation snapshots for factory-scoped consumers while preserving the complete CL plus KN rule for canonical combined generation.
@@ -395,6 +392,7 @@ tests:
   - apps/server/src/mqtt/metricKeyIngestion.test.ts
 -->
 
+---
 ### Requirement: Canonical multi-factory generation is explicitly global
 
 The canonical generation values derived from complete CL and KN factory sources SHALL use `metricScope = global`. CL and KN source generation SHALL remain independently addressable under their own scopes and MUST NOT be overwritten when the global aggregate is updated.
@@ -409,6 +407,7 @@ The canonical generation values derived from complete CL and KN factory sources 
 - **THEN** it resolves the CL value rather than the global CL+KN aggregate
 - **AND** the global aggregate is used only by a contract that explicitly requests global scope
 
+---
 ### Requirement: Aggregate completeness is evaluated across scoped source identities
 
 The existing complete-both-sites and last-complete-value rules SHALL evaluate CL and KN as two explicit scoped inputs. A reading from one site MUST NOT satisfy the other site's dependency merely because both inputs share the same semantic metric key.
@@ -417,3 +416,28 @@ The existing complete-both-sites and last-complete-value rules SHALL evaluate CL
 - **WHEN** the CL source identity is current and the KN source identity is stale
 - **THEN** the global aggregate is not recomputed from CL alone
 - **AND** the last complete global value is retained according to the existing aggregation contract
+
+---
+### Requirement: Multi-factory aggregation consumes adapter-managed factory source metrics
+
+The multi-factory generation aggregate SHALL use the Solar adapter's scoped `factoryGeneration.todayMwh`, `factoryGeneration.monthMwh`, and `factoryGeneration.totalMwh` readings as its CL and KN upstream inputs. Generic direct mappings and scalar compatibility topics MUST NOT compete as alternate inputs to the canonical aggregate.
+
+#### Scenario: Both adapter-managed site summaries are current
+- **WHEN** the CL and KN adapter source metrics are finite, current, and sourced from valid factory summaries
+- **THEN** the existing complete-both-sites aggregation rules evaluate those scoped inputs
+- **AND** the global canonical generation is updated using the older of the two source timestamps as already required
+
+#### Scenario: Legacy generic factory-generation mapping is still present
+- **WHEN** a legacy or custom mapping attempts to write an adapter-owned CL or KN factory-generation source identity
+- **THEN** that mapping cannot become an enabled competing source
+- **AND** aggregate evaluation continues to use the adapter-managed scoped reading
+
+---
+### Requirement: Aggregate units remain MWh at the factory-source boundary
+
+The Solar adapter and multi-factory aggregation boundary SHALL preserve `today_mwh`, `month_mwh`, and `total_mwh` as `MWh` values. Player-facing conversions such as displaying daily generation in `kWh` SHALL occur downstream and MUST NOT alter or relabel the adapter source values.
+
+#### Scenario: CL summary reports 3.49 MWh today
+- **WHEN** the adapter projects the CL summary for aggregation
+- **THEN** `cl/factoryGeneration.todayMwh` has value `3.49` and unit `MWh`
+- **AND** downstream presentation MAY derive `3490 kWh` without rewriting the source metric as if it had arrived in kWh

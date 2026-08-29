@@ -207,6 +207,65 @@ test("GET /api/settings/mqtt/topics exposes broker status alongside topic and re
   }
 });
 
+test("GET /api/settings/mqtt/solar-sources exposes scoped managed diagnostics only to trusted readers", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const app = await buildApp();
+
+  try {
+    const trusted = await app.inject({
+      method: "GET",
+      url: "/api/settings/mqtt/solar-sources"
+    });
+    assert.equal(trusted.statusCode, 200);
+    const body = trusted.json() as {
+      sources: Array<{
+        metricScope: string;
+        ownership: string;
+        sourceTimestamp: string | null;
+        sourceTopic: string;
+      }>;
+      zones: unknown[];
+    };
+    assert.deepEqual(
+      body.sources.map(({ metricScope, ownership, sourceTimestamp, sourceTopic }) => ({
+        metricScope,
+        ownership,
+        sourceTimestamp,
+        sourceTopic
+      })),
+      [
+        {
+          metricScope: "cl",
+          ownership: "managed",
+          sourceTimestamp: null,
+          sourceTopic: "solar/CL/summary"
+        },
+        {
+          metricScope: "kn",
+          ownership: "managed",
+          sourceTimestamp: null,
+          sourceTopic: "solar/KN/summary"
+        }
+      ]
+    );
+    assert.deepEqual(body.zones, []);
+
+    const denied = await app.inject({
+      headers: {
+        host: "player.example",
+        origin: "https://evil.example"
+      },
+      method: "GET",
+      url: "/api/settings/mqtt/solar-sources"
+    });
+    assert.equal(denied.statusCode, 403);
+    assert.equal(denied.json<{ access: string }>().access, "denied");
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/settings/mqtt/topics exposes custom display names per mapping", async () => {
   migrateDatabase();
   seedDatabase();
@@ -1512,6 +1571,84 @@ test("PUT /api/settings/mqtt/topics rejects invalid scopes and duplicate scoped 
       (database.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count,
       before.count
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics rejects enabled mappings that compete with managed Solar identities", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  const before = database
+    .prepare("SELECT COUNT(*) AS count FROM topic_mappings")
+    .get() as { count: number };
+  const app = await buildApp();
+
+  try {
+    for (const mapping of [
+      {
+        enabled: true,
+        metricKey: "factoryGeneration.todayMwh",
+        metricScope: "cl",
+        topic: "custom/cl/today"
+      },
+      {
+        enabled: true,
+        metricKey: "solarZone.12.powerKw",
+        metricScope: "kn",
+        topic: "custom/kn/zone-12-power"
+      }
+    ]) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/api/settings/mqtt/topics",
+        payload: { topics: [mapping] }
+      });
+
+      assert.equal(response.statusCode, 409);
+      assert.equal(
+        response.json<{ code: string }>().code,
+        "MANAGED_SOURCE_METRIC_CONFLICT"
+      );
+    }
+    assert.equal(
+      (database.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count,
+      before.count
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics allows unrelated and disabled legacy Solar mappings", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            enabled: true,
+            metricKey: "customInverterTemperature",
+            metricScope: "cl",
+            topic: "custom/cl/inverter-temperature"
+          },
+          {
+            enabled: false,
+            metricKey: "factoryGeneration.todayMwh",
+            metricScope: "kn",
+            topic: "legacy/kn/today"
+          }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
   } finally {
     await app.close();
   }

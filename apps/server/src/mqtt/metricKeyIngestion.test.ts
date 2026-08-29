@@ -91,6 +91,49 @@ test("enabled topic mapping ingests under its metric_key without a metric_key wh
   }
 });
 
+test("managed adapter rejection does not block an unrelated generic Solar mapping", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES ('cl', 'customSolarDiagnostic', 'solar/XX/summary', 'count', '$.value', 1, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run();
+
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "solar/XX/summary", Buffer.from(JSON.stringify({ value: 42 })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'customSolarDiagnostic'").pluck().get(),
+      42
+    );
+    assert.deepEqual(service.readSolarSourceManagementSnapshot().errors, [{
+      code: "unsupported-site",
+      message: "Unsupported Solar site: XX",
+      observedAt: service.readSolarSourceManagementSnapshot().errors[0]?.observedAt,
+      sourceTopic: "solar/XX/summary"
+    }]);
+  } finally {
+    await service.disconnect();
+  }
+});
+
 test("one MQTT topic persists CL and KN mappings with the same semantic key independently", async () => {
   migrateDatabase();
   seedDatabase();
@@ -132,27 +175,7 @@ test("CL and KN summaries produce canonical generation while a disabled legacy d
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("UPDATE mqtt_settings SET message_timeout = 60, data_mode = 'mqtt'").run();
-  database.prepare("DELETE FROM topic_mappings WHERE metric_key = 'totalGeneration'").run();
-  database.prepare(`
-    INSERT INTO topic_mappings
-      (metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, 'MWh', '$.today_mwh', 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `).run("cl", "factoryGeneration.todayMwh", "solar/CL/summary");
-  database.prepare(`
-    INSERT INTO topic_mappings
-      (metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, 'MWh', '$.today_mwh', 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `).run("kn", "factoryGeneration.todayMwh", "solar/KN/summary");
-  for (const [scope, field] of [
-    ["cl", "month_mwh"], ["cl", "total_mwh"],
-    ["kn", "month_mwh"], ["kn", "total_mwh"]
-  ] as const) {
-    database.prepare(`
-      INSERT INTO topic_mappings
-        (metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).run(scope, `factoryGeneration.${field.replace("_mwh", "Mwh")}`, `solar/${scope.toUpperCase()}/summary`, `$.${field}`);
-  }
+  database.prepare("DELETE FROM topic_mappings").run();
   database.prepare(`
     INSERT INTO topic_mappings (
       metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
@@ -190,18 +213,22 @@ test("CL and KN summaries produce canonical generation while a disabled legacy d
   try {
     await service.connect();
     client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
       today_mwh: 3.49,
       month_mwh: 366.93,
       total_mwh: 9986.306,
+      total_power_kw: 120.5,
       timestamp: clTimestamp
     })));
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").get(), undefined);
 
     client.emit("message", "solar/KN/summary", Buffer.from(JSON.stringify({
+      factory: "KN",
       today_mwh: 2.92,
       month_mwh: 265.77,
       total_mwh: 3659.570,
+      total_power_kw: 98.2,
       timestamp: knTimestamp
     })));
     await new Promise((resolve) => setImmediate(resolve));
@@ -226,14 +253,20 @@ test("CL and KN summaries produce canonical generation while a disabled legacy d
     );
 
     client.emit("message", "legacy/solar/total", Buffer.from(JSON.stringify({ value: 999999999 })));
+    client.emit("message", "solar/CL/today_mwh", Buffer.from(JSON.stringify({ value: 999999999 })));
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(
       database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
       13645.876
     );
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.todayMwh'").pluck().get(),
+      3.49
+    );
     assert.deepEqual(circuitMetricEvents, [
       {
         metricKeys: [
+          "factoryGeneration.powerKw",
           "factoryGeneration.todayMwh",
           "factoryGeneration.monthMwh",
           "factoryGeneration.totalMwh"
@@ -242,6 +275,7 @@ test("CL and KN summaries produce canonical generation while a disabled legacy d
       },
       {
         metricKeys: [
+          "factoryGeneration.powerKw",
           "factoryGeneration.todayMwh",
           "factoryGeneration.monthMwh",
           "factoryGeneration.totalMwh"
@@ -249,6 +283,76 @@ test("CL and KN summaries produce canonical generation while a disabled legacy d
         metricScope: "kn"
       }
     ]);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("managed CL and KN summaries update canonical generation without generic mappings", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("UPDATE mqtt_settings SET message_timeout = 60, data_mode = 'mqtt'").run();
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    }
+  });
+  const clTimestamp = new Date(Date.now() - 10_000).toISOString();
+  const knTimestamp = new Date(Date.now() - 20_000).toISOString();
+
+  try {
+    await service.connect();
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
+      month_mwh: 366.93,
+      timestamp: clTimestamp,
+      today_mwh: 3.49,
+      total_mwh: 9986.306,
+      total_power_kw: 120.5
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").get(),
+      undefined
+    );
+
+    client.emit("message", "solar/KN/summary", Buffer.from(JSON.stringify({
+      factory: "KN",
+      month_mwh: 265.77,
+      timestamp: knTimestamp,
+      today_mwh: 2.92,
+      total_mwh: 3659.57,
+      total_power_kw: 98.2
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(
+      database.prepare(`
+        SELECT metric_key, value, unit, timestamp
+        FROM live_metric_values
+        WHERE metric_scope = 'global'
+          AND metric_key IN ('todayGeneration', 'monthGeneration', 'totalGeneration')
+        ORDER BY metric_key
+      `).all(),
+      [
+        { metric_key: "monthGeneration", timestamp: knTimestamp, unit: "MWh", value: 632.7 },
+        { metric_key: "todayGeneration", timestamp: knTimestamp, unit: "MWh", value: 6.41 },
+        { metric_key: "totalGeneration", timestamp: knTimestamp, unit: "MWh", value: 13645.876 }
+      ]
+    );
   } finally {
     await service.disconnect();
   }
@@ -325,16 +429,6 @@ test("factory generation summary publishes playback sync when fresh data replace
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM topic_mappings").run();
   database.prepare("UPDATE mqtt_settings SET message_timeout = 60, data_mode = 'mqtt'").run();
-  const insertTopicMapping = database.prepare(
-    `
-      INSERT INTO topic_mappings (
-      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
-    ) VALUES ('cl', ?, 'solar/CL/summary', 'MWh', ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `
-  );
-  insertTopicMapping.run("factoryGeneration.cl.todayMwh", "$.today_mwh");
-  insertTopicMapping.run("factoryGeneration.cl.monthMwh", "$.month_mwh");
-  insertTopicMapping.run("factoryGeneration.cl.totalMwh", "$.total_mwh");
   const client = new FakeMqttClient();
   const displaySyncEvents: Array<Pick<DisplaySyncEvent, "reason" | "scope">> = [];
   const service = new MqttClientService({
@@ -364,19 +458,23 @@ test("factory generation summary publishes playback sync when fresh data replace
   try {
     await service.connect();
     client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
       month_mwh: 2345,
       timestamp: new Date(Date.now() - 120_000).toISOString(),
       today_mwh: 123.4,
-      total_mwh: 45678
+      total_mwh: 45678,
+      total_power_kw: 120.5
     })));
     await new Promise((resolve) => setImmediate(resolve));
     displaySyncEvents.length = 0;
 
     client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
       month_mwh: 2345,
       timestamp: new Date().toISOString(),
       today_mwh: 123.4,
-      total_mwh: 45678
+      total_mwh: 45678,
+      total_power_kw: 120.5
     })));
     await new Promise((resolve) => setImmediate(resolve));
 

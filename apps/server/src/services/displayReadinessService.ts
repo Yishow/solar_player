@@ -195,39 +195,9 @@ function buildMetricFindings(
         };
       }
       const requiredScopes: SiteScope[] = scope === "CL+KN" ? ["cl", "kn"] : [scope.toLowerCase() as SiteScope];
-      const sourceMappings = requiredScopes.flatMap((metricScope) =>
-        ["todayMwh", "monthMwh", "totalMwh"].map((suffix) => {
-          const metricKey = `factoryGeneration.${suffix}`;
-          return { metricKey: `${metricScope}:${metricKey}`, mapping: readMapping(metricScope, metricKey) };
-        })
-      );
-      const sourceMappingsAvailable = sourceMappings.every(
-        ({ mapping }) =>
-          Boolean(mapping && toBoolean(mapping.enabled) && (mapping.topic?.trim().length ?? 0) > 0)
-      );
-      const sourceTopics = [
-        ...new Set(
-          sourceMappings
-            .map(({ mapping }) => mapping?.topic?.trim())
-            .filter((topic): topic is string => Boolean(topic))
-        )
-      ].join(", ");
-      if (!sourceMappingsAvailable) {
-        const missingKeys = sourceMappings
-          .filter(({ mapping }) => !mapping || !toBoolean(mapping.enabled) || !mapping.topic?.trim())
-          .map(({ metricKey }) => metricKey)
-          .join(", ");
-        return {
-          blocking: true,
-          metricScope,
-          pageId: requirement.pageId,
-          reason: `missing CL/KN MQTT mapping: ${missingKeys}`,
-          requirementKey: requirement.requirementKey,
-          sourceId: sourceTopics || null,
-          sourceType: requirement.sourceType,
-          status: "blocking"
-        };
-      }
+      const sourceTopics = requiredScopes
+        .map((requiredScope) => `solar/${requiredScope.toUpperCase()}/summary`)
+        .join(", ");
 
       const scopedEvaluation = scope === "CL+KN"
         ? aggregate

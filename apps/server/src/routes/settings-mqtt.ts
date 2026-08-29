@@ -5,6 +5,7 @@ import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
+import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -432,6 +433,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.get("/api/settings/mqtt/solar-sources", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    return app.mqttClientService.readSolarSourceManagementSnapshot();
+  });
+
   app.post<{ Body: ResetFactoryGenerationBaselineBody }>(
     "/api/settings/mqtt/factory-generation/reset-baseline",
     async (request, reply) => {
@@ -566,6 +575,16 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       if (!isMetricScope(metricScope)) {
         return reply.status(400).send({
           code: "INVALID_METRIC_SCOPE",
+          success: false
+        });
+      }
+      if (
+        topic.enabled !== false
+        && isSolarAdapterManagedMetricIdentity(metricScope, topic.metricKey)
+      ) {
+        return reply.status(409).send({
+          code: "MANAGED_SOURCE_METRIC_CONFLICT",
+          error: `Metric identity is managed by the Solar source adapter: ${metricScope}:${topic.metricKey}`,
           success: false
         });
       }

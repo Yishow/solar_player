@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+import Database from "better-sqlite3";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-cl-kn-topics-test-"));
 process.env.DATA_DIR = tempDir;
@@ -19,7 +20,7 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
-test("025 migration installs CL and KN summary source mappings without enabled direct generation mappings", () => {
+test("managed Solar adapter migration removes legacy CL and KN summary source mappings", () => {
   migrateDatabase();
   seedDatabase();
   migrateDatabase();
@@ -36,14 +37,7 @@ test("025 migration installs CL and KN summary source mappings without enabled d
     )
     .all();
 
-  assert.deepEqual(rows, [
-    { metric_scope: "cl", metric_key: "factoryGeneration.monthMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_scope: "kn", metric_key: "factoryGeneration.monthMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.month_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_scope: "cl", metric_key: "factoryGeneration.todayMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_scope: "kn", metric_key: "factoryGeneration.todayMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.today_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_scope: "cl", metric_key: "factoryGeneration.totalMwh", topic: "solar/CL/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 },
-    { metric_scope: "kn", metric_key: "factoryGeneration.totalMwh", topic: "solar/KN/summary", unit: "MWh", value_path: "$.total_mwh", multiplier: 1, decimal_places: 3, enabled: 1 }
-  ]);
+  assert.deepEqual(rows, []);
 
   const enabledDirectMappings = getDatabase()
     .prepare(
@@ -62,4 +56,38 @@ test("025 migration installs CL and KN summary source mappings without enabled d
     )
     .all();
   assert.deepEqual(enabledDirectMappings, []);
+});
+
+test("managed Solar migration preserves custom and disabled operator mappings", () => {
+  const database = new Database(":memory:");
+  database.exec(`
+    CREATE TABLE topic_mappings (
+      metric_scope TEXT NOT NULL,
+      metric_key TEXT NOT NULL,
+      topic TEXT,
+      value_path TEXT,
+      enabled INTEGER NOT NULL
+    );
+    INSERT INTO topic_mappings VALUES
+      ('cl', 'factoryGeneration.todayMwh', 'solar/CL/summary', '$.today_mwh', 1),
+      ('kn', 'factoryGeneration.totalMwh', 'custom/kn/total', '$.value', 1),
+      ('cl', 'solarZone.12.powerKw', 'custom/cl/zone/12', '$.value', 0);
+  `);
+
+  try {
+    database.exec(readFileSync(
+      join(import.meta.dirname, "036_remove_managed_solar_topic_mappings.sql"),
+      "utf8"
+    ));
+
+    assert.deepEqual(
+      database.prepare("SELECT metric_scope, metric_key, topic, enabled FROM topic_mappings ORDER BY topic").all(),
+      [
+        { enabled: 0, metric_key: "solarZone.12.powerKw", metric_scope: "cl", topic: "custom/cl/zone/12" },
+        { enabled: 0, metric_key: "factoryGeneration.totalMwh", metric_scope: "kn", topic: "custom/kn/total" }
+      ]
+    );
+  } finally {
+    database.close();
+  }
 });

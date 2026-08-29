@@ -12,8 +12,10 @@ class FakeMqttClient extends EventEmitter {
   publishError: Error | null = null;
   subscribeError: Error | null = null;
   published: Array<{ topic: string; payload: string }> = [];
+  subscriptions: string[][] = [];
 
-  subscribe(_topics: string[], callback: (error?: Error | null) => void) {
+  subscribe(topics: string[], callback: (error?: Error | null) => void) {
+    this.subscriptions.push([...topics]);
     queueMicrotask(() => callback(this.subscribeError));
     return this;
   }
@@ -34,6 +36,63 @@ class FakeMqttClient extends EventEmitter {
     return this;
   }
 }
+
+test("managed source filters share the generic MQTT connection and resubscribe after reconnect", async () => {
+  const client = new FakeMqttClient();
+  const handledMessages: Array<{ payload: string; topic: string }> = [];
+  const adapterFilters = [
+    "solar/+/summary",
+    "solar/+/zone/+",
+    "solar/+/status",
+    "solar/+/heartbeat",
+    "solar/+/alert"
+  ];
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database: createDatabase(),
+    logger: {
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined
+    },
+    managedSourceAdapters: [{
+      handleMessage(topic: string, payload: string) {
+        handledMessages.push({ payload, topic });
+      },
+      subscriptionFilters: adapterFilters
+    }]
+  });
+
+  try {
+    await service.connect();
+    assert.deepEqual(
+      client.subscriptions.at(-1)?.sort(),
+      ["kuozui/plant/solar/power", ...adapterFilters].sort()
+    );
+    const initialSubscriptionCount = client.subscriptions.length;
+
+    client.emit("message", "solar/CL/status", Buffer.from('{"status":"online"}'));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(handledMessages, [{
+      payload: '{"status":"online"}',
+      topic: "solar/CL/status"
+    }]);
+
+    client.emit("reconnect");
+    client.emit("connect");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(
+      client.subscriptions.at(-1)?.sort(),
+      ["kuozui/plant/solar/power", ...adapterFilters].sort()
+    );
+    assert.equal(client.subscriptions.length, initialSubscriptionCount + 1);
+  } finally {
+    await service.disconnect();
+  }
+});
 
 function createDatabase(options?: {
   clientId?: string;

@@ -19,7 +19,12 @@ import {
 } from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
 import { updateFactoryGenerationAggregate } from "../services/factoryGenerationAggregateService.js";
+import type { ManagedSourceAdapter } from "./ManagedSourceAdapter.js";
 import { parse } from "./PayloadParser.js";
+import {
+  SolarSourceAdapter,
+  type SolarMetricMessage
+} from "./SolarSourceAdapter.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "./settings-source.js";
 
 type LoggerLike = {
@@ -61,6 +66,7 @@ type MqttClientServiceOptions = {
   database?: Database.Database;
   generatedClientIdFn?: () => string;
   connectFn?: ConnectFunction;
+  managedSourceAdapters?: readonly ManagedSourceAdapter[];
   runtimeProcessAliveFn?: ProcessAliveFunction;
   socketService?: Pick<
     SocketService,
@@ -194,6 +200,26 @@ function disconnectClient(client: MqttClient) {
   });
 }
 
+function matchesMqttTopicFilter(filter: string, topic: string) {
+  const filterLevels = filter.split("/");
+  const topicLevels = topic.split("/");
+
+  for (let index = 0; index < filterLevels.length; index += 1) {
+    const filterLevel = filterLevels[index];
+    if (filterLevel === "#") {
+      return index === filterLevels.length - 1;
+    }
+    if (topicLevels[index] === undefined) {
+      return false;
+    }
+    if (filterLevel !== "+" && filterLevel !== topicLevels[index]) {
+      return false;
+    }
+  }
+
+  return filterLevels.length === topicLevels.length;
+}
+
 function hasPayloadTimestamp(rawPayload: string) {
   try {
     return typeof (JSON.parse(rawPayload) as { timestamp?: unknown }).timestamp === "string";
@@ -245,6 +271,8 @@ export class MqttClientService {
   private readonly logger: LoggerLike;
   private readonly connectFn: ConnectFunction;
   private readonly generatedClientIdFn: () => string;
+  private readonly managedSourceAdapters: readonly ManagedSourceAdapter[];
+  private readonly solarSourceAdapter: SolarSourceAdapter | null;
   private readonly runtimeProcessAliveFn: ProcessAliveFunction;
   private readonly socketService: MqttClientServiceOptions["socketService"];
   private readonly runtimeLeaseOwnerToken = `${process.pid}-${randomBytes(4).toString("hex")}`;
@@ -268,11 +296,19 @@ export class MqttClientService {
     this.database = options.database ?? getDatabase();
     this.logger = options.logger;
     this.connectFn = options.connectFn ?? connect;
+    this.socketService = options.socketService;
     this.generatedClientIdFn =
       options.generatedClientIdFn
       ?? (() => `${RUNTIME_CLIENT_ID_PREFIX}${randomBytes(4).toString("hex")}`);
+    this.managedSourceAdapters = options.managedSourceAdapters
+      ?? [new SolarSourceAdapter({
+        database: this.database,
+        onMetricsPersisted: (message) => this.handleManagedSourceMetricsPersisted(message)
+      })];
+    this.solarSourceAdapter = this.managedSourceAdapters.find(
+      (adapter): adapter is SolarSourceAdapter => adapter instanceof SolarSourceAdapter
+    ) ?? null;
     this.runtimeProcessAliveFn = options.runtimeProcessAliveFn ?? isProcessAlive;
-    this.socketService = options.socketService;
   }
 
   async connect() {
@@ -286,7 +322,7 @@ export class MqttClientService {
       reason: settings.data_mode === "mock" ? "mock" : "offline",
       updatedAt: new Date().toISOString()
     };
-    this.desiredTopics = new Set(await this.loadEnabledTopics());
+    this.desiredTopics = this.buildDesiredTopics(await this.loadEnabledTopics());
     this.publishStatus();
 
     if (settings.data_mode === "mock") {
@@ -374,9 +410,7 @@ export class MqttClientService {
   }
 
   async subscribe(topics: string[]) {
-    this.desiredTopics = new Set(
-      topics.map((topic) => topic.trim()).filter((topic) => topic.length > 0)
-    );
+    this.desiredTopics = this.buildDesiredTopics(topics);
 
     if (this.mockMode || !this.client || !this.status.connected) {
       return;
@@ -414,6 +448,14 @@ export class MqttClientService {
   getStatus(): MqttStatus {
     return {
       ...this.status
+    };
+  }
+
+  readSolarSourceManagementSnapshot() {
+    return {
+      errors: this.solarSourceAdapter?.readContractErrors() ?? [],
+      sources: this.solarSourceAdapter?.readSourceDiagnostics() ?? [],
+      zones: this.solarSourceAdapter?.readDiscoveredZones() ?? []
     };
   }
 
@@ -716,6 +758,7 @@ export class MqttClientService {
       });
     });
     client.on("reconnect", () => {
+      this.activeTopics.clear();
       this.setStatus({
         connected: false,
         reason: "reconnecting"
@@ -825,7 +868,35 @@ export class MqttClientService {
     return rows.map((row) => row.topic);
   }
 
+  private buildDesiredTopics(genericTopics: readonly string[]) {
+    return new Set(
+      [
+        ...genericTopics,
+        ...this.managedSourceAdapters.flatMap(({ subscriptionFilters }) => subscriptionFilters)
+      ]
+        .map((topic) => topic.trim())
+        .filter((topic) => topic.length > 0)
+    );
+  }
+
   private async handleMessage(topic: string, rawPayload: string) {
+    await Promise.all(
+      this.managedSourceAdapters
+        .filter(({ subscriptionFilters }) =>
+          subscriptionFilters.some((filter) => matchesMqttTopicFilter(filter, topic))
+        )
+        .map(async (adapter) => {
+          try {
+            await adapter.handleMessage(topic, rawPayload);
+          } catch (error) {
+            this.logger.warn(
+              { error, topic },
+              "Managed source adapter rejected MQTT payload"
+            );
+          }
+        })
+    );
+
     const mappings = this.database
       .prepare(
         `
@@ -957,6 +1028,42 @@ export class MqttClientService {
       });
     }
 
+  }
+
+  private handleManagedSourceMetricsPersisted(message: SolarMetricMessage) {
+    const sourceSnapshot = readAuthoritativeScopedLiveMetricsSnapshot(
+      message.metricScope,
+      this.database
+    );
+    this.socketService?.emitLiveMetrics(message.metricScope, sourceSnapshot);
+    const circuitMetrics = this.buildCircuitMetricsSnapshot(
+      sourceSnapshot,
+      message.readings.map(({ metricKey }) => metricKey)
+    );
+    if (circuitMetrics !== null) {
+      this.socketService?.emitCircuitMetrics(message.metricScope, circuitMetrics);
+    }
+
+    if (message.sourceType !== "summary") {
+      return;
+    }
+    const aggregateStatus = updateFactoryGenerationAggregate(this.database);
+    if (aggregateStatus.state === "ready") {
+      this.socketService?.emitLiveMetrics(
+        "global",
+        readAuthoritativeScopedLiveMetricsSnapshot("global", this.database)
+      );
+    } else {
+      this.logger.warn(
+        { issues: aggregateStatus.issues, state: aggregateStatus.state },
+        "CL+KN generation aggregate is not ready"
+      );
+    }
+    this.socketService?.emitDisplaySync({
+      generatedAt: new Date().toISOString(),
+      reason: "mqtt-factory-generation-updated",
+      scope: "mqtt"
+    });
   }
 
   private buildCircuitMetricsSnapshot(
