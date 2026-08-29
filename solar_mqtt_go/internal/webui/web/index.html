@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar MQTT Web Console - 雙廠發電量監控</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-icon" role="img" aria-label="Solar">☀️</span>
+      <div class="topbar-title-group">
+        <h1>Solar MQTT Web Console <span class="badge badge-subtle">KN & CL</span></h1>
+        <p>即時發電數據採集・分區監控・全域設定維運</p>
+      </div>
+    </div>
+    <div class="topbar-controls">
+      <div class="btn-group" role="group" aria-label="版面配置切換">
+        <button id="layout-split-btn" class="toggle-btn active" type="button" title="雙欄並排模式">⊞ 雙欄</button>
+        <button id="layout-tabs-btn" class="toggle-btn" type="button" title="單廠分頁模式">◫ 分頁</button>
+      </div>
+      <button id="theme-toggle-btn" class="icon-btn" type="button" title="切換深色/淺色主題">🌙 深色</button>
+      <button id="operations-toggle-btn" class="icon-btn icon-btn--primary" type="button" title="開啟連線與維運設定">⚙️ 維運設定</button>
+    </div>
+  </header>
+  <main id="console-layout" class="console-layout" data-layout="split">
+    <section id="summary-panel" class="summary-strip">
+      <div class="summary-item">
+        <span class="summary-label">即時總發電功率</span>
+        <strong id="summary-total-power">-- kW</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">雙廠今日發電</span>
+        <strong id="summary-today-mwh">-- MWh</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">雙廠本月發電</span>
+        <strong id="summary-month-mwh">-- MWh</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">歷史累積總發電</span>
+        <strong id="summary-total-mwh">-- MWh</strong>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">MQTT 連線狀態</span>
+        <strong id="summary-mqtt-status">Disconnected</strong>
+      </div>
+    </section>
+    <nav id="factory-tabs-nav" class="factory-tabs-nav" aria-label="廠區切換">
+      <button id="tab-btn-kn" class="tab-btn active" type="button" data-factory="KN">🏢 KN 觀音廠</button>
+      <button id="tab-btn-cl" class="tab-btn" type="button" data-factory="CL">🏢 CL 中壢廠</button>
+    </nav>
+    <section id="monitoring-panel" class="monitoring-grid">
+      <article id="factory-panel-kn" class="factory-panel active-tab" data-factory="KN">
+        <div class="factory-header">
+          <div class="factory-title-group">
+            <h2>KN 觀音廠 <small style="font-size:12px;font-weight:normal;color:var(--text-dim);">(192.168.80.5)</small></h2>
+            <span id="factory-status-kn" class="factory-status" data-state="idle">No Data</span>
+          </div>
+          <div class="factory-meta">
+            <button id="scrape-now-btn-kn" class="icon-btn icon-btn--small" type="button" title="立即對 KN 抓取一輪">🔄 立即擷取</button>
+            <button id="export-csv-btn-kn" class="icon-btn icon-btn--small" type="button" title="匯出分區資料 CSV">📊 匯出 CSV</button>
+            <span id="factory-updated-kn" class="factory-updated">Never</span>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card" data-kpi="power">
+            <span class="kpi-label">⚡ 即時總功率</span>
+            <div class="kpi-value-group">
+              <span id="kpi-power-kn" class="kpi-value">--</span>
+              <span class="kpi-unit">kW</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="today">
+            <span class="kpi-label">☀️ 今日發電量</span>
+            <div class="kpi-value-group">
+              <span id="kpi-today-kn" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="month">
+            <span class="kpi-label">📅 本月發電量</span>
+            <div class="kpi-value-group">
+              <span id="kpi-month-kn" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="total">
+            <span class="kpi-label">📈 歷史累積發電</span>
+            <div class="kpi-value-group">
+              <span id="kpi-total-kn" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+        </div>
+        <div class="zone-section">
+          <div class="zone-header">
+            <h3>分區發電明細</h3>
+            <span id="zone-count-kn" class="zone-count-badge">0 分區</span>
+          </div>
+          <div class="zone-table-container">
+            <table class="zone-table">
+              <thead>
+                <tr>
+                  <th class="col-id">Zone</th>
+                  <th class="col-name">區域名稱</th>
+                  <th class="col-num">即時功率 (kW)</th>
+                  <th class="col-num">今日發電 (kWh)</th>
+                  <th class="col-num">本月發電 (MWh)</th>
+                  <th class="col-num">歷史累積 (MWh)</th>
+                  <th class="col-num">裝置容量 (kWp)</th>
+                  <th class="col-num">等效時數 (h)</th>
+                </tr>
+              </thead>
+              <tbody id="zone-tbody-kn">
+                <tr><td colspan="8" class="empty-state">尚無分區資料</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <details class="telemetry-details">
+          <summary><span>📡 MQTT 主題與資料流對照</span><span class="summary-arrow">▾</span></summary>
+          <div class="telemetry-body">
+            <div class="quick-command-box">
+              <code id="quick-sub-cmd-kn">mosquitto_sub -h localhost -p 1883 -v</code>
+              <button class="copy-btn" type="button" data-copy-target="quick-sub-cmd-kn">複製指令</button>
+            </div>
+            <div id="factory-highlights-kn" class="topic-list-container"></div>
+          </div>
+        </details>
+      </article>
+      <article id="factory-panel-cl" class="factory-panel" data-factory="CL">
+        <div class="factory-header">
+          <div class="factory-title-group">
+            <h2>CL 中壢廠 <small style="font-size:12px;font-weight:normal;color:var(--text-dim);">(192.168.17.182)</small></h2>
+            <span id="factory-status-cl" class="factory-status" data-state="idle">No Data</span>
+          </div>
+          <div class="factory-meta">
+            <button id="scrape-now-btn-cl" class="icon-btn icon-btn--small" type="button" title="立即對 CL 抓取一輪">🔄 立即擷取</button>
+            <button id="export-csv-btn-cl" class="icon-btn icon-btn--small" type="button" title="匯出分區資料 CSV">📊 匯出 CSV</button>
+            <span id="factory-updated-cl" class="factory-updated">Never</span>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card" data-kpi="power">
+            <span class="kpi-label">⚡ 即時總功率</span>
+            <div class="kpi-value-group">
+              <span id="kpi-power-cl" class="kpi-value">--</span>
+              <span class="kpi-unit">kW</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="today">
+            <span class="kpi-label">☀️ 今日發電量</span>
+            <div class="kpi-value-group">
+              <span id="kpi-today-cl" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="month">
+            <span class="kpi-label">📅 本月發電量</span>
+            <div class="kpi-value-group">
+              <span id="kpi-month-cl" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+          <div class="kpi-card" data-kpi="total">
+            <span class="kpi-label">📈 歷史累積發電</span>
+            <div class="kpi-value-group">
+              <span id="kpi-total-cl" class="kpi-value">--</span>
+              <span class="kpi-unit">MWh</span>
+            </div>
+          </div>
+        </div>
+        <div class="zone-section">
+          <div class="zone-header">
+            <h3>分區發電明細</h3>
+            <span id="zone-count-cl" class="zone-count-badge">0 分區</span>
+          </div>
+          <div class="zone-table-container">
+            <table class="zone-table">
+              <thead>
+                <tr>
+                  <th class="col-id">Zone</th>
+                  <th class="col-name">區域名稱</th>
+                  <th class="col-num">即時功率 (kW)</th>
+                  <th class="col-num">今日發電 (kWh)</th>
+                  <th class="col-num">本月發電 (MWh)</th>
+                  <th class="col-num">歷史累積 (MWh)</th>
+                  <th class="col-num">裝置容量 (kWp)</th>
+                  <th class="col-num">等效時數 (h)</th>
+                </tr>
+              </thead>
+              <tbody id="zone-tbody-cl">
+                <tr><td colspan="8" class="empty-state">尚無分區資料</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <details class="telemetry-details">
+          <summary><span>📡 MQTT 主題與資料流對照</span><span class="summary-arrow">▾</span></summary>
+          <div class="telemetry-body">
+            <div class="quick-command-box">
+              <code id="quick-sub-cmd-cl">mosquitto_sub -h localhost -p 1883 -v</code>
+              <button class="copy-btn" type="button" data-copy-target="quick-sub-cmd-cl">複製指令</button>
+            </div>
+            <div id="factory-highlights-cl" class="topic-list-container"></div>
+          </div>
+        </details>
+      </article>
+    </section>
+    <section id="mqtt-subscriptions" class="panel mqtt-subscriptions" aria-labelledby="mqtt-subscriptions-title">
+      <h2 id="mqtt-subscriptions-title">MQTT Subscriptions</h2>
+      <div class="mqtt-subscriptions__grid">
+        <article id="mqtt-subscriptions-kn" class="mqtt-subscriptions__factory">
+          <h3>KN 觀音廠</h3>
+          <span data-subscription-status="KN" data-subscription-state="not-subscribed">not-subscribed</span>
+          <ul data-subscription-list="KN" class="mqtt-subscriptions__list"></ul>
+        </article>
+        <article id="mqtt-subscriptions-cl" class="mqtt-subscriptions__factory">
+          <h3>CL 中壢廠</h3>
+          <span data-subscription-status="CL" data-subscription-state="not-subscribed">not-subscribed</span>
+          <ul data-subscription-list="CL" class="mqtt-subscriptions__list"></ul>
+        </article>
+      </div>
+    </section>
+  </main>
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="operations-drawer" class="operations-drawer" aria-label="Operations & Settings">
+    <div class="drawer-header">
+      <div>
+        <h2>⚙️ 維運與設定控制台</h2>
+        <p style="margin:2px 0 0;font-size:11px;color:var(--text-dim);">本機設定檔・連線診斷・遠端控制・日誌</p>
+      </div>
+      <button id="drawer-close-btn" class="drawer-close-btn" type="button" title="關閉">✕</button>
+    </div>
+    <nav class="drawer-tabs" aria-label="維運模組切換">
+      <button class="drawer-nav-btn active" type="button" data-target-section="drawer-section-factories">🏢 廠區與連線</button>
+      <button class="drawer-nav-btn" type="button" data-target-section="drawer-section-rawjson">📝 完整 JSON</button>
+      <button class="drawer-nav-btn" type="button" data-target-section="drawer-section-broker">📡 MQTT Broker</button>
+      <button class="drawer-nav-btn" type="button" data-target-section="drawer-section-remote">🎛️ 遠端參數</button>
+      <button class="drawer-nav-btn" type="button" data-target-section="drawer-section-logs">📋 即時日誌</button>
+    </nav>
+    <div class="drawer-body">
+      <div id="drawer-section-factories" class="drawer-tab-section">
+        <div class="operations-module">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>🏢 廠區 IP 與連線管理</h3>
+            <div style="display:flex;gap:6px;">
+              <button id="local-add-factory-btn" class="icon-btn icon-btn--small" type="button">➕ 新增廠區</button>
+              <button id="local-config-load-btn" class="icon-btn icon-btn--small" type="button">📥 讀取</button>
+              <button id="local-config-save-btn" class="icon-btn icon-btn--small icon-btn--success" type="button">💾 儲存生效</button>
+            </div>
+          </div>
+          <span id="local-config-status" class="status-text" style="font-size:11px;color:var(--text-dim);margin-top:-4px;">載入本機設定中...</span>
+          <div id="local-factories-container" style="margin-top:6px;"></div>
+          <fieldset style="margin-top:8px;">
+            <legend>⚙️ 全域採集參數 (Global Parameters)</legend>
+            <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:8px;">
+              <label class="local-field-row">
+                <span>⏱️ 採集週期 (秒)</span>
+                <input id="local-global-interval" type="number" min="1" value="60">
+              </label>
+              <label class="local-field-row">
+                <span>❤️ 心跳週期 (秒)</span>
+                <input id="local-global-heartbeat" type="number" min="1" value="30">
+              </label>
+              <label class="local-field-row">
+                <span>⚠️ 歸零警戒 (分)</span>
+                <input id="local-global-zeromin" type="number" min="1" value="5">
+              </label>
+              <label class="local-field-row" style="justify-content:center;">
+                <span style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;cursor:pointer;">
+                  <input id="local-global-nightpause" type="checkbox"> 🌙 夜間暫停
+                </span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+      <div id="drawer-section-rawjson" class="drawer-tab-section" hidden>
+        <div class="operations-module">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>📄 solar_config.json 原生編輯</h3>
+            <div style="display:flex;gap:6px;">
+              <button id="local-format-json-btn" class="icon-btn icon-btn--small" type="button">✨ 格式化排版</button>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0;">直接編輯完整的 JSON 結構，點擊「儲存生效」將直接寫入本機磁碟檔案。</p>
+          <textarea id="local-raw-json-textarea" class="code-editor" rows="18" spellcheck="false" placeholder="{}"></textarea>
+        </div>
+      </div>
+      <div id="drawer-section-broker" class="drawer-tab-section" hidden>
+        <div id="broker-module" class="operations-module">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>🌐 MQTT Broker 連線</h3>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span id="broker-status" class="factory-status" data-state="disconnected">Disconnected</span>
+            </div>
+          </div>
+          <span id="broker-status-text" class="status-text" style="font-size:11px;color:var(--text-dim);margin-top:-6px;">Disconnected</span>
+          <form id="broker-form" class="stack">
+            <label><span>Host</span><input id="broker-host" name="brokerHost" value="localhost" autocomplete="off"></label>
+            <label><span>WebSocket Port</span><input id="broker-port" name="brokerPort" type="number" min="1" value="8884"></label>
+            <label><span>Username</span><input id="broker-username" name="brokerUsername" autocomplete="off"></label>
+            <label><span>Password</span><input id="broker-password" name="brokerPassword" type="password" autocomplete="off"></label>
+            <label><span>Client ID</span><input id="client-id" name="clientId" autocomplete="off"></label>
+            <label><span>Active Prefix</span><input id="active-prefix" name="activePrefix" value="solar" autocomplete="off"></label>
+            <div class="actions" style="display:flex;gap:8px;margin-top:6px;">
+              <button id="connect-broker" class="icon-btn icon-btn--primary" type="submit">連線 (Connect)</button>
+              <button id="disconnect-broker" class="icon-btn" type="button">中斷 (Disconnect)</button>
+            </div>
+          </form>
+          <div class="status-legend" aria-label="Connection states">
+            <span data-state="disconnected">Disconnected</span>
+            <span data-state="connecting">Connecting</span>
+            <span data-state="connected">Connected</span>
+            <span data-state="reconnecting">Reconnecting</span>
+            <span data-state="error">Error</span>
+          </div>
+        </div>
+      </div>
+      <div id="drawer-section-remote" class="drawer-tab-section" hidden>
+        <div id="settings-module" class="operations-module">
+          <h3>🎛️ 遠端參數設定 (MQTT Control)</h3>
+          <div class="toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="selected-factory" name="selectedFactory">
+              <option value="KN">KN 觀音廠</option>
+              <option value="CL">CL 中壢廠</option>
+            </select>
+            <button id="load-config" class="icon-btn" type="button">載入設定</button>
+            <button id="save-config" class="icon-btn icon-btn--success" type="submit" form="config-form">發送變更</button>
+          </div>
+          <div class="config-mode-toggle">
+            <button id="config-mode-form-btn" class="tab-btn active" type="button" style="padding:3px 8px;font-size:11px;">📋 表單模式</button>
+            <button id="config-mode-json-btn" class="tab-btn" type="button" style="padding:3px 8px;font-size:11px;">📝 JSON 編輯</button>
+          </div>
+          <span id="config-status" class="status-text" style="font-size:12px;color:var(--text-dim);">請選擇廠別以讀取設定。</span>
+          <form id="config-form" class="stack config-form" style="margin-top:8px;">
+            <label><span>Factory ID</span><input name="factory_id" readonly></label>
+            <div id="config-groups-container" class="config-groups">
+              <fieldset>
+                <legend>Runtime <span class="field-effect">即時套用</span></legend>
+                <label><span>interval</span><input name="interval" type="number" min="1"></label>
+                <label><span>heartbeat_interval</span><input name="heartbeat_interval" type="number" min="1"></label>
+                <label><span>anomaly_daytime_zero_minutes</span><input name="anomaly_daytime_zero_minutes" type="number" min="1"></label>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="night_pause" type="checkbox"> night_pause</span></label>
+                <label><span>night_padding_min</span><input name="night_padding_min" type="number" min="1"></label>
+              </fieldset>
+              <fieldset>
+                <legend>MQTT Retain <span class="field-effect">即時套用</span></legend>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="mqtt_retain_summary" type="checkbox"> mqtt_retain_summary</span></label>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="mqtt_retain_zone" type="checkbox"> mqtt_retain_zone</span></label>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="mqtt_retain_status" type="checkbox"> mqtt_retain_status</span></label>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="mqtt_retain_alert" type="checkbox"> mqtt_retain_alert</span></label>
+                <label><span style="display:inline-flex;gap:6px;align-items:center;"><input name="mqtt_retain_heartbeat" type="checkbox"> mqtt_retain_heartbeat</span></label>
+              </fieldset>
+            </div>
+            <div id="config-json-editor-container" class="stack" hidden>
+              <textarea id="config-json-textarea" class="code-editor" rows="12" spellcheck="false" placeholder="{}"></textarea>
+              <p id="json-parse-error" class="error-text" hidden></p>
+            </div>
+          </form>
+        </div>
+        <div id="publish-module" class="operations-module" style="margin-top:16px;">
+          <h3>🚀 手動發布 (Manual Publish)</h3>
+          <p id="publish-error" class="error-text" hidden style="color:var(--color-danger);font-size:12px;margin:0;"></p>
+          <form id="publish-form" class="stack">
+            <label><span>Topic</span><input id="publish-topic" name="publishTopic" autocomplete="off"></label>
+            <label><span>JSON payload</span><textarea id="publish-payload" name="publishPayload" rows="3">{}</textarea></label>
+            <div class="actions">
+              <button id="publish-submit" class="icon-btn" type="submit">發布 (Publish)</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div id="drawer-section-logs" class="drawer-tab-section" hidden>
+        <div id="activity-log-module" class="operations-module">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>📋 即時活動日誌 (Activity Log)</h3>
+            <button id="local-clear-log-btn" class="icon-btn icon-btn--small" type="button">🗑️ 清除日誌</button>
+          </div>
+          <div id="local-log-list" class="activity-log-viewer">
+            <div class="log-entry log-entry--info">系統初始化完成，等待操作...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <script src="vendor/mqtt.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

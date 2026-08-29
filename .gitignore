@@ -7,6 +7,7 @@ dist/
 .env
 .env.*
 !.env.example
+solar_mqtt_go/solar_config.json
 __pycache__/
 
 .antigravitycli/
@@ -14,6 +15,7 @@ __pycache__/
 .claude/
 .DS_Store
 server-runtime.lock.json
+solar.db
 
 logs/
 apps/server/logs/
