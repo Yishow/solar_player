@@ -14,10 +14,10 @@ test("AppHeader waits for App Time without falling back to the Client OS Clock",
     )
   );
 
-  assert.match(headerHtml, /data-time-state="waiting"/);
   assert.match(headerHtml, />--:--</);
   assert.match(headerHtml, /伺服器時間/);
-  assert.match(headerHtml, /等待同步/);
+  assert.doesNotMatch(headerHtml, /等待同步/);
+  assert.doesNotMatch(headerHtml, /已同步/);
 });
 
 test("AppHeader preserves explicit clock metadata overrides for previews and tests", () => {

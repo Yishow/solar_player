@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAppTime } from "../../hooks/useAppTime";
 import { useDeviceDisplayOpsSummary } from "../../hooks/useDeviceDisplayOpsSummary";
 import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import {
@@ -157,14 +158,14 @@ export function DeviceStatus() {
     try {
       const result = await runDeviceDisplayDiagnostic(action);
       setActionFeedback({
-        detail: `${result.message} ${formatGeneratedAt(result.generatedAt)} · operational: ${result.summary.operationalHealthSummary.blockingCount} blocking · config: ${result.summary.configurationReadinessSummary.blockingCount} blocking · ${result.summary.skipSummary.count} skipped · ${result.summary.assetHealthSummary.unhealthyCount} unhealthy · host: ${result.guidance.hostRestartCommand}`,
+        detail: `${result.message} ${formatGeneratedAt(result.generatedAt)} · 營運健康：${result.summary.operationalHealthSummary.blockingCount} 項阻擋 · 設定整備：${result.summary.configurationReadinessSummary.blockingCount} 項阻擋 · ${result.summary.skipSummary.count} 項略過 · ${result.summary.assetHealthSummary.unhealthyCount} 項資產異常 · 主機處置：${result.guidance.hostRestartCommand}`,
         title: label,
         tone: "ready"
       });
       await reloadDisplayOpsSummary();
     } catch (error) {
       setActionFeedback({
-        detail: error instanceof Error ? error.message : "Display diagnostics 失敗。",
+        detail: error instanceof Error ? error.message : "展示診斷執行失敗。",
         title: `${label}失敗`,
         tone: "error"
       });
@@ -208,10 +209,13 @@ export function DeviceStatus() {
     }
   };
 
+  const appTime = useAppTime();
+
   const viewModel = useMemo(
     () =>
       buildDeviceStatusViewModel({
         actionFeedback,
+        appTime,
         displayOpsAccessDenied,
         displayOpsLoading,
         displayOpsSummary,
@@ -225,6 +229,7 @@ export function DeviceStatus() {
       }),
     [
       actionFeedback,
+      appTime,
       displayOpsAccessDenied,
       displayOpsLoading,
       displayOpsSummary,

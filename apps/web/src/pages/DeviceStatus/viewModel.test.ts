@@ -90,35 +90,37 @@ test("buildDeviceStatusViewModel formats system info, resource gauges, and maint
     }
   });
 
-  assert.equal(model.systemRows[0]?.label, "裝置名稱");
-  assert.equal(model.systemRows[0]?.value, "KZ-Display-01");
-  assert.equal(model.systemRows[3]?.value, "15 天 5 時");
+  assert.equal(model.systemRows[0]?.label, "伺服器時間");
+  assert.equal(model.systemRows[1]?.label, "時間同步狀態");
+  assert.equal(model.systemRows.find((row) => row.label === "裝置名稱")?.value, "KZ-Display-01");
+  assert.equal(model.systemRows.find((row) => row.label === "運行時間")?.value, "15 天 5 時");
+  assert.equal(model.uptimeLabel, "15 天 5 時");
   assert.equal(model.runtimeSummary.title, "正常運作");
   assert.equal(model.resourceCards[0]?.label, "CPU 負載");
   assert.equal(model.resourceCards[0]?.valueLabel, "0.18");
   assert.equal(model.resourceCards[0]?.gaugePercent, 18);
-  assert.match(model.resourceCards[0]?.helper ?? "", /1m \/ 5m \/ 15m/);
-  assert.equal(model.resourceCards[3]?.valueLabel, "Unavailable");
+  assert.match(model.resourceCards[0]?.helper ?? "", /1分 \/ 5分 \/ 15分/);
+  assert.equal(model.resourceCards[3]?.valueLabel, "無法取得");
   assert.equal(model.resourceCards[3]?.helper, "目前無可信溫度量測來源");
-  assert.equal(model.systemRows.find((row) => row.label === "風扇狀態")?.value, "Unavailable");
+  assert.equal(model.systemRows.find((row) => row.label === "風扇狀態")?.value, "無法取得");
   assert.match(model.feedback.title, /清除快取完成/);
   assert.equal(model.networkRows[0]?.value, "● 管理通道可達");
   assert.equal(model.networkRows[1]?.value, "目前無可信訊號強度量測");
   assert.equal(model.displayOpsSummary.statusTitle, "展示退化");
   assert.equal(model.displayOpsSummary.liveVersion, "v14");
   assert.equal(model.displayOpsSummary.lastPublishLabel, "2026-05-18 08:45");
-  assert.equal(model.displayOpsSummary.assetHealthLabel, "1 unhealthy");
-  assert.equal(model.displayOpsSummary.alerts[0]?.message, "overview live asset missing");
-  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "operational-health");
-  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "3 blocking");
-  assert.equal(model.displayOpsSummary.operationalHealthLabel, "1 blocking");
+  assert.equal(model.displayOpsSummary.assetHealthLabel, "1 項異常");
+  assert.equal(model.displayOpsSummary.alerts[0]?.message, "總覽首頁 缺少線上即時素材");
+  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "營運健康");
+  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "3 項阻擋");
+  assert.equal(model.displayOpsSummary.operationalHealthLabel, "1 項阻擋");
   assert.equal(model.displayOpsSummary.diagnostics[0]?.action, "refresh-readiness");
   assert.equal(model.displayOpsSummary.runbookPath, "docs/runbooks/device-diagnostics-safe-ops.md");
   assert.equal(model.displayOpsSummary.hostRestartCommand, "systemctl restart solar-display");
   assert.match(model.displayOpsSummary.safeOpsHelper, /systemctl restart solar-display/);
   assert.match(model.displayOpsSummary.safeOpsHelper, /docs\/runbooks\/device-diagnostics-safe-ops\.md/);
   assert.equal(model.logsSummary.statusTitle, "Journald 可用");
-  assert.equal(model.logsSummary.entryCountLabel, "2 entries");
+  assert.equal(model.logsSummary.entryCountLabel, "2 筆記錄");
   assert.match(model.logsSummary.detail, /server boot ready/);
 });
 
@@ -153,7 +155,7 @@ test("buildDeviceStatusViewModel formats measured Pi temperature and fan telemet
     ...baseStatus,
     fan: { available: true, coolingState: 3, rpm: null, status: "running" }
   });
-  assert.equal(coolingModel.systemRows.find((row) => row.label === "風扇狀態")?.value, "運轉中 · Cooling state 3");
+  assert.equal(coolingModel.systemRows.find((row) => row.label === "風扇狀態")?.value, "運轉中 · 冷卻檔位 3");
 });
 
 test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", () => {
@@ -167,7 +169,7 @@ test("buildDeviceStatusViewModel keeps loading and empty fallbacks readable", ()
 
   assert.equal(model.feedback.title, "正在同步裝置狀態");
   assert.equal(model.runtimeSummary.title, "同步中");
-  assert.equal(model.systemRows[0]?.value, "-");
+  assert.equal(model.systemRows.find((row) => row.label === "裝置名稱")?.value, "-");
   assert.equal(model.resourceCards[3]?.valueLabel, "--");
   assert.equal(model.resourceCards[3]?.gaugePercent, 0);
 });
@@ -189,7 +191,7 @@ test("buildDeviceStatusViewModel shows failed runtime summary when status cannot
   assert.equal(model.networkRows[0]?.value, "● 未連線");
   assert.equal(model.networkRows[1]?.value, "需待裝置狀態恢復後確認");
   assert.equal(model.logsSummary.statusTitle, "日誌不可用");
-  assert.equal(model.logsSummary.entryCountLabel, "Unavailable");
+  assert.equal(model.logsSummary.entryCountLabel, "無法取得");
 });
 
 test("buildDeviceStatusViewModel preserves unpublished triage semantics across the device surface", () => {
@@ -344,18 +346,18 @@ test("buildDeviceStatusViewModel exposes summary-first hero cards diagnostics re
     }
   });
 
-  assert.equal(model.heroCards[0]?.title, "Host Health");
-  assert.equal(model.heroCards[0]?.value, "正常運作");
-  assert.equal(model.heroCards[1]?.title, "Display Operations");
-  assert.equal(model.heroCards[1]?.value, "展示退化");
-  assert.equal(model.heroCards[2]?.title, "Next Action Guidance");
+  assert.equal(model.heroCards[0]?.title, "受影響範圍");
+  assert.equal(model.heroCards[0]?.value, "總覽首頁");
+  assert.equal(model.heroCards[1]?.title, "主要原因");
+  assert.equal(model.heroCards[1]?.value, "總覽首頁 缺少線上即時素材");
+  assert.equal(model.heroCards[2]?.title, "建議處置");
   assert.match(model.heroCards[2]?.detail ?? "", /Display Pages Editor/);
-  assert.equal(model.diagnosticsSurface.resultTitle, "Refresh readiness");
-  assert.match(model.diagnosticsSurface.safeScopeLabel, /safe-refresh/);
-  assert.equal(model.diagnosticsSurface.unsupportedActions[0]?.label, "Reboot device");
-  assert.equal(model.alertsTriage.summaryTitle, "1 display alert");
+  assert.equal(model.diagnosticsSurface.resultTitle, "更新狀態診斷");
+  assert.match(model.diagnosticsSurface.safeScopeLabel, /安全重新整理/);
+  assert.equal(model.diagnosticsSurface.unsupportedActions[0]?.label, "重啟裝置");
+  assert.equal(model.alertsTriage.summaryTitle, "1 項展示警示");
   assert.equal(model.logsTriage.summaryTitle, "Journald 可用");
-  assert.equal(model.livenessTriage.summaryTitle, "0 clients");
+  assert.equal(model.livenessTriage.summaryTitle, "0 台展示端");
 });
 
 test("buildDeviceStatusViewModel maps display client liveness rows and summary badges", () => {
@@ -477,24 +479,24 @@ test("buildDeviceStatusViewModel maps display client liveness rows and summary b
       { count: 1, tone: "is-error" }
     ]
   );
-  assert.equal(model.displayClientSummary.totalLabel, "3 clients");
-  assert.equal(model.displayClientSummary.rows[0]?.pageLabel, "Overview");
+  assert.equal(model.displayClientSummary.totalLabel, "3 台展示端");
+  assert.equal(model.displayClientSummary.rows[0]?.pageLabel, "總覽首頁");
   assert.equal(model.displayClientSummary.rows[0]?.playbackLabel, "播放中");
   assert.equal(model.displayClientSummary.rows[0]?.lastSeenLabel, "5 秒前");
   assert.equal(model.displayClientSummary.rows[0]?.badgeTone, "is-good");
-  assert.equal(model.displayClientSummary.rows[0]?.timeSyncLabel, "App Time synced");
-  assert.equal(model.displayClientSummary.rows[1]?.pageLabel, "Route /offline");
+  assert.equal(model.displayClientSummary.rows[0]?.timeSyncLabel, "時間同步 已校時");
+  assert.equal(model.displayClientSummary.rows[1]?.pageLabel, "路由 /offline");
   assert.equal(model.displayClientSummary.rows[1]?.playbackLabel, "閒置中");
   assert.equal(model.displayClientSummary.rows[1]?.lastSeenLabel, "45 秒前");
   assert.equal(model.displayClientSummary.rows[1]?.badgeTone, "is-warning");
-  assert.equal(model.displayClientSummary.rows[1]?.timeSyncLabel, "App Time stale");
-  assert.equal(model.displayClientSummary.rows[2]?.pageLabel, "Solar");
+  assert.equal(model.displayClientSummary.rows[1]?.timeSyncLabel, "時間同步 延遲");
+  assert.equal(model.displayClientSummary.rows[2]?.pageLabel, "太陽能發電");
   assert.equal(model.displayClientSummary.rows[2]?.playbackLabel, "已離線");
   assert.equal(model.displayClientSummary.rows[2]?.lastSeenLabel, "50 秒前");
   assert.equal(model.displayClientSummary.rows[2]?.badgeTone, "is-error");
   assert.equal(
     model.displayClientSummary.rows[2]?.timeSyncLabel,
-    "App Time time-untrusted"
+    "時間同步 不可信"
   );
 });
 
@@ -623,10 +625,10 @@ test("buildDeviceStatusViewModel presents stable Device identity and duplicate d
     },
     {
       clientId: "display-kn-17",
-      connectionLabel: "2 connections",
+      connectionLabel: "2 條連線",
       duplicateWarningLabel: "疑似重複身份",
-      groupLabel: "Group 7",
-      siteLabel: "Site KN"
+      groupLabel: "分組 7",
+      siteLabel: "廠區 KN"
     }
   );
   assert.equal("credential" in (row ?? {}), false);
@@ -683,9 +685,9 @@ test("buildDeviceStatusViewModel keeps configuration-readiness distinct from ope
   });
 
   assert.equal(model.displayOpsSummary.statusTitle, "設定待完成");
-  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "1 blocking");
-  assert.equal(model.displayOpsSummary.operationalHealthLabel, "0 blocking");
-  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "configuration-readiness");
+  assert.equal(model.displayOpsSummary.configurationReadinessLabel, "1 項阻擋");
+  assert.equal(model.displayOpsSummary.operationalHealthLabel, "0 項阻擋");
+  assert.equal(model.displayOpsSummary.alerts[0]?.domainLabel, "設定整備");
 });
 
 test("buildDeviceStatusViewModel keeps denied reads distinct from empty and generic failure states", () => {
@@ -752,8 +754,50 @@ test("buildDeviceStatusViewModel presents journal unavailable and dirty release 
   assert.match(model.logsSummary.detail, /journal access denied/);
   assert.equal(model.logsSummary.sourceLabel, "journald");
   assert.equal(model.logsTriage.exportAvailable, false);
-  const releaseId = model.systemRows.find((row) => row.label === "Release ID");
-  assert.match(releaseId?.value ?? "", /dirty/);
-  const schema = model.systemRows.find((row) => row.label === "Schema");
+  const releaseId = model.systemRows.find((row) => row.label === "發布版本 ID");
+  assert.match(releaseId?.value ?? "", /已修改/);
+  const schema = model.systemRows.find((row) => row.label === "資料架構 (Schema)");
   assert.equal(schema?.value, "22");
+});
+
+test("buildDeviceStatusViewModel renders Server Authoritative App Time and Time Sync Status", () => {
+  const syncedModel = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    appTime: {
+      lastSignalMonotonicMs: 1000,
+      nowEpochMs: new Date("2026-08-30T14:30:00.000Z").getTime(), // 22:30 in Taipei
+      state: "synced"
+    },
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    status: null
+  });
+
+  const serverTimeRow = syncedModel.systemRows.find((row) => row.label === "伺服器時間");
+  const timeSyncRow = syncedModel.systemRows.find((row) => row.label === "時間同步狀態");
+
+  assert.match(serverTimeRow?.value ?? "", /2026\/08\/30 22:30:00 \(Asia\/Taipei\)/);
+  assert.equal(timeSyncRow?.value, "● 正常同步中 (已校時)");
+  assert.equal((timeSyncRow as { tone?: string })?.tone, "is-good");
+
+  const staleModel = buildDeviceStatusViewModel({
+    actionFeedback: null,
+    appTime: {
+      lastSignalMonotonicMs: 1000,
+      nowEpochMs: null,
+      state: "stale"
+    },
+    isLoading: false,
+    logSummary: null,
+    logSummaryError: "",
+    status: null
+  });
+
+  const staleTimeRow = staleModel.systemRows.find((row) => row.label === "伺服器時間");
+  const staleSyncRow = staleModel.systemRows.find((row) => row.label === "時間同步狀態");
+
+  assert.equal(staleTimeRow?.value, "--:--:-- (Asia/Taipei)");
+  assert.equal(staleSyncRow?.value, "● 訊號延遲");
+  assert.equal((staleSyncRow as { tone?: string })?.tone, "is-warning");
 });

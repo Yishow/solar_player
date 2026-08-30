@@ -24,74 +24,82 @@ The Server Time Signal SHALL be delivered to every connected Client regardless o
 - **THEN** it receives one Server Time Signal immediately and every 30000 milliseconds thereafter
 - **AND** its App Time SHALL leave the waiting state once the first signal is applied
 
-##### Example: Unpaired browser leaves the waiting state
+##### Example: Unpaired browser renders clean clock without sync state labels
 
 - **GIVEN** a browser with no Device Credential opens a playback display route
 - **WHEN** its Socket connection is established
-- **THEN** the header stops showing the waiting-for-sync state
-- **AND** the header shows a clock derived from the Server Time Signal
+- **THEN** the header displays the clock derived from the Server Time Signal
+- **AND** the header SHALL NOT render synchronization status labels
 
 
 <!-- @trace
-source: narrow-display-socket-gate-to-identity-scoped-feeds
-updated: 2026-08-08
+source: remove-header-sync-status-indicator
+updated: 2026-08-31
 code:
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/server/src/app.ts
-  - apps/web/src/layouts/ManagementShell.tsx
-  - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
-  - apps/server/src/routes/device.ts
-  - apps/server/src/services/unpairedDisplayAccessRegistry.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/Sustainability/index.tsx
-  - apps/web/src/pages/Images/index.tsx
-  - apps/web/src/components/ManagementUnlockScreen.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
-  - apps/web/src/app/routeMeta.ts
-  - packages/shared/src/displayClientLiveness.ts
-  - apps/server/src/plugins/deviceContext.ts
-  - apps/server/src/services/deviceLivenessRegistry.ts
-  - apps/web/src/app/router.tsx
-  - apps/web/src/pages/Solar/index.tsx
-  - apps/web/src/services/displayRuntimeSyncReporter.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/server/src/realtime/SocketService.ts
-  - apps/server/src/plugins/managementAuth.ts
-  - apps/web/src/pages/runtimeConfigHydration.tsx
-  - apps/web/src/hooks/useDisplayStoryRuntime.ts
-  - apps/server/src/services/managementPasswordService.ts
-  - apps/server/src/routes/management-auth.ts
-  - apps/web/src/pages/SecuritySettings/index.tsx
-  - apps/web/src/pages/SecuritySettings/viewModel.ts
-  - apps/web/src/pages/FactoryCircuit/index.tsx
-  - apps/web/src/hooks/useImagePlaylistRuntime.ts
-  - apps/server/src/fastify.ts
-  - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
-  - apps/server/src/db/migrations/034_management_password_gate.sql
+  - apps/web/src/pages/DeviceStatus/device.css
+  - packages/shared/src/derivedMetric.ts
   - apps/web/src/services/api.ts
-  - apps/web/src/hooks/useDisplayClientHeartbeat.ts
-  - apps/server/src/services/managementSessionService.ts
+  - apps/server/src/services/calculationSettingsService.ts
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/server/src/db/migrations/038_derived_metric_site_scopes.sql
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - packages/shared/src/displayStory.ts
+  - apps/web/src/pages/DeviceStatus/layout.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/server/src/services/derivedMetricExpression.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.ts
+  - apps/server/src/services/playbackMetricAuthorizationService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/displayCardData.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/app.ts
+  - apps/server/src/db/migrations/037_derived_metric_registry.sql
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/routes/calculation-settings.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/displayPagePublishingService.ts
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/components/AppHeader.tsx
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/server/src/routes/derived-metrics.ts
 tests:
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/services/displayRuntimeSyncReporter.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/server/src/plugins/managementAuth.test.ts
-  - apps/web/src/pages/runtimeConfigHydration.test.ts
-  - apps/web/src/pages/SecuritySettings/viewModel.test.ts
-  - apps/server/src/services/unpairedDisplayAccessRegistry.test.ts
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/server/src/plugins/deviceContext.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
-  - packages/shared/src/displayClientLiveness.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/server/src/routes/derived-metrics.test.ts
+  - apps/server/src/services/playbackMetricAuthorizationService.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - apps/web/src/pages/DeviceStatus/layout.test.ts
+  - apps/server/src/services/derivedMetricExpression.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/server/src/mqtt/SolarSourceAdapter.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/server/src/services/derivedMetricRegistryService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - packages/shared/src/derivedMetric.test.ts
+  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
   - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/web/src/hooks/useDisplayClientHeartbeat.test.ts
-  - apps/server/src/routes/device.test.ts
-  - apps/server/src/services/managementSessionService.test.ts
-  - apps/web/src/components/ManagementUnlockScreen.test.tsx
-  - apps/server/src/routes/management-auth.test.ts
-  - apps/server/src/services/deviceLivenessRegistry.test.ts
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/server/src/services/managementPasswordService.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/db/migrations/derivedMetricRegistry.test.ts
+  - apps/server/src/db/migrations/calculationSettings.test.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.test.tsx
+  - apps/server/src/services/sustainabilityStoryService.test.ts
 -->
 
 ---

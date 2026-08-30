@@ -41,12 +41,6 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
   const timeLabel = meta?.time ?? appTime.time;
   const dateLabel = meta?.date ?? appTime.date;
   const weekdayLabel = meta?.weekday ?? appTime.weekday;
-  const stateTone =
-    appTime.state === "synced"
-      ? "text-[var(--color-status-success-500)]"
-      : appTime.state === "time-untrusted"
-        ? "text-[var(--color-status-error-500)]"
-        : "text-[var(--color-status-warning-500)]";
 
   return (
     <div className="flex items-center gap-x-[40px]">
@@ -65,16 +59,7 @@ function ClockArea({ meta }: { meta?: AppHeaderMeta }) {
         style={{ color: "var(--shell-kicker-muted)" }}
       >
         <div>{dateLabel}</div>
-        <div>
-          {weekdayLabel}
-          <span
-            aria-label={`App Time ${appTime.stateLabel}`}
-            className={`ml-[8px] text-[12px] ${stateTone}`}
-            data-time-state={appTime.state}
-          >
-            · {appTime.stateLabel}
-          </span>
-        </div>
+        <div>{weekdayLabel}</div>
       </div>
     </div>
   );

@@ -2,68 +2,44 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { deviceLayout } from "./layout";
 
-test("device status layout centralizes title, info, resource, network, and action geometry", () => {
+test("device status layout centralizes title, actions, kpiBar, leftPanel, and rightPanel geometry", () => {
   assert.deepEqual(deviceLayout.title, { left: 58, top: 28 });
-  assert.deepEqual(deviceLayout.side, { left: 50, top: 64, width: 390 });
-  assert.deepEqual(deviceLayout.info, {
-    height: 510,
-    left: 460,
-    top: 64,
-    width: 710
-  });
-  assert.deepEqual(deviceLayout.photo, {
-    height: 240,
-    left: 1190,
-    top: 64,
-    width: 680
-  });
-  assert.deepEqual(deviceLayout.resource, {
-    height: 268,
-    left: 1190,
-    top: 320,
-    width: 680
-  });
-  assert.deepEqual(deviceLayout.network, {
-    height: 62,
-    left: 1190,
-    top: 604,
-    width: 680
-  });
   assert.deepEqual(deviceLayout.actions, {
-    height: 56,
+    height: 48,
+    left: 1190,
+    top: 32,
+    width: 680
+  });
+  assert.deepEqual(deviceLayout.kpiBar, {
+    height: 116,
     left: 50,
-    top: 686,
+    top: 118,
     width: 1820
   });
-  assert.deepEqual(deviceLayout.feedback, {
-    height: 48,
+  assert.deepEqual(deviceLayout.leftPanel, {
+    height: 612,
     left: 50,
-    top: 758,
-    width: 1820
+    top: 246,
+    width: 896
+  });
+  assert.deepEqual(deviceLayout.rightPanel, {
+    height: 612,
+    left: 962,
+    top: 246,
+    width: 908
   });
 });
 
-test("device status regions never overlap on the y axis where columns share x", () => {
-  // right column (left=1190): photo → resource → network must be strictly stacked
-  const photoBottom = deviceLayout.photo.top + deviceLayout.photo.height;
-  const resourceBottom = deviceLayout.resource.top + deviceLayout.resource.height;
-  const networkBottom = deviceLayout.network.top + deviceLayout.network.height;
+test("device status regions never overlap on the y axis and fit within FHD content area", () => {
+  const kpiBottom = deviceLayout.kpiBar.top + deviceLayout.kpiBar.height;
+  assert.ok(deviceLayout.leftPanel.top >= kpiBottom, "leftPanel must start below kpiBar");
+  assert.ok(deviceLayout.rightPanel.top >= kpiBottom, "rightPanel must start below kpiBar");
 
-  assert.ok(deviceLayout.resource.top > photoBottom, "resource must start below photo");
-  assert.ok(
-    deviceLayout.network.top > resourceBottom,
-    "network must start below resource"
-  );
+  const leftBottom = deviceLayout.leftPanel.top + deviceLayout.leftPanel.height;
+  const rightBottom = deviceLayout.rightPanel.top + deviceLayout.rightPanel.height;
 
-  // bottom strip across full width
-  assert.ok(deviceLayout.actions.top > networkBottom, "actions must start below network");
-  const actionsBottom = deviceLayout.actions.top + deviceLayout.actions.height;
-  assert.ok(
-    deviceLayout.feedback.top > actionsBottom,
-    "feedback must start below actions"
-  );
-
-  // total fits within 838
-  const feedbackBottom = deviceLayout.feedback.top + deviceLayout.feedback.height;
-  assert.ok(feedbackBottom <= 838, "all regions fit within content height 838");
+  assert.ok(leftBottom <= 858, "leftPanel fits within content height 858");
+  assert.ok(rightBottom <= 858, "rightPanel fits within content height 858");
+  assert.equal(leftBottom, 858);
+  assert.equal(rightBottom, 858);
 });

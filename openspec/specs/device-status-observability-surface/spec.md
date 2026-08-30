@@ -8,106 +8,89 @@ TBD - created by archiving change 'complete-device-status-observability-surface'
 
 ### Requirement: Present device status as a summary-first observability dashboard
 
-The system SHALL present `Device Status` as a summary-first observability dashboard.
+The system SHALL present `Device Status` as a summary-first observability dashboard. It SHALL align with standard management surface positioning without overlapping the page title, SHALL support internal vertical scrolling within the info region, and SHALL expose Server Authoritative App Time and Time Sync Status within the Device Information section.
 
 #### Scenario: Operator opens device status during an incident
 
 - **WHEN** the operator opens `Device Status` during a degraded runtime incident
 - **THEN** the page SHALL surface host health, display-operations health, and next-action guidance before deep detail sections
+- **AND** the top of main content panels SHALL NOT overlap the page title
 
-#### Scenario: Dashboard remains distinct from settings workspaces
+#### Scenario: Operator inspects server time and sync status
 
-- **WHEN** the operator navigates from a settings workspace to `Device Status`
-- **THEN** the page SHALL remain visually and structurally identifiable as an observability dashboard
-- **AND** it SHALL still share the same semantic state language as the settings family
+- **WHEN** the operator views the Device Information section in `Device Status`
+- **THEN** it SHALL display the formatted Server Authoritative Time
+- **AND** it SHALL display the current Time Sync Status indicator
 
 
 <!-- @trace
-source: complete-device-status-observability-surface
-updated: 2026-05-29
+source: remove-header-sync-status-indicator
+updated: 2026-08-31
 code:
-  - apps/web/src/app/routeMeta.ts
-  - apps/web/src/components/PageContainer.tsx
-  - apps/web/src/pages/EnergyTrend/index.tsx
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/SlideshowPreview/preview.css
-  - docs/goal.md
-  - data/server-runtime.lock.json
-  - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
-  - apps/web/src/hooks/useDisplayPageConfig.ts
-  - apps/web/src/pages/PlaybackSettings/LiveRotationPreviewList.tsx
-  - apps/web/src/pages/Overview/layout.ts
-  - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
-  - apps/web/src/pages/PlaybackSettings/viewModel.ts
-  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
-  - apps/web/src/pages/Overview/assets/overview-leaf-reference-crop.png
-  - apps/web/src/pages/EnergyHistory/history.css
-  - apps/web/src/pages/ImageManagement/index.tsx
-  - apps/web/src/components/management/opsSurfacePrimitives.tsx
-  - .agents/skills/spectra-verify/SKILL.md
-  - apps/web/src/components/management/index.tsx
-  - apps/web/src/pages/CircuitSettings/index.tsx
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/EnergyHistory/layout.ts
-  - docs/roadmaps/2026-05-28-settings-status-design-token-alignment-roadmap.md
-  - apps/web/src/pages/Overview/displayPageConfig.ts
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/web/src/pages/PlaybackSettings/index.tsx
-  - apps/web/src/pages/PlaybackSettings/playbackSettings.css
-  - apps/web/src/pages/EnergyTrend/layout.ts
-  - .agents/skills/spectra-analyze/SKILL.md
   - apps/web/src/pages/DeviceStatus/device.css
-  - apps/web/src/pages/EnergyTrend/trend.css
-  - apps/web/src/pages/CircuitSettings/circuitSettings.css
-  - apps/web/src/pages/EnergyHistory/index.tsx
-  - apps/web/src/pages/SlideshowPreview/index.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/web/src/pages/CircuitSettings/viewModel.ts
-  - apps/web/src/pages/ImageManagement/viewModel.ts
-  - apps/web/src/components/management/RemoteSyncBanner.tsx
+  - packages/shared/src/derivedMetric.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/services/calculationSettingsService.ts
+  - apps/web/src/pages/DeviceStatus/index.tsx
+  - apps/web/src/pages/FactoryCircuit/viewModel.ts
+  - apps/server/src/db/migrations/038_derived_metric_site_scopes.sql
+  - apps/server/src/services/factoryGenerationAggregateService.ts
+  - packages/shared/src/displayStory.ts
   - apps/web/src/pages/DeviceStatus/layout.ts
-  - apps/web/src/styles/management.css
-  - apps/web/src/styles/tokens.css
-  - apps/web/src/pages/SlideshowPreview/viewModel.ts
-  - apps/web/src/pages/Overview/overview.css
-  - apps/web/src/components/management/rotationOpsSummary.tsx
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/pages/ImageManagement/imageManagement.css
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - apps/web/src/pages/SlideshowPreview/layout.ts
+  - apps/web/src/pages/DataSourceSettings/index.tsx
+  - apps/server/src/services/derivedMetricExpression.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
+  - apps/server/src/services/displayDataPreviewService.ts
   - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/web/src/pages/Overview/assets/overview-leaf-cluster-reference.png
-  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.tsx
-  - apps/web/src/components/TitleBlock.tsx
+  - apps/server/src/services/playbackMetricAuthorizationService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/displayCardData.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/server/src/app.ts
+  - apps/server/src/db/migrations/037_derived_metric_registry.sql
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/routes/calculation-settings.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/displayPagePublishingService.ts
+  - apps/server/src/services/displayCardDataService.ts
+  - apps/server/src/services/displayStoryService.ts
+  - apps/web/src/components/AppHeader.tsx
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+  - apps/server/src/services/sustainabilityStoryService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/server/src/routes/derived-metrics.ts
 tests:
-  - apps/web/src/pages/Overview/layout.test.ts
-  - apps/web/src/pages/ImageManagement/index.test.tsx
-  - apps/web/src/hooks/useDisplayPageConfig.test.ts
-  - apps/web/src/styles/tokens.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/web/src/pages/Overview/style.test.ts
-  - apps/web/src/components/management/rotationOpsSummary.test.tsx
-  - apps/web/src/pages/SlideshowPreview/index.test.ts
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - apps/web/src/pages/PlaybackSettings/viewModel.test.ts
-  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/web/src/pages/ImageManagement/viewModel.test.ts
-  - apps/web/src/pages/shared/displaySurfaceChrome.test.ts
-  - apps/web/src/pages/MqttSettings/viewModel.test.ts
-  - apps/web/src/pages/EnergyHistory/layout.test.ts
-  - apps/web/src/pages/SlideshowPreview/viewModel.test.ts
-  - apps/web/src/pages/SlideshowPreview/layout.test.ts
-  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/components/shellFoundation.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/displayStoryService.test.ts
+  - apps/server/src/services/factoryGenerationAggregateService.test.ts
+  - apps/server/src/services/carbonReductionConsistency.test.ts
+  - apps/server/src/routes/derived-metrics.test.ts
+  - apps/server/src/services/playbackMetricAuthorizationService.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
   - apps/web/src/pages/DeviceStatus/layout.test.ts
-  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
-  - apps/web/src/components/management/opsSurfacePrimitives.test.tsx
-  - apps/web/src/pages/EnergyTrend/layout.test.ts
-  - apps/web/src/pages/shared/liveManagementPreviewSurfaces.test.ts
+  - apps/server/src/services/derivedMetricExpression.test.ts
+  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
+  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
+  - apps/server/src/mqtt/SolarSourceAdapter.test.ts
+  - apps/server/src/routes/sustainability-story.test.ts
+  - apps/web/src/components/AppHeader.test.ts
+  - apps/server/src/services/derivedMetricRegistryService.test.ts
+  - apps/server/src/routes/display-story.test.ts
+  - packages/shared/src/derivedMetric.test.ts
+  - apps/server/src/routes/calculation-settings.test.ts
+  - apps/server/src/mqtt/metricKeyIngestion.test.ts
+  - apps/server/src/routes/data-source.test.ts
+  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/server/src/db/migrations/derivedMetricRegistry.test.ts
+  - apps/server/src/db/migrations/calculationSettings.test.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.test.tsx
+  - apps/server/src/services/sustainabilityStoryService.test.ts
 -->
 
 ---

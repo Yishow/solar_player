@@ -1,34 +1,37 @@
 import {
   resolveDisplayFaultTriageSummaryFromAlerts,
-  type DisplayClientLivenessSnapshot,
-  type UnpairedDisplayAccessSummary,
+  type AppTimeSnapshot,
   type DeviceDisplayOpsSummary,
-  type DeviceSafeOpsGuidance,
-  type DisplayFaultTriageSummary
+  type DeviceSafeOpsGuidance
 } from "@solar-display/shared";
 import type {
-  DeviceFanTelemetry,
-  DeviceLogSummary,
-  DeviceReleaseIdentity,
-  DeviceTemperatureTelemetry
+  DeviceLogSummary
 } from "../../services/api";
-
-type DeviceRouteStatus = {
-  hostname: string;
-  platform: string;
-  arch: string;
-  nodeVersion: string;
-  uptimeSeconds: number;
-  cpu: { cores: number; loadAvg: [number, number, number] };
-  memory: { totalMB: number; usedMB: number; freeMB: number; usePercent: number };
-  disk: { totalMB: number; usedMB: number; availableMB: number; usePercent: number };
-  temperature?: DeviceTemperatureTelemetry;
-  fan?: DeviceFanTelemetry;
-  displayClients?: DisplayClientLivenessSnapshot;
-  unpairedDisplayAccess?: UnpairedDisplayAccessSummary;
-  pid: number;
-  release?: DeviceReleaseIdentity;
-};
+import {
+  displayClientPageLabels,
+  formatTriageHelper,
+  formatTriagePages,
+  localizeActionLabel,
+  localizeAlertMessage,
+  localizeRepairDestination,
+  localizeSafeScope,
+  localizeTriageKind
+} from "./localization";
+import {
+  buildDisplayClientSummary,
+  buildLogsSummary,
+  buildReleaseRows,
+  buildResourceCards,
+  buildRuntimeSummary,
+  buildUnpairedDisplayAccessSummary,
+  formatFanTelemetry,
+  formatServerTime,
+  formatTimestamp,
+  formatTimeSyncStatus,
+  formatUptime,
+  type DeviceRouteStatus,
+  type SystemRowItem
+} from "./formatters";
 
 export type DeviceActionFeedback = {
   detail: string;
@@ -36,8 +39,9 @@ export type DeviceActionFeedback = {
   tone: "error" | "loading" | "ready";
 } | null;
 
-type BuildDeviceStatusViewModelArgs = {
+export type BuildDeviceStatusViewModelArgs = {
   actionFeedback: DeviceActionFeedback;
+  appTime?: AppTimeSnapshot;
   displayOpsAccessDenied?: boolean;
   displayOpsLoading?: boolean;
   displayOpsSummary?: DeviceDisplayOpsSummary | null;
@@ -51,382 +55,19 @@ type BuildDeviceStatusViewModelArgs = {
   statusAccessDenied?: boolean;
 };
 
-function parseGaugeValue(label: string, valueLabel: string) {
-  if (label === "CPU 負載") {
-    const numeric = Number.parseFloat(valueLabel);
-    if (Number.isFinite(numeric)) {
-      return Math.max(0, Math.min(100, Math.round(numeric * 100)));
-    }
-  }
-
-  const numeric = Number.parseFloat(valueLabel.replace("%", ""));
-  if (Number.isFinite(numeric)) {
-    return Math.max(0, Math.min(100, Math.round(numeric)));
-  }
-
-  return 0;
-}
-
-function gaugePercentForCard(label: string, gaugeValue: string, valueLabel: string) {
-  if (label === "CPU 負載") {
-    return parseGaugeValue(label, valueLabel);
-  }
-
-  return parseGaugeValue(label, gaugeValue);
-}
-
-function buildRuntimeSummary(
-  isLoading: boolean,
-  status: DeviceRouteStatus | null,
-  accessDenied: boolean
-) {
-  if (accessDenied) {
-    return {
-      detail: "此頁面僅對受信任的管理端開放。",
-      title: "存取受限"
-    };
-  }
-
-  if (isLoading) {
-    return {
-      detail: "Normalizing runtime status...",
-      title: "同步中"
-    };
-  }
-
-  if (status === null) {
-    return {
-      detail: "Unable to load device telemetry.",
-      title: "同步失敗"
-    };
-  }
-
-  return {
-    detail: "Device telemetry available",
-    title: "正常運作"
-  };
-}
-
-function formatUptime(seconds: number | null) {
-  if (seconds === null) {
-    return "-";
-  }
-
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  if (days > 0) {
-    return `${days} 天 ${hours} 時`;
-  }
-
-  if (hours > 0) {
-    return `${hours} 時 ${minutes} 分`;
-  }
-
-  return `${minutes} 分`;
-}
-
-function formatFanTelemetry(fan: DeviceFanTelemetry | undefined) {
-  if (!fan?.available || fan.status === "unavailable") {
-    return "Unavailable";
-  }
-
-  const statusLabel = fan.status === "running" ? "運轉中" : "已停止";
-  if (fan.rpm !== null) {
-    return `${statusLabel} · ${fan.rpm} RPM`;
-  }
-  if (fan.coolingState !== null) {
-    return `${statusLabel} · Cooling state ${fan.coolingState}`;
-  }
-  return "Unavailable";
-}
-
-function formatPercent(value: number | null) {
-  if (value === null) {
-    return "--";
-  }
-
-  return `${Math.round(value)}%`;
-}
-
-function formatTimestamp(value: string | null | undefined) {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hour = String(date.getUTCHours()).padStart(2, "0");
-  const minute = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hour}:${minute}`;
-}
-
-function formatRelativeTime(value: string | null | undefined, now: Date) {
-  if (!value) {
-    return "--";
-  }
-
-  const timestamp = new Date(value).getTime();
-  const nowValue = now.getTime();
-  if (!Number.isFinite(timestamp) || !Number.isFinite(nowValue)) {
-    return "--";
-  }
-
-  const deltaSeconds = Math.max(0, Math.round((nowValue - timestamp) / 1000));
-  if (deltaSeconds < 60) {
-    return `${deltaSeconds} 秒前`;
-  }
-
-  const deltaMinutes = Math.round(deltaSeconds / 60);
-  if (deltaMinutes < 60) {
-    return `${deltaMinutes} 分前`;
-  }
-
-  const deltaHours = Math.round(deltaMinutes / 60);
-  return `${deltaHours} 小時前`;
-}
-
-const displayClientPageLabels: Record<string, string> = {
-  "factory-circuit": "Factory Circuit",
-  images: "Images",
-  overview: "Overview",
-  solar: "Solar",
-  sustainability: "Sustainability"
-};
-
-function buildDisplayClientSummary(
-  snapshot: DisplayClientLivenessSnapshot | undefined,
-  now: Date
-) {
-  const summary = snapshot?.summary ?? {
-    offline: 0,
-    online: 0,
-    stale: 0,
-    total: 0
-  };
-
-  return {
-    badges: [
-      {
-        count: summary.online,
-        label: "Online",
-        tone: "is-good"
-      },
-      {
-        count: summary.stale,
-        label: "Stale",
-        tone: "is-warning"
-      },
-      {
-        count: summary.offline,
-        label: "Offline",
-        tone: "is-error"
-      }
-    ],
-    rows: (snapshot?.clients ?? []).map((client) => ({
-      badgeTone:
-        client.state === "online"
-          ? "is-good"
-          : client.state === "stale"
-            ? "is-warning"
-            : "is-error",
-      lastSeenLabel: formatRelativeTime(client.lastSeenAt, now),
-      runtimeSyncStateLabel: client.runtimeSyncState === "synced"
-        ? "同步正常"
-        : client.runtimeSyncState === "loading"
-          ? "同步中"
-          : client.runtimeSyncState === "degraded"
-            ? "同步異常"
-            : "未回報",
-      runtimeSyncResolvedAtLabel: formatTimestamp(client.runtimeSyncResolvedAt),
-      pageLabel: client.pageKey
-        ? displayClientPageLabels[client.pageKey] ?? client.pageKey
-        : `Route ${client.route}`,
-      playbackLabel:
-        client.state === "offline"
-          ? "已離線"
-          : client.isIdle
-            ? "閒置中"
-            : client.isPlaying
-              ? "播放中"
-              : "待命中",
-      clientId: client.clientId,
-      connectionLabel: `${client.connectedCount} connections`,
-      deviceId: client.deviceId,
-      duplicateWarningLabel: client.duplicateIdentity ? "疑似重複身份" : null,
-      groupLabel: `Group ${client.groupId}`,
-      routeLabel: client.route,
-      siteLabel: `Site ${client.siteScope.toUpperCase()}`,
-      stateLabel: client.state,
-      timeSyncLabel: `App Time ${client.timeSyncState}`
-    })),
-    totalLabel: `${summary.total} clients`
-  };
-}
-
-function buildUnpairedDisplayAccessSummary(summary: UnpairedDisplayAccessSummary | undefined, now: Date) {
-  const totalCount = summary?.totalCount ?? 0;
-  return {
-    totalCount,
-    totalLabel: totalCount === 0 ? "無未配對存取" : `${totalCount} 次未配對存取`,
-    lastSeenLabel: formatRelativeTime(summary?.lastSeenAt, now),
-    lastDeniedRouteLabel: summary?.lastDeniedRoute ?? "--"
-  };
-}
-
-function formatTriagePages(summary: DisplayFaultTriageSummary) {
-  return summary.affectedPages.length > 0 ? summary.affectedPages.join("、") : "global";
-}
-
-function formatTriageHelper(summary: DisplayFaultTriageSummary) {
-  const nextStep = summary.repairDestinationLabel
-    ? `下一步：${summary.repairDestinationLabel}`
-    : "請改由管理頁面檢查整體 display readiness。";
-
-  return `受影響頁面：${formatTriagePages(summary)} · 主因：${summary.dominantReason} · ${nextStep}`;
-}
-
 const defaultSafeOpsGuidance: DeviceSafeOpsGuidance = {
   hostRestartCommand: "systemctl restart solar-display",
-  hostRestartLabel: "Host-level restart",
+  hostRestartLabel: "主機層重啟",
   runbookPath: "docs/runbooks/device-diagnostics-safe-ops.md",
   unsupportedOperations: []
 };
 
-function buildLogsSummary(
-  logSummary: DeviceLogSummary | null,
-  logSummaryAccessDenied: boolean,
-  logSummaryError: string,
-  logSummaryLoading: boolean
-) {
-  if (logSummaryAccessDenied) {
-    return {
-      detail: "此頁面僅對受信任的管理端開放。",
-      entryCountLabel: "--",
-      exportAvailable: false,
-      retentionLabel: "--",
-      sourceLabel: "journald",
-      statusTitle: "存取受限"
-    };
-  }
-
-  if (logSummaryLoading && logSummary === null && !logSummaryError) {
-    return {
-      detail: "正在同步 Journald 日誌摘要。",
-      entryCountLabel: "--",
-      exportAvailable: false,
-      retentionLabel: "--",
-      sourceLabel: "journald",
-      statusTitle: "同步中"
-    };
-  }
-
-  if (logSummaryError) {
-    return {
-      detail: logSummaryError,
-      entryCountLabel: "Unavailable",
-      exportAvailable: false,
-      retentionLabel: "--",
-      sourceLabel: "journald",
-      statusTitle: "日誌不可用"
-    };
-  }
-
-  if (logSummary === null) {
-    return {
-      detail: "尚未載入 Journald 日誌摘要。",
-      entryCountLabel: "--",
-      exportAvailable: false,
-      retentionLabel: "--",
-      sourceLabel: "journald",
-      statusTitle: "尚未載入"
-    };
-  }
-
-  if (!logSummary.available) {
-    return {
-      detail: logSummary.unavailableReason ?? "Journald 目前不可用。",
-      entryCountLabel: "Unavailable",
-      exportAvailable: false,
-      retentionLabel: `${logSummary.retention.scope} · max ${logSummary.retention.maxEntries}`,
-      sourceLabel: logSummary.source,
-      statusTitle: "日誌不可用"
-    };
-  }
-
-  const preview =
-    logSummary.entries.length > 0
-      ? logSummary.entries
-          .slice(0, 3)
-          .map((entry) => entry.message)
-          .join(" / ")
-      : "目前 boot 範圍內沒有 journal 記錄（不是「沒有錯誤」的保證）。";
-
-  return {
-    detail: preview,
-    entryCountLabel: `${logSummary.entries.length} entries`,
-    exportAvailable: true,
-    retentionLabel: `${logSummary.retention.scope} · max ${logSummary.retention.maxEntries}`,
-    sourceLabel: logSummary.source,
-    statusTitle: "Journald 可用"
-  };
-}
-
-function buildReleaseRows(status: DeviceRouteStatus | null, statusAccessDenied: boolean) {
-  if (statusAccessDenied) {
-    return [
-      { label: "Release ID", value: "存取受限" },
-      { label: "Commit", value: "-" },
-      { label: "Built At", value: "-" },
-      { label: "Package", value: "-" },
-      { label: "Schema", value: "-" }
-    ];
-  }
-
-  const release = status?.release;
-  if (!release || !release.available) {
-    return [
-      {
-        label: "Release ID",
-        value: release?.unavailableReason ?? "Release identity unavailable"
-      },
-      { label: "Commit", value: "-" },
-      { label: "Built At", value: "-" },
-      { label: "Package", value: "-" },
-      { label: "Schema", value: "-" }
-    ];
-  }
-
-  const shortCommit = release.commit ? release.commit.slice(0, 12) : "-";
-  return [
-    {
-      label: "Release ID",
-      value: release.sourceDirty ? `${release.releaseId ?? "-"} (dirty)` : (release.releaseId ?? "-")
-    },
-    { label: "Commit", value: shortCommit },
-    { label: "Built At", value: formatTimestamp(release.builtAt) },
-    { label: "Package", value: release.packageVersion ?? "-" },
-    {
-      label: "Schema",
-      value: release.schemaVersion === null || release.schemaVersion === undefined
-        ? "-"
-        : String(release.schemaVersion)
-    }
-  ];
-}
-
 export function buildDeviceStatusViewModel({
   actionFeedback,
+  appTime,
   displayOpsAccessDenied = false,
   displayOpsLoading = false,
-  displayOpsSummary,
+  displayOpsSummary = null,
   isLoading,
   logSummary,
   logSummaryAccessDenied = false,
@@ -437,12 +78,17 @@ export function buildDeviceStatusViewModel({
   statusAccessDenied = false
 }: BuildDeviceStatusViewModelArgs) {
   const runtimeSummary = buildRuntimeSummary(isLoading, status, statusAccessDenied);
-  const triageSummary =
-    displayOpsSummary?.triageSummary
-    ?? resolveDisplayFaultTriageSummaryFromAlerts(displayOpsSummary?.alerts ?? null);
+  const triageSummary = displayOpsSummary?.triageSummary ?? resolveDisplayFaultTriageSummaryFromAlerts(displayOpsSummary?.alerts);
   const safeOpsGuidance = displayOpsSummary?.safeOpsGuidance ?? defaultSafeOpsGuidance;
-  const diagnostics = displayOpsSummary?.diagnosticActions ?? [];
-  const unsupportedActions = safeOpsGuidance.unsupportedOperations;
+  const diagnostics = (displayOpsSummary?.diagnosticActions ?? []).map((action) => ({
+    ...action,
+    label: localizeActionLabel(action.action, action.label),
+    safeScope: localizeSafeScope(action.safeScope)
+  }));
+  const unsupportedActions = safeOpsGuidance.unsupportedOperations.map((op) => ({
+    ...op,
+    label: op.label === "Reboot device" ? "重啟裝置" : op.label
+  }));
   const displayStatusTitle =
     displayOpsAccessDenied
       ? "存取受限"
@@ -457,12 +103,12 @@ export function buildDeviceStatusViewModel({
     displayOpsAccessDenied
       ? "此頁面僅對受信任的管理端開放。"
       : displayOpsLoading && !displayOpsSummary
-        ? "正在同步 display diagnostics 摘要。"
+        ? "正在同步展示診斷摘要。"
       : triageSummary
         ? formatTriageHelper(triageSummary)
         : diagnostics.length > 0
-          ? `先執行 safe diagnostics，再決定是否升級到 ${safeOpsGuidance.hostRestartCommand}。`
-          : `若問題持續，請依 runbook 改走 ${safeOpsGuidance.hostRestartCommand}。`;
+          ? `先執行安全診斷，再決定是否升級到 ${safeOpsGuidance.hostRestartCommand}。`
+          : `若問題持續，請依維運操作手冊改走 ${safeOpsGuidance.hostRestartCommand}。`;
   const logsSummary = buildLogsSummary(
     logSummary,
     logSummaryAccessDenied,
@@ -474,42 +120,69 @@ export function buildDeviceStatusViewModel({
   const unpairedDisplayAccessSummary = buildUnpairedDisplayAccessSummary(status?.unpairedDisplayAccess, now);
   const alerts = displayOpsSummary?.alerts.map((alert) => ({
     ...alert,
-    domainLabel: alert.domain,
-    pageLabel: alert.pageId ? `${alert.pageId}` : "global"
+    domainLabel: alert.domain === "operational-health" ? "營運健康" : alert.domain === "configuration-readiness" ? "設定整備" : alert.domain,
+    message: localizeAlertMessage(alert.message),
+    pageLabel: alert.pageId ? (displayClientPageLabels[alert.pageId] ?? alert.pageId) : "全域"
   })) ?? [];
+  const affectedPagesLabel = triageSummary
+    ? formatTriagePages(triageSummary)
+    : displayOpsSummary?.alerts.some((a) => a.pageId)
+      ? [
+          ...new Set(
+            displayOpsSummary.alerts
+              .map((a) => (a.pageId ? (displayClientPageLabels[a.pageId] ?? a.pageId) : "全域"))
+          )
+        ].join("、")
+      : "全頁面正常";
+
+  const dominantReasonLabel = triageSummary
+    ? localizeAlertMessage(triageSummary.dominantReason)
+    : displayOpsSummary?.alerts[0]?.message
+      ? localizeAlertMessage(displayOpsSummary.alerts[0].message)
+      : "無異常事件";
+
   const heroCards = [
     {
-      detail: runtimeSummary.detail,
-      title: "Host Health",
-      tone: runtimeSummary.title === "同步失敗" || runtimeSummary.title === "存取受限" ? "error" as const : runtimeSummary.title === "同步中" ? "warning" as const : "ready" as const,
-      value: runtimeSummary.title
+      detail: triageSummary
+        ? `共 ${triageSummary.affectedPages.length} 個展示頁面需要關注`
+        : runtimeSummary.title === "正常運作"
+          ? "5 個正式展示頁面均正常播映"
+          : runtimeSummary.detail,
+      title: "受影響範圍",
+      tone:
+        triageSummary || runtimeSummary.title === "同步失敗"
+          ? ("error" as const)
+          : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
+            ? ("warning" as const)
+            : ("ready" as const),
+      value: affectedPagesLabel
     },
     {
       detail:
         displayOpsAccessDenied
           ? "此頁面僅對受信任的管理端開放。"
-          : `${displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined ? "--" : `v${displayOpsSummary.liveVersion}`} · ${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} blocking · ${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} config blocking`,
-      title: "Display Operations",
+          : triageSummary
+            ? `事件類別：${localizeTriageKind(triageSummary.faultKind)}`
+            : `營運健康：${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} 阻擋 · 設定整備：${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} 阻擋`,
+      title: "主要原因",
       tone:
-        displayOpsAccessDenied
-          ? "error" as const
-          : (displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded)
-            ? "warning" as const
-            : "ready" as const,
-      value: displayStatusTitle
+        triageSummary || (displayOpsSummary?.alerts.length ?? 0) > 0
+          ? ("warning" as const)
+          : ("ready" as const),
+      value: dominantReasonLabel
     },
     {
       detail: nextActionDetail,
-      title: "Next Action Guidance",
+      title: "建議處置",
       tone:
         displayOpsAccessDenied || statusAccessDenied
-          ? "error" as const
+          ? ("error" as const)
           : triageSummary || (displayOpsSummary?.degraded ?? false)
-            ? "warning" as const
-            : "ready" as const,
+            ? ("warning" as const)
+            : ("ready" as const),
       value:
-        triageSummary?.repairDestinationLabel
-        ?? (diagnostics.length > 0 ? "Run safe diagnostics" : "Keep monitoring")
+        localizeRepairDestination(triageSummary?.repairDestinationLabel)
+        ?? (diagnostics.length > 0 ? "執行安全診斷" : "維持監控中")
     }
   ];
 
@@ -553,9 +226,9 @@ export function buildDeviceStatusViewModel({
     displayOpsSummary: {
       alertCount: displayOpsSummary?.alerts.length ?? 0,
       alerts,
-      assetHealthLabel: `${displayOpsSummary?.assetHealthSummary.unhealthyCount ?? 0} unhealthy`,
+      assetHealthLabel: `${displayOpsSummary?.assetHealthSummary.unhealthyCount ?? 0} 項異常`,
       configurationReadinessLabel:
-        `${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} blocking`,
+        `${displayOpsSummary?.configurationReadinessSummary.blockingCount ?? 0} 項阻擋`,
       degraded: displayOpsSummary?.operationalHealthSummary.degraded ?? displayOpsSummary?.degraded ?? false,
       diagnosticsLabel:
         displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") ?? "--",
@@ -566,21 +239,21 @@ export function buildDeviceStatusViewModel({
         displayOpsAccessDenied
           ? "此頁面僅對受信任的管理端開放。"
           : displayOpsLoading && !displayOpsSummary
-            ? "正在同步 display diagnostics 摘要。"
+            ? "正在同步展示診斷摘要。"
           : triageSummary
             ? formatTriageHelper(triageSummary)
-            : displayOpsSummary?.alerts[0]?.message
-              ?? "可在此查看 live publish、skip 與 readiness 摘要。",
+            : (displayOpsSummary?.alerts[0]?.message ? localizeAlertMessage(displayOpsSummary.alerts[0].message) : null)
+              ?? "可在此查看正式發布、略過與整備度摘要。",
       lastPublishLabel: formatTimestamp(displayOpsSummary?.lastPublishAt),
       liveVersion:
         displayOpsSummary?.liveVersion === null || displayOpsSummary?.liveVersion === undefined
           ? "--"
           : `v${displayOpsSummary.liveVersion}`,
       operationalHealthLabel:
-        `${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} blocking`,
+        `${displayOpsSummary?.operationalHealthSummary.blockingCount ?? 0} 項阻擋`,
       runbookPath: safeOpsGuidance.runbookPath,
-      safeOpsHelper: `安全操作：${displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") || "--"} · 主機層處置：${safeOpsGuidance.hostRestartCommand} · Runbook：${safeOpsGuidance.runbookPath}`,
-      skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} skipped`,
+      safeOpsHelper: `安全操作：${displayOpsSummary?.diagnosticActions.map((action) => action.label).join(" / ") || "--"} · 主機層處置：${safeOpsGuidance.hostRestartCommand} · 操作手冊：${safeOpsGuidance.runbookPath}`,
+      skipLabel: `${displayOpsSummary?.skipSummary.count ?? 0} 項略過`,
       statusTitle: displayStatusTitle,
       unsupportedControlsLabel:
         unsupportedActions.length > 0
@@ -592,8 +265,8 @@ export function buildDeviceStatusViewModel({
       hostEscalationLabel: safeOpsGuidance.hostRestartCommand,
       resultDetail:
         actionFeedback?.detail
-        ?? "執行下方 safe diagnostics actions 時，只會觸發安全讀取或摘要刷新，不會進行危險裝置控制。",
-      resultTitle: actionFeedback?.title ?? "尚未執行 safe diagnostics",
+        ?? "執行安全診斷操作時，只會觸發安全讀取或摘要刷新，不會進行危險裝置控制。",
+      resultTitle: actionFeedback?.title ? localizeActionLabel("", actionFeedback.title) : "尚未執行安全診斷",
       runbookPath: safeOpsGuidance.runbookPath,
       safeScopeLabel: diagnostics.map((action) => `${action.label} (${action.safeScope})`).join(" / ") || "--",
       unsupportedActions
@@ -606,10 +279,10 @@ export function buildDeviceStatusViewModel({
             ? "此頁面僅對受信任的管理端開放。"
             : triageSummary
               ? formatTriageHelper(triageSummary)
-              : displayOpsSummary?.alerts[0]?.message ?? "請先處理 blocking alerts。"
-          : "目前沒有 display readiness、skip 或 asset 警示。",
+              : (displayOpsSummary?.alerts[0]?.message ? localizeAlertMessage(displayOpsSummary.alerts[0].message) : null) ?? "請先處理阻擋性警示。"
+          : "目前沒有展示整備度、略過或資產警示。",
       items: alerts,
-      summaryTitle: `${alerts.length} display alert${alerts.length === 1 ? "" : "s"}`
+      summaryTitle: `${alerts.length} 項展示警示`
     },
     logsSummary,
     logsTriage: {
@@ -630,54 +303,17 @@ export function buildDeviceStatusViewModel({
       summaryTitle: displayClientSummary.totalLabel
     },
     releaseRows,
-    resourceCards: [
+    resourceCards: buildResourceCards(status),
+    systemRows: ([
       {
-        gaugeValue: status ? formatPercent(status.cpu.loadAvg[0] * 100) : "--",
-        helper: status ? `1m / 5m / 15m: ${status.cpu.loadAvg.map((value) => value.toFixed(2)).join(" / ")}` : "--",
-        label: "CPU 負載",
-        valueLabel: status ? status.cpu.loadAvg[0].toFixed(2) : "--"
+        label: "伺服器時間",
+        value: formatServerTime(appTime?.nowEpochMs ?? null)
       },
       {
-        gaugeValue: status ? formatPercent(status.memory.usePercent) : "--",
-        helper: status ? `${status.memory.usedMB} / ${status.memory.totalMB} MB` : "--",
-        label: "記憶體使用率",
-        valueLabel: status ? formatPercent(status.memory.usePercent) : "--"
+        label: "時間同步狀態",
+        tone: formatTimeSyncStatus(appTime?.state).tone,
+        value: formatTimeSyncStatus(appTime?.state).value
       },
-      {
-        gaugeValue: status ? formatPercent(status.disk.usePercent) : "--",
-        helper: status ? `${status.disk.usedMB} / ${status.disk.totalMB} MB` : "--",
-        label: "磁碟使用率",
-        valueLabel: status ? formatPercent(status.disk.usePercent) : "--"
-      },
-      {
-        gaugeValue: status?.temperature?.available && status.temperature.celsius !== null
-          ? `${status.temperature.celsius.toFixed(1)}°C`
-          : "--",
-        helper: status
-          ? status.temperature?.available
-            ? "Pi 5 CPU thermal"
-            : "目前無可信溫度量測來源"
-          : "--",
-        label: "系統溫度",
-        valueLabel: status
-          ? status.temperature?.available && status.temperature.celsius !== null
-            ? `${status.temperature.celsius.toFixed(1)}°C`
-            : "Unavailable"
-          : "--"
-      }
-    ].map((card, index) => {
-      const gaugePercent = gaugePercentForCard(card.label, card.gaugeValue, card.valueLabel);
-      let gaugeColor: string;
-      if (card.valueLabel === "Unavailable") {
-        gaugeColor = "#7c847c";
-      } else if (index === 3) {
-        gaugeColor = gaugePercent >= 75 ? "#c14a4a" : gaugePercent >= 55 ? "#c9881a" : "#d89c45";
-      } else {
-        gaugeColor = gaugePercent >= 90 ? "#c14a4a" : gaugePercent >= 70 ? "#c9881a" : "#4f7c42";
-      }
-      return { ...card, gaugeColor, gaugePercent };
-    }),
-    systemRows: [
       {
         label: "裝置名稱",
         value: status?.hostname ?? "-"
@@ -707,6 +343,13 @@ export function buildDeviceStatusViewModel({
         value: status ? String(status.pid) : "-"
       },
       ...releaseRows
-    ]
+    ] as SystemRowItem[]),
+    timeSyncSummary: {
+      formattedTime: formatServerTime(appTime?.nowEpochMs ?? null),
+      state: appTime?.state ?? "waiting",
+      stateLabel: formatTimeSyncStatus(appTime?.state).value,
+      tone: formatTimeSyncStatus(appTime?.state).tone
+    },
+    uptimeLabel: formatUptime(status?.uptimeSeconds ?? null)
   };
 }

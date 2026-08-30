@@ -1,23 +1,16 @@
-// Device status — FHD content area (1920 × 838) layout, redesigned to remove the
-// resource/network overlap and give every region clear breathing room.
+// Device status — FHD content area (1920 × 858) layout, aligned to management surface standard.
+// Actions are placed at the top header right of the title.
+// Layout Variant: Plan A — Top KPI Bar + Dual-Wing Panels (Total 740px height from top 118px to 858px).
 //
 // Vertical budget:
-//   28-76    title
-//   64-554   left aside (3 status cards, h=156, gap 16)
-//   64-574   info panel
-//   64-304   photo
-//   320-588  resource panel (h=268)
-//   604-666  network bar (h=62)
-//   686-742  actions row (h=56)
-//   758-806  feedback strip (h=48)
+//   28-90    title (left) and action buttons (right, top 32)
+//   118-228  top KPI banner (height: 110, width: 1820)
+//   244-858  dual-wing panels (height: 614, left: 896w, right: 908w)
 
 export const deviceLayout = {
-  actions: { height: 56, left: 50, top: 686, width: 1820 },
-  feedback: { height: 48, left: 50, top: 758, width: 1820 },
-  info: { height: 510, left: 460, top: 64, width: 710 },
-  network: { height: 62, left: 1190, top: 604, width: 680 },
-  photo: { height: 240, left: 1190, top: 64, width: 680 },
-  resource: { height: 268, left: 1190, top: 320, width: 680 },
-  side: { left: 50, top: 64, width: 390 },
+  actions: { height: 48, left: 1190, top: 32, width: 680 },
+  kpiBar: { height: 116, left: 50, top: 118, width: 1820 },
+  leftPanel: { height: 612, left: 50, top: 246, width: 896 },
+  rightPanel: { height: 612, left: 962, top: 246, width: 908 },
   title: { left: 58, top: 28 }
 } as const;
