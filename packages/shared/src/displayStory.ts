@@ -2,6 +2,7 @@ import type { DisplayCircuitSlotKey, DisplayReadinessFinding, FactoryCircuitPage
 import type { MetricKey } from "./types.js";
 import type { FreshnessPolicy, FreshnessResult } from "./freshnessPolicy.js";
 import type { MetricScope } from "./metricScope.js";
+import type { DerivedMetricRuntimeDiagnostics } from "./derivedMetric.js";
 
 export type MonitoringFreshnessState = "fresh" | "fallback" | "stale";
 export type MonitoringAlertTone = "danger" | "normal" | "warning";
@@ -69,6 +70,7 @@ export type MonitoringMetricBinding<TMetric extends string = MetricKey> = {
 export type ResolvedMonitoringMetricBinding<TMetric extends string = MetricKey> =
   MonitoringStoryState & {
     dependencyKeys: string[];
+    derivedMetric?: DerivedMetricRuntimeDiagnostics;
     fallbackStrategy: MonitoringFallbackStrategy;
     freshness?: FreshnessResult;
     helper: string;
@@ -111,7 +113,7 @@ export type FactoryCircuitStorySlot = MonitoringStoryState & {
 
 export type FactoryCircuitStoryPayload = {
   freshnessPolicy?: FreshnessPolicy;
-  kpis: Array<ResolvedMonitoringMetricBinding<FactoryCircuitKpiKey>>;
+  kpis: Array<ResolvedMonitoringMetricBinding<string>>;
   slots: FactoryCircuitStorySlot[];
   summary: MonitoringSummaryState;
 };
@@ -180,6 +182,7 @@ export type DisplayStoryPagePayload<PageId extends DisplayStoryPageId = DisplayS
 };
 
 export type MonitoringDisplayValueOptions = {
+  maximumPrecision?: number;
   precision?: number;
   preferKilogramsForSubTonCo2?: boolean;
   unitDisplay?: "auto" | "hide";
@@ -211,10 +214,24 @@ export function formatMonitoringDisplayValue(
     displayUnit = "kg";
   }
 
+  const adaptiveDigits = displayUnit === "%"
+    ? 1
+    : Math.abs(displayValue) >= 100
+      ? 0
+      : Math.abs(displayValue) >= 10
+        ? 1
+        : 2;
+  const maximumFractionDigits = options.maximumPrecision === undefined
+    ? adaptiveDigits
+    : Math.min(adaptiveDigits, options.maximumPrecision);
+
   return {
     unit: options.unitDisplay === "hide" ? "" : displayUnit,
     value: options.precision === undefined
-      ? formatMonitoringValue(displayValue, displayUnit)
+      ? displayValue.toLocaleString("zh-TW", {
+          maximumFractionDigits,
+          minimumFractionDigits: maximumFractionDigits === 0 ? 0 : 1
+        })
       : displayValue.toLocaleString("zh-TW", {
           maximumFractionDigits: options.precision,
           minimumFractionDigits: options.precision

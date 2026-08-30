@@ -32,6 +32,7 @@ import playbackProfilesRoute from "./routes/playback-profiles.js";
 import imagesRoute from "./routes/images.js";
 import brandRoute from "./routes/brand.js";
 import calculationSettingsRoute from "./routes/calculation-settings.js";
+import derivedMetricsRoute from "./routes/derived-metrics.js";
 import circuitsRoute from "./routes/circuits.js";
 import dataSourceRoute from "./routes/data-source.js";
 import deviceRoute from "./routes/device.js";
@@ -55,6 +56,10 @@ import managementAuthRoute from "./routes/management-auth.js";
 import { readManagementPasswordState } from "./services/managementPasswordService.js";
 import { verifyManagementSession } from "./services/managementSessionService.js";
 import { readManagementSessionCookie } from "./plugins/managementAuth.js";
+import {
+  evaluateDerivedMetrics,
+  initializeDerivedMetricRegistry
+} from "./services/derivedMetricRegistryService.js";
 
 function shouldServeSpaFallback(request: { headers: { accept?: string }; method: string; url: string }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -128,6 +133,8 @@ export function createFastifyOptions(): FastifyServerOptions {
 }
 
 export async function buildApp() {
+  initializeDerivedMetricRegistry();
+  evaluateDerivedMetrics();
   const app = Fastify(createFastifyOptions());
   const trustedManagementOrigins = parseManagementTrustedOrigins(config.managementTrustedOrigins);
   const managementCorsOrigin = createManagementCorsOriginDelegate(trustedManagementOrigins);
@@ -222,6 +229,7 @@ export async function buildApp() {
   await app.register(imagesRoute);
   await app.register(brandRoute);
   await app.register(calculationSettingsRoute);
+  await app.register(derivedMetricsRoute);
   await app.register(circuitsRoute);
   await app.register(dataSourceRoute);
   await app.register(deviceRoute);

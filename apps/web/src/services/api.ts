@@ -23,6 +23,8 @@ import type {
   DisplayPageFreeformObject,
   DisplayPageId,
   DisplayReadinessReport,
+  DerivedMetricDefinition,
+  DerivedMetricEvaluation,
   FreshnessPolicy,
   ImageAsset,
   ManagementDraftSaveConflict,
@@ -1100,6 +1102,45 @@ export async function updateCalculationSettings(settings: CalculationSettings) {
     method: "PUT"
   });
   return response.settings;
+}
+
+export async function getDerivedMetricDefinitions() {
+  const response = await requestJson<{ definitions: DerivedMetricDefinition[] }>(
+    "/api/derived-metrics"
+  );
+  return response.definitions;
+}
+
+export async function saveDerivedMetricDefinition(definition: DerivedMetricDefinition) {
+  const response = await requestJson<{ definition: DerivedMetricDefinition }>(
+    definition.revision > 0
+      ? `/api/derived-metrics/${encodeURIComponent(definition.metricKey)}`
+      : "/api/derived-metrics",
+    {
+      body: JSON.stringify(definition),
+      method: definition.revision > 0 ? "PUT" : "POST"
+    }
+  );
+  return response.definition;
+}
+
+export async function previewDerivedMetricDefinition(
+  definition: DerivedMetricDefinition,
+  metricScope: MetricScope
+) {
+  const response = await requestJson<{ evaluation: DerivedMetricEvaluation }>(
+    "/api/derived-metrics/preview",
+    { body: JSON.stringify({ definition, metricScope }), method: "POST" }
+  );
+  return response.evaluation;
+}
+
+export async function setDerivedMetricEnabled(metricKey: string, enabled: boolean) {
+  const response = await requestJson<{ definition: DerivedMetricDefinition }>(
+    `/api/derived-metrics/${encodeURIComponent(metricKey)}/enabled`,
+    { body: JSON.stringify({ enabled }), method: "PATCH" }
+  );
+  return response.definition;
 }
 
 export async function getDeviceStatus() {

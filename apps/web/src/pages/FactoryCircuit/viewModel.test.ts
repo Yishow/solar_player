@@ -137,6 +137,9 @@ test("buildFactoryCircuitViewModel centralizes threshold mapping by power and ke
   assert.match(model.kpis[0]?.sourceTooltip ?? "", /Source: slot-aggregate/);
   assert.match(model.kpis[0]?.sourceTooltip ?? "", /Depends on: stamping/);
   assert.equal(model.kpis[1]?.value, "--");
+  assert.equal(model.kpis[1]?.helper, "等待 Registry Story");
+  assert.equal(model.kpis[3]?.value, "--");
+  assert.equal(model.kpis[3]?.helper, "等待 Registry Story");
   assert.equal(model.kpis[4]?.value, "待命");
 });
 
@@ -251,12 +254,13 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
           fallbackStrategy: "placeholder",
           freshnessState: "fallback",
           helper: "缺少空調迴路綁定",
+          itemId: "totalPower",
           label: "目前廠區總用電",
-          metricKey: "totalPower",
-          provenance: "fallback",
-          sourceClass: "slot-aggregate",
+          metricKey: "custom.factoryPower",
+          provenance: "derived",
+          sourceClass: "derived-metric",
           unit: "kW",
-          value: "--"
+          value: "123.4"
         },
         {
           alertTone: "warning",
@@ -345,9 +349,10 @@ test("buildFactoryCircuitViewModel uses factoryCircuitStory slots when available
   assert.equal(model.loadRows[2]?.labelEn, "Painting Shop");
   assert.equal(model.loadRows[2]?.statusLabel, "未綁定");
   assert.equal(model.loadRows[2]?.livePowerKw, null);
-  assert.equal(model.kpis[0]?.value, "--");
-  assert.equal(model.kpis[0]?.provenance, "fallback");
-  assert.equal(model.kpis[0]?.sourceClass, "slot-aggregate");
+  assert.equal(model.kpis[0]?.metricKey, "custom.factoryPower");
+  assert.equal(model.kpis[0]?.value, "123.4");
+  assert.equal(model.kpis[0]?.provenance, "derived");
+  assert.equal(model.kpis[0]?.sourceClass, "derived-metric");
   assert.equal(model.kpis[2]?.value, "2,430");
   assert.equal(model.kpis[2]?.provenance, "live");
   assert.ok(

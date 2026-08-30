@@ -4,6 +4,7 @@ import type {
   DisplayStoryPayload,
   DisplayStoryPayloadByPageId,
   DisplayCircuitSlotKey,
+  DerivedMetricDependencyIdentity,
   EffectiveBindingPlan,
   FactoryCircuitPageKey,
   FactoryCircuitKpiKey,
@@ -17,7 +18,8 @@ import type {
   OverviewStoryPayload,
   ResolvedMonitoringMetricBinding,
   SiteScope,
-  SolarComparisonTarget
+  SolarComparisonTarget,
+  WidgetDataBindingPageKey
 } from "@solar-display/shared";
 import {
   aggregateFreshnessResults,
@@ -32,12 +34,16 @@ import {
   resolveMonitoringSummaryState,
   resolvePlaybackDisplayMetricSourceClass,
   resolvePlaybackBindingItemConstraints,
-  resolvePlaybackMetricCatalog,
   resolveSolarComparison,
   resolveSolarFlowState
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readCalculationSettings, type CalculationSettings } from "./calculationSettingsService.js";
+import { resolveServerPlaybackMetricCatalog } from "./derivedMetricCatalogService.js";
+import {
+  readDerivedMetricDefinition,
+  readDerivedMetricEvaluation
+} from "./derivedMetricRegistryService.js";
 import { readDisplayReadinessReport } from "./displayReadinessService.js";
 import { readPlaybackSettings } from "./displayRotationService.js";
 import { readStageConfig } from "./displayPagePublishingService.js";
@@ -230,29 +236,93 @@ type DisplayStorySourceContext = {
 type DisplayStoryReadOptions = {
   applyDisplayOverrides?: boolean;
   profileId?: number;
+  resolveMetricCatalog?: (pageKey: WidgetDataBindingPageKey) =>
+    ReturnType<typeof resolveServerPlaybackMetricCatalog>;
   siteScope?: SiteScope;
 };
 
+type CatalogMetricBinding = MonitoringMetricBinding<string> & {
+  catalogUnavailable?: boolean;
+};
+
+function resolveStoryMetricCatalog(
+  pageKey: WidgetDataBindingPageKey,
+  options: DisplayStoryReadOptions
+) {
+  return options.resolveMetricCatalog?.(pageKey) ?? resolveServerPlaybackMetricCatalog(pageKey);
+}
+
 function readPublishedEffectiveBindingPlan(
   pageKey: "overview" | "solar" | FactoryCircuitPageKey,
-  siteScope: SiteScope | null
+  siteScope: SiteScope | null,
+  catalog: ReturnType<typeof resolveServerPlaybackMetricCatalog>
 ) {
   const live = readStageConfig(pageKey, "live");
   const normalized = normalizeMetricBoundPageConfig(pageKey, live.regions);
+  const items = Object.values(normalized.dataBindings);
   const compiled = compileEffectiveBindingPlan({
-    catalog: resolvePlaybackMetricCatalog(pageKey),
+    catalog,
     context: {
       contextKey: `site:${siteScope ?? "missing"}:live:${live.version}`,
       siteScope
     },
     itemConstraints: resolvePlaybackBindingItemConstraints(pageKey),
-    items: Object.values(normalized.dataBindings),
+    items,
     pageId: pageKey
   });
   if (!compiled.ok) {
-    throw new Error(
-      `Invalid published widget binding ${pageKey}.${compiled.error.itemId}: ${compiled.error.code}`
+    const activeItems = items.filter(({ dataBinding }) =>
+      catalog.some(({ metricKey }) => metricKey === dataBinding.metricKey)
     );
+    const inactiveItems = items.filter(({ dataBinding }) =>
+      !catalog.some(({ metricKey }) => metricKey === dataBinding.metricKey)
+    );
+    if (inactiveItems.length === 0) {
+      throw new Error(
+        `Invalid published widget binding ${pageKey}.${compiled.error.itemId}: ${compiled.error.code}`
+      );
+    }
+    const activeCompiled = compileEffectiveBindingPlan({
+      catalog,
+      context: {
+        contextKey: `site:${siteScope ?? "missing"}:live:${live.version}`,
+        siteScope
+      },
+      itemConstraints: resolvePlaybackBindingItemConstraints(pageKey),
+      items: activeItems,
+      pageId: pageKey
+    });
+    if (!activeCompiled.ok) {
+      throw new Error(
+        `Invalid published widget binding ${pageKey}.${activeCompiled.error.itemId}: ${activeCompiled.error.code}`
+      );
+    }
+    const activeBindings = new Map(
+      activeCompiled.plan.items.map((binding) => [binding.itemId, binding])
+    );
+    return {
+      ...activeCompiled.plan,
+      items: items.map((item) => {
+        const activeBinding = activeBindings.get(item.itemId);
+        if (activeBinding) return activeBinding;
+        const effectiveScope: MetricScope = item.dataBinding.scope === "inherit-device"
+          ? siteScope ?? "global"
+          : item.dataBinding.scope;
+        return {
+          configuredScope: item.dataBinding.scope,
+          dependencyIdentities: [{
+            metricKey: item.dataBinding.metricKey,
+            metricScope: effectiveScope
+          }],
+          effectiveScope,
+          format: item.dataBinding.format,
+          itemId: item.itemId,
+          metricKey: item.dataBinding.metricKey,
+          sourceClass: "derived-metric" as const,
+          catalogUnavailable: true as const
+        };
+      })
+    };
   }
   return compiled.plan;
 }
@@ -298,106 +368,10 @@ function roundTo(value: number, digits: number) {
   return Number(value.toFixed(digits));
 }
 
-function normalizeGenerationKwh(value: number, unit: string | null) {
-  switch (unit?.trim().toLowerCase()) {
-    case "gwh":
-      return value * 1_000_000;
-    case "mwh":
-      return value * 1_000;
-    case "wh":
-      return value / 1_000;
-    default:
-      return value;
-  }
-}
-
-function readCumulativeCounter(metricKey: string, metricScope: "cl" | "kn" | "global") {
-  return getDatabase()
-    .prepare(
-      `
-        SELECT total_value, last_updated
-        FROM cumulative_counters
-        WHERE metric_scope = ? AND metric_key = ?
-      `
-    )
-    .get(metricScope, metricKey) as { last_updated: string | null; total_value: number | null } | undefined;
-}
-
-function buildDerivedCarbonReductionReading(
-  generationReading: ReturnType<typeof readLiveMetricsSnapshot>["metrics"][string] | null,
-  carbonEmissionFactor: number
-) {
-  if (!generationReading || !Number.isFinite(generationReading.value)) {
-    return null;
-  }
-
-  return {
-    freshness: generationReading.freshness,
-    quality: generationReading.quality,
-    timestamp: generationReading.timestamp,
-    unit: "t",
-    value: roundTo(
-      normalizeGenerationKwh(generationReading.value, generationReading.unit) * carbonEmissionFactor / 1000,
-      6
-    )
-  };
-}
-
-function buildCumulativeGenerationReading(
-  snapshot: ReturnType<typeof readLiveMetricsSnapshot>,
-  metricScope: "cl" | "kn" | "global",
-  preferSnapshot = false,
-  nowMs = Date.now()
-) {
-  if (preferSnapshot) {
-    return snapshot.metrics.totalGeneration ?? null;
-  }
-
-  const cumulativeGeneration = readCumulativeCounter("generation", metricScope);
-
-  if (
-    typeof cumulativeGeneration?.total_value === "number"
-    && cumulativeGeneration.last_updated
-  ) {
-    return {
-      freshness: evaluateMetricFreshness({
-        metricKey: "totalGeneration",
-        nowMs,
-        sourceTimestamp: cumulativeGeneration.last_updated
-      }),
-      quality: null,
-      timestamp: cumulativeGeneration.last_updated,
-      unit: "kWh",
-      value: cumulativeGeneration.total_value
-    };
-  }
-
-  return snapshot.metrics.totalGeneration ?? null;
-}
-
 function resolveStoryMetricReading(
-  metricKey: StoryMetricKey,
+  metricKey: string,
   context: DisplayStorySourceContext
 ) {
-  if (metricKey === "todayCo2Reduction") {
-    return buildDerivedCarbonReductionReading(
-      context.snapshot.metrics.todayGeneration ?? null,
-      context.calculationSettings.carbonEmissionFactor
-    );
-  }
-
-  if (metricKey === "totalCo2Reduction") {
-    return buildDerivedCarbonReductionReading(
-      buildCumulativeGenerationReading(
-        context.snapshot,
-        context.siteScope ?? "global",
-        context.siteScope !== null,
-        Date.parse(context.generatedAt)
-      ),
-      context.calculationSettings.carbonEmissionFactor
-    );
-  }
-
   if (context.siteScope) {
     const resolved = resolveMetric(
       getDatabase(),
@@ -549,7 +523,8 @@ function resolveCircuitState(args: {
 }
 
 function resolveSolarKpiBinding(args: {
-  binding: MonitoringMetricBinding<StoryMetricKey>;
+  binding: MonitoringMetricBinding<string>;
+  catalogUnavailable?: boolean;
   calculationSettings: CalculationSettings;
   displayValueOptions?: MonitoringDisplayValueOptions;
   isConnected: boolean;
@@ -557,110 +532,146 @@ function resolveSolarKpiBinding(args: {
   nowMs: number;
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
 }) {
-  if (args.binding.metricKey !== "selfConsumptionRatio") {
-    return resolveMonitoringMetricBinding({
-      binding: args.binding,
-      displayValueOptions: {
-        ...args.displayValueOptions,
-        preferKilogramsForSubTonCo2:
-          args.calculationSettings.co2AutoConvertSmallToKg &&
-          (args.binding.metricKey === "todayCo2Reduction" ||
-            args.binding.metricKey === "totalCo2Reduction")
-      },
-      isConnected: args.isConnected,
-      metricScope: args.metricScope,
-      reading:
-        args.binding.metricKey === "todayCo2Reduction"
-          ? buildDerivedCarbonReductionReading(
-            args.snapshot.metrics.todayGeneration ?? null,
-            args.calculationSettings.carbonEmissionFactor
-          )
-          : args.binding.metricKey === "totalCo2Reduction"
-            ? buildDerivedCarbonReductionReading(
-              buildCumulativeGenerationReading(
-                args.snapshot,
-                "global",
-                false,
-                args.nowMs
-              ),
-              args.calculationSettings.carbonEmissionFactor
-            )
-            : args.snapshot.metrics[args.binding.metricKey] ?? null
-    });
-  }
-
-  const directReading = args.snapshot.metrics.selfConsumptionRatio ?? null;
-  if (directReading) {
-    return resolveMonitoringMetricBinding({
-      binding: args.binding,
-      displayValueOptions: args.displayValueOptions,
-      isConnected: args.isConnected,
-      metricScope: args.metricScope,
-      reading: directReading
-    });
-  }
-
-  const selfConsumptionReading = args.snapshot.metrics.selfConsumptionEnergy ?? null;
-  const consumptionReading = args.snapshot.metrics.consumptionEnergy ?? null;
-  if (
-    args.isConnected &&
-    selfConsumptionReading &&
-    consumptionReading &&
-    consumptionReading.value > 0
-  ) {
-    const dependencyFreshness: Array<{
-      freshness: FreshnessResult;
-      metricKey: string;
-    }> = [];
-    if (selfConsumptionReading.freshness) {
-      dependencyFreshness.push({
-        freshness: selfConsumptionReading.freshness,
-        metricKey: "selfConsumptionEnergy"
-      });
-    }
-    if (consumptionReading.freshness) {
-      dependencyFreshness.push({
-        freshness: consumptionReading.freshness,
-        metricKey: "consumptionEnergy"
-      });
-    }
-    const aggregateFreshness = aggregateFreshnessResults(dependencyFreshness);
-    const freshness = dependencyFreshness.find(
-      (result) => result.metricKey === aggregateFreshness.metricKey
-    )?.freshness;
-    const observedAt =
-      freshness?.sourceTimestamp
-      ?? (selfConsumptionReading.timestamp < consumptionReading.timestamp
-        ? selfConsumptionReading.timestamp
-        : consumptionReading.timestamp);
-    const resolved = resolveMonitoringMetricBinding({
-      binding: args.binding,
-      displayValueOptions: args.displayValueOptions,
-      isConnected: true,
-      metricScope: args.metricScope,
-      reading: {
-        freshness,
-        quality: selfConsumptionReading.quality ?? consumptionReading.quality,
-        timestamp: observedAt,
-        unit: "%",
-        value: (selfConsumptionReading.value / consumptionReading.value) * 100
-      }
-    });
-
-    return {
-      ...resolved,
-      helper: "由自發自用量與總用電推導",
-      provenance: "derived" as const
-    };
-  }
-
-  return resolveMonitoringMetricBinding({
+  const displayValueOptions = {
+    ...args.displayValueOptions,
+    preferKilogramsForSubTonCo2:
+      args.calculationSettings.co2AutoConvertSmallToKg &&
+      (args.binding.metricKey === "todayCo2Reduction" ||
+        args.binding.metricKey === "totalCo2Reduction")
+  };
+  const resolved = resolveMonitoringMetricBinding({
     binding: args.binding,
-    displayValueOptions: args.displayValueOptions,
+    displayValueOptions,
     isConnected: args.isConnected,
     metricScope: args.metricScope,
-    reading: null
+    reading: args.catalogUnavailable
+      ? null
+      : args.snapshot.metrics[args.binding.metricKey] ?? null
   });
+  return applyDerivedMetricEvaluation(resolved, {
+    displayValueOptions,
+    nowMs: args.nowMs,
+    registryMetricKey: args.binding.metricKey,
+    skipEvaluation: args.catalogUnavailable
+  });
+}
+
+function resolveCatalogMetricBinding(
+  pageKey: WidgetDataBindingPageKey,
+  effectiveBinding: EffectiveBindingPlan["items"][number],
+  catalog: ReturnType<typeof resolveServerPlaybackMetricCatalog>
+): CatalogMetricBinding {
+  const entry = catalog.find(
+    ({ metricKey }) => metricKey === effectiveBinding.metricKey
+  );
+  if (!entry) {
+    return {
+      catalogUnavailable: true,
+      dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
+      fallbackIndex: 0,
+      fallbackValue: "--",
+      label: "未設定指標",
+      metricKey: effectiveBinding.metricKey,
+      sourceClass: effectiveBinding.sourceClass,
+      unit: ""
+    };
+  }
+  return {
+    dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
+    fallbackIndex: 0,
+    fallbackValue: "--",
+    label: entry.label,
+    metricKey: entry.metricKey,
+    sourceClass: effectiveBinding.sourceClass,
+    unit: entry.unit ?? ""
+  };
+}
+
+function flattenDerivedSourceTopics(
+  dependencies: DerivedMetricDependencyIdentity[]
+) {
+  const topics: MonitoringMetricSourceTopic[] = [];
+  const visit = (dependency: DerivedMetricDependencyIdentity) => {
+    if (dependency.metricKey && dependency.sourceTopic) {
+      topics.push({ metricKey: dependency.metricKey, topic: dependency.sourceTopic });
+    }
+    dependency.upstream?.forEach(visit);
+  };
+  dependencies.forEach(visit);
+  return topics;
+}
+
+function applyDerivedMetricEvaluation<TMetric extends string>(
+  resolved: ResolvedMonitoringMetricBinding<TMetric>,
+  options: {
+    displayValueOptions?: MonitoringDisplayValueOptions;
+    nowMs?: number;
+    registryMetricKey?: string;
+    skipEvaluation?: boolean;
+  } = {}
+) {
+  if (options.skipEvaluation) return resolved;
+  const registryMetricKey = options.registryMetricKey ?? resolved.metricKey;
+  const evaluation = readDerivedMetricEvaluation(resolved.metricScope, registryMetricKey);
+  if (!evaluation) return resolved;
+  const definition = readDerivedMetricDefinition(registryMetricKey);
+  const freshness = evaluateMetricFreshness({
+    metricKey: registryMetricKey,
+    nowMs: options.nowMs ?? Date.now(),
+    sourceTimestamp: evaluation.timestamp
+  });
+  const evaluationFreshness = {
+    ...freshness,
+    state: evaluation.freshnessState === "fresh"
+      ? "live" as const
+      : evaluation.freshnessState === "stale"
+        ? "stale" as const
+        : "unavailable" as const
+  };
+  const display = evaluation.value === null
+    ? null
+    : formatMonitoringDisplayValue(
+        evaluation.value,
+        evaluation.outputUnit,
+        { maximumPrecision: evaluation.precision, ...options.displayValueOptions }
+      );
+  const unavailable = evaluation.status === "unavailable" || display === null;
+  const stale = !unavailable && evaluation.freshnessState === "stale";
+  const sourceTopics = unavailable ? undefined : flattenDerivedSourceTopics(evaluation.dependencies);
+
+  return {
+    ...resolved,
+    alertTone: unavailable || stale ? "warning" as const : "normal" as const,
+    bindingState: unavailable ? "missing" as const : "bound" as const,
+    dependencyKeys: definition.inputs.flatMap(
+      (input) => input.kind === "metric" ? [input.metricKey] : []
+    ),
+    derivedMetric: {
+      definitionRevision: definition.revision,
+      effectiveOutputScope: evaluation.metricScope,
+      evaluation,
+      inputs: definition.inputs,
+      metricKey: definition.metricKey,
+      provenance: evaluation.dependencies
+    },
+    fallbackReason: unavailable ? "metric-unavailable" as const : stale ? "stale-data" as const : null,
+    fallbackStrategy: stale && evaluation.retainedLastGood
+      ? "retain-last-reading" as const
+      : resolved.fallbackStrategy,
+    freshness: evaluationFreshness,
+    freshnessState: unavailable ? "fallback" as const : stale ? "stale" as const : "fresh" as const,
+    helper: unavailable
+      ? `Registry：${evaluation.failureCode ?? "unavailable"}`
+      : stale
+        ? "顯示 Registry 最近一次有效讀值"
+        : `Registry r${definition.revision}｜最後更新 ${evaluation.timestamp ?? evaluation.evaluatedAt}`,
+    metricScope: evaluation.metricScope,
+    provenance: unavailable ? "fallback" as const : "derived" as const,
+    sourceClass: "derived-metric" as const,
+    sourceTopics,
+    unit: display?.unit ?? evaluation.outputUnit,
+    value: display?.value ?? "--"
+  } satisfies ResolvedMonitoringMetricBinding<TMetric>;
 }
 
 function resolveFactoryMetricBinding(args: {
@@ -815,6 +826,7 @@ function resolveFactoryCircuitKpis(args: {
   allowStaleRuntimeData: boolean;
   pageKey: FactoryCircuitPageKey;
   isConnected: boolean;
+  metricScope: MetricScope;
   nowMs: number;
   slots: FactoryCircuitStoryPayload["slots"];
   snapshot: ReturnType<typeof readLiveMetricsSnapshot>;
@@ -835,21 +847,37 @@ function resolveFactoryCircuitKpis(args: {
     return available.find((entry) => entry.metricKey === worst.metricKey)?.freshness;
   };
   const aggregateDependencyKeys = args.slots.flatMap((slot) => slot.metricKey ? [slot.metricKey] : []);
-  const siteMetricScope: SiteScope = args.pageKey === "factory-circuit" ? "cl" : "kn";
+  const siteMetricScope: SiteScope = args.metricScope === "global"
+    ? (args.pageKey === "factory-circuit" ? "cl" : "kn")
+    : args.metricScope;
   const aggregateFreshness = resolveWorstFreshness(
     args.slots.map((slot) => ({
       freshness: slot.freshness,
       metricKey: slot.metricKey ?? slot.slotKey
     }))
   );
-  const aggregateFailure = args.slots.find(
-    (slot) =>
-      !isUsableFactoryMetric(slot, args.allowStaleRuntimeData) ||
-      slot.livePowerKw === null
+  const aggregateFailure = (!args.allowStaleRuntimeData
+    ? args.slots.find((slot) => slot.freshnessState === "stale")
+    : undefined) ?? args.slots.find(
+      (slot) =>
+        !isUsableFactoryMetric(slot, args.allowStaleRuntimeData) ||
+        slot.livePowerKw === null
+    );
+  const totalPowerDefinitionKey = args.pageKey === "factory-circuit"
+    ? "factoryCircuit.jungliTotalPower"
+    : "factoryCircuit.guanyinTotalPower";
+  const totalPowerEvaluation = readDerivedMetricEvaluation(
+    siteMetricScope,
+    totalPowerDefinitionKey,
+    getDatabase()
   );
-  const totalPowerValue = aggregateFailure
+  const staleAggregateBlocked =
+    !args.allowStaleRuntimeData && args.slots.some((slot) => slot.freshnessState === "stale");
+  const totalPowerValue = !totalPowerEvaluation ||
+    totalPowerEvaluation.status === "unavailable" ||
+    staleAggregateBlocked
     ? null
-    : args.slots.reduce((sum, slot) => sum + (slot.livePowerKw ?? 0), 0);
+    : totalPowerEvaluation.value;
   const aggregateHelper = resolveFactoryDegradedHelper(aggregateFailure);
   const aggregateFreshnessState = aggregateFailure?.freshnessState ??
     (args.slots.some((slot) => slot.freshnessState === "stale") ? "stale" : "fresh");
@@ -857,7 +885,7 @@ function resolveFactoryCircuitKpis(args: {
     (aggregateFreshnessState === "stale" ? "stale-data" : null);
   const aggregateAlertTone = aggregateFreshnessState === "stale" ? "warning" : "normal";
 
-  const totalPower = totalPowerValue === null
+  const totalPowerBase = totalPowerValue === null
     ? buildFactoryFallbackKpi({
         bindingState: aggregateFailure?.bindingState ?? args.summary.bindingState,
         dependencyKeys: aggregateDependencyKeys,
@@ -889,6 +917,20 @@ function resolveFactoryCircuitKpis(args: {
         unit: "kW",
         value: totalPowerValue
       });
+  const evaluatedTotalPower = applyDerivedMetricEvaluation<FactoryCircuitKpiKey>({
+    ...totalPowerBase,
+    metricScope: siteMetricScope
+  }, {
+    registryMetricKey: totalPowerDefinitionKey
+  });
+  const totalPower = staleAggregateBlocked
+    ? {
+        ...evaluatedTotalPower,
+        ...totalPowerBase,
+        derivedMetric: evaluatedTotalPower.derivedMetric,
+        metricScope: siteMetricScope
+      }
+    : evaluatedTotalPower;
 
   const solarPower = resolveFactoryMetricBinding({
     allowStaleRuntimeData: args.allowStaleRuntimeData,
@@ -913,11 +955,6 @@ function resolveFactoryCircuitKpis(args: {
         label: "太陽能供應占比",
         metricKey: "solarShare",
         sourceClass: "derived-metric",
-        sourceTopics: resolveSourceTopics({
-          dependencyKeys: ["realTimePower"],
-          metricKey: "solarShare",
-          topicNames: args.topicNames
-        }),
         unit: "%"
       })
     : !isUsableFactoryMetric(solarPower, args.allowStaleRuntimeData)
@@ -932,11 +969,6 @@ function resolveFactoryCircuitKpis(args: {
           label: "太陽能供應占比",
           metricKey: "solarShare",
           sourceClass: "derived-metric",
-          sourceTopics: resolveSourceTopics({
-            dependencyKeys: ["realTimePower"],
-            metricKey: "solarShare",
-            topicNames: args.topicNames
-          }),
           unit: "%"
         })
       : buildFactoryResolvedKpi({
@@ -1094,11 +1126,6 @@ function resolveFactoryCircuitKpis(args: {
         label: "尖峰負載",
         metricKey: "peak",
         sourceClass: "derived-metric",
-        sourceTopics: resolveSourceTopics({
-          dependencyKeys: ["factoryPeakMultiplier"],
-          metricKey: "peak",
-          topicNames: args.topicNames
-        }),
         unit: "kW"
       })
     : !peakMultiplierAvailable
@@ -1113,11 +1140,6 @@ function resolveFactoryCircuitKpis(args: {
           label: "尖峰負載",
           metricKey: "peak",
           sourceClass: "derived-metric",
-          sourceTopics: resolveSourceTopics({
-            dependencyKeys: ["factoryPeakMultiplier"],
-            metricKey: "peak",
-            topicNames: args.topicNames
-          }),
           unit: "kW"
         })
     : buildFactoryResolvedKpi({
@@ -1405,46 +1427,62 @@ export function readOverviewDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): OverviewStoryPayload {
-  const plan = readPublishedEffectiveBindingPlan("overview", context.siteScope);
+  const catalog = resolveStoryMetricCatalog("overview", options);
+  const plan = readPublishedEffectiveBindingPlan("overview", context.siteScope, catalog);
   const resolveContext = createScopedStoryContextResolver(context, options.profileId);
   const overview = plan.items.map((effectiveBinding) => {
-    const definition = overviewMetrics.find(
+    const catalogUnavailable = !catalog.some(
       ({ metricKey }) => metricKey === effectiveBinding.metricKey
     );
-    if (!definition) {
-      throw new Error(`Missing Overview metric definition: ${effectiveBinding.metricKey}`);
-    }
+    const definition = overviewMetrics.find(
+      ({ metricKey }) => metricKey === effectiveBinding.metricKey
+    ) ?? resolveCatalogMetricBinding("overview", effectiveBinding, catalog);
     const binding = {
       ...definition,
       dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
       sourceClass: effectiveBinding.sourceClass
     };
     const itemContext = resolveContext(effectiveBinding.effectiveScope);
-    const reading = resolveStoryMetricReading(binding.metricKey, itemContext);
-    const resolved = {
-      ...resolveMonitoringMetricBinding({
+    const reading = catalogUnavailable
+      ? null
+      : resolveStoryMetricReading(binding.metricKey, itemContext);
+    const displayValueOptions = {
+      ...effectiveBinding.format,
+      preferKilogramsForSubTonCo2:
+        itemContext.calculationSettings.co2AutoConvertSmallToKg &&
+        (binding.metricKey === "todayCo2Reduction" ||
+          binding.metricKey === "totalCo2Reduction")
+    };
+    const registryResolved = applyDerivedMetricEvaluation(
+      resolveMonitoringMetricBinding({
         binding,
-        displayValueOptions: {
-          ...effectiveBinding.format,
-          preferKilogramsForSubTonCo2:
-            itemContext.calculationSettings.co2AutoConvertSmallToKg &&
-            (binding.metricKey === "todayCo2Reduction" ||
-              binding.metricKey === "totalCo2Reduction")
-        },
+        displayValueOptions,
         isConnected: itemContext.isConnected,
         metricScope: effectiveBinding.effectiveScope,
         reading
       }),
+      {
+        displayValueOptions,
+        nowMs: Date.parse(itemContext.generatedAt),
+        skipEvaluation: catalogUnavailable
+      }
+    );
+    const resolved = {
+      ...registryResolved,
       itemId: effectiveBinding.itemId,
       label: resolveTopicLabel(itemContext.topicNames, binding.metricKey, binding.label),
-      sourceTopics: reading ? resolveSourceTopics({
-        dependencyKeys: binding.dependencyKeys,
-        metricKey: binding.metricKey,
-        siteScope: effectiveBinding.effectiveScope === "global"
-          ? undefined
-          : effectiveBinding.effectiveScope,
-        topicNames: itemContext.topicNames
-      }) : undefined
+      sourceTopics: registryResolved.sourceTopics ?? (
+        reading && registryResolved.derivedMetric?.evaluation?.status !== "unavailable"
+          ? resolveSourceTopics({
+            dependencyKeys: binding.dependencyKeys,
+            metricKey: binding.metricKey,
+            siteScope: effectiveBinding.effectiveScope === "global"
+              ? undefined
+              : effectiveBinding.effectiveScope,
+            topicNames: itemContext.topicNames
+          })
+          : undefined
+      )
     };
 
     const trendProfile = binding.metricKey === "realTimePower"
@@ -1475,16 +1513,17 @@ export function readSolarDisplayStory(
   context: DisplayStorySourceContext = createDisplayStorySourceContext(),
   options: DisplayStoryReadOptions = {}
 ): DisplayStoryPayload["solar"] {
-  const plan = readPublishedEffectiveBindingPlan("solar", context.siteScope);
+  const catalog = resolveStoryMetricCatalog("solar", options);
+  const plan = readPublishedEffectiveBindingPlan("solar", context.siteScope, catalog);
   const resolveContext = createScopedStoryContextResolver(context, options.profileId);
   return {
     kpis: applyMonitoringDisplayOverrides("solar", plan.items.map((effectiveBinding) => {
-      const definition = solarKpis.find(
+      const catalogUnavailable = !catalog.some(
         ({ metricKey }) => metricKey === effectiveBinding.metricKey
       );
-      if (!definition) {
-        throw new Error(`Missing Solar metric definition: ${effectiveBinding.metricKey}`);
-      }
+      const definition = solarKpis.find(
+        ({ metricKey }) => metricKey === effectiveBinding.metricKey
+      ) ?? resolveCatalogMetricBinding("solar", effectiveBinding, catalog);
       const binding = {
         ...definition,
         dependencyKeys: effectiveBinding.dependencyIdentities.map(({ metricKey }) => metricKey),
@@ -1493,6 +1532,7 @@ export function readSolarDisplayStory(
       const itemContext = resolveContext(effectiveBinding.effectiveScope);
         const resolved = resolveSolarKpiBinding({
           binding,
+          catalogUnavailable,
           calculationSettings: itemContext.calculationSettings,
           displayValueOptions: effectiveBinding.format,
         isConnected: itemContext.isConnected,
@@ -1500,41 +1540,25 @@ export function readSolarDisplayStory(
         nowMs: Date.parse(itemContext.generatedAt),
         snapshot: itemContext.snapshot
       });
-      const comparisonActualValue =
-        binding.metricKey === "todayCo2Reduction"
-          ? buildDerivedCarbonReductionReading(
-            itemContext.snapshot.metrics.todayGeneration ?? null,
-            itemContext.calculationSettings.carbonEmissionFactor
-          )?.value ?? null
-          : binding.metricKey === "totalCo2Reduction"
-            ? buildDerivedCarbonReductionReading(
-              buildCumulativeGenerationReading(
-                itemContext.snapshot,
-                effectiveBinding.effectiveScope,
-                effectiveBinding.effectiveScope !== "global",
-                Date.parse(itemContext.generatedAt)
-              ),
-              itemContext.calculationSettings.carbonEmissionFactor
-            )?.value ?? null
-            : itemContext.isConnected
-              ? itemContext.snapshot.metrics[binding.metricKey]?.value ?? null
-              : null;
+      const comparisonActualValue = itemContext.isConnected && !catalogUnavailable
+        ? itemContext.snapshot.metrics[binding.metricKey]?.value ?? null
+        : null;
       return {
         ...resolved,
         itemId: effectiveBinding.itemId,
         label: resolveTopicLabel(itemContext.topicNames, binding.metricKey, binding.label),
-        sourceTopics: resolved.bindingState === "bound" ? resolveSourceTopics({
+        sourceTopics: resolved.sourceTopics ?? (resolved.bindingState === "bound" ? resolveSourceTopics({
           dependencyKeys: resolved.dependencyKeys,
           metricKey: binding.metricKey,
           siteScope: effectiveBinding.effectiveScope === "global"
             ? undefined
             : effectiveBinding.effectiveScope,
           topicNames: itemContext.topicNames
-        }) : undefined,
+        }) : undefined),
         comparison: resolveSolarComparison({
           actualUnit: resolved.unit,
           actualValue: comparisonActualValue,
-          target: solarTargets[binding.metricKey]
+          target: solarTargets[binding.metricKey as StoryMetricKey]
         })
       };
     }), options),
@@ -1574,12 +1598,14 @@ export function readFactoryCircuitDisplayStory(
   const scopedCircuits = context.circuits.filter((circuit) => circuit.page_key === pageKey);
   const pageSiteScope = context.siteScope
     ?? (pageKey === "factory-circuit" ? "cl" : "kn");
-  const effectivePlan = readPublishedEffectiveBindingPlan(pageKey, pageSiteScope);
+  const catalog = resolveStoryMetricCatalog(pageKey, options);
+  const effectivePlan = readPublishedEffectiveBindingPlan(pageKey, pageSiteScope, catalog);
   const resolveContext = createScopedStoryContextResolver(context, options.profileId);
 
   const resolveFactorySlot = (
     slotKey: DisplayCircuitSlotKey,
     effectiveBinding: {
+      catalogUnavailable?: boolean;
       effectiveScope: MetricScope;
       format?: { precision?: number; unitDisplay?: "auto" | "hide" };
       itemId: string;
@@ -1596,7 +1622,9 @@ export function readFactoryCircuitDisplayStory(
     });
     const circuit = matches.length === 1 ? matches[0]! : null;
     const metricKey = effectiveBinding.metricKey;
-    const reading = itemContext.snapshot.metrics[metricKey] ?? null;
+    const reading = effectiveBinding.catalogUnavailable
+      ? null
+      : itemContext.snapshot.metrics[metricKey] ?? null;
     const slotDefaults = slotDefaultLabels[slotKey];
     const slotLabels = resolveTopicDisplayLabels({
       topicNames: itemContext.topicNames,
@@ -1714,6 +1742,7 @@ export function readFactoryCircuitDisplayStory(
         allowStaleRuntimeData: itemContext.allowStaleRuntimeData,
         pageKey,
         isConnected: itemContext.isConnected,
+        metricScope: binding.effectiveScope,
         nowMs: Date.parse(itemContext.generatedAt),
         slots: scopedSlots,
         snapshot: itemContext.snapshot,
@@ -1723,7 +1752,25 @@ export function readFactoryCircuitDisplayStory(
         (candidate) => candidate.metricKey === binding.metricKey
       );
       if (!kpi) {
-        throw new Error(`Missing Factory Circuit metric definition: ${binding.metricKey}`);
+        const dynamicBinding = resolveCatalogMetricBinding(pageKey, binding, catalog);
+        const monitoringResolved = resolveMonitoringMetricBinding({
+          binding: dynamicBinding,
+          displayValueOptions: binding.format,
+          isConnected: itemContext.isConnected,
+          metricScope: binding.effectiveScope,
+          reading: dynamicBinding.catalogUnavailable
+            ? null
+            : resolveStoryMetricReading(dynamicBinding.metricKey, itemContext)
+        });
+        const resolved = applyDerivedMetricEvaluation(monitoringResolved, {
+          displayValueOptions: binding.format,
+          nowMs: Date.parse(itemContext.generatedAt),
+          skipEvaluation: dynamicBinding.catalogUnavailable
+        });
+        return applyEffectiveDisplayFormat({
+          ...resolved,
+          itemId: binding.itemId
+        }, binding.format);
       }
       return applyEffectiveDisplayFormat({
         ...kpi,

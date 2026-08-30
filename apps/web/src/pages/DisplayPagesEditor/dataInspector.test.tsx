@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -89,6 +90,50 @@ test("Data inspector binding updates preserve the stable item identity and limit
     itemId: "power"
   });
   assert.throws(() => createDataBindingItemUpdate(current, { precision: 4 }), /precision/);
+});
+
+test("Data inspector offers enabled custom registry metrics without persisting formula text", () => {
+  assert.ok(powerCapability);
+  const config = createOverviewDisplayPageSeedConfig();
+  const power = config.dataBindings.power!;
+  power.dataBinding.metricKey = "custom.netPower";
+  const model = resolveDataInspectorModel({
+    capability: powerCapability,
+    config,
+    derivedDefinitions: [{
+      description: "Net power",
+      enabled: true,
+      expression: "generation - consumption",
+      fallbackPolicy: "unavailable",
+      inputs: [
+        { alias: "generation", kind: "metric", metricKey: "realTimePower", scope: "output-site", unit: "kW" },
+        { alias: "consumption", kind: "metric", metricKey: "consumptionPower", scope: "output-site", unit: "kW" }
+      ],
+      managed: false,
+      metricKey: "custom.netPower",
+      name: "Net Power",
+      outputScopePolicy: "site",
+      outputUnit: "kW",
+      precision: 1,
+      revision: 1
+    }],
+    pageKey: "overview"
+  });
+
+  assert.ok(model);
+  assert.equal(model.metricOptions.some(({ value }) => value === "custom.netPower"), true);
+  assert.deepEqual(power.dataBinding, {
+    metricKey: "custom.netPower",
+    scope: "inherit-device",
+    sourceType: "metric"
+  });
+});
+
+test("Data inspector surfaces derived catalog load failures instead of silently dropping custom metrics", () => {
+  const source = readFileSync(new URL("./dataInspector.tsx", import.meta.url), "utf8");
+  assert.match(source, /衍生指標目錄載入失敗/u);
+  assert.match(source, /setDerivedDefinitionsError/u);
+  assert.doesNotMatch(source, /getDerivedMetricDefinitions\(\)[\s\S]*?\.catch\(\(\) => undefined\)/u);
 });
 
 test("Data inspector distinguishes temporary CL Preview Context from a KN-pinned binding", () => {

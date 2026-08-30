@@ -1,10 +1,13 @@
 import {
+  derivedMetricCatalogMetadata,
   METRIC_DATA_BINDING_SCOPES,
   resolvePlaybackBindingItemConstraints,
   resolvePlaybackMetricCatalog,
   type DisplayDataPreviewItem,
   type DisplayEditorDataBindingCapability,
   type DisplayPreviewContextSelection,
+  type DerivedMetricDefinition,
+  type MetricCatalogEntry,
   type MetricBoundItem,
   type MetricDataBindingScope,
   type MetricUnitDisplay,
@@ -16,6 +19,7 @@ import { getValueAtPath } from "../../hooks/displayPageConfigPaths";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import {
   getDeviceGroups,
+  getDerivedMetricDefinitions,
   getDisplayDataPreview,
   getFleetDevices
 } from "../../services/api";
@@ -162,6 +166,7 @@ export function resolveDataInspectorModel(args: {
   previewContext?: ResolvedDisplayPreviewContext | null;
   previewItem?: DisplayDataPreviewItem | null;
   previewReading?: LiveMetricReading | null;
+  derivedDefinitions?: readonly DerivedMetricDefinition[];
 }) {
   const item = getValueAtPath(args.config, args.capability.bindingPath);
   if (!isMetricBoundItem(item, args.capability.itemId)) return null;
@@ -169,7 +174,13 @@ export function resolveDataInspectorModel(args: {
   const itemConstraint = resolvePlaybackBindingItemConstraints(args.pageKey)[args.capability.itemId];
   if (!itemConstraint) return null;
 
-  const catalog = resolvePlaybackMetricCatalog(args.pageKey);
+  const catalog: readonly MetricCatalogEntry[] = [
+    ...resolvePlaybackMetricCatalog(args.pageKey),
+    ...(args.derivedDefinitions ?? []).filter(({ enabled, managed }) => enabled && !managed).map((definition) => ({
+      ...derivedMetricCatalogMetadata(definition),
+      compatibleWidgetRoles: ["numeric-kpi", "numeric-flow"],
+    }))
+  ];
   const metricOptions = catalog.filter((entry) => (
     entry.valueType === itemConstraint.valueType
     && (!itemConstraint.widgetRole || !entry.compatibleWidgetRoles || entry.compatibleWidgetRoles.includes(itemConstraint.widgetRole))
@@ -245,10 +256,33 @@ export function DataInspectorPanel({
   const [loadedPreviewItem, setLoadedPreviewItem] = useState<DisplayDataPreviewItem | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [derivedDefinitions, setDerivedDefinitions] = useState<DerivedMetricDefinition[]>([]);
+  const [derivedDefinitionsError, setDerivedDefinitionsError] = useState<string | null>(null);
   const shouldLoadManagedPreview = Boolean(pageId) && previewItem === undefined;
   const liveMetrics = useLiveMetrics({
     enabled: previewReading === undefined && !shouldLoadManagedPreview
   });
+
+  useEffect(() => {
+    let active = true;
+    void getDerivedMetricDefinitions()
+      .then((definitions) => {
+        if (active) {
+          setDerivedDefinitions(definitions);
+          setDerivedDefinitionsError(null);
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setDerivedDefinitionsError(
+            error instanceof Error ? error.message : "無法載入衍生指標目錄。"
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!shouldLoadManagedPreview) return;
@@ -335,6 +369,7 @@ export function DataInspectorPanel({
   const model = resolveDataInspectorModel({
     capability,
     config,
+    derivedDefinitions,
     pageKey,
     previewContext: effectivePreviewContext,
     previewItem: previewMatchesCurrentBinding ? effectivePreviewItem : null,
@@ -362,6 +397,12 @@ export function DataInspectorPanel({
         <p className="mt-1">選擇頁面契約允許的語意資料，設定只會寫入這個穩定 item id。</p>
         <p className="mt-1 font-mono text-[11px] text-[var(--shell-subtitle-ink)]">穩定項目：{capability.itemId}</p>
       </div>
+
+      {derivedDefinitionsError ? (
+        <p className="rounded-[12px] border border-[#c97a5f] bg-[#fff4ef] p-3 text-[#8f452d]">
+          衍生指標目錄載入失敗：{derivedDefinitionsError}
+        </p>
+      ) : null}
 
       {pageId ? (
         <div className="space-y-2 rounded-[16px] border border-[var(--shell-accent)] bg-[rgba(95,140,80,0.08)] p-3">

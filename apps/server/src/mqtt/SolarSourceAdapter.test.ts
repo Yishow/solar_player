@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Database from "better-sqlite3";
 import {
+  isSolarAdapterManagedMetricIdentity,
   SolarSourceAdapter,
   SolarSourceContractError,
   parseSolarCollectorMessage
@@ -203,6 +204,14 @@ test("preserves a delayed retained source timestamp for downstream stale classif
   );
 
   assert.equal(result.kind === "metrics" ? result.sourceTimestamp : null, delayedTimestamp);
+});
+
+test("recognizes only scoped Solar adapter source identities", () => {
+  assert.equal(isSolarAdapterManagedMetricIdentity("cl", "factoryGeneration.powerKw"), true);
+  assert.equal(isSolarAdapterManagedMetricIdentity("kn", "solarZone.roof.powerKw"), true);
+  assert.equal(isSolarAdapterManagedMetricIdentity("global", "factoryGeneration.powerKw"), false);
+  assert.equal(isSolarAdapterManagedMetricIdentity("global", "solarZone.roof.powerKw"), false);
+  assert.equal(isSolarAdapterManagedMetricIdentity("cl", "custom.powerKw"), false);
 });
 
 test("persists one summary atomically with source timestamp and topic provenance", async () => {

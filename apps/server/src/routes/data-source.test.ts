@@ -308,6 +308,9 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
   );
 
   const app = await buildApp();
+  const liveValueCountBeforeReset = (
+    database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number }
+  ).count;
 
   try {
     const response = await app.inject({
@@ -345,7 +348,7 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
     const liveValueCount = database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number };
     assert.equal(dailySummaryCount.count, 1);
     assert.equal(counterCount.count, 1);
-    assert.equal(liveValueCount.count, 1);
+    assert.equal(liveValueCount.count, liveValueCountBeforeReset);
   } finally {
     await app.close();
   }
@@ -433,6 +436,9 @@ test("POST /api/data-source/reset-month-trend deletes only current calendar-mont
   );
 
   const app = await buildApp();
+  const liveValueCountBeforeReset = (
+    database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number }
+  ).count;
 
   try {
     const response = await app.inject({
@@ -478,7 +484,7 @@ test("POST /api/data-source/reset-month-trend deletes only current calendar-mont
     const counterCount = database.prepare("SELECT COUNT(*) AS count FROM cumulative_counters").get() as { count: number };
     const liveValueCount = database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number };
     assert.equal(counterCount.count, 1);
-    assert.equal(liveValueCount.count, 1);
+    assert.equal(liveValueCount.count, liveValueCountBeforeReset);
   } finally {
     await app.close();
   }

@@ -15,6 +15,7 @@ export * from "./freshnessPolicy.js";
 export * from "./playbackMetricContract.js";
 export * from "./deviceDisplayOps.js";
 export * from "./displayStory.js";
+export * from "./derivedMetric.js";
 export * from "./displayCardData.js";
 export * from "./imagePlaylist.js";
 export * from "./managementAccess.js";

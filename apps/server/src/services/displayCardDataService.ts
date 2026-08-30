@@ -7,6 +7,8 @@ import type {
   DisplayCardDataRow,
   DisplayCardDataStatus,
   DisplayStoryPayloadByPageId,
+  DerivedMetricDependencyIdentity,
+  DerivedMetricDefinition,
   FactoryCircuitPageKey,
   MetricScope,
   ResolvedMonitoringMetricBinding
@@ -24,6 +26,11 @@ import {
   readDisplayValueOverrides
 } from "./displayValueOverrideService.js";
 import { readSustainabilityStory } from "./sustainabilityStoryService.js";
+import {
+  listDerivedMetricDefinitions,
+  readDerivedMetricEvaluation,
+  readDerivedMetricRegistryDiagnostics
+} from "./derivedMetricRegistryService.js";
 
 type TopicMappingRow = {
   enabled: number;
@@ -118,11 +125,15 @@ function statusForDependency(
   const identityKey = scopedIdentityKey(metricScope, metricKey);
   const topic = topics.get(identityKey);
 
+  if (liveMetrics.has(identityKey)) {
+    return "ready";
+  }
+
   if (!topic?.topic || !topic.enabled) {
     return "missing-topic";
   }
 
-  return liveMetrics.has(identityKey) ? "ready" : "idle-topic";
+  return "idle-topic";
 }
 
 function buildDependencies(args: {
@@ -144,8 +155,35 @@ function buildDependencies(args: {
   });
 }
 
+function buildDerivedDependencies(args: {
+  definition: DerivedMetricDefinition;
+  dependencies: DerivedMetricDependencyIdentity[];
+  liveMetrics: LiveMetricLookup;
+  metricScope: MetricScope;
+}) {
+  return args.definition.inputs.flatMap((input) => {
+    if (input.kind !== "metric") return [];
+    const dependency = args.dependencies.find(({ alias }) => alias === input.alias);
+    const metricScope = dependency?.metricScope
+      ?? (input.scope === "output-site" ? args.metricScope : input.scope);
+    const identityKey = scopedIdentityKey(metricScope, input.metricKey);
+    const topic = dependency?.sourceTopic ?? null;
+    const reading = args.liveMetrics.get(identityKey);
+    return [{
+      latestValue: reading
+        ? `${reading.value}${reading.unit ? ` ${reading.unit}` : ""}`
+        : null,
+      metricKey: input.metricKey,
+      metricScope,
+      status: reading ? "ready" : topic ? "idle-topic" : "missing-topic",
+      topic
+    } satisfies DisplayCardDataDependency];
+  });
+}
+
 function deriveMonitoringStatus(args: {
   dependencies: DisplayCardDataDependency[];
+  isDerivedMetric: boolean;
   metric: ResolvedMonitoringMetricBinding<string>;
 }) {
   if (args.metric.bindingState === "bound" && args.metric.freshnessState === "fresh") {
@@ -153,7 +191,7 @@ function deriveMonitoringStatus(args: {
   }
 
   if (
-    args.metric.sourceClass === "derived-metric" &&
+    args.isDerivedMetric &&
     args.dependencies.some((dependency) => dependency.latestValue === null)
   ) {
     return "formula-input-missing" satisfies DisplayCardDataStatus;
@@ -211,6 +249,7 @@ function applyDisplayCardOverride(
 
 function monitoringRow(args: {
   cardId: string;
+  definition?: DerivedMetricDefinition;
   formula: string | null;
   metric: ResolvedMonitoringMetricBinding<string>;
   metricScope: MetricScope;
@@ -219,14 +258,25 @@ function monitoringRow(args: {
   overrides: OverrideLookup;
   topics: Map<string, TopicMapping>;
 }) {
-  const dependencies = buildDependencies({
-    dependencyKeys: args.metric.dependencyKeys,
-    liveMetrics: args.liveMetrics,
-    metricScope: args.metricScope,
-    topics: args.topics
-  });
+  const evaluation = args.definition
+    ? readDerivedMetricEvaluation(args.metricScope, args.definition.metricKey)
+    : null;
+  const dependencies = args.definition
+      ? buildDerivedDependencies({
+        definition: args.definition!,
+        dependencies: evaluation?.dependencies ?? [],
+        liveMetrics: args.liveMetrics,
+        metricScope: args.metricScope
+      })
+    : buildDependencies({
+        dependencyKeys: args.metric.dependencyKeys,
+        liveMetrics: args.liveMetrics,
+        metricScope: args.metricScope,
+        topics: args.topics
+      });
   const status = deriveMonitoringStatus({
     dependencies,
+    isDerivedMetric: args.definition !== undefined,
     metric: args.metric
   });
 
@@ -237,9 +287,17 @@ function monitoringRow(args: {
     cardId: args.cardId,
     dependencies,
     displayValue: args.metric.value,
-    formula: args.formula,
+    derivedMetric: args.definition ? {
+      definitionRevision: args.definition.revision,
+      effectiveOutputScope: args.metricScope,
+      evaluation,
+      inputs: args.definition.inputs,
+      metricKey: args.definition.metricKey,
+      provenance: evaluation?.dependencies ?? []
+    } : null,
+    formula: args.definition?.expression ?? args.formula,
     label: args.metric.label,
-    lastUpdatedAt:
+    lastUpdatedAt: evaluation?.timestamp ??
       dependencies.map((dependency) =>
         args.liveMetrics.get(
           scopedIdentityKey(dependency.metricScope, dependency.metricKey)
@@ -270,16 +328,24 @@ function monitoringRows(
   story: DisplayStoryPayloadByPageId,
   topics: Map<string, TopicMapping>,
   liveMetrics: LiveMetricLookup,
-  sharedSiteScope: SiteScope,
   overrides: OverrideLookup
 ) {
+  const excludedDefinitions = new Set(
+    readDerivedMetricRegistryDiagnostics().map(({ metricKey }) => metricKey)
+  );
+  const derivedDefinitions = new Map(
+    listDerivedMetricDefinitions()
+      .filter(({ enabled, metricKey }) => enabled && !excludedDefinitions.has(metricKey))
+      .map((definition) => [definition.metricKey, definition])
+  );
   const overviewRows = story.overview.metrics.map((metric) =>
     monitoringRow({
       cardId: `overview.${metric.metricKey}`,
+      definition: derivedDefinitions.get(metric.metricKey),
       formula: null,
       liveMetrics,
       metric,
-      metricScope: sharedSiteScope,
+      metricScope: metric.metricScope,
       overrides,
       pageId: "overview",
       topics
@@ -288,13 +354,11 @@ function monitoringRows(
   const solarRows = story.solar.kpis.map((metric) =>
     monitoringRow({
       cardId: `solar.${metric.metricKey}`,
-      formula:
-        metric.metricKey === "selfConsumptionRatio"
-          ? "selfConsumptionEnergy / consumptionEnergy * 100"
-          : null,
+      definition: derivedDefinitions.get(metric.metricKey),
+      formula: null,
       liveMetrics,
       metric,
-      metricScope: sharedSiteScope,
+      metricScope: metric.metricScope,
       overrides,
       pageId: "solar",
       topics
@@ -304,16 +368,19 @@ function monitoringRows(
     story[pageId].kpis.map((metric) =>
       monitoringRow({
         cardId: `${pageId}.${metric.metricKey}`,
-        formula:
-          metric.sourceClass === "slot-aggregate"
-            ? "sum(display circuit slots)"
-            : metric.metricKey === "selfConsumption" &&
-              metric.dependencyKeys.includes("todayGeneration")
-              ? "todayGeneration fallback"
-              : null,
+        definition: derivedDefinitions.get(
+          metric.metricKey === "totalPower"
+            ? pageId === "factory-circuit"
+              ? "factoryCircuit.jungliTotalPower"
+              : "factoryCircuit.guanyinTotalPower"
+            : metric.metricKey
+        ),
+        formula: metric.metricKey === "selfConsumption" && metric.dependencyKeys.includes("todayGeneration")
+            ? "todayGeneration fallback"
+            : null,
         liveMetrics,
         metric,
-        metricScope: pageId === "factory-circuit" ? "cl" : "kn",
+        metricScope: metric.metricScope,
         overrides,
         pageId,
         topics
@@ -343,6 +410,7 @@ function formatGenerationMwh(valueGwh: number | null) {
 
 function sustainabilityNumericRows(
   story: SustainabilityStory,
+  liveMetrics: LiveMetricLookup,
   overrides: OverrideLookup
 ) {
   const bigNumbers = story.period.bigNumbers;
@@ -362,6 +430,7 @@ function sustainabilityNumericRows(
       displayValue: formatIntegerValue(bigNumbers.accumulatedCarbonReductionTons),
       label: "累積 CO₂ 減量",
       metricKey: "accumulatedCarbonReductionTons",
+      registryMetricKey: "sustainability.global.accumulatedCarbonReductionTons",
       provenance: provenance.accumulatedCarbonReductionTons,
       unit: "t",
       value: bigNumbers.accumulatedCarbonReductionTons
@@ -371,6 +440,7 @@ function sustainabilityNumericRows(
       displayValue: formatFixedValue(bigNumbers.annualEnergySavingPercent, 1),
       label: "年度節能成效",
       metricKey: "annualEnergySavingPercent",
+      registryMetricKey: "sustainability.global.annualEnergySavingPercent",
       provenance: provenance.annualEnergySavingPercent,
       unit: "%",
       value: bigNumbers.annualEnergySavingPercent
@@ -380,31 +450,65 @@ function sustainabilityNumericRows(
       displayValue: formatIntegerValue(bigNumbers.plantedTreeEquivalent),
       label: "相當於種樹",
       metricKey: "plantedTreeEquivalent",
+      registryMetricKey: "sustainability.global.plantedTreeEquivalent",
       provenance: provenance.plantedTreeEquivalent,
       unit: "trees",
       value: bigNumbers.plantedTreeEquivalent
     }
   ];
 
-  return definitions.map((definition) =>
-    applyDisplayCardOverride({
+  const excludedDefinitions = new Set(
+    readDerivedMetricRegistryDiagnostics().map(({ metricKey }) => metricKey)
+  );
+  const derivedDefinitions = new Map(
+    listDerivedMetricDefinitions()
+      .filter(({ enabled, metricKey }) => enabled && !excludedDefinitions.has(metricKey))
+      .map((definition) => [definition.metricKey, definition])
+  );
+
+  return definitions.map((definition) => {
+    const registryMetricKey = "registryMetricKey" in definition
+      ? definition.registryMetricKey
+      : null;
+    const derivedDefinition = registryMetricKey
+      ? derivedDefinitions.get(registryMetricKey)
+      : undefined;
+    const evaluation = registryMetricKey
+      ? readDerivedMetricEvaluation("global", registryMetricKey)
+      : null;
+    const dependencies = derivedDefinition
+      ? buildDerivedDependencies({
+        definition: derivedDefinition,
+        dependencies: evaluation?.dependencies ?? [],
+        liveMetrics,
+        metricScope: "global"
+      })
+      : [{
+        latestValue: definition.value === null ? null : `${definition.displayValue} ${definition.unit}`,
+        metricKey: definition.metricKey,
+        metricScope: "global" as const,
+        status: definition.value === null ? "waiting-aggregate" as const : "ready" as const,
+        topic: null
+      }];
+
+    return applyDisplayCardOverride({
       actions: displayOnlyActions(),
       aggregateSource: definition.provenance.source,
       calculationFields: [],
       cardId: definition.cardId,
-      dependencies: [
-        {
-          latestValue: definition.value === null ? null : `${definition.displayValue} ${definition.unit}`,
-          metricKey: definition.metricKey,
-          metricScope: "global",
-          status: definition.value === null ? "waiting-aggregate" : "ready",
-          topic: null
-        }
-      ],
+      dependencies,
       displayValue: definition.displayValue,
-      formula: null,
+      derivedMetric: derivedDefinition ? {
+        definitionRevision: derivedDefinition.revision,
+        effectiveOutputScope: "global",
+        evaluation,
+        inputs: derivedDefinition.inputs,
+        metricKey: derivedDefinition.metricKey,
+        provenance: evaluation?.dependencies ?? []
+      } : null,
+      formula: derivedDefinition?.expression ?? null,
       label: definition.label,
-      lastUpdatedAt: definition.provenance.updatedAt,
+      lastUpdatedAt: evaluation?.timestamp ?? definition.provenance.updatedAt,
       metricKey: definition.metricKey,
       metricScope: "global",
       originalValue: definition.displayValue,
@@ -414,8 +518,8 @@ function sustainabilityNumericRows(
       sourceTopics: [],
       status: definition.value === null ? "waiting-aggregate" : "ready",
       unit: definition.unit
-    } satisfies DisplayCardDataRow, overrides)
-  );
+    } satisfies DisplayCardDataRow, overrides);
+  });
 }
 
 function factorySlotRows(
@@ -453,6 +557,7 @@ function factorySlotRows(
       cardId: `${pageId}.slot.${slot.slotKey}`,
       dependencies,
       displayValue,
+      derivedMetric: null,
       formula: null,
       label: slot.label,
       lastUpdatedAt:
@@ -516,6 +621,7 @@ function householdRows(story: SustainabilityStory, overrides: OverrideLookup) {
         }
       ],
       displayValue: entry.card.householdCountDisplay,
+      derivedMetric: null,
       formula:
         usesLiveTodayGenerationFallback
           ? "todayGeneration / householdDailyUsageKwh"
@@ -562,10 +668,10 @@ export function readDisplayCardData(sharedSiteScope: SiteScope = "cl"): DisplayC
   return {
     generatedAt: new Date().toISOString(),
     rows: [
-      ...monitoringRows(story, topics, liveMetrics, sharedSiteScope, overrides),
+      ...monitoringRows(story, topics, liveMetrics, overrides),
       ...factorySlotRows("factory-circuit", "cl", story["factory-circuit"], topics, liveMetrics, overrides),
       ...factorySlotRows("factory-circuit-guanyin", "kn", story["factory-circuit-guanyin"], topics, liveMetrics, overrides),
-      ...sustainabilityNumericRows(sustainabilityStory, overrides),
+      ...sustainabilityNumericRows(sustainabilityStory, liveMetrics, overrides),
       ...householdRows(sustainabilityStory, overrides)
     ]
   };

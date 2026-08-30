@@ -19,6 +19,10 @@ import {
 } from "../metrics/liveMetrics.js";
 import type { SocketService } from "../realtime/SocketService.js";
 import { updateFactoryGenerationAggregate } from "../services/factoryGenerationAggregateService.js";
+import {
+  evaluateDerivedMetrics,
+  type DerivedMetricChange
+} from "../services/derivedMetricRegistryService.js";
 import type { ManagedSourceAdapter } from "./ManagedSourceAdapter.js";
 import { parse } from "./PayloadParser.js";
 import {
@@ -947,6 +951,7 @@ export class MqttClientService {
         raw_payload = excluded.raw_payload
     `);
     let persistedMetricCount = 0;
+    const changedMetrics: DerivedMetricChange[] = [];
 
     for (const mapping of mappings) {
       try {
@@ -963,6 +968,10 @@ export class MqttClientService {
           parsedPayload.raw
         );
         persistedMetricCount += 1;
+        changedMetrics.push({
+          metricKey: mapping.metric_key,
+          metricScope: mapping.metric_scope
+        });
       } catch (error) {
         this.logger.warn(
           {
@@ -977,11 +986,16 @@ export class MqttClientService {
     }
 
     let didWriteGlobalAggregate = false;
+    const didPersistFactoryGeneration = changedMetrics.some(({ metricKey }) =>
+      metricKey.startsWith("factoryGeneration.")
+    );
     if (
       persistedMetricCount > 0
-      && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."))
+      && didPersistFactoryGeneration
     ) {
-      const aggregateStatus = updateFactoryGenerationAggregate(this.database);
+      const aggregateStatus = updateFactoryGenerationAggregate(this.database, new Date(), {
+        changedMetrics
+      });
       didWriteGlobalAggregate = aggregateStatus.state === "ready";
       if (aggregateStatus.state !== "ready") {
         this.logger.warn(
@@ -989,6 +1003,10 @@ export class MqttClientService {
           "CL+KN generation aggregate is not ready"
         );
       }
+    } else if (persistedMetricCount > 0) {
+      evaluateDerivedMetrics(this.database, new Date(), {
+        changedMetrics
+      });
     }
 
     const updatedMetricScopes = new Set(mappings.map((mapping) => mapping.metric_scope));
@@ -1008,7 +1026,7 @@ export class MqttClientService {
     }
     const didFactoryGenerationUpdate =
       hasPayloadTimestamp(rawPayload)
-      && mappings.some((mapping) => mapping.metric_key.startsWith("factoryGeneration."));
+      && didPersistFactoryGeneration;
     const didRuntimeAvailabilityChange = [...affectedMetricScopes].some((metricScope) =>
       didPlaybackRuntimeAvailabilityChange(
         previousSnapshots.get(metricScope) ?? { metrics: {}, timestamp: null },
@@ -1031,6 +1049,15 @@ export class MqttClientService {
   }
 
   private handleManagedSourceMetricsPersisted(message: SolarMetricMessage) {
+    const changedMetrics: DerivedMetricChange[] = message.readings.map(({ metricKey }) => ({
+      metricScope: message.metricScope,
+      metricKey
+    }));
+    if (message.sourceType !== "summary") {
+      evaluateDerivedMetrics(this.database, new Date(), {
+        changedMetrics
+      });
+    }
     const sourceSnapshot = readAuthoritativeScopedLiveMetricsSnapshot(
       message.metricScope,
       this.database
@@ -1047,7 +1074,9 @@ export class MqttClientService {
     if (message.sourceType !== "summary") {
       return;
     }
-    const aggregateStatus = updateFactoryGenerationAggregate(this.database);
+    const aggregateStatus = updateFactoryGenerationAggregate(this.database, new Date(), {
+      changedMetrics
+    });
     if (aggregateStatus.state === "ready") {
       this.socketService?.emitLiveMetrics(
         "global",

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
+import type { DerivedMetricDefinition } from "@solar-display/shared";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-calculation-settings-route-test-"));
 process.env.DATA_DIR = tempDir;
@@ -11,14 +12,16 @@ const databasePath = process.env.DATABASE_PATH;
 
 const [
   { buildApp },
-  { closeDatabaseConnection },
+  { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
-  { seedDatabase }
+  { seedDatabase },
+  registry
 ] = await Promise.all([
   import("../app.js"),
   import("../db/index.js"),
   import("../db/migrate.js"),
-  import("../db/seed.js")
+  import("../db/seed.js"),
+  import("../services/derivedMetricRegistryService.js")
 ]);
 
 function removeDatabaseFiles() {
@@ -158,6 +161,83 @@ test("calculation settings reject a non-boolean CO2 display preference through t
     assert.equal(
       response.json<{ error: string }>().error,
       "Calculation co2AutoConvertSmallToKg must be a boolean"
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("calculation setting updates evaluate only their dependent registry chain", async () => {
+  const database = getDatabase();
+  registry.initializeDerivedMetricRegistry(database);
+  const settingDefinition = (
+    metricKey: string,
+    expression: string,
+    input: DerivedMetricDefinition["inputs"][number],
+    outputUnit: string
+  ): DerivedMetricDefinition => ({
+    description: "route setting test definition",
+    enabled: true,
+    expression,
+    fallbackPolicy: "unavailable",
+    inputs: [input],
+    managed: false,
+    metricKey,
+    name: metricKey,
+    outputScopePolicy: "site",
+    outputUnit,
+    precision: 6,
+    revision: 0
+  });
+  registry.saveDerivedMetricDefinition(settingDefinition(
+    "custom.routeSettingDouble",
+    "factor * 2",
+    { alias: "factor", kind: "calculation-setting", settingKey: "carbonEmissionFactor", unit: "kg/kWh" },
+    "kg/kWh"
+  ), database);
+  registry.saveDerivedMetricDefinition(settingDefinition(
+    "custom.routeSettingQuad",
+    "upstream * 2",
+    { alias: "upstream", kind: "metric", metricKey: "custom.routeSettingDouble", scope: "output-site", unit: "kg/kWh" },
+    "kg/kWh"
+  ), database);
+  registry.saveDerivedMetricDefinition(settingDefinition(
+    "custom.routeSettingUnrelated",
+    "tariff * 2",
+    { alias: "tariff", kind: "calculation-setting", settingKey: "estimatedTariffPerKwh", unit: "TWD/kWh" },
+    "TWD/kWh"
+  ), database);
+
+  const app = await buildApp();
+  try {
+    const previousUnrelatedRows = database.prepare(`
+      SELECT * FROM derived_metric_evaluations
+      WHERE metric_key = 'custom.routeSettingUnrelated'
+      ORDER BY metric_scope
+    `).all();
+    const response = await app.inject({
+      method: "PUT",
+      payload: {
+        carbonEmissionFactor: 0.55,
+        co2AutoConvertSmallToKg: false,
+        estimatedTariffPerKwh: 4.5,
+        householdDailyUsageKwh: 13,
+        householdMonthlyUsageKwh: 400,
+        treeEquivalentFactor: 0.16
+      },
+      url: "/api/calculation-settings"
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.routeSettingDouble", database)?.value, 1.1);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.routeSettingQuad", database)?.value, 2.2);
+    assert.deepEqual(
+      database.prepare(`
+        SELECT * FROM derived_metric_evaluations
+        WHERE metric_key = 'custom.routeSettingUnrelated'
+        ORDER BY metric_scope
+      `).all(),
+      previousUnrelatedRows
     );
   } finally {
     await app.close();

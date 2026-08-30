@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
 import {
-  resolveLiveMetricKeysForPage,
   type DisplaySyncEvent
 } from "@solar-display/shared";
 import type { MqttClient } from "mqtt";
@@ -14,13 +13,14 @@ const tempDir = mkdtempSync(join(tmpdir(), "solar-display-ingest-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ MqttClientService }, { migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, { readLiveMetricsSnapshot, readScopedLiveMetricsSnapshot }] =
+const [{ MqttClientService }, { migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, { readLiveMetricsSnapshot, readScopedLiveMetricsSnapshot }, registry] =
   await Promise.all([
     import("./MqttClientService.js"),
     import("../db/migrate.js"),
     import("../db/seed.js"),
     import("../db/index.js"),
-    import("../metrics/liveMetrics.js")
+    import("../metrics/liveMetrics.js"),
+    import("../services/derivedMetricRegistryService.js")
   ]);
 
 after(() => {
@@ -86,6 +86,104 @@ test("enabled topic mapping ingests under its metric_key without a metric_key wh
     const snapshot = readLiveMetricsSnapshot(database);
     assert.ok(snapshot.metrics.phaseRVoltage, "expected phaseRVoltage to be present in the live snapshot");
     assert.equal(snapshot.metrics.phaseRVoltage.value, 220.5);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("MQTT source updates evaluate only transitively affected derived metrics", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES
+      ('cl', 'realTimePower', 'test/changed-source', 'kW', '$.value', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cl', 'custom.ingestUnrelatedSource', 'test/unrelated-source', 'kW', '$.value', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.ingestDouble",
+    name: "custom.ingestDouble",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "source * 2",
+    outputUnit: "kW",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "output-site", unit: "kW" }]
+  }, database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.ingestQuad",
+    name: "custom.ingestQuad",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "upstream * 2",
+    outputUnit: "kW",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "upstream", kind: "metric", metricKey: "custom.ingestDouble", scope: "output-site", unit: "kW" }]
+  }, database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.ingestUnrelated",
+    name: "custom.ingestUnrelated",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "source * 3",
+    outputUnit: "kW",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "source", kind: "metric", metricKey: "custom.ingestUnrelatedSource", scope: "cl", unit: "kW" }]
+  }, database);
+
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "test/unrelated-source", Buffer.from(JSON.stringify({ value: 5 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    client.emit("message", "test/changed-source", Buffer.from(JSON.stringify({ value: 12 })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const readEvaluation = () => database.prepare(`
+      SELECT * FROM derived_metric_evaluations
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.ingestUnrelated'
+    `).get();
+    const readLive = () => database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.ingestUnrelated'
+    `).get();
+    const previousEvaluation = readEvaluation();
+    const previousLive = readLive();
+
+    client.emit("message", "test/changed-source", Buffer.from(JSON.stringify({ value: 13 })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.ingestDouble", database)?.value, 26);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.ingestQuad", database)?.value, 52);
+    assert.deepEqual(readEvaluation(), previousEvaluation);
+    assert.deepEqual(readLive(), previousLive);
   } finally {
     await service.disconnect();
   }
@@ -365,7 +463,7 @@ test("mapped MQTT live metrics publish playback sync only when runtime availabil
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM topic_mappings").run();
-  const requiredMetricKeys = resolveLiveMetricKeysForPage("overview");
+  const requiredMetricKeys = ["realTimePower", "todayGeneration", "totalGeneration"];
   const insertTopicMapping = database.prepare(
     `
       INSERT INTO topic_mappings (
@@ -411,7 +509,7 @@ test("mapped MQTT live metrics publish playback sync only when runtime availabil
     await new Promise((resolve) => setImmediate(resolve));
 
     const snapshot = readScopedLiveMetricsSnapshot("cl", database);
-    assert.equal(snapshot.metrics["factoryGeneration.todayMwh"]?.value, 4001);
+    assert.equal(snapshot.metrics.todayGeneration?.value, 4001);
     assert.deepEqual(
       displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
       [{ reason: "mqtt-live-runtime-availability-updated", scope: "mqtt" }]
@@ -573,6 +671,335 @@ test("solar runtime availability accepts derived self consumption inputs", async
       displaySyncEvents.map((event) => ({ reason: event.reason, scope: event.scope })),
       [{ reason: "mqtt-live-runtime-availability-updated", scope: "mqtt" }]
     );
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("managed Solar summaries evaluate only dependent derived metrics", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM derived_metric_definitions").run();
+  database.prepare(`
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('cl', 'realTimePower', 5, 'kW', '2026-08-30T08:00:00.000Z', 'good', '{}')
+  `).run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.managedSummaryUnrelated",
+    name: "custom.managedSummaryUnrelated",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "source * 2",
+    outputUnit: "kW",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "cl", unit: "kW" }]
+  }, database);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+
+  try {
+    await service.connect();
+    const readUnrelated = () => database.prepare(`
+      SELECT * FROM derived_metric_evaluations
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.managedSummaryUnrelated'
+    `).get();
+    const previous = readUnrelated();
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
+      month_mwh: 366.93,
+      timestamp: "2026-08-30T08:00:10.000Z",
+      today_mwh: 3.49,
+      total_mwh: 9986.306,
+      total_power_kw: 120.5
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(readUnrelated(), previous);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("generic factory generation mappings evaluate only affected derived metrics", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM derived_metric_definitions").run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES
+      ('cl', 'factoryGeneration.powerKw', 'test/factory-generation', 'kW', '$.value', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cl', 'custom.factoryUnrelatedSource', 'test/factory-unrelated', 'kW', '$.value', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.factoryUnrelated",
+    name: "custom.factoryUnrelated",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "source * 2",
+    outputUnit: "kW",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "source", kind: "metric", metricKey: "custom.factoryUnrelatedSource", scope: "cl", unit: "kW" }]
+  }, database);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "test/factory-unrelated", Buffer.from(JSON.stringify({ value: 5 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    const readUnrelated = () => database.prepare(`
+      SELECT * FROM derived_metric_evaluations
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.factoryUnrelated'
+    `).get();
+    const previous = readUnrelated();
+    client.emit("message", "test/factory-generation", Buffer.from(JSON.stringify({ value: 42 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(readUnrelated(), previous);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("failed MQTT mappings do not reevaluate their dependent rows", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM derived_metric_definitions").run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES
+      ('cl', 'custom.multiSuccessSource', 'test/multi-mapping', 'kW', '$.value', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cl', 'custom.multiFailedSource', 'test/multi-mapping', 'kW', '$.missing', 1, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run();
+  registry.initializeDerivedMetricRegistry(database);
+  for (const [metricKey, sourceKey] of [
+    ["custom.multiSuccess", "custom.multiSuccessSource"],
+    ["custom.multiFailed", "custom.multiFailedSource"]
+  ] as const) {
+    registry.saveDerivedMetricDefinition({
+      metricKey,
+      name: metricKey,
+      description: "test definition",
+      outputScopePolicy: "site",
+      expression: "source * 2",
+      outputUnit: "kW",
+      precision: 1,
+      fallbackPolicy: "unavailable",
+      enabled: true,
+      managed: false,
+      revision: 0,
+      inputs: [{ alias: "source", kind: "metric", metricKey: sourceKey, scope: "cl", unit: "kW" }]
+    }, database);
+  }
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+
+  try {
+    await service.connect();
+    client.emit("message", "test/multi-mapping", Buffer.from(JSON.stringify({ value: 5 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    const readFailed = () => database.prepare(`
+      SELECT * FROM derived_metric_evaluations
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.multiFailed'
+    `).get();
+    const previousFailed = readFailed();
+    assert.ok(previousFailed);
+    client.emit("message", "test/multi-mapping", Buffer.from(JSON.stringify({ value: 6 })));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.multiSuccess", database)?.value, 12);
+    assert.deepEqual(readFailed(), previousFailed);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("omitted optional summary identities preserve last-good dependencies", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM derived_metric_definitions").run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition({
+    metricKey: "custom.summaryTotal",
+    name: "custom.summaryTotal",
+    description: "test definition",
+    outputScopePolicy: "site",
+    expression: "source * 2",
+    outputUnit: "MWh",
+    precision: 1,
+    fallbackPolicy: "unavailable",
+    enabled: true,
+    managed: false,
+    revision: 0,
+    inputs: [{ alias: "source", kind: "metric", metricKey: "factoryGeneration.totalMwh", scope: "cl", unit: "MWh" }]
+  }, database);
+  for (const [metricKey, sourceKey] of [
+    ["custom.summaryToday", "factoryGeneration.todayMwh"],
+    ["custom.summaryMonth", "factoryGeneration.monthMwh"]
+  ] as const) {
+    registry.saveDerivedMetricDefinition({
+      metricKey,
+      name: metricKey,
+      description: "test definition",
+      outputScopePolicy: "site",
+      expression: "source * 2",
+      outputUnit: "MWh",
+      precision: 1,
+      fallbackPolicy: "unavailable",
+      enabled: true,
+      managed: false,
+      revision: 0,
+      inputs: [{ alias: "source", kind: "metric", metricKey: sourceKey, scope: "cl", unit: "MWh" }]
+    }, database);
+  }
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined }
+  });
+  const firstTimestamp = new Date(Date.now() - 3_000).toISOString();
+  const secondTimestamp = new Date(Date.now() - 1_000).toISOString();
+
+  try {
+    await service.connect();
+    for (const [site, timestamp, total] of [
+      ["CL", firstTimestamp, 10],
+      ["KN", firstTimestamp, 20]
+    ] as const) {
+      client.emit("message", `solar/${site}/summary`, Buffer.from(JSON.stringify({
+        factory: site,
+        month_mwh: 2,
+        timestamp,
+        today_mwh: 1,
+        total_mwh: total,
+        total_power_kw: 5
+      })));
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    registry.evaluateDerivedMetrics(database, new Date());
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.summaryTotal", database)?.status, "ready");
+    assert.equal(database.prepare(`
+      SELECT value FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.summaryTotal'
+    `).pluck().get(), 20);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.summaryToday", database)?.value, 2);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.summaryMonth", database)?.value, 4);
+    const previousTotalSource = database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.totalMwh'
+    `).get();
+    const previousTotalEvaluation = registry.readDerivedMetricEvaluation(
+      "cl",
+      "custom.summaryTotal",
+      database
+    );
+    const previousTotalLive = database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.summaryTotal'
+    `).get();
+    const previousGlobalEvaluation = registry.readDerivedMetricEvaluation(
+      "global",
+      "totalGeneration",
+      database
+    );
+    const previousGlobalLive = database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'
+    `).get();
+
+    client.emit("message", "solar/CL/summary", Buffer.from(JSON.stringify({
+      factory: "CL",
+      month_mwh: 3,
+      timestamp: secondTimestamp,
+      today_mwh: 2,
+      total_power_kw: 6
+    })));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.totalMwh'
+    `).get(), previousTotalSource);
+    assert.equal(database.prepare(`
+      SELECT value FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.todayMwh'
+    `).pluck().get(), 2);
+    assert.equal(database.prepare(`
+      SELECT value FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.monthMwh'
+    `).pluck().get(), 3);
+    assert.deepEqual(
+      registry.readDerivedMetricEvaluation("cl", "custom.summaryTotal", database),
+      previousTotalEvaluation
+    );
+    assert.deepEqual(database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'cl' AND metric_key = 'custom.summaryTotal'
+    `).get(), previousTotalLive);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.summaryToday", database)?.value, 4);
+    assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.summaryMonth", database)?.value, 6);
+    assert.deepEqual(
+      registry.readDerivedMetricEvaluation("global", "totalGeneration", database),
+      previousGlobalEvaluation
+    );
+    assert.deepEqual(database.prepare(`
+      SELECT * FROM live_metric_values
+      WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'
+    `).get(), previousGlobalLive);
   } finally {
     await service.disconnect();
   }

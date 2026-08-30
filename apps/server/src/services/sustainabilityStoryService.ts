@@ -9,19 +9,17 @@ import type {
   SiteScope
 } from "@solar-display/shared";
 import {
-  co2TreeEquivalentFactor,
-  formatMonitoringValue,
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod,
   scopedIdentityKey
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
-import { readCalculationSettings } from "./calculationSettingsService.js";
 import {
   formatDisplayOverrideValue,
   readActiveDisplayValueOverrides
 } from "./displayValueOverrideService.js";
+import { readDerivedMetricEvaluation } from "./derivedMetricRegistryService.js";
 import { readHouseholdEquivalenceCards } from "./householdEquivalenceService.js";
 import {
   evaluateFactoryGenerationScope,
@@ -109,15 +107,6 @@ function resolveLiveMetricCounterFallbackValue(
   }
 
   return value;
-}
-
-function parseFormattedMonitoringNumber(value: string) {
-  const parsed = Number(value.replaceAll(",", "").trim());
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function resolveOverviewTreeEquivalentBasis(carbonReductionTons: number) {
-  return parseFormattedMonitoringNumber(formatMonitoringValue(carbonReductionTons, "t"));
 }
 
 function defaultStory(): SustainabilityStoryInput {
@@ -412,49 +401,47 @@ function buildBigNumbers(
 ) {
   const scopedGeneration = resolveScopedGeneration(counterMap, now, siteScope);
   const generation = scopedGeneration.generation;
-  const consumption = siteScope
-    ? { updatedAt: null, value: null }
-    : readCounter(counterMap, "consumption");
-  const selfConsumption = siteScope
-    ? { updatedAt: null, value: null }
-    : readCounter(counterMap, "selfConsumption");
-  const calculationSettings = readCalculationSettings();
-  const accumulatedCarbonReductionTons =
-    typeof generation.value === "number"
-      ? roundTo((generation.value * calculationSettings.carbonEmissionFactor) / 1000, 3)
-      : null;
-
-  const annualEnergySavingPercent =
-    typeof selfConsumption.value === "number" &&
-      typeof consumption.value === "number" &&
-      consumption.value > 0
-      ? roundTo((selfConsumption.value / consumption.value) * 100, 1)
-      : null;
-  const plantedTreeEquivalent =
-    accumulatedCarbonReductionTons === null
-      ? null
-      : Math.round(
-        (resolveOverviewTreeEquivalentBasis(accumulatedCarbonReductionTons) ??
-          accumulatedCarbonReductionTons) * co2TreeEquivalentFactor
-      );
+  const metricScope: MetricScope = siteScope ?? "global";
+  const metricNamespace = siteScope ? "sustainability.site" : "sustainability.global";
+  const readRegistryValue = (metricName: string) =>
+    readDerivedMetricEvaluation(metricScope, `${metricNamespace}.${metricName}`);
+  const carbonEvaluation = readRegistryValue("accumulatedCarbonReductionTons");
+  const annualEvaluation = readRegistryValue("annualEnergySavingPercent");
+  const treeEvaluation = readRegistryValue("plantedTreeEquivalent");
+  const registryValue = (evaluation: ReturnType<typeof readDerivedMetricEvaluation>) =>
+    typeof evaluation?.value === "number" ? evaluation.value : null;
+  const registryProvenance = (
+    label: string,
+    metricName: string,
+    evaluation: ReturnType<typeof readDerivedMetricEvaluation>
+  ) => ({
+    label,
+    source: evaluation ? `${metricScope}:${metricNamespace}.${metricName}` : "Registry evaluation unavailable",
+    sourceClass: evaluation ? "derived-metric" : "missing",
+    syncState:
+      evaluation?.status === "ready"
+        ? "fresh"
+        : evaluation?.status === "degraded"
+          ? "stale"
+          : "missing",
+    updatedAt: evaluation?.timestamp ?? null
+  }) satisfies SustainabilityProvenance;
 
   return {
     values: {
-      accumulatedCarbonReductionTons,
+      accumulatedCarbonReductionTons: registryValue(carbonEvaluation),
       accumulatedGenerationGwh:
         typeof generation.value === "number"
           ? roundTo(generation.value / 1_000_000, 6)
           : null,
-      annualEnergySavingPercent,
-      plantedTreeEquivalent
+      annualEnergySavingPercent: registryValue(annualEvaluation),
+      plantedTreeEquivalent: registryValue(treeEvaluation)
     } satisfies Record<SustainabilityBigNumberKey, number | null>,
     provenance: {
-      accumulatedCarbonReductionTons: buildFactoryGenerationProvenance(
+      accumulatedCarbonReductionTons: registryProvenance(
         "累積減碳",
-        `${scopedGeneration.source} × carbonEmissionFactor`,
-        "derived-metric",
-        scopedGeneration.evaluation,
-        generation
+        "accumulatedCarbonReductionTons",
+        carbonEvaluation
       ),
       accumulatedGenerationGwh: buildFactoryGenerationProvenance(
         "累積發電",
@@ -463,18 +450,15 @@ function buildBigNumbers(
         scopedGeneration.evaluation,
         generation
       ),
-      annualEnergySavingPercent: buildCounterProvenance(
+      annualEnergySavingPercent: registryProvenance(
         "年度節能成效",
-        "self-consumption-ratio",
-        "derived-metric",
-        [selfConsumption, consumption]
+        "annualEnergySavingPercent",
+        annualEvaluation
       ),
-      plantedTreeEquivalent: buildFactoryGenerationProvenance(
+      plantedTreeEquivalent: registryProvenance(
         "植樹等效",
-        `${scopedGeneration.source} × carbonEmissionFactor × co2TreeEquivalentFactor`,
-        "derived-metric",
-        scopedGeneration.evaluation,
-        generation
+        "plantedTreeEquivalent",
+        treeEvaluation
       )
     }
   };

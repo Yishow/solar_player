@@ -7,6 +7,12 @@ import {
 } from "./display-pages-asset-governance.test-support.js";
 import { createPairedDeviceTestContext } from "../testing/deviceContextTestSupport.js";
 import { readDisplayCardData } from "../services/displayCardDataService.js";
+import { writeStageConfig } from "../services/displayPagePublishingService.js";
+import {
+  evaluateDerivedMetrics,
+  initializeDerivedMetricRegistry,
+  saveDerivedMetricDefinition
+} from "../services/derivedMetricRegistryService.js";
 
 function toLocalDateKey(date: Date) {
   const pad = (value: number) => `${value}`.padStart(2, "0");
@@ -266,7 +272,15 @@ test("GET /api/display-card-data exposes monitoring card diagnostics", async () 
       rows: Array<{
         cardId: string;
         dependencies: Array<{ metricKey: string; topic: string | null }>;
+        derivedMetric?: {
+          definitionRevision: number;
+          effectiveOutputScope: string;
+          evaluation: { freshnessState: string; status: string } | null;
+          metricKey: string;
+          provenance: Array<{ metricKey?: string; metricScope?: string; upstream?: unknown[] }>;
+        };
         displayValue: string;
+        formula: string | null;
         metricKey: string;
         pageId: string;
         sourceTopics: Array<{ metricKey: string; topic: string }>;
@@ -294,18 +308,137 @@ test("GET /api/display-card-data exposes monitoring card diagnostics", async () 
     assert.deepEqual(
       solarRatio?.dependencies.map((dependency) => [dependency.metricKey, dependency.topic]),
       [
-        ["selfConsumptionRatio", null],
         ["selfConsumptionEnergy", "kuozui/plant/solar/self_consumption"],
         ["consumptionEnergy", "kuozui/plant/factory/consumption"]
       ]
+    );
+    assert.equal(solarRatio?.formula, "self / consumption * 100");
+    assert.equal(solarRatio?.derivedMetric?.definitionRevision, 1);
+    assert.equal(solarRatio?.derivedMetric?.metricKey, "selfConsumptionRatio");
+    assert.equal(solarRatio?.derivedMetric?.effectiveOutputScope, "cl");
+    assert.equal(solarRatio?.derivedMetric?.evaluation?.status, "ready");
+    assert.equal(solarRatio?.derivedMetric?.evaluation?.freshnessState, "fresh");
+    assert.equal(
+      solarRatio?.derivedMetric?.provenance.some(
+        ({ metricKey, metricScope }) => metricKey === "selfConsumptionEnergy" && metricScope === "cl"
+      ),
+      true
     );
   } finally {
     await app.close();
   }
 });
 
+test("managed generation dependencies use resolved readings without requiring a topic mapping", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database);
+
+  const rows = readDisplayCardData("cl").rows;
+  for (const cardId of ["overview.todayGeneration", "overview.todayCo2Reduction"]) {
+    const row = rows.find((candidate) => candidate.cardId === cardId);
+    const dependency = row?.dependencies.find(
+      (candidate) => candidate.metricKey === "factoryGeneration.todayMwh"
+    );
+    assert.ok(dependency);
+    assert.equal(dependency.topic, null);
+    assert.equal(dependency.status, "ready");
+    assert.notEqual(dependency.latestValue, null);
+  }
+});
+
+test("derived Card Data does not recover an omitted oversized source topic", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const oversizedTopic = `factory/${"x".repeat(300_000)}`;
+  database.prepare(`
+    UPDATE topic_mappings
+    SET topic = ?
+    WHERE metric_scope = 'cl' AND metric_key = 'selfConsumptionEnergy'
+  `).run(oversizedTopic);
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database);
+
+  const rows = readDisplayCardData("cl").rows;
+  const derived = rows.find((row) => row.cardId === "solar.selfConsumptionRatio");
+  assert.equal(derived?.derivedMetric?.evaluation?.status, "ready");
+  assert.equal(derived?.dependencies.find(({ metricKey }) => metricKey === "selfConsumptionEnergy")?.topic, null);
+  assert.equal(derived?.dependencies.some(({ topic }) => (topic?.length ?? 0) > 1_000), false);
+  assert.equal(derived?.sourceTopics.some(({ topic }) => topic.length > 1_000), false);
+  assert.equal(
+    derived?.dependencies.some(
+      ({ metricKey, metricScope }) => metricKey === "selfConsumptionEnergy" && metricScope === "cl"
+    ),
+    true
+  );
+
+  const nonDerived = rows.find((row) => row.cardId === "overview.realTimePower");
+  assert.deepEqual(nonDerived?.sourceTopics, [
+    { metricKey: "realTimePower", metricScope: "cl", topic: "kuozui/plant/solar/power" }
+  ]);
+});
+
+test("derived Card Data does not recover mapping topics after oversized persisted provenance", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const oversizedTopic = `factory/${"x".repeat(300_000)}`;
+  database.prepare(`
+    UPDATE topic_mappings
+    SET topic = ?
+    WHERE metric_scope = 'cl' AND metric_key = 'selfConsumptionEnergy'
+  `).run(oversizedTopic);
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database);
+
+  const oversizedInvalidJson = `{"${"x".repeat(256 * 1024)}}`;
+  database.prepare(`
+    UPDATE derived_metric_evaluations
+    SET provenance_json = ?
+    WHERE metric_scope = 'cl' AND metric_key = 'selfConsumptionRatio'
+  `).run(oversizedInvalidJson);
+
+  const rows = readDisplayCardData("cl").rows;
+  const derived = rows.find((row) => row.cardId === "solar.selfConsumptionRatio");
+  assert.equal(derived?.derivedMetric?.evaluation?.status, "ready");
+  assert.equal(derived?.status, "ready");
+  assert.deepEqual(
+    derived?.dependencies.map(({ metricKey, metricScope, topic }) => ({ metricKey, metricScope, topic })),
+    [
+      { metricKey: "selfConsumptionEnergy", metricScope: "cl", topic: null },
+      { metricKey: "consumptionEnergy", metricScope: "cl", topic: null }
+    ]
+  );
+  assert.deepEqual(derived?.sourceTopics, []);
+  assert.equal(derived?.dependencies.some(({ topic }) => (topic?.length ?? 0) > 1_000), false);
+
+  const nonDerived = rows.find((row) => row.cardId === "overview.realTimePower");
+  assert.deepEqual(nonDerived?.sourceTopics, [
+    { metricKey: "realTimePower", metricScope: "cl", topic: "kuozui/plant/solar/power" }
+  ]);
+});
+
+test("Factory total Card Data rejects a foreign scope outside the managed definition allowlist", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  writeStageConfig("factory-circuit", "live", {
+    dataBindings: {
+      totalPower: {
+        dataBinding: { metricKey: "totalPower", scope: "kn", sourceType: "metric" },
+        itemId: "totalPower"
+      }
+    }
+  });
+  initializeDerivedMetricRegistry(database);
+  assert.throws(
+    () => readDisplayCardData("cl"),
+    /Invalid published widget binding factory-circuit\.totalPower: metric-binding-incompatible-scope/
+  );
+});
+
 test("card diagnostics keep CL and KN semantic twins scoped independently", () => {
   seedCardDataFixture();
+  initializeDerivedMetricRegistry();
   const database = getDatabase();
   const timestamp = new Date().toISOString();
   database.prepare(`
@@ -407,11 +540,18 @@ test("GET /api/display-card-data identifies live today generation fallback for t
   database
     .prepare(
       `
-        INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
-        VALUES ('global', 'todayGeneration', 7.99, 'MWh', ?, 'good', '{}')
+        INSERT OR REPLACE INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+        VALUES
+          ('cl', 'factoryGeneration.todayMwh', 4, 'MWh', ?, 'good', ?),
+          ('kn', 'factoryGeneration.todayMwh', 3.99, 'MWh', ?, 'good', ?)
       `
     )
-    .run(observedAt);
+    .run(
+      observedAt,
+      JSON.stringify({ timestamp: observedAt, today_mwh: 4 }),
+      observedAt,
+      JSON.stringify({ timestamp: observedAt, today_mwh: 3.99 })
+    );
   const app = await buildApp();
 
   try {
@@ -718,7 +858,6 @@ test("GET /api/display-card-data classifies missing topics and formula inputs", 
     assert.deepEqual(
       solarRatio?.dependencies.map((dependency) => [dependency.metricKey, dependency.status]),
       [
-        ["selfConsumptionRatio", "missing-topic"],
         ["selfConsumptionEnergy", "ready"],
         ["consumptionEnergy", "idle-topic"]
       ]
@@ -928,4 +1067,162 @@ test("GET /api/display-card-data keeps expired overrides visible but inactive", 
   } finally {
     await app.close();
   }
+});
+
+test("Card Data falls back when a published custom definition is disabled", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const definition = saveDerivedMetricDefinition({
+    description: "Disabled published card binding test",
+    enabled: true,
+    expression: "source * 2",
+    fallbackPolicy: "unavailable",
+    inputs: [
+      {
+        alias: "source",
+        kind: "metric",
+        metricKey: "realTimePower",
+        scope: "output-site",
+        unit: "kW"
+      }
+    ],
+    managed: false,
+    metricKey: "custom.disabledCardPower",
+    name: "Disabled Card Power",
+    outputScopePolicy: "site",
+    outputUnit: "kW",
+    precision: 1,
+    revision: 0
+  });
+  writeStageConfig("overview", "live", {
+    dataBindings: {
+      power: {
+        dataBinding: {
+          metricKey: definition.metricKey,
+          scope: "inherit-device",
+          sourceType: "metric"
+        },
+        itemId: "power"
+      }
+    }
+  });
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database);
+
+  saveDerivedMetricDefinition({ ...definition, enabled: false });
+
+  const row = readDisplayCardData("cl").rows.find(
+    ({ cardId }) => cardId === `overview.${definition.metricKey}`
+  );
+  assert.equal(row?.displayValue, "--");
+  assert.notEqual(row?.status, "ready");
+  assert.equal(row?.derivedMetric ?? null, null);
+});
+
+test("Card Data excludes a stored definition rejected during startup compilation", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  const definition = saveDerivedMetricDefinition({
+    description: "Startup exclusion card test",
+    enabled: true,
+    expression: "source * 2",
+    fallbackPolicy: "unavailable",
+    inputs: [{
+      alias: "source",
+      kind: "metric",
+      metricKey: "realTimePower",
+      scope: "output-site",
+      unit: "kW"
+    }],
+    managed: false,
+    metricKey: "custom.startupExcludedCard",
+    name: "Startup Excluded Card",
+    outputScopePolicy: "site",
+    outputUnit: "kW",
+    precision: 1,
+    revision: 0
+  });
+  database
+    .prepare("UPDATE derived_metric_definitions SET expression = ? WHERE metric_key = ?")
+    .run("source *", definition.metricKey);
+  writeStageConfig("overview", "live", {
+    dataBindings: {
+      power: {
+        dataBinding: {
+          metricKey: definition.metricKey,
+          scope: "inherit-device",
+          sourceType: "metric"
+        },
+        itemId: "power"
+      }
+    }
+  });
+  initializeDerivedMetricRegistry(database);
+
+  const row = readDisplayCardData("cl").rows.find(
+    ({ cardId }) => cardId === `overview.${definition.metricKey}`
+  );
+  assert.equal(row?.displayValue, "--");
+  assert.equal(row?.derivedMetric ?? null, null);
+  assert.equal(row?.formula, null);
+});
+
+test("Card Data Sustainability rows consume global registry evaluations", () => {
+  seedCardDataFixture();
+  const database = getDatabase();
+  initializeDerivedMetricRegistry(database);
+
+  const observedAt = "2026-08-30T00:00:00.000Z";
+  const insertEvaluation = database.prepare(`
+    INSERT INTO derived_metric_evaluations (
+      metric_scope, metric_key, definition_revision, status, failure_code,
+      retained_last_good, value, unit, source_timestamp, evaluated_at, provenance_json
+    ) VALUES ('global', ?, 1, 'ready', NULL, 0, ?, ?, ?, ?, ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+      value = excluded.value,
+      unit = excluded.unit,
+      source_timestamp = excluded.source_timestamp,
+      evaluated_at = excluded.evaluated_at,
+      provenance_json = excluded.provenance_json
+  `);
+  insertEvaluation.run(
+    "sustainability.global.accumulatedCarbonReductionTons",
+    123,
+    "t",
+    observedAt,
+    observedAt,
+    JSON.stringify({ dependencies: [] })
+  );
+  insertEvaluation.run(
+    "sustainability.global.annualEnergySavingPercent",
+    67.8,
+    "%",
+    observedAt,
+    observedAt,
+    JSON.stringify({ dependencies: [] })
+  );
+  insertEvaluation.run(
+    "sustainability.global.plantedTreeEquivalent",
+    111,
+    "trees",
+    observedAt,
+    observedAt,
+    JSON.stringify({ dependencies: [] })
+  );
+
+  const rows = readDisplayCardData("cl").rows;
+  const carbon = rows.find(({ cardId }) => cardId === "sustainability.big-number.accumulatedCarbonReductionTons");
+  const annual = rows.find(({ cardId }) => cardId === "sustainability.big-number.annualEnergySavingPercent");
+  const trees = rows.find(({ cardId }) => cardId === "sustainability.big-number.plantedTreeEquivalent");
+
+  assert.equal(carbon?.metricKey, "accumulatedCarbonReductionTons");
+  assert.equal(carbon?.originalValue, "123");
+  assert.equal(carbon?.derivedMetric?.metricKey, "sustainability.global.accumulatedCarbonReductionTons");
+  assert.equal(carbon?.derivedMetric?.evaluation?.value, 123);
+  assert.equal(annual?.originalValue, "67.8");
+  assert.equal(annual?.derivedMetric?.metricKey, "sustainability.global.annualEnergySavingPercent");
+  assert.equal(annual?.derivedMetric?.evaluation?.value, 67.8);
+  assert.equal(trees?.originalValue, "111");
+  assert.equal(trees?.derivedMetric?.metricKey, "sustainability.global.plantedTreeEquivalent");
+  assert.equal(trees?.derivedMetric?.evaluation?.value, 111);
 });

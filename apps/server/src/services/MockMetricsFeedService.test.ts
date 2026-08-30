@@ -136,8 +136,90 @@ test("writeReading seeds a runtime-complete mock metric set for playback surface
   assert.ok(totalFactoryPower > 0, "expected factory slot power distribution to be positive");
   assert.ok(snapshot.systemEfficiency!.value >= 90 && snapshot.systemEfficiency!.value <= 100);
 
-  const expectedTodayCo2Reduction = Number((todayGeneration * 0.494 / 1000).toFixed(2));
+  const expectedTodayCo2Reduction = Number((todayGeneration * 0.467 / 1000).toFixed(6));
   assert.equal(todayCo2Reduction, expectedTodayCo2Reduction);
+});
+
+test("writeReading leaves registry as the single writer for migrated site metrics", () => {
+  migrateDatabase();
+  const database = getDatabase();
+  database.exec(`
+    CREATE TEMP TABLE migrated_metric_write_audit (metric_key TEXT NOT NULL);
+    CREATE TEMP TRIGGER audit_migrated_site_insert
+    AFTER INSERT ON live_metric_values
+    WHEN NEW.metric_scope = 'cl' AND NEW.metric_key IN (
+      'selfConsumptionRatio',
+      'todayCo2Reduction',
+      'totalCo2Reduction',
+      'factoryCircuit.jungliTotalPower',
+      'sustainability.site.accumulatedCarbonReductionTons',
+      'sustainability.site.annualEnergySavingPercent',
+      'sustainability.site.plantedTreeEquivalent'
+    )
+    BEGIN
+      INSERT INTO migrated_metric_write_audit (metric_key) VALUES (NEW.metric_key);
+    END;
+    CREATE TEMP TRIGGER audit_migrated_site_update
+    AFTER UPDATE ON live_metric_values
+    WHEN NEW.metric_scope = 'cl' AND NEW.metric_key IN (
+      'selfConsumptionRatio',
+      'todayCo2Reduction',
+      'totalCo2Reduction',
+      'factoryCircuit.jungliTotalPower',
+      'sustainability.site.accumulatedCarbonReductionTons',
+      'sustainability.site.annualEnergySavingPercent',
+      'sustainability.site.plantedTreeEquivalent'
+    )
+    BEGIN
+      INSERT INTO migrated_metric_write_audit (metric_key) VALUES (NEW.metric_key);
+    END;
+  `);
+  const service = new MockMetricsFeedService({
+    database,
+    metricScope: "cl",
+    now: () => at(12)
+  });
+
+  service.writeReading();
+
+  assert.deepEqual(
+    database.prepare(`
+      SELECT metric_key, COUNT(*) AS writes
+      FROM migrated_metric_write_audit
+      GROUP BY metric_key
+      ORDER BY metric_key
+    `).all(),
+    [
+      { metric_key: "factoryCircuit.jungliTotalPower", writes: 1 },
+      { metric_key: "selfConsumptionRatio", writes: 1 },
+      { metric_key: "sustainability.site.accumulatedCarbonReductionTons", writes: 1 },
+      { metric_key: "sustainability.site.annualEnergySavingPercent", writes: 1 },
+      { metric_key: "sustainability.site.plantedTreeEquivalent", writes: 1 },
+      { metric_key: "todayCo2Reduction", writes: 1 },
+      { metric_key: "totalCo2Reduction", writes: 1 }
+    ]
+  );
+});
+
+test("writeReading accumulates month-to-date generation after the first day", () => {
+  migrateDatabase();
+  const database = getDatabase();
+  const service = new MockMetricsFeedService({
+    database,
+    metricScope: "cl",
+    now: () => at(12)
+  });
+
+  service.writeReading();
+
+  const metrics = readScopedLiveMetricsSnapshot("cl", database).metrics;
+  const todayMwh = metrics["factoryGeneration.todayMwh"];
+  const monthMwh = metrics["factoryGeneration.monthMwh"];
+  assert.ok(todayMwh, "expected today generation to be written");
+  assert.ok(monthMwh, "expected month generation to be written");
+  assert.ok(monthMwh.value > todayMwh.value, "month generation should exceed today's after day one");
+  assert.equal(monthMwh.unit, todayMwh.unit);
+  assert.equal(monthMwh.timestamp, todayMwh.timestamp);
 });
 
 test("writeReading keeps a single realTimePower row across repeated writes", () => {
@@ -146,6 +228,9 @@ test("writeReading keeps a single realTimePower row across repeated writes", () 
   const service = new MockMetricsFeedService({ database, metricScope: "cl", now: () => at(12) });
 
   service.writeReading();
+  const firstTotalCount = (
+    database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number }
+  ).count;
   service.writeReading();
 
   const realTimePowerCount = (
@@ -157,7 +242,7 @@ test("writeReading keeps a single realTimePower row across repeated writes", () 
     database.prepare("SELECT COUNT(*) AS count FROM live_metric_values").get() as { count: number }
   ).count;
   assert.equal(realTimePowerCount, 1);
-  assert.equal(totalCount, 16);
+  assert.equal(totalCount, firstTotalCount);
 });
 
 test("mock cumulative energy advances within a day and does not reset across local days", () => {

@@ -14,12 +14,16 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readDisplayStory }
+  { readDisplayStory },
+  { evaluateDerivedMetrics },
+  { mirrorLegacyGenerationIntoSiteSummaryForTest }
 ] = await Promise.all([
   import("../db/index.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
-  import("./displayStoryService.js")
+  import("./displayStoryService.js"),
+  import("./derivedMetricRegistryService.js"),
+  import("../testing/deviceContextTestSupport.js")
 ]);
 
 function removeDatabaseFiles() {
@@ -81,6 +85,8 @@ test("overview and solar carbon cards derive the same values from generation and
     )
     .run(timestamp);
 
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  evaluateDerivedMetrics(database);
   const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
@@ -131,6 +137,8 @@ test("overview and solar carbon cards switch sub-ton displays to kilograms when 
     )
     .run(timestamp);
 
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  evaluateDerivedMetrics(database);
   const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
@@ -185,6 +193,8 @@ test("overview and solar carbon cards preserve precision before converting small
     )
     .run(timestamp);
 
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  evaluateDerivedMetrics(database);
   const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
@@ -239,6 +249,8 @@ test("overview and solar carbon cards treat lower-case mWh as megawatt-hours", (
     )
     .run(timestamp);
 
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  evaluateDerivedMetrics(database);
   const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");
@@ -270,6 +282,7 @@ test("overview and solar carbon cards fail closed when the generation basis is u
     )
     .run(timestamp);
 
+  evaluateDerivedMetrics(database);
   const { overview, solar } = readDisplayStory({ siteScope: "cl" });
   const overviewTodayCarbon = overview.metrics.find((metric) => metric.metricKey === "todayCo2Reduction");
   const overviewTotalCarbon = overview.metrics.find((metric) => metric.metricKey === "totalCo2Reduction");

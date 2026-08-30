@@ -12,6 +12,9 @@ const {
 } = await import(
   "../testing/deviceContextTestSupport.js"
 );
+const { evaluateDerivedMetrics } = await import(
+  "../services/derivedMetricRegistryService.js"
+);
 
 function deviceCookies(siteScope: "cl" | "kn" = "cl") {
   mirrorLegacyGenerationIntoSiteSummaryForTest(siteScope);
@@ -171,6 +174,7 @@ function seedDisplayStoryFixture() {
       "UPDATE circuit_configs SET display_slot = NULL WHERE mqtt_topic = ?"
     )
     .run("factory/power/stamping");
+  mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
 
   return { today };
 }
@@ -335,6 +339,11 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
         kpis: Array<{
           bindingState: string;
           dependencyKeys: string[];
+          derivedMetric?: {
+            effectiveOutputScope: string;
+            evaluation: { failureCode: string | null } | null;
+            metricKey: string;
+          };
           fallbackReason: string | null;
           metricKey: string;
           provenance: string;
@@ -416,7 +425,6 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
     assert.equal(selfConsumptionMetric.provenance, "derived");
     assert.equal(selfConsumptionMetric.sourceClass, "derived-metric");
     assert.deepEqual(selfConsumptionMetric.dependencyKeys, [
-      "selfConsumptionRatio",
       "selfConsumptionEnergy",
       "consumptionEnergy"
     ]);
@@ -436,8 +444,9 @@ test("GET /api/display-story exposes monitoring semantics for overview, solar, a
       (metric) => metric.metricKey === "totalPower"
     );
     assert.ok(totalPowerKpi);
-    assert.equal(totalPowerKpi.bindingState, "missing");
-    assert.equal(totalPowerKpi.fallbackReason, "missing-slot-binding");
+    assert.equal(totalPowerKpi.bindingState, "bound");
+    assert.equal(totalPowerKpi.fallbackReason, "stale-data");
+    assert.equal(totalPowerKpi.derivedMetric?.evaluation?.failureCode, "input-unavailable");
     assert.equal(totalPowerKpi.provenance, "fallback");
     assert.equal(totalPowerKpi.sourceClass, "slot-aggregate");
     assert.equal(totalPowerKpi.value, "--");
@@ -516,6 +525,143 @@ test("Site-scoped Overview does not expose global persisted history after MQTT r
   }
 });
 
+test("GET /api/display-story omits source topics for unavailable registered outputs retained in live rows", async () => {
+  seedDisplayStoryFixture();
+  const app = await buildApp();
+  try {
+    const database = getDatabase();
+    const staleObservedAt = "2026-01-01T00:00:00.000Z";
+    const sourceKeys = [
+      "selfConsumptionEnergy",
+      "consumptionEnergy",
+      "factoryGeneration.todayMwh",
+      ...["stamping", "body", "painting", "assembly", "utility", "office"].map(
+        (slot) => `factoryCircuit.${slot}Power`
+      )
+    ];
+    database
+      .prepare(
+        `DELETE FROM live_metric_values
+          WHERE metric_scope = 'cl' AND metric_key IN (${sourceKeys.map(() => "?").join(", ")})`
+      )
+      .run(...sourceKeys);
+    database
+      .prepare(`
+        INSERT INTO topic_mappings (
+          metric_scope,
+          metric_key,
+          topic,
+          unit,
+          value_path,
+          multiplier,
+          offset,
+          decimal_places,
+          enabled
+        ) VALUES ('cl', 'todayCo2Reduction', 'solar/derived/today-co2', 't', '$.value', 1, 0, 2, 1)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+          topic = excluded.topic,
+          enabled = excluded.enabled
+      `)
+      .run();
+    database
+      .prepare(`
+        INSERT INTO topic_mappings (
+          metric_scope,
+          metric_key,
+          topic,
+          unit,
+          value_path,
+          multiplier,
+          offset,
+          decimal_places,
+          enabled
+        ) VALUES ('global', 'factoryPeakMultiplier', 'factory/peak_multiplier', 'x', '$.value', 1, 0, 2, 1)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+          topic = excluded.topic,
+          enabled = excluded.enabled
+      `)
+      .run();
+    const upsert = database.prepare(`
+      INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+      VALUES (?, ?, ?, ?, ?, 'good', '{}')
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+        value = excluded.value,
+        unit = excluded.unit,
+        timestamp = excluded.timestamp,
+        quality = excluded.quality,
+        raw_payload = excluded.raw_payload
+    `);
+    upsert.run("cl", "todayCo2Reduction", 1.94, "t", staleObservedAt);
+    upsert.run("cl", "factoryCircuit.jungliTotalPower", 999, "kW", staleObservedAt);
+
+    const evaluations = evaluateDerivedMetrics(database, new Date(), { materialize: false });
+    assert.equal(
+      evaluations.find(
+        ({ metricKey, metricScope }) =>
+          metricScope === "cl" && metricKey === "todayCo2Reduction"
+      )?.status,
+      "unavailable"
+    );
+    assert.equal(
+      database
+        .prepare(
+          `SELECT value FROM live_metric_values
+             WHERE metric_scope = 'cl' AND metric_key = 'todayCo2Reduction'`
+        )
+        .pluck()
+        .get(),
+      1.94
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/display-story",
+      cookies: deviceCookies()
+    });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      overview: { metrics: Array<{ metricKey: string; sourceTopics?: unknown }> };
+      solar: { kpis: Array<{ metricKey: string; sourceTopics?: unknown }> };
+      factoryCircuit: { kpis: Array<{ metricKey: string; sourceTopics?: unknown; value: string }> };
+    };
+    const overviewMetric = body.overview.metrics.find(
+      ({ metricKey }) => metricKey === "todayCo2Reduction"
+    );
+    const solarMetric = body.solar.kpis.find(
+      ({ metricKey }) => metricKey === "selfConsumptionRatio"
+    );
+    const factoryMetric = body.factoryCircuit.kpis.find(
+      ({ metricKey }) => metricKey === "totalPower"
+    );
+    const factorySolarShareMetric = body.factoryCircuit.kpis.find(
+      ({ metricKey }) => metricKey === "solarShare"
+    );
+    const factoryPeakMetric = body.factoryCircuit.kpis.find(
+      ({ metricKey }) => metricKey === "peak"
+    );
+    assert.ok(overviewMetric, JSON.stringify(body.overview.metrics.map(({ metricKey }) => metricKey)));
+    assert.ok(solarMetric);
+    assert.ok(factoryMetric);
+    assert.ok(factorySolarShareMetric);
+    assert.ok(factoryPeakMetric);
+    assert.equal(
+      overviewMetric.sourceTopics,
+      undefined
+    );
+    assert.equal(
+      solarMetric.sourceTopics,
+      undefined
+    );
+    assert.equal(factoryMetric.sourceTopics, undefined);
+    assert.equal(factorySolarShareMetric.value, "--");
+    assert.equal(factorySolarShareMetric.sourceTopics, undefined);
+    assert.equal(factoryPeakMetric.value, "--");
+    assert.equal(factoryPeakMetric.sourceTopics, undefined);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /api/display-story falls back factory self-consumption KPI to today generation when self-consumption is stale", async () => {
   const { today } = seedDisplayStoryFixture();
   const database = getDatabase();
@@ -546,6 +692,10 @@ test("GET /api/display-story falls back factory self-consumption KPI to today ge
           freshnessState: string;
           helper: string;
           metricKey: string;
+          derivedMetric?: {
+            effectiveOutputScope: string;
+            metricKey: string;
+          };
           provenance: string;
           sourceTopics?: Array<{ metricKey: string; topic: string }>;
           unit: string;
@@ -795,6 +945,10 @@ test("GET /api/display-story falls back when Factory Circuit peak multiplier is 
     const body = response.json() as {
       payload: {
         kpis: Array<{
+          derivedMetric?: {
+            effectiveOutputScope: string;
+            metricKey: string;
+          };
           fallbackReason: string | null;
           metricKey: string;
           provenance: string;
@@ -887,6 +1041,10 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
     const body = response.json() as {
       payload: {
         kpis: Array<{
+          derivedMetric?: {
+            effectiveOutputScope: string;
+            metricKey: string;
+          };
           fallbackReason: string | null;
           freshnessState: string;
           helper: string;
@@ -912,7 +1070,9 @@ test("GET /api/display-story/factory-circuit-guanyin keeps stale readings visibl
     const stamping = body.payload.slots.find((slot) => slot.slotKey === "stamping");
 
     assert.equal(totalPower?.value, "36.0");
-    assert.equal(totalPower?.provenance, "aggregate");
+    assert.equal(totalPower?.provenance, "derived");
+    assert.equal(totalPower?.derivedMetric?.metricKey, "factoryCircuit.guanyinTotalPower");
+    assert.equal(totalPower?.derivedMetric?.effectiveOutputScope, "kn");
     assert.equal(totalPower?.freshnessState, "stale");
     assert.equal(totalPower?.fallbackReason, "stale-data");
     assert.match(totalPower?.helper ?? "", /最近一次有效讀值/);

@@ -1,6 +1,7 @@
 import type {
   DisplayCardDataAction,
   DisplayCardDataRow,
+  DerivedMetricDependencyIdentity,
   DisplayReadinessReport,
   WeatherDiagnostic,
   WeatherFieldKey,
@@ -131,6 +132,20 @@ function resolveCardDataStatusClass(status: string) {
   if (status === "missing-topic" || status === "formula-input-missing") return "mgmt-chip is-danger";
   if (status === "overridden") return "mgmt-chip is-success";
   return "mgmt-chip is-warning";
+}
+
+function formatDerivedProvenance(dependencies: DerivedMetricDependencyIdentity[]): string {
+  const entries: string[] = [];
+  const visit = (dependency: DerivedMetricDependencyIdentity) => {
+    entries.push(
+      dependency.kind === "metric"
+        ? `${dependency.metricScope ?? "?"}/${dependency.metricKey ?? dependency.alias}${dependency.sourceTopic ? `=${dependency.sourceTopic}` : ""}`
+        : `setting/${dependency.settingKey ?? dependency.alias}@${dependency.settingRevision ?? "?"}`
+    );
+    dependency.upstream?.forEach(visit);
+  };
+  dependencies.forEach(visit);
+  return entries.join(" → ");
 }
 
 function isPublishAction(
@@ -479,6 +494,11 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                       <span>來源：{row.sourceClassification}</span>
                       {row.aggregateSource ? <span>聚合：{row.aggregateSource}</span> : null}
                       {row.formula ? <span>公式：{row.formula}</span> : null}
+                      {row.derivedMetric ? (
+                        <span>
+                          Registry r{row.derivedMetric.definitionRevision} · {row.derivedMetric.effectiveOutputScope} · {row.derivedMetric.evaluation?.status ?? "unavailable"} · {row.derivedMetric.evaluation?.freshnessState ?? "unavailable"}
+                        </span>
+                      ) : null}
                       {row.lastUpdatedAt ? <span>更新：{row.lastUpdatedAt}</span> : null}
                     </div>
                     <div className="mqtt-card-data-row__sources">
@@ -494,6 +514,12 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                         <span className="field-label">Calculation</span>
                         <p>{row.calculationFields.length > 0 ? row.calculationFields.join(", ") : "--"}</p>
                       </div>
+                      {row.derivedMetric ? (
+                        <div>
+                          <span className="field-label">Registry Provenance</span>
+                          <p>{formatDerivedProvenance(row.derivedMetric.provenance) || "--"}</p>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mqtt-card-data-row__actions">
                       {canSetOverride ? (

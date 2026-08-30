@@ -2,7 +2,6 @@ import {
   compileEffectiveBindingPlan,
   normalizeMetricBoundPageConfig,
   resolvePlaybackBindingItemConstraints,
-  resolvePlaybackMetricCatalog,
   resolveWidgetDataBindingPageKey,
   type DisplayPreviewContextSelection,
   type EffectiveBindingPlan,
@@ -13,6 +12,7 @@ import { resolveMetric } from "./MetricResolver.js";
 import { readDisplayPageInstance } from "./displayPageRegistryService.js";
 import { readStageConfig } from "./displayPagePublishingService.js";
 import { resolveDisplayPreviewContext } from "./displayPreviewContextService.js";
+import { resolveServerPlaybackMetricCatalog } from "./derivedMetricCatalogService.js";
 
 type CachedBindingPlan = {
   cacheKey: string;
@@ -60,7 +60,7 @@ function readBindingPlan(
 
   const normalized = normalizeMetricBoundPageConfig(bindingPageKey, config.regions);
   const compiled = compileEffectiveBindingPlan({
-    catalog: resolvePlaybackMetricCatalog(bindingPageKey),
+    catalog: resolveServerPlaybackMetricCatalog(bindingPageKey),
     context: { contextKey, siteScope },
     itemConstraints: resolvePlaybackBindingItemConstraints(bindingPageKey),
     items: Object.values(normalized.dataBindings),

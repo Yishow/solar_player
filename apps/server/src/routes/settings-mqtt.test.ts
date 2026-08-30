@@ -99,6 +99,8 @@ test("POST factory generation baseline reset requires trusted access and exact c
 
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
   database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'").run();
   database.prepare(`
     INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
@@ -323,6 +325,344 @@ test("GET /api/settings/mqtt/topics exposes multiplier for topic mappings", asyn
     };
     const topic = body.topics.find((entry) => entry.metricKey === "realTimePower");
     assert.equal(topic?.multiplier, 1.2);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics rejects enabled mappings that collide with derived metric identities without partial writes", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            metricKey: "selfConsumptionRatio",
+            metricScope: "cl",
+            topic: "solar/derived/self-consumption-ratio"
+          },
+          {
+            metricKey: "batchShouldNotWrite",
+            metricScope: "global",
+            topic: "solar/should-not-write"
+          }
+        ]
+      }
+    });
+
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as { code: string; error: string; success: boolean };
+    assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.match(body.error, /cl:selfConsumptionRatio/);
+    assert.equal(body.success, false);
+
+    const stored = getDatabase()
+      .prepare(
+        `
+          SELECT metric_scope, metric_key
+          FROM topic_mappings
+          WHERE (metric_scope = 'cl' AND metric_key = 'selfConsumptionRatio')
+             OR (metric_scope = 'global' AND metric_key = 'batchShouldNotWrite')
+        `
+      )
+      .all();
+    assert.deepEqual(stored, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics rejects mappings onto disabled derived identities", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const metricKey = "custom.disabledCollision";
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/derived-metrics",
+      payload: {
+        description: "disabled collision",
+        enabled: true,
+        expression: "source * 2",
+        fallbackPolicy: "unavailable",
+        inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "output-site", unit: "kW" }],
+        managed: false,
+        metricKey,
+        name: "Disabled collision",
+        outputScopePolicy: "site",
+        outputUnit: "kW",
+        precision: 1,
+        revision: 0
+      },
+    });
+    assert.equal(created.statusCode, 201);
+
+    const disabled = await app.inject({
+      method: "PATCH",
+      url: `/api/derived-metrics/${metricKey}/enabled`,
+      payload: { enabled: false },
+    });
+    assert.equal(disabled.statusCode, 200);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [{ metricKey, metricScope: "cl", topic: "solar/disabled-derived" }],
+      },
+    });
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as { code: string; error: string; success: boolean };
+    assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.match(body.error, new RegExp(`cl:${metricKey}`));
+    assert.equal(body.success, false);
+    assert.equal(
+      getDatabase().prepare("SELECT 1 FROM topic_mappings WHERE metric_scope = 'cl' AND metric_key = ?").get(metricKey),
+      undefined,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics reserves disabled derived identities for disabled incoming mappings", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const metricKey = "custom.disabledIncomingCollision";
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/derived-metrics",
+      payload: {
+        description: "disabled incoming collision",
+        enabled: true,
+        expression: "source * 2",
+        fallbackPolicy: "unavailable",
+        inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "output-site", unit: "kW" }],
+        managed: false,
+        metricKey,
+        name: "Disabled incoming collision",
+        outputScopePolicy: "site",
+        outputUnit: "kW",
+        precision: 1,
+        revision: 0
+      }
+    });
+    assert.equal(created.statusCode, 201);
+
+    const disabled = await app.inject({
+      method: "PATCH",
+      url: `/api/derived-metrics/${metricKey}/enabled`,
+      payload: { enabled: false }
+    });
+    assert.equal(disabled.statusCode, 200);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [
+          {
+            enabled: false,
+            metricKey,
+            metricScope: "cl",
+            topic: "solar/disabled-derived"
+          },
+          {
+            metricKey: "batchShouldNotWrite",
+            metricScope: "global",
+            topic: "solar/should-not-write"
+          }
+        ]
+      }
+    });
+    assert.equal(response.statusCode, 409);
+    const body = response.json() as { code: string; error: string; success: boolean };
+    assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.match(body.error, new RegExp(`cl:${metricKey}`));
+    assert.equal(body.success, false);
+    assert.deepEqual(
+      getDatabase()
+        .prepare(
+          `
+            SELECT metric_scope, metric_key
+            FROM topic_mappings
+            WHERE (metric_scope = 'cl' AND metric_key = ?)
+               OR (metric_scope = 'global' AND metric_key = 'batchShouldNotWrite')
+          `
+        )
+        .all(metricKey),
+      []
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics honors restricted Factory Circuit output scopes", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+    for (const candidate of [
+      {
+        allowedScope: "kn",
+        metricKey: "factoryCircuit.jungliTotalPower",
+        rejectedScope: "cl"
+      },
+      {
+        allowedScope: "cl",
+        metricKey: "factoryCircuit.guanyinTotalPower",
+        rejectedScope: "kn"
+      }
+    ] as const) {
+      const rejected = await app.inject({
+        method: "PUT",
+        url: "/api/settings/mqtt/topics",
+        payload: {
+          topics: [{
+            metricKey: candidate.metricKey,
+            metricScope: candidate.rejectedScope,
+            topic: `solar/rejected/${candidate.metricKey}`
+          }]
+        }
+      });
+      assert.equal(rejected.statusCode, 409);
+      const rejectedBody = rejected.json() as { code: string; error: string; success: boolean };
+      assert.equal(rejectedBody.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+      assert.match(rejectedBody.error, new RegExp(`${candidate.rejectedScope}:${candidate.metricKey}`));
+      assert.equal(rejectedBody.success, false);
+
+      const allowed = await app.inject({
+        method: "PUT",
+        url: "/api/settings/mqtt/topics",
+        payload: {
+          topics: [{
+            metricKey: candidate.metricKey,
+            metricScope: candidate.allowedScope,
+            topic: `solar/allowed/${candidate.metricKey}`
+          }]
+        }
+      });
+      assert.equal(allowed.statusCode, 200);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics rejects both site scopes when a definition omits siteScopes", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    const metricKey = "custom.defaultScopedCollision";
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/derived-metrics",
+      payload: {
+        description: "default scoped collision",
+        enabled: true,
+        expression: "source * 2",
+        fallbackPolicy: "unavailable",
+        inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "output-site", unit: "kW" }],
+        managed: false,
+        metricKey,
+        name: "Default scoped collision",
+        outputScopePolicy: "site",
+        outputUnit: "kW",
+        precision: 1,
+        revision: 0
+      }
+    });
+    assert.equal(created.statusCode, 201);
+
+    for (const metricScope of ["cl", "kn"] as const) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/api/settings/mqtt/topics",
+        payload: {
+          topics: [{ metricKey, metricScope, topic: `solar/default/${metricScope}` }]
+        }
+      });
+      assert.equal(response.statusCode, 409);
+      const body = response.json() as { code: string; error: string; success: boolean };
+      assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+      assert.match(body.error, new RegExp(`${metricScope}:${metricKey}`));
+      assert.equal(body.success, false);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /api/settings/mqtt/topics keeps global derived collisions global-scoped", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    app.mqttClientService.subscribe = async () => undefined;
+    const metricKey = "custom.globalScopedCollision";
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/derived-metrics",
+      payload: {
+        description: "global scoped collision",
+        enabled: true,
+        expression: "source * 2",
+        fallbackPolicy: "unavailable",
+        inputs: [{ alias: "source", kind: "metric", metricKey: "realTimePower", scope: "cl", unit: "kW" }],
+        managed: false,
+        metricKey,
+        name: "Global scoped collision",
+        outputScopePolicy: "global",
+        outputUnit: "kW",
+        precision: 1,
+        revision: 0
+      }
+    });
+    assert.equal(created.statusCode, 201);
+
+    const rejected = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [{ metricKey, metricScope: "global", topic: "solar/global-derived" }]
+      }
+    });
+    assert.equal(rejected.statusCode, 409);
+    const rejectedBody = rejected.json() as { code: string; error: string; success: boolean };
+    assert.equal(rejectedBody.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.match(rejectedBody.error, new RegExp(`global:${metricKey}`));
+    assert.equal(rejectedBody.success, false);
+
+    const allowed = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: [{ metricKey, metricScope: "cl", topic: "solar/global-key-at-cl" }]
+      }
+    });
+    assert.equal(allowed.statusCode, 200);
   } finally {
     await app.close();
   }
@@ -1039,7 +1379,11 @@ test("GET /api/metrics/live returns the latest live metrics snapshot", async () 
       timestamp: string | null;
     };
 
-    assert.equal(body.timestamp, "2026-05-13T09:05:00.000Z");
+    const latestMetricTimestamp = Object.values(body.metrics)
+      .map(({ timestamp }) => timestamp)
+      .sort((left, right) => Date.parse(left) - Date.parse(right))
+      .at(-1) ?? null;
+    assert.equal(body.timestamp, latestMetricTimestamp);
     assert.deepEqual(
       {
         quality: body.metrics.realTimePower?.quality,

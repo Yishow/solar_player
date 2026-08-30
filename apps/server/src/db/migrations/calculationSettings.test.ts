@@ -51,7 +51,8 @@ test("012_calculation_settings creates the singleton coefficient table with the 
     "estimated_tariff_per_kwh",
     "created_at",
     "updated_at",
-    "co2_auto_convert_small_to_kg"
+    "co2_auto_convert_small_to_kg",
+    "revision"
   ]);
 });
 

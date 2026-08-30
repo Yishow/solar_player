@@ -539,6 +539,37 @@ test("mqtt settings content renders card data diagnostics in the third workspace
         calculationFields: ["householdDailyUsageKwh"],
         cardId: "sustainability.household.today",
         dependencies: [],
+        derivedMetric: {
+          definitionRevision: 3,
+          effectiveOutputScope: "cl",
+          evaluation: {
+            definitionRevision: 3,
+            dependencies: [],
+            evaluatedAt: "2026-07-08T09:00:00.000Z",
+            failureCode: null,
+            freshnessState: "fresh",
+            metricKey: "householdEquivalent.today",
+            metricScope: "cl",
+            outputUnit: "戶4口之家",
+            precision: 0,
+            retainedLastGood: false,
+            status: "ready",
+            timestamp: "2026-07-08T09:00:00.000Z",
+            value: 4
+          },
+          inputs: [],
+          metricKey: "householdEquivalent.today",
+          provenance: [
+            {
+              alias: "dailyUsage",
+              kind: "calculation-setting",
+              settingKey: "householdDailyUsageKwh",
+              settingRevision: "2026-07-08T08:00:00.000Z",
+              unit: "kWh",
+              value: 12
+            }
+          ]
+        },
         displayValue: "4",
         formula: "daily selfConsumption / householdDailyUsageKwh",
         label: "今日綠電效益",
@@ -569,6 +600,9 @@ test("mqtt settings content renders card data diagnostics in the third workspace
   assert.match(html, /householdDailyUsageKwh/);
   assert.match(html, /data-mqtt-card-calculation-field="householdDailyUsageKwh"/);
   assert.match(html, /daily selfConsumption \/ householdDailyUsageKwh/);
+  assert.match(html, /Registry r3 · cl · ready · fresh/);
+  assert.match(html, /Registry Provenance/);
+  assert.match(html, /setting\/householdDailyUsageKwh@2026-07-08T08:00:00.000Z/);
 });
 
 test("mqtt settings content labels Guanyin Factory Circuit card diagnostics distinctly", () => {

@@ -198,6 +198,7 @@ export function saveCalculationSettings(
           household_daily_usage_kwh = excluded.household_daily_usage_kwh,
           household_monthly_usage_kwh = excluded.household_monthly_usage_kwh,
           estimated_tariff_per_kwh = excluded.estimated_tariff_per_kwh,
+          revision = calculation_settings.revision + 1,
           updated_at = CURRENT_TIMESTAMP
       `
     )

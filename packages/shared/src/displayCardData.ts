@@ -1,4 +1,7 @@
 import type { MetricScope } from "./metricScope.js";
+import type {
+  DerivedMetricRuntimeDiagnostics
+} from "./derivedMetric.js";
 
 export type DisplayCardDataPageId =
   | "factory-circuit"
@@ -60,6 +63,7 @@ export type DisplayCardDataRow = {
   cardId: string;
   dependencies: DisplayCardDataDependency[];
   displayValue: string;
+  derivedMetric?: DerivedMetricRuntimeDiagnostics | null;
   formula: string | null;
   label: string;
   lastUpdatedAt: string | null;

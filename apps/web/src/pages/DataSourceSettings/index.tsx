@@ -20,6 +20,7 @@ import {
   createCalculationSettingsForm,
   type CalculationSettingsForm
 } from "./viewModel";
+import { DerivedMetricRegistryPanel } from "./DerivedMetricRegistryPanel";
 
 function getFieldIcon(key: string) {
   switch (key) {
@@ -446,6 +447,8 @@ export function DataSourceSettings() {
             </button>
           </OpsActionRow>
         </OpsSurface>
+
+        <DerivedMetricRegistryPanel />
 
         <div className="grid grid-cols-3 gap-4">
           {viewModel.sections.map((section) => (

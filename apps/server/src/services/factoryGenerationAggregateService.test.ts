@@ -3,16 +3,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+import type { DerivedMetricDefinition } from "@solar-display/shared";
 
 const tempDir = mkdtempSync(join(tmpdir(), "solar-display-factory-generation-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, aggregateService] = await Promise.all([
+const [{ migrateDatabase }, { seedDatabase }, { getDatabase, closeDatabaseConnection }, aggregateService, registry] = await Promise.all([
   import("../db/migrate.js"),
   import("../db/seed.js"),
   import("../db/index.js"),
-  import("./factoryGenerationAggregateService.js")
+  import("./factoryGenerationAggregateService.js"),
+  import("./derivedMetricRegistryService.js")
 ]);
 
 migrateDatabase();
@@ -26,6 +28,7 @@ after(() => {
 function resetDatabase(timeoutSeconds = 60) {
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
   database.prepare("UPDATE mqtt_settings SET message_timeout = ?").run(timeoutSeconds);
   return database;
 }
@@ -47,6 +50,8 @@ function insertFactorySummary(
   }
 }
 
+const aggregateSourceFields = ["todayMwh", "monthMwh", "totalMwh"] as const;
+
 function readCanonicalRows() {
   return getDatabase()
     .prepare(
@@ -59,6 +64,52 @@ function readCanonicalRows() {
       `
     )
     .all();
+}
+
+function aggregateUnrelatedDefinition(): DerivedMetricDefinition {
+  return {
+    description: "aggregate unrelated test definition",
+    enabled: true,
+    expression: "source * 2",
+    fallbackPolicy: "unavailable",
+    inputs: [{
+      alias: "source",
+      kind: "metric",
+      metricKey: "realTimePower",
+      scope: "output-site",
+      unit: "kW"
+    }],
+    managed: false,
+    metricKey: "custom.aggregateUnrelated",
+    name: "custom.aggregateUnrelated",
+    outputScopePolicy: "site",
+    outputUnit: "kW",
+    precision: 1,
+    revision: 0
+  };
+}
+
+function aggregateAcceptedDefinition(): DerivedMetricDefinition {
+  return {
+    description: "aggregate accepted total test definition",
+    enabled: true,
+    expression: "source * 2",
+    fallbackPolicy: "unavailable",
+    inputs: [{
+      alias: "source",
+      kind: "metric",
+      metricKey: "factoryGeneration.acceptedTotalMwh",
+      scope: "output-site",
+      unit: "MWh"
+    }],
+    managed: false,
+    metricKey: "custom.aggregateAccepted",
+    name: "custom.aggregateAccepted",
+    outputScopePolicy: "site",
+    outputUnit: "MWh",
+    precision: 1,
+    revision: 0
+  };
 }
 
 test("complete CL and KN summaries update canonical generation with the older source timestamp", () => {
@@ -91,6 +142,183 @@ test("complete CL and KN summaries update canonical generation with the older so
     { metric_key: "todayGeneration", value: 6.41, unit: "MWh", timestamp: "2026-06-26T15:37:55+08:00", quality: "good" },
     { metric_key: "totalGeneration", value: 13645.876, unit: "MWh", timestamp: "2026-06-26T15:37:55+08:00", quality: "good" }
   ]);
+});
+
+test("factory aggregate updates only dependent registry nodes in ready and non-ready states", () => {
+  const database = resetDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare(`
+    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
+    VALUES ('cl', 'realTimePower', 5, 'kW', '2026-06-26T15:38:00+08:00', 'good', '{}')
+  `).run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition(aggregateUnrelatedDefinition(), database);
+  const readUnrelatedRows = () => database.prepare(`
+    SELECT * FROM derived_metric_evaluations
+    WHERE metric_key = 'custom.aggregateUnrelated'
+    ORDER BY metric_scope
+  `).all();
+
+  insertFactorySummary("cl", {
+    today_mwh: 3.49,
+    month_mwh: 366.93,
+    total_mwh: 9986.306,
+    timestamp: "2026-06-26T15:38:10+08:00"
+  });
+  registry.evaluateDerivedMetrics(database, new Date("2026-06-26T15:38:10+08:00"));
+  const beforeNonReady = readUnrelatedRows();
+  assert.equal(
+    aggregateService.updateFactoryGenerationAggregate(
+      database,
+      new Date("2026-06-26T15:38:20+08:00")
+    ).state,
+    "missing"
+  );
+  assert.deepEqual(readUnrelatedRows(), beforeNonReady);
+
+  insertFactorySummary("kn", {
+    today_mwh: 2.92,
+    month_mwh: 265.77,
+    total_mwh: 3659.570,
+    timestamp: "2026-06-26T15:37:55+08:00"
+  });
+  const beforeReady = readUnrelatedRows();
+  assert.equal(
+    aggregateService.updateFactoryGenerationAggregate(
+      database,
+      new Date("2026-06-26T15:38:20+08:00")
+    ).state,
+    "ready"
+  );
+  assert.deepEqual(readUnrelatedRows(), beforeReady);
+});
+
+test("factory aggregate updates accepted totals only for triggered factory scopes", () => {
+  const database = resetDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  registry.initializeDerivedMetricRegistry(database);
+  registry.saveDerivedMetricDefinition(aggregateAcceptedDefinition(), database);
+  insertFactorySummary("cl", {
+    today_mwh: 3.49,
+    month_mwh: 366.93,
+    total_mwh: 9986.306,
+    timestamp: "2026-06-26T15:38:10+08:00"
+  });
+  insertFactorySummary("kn", {
+    today_mwh: 2.92,
+    month_mwh: 265.77,
+    total_mwh: 3659.570,
+    timestamp: "2026-06-26T15:38:10+08:00"
+  });
+  const allSourceChanges = (["cl", "kn"] as const).flatMap((metricScope) =>
+    aggregateSourceFields.map((suffix) => ({ metricScope, metricKey: `factoryGeneration.${suffix}` }))
+  );
+  aggregateService.updateFactoryGenerationAggregate(
+    database,
+    new Date("2026-06-26T15:38:20+08:00"),
+    { changedMetrics: allSourceChanges }
+  );
+  const readKnAccepted = () => database.prepare(`
+    SELECT * FROM live_metric_values
+    WHERE metric_scope = 'kn' AND metric_key = 'factoryGeneration.acceptedTotalMwh'
+  `).get();
+  const readKnDerived = () => database.prepare(`
+    SELECT * FROM derived_metric_evaluations
+    WHERE metric_scope = 'kn' AND metric_key = 'custom.aggregateAccepted'
+  `).get();
+  const previousKnAccepted = readKnAccepted();
+  const previousKnDerived = readKnDerived();
+
+  const updatedPayload = JSON.stringify({
+    month_mwh: 370,
+    timestamp: "2026-06-26T15:38:20+08:00",
+    today_mwh: 4,
+    total_mwh: 9990
+  });
+  for (const [metricKey, value] of [
+    ["factoryGeneration.todayMwh", 4],
+    ["factoryGeneration.monthMwh", 370],
+    ["factoryGeneration.totalMwh", 9990]
+  ] as const) {
+    database.prepare(`
+      UPDATE live_metric_values
+      SET value = ?, raw_payload = ?
+      WHERE metric_scope = 'cl' AND metric_key = ?
+    `).run(value, updatedPayload, metricKey);
+  }
+
+  aggregateService.updateFactoryGenerationAggregate(
+    database,
+    new Date("2026-06-26T15:38:25+08:00"),
+    {
+      changedMetrics: [
+        { metricScope: "cl", metricKey: "factoryGeneration.todayMwh" },
+        { metricScope: "cl", metricKey: "factoryGeneration.monthMwh" },
+        { metricScope: "cl", metricKey: "factoryGeneration.totalMwh" }
+      ]
+    }
+  );
+
+  assert.deepEqual(readKnAccepted(), previousKnAccepted);
+  assert.deepEqual(readKnDerived(), previousKnDerived);
+});
+
+test("factory aggregate reuses the cached registry after its first lazy initialization", () => {
+  const database = resetDatabase();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  insertFactorySummary("cl", {
+    today_mwh: 3.49,
+    month_mwh: 366.93,
+    total_mwh: 9986.306,
+    timestamp: "2026-06-26T15:38:10+08:00"
+  });
+  insertFactorySummary("kn", {
+    today_mwh: 2.92,
+    month_mwh: 265.77,
+    total_mwh: 3659.570,
+    timestamp: "2026-06-26T15:38:10+08:00"
+  });
+  aggregateService.updateFactoryGenerationAggregate(
+    database,
+    new Date("2026-06-26T15:38:20+08:00")
+  );
+
+  database.prepare(`
+    INSERT INTO derived_metric_definitions (
+      metric_key, name, description, output_scope_policy, expression, output_unit,
+      precision, fallback_policy, enabled, managed, revision
+    ) VALUES (
+      'custom.cacheProbe', 'custom.cacheProbe', 'cache probe', 'site', 'source * 2', 'MWh',
+      1, 'unavailable', 1, 0, 1
+    )
+  `).run();
+  database.prepare(`
+    INSERT INTO derived_metric_inputs (
+      derived_metric_key, alias, input_kind, metric_key, scope_selector, unit, sort_order
+    ) VALUES ('custom.cacheProbe', 'source', 'metric', 'factoryGeneration.totalMwh', 'output-site', 'MWh', 0)
+  `).run();
+  const updatedPayload = JSON.stringify({
+    month_mwh: 370,
+    timestamp: "2026-06-26T15:38:20+08:00",
+    today_mwh: 4,
+    total_mwh: 9990
+  });
+  database.prepare(`
+    UPDATE live_metric_values
+    SET value = 9990, raw_payload = ?
+    WHERE metric_scope = 'cl' AND metric_key = 'factoryGeneration.totalMwh'
+  `).run(updatedPayload);
+
+  aggregateService.updateFactoryGenerationAggregate(
+    database,
+    new Date("2026-06-26T15:38:25+08:00"),
+    { changedMetrics: [{ metricScope: "cl", metricKey: "factoryGeneration.totalMwh" }] }
+  );
+
+  assert.equal(registry.readDerivedMetricEvaluation("cl", "custom.cacheProbe", database), null);
 });
 
 test("factory summaries normalize today kWh while retaining monthly and cumulative MWh", () => {
@@ -158,6 +386,14 @@ test("stale KN summary retains the last complete canonical reading", () => {
     database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'").pluck().get(),
     13645.876
   );
+  assert.deepEqual(
+    database.prepare(`
+      SELECT status, failure_code, retained_last_good
+      FROM derived_metric_evaluations
+      WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'
+    `).get(),
+    { status: "degraded", failure_code: "input-stale", retained_last_good: 1 }
+  );
   assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'todayGeneration'").get(), undefined);
 });
 
@@ -216,6 +452,12 @@ test("lower combined cumulative total is rejected as a regression", () => {
     13645.876
   );
   assert.equal(database.prepare("SELECT value FROM live_metric_values WHERE metric_scope = 'global' AND metric_key = 'todayGeneration'").get(), undefined);
+  assert.deepEqual(
+    database.prepare(
+      "SELECT status, failure_code FROM derived_metric_evaluations WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'"
+    ).get(),
+    { status: "degraded", failure_code: "acceptance-policy-rejected" }
+  );
 });
 
 test("persisted cumulative counter rejects a lower aggregate when the canonical live row is absent", () => {
@@ -329,6 +571,44 @@ test("explicit baseline reset atomically accepts the confirmed current regressio
     total_mwh: 3659.57,
     timestamp: "2026-06-26T15:39:05+08:00"
   });
+  database.prepare(`
+    INSERT OR REPLACE INTO live_metric_values (
+      metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+    ) VALUES
+      ('global', 'selfConsumptionEnergy', 600, 'kWh', '2026-06-26T15:39:05+08:00', 'good', '{}'),
+      ('global', 'consumptionEnergy', 1000, 'kWh', '2026-06-26T15:39:05+08:00', 'good', '{}')
+  `).run();
+  database.exec(`
+    CREATE TEMP TABLE canonical_write_audit (metric_key TEXT NOT NULL);
+    CREATE TEMP TRIGGER audit_canonical_insert
+    AFTER INSERT ON live_metric_values
+    WHEN NEW.metric_scope = 'global'
+      AND NEW.metric_key IN (
+        'todayGeneration',
+        'monthGeneration',
+        'totalGeneration',
+        'sustainability.global.accumulatedCarbonReductionTons',
+        'sustainability.global.annualEnergySavingPercent',
+        'sustainability.global.plantedTreeEquivalent'
+      )
+    BEGIN
+      INSERT INTO canonical_write_audit (metric_key) VALUES (NEW.metric_key);
+    END;
+    CREATE TEMP TRIGGER audit_canonical_update
+    AFTER UPDATE ON live_metric_values
+    WHEN NEW.metric_scope = 'global'
+      AND NEW.metric_key IN (
+        'todayGeneration',
+        'monthGeneration',
+        'totalGeneration',
+        'sustainability.global.accumulatedCarbonReductionTons',
+        'sustainability.global.annualEnergySavingPercent',
+        'sustainability.global.plantedTreeEquivalent'
+      )
+    BEGIN
+      INSERT INTO canonical_write_audit (metric_key) VALUES (NEW.metric_key);
+    END;
+  `);
 
   const result = aggregateService.resetFactoryGenerationBaseline(
     database,
@@ -347,6 +627,22 @@ test("explicit baseline reset atomically accepts the confirmed current regressio
     { metric_key: "todayGeneration", value: 2, unit: "MWh", timestamp: "2026-06-26T15:39:05+08:00", quality: "good" },
     { metric_key: "totalGeneration", value: 11659.57, unit: "MWh", timestamp: "2026-06-26T15:39:05+08:00", quality: "good" }
   ]);
+  assert.deepEqual(
+    database.prepare(`
+      SELECT metric_key, COUNT(*) AS writes
+      FROM canonical_write_audit
+      GROUP BY metric_key
+      ORDER BY metric_key
+    `).all(),
+    [
+      { metric_key: "monthGeneration", writes: 1 },
+      { metric_key: "sustainability.global.accumulatedCarbonReductionTons", writes: 1 },
+      { metric_key: "sustainability.global.annualEnergySavingPercent", writes: 1 },
+      { metric_key: "sustainability.global.plantedTreeEquivalent", writes: 1 },
+      { metric_key: "todayGeneration", writes: 1 },
+      { metric_key: "totalGeneration", writes: 1 }
+    ]
+  );
   assert.deepEqual(
     database.prepare(
       "SELECT total_value, reset_count FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'"

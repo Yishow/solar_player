@@ -260,7 +260,9 @@ function buildFactoryCircuitStoryKpis(story: FactoryCircuitStoryPayload) {
     "peak",
     "flow"
   ];
-  const storyKpiByKey = new Map(story.kpis.map((kpi) => [kpi.metricKey, kpi]));
+  const storyKpiByKey = new Map(
+    story.kpis.map((kpi) => [kpi.itemId ?? kpi.metricKey, kpi])
+  );
 
   return kpiOrder.map((key) => {
     const storyKpi = storyKpiByKey.get(key);
@@ -331,19 +333,6 @@ export function buildFactoryCircuitViewModel({
       warning: { progressClass: "bg-[#d6a73f]", textClass: "text-[#9b7121]", tone: "warning", statusLabel: "注意" },
       danger: { progressClass: "bg-[#c96745]", textClass: "text-[#9f4324]", tone: "danger", statusLabel: "警告" }
     };
-    const totalPowerKpi = factoryCircuitStory.kpis.find((kpi) => kpi.metricKey === "totalPower");
-    const aggregateAvailable =
-      totalPowerKpi?.provenance !== "fallback" &&
-      totalPowerKpi?.value !== "--" &&
-      factoryCircuitStory.slots.every(
-        (slot) =>
-          slot.bindingState === "bound" &&
-          slot.livePowerKw !== null
-      );
-    const totalPowerKw = aggregateAvailable
-      ? factoryCircuitStory.slots.reduce((sum, slot) => sum + (slot.livePowerKw ?? 0), 0)
-      : null;
-
     const loadRows = slotDefinitions.map((slot) => {
       const storySlot = storySlotByKey.get(slot.key);
       const binding = resolveMonitoringSlotBinding({
@@ -395,7 +384,7 @@ export function buildFactoryCircuitViewModel({
         labelZh: storySlot.labelZh ?? storySlot.label,
         livePowerKw: livePower,
         progressClass: tone.progressClass,
-        sharePercent: totalPowerKw && totalPowerKw > 0 ? Math.round((livePower / totalPowerKw) * 100) : slot.sharePercent,
+        sharePercent: slot.sharePercent,
         statusLabel: tone.statusLabel,
         statusTone: tone.tone as "success" | "warning" | "danger" | "neutral",
         textClass: tone.textClass,
@@ -435,7 +424,6 @@ export function buildFactoryCircuitViewModel({
   }
 
   const totalPowerDependencyKeys = slotDefinitions.map((slot) => slot.key);
-  const totalPowerKw = circuits.reduce((sum, circuit) => sum + (circuit.livePowerKw ?? 0), 0);
   const selfConsumptionReading = readMetricReading(snapshot, "selfConsumptionEnergy");
   const todayGenerationReading = readMetricReading(snapshot, "todayGeneration");
   const selfConsumptionKwh = isReadingOnReferenceDay(selfConsumptionReading, snapshot.timestamp)
@@ -444,8 +432,6 @@ export function buildFactoryCircuitViewModel({
   const todayGeneration = isReadingOnReferenceDay(todayGenerationReading, snapshot.timestamp)
     ? todayGenerationReading?.value ?? null
     : null;
-  const peakMultiplier = readMetricValue(snapshot, "factoryPeakMultiplier");
-  const peakMultiplierAvailable = peakMultiplier !== null && Number.isFinite(peakMultiplier) && peakMultiplier > 0;
   const hasCompleteRuntime = slotDefinitions.every((slot) => {
     const circuit = circuits.find((entry) => entry.displaySlot === slot.key);
     return circuit !== undefined && circuit.livePowerKw !== null;
@@ -519,7 +505,7 @@ export function buildFactoryCircuitViewModel({
       labelZh: circuit.nameZh ?? slot.defaultZh,
       livePowerKw: circuit.livePowerKw,
       progressClass: status.progressClass,
-      sharePercent: totalPowerKw > 0 ? Math.round(((circuit.livePowerKw ?? 0) / totalPowerKw) * 100) : 0,
+      sharePercent: slot.sharePercent,
       statusLabel: status.label,
       statusTone: status.tone,
       textClass: status.textClass,
@@ -559,60 +545,26 @@ export function buildFactoryCircuitViewModel({
       title: "廠區用電迴路"
     },
     kpis: [
-      hasCompleteRuntime
-        ? {
-            alertTone: "normal" as const,
-            bindingState: "bound" as const,
-            dependencyKeys: totalPowerDependencyKeys,
-            fallbackReason: null,
-            fallbackStrategy: "placeholder" as const,
-            freshnessState: "fresh" as const,
-            helper: `${loadRows.filter((row) => !row.isEmpty).length || slotDefinitions.length} 個迴路面板`,
-            iconKey: "bolt" as const,
-            label: "目前廠區總用電",
-            metricKey: "totalPower" as const,
-            provenance: "aggregate" as const,
-            sourceClass: "slot-aggregate" as const,
-            unit: "kW",
-            value: formatNumber(totalPowerKw)
-          }
-        : buildFallbackKpi({
-            dependencyKeys: totalPowerDependencyKeys,
-            fallbackReason: connectionState === "connected" ? "missing-live-power" : "socket-disconnected",
-            fallbackStrategy: "placeholder",
-            helper: buildFlowFallbackLabel({ connectionState, loadState }),
-            label: "目前廠區總用電",
-            metricKey: "totalPower",
-            sourceClass: "slot-aggregate",
-            unit: "kW"
-          }),
-      hasCompleteRuntime && readMetricValue(snapshot, "realTimePower") !== null
-        ? {
-            alertTone: "normal" as const,
-            bindingState: "bound" as const,
-            dependencyKeys: ["realTimePower", ...totalPowerDependencyKeys],
-            fallbackReason: null,
-            fallbackStrategy: "derive-from-dependencies" as const,
-            freshnessState: "fresh" as const,
-            helper: "Solar Supply Share",
-            iconKey: "pie" as const,
-            label: "太陽能供應占比",
-            metricKey: "solarShare" as const,
-            provenance: "derived" as const,
-            sourceClass: "derived-metric" as const,
-            unit: "%",
-            value: formatNumber(Math.round((readMetricValue(snapshot, "realTimePower")! / totalPowerKw) * 100))
-          }
-        : buildFallbackKpi({
-            dependencyKeys: ["realTimePower", ...totalPowerDependencyKeys],
-            fallbackReason: connectionState === "connected" ? "missing-live-power" : "socket-disconnected",
-            fallbackStrategy: "derive-from-dependencies",
-            helper: buildFlowFallbackLabel({ connectionState, loadState }),
-            label: "太陽能供應占比",
-            metricKey: "solarShare",
-            sourceClass: "derived-metric",
-            unit: "%"
-          }),
+      buildFallbackKpi({
+        dependencyKeys: totalPowerDependencyKeys,
+        fallbackReason: connectionState === "connected" ? "missing-live-power" : "socket-disconnected",
+        fallbackStrategy: "placeholder",
+        helper: "等待 Registry Story",
+        label: "目前廠區總用電",
+        metricKey: "totalPower",
+        sourceClass: "slot-aggregate",
+        unit: "kW"
+      }),
+      buildFallbackKpi({
+        dependencyKeys: ["realTimePower", ...totalPowerDependencyKeys],
+        fallbackReason: connectionState === "connected" ? "missing-live-power" : "socket-disconnected",
+        fallbackStrategy: "derive-from-dependencies",
+        helper: "等待 Registry Story",
+        label: "太陽能供應占比",
+        metricKey: "solarShare",
+        sourceClass: "derived-metric",
+        unit: "%"
+      }),
       selfConsumptionKwh !== null
         ? {
             alertTone: "normal" as const,
@@ -657,39 +609,16 @@ export function buildFactoryCircuitViewModel({
             sourceClass: "mqtt-live",
             unit: "kWh"
           }),
-      hasCompleteRuntime
-        && peakMultiplierAvailable
-        ? {
-            alertTone: "normal" as const,
-            bindingState: "bound" as const,
-            dependencyKeys: ["factoryPeakMultiplier", ...totalPowerDependencyKeys],
-            fallbackReason: null,
-            fallbackStrategy: "derive-from-dependencies" as const,
-            freshnessState: "fresh" as const,
-            helper: `Estimated Peak Load x${peakMultiplier}`,
-            iconKey: "bars" as const,
-            label: "尖峰負載",
-            metricKey: "peak" as const,
-            provenance: "derived" as const,
-            sourceClass: "derived-metric" as const,
-            unit: "kW",
-            value: formatNumber(Math.round(totalPowerKw * peakMultiplier))
-          }
-        : buildFallbackKpi({
-            dependencyKeys: ["factoryPeakMultiplier", ...totalPowerDependencyKeys],
-            fallbackReason:
-              connectionState === "connected"
-                ? hasCompleteRuntime
-                  ? "metric-unavailable"
-                  : "missing-live-power"
-                : "socket-disconnected",
-            fallbackStrategy: "derive-from-dependencies",
-            helper: buildFlowFallbackLabel({ connectionState, loadState }),
-            label: "尖峰負載",
-            metricKey: "peak",
-            sourceClass: "derived-metric",
-            unit: "kW"
-          }),
+      buildFallbackKpi({
+        dependencyKeys: ["factoryPeakMultiplier", ...totalPowerDependencyKeys],
+        fallbackReason: connectionState === "connected" ? "metric-unavailable" : "socket-disconnected",
+        fallbackStrategy: "derive-from-dependencies",
+        helper: "等待 Registry Story",
+        label: "尖峰負載",
+        metricKey: "peak",
+        sourceClass: "derived-metric",
+        unit: "kW"
+      }),
       hasCompleteRuntime && connectionState === "connected"
         ? {
             alertTone: "normal" as const,

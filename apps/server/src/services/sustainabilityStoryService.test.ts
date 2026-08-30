@@ -5,6 +5,10 @@ import { join } from "node:path";
 import test, { after, beforeEach } from "node:test";
 import { updateDefaultPlaybackPageForTest } from "../testing/defaultPlaybackProfileTestSupport.js";
 import {
+  evaluateDerivedMetrics,
+  initializeDerivedMetricRegistry
+} from "./derivedMetricRegistryService.js";
+import {
   normalizeSustainabilityStory,
   resolveSustainabilityStoryPeriod,
   type SustainabilityStoryInput
@@ -19,7 +23,7 @@ const [
   { closeDatabaseConnection, getDatabase },
   { migrateDatabase },
   { seedDatabase },
-  { readSustainabilityStory, resolveSustainabilityFactoryScope, saveSustainabilityStory },
+  { readSustainabilityStory: readRawSustainabilityStory, resolveSustainabilityFactoryScope, saveSustainabilityStory },
   { clearDisplayValueOverride, saveDisplayValueOverride }
 ] = await Promise.all([
   import("../db/index.js"),
@@ -28,6 +32,15 @@ const [
   import("./sustainabilityStoryService.js"),
   import("./displayValueOverrideService.js")
 ]);
+
+function readSustainabilityStory(
+  ...args: Parameters<typeof readRawSustainabilityStory>
+) {
+  const database = getDatabase();
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database, args[1]?.now);
+  return readRawSustainabilityStory(...args);
+}
 
 const story: SustainabilityStoryInput = {
   availablePeriods: ["month", "quarter", "year", "lifetime"],
@@ -168,11 +181,11 @@ test("readSustainabilityStory derives carbon reduction and tree equivalence with
   assert.equal(story.period.bigNumbers.plantedTreeEquivalent, 6);
   assert.equal(
     story.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
-    "CL + KN MQTT aggregate × carbonEmissionFactor (CL today_mwh missing)"
+    "global:sustainability.global.accumulatedCarbonReductionTons"
   );
   assert.equal(
     story.period.bigNumberProvenance.plantedTreeEquivalent.source,
-    "CL + KN MQTT aggregate × carbonEmissionFactor × co2TreeEquivalentFactor (CL today_mwh missing)"
+    "global:sustainability.global.plantedTreeEquivalent"
   );
 });
 
@@ -508,7 +521,7 @@ test("readSustainabilityStory uses the CL and KN cumulative aggregate and older 
   );
   assert.equal(
     result.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
-    "CL + KN MQTT aggregate × carbonEmissionFactor"
+    "global:sustainability.global.accumulatedCarbonReductionTons"
   );
   assert.equal(
     result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
@@ -579,15 +592,18 @@ test("readSustainabilityStory scopes generation and CO2 to CL, KN, both, or none
   const now = new Date("2026-06-26T15:38:20+08:00");
 
   const cases = [
-    { cl: true, co2: 4943.221, generation: 9.986306, kn: false, source: "CL MQTT" },
-    { cl: false, co2: 1811.487, generation: 3.65957, kn: true, source: "KN MQTT" },
-    { cl: true, co2: 6754.709, generation: 13.645876, kn: true, source: "CL + KN MQTT aggregate" },
-    { cl: false, co2: null, generation: null, kn: false, source: "未選擇廠區" }
+    { cl: true, co2: 4943.221, generation: 9.986306, kn: false, siteScope: "cl" as const, source: "CL MQTT" },
+    { cl: false, co2: 1811.487, generation: 3.65957, kn: true, siteScope: "kn" as const, source: "KN MQTT" },
+    { cl: true, co2: 6754.709, generation: 13.645876, kn: true, siteScope: undefined, source: "CL + KN MQTT aggregate" }
   ] as const;
 
   for (const expected of cases) {
     setFactoryPlaybackSelection(expected.cl, expected.kn);
-    const result = readSustainabilityStory("lifetime", { applyDisplayOverrides: false, now });
+    const result = readSustainabilityStory("lifetime", {
+      applyDisplayOverrides: false,
+      now,
+      siteScope: expected.siteScope
+    });
 
     assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, expected.generation);
     assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, expected.co2);
@@ -639,7 +655,7 @@ test("Sustainability marks an old cumulative value as a historical snapshot", ()
   assert.equal(provenance.syncState, "stale");
 });
 
-test("no factory selection does not fall back to the combined generation counter", () => {
+test("global Registry metrics remain available without a factory playback selection", () => {
   const database = getDatabase();
   database.prepare("DELETE FROM live_metric_values").run();
   database.prepare("DELETE FROM cumulative_counters").run();
@@ -654,9 +670,13 @@ test("no factory selection does not fall back to the combined generation counter
   const result = readSustainabilityStory("lifetime", { applyDisplayOverrides: false });
 
   assert.equal(result.period.bigNumbers.accumulatedGenerationGwh, null);
-  assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, null);
+  assert.equal(result.period.bigNumbers.accumulatedCarbonReductionTons, 6372.624);
   assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.source, "未選擇廠區");
   assert.equal(result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt, null);
+  assert.equal(
+    result.period.bigNumberProvenance.accumulatedCarbonReductionTons.source,
+    "global:sustainability.global.accumulatedCarbonReductionTons"
+  );
 });
 
 test("stored editorial provenance cannot override the runtime factory scope", () => {
@@ -687,4 +707,79 @@ test("stored editorial provenance cannot override the runtime factory scope", ()
     result.period.bigNumberProvenance.accumulatedGenerationGwh.updatedAt,
     "2026-06-26T15:38:10+08:00"
   );
+});
+
+test("Sustainability reads scope-qualified registry evaluations for site and global stories", () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM derived_metric_evaluations").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+
+  initializeDerivedMetricRegistry(database);
+
+  const observedAt = "2026-08-30T00:00:00.000Z";
+  const insertEvaluation = database.prepare(`
+    INSERT INTO derived_metric_evaluations (
+      metric_scope, metric_key, definition_revision, status, failure_code,
+      retained_last_good, value, unit, source_timestamp, evaluated_at, provenance_json
+    ) VALUES (?, ?, 1, ?, NULL, 0, ?, ?, ?, ?, ?)
+    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+      status = excluded.status,
+      value = excluded.value,
+      unit = excluded.unit,
+      source_timestamp = excluded.source_timestamp,
+      evaluated_at = excluded.evaluated_at,
+      provenance_json = excluded.provenance_json
+  `);
+  const put = (metricScope: "cl" | "kn" | "global", metricKey: string, value: number | null, unit: string) => {
+    insertEvaluation.run(
+      metricScope,
+      metricKey,
+      value === null ? "unavailable" : "ready",
+      value,
+      unit,
+      observedAt,
+      observedAt,
+      JSON.stringify({ dependencies: [] })
+    );
+  };
+  put("cl", "sustainability.site.accumulatedCarbonReductionTons", 12.345, "t");
+  put("cl", "sustainability.site.annualEnergySavingPercent", 67.8, "%");
+  put("cl", "sustainability.site.plantedTreeEquivalent", 901, "trees");
+  put("kn", "sustainability.site.accumulatedCarbonReductionTons", 98.765, "t");
+  put("kn", "sustainability.site.annualEnergySavingPercent", 23.4, "%");
+  put("kn", "sustainability.site.plantedTreeEquivalent", 321, "trees");
+  put("global", "sustainability.global.accumulatedCarbonReductionTons", 45.678, "t");
+  put("global", "sustainability.global.annualEnergySavingPercent", 55.5, "%");
+  put("global", "sustainability.global.plantedTreeEquivalent", 111, "trees");
+
+  const cl = readRawSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date(observedAt),
+    siteScope: "cl"
+  });
+  assert.equal(cl.period.bigNumbers.accumulatedCarbonReductionTons, 12.345);
+  assert.equal(cl.period.bigNumbers.annualEnergySavingPercent, 67.8);
+  assert.equal(cl.period.bigNumbers.plantedTreeEquivalent, 901);
+  assert.equal(
+    cl.period.bigNumberProvenance.accumulatedCarbonReductionTons.updatedAt,
+    observedAt
+  );
+
+  const kn = readRawSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date(observedAt),
+    siteScope: "kn"
+  });
+  assert.equal(kn.period.bigNumbers.accumulatedCarbonReductionTons, 98.765);
+  assert.equal(kn.period.bigNumbers.annualEnergySavingPercent, 23.4);
+  assert.equal(kn.period.bigNumbers.plantedTreeEquivalent, 321);
+
+  const global = readRawSustainabilityStory("lifetime", {
+    applyDisplayOverrides: false,
+    now: new Date(observedAt)
+  });
+  assert.equal(global.period.bigNumbers.accumulatedCarbonReductionTons, 45.678);
+  assert.equal(global.period.bigNumbers.annualEnergySavingPercent, 55.5);
+  assert.equal(global.period.bigNumbers.plantedTreeEquivalent, 111);
 });

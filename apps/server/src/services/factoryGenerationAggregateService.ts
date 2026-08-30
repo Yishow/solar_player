@@ -1,4 +1,10 @@
 import type Database from "better-sqlite3";
+import type { MetricScope } from "@solar-display/shared";
+import {
+  type DerivedMetricChange,
+  evaluateDerivedMetrics,
+  initializeDerivedMetricRegistry
+} from "./derivedMetricRegistryService.js";
 
 export type FactoryId = "CL" | "KN";
 export type FactoryGenerationScope = FactoryId | "CL+KN" | "none";
@@ -64,6 +70,11 @@ const sourceFields = [
   { field: "month_mwh", suffix: "monthMwh" },
   { field: "total_mwh", suffix: "totalMwh" }
 ] as const;
+
+const factoryGenerationSourceMetricKeys = new Set([
+  "factoryGeneration.powerKw",
+  ...sourceFields.map(({ suffix }) => `factoryGeneration.${suffix}`)
+]);
 
 export function resolveFactoryGenerationScope(
   pages: readonly FactoryPlaybackPage[]
@@ -329,8 +340,25 @@ export function evaluateFactoryGenerationScope(
 
 export function updateFactoryGenerationAggregate(
   database: Database.Database,
-  now: Date = new Date()
+  now: Date = new Date(),
+  options: { changedMetrics?: readonly DerivedMetricChange[] } = {}
 ): FactoryGenerationAggregateStatus {
+  const changedMetrics: DerivedMetricChange[] = options.changedMetrics === undefined
+    ? (["cl", "kn"] as MetricScope[]).flatMap((metricScope) =>
+      sourceFields.map(({ suffix }) => ({
+        metricScope,
+        metricKey: `factoryGeneration.${suffix}`
+      }))
+    )
+    : [...options.changedMetrics];
+  const triggeredFactoryScopes = new Set(
+    changedMetrics
+      .filter(({ metricScope, metricKey }) =>
+        (metricScope === "cl" || metricScope === "kn")
+        && factoryGenerationSourceMetricKeys.has(metricKey)
+      )
+      .map(({ metricScope }) => metricScope)
+  );
   const acceptedFactoryTotalUpsert = database.prepare(`
     INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
     VALUES (?, ?, ?, 'MWh', ?, 'good', ?)
@@ -343,46 +371,34 @@ export function updateFactoryGenerationAggregate(
   `);
   for (const factory of ["CL", "KN"] as const) {
     const factoryEvaluation = evaluateFactoryGenerationScope(database, factory, now);
+    const factoryScope = factory.toLowerCase() as MetricScope;
     if (
       factoryEvaluation.state === "ready"
       && "values" in factoryEvaluation
       && factoryEvaluation.updatedAt
+      && triggeredFactoryScopes.has(factoryScope)
     ) {
       acceptedFactoryTotalUpsert.run(
-        factory.toLowerCase(),
+        factoryScope,
         "factoryGeneration.acceptedTotalMwh",
         factoryEvaluation.values.totalGeneration,
         factoryEvaluation.updatedAt,
         JSON.stringify({ source: `${factory} MQTT`, updatedAt: factoryEvaluation.updatedAt })
       );
+      changedMetrics.push({
+        metricScope: factoryScope,
+        metricKey: "factoryGeneration.acceptedTotalMwh"
+      });
     }
   }
 
   const evaluation = evaluateFactoryGenerationAggregate(database, now);
   if (evaluation.state !== "ready" || !("values" in evaluation) || !evaluation.updatedAt) {
+    evaluateDerivedMetrics(database, now, { changedMetrics, materialize: false });
     return evaluation;
   }
 
-  const upsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('global', ?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
-      value = excluded.value,
-      unit = excluded.unit,
-      timestamp = excluded.timestamp,
-      quality = excluded.quality,
-      raw_payload = excluded.raw_payload
-  `);
-  const provenance = JSON.stringify({
-    source: "CL+KN MQTT aggregate",
-    updatedAt: evaluation.updatedAt
-  });
-
-  database.transaction(() => {
-    for (const [metricKey, value] of Object.entries(evaluation.values)) {
-      upsert.run(metricKey, value, evaluation.updatedAt, provenance);
-    }
-  })();
+  evaluateDerivedMetrics(database, now, { changedMetrics });
 
   return {
     state: evaluation.state,
@@ -442,16 +458,6 @@ export function resetFactoryGenerationBaseline(
       quality = excluded.quality,
       raw_payload = excluded.raw_payload
   `);
-  const canonicalUpsert = database.prepare(`
-    INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload)
-    VALUES ('global', ?, ?, 'MWh', ?, 'good', ?)
-    ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
-      value = excluded.value,
-      unit = excluded.unit,
-      timestamp = excluded.timestamp,
-      quality = excluded.quality,
-      raw_payload = excluded.raw_payload
-  `);
   const counter = database
     .prepare("SELECT reset_count FROM cumulative_counters WHERE metric_scope = 'global' AND metric_key = 'generation'")
     .get() as { reset_count: number | null } | undefined;
@@ -468,14 +474,6 @@ export function resetFactoryGenerationBaseline(
       );
     }
 
-    const provenance = JSON.stringify({
-      source: "CL+KN MQTT aggregate",
-      updatedAt
-    });
-    for (const [metricKey, value] of Object.entries(values)) {
-      canonicalUpsert.run(metricKey, value, updatedAt, provenance);
-    }
-
     database.prepare(`
       INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count)
       VALUES ('global', 'generation', ?, ?, ?)
@@ -488,7 +486,18 @@ export function resetFactoryGenerationBaseline(
       resetAt,
       (counter?.reset_count ?? 0) + 1
     );
+    database.prepare(`
+      DELETE FROM derived_metric_evaluations
+      WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'
+    `).run();
+    database.prepare(`
+      DELETE FROM live_metric_values
+      WHERE metric_scope = 'global' AND metric_key = 'totalGeneration'
+    `).run();
   })();
+
+  initializeDerivedMetricRegistry(database);
+  evaluateDerivedMetrics(database, now);
 
   return {
     acceptedTotalMwh: values.totalGeneration,

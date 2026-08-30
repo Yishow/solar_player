@@ -2,7 +2,6 @@ import {
   compileEffectiveBindingPlan,
   normalizeMetricBoundPageConfig,
   resolvePlaybackBindingItemConstraints,
-  resolvePlaybackMetricCatalog,
   resolveWidgetDataBindingPageKey,
   scopedIdentityKey,
   type DisplayClientContext,
@@ -10,6 +9,7 @@ import {
 } from "@solar-display/shared";
 import { readStageConfig } from "./displayPagePublishingService.js";
 import { readPlaybackProfilePageRows } from "./playbackProfileService.js";
+import { resolveServerPlaybackMetricCatalog } from "./derivedMetricCatalogService.js";
 
 export type PlaybackMetricAuthorizationPlan = {
   foreignSiteIdentities: ScopedMetricIdentity[];
@@ -33,14 +33,18 @@ export function readPlaybackMetricAuthorizationPlan(
 
     const live = readStageConfig(page.page_key, "live");
     const normalized = normalizeMetricBoundPageConfig(bindingPageKey, live.regions);
+    const catalog = resolveServerPlaybackMetricCatalog(bindingPageKey);
+    const items = Object.values(normalized.dataBindings).filter(({ dataBinding }) =>
+      catalog.some(({ metricKey }) => metricKey === dataBinding.metricKey)
+    );
     const compiled = compileEffectiveBindingPlan({
-      catalog: resolvePlaybackMetricCatalog(bindingPageKey),
+      catalog,
       context: {
         contextKey: context.contextRevision,
         siteScope: context.siteScope
       },
       itemConstraints: resolvePlaybackBindingItemConstraints(bindingPageKey),
-      items: Object.values(normalized.dataBindings),
+      items,
       pageId: page.page_key
     });
     if (!compiled.ok) {

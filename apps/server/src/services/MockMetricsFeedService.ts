@@ -6,14 +6,16 @@ import {
   computeSolarGenerationPowerAt,
   SOLAR_GENERATION_PROFILE_KW
 } from "../metrics/solarGenerationProfile.js";
+import {
+  evaluateDerivedMetrics,
+  initializeDerivedMetricRegistry
+} from "./derivedMetricRegistryService.js";
 
 const DEFAULT_INTERVAL_MS = 60_000;
-const CO2_FACTOR_TON_PER_KWH = 0.494 / 1000;
 const TOTAL_GENERATION_BASELINE_GWH = 18_642;
 const TOTAL_CONSUMPTION_BASELINE_KWH = 28_400_000;
 const TOTAL_SELF_CONSUMPTION_BASELINE_KWH = 19_600_000;
 const MOCK_ACCUMULATION_EPOCH = new Date(2026, 0, 1);
-const TOTAL_CO2_BASELINE_TONS = 9_842;
 const FACTORY_SLOT_WEIGHTS = [
   ["factoryCircuit.stampingPower", 0.18],
   ["factoryCircuit.bodyPower", 0.16],
@@ -78,9 +80,10 @@ function buildMockMetricReadings(date: Date): MockMetricReading[] {
   const todayGeneration = computeTodayGenerationKwh(date);
   const completedDays = Math.max(0, localDayNumber(date) - localDayNumber(MOCK_ACCUMULATION_EPOCH));
   const cumulativeGeneration = completedDays * MOCK_DAILY_GENERATION_KWH + todayGeneration;
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const completedMonthDays = Math.max(0, localDayNumber(date) - localDayNumber(monthStart));
+  const monthGeneration = completedMonthDays * MOCK_DAILY_GENERATION_KWH + todayGeneration;
   const totalGeneration = roundTo(TOTAL_GENERATION_BASELINE_GWH + cumulativeGeneration / 1_000_000, 6);
-  const todayCo2Reduction = roundTo(todayGeneration * CO2_FACTOR_TON_PER_KWH, 2);
-  const totalCo2Reduction = roundTo(TOTAL_CO2_BASELINE_TONS + todayCo2Reduction, 2);
   const solarPeakPower = Math.max(...SOLAR_GENERATION_PROFILE_KW);
   const powerIntensity = solarPeakPower > 0 ? realTimePower / solarPeakPower : 0;
   const todayConsumption = computeDailyConsumptionKwh(todayGeneration);
@@ -95,23 +98,21 @@ function buildMockMetricReadings(date: Date): MockMetricReading[] {
     TOTAL_SELF_CONSUMPTION_BASELINE_KWH + completedDays * dailySelfConsumption + todaySelfConsumption;
   const systemEfficiency = roundTo(92 + powerIntensity * 6.5, 1);
   const factoryLoadPower = roundTo(Math.max(realTimePower * 1.18, 460), 0);
+  const sourceTimestamp = date.toISOString();
+  const sourceReading = (metricKey: string, value: number): MockMetricReading => ({
+    metricKey,
+    rawPayload: JSON.stringify({ timestamp: sourceTimestamp, value }),
+    unit: "MWh",
+    value
+  });
 
   return [
     { metricKey: "realTimePower", rawPayload: JSON.stringify({ value: realTimePower }), unit: "kW", value: realTimePower },
     { metricKey: "todayGeneration", rawPayload: JSON.stringify({ value: todayGeneration }), unit: "kWh", value: todayGeneration },
     { metricKey: "totalGeneration", rawPayload: JSON.stringify({ value: totalGeneration }), unit: "GWh", value: totalGeneration },
-    {
-      metricKey: "todayCo2Reduction",
-      rawPayload: JSON.stringify({ value: todayCo2Reduction }),
-      unit: "t",
-      value: todayCo2Reduction
-    },
-    {
-      metricKey: "totalCo2Reduction",
-      rawPayload: JSON.stringify({ value: totalCo2Reduction }),
-      unit: "t",
-      value: totalCo2Reduction
-    },
+    sourceReading("factoryGeneration.todayMwh", todayGeneration / 1_000),
+    sourceReading("factoryGeneration.monthMwh", monthGeneration / 1_000),
+    sourceReading("factoryGeneration.totalMwh", totalGeneration * 1_000),
     {
       metricKey: "consumptionEnergy",
       rawPayload: JSON.stringify({ value: consumptionEnergy }),
@@ -219,5 +220,7 @@ export class MockMetricsFeedService {
     });
 
     transaction(readings);
+    initializeDerivedMetricRegistry(this.database);
+    evaluateDerivedMetrics(this.database, this.now());
   }
 }

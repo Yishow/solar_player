@@ -4,6 +4,7 @@ import { getDatabase } from "../db/index.js";
 import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
+import { listDerivedMetricDefinitions } from "../services/derivedMetricRegistryService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
 import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
 
@@ -542,6 +543,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request, reply) => {
     const database = getDatabase();
     const topics = request.body?.topics ?? [];
+    const derivedMetricIdentities = new Set(
+      listDerivedMetricDefinitions(database).flatMap((definition) => {
+        const scopes = definition.outputScopePolicy === "site"
+          ? definition.siteScopes ?? ["cl", "kn"]
+          : ["global"];
+        return scopes.map((scope) => `${scope}:${definition.metricKey}`);
+      })
+    );
     const existingMappings = new Map<string, ExistingTopicMappingRow>(
       (
         database
@@ -578,6 +587,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           success: false
         });
       }
+      const identity = `${metricScope}:${topic.metricKey}`;
+      if (derivedMetricIdentities.has(identity)) {
+        return reply.status(409).send({
+          code: "DERIVED_METRIC_IDENTITY_CONFLICT",
+          error: `Metric identity is already provided by an enabled derived metric: ${identity}`,
+          success: false
+        });
+      }
       if (
         topic.enabled !== false
         && isSolarAdapterManagedMetricIdentity(metricScope, topic.metricKey)
@@ -588,7 +605,6 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           success: false
         });
       }
-      const identity = `${metricScope}:${topic.metricKey}`;
       if (seen.has(identity)) {
         return reply.status(400).send({
           code: "DUPLICATE_METRIC_IDENTITY",

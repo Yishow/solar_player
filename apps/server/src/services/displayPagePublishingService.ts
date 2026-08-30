@@ -22,12 +22,12 @@ import {
   isDisplayPageMediaBinding,
   normalizeDisplayPageFreeformObjects,
   resolvePlaybackBindingItemConstraints,
-  resolvePlaybackMetricCatalog,
   resolveWidgetDataBindingPageKey,
   validateMetricDataBinding,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { resolveServerPlaybackMetricCatalog } from "./derivedMetricCatalogService.js";
 import { config } from "../config.js";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -330,7 +330,7 @@ function validateDisplayPageMetricBindings(
     : null;
   if (!bindingPageKey) return [];
 
-  const catalog = resolvePlaybackMetricCatalog(bindingPageKey);
+  const catalog = resolveServerPlaybackMetricCatalog(bindingPageKey);
   const constraints = resolvePlaybackBindingItemConstraints(bindingPageKey);
   const findings: ValidationFinding[] = [];
 

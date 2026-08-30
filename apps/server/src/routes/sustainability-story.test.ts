@@ -10,9 +10,13 @@ const {
 } = await import(
   "../testing/deviceContextTestSupport.js"
 );
+const { evaluateDerivedMetrics } = await import(
+  "../services/derivedMetricRegistryService.js"
+);
 
 function deviceCookies() {
   mirrorLegacyGenerationIntoSiteSummaryForTest("cl");
+  evaluateDerivedMetrics(getDatabase());
   return {
     solar_device_credential:
       createPairedDeviceTestContext("cl").credential
