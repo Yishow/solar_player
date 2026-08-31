@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useBlocker } from "react-router-dom";
+import { useBlocker } from "react-router-dom";
+import type { MetricScope } from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 import { DataHubSectionState } from "./sectionState";
 import { applySourcesLiveSnapshot, useDataHubLiveMetrics } from "./liveActivity";
@@ -9,7 +10,6 @@ import {
   defaultMqttStatus,
   emptySolarSources,
   fetchDataHubSourcesModel,
-  getMetricScopeLabel,
   loadDataHubSourcesRoute,
   normalizeTopicMapping,
   readCachedDataHubSourcesErrorMessage,
@@ -22,10 +22,15 @@ import {
   type GenericMqttMapping,
   type GenericSourceRow,
   type ManagedSourceRow,
-  type MqttSourceStatus,
-  type SourceHealth,
-  type SourceResource
+  type MqttSourceStatus
 } from "./SourcesModel";
+import {
+  GenericSourceCard,
+  ManagedSourceCard,
+  SourceHealthChip,
+  SourceResourceList,
+  SourceRowMeta
+} from "./SourceCards";
 
 export {
   buildSourceRows,
@@ -36,6 +41,13 @@ export {
   resolveSourcesSaveErrorMessage,
   updateGenericMapping
 } from "./SourcesModel";
+export {
+  GenericSourceCard,
+  ManagedSourceCard,
+  SourceHealthChip,
+  SourceResourceList,
+  SourceRowMeta
+} from "./SourceCards";
 export { applySourcesLiveSnapshot };
 export type {
   DataHubSourcesModel,
@@ -53,176 +65,6 @@ type TopicMappingsResponse = {
   status: MqttSourceStatus;
   topics: Array<GenericMqttMapping & { rawPayload?: string | null }>;
 };
-
-function SourceHealthChip({ health }: { health: SourceHealth }) {
-  return <span className={`mgmt-chip ${health.tone === "default" ? "" : `is-${health.tone}`}`.trim()}>{health.label}</span>;
-}
-
-function SourceResourceList({ resources }: { resources: SourceResource[] }) {
-  if (resources.length === 0) {
-    return <p className="text-sm text-[#687169]">尚未發現額外資源。</p>;
-  }
-
-  return (
-    <ul className="space-y-2" data-source-resources>
-      {resources.map((resource) => (
-        <li className="rounded border border-[#d9e2dc] bg-white/60 p-3" key={`${resource.label}:${resource.detail}`}>
-          <strong className="block text-sm text-[#27322b]">{resource.label}</strong>
-          <small className="block text-[#687169]">{resource.detail}</small>
-          {resource.metrics.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2" data-source-resource-metrics>
-              {resource.metrics.map((metric) => <code className="rounded bg-[#edf4ee] px-2 py-1 text-xs" key={metric}>{metric}</code>)}
-            </div>
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function SourceRowMeta({ row }: { row: ManagedSourceRow | GenericSourceRow }) {
-  return (
-    <dl className="grid gap-x-6 gap-y-2 text-sm text-[#4d554f] sm:grid-cols-2 lg:grid-cols-4" data-source-meta>
-      <div>
-        <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Scope / site</dt>
-        <dd data-source-scope={row.metricScope}>{getMetricScopeLabel(row.metricScope)}</dd>
-      </div>
-      <div>
-        <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Health</dt>
-        <dd><SourceHealthChip health={row.health} /></dd>
-      </div>
-      <div>
-        <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Activity</dt>
-        <dd data-source-activity>{row.activity}</dd>
-      </div>
-      <div>
-        <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Ownership</dt>
-        <dd data-source-ownership={row.ownership}>{row.ownership === "managed" ? "Managed / read-only" : "Operator-managed"}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function ManagedSourceCard({ row }: { row: ManagedSourceRow }) {
-  return (
-    <article className="mgmt-card space-y-4 p-5" data-source-id={row.id} data-source-kind="managed" data-source-row>
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-[#687169]">{row.sourceType}</p>
-          <h3 className="text-lg font-semibold text-[#27322b]">Solar adapter · {getMetricScopeLabel(row.metricScope)}</h3>
-          <p className="text-sm text-[#687169]">{row.sourceTopic}</p>
-        </div>
-        <span className="mgmt-chip is-accent">Managed adapter</span>
-      </header>
-      <SourceRowMeta row={row} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-[#27322b]">Owned semantic metrics</h4>
-          <div className="flex flex-wrap gap-2" data-source-owned-metrics>
-            {row.ownedMetrics.map((metric) => <code className="rounded bg-[#edf4ee] px-2 py-1 text-xs" key={metric}>{metric}</code>)}
-          </div>
-        </div>
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-[#27322b]">Discovered resources</h4>
-          <SourceResourceList resources={row.resources} />
-        </div>
-      </div>
-      <p className="text-xs text-[#687169]">Solar adapter-owned identities cannot be edited as generic MQTT mappings.</p>
-    </article>
-  );
-}
-
-function GenericSourceCard({
-  row,
-  onChange
-}: {
-  row: GenericSourceRow;
-  onChange: (id: number, patch: GenericMappingPatch) => void;
-}) {
-  const disabled = !row.editable;
-  const inputClass = "mt-1 w-full rounded border border-[#cbd6ce] bg-white px-3 py-2 text-sm text-[#27322b] disabled:cursor-not-allowed disabled:bg-[#f0f3f1]";
-
-  return (
-    <article
-      className={`mgmt-card space-y-4 p-5 ${disabled ? "opacity-90" : ""}`}
-      data-source-id={row.id}
-      data-source-kind="generic"
-      data-source-ownership={row.ownership}
-      data-source-row
-    >
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-[#687169]">{row.sourceType}</p>
-          <h3 className="text-lg font-semibold text-[#27322b]">{row.metricKey}</h3>
-          <p className="text-sm text-[#687169]">{row.sourceTopic}</p>
-        </div>
-        <span className={`mgmt-chip ${disabled ? "is-warning" : "is-accent"}`}>
-          {disabled ? "Reserved by Solar adapter" : "Operator-managed"}
-        </span>
-      </header>
-      <SourceRowMeta row={row} />
-      {disabled ? (
-        <p className="rounded border border-[#ead7aa] bg-[#fff8e8] p-3 text-sm text-[#6b5524]" role="note">
-          This metric identity is managed by the Solar adapter. Topic mapping controls are read-only.
-        </p>
-      ) : null}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3" data-source-generic-fields>
-        <label className="text-sm text-[#4d554f]">
-          Metric key
-          <input className={inputClass} disabled={disabled} name="metricKey" onChange={(event) => onChange(row.mapping.id, { metricKey: event.target.value })} value={row.mapping.metricKey} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          Metric scope
-          <select
-            className={inputClass}
-            disabled={disabled}
-            name="metricScope"
-            value={row.mapping.metricScope}
-            onChange={(event) => onChange(row.mapping.id, { metricScope: event.target.value as GenericMqttMapping["metricScope"] })}
-          >
-            <option value="cl">CL</option>
-            <option value="kn">KN</option>
-            <option value="global">Global</option>
-          </select>
-        </label>
-        <label className="text-sm text-[#4d554f] md:col-span-2">
-          Topic
-          <input className={inputClass} disabled={disabled} name="topic" onChange={(event) => onChange(row.mapping.id, { topic: event.target.value })} value={row.mapping.topic} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          Unit
-          <input className={inputClass} disabled={disabled} name="unit" onChange={(event) => onChange(row.mapping.id, { unit: event.target.value })} value={row.mapping.unit} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          Value path
-          <input className={inputClass} disabled={disabled} name="valuePath" onChange={(event) => onChange(row.mapping.id, { valuePath: event.target.value })} value={row.mapping.valuePath} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          Multiplier
-          <input className={inputClass} disabled={disabled} inputMode="decimal" name="multiplier" onChange={(event) => onChange(row.mapping.id, { multiplier: Number(event.target.value) || 1 })} step="0.01" type="number" value={row.mapping.multiplier ?? 1} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          名稱
-          <input className={inputClass} disabled={disabled} name="nameZh" onChange={(event) => onChange(row.mapping.id, { nameZh: event.target.value })} value={row.mapping.nameZh ?? ""} />
-        </label>
-        <label className="text-sm text-[#4d554f]">
-          Name
-          <input className={inputClass} disabled={disabled} name="nameEn" onChange={(event) => onChange(row.mapping.id, { nameEn: event.target.value })} value={row.mapping.nameEn ?? ""} />
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e1e8e2] pt-3">
-        <label className="flex items-center gap-2 text-sm text-[#4d554f]">
-          <input checked={row.mapping.enabled} disabled={disabled} name="enabled" onChange={(event) => onChange(row.mapping.id, { enabled: event.target.checked })} type="checkbox" />
-          Enabled
-        </label>
-        <div className="flex flex-wrap gap-2 text-xs text-[#687169]">
-          {row.ownedMetrics.map((metric) => <code className="rounded bg-[#edf4ee] px-2 py-1" key={metric}>{metric}</code>)}
-          <span>Last activity: {row.activity}</span>
-        </div>
-      </div>
-    </article>
-  );
-}
 
 export function DataHubSourcesContent({
   initialErrorMessage = "",
@@ -279,6 +121,53 @@ export function DataHubSourcesContent({
     setErrorMessage("");
   }, []);
 
+  const handleAddGenericMapping = useCallback(() => {
+    const nextId = draftTopics.length > 0
+      ? Math.min(0, ...draftTopics.map((t) => t.id)) - 1
+      : -1;
+    const newMapping: GenericMqttMapping = {
+      enabled: true,
+      id: nextId,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "custom.metric",
+      metricScope: "cl",
+      multiplier: 1,
+      nameEn: "",
+      nameZh: "自訂指標",
+      quality: null,
+      topic: "custom/cl/metric",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    };
+    setDraftTopics((current) => [...current, newMapping]);
+    setMessage("已新增一筆自訂通用 MQTT 主題，請填寫參數後儲存。");
+    setErrorMessage("");
+  }, [draftTopics]);
+
+  const handleDeleteGenericMapping = useCallback((id: number) => {
+    setDraftTopics((current) => current.filter((t) => t.id !== id));
+    setMessage("");
+    setErrorMessage("");
+  }, []);
+
+  const handlePublishTest = useCallback(async (metricScope: MetricScope, metricKey: string, value: number) => {
+    setErrorMessage("");
+    try {
+      await requestJson<{ status: MqttSourceStatus }>(
+        `/api/settings/mqtt/topics/${encodeURIComponent(metricKey)}/publish`,
+        {
+          body: JSON.stringify({ metricScope, value }),
+          method: "POST"
+        }
+      );
+      setMessage(`MQTT 測試值已發佈：${metricKey} (${metricScope.toUpperCase()}) = ${value}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "發佈 MQTT 測試值失敗。");
+    }
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!onSave || !isDirty) {
       return;
@@ -309,15 +198,12 @@ export function DataHubSourcesContent({
   }, [isDirty, onRefresh]);
 
   return (
-    <div className="space-y-5 px-5 pb-8" data-data-hub-section="sources">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[#687169]">Data Hub / Sources</p>
-          <h2 className="text-2xl font-semibold text-[#27322b]">資料來源</h2>
-          <p className="mt-1 max-w-3xl text-sm text-[#687169]">集中查看 Solar managed adapter 與 operator-managed generic MQTT mappings；scope/site 會保留在每一筆來源身份上。</p>
+    <div className="space-y-5" data-data-hub-section="sources">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="text-xs text-[#687169]">
+          集中查看 Solar managed adapter 與 operator-managed generic MQTT mappings；可在本頁直接編輯、新增、刪除與測試發佈。
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link className="mgmt-action" to="/settings/data-hub/sources/operations">進階 MQTT 維運</Link>
           <button className="mgmt-action" disabled={!onRefresh} onClick={() => void handleRefresh()} type="button">重新整理</button>
           <button className="mgmt-action primary" disabled={!onSave || !isDirty || isSaving} onClick={() => void handleSave()} type="button">{isSaving ? "儲存中..." : "儲存 mappings"}</button>
         </div>
@@ -326,25 +212,42 @@ export function DataHubSourcesContent({
       {errorMessage ? <div className="mgmt-status is-error" data-source-error role="alert">{errorMessage}</div> : null}
       {message ? <div className="mgmt-status is-success" role="status">{message}</div> : null}
       <div className="mgmt-card grid gap-3 p-4 text-sm text-[#4d554f] sm:grid-cols-3" data-source-connection-summary>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Central broker</span><strong>{model.status.broker || "未設定"}</strong></div>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Connection health</span><SourceHealthChip health={model.status.connected ? { label: "Connected", tone: "success" } : { label: "Offline", tone: "danger" }} /></div>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Source counts</span><strong>{managedRows.length} managed · {genericRows.length} generic</strong></div>
+        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">中央 Broker</span><strong>{model.status.broker || "未設定"}</strong></div>
+        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">連線狀態</span><SourceHealthChip health={model.status.connected ? { label: "正常連線 (Connected)", tone: "success" } : { label: "未連線 (Offline)", tone: "danger" }} /></div>
+        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">來源統計</span><strong>{managedRows.length} 託管來源 · {genericRows.length} 通用來源</strong></div>
       </div>
 
       <section className="space-y-3" data-source-group="managed">
         <div>
-          <h3 className="text-lg font-semibold text-[#27322b]">Managed Solar adapters</h3>
-          <p className="text-sm text-[#687169]">由 Solar Collector adapter 擁有的 canonical metrics 與 discovered resources。</p>
+          <h3 className="text-lg font-semibold text-[#27322b]">託管 Solar 轉接器 (Managed Solar Adapters)</h3>
+          <p className="text-sm text-[#687169]">由 Solar Collector 轉接器擁有的標準指標與自動探索資源。</p>
         </div>
-        {managedRows.length > 0 ? managedRows.map((row) => <ManagedSourceCard key={row.id} row={row} />) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有 managed Solar source diagnostics。</div>}
+        {managedRows.length > 0 ? managedRows.map((row) => <ManagedSourceCard key={row.id} row={row} />) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有託管的 Solar 來源診斷。</div>}
       </section>
 
       <section className="space-y-3" data-source-group="generic">
-        <div>
-          <h3 className="text-lg font-semibold text-[#27322b]">Generic MQTT mappings</h3>
-          <p className="text-sm text-[#687169]">Operator 可調整 metric key、topic、scope、名稱與解析欄位；adapter-owned identity 會維持唯讀。</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-[#27322b]">通用 MQTT 來源 (Generic MQTT Mappings)</h3>
+            <p className="text-sm text-[#687169]">維運人員可直接新增、編輯、測試發佈與刪除主題映射；轉接器託管指標維持唯讀。</p>
+          </div>
+          <button
+            type="button"
+            className="mgmt-action primary"
+            onClick={handleAddGenericMapping}
+          >
+            + 新增通用 MQTT 主題
+          </button>
         </div>
-        {genericRows.length > 0 ? genericRows.map((row) => <GenericSourceCard key={row.id} onChange={handleGenericChange} row={row} />) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有 generic MQTT mappings。</div>}
+        {genericRows.length > 0 ? genericRows.map((row) => (
+          <GenericSourceCard
+            key={row.id}
+            onChange={handleGenericChange}
+            onDelete={handleDeleteGenericMapping}
+            onPublishTest={handlePublishTest}
+            row={row}
+          />
+        )) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有自訂通用 MQTT 映射。</div>}
       </section>
     </div>
   );

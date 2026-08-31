@@ -223,11 +223,12 @@ test("Sources renders source type, scope, health, ownership, resources, and gene
   assert.doesNotMatch(html, /rawPayload|\{\"value\":4\.2\}/);
 });
 
-test("Sources exposes the retained MQTT operations entry point", () => {
+test("Sources exposes consolidated generic mapping controls including add topic and test publish", () => {
   const html = renderSourcesContent({ model: baseModel, onRefresh: async () => undefined, onSave: async () => undefined });
 
-  assert.match(html, /href="\/settings\/data-hub\/sources\/operations"/);
-  assert.match(html, /進階 MQTT 維運/);
+  assert.match(html, /新增通用 MQTT 主題/);
+  assert.match(html, /測試發佈/);
+  assert.match(html, /刪除/);
 });
 
 test("Sources refresh asks before discarding dirty mappings", () => {
@@ -260,8 +261,8 @@ test("Sources blocks dirty route navigation and full-document unload", async () 
       path: "/settings/data-hub/sources"
     },
     {
-      element: <div data-testid="sources-operations">Operations</div>,
-      path: "/settings/data-hub/sources/operations"
+      element: <div data-testid="other-section">Other Section</div>,
+      path: "/settings/data-hub/connections"
     }
   ], { initialEntries: ["/settings/data-hub/sources"] });
   let root: Root | null = null;
@@ -290,22 +291,18 @@ test("Sources blocks dirty route navigation and full-document unload", async () 
     dom.window.dispatchEvent(beforeUnload);
     assert.equal(beforeUnload.defaultPrevented, true);
 
-    const operationsLink = dom.window.document.querySelector<HTMLAnchorElement>(
-      "a[href=\"/settings/data-hub/sources/operations\"]"
-    );
-    assert.ok(operationsLink);
     await act(async () => {
-      operationsLink.click();
+      void router.navigate("/settings/data-hub/connections");
       await Promise.resolve();
     });
     assert.equal(router.state.location.pathname, "/settings/data-hub/sources");
 
     confirmResult = true;
     await act(async () => {
-      operationsLink.click();
+      void router.navigate("/settings/data-hub/connections");
       await Promise.resolve();
     });
-    assert.equal(router.state.location.pathname, "/settings/data-hub/sources/operations");
+    assert.equal(router.state.location.pathname, "/settings/data-hub/connections");
   } finally {
     await act(async () => {
       root?.unmount();

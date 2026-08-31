@@ -201,57 +201,19 @@ export const router = createBrowserRouter([
           },
           {
             path: "derived",
-            loader: createManagementRouteLoader("settings/data-hub/derived"),
-            hydrateFallbackElement: <></>,
-            lazy: async () => {
-              const { DataHubDerivedMetrics } = await import("../pages/DataHub/DerivedMetrics");
-              return { Component: DataHubDerivedMetrics };
-            }
+            loader: createDataHubCompatibilityRedirectLoader("settings/data-hub/derived")
           },
           {
             path: "usage",
-            loader: createLazyManagementRouteLoader(
-              "settings/data-hub/usage",
-              async () => {
-                const { loadDataHubUsageRoute } = await import("../pages/DataHub/UsageModel");
-                return loadDataHubUsageRoute;
-              }
-            ),
-            hydrateFallbackElement: <></>,
-            lazy: async () => {
-              const { DataHubUsage } = await import("../pages/DataHub/Usage");
-              return { Component: DataHubUsage };
-            }
+            loader: createDataHubCompatibilityRedirectLoader("settings/data-hub/usage")
           },
           {
             path: "diagnostics",
-            loader: createLazyManagementRouteLoader(
-              "settings/data-hub/diagnostics",
-              async () => {
-                const { loadDataHubDiagnosticsRoute } = await import("../pages/DataHub/DiagnosticsModel");
-                return loadDataHubDiagnosticsRoute;
-              }
-            ),
-            hydrateFallbackElement: <></>,
-            lazy: async () => {
-              const { DataHubDiagnostics } = await import("../pages/DataHub/Diagnostics");
-              return { Component: DataHubDiagnostics };
-            }
+            loader: createDataHubCompatibilityRedirectLoader("settings/data-hub/diagnostics")
           },
           {
             path: "diagnostics/operations",
-            loader: createLazyManagementRouteLoader(
-              "settings/data-hub/diagnostics/operations",
-              async () => {
-                const { loadDataSourceOperationsRoute } = await import("../pages/DataSourceSettings");
-                return loadDataSourceOperationsRoute;
-              }
-            ),
-            hydrateFallbackElement: <></>,
-            lazy: async () => {
-              const { DataSourceOperations } = await import("../pages/DataSourceSettings");
-              return { Component: DataSourceOperations };
-            }
+            loader: createDataHubCompatibilityRedirectLoader("settings/data-hub/diagnostics/operations")
           },
           {
             path: "external",

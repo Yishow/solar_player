@@ -442,7 +442,7 @@ test("settings footer keeps overview return plus Data Hub management routes only
   const expectedOrder = [
     "回總覽",
     "播放設定",
-    "Data Hub",
+    "資料中樞",
     "圖片管理",
     "迴路設定",
     "裝置狀態",

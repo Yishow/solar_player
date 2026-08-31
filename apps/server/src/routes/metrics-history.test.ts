@@ -171,13 +171,11 @@ test("metrics history routes keep year and total boundaries distinct", async () 
 
 test("monthly daily summaries start at the first day of the current calendar month", async () => {
   const now = new Date();
-  const currentYear = now.getUTCFullYear();
-  const currentMonth = now.getUTCMonth() + 1;
-  const previousMonthDate = new Date(Date.UTC(currentYear, currentMonth - 2, 28));
-  const currentMonthDate = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
   const pad = (value: number) => `${value}`.padStart(2, "0");
   const formatDate = (date: Date) =>
-    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 28);
+  const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
   const database = getDatabase();
   database.prepare("DELETE FROM daily_energy_summaries").run();
 
@@ -377,20 +375,25 @@ test("GET /api/data-hub/energy-history returns one explicit scope with the reque
   database.prepare("DELETE FROM metric_snapshots").run();
   database.prepare("DELETE FROM daily_energy_summaries").run();
   database.prepare("DELETE FROM cumulative_counters").run();
+  const now = new Date();
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const nowIso = now.toISOString();
+
   database.prepare(`
     INSERT INTO metric_snapshots (metric_scope, generation, consumption, captured_at)
     VALUES
-      ('cl', 110, 90, '2026-08-31T01:00:00.000Z'),
-      ('kn', 220, 190, '2026-08-31T01:00:00.000Z'),
-      ('global', 330, 290, '2026-08-31T01:00:00.000Z')
-  `).run();
+      ('cl', 110, 90, ?),
+      ('kn', 220, 190, ?),
+      ('global', 330, 290, ?)
+  `).run(nowIso, nowIso, nowIso);
   database.prepare(`
     INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total)
     VALUES
-      ('cl', '2026-08-31', 110, 90),
-      ('kn', '2026-08-31', 220, 190),
-      ('global', '2026-08-31', 330, 290)
-  `).run();
+      ('cl', ?, 110, 90),
+      ('kn', ?, 220, 190),
+      ('global', ?, 330, 290)
+  `).run(todayKey, todayKey, todayKey);
   database.prepare(`
     INSERT INTO cumulative_counters (metric_scope, metric_key, total_value)
     VALUES

@@ -104,7 +104,7 @@ test("management footer exposes Data Hub without legacy data settings entries", 
 
   assert.doesNotMatch(html, /data-shell-nav-icon=/);
   assert.match(html, />回總覽</);
-  assert.match(html, />Data Hub</);
+  assert.match(html, />資料中樞</);
   assert.doesNotMatch(html, />資料來源</);
   assert.doesNotMatch(html, />MQTT</);
 });
@@ -112,5 +112,5 @@ test("management footer exposes Data Hub without legacy data settings entries", 
 test("management footer keeps Data Hub active for section routes", () => {
   const html = renderFooter("/settings/data-hub/metrics");
 
-  assert.match(html, /<a[^>]*aria-current="page"[^>]*href="\/settings\/data-hub"[^>]*>[\s\S]*?<span>Data Hub<\/span>/);
+  assert.match(html, /<a[^>]*aria-current="page"[^>]*href="\/settings\/data-hub"[^>]*>[\s\S]*?<span>資料中樞<\/span>/);
 });

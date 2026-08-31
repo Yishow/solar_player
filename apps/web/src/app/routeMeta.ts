@@ -146,7 +146,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: DATA_HUB_ROOT_PATH,
-    navLabel: "Data Hub",
+    navLabel: "資料中樞",
     title: "資料中樞",
     subtitle: "Data Hub",
     group: "management",
@@ -164,7 +164,7 @@ export const routeMetaList: RouteMeta[] = [
   })),
   {
     path: `${DATA_HUB_ROOT_PATH}/sources/operations`,
-    navLabel: "Sources operations",
+    navLabel: "來源維運",
     title: "來源維運",
     subtitle: "Sources Operations",
     group: "management",
@@ -173,7 +173,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: `${DATA_HUB_ROOT_PATH}/diagnostics/operations`,
-    navLabel: "Diagnostics operations",
+    navLabel: "診斷維運",
     title: "診斷維運",
     subtitle: "Diagnostics Operations",
     group: "management",
@@ -200,7 +200,7 @@ export const routeMetaList: RouteMeta[] = [
   },
   {
     path: "/settings/mqtt",
-    navLabel: "MQTT",
+    navLabel: "MQTT 設定",
     title: "MQTT 設定",
     subtitle: "MQTT Settings",
     group: "management",

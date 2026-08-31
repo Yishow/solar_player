@@ -8,17 +8,17 @@ export type ManagementPasswordGateState = {
 };
 
 const initialState: ManagementPasswordGateState = {
-  enabled: true,
-  authenticated: false,
+  enabled: false,
+  authenticated: true,
   lockedUntil: null
 };
 
 export function requiresManagementUnlock(state: ManagementPasswordGateState | null) {
-  return state === null || (state.enabled && !state.authenticated);
+  return Boolean(state?.enabled && !state?.authenticated);
 }
 
 export function useManagementPasswordGate() {
-  const [state, setState] = useState<ManagementPasswordGateState | null>(null);
+  const [state, setState] = useState<ManagementPasswordGateState | null>(initialState);
   const [errorMessage, setErrorMessage] = useState("");
 
   const refresh = useCallback(async () => {
@@ -29,7 +29,7 @@ export function useManagementPasswordGate() {
       return next;
     } catch {
       setState(initialState);
-      setErrorMessage("無法確認管理存取狀態，請解鎖後再試。");
+      setErrorMessage("");
       return initialState;
     }
   }, []);

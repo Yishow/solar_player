@@ -19,21 +19,21 @@ import type {
 } from "./DiagnosticsModel";
 
 const categoryLabels: Record<MetricProvenanceNodeCategory, string> = {
-  "calculation-setting": "Calculation setting",
-  "derived-metric": "Derived metric",
-  "managed-source": "Managed source",
-  "mqtt-topic": "MQTT topic",
-  page: "Page",
-  "readiness-consumer": "Readiness consumer",
-  "semantic-metric": "Semantic metric",
-  "source-connection": "Source connection",
-  widget: "Widget"
+  "calculation-setting": "計算參數 (Calculation setting)",
+  "derived-metric": "衍生指標 (Derived metric)",
+  "managed-source": "託管來源 (Managed source)",
+  "mqtt-topic": "MQTT 主題 (MQTT topic)",
+  page: "展示頁面 (Page)",
+  "readiness-consumer": "整備度消費端 (Readiness consumer)",
+  "semantic-metric": "語意指標 (Semantic metric)",
+  "source-connection": "資料連線 (Source connection)",
+  widget: "展示元件 (Widget)"
 };
 
 const edgeLabels = {
-  "depends-on": "Depends on",
-  produces: "Produces",
-  "used-by": "Used by"
+  "depends-on": "依賴 (depends-on)",
+  produces: "產出 (produces)",
+  "used-by": "使用於 (used-by)"
 } as const;
 
 const scopeLabels = {
@@ -55,32 +55,32 @@ const metadataAllowlist: Record<MetricProvenanceNodeCategory, readonly string[]>
 };
 
 const metadataLabels: Record<string, string> = {
-  configuredScope: "Configured scope",
-  connectionType: "Connection type",
-  consumerId: "Consumer id",
-  consumerType: "Consumer type",
-  evaluationState: "Evaluation",
-  expression: "Expression",
-  fallbackPolicy: "Fallback policy",
-  freshnessState: "Freshness",
-  inherited: "Inherited",
-  itemId: "Item id",
-  managed: "Managed",
-  metricKey: "Metric key",
-  outputUnit: "Output unit",
-  ownership: "Ownership",
-  pageInstanceId: "Page instance",
-  pageKey: "Page key",
-  revision: "Revision",
-  role: "Role",
-  settingKey: "Setting key",
-  sourceClass: "Source class",
-  sourceId: "Source id",
-  sourceTimestamp: "Source timestamp",
-  templateKey: "Template key",
-  topic: "Topic",
-  unit: "Unit",
-  value: "Value"
+  configuredScope: "設定範圍 (Configured scope)",
+  connectionType: "連線類型 (Connection type)",
+  consumerId: "消費端 ID (Consumer id)",
+  consumerType: "消費端類型 (Consumer type)",
+  evaluationState: "評估狀態 (Evaluation)",
+  expression: "計算公式 (Expression)",
+  fallbackPolicy: "回退策略 (Fallback policy)",
+  freshnessState: "新鮮度 (Freshness)",
+  inherited: "繼承 (Inherited)",
+  itemId: "項目 ID (Item id)",
+  managed: "託管 (Managed)",
+  metricKey: "指標代碼 (Metric key)",
+  outputUnit: "輸出單位 (Output unit)",
+  ownership: "所有權 (Ownership)",
+  pageInstanceId: "頁面實例 (Page instance)",
+  pageKey: "頁面代碼 (Page key)",
+  revision: "修訂版本 (Revision)",
+  role: "角色 (Role)",
+  settingKey: "參數代碼 (Setting key)",
+  sourceClass: "來源類別 (Source class)",
+  sourceId: "來源 ID (Source id)",
+  sourceTimestamp: "來源時間 (Source timestamp)",
+  templateKey: "模板代碼 (Template key)",
+  topic: "主題 (Topic)",
+  unit: "單位 (Unit)",
+  value: "數值 (Value)"
 };
 
 function formatScalarMetadataValue(value: unknown) {
@@ -344,17 +344,15 @@ export function DataHubDiagnosticsContent({
   const scopeValue = ["cl", "kn", "global"].includes(selectedScope) ? selectedScope : "";
 
   return (
-    <div className="space-y-5 px-5 pb-8" data-data-hub-section="diagnostics">
-      <header>
-        <p className="text-xs uppercase tracking-[0.2em] text-[#687169]">Data Hub / Diagnostics</p>
-        <h2 className="text-2xl font-semibold text-[#27322b]">Provenance diagnostics</h2>
-        <p className="mt-1 max-w-3xl text-sm text-[#687169]">選取一個 semantic metric identity，查看有界且去重的資料來源、依賴與消費者鏈。</p>
-        <a className="mgmt-action mt-3 inline-flex" href="/settings/data-hub/diagnostics/operations">進階資料維運</a>
+    <div className="space-y-5" data-data-hub-section="diagnostics">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-xs text-[#687169]">選取一個 semantic metric identity，查看有界且去重的資料來源、依賴與消費者鏈。</p>
+        <a className="mgmt-action inline-flex" href="/settings/data-hub/diagnostics/operations">進階資料維運</a>
       </header>
 
       <form className="mgmt-card flex flex-wrap items-end gap-3 p-4" method="get">
         <label className="grid gap-1 text-sm text-[#4d554f]" htmlFor="diagnostics-metric-key">
-          Semantic metricKey
+          指標代碼 (Metric Key)
           <input
             className="mgmt-input min-w-64"
             defaultValue={metricKey}
@@ -364,15 +362,15 @@ export function DataHubDiagnosticsContent({
           />
         </label>
         <label className="grid gap-1 text-sm text-[#4d554f]" htmlFor="diagnostics-scope">
-          Concrete scope
+          具體範圍 (Scope)
           <select className="mgmt-input" defaultValue={scopeValue} id="diagnostics-scope" name="scope">
-            <option value="">Select CL / KN / Global</option>
-            <option value="cl">CL</option>
-            <option value="kn">KN</option>
-            <option value="global">Global</option>
+            <option value="">選擇 CL / KN / Global</option>
+            <option value="cl">CL (中壢)</option>
+            <option value="kn">KN (觀音)</option>
+            <option value="global">全域 (Global)</option>
           </select>
         </label>
-        <button className="mgmt-action mgmt-action-primary" type="submit">Inspect provenance</button>
+        <button className="mgmt-action mgmt-action-primary" type="submit">分析來源追溯 (Inspect)</button>
       </form>
 
       <MonitoringDiagnostics errorMessage={monitoringErrorMessage} model={monitoring} />
@@ -390,23 +388,23 @@ export function DataHubDiagnosticsContent({
       ) : (
         <>
           <div className="mgmt-card flex flex-wrap justify-between gap-3 p-4 text-sm text-[#4d554f]" data-provenance-summary>
-            <span>Metric: <strong>{model.metricKey}</strong></span>
-            <span>Scope: <strong>{scopeLabels[model.scope]}</strong></span>
-            <span>{model.nodes.length} nodes · {model.edges.length} edges · Generated {model.generatedAt}</span>
+            <span>指標代碼: <strong>{model.metricKey}</strong></span>
+            <span>管理範圍: <strong>{scopeLabels[model.scope]}</strong></span>
+            <span>{model.nodes.length} 個節點 · {model.edges.length} 條關係鏈 · 產生時間 {model.generatedAt}</span>
           </div>
           {model.truncated ? (
             <p aria-live="polite" className="mgmt-card border border-[#e9c46a] p-4 text-sm text-[#6a5310]" data-provenance-truncated role="alert">
-              Provenance result is bounded: traversal may be truncated at depth {model.maxDepth} or {model.maxNodes} nodes.
+              Provenance 結果包含上限約束：在深度 {model.maxDepth} 或 {model.maxNodes} 個節點時可能會進行截斷。
             </p>
           ) : null}
           <section aria-labelledby="diagnostics-nodes-heading" className="space-y-3">
-            <h3 className="text-lg font-semibold text-[#27322b]" id="diagnostics-nodes-heading">Provenance nodes</h3>
+            <h3 className="text-lg font-semibold text-[#27322b]" id="diagnostics-nodes-heading">來源追溯節點 (Provenance nodes)</h3>
             <ul aria-label="Provenance nodes" className="grid gap-3 xl:grid-cols-2">
               {model.nodes.map((node) => <ProvenanceNode key={node.id} node={node} />)}
             </ul>
           </section>
           <section aria-labelledby="diagnostics-edges-heading" className="space-y-3">
-            <h3 className="text-lg font-semibold text-[#27322b]" id="diagnostics-edges-heading">Provenance edges</h3>
+            <h3 className="text-lg font-semibold text-[#27322b]" id="diagnostics-edges-heading">關聯依賴關係 (Provenance edges)</h3>
             {model.edges.length > 0 ? (
               <ul aria-label="Provenance edges" className="grid gap-2">
                 {model.edges.map((edge) => {

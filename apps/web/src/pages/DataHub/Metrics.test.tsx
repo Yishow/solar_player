@@ -123,13 +123,9 @@ test("Metrics renders scope, current value, states, source, ownership, and prove
   assert.doesNotMatch(html, /rawPayload|password|credential/);
 });
 
-test("Metrics rows expose scope-preserving Usage and Diagnostics links", () => {
-  const usageHref = buildDataHubUsageHref("inventory.same", "cl");
-  const diagnosticsHref = buildDataHubDiagnosticsHref("inventory.same", "cl");
+test("Metrics rows expose inline toggle details action", () => {
   const html = renderToStaticMarkup(<DataHubMetricsContent model={normalizeMetricsInventory(inventory)} />);
 
-  assert.match(usageHref, /metricKey=inventory\.same&scope=cl/);
-  assert.match(diagnosticsHref, /metricKey=inventory\.same&scope=cl/);
-  assert.match(html, /data-metric-action="usage" href="\/settings\/data-hub\/usage\?metricKey=inventory\.same&amp;scope=cl"/);
-  assert.match(html, /data-metric-action="diagnostics" href="\/settings\/data-hub\/diagnostics\?metricKey=inventory\.same&amp;scope=cl"/);
+  assert.match(html, /data-metric-action="toggle-details"/);
+  assert.match(html, /展開使用情形與診斷/);
 });

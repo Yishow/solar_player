@@ -18,9 +18,9 @@ function pageLabel(row: MetricUsageRow) {
 }
 
 function configuredScopeLabel(row: MetricUsageRow) {
-  if (row.inherited || row.configuredScope === "inherit-device") return "Inherited";
+  if (row.inherited || row.configuredScope === "inherit-device") return "繼承自裝置 (Inherited)";
   if (row.configuredScope) return scopeLabels[row.configuredScope] ?? row.configuredScope;
-  return row.scopeLabel === "registered" ? "Registered" : row.scopeLabel;
+  return row.scopeLabel === "registered" ? "已註冊 (Registered)" : row.scopeLabel;
 }
 
 function UsageRow({ modelScope, row }: { modelScope: DataHubManagementScope; row: MetricUsageRow }) {
@@ -44,23 +44,23 @@ function UsageRow({ modelScope, row }: { modelScope: DataHubManagementScope; row
       </header>
       <dl className="grid gap-x-6 gap-y-3 text-sm text-[#4d554f] sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Page instance / label</dt>
+          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">頁面實例 / 名稱</dt>
           <dd data-usage-page-label>
-            {row.pageInstanceId === null ? "Registered" : `#${row.pageInstanceId}`} · {pageLabel(row)}
+            {row.pageInstanceId === null ? "已註冊 (Registered)" : `#${row.pageInstanceId}`} · {pageLabel(row)}
           </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Item / consumer id</dt>
+          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">項目 / 消費端識別碼</dt>
           <dd>
             <code>{row.itemId ?? "—"}</code> · <code>{row.consumerId}</code>
           </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Consumer type</dt>
+          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">消費端類型 (Type)</dt>
           <dd data-usage-consumer-type={row.consumerType}>{row.consumerType}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">Configured scope</dt>
+          <dt className="text-xs uppercase tracking-wide text-[#7b857d]">設定範圍 (Scope)</dt>
           <dd data-usage-configured-scope={row.configuredScope ?? "registered"}>
             {configuredScopeLabel(row)}
           </dd>
@@ -69,7 +69,7 @@ function UsageRow({ modelScope, row }: { modelScope: DataHubManagementScope; row
       <nav aria-label={`${row.metricKey} consumer actions`} className="flex flex-wrap gap-2 border-t border-[#e1e8e2] pt-3">
         {editorHref ? (
           <a className="mgmt-action" data-usage-action="display-editor" href={editorHref}>
-            Display Editor
+            展示頁編輯 (Display Editor)
           </a>
         ) : null}
         <a
@@ -77,7 +77,7 @@ function UsageRow({ modelScope, row }: { modelScope: DataHubManagementScope; row
           data-usage-action="diagnostics"
           href={buildMetricUsageDiagnosticsHref(row, modelScope)}
         >
-          Diagnostics
+          資料診斷 (Diagnostics)
         </a>
       </nav>
     </article>
@@ -92,24 +92,22 @@ export function DataHubUsageContent({
   model: DataHubUsageModel | null;
 }) {
   if (!model) {
-    return <DataHubSectionState message={errorMessage || "Usage 資料同步失敗。"} status="error" />;
+    return <DataHubSectionState message={errorMessage || "使用情形 (Usage) 資料同步失敗。"} status="error" />;
   }
   if (model.usage.length === 0) {
     return <DataHubSectionState message="此範圍目前沒有 metric consumers。" status="empty" />;
   }
 
   return (
-    <div className="space-y-5 px-5 pb-8" data-data-hub-section="usage">
+    <div className="space-y-5" data-data-hub-section="usage">
       <header>
-        <p className="text-xs uppercase tracking-[0.2em] text-[#687169]">Data Hub / Usage</p>
-        <h2 className="text-2xl font-semibold text-[#27322b]">使用情形</h2>
-        <p className="mt-1 max-w-3xl text-sm text-[#687169]">
+        <p className="text-xs text-[#687169]">
           依 semantic metric 查看已發布頁面、Widget 與 registered story/readiness consumers；source topic 不是 Usage identity。
         </p>
       </header>
       <div className="mgmt-card flex flex-wrap justify-between gap-3 p-4 text-sm text-[#4d554f]">
-        <span>Scope: <strong>{model.scope === "all" ? "All" : scopeLabels[model.scope] ?? model.scope}</strong></span>
-        <span>{model.usage.length} consumers · Generated {model.generatedAt}</span>
+        <span>管理範圍: <strong>{model.scope === "all" ? "全域 (All)" : scopeLabels[model.scope] ?? model.scope}</strong></span>
+        <span>{model.usage.length} 項消費端 (Consumers) · 產生時間 {model.generatedAt}</span>
       </div>
       <section className="grid gap-4 xl:grid-cols-2">
         {model.usage.map((row) => (

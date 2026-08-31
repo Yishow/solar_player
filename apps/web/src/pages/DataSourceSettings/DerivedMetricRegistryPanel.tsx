@@ -213,18 +213,18 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
         <div className="mgmt-card space-y-4 p-5">
           <div className="grid gap-3 text-sm sm:grid-cols-3" data-derived-definition-status>
             <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Revision:</span><strong>r{draft.revision}</strong></div>
-            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Status:</span><strong>{definitionStatus(draft)}</strong></div>
-            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Applicable scopes:</span><strong>{evaluationScopes(draft).join(" / ").toUpperCase()}</strong></div>
+            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">狀態 (Status):</span><strong>{definitionStatus(draft)}</strong></div>
+            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">適用範圍 (Scopes):</span><strong>{evaluationScopes(draft).join(" / ").toUpperCase()}</strong></div>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-xs">Metric key<input className={inputClass} disabled={draft.managed || draft.revision > 0} value={draft.metricKey} onChange={(event) => setDraft({ ...draft, metricKey: event.target.value })} /></label>
-            <label className="text-xs">名稱<input className={inputClass} disabled={draft.managed} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-            <label className="text-xs">輸出範圍<select className={inputClass} disabled={draft.managed} value={draft.outputScopePolicy} onChange={(event) => setDraft({ ...draft, outputScopePolicy: event.target.value as "global" | "site" })}><option value="site">Site（CL / KN）</option><option value="global">Global</option></select></label>
-            <label className="text-xs">輸出單位<input className={inputClass} disabled={draft.managed} value={draft.outputUnit} onChange={(event) => setDraft({ ...draft, outputUnit: event.target.value })} /></label>
+            <label className="text-xs">指標代碼 (Metric key)<input className={inputClass} disabled={draft.managed || draft.revision > 0} value={draft.metricKey} onChange={(event) => setDraft({ ...draft, metricKey: event.target.value })} /></label>
+            <label className="text-xs">指標名稱<input className={inputClass} disabled={draft.managed} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+            <label className="text-xs">輸出範圍 (Scope)<select className={inputClass} disabled={draft.managed} value={draft.outputScopePolicy} onChange={(event) => setDraft({ ...draft, outputScopePolicy: event.target.value as "global" | "site" })}><option value="site">廠區 Site（CL / KN）</option><option value="global">全域 Global</option></select></label>
+            <label className="text-xs">輸出單位 (Unit)<input className={inputClass} disabled={draft.managed} value={draft.outputUnit} onChange={(event) => setDraft({ ...draft, outputUnit: event.target.value })} /></label>
           </div>
-          <label className="block text-xs">公式<input className={`${inputClass} font-mono`} disabled={draft.managed} value={draft.expression} onChange={(event) => setDraft({ ...draft, expression: event.target.value })} /></label>
+          <label className="block text-xs">計算公式<input className={`${inputClass} font-mono`} disabled={draft.managed} value={draft.expression} onChange={(event) => setDraft({ ...draft, expression: event.target.value })} /></label>
           <div className="space-y-2">
-            <p className="text-xs font-semibold">輸入別名與來源</p>
+            <p className="text-xs font-semibold">輸入別名與來源 (Inputs)</p>
             {draft.inputs.map((input, index) => (
               <div className="grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-6" key={`${index}-${input.alias}`}>
                 <input aria-label="Alias" className={inputClass} disabled={draft.managed} value={input.alias} onChange={(event) => updateInput(index, { ...input, alias: event.target.value })} />
@@ -250,7 +250,7 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
           </div>
           <section className="space-y-2 border-t border-[#e1e8e2] pt-4" data-derived-evaluations>
             <div>
-              <h3 className="text-sm font-semibold text-[#27322b]">Current evaluation</h3>
+              <h3 className="text-sm font-semibold text-[#27322b]">即時評估狀態 (Current evaluation)</h3>
               <p className="text-xs text-[#687169]">由已儲存 definition 的 scope-specific runtime evaluation 提供；Preview 不會取代目前狀態。</p>
             </div>
             {evaluationLoading ? <p className="text-sm text-[#687169]" role="status">載入目前 evaluation…</p> : (
@@ -263,9 +263,9 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
                   return (
                     <div className="rounded-lg border border-black/10 bg-white p-3 text-sm" data-derived-evaluation-scope={metricScope} key={metricScope}>
                       <div className="flex items-center justify-between gap-2"><strong>{metricScope.toUpperCase()}</strong><span>{status}</span></div>
-                      <div>Value: {value} {unit}</div>
-                      <div>Freshness: {freshness}</div>
-                      {evaluation?.failureCode ? <div>Failure: {evaluation.failureCode}</div> : null}
+                      <div>數值 (Value): {value} {unit}</div>
+                      <div>新鮮度 (Freshness): {freshness}</div>
+                      {evaluation?.failureCode ? <div>失敗代碼: {evaluation.failureCode}</div> : null}
                     </div>
                   );
                 })}
@@ -276,7 +276,7 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
             <button className="mgmt-action" disabled={busy} type="button" onClick={() => void run(async () => {
               const evaluation = await api.preview(draft, resolveDerivedMetricPreviewScope(draft));
               return evaluation.value === null ? `Preview：${evaluation.failureCode ?? evaluation.status}` : `Preview：${evaluation.value} ${evaluation.outputUnit}（${evaluation.freshnessState}）`;
-            })}>Preview</button>
+            })}>預覽計算 (Preview)</button>
             {!draft.managed ? <button className="mgmt-action primary" disabled={busy} type="button" onClick={() => void run(async () => {
               const saved = await api.save(draft);
               await reload(saved.metricKey);

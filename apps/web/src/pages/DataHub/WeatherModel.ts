@@ -18,7 +18,13 @@ import {
   weatherFieldLabelMap,
   weatherFieldPresetOptions
 } from "../MqttSettings/weatherFieldPresets";
-import { getWeatherSettings, updateWeatherSettings } from "../../services/api";
+import {
+  getWeatherDiagnostics,
+  getWeatherOptions,
+  getWeatherPreview,
+  getWeatherSettings,
+  updateWeatherSettings
+} from "../../services/api";
 
 export type WeatherSelectOption = {
   label: string;
@@ -86,6 +92,9 @@ export type BuildWeatherViewModelArgs = {
 export type DataHubWeatherRouteModel = {
   errorMessage: string;
   settings: WeatherSettings | null;
+  initialOptions?: WeatherOptionsResponse | null;
+  initialPreview?: WeatherHeaderContract | null;
+  initialDiagnostic?: WeatherDiagnostic | null;
 };
 
 export function buildWeatherViewModel({

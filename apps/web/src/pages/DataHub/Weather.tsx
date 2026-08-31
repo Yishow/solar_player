@@ -8,7 +8,6 @@ import type {
   WeatherOptionsResponse,
   WeatherSettings
 } from "@solar-display/shared";
-import { CustomSelect } from "../../components/management";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
   hasDisplaySyncDraftChanges,
@@ -32,19 +31,17 @@ import { DataHubSectionState } from "./sectionState";
 import {
   buildWeatherViewModel,
   getWeatherPresetOptions,
-  resolveWeatherLocationMode,
   saveDataHubWeatherSettings,
-  weatherUpdateIntervalOptions,
-  type DataHubWeatherRouteModel,
-  type WeatherSelectOption
+  type DataHubWeatherRouteModel
 } from "./WeatherModel";
+import {
+  WeatherConfigCard,
+  WeatherDiagnosticCard,
+  WeatherPreviewCard,
+  type WeatherChangeHandler
+} from "./WeatherCards";
 
 const WEATHER_DISPLAY_SYNC_SCOPES = ["weather"] as const;
-
-type WeatherChangeHandler = <Key extends keyof WeatherSettings>(
-  key: Key,
-  value: WeatherSettings[Key]
-) => void;
 
 export type DataHubWeatherContentProps = {
   diagnosticErrorMessage?: string;
@@ -67,10 +64,6 @@ export type DataHubWeatherContentProps = {
   settings: WeatherSettings;
   weatherDiagnostic?: WeatherDiagnostic | null;
 };
-
-function renderSelectOptions(options: readonly WeatherSelectOption[]) {
-  return options.map(({ label, value }) => ({ label, value }));
-}
 
 export function DataHubWeatherContent({
   diagnosticErrorMessage = "",
@@ -119,219 +112,63 @@ export function DataHubWeatherContent({
   }
 
   return (
-    <div className="space-y-5 px-5 pb-8" data-data-hub-section="external-weather">
-      <header>
-        <p className="text-xs uppercase tracking-[0.2em] text-[#687169]">Data Hub / External Data</p>
-        <h2 className="text-2xl font-semibold text-[#27322b]">Weather</h2>
-        <p className="mt-1 max-w-3xl text-sm text-[#687169]">
-          管理 Header 天氣的啟用狀態、定位、欄位預設與更新頻率；這些設定不依賴 MQTT broker 管理。
-        </p>
-      </header>
-
+    <div className="space-y-6" data-data-hub-section="external-weather">
       {remoteSyncBanner}
       {errorMessage ? <div className="mgmt-status is-error" role="alert">{errorMessage}</div> : null}
       {message ? <div className="mgmt-status is-success" role="status">{message}</div> : null}
 
-      <section className="mgmt-card space-y-5 p-5" data-weather-management>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[#687169]">External Data</p>
-            <h3 className="text-lg font-semibold text-[#27322b]">天氣設定</h3>
-          </div>
-          <button
-            className="mgmt-action mgmt-action-primary"
-            data-weather-action="save"
-            disabled={isSaving || !isDirty}
-            onClick={() => void onSave()}
-            type="button"
-          >
-            {isSaving ? "儲存中..." : "儲存天氣設定"}
-          </button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* 左欄：頂欄預覽與天氣診斷 (佔 5 欄) */}
+        <div className="lg:col-span-5 flex flex-col justify-between gap-6">
+          <WeatherPreviewCard
+            isRefreshing={isRefreshing}
+            onRefresh={onRefresh}
+            optionsErrorMessage={optionsErrorMessage}
+            settings={settings}
+            viewModel={viewModel}
+          />
+
+          <WeatherDiagnosticCard
+            diagnosticErrorMessage={diagnosticErrorMessage}
+            onCopyDiagnostic={onCopyDiagnostic}
+            viewModel={viewModel}
+          />
         </div>
 
-        <div className="mgmt-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-[#4d554f]">
-          <label className="flex items-center gap-2" data-weather-control="enabled">
-            <input
-              checked={settings.enabled}
-              onChange={(event) => onChange("enabled", event.target.checked)}
-              type="checkbox"
-            />
-            啟用天氣顯示
-          </label>
-          <span className={`mgmt-chip ${isDirty ? "is-warning" : "is-success"}`} data-weather-dirty={isDirty}>
-            {isDirty ? "尚未儲存" : "已同步"}
-          </span>
+        {/* 右欄：天氣設定表單 (佔 7 欄) */}
+        <div className="lg:col-span-7 h-full">
+          <WeatherConfigCard
+            countyOptions={countyOptions}
+            isDirty={isDirty}
+            isSaving={isSaving}
+            onChange={onChange}
+            onSave={onSave}
+            onToggleField={onToggleField}
+            optionsLoaded={Boolean(options)}
+            optionsErrorMessage={optionsErrorMessage}
+            presetOptions={presetOptions}
+            settings={settings}
+            stationOptions={stationOptions}
+            viewModel={viewModel}
+          />
         </div>
-
-        <div className="flex flex-wrap gap-2" data-weather-control="preset" role="tablist" aria-label="天氣欄位預設">
-          {presetOptions.map((option) => (
-            <button
-              aria-selected={settings.preset === option.value}
-              className={settings.preset === option.value ? "mgmt-action mgmt-action-primary" : "mgmt-action"}
-              data-weather-preset={option.value}
-              key={option.value}
-              onClick={() => onChange("preset", option.value)}
-              role="tab"
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-1 text-sm text-[#4d554f]" data-weather-control="location-mode">
-            定位方式
-            <CustomSelect
-              onChange={(value) => onChange("locationMode", resolveWeatherLocationMode(value))}
-              options={renderSelectOptions(viewModel.locationOptions)}
-              value={settings.locationMode}
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[#4d554f]" data-weather-control="interval">
-            更新頻率
-            <CustomSelect
-              onChange={(value) => onChange("updateIntervalMinutes", Number(value))}
-              options={renderSelectOptions(weatherUpdateIntervalOptions)}
-              value={String(settings.updateIntervalMinutes)}
-            />
-          </label>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-1 text-sm text-[#4d554f]" data-weather-control="county">
-            縣市
-            <CustomSelect
-              onChange={(value) => onChange("countyName", value || null)}
-              options={countyOptions}
-              value={settings.countyName ?? ""}
-            />
-          </label>
-          {settings.locationMode === "station" ? (
-            <label className="grid gap-1 text-sm text-[#4d554f]" data-weather-control="station">
-              測站
-              <CustomSelect
-                onChange={(value) => onChange("stationId", value || null)}
-                options={stationOptions}
-                value={settings.stationId ?? ""}
-              />
-            </label>
-          ) : null}
-        </div>
-
-        {viewModel.customFieldOptions.length > 0 ? (
-          <fieldset className="space-y-2" data-weather-control="custom-fields">
-            <legend className="text-sm font-semibold text-[#4d554f]">自訂欄位</legend>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {viewModel.customFieldOptions.map((option) => (
-                <label className="flex items-center gap-2 text-sm text-[#4d554f]" key={option.value}>
-                  <input
-                    checked={option.checked}
-                    onChange={(event) => onToggleField(option.value, event.target.checked)}
-                    type="checkbox"
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ) : null}
-
-        {viewModel.stationFeedback ? <div className="mgmt-status is-error" role="alert">{viewModel.stationFeedback}</div> : null}
-        {!options && !optionsErrorMessage ? (
-          <div className="mgmt-status" role="status">正在載入測站／縣市選項...</div>
-        ) : null}
-        {viewModel.localValidationFeedback ? (
-          <div className="mgmt-status is-error" data-weather-validation role="alert">
-            {viewModel.localValidationFeedback}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="mgmt-card space-y-2 p-5" data-weather-preview data-weather-preview-state={viewModel.preview.state}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[#687169]">Header Preview</p>
-            <h3 className="text-lg font-semibold text-[#27322b]">目前設定預覽</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="mgmt-chip">{viewModel.preview.state}</span>
-            <button
-              className="mgmt-action"
-              data-weather-action="refresh"
-              disabled={isRefreshing || !settings.enabled}
-              onClick={() => void onRefresh()}
-              type="button"
-            >
-              {isRefreshing ? "更新中..." : "立即更新"}
-            </button>
-          </div>
-        </div>
-        <p className="text-base text-[#27322b]">{viewModel.preview.primaryText}</p>
-        {viewModel.preview.secondaryText ? <small className="text-sm text-[#687169]">{viewModel.preview.secondaryText}</small> : null}
-        <div
-          className={`mgmt-status ${viewModel.currentStatus.tone === "error" ? "is-error" : viewModel.currentStatus.tone === "warning" ? "is-warning" : ""}`}
-          data-weather-current-source={viewModel.currentStatus.sourceLabel}
-          data-weather-current-state={viewModel.currentStatus.fetchState}
-        >
-          <strong>資料狀態：{viewModel.currentStatus.label}</strong>
-          <span>來源：{viewModel.currentStatus.sourceLabel}</span>
-          <span>updatedAt：{viewModel.currentStatus.updatedAtLabel}</span>
-          <span>staleAt：{viewModel.currentStatus.staleAtLabel}</span>
-        </div>
-        {viewModel.previewFeedback ? <div className="mgmt-status is-error" role="alert">{viewModel.previewFeedback}</div> : null}
-        {optionsErrorMessage ? <div className="mgmt-status is-error" role="alert">{optionsErrorMessage}</div> : null}
-      </section>
-
-      <section
-        className={`mgmt-card space-y-3 p-5 ${viewModel.diagnostic.tone === "error" ? "is-error" : viewModel.diagnostic.tone === "warning" ? "is-warning" : ""}`}
-        data-weather-diagnostic
-        data-weather-diagnostic-source={viewModel.diagnostic.source}
-        data-weather-diagnostic-stage={viewModel.diagnostic.stage}
-        data-weather-diagnostic-state={viewModel.diagnostic.state}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[#687169]">Weather Diagnostic</p>
-            <h3 className="text-lg font-semibold text-[#27322b]">最近一次天氣資料診斷</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="mgmt-chip">{viewModel.diagnostic.stateLabel}</span>
-            <button
-              className="mgmt-action"
-              data-weather-diagnostic-copy
-              onClick={() => void onCopyDiagnostic(viewModel.diagnostic.copyText)}
-              type="button"
-            >
-              複製診斷
-            </button>
-          </div>
-        </div>
-        <p>{viewModel.diagnostic.safeSummary}</p>
-        <dl className="grid gap-2 text-sm text-[#4d554f] sm:grid-cols-2">
-          <div><dt>錯誤碼</dt><dd>{viewModel.diagnostic.code ?? "—"}</dd></div>
-          <div><dt>來源</dt><dd>{viewModel.diagnostic.sourceLabel}</dd></div>
-          {viewModel.diagnostic.stageLabel ? <div><dt>失敗階段</dt><dd>{viewModel.diagnostic.stageLabel}</dd></div> : null}
-          <div><dt>操作</dt><dd>{viewModel.diagnostic.operationLabel}</dd></div>
-          <div><dt>發生時間</dt><dd>{viewModel.diagnostic.occurredAtLabel}</dd></div>
-          <div><dt>上次成功</dt><dd>{viewModel.diagnostic.lastSuccessAtLabel}</dd></div>
-          <div><dt>重試</dt><dd>{viewModel.diagnostic.retryableLabel}</dd></div>
-          {viewModel.diagnostic.httpStatusLabel ? <div><dt>HTTP</dt><dd>{viewModel.diagnostic.httpStatusLabel}</dd></div> : null}
-        </dl>
-        {diagnosticErrorMessage ? <div className="mgmt-status is-error" role="alert">{diagnosticErrorMessage}</div> : null}
-      </section>
+      </div>
     </div>
   );
 }
+
+let cachedWeatherOptions: WeatherOptionsResponse | null = null;
+let cachedWeatherPreview: WeatherHeaderContract | null = null;
+let cachedWeatherDiagnostic: WeatherDiagnostic | null = null;
 
 export function DataHubWeather() {
   const routeModel = useLoaderData() as DataHubWeatherRouteModel;
   const initialSettings = routeModel.settings;
   const [settings, setSettings] = useState<WeatherSettings | null>(initialSettings);
   const [lastSyncedSettings, setLastSyncedSettings] = useState<WeatherSettings | null>(initialSettings);
-  const [options, setOptions] = useState<WeatherOptionsResponse | null>(null);
-  const [preview, setPreview] = useState<WeatherHeaderContract | null>(null);
-  const [weatherDiagnostic, setWeatherDiagnostic] = useState<WeatherDiagnostic | null>(null);
+  const [options, setOptions] = useState<WeatherOptionsResponse | null>(() => cachedWeatherOptions);
+  const [preview, setPreview] = useState<WeatherHeaderContract | null>(() => cachedWeatherPreview);
+  const [weatherDiagnostic, setWeatherDiagnostic] = useState<WeatherDiagnostic | null>(() => cachedWeatherDiagnostic);
   const [optionsErrorMessage, setOptionsErrorMessage] = useState("");
   const [previewErrorMessage, setPreviewErrorMessage] = useState("");
   const [diagnosticErrorMessage, setDiagnosticErrorMessage] = useState("");
@@ -341,12 +178,11 @@ export function DataHubWeather() {
   const [isSaving, setIsSaving] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const loadedCountyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSettings(routeModel.settings);
     setLastSyncedSettings(routeModel.settings);
-    setOptions(null);
-    setPreview(null);
     setOptionsErrorMessage("");
     setPreviewErrorMessage("");
     setMessage("");
@@ -383,9 +219,12 @@ export function DataHubWeather() {
     setMessage("Weather 設定已同步。");
     setErrorMessage("");
   }, []);
+
   const reloadWeatherDiagnostic = useCallback(async () => {
     try {
-      setWeatherDiagnostic(await getWeatherDiagnostics());
+      const diag = await getWeatherDiagnostics();
+      cachedWeatherDiagnostic = diag;
+      setWeatherDiagnostic(diag);
       setDiagnosticErrorMessage("");
     } catch (error) {
       setDiagnosticErrorMessage(
@@ -407,12 +246,19 @@ export function DataHubWeather() {
   useDisplaySyncRefresh(syncDraftGuard.handleDisplaySync, WEATHER_DISPLAY_SYNC_SCOPES);
 
   useEffect(() => {
-    if (!settings) return;
+    if (!settings?.countyName) return;
+    if (loadedCountyRef.current === settings.countyName && options !== null) {
+      return;
+    }
     let active = true;
     setOptionsErrorMessage("");
     void getWeatherOptions(settings.countyName)
       .then((nextOptions) => {
-        if (active) setOptions(nextOptions);
+        if (active) {
+          cachedWeatherOptions = nextOptions;
+          setOptions(nextOptions);
+          loadedCountyRef.current = settings.countyName;
+        }
       })
       .catch((error) => {
         if (active) {
@@ -435,7 +281,10 @@ export function DataHubWeather() {
     setPreviewErrorMessage("");
     void getWeatherPreview(settings)
       .then((nextPreview) => {
-        if (active) setPreview(nextPreview);
+        if (active) {
+          cachedWeatherPreview = nextPreview;
+          setPreview(nextPreview);
+        }
       })
       .catch((error) => {
         if (active) {

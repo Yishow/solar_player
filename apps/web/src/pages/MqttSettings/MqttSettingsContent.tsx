@@ -19,6 +19,7 @@ import type {
   MqttStatus,
   TopicMapping
 } from "./viewModel";
+import { ConnectionsView } from "../DataHub/Connections/ConnectionsView";
 import { buildMqttScopedMetricKey, buildMqttSettingsViewModel } from "./viewModel";
 import { CustomSelect } from "../../components/management";
 import { TopicWorkspaceRow } from "./TopicWorkspaceRow";
@@ -250,65 +251,92 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
   const selectCardDataSite = (site: CardDataSiteFilter) => {
     props.handleCardDataSiteChange?.(site);
   };
+  if (connectionsOnly) {
+    return (
+      <ConnectionsView
+        settings={props.settings}
+        status={props.status}
+        lastConnectionTest={props.lastConnectionTest}
+        isTesting={props.actionState.isTestingConnection}
+        isSaving={props.actionState.isSavingSettings}
+        isDirty={props.draftSections?.broker ?? false}
+        message={props.message}
+        errorMessage={props.errorMessage}
+        remoteSyncBanner={props.remoteSyncBanner}
+        onChange={props.handleSettingChange}
+        onTestConnection={props.testConnection}
+        onSaveSettings={props.saveSettings}
+      />
+    );
+  }
 
   return (
     <div className="mqtt-settings-page">
       <section className="mqtt-title mgmt-page-title">
-        <h1 className="mgmt-page-title__heading"><em>{connectionsOnly ? "Connections" : operationsOnly ? "MQTT Operations" : "MQTT"}</em> {connectionsOnly ? "中央 Broker" : operationsOnly ? "Topic / Card Data" : "設定"}</h1>
-        <p className="mgmt-page-title__subtitle">{connectionsOnly ? "Central MQTT Infrastructure" : operationsOnly ? "MQTT Operations" : "MQTT Settings"}</p>
+        <h1 className="mgmt-page-title__heading"><em>{operationsOnly ? "MQTT Operations" : "MQTT"}</em> {operationsOnly ? "Topic / Card Data" : "設定"}</h1>
+        <p className="mgmt-page-title__subtitle">{operationsOnly ? "MQTT Operations" : "MQTT Settings"}</p>
       </section>
 
-      {!operationsOnly ? <>
-        <button
-          type="button"
-          className="mgmt-action mqtt-test-conn"
-          disabled={viewModel.actions.testConnectionDisabled}
-          onClick={() => void props.testConnection()}
-        >
-          {viewModel.actions.testConnectionLabel}
-          <small>Test Connection</small>
-        </button>
-        <button
-          type="button"
-          className="mgmt-action primary mqtt-save"
-          disabled={viewModel.actions.saveSettingsDisabled}
-          onClick={() => void props.saveSettings()}
-        >
-          {viewModel.actions.saveSettingsLabel}
-          <small>Save Settings</small>
-        </button>
-      </> : null}
+      {!operationsOnly ? (
+        <div className="flex flex-wrap justify-end gap-3 -mt-2">
+          <button
+            type="button"
+            className="mgmt-action mqtt-test-conn"
+            disabled={viewModel.actions.testConnectionDisabled}
+            onClick={() => void props.testConnection()}
+          >
+            {viewModel.actions.testConnectionLabel}
+            <small>Test Connection</small>
+          </button>
+          <button
+            type="button"
+            className="mgmt-action primary mqtt-save"
+            disabled={viewModel.actions.saveSettingsDisabled}
+            onClick={() => void props.saveSettings()}
+          >
+            {viewModel.actions.saveSettingsLabel}
+            <small>Save Settings</small>
+          </button>
+        </div>
+      ) : null}
 
       {props.remoteSyncBanner}
 
       <section className="settings-card mgmt-interactive-card mqtt-topic-workspace" data-mqtt-section="topic-workspace">
-        <div className="settings-card__title">{connectionsOnly ? "中央 Broker" : operationsOnly ? "MQTT 維運" : "Topic 工作區"}<small>{connectionsOnly ? "Central Broker" : operationsOnly ? "MQTT Operations" : "Topic Workspace"}</small></div>
-        {!connectionsOnly ? <div className="mqtt-workspace-tabs" role="tablist" aria-label="Topic workspace views">
-          {(operationsOnly
-            ? [
-                { id: "topic" as const, label: "Topic mapping", subtitle: "Mappings" },
-                { id: "card-data" as const, label: "卡片資料管理", subtitle: "Card Data" }
-              ]
-            : [
-                { id: "source" as const, label: "資料來源模式", subtitle: "Data Mode" },
-                { id: "topic" as const, label: "Topic mapping", subtitle: "Mappings" },
-                { id: "card-data" as const, label: "卡片資料管理", subtitle: "Card Data" }
-              ]
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTopicWorkspaceTab === tab.id}
-              className={activeTopicWorkspaceTab === tab.id ? "active" : ""}
-              data-mqtt-workspace-tab={tab.id}
-              onClick={() => selectTopicWorkspaceTab(tab.id)}
-            >
-              {tab.label}
-              <small>{tab.subtitle}</small>
-            </button>
-          ))}
-        </div> : null}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#92a294]/20 pb-4 mb-4">
+          <div className="settings-card__title">
+            {connectionsOnly ? "中央 Broker" : operationsOnly ? "MQTT 維運" : "Topic 工作區"}
+            <small>{connectionsOnly ? "Central Broker" : operationsOnly ? "MQTT Operations" : "Topic Workspace"}</small>
+          </div>
+          {!connectionsOnly ? (
+            <div className="mqtt-workspace-tabs" role="tablist" aria-label="Topic workspace views">
+              {(operationsOnly
+                ? [
+                    { id: "topic" as const, label: "Topic mapping", subtitle: "Mappings" },
+                    { id: "card-data" as const, label: "卡片資料管理", subtitle: "Card Data" }
+                  ]
+                : [
+                    { id: "source" as const, label: "資料來源模式", subtitle: "Data Mode" },
+                    { id: "topic" as const, label: "Topic mapping", subtitle: "Mappings" },
+                    { id: "card-data" as const, label: "卡片資料管理", subtitle: "Card Data" }
+                  ]
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTopicWorkspaceTab === tab.id}
+                  className={activeTopicWorkspaceTab === tab.id ? "active" : ""}
+                  data-mqtt-workspace-tab={tab.id}
+                  onClick={() => selectTopicWorkspaceTab(tab.id)}
+                >
+                  {tab.label}
+                  <small>{tab.subtitle}</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         {!operationsOnly && activeTopicWorkspaceTab === "source" ? (
           <div className="mqtt-workspace-panel mqtt-source-panel">
@@ -525,20 +553,20 @@ function MqttSettingsContentImpl(props: MqttSettingsContentProps) {
                     </div>
                     <div className="mqtt-card-data-row__sources">
                       <div>
-                        <span className="field-label">Topic</span>
+                        <span className="field-label">MQTT 主題</span>
                         <p>{row.sourceTopics.length > 0 ? row.sourceTopics.map((topic) => `${topic.metricKey}=${topic.topic}`).join(", ") : "--"}</p>
                       </div>
                       <div>
-                        <span className="field-label">Depends on</span>
+                        <span className="field-label">依賴指標</span>
                         <p>{row.dependencies.length > 0 ? row.dependencies.map((dependency) => `${dependency.metricKey}${dependency.topic ? `=${dependency.topic}` : ""}`).join(", ") : "--"}</p>
                       </div>
                       <div>
-                        <span className="field-label">Calculation</span>
+                        <span className="field-label">計算欄位</span>
                         <p>{row.calculationFields.length > 0 ? row.calculationFields.join(", ") : "--"}</p>
                       </div>
                       {row.derivedMetric ? (
                         <div>
-                          <span className="field-label">Registry Provenance</span>
+                          <span className="field-label">註冊庫追溯 (Registry Provenance)</span>
                           <p>{formatDerivedProvenance(row.derivedMetric.provenance) || "--"}</p>
                         </div>
                       ) : null}

@@ -76,7 +76,7 @@ async function loadServiceWorker() {
     }
   });
 
-  const module = await import(`./sw.js?case=${listeners.size}-${Date.now()}`);
+  const module = await import(`./sw.js?case=${listeners.size}-${Date.now()}-${Math.random()}`);
   return { cacheStorage, listeners, module };
 }
 

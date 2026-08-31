@@ -3,13 +3,10 @@ import type { MetricScope } from "@solar-display/shared";
 export const DATA_HUB_ROOT_PATH = "/settings/data-hub";
 
 export const DATA_HUB_SECTIONS = [
-  { key: "connections", label: "Connections", path: `${DATA_HUB_ROOT_PATH}/connections`, title: "資料連線" },
-  { key: "sources", label: "Sources", path: `${DATA_HUB_ROOT_PATH}/sources`, title: "資料來源" },
-  { key: "metrics", label: "Metrics", path: `${DATA_HUB_ROOT_PATH}/metrics`, title: "語意指標" },
-  { key: "derived", label: "Derived Metrics", path: `${DATA_HUB_ROOT_PATH}/derived`, title: "衍生指標" },
-  { key: "usage", label: "Usage", path: `${DATA_HUB_ROOT_PATH}/usage`, title: "使用情形" },
-  { key: "diagnostics", label: "Diagnostics", path: `${DATA_HUB_ROOT_PATH}/diagnostics`, title: "資料診斷" },
-  { key: "external", label: "External Data", path: `${DATA_HUB_ROOT_PATH}/external`, title: "外部資料" }
+  { key: "connections", label: "資料連線", path: `${DATA_HUB_ROOT_PATH}/connections`, title: "資料連線" },
+  { key: "sources", label: "資料來源", path: `${DATA_HUB_ROOT_PATH}/sources`, title: "資料來源" },
+  { key: "metrics", label: "語意指標", path: `${DATA_HUB_ROOT_PATH}/metrics`, title: "語意指標" },
+  { key: "external", label: "外部資料", path: `${DATA_HUB_ROOT_PATH}/external`, title: "外部資料" }
 ] as const;
 
 export type DataHubSection = typeof DATA_HUB_SECTIONS[number];

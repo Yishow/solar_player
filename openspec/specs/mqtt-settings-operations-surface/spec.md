@@ -1264,3 +1264,89 @@ tests:
   - apps/server/src/routes/display-story.test.ts
   - apps/web/src/pages/Sustainability/viewModel.test.ts
 -->
+
+---
+### Requirement: MQTT operations and topic workspace adopt fluid responsive card layout
+The MQTT topic mappings and card data override management workspace SHALL render using fluid, auto-sizing container layouts instead of fixed-dimension absolute canvas coordinates. The workspace SHALL support searching, creating, editing, and deleting mappings, as well as publishing test values and applying display overrides with full visual responsiveness.
+
+#### Scenario: Operator manages topic mappings in operations sub-surface
+- **WHEN** the operator opens the advanced MQTT operations workspace
+- **THEN** the mapping rows and card data rows expand fluidly to fill the available container width
+- **AND** interactive actions (publish test values, apply overrides, edit topics) remain immediately accessible without canvas clipping
+
+
+<!-- @trace
+source: refactor-data-hub-layout-and-connections
+updated: 2026-08-31
+code:
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - apps/web/src/pages/DataHub/Usage.tsx
+  - apps/web/src/app/dataHub.ts
+  - apps/web/src/pages/DataHub/index.tsx
+  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
+  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/app/routeMeta.ts
+  - apps/web/src/pages/DataHub/Metrics.tsx
+  - apps/web/src/pages/DataHub/Diagnostics.tsx
+  - apps/web/src/hooks/useManagementPasswordGate.ts
+  - apps/web/src/pages/DataHub/SourceCards.tsx
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/styles/management.css
+  - apps/web/src/pages/DataHub/Weather.tsx
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+tests:
+  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/hooks/useManagementPasswordGate.test.ts
+  - apps/web/src/components/AppFooterNav.icons.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
+  - apps/web/src/pages/DataHub/Sources.test.tsx
+  - apps/web/src/sw.test.ts
+-->
+
+---
+### Requirement: MQTT management components are structured into modular units under 400 lines
+The MQTT connection and operations management UI SHALL be decoupled into single-responsibility components (such as dedicated Broker form, connection status card, and topic operations view) where each source file is maintained under the 400-line constraint.
+
+#### Scenario: Codebase inspection of MQTT and Data Hub management components
+- **WHEN** the management UI code files are checked
+- **THEN** all newly created and refactored components for connections, broker forms, status cards, and topic operations strictly satisfy the file length and modularity constraints
+
+<!-- @trace
+source: refactor-data-hub-layout-and-connections
+updated: 2026-08-31
+code:
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - apps/web/src/pages/DataHub/Usage.tsx
+  - apps/web/src/app/dataHub.ts
+  - apps/web/src/pages/DataHub/index.tsx
+  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
+  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
+  - apps/web/src/app/routeMeta.ts
+  - apps/web/src/pages/DataHub/Metrics.tsx
+  - apps/web/src/pages/DataHub/Diagnostics.tsx
+  - apps/web/src/hooks/useManagementPasswordGate.ts
+  - apps/web/src/pages/DataHub/SourceCards.tsx
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/styles/management.css
+  - apps/web/src/pages/DataHub/Weather.tsx
+  - apps/web/src/pages/MqttSettings/mqttSettings.css
+tests:
+  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
+  - apps/web/src/components/shellFoundation.test.ts
+  - apps/web/src/hooks/useManagementPasswordGate.test.ts
+  - apps/web/src/components/AppFooterNav.icons.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
+  - apps/web/src/pages/DataHub/Sources.test.tsx
+  - apps/web/src/sw.test.ts
+-->

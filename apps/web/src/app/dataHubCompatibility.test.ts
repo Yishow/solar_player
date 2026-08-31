@@ -9,7 +9,15 @@ test("legacy data settings URLs resolve to their Data Hub sections and preserve 
   );
   assert.equal(
     resolveDataHubCompatibilityRedirect("https://display.local/settings/data-source?scope=cl&metricKey=realTimePower"),
-    "/settings/data-hub/diagnostics?scope=cl&metricKey=realTimePower"
+    "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
+  );
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/usage?scope=cl&metricKey=realTimePower"),
+    "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
+  );
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/diagnostics?scope=cl&metricKey=realTimePower"),
+    "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
   );
 });
 

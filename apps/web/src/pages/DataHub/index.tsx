@@ -41,14 +41,14 @@ export function DataHub() {
   };
 
   return (
-    <div className="space-y-5">
-      <PageScaffold path={section.path} description="集中管理資料連線、來源、語意指標與外部資料。">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <PageScaffold path={section.path} description="集中管理資料連線、來源、語意指標與外部資料。">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#92a294]/20 pb-4">
           <nav aria-label="Data Hub sections" className="flex flex-wrap gap-2">
             {visibleSections.map((entry) => (
               <Link
                 aria-current={entry.key === section.key ? "page" : undefined}
-                className={entry.key === section.key ? "mgmt-action mgmt-action-primary" : "mgmt-action"}
+                className={entry.key === section.key ? "mgmt-action primary" : "mgmt-action"}
                 key={entry.key}
                 to={`${entry.path}?${searchParams.toString()}`}
               >
@@ -70,8 +70,8 @@ export function DataHub() {
             </select>
           </label>
         </div>
-      </PageScaffold>
-      <Outlet />
-    </div>
+        <Outlet />
+      </div>
+    </PageScaffold>
   );
 }

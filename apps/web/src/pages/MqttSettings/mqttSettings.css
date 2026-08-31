@@ -1,34 +1,39 @@
-/* MQTT settings — reference-aligned absolute layout on the FHD canvas (1920 × 838). */
+/* MQTT settings — fluid responsive layout on the management canvas. */
 
 .mqtt-settings-page {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 838px;
+  min-height: 100%;
   font-family: var(--font-family-zh);
   color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0 1.25rem 2rem;
 }
 
 /* action button positioning */
 
-.mqtt-settings-page .mqtt-test-conn { left: 1340px; width: 230px; }
-.mqtt-settings-page .mqtt-save { left: 1590px; width: 250px; }
+.mqtt-settings-page .mqtt-test-conn { position: static; left: auto; width: auto; }
+.mqtt-settings-page .mqtt-save { position: static; left: auto; width: auto; }
 
 /* card positioning (merged Topic workspace | weather) */
-.mqtt-settings-page .mqtt-mode { left: 50px; top: 118px; width: 500px; height: 740px !important; }
+.mqtt-settings-page .mqtt-mode { position: relative; left: auto; top: auto; width: 100%; min-height: 600px; }
 .mqtt-settings-page .mqtt-topic-workspace {
-  left: 50px;
-  top: 118px;
-  width: 1198px;
-  height: 740px !important;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-height: 600px;
   display: flex;
   flex-direction: column;
 }
 .mqtt-settings-page .mqtt-weather-card {
-  left: 1266px;
-  top: 118px;
-  width: 600px;
-  height: 740px !important;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-height: 600px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -137,43 +142,51 @@
   color: #6f766f;
 }
 
+.mqtt-settings-page .mqtt-title {
+  position: static;
+  left: auto;
+  top: auto;
+  margin-bottom: 0.5rem;
+}
+
 /* title stacked vertically (overrides global baseline alignment) */
 .mqtt-settings-page .settings-card__title {
+  position: static;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
+  margin: 0;
 }
 
 .mqtt-settings-page .mqtt-weather-card > .settings-card__title {
-  padding-right: 360px;
+  padding-right: 0;
 }
 
 .mqtt-settings-page .mqtt-workspace-tabs {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  width: 480px;
+  position: static;
+  display: inline-flex;
   border: 1px solid rgba(92, 105, 79, 0.22);
   border-radius: 9px;
   overflow: hidden;
   background: #fffdf8;
-  z-index: 10;
+  z-index: 2;
 }
 
 .mqtt-settings-page .mqtt-workspace-tabs button {
-  min-width: 0;
-  height: 52px;
+  min-width: 130px;
+  height: 48px;
+  padding: 0 16px;
   border: 0;
   border-right: 1px solid rgba(92, 105, 79, 0.14);
   background: transparent;
   color: #4f5a52;
   cursor: pointer;
-  display: grid;
-  place-content: center;
-  gap: 3px;
-  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 14px;
   font-weight: 700;
   transition: background 120ms ease, color 120ms ease;
 }

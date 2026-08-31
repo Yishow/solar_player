@@ -2,7 +2,11 @@ import { DATA_HUB_ROOT_PATH } from "./dataHub";
 
 const compatibilityTargets = new Map([
   ["/settings/mqtt", `${DATA_HUB_ROOT_PATH}/connections`],
-  ["/settings/data-source", `${DATA_HUB_ROOT_PATH}/diagnostics`]
+  ["/settings/data-source", `${DATA_HUB_ROOT_PATH}/metrics`],
+  [`${DATA_HUB_ROOT_PATH}/usage`, `${DATA_HUB_ROOT_PATH}/metrics`],
+  [`${DATA_HUB_ROOT_PATH}/diagnostics`, `${DATA_HUB_ROOT_PATH}/metrics`],
+  [`${DATA_HUB_ROOT_PATH}/diagnostics/operations`, `${DATA_HUB_ROOT_PATH}/sources`],
+  [`${DATA_HUB_ROOT_PATH}/derived`, `${DATA_HUB_ROOT_PATH}/metrics`]
 ]);
 
 export function resolveDataHubCompatibilityRedirect(requestUrl: string): string | null {

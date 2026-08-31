@@ -9,10 +9,6 @@ const managementPageModules = [
   "../pages/BrandAssets",
   "../pages/CircuitSettings",
   "../pages/DataHub",
-  "../pages/DataHub/Diagnostics",
-  "../pages/DataHub/DiagnosticsModel",
-  "../pages/DataHub/Usage",
-  "../pages/DataHub/UsageModel",
   "../pages/DeviceStatus",
   "../pages/DisplayPagesEditor/runtime",
   "../pages/EnergyHistory",
@@ -26,10 +22,9 @@ const managementPageModules = [
 
 test("Data Hub route family exposes the required sections", () => {
   assert.match(routerSource, /path:\s*"settings\/data-hub"/);
-  for (const section of ["connections", "sources", "metrics", "usage", "diagnostics"]) {
+  for (const section of ["connections", "sources", "metrics", "external"]) {
     assert.match(routerSource, new RegExp(`path:\\s*"${section}"`));
   }
-  assert.match(routerSource, /path:\s*"external"/);
 });
 
 test("legacy data settings routes redirect through guarded compatibility loaders", () => {
@@ -47,18 +42,13 @@ test("legacy data settings routes redirect through guarded compatibility loaders
   );
   assert.match(
     routerSource,
-    /path:\s*"diagnostics",[\s\S]*loadDataHubDiagnosticsRoute[\s\S]*import\("\.\.\/pages\/DataHub\/Diagnostics"\)[\s\S]*DataHubDiagnostics/s
+    /path:\s*"usage",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-hub\/usage"\)/s
   );
-  assert.doesNotMatch(routerSource, /loadDataSourceSettingsRoute/);
-});
-
-test("Data Hub Usage lazy-loads only its section-local model and UI", () => {
-  assert.doesNotMatch(routerSource, /createDataHubPlaceholderRoute\("usage"\)/);
   assert.match(
     routerSource,
-    /path:\s*"usage",[\s\S]*createLazyManagementRouteLoader\([\s\S]*loadDataHubUsageRoute[\s\S]*import\("\.\.\/pages\/DataHub\/Usage"\)[\s\S]*DataHubUsage/s
+    /path:\s*"diagnostics",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-hub\/diagnostics"\)/s
   );
-  assert.match(routerSource, /loadDataHubWeatherRoute/);
+  assert.doesNotMatch(routerSource, /loadDataSourceSettingsRoute/);
 });
 
 test("Data Hub External Data lazy-loads only the weather surface", () => {
@@ -78,14 +68,14 @@ test("Data Hub Sources loads only the managed and generic source surface", () =>
   );
 });
 
-test("Data Hub keeps MQTT and Data Source operations as guarded lazy child routes", () => {
+test("Data Hub keeps MQTT operations as guarded lazy child route", () => {
   assert.match(
     routerSource,
     /path:\s*"sources\/operations",[\s\S]*createLazyManagementRouteLoader\([\s\S]*settings\/data-hub\/sources\/operations[\s\S]*loadMqttOperationsRoute[\s\S]*import\("\.\.\/pages\/MqttSettings"\)[\s\S]*MqttOperations/s
   );
   assert.match(
     routerSource,
-    /path:\s*"diagnostics\/operations",[\s\S]*createLazyManagementRouteLoader\([\s\S]*settings\/data-hub\/diagnostics\/operations[\s\S]*loadDataSourceOperationsRoute[\s\S]*import\("\.\.\/pages\/DataSourceSettings"\)[\s\S]*DataSourceOperations/s
+    /path:\s*"diagnostics\/operations",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-hub\/diagnostics\/operations"\)/s
   );
 });
 
@@ -96,11 +86,10 @@ test("Data Hub Metrics loads its scoped inventory surface", () => {
   );
 });
 
-test("Data Hub Derived Metrics mounts the registry surface instead of a placeholder", () => {
-  assert.doesNotMatch(routerSource, /createDataHubPlaceholderRoute\("derived"\)/);
+test("Data Hub Derived Metrics redirects through compatibility loader", () => {
   assert.match(
     routerSource,
-    /path:\s*"derived",[\s\S]*createManagementRouteLoader\("settings\/data-hub\/derived"\)[\s\S]*import\("\.\.\/pages\/DataHub\/DerivedMetrics"\)[\s\S]*DataHubDerivedMetrics/s
+    /path:\s*"derived",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-hub\/derived"\)/s
   );
 });
 

@@ -196,30 +196,30 @@ function TopicWorkspaceRowImpl({
 
       <div className="topic-workspace-row__fields">
         <label className="topic-input-group">
-          <span className="topic-input-group__label">Scope</span>
+          <span className="topic-input-group__label">範圍</span>
           <select
             aria-label="Metric scope"
             value={topic.metricScope}
             onChange={(event) => handleTopicChange(topic.id, "metricScope", event.target.value as TopicMapping["metricScope"])}
           >
-            <option value="cl">CL</option>
-            <option value="kn">KN</option>
-            <option value="global">Global</option>
+            <option value="cl">CL (中壢)</option>
+            <option value="kn">KN (觀音)</option>
+            <option value="global">全域 (Global)</option>
           </select>
         </label>
         <TopicInputGroup
           rowId={topic.id}
           field="topic"
-          label="Topic"
-          placeholder="輸入 MQTT topic..."
+          label="主題"
+          placeholder="例如: factory/cl/power"
           value={topic.topic}
           handleTopicChange={handleTopicChange}
         />
         <TopicInputGroup
           rowId={topic.id}
           field="unit"
-          label="Unit"
-          placeholder="單位"
+          label="單位"
+          placeholder="單位 (如 kW)"
           value={topic.unit}
           handleTopicChange={handleTopicChange}
         />
@@ -241,7 +241,7 @@ function TopicWorkspaceRowImpl({
             <TopicInputGroup
               rowId={topic.id}
               field="nameZh"
-              label="名稱"
+              label="中文名稱"
               placeholder="自訂中文名稱..."
               value={topic.nameZh}
               handleTopicChange={handleTopicChange}
@@ -249,8 +249,8 @@ function TopicWorkspaceRowImpl({
             <TopicInputGroup
               rowId={topic.id}
               field="nameEn"
-              label="Name"
-              placeholder="Custom English name..."
+              label="英文名稱"
+              placeholder="自訂英文名稱..."
               value={topic.nameEn}
               handleTopicChange={handleTopicChange}
             />
