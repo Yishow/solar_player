@@ -33,11 +33,11 @@ export function DeviceFleet() {
   const routeLoaders = readDeviceFleetLoaders();
   const [model, setModel] = useState<DeviceFleetModel>(() => initialRouteModel ?? {
     accessDenied: false,
-    defaultProfile: null,
     devices: [],
     groups: [],
     liveness: null,
-    unavailable: ["defaultProfile", "devices", "groups", "liveness"]
+    profiles: [],
+    unavailable: ["devices", "groups", "liveness", "profiles"]
   });
   const [filter, setFilter] = useState("");
   const [mutationPending, setMutationPending] = useState(false);
@@ -45,6 +45,7 @@ export function DeviceFleet() {
   const [pairing, setPairing] = useState<PairingDialogState>({
     issue: null
   });
+  const [pairingPreparation, setPairingPreparation] = useState<DeviceFleetRow | null>(null);
 
   const refreshers: Partial<
     Record<DeviceFleetResource, () => Promise<void>>
@@ -71,6 +72,14 @@ export function DeviceFleet() {
         ...current,
         liveness,
         unavailable: current.unavailable.filter((item) => item !== "liveness")
+      }));
+    },
+    profiles: async () => {
+      const profiles = await routeLoaders.getProfiles();
+      setModel((current) => ({
+        ...current,
+        profiles,
+        unavailable: current.unavailable.filter((item) => item !== "profiles")
       }));
     }
   };
@@ -118,51 +127,35 @@ export function DeviceFleet() {
     <DeviceFleetContent
       accessDenied={model.accessDenied}
       filter={filter}
+      profiles={model.profiles}
       model={viewModel}
       mutationError={mutationError}
       mutationPending={mutationPending}
-      onClosePairing={() => setPairing((current) => closePairingDialog(current))}
+      onClosePairing={() => {
+        setPairingPreparation(null);
+        setPairing((current) => closePairingDialog(current));
+      }}
       onCreateDevice={async (input) => {
-        await mutate(() => createFleetDevice(input), ["devices"]);
+        const result = await mutate(() => createFleetDevice(input), ["devices"]);
+        return result !== undefined;
       }}
       onCreateGroup={async (input) => {
-        await mutate(() => createDeviceGroup(input), ["groups"]);
+        const result = await mutate(() => createDeviceGroup(input), ["groups"]);
+        return result !== undefined;
       }}
-      onEditDevice={async (row) => {
-        const displayName = window.prompt("顯示名稱", row.displayName);
-        if (displayName === null || !displayName.trim()) return;
-        const groupIdInput = window.prompt(
-          "群組 ID",
-          row.groupId === null ? "" : String(row.groupId)
-        );
-        if (groupIdInput === null) return;
-        const groupId = Number(groupIdInput);
-        if (!Number.isInteger(groupId) || groupId <= 0) return;
-        await mutate(
-          () => updateFleetDevice(row.id, {
-            displayName: displayName.trim(),
-            groupId
-          }),
+      onEditDevice={async (row, input) => {
+        const result = await mutate(
+          () => updateFleetDevice(row.id, input),
           ["devices"]
         );
+        return result !== undefined;
       }}
-      onEditGroup={async (group) => {
-        const name = window.prompt("群組名稱", group.name);
-        if (name === null || !name.trim()) return;
-        const siteScope = window.prompt(
-          "Site Scope（cl 或 kn）",
-          group.siteScope
-        );
-        if (siteScope !== "cl" && siteScope !== "kn") return;
-        await mutate(
-          () => updateDeviceGroup(group.id, {
-            name: name.trim(),
-            playbackProfileId:
-              model.defaultProfile?.id ?? group.playbackProfileId,
-            siteScope
-          }),
+      onEditGroup={async (group, input) => {
+        const result = await mutate(
+          () => updateDeviceGroup(group.id, input),
           ["groups", "devices"]
         );
+        return result !== undefined;
       }}
       onFilterChange={setFilter}
       onIssuePairing={async (row: DeviceFleetRow) => {
@@ -173,6 +166,11 @@ export function DeviceFleet() {
         if (issue) {
           setPairing(showPairingIssue({ issue: null }, issue));
         }
+      }}
+      onPreparePairing={(row) => {
+        setMutationError("");
+        setPairing({ issue: null });
+        setPairingPreparation(row);
       }}
       onToggleDevice={async (row) => {
         await mutate(
@@ -187,7 +185,7 @@ export function DeviceFleet() {
         );
       }}
       pairing={pairing}
-      profileId={model.defaultProfile?.id ?? null}
+      pairingPreparation={pairingPreparation}
     />
   );
 }

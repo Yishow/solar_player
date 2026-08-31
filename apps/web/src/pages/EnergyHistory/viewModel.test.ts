@@ -1,6 +1,43 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildEnergyHistoryViewModel } from "./viewModel";
+import {
+  buildEnergyHistoryViewModel,
+  isEnergyHistoryPayloadForSelection,
+  resolveEnergyHistorySelection,
+  updateEnergyHistorySearchParams
+} from "./viewModel";
+
+test("energy history URL selection defaults explicitly and keeps scope and range independent", () => {
+  assert.deepEqual(resolveEnergyHistorySelection(""), { metricScope: "global", range: "day" });
+  assert.deepEqual(resolveEnergyHistorySelection("?metricScope=cl&range=month"), { metricScope: "cl", range: "month" });
+  assert.deepEqual(resolveEnergyHistorySelection("?metricScope=invalid&range=invalid"), { metricScope: "global", range: "day" });
+
+  assert.equal(
+    updateEnergyHistorySearchParams("?metricScope=cl&range=month", { metricScope: "kn" }).toString(),
+    "metricScope=kn&range=month"
+  );
+  assert.equal(
+    updateEnergyHistorySearchParams("?metricScope=kn&range=month", { range: "year" }).toString(),
+    "metricScope=kn&range=year"
+  );
+});
+
+test("energy history payload identity gate rejects the previous scope or range", () => {
+  assert.equal(
+    isEnergyHistoryPayloadForSelection(
+      { metricScope: "cl", range: "month" },
+      { metricScope: "kn", range: "month" }
+    ),
+    false
+  );
+  assert.equal(
+    isEnergyHistoryPayloadForSelection(
+      { metricScope: "kn", range: "month" },
+      { metricScope: "kn", range: "month" }
+    ),
+    true
+  );
+});
 
 const snapshots = [
   {
@@ -73,6 +110,7 @@ const cumulativeCounters = [
 test("buildEnergyHistoryViewModel maps side navigation, summary cards, and dense rows", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "cl",
     now: "2026-05-13T10:02:00.000Z",
     range: "day",
     snapshots,
@@ -93,7 +131,8 @@ test("buildEnergyHistoryViewModel maps side navigation, summary cards, and dense
   assert.equal(model.bottomSummary[0]?.label, "尖峰發電");
   assert.equal(model.bottomSummary[0]?.valueLabel, "1,920 kW");
   assert.equal(model.bottomSummary[0]?.detailLabel, "12:30");
-  assert.equal(model.bottomSummary[2]?.valueLabel, "History Summary");
+  assert.equal(model.scopeLabel, "CL 廠區 / CL Site");
+  assert.equal(model.bottomSummary[2]?.valueLabel, "CL 廠區 / CL Site · History Summary");
   assert.equal(model.tableRows.length, 1);
   assert.equal(model.tableRows[0]?.dateLabel, "2026-05-13");
   assert.equal(model.tableRows[0]?.consumptionLabel, "12,680");
@@ -105,6 +144,7 @@ test("buildEnergyHistoryViewModel maps side navigation, summary cards, and dense
 test("buildEnergyHistoryViewModel falls back to cumulative counters for total range", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "global",
     now: "2026-05-13T10:02:00.000Z",
     range: "total",
     snapshots: [],
@@ -118,7 +158,8 @@ test("buildEnergyHistoryViewModel falls back to cumulative counters for total ra
   assert.equal(model.metricCards[2]?.valueLabel, "734,120");
   assert.equal(model.tableRows.length, 0);
   assert.equal(model.bottomSummary[2]?.label, "資料來源");
-  assert.equal(model.bottomSummary[2]?.valueLabel, "Cumulative Counter");
+  assert.equal(model.scopeLabel, "Global · 跨廠 / Cross-site");
+  assert.equal(model.bottomSummary[2]?.valueLabel, "Global · 跨廠 / Cross-site · Cumulative Counter");
   assert.equal(model.monitoringState.category, "fresh");
   assert.equal(model.monitoringState.freshnessLabel, "累積資料");
 });
@@ -126,6 +167,7 @@ test("buildEnergyHistoryViewModel falls back to cumulative counters for total ra
 test("buildEnergyHistoryViewModel uses chronological daily kWh summaries for the monthly consumption curve", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "cl",
     now: "2026-05-13T10:02:00.000Z",
     range: "month",
     snapshots,
@@ -159,6 +201,7 @@ test("buildEnergyHistoryViewModel uses chronological daily kWh summaries for the
 test("buildEnergyHistoryViewModel keeps year distinct from total-only counters and labels", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "cl",
     now: "2026-05-13T10:02:00.000Z",
     range: "year",
     snapshots,
@@ -197,7 +240,7 @@ test("buildEnergyHistoryViewModel keeps year distinct from total-only counters a
   assert.equal(model.bottomSummary[0]?.detailLabel, "12:45");
   assert.equal(model.bottomSummary[1]?.valueLabel, "1,680 kW");
   assert.equal(model.bottomSummary[1]?.detailLabel, "15:40");
-  assert.equal(model.bottomSummary[2]?.valueLabel, "History Summary");
+  assert.equal(model.bottomSummary[2]?.valueLabel, "CL 廠區 / CL Site · History Summary");
   assert.equal(model.chartTitle, "今年趨勢");
   assert.equal(model.chartSubtitle, "This Year");
   assert.equal(model.monitoringState.category, "fresh");
@@ -206,6 +249,7 @@ test("buildEnergyHistoryViewModel keeps year distinct from total-only counters a
 test("buildEnergyHistoryViewModel keeps partial history inputs in the shared degraded category", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "kn",
     now: "2026-05-13T10:02:00.000Z",
     range: "month",
     snapshots: [],
@@ -220,6 +264,7 @@ test("buildEnergyHistoryViewModel keeps partial history inputs in the shared deg
 test("buildEnergyHistoryViewModel marks stale history sources explicitly", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "cl",
     now: "2026-05-15T10:02:00.000Z",
     range: "day",
     snapshots,
@@ -233,6 +278,7 @@ test("buildEnergyHistoryViewModel marks stale history sources explicitly", () =>
 test("buildEnergyHistoryViewModel keeps missing annual data in the shared empty category", () => {
   const model = buildEnergyHistoryViewModel({
     counters: cumulativeCounters,
+    metricScope: "cl",
     now: "2026-05-13T10:02:00.000Z",
     range: "year",
     snapshots: [],
@@ -240,5 +286,20 @@ test("buildEnergyHistoryViewModel keeps missing annual data in the shared empty 
   });
 
   assert.equal(model.monitoringState.category, "empty");
-  assert.equal(model.monitoringState.emptyStateLabel, "目前沒有可用的歷史資料來源");
+  assert.equal(model.monitoringState.emptyStateLabel, "CL 廠區 / CL Site · 目前沒有可用的歷史資料來源");
+});
+
+test("buildEnergyHistoryViewModel keeps an empty selected scope visibly scoped", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: [],
+    metricScope: "kn",
+    now: "2026-05-13T10:02:00.000Z",
+    range: "week",
+    snapshots: [],
+    summaries: []
+  });
+
+  assert.equal(model.scopeLabel, "KN 廠區 / KN Site");
+  assert.equal(model.monitoringState.category, "empty");
+  assert.match(model.monitoringState.emptyStateLabel, /KN 廠區/);
 });

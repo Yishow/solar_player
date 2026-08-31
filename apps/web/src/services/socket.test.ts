@@ -81,6 +81,7 @@ test("resolveSocketSessionClass keeps playback routes public-safe and upgrades m
   assert.equal(resolveSocketSessionClass("/solar"), "playback-safe");
   assert.equal(resolveSocketSessionClass("/device-status"), "management-trusted");
   assert.equal(resolveSocketSessionClass("/settings/mqtt"), "management-trusted");
+  assert.equal(resolveSocketSessionClass("/settings/data-hub/metrics"), "management-trusted");
 });
 
 test("buildSocketConnectionOptions authenticates with HttpOnly cookies while preserving management session class", () => {

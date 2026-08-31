@@ -5,6 +5,7 @@ import {
   isManagementRouteHidden
 } from "./managementRouteVisibility";
 import { routeMetaList } from "./routeMeta";
+import { resolveDataHubCompatibilityRedirect } from "./dataHubCompatibility";
 import { LayoutShellRoute } from "../layouts/LayoutShell";
 import { ManagementShellRoute } from "../layouts/ManagementShell";
 import { loadShellBootstrap } from "../layouts/shellBootstrap";
@@ -34,6 +35,16 @@ function createLazyManagementRouteLoader(
   return createManagementRouteLoader(path, async (args) => {
     const routeLoader = await loadRouteLoader();
     return routeLoader(args);
+  });
+}
+
+function createDataHubCompatibilityRedirectLoader(path: string): ManagementRouteLoader {
+  return createManagementRouteLoader(path, ({ request }) => {
+    const target = resolveDataHubCompatibilityRedirect(request.url);
+    if (!target) {
+      throw new Error(`Missing Data Hub compatibility target for /${path}`);
+    }
+    throw redirect(target);
   });
 }
 
@@ -117,18 +128,147 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/data-source",
-        loader: createLazyManagementRouteLoader(
-          "settings/data-source",
-          async () => {
-            const { loadDataSourceSettingsRoute } = await import("../pages/DataSourceSettings");
-            return loadDataSourceSettingsRoute;
-          }
-        ),
-        hydrateFallbackElement: <></>,
+        loader: createDataHubCompatibilityRedirectLoader("settings/data-source")
+      },
+      {
+        path: "settings/data-hub",
+        loader: createManagementRouteLoader("settings/data-hub"),
         lazy: async () => {
-          const { DataSourceSettings } = await import("../pages/DataSourceSettings");
-          return { Component: DataSourceSettings };
-        }
+          const { DataHub } = await import("../pages/DataHub");
+          return { Component: DataHub };
+        },
+        children: [
+          { index: true, element: <Navigate to="connections" replace /> },
+          {
+            path: "connections",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/connections",
+              async () => {
+                const { loadMqttConnectionsRoute } = await import("../pages/MqttSettings");
+                return loadMqttConnectionsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { MqttConnections } = await import("../pages/MqttSettings");
+              return { Component: MqttConnections };
+            }
+          },
+          {
+            path: "sources",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/sources",
+              async () => {
+                const { loadDataHubSourcesRoute } = await import("../pages/DataHub/SourcesModel");
+                return loadDataHubSourcesRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubSources } = await import("../pages/DataHub/Sources");
+              return { Component: DataHubSources };
+            }
+          },
+          {
+            path: "sources/operations",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/sources/operations",
+              async () => {
+                const { loadMqttOperationsRoute } = await import("../pages/MqttSettings");
+                return loadMqttOperationsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { MqttOperations } = await import("../pages/MqttSettings");
+              return { Component: MqttOperations };
+            }
+          },
+          {
+            path: "metrics",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/metrics",
+              async () => {
+                const { loadDataHubMetricsRoute } = await import("../pages/DataHub/MetricsModel");
+                return loadDataHubMetricsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubMetrics } = await import("../pages/DataHub/Metrics");
+              return { Component: DataHubMetrics };
+            }
+          },
+          {
+            path: "derived",
+            loader: createManagementRouteLoader("settings/data-hub/derived"),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubDerivedMetrics } = await import("../pages/DataHub/DerivedMetrics");
+              return { Component: DataHubDerivedMetrics };
+            }
+          },
+          {
+            path: "usage",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/usage",
+              async () => {
+                const { loadDataHubUsageRoute } = await import("../pages/DataHub/UsageModel");
+                return loadDataHubUsageRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubUsage } = await import("../pages/DataHub/Usage");
+              return { Component: DataHubUsage };
+            }
+          },
+          {
+            path: "diagnostics",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/diagnostics",
+              async () => {
+                const { loadDataHubDiagnosticsRoute } = await import("../pages/DataHub/DiagnosticsModel");
+                return loadDataHubDiagnosticsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubDiagnostics } = await import("../pages/DataHub/Diagnostics");
+              return { Component: DataHubDiagnostics };
+            }
+          },
+          {
+            path: "diagnostics/operations",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/diagnostics/operations",
+              async () => {
+                const { loadDataSourceOperationsRoute } = await import("../pages/DataSourceSettings");
+                return loadDataSourceOperationsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataSourceOperations } = await import("../pages/DataSourceSettings");
+              return { Component: DataSourceOperations };
+            }
+          },
+          {
+            path: "external",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/external",
+              async () => {
+                const { loadDataHubWeatherRoute } = await import("../pages/DataHub/WeatherModel");
+                return loadDataHubWeatherRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataHubWeather } = await import("../pages/DataHub/Weather");
+              return { Component: DataHubWeather };
+            }
+          }
+        ]
       },
       {
         path: "settings/assets",
@@ -152,18 +292,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings/mqtt",
-        loader: createLazyManagementRouteLoader(
-          "settings/mqtt",
-          async () => {
-            const { loadMqttSettingsRoute } = await import("../pages/MqttSettings");
-            return loadMqttSettingsRoute;
-          }
-        ),
-        hydrateFallbackElement: <></>,
-        lazy: async () => {
-          const { MqttSettings } = await import("../pages/MqttSettings");
-          return { Component: MqttSettings };
-        }
+        loader: createDataHubCompatibilityRedirectLoader("settings/mqtt")
       },
       {
         path: "settings/circuits",

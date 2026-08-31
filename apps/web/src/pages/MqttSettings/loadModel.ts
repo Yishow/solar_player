@@ -59,7 +59,7 @@ export const defaultMqttStatus: MqttStatus = {
 
 let cachedMqttEditableModel: MqttEditableModel | null = null;
 
-const topicEditableFields = ["enabled", "metricKey", "topic", "nameZh", "nameEn", "unit", "valuePath", "multiplier"] as const;
+const topicEditableFields = ["enabled", "metricKey", "metricScope", "topic", "nameZh", "nameEn", "unit", "valuePath", "multiplier"] as const;
 
 function hasEditableTopicDraft(current: TopicMapping, synced: TopicMapping | undefined) {
   if (!synced) {
@@ -74,6 +74,7 @@ function preserveEditableTopicFields(polled: TopicMapping, current: TopicMapping
     ...polled,
     enabled: current.enabled,
     metricKey: current.metricKey,
+    metricScope: current.metricScope,
     topic: current.topic,
     nameZh: current.nameZh,
     nameEn: current.nameEn,

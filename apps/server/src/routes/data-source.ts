@@ -186,6 +186,9 @@ type MonitoringSnapshotDiagnosticRow = {
   generation_power: number | null;
 };
 
+type MonitoringDiagnosticsScope = MetricScope | "all";
+const MONITORING_DIAGNOSTICS_SAMPLE_LIMIT = 2000;
+
 function parseCapturedAt(capturedAt: string) {
   return new Date(capturedAt.replace(" ", "T"));
 }
@@ -213,7 +216,7 @@ function readMonitoringDiagnostics(now: Date, metricScope: MetricScope) {
         WHERE metric_scope = ?
           AND (generation IS NOT NULL OR generation_power IS NOT NULL)
         ORDER BY captured_at DESC
-        LIMIT 2000
+        LIMIT ${MONITORING_DIAGNOSTICS_SAMPLE_LIMIT}
       `
     )
     .all(metricScope) as MonitoringSnapshotDiagnosticRow[];
@@ -234,7 +237,8 @@ function readMonitoringDiagnostics(now: Date, metricScope: MetricScope) {
     return latest;
   }, null);
   const latestSnapshotDate = latestRow ? toLocalDateKey(latestRow.date) : null;
-  const hasCurrentDaySnapshots = parsedRows.some((row) => toLocalDateKey(row.date) === localDate);
+  const currentDaySnapshotCount = parsedRows.filter((row) => toLocalDateKey(row.date) === localDate).length;
+  const hasCurrentDaySnapshots = currentDaySnapshotCount > 0;
   const anomalyMessages: string[] = [];
 
   if (!hasCurrentDaySnapshots && latestSnapshotDate) {
@@ -259,12 +263,24 @@ function readMonitoringDiagnostics(now: Date, metricScope: MetricScope) {
 
   return {
     anomalyMessages,
+    currentDaySnapshotCount,
     hasCurrentDaySnapshots,
     latestSnapshotAt: latestRow?.capturedAt ?? null,
     latestSnapshotDate,
     localDate,
-    metricScope
+    metricScope,
+    snapshotCount: parsedRows.length,
+    snapshotSampleLimit: MONITORING_DIAGNOSTICS_SAMPLE_LIMIT
   };
+}
+
+function isMonitoringDiagnosticsScope(value: unknown): value is MonitoringDiagnosticsScope {
+  return value === "all" || isMetricScope(value);
+}
+
+function readMonitoringDiagnosticsSummaries(now: Date, requestedScope: MonitoringDiagnosticsScope) {
+  const scopes: MetricScope[] = requestedScope === "all" ? ["cl", "kn", "global"] : [requestedScope];
+  return scopes.map((metricScope) => readMonitoringDiagnostics(now, metricScope));
 }
 
 function deleteTodayTrendSnapshots(now: Date, metricScope: MetricScope) {
@@ -441,6 +457,27 @@ export function buildDataSourceOverview(
 }
 
 const dataSourceRoute: FastifyPluginAsync = async (app) => {
+  app.get<{ Querystring: { metricScope?: unknown } }>("/api/data-source/monitoring-diagnostics", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+
+    if (!isMonitoringDiagnosticsScope(request.query.metricScope)) {
+      return reply.status(400).send({
+        code: "INVALID_METRIC_SCOPE",
+        error: "Monitoring diagnostics metricScope must be cl, kn, global, or all",
+        success: false
+      });
+    }
+
+    const now = new Date();
+    return {
+      generatedAt: now.toISOString(),
+      requestedScope: request.query.metricScope,
+      summaries: readMonitoringDiagnosticsSummaries(now, request.query.metricScope)
+    };
+  });
+
   app.get<{ Querystring: { metricScope?: unknown } }>("/api/data-source/overview", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
       return app.managementAccess.deny(reply);
@@ -481,6 +518,7 @@ const dataSourceRoute: FastifyPluginAsync = async (app) => {
     reply.send({
       data: {
         deletedSnapshots: result.deletedSnapshots,
+        metricScope: request.body.metricScope,
         resetAt: new Date().toISOString(),
         resetDate: result.resetDate
       },

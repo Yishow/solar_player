@@ -584,26 +584,30 @@ export async function getDisplayCardData() {
   return requestJson<DisplayCardDataResponse>("/api/display-card-data");
 }
 
-export async function saveDisplayCardOverride(targetId: string, displayValue: number) {
+export async function saveDisplayCardOverride(
+  targetId: string,
+  metricScope: MetricScope,
+  displayValue: number
+) {
   const response = await requestJson<{
     row: DisplayCardDataResponse["rows"][number];
     success: boolean;
   }>(
     `/api/display-card-data/overrides/${encodeURIComponent(targetId)}`,
     {
-      body: JSON.stringify({ displayValue }),
+      body: JSON.stringify({ displayValue, metricScope }),
       method: "PUT"
     }
   );
   return response.row;
 }
 
-export async function clearDisplayCardOverride(targetId: string) {
+export async function clearDisplayCardOverride(targetId: string, metricScope: MetricScope) {
   const response = await requestJson<{
     row: DisplayCardDataResponse["rows"][number];
     success: boolean;
   }>(
-    `/api/display-card-data/overrides/${encodeURIComponent(targetId)}`,
+    `/api/display-card-data/overrides/${encodeURIComponent(targetId)}?metricScope=${encodeURIComponent(metricScope)}`,
     {
       method: "DELETE"
     }
@@ -1043,11 +1047,13 @@ export type DataSourceOverviewResponse = {
   };
   monitoring: {
     anomalyMessages: string[];
+    currentDaySnapshotCount?: number;
     hasCurrentDaySnapshots: boolean;
     latestSnapshotAt: string | null;
     latestSnapshotDate: string | null;
     localDate: string;
     metricScope: MetricScope;
+    snapshotCount?: number;
   };
   weather: {
     status: "ready";
@@ -1076,6 +1082,66 @@ export type DataSourceOverviewResponse = {
     title: string;
   }>;
   warnings: string[];
+};
+
+export type MonitoringDiagnosticsScope = MetricScope | "all";
+
+export type MonitoringDiagnosticsSummary = {
+  anomalyMessages: string[];
+  currentDaySnapshotCount: number;
+  hasCurrentDaySnapshots: boolean;
+  latestSnapshotAt: string | null;
+  latestSnapshotDate: string | null;
+  localDate: string;
+  metricScope: MetricScope;
+  snapshotCount: number;
+  snapshotSampleLimit: number;
+};
+
+export type MonitoringDiagnosticsResponse = {
+  generatedAt: string;
+  requestedScope: MonitoringDiagnosticsScope;
+  summaries: MonitoringDiagnosticsSummary[];
+};
+
+export type DataHubEnergyHistoryRange = "day" | "week" | "month" | "year" | "total";
+
+export type DataHubEnergyHistoryResponse = {
+  counters: Array<{
+    lastUpdated: string | null;
+    metricKey: string;
+    resetCount: number;
+    totalValue: number | null;
+  }>;
+  metricScope: MetricScope;
+  range: DataHubEnergyHistoryRange;
+  snapshots: Array<{
+    capturedAt: string;
+    co2: number | null;
+    consumption: number | null;
+    efficiency: number | null;
+    generation: number | null;
+    ratio: number | null;
+    selfConsumption: number | null;
+  }>;
+  summaries: Array<{
+    co2Total: number | null;
+    consumptionTotal: number | null;
+    date: string;
+    generationTotal: number | null;
+    peakConsumption: number | null;
+    peakConsumptionTime: string | null;
+    peakGeneration: number | null;
+    peakGenerationTime: string | null;
+    selfConsumptionTotal: number | null;
+  }>;
+};
+
+export type ResetTodayTrendResponse = {
+  deletedSnapshots: number;
+  metricScope: MetricScope;
+  resetAt: string;
+  resetDate: string;
 };
 
 export type CalculationSettings = {
@@ -1109,6 +1175,15 @@ export async function getDerivedMetricDefinitions() {
     "/api/derived-metrics"
   );
   return response.definitions;
+}
+
+export async function getDerivedMetricDefinition(metricKey: string, metricScope: MetricScope) {
+  return requestJson<{
+    definition: DerivedMetricDefinition;
+    evaluation: DerivedMetricEvaluation | null;
+  }>(
+    `/api/derived-metrics/${encodeURIComponent(metricKey)}?scope=${encodeURIComponent(metricScope)}`
+  );
 }
 
 export async function saveDerivedMetricDefinition(definition: DerivedMetricDefinition) {
@@ -1160,13 +1235,26 @@ export async function getDataSourceOverview(metricScope: MetricScope = "global")
   );
 }
 
+export async function getMonitoringDiagnostics(metricScope: MonitoringDiagnosticsScope = "all") {
+  return requestJson<MonitoringDiagnosticsResponse>(
+    `/api/data-source/monitoring-diagnostics?metricScope=${encodeURIComponent(metricScope)}`
+  );
+}
+
+export async function getEnergyHistory(
+  metricScope: MetricScope,
+  range: DataHubEnergyHistoryRange
+) {
+  const query = new URLSearchParams({
+    metricScope,
+    range
+  });
+  return requestJson<DataHubEnergyHistoryResponse>(`/api/data-hub/energy-history?${query.toString()}`);
+}
+
 export async function resetTodayTrend(metricScope: MetricScope) {
   const response = await requestJson<{
-    data: {
-      deletedSnapshots: number;
-      resetAt: string;
-      resetDate: string;
-    };
+    data: ResetTodayTrendResponse;
     success: boolean;
   }>("/api/data-source/reset-today-trend", {
     body: JSON.stringify({ metricScope }),

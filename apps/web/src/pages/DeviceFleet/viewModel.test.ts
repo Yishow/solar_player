@@ -114,6 +114,15 @@ test("buildDeviceFleetViewModel keeps 50 stable rows and filters by identity", (
     waiting: 0
   });
   assert.equal(model.rows[0]?.groupId, devices[0]?.groupId);
+  assert.equal(model.rows[0]?.groupEnabled, true);
+  assert.equal(
+    model.rows[0]?.playbackProfileId,
+    devices[0]?.group?.playbackProfileId
+  );
+  assert.equal(
+    model.rows[0]?.playbackProfileName,
+    devices[0]?.group?.playbackProfile.name
+  );
   assert.equal(
     buildDeviceFleetViewModel({
       devices,

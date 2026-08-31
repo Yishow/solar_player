@@ -38,7 +38,11 @@ test("router preloads settings editable models before mounting settings pages", 
   assert.doesNotMatch(routerSource, /import \{ CircuitSettings, loadCircuitSettingsRoute \}/);
   assert.match(
     routerSource,
-    /path:\s*"settings\/data-source",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/data-source",[\s\S]*import\("\.\.\/pages\/DataSourceSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*DataSourceSettings/s
+    /path:\s*"settings\/data-source",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-source"\)/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"settings\/data-hub",[\s\S]*import\("\.\.\/pages\/DataHub"\)[\s\S]*Component:\s*DataHub/s
   );
   assert.match(
     routerSource,
@@ -50,7 +54,7 @@ test("router preloads settings editable models before mounting settings pages", 
   );
   assert.match(
     routerSource,
-    /path:\s*"settings\/mqtt",\s*loader:\s*createLazyManagementRouteLoader\(\s*"settings\/mqtt",[\s\S]*import\("\.\.\/pages\/MqttSettings"\)[\s\S]*lazy:\s*async\s*\(\)\s*=>\s*\{[\s\S]*Component:\s*MqttSettings/s
+    /path:\s*"settings\/mqtt",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/mqtt"\)/s
   );
   assert.match(
     routerSource,

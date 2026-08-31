@@ -17,6 +17,7 @@ import {
   applyManagedAssetSelectionToRegionConfig,
   applyManagedAssetSelectionToShellDraft,
   DisplayPagesEditor,
+  resolveDisplayEditorDeepLink,
   resolveDisplayPageObjectAssetOptions,
   restoreRegionSourceToSeedDefault,
   type DisplayEditorPageDefinition
@@ -83,6 +84,59 @@ const initialShellDecorationDraft: ShellDecorationEnvelope = {
   updatedAt: "2026-05-26T00:00:00.000Z",
   version: 3
 };
+
+test("display editor deep links select only an existing data-capable item on the requested page", () => {
+  assert.deepEqual(
+    resolveDisplayEditorDeepLink({
+      items: [{ hasDataBinding: true, id: "overview-kpi-power" }],
+      requestedItemId: "overview-kpi-power",
+      requestedPageId: "overview",
+      requestedTab: "data",
+      selectedPageId: "overview"
+    }),
+    { itemId: "overview-kpi-power", pageId: "overview", rightTab: "data" }
+  );
+  assert.equal(
+    resolveDisplayEditorDeepLink({
+      items: [{ hasDataBinding: false, id: "overview-hero-media" }],
+      requestedItemId: "overview-hero-media",
+      requestedPageId: "overview",
+      requestedTab: "data",
+      selectedPageId: "overview"
+    }),
+    null
+  );
+  assert.equal(
+    resolveDisplayEditorDeepLink({
+      items: [{ hasDataBinding: true, id: "overview-kpi-power" }],
+      requestedItemId: "missing",
+      requestedPageId: "overview",
+      requestedTab: "data",
+      selectedPageId: "overview"
+    }),
+    null
+  );
+  assert.equal(
+    resolveDisplayEditorDeepLink({
+      items: [{ hasDataBinding: true, id: "overview-kpi-power" }],
+      requestedItemId: "overview-kpi-power",
+      requestedPageId: "overview",
+      requestedTab: "source",
+      selectedPageId: "overview"
+    }),
+    null
+  );
+  assert.equal(
+    resolveDisplayEditorDeepLink({
+      items: [{ hasDataBinding: true, id: "overview-kpi-power" }],
+      requestedItemId: "overview-kpi-power",
+      requestedPageId: "invalid",
+      requestedTab: "data",
+      selectedPageId: "overview"
+    }),
+    null
+  );
+});
 
 function withMockWindow<T>(windowValue: Window & typeof globalThis, callback: () => T) {
   const target = globalThis as typeof globalThis & { window?: Window & typeof globalThis };

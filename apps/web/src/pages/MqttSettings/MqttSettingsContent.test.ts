@@ -158,7 +158,7 @@ test("mqtt settings content renders per-row publish controls for topic mappings"
   const html = renderContent({
     publishTopicValue: async () => undefined,
     topicPublishDrafts: {
-      selfConsumptionEnergy: "1200"
+      "cl:selfConsumptionEnergy": "1200"
     },
     topics: [
       {
@@ -230,7 +230,7 @@ test("mqtt settings content requires saving topic mapping drafts before publishi
     publishTopicValue: async () => undefined,
     topicMappingsDirty: true,
     topicPublishDrafts: {
-      selfConsumptionEnergy: "1200"
+      "cl:selfConsumptionEnergy": "1200"
     },
     topics: [
       {
@@ -254,6 +254,64 @@ test("mqtt settings content requires saving topic mapping drafts before publishi
 
   assert.match(html, /data-mqtt-publish-row="selfConsumptionEnergy"[^>]*data-mqtt-publish-disabled="true"/);
   assert.match(html, /請先儲存 topic mapping/);
+});
+
+test("mqtt topic workspace isolates same-key drafts and busy state by metric scope", () => {
+  const topics = [
+    {
+      enabled: true,
+      id: 1,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "realTimePower",
+      metricScope: "cl" as const,
+      nameEn: null,
+      nameZh: null,
+      quality: null,
+      rawPayload: null,
+      topic: "factory/cl/power",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    },
+    {
+      enabled: true,
+      id: 2,
+      lastReceivedAt: null,
+      lastValue: null,
+      metricKey: "realTimePower",
+      metricScope: "kn" as const,
+      nameEn: null,
+      nameZh: null,
+      quality: null,
+      rawPayload: null,
+      topic: "factory/kn/power",
+      unit: "kW",
+      updatedAt: null,
+      valuePath: "$.value"
+    }
+  ];
+  const html = renderContent({
+    activeTopicWorkspaceTab: "topic",
+    publishTopicValue: async () => undefined,
+    publishingTopicKey: "kn:realTimePower",
+    topicPublishDrafts: {
+      "cl:realTimePower": "101",
+      "kn:realTimePower": "202"
+    },
+    topics
+  });
+  const rows = [...html.matchAll(/data-mqtt-row="editable-topic-row"/g)].map((match) => match.index ?? -1);
+  assert.equal(rows.length, 2);
+
+  const clRow = html.slice(rows[0], rows[1]);
+  const knRow = html.slice(rows[1]);
+  assert.match(clRow, /value="101"/);
+  assert.match(clRow, /data-mqtt-publish-disabled="false"/);
+  assert.doesNotMatch(clRow, /發佈中\.\.\./);
+  assert.match(knRow, /value="202"/);
+  assert.match(knRow, /data-mqtt-publish-disabled="true"/);
+  assert.match(knRow, /發佈中\.\.\./);
 });
 
 test("mqtt settings content combines source mode and topic controls into a three-tab workspace", () => {
@@ -288,6 +346,65 @@ test("mqtt settings content combines source mode and topic controls into a three
   assert.match(html, /data-mqtt-row="editable-topic-row"/);
   assert.doesNotMatch(html, /data-mqtt-section="source-mode-card"/);
   assert.doesNotMatch(html, /class="[^"]*mqtt-mode/);
+});
+
+test("Connections surface renders only central broker controls", () => {
+  const html = renderContent({ surface: "connections" });
+
+  assert.match(html, /<em>Connections<\/em>/);
+  assert.match(html, /Broker Host|主機/);
+  assert.doesNotMatch(html, /Topic workspace views/);
+  assert.doesNotMatch(html, /data-mqtt-section="weather-card"/);
+});
+
+test("MQTT operations surface keeps topic and card-data actions without broker or weather controls", () => {
+  const html = renderContent({
+    surface: "operations",
+    activeTopicWorkspaceTab: "topic",
+    topics: [
+      {
+        enabled: true,
+        id: 1,
+        lastReceivedAt: "2026-05-23T09:31:00.000Z",
+        lastValue: 42,
+        metricKey: "realTimePower",
+        metricScope: "cl" as const,
+        nameEn: null,
+        nameZh: "即時發電功率",
+        quality: "good",
+        rawPayload: null,
+        topic: "kuozui/plant/solar/power",
+        unit: "kW",
+        updatedAt: "2026-05-23T09:31:00.000Z",
+        valuePath: "$.value"
+      }
+    ]
+  });
+
+  assert.match(html, /<em>MQTT Operations<\/em>/);
+  assert.match(html, /data-mqtt-workspace-tab="topic"/);
+  assert.match(html, /data-mqtt-workspace-tab="card-data"/);
+  assert.match(html, /data-mqtt-row="editable-topic-row"/);
+  assert.match(html, /新增 mapping/);
+  assert.match(html, /Reload topics/);
+  assert.match(html, /Save mappings/);
+  assert.doesNotMatch(html, /data-mqtt-workspace-tab="source"/);
+  assert.doesNotMatch(html, /Broker Host|Broker 主機/);
+  assert.doesNotMatch(html, /Test Connection|Test connection/);
+  assert.doesNotMatch(html, /Save Settings|Save settings/);
+  assert.doesNotMatch(html, /data-mqtt-section="weather-card"/);
+});
+
+test("MQTT operations surface guards against rendering the broker source tab", () => {
+  const html = renderContent({
+    surface: "operations",
+    activeTopicWorkspaceTab: "source"
+  });
+
+  assert.match(html, /data-mqtt-workspace-tab="topic"/);
+  assert.doesNotMatch(html, /data-mqtt-workspace-tab="source"/);
+  assert.doesNotMatch(html, /data-mqtt-section="source-mode-card"/);
+  assert.doesNotMatch(html, /Broker 主機/);
 });
 
 test("mqtt settings content filters Factory Circuit topic mappings by active factory site", () => {
@@ -471,7 +588,7 @@ test("mqtt settings content renders card data diagnostics in the third workspace
     activeTopicWorkspaceTab: "card-data",
     publishTopicValue: async () => undefined,
     topicPublishDrafts: {
-      realTimePower: "60"
+      "cl:realTimePower": "60"
     },
     cardDataRows: [
       {
@@ -603,6 +720,72 @@ test("mqtt settings content renders card data diagnostics in the third workspace
   assert.match(html, /Registry r3 · cl · ready · fresh/);
   assert.match(html, /Registry Provenance/);
   assert.match(html, /setting\/householdDailyUsageKwh@2026-07-08T08:00:00.000Z/);
+});
+
+test("mqtt card data actions isolate same-key drafts and busy state by metric scope", () => {
+  const cardDataRows: NonNullable<React.ComponentProps<typeof MqttSettingsContent>["cardDataRows"]> = [
+    {
+      actions: [{ metricKey: "realTimePower", metricScope: "cl" as const, type: "publish-test-value" }],
+      aggregateSource: null,
+      calculationFields: [],
+      cardId: "overview.realTimePower",
+      dependencies: [],
+      displayValue: "101.0",
+      formula: null,
+      label: "CL 即時發電功率",
+      lastUpdatedAt: null,
+      metricKey: "realTimePower",
+      metricScope: "cl" as const,
+      originalValue: "101.0",
+      override: null,
+      pageId: "overview",
+      sourceClassification: "mqtt-live",
+      sourceTopics: [],
+      status: "ready",
+      unit: "kW"
+    },
+    {
+      actions: [{ metricKey: "realTimePower", metricScope: "kn" as const, type: "publish-test-value" }],
+      aggregateSource: null,
+      calculationFields: [],
+      cardId: "solar.realTimePower",
+      dependencies: [],
+      displayValue: "202.0",
+      formula: null,
+      label: "KN 即時發電功率",
+      lastUpdatedAt: null,
+      metricKey: "realTimePower",
+      metricScope: "kn" as const,
+      originalValue: "202.0",
+      override: null,
+      pageId: "solar",
+      sourceClassification: "mqtt-live",
+      sourceTopics: [],
+      status: "ready",
+      unit: "kW"
+    }
+  ];
+  const html = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    cardDataRows,
+    publishTopicValue: async () => undefined,
+    publishingTopicKey: "kn:realTimePower",
+    topicPublishDrafts: {
+      "cl:realTimePower": "101",
+      "kn:realTimePower": "202"
+    }
+  });
+  const rows = [...html.matchAll(/data-mqtt-card-data-row-key="[^"]+"/g)].map((match) => match.index ?? -1);
+  assert.equal(rows.length, 2);
+
+  const clRow = html.slice(rows[0], rows[1]);
+  const knRow = html.slice(rows[1]);
+  assert.match(clRow, /value="101"/);
+  assert.match(clRow, /data-mqtt-card-publish-disabled="false"/);
+  assert.doesNotMatch(clRow, /發佈中\.\.\./);
+  assert.match(knRow, /value="202"/);
+  assert.match(knRow, /data-mqtt-card-publish-disabled="true"/);
+  assert.match(knRow, /發佈中\.\.\./);
 });
 
 test("mqtt settings content labels Guanyin Factory Circuit card diagnostics distinctly", () => {
@@ -774,12 +957,12 @@ test("mqtt settings content renders display override controls and invalid numeri
     handleOverrideDraftChange: () => undefined,
     handleTopicPublishDraftChange: () => undefined,
     overrideDrafts: {
-      "overview.realTimePower": "good looking"
+      "cl:overview.realTimePower": "good looking"
     },
     publishTopicValue: async () => undefined,
     saveDisplayOverride: async () => undefined,
     topicPublishDrafts: {
-      realTimePower: "60"
+      "cl:realTimePower": "60"
     },
     cardDataRows: [
       {
@@ -820,6 +1003,7 @@ test("mqtt settings content renders display override controls and invalid numeri
   });
 
   assert.match(html, /data-mqtt-card-override-row="overview\.realTimePower"/);
+  assert.match(html, /data-mqtt-card-override-row-key="cl:overview\.realTimePower"/);
   assert.match(html, /data-mqtt-card-publish-row="realTimePower"/);
   assert.ok(
     html.indexOf('data-mqtt-card-override-row="overview.realTimePower"') <
@@ -1032,7 +1216,7 @@ test("mqtt settings content merges topic editing, runtime, and coverage into one
       liveMetricsConnectionState: "connected",
       liveMetricsSnapshot: {
         metrics: {
-          realTimePower: {
+          "cl:realTimePower": {
             quality: "good",
             timestamp: "2026-05-23T09:31:00.000Z",
             unit: "kW",

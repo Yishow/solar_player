@@ -1,11 +1,13 @@
 import type {
   DerivedMetricDefinition,
+  DerivedMetricEvaluation,
   DerivedMetricInput,
   DerivedMetricScopeSelector,
   MetricScope
 } from "@solar-display/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  getDerivedMetricDefinition,
   getDerivedMetricDefinitions,
   previewDerivedMetricDefinition,
   saveDerivedMetricDefinition,
@@ -42,6 +44,7 @@ function cloneDefinition(definition: DerivedMetricDefinition): DerivedMetricDefi
 }
 
 type DerivedMetricRegistryApi = {
+  getDefinition: typeof getDerivedMetricDefinition;
   getDefinitions: typeof getDerivedMetricDefinitions;
   preview: typeof previewDerivedMetricDefinition;
   save: typeof saveDerivedMetricDefinition;
@@ -49,24 +52,97 @@ type DerivedMetricRegistryApi = {
 };
 
 const defaultApi: DerivedMetricRegistryApi = {
+  getDefinition: getDerivedMetricDefinition,
   getDefinitions: getDerivedMetricDefinitions,
   preview: previewDerivedMetricDefinition,
   save: saveDerivedMetricDefinition,
   setEnabled: setDerivedMetricEnabled
 };
 
+type DerivedMetricEvaluationRow = {
+  evaluation: DerivedMetricEvaluation | null;
+  metricScope: MetricScope;
+};
+
+function evaluationScopes(definition: DerivedMetricDefinition): MetricScope[] {
+  if (definition.outputScopePolicy === "global") return ["global"];
+  return definition.siteScopes && definition.siteScopes.length > 0
+    ? [...definition.siteScopes]
+    : ["cl", "kn"];
+}
+
+function definitionStatus(definition: DerivedMetricDefinition) {
+  return `${definition.managed ? "Managed" : "Custom"} · ${definition.enabled ? "Enabled" : "Disabled"}`;
+}
+
+function evaluationStatusLabel(status: DerivedMetricEvaluation["status"] | null) {
+  if (status === "ready") return "Ready";
+  if (status === "degraded") return "Degraded";
+  return "Unavailable";
+}
+
+function freshnessLabel(state: DerivedMetricEvaluation["freshnessState"] | null) {
+  if (state === "fresh") return "Fresh";
+  if (state === "stale") return "Stale";
+  return "Unavailable";
+}
+
 export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: DerivedMetricRegistryApi }) {
   const [definitions, setDefinitions] = useState<DerivedMetricDefinition[]>([]);
   const [draft, setDraft] = useState<DerivedMetricDefinition>(createDraft);
+  const [evaluationRows, setEvaluationRows] = useState<DerivedMetricEvaluationRow[]>([]);
+  const [evaluationLoading, setEvaluationLoading] = useState(false);
+  const evaluationRequestGeneration = useRef(0);
   const [message, setMessage] = useState("載入衍生指標定義中…");
   const [busy, setBusy] = useState(false);
+
+  const loadEvaluations = async (definition: DerivedMetricDefinition): Promise<boolean> => {
+    const requestGeneration = evaluationRequestGeneration.current + 1;
+    evaluationRequestGeneration.current = requestGeneration;
+    setEvaluationRows([]);
+    setEvaluationLoading(true);
+    const scopes = evaluationScopes(definition);
+    try {
+      const details = await Promise.all(
+        scopes.map((metricScope) => api.getDefinition(definition.metricKey, metricScope))
+      );
+      if (requestGeneration !== evaluationRequestGeneration.current) return false;
+      setEvaluationRows(details.map((detail, index) => ({
+        evaluation: detail.evaluation,
+        metricScope: scopes[index]!
+      })));
+      return true;
+    } catch (error) {
+      if (requestGeneration !== evaluationRequestGeneration.current) return false;
+      throw error;
+    } finally {
+      if (requestGeneration === evaluationRequestGeneration.current) {
+        setEvaluationLoading(false);
+      }
+    }
+  };
 
   const reload = async (selectedKey?: string) => {
     const next = await api.getDefinitions();
     setDefinitions(next);
     const selected = next.find(({ metricKey }) => metricKey === selectedKey) ?? next[0];
-    if (selected) setDraft(cloneDefinition(selected));
+    if (selected) {
+      setDraft(cloneDefinition(selected));
+      const loaded = await loadEvaluations(selected);
+      if (!loaded) return;
+    } else {
+      setEvaluationRows([]);
+    }
     setMessage("");
+  };
+
+  const selectDefinition = async (definition: DerivedMetricDefinition) => {
+    setDraft(cloneDefinition(definition));
+    try {
+      if (await loadEvaluations(definition)) setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "無法載入衍生指標 evaluation。");
+    }
   };
 
   useEffect(() => {
@@ -101,7 +177,13 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
       {message ? <OpsInfoBanner className="mt-4" title="Registry 狀態" detail={message} tone="warning" /> : null}
       <div className="mt-4 grid gap-4 lg:grid-cols-[260px_1fr]">
         <div className="space-y-2">
-          <button className="mgmt-action w-full" type="button" onClick={() => setDraft(createDraft())}>
+          <button className="mgmt-action w-full" type="button" onClick={() => {
+            evaluationRequestGeneration.current += 1;
+            setDraft(createDraft());
+            setEvaluationRows([]);
+            setEvaluationLoading(false);
+            setMessage("");
+          }}>
             新增 custom 指標
           </button>
           {definitions.map((definition) => (
@@ -109,7 +191,7 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
               className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${draft.metricKey === definition.metricKey ? "border-[#5d7745] bg-[#f4f8f1]" : "border-black/10 bg-white"}`}
               key={definition.metricKey}
               type="button"
-              onClick={() => setDraft(cloneDefinition(definition))}
+              onClick={() => void selectDefinition(definition)}
             >
               <span className="block font-semibold">{definition.name}</span>
               <span className="block font-mono text-[11px] text-[#6e746f]">{definition.metricKey}</span>
@@ -117,6 +199,11 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
           ))}
         </div>
         <div className="mgmt-card space-y-4 p-5">
+          <div className="grid gap-3 text-sm sm:grid-cols-3" data-derived-definition-status>
+            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Revision:</span><strong>r{draft.revision}</strong></div>
+            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Status:</span><strong>{definitionStatus(draft)}</strong></div>
+            <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">Applicable scopes:</span><strong>{evaluationScopes(draft).join(" / ").toUpperCase()}</strong></div>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs">Metric key<input className={inputClass} disabled={draft.managed || draft.revision > 0} value={draft.metricKey} onChange={(event) => setDraft({ ...draft, metricKey: event.target.value })} /></label>
             <label className="text-xs">名稱<input className={inputClass} disabled={draft.managed} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
@@ -149,6 +236,30 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
             ))}
             {!draft.managed ? <button className="mgmt-action" type="button" onClick={() => setDraft({ ...draft, inputs: [...draft.inputs, { alias: `input${draft.inputs.length + 1}`, kind: "metric", metricKey: "realTimePower", scope: draft.outputScopePolicy === "site" ? "output-site" : "global", unit: "kW" }] })}>新增輸入</button> : null}
           </div>
+          <section className="space-y-2 border-t border-[#e1e8e2] pt-4" data-derived-evaluations>
+            <div>
+              <h3 className="text-sm font-semibold text-[#27322b]">Current evaluation</h3>
+              <p className="text-xs text-[#687169]">由已儲存 definition 的 scope-specific runtime evaluation 提供；Preview 不會取代目前狀態。</p>
+            </div>
+            {evaluationLoading ? <p className="text-sm text-[#687169]" role="status">載入目前 evaluation…</p> : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {evaluationRows.map(({ evaluation, metricScope }) => {
+                  const value = evaluation?.value === null || evaluation === null ? "--" : String(evaluation.value);
+                  const unit = evaluation?.outputUnit ?? draft.outputUnit;
+                  const status = evaluationStatusLabel(evaluation?.status ?? null);
+                  const freshness = freshnessLabel(evaluation?.freshnessState ?? null);
+                  return (
+                    <div className="rounded-lg border border-black/10 bg-white p-3 text-sm" data-derived-evaluation-scope={metricScope} key={metricScope}>
+                      <div className="flex items-center justify-between gap-2"><strong>{metricScope.toUpperCase()}</strong><span>{status}</span></div>
+                      <div>Value: {value} {unit}</div>
+                      <div>Freshness: {freshness}</div>
+                      {evaluation?.failureCode ? <div>Failure: {evaluation.failureCode}</div> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
           <OpsActionRow>
             <button className="mgmt-action" disabled={busy} type="button" onClick={() => void run(async () => {
               const scope: MetricScope = draft.outputScopePolicy === "global" ? "global" : "cl";

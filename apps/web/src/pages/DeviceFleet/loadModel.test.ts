@@ -7,6 +7,13 @@ import {
 } from "./loadModel";
 
 test("loadDeviceFleetModel preserves successful resources when one request fails", async () => {
+  const profiles = [{
+    archivedAt: null,
+    id: 1,
+    isDefault: true,
+    name: "Default Profile",
+    profileKey: "default"
+  }];
   const groups = [{
     desiredVersion: 1,
     enabled: true,
@@ -24,6 +31,7 @@ test("loadDeviceFleetModel preserves successful resources when one request fails
   const model = await loadDeviceFleetModel({
     getDevices: async () => [],
     getGroups: async () => groups,
+    getProfiles: async () => profiles,
     getLiveness: async () => {
       throw new Error("liveness unavailable");
     }
@@ -31,7 +39,7 @@ test("loadDeviceFleetModel preserves successful resources when one request fails
 
   assert.deepEqual(model.devices, []);
   assert.deepEqual(model.groups, groups);
-  assert.equal(model.defaultProfile?.id, 1);
+  assert.deepEqual(model.profiles, profiles);
   assert.equal(model.liveness, null);
   assert.deepEqual(model.unavailable, ["liveness"]);
 });
@@ -52,13 +60,16 @@ test("loadDeviceFleetModel identifies management trust loss", async () => {
     getGroups: async () => {
       throw denied;
     },
+    getProfiles: async () => {
+      throw denied;
+    },
     getLiveness: async () => {
       throw denied;
     }
   });
 
   assert.equal(model.accessDenied, true);
-  assert.deepEqual(model.unavailable, ["devices", "groups", "liveness"]);
+  assert.deepEqual(model.unavailable, ["devices", "groups", "liveness", "profiles"]);
 });
 
 test("runDeviceFleetMutation refreshes only named resources after success", async () => {

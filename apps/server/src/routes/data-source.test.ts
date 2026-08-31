@@ -271,6 +271,181 @@ test("GET /api/data-source/overview reports stale-day and suspicious nighttime g
   }
 });
 
+test("GET /api/data-source/monitoring-diagnostics keeps concrete scope summaries separate", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+
+  const now = new Date();
+  const today = toLocalDateKey(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "cl",
+    100,
+    `${toLocalDateKey(yesterday)} 10:00:00`
+  );
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "kn",
+    200,
+    `${today} 10:00:00`
+  );
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "global",
+    300,
+    `${today} 11:00:00`
+  );
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      headers: { "x-solar-management-token": "management-secret-value" },
+      method: "GET",
+      url: "/api/data-source/monitoring-diagnostics?metricScope=all"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      generatedAt: string;
+      requestedScope: string;
+      summaries: Array<{
+        anomalyMessages: string[];
+        currentDaySnapshotCount: number;
+        hasCurrentDaySnapshots: boolean;
+        latestSnapshotAt: string | null;
+        latestSnapshotDate: string | null;
+        localDate: string;
+        metricScope: string;
+        snapshotCount: number;
+        snapshotSampleLimit: number;
+      }>;
+    };
+
+    assert.equal(typeof body.generatedAt, "string");
+    assert.equal(body.requestedScope, "all");
+    assert.deepEqual(
+      body.summaries.map((summary) => ({
+        currentDaySnapshotCount: summary.currentDaySnapshotCount,
+        hasCurrentDaySnapshots: summary.hasCurrentDaySnapshots,
+        latestSnapshotDate: summary.latestSnapshotDate,
+        localDate: summary.localDate,
+        metricScope: summary.metricScope,
+        snapshotCount: summary.snapshotCount,
+        snapshotSampleLimit: summary.snapshotSampleLimit
+      })),
+      [
+        {
+          currentDaySnapshotCount: 0,
+          hasCurrentDaySnapshots: false,
+          latestSnapshotDate: toLocalDateKey(yesterday),
+          localDate: today,
+          metricScope: "cl",
+          snapshotCount: 1,
+          snapshotSampleLimit: 2000
+        },
+        {
+          currentDaySnapshotCount: 1,
+          hasCurrentDaySnapshots: true,
+          latestSnapshotDate: today,
+          localDate: today,
+          metricScope: "kn",
+          snapshotCount: 1,
+          snapshotSampleLimit: 2000
+        },
+        {
+          currentDaySnapshotCount: 1,
+          hasCurrentDaySnapshots: true,
+          latestSnapshotDate: today,
+          localDate: today,
+          metricScope: "global",
+          snapshotCount: 1,
+          snapshotSampleLimit: 2000
+        }
+      ]
+    );
+    assert.equal(body.summaries[0]?.anomalyMessages.some((message) => message.includes("尚無今日 snapshot")), true);
+    assert.equal(body.summaries[1]?.anomalyMessages.some((message) => message.includes("尚無今日 snapshot")), false);
+    assert.equal(body.summaries[2]?.anomalyMessages.some((message) => message.includes("尚無今日 snapshot")), false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/data-source/monitoring-diagnostics requires a valid scope and isolates concrete reads", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('cl', ?, CURRENT_TIMESTAMP)").run(100);
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES ('kn', ?, CURRENT_TIMESTAMP)").run(200);
+  const app = await buildApp();
+
+  try {
+    for (const metricScope of [undefined, "bogus"]) {
+      const query = metricScope ? `?metricScope=${metricScope}` : "";
+      const response = await app.inject({
+        headers: { "x-solar-management-token": "management-secret-value" },
+        method: "GET",
+        url: `/api/data-source/monitoring-diagnostics${query}`
+      });
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json<{ code: string }>().code, "INVALID_METRIC_SCOPE");
+    }
+
+    const response = await app.inject({
+      headers: { "x-solar-management-token": "management-secret-value" },
+      method: "GET",
+      url: "/api/data-source/monitoring-diagnostics?metricScope=cl"
+    });
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      requestedScope: string;
+      summaries: Array<{ metricScope: string; snapshotCount: number; snapshotSampleLimit: number }>;
+    };
+    assert.equal(body.requestedScope, "cl");
+    assert.deepEqual(body.summaries.map(({ metricScope, snapshotCount, snapshotSampleLimit }) => ({
+      metricScope,
+      snapshotCount,
+      snapshotSampleLimit
+    })), [{
+      metricScope: "cl",
+      snapshotCount: 1,
+      snapshotSampleLimit: 2000
+    }]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/data-source/monitoring-diagnostics denies untrusted management callers", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      headers: {
+        host: "player.example",
+        origin: "https://evil.example"
+      },
+      method: "GET",
+      url: "/api/data-source/monitoring-diagnostics?metricScope=all"
+    });
+
+    assert.equal(response.statusCode, 403);
+    const serialized = JSON.stringify(response.json());
+    assert.equal(serialized.includes("metric_snapshots"), false);
+    assert.equal(serialized.includes("summaries"), false);
+  } finally {
+    await app.close();
+  }
+});
+
 test("POST /api/data-source/reset-today-trend deletes only current-day snapshots", async () => {
   process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
   migrateDatabase();
@@ -354,6 +529,175 @@ test("POST /api/data-source/reset-today-trend deletes only current-day snapshots
   }
 });
 
+test("POST /api/data-source/reset-today-trend deletes only the selected CL scope and emits a scoped refresh", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const todayKey = toLocalDateKey(today);
+  const yesterdayKey = toLocalDateKey(yesterday);
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare("DELETE FROM live_metric_values").run();
+
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "cl",
+    101,
+    toLocalTimestamp(today, 1)
+  );
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "cl",
+    102,
+    toLocalTimestamp(yesterday, 1)
+  );
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "kn",
+    201,
+    toLocalTimestamp(today, 2)
+  );
+  database.prepare("INSERT INTO metric_snapshots (metric_scope, generation_power, captured_at) VALUES (?, ?, ?)").run(
+    "global",
+    301,
+    toLocalTimestamp(today, 3)
+  );
+  for (const [metricScope, generationTotal] of [["cl", 11], ["kn", 22], ["global", 33]] as const) {
+    database.prepare(
+      "INSERT INTO daily_energy_summaries (metric_scope, date, generation_total) VALUES (?, ?, ?)"
+    ).run(metricScope, todayKey, generationTotal);
+  }
+  for (const [metricScope, totalValue] of [["cl", 111], ["kn", 222], ["global", 333]] as const) {
+    database.prepare(
+      "INSERT INTO cumulative_counters (metric_scope, metric_key, total_value, last_updated, reset_count) VALUES (?, ?, ?, ?, ?)"
+    ).run(metricScope, "generation", totalValue, `${todayKey}T09:00:00.000Z`, 0);
+  }
+  for (const [metricScope, value] of [["cl", 1111], ["kn", 2222], ["global", 3333]] as const) {
+    database.prepare(
+      "INSERT INTO live_metric_values (metric_scope, metric_key, value, unit, timestamp, quality, raw_payload) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(metricScope, "realTimePower", value, "kW", `${todayKey}T09:00:00.000Z`, "good", JSON.stringify({ value }));
+  }
+
+  const app = await buildApp();
+  const dailySummariesBefore = database
+    .prepare("SELECT metric_scope, date, generation_total FROM daily_energy_summaries ORDER BY metric_scope")
+    .all();
+  const cumulativeCountersBefore = database
+    .prepare("SELECT metric_scope, metric_key, total_value, last_updated, reset_count FROM cumulative_counters ORDER BY metric_scope")
+    .all();
+  const liveMetricValuesBefore = database
+    .prepare("SELECT metric_scope, metric_key, value, unit, timestamp, quality, raw_payload FROM live_metric_values ORDER BY metric_scope")
+    .all();
+  const emittedEvents: unknown[] = [];
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  app.socketService.emitDisplaySync = ((payload) => {
+    emittedEvents.push(payload);
+  }) as typeof app.socketService.emitDisplaySync;
+
+  try {
+    const response = await app.inject({
+      body: { metricScope: "cl" },
+      headers: { "x-solar-management-token": "management-secret-value" },
+      method: "POST",
+      url: "/api/data-source/reset-today-trend"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as {
+      data: { deletedSnapshots: number; metricScope: string; resetAt: string; resetDate: string };
+      success: boolean;
+    };
+    assert.equal(body.success, true);
+    assert.deepEqual(
+      {
+        deletedSnapshots: body.data.deletedSnapshots,
+        metricScope: body.data.metricScope,
+        resetDate: body.data.resetDate
+      },
+      { deletedSnapshots: 1, metricScope: "cl", resetDate: todayKey }
+    );
+    assert.equal(typeof body.data.resetAt, "string");
+
+    const remainingSnapshots = database
+      .prepare("SELECT metric_scope, generation_power, captured_at FROM metric_snapshots ORDER BY metric_scope, captured_at")
+      .all();
+    assert.deepEqual(remainingSnapshots, [
+      { captured_at: toLocalTimestamp(yesterday, 1), generation_power: 102, metric_scope: "cl" },
+      { captured_at: toLocalTimestamp(today, 3), generation_power: 301, metric_scope: "global" },
+      { captured_at: toLocalTimestamp(today, 2), generation_power: 201, metric_scope: "kn" }
+    ]);
+    assert.deepEqual(
+      database.prepare("SELECT metric_scope, date, generation_total FROM daily_energy_summaries ORDER BY metric_scope").all(),
+      dailySummariesBefore
+    );
+    assert.deepEqual(
+      database.prepare("SELECT metric_scope, metric_key, total_value, last_updated, reset_count FROM cumulative_counters ORDER BY metric_scope").all(),
+      cumulativeCountersBefore
+    );
+    assert.deepEqual(
+      database.prepare("SELECT metric_scope, metric_key, value, unit, timestamp, quality, raw_payload FROM live_metric_values ORDER BY metric_scope").all(),
+      liveMetricValuesBefore
+    );
+
+    assert.equal(emittedEvents.length, 1);
+    const emitted = emittedEvents[0] as {
+      generatedAt: string;
+      metricScope: string;
+      reason: string;
+      scope: string;
+    };
+    assert.deepEqual(
+      { metricScope: emitted.metricScope, reason: emitted.reason, scope: emitted.scope },
+      { metricScope: "cl", reason: "today-trend-reset", scope: "monitoring-history" }
+    );
+    assert.equal(typeof emitted.generatedAt, "string");
+  } finally {
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
+    await app.close();
+  }
+});
+
+test("POST /api/data-source/reset-today-trend succeeds with zero deleted rows for a concrete scope", async () => {
+  process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      body: { metricScope: "kn" },
+      headers: { "x-solar-management-token": "management-secret-value" },
+      method: "POST",
+      url: "/api/data-source/reset-today-trend"
+    });
+
+    assert.equal(response.statusCode, 200);
+    const data = response.json().data as {
+      deletedSnapshots: number;
+      metricScope: string;
+      resetAt: string;
+      resetDate: string;
+    };
+    assert.deepEqual(
+      {
+        deletedSnapshots: data.deletedSnapshots,
+        metricScope: data.metricScope,
+        resetDate: data.resetDate
+      },
+      { deletedSnapshots: 0, metricScope: "kn", resetDate: toLocalDateKey(new Date()) }
+    );
+    assert.equal(typeof data.resetAt, "string");
+  } finally {
+    await app.close();
+  }
+});
+
 test("trend reset requires an explicit valid metric scope before deleting history", async () => {
   process.env.MANAGEMENT_ACCESS_TOKEN = "management-secret-value";
   migrateDatabase();
@@ -365,6 +709,11 @@ test("trend reset requires an explicit valid metric scope before deleting histor
     VALUES ('cl', 100, CURRENT_TIMESTAMP)
   `).run();
   const app = await buildApp();
+  const emittedEvents: unknown[] = [];
+  const originalEmitDisplaySync = app.socketService.emitDisplaySync.bind(app.socketService);
+  app.socketService.emitDisplaySync = ((payload) => {
+    emittedEvents.push(payload);
+  }) as typeof app.socketService.emitDisplaySync;
 
   try {
     for (const body of [{}, { metricScope: "all" }]) {
@@ -380,7 +729,9 @@ test("trend reset requires an explicit valid metric scope before deleting histor
 
     const count = database.prepare("SELECT COUNT(*) AS count FROM metric_snapshots").get() as { count: number };
     assert.equal(count.count, 1);
+    assert.deepEqual(emittedEvents, []);
   } finally {
+    app.socketService.emitDisplaySync = originalEmitDisplaySync;
     await app.close();
   }
 });

@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from "react";
-import type { DeviceGroup } from "@solar-display/shared";
+import type {
+  DeviceGroup,
+  PlaybackProfileSummary
+} from "@solar-display/shared";
 import {
   Chip,
   OpsInfoBanner,
@@ -10,6 +13,11 @@ import type {
   DeviceFleetRow,
   PairingDialogState
 } from "./viewModel";
+import {
+  GroupEditDialog,
+  type GroupEditInput
+} from "./GroupEditDialog";
+import { PairingDialog } from "./PairingDialog";
 
 type DeviceCreateInput = {
   clientId: string;
@@ -18,16 +26,23 @@ type DeviceCreateInput = {
   groupId: number;
 };
 
-type GroupCreateInput = {
+export type DeviceEditInput = {
+  displayName: string;
+  enabled: boolean;
+  groupId: number;
+};
+
+export type GroupCreateInput = {
   enabled: true;
   name: string;
-  playbackProfileId?: number;
+  playbackProfileId: number;
   siteScope: "cl" | "kn";
 };
 
 export type DeviceFleetContentProps = {
   accessDenied: boolean;
   filter: string;
+  profiles: PlaybackProfileSummary[];
   model: {
     groups: DeviceGroup[];
     rows: DeviceFleetRow[];
@@ -44,16 +59,17 @@ export type DeviceFleetContentProps = {
   mutationError: string;
   mutationPending: boolean;
   onClosePairing: () => void;
-  onCreateDevice: (input: DeviceCreateInput) => Promise<void>;
-  onCreateGroup: (input: GroupCreateInput) => Promise<void>;
-  onEditDevice: (row: DeviceFleetRow) => Promise<void>;
-  onEditGroup: (group: DeviceGroup) => Promise<void>;
+  onCreateDevice: (input: DeviceCreateInput) => Promise<boolean>;
+  onCreateGroup: (input: GroupCreateInput) => Promise<boolean | void>;
+  onEditDevice: (row: DeviceFleetRow, input: DeviceEditInput) => Promise<boolean | void>;
+  onEditGroup: (group: DeviceGroup, input: GroupEditInput) => Promise<boolean | void>;
   onFilterChange: (value: string) => void;
   onIssuePairing: (row: DeviceFleetRow) => Promise<void>;
+  onPreparePairing: (row: DeviceFleetRow) => void;
   onToggleDevice: (row: DeviceFleetRow) => Promise<void>;
   onToggleGroup: (group: DeviceGroup) => Promise<void>;
   pairing: PairingDialogState;
-  profileId: number | null;
+  pairingPreparation: DeviceFleetRow | null;
 };
 
 const stateLabels = {
@@ -78,6 +94,7 @@ export function DeviceFleetContent({
   accessDenied,
   filter,
   model,
+  profiles,
   mutationError,
   mutationPending,
   onClosePairing,
@@ -87,17 +104,27 @@ export function DeviceFleetContent({
   onEditGroup,
   onFilterChange,
   onIssuePairing,
+  onPreparePairing,
   onToggleDevice,
   onToggleGroup,
   pairing,
-  profileId
+  pairingPreparation
 }: DeviceFleetContentProps) {
   const [clientId, setClientId] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [deviceEditDisplayName, setDeviceEditDisplayName] = useState("");
+  const [deviceEditEnabled, setDeviceEditEnabled] = useState(true);
+  const [deviceEditGroupId, setDeviceEditGroupId] = useState("");
+  const [editingDevice, setEditingDevice] = useState<DeviceFleetRow | null>(null);
   const [groupId, setGroupId] = useState("");
   const [groupName, setGroupName] = useState("");
-  const [pairingCopied, setPairingCopied] = useState(false);
+  const [groupPlaybackProfileId, setGroupPlaybackProfileId] = useState("");
+  const [editingGroup, setEditingGroup] = useState<DeviceGroup | null>(null);
   const [siteScope, setSiteScope] = useState<"cl" | "kn">("cl");
+  const activeProfiles = profiles.filter((profile) => profile.archivedAt === null);
+  const defaultActiveProfile = activeProfiles.find((profile) => profile.isDefault);
+  const selectedCreateProfileId =
+    groupPlaybackProfileId || String(defaultActiveProfile?.id ?? "");
 
   const submitDevice = async (event: FormEvent) => {
     event.preventDefault();
@@ -105,49 +132,75 @@ export function DeviceFleetContent({
     if (!clientId.trim() || !displayName.trim() || !Number.isInteger(parsedGroupId)) {
       return;
     }
-    await onCreateDevice({
+    const saved = await onCreateDevice({
       clientId: clientId.trim(),
       displayName: displayName.trim(),
       enabled: true,
       groupId: parsedGroupId
     });
-    setClientId("");
-    setDisplayName("");
+    if (saved) {
+      setClientId("");
+      setDisplayName("");
+    }
   };
 
   const submitGroup = async (event: FormEvent) => {
     event.preventDefault();
-    if (!groupName.trim()) return;
-    await onCreateGroup({
+    const parsedProfileId = Number(selectedCreateProfileId);
+    if (
+      !groupName.trim()
+      || !Number.isInteger(parsedProfileId)
+      || !activeProfiles.some((profile) => profile.id === parsedProfileId)
+    ) return;
+    const saved = await onCreateGroup({
       enabled: true,
       name: groupName.trim(),
+      playbackProfileId: parsedProfileId,
       siteScope,
-      ...(profileId === null ? {} : { playbackProfileId: profileId })
     });
-    setGroupName("");
+    if (saved !== false) {
+      setGroupName("");
+    }
   };
 
-  const issuePairing = async (row: DeviceFleetRow) => {
-    if (
-      row.pairingAction === "re-pair"
-      && typeof window !== "undefined"
-      && !window.confirm("重新配對後，新 Credential 交換成功時會撤銷舊 Credential。確定繼續？")
-    ) {
-      return;
-    }
-    await onIssuePairing(row);
+  const openDeviceEdit = (row: DeviceFleetRow) => {
+    setEditingDevice(row);
+    setDeviceEditDisplayName(row.displayName);
+    setDeviceEditEnabled(row.enabled);
+    setDeviceEditGroupId(row.groupId === null ? "" : String(row.groupId));
   };
 
-  const copyPairingPath = async () => {
-    if (!pairing.issue || typeof navigator === "undefined" || !navigator.clipboard) {
+  const closeDeviceEdit = () => {
+    setEditingDevice(null);
+    setDeviceEditDisplayName("");
+    setDeviceEditGroupId("");
+  };
+
+  const submitDeviceEdit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editingDevice || !deviceEditDisplayName.trim()) return;
+
+    const parsedGroupId = Number(deviceEditGroupId);
+    const selectedGroup = model.groups.find((group) => group.id === parsedGroupId);
+    if (!selectedGroup || !Number.isInteger(parsedGroupId) || parsedGroupId <= 0) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(pairing.issue.pairingPath);
-      setPairingCopied(true);
-    } catch {
-      setPairingCopied(false);
+    if (deviceEditEnabled && !selectedGroup.enabled) {
+      return;
     }
+
+    const saved = await onEditDevice(editingDevice, {
+      displayName: deviceEditDisplayName.trim(),
+      enabled: deviceEditEnabled,
+      groupId: parsedGroupId
+    });
+    if (saved !== false) {
+      closeDeviceEdit();
+    }
+  };
+
+  const issuePairing = (row: DeviceFleetRow) => {
+    onPreparePairing(row);
   };
 
   if (accessDenied) {
@@ -200,7 +253,7 @@ export function DeviceFleetContent({
 
       <section className="device-fleet-page__forms" aria-label="新增資源">
         <OpsSurface family="operations">
-          <OpsSurfaceTitle title="新增群組" caption="Site Scope 與 Default Profile" />
+          <OpsSurfaceTitle title="新增群組" caption="Site Scope 與 Playback Profile" />
           <form onSubmit={submitGroup}>
             <label>
               群組名稱
@@ -221,7 +274,30 @@ export function DeviceFleetContent({
                 <option value="kn">KN 觀音</option>
               </select>
             </label>
-            <button type="submit" disabled={mutationPending}>
+            <label>
+              Playback Profile
+              <select
+                data-field="group-create-playback-profile"
+                value={selectedCreateProfileId}
+                onChange={(event) => setGroupPlaybackProfileId(event.target.value)}
+                disabled={mutationPending}
+              >
+                <option value="">選擇 active Playback Profile</option>
+                {activeProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name} · {profile.profileKey}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={
+                mutationPending
+                || !groupName.trim()
+                || !activeProfiles.some((profile) => profile.id === Number(selectedCreateProfileId))
+              }
+            >
               建立群組
             </button>
           </form>
@@ -256,7 +332,7 @@ export function DeviceFleetContent({
                 <option value="">選擇群組</option>
                 {model.groups.filter((group) => group.enabled).map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.name} · {group.siteScope.toUpperCase()}
+                    {group.name} · {group.siteScope.toUpperCase()} · {group.playbackProfile.name}
                   </option>
                 ))}
               </select>
@@ -284,8 +360,9 @@ export function DeviceFleetContent({
               </Chip>
               <button
                 type="button"
+                data-action="edit-group"
                 disabled={mutationPending}
-                onClick={() => void onEditGroup(group)}
+                onClick={() => setEditingGroup(group)}
               >
                 編輯
               </button>
@@ -378,8 +455,9 @@ export function DeviceFleetContent({
                       </button>
                       <button
                         type="button"
+                        data-action="edit-device"
                         disabled={mutationPending}
-                        onClick={() => void onEditDevice(row)}
+                        onClick={() => openDeviceEdit(row)}
                       >
                         編輯
                       </button>
@@ -399,38 +477,108 @@ export function DeviceFleetContent({
         ) : null}
       </OpsSurface>
 
-      {pairing.issue ? (
+      {editingDevice ? (
         <div className="device-fleet-dialog-backdrop" role="presentation">
           <section
-            aria-labelledby="device-fleet-pairing-title"
+            aria-labelledby="device-fleet-device-edit-title"
             aria-modal="true"
             className="device-fleet-dialog"
+            data-testid="device-edit-dialog"
             role="dialog"
           >
-            <small>ONE-TIME PAIRING</small>
-            <h2 id="device-fleet-pairing-title">一次性配對連結</h2>
-            <p>此連結只在本次建立後顯示；關閉視窗即從畫面記憶體清除。</p>
-            <code>{pairing.issue.pairingPath}</code>
-            <small>到期：{pairing.issue.expiresAt}</small>
-            <button
-              type="button"
-              data-action="copy-pairing"
-              onClick={() => void copyPairingPath()}
-            >
-              {pairingCopied ? "已複製" : "複製連結"}
-            </button>
-            <button
-              type="button"
-              data-action="close-pairing"
-              onClick={() => {
-                setPairingCopied(false);
-                onClosePairing();
-              }}
-            >
-              關閉並清除
-            </button>
+            <small>DEVICE MANAGEMENT</small>
+            <h2 id="device-fleet-device-edit-title">編輯裝置</h2>
+            <form onSubmit={submitDeviceEdit}>
+              <label>
+                顯示名稱
+                <input
+                  data-field="device-display-name"
+                  value={deviceEditDisplayName}
+                  onChange={(event) => setDeviceEditDisplayName(event.target.value)}
+                  disabled={mutationPending}
+                />
+              </label>
+              <label>
+                群組
+                <select
+                  data-field="device-group"
+                  value={deviceEditGroupId}
+                  onChange={(event) => setDeviceEditGroupId(event.target.value)}
+                  disabled={mutationPending}
+                >
+                  <option value="">選擇群組</option>
+                  {model.groups
+                    .filter((group) => !deviceEditEnabled || group.enabled)
+                    .map((group) => (
+                      <option
+                        key={group.id}
+                        value={group.id}
+                        disabled={deviceEditEnabled && !group.enabled}
+                      >
+                        {group.name} · {group.siteScope.toUpperCase()} · {group.playbackProfile.name}
+                        {!group.enabled ? " · 已停用" : ""}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                <input
+                  data-field="device-enabled"
+                  type="checkbox"
+                  checked={deviceEditEnabled}
+                  onChange={(event) => setDeviceEditEnabled(event.target.checked)}
+                  disabled={mutationPending}
+                />
+                啟用裝置
+              </label>
+              <div className="device-fleet-dialog__actions">
+                <button
+                  type="submit"
+                  data-action="save-device-edit"
+                  disabled={
+                    mutationPending
+                    || !deviceEditGroupId
+                    || (
+                      deviceEditEnabled
+                      && !model.groups.find((group) => String(group.id) === deviceEditGroupId)?.enabled
+                    )
+                  }
+                >
+                  儲存裝置
+                </button>
+                <button
+                  type="button"
+                  data-action="cancel-device-edit"
+                  disabled={mutationPending}
+                  onClick={closeDeviceEdit}
+                >
+                  取消
+                </button>
+              </div>
+            </form>
           </section>
         </div>
+      ) : null}
+
+      {editingGroup ? (
+        <GroupEditDialog
+          group={editingGroup}
+          mutationPending={mutationPending}
+          onClose={() => setEditingGroup(null)}
+          onSubmit={(input) => onEditGroup(editingGroup, input)}
+          profiles={profiles}
+        />
+      ) : null}
+
+      {pairingPreparation ? (
+        <PairingDialog
+          device={pairingPreparation}
+          issue={pairing.issue}
+          mutationError={mutationError}
+          mutationPending={mutationPending}
+          onClose={onClosePairing}
+          onConfirm={() => onIssuePairing(pairingPreparation)}
+        />
       ) : null}
     </main>
   );

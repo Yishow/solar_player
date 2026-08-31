@@ -40,6 +40,10 @@ test("loadDeviceFleetRoute runs fleet requests only when the lazy route loader i
       calls.push("groups");
       return [];
     },
+    getProfiles: async () => {
+      calls.push("profiles");
+      return [];
+    },
     getLiveness: async () => {
       calls.push("liveness");
       return {
@@ -51,5 +55,5 @@ test("loadDeviceFleetRoute runs fleet requests only when the lazy route loader i
 
   assert.deepEqual(calls, []);
   await loadDeviceFleetRoute();
-  assert.deepEqual(calls.sort(), ["devices", "groups", "liveness"]);
+  assert.deepEqual(calls.sort(), ["devices", "groups", "liveness", "profiles"]);
 });

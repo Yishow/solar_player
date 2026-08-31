@@ -231,3 +231,36 @@ test("Data inspector identifies inherited binding as following Preview Context",
   assert.match(html, /此元件跟隨暫時預覽情境/);
   assert.match(html, /有效範圍：KN/);
 });
+
+test("Data inspector offers a read-only diagnostics back link with only a safe scope", () => {
+  assert.ok(powerCapability);
+  const html = renderToStaticMarkup(
+    React.createElement(DataInspectorPanel, {
+      capability: powerCapability,
+      config: createOverviewDisplayPageSeedConfig(),
+      editMode: false,
+      onChange: () => undefined,
+      onReset: () => undefined,
+      pageId: "overview",
+      pageKey: "overview",
+      previewReading: {
+        freshness: {
+          ageFrozen: false,
+          ageMs: 1_000,
+          category: "realtime" as const,
+          nextTransitionAt: null,
+          sourceTimestamp: "2026-08-30T08:00:00.000Z",
+          state: "live" as const
+        },
+        quality: "good",
+        timestamp: "2026-08-30T08:00:00.000Z",
+        unit: "kW",
+        value: 813.26
+      }
+    })
+  );
+
+  assert.match(html, /Data Hub Diagnostics/);
+  assert.match(html, /href="\/settings\/data-hub\/diagnostics\?metricKey=realTimePower"/);
+  assert.doesNotMatch(html, /scope=all/);
+});

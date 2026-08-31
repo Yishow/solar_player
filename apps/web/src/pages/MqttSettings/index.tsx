@@ -19,6 +19,11 @@ import { useDisplaySyncRefresh } from "../../hooks/useDisplaySyncRefresh";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { useMqttStatus } from "../../hooks/useMqttStatus";
 import {
+  getSocketClient,
+  type LiveMetricsSnapshot,
+  type ScopedLiveMetricsSnapshot
+} from "../../services/socket";
+import {
   getWeatherOptions,
   getWeatherDiagnostics,
   getWeatherPreview,
@@ -27,8 +32,7 @@ import {
   getPlaybackPages,
   clearDisplayCardOverride,
   requestJson,
-  saveDisplayCardOverride,
-  updateWeatherSettings
+  saveDisplayCardOverride
 } from "../../services/api";
 import "./mqttSettings.css";
 import { MqttSettingsContent } from "./MqttSettingsContent";
@@ -45,6 +49,8 @@ import {
   type MqttSettingsForm,
   type MqttStatus,
   type TopicMapping,
+  buildMqttScopedMetricKey,
+  mergeScopedLiveMetricsSnapshot,
   resolveWeatherRefreshFeedback
 } from "./viewModel";
 import { applyWeatherSettingChange, toggleWeatherFieldKey } from "./weatherFieldPresets";
@@ -99,6 +105,10 @@ type MqttEditableModelLoadOptions = {
   topicsAsPolling?: boolean;
 };
 
+type MqttSettingsSurface = "full" | "connections" | "operations";
+
+let cachedMqttConnectionModel: { settings: MqttSettingsForm; status: MqttStatus } | null = null;
+
 function buildSettingsPayload(settings: MqttSettingsForm) {
   return {
     clientId: settings.clientId.trim(),
@@ -110,6 +120,10 @@ function buildSettingsPayload(settings: MqttSettingsForm) {
     reconnectInterval: Number.parseInt(settings.reconnectInterval, 10) || 5000,
     username: settings.username.trim()
   };
+}
+
+function buildCardDataOverrideKey(targetId: string, metricScope: DisplayCardDataResponse["rows"][number]["metricScope"]) {
+  return `${metricScope}:${targetId}`;
 }
 
 function createEmptyMapping(metricKey: string, metricScope: TopicMapping["metricScope"]): TopicMapping {
@@ -141,11 +155,50 @@ export async function loadMqttSettingsRoute() {
   return null;
 }
 
-export function MqttSettings() {
-  const initialEditableModel = useMemo(() => readCachedMqttEditableModel(), []);
-  const [settings, setSettings] = useState<MqttSettingsForm>(initialEditableModel?.settings ?? defaultMqttFormState);
-  const [lastSyncedSettings, setLastSyncedSettings] = useState<MqttSettingsForm>(initialEditableModel?.settings ?? defaultMqttFormState);
-  const [status, setStatus] = useState<MqttStatus>(initialEditableModel?.status ?? defaultMqttStatus);
+export async function loadMqttConnectionsRoute() {
+  try {
+    const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt");
+    cachedMqttConnectionModel = {
+      settings: toFormState(response.settings),
+      status: response.status
+    };
+  } catch {
+    cachedMqttConnectionModel = null;
+  }
+  return null;
+}
+
+export async function loadMqttOperationsRoute() {
+  try {
+    await loadCachedMqttEditableModel();
+  } catch {
+    // Keep the route reachable; the operations surface will show the load failure.
+  }
+  return null;
+}
+
+export function MqttConnections() {
+  return <MqttSettings surface="connections" />;
+}
+
+export function MqttOperations() {
+  return <MqttSettings surface="operations" />;
+}
+
+export function MqttSettings({ surface = "full" }: { surface?: MqttSettingsSurface } = {}) {
+  const connectionsOnly = surface === "connections";
+  const initialEditableModel = useMemo(
+    () => connectionsOnly ? null : readCachedMqttEditableModel(),
+    [connectionsOnly]
+  );
+  const initialConnectionModel = useMemo(
+    () => connectionsOnly ? cachedMqttConnectionModel : null,
+    [connectionsOnly]
+  );
+  const initialSettings = initialConnectionModel?.settings ?? initialEditableModel?.settings ?? defaultMqttFormState;
+  const [settings, setSettings] = useState<MqttSettingsForm>(initialSettings);
+  const [lastSyncedSettings, setLastSyncedSettings] = useState<MqttSettingsForm>(initialSettings);
+  const [status, setStatus] = useState<MqttStatus>(initialConnectionModel?.status ?? initialEditableModel?.status ?? defaultMqttStatus);
   const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const lastSyncedTopicsRef = useRef(lastSyncedTopics);
@@ -171,8 +224,8 @@ export function MqttSettings() {
   const [message, setMessage] = useState("正在載入 MQTT 設定...");
   const [errorMessage, setErrorMessage] = useState("");
   const [actionState, setActionState] = useState<ActionState>({
-    isLoadingSettings: initialEditableModel === null,
-    isLoadingTopics: initialEditableModel === null,
+    isLoadingSettings: initialConnectionModel === null && initialEditableModel === null,
+    isLoadingTopics: connectionsOnly ? false : initialEditableModel === null,
     isReloadingTopics: false,
     isSavingSettings: false,
     isSavingTopics: false,
@@ -180,17 +233,38 @@ export function MqttSettings() {
     isLoadingCardData: false,
     isRefreshingWeather: false
   });
-  const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(initialEditableModel !== null);
-  const [hasLoadedTopics, setHasLoadedTopics] = useState(initialEditableModel !== null);
-  const [hasLoadedWeatherSettings, setHasLoadedWeatherSettings] = useState(initialEditableModel !== null);
+  const [hasLoadedMqttSettings, setHasLoadedMqttSettings] = useState(
+    initialConnectionModel !== null || initialEditableModel !== null
+  );
+  const [hasLoadedTopics, setHasLoadedTopics] = useState(!connectionsOnly && initialEditableModel !== null);
+  const [hasLoadedWeatherSettings, setHasLoadedWeatherSettings] = useState(!connectionsOnly && initialEditableModel !== null);
   const hasLoadedMqttEditableModel = hasLoadedMqttSettings && hasLoadedTopics && hasLoadedWeatherSettings;
   const {
     errorMessage: readinessErrorMessage,
     readiness,
     reload: reloadReadiness
   } = useDisplayReadiness({ enabled: hasLoadedMqttEditableModel });
-  const { connectionState: liveMetricsConnectionState, snapshot: liveMetricsSnapshot } = useLiveMetrics({ enabled: hasLoadedMqttEditableModel });
-  const mqttStatusStream = useMqttStatus(undefined, { enabled: hasLoadedMqttEditableModel });
+  const { connectionState: liveMetricsConnectionState } = useLiveMetrics({ enabled: hasLoadedMqttEditableModel });
+  const [mqttLiveMetricsSnapshot, setMqttLiveMetricsSnapshot] = useState<LiveMetricsSnapshot | null>(null);
+  const mqttStatusStream = useMqttStatus(undefined, {
+    enabled: connectionsOnly ? hasLoadedMqttSettings : hasLoadedMqttEditableModel
+  });
+
+  useEffect(() => {
+    if (!hasLoadedMqttEditableModel) {
+      return;
+    }
+
+    const client = getSocketClient();
+    const handleLiveMetricsUpdate = (snapshot: ScopedLiveMetricsSnapshot) => {
+      setMqttLiveMetricsSnapshot((current) => mergeScopedLiveMetricsSnapshot(current, snapshot));
+    };
+    client.on("liveMetrics:update", handleLiveMetricsUpdate);
+
+    return () => {
+      client.off("liveMetrics:update", handleLiveMetricsUpdate);
+    };
+  }, [hasLoadedMqttEditableModel]);
 
   useEffect(() => {
     if (!mqttStatusStream.isHydrated) {
@@ -243,6 +317,9 @@ export function MqttSettings() {
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt");
       const nextSettings = toFormState(response.settings);
+      if (connectionsOnly) {
+        cachedMqttConnectionModel = { settings: nextSettings, status: response.status };
+      }
       setSettings(nextSettings);
       setLastSyncedSettings(nextSettings);
       setStatus(response.status);
@@ -364,6 +441,12 @@ export function MqttSettings() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
+        if (connectionsOnly) {
+          if (initialConnectionModel === null) {
+            await loadSettings();
+          }
+          return;
+        }
         await loadMqttEditableModel({ force: initialEditableModel !== null });
         await loadPlaybackPages();
         await loadWeatherDiagnostic();
@@ -373,7 +456,7 @@ export function MqttSettings() {
     };
     void bootstrap();
 
-  }, [initialEditableModel, loadPlaybackPages, loadWeatherDiagnostic]);
+  }, [connectionsOnly, initialConnectionModel, initialEditableModel, loadPlaybackPages, loadWeatherDiagnostic]);
 
   useEffect(() => {
     if (!hasLoadedTopics) {
@@ -502,12 +585,14 @@ export function MqttSettings() {
     );
   }, [markDirty]);
 
-  const handleTopicPublishDraftChange = useCallback((metricKey: string, value: string) => {
-    setTopicPublishDrafts((current) => ({ ...current, [metricKey]: value }));
+  const handleTopicPublishDraftChange = useCallback((metricScope: TopicMapping["metricScope"], metricKey: string, value: string) => {
+    const scopedKey = buildMqttScopedMetricKey(metricScope, metricKey);
+    setTopicPublishDrafts((current) => ({ ...current, [scopedKey]: value }));
   }, []);
 
-  const handleOverrideDraftChange = useCallback((targetId: string, value: string) => {
-    setOverrideDrafts((current) => ({ ...current, [targetId]: value }));
+  const handleOverrideDraftChange = useCallback((targetId: string, metricScope: DisplayCardDataResponse["rows"][number]["metricScope"], value: string) => {
+    const overrideKey = buildCardDataOverrideKey(targetId, metricScope);
+    setOverrideDrafts((current) => ({ ...current, [overrideKey]: value }));
   }, []);
 
   const handleConfigureTopicMetric = useCallback((metricKey: string) => {
@@ -538,14 +623,14 @@ export function MqttSettings() {
         method: "PUT"
       });
       const nextSettings = toFormState(response.settings);
-      const savedWeatherSettings = await updateWeatherSettings(weatherSettings);
       setSettings(nextSettings);
       setLastSyncedSettings(nextSettings);
       setStatus(response.status);
-      setWeatherSettings(savedWeatherSettings);
-      setLastSyncedWeatherSettings(savedWeatherSettings);
+      if (connectionsOnly) {
+        cachedMqttConnectionModel = { settings: nextSettings, status: response.status };
+      }
       setLastConnectionTest(null);
-      setMessage("MQTT broker 與天氣設定已儲存並重新連線。");
+      setMessage("MQTT broker 設定已儲存；連線狀態請查看診斷。");
       setErrorMessage("");
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     } catch (error) {
@@ -553,7 +638,7 @@ export function MqttSettings() {
     } finally {
       setActionState((current) => ({ ...current, isSavingSettings: false }));
     }
-  }, [settings, weatherSettings, reloadReadiness]);
+  }, [connectionsOnly, settings, reloadReadiness]);
 
   const refreshWeather = useCallback(async () => {
     setActionState((current) => ({ ...current, isRefreshingWeather: true }));
@@ -609,7 +694,7 @@ export function MqttSettings() {
   }, [settings]);
 
   const publishTopicValue = useCallback(async (metricScope: TopicMapping["metricScope"], metricKey: string, value: number) => {
-    setPublishingTopicKey(metricKey);
+    setPublishingTopicKey(buildMqttScopedMetricKey(metricScope, metricKey));
     try {
       const response = await requestJson<{
         status: MqttStatus;
@@ -632,16 +717,21 @@ export function MqttSettings() {
     }
   }, [activeTopicWorkspaceTab, loadCardData, reloadReadiness]);
 
-  const saveDisplayOverride = useCallback(async (targetId: string, value: number) => {
+  const saveDisplayOverride = useCallback(async (
+    targetId: string,
+    metricScope: DisplayCardDataResponse["rows"][number]["metricScope"],
+    value: number
+  ) => {
     if (!Number.isFinite(value)) {
       setErrorMessage("展示覆寫值必須是數字。");
       return;
     }
 
-    setSavingOverrideTargetId(targetId);
+    const overrideKey = buildCardDataOverrideKey(targetId, metricScope);
+    setSavingOverrideTargetId(overrideKey);
     try {
-      await saveDisplayCardOverride(targetId, value);
-      setOverrideDrafts((current) => ({ ...current, [targetId]: "" }));
+      await saveDisplayCardOverride(targetId, metricScope, value);
+      setOverrideDrafts((current) => ({ ...current, [overrideKey]: "" }));
       setMessage(`展示覆寫已套用：${targetId}`);
       setErrorMessage("");
       await loadCardData();
@@ -652,11 +742,15 @@ export function MqttSettings() {
     }
   }, [loadCardData]);
 
-  const clearDisplayOverride = useCallback(async (targetId: string) => {
-    setSavingOverrideTargetId(targetId);
+  const clearDisplayOverride = useCallback(async (
+    targetId: string,
+    metricScope: DisplayCardDataResponse["rows"][number]["metricScope"]
+  ) => {
+    const overrideKey = buildCardDataOverrideKey(targetId, metricScope);
+    setSavingOverrideTargetId(overrideKey);
     try {
-      await clearDisplayCardOverride(targetId);
-      setOverrideDrafts((current) => ({ ...current, [targetId]: "" }));
+      await clearDisplayCardOverride(targetId, metricScope);
+      setOverrideDrafts((current) => ({ ...current, [overrideKey]: "" }));
       setMessage(`展示覆寫已清除：${targetId}`);
       setErrorMessage("");
       await loadCardData();
@@ -675,6 +769,7 @@ export function MqttSettings() {
           topics: topics.map((topic) => ({
             enabled: topic.enabled,
             metricKey: topic.metricKey,
+            metricScope: topic.metricScope,
             multiplier: topic.multiplier ?? 1,
             nameZh: topic.nameZh?.trim() ?? "",
             nameEn: topic.nameEn?.trim() ?? "",
@@ -750,10 +845,10 @@ export function MqttSettings() {
   const draftSections = useMemo(
     () => ({
       broker: hasDisplaySyncDraftChanges(settings, lastSyncedSettings),
-      topic: hasDisplaySyncDraftChanges(topics, lastSyncedTopics),
-      weather: hasDisplaySyncDraftChanges(weatherSettings, lastSyncedWeatherSettings)
+      topic: !connectionsOnly && hasDisplaySyncDraftChanges(topics, lastSyncedTopics),
+      weather: !connectionsOnly && hasDisplaySyncDraftChanges(weatherSettings, lastSyncedWeatherSettings)
     }),
-    [lastSyncedSettings, lastSyncedTopics, lastSyncedWeatherSettings, settings, topics, weatherSettings]
+    [connectionsOnly, lastSyncedSettings, lastSyncedTopics, lastSyncedWeatherSettings, settings, topics, weatherSettings]
   );
   const isDirty = useMemo(
     () => draftSections.broker || draftSections.topic || draftSections.weather,
@@ -763,8 +858,12 @@ export function MqttSettings() {
     isDirty: isDirty,
     relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
     reloadNow: async () => {
-      await loadMqttEditableModel({ propagateError: true, topicsAsPolling: true });
-      await loadPlaybackPages();
+      if (connectionsOnly) {
+        await loadSettings({ propagateError: true });
+      } else {
+        await loadMqttEditableModel({ propagateError: true, topicsAsPolling: true });
+        await loadPlaybackPages();
+      }
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }
   });
@@ -809,7 +908,7 @@ export function MqttSettings() {
       handleTopicWorkspaceTabChange={setActiveTopicWorkspaceTab}
       lastConnectionTest={lastConnectionTest}
       liveMetricsConnectionState={liveMetricsConnectionState}
-      liveMetricsSnapshot={liveMetricsSnapshot}
+      liveMetricsSnapshot={mqttLiveMetricsSnapshot}
       isLoadingCardData={actionState.isLoadingCardData}
       highlightedTopicMetricKey={highlightedTopicMetricKey}
       message={message}
@@ -834,6 +933,7 @@ export function MqttSettings() {
       savingOverrideTargetId={savingOverrideTargetId}
       settings={settings}
       status={status}
+      surface={surface}
       testConnection={testConnection}
       toggleWeatherField={toggleWeatherField}
       topicPublishDrafts={topicPublishDrafts}

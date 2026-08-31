@@ -429,12 +429,12 @@ test("playback footer removes archived registry-backed entries after the refresh
   assert.doesNotMatch(refreshedFooterHtml, /aria-current="page"/);
 });
 
-test("settings footer keeps overview return plus settings-related routes only", () => {
+test("settings footer keeps overview return plus Data Hub management routes only", () => {
   const footerHtml = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
       {
-        initialEntries: ["/settings/mqtt"]
+        initialEntries: ["/settings/data-hub/sources"]
       },
       React.createElement(AppFooterNav)
     )
@@ -442,8 +442,7 @@ test("settings footer keeps overview return plus settings-related routes only", 
   const expectedOrder = [
     "回總覽",
     "播放設定",
-    "資料來源",
-    "MQTT",
+    "Data Hub",
     "圖片管理",
     "迴路設定",
     "裝置狀態",
@@ -464,7 +463,9 @@ test("settings footer keeps overview return plus settings-related routes only", 
     return label;
   }, expectedOrder[0]!);
 
-  assert.match(footerHtml, /aria-current="page"[^>]*href="\/settings\/mqtt"/);
+  assert.match(footerHtml, /aria-current="page"[^>]*href="\/settings\/data-hub"/);
+  assert.doesNotMatch(footerHtml, />資料來源</);
+  assert.doesNotMatch(footerHtml, />MQTT</);
   assert.match(footerHtml, /font-size:15px/);
   assert.doesNotMatch(footerHtml, /font-size:17px/);
   assert.doesNotMatch(footerHtml, /font-size:13px/);

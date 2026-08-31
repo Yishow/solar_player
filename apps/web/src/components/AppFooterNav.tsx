@@ -5,6 +5,7 @@ import {
   getConfiguredHiddenManagementRoutePaths,
   isManagementRouteHidden
 } from "../app/managementRouteVisibility";
+import { DATA_HUB_ROOT_PATH } from "../app/dataHub";
 import { routeMetaList, routeMetaMap, type PlaybackRouteNavIcon, type RouteMeta } from "../app/routeMeta";
 import type { PlaybackFooterEntry, ResolvedPlaybackRouteMeta } from "../app/playbackRouteMeta";
 import { defaultBrandView, type BrandView } from "../hooks/useBrandAssets";
@@ -21,11 +22,14 @@ type FooterMode = "playback" | "management";
 
 const hiddenManagementFooterPaths = new Set([
   "/settings/assets",
-  "/shell-decorations/editor"
+  "/shell-decorations/editor",
+  "/settings/data-source",
+  "/settings/mqtt"
 ]);
 
 const managementFooterOrder = [
   "/settings/playback",
+  "/settings/data-hub",
   "/settings/data-source",
   "/settings/mqtt",
   "/settings/images",
@@ -87,7 +91,9 @@ function buildEntries(
   return {
     entries: [overviewEntry, ...managementTabs],
     mode: "management",
-    isActivePath: (path) => path === currentPath
+    isActivePath: (path) =>
+      path === currentPath ||
+      (path === DATA_HUB_ROOT_PATH && currentPath.startsWith(`${DATA_HUB_ROOT_PATH}/`))
   };
 }
 
@@ -357,6 +363,3 @@ export function EnergyPulseLine() {
     </div>
   );
 }
-
-
-

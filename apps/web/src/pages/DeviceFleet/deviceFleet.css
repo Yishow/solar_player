@@ -140,6 +140,12 @@
   background: var(--workspace-surface-muted);
 }
 
+.device-fleet-dialog__actions {
+  display: flex;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 900px) {
   .device-fleet-page__forms {
     flex-direction: column;

@@ -487,6 +487,75 @@ test("re-pairing revokes the prior credential and revalidates Device and Group s
   }
 });
 
+test("pairing token issuance fails closed for unavailable Device context", async () => {
+  const app = await buildApp();
+
+  try {
+    const { deviceId, groupId } = await createDevice(app);
+    const tokenCount = () =>
+      getDatabase()
+        .prepare("SELECT COUNT(*) AS count FROM pairing_tokens")
+        .get() as { count: number };
+
+    getDatabase()
+      .prepare("UPDATE devices SET enabled = 0 WHERE id = ?")
+      .run(deviceId);
+    const disabledDevice = await app.inject({
+      method: "POST",
+      url: `/api/devices/${deviceId}/pairing-tokens`
+    });
+    assert.equal(disabledDevice.statusCode, 403);
+    assert.equal(disabledDevice.json<{ code: string }>().code, "device_disabled");
+    assert.deepEqual(tokenCount(), { count: 0 });
+
+    getDatabase()
+      .prepare("UPDATE devices SET enabled = 1 WHERE id = ?")
+      .run(deviceId);
+    getDatabase()
+      .prepare("UPDATE device_groups SET enabled = 0 WHERE id = ?")
+      .run(groupId);
+    const disabledGroup = await app.inject({
+      method: "POST",
+      url: `/api/devices/${deviceId}/pairing-tokens`
+    });
+    assert.equal(disabledGroup.statusCode, 403);
+    assert.equal(disabledGroup.json<{ code: string }>().code, "group_disabled");
+    assert.deepEqual(tokenCount(), { count: 0 });
+
+    getDatabase()
+      .prepare("UPDATE device_groups SET enabled = 1 WHERE id = ?")
+      .run(groupId);
+    getDatabase()
+      .prepare(
+        `DELETE FROM playback_profile_settings
+         WHERE profile_id = (
+           SELECT playback_profile_id FROM device_groups WHERE id = ?
+         )`
+      )
+      .run(groupId);
+    const incompleteProfile = await app.inject({
+      method: "POST",
+      url: `/api/devices/${deviceId}/pairing-tokens`
+    });
+    assert.equal(incompleteProfile.statusCode, 403);
+    assert.equal(incompleteProfile.json<{ code: string }>().code, "group_missing");
+    assert.deepEqual(tokenCount(), { count: 0 });
+
+    getDatabase()
+      .prepare("UPDATE devices SET enabled = 0, group_id = NULL WHERE id = ?")
+      .run(deviceId);
+    const unassigned = await app.inject({
+      method: "POST",
+      url: `/api/devices/${deviceId}/pairing-tokens`
+    });
+    assert.equal(unassigned.statusCode, 403);
+    assert.equal(unassigned.json<{ code: string }>().code, "device_disabled");
+    assert.deepEqual(tokenCount(), { count: 0 });
+  } finally {
+    await app.close();
+  }
+});
+
 test("pairing administration rejects playback callers without database side effects", async () => {
   const app = await buildApp();
 

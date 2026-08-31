@@ -5,6 +5,9 @@ import {
   buildApiUrl,
   fetchDisplayStoryPage,
   getDataSourceOverview,
+  getEnergyHistory,
+  getMonitoringDiagnostics,
+  resetTodayTrend,
   isManagementAccessDeniedError,
   isManagementDraftConflictError,
   isViteDevRuntime,
@@ -20,6 +23,8 @@ import {
   runDeviceKioskExit,
   getRuntimeBrandProfile,
   getRuntimeMqttStatus,
+  saveDisplayCardOverride,
+  clearDisplayCardOverride,
   resolveBrowserApiOrigin,
   updateAllImagePlaylistDurations,
   updateDisplayPageConfig,
@@ -207,6 +212,55 @@ test("requestJson prefers JSON error messages over the raw serialized body", asy
   }
 });
 
+test("saveDisplayCardOverride sends the concrete metric scope in the PUT body", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  let requestedBody = "";
+
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    requestedBody = String(init?.body ?? "");
+    return new Response(JSON.stringify({ row: {}, success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  };
+
+  try {
+    await saveDisplayCardOverride("overview.realTimePower", "cl", 60);
+    assert.equal(
+      requestedUrl,
+      buildApiUrl("/api/display-card-data/overrides/overview.realTimePower")
+    );
+    assert.deepEqual(JSON.parse(requestedBody), { displayValue: 60, metricScope: "cl" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("clearDisplayCardOverride sends the concrete metric scope in the DELETE query", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+
+  globalThis.fetch = async (input) => {
+    requestedUrl = String(input);
+    return new Response(JSON.stringify({ row: {}, success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  };
+
+  try {
+    await clearDisplayCardOverride("overview.realTimePower", "kn");
+    assert.equal(
+      requestedUrl,
+      buildApiUrl("/api/display-card-data/overrides/overview.realTimePower?metricScope=kn")
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("requestJson surfaces explicit management denied envelopes as typed access-denied errors", async () => {
   const originalFetch = globalThis.fetch;
 
@@ -268,6 +322,116 @@ test("getDataSourceOverview requests the read-only diagnostics endpoint", async 
       requestedUrls[0],
       buildApiUrl("/api/data-source/overview?metricScope=global")
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getMonitoringDiagnostics requests the explicit management scope", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = async (input) => {
+    requestedUrls.push(String(input));
+    return new Response(
+      JSON.stringify({
+        generatedAt: "2026-08-31T00:00:00.000Z",
+        requestedScope: "all",
+        summaries: []
+      }),
+      {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const response = await getMonitoringDiagnostics();
+    assert.equal(response.requestedScope, "all");
+    assert.equal(
+      requestedUrls[0],
+      buildApiUrl("/api/data-source/monitoring-diagnostics?metricScope=all")
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("getEnergyHistory requests one combined endpoint with explicit scope and range", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+
+  globalThis.fetch = async (input) => {
+    requestedUrl = String(input);
+    return new Response(
+      JSON.stringify({
+        counters: [],
+        metricScope: "global",
+        range: "month",
+        snapshots: [],
+        summaries: []
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const response = await getEnergyHistory("global", "month");
+    assert.equal(response.metricScope, "global");
+    assert.equal(response.range, "month");
+    assert.equal(
+      requestedUrl,
+      buildApiUrl("/api/data-hub/energy-history?metricScope=global&range=month")
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("resetTodayTrend sends only the selected concrete scope and returns the scoped result", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  let requestedMethod = "";
+  let requestedBody = "";
+
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    requestedMethod = init?.method ?? "";
+    requestedBody = typeof init?.body === "string" ? init.body : "";
+    return new Response(
+      JSON.stringify({
+        data: {
+          deletedSnapshots: 2,
+          metricScope: "cl",
+          resetAt: "2026-08-31T03:00:00.000Z",
+          resetDate: "2026-08-31"
+        },
+        success: true
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 200
+      }
+    );
+  };
+
+  try {
+    const result = await resetTodayTrend("cl");
+    assert.equal(requestedUrl, buildApiUrl("/api/data-source/reset-today-trend"));
+    assert.equal(requestedMethod, "POST");
+    assert.deepEqual(JSON.parse(requestedBody), { metricScope: "cl" });
+    assert.deepEqual(result, {
+      deletedSnapshots: 2,
+      metricScope: "cl",
+      resetAt: "2026-08-31T03:00:00.000Z",
+      resetDate: "2026-08-31"
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }

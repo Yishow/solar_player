@@ -8,7 +8,41 @@ import type {
   WeatherOptionsResponse,
   WeatherSettings
 } from "@solar-display/shared";
-import { buildMqttSettingsViewModel, resolveWeatherRefreshFeedback } from "./viewModel";
+import {
+  buildMqttSettingsViewModel,
+  mergeScopedLiveMetricsSnapshot,
+  resolveWeatherRefreshFeedback
+} from "./viewModel";
+
+test("MQTT scoped runtime retains same-key readings for both CL and KN", () => {
+  const clSnapshot = mergeScopedLiveMetricsSnapshot(null, {
+    metricScope: "cl",
+    metrics: {
+      realTimePower: {
+        quality: "good",
+        timestamp: "2026-08-31T03:00:00.000Z",
+        unit: "kW",
+        value: 101
+      }
+    },
+    timestamp: "2026-08-31T03:00:00.000Z"
+  });
+  const bothScopes = mergeScopedLiveMetricsSnapshot(clSnapshot, {
+    metricScope: "kn",
+    metrics: {
+      realTimePower: {
+        quality: "good",
+        timestamp: "2026-08-31T03:00:01.000Z",
+        unit: "kW",
+        value: 202
+      }
+    },
+    timestamp: "2026-08-31T03:00:01.000Z"
+  });
+
+  assert.equal(bothScopes.metrics["cl:realTimePower"]?.value, 101);
+  assert.equal(bothScopes.metrics["kn:realTimePower"]?.value, 202);
+});
 
 function createReadinessReport(findings: DisplayReadinessReport["findings"]): DisplayReadinessReport {
   return {
@@ -384,6 +418,7 @@ test("buildMqttSettingsViewModel prefers streamed live metric updates over stale
     lastConnectionTest: null,
     liveMetricsConnectionState: "connected",
     liveMetricsSnapshot: {
+      metricScope: "cl",
       metrics: {
         realTimePower: {
           quality: "good",
@@ -429,6 +464,22 @@ test("buildMqttSettingsViewModel prefers streamed live metric updates over stale
         unit: "kW",
         updatedAt: "2026-05-20T10:05:00.000Z",
         valuePath: "$.value"
+      },
+      {
+        enabled: true,
+        id: 2,
+        lastReceivedAt: "2026-05-20T10:05:00.000Z",
+        lastValue: 222.2,
+        metricKey: "realTimePower",
+        metricScope: "kn" as const,
+        nameZh: null,
+        nameEn: null,
+        quality: "good",
+        rawPayload: "{\"value\":222.2}",
+        topic: "kuozui/plant/kn/solar/power",
+        unit: "kW",
+        updatedAt: "2026-05-20T10:05:00.000Z",
+        valuePath: "$.value"
       }
     ],
     weatherOptions: createWeatherOptions(),
@@ -440,6 +491,7 @@ test("buildMqttSettingsViewModel prefers streamed live metric updates over stale
 
   assert.equal(model.previewCards[0]?.valueLabel, "601.4");
   assert.equal(model.liveTopicRows[0]?.runtimeLabel, "Live");
+  assert.equal(model.topicWorkspaceRows[1]?.valueLabel, "222.2");
   assert.equal(model.runtimePreview.statusLabel, "即時串流中");
 });
 
@@ -659,6 +711,7 @@ test("buildMqttSettingsViewModel merges editable topic rows with runtime and cov
     lastConnectionTest: null,
     liveMetricsConnectionState: "connected",
     liveMetricsSnapshot: {
+      metricScope: "cl",
       metrics: {
         realTimePower: {
           quality: "good",

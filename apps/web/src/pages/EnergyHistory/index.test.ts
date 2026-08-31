@@ -7,8 +7,8 @@ const energyHistorySource = readFileSync(path.join(import.meta.dirname, "index.t
 
 test("energy history stops remapping year to total and queries summaries with the selected range", () => {
   assert.doesNotMatch(energyHistorySource, /range === "year" \? "total" : range/);
-  assert.match(energyHistorySource, /\/api\/metrics\/history\?range=\$\{range\}/);
-  assert.match(energyHistorySource, /\/api\/metrics\/daily-summary\?range=\$\{range\}/);
+  assert.match(energyHistorySource, /getEnergyHistory\(metricScope,\s*range\)/);
+  assert.doesNotMatch(energyHistorySource, /\/api\/metrics\/(history|daily-summary|cumulative)/);
 });
 
 test("energy history renders range-aware chart headings from the view model contract", () => {
@@ -26,24 +26,37 @@ test("energy history renders explicit operator-facing monitoring state semantics
 
 test("energy history reloads all persisted history datasets through the monitoring-history runtime refresh contract", () => {
   assert.match(energyHistorySource, /useRuntimeRefreshLifecycle/);
-  assert.match(energyHistorySource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range\)/);
+  assert.match(energyHistorySource, /resolveMonitoringHistoryRuntimeRefreshSpec\(range,\s*metricScope\)/);
   assert.match(energyHistorySource, /refreshKey:\s*historyRefresh\.refreshKey/);
+  assert.match(energyHistorySource, /shouldRefreshMonitoringHistory\(event,\s*metricScope\)/);
 });
 
-test("energy history loads snapshots summaries and counters as independent staged sources", () => {
+test("energy history loads the combined persisted history source as one staged lane", () => {
   assert.doesNotMatch(energyHistorySource, /Promise\.all\(/);
-  assert.match(energyHistorySource, /historySnapshotsRuntime\s*=\s*useRuntimeRefreshLifecycle/);
-  assert.match(energyHistorySource, /dailySummariesRuntime\s*=\s*useRuntimeRefreshLifecycle/);
-  assert.match(energyHistorySource, /cumulativeCountersRuntime\s*=\s*useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /historyRuntime\s*=\s*useRuntimeRefreshLifecycle/);
+  assert.match(energyHistorySource, /const snapshots = historyPayload\?\.snapshots/);
+  assert.match(energyHistorySource, /const summaries = historyPayload\?\.summaries/);
+  assert.match(energyHistorySource, /const counters = historyPayload\?\.counters/);
   assert.match(energyHistorySource, /historySourceErrorMessage/);
 });
 
-test("energy history reuses the shared warm history payload without flattening source lanes", () => {
-  assert.match(energyHistorySource, /readCachedMonitoringHistoryPayload(?:<[^>]+>)?\(range\)/);
-  assert.match(energyHistorySource, /initialPayload:\s*cachedHistoryPayload/);
-  assert.match(energyHistorySource, /rememberMonitoringHistoryPayload\(historySnapshotsRuntime\.payload\)/);
-  assert.match(energyHistorySource, /resolveMonitoringHistoryPayloadForRange/);
-  assert.match(energyHistorySource, /const snapshots = historyPayload\?\.snapshots \?\? \[\]/);
-  assert.doesNotMatch(energyHistorySource, /dailySummariesRuntime[^;]+initialPayload/s);
-  assert.doesNotMatch(energyHistorySource, /cumulativeCountersRuntime[^;]+initialPayload/s);
+test("energy history uses the combined scoped payload and rejects stale scope or range data", () => {
+  assert.match(energyHistorySource, /getEnergyHistory\(metricScope,\s*range\)/);
+  assert.match(energyHistorySource, /isEnergyHistoryPayloadForSelection\(historyRuntime\.payload,\s*selection\)/);
+  assert.doesNotMatch(energyHistorySource, /monitoringHistoryPayloadCache/);
+  assert.doesNotMatch(energyHistorySource, /readCachedMonitoringHistoryPayload/);
+  assert.doesNotMatch(energyHistorySource, /rememberMonitoringHistoryPayload/);
+  assert.doesNotMatch(energyHistorySource, /resolveMonitoringHistoryPayloadForRange/);
+});
+
+test("energy history keeps scope and range explicit in URL state", () => {
+  assert.match(energyHistorySource, /useSearchParams/);
+  assert.match(energyHistorySource, /resolveEnergyHistorySelection\(searchParams\)/);
+  assert.match(energyHistorySource, /updateEnergyHistorySearchParams/);
+});
+
+test("energy history exposes a visible global cross-site scope", () => {
+  assert.match(energyHistorySource, /viewModel\.scopeLabel/);
+  assert.match(energyHistorySource, /energyHistoryScopeOptions/);
+  assert.match(energyHistorySource, /管理範圍|資料範圍/);
 });

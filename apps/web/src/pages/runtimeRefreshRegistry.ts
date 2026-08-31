@@ -79,9 +79,14 @@ export function resolveDisplayPageRuntimeRefreshSpec(
   };
 }
 
-export function resolveMonitoringHistoryRuntimeRefreshSpec(range: MonitoringHistoryRuntimeRangeKey) {
+export function resolveMonitoringHistoryRuntimeRefreshSpec(
+  range: MonitoringHistoryRuntimeRangeKey,
+  metricScope?: MetricScope
+) {
   return {
-    refreshKey: `monitoring-history:${range}`,
+    refreshKey: metricScope
+      ? `monitoring-history:${metricScope}:${range}`
+      : `monitoring-history:${range}`,
     refreshScopes: ["monitoring-history"] as DisplaySyncEventScope[],
     sourceKind: "monitoring-history" as const
   };

@@ -16,38 +16,53 @@ test("mqtt settings includes custom display names in the topics save payload", (
 
   assert.match(saveTopicsSource, /nameZh:\s*topic\.nameZh/);
   assert.match(saveTopicsSource, /nameEn:\s*topic\.nameEn/);
+  assert.match(saveTopicsSource, /metricScope:\s*topic\.metricScope/);
 });
 
-test("mqtt settings only marks broker settings synced after weather settings save succeeds", () => {
+test("mqtt settings saves broker settings without weather dependency", () => {
+  const saveSettingsStart = mqttSettingsSource.indexOf("const saveSettings = useCallback(async () => {");
   const saveSettingsSource = mqttSettingsSource.slice(
-    mqttSettingsSource.indexOf("const saveSettings = useCallback(async () => {"),
-    mqttSettingsSource.indexOf("const testConnection = useCallback(async () => {")
+    saveSettingsStart,
+    mqttSettingsSource.indexOf("const refreshWeather = useCallback", saveSettingsStart)
   );
-  const weatherSaveIndex = saveSettingsSource.indexOf(
-    "const savedWeatherSettings = await updateWeatherSettings(weatherSettings);"
-  );
-  const lastSyncedSettingsIndex = saveSettingsSource.indexOf("setLastSyncedSettings(nextSettings);");
 
-  assert.notEqual(weatherSaveIndex, -1);
-  assert.notEqual(lastSyncedSettingsIndex, -1);
-  assert.ok(
-    weatherSaveIndex < lastSyncedSettingsIndex,
-    "broker settings should not be marked synced before weather settings save succeeds"
-  );
+  assert.doesNotMatch(mqttSettingsSource, /updateWeatherSettings/);
+  assert.doesNotMatch(saveSettingsSource, /weather/i);
+  assert.match(saveSettingsSource, /setLastSyncedSettings\(nextSettings\);/);
+  assert.doesNotMatch(saveSettingsSource, /setLastSyncedWeatherSettings|setWeatherSettings/);
+  assert.match(saveSettingsSource, /setMessage\("MQTT broker 設定已儲存；連線狀態請查看診斷。"\);/);
+  assert.doesNotMatch(saveSettingsSource, /MQTT broker 與天氣設定/);
 });
 
-test("mqtt settings uses a phase-neutral fallback error when the combined save fails", () => {
+test("mqtt settings uses a phase-neutral fallback error when the broker save fails", () => {
   assert.match(mqttSettingsSource, /儲存設定失敗。/);
   assert.doesNotMatch(mqttSettingsSource, /儲存 MQTT 設定失敗。/);
+});
+
+test("Data Hub Connections loads and saves only broker settings", () => {
+  assert.match(mqttSettingsSource, /export async function loadMqttConnectionsRoute/);
+  assert.match(mqttSettingsSource, /export function MqttConnections/);
+  assert.match(mqttSettingsSource, /<MqttSettings surface="connections"\s*\/>/);
+  assert.match(mqttSettingsSource, /surface === "connections"/);
+});
+
+test("Data Hub Sources can lazy-load the MQTT operations surface", () => {
+  assert.match(mqttSettingsSource, /export async function loadMqttOperationsRoute/);
+  assert.match(mqttSettingsSource, /export function MqttOperations/);
+  assert.match(mqttSettingsSource, /<MqttSettings surface="operations"\s*\/>/);
+  assert.match(mqttSettingsSource, /surface="operations"/);
 });
 
 test("mqtt settings computes broker topic and weather draft scopes before rendering the workspace", () => {
   assert.match(mqttSettingsSource, /const draftSections = useMemo\(/);
   assert.match(mqttSettingsSource, /broker:\s*hasDisplaySyncDraftChanges\(settings,\s*lastSyncedSettings\)/);
-  assert.match(mqttSettingsSource, /topic:\s*hasDisplaySyncDraftChanges\(topics,\s*lastSyncedTopics\)/);
   assert.match(
     mqttSettingsSource,
-    /weather:\s*hasDisplaySyncDraftChanges\(weatherSettings,\s*lastSyncedWeatherSettings\)/
+    /topic:\s*!connectionsOnly\s*&&\s*hasDisplaySyncDraftChanges\(topics,\s*lastSyncedTopics\)/
+  );
+  assert.match(
+    mqttSettingsSource,
+    /weather:\s*!connectionsOnly\s*&&\s*hasDisplaySyncDraftChanges\(weatherSettings,\s*lastSyncedWeatherSettings\)/
   );
   assert.match(mqttSettingsSource, /draftSections=\{draftSections\}/);
 });
@@ -136,7 +151,10 @@ test("mqtt settings defers diagnostics polling and weather preview until persist
   assert.match(mqttSettingsSource, /hasLoadedMqttEditableModel/);
   assert.match(mqttSettingsSource, /useDisplayReadiness\(\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
   assert.match(mqttSettingsSource, /useLiveMetrics\(\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
-  assert.match(mqttSettingsSource, /useMqttStatus\(undefined,\s*\{\s*enabled:\s*hasLoadedMqttEditableModel\s*\}\)/);
+  assert.match(
+    mqttSettingsSource,
+    /useMqttStatus\(undefined,\s*\{\s*enabled:\s*connectionsOnly\s*\?\s*hasLoadedMqttSettings\s*:\s*hasLoadedMqttEditableModel\s*\}\)/
+  );
   assert.match(mqttSettingsSource, /if \(!hasLoadedWeatherSettings\) \{/);
   assert.match(mqttSettingsSource, /if \(!hasLoadedTopics\) \{/);
 });
@@ -147,7 +165,8 @@ test("mqtt settings reuses one editable loader before deferred diagnostics refre
   assert.match(mqttSettingsSource, /readCachedMqttEditableModel\(\)/);
   assert.match(mqttSettingsSource, /export async function loadMqttSettingsRoute\(\)/);
   assert.match(mqttSettingsSource, /const applyMqttEditableModel = \(model: MqttEditableModel\) => {/);
-  assert.match(mqttSettingsSource, /useState<MqttSettingsForm>\(initialEditableModel\?\.settings \?\? defaultMqttFormState\)/);
+  assert.match(mqttSettingsSource, /const initialSettings = initialConnectionModel\?\.settings \?\? initialEditableModel\?\.settings \?\? defaultMqttFormState/);
+  assert.match(mqttSettingsSource, /useState<MqttSettingsForm>\(initialSettings\)/);
   assert.match(mqttSettingsSource, /await loadMqttEditableModel\(\{ force: initialEditableModel !== null \}\)/);
   assert.match(mqttSettingsSource, /loadCachedMqttEditableModel\(\{ force \}\)/);
   assert.match(mqttSettingsLoadModelSource, /let cachedMqttEditableModel: MqttEditableModel \| null = null/);

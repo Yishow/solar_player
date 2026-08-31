@@ -8,7 +8,7 @@ import {
   type ShellDecorationEnvelope
 } from "@solar-display/shared";
 import type { ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DisplayPageEditorAssetHealthPanel } from "../../components/displayPageAssetHealthPanels";
 import { PageContainer } from "../../components/PageContainer";
@@ -90,6 +90,33 @@ export type DisplayEditorPageDefinition = {
   renderPreview?: (config: Record<string, unknown>) => ReactElement;
   templateKey: DisplayPageTemplateKey;
 };
+
+export function resolveDisplayEditorDeepLink(args: {
+  items: readonly { hasDataBinding: boolean; id: string }[];
+  requestedItemId: string | null;
+  requestedPageId: string | null;
+  requestedTab: string | null;
+  selectedPageId: string;
+}) {
+  if (
+    args.requestedPageId !== args.selectedPageId
+    || args.requestedTab !== "data"
+    || !args.requestedItemId
+  ) {
+    return null;
+  }
+
+  const item = args.items.find(({ id }) => id === args.requestedItemId);
+  if (!item?.hasDataBinding) {
+    return null;
+  }
+
+  return {
+    itemId: item.id,
+    pageId: args.selectedPageId,
+    rightTab: "data" as const
+  };
+}
 
 type DisplayPageObjectAssetOption = {
   assetId: number;
@@ -331,6 +358,9 @@ export function DisplayPagesEditor({
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedPageId = searchParams.get("page");
+  const requestedItemId = searchParams.get("item");
+  const requestedTab = searchParams.get("tab");
+  const hasEditorDeepLinkRequest = requestedItemId !== null || requestedTab !== null;
   const assetContextId = searchParams.get("assetContext");
   const assetReturnWorkspace: AssetWorkspaceOrigin = searchParams.get("assetReturn") === "shell" ? "shell" : "editor";
   const selectedWorkspace: DisplayEditorWorkspace =
@@ -371,6 +401,7 @@ export function DisplayPagesEditor({
   const [shellSelectedObjectId, setShellSelectedObjectId] = useState<string | null>(
     initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
   );
+  const appliedEditorDeepLinkRef = useRef<string | null>(null);
   const editMode = controlledEditMode ?? internalEditMode;
   const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
   const displayEditorProfilingEnabled = useMemo(() => isDisplayEditorProfilingEnabled(), []);
@@ -512,6 +543,19 @@ export function DisplayPagesEditor({
       || selectedPage.templateKey === "factory-circuit"
       ? selectedPage.templateKey
       : null;
+  const requestedEditorDeepLink = useMemo(
+    () => resolveDisplayEditorDeepLink({
+      items: editableItems.map((item) => ({
+        hasDataBinding: Boolean(item.schema.dataBinding && dataBindingPageKey),
+        id: item.id
+      })),
+      requestedItemId,
+      requestedPageId,
+      requestedTab,
+      selectedPageId
+    }),
+    [dataBindingPageKey, editableItems, requestedItemId, requestedPageId, requestedTab, selectedPageId]
+  );
   const lockedRegionIds = lockedRegionIdsByPage[selectedPage.id] ?? [];
   const lockedObjectIds = useMemo(
     () => freeformObjects.filter((object) => object.locked).map((object) => object.id),
@@ -581,7 +625,7 @@ export function DisplayPagesEditor({
   }, [selectedPage.id]);
 
   useEffect(() => {
-    if (!editMode) {
+    if (!editMode && !requestedEditorDeepLink) {
       setSelectedRegionId(null);
       setSelectedRegionIds([]);
       setProductivityMessage(null);
@@ -589,11 +633,28 @@ export function DisplayPagesEditor({
       return;
     }
 
-    if (!selectedRegionId && editableItems[0]) {
+    if (editMode && !selectedRegionId && editableItems[0] && !hasEditorDeepLinkRequest) {
       setSelectedRegionId(editableItems[0].id);
       setSelectedRegionIds([editableItems[0].id]);
     }
-  }, [editMode, editableItems, selectedRegionId]);
+  }, [editMode, editableItems, hasEditorDeepLinkRequest, requestedEditorDeepLink, selectedRegionId]);
+
+  useEffect(() => {
+    if (!requestedEditorDeepLink) {
+      appliedEditorDeepLinkRef.current = null;
+      return;
+    }
+
+    const deepLinkKey = `${requestedEditorDeepLink.pageId}:${requestedEditorDeepLink.itemId}:${requestedEditorDeepLink.rightTab}`;
+    if (appliedEditorDeepLinkRef.current === deepLinkKey) {
+      return;
+    }
+    appliedEditorDeepLinkRef.current = deepLinkKey;
+
+    setSelectedRegionId(requestedEditorDeepLink.itemId);
+    setSelectedRegionIds([requestedEditorDeepLink.itemId]);
+    setRightTab(requestedEditorDeepLink.rightTab);
+  }, [requestedEditorDeepLink]);
 
   useEffect(() => {
     if (selectedRegionId && !editableItemIds.has(selectedRegionId)) {

@@ -41,6 +41,40 @@ test("mergePolledTopicMappings preserves a locally edited custom name as a draft
   assert.equal(merged[0]?.lastValue, 123.4);
 });
 
+test("mergePolledTopicMappings preserves a scope-only draft while refreshing runtime fields", () => {
+  const synced = buildTopicMapping({ metricScope: "cl" });
+  const currentDraft = buildTopicMapping({ metricScope: "kn" });
+  const polled = buildTopicMapping({
+    lastReceivedAt: "2026-06-26T07:05:00.000Z",
+    lastValue: 123.4,
+    metricScope: "cl"
+  });
+
+  const merged = mergePolledTopicMappings([currentDraft], [synced], [polled]);
+
+  assert.equal(merged[0]?.metricScope, "kn");
+  assert.equal(merged[0]?.lastValue, 123.4);
+});
+
+test("mergePolledTopicMappings preserves a scope plus topic draft while refreshing runtime fields", () => {
+  const synced = buildTopicMapping({ metricScope: "cl" });
+  const currentDraft = buildTopicMapping({
+    metricScope: "kn",
+    topic: "kuozui/plant/solar/custom-power"
+  });
+  const polled = buildTopicMapping({
+    lastReceivedAt: "2026-06-26T07:05:00.000Z",
+    lastValue: 123.4,
+    metricScope: "cl"
+  });
+
+  const merged = mergePolledTopicMappings([currentDraft], [synced], [polled]);
+
+  assert.equal(merged[0]?.metricScope, "kn");
+  assert.equal(merged[0]?.topic, "kuozui/plant/solar/custom-power");
+  assert.equal(merged[0]?.lastValue, 123.4);
+});
+
 test("mergePolledTopicMappings preserves local editable topic drafts while refreshing runtime fields", () => {
   const synced = buildTopicMapping();
   const currentDraft = buildTopicMapping({

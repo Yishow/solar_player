@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { getValueAtPath } from "../../hooks/displayPageConfigPaths";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
+import { buildDataHubDiagnosticsHref } from "../DataHub/links";
 import {
   getDeviceGroups,
   getDerivedMetricDefinitions,
@@ -389,6 +390,10 @@ export function DataInspectorPanel({
   const update = (patch: DataBindingItemPatch) => {
     onChange(capability.bindingPath, createDataBindingItemUpdate(model.item, patch));
   };
+  const diagnosticsScope = model.binding.scope === "inherit-device"
+    ? model.scopeSummary.effectiveScope
+    : model.binding.scope;
+  const diagnosticsHref = buildDataHubDiagnosticsHref(model.provenance.metricKey, diagnosticsScope);
 
   return (
     <div className="space-y-4 text-[12px] text-[var(--shell-copy-ink)]">
@@ -505,6 +510,14 @@ export function DataInspectorPanel({
         <p>來源分類：{model.provenance.sourceClass}</p>
         {model.provenance.topic ? <p>來源 Topic：{model.provenance.topic}</p> : null}
       </div>
+
+      <a
+        className="inline-flex rounded-full border border-[var(--shell-divider)] px-3 py-1.5 font-semibold"
+        data-data-inspector-action="diagnostics"
+        href={diagnosticsHref}
+      >
+        Data Hub Diagnostics
+      </a>
 
       <button
         type="button"

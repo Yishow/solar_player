@@ -26,6 +26,9 @@ import { recordDeviceProfileRolloutHeartbeat } from "./services/deviceProfileRol
 import { createUnpairedDisplayAccessRegistry } from "./services/unpairedDisplayAccessRegistry.js";
 import healthRoute from "./routes/health.js";
 import metricsRoute from "./routes/metrics.js";
+import metricsInventoryRoute from "./routes/metrics-inventory.js";
+import metricUsageRoute from "./routes/metric-usage.js";
+import metricProvenanceRoute from "./routes/metric-provenance.js";
 import metricsHistoryRoute from "./routes/metrics-history.js";
 import playbackRoute from "./routes/playback.js";
 import playbackProfilesRoute from "./routes/playback-profiles.js";
@@ -223,6 +226,9 @@ export async function buildApp() {
 
   await app.register(healthRoute);
   await app.register(metricsRoute);
+  await app.register(metricsInventoryRoute);
+  await app.register(metricUsageRoute);
+  await app.register(metricProvenanceRoute);
   await app.register(metricsHistoryRoute);
   await app.register(playbackRoute);
   await app.register(playbackProfilesRoute);

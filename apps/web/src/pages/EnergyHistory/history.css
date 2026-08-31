@@ -38,6 +38,32 @@
   letter-spacing: 0.04em;
 }
 
+.eh-page .eh-scope-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 6px 16px;
+  color: #5c655d;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.eh-page .eh-scope-picker select {
+  width: 100%;
+  border: 1px solid rgba(92, 105, 79, 0.2);
+  border-radius: 9px;
+  background: #fffdf8;
+  color: var(--ink-strong);
+  padding: 8px 10px;
+  font: 600 13px/1.2 var(--font-family-en);
+}
+
+.eh-page .eh-scope-picker small {
+  color: #6f766f;
+  font: 400 10px/1.1 var(--font-family-en);
+  letter-spacing: 0.02em;
+}
+
 .eh-page .eh-side-list {
   display: flex;
   flex-direction: column;

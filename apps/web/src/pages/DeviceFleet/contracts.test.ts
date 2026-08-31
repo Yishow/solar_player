@@ -60,6 +60,7 @@ function createRow(overrides: Partial<DeviceFleetRow> = {}): DeviceFleetRow {
     duplicateIdentity: false,
     enabled: true,
     groupId: 7,
+    groupEnabled: true,
     groupName: "CL Lobby",
     id: 1,
     isPlaying: true,
@@ -72,6 +73,8 @@ function createRow(overrides: Partial<DeviceFleetRow> = {}): DeviceFleetRow {
     rolloutState: "applied",
     desiredVersion: 1,
     pairingAction: "re-pair",
+    playbackProfileId: 1,
+    playbackProfileName: "Default Profile",
     route: "/overview",
     siteScope: "cl",
     ...overrides
@@ -84,6 +87,7 @@ function createContentProps(
   return {
     accessDenied: false,
     filter: "",
+    profiles: [],
     model: {
       groups: [],
       rolloutSummary: {
@@ -99,8 +103,9 @@ function createContentProps(
     },
     mutationError: "",
     mutationPending: false,
+    onPreparePairing: () => {},
     onClosePairing: () => {},
-    onCreateDevice: async () => {},
+    onCreateDevice: async () => true,
     onCreateGroup: async () => {},
     onEditDevice: async () => {},
     onEditGroup: async () => {},
@@ -111,7 +116,7 @@ function createContentProps(
     pairing: {
       issue: null
     },
-    profileId: profile.id,
+    pairingPreparation: null,
     ...overrides
   };
 }
@@ -293,7 +298,7 @@ test("Device Fleet contract keeps disabled, unpaired, offline, stale, and duplic
     groups: [group],
     liveness,
     loading: false,
-    unavailable: ["defaultProfile"]
+    unavailable: ["profiles"]
   });
 
   assert.deepEqual(
@@ -309,10 +314,10 @@ test("Device Fleet contract keeps disabled, unpaired, offline, stale, and duplic
       { action: "re-pair", duplicate: true, state: "stale" }
     ]
   );
-  assert.deepEqual(model.unavailable, ["defaultProfile"]);
+  assert.deepEqual(model.unavailable, ["profiles"]);
 });
 
-test("Device Fleet contract requires re-pair confirmation and clears one-time plaintext", async () => {
+test("Device Fleet contract presents pairing context before issuing one-time plaintext", async () => {
   const dom = new JSDOM(
     "<!doctype html><html><body><div id=\"root\"></div></body></html>",
     { pretendToBeVisual: true, url: "http://127.0.0.1/" }
@@ -328,9 +333,13 @@ test("Device Fleet contract requires re-pair confirmation and clears one-time pl
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
   let root: Root | null = null;
-  let confirmed = false;
   let issueCalls = 0;
-  dom.window.confirm = () => confirmed;
+  let prepared: DeviceFleetRow | null = null;
+  const pairingRow = createRow({
+    groupName: "CL Lobby",
+    playbackProfileName: "Default Profile",
+    siteScope: "cl"
+  });
 
   try {
     root = createRoot(dom.window.document.getElementById("root")!);
@@ -339,6 +348,22 @@ test("Device Fleet contract requires re-pair confirmation and clears one-time pl
         React.createElement(
           DeviceFleetContent,
           createContentProps({
+            model: {
+              groups: [],
+              rolloutSummary: {
+                applied: 1,
+                failed: 0,
+                offline: 0,
+                total: 1,
+                waiting: 0
+              },
+              rows: [pairingRow],
+              state: "ready",
+              unavailable: []
+            },
+            onPreparePairing: (row: DeviceFleetRow) => {
+              prepared = row;
+            },
             onIssuePairing: async () => {
               issueCalls += 1;
             }
@@ -354,11 +379,48 @@ test("Device Fleet contract requires re-pair confirmation and clears one-time pl
       rePair.click();
       await Promise.resolve();
     });
+    assert.equal(prepared, pairingRow);
     assert.equal(issueCalls, 0);
 
-    confirmed = true;
     await act(async () => {
-      rePair.click();
+      root!.render(
+        React.createElement(
+          DeviceFleetContent,
+          createContentProps({
+            model: {
+              groups: [],
+              rolloutSummary: {
+                applied: 1,
+                failed: 0,
+                offline: 0,
+                total: 1,
+                waiting: 0
+              },
+              rows: [pairingRow],
+              state: "ready",
+              unavailable: []
+            },
+            onIssuePairing: async () => {
+              issueCalls += 1;
+            },
+            pairingPreparation: pairingRow
+          })
+        )
+      );
+    });
+
+    const dialog = dom.window.document.querySelector<HTMLElement>(
+      "[data-testid=\"pairing-dialog\"]"
+    );
+    assert.ok(dialog);
+    assert.match(dialog.textContent ?? "", /CL Lobby/u);
+    assert.match(dialog.textContent ?? "", /CL/u);
+    assert.match(dialog.textContent ?? "", /Default Profile/u);
+    assert.match(dialog.textContent ?? "", /撤銷舊 Credential/u);
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>(
+        "[data-action=\"confirm-pairing\"]"
+      )!.click();
       await Promise.resolve();
     });
     assert.equal(issueCalls, 1);
@@ -387,6 +449,18 @@ test("Device Fleet contract requires re-pair confirmation and clears one-time pl
   }
 });
 
+test("Device Fleet resets mutation feedback and stale pairing issue before preparation", () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, "index.tsx"),
+    "utf8"
+  );
+
+  assert.match(
+    source,
+    /onPreparePairing=\{\(row\) => \{\s*setMutationError\(""\);\s*setPairing\(\{ issue: null \}\);\s*setPairingPreparation\(row\);/u
+  );
+});
+
 test("Device Fleet contract remains lazy and management-gated before fleet requests run", async () => {
   const routerSource = readFileSync(
     path.join(import.meta.dirname, "../../app/router.tsx"),
@@ -402,6 +476,10 @@ test("Device Fleet contract remains lazy and management-gated before fleet reque
     getGroups: async () => {
       calls.push("groups");
       return [createGroup(1)];
+    },
+    getProfiles: async () => {
+      calls.push("profiles");
+      return [profile];
     },
     getLiveness: async () => {
       calls.push("liveness");
@@ -419,7 +497,7 @@ test("Device Fleet contract remains lazy and management-gated before fleet reque
     );
     assert.deepEqual(calls, []);
     await loadDeviceFleetRoute();
-    assert.deepEqual(calls.sort(), ["devices", "groups", "liveness"]);
+    assert.deepEqual(calls.sort(), ["devices", "groups", "liveness", "profiles"]);
   } finally {
     resetDeviceFleetRouteModelForTests();
   }

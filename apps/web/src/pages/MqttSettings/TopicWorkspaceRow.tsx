@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { buildMqttScopedMetricKey } from "./viewModel";
 import type { buildMqttSettingsViewModel, TopicMapping } from "./viewModel";
 
 /**
@@ -18,7 +19,11 @@ export type TopicWorkspaceRowProps = {
     key: Key,
     value: TopicMapping[Key]
   ) => void;
-  handleTopicPublishDraftChange?: (metricKey: string, value: string) => void;
+  handleTopicPublishDraftChange?: (
+    metricScope: TopicMapping["metricScope"],
+    metricKey: string,
+    value: string
+  ) => void;
   hasUnsavedChanges?: boolean;
   highlighted?: boolean;
   publishDraftValue?: string;
@@ -105,7 +110,8 @@ function TopicWorkspaceRowImpl({
   const trimmedPublishDraft = publishDraftValue.trim();
   const publishNumber = Number(trimmedPublishDraft);
   const publishValueIsValid = trimmedPublishDraft !== "" && Number.isFinite(publishNumber);
-  const isPublishing = publishingTopicKey === topic.metricKey;
+  const scopedKey = buildMqttScopedMetricKey(topic.metricScope, topic.metricKey);
+  const isPublishing = publishingTopicKey === scopedKey;
   const publishDisabledReason = !topic.enabled
     ? "此 mapping 已停用"
     : topic.topic.trim() === ""
@@ -262,7 +268,7 @@ function TopicWorkspaceRowImpl({
                 inputMode="decimal"
                 placeholder="輸入測試數值"
                 value={publishDraftValue}
-                onChange={(event) => handleTopicPublishDraftChange?.(topic.metricKey, event.target.value)}
+                onChange={(event) => handleTopicPublishDraftChange?.(topic.metricScope, topic.metricKey, event.target.value)}
               />
             </label>
             <button

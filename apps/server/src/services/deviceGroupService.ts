@@ -222,11 +222,13 @@ function resolvePlaybackProfileId(value: unknown): number {
     value === undefined
       ? (database
           .prepare(
-            "SELECT id FROM playback_profiles WHERE is_default = 1 ORDER BY id LIMIT 1"
+            "SELECT id FROM playback_profiles WHERE is_default = 1 AND archived_at IS NULL ORDER BY id LIMIT 1"
           )
           .get() as { id: number } | undefined)
       : (database
-          .prepare("SELECT id FROM playback_profiles WHERE id = ?")
+          .prepare(
+            "SELECT id FROM playback_profiles WHERE id = ? AND archived_at IS NULL"
+          )
           .get(normalizeNullableId(value, "playbackProfileId")) as
           | { id: number }
           | undefined);

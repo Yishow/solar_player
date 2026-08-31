@@ -2,7 +2,6 @@ import type {
   DisplayReadinessReport,
   MetricScope,
   WeatherDiagnostic,
-  WeatherFieldKey,
   WeatherHeaderContract,
   WeatherOptionsResponse,
   WeatherSettings
@@ -10,9 +9,24 @@ import type {
 import type { ReferenceGlyphName } from "../../components/ReferenceGlyph";
 import type { ReferenceTone } from "../../components/reference/ReferenceManagement";
 import { resolveHeaderWeatherMeta } from "../../components/headerWeatherMeta";
-import type { LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
+import type {
+  LiveMetricsSnapshot,
+  ScopedLiveMetricsSnapshot,
+  SocketConnectionState
+} from "../../services/socket";
 import { factoryGenerationDerivedRequirementKeys, weatherFieldKeys } from "@solar-display/shared";
-import { weatherFieldPresetOptions } from "./weatherFieldPresets";
+import {
+  buildWeatherDiagnosticModel,
+  resolveWeatherValidationFeedback,
+  weatherFieldLabelMap,
+  weatherFieldPresetOptions
+} from "./weatherFieldPresets";
+
+export {
+  buildWeatherDiagnosticModel,
+  resolveWeatherRefreshFeedback,
+  resolveWeatherValidationFeedback
+} from "./weatherFieldPresets";
 
 export type DataMode = "mqtt" | "mock";
 
@@ -53,6 +67,38 @@ export type TopicMapping = {
   rawPayload: string | null;
 };
 
+type MqttLiveMetricsSnapshot = LiveMetricsSnapshot & {
+  metricScope?: MetricScope;
+};
+
+export function buildMqttScopedMetricKey(metricScope: MetricScope, metricKey: string) {
+  return `${metricScope}:${metricKey}`;
+}
+
+export function mergeScopedLiveMetricsSnapshot(
+  current: LiveMetricsSnapshot | null,
+  next: ScopedLiveMetricsSnapshot
+): LiveMetricsSnapshot {
+  const metrics = { ...(current?.metrics ?? {}) };
+  for (const [metricKey, reading] of Object.entries(next.metrics)) {
+    const scopedMetricKey = buildMqttScopedMetricKey(next.metricScope, metricKey);
+    const currentReading = metrics[scopedMetricKey];
+    if (!currentReading || reading.timestamp >= currentReading.timestamp) {
+      metrics[scopedMetricKey] = reading;
+    }
+  }
+
+  const timestamps = [current?.timestamp, next.timestamp].filter(
+    (timestamp): timestamp is string => timestamp !== null && timestamp !== undefined
+  );
+
+  return {
+    freshnessPolicy: next.freshnessPolicy ?? current?.freshnessPolicy,
+    metrics,
+    timestamp: timestamps.sort().at(-1) ?? null
+  };
+}
+
 export type ActionState = {
   isLoadingCardData?: boolean;
   isLoadingSettings: boolean;
@@ -81,7 +127,7 @@ type BuildMqttSettingsViewModelArgs = {
   errorMessage: string;
   lastConnectionTest: ConnectionTestFeedback;
   liveMetricsConnectionState: SocketConnectionState["status"];
-  liveMetricsSnapshot: LiveMetricsSnapshot | null;
+  liveMetricsSnapshot: MqttLiveMetricsSnapshot | null;
   message: string;
   readiness: DisplayReadinessReport | null;
   settings: MqttSettingsForm;
@@ -110,19 +156,6 @@ type TopicImpactGroup = {
   summary: string;
   title: string;
   tone: "ready" | "warning" | "error";
-};
-
-const weatherFieldLabelMap: Record<WeatherFieldKey, string> = {
-  airPressure: "氣壓",
-  airTemperature: "溫度",
-  dailyHigh: "最高溫",
-  dailyLow: "最低溫",
-  observationTime: "觀測時間",
-  precipitation: "降雨量",
-  relativeHumidity: "相對濕度",
-  weather: "天氣現象",
-  windDirection: "風向",
-  windSpeed: "風速"
 };
 
 const metricLabelMap: Record<string, { en: string; zh: string; icon: ReferenceGlyphName }> = {
@@ -214,10 +247,15 @@ function buildLastUpdateLabel(topics: TopicMapping[]) {
 function resolveTopicRuntime(
   topic: TopicMapping,
   status: MqttStatus,
-  liveMetricsSnapshot: LiveMetricsSnapshot | null,
+  liveMetricsSnapshot: MqttLiveMetricsSnapshot | null,
   liveMetricsConnectionState: SocketConnectionState["status"]
 ) {
-  const liveReading = liveMetricsSnapshot?.metrics[topic.metricKey];
+  const liveReading = liveMetricsSnapshot
+    ? liveMetricsSnapshot.metrics[buildMqttScopedMetricKey(topic.metricScope, topic.metricKey)]
+      ?? (liveMetricsSnapshot.metricScope === topic.metricScope
+        ? liveMetricsSnapshot.metrics[topic.metricKey]
+        : undefined)
+    : undefined;
   const shouldPreferLiveReading =
     liveReading !== undefined &&
     (topic.lastReceivedAt === null || liveReading.timestamp >= topic.lastReceivedAt);
@@ -284,123 +322,6 @@ function resolveRuntimePreviewStatus(
     statusDetail: "Socket 與 broker 都尚未提供可用的即時 preview，請先檢查串流與連線狀態。",
     statusLabel: "串流不可用",
     statusTone: "disconnected" as const
-  };
-}
-
-function resolveWeatherValidationFeedback(weatherSettings: WeatherSettings) {
-  if (!weatherSettings.enabled) {
-    return "";
-  }
-
-  if (!weatherSettings.countyName) {
-    return "請先選擇縣市，才能決定 header 會顯示哪個地區。";
-  }
-
-  if (weatherSettings.locationMode === "station" && !weatherSettings.stationId) {
-    return "請先選擇測站，才能確認 header 會顯示哪個站點。";
-  }
-
-  if (weatherSettings.preset === "custom" && weatherSettings.fieldKeys.length === 0) {
-    return "至少勾選一個天氣欄位，header 才有可顯示的 weather metadata。";
-  }
-
-  return "";
-}
-
-export function resolveWeatherRefreshFeedback(diagnostic: WeatherDiagnostic) {
-  if (diagnostic.state === "ok" && diagnostic.source === "upstream") {
-    return {
-      errorMessage: "",
-      message: "天氣資訊已立即更新。"
-    };
-  }
-
-  const code = diagnostic.code ? `（${diagnostic.code}）` : "";
-  const sourceDetail = {
-    cache: "本次只取得快取資料。",
-    stale: "目前顯示舊資料。",
-    unavailable: "目前沒有可用天氣資料。",
-    upstream: "請查看下方診斷。"
-  }[diagnostic.source];
-  const outcome = diagnostic.state === "error" ? "失敗" : "未完成";
-
-  return {
-    errorMessage: `天氣即時更新${outcome}${code}；${sourceDetail}`,
-    message: ""
-  };
-}
-
-function buildWeatherDiagnosticModel(diagnostic: WeatherDiagnostic | null) {
-  const value: WeatherDiagnostic = diagnostic ?? {
-    code: null,
-    httpStatus: null,
-    lastSuccessAt: null,
-    occurredAt: null,
-    operation: null,
-    retryable: false,
-    safeSummary: "尚未執行天氣資料請求",
-    source: "unavailable",
-    state: "never-attempted"
-  };
-  const stateMeta = {
-    error: { label: "取得失敗", tone: "error" as const },
-    "never-attempted": { label: "尚未執行", tone: "muted" as const },
-    ok: { label: "取得成功", tone: "ready" as const },
-    unconfigured: { label: "尚未設定", tone: "warning" as const }
-  }[value.state];
-  const sourceLabel = {
-    cache: "快取資料",
-    stale: "使用舊資料",
-    unavailable: "無可用資料",
-    upstream: "即時上游"
-  }[value.source];
-  const stage = (() => {
-    switch (value.code) {
-      case "WEATHER_UNCONFIGURED": return { id: "configuration", label: "Configuration" };
-      case "WEATHER_DNS_LOOKUP_FAILED": return { id: "dns", label: "DNS" };
-      case "WEATHER_CONNECTION_TIMEOUT": return { id: "connect", label: "Connect" };
-      case "WEATHER_TLS_FAILED": return { id: "tls", label: "TLS" };
-      case "WEATHER_HTTP_ERROR":
-      case "WEATHER_REQUEST_TIMEOUT": return { id: "http", label: "HTTP" };
-      case "WEATHER_INVALID_PAYLOAD": return { id: "payload", label: "Payload" };
-      case "WEATHER_UNKNOWN_ERROR": return { id: "unknown", label: "Unknown" };
-      default: return null;
-    }
-  })();
-  const copyText = [
-    "Weather diagnostic",
-    `State: ${value.state}`,
-    `Source: ${value.source}`,
-    `Stage: ${stage?.id ?? "-"}`,
-    `Code: ${value.code ?? "-"}`,
-    `Operation: ${value.operation ?? "-"}`,
-    `Occurred at: ${value.occurredAt ?? "-"}`,
-    `Last success at: ${value.lastSuccessAt ?? "-"}`,
-    `Retryable: ${value.retryable}`,
-    `HTTP status: ${value.httpStatus ?? "-"}`,
-    `Summary: ${value.safeSummary}`
-  ].join("\n");
-
-  return {
-    code: value.code,
-    copyText,
-    httpStatusLabel: value.httpStatus === null ? null : String(value.httpStatus),
-    lastSuccessAtLabel: value.lastSuccessAt ? formatTimestamp(value.lastSuccessAt) : "尚無成功紀錄",
-    occurredAtLabel: value.occurredAt ? formatTimestamp(value.occurredAt) : "尚未執行",
-    operationLabel: value.operation === "current"
-      ? "目前天氣"
-      : value.operation === "options"
-        ? "測站／縣市選項"
-        : "尚未執行",
-    retryableLabel: value.retryable ? "可重試" : "不可重試",
-    safeSummary: value.safeSummary,
-    source: value.source,
-    sourceLabel,
-    stage: stage?.id ?? null,
-    stageLabel: stage?.label ?? null,
-    state: value.state,
-    stateLabel: stateMeta.label,
-    tone: stateMeta.tone
   };
 }
 

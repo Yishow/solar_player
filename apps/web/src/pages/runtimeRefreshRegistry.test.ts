@@ -36,6 +36,10 @@ test("runtime refresh registry derives stable refresh keys from page-specific pa
     resolveMonitoringHistoryRuntimeRefreshSpec("week").refreshKey,
     "monitoring-history:week"
   );
+  assert.equal(
+    resolveMonitoringHistoryRuntimeRefreshSpec("week", "cl").refreshKey,
+    "monitoring-history:cl:week"
+  );
 });
 
 test("runtime refresh registry assigns dedicated refresh scopes for sustainability and monitoring history", () => {

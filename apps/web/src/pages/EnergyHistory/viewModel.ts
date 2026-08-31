@@ -2,8 +2,58 @@ import {
   buildMonitoringSurfaceState,
   isMonitoringSourceStale
 } from "../energyMonitoringState";
+import type { MetricScope } from "@solar-display/shared";
 
 export type EnergyHistoryRange = "day" | "week" | "month" | "year" | "total";
+
+export function isEnergyHistoryRange(value: string | null): value is EnergyHistoryRange {
+  return value === "day" || value === "week" || value === "month" || value === "year" || value === "total";
+}
+
+export const energyHistoryScopeOptions = [
+  { key: "cl", label: "CL 廠區 / CL Site" },
+  { key: "kn", label: "KN 廠區 / KN Site" },
+  { key: "global", label: "Global · 跨廠 / Cross-site" }
+] as const satisfies ReadonlyArray<{ key: MetricScope; label: string }>;
+
+export function resolveEnergyHistoryScopeLabel(metricScope: MetricScope) {
+  return energyHistoryScopeOptions.find((option) => option.key === metricScope)?.label ?? metricScope;
+}
+
+export type EnergyHistorySelection = {
+  metricScope: MetricScope;
+  range: EnergyHistoryRange;
+};
+
+export function resolveEnergyHistorySelection(search: string | URLSearchParams): EnergyHistorySelection {
+  const searchParams = typeof search === "string" ? new URLSearchParams(search) : search;
+  const requestedMetricScope = searchParams.get("metricScope");
+  const requestedRange = searchParams.get("range");
+  return {
+    metricScope: requestedMetricScope === "cl" || requestedMetricScope === "kn" || requestedMetricScope === "global"
+      ? requestedMetricScope
+      : "global",
+    range: isEnergyHistoryRange(requestedRange) ? requestedRange : "day"
+  };
+}
+
+export function updateEnergyHistorySearchParams(
+  current: string | URLSearchParams,
+  selection: Partial<EnergyHistorySelection>
+) {
+  const searchParams = new URLSearchParams(current);
+  const currentSelection = resolveEnergyHistorySelection(searchParams);
+  searchParams.set("metricScope", selection.metricScope ?? currentSelection.metricScope);
+  searchParams.set("range", selection.range ?? currentSelection.range);
+  return searchParams;
+}
+
+export function isEnergyHistoryPayloadForSelection(
+  payload: { metricScope?: unknown; range?: unknown } | null | undefined,
+  selection: EnergyHistorySelection
+) {
+  return payload?.metricScope === selection.metricScope && payload.range === selection.range;
+}
 
 export type EnergyHistorySnapshot = {
   capturedAt: string;
@@ -38,6 +88,7 @@ export type CumulativeCounter = {
 
 type BuildEnergyHistoryViewModelArgs = {
   counters: CumulativeCounter[];
+  metricScope: MetricScope;
   now?: Date | string | null;
   range: EnergyHistoryRange;
   snapshots: EnergyHistorySnapshot[];
@@ -180,12 +231,16 @@ function hasRequiredCounterData(counters: CumulativeCounter[]) {
 
 export function buildEnergyHistoryViewModel({
   counters,
+  metricScope,
   now,
   range,
   snapshots,
   summaries
 }: BuildEnergyHistoryViewModelArgs) {
   const rangeHeading = rangeHeadings[range];
+  const scopeLabel = resolveEnergyHistoryScopeLabel(metricScope);
+  const sourceLabel = `${scopeLabel} · ${rangeHeading.sourceLabel}`;
+  const emptyStateLabel = `${scopeLabel} · 目前沒有可用的歷史資料來源`;
   const peakGenerationSummary = resolvePeakSummary(summaries, (summary) => summary.peakGeneration);
   const peakConsumptionSummary = resolvePeakSummary(summaries, (summary) => summary.peakConsumption);
   const lastUpdated =
@@ -237,7 +292,7 @@ export function buildEnergyHistoryViewModel({
       ? buildMonitoringSurfaceState({
           category: "empty",
           detailLabel: "累積計數器目前沒有可用資料",
-          emptyStateLabel: "目前沒有可用的歷史資料來源",
+          emptyStateLabel,
           freshnessLabel: "無資料",
           lastUpdatedAt: null,
           sourceRoleLabel: "Cumulative Counter"
@@ -246,7 +301,7 @@ export function buildEnergyHistoryViewModel({
         ? buildMonitoringSurfaceState({
             category: "stale",
             detailLabel: "累積計數器已超過操作監看時效，請確認上游同步",
-            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            emptyStateLabel,
             freshnessLabel: "逾時資料",
             lastUpdatedAt: lastUpdated,
             sourceRoleLabel: "Cumulative Counter"
@@ -254,7 +309,7 @@ export function buildEnergyHistoryViewModel({
         : buildMonitoringSurfaceState({
             category: "fresh",
             detailLabel: "累積計數器已同步，可用於長期監看",
-            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            emptyStateLabel,
             freshnessLabel: "累積資料",
             lastUpdatedAt: lastUpdated,
             sourceRoleLabel: "Cumulative Counter"
@@ -263,7 +318,7 @@ export function buildEnergyHistoryViewModel({
       ? buildMonitoringSurfaceState({
           category: "empty",
           detailLabel: "所選 range 尚未產生可用的 history rows",
-          emptyStateLabel: "目前沒有可用的歷史資料來源",
+          emptyStateLabel,
           freshnessLabel: "無資料",
           lastUpdatedAt: null,
           sourceRoleLabel: "History Summary"
@@ -272,7 +327,7 @@ export function buildEnergyHistoryViewModel({
         ? buildMonitoringSurfaceState({
             category: "stale",
             detailLabel: "歷史來源已超過操作監看時效，請留意目前數據可能過舊",
-            emptyStateLabel: "目前沒有可用的歷史資料來源",
+            emptyStateLabel,
             freshnessLabel: "逾時資料",
             lastUpdatedAt: lastUpdated,
             sourceRoleLabel: hasUsableSummaries ? "History Summary + Trend Snapshot" : "Trend Snapshot Fallback"
@@ -283,7 +338,7 @@ export function buildEnergyHistoryViewModel({
               detailLabel: hasUsableSummaries
                 ? "缺少 trend snapshot，僅能用 history summary 呈現監看結果"
                 : "缺少 history summary，僅能用 trend snapshot 維持趨勢判讀",
-              emptyStateLabel: "目前沒有可用的歷史資料來源",
+              emptyStateLabel,
               freshnessLabel: "降級資料",
               lastUpdatedAt: lastUpdated,
               sourceRoleLabel: hasUsableSummaries ? "History Summary" : "Trend Snapshot Fallback"
@@ -291,7 +346,7 @@ export function buildEnergyHistoryViewModel({
           : buildMonitoringSurfaceState({
               category: "fresh",
               detailLabel: "history summary 與 trend snapshot 皆可用",
-              emptyStateLabel: "目前沒有可用的歷史資料來源",
+              emptyStateLabel,
               freshnessLabel: "歷史資料",
               lastUpdatedAt: lastUpdated,
               sourceRoleLabel: "History Summary + Trend Snapshot"
@@ -333,7 +388,7 @@ export function buildEnergyHistoryViewModel({
       {
         detailLabel: "",
         label: "資料來源",
-        valueLabel: rangeHeading.sourceLabel
+        valueLabel: sourceLabel
       },
       {
         detailLabel: "",
@@ -400,7 +455,8 @@ export function buildEnergyHistoryViewModel({
       active: option.key === range
     })),
     monitoringState,
-    sourceLabel: rangeHeading.sourceLabel,
+    scopeLabel,
+    sourceLabel,
     tableRows: summaries.map((summary) => ({
       co2Label: formatCo2Tonnes(summary.co2Total),
       consumptionLabel: formatInteger(summary.consumptionTotal),

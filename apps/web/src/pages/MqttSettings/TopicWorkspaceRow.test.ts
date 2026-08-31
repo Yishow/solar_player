@@ -133,3 +133,33 @@ test("TopicWorkspaceRow renders coverage information when present", () => {
   assert.match(html, /class="[^"]*coverage[^"]*"/);
   assert.match(html, /Ready · Fully mapped to active widgets/);
 });
+
+test("TopicWorkspaceRow isolates same-key publish drafts and busy state by metric scope", () => {
+  const clHtml = renderToStaticMarkup(
+    React.createElement(TopicWorkspaceRow, {
+      topic: { ...baseMockTopic, metricScope: "cl" },
+      handleTopicChange: () => undefined,
+      publishDraftValue: "101",
+      publishTopicValue: async () => undefined,
+      publishingTopicKey: "kn:realTimePower",
+      removeTopicMapping: () => undefined
+    })
+  );
+  const knHtml = renderToStaticMarkup(
+    React.createElement(TopicWorkspaceRow, {
+      topic: { ...baseMockTopic, metricScope: "kn" },
+      handleTopicChange: () => undefined,
+      publishDraftValue: "202",
+      publishTopicValue: async () => undefined,
+      publishingTopicKey: "kn:realTimePower",
+      removeTopicMapping: () => undefined
+    })
+  );
+
+  assert.match(clHtml, /value="101"/);
+  assert.match(clHtml, /data-mqtt-publish-disabled="false"/);
+  assert.doesNotMatch(clHtml, /發佈中\.\.\./);
+  assert.match(knHtml, /value="202"/);
+  assert.match(knHtml, /data-mqtt-publish-disabled="true"/);
+  assert.match(knHtml, /發佈中\.\.\./);
+});

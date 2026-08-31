@@ -1,7 +1,8 @@
 import {
   getDeviceGroups,
   getDeviceStatus,
-  getFleetDevices
+  getFleetDevices,
+  getPlaybackProfiles
 } from "../../services/api";
 import {
   loadDeviceFleetModel,
@@ -12,7 +13,8 @@ import {
 const defaultLoaders: DeviceFleetLoaders = {
   getDevices: getFleetDevices,
   getGroups: getDeviceGroups,
-  getLiveness: async () => (await getDeviceStatus()).displayClients
+  getLiveness: async () => (await getDeviceStatus()).displayClients,
+  getProfiles: getPlaybackProfiles
 };
 
 let routeLoaders = defaultLoaders;

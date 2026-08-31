@@ -6,10 +6,10 @@ import type {
 } from "@solar-display/shared";
 
 export type DeviceFleetResource =
-  | "defaultProfile"
   | "devices"
   | "groups"
-  | "liveness";
+  | "liveness"
+  | "profiles";
 
 export type DeviceFleetOperationalState =
   | "disabled"
@@ -28,6 +28,7 @@ export type DeviceFleetRow = {
   desiredVersion: number | null;
   enabled: boolean;
   groupId: number | null;
+  groupEnabled: boolean | null;
   groupName: string | null;
   id: number;
   isPlaying: boolean;
@@ -37,6 +38,8 @@ export type DeviceFleetRow = {
   pageKey: string | null;
   paired: boolean;
   pairingAction: "pair" | "re-pair";
+  playbackProfileId: number | null;
+  playbackProfileName: string | null;
   route: string | null;
   rolloutState: "applied" | "failed" | "offline" | "waiting";
   rolloutError: string | null;
@@ -126,6 +129,7 @@ export function buildDeviceFleetViewModel(args: {
           liveness?.desiredVersion ?? device.group?.desiredVersion ?? null,
         enabled: device.enabled,
         groupId: device.groupId,
+        groupEnabled: device.group?.enabled ?? null,
         groupName: device.group?.name ?? null,
         id: device.id,
         isPlaying: liveness?.isPlaying ?? false,
@@ -139,6 +143,8 @@ export function buildDeviceFleetViewModel(args: {
         pageKey: liveness?.pageKey ?? null,
         paired: device.paired,
         pairingAction: device.paired ? "re-pair" : "pair",
+        playbackProfileId: device.group?.playbackProfileId ?? null,
+        playbackProfileName: device.group?.playbackProfile.name ?? null,
         route: liveness?.route ?? null,
         rolloutError:
           liveness?.profileUpdateError ?? device.profileUpdateError,

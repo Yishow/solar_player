@@ -1,4 +1,5 @@
 import type { ShellDensity } from "../components/shellDensity";
+import { DATA_HUB_ROOT_PATH, DATA_HUB_SECTIONS } from "./dataHub";
 
 export type RouteGroup = "playback" | "management";
 export type PlaybackRouteNavIcon = "overview" | "solar" | "factory-circuit" | "images" | "sustainability";
@@ -141,6 +142,42 @@ export const routeMetaList: RouteMeta[] = [
     subtitle: "Data Sources",
     group: "management",
     order: 11,
+    shellDensity: "management"
+  },
+  {
+    path: DATA_HUB_ROOT_PATH,
+    navLabel: "Data Hub",
+    title: "資料中樞",
+    subtitle: "Data Hub",
+    group: "management",
+    order: 12,
+    shellDensity: "management"
+  },
+  ...DATA_HUB_SECTIONS.map((section, index): RouteMeta => ({
+    path: section.path,
+    navLabel: section.label,
+    title: section.title,
+    subtitle: section.label,
+    group: "management",
+    order: 12 + index,
+    shellDensity: "management"
+  })),
+  {
+    path: `${DATA_HUB_ROOT_PATH}/sources/operations`,
+    navLabel: "Sources operations",
+    title: "來源維運",
+    subtitle: "Sources Operations",
+    group: "management",
+    order: 19,
+    shellDensity: "management"
+  },
+  {
+    path: `${DATA_HUB_ROOT_PATH}/diagnostics/operations`,
+    navLabel: "Diagnostics operations",
+    title: "診斷維運",
+    subtitle: "Diagnostics Operations",
+    group: "management",
+    order: 20,
     shellDensity: "management"
   },
   {

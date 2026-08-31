@@ -1,33 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { isMetricScope, type MetricScope } from "@solar-display/shared";
+import { useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useRuntimeRefreshLifecycle } from "../../hooks/useRuntimeRefreshLifecycle";
 import { useAbsoluteAppTimeEpoch } from "../../hooks/useAppTime";
-import { requestJson } from "../../services/api";
-import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../runtimeRefreshRegistry";
-import {
-  readCachedMonitoringHistoryPayload,
-  rememberMonitoringHistoryPayload,
-  resolveMonitoringHistoryPayloadForRange,
-  type MonitoringHistoryPayload
-} from "../shared/monitoringHistoryPayloadCache";
+import { getEnergyHistory, type DataHubEnergyHistoryResponse } from "../../services/api";
+import { resolveMonitoringHistoryRuntimeRefreshSpec, shouldRefreshMonitoringHistory } from "../runtimeRefreshRegistry";
 import { energyHistoryLayout, energyHistoryMetricCardKeys } from "./layout";
 import "./history.css";
 import {
   buildEnergyHistoryViewModel,
-  type CumulativeCounter,
-  type DailyEnergySummary,
+  energyHistoryScopeOptions,
+  isEnergyHistoryPayloadForSelection,
+  resolveEnergyHistorySelection,
   type EnergyHistoryRange,
-  type EnergyHistorySnapshot
+  updateEnergyHistorySearchParams
 } from "./viewModel";
 
-type MetricsHistoryResponse = MonitoringHistoryPayload<EnergyHistorySnapshot>;
-
-type DailySummaryResponse = {
-  summaries: DailyEnergySummary[];
-};
-
-type CumulativeResponse = {
-  counters: CumulativeCounter[];
-};
+type MetricsHistoryResponse = DataHubEnergyHistoryResponse;
 
 const METRIC_ICON_GLYPHS: Record<number, string> = {
   0: "☀",
@@ -106,58 +95,47 @@ function TrendChart({
 }
 
 export function EnergyHistory() {
-  const [range, setRange] = useState<EnergyHistoryRange>("day");
-  const absoluteAppTimeEpoch = useAbsoluteAppTimeEpoch();
-  const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range);
-  const cachedHistoryPayload = readCachedMonitoringHistoryPayload<EnergyHistorySnapshot>(range);
-  const historySnapshotsRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
-    enabled: true,
-    load: () => requestJson<MetricsHistoryResponse>(`/api/metrics/history?range=${range}`),
-    initialPayload: cachedHistoryPayload,
-    refreshKey: historyRefresh.refreshKey,
-    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
-  });
-  const dailySummariesRuntime = useRuntimeRefreshLifecycle<DailySummaryResponse>({
-    enabled: true,
-    load: () => requestJson<DailySummaryResponse>(`/api/metrics/daily-summary?range=${range}`),
-    refreshKey: historyRefresh.refreshKey,
-    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
-  });
-  const cumulativeCountersRuntime = useRuntimeRefreshLifecycle<CumulativeResponse>({
-    enabled: true,
-    load: () => requestJson<CumulativeResponse>("/api/metrics/cumulative"),
-    refreshKey: historyRefresh.refreshKey,
-    shouldRefresh: (event) => historyRefresh.refreshScopes.includes(event.scope)
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedMetricScope = searchParams.get("metricScope");
+  const requestedRange = searchParams.get("range");
+  const selection = resolveEnergyHistorySelection(searchParams);
+  const { metricScope, range } = selection;
+
   useEffect(() => {
-    rememberMonitoringHistoryPayload(historySnapshotsRuntime.payload);
-  }, [historySnapshotsRuntime.payload]);
-  const historyPayload = resolveMonitoringHistoryPayloadForRange({
-    cachedPayload: cachedHistoryPayload,
-    range,
-    runtimePayload: historySnapshotsRuntime.payload
+    if (requestedMetricScope === metricScope && requestedRange === range) {
+      return;
+    }
+
+    setSearchParams((current) => updateEnergyHistorySearchParams(current, selection), { replace: true });
+  }, [metricScope, range, requestedMetricScope, requestedRange, setSearchParams]);
+
+  const updateSelection = (selection: Partial<{ metricScope: MetricScope; range: EnergyHistoryRange }>) => {
+    setSearchParams((current) => updateEnergyHistorySearchParams(current, selection));
+  };
+
+  const absoluteAppTimeEpoch = useAbsoluteAppTimeEpoch();
+  const historyRefresh = resolveMonitoringHistoryRuntimeRefreshSpec(range, metricScope);
+  const historyRuntime = useRuntimeRefreshLifecycle<MetricsHistoryResponse>({
+    enabled: true,
+    load: () => getEnergyHistory(metricScope, range),
+    refreshKey: historyRefresh.refreshKey,
+    shouldRefresh: (event) => shouldRefreshMonitoringHistory(event, metricScope)
   });
+  const historyPayload = isEnergyHistoryPayloadForSelection(historyRuntime.payload, selection)
+    ? historyRuntime.payload
+    : null;
   const snapshots = historyPayload?.snapshots ?? [];
-  const summaries = dailySummariesRuntime.payload?.summaries ?? [];
-  const counters = cumulativeCountersRuntime.payload?.counters ?? [];
-  const isLoading =
-    historySnapshotsRuntime.isLoading ||
-    historySnapshotsRuntime.isRefreshing ||
-    dailySummariesRuntime.isLoading ||
-    dailySummariesRuntime.isRefreshing ||
-    cumulativeCountersRuntime.isLoading ||
-    cumulativeCountersRuntime.isRefreshing;
-  const historySourceErrorMessage = [
-    historySnapshotsRuntime.errorMessage,
-    dailySummariesRuntime.errorMessage,
-    cumulativeCountersRuntime.errorMessage
-  ].filter(Boolean).join(" / ");
+  const summaries = historyPayload?.summaries ?? [];
+  const counters = historyPayload?.counters ?? [];
+  const isLoading = historyRuntime.isLoading || historyRuntime.isRefreshing;
+  const historySourceErrorMessage = historyRuntime.errorMessage;
   const errorMessage = historySourceErrorMessage;
 
   const viewModel = useMemo(
     () =>
       buildEnergyHistoryViewModel({
         counters,
+        metricScope,
         now:
           absoluteAppTimeEpoch === null
             ? null
@@ -166,7 +144,7 @@ export function EnergyHistory() {
         snapshots,
         summaries
       }),
-    [absoluteAppTimeEpoch, counters, range, snapshots, summaries]
+    [absoluteAppTimeEpoch, counters, metricScope, range, snapshots, summaries]
   );
 
   const validChartPoints = viewModel.chartLines
@@ -206,13 +184,30 @@ export function EnergyHistory() {
           範圍切換
           <small>RANGE</small>
         </div>
+        <label className="eh-scope-picker">
+          <span>資料範圍</span>
+          <select
+            aria-label="資料範圍"
+            value={metricScope}
+            onChange={(event) => {
+              if (isMetricScope(event.target.value)) {
+                updateSelection({ metricScope: event.target.value });
+              }
+            }}
+          >
+            {energyHistoryScopeOptions.map((option) => (
+              <option key={option.key} value={option.key}>{option.label}</option>
+            ))}
+          </select>
+          <small>{viewModel.scopeLabel}</small>
+        </label>
         <div className="eh-side-list">
           {viewModel.rangeOptions.map((option) => (
             <button
               key={option.key}
               type="button"
               className={option.active ? "active" : ""}
-              onClick={() => setRange(option.key)}
+              onClick={() => updateSelection({ range: option.key })}
             >
               <span className="eh-range-zh">{option.label}</span>
               <span className="eh-range-en">{option.subtitle}</span>
@@ -268,7 +263,7 @@ export function EnergyHistory() {
         <div className="eh-chart-head">
           <div className="eh-chart-title">
             {viewModel.chartTitle}
-            <small>{viewModel.chartSubtitle}</small>
+            <small>{viewModel.scopeLabel} · {viewModel.chartSubtitle}</small>
           </div>
           <div className="eh-legend">
             <span className="orange">發電量 (kW)</span>

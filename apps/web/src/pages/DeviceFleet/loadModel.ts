@@ -11,10 +11,10 @@ import type {
 
 export type DeviceFleetModel = {
   accessDenied: boolean;
-  defaultProfile: PlaybackProfileSummary | null;
   devices: Device[];
   groups: DeviceGroup[];
   liveness: DisplayClientLivenessSnapshot | null;
+  profiles: PlaybackProfileSummary[];
   unavailable: DeviceFleetResource[];
 };
 
@@ -22,17 +22,19 @@ export type DeviceFleetLoaders = {
   getDevices: () => Promise<Device[]>;
   getGroups: () => Promise<DeviceGroup[]>;
   getLiveness: () => Promise<DisplayClientLivenessSnapshot>;
+  getProfiles: () => Promise<PlaybackProfileSummary[]>;
 };
 
 export async function loadDeviceFleetModel(
   loaders: DeviceFleetLoaders
 ): Promise<DeviceFleetModel> {
-  const [devices, groups, liveness] = await Promise.allSettled([
+  const [devices, groups, liveness, profiles] = await Promise.allSettled([
     loaders.getDevices(),
     loaders.getGroups(),
-    loaders.getLiveness()
+    loaders.getLiveness(),
+    loaders.getProfiles()
   ]);
-  const accessDenied = [devices, groups, liveness].some(
+  const accessDenied = [devices, groups, liveness, profiles].some(
     (result) =>
       result.status === "rejected"
       && isManagementAccessDeniedError(result.reason)
@@ -42,22 +44,15 @@ export async function loadDeviceFleetModel(
   if (devices.status === "rejected") unavailable.push("devices");
   if (groups.status === "rejected") unavailable.push("groups");
   if (liveness.status === "rejected") unavailable.push("liveness");
-  const defaultProfile =
-    groups.status === "fulfilled"
-      ? groups.value
-          .map((group) => group.playbackProfile)
-          .find((profile) => profile.isDefault) ?? null
-      : null;
-  if (groups.status === "fulfilled" && defaultProfile === null) {
-    unavailable.push("defaultProfile");
-  }
+  if (profiles.status === "rejected") unavailable.push("profiles");
+  const availableProfiles = profiles.status === "fulfilled" ? profiles.value : [];
 
   return {
     accessDenied,
-    defaultProfile,
     devices: devices.status === "fulfilled" ? devices.value : [],
     groups: groups.status === "fulfilled" ? groups.value : [],
     liveness: liveness.status === "fulfilled" ? liveness.value : null,
+    profiles: availableProfiles,
     unavailable
   };
 }

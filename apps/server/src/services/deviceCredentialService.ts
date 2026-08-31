@@ -17,6 +17,17 @@ type PairingTokenRow = {
   used_at: string | null;
 };
 
+type PairingDeviceRow = {
+  device_enabled: number;
+  group_enabled: number | null;
+  group_id: number | null;
+  id: number;
+  playback_profile_archived_at: string | null;
+  playback_profile_id: number | null;
+  playback_profile_settings_id: number | null;
+  site_scope: SiteScope | null;
+};
+
 type CredentialRow = {
   client_id: string;
   credential_id: number;
@@ -82,34 +93,82 @@ export function resetDeviceCredentialClockForTests() {
 
 export function issuePairingToken(deviceId: number): PairingTokenIssue {
   const database = getDatabase();
-  const device = database
-    .prepare("SELECT id FROM devices WHERE id = ?")
-    .get(deviceId) as { id: number } | undefined;
 
-  if (!device) {
-    throw new DeviceCredentialServiceError(
-      "device_not_found",
-      "Device does not exist",
-      404
-    );
-  }
+  return database.transaction(() => {
+    const device = database
+      .prepare(
+        `SELECT
+           devices.id,
+           devices.enabled AS device_enabled,
+           devices.group_id,
+           device_groups.enabled AS group_enabled,
+           device_groups.site_scope,
+           device_groups.playback_profile_id,
+           playback_profiles.archived_at AS playback_profile_archived_at,
+           playback_profile_settings.profile_id AS playback_profile_settings_id
+         FROM devices
+         LEFT JOIN device_groups ON device_groups.id = devices.group_id
+         LEFT JOIN playback_profiles
+           ON playback_profiles.id = device_groups.playback_profile_id
+         LEFT JOIN playback_profile_settings
+           ON playback_profile_settings.profile_id = playback_profiles.id
+         WHERE devices.id = ?`
+      )
+      .get(deviceId) as PairingDeviceRow | undefined;
 
-  const now = readNow();
-  const token = createSecret();
-  const expiresAt = expiresAtFrom(now, PAIRING_TOKEN_LIFETIME_MS);
-  database
-    .prepare(
-      `INSERT INTO pairing_tokens (
-         device_id, token_hash, expires_at, used_at, created_at
-       ) VALUES (?, ?, ?, NULL, ?)`
-    )
-    .run(deviceId, hashSecret(token), expiresAt, now.toISOString());
+    if (!device) {
+      throw new DeviceCredentialServiceError(
+        "device_not_found",
+        "Device does not exist",
+        404
+      );
+    }
+    if (device.device_enabled !== 1) {
+      throw new DeviceCredentialServiceError(
+        "device_disabled",
+        "Device is disabled",
+        403
+      );
+    }
+    if (
+      device.group_id === null
+      || device.group_enabled === null
+      || device.site_scope === null
+      || device.playback_profile_id === null
+      || device.playback_profile_archived_at !== null
+      || device.playback_profile_settings_id === null
+    ) {
+      throw new DeviceCredentialServiceError(
+        "group_missing",
+        "Device Group is unavailable",
+        403
+      );
+    }
+    if (device.group_enabled !== 1) {
+      throw new DeviceCredentialServiceError(
+        "group_disabled",
+        "Device Group is disabled",
+        403
+      );
+    }
 
-  return {
-    expiresAt,
-    pairingPath: `/device-pairing#token=${encodeURIComponent(token)}`,
-    token
-  };
+    const now = readNow();
+    const token = createSecret();
+    const expiresAt = expiresAtFrom(now, PAIRING_TOKEN_LIFETIME_MS);
+    database
+      .prepare(
+        `INSERT INTO pairing_tokens (
+           device_id, token_hash, expires_at, used_at, created_at
+         ) VALUES (?, ?, ?, NULL, ?)`
+      )
+      .run(deviceId, hashSecret(token), expiresAt, now.toISOString());
+
+    return {
+      expiresAt,
+      pairingPath: `/device-pairing#token=${encodeURIComponent(token)}`,
+      token
+    };
+  })();
 }
 
 export function exchangePairingToken(value: unknown) {

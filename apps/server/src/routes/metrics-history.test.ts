@@ -371,3 +371,123 @@ test("metrics history range readers return only the requested metric scope", asy
     await app.close();
   }
 });
+
+test("GET /api/data-hub/energy-history returns one explicit scope with the requested range", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation, consumption, captured_at)
+    VALUES
+      ('cl', 110, 90, '2026-08-31T01:00:00.000Z'),
+      ('kn', 220, 190, '2026-08-31T01:00:00.000Z'),
+      ('global', 330, 290, '2026-08-31T01:00:00.000Z')
+  `).run();
+  database.prepare(`
+    INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total)
+    VALUES
+      ('cl', '2026-08-31', 110, 90),
+      ('kn', '2026-08-31', 220, 190),
+      ('global', '2026-08-31', 330, 290)
+  `).run();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value)
+    VALUES
+      ('cl', 'generation', 110),
+      ('kn', 'generation', 220),
+      ('global', 'generation', 330)
+  `).run();
+
+  const app = await buildApp();
+  try {
+    for (const metricScope of ["cl", "kn", "global"] as const) {
+      for (const range of ["day", "week", "month", "year", "total"] as const) {
+        const response = await app.inject({
+          method: "GET",
+          url: `/api/data-hub/energy-history?metricScope=${metricScope}&range=${range}`
+        });
+
+        assert.equal(response.statusCode, 200);
+        const body = response.json() as {
+          counters: Array<{ totalValue: number }>;
+          metricScope: string;
+          range: string;
+          snapshots: Array<{ generation: number }>;
+          summaries: Array<{ generationTotal: number }>;
+        };
+        assert.equal(body.metricScope, metricScope);
+        assert.equal(body.range, range);
+        assert.deepEqual(body.snapshots.map(({ generation }) => generation), [
+          metricScope === "cl" ? 110 : metricScope === "kn" ? 220 : 330
+        ]);
+        assert.deepEqual(body.summaries.map(({ generationTotal }) => generationTotal), [
+          metricScope === "cl" ? 110 : metricScope === "kn" ? 220 : 330
+        ]);
+        assert.deepEqual(body.counters.map(({ totalValue }) => totalValue), [
+          metricScope === "cl" ? 110 : metricScope === "kn" ? 220 : 330
+        ]);
+      }
+    }
+
+    for (const query of [
+      "",
+      "?metricScope=all&range=day",
+      "?metricScope=invalid&range=day",
+      "?metricScope=cl",
+      "?metricScope=cl&range=invalid"
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/data-hub/energy-history${query}`
+      });
+      assert.equal(response.statusCode, 400, query || "missing query");
+    }
+
+    const denied = await app.inject({
+      method: "GET",
+      remoteAddress: "198.51.100.24",
+      url: "/api/data-hub/energy-history?metricScope=global&range=day"
+    });
+    assert.equal(denied.statusCode, 403);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /api/data-hub/energy-history keeps an empty selected scope empty", async () => {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+  database.prepare("DELETE FROM cumulative_counters").run();
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation, captured_at)
+    VALUES ('kn', 220, '2026-08-31T01:00:00.000Z'), ('global', 330, '2026-08-31T01:00:00.000Z')
+  `).run();
+  database.prepare(`
+    INSERT INTO daily_energy_summaries (metric_scope, date, generation_total)
+    VALUES ('kn', '2026-08-31', 220), ('global', '2026-08-31', 330)
+  `).run();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value)
+    VALUES ('kn', 'generation', 220), ('global', 'generation', 330)
+  `).run();
+
+  const app = await buildApp();
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/data-hub/energy-history?metricScope=cl&range=week"
+    });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      counters: [],
+      metricScope: "cl",
+      range: "week",
+      snapshots: [],
+      summaries: []
+    });
+  } finally {
+    await app.close();
+  }
+});

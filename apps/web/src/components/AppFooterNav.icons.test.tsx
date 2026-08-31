@@ -99,10 +99,18 @@ test("registry-backed playback footer entries inherit the icon from their templa
   assertIconLabelEntry(html, { icon: "images", label: "圖像展區", path: "/images-gallery" });
 });
 
-test("management footer keeps existing entries without route icons", () => {
+test("management footer exposes Data Hub without legacy data settings entries", () => {
   const html = renderFooter("/settings/mqtt");
 
   assert.doesNotMatch(html, /data-shell-nav-icon=/);
   assert.match(html, />回總覽</);
-  assert.match(html, />MQTT</);
+  assert.match(html, />Data Hub</);
+  assert.doesNotMatch(html, />資料來源</);
+  assert.doesNotMatch(html, />MQTT</);
+});
+
+test("management footer keeps Data Hub active for section routes", () => {
+  const html = renderFooter("/settings/data-hub/metrics");
+
+  assert.match(html, /<a[^>]*aria-current="page"[^>]*href="\/settings\/data-hub"[^>]*>[\s\S]*?<span>Data Hub<\/span>/);
 });

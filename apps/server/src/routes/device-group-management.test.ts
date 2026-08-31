@@ -464,6 +464,72 @@ test("missing Playback Profile rejects a Group mutation without partial writes",
   }
 });
 
+test("archived Playback Profile rejects Group mutations without partial writes", async () => {
+  const app = await buildApp();
+
+  try {
+    const database = getDatabase();
+    const archivedProfileId = Number(
+      database
+        .prepare(
+          `INSERT INTO playback_profiles (
+             profile_key, name, is_default, archived_at, created_at, updated_at
+           ) VALUES (?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        )
+        .run("archived-device-group", "Archived Device Group Profile").lastInsertRowid
+    );
+    const groupResponse = await app.inject({
+      method: "POST",
+      payload: {
+        enabled: true,
+        name: "中壢展示群組",
+        siteScope: "cl"
+      },
+      url: "/api/device-groups"
+    });
+    assert.equal(groupResponse.statusCode, 201);
+    const groupId = groupResponse.json<{ data: { id: number; playbackProfileId: number } }>().data.id;
+
+    const updateResponse = await app.inject({
+      method: "PUT",
+      payload: {
+        name: "不應寫入",
+        playbackProfileId: archivedProfileId,
+        siteScope: "kn"
+      },
+      url: `/api/device-groups/${groupId}`
+    });
+    assert.equal(updateResponse.statusCode, 400);
+    assert.equal(updateResponse.json<{ code: string }>().code, "profile_not_found");
+
+    const createResponse = await app.inject({
+      method: "POST",
+      payload: {
+        enabled: true,
+        name: "封存 Profile 群組",
+        playbackProfileId: archivedProfileId,
+        siteScope: "kn"
+      },
+      url: "/api/device-groups"
+    });
+    assert.equal(createResponse.statusCode, 400);
+    assert.equal(createResponse.json<{ code: string }>().code, "profile_not_found");
+
+    assert.deepEqual(
+      database
+        .prepare("SELECT name, playback_profile_id, site_scope FROM device_groups WHERE id = ?")
+        .get(groupId),
+      {
+        name: "中壢展示群組",
+        playback_profile_id: groupResponse.json<{ data: { playbackProfileId: number } }>().data.playbackProfileId,
+        site_scope: "cl"
+      }
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("disabling a Device preserves its existing Group reference", async () => {
   const app = await buildApp();
 
