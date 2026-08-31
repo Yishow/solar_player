@@ -1177,6 +1177,24 @@ export async function getDerivedMetricDefinitions() {
   return response.definitions;
 }
 
+/**
+ * Same endpoint as {@link getDerivedMetricDefinitions}, but keeps the registry
+ * diagnostics the response already carries. A surface that resolves the
+ * effective metric catalog needs them: a definition the registry failed to
+ * compile is excluded server-side, so a catalog built without the diagnostics
+ * would offer metrics the server does not accept.
+ */
+export async function getDerivedMetricRegistrySource() {
+  const response = await requestJson<{
+    definitions: DerivedMetricDefinition[];
+    diagnostics?: Array<{ metricKey: string }>;
+  }>("/api/derived-metrics");
+  return {
+    definitions: response.definitions,
+    excludedMetricKeys: new Set((response.diagnostics ?? []).map(({ metricKey }) => metricKey))
+  };
+}
+
 export async function getDerivedMetricDefinition(metricKey: string, metricScope: MetricScope) {
   return requestJson<{
     definition: DerivedMetricDefinition;

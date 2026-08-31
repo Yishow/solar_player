@@ -1997,3 +1997,100 @@ test("PUT /api/settings/mqtt/topics allows unrelated and disabled legacy Solar m
     await app.close();
   }
 });
+
+test("PUT /api/settings/mqtt/topics accepts the topic list read back from an upgraded deployment", async () => {
+  migrateDatabase();
+  seedDatabase();
+
+  const app = await buildApp();
+
+  try {
+    // An upgraded deployment still carries the rows that migration 037
+    // superseded; they are what the Sources surface reads and sends back.
+    const database = getDatabase();
+    database
+      .prepare(
+        `
+          INSERT OR IGNORE INTO topic_mappings
+            (metric_scope, metric_key, topic, unit, enabled, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `
+      )
+      .run("cl", "selfConsumptionRatio", "solar/cl/self-consumption", "%");
+    database
+      .prepare(
+        `
+          INSERT OR IGNORE INTO topic_mappings
+            (metric_scope, metric_key, topic, unit, enabled, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `
+      )
+      .run("global", "todayGeneration", "solar/global/today-generation", "MWh");
+    // totalPower is not produced by any derived metric definition, so its row is
+    // still usable and must survive the migration with its operator settings.
+    database
+      .prepare(
+        `
+          INSERT OR IGNORE INTO topic_mappings
+            (metric_scope, metric_key, topic, unit, multiplier, enabled, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `
+      )
+      .run("cl", "totalPower", "solar/cl/total-power", "kW", 3);
+    // Replay the upgrade: the rows predate the migration that retires them, so
+    // roll that migration back out of the ledger and migrate again.
+    database
+      .prepare("DELETE FROM schema_migrations WHERE version = ?")
+      .run("039_remove_derived_metric_topic_mappings");
+    migrateDatabase();
+
+    const read = await app.inject({ method: "GET", url: "/api/settings/mqtt/topics" });
+    assert.equal(read.statusCode, 200);
+    const topics = (read.json() as { topics: Array<Record<string, string | number | boolean | null>> }).topics;
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: {
+        topics: topics.map((topic) => ({
+          enabled: topic.enabled,
+          metricKey: topic.metricKey,
+          metricScope: topic.metricScope,
+          multiplier: topic.multiplier ?? 1,
+          nameEn: String(topic.nameEn ?? "").trim(),
+          nameZh: String(topic.nameZh ?? "").trim(),
+          topic: String(topic.topic ?? "").trim(),
+          unit: String(topic.unit ?? "").trim(),
+          valuePath: String(topic.valuePath ?? "").trim()
+        }))
+      }
+    });
+
+    assert.equal(saved.statusCode, 200);
+    assert.deepEqual(
+      database
+        .prepare(
+          `
+            SELECT metric_scope, metric_key FROM topic_mappings
+            WHERE (metric_scope = 'cl' AND metric_key = 'selfConsumptionRatio')
+              OR (metric_scope = 'global' AND metric_key = 'todayGeneration')
+          `
+        )
+        .all(),
+      []
+    );
+    assert.deepEqual(
+      database
+        .prepare(
+          `
+            SELECT metric_key, topic, multiplier FROM topic_mappings
+            WHERE metric_scope = 'cl' AND metric_key = 'totalPower'
+          `
+        )
+        .all(),
+      [{ metric_key: "totalPower", topic: "solar/cl/total-power", multiplier: 3 }]
+    );
+  } finally {
+    await app.close();
+  }
+});

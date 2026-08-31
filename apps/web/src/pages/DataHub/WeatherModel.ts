@@ -69,6 +69,12 @@ export type WeatherCurrentStatusModel = {
 };
 
 export type BuildWeatherViewModelArgs = {
+  /**
+   * Reference instant for preview staleness. Production leaves it unset so the
+   * preview ages against the real clock; a caller that must stay independent of
+   * when it runs supplies a fixed instant.
+   */
+  now?: Date;
   options: WeatherOptionsResponse | null;
   optionsErrorMessage?: string;
   preview: WeatherHeaderContract | null;
@@ -83,6 +89,7 @@ export type DataHubWeatherRouteModel = {
 };
 
 export function buildWeatherViewModel({
+  now,
   options,
   optionsErrorMessage = "",
   preview,
@@ -133,6 +140,7 @@ export function buildWeatherViewModel({
     locationOptions: weatherLocationOptions,
     preview: resolveHeaderWeatherMeta({
       current: preview?.current ?? null,
+      ...(now ? { now } : {}),
       isHydrated: Boolean(preview) || previewErrorMessage.trim().length > 0,
       settings: {
         enabled: settings.enabled,

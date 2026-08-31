@@ -13,13 +13,48 @@ import { readDisplayPageInstance } from "./displayPageRegistryService.js";
 import { readStageConfig } from "./displayPagePublishingService.js";
 import { resolveDisplayPreviewContext } from "./displayPreviewContextService.js";
 import { resolveServerPlaybackMetricCatalog } from "./derivedMetricCatalogService.js";
+import { readDerivedMetricRegistryRevision } from "./derivedMetricRegistryService.js";
 
 type CachedBindingPlan = {
   cacheKey: string;
   plan: EffectiveBindingPlan;
 };
 
-const bindingPlanCache = new Map<string, CachedBindingPlan>();
+/**
+ * An editing session produces a new entry for every page configuration and
+ * preview context it touches, so the cache needs a ceiling; without one it
+ * grows for the lifetime of the process. Eviction only costs a recompile.
+ */
+const MAX_BINDING_PLAN_CACHE_ENTRIES = 64;
+
+export function createBoundedCache<T>(limit: number) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error("Bounded cache limit must be a positive integer");
+  }
+  const entries = new Map<string, T>();
+  return {
+    get(key: string) {
+      return entries.get(key);
+    },
+    set(key: string, value: T) {
+      entries.delete(key);
+      entries.set(key, value);
+      while (entries.size > limit) {
+        const oldest = entries.keys().next();
+        if (oldest.done) break;
+        entries.delete(oldest.value);
+      }
+    },
+    clear() {
+      entries.clear();
+    },
+    get size() {
+      return entries.size;
+    }
+  };
+}
+
+const bindingPlanCache = createBoundedCache<CachedBindingPlan>(MAX_BINDING_PLAN_CACHE_ENTRIES);
 
 function readBindingPlan(
   pageId: string,
@@ -46,14 +81,20 @@ function readBindingPlan(
   }
 
   const config = readStageConfig(pageId, stage);
+  // The plan carries the source class and dependency identities the derived
+  // metric registry resolved, so a registry change invalidates it even when the
+  // page configuration and context are untouched. A missing revision means the
+  // registry state cannot be read, in which case the plan is not cached at all.
+  const registryRevision = readDerivedMetricRegistryRevision();
   const cacheKey = JSON.stringify([
     pageId,
     stage,
     config.version,
     config.updatedAt,
-    contextKey
+    contextKey,
+    registryRevision
   ]);
-  const cached = bindingPlanCache.get(cacheKey);
+  const cached = registryRevision === null ? undefined : bindingPlanCache.get(cacheKey);
   if (cached) {
     return { ...cached, configRevision: config.version };
   }
@@ -76,7 +117,9 @@ function readBindingPlan(
   }
 
   const entry = { cacheKey, plan: compiled.plan };
-  bindingPlanCache.set(cacheKey, entry);
+  if (registryRevision !== null) {
+    bindingPlanCache.set(cacheKey, entry);
+  }
   return { ...entry, configRevision: config.version };
 }
 

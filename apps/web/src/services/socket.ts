@@ -1,6 +1,7 @@
 import type {
   DisplayClientHeartbeat,
   DisplaySyncEvent,
+  ForeignSiteDelivery,
   FreshnessResult,
   FreshnessPolicy,
   ManagementSocketSessionClass,
@@ -38,7 +39,7 @@ export type LiveMetricsSnapshot = {
   timestamp: string | null;
 };
 
-export type ScopedLiveMetricsSnapshot = LiveMetricsSnapshot & {
+export type ScopedLiveMetricsSnapshot = LiveMetricsSnapshot & ForeignSiteDelivery & {
   metricScope: MetricScope;
 };
 

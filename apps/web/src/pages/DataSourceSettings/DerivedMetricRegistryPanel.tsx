@@ -64,12 +64,24 @@ type DerivedMetricEvaluationRow = {
   metricScope: MetricScope;
 };
 
-function evaluationScopes(definition: DerivedMetricDefinition): MetricScope[] {
+export function derivedMetricEvaluationScopes(definition: DerivedMetricDefinition): MetricScope[] {
   if (definition.outputScopePolicy === "global") return ["global"];
   return definition.siteScopes && definition.siteScopes.length > 0
     ? [...definition.siteScopes]
     : ["cl", "kn"];
 }
+
+/**
+ * The scope a draft preview is evaluated under. It must be one the definition
+ * actually evaluates: previewing a site definition under a site it does not
+ * declare is rejected, which is why this derives from the same declared scopes
+ * the panel already shows as applicable rather than assuming CL.
+ */
+export function resolveDerivedMetricPreviewScope(definition: DerivedMetricDefinition): MetricScope {
+  return derivedMetricEvaluationScopes(definition)[0] ?? "global";
+}
+
+const evaluationScopes = derivedMetricEvaluationScopes;
 
 function definitionStatus(definition: DerivedMetricDefinition) {
   return `${definition.managed ? "Managed" : "Custom"} · ${definition.enabled ? "Enabled" : "Disabled"}`;
@@ -262,8 +274,7 @@ export function DerivedMetricRegistryPanel({ api = defaultApi }: { api?: Derived
           </section>
           <OpsActionRow>
             <button className="mgmt-action" disabled={busy} type="button" onClick={() => void run(async () => {
-              const scope: MetricScope = draft.outputScopePolicy === "global" ? "global" : "cl";
-              const evaluation = await api.preview(draft, scope);
+              const evaluation = await api.preview(draft, resolveDerivedMetricPreviewScope(draft));
               return evaluation.value === null ? `Preview：${evaluation.failureCode ?? evaluation.status}` : `Preview：${evaluation.value} ${evaluation.outputUnit}（${evaluation.freshnessState}）`;
             })}>Preview</button>
             {!draft.managed ? <button className="mgmt-action primary" disabled={busy} type="button" onClick={() => void run(async () => {

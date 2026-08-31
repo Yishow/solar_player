@@ -28,3 +28,13 @@ export type ScopedMetricSnapshot = {
   metrics: ScopedMetricReading[];
   timestamp: string | null;
 };
+
+/**
+ * Marks a scoped live metrics payload that was delivered to a session only
+ * because one of its bindings crosses site scope. Absent or `false` means the
+ * payload belongs to the receiving session's own site (or to `global`), which
+ * is why REST bootstrap responses and management broadcasts never set it.
+ */
+export type ForeignSiteDelivery = {
+  foreignSite?: boolean;
+};

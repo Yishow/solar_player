@@ -240,3 +240,87 @@ test("disabled selector subscription freezes updates until re-enabled", () => {
   assert.equal(subscription.getSnapshot(), 813.0);
   unsubscribe();
 });
+
+function createForeignSnapshot(
+  values: Record<string, number>,
+  timestamp: string,
+  metricScope: "cl" | "kn"
+): ScopedLiveMetricsSnapshot {
+  return { ...createSnapshot(values, timestamp, metricScope), foreignSite: true };
+}
+
+function readValues(store: ReturnType<typeof createLiveMetricsStore>) {
+  return Object.fromEntries(
+    Object.entries(store.getState().snapshot.metrics).map(([key, reading]) => [key, reading.value])
+  );
+}
+
+test("cross-site snapshot keeps the session's own-site readings", () => {
+  const store = createLiveMetricsStore();
+  store.setSnapshot(createSnapshot({ todayGeneration: 5, totalPower: 77 }, "2026-07-05T10:00:00.000Z", "kn"));
+  store.setSnapshot(createSnapshot({ monthGeneration: 120 }, "2026-07-05T10:00:00.000Z", "global"));
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 42 }, "2026-07-05T10:00:00.000Z", "cl"));
+
+  assert.deepEqual(readValues(store), {
+    monthGeneration: 120,
+    realTimePower: 42,
+    todayGeneration: 5,
+    totalPower: 77
+  });
+
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 43 }, "2026-07-05T10:00:03.000Z", "cl"));
+  assert.deepEqual(readValues(store), {
+    monthGeneration: 120,
+    realTimePower: 43,
+    todayGeneration: 5,
+    totalPower: 77
+  });
+});
+
+test("own-site reading wins a metric key collision with a cross-site reading", () => {
+  const store = createLiveMetricsStore();
+  store.setSnapshot(createForeignSnapshot({ totalPower: 11 }, "2026-07-05T10:00:00.000Z", "cl"));
+  store.setSnapshot(createSnapshot({ totalPower: 77 }, "2026-07-05T10:00:01.000Z", "kn"));
+  assert.deepEqual(readValues(store), { totalPower: 77 });
+
+  store.setSnapshot(createForeignSnapshot({ totalPower: 12 }, "2026-07-05T10:00:02.000Z", "cl"));
+  assert.deepEqual(readValues(store), { totalPower: 77 });
+});
+
+test("empty cross-site snapshot clears only the cross-site readings", () => {
+  const store = createLiveMetricsStore();
+  store.setSnapshot(createSnapshot({ totalPower: 77 }, "2026-07-05T10:00:00.000Z", "kn"));
+  store.setSnapshot(createSnapshot({ monthGeneration: 120 }, "2026-07-05T10:00:00.000Z", "global"));
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 42 }, "2026-07-05T10:00:00.000Z", "cl"));
+  store.setSnapshot(createForeignSnapshot({}, "2026-07-05T10:00:04.000Z", "cl"));
+
+  assert.deepEqual(readValues(store), { monthGeneration: 120, totalPower: 77 });
+});
+
+test("cross-site snapshot does not move the session-level timestamp", () => {
+  const store = createLiveMetricsStore();
+  store.setSnapshot(createSnapshot({ totalPower: 77 }, "2026-07-05T10:00:00.000Z", "kn"));
+  store.setSnapshot(createSnapshot({ monthGeneration: 120 }, "2026-07-05T10:00:01.000Z", "global"));
+  assert.equal(store.getState().snapshot.timestamp, "2026-07-05T10:00:01.000Z");
+
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 42 }, "2026-07-05T10:09:00.000Z", "cl"));
+  assert.equal(store.getState().snapshot.timestamp, "2026-07-05T10:00:01.000Z");
+});
+
+test("reconnecting drops cross-site readings that are no longer being delivered", () => {
+  const store = createLiveMetricsStore();
+  store.setConnectionState({ ...baseConnectionState, status: "connected" });
+  store.setSnapshot(createSnapshot({ totalPower: 77 }, "2026-07-05T10:00:00.000Z", "kn"));
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 42 }, "2026-07-05T10:00:00.000Z", "cl"));
+  assert.deepEqual(readValues(store), { realTimePower: 42, totalPower: 77 });
+
+  // Cross-site readings are only ever delivered by explicit authorization and
+  // never age out on their own, so a session that dropped must not keep showing
+  // them: the reconnect bootstrap re-delivers whatever is still authorized.
+  store.setConnectionState({ ...baseConnectionState, status: "connecting" });
+  store.setConnectionState({ ...baseConnectionState, status: "connected" });
+  assert.deepEqual(readValues(store), { totalPower: 77 });
+
+  store.setSnapshot(createForeignSnapshot({ realTimePower: 43 }, "2026-07-05T10:05:00.000Z", "cl"));
+  assert.deepEqual(readValues(store), { realTimePower: 43, totalPower: 77 });
+});

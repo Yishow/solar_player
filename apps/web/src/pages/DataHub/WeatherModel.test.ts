@@ -89,8 +89,15 @@ test("Weather view model exposes the exact supported update intervals", () => {
   );
 });
 
+// The preview fixtures are observed at a fixed instant, so every assertion on
+// preview staleness pins the reference instant too. Without it the expectations
+// hold only while the machine clock is within one update interval of the
+// fixture, which makes the suite fail purely with the passage of time.
+const previewNow = new Date("2026-08-31T03:10:00.000Z");
+
 test("Weather view model filters stations by county and projects pending preview fields", () => {
   const model = buildWeatherViewModel({
+    now: previewNow,
     options,
     preview,
     previewErrorMessage: "",
@@ -103,6 +110,7 @@ test("Weather view model filters stations by county and projects pending preview
   assert.equal(model.preview.secondaryText, "");
 
   const custom = buildWeatherViewModel({
+    now: previewNow,
     options,
     preview,
     previewErrorMessage: "",
@@ -120,6 +128,7 @@ test("Weather view model filters stations by county and projects pending preview
 
 test("Weather custom fields preserve the canonical field order and labels", () => {
   const model = buildWeatherViewModel({
+    now: previewNow,
     options,
     preview,
     previewErrorMessage: "",
@@ -148,6 +157,7 @@ test("Weather custom fields preserve the canonical field order and labels", () =
 
 test("Weather view model keeps validation and preview failures local", () => {
   const model = buildWeatherViewModel({
+    now: previewNow,
     options,
     preview: null,
     previewErrorMessage: "weather preview unavailable",
@@ -160,6 +170,7 @@ test("Weather view model keeps validation and preview failures local", () => {
 
 test("Weather current source stays neutral when the latest diagnostic is for options", () => {
   const model = buildWeatherViewModel({
+    now: previewNow,
     options,
     preview,
     previewErrorMessage: "",
@@ -190,6 +201,7 @@ test("Weather current source reflects current diagnostics for cache, stale, and 
 
   for (const { fetchState, source, sourceLabel } of diagnostics) {
     const model = buildWeatherViewModel({
+    now: previewNow,
       options,
       preview: {
         ...preview,

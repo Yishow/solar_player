@@ -207,8 +207,14 @@ export class SocketService {
   private readonly resolvePlaybackMetricAuthorizationPlan;
   private readonly stopServerTimeSignalBroadcast: () => void;
   private readonly liveMetricsSnapshots = new Map<MetricScope, LiveMetricsSnapshot>();
+  // Cross-site payloads are emitted into the `device:<id>` room, so the outer
+  // key is the device: one entry delivers exactly once no matter how many
+  // connections that device holds. Identities are kept per connection rather
+  // than per device so that one connection failing closed silences only itself
+  // — every connection of a device resolves the same device-scoped plan, so the
+  // union across them never grants more than the device is entitled to.
   private readonly deviceForeignMetricIdentities =
-    new Map<number, ScopedMetricIdentity[]>();
+    new Map<number, Map<string, readonly ScopedMetricIdentity[]>>();
   private mqttStatus: MqttStatus;
 
   constructor(options: SocketServiceOptions) {
@@ -360,8 +366,9 @@ export class SocketService {
         socket.join?.(`site:${identity.siteScope}`);
         try {
           metricAuthorization = this.resolvePlaybackMetricAuthorizationPlan(identity);
-          this.deviceForeignMetricIdentities.set(
+          this.retainDeviceForeignMetricIdentities(
             identity.deviceId,
+            socketId,
             metricAuthorization.foreignSiteIdentities
           );
         } catch (error) {
@@ -369,7 +376,7 @@ export class SocketService {
             { error, socketId },
             "Display client metric authorization resolution failed closed"
           );
-          this.deviceForeignMetricIdentities.set(identity.deviceId, []);
+          this.retainDeviceForeignMetricIdentities(identity.deviceId, socketId, []);
         }
       }
 
@@ -421,8 +428,9 @@ export class SocketService {
                 previousForeignScopes
               );
               metricAuthorization = nextAuthorization;
-              this.deviceForeignMetricIdentities.set(
+              this.retainDeviceForeignMetricIdentities(
                 currentIdentity.deviceId,
+                heartbeatSocketId,
                 nextAuthorization.foreignSiteIdentities
               );
             }
@@ -445,7 +453,11 @@ export class SocketService {
               );
             }
             metricAuthorization = null;
-            this.deviceForeignMetricIdentities.set(currentIdentity.deviceId, []);
+            this.retainDeviceForeignMetricIdentities(
+              currentIdentity.deviceId,
+              heartbeatSocketId,
+              []
+            );
           }
           identity = currentIdentity;
         } catch (error) {
@@ -498,6 +510,9 @@ export class SocketService {
         }
 
         this.displayClientRegistry.disconnect(socket.id);
+        if (identity) {
+          this.releaseDeviceForeignMetricIdentities(identity.deviceId, socket.id);
+        }
       });
 
       this.logger.debug?.({ sessionClass: effectiveSessionClass, socketId: socket.id }, "Socket.IO client connected");
@@ -529,6 +544,39 @@ export class SocketService {
     this.io.to("management-trusted").emit(event, payload);
   }
 
+  private retainDeviceForeignMetricIdentities(
+    deviceId: number,
+    connectionId: string,
+    identities: readonly ScopedMetricIdentity[]
+  ) {
+    const entry = this.deviceForeignMetricIdentities.get(deviceId)
+      ?? new Map<string, readonly ScopedMetricIdentity[]>();
+    entry.set(connectionId, identities);
+    this.deviceForeignMetricIdentities.set(deviceId, entry);
+  }
+
+  private releaseDeviceForeignMetricIdentities(deviceId: number, connectionId: string) {
+    const entry = this.deviceForeignMetricIdentities.get(deviceId);
+    if (!entry) return;
+    entry.delete(connectionId);
+    if (entry.size === 0) {
+      this.deviceForeignMetricIdentities.delete(deviceId);
+    }
+  }
+
+  private readDeviceForeignMetricKeys(
+    connections: Map<string, readonly ScopedMetricIdentity[]>,
+    metricScope: MetricScope
+  ) {
+    const metricKeys = new Set<string>();
+    for (const identities of connections.values()) {
+      for (const identity of identities) {
+        if (identity.metricScope === metricScope) metricKeys.add(identity.metricKey);
+      }
+    }
+    return metricKeys;
+  }
+
   private emitSnapshotToSocket(
     socket: SocketClientLike,
     siteScope: "cl" | "kn",
@@ -556,6 +604,7 @@ export class SocketService {
           this.liveMetricsSnapshots.get(foreignScope) ?? { metrics: {}, timestamp: null },
           metricKeys
         ),
+        foreignSite: true,
         metricScope: foreignScope
       });
     }
@@ -569,15 +618,12 @@ export class SocketService {
       this.io.to("site:kn").emit("liveMetrics:update", payload);
     } else {
       this.io.to(`site:${metricScope}`).emit("liveMetrics:update", payload);
-      for (const [deviceId, identities] of this.deviceForeignMetricIdentities) {
-        const metricKeys = new Set(
-          identities
-            .filter((identity) => identity.metricScope === metricScope)
-            .map((identity) => identity.metricKey)
-        );
+      for (const [deviceId, connections] of this.deviceForeignMetricIdentities) {
+        const metricKeys = this.readDeviceForeignMetricKeys(connections, metricScope);
         if (metricKeys.size === 0) continue;
         this.io.to(`device:${deviceId}`).emit("liveMetrics:update", {
           ...filterLiveMetricsSnapshot(data, metricKeys),
+          foreignSite: true,
           metricScope
         });
       }

@@ -77,9 +77,15 @@ class FakeIo {
     this.connectionListener = listener;
   }
 
+  roomEmits: Array<{ event: string; room: string }> = [];
+
   to(room: string) {
     return {
       emit: (event: string, payload: unknown) => {
+        // Record the attempt, not just the delivery: emitting into a room no
+        // live socket has joined is the observable symptom of retained
+        // per-device state.
+        this.roomEmits.push({ event, room });
         for (const socket of this.socketsByRoom.get(room) ?? []) {
           socket.emit(event, payload);
         }
@@ -1039,4 +1045,209 @@ test("SocketService keeps routine client connections out of info logs", () => {
       socketId: "socket-1"
     }
   ]);
+});
+
+test("cross-site payloads carry the foreignSite marker while own-site and global payloads do not", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: {
+      metrics: {
+        realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 12 },
+        unrelatedClMetric: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 999 }
+      },
+      timestamp: "2026-05-22T12:00:00.000Z"
+    },
+    global: { metrics: { monthGeneration: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "MWh", value: 5 } }, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: { metrics: { totalPower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 77 } }, timestamp: "2026-05-22T12:00:00.000Z" }
+  } as const;
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "kn"),
+    resolvePlaybackMetricAuthorizationPlan: () => ({
+      foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      identities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      revision: "revision-kn-1|overview:2"
+    })
+  } as ConstructorParameters<typeof SocketService>[0]);
+  const socket = new FakeSocket();
+  io.connect(socket);
+
+  const bootstrap = socket.emitted
+    .filter(({ event }) => event === "liveMetrics:update")
+    .map(({ payload }) => payload as { foreignSite?: boolean; metricScope: string });
+  assert.deepEqual(
+    bootstrap.map(({ foreignSite, metricScope }) => [metricScope, foreignSite === true]),
+    [["kn", false], ["global", false], ["cl", true]]
+  );
+
+  socket.emitted = [];
+  service.emitLiveMetrics("cl", snapshots.cl);
+  const crossSiteDelta = socket.emitted
+    .filter(({ event }) => event === "liveMetrics:update")
+    .map(({ payload }) => payload as { foreignSite?: boolean; metrics: Record<string, unknown>; metricScope: string });
+  assert.deepEqual(crossSiteDelta.map(({ metricScope }) => metricScope), ["cl"]);
+  assert.equal(crossSiteDelta[0]?.foreignSite, true);
+  assert.deepEqual(Object.keys(crossSiteDelta[0]?.metrics ?? {}), ["realTimePower"]);
+
+  socket.emitted = [];
+  service.emitLiveMetrics("kn", snapshots.kn);
+  const ownSiteDelta = socket.emitted
+    .filter(({ event }) => event === "liveMetrics:update")
+    .map(({ payload }) => payload as { foreignSite?: boolean; metricScope: string });
+  assert.deepEqual(ownSiteDelta.map(({ metricScope }) => metricScope), ["kn"]);
+  assert.equal(ownSiteDelta[0]?.foreignSite, undefined);
+
+  socket.emitted = [];
+  service.emitLiveMetrics("global", snapshots.global);
+  const globalDelta = socket.emitted
+    .filter(({ event }) => event === "liveMetrics:update")
+    .map(({ payload }) => payload as { foreignSite?: boolean; metricScope: string });
+  assert.deepEqual(globalDelta.map(({ metricScope }) => metricScope), ["global"]);
+  assert.equal(globalDelta[0]?.foreignSite, undefined);
+});
+
+test("cross-site state is released when the device's last connection ends", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: { metrics: { realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 12 } }, timestamp: "2026-05-22T12:00:00.000Z" },
+    global: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" }
+  } as const;
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "kn"),
+    resolvePlaybackMetricAuthorizationPlan: () => ({
+      foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      identities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      revision: "revision-kn-1|overview:2"
+    })
+  } as ConstructorParameters<typeof SocketService>[0]);
+  const socket = new FakeSocket();
+  io.connect(socket);
+  socket.emitted = [];
+
+  service.emitLiveMetrics("cl", snapshots.cl);
+  assert.equal(
+    socket.emitted.filter(({ event }) => event === "liveMetrics:update").length,
+    1
+  );
+
+  socket.trigger("disconnect");
+  io.socketsByRoom.get("device:1")?.delete(socket);
+  socket.emitted = [];
+  io.roomEmits = [];
+  service.emitLiveMetrics("cl", snapshots.cl);
+  assert.deepEqual(
+    io.roomEmits.filter(({ room }) => room === "device:1"),
+    []
+  );
+  assert.equal(
+    socket.emitted.filter(({ event }) => event === "liveMetrics:update").length,
+    0
+  );
+});
+
+test("a device keeps its cross-site state while a second connection stays live", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: { metrics: { realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 12 } }, timestamp: "2026-05-22T12:00:00.000Z" },
+    global: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" }
+  } as const;
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "kn"),
+    resolvePlaybackMetricAuthorizationPlan: () => ({
+      foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      identities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+      revision: "revision-kn-1|overview:2"
+    })
+  } as ConstructorParameters<typeof SocketService>[0]);
+  const first = new FakeSocket();
+  const second = new FakeSocket();
+  second.id = "socket-2";
+  io.connect(first);
+  io.connect(second);
+
+  first.trigger("disconnect");
+  io.socketsByRoom.get("device:1")?.delete(first);
+  first.emitted = [];
+  second.emitted = [];
+  io.roomEmits = [];
+  service.emitLiveMetrics("cl", snapshots.cl);
+
+  assert.deepEqual(
+    io.roomEmits.filter(({ room }) => room === "device:1").length,
+    1
+  );
+  assert.equal(
+    second.emitted.filter(({ event }) => event === "liveMetrics:update").length,
+    1
+  );
+  assert.equal(
+    first.emitted.filter(({ event }) => event === "liveMetrics:update").length,
+    0
+  );
+});
+
+test("one connection failing closed does not cut off the device's other connections", () => {
+  const io = new FakeIo();
+  const logger = createLogger();
+  const snapshots = {
+    cl: { metrics: { realTimePower: { quality: "good", timestamp: "2026-05-22T12:00:00.000Z", unit: "kW", value: 12 } }, timestamp: "2026-05-22T12:00:00.000Z" },
+    global: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" },
+    kn: { metrics: {}, timestamp: "2026-05-22T12:00:00.000Z" }
+  } as const;
+  let shouldFail = false;
+  const service = new SocketService({
+    getLiveMetricsSnapshot: (metricScope) => snapshots[metricScope],
+    getMqttStatus: createMqttStatus,
+    io,
+    logger,
+    now: () => new Date("2026-05-22T12:00:00.000Z"),
+    resolveDisplayClientContext: () => createDeviceContext(1, "kn"),
+    resolvePlaybackMetricAuthorizationPlan: () => {
+      if (shouldFail) throw new Error("transient authorization failure");
+      return {
+        foreignSiteIdentities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+        identities: [{ metricKey: "realTimePower", metricScope: "cl" }],
+        revision: "revision-kn-1|overview:2"
+      };
+    }
+  } as ConstructorParameters<typeof SocketService>[0]);
+
+  const healthy = new FakeSocket();
+  io.connect(healthy);
+
+  // A second window for the same device whose authorization resolution fails
+  // must fail closed for itself only. Its own delivery stops; the window that
+  // resolved fine keeps receiving what it was authorized for.
+  shouldFail = true;
+  const failing = new FakeSocket();
+  failing.id = "socket-2";
+  io.connect(failing);
+
+  healthy.emitted = [];
+  service.emitLiveMetrics("cl", snapshots.cl);
+  const crossSite = healthy.emitted.filter(({ event }) => event === "liveMetrics:update");
+  assert.equal(crossSite.length, 1, "the healthy connection must keep its cross-site delivery");
+  assert.deepEqual(
+    Object.keys((crossSite[0]?.payload as { metrics: Record<string, unknown> }).metrics),
+    ["realTimePower"]
+  );
 });

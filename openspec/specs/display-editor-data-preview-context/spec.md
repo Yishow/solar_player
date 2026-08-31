@@ -1164,3 +1164,97 @@ tests:
   - apps/web/src/pages/MqttSettings/viewModel.test.ts
   - apps/server/src/services/managementPasswordService.test.ts
 -->
+
+---
+### Requirement: Cached preview binding plans invalidate on derived metric registry changes
+
+A cached preview binding plan SHALL be reused only while the derived metric registry it was compiled against is unchanged. When a derived metric definition is saved, enabled, or disabled, a subsequent preview for an otherwise unchanged page configuration and context SHALL recompile the plan.
+
+#### Scenario: Enabling a derived metric refreshes the preview plan
+
+- **WHEN** a preview is taken for a page and context, a derived metric definition bound on that page is then enabled, and the same preview is taken again with the page configuration unchanged
+- **THEN** the second preview reports the source class and dependency identities produced by the updated registry
+- **AND** the stale plan is not reused
+
+#### Scenario: Unchanged registry still serves the cached plan
+
+- **WHEN** the same preview is requested twice with no configuration change and no derived metric registry change
+- **THEN** the second request reuses the cached binding plan
+
+
+<!-- @trace
+source: fix-derived-metric-scope-regressions
+updated: 2026-08-31
+code:
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - apps/web/src/services/socket.ts
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - packages/shared/src/metricScope.ts
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/039_remove_derived_metric_topic_mappings.sql
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataHub/WeatherModel.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/realtime/SocketService.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - packages/shared/src/derivedMetricCatalogOverlay.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+tests:
+  - apps/server/src/services/displayDataPreviewCache.test.ts
+  - apps/web/src/pages/DataSourceSettings/derivedMetricPreviewScope.test.ts
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/services/mockMetricsFeedRegistryUsage.test.ts
+  - apps/web/src/pages/DataHub/WeatherModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - packages/shared/src/derivedMetricCatalogOverlay.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/display-data-preview.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspectorScopeOptions.test.ts
+-->
+
+---
+### Requirement: Preview binding plan cache is bounded
+
+The preview binding plan cache SHALL have a fixed upper bound on retained entries. When the bound is reached, the cache SHALL evict the least recently inserted entry rather than growing without limit. Eviction SHALL affect latency only and MUST NOT change preview results.
+
+#### Scenario: Repeated draft saves do not grow the cache without limit
+
+- **WHEN** an editing session produces more distinct page configuration and context combinations than the cache bound
+- **THEN** the number of retained cache entries does not exceed the bound
+- **AND** a preview whose entry was evicted returns the same result by recompiling the plan
+
+<!-- @trace
+source: fix-derived-metric-scope-regressions
+updated: 2026-08-31
+code:
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - apps/web/src/services/socket.ts
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - packages/shared/src/metricScope.ts
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/039_remove_derived_metric_topic_mappings.sql
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataHub/WeatherModel.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/realtime/SocketService.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - packages/shared/src/derivedMetricCatalogOverlay.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+tests:
+  - apps/server/src/services/displayDataPreviewCache.test.ts
+  - apps/web/src/pages/DataSourceSettings/derivedMetricPreviewScope.test.ts
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/services/mockMetricsFeedRegistryUsage.test.ts
+  - apps/web/src/pages/DataHub/WeatherModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - packages/shared/src/derivedMetricCatalogOverlay.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/display-data-preview.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspectorScopeOptions.test.ts
+-->

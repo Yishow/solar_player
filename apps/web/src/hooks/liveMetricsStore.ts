@@ -54,19 +54,33 @@ function shouldReplaceSnapshot(current: LiveMetricsSnapshot, next: LiveMetricsSn
   return next.timestamp >= current.timestamp;
 }
 
+/**
+ * Compose the rendered snapshot in a fixed order: global, then the readings
+ * delivered because a binding crosses site scope, then the session's own site.
+ * Own-site applies last so it wins a metric key collision with a cross-site
+ * reading. Cross-site readings deliberately do not participate in the
+ * session-level timestamp or freshness policy, which stay own-site semantics.
+ */
 function composeScopedSnapshot(
   activeSiteScope: "cl" | "kn" | null,
-  snapshots: Map<MetricScope, ScopedLiveMetricsSnapshot>
+  snapshots: Map<MetricScope, ScopedLiveMetricsSnapshot>,
+  foreignSnapshots: Map<"cl" | "kn", ScopedLiveMetricsSnapshot>
 ): LiveMetricsSnapshot {
   const globalSnapshot = snapshots.get("global");
   const siteSnapshot = activeSiteScope ? snapshots.get(activeSiteScope) : undefined;
   const timestamps = [globalSnapshot?.timestamp, siteSnapshot?.timestamp].filter(
     (timestamp): timestamp is string => timestamp !== null && timestamp !== undefined
   );
+  const foreignMetrics: LiveMetricsSnapshot["metrics"] = {};
+  for (const foreignScope of ["cl", "kn"] as const) {
+    if (foreignScope === activeSiteScope) continue;
+    Object.assign(foreignMetrics, foreignSnapshots.get(foreignScope)?.metrics ?? {});
+  }
   return {
     freshnessPolicy: siteSnapshot?.freshnessPolicy ?? globalSnapshot?.freshnessPolicy,
     metrics: {
       ...(globalSnapshot?.metrics ?? {}),
+      ...foreignMetrics,
       ...(siteSnapshot?.metrics ?? {})
     },
     timestamp: timestamps.length > 0 ? timestamps.sort().at(-1)! : null
@@ -184,6 +198,7 @@ export function createLiveMetricsStore(
   let state = initialState;
   let activeSiteScope: "cl" | "kn" | null = null;
   const scopedSnapshots = new Map<MetricScope, ScopedLiveMetricsSnapshot>();
+  const foreignSnapshots = new Map<"cl" | "kn", ScopedLiveMetricsSnapshot>();
   const listeners = new Set<StoreListener>();
 
   const emitChange = () => {
@@ -201,28 +216,54 @@ export function createLiveMetricsStore(
         return false;
       }
 
+      // Cross-site readings arrive only while a session is authorized for them
+      // and never age out on their own, so they must not outlive the connection
+      // that delivered them. Reconnecting re-delivers whatever is still
+      // authorized; anything that is not simply stops coming back.
+      const reconnected =
+        nextConnectionState.status === "connected"
+        && state.connectionState.status !== "connected"
+        && foreignSnapshots.size > 0;
+      if (reconnected) {
+        foreignSnapshots.clear();
+      }
+
       state = {
         ...state,
-        connectionState: nextConnectionState
+        connectionState: nextConnectionState,
+        ...(reconnected
+          ? { snapshot: composeScopedSnapshot(activeSiteScope, scopedSnapshots, foreignSnapshots) }
+          : {})
       };
       emitChange();
       return true;
     },
     setSnapshot(nextSnapshot) {
-      const currentScopedSnapshot = scopedSnapshots.get(nextSnapshot.metricScope);
+      // A cross-site payload describes another site's readings that this
+      // session was explicitly authorized to see. It must never be mistaken for
+      // the session's own site, which is what `activeSiteScope` tracks.
+      const isForeignSite = nextSnapshot.foreignSite === true && nextSnapshot.metricScope !== "global";
+      const currentScopedSnapshot = isForeignSite
+        ? foreignSnapshots.get(nextSnapshot.metricScope as "cl" | "kn")
+        : scopedSnapshots.get(nextSnapshot.metricScope);
       if (currentScopedSnapshot && !shouldReplaceSnapshot(currentScopedSnapshot, nextSnapshot)) {
         return false;
       }
 
-      if (nextSnapshot.metricScope !== "global") {
-        activeSiteScope = nextSnapshot.metricScope;
-        scopedSnapshots.delete(nextSnapshot.metricScope === "cl" ? "kn" : "cl");
+      if (isForeignSite) {
+        foreignSnapshots.set(nextSnapshot.metricScope as "cl" | "kn", nextSnapshot);
+      } else {
+        if (nextSnapshot.metricScope !== "global") {
+          activeSiteScope = nextSnapshot.metricScope;
+          scopedSnapshots.delete(nextSnapshot.metricScope === "cl" ? "kn" : "cl");
+          foreignSnapshots.delete(nextSnapshot.metricScope);
+        }
+        scopedSnapshots.set(nextSnapshot.metricScope, nextSnapshot);
       }
-      scopedSnapshots.set(nextSnapshot.metricScope, nextSnapshot);
 
       state = {
         ...state,
-        snapshot: composeScopedSnapshot(activeSiteScope, scopedSnapshots),
+        snapshot: composeScopedSnapshot(activeSiteScope, scopedSnapshots, foreignSnapshots),
         snapshotReceivedAtMonotonicMs:
           typeof performance === "undefined" ? 0 : performance.now()
       };

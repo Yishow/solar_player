@@ -2092,3 +2092,63 @@ tests:
   - apps/server/src/routes/display-story.test.ts
   - apps/server/src/routes/data-source.test.ts
 -->
+
+---
+### Requirement: Draft preview defaults to a scope the definition evaluates
+
+When the authoring surface previews a draft definition without the operator naming a scope, it SHALL send a scope that the draft definition actually evaluates: the global scope for a global output scope policy, and the first declared site for a site output scope policy. The default scope SHALL be derived from the same declared evaluation scopes the authoring surface already shows as applicable.
+
+A draft that declares a single site MUST NOT be previewed under the other site.
+
+#### Scenario: KN-only site definition previews under KN
+
+- **WHEN** an operator previews a draft site-scoped definition whose declared sites are KN only
+- **THEN** the preview is evaluated under KN
+- **AND** the request is not rejected for naming a scope the definition does not evaluate
+
+#### Scenario: Global definition previews under global
+
+- **WHEN** an operator previews a draft definition whose output scope policy is global
+- **THEN** the preview is evaluated under the global scope
+
+##### Example: default preview scope per declared policy
+
+| Output scope policy | Declared sites | Default preview scope |
+| ------------------- | -------------- | --------------------- |
+| global | not applicable | `global` |
+| site | CL, KN | `cl` |
+| site | KN | `kn` |
+| site | none declared | `cl` |
+
+<!-- @trace
+source: fix-derived-metric-scope-regressions
+updated: 2026-08-31
+code:
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - apps/web/src/services/socket.ts
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - packages/shared/src/metricScope.ts
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/039_remove_derived_metric_topic_mappings.sql
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataHub/WeatherModel.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/realtime/SocketService.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - packages/shared/src/derivedMetricCatalogOverlay.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+tests:
+  - apps/server/src/services/displayDataPreviewCache.test.ts
+  - apps/web/src/pages/DataSourceSettings/derivedMetricPreviewScope.test.ts
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/services/mockMetricsFeedRegistryUsage.test.ts
+  - apps/web/src/pages/DataHub/WeatherModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - packages/shared/src/derivedMetricCatalogOverlay.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/display-data-preview.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspectorScopeOptions.test.ts
+-->

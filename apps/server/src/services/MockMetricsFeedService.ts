@@ -6,10 +6,7 @@ import {
   computeSolarGenerationPowerAt,
   SOLAR_GENERATION_PROFILE_KW
 } from "../metrics/solarGenerationProfile.js";
-import {
-  evaluateDerivedMetrics,
-  initializeDerivedMetricRegistry
-} from "./derivedMetricRegistryService.js";
+import { evaluateDerivedMetrics } from "./derivedMetricRegistryService.js";
 
 const DEFAULT_INTERVAL_MS = 60_000;
 const TOTAL_GENERATION_BASELINE_GWH = 18_642;
@@ -220,7 +217,8 @@ export class MockMetricsFeedService {
     });
 
     transaction(readings);
-    initializeDerivedMetricRegistry(this.database);
+    // evaluateDerivedMetrics initialises the registry lazily when no compiled
+    // snapshot is cached, so a tick never needs to recompile it explicitly.
     evaluateDerivedMetrics(this.database, this.now());
   }
 }

@@ -1,8 +1,7 @@
 import {
-  derivedMetricCatalogMetadata,
   METRIC_DATA_BINDING_SCOPES,
+  resolveEffectivePlaybackMetricCatalog,
   resolvePlaybackBindingItemConstraints,
-  resolvePlaybackMetricCatalog,
   type DisplayDataPreviewItem,
   type DisplayEditorDataBindingCapability,
   type DisplayPreviewContextSelection,
@@ -20,7 +19,7 @@ import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { buildDataHubDiagnosticsHref } from "../DataHub/links";
 import {
   getDeviceGroups,
-  getDerivedMetricDefinitions,
+  getDerivedMetricRegistrySource,
   getDisplayDataPreview,
   getFleetDevices
 } from "../../services/api";
@@ -160,6 +159,20 @@ function formatPreviewValue(
   return unit ? `${value} ${unit}` : value;
 }
 
+/**
+ * Whether the metric and scope selects accept input. The offered scopes are
+ * narrowed by the derived metric catalog, so before it loads — or when it
+ * failed to load — the options shown are the un-narrowed built-in ones and can
+ * include a scope the server rejects on save. Editing stays closed until the
+ * catalog that defines the accepted scopes is actually in hand.
+ */
+export function isDataInspectorBindingEditable(args: {
+  catalogLoaded: boolean;
+  editMode: boolean;
+}) {
+  return args.editMode && args.catalogLoaded;
+}
+
 export function resolveDataInspectorModel(args: {
   capability: DisplayEditorDataBindingCapability;
   config: Record<string, unknown>;
@@ -168,6 +181,7 @@ export function resolveDataInspectorModel(args: {
   previewItem?: DisplayDataPreviewItem | null;
   previewReading?: LiveMetricReading | null;
   derivedDefinitions?: readonly DerivedMetricDefinition[];
+  excludedMetricKeys?: ReadonlySet<string>;
 }) {
   const item = getValueAtPath(args.config, args.capability.bindingPath);
   if (!isMetricBoundItem(item, args.capability.itemId)) return null;
@@ -175,13 +189,13 @@ export function resolveDataInspectorModel(args: {
   const itemConstraint = resolvePlaybackBindingItemConstraints(args.pageKey)[args.capability.itemId];
   if (!itemConstraint) return null;
 
-  const catalog: readonly MetricCatalogEntry[] = [
-    ...resolvePlaybackMetricCatalog(args.pageKey),
-    ...(args.derivedDefinitions ?? []).filter(({ enabled, managed }) => enabled && !managed).map((definition) => ({
-      ...derivedMetricCatalogMetadata(definition),
-      compatibleWidgetRoles: ["numeric-kpi", "numeric-flow"],
-    }))
-  ];
+  // The same resolution the server validates a saved binding against, so the
+  // scope options offered here cannot include a scope the server rejects.
+  const catalog: readonly MetricCatalogEntry[] = resolveEffectivePlaybackMetricCatalog({
+    definitions: args.derivedDefinitions ?? [],
+    excludedMetricKeys: args.excludedMetricKeys ?? new Set(),
+    pageKey: args.pageKey
+  });
   const metricOptions = catalog.filter((entry) => (
     entry.valueType === itemConstraint.valueType
     && (!itemConstraint.widgetRole || !entry.compatibleWidgetRoles || entry.compatibleWidgetRoles.includes(itemConstraint.widgetRole))
@@ -258,6 +272,8 @@ export function DataInspectorPanel({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [derivedDefinitions, setDerivedDefinitions] = useState<DerivedMetricDefinition[]>([]);
+  const [excludedMetricKeys, setExcludedMetricKeys] = useState<ReadonlySet<string>>(new Set());
+  const [derivedCatalogLoaded, setDerivedCatalogLoaded] = useState(false);
   const [derivedDefinitionsError, setDerivedDefinitionsError] = useState<string | null>(null);
   const shouldLoadManagedPreview = Boolean(pageId) && previewItem === undefined;
   const liveMetrics = useLiveMetrics({
@@ -266,10 +282,12 @@ export function DataInspectorPanel({
 
   useEffect(() => {
     let active = true;
-    void getDerivedMetricDefinitions()
-      .then((definitions) => {
+    void getDerivedMetricRegistrySource()
+      .then(({ definitions, excludedMetricKeys: excluded }) => {
         if (active) {
           setDerivedDefinitions(definitions);
+          setExcludedMetricKeys(excluded);
+          setDerivedCatalogLoaded(true);
           setDerivedDefinitionsError(null);
         }
       })
@@ -371,6 +389,7 @@ export function DataInspectorPanel({
     capability,
     config,
     derivedDefinitions,
+    excludedMetricKeys,
     pageKey,
     previewContext: effectivePreviewContext,
     previewItem: previewMatchesCurrentBinding ? effectivePreviewItem : null,
@@ -390,6 +409,10 @@ export function DataInspectorPanel({
   const update = (patch: DataBindingItemPatch) => {
     onChange(capability.bindingPath, createDataBindingItemUpdate(model.item, patch));
   };
+  const bindingEditable = isDataInspectorBindingEditable({
+    catalogLoaded: derivedCatalogLoaded,
+    editMode
+  });
   const diagnosticsScope = model.binding.scope === "inherit-device"
     ? model.scopeSummary.effectiveScope
     : model.binding.scope;
@@ -405,7 +428,7 @@ export function DataInspectorPanel({
 
       {derivedDefinitionsError ? (
         <p className="rounded-[12px] border border-[#c97a5f] bg-[#fff4ef] p-3 text-[#8f452d]">
-          衍生指標目錄載入失敗：{derivedDefinitionsError}
+          衍生指標目錄載入失敗：{derivedDefinitionsError}，指標與範圍暫時無法編輯。
         </p>
       ) : null}
 
@@ -444,7 +467,7 @@ export function DataInspectorPanel({
         <span className="font-semibold text-[var(--shell-title-ink)]">語意指標</span>
         <select
           className="w-full rounded-[12px] border border-[var(--shell-divider)] bg-white px-3 py-2 disabled:opacity-55"
-          disabled={!editMode}
+          disabled={!bindingEditable}
           onChange={(event) => update({ metricKey: event.target.value })}
           value={model.binding.metricKey}
         >
@@ -458,7 +481,7 @@ export function DataInspectorPanel({
         <span className="font-semibold text-[var(--shell-title-ink)]">資料範圍</span>
         <select
           className="w-full rounded-[12px] border border-[var(--shell-divider)] bg-white px-3 py-2 disabled:opacity-55"
-          disabled={!editMode}
+          disabled={!bindingEditable}
           onChange={(event) => update({ scope: event.target.value as MetricDataBindingScope })}
           value={model.binding.scope}
         >

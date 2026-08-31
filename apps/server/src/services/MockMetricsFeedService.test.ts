@@ -277,3 +277,40 @@ test("mock cumulative energy advances within a day and does not reset across loc
   assert.ok(nextDay.consumption >= afternoon.consumption);
   assert.ok(nextDay.selfConsumption >= afternoon.selfConsumption);
 });
+
+test("derived metric evaluations stay identical across consecutive mock ticks", () => {
+  migrateDatabase();
+  const database = getDatabase();
+  const service = new MockMetricsFeedService({
+    database,
+    metricScope: "cl",
+    now: () => at(12)
+  });
+
+  service.writeReading();
+  const firstTick = database
+    .prepare(
+      `
+        SELECT metric_key, value FROM live_metric_values
+        WHERE metric_scope = 'cl'
+          AND metric_key IN ('selfConsumptionRatio', 'todayCo2Reduction', 'totalCo2Reduction')
+        ORDER BY metric_key
+      `
+    )
+    .all();
+
+  service.writeReading();
+  const secondTick = database
+    .prepare(
+      `
+        SELECT metric_key, value FROM live_metric_values
+        WHERE metric_scope = 'cl'
+          AND metric_key IN ('selfConsumptionRatio', 'todayCo2Reduction', 'totalCo2Reduction')
+        ORDER BY metric_key
+      `
+    )
+    .all();
+
+  assert.equal(firstTick.length, 3);
+  assert.deepEqual(secondTick, firstTick);
+});

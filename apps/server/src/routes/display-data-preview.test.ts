@@ -233,3 +233,77 @@ test("data preview rejects untrusted remote management callers", async () => {
     await app.close();
   }
 });
+
+test("data preview recompiles the binding plan after the derived metric registry changes", async () => {
+  const timestamp = new Date().toISOString();
+  seedMetric("cl", "realTimePower", 11, timestamp);
+  seedMetric("cl", "todayGeneration", 77, timestamp);
+  const metricKey = "custom.previewPlanDependency";
+  const app = await buildApp();
+
+  try {
+    const definition = (inputMetricKey: string, revision: number) => ({
+      description: "preview plan dependency",
+      enabled: true,
+      expression: "source * 1",
+      fallbackPolicy: "unavailable",
+      inputs: [
+        { alias: "source", kind: "metric", metricKey: inputMetricKey, scope: "output-site", unit: "kW" }
+      ],
+      managed: false,
+      metricKey,
+      name: "Preview plan dependency",
+      outputScopePolicy: "site",
+      outputUnit: "kW",
+      precision: 1,
+      revision
+    });
+
+    const created = await app.inject({
+      method: "POST",
+      payload: definition("realTimePower", 0),
+      url: "/api/derived-metrics"
+    });
+    assert.equal(created.statusCode, 201);
+
+    writeStageConfig("overview", "live", {
+      dataBindings: {
+        power: {
+          dataBinding: { metricKey, scope: "inherit-device", sourceType: "metric" },
+          itemId: "power"
+        }
+      }
+    });
+
+    const requestPreview = () => app.inject({
+      method: "POST",
+      payload: { kind: "site", siteScope: "cl" },
+      url: "/api/display-pages/overview/data-preview"
+    });
+
+    const before = await requestPreview();
+    assert.equal(before.statusCode, 200);
+    const findPower = (body: any) => body.preview.items.find((item: any) => item.itemId === "power");
+    assert.equal(findPower(before.json()).sourceClass, "derived-metric");
+    assert.deepEqual(
+      findPower(before.json()).dependencyIdentities.map((identity: any) => identity.metricKey).sort(),
+      [metricKey, "realTimePower"].sort()
+    );
+
+    const updated = await app.inject({
+      method: "PUT",
+      payload: definition("todayGeneration", 1),
+      url: `/api/derived-metrics/${encodeURIComponent(metricKey)}`
+    });
+    assert.equal(updated.statusCode, 200);
+
+    const after = await requestPreview();
+    assert.equal(after.statusCode, 200);
+    assert.deepEqual(
+      findPower(after.json()).dependencyIdentities.map((identity: any) => identity.metricKey).sort(),
+      [metricKey, "todayGeneration"].sort()
+    );
+  } finally {
+    await app.close();
+  }
+});

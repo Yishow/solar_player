@@ -1640,3 +1640,69 @@ tests:
   - apps/web/src/pages/MqttSettings/viewModel.test.ts
   - apps/server/src/services/managementPasswordService.test.ts
 -->
+
+---
+### Requirement: Authoring scope options come from the effective metric catalog
+
+The scope options offered when authoring a widget data binding SHALL be derived from the same effective metric catalog the server validates the saved configuration against. When a derived metric definition narrows the scopes a metric supports, the authoring surface SHALL offer only the narrowed scopes.
+
+An operator MUST NOT be able to select, from the authoring surface, a scope that the server rejects as incompatible on save.
+
+#### Scenario: Site-policy derived metric does not offer global
+
+- **WHEN** an operator opens the data inspector for a widget bound to `selfConsumptionRatio`, whose derived definition uses the site output scope policy
+- **THEN** the scope options list the device-inherited scope and the sites the definition evaluates
+- **AND** the global scope is not offered
+
+#### Scenario: Factory circuit total power offers only its own site
+
+- **WHEN** an operator opens the data inspector for a `totalPower` binding on the Jungli factory circuit page, whose derived definition declares only the CL site
+- **THEN** the scope options list the device-inherited scope and CL
+- **AND** KN and global are not offered
+
+##### Example: offered scopes per metric and page
+
+| Page | Metric | Derived definition scopes | Offered scope options |
+| ---- | ------ | ------------------------- | --------------------- |
+| Solar overview | `selfConsumptionRatio` | site: CL, KN | inherit-device, CL, KN |
+| Jungli factory circuit | `totalPower` | site: CL | inherit-device, CL |
+| Guanyin factory circuit | `totalPower` | site: KN | inherit-device, KN |
+
+#### Scenario: Selected scope survives save
+
+- **WHEN** an operator selects any scope offered by the authoring surface and saves the draft
+- **THEN** the server accepts the binding
+- **AND** no incompatible-scope validation error is returned
+
+<!-- @trace
+source: fix-derived-metric-scope-regressions
+updated: 2026-08-31
+code:
+  - apps/server/src/services/displayDataPreviewService.ts
+  - apps/server/src/services/MockMetricsFeedService.ts
+  - apps/server/src/services/derivedMetricRegistryService.ts
+  - apps/web/src/services/socket.ts
+  - apps/server/src/services/derivedMetricCatalogService.ts
+  - packages/shared/src/metricScope.ts
+  - packages/shared/src/index.ts
+  - apps/server/src/db/migrations/039_remove_derived_metric_topic_mappings.sql
+  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataHub/WeatherModel.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/realtime/SocketService.ts
+  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
+  - packages/shared/src/derivedMetricCatalogOverlay.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
+tests:
+  - apps/server/src/services/displayDataPreviewCache.test.ts
+  - apps/web/src/pages/DataSourceSettings/derivedMetricPreviewScope.test.ts
+  - apps/web/src/hooks/liveMetricsStore.test.ts
+  - apps/server/src/services/mockMetricsFeedRegistryUsage.test.ts
+  - apps/web/src/pages/DataHub/WeatherModel.test.ts
+  - apps/server/src/routes/settings-mqtt.test.ts
+  - apps/server/src/services/MockMetricsFeedService.test.ts
+  - packages/shared/src/derivedMetricCatalogOverlay.test.ts
+  - apps/server/src/realtime/SocketService.test.ts
+  - apps/server/src/routes/display-data-preview.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/dataInspectorScopeOptions.test.ts
+-->

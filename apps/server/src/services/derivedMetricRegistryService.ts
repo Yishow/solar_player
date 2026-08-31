@@ -1109,6 +1109,21 @@ export function readDerivedMetricRegistryDiagnostics(database: Database.Database
   return registryDiagnostics.get(database) ?? [];
 }
 
+/**
+ * Monotonic counter bumped whenever a derived metric definition is activated,
+ * so a consumer can tell whether anything it derived from the registry is still
+ * current. Returns `null` when the registry state row is missing: a caller must
+ * then treat its derived state as uncacheable rather than assume it is fresh.
+ */
+export function readDerivedMetricRegistryRevision(
+  database: Database.Database = getDatabase()
+): number | null {
+  const row = database
+    .prepare("SELECT revision FROM derived_metric_registry_state WHERE id = 1")
+    .get() as { revision: number } | undefined;
+  return row?.revision ?? null;
+}
+
 export function readDerivedMetricDefinition(metricKey: string, database: Database.Database = getDatabase()) {
   const definition = readDefinitions(database).find((candidate) => candidate.metricKey === metricKey);
   if (!definition) throw new DerivedMetricRegistryError("derived_metric_not_found", "Derived metric not found", [], 404);
