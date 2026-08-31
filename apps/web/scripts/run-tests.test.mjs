@@ -22,6 +22,11 @@ test("test runner wraps tsx through cmd.exe only on Windows", () => {
 
   assert.equal(resolveTestRunnerCommand("darwin"), "tsx");
   assert.deepEqual(buildTestRunnerArgs(testTargets, "darwin"), ["--test", ...testTargets]);
+  assert.deepEqual(buildTestRunnerArgs([], "darwin"), [
+    "--test",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ]);
 });
 
 test("runTests returns the child status code", () => {

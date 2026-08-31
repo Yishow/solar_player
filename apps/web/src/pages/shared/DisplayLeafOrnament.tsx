@@ -2,7 +2,10 @@ import React from "react";
 import type { CSSProperties } from "react";
 import type { LeafOrnamentChromeConfig } from "./displayPageChromeConfig";
 
-import builtinLeafWatermarkUrl from "../FactoryCircuit/assets/factory-leaf-watermark-reference.png";
+const builtinLeafWatermarkUrl = new URL(
+  "../FactoryCircuit/assets/factory-leaf-watermark-reference.png",
+  import.meta.url
+).href;
 
 export function resolveLeafOrnamentAssetSrc(source: LeafOrnamentChromeConfig["source"]) {
   if (source.mode === "builtin") {

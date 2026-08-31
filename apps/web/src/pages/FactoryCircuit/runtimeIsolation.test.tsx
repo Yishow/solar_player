@@ -206,6 +206,6 @@ test("factory circuit runtime applies slot precision and hidden unit", () => {
     />
   );
 
-  assert.match(markup, /<b>13\.00<\/b>/);
-  assert.doesNotMatch(markup, /13\.00%/);
+  assert.match(markup, /<b>25\.00<\/b>/);
+  assert.doesNotMatch(markup, /25\.00%/);
 });

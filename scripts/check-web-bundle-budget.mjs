@@ -63,7 +63,7 @@ async function gzipSize(filePath) {
   return size;
 }
 
-function collectReachableManifestKeys(manifest, startKeys) {
+export function collectReachableManifestKeys(manifest, startKeys) {
   const queue = [...startKeys];
   const seen = new Set(startKeys);
 
@@ -187,20 +187,12 @@ export async function checkWebBundleBudget({
     })
   );
 
-  // Walk full dynamic import graph from the entry, not only direct dynamicImports.
-  const allDynamicFromEntry = new Set();
-  const visitQueue = [...(primaryEntry.dynamicImports ?? [])];
-  while (visitQueue.length > 0) {
-    const key = visitQueue.shift();
-    if (allDynamicFromEntry.has(key)) {
-      continue;
-    }
-    allDynamicFromEntry.add(key);
-    const entry = manifest[key];
-    for (const next of entry?.dynamicImports ?? []) {
-      visitQueue.push(next);
-    }
-  }
+  // Everything below a dynamic entry edge remains lazy relative to the initial entry,
+  // including static imports inside that lazy subtree.
+  const allDynamicFromEntry = collectReachableManifestKeys(
+    manifest,
+    primaryEntry.dynamicImports ?? []
+  );
 
   const managementMatches = findMatchingKeys(allDynamicFromEntry, MANAGEMENT_SOURCE_MARKERS);
   const missingManagement = managementMatches.filter((item) => !item.match);

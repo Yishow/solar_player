@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import Fastify from "fastify";
 import { createFastifyOptions } from "./app.js";
 import { createLoggerOptions } from "./logger.js";
 
 test("createFastifyOptions disables automatic 2xx request access logs", () => {
-  assert.equal(createFastifyOptions().disableRequestLogging, true);
+  const options = createFastifyOptions();
+
+  assert.equal(options.disableRequestLogging, undefined);
+  assert.ok(options.logController instanceof Fastify.LogController);
+  assert.equal(options.logController.disableRequestLogging, true);
 });
 
 test("createFastifyOptions trusts only configured valid proxy IPs", () => {

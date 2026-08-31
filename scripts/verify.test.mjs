@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { collectReachableManifestKeys } from "./check-web-bundle-budget.mjs";
 import { VERIFY_STAGES, runVerifyStages } from "./verify.mjs";
 
 const rootScripts = JSON.parse(
@@ -22,10 +23,30 @@ test("device-scoped playback acceptance has an explicit opt-in root command", ()
   );
 });
 
-test("root verify stages are build → bundle-budget → server → web → deploy → server-runner", () => {
+test("root verify stages are build → bundle-budget → shared → server → web → deploy → server-runner", () => {
   assert.deepEqual(
     VERIFY_STAGES.map((s) => s.label),
-    ["build", "bundle-budget", "server", "web", "deploy", "server-runner"]
+    ["build", "bundle-budget", "shared", "server", "web", "deploy", "server-runner"]
+  );
+});
+
+test("bundle budget follows static imports below a lazy entry chunk", () => {
+  const manifest = {
+    "index.html": {
+      dynamicImports: ["runtime-editor.js"]
+    },
+    "runtime-editor.js": {
+      imports: ["runtime-page-definitions.js"]
+    },
+    "runtime-page-definitions.js": {
+      imports: ["runtimeOverview.js"]
+    },
+    "runtimeOverview.js": {}
+  };
+
+  assert.deepEqual(
+    [...collectReachableManifestKeys(manifest, manifest["index.html"].dynamicImports)],
+    ["runtime-editor.js", "runtime-page-definitions.js", "runtimeOverview.js"]
   );
 });
 

@@ -10,7 +10,7 @@ import { readDotEnvFile, resolveDevBackendHost, resolveDevPorts } from "../../sc
 import {
   REACT_GRAB_BOOTSTRAP_ALIAS,
   resolveReactGrabBootstrapTarget
-} from "./src/devtools/reactGrabBootstrapTarget";
+} from "./src/devtools/reactGrabBootstrapTarget.ts";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const appRelease =

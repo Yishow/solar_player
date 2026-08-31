@@ -129,7 +129,7 @@ export function parseTrustedProxyIps(value: string | undefined): string[] {
 export function createFastifyOptions(): FastifyServerOptions {
   const trustedProxyIps = parseTrustedProxyIps(config.trustProxyIps);
   return {
-    disableRequestLogging: true,
+    logController: new Fastify.LogController({ disableRequestLogging: true }),
     logger: createLoggerOptions(),
     trustProxy: trustedProxyIps.length > 0 ? trustedProxyIps : false
   };

@@ -24,10 +24,14 @@ function buildEntry(overrides: Partial<DisplayClientLivenessEntry>): DisplayClie
     lastSeenAt: "2026-05-22T11:59:55.000Z",
     pageKey: "overview",
     profileId: 100,
+    appliedVersion: 7,
+    desiredVersion: 7,
+    profileUpdateError: null,
     route: "/overview",
     siteScope: "cl",
     sourceStatus: "same-source",
     timeSyncState: "waiting",
+    updateState: "applied",
     runtimeSyncState: "unknown",
     runtimeSyncPageKey: null,
     runtimeSyncResolvedAt: null,
@@ -42,11 +46,14 @@ function buildEntry(overrides: Partial<DisplayClientLivenessEntry>): DisplayClie
 
 test("display liveness keeps the 10 second heartbeat interval and a server-owned identity-free payload", () => {
   const heartbeat: DisplayClientHeartbeat = {
+    appliedVersion: 7,
+    desiredVersion: 7,
     isPlaying: true,
     pageKey: "overview",
     route: "/overview",
-    timeSyncState: "synced"
-    ,runtimeSyncState: "unknown",
+    timeSyncState: "synced",
+    updateState: "applied",
+    runtimeSyncState: "unknown",
     runtimeSyncPageKey: null,
     runtimeSyncResolvedAt: null,
     runtimeSyncError: null
@@ -54,10 +61,17 @@ test("display liveness keeps the 10 second heartbeat interval and a server-owned
 
   assert.equal(DISPLAY_CLIENT_HEARTBEAT_INTERVAL_MS, 10_000);
   assert.deepEqual(heartbeat, {
+    appliedVersion: 7,
+    desiredVersion: 7,
     isPlaying: true,
     pageKey: "overview",
     route: "/overview",
-    timeSyncState: "synced"
+    timeSyncState: "synced",
+    updateState: "applied",
+    runtimeSyncState: "unknown",
+    runtimeSyncPageKey: null,
+    runtimeSyncResolvedAt: null,
+    runtimeSyncError: null
   });
 });
 
@@ -201,6 +215,9 @@ test("buildDisplayClientLivenessSnapshot exposes Device context without credenti
     lastSeenAt: "2026-05-22T11:59:55.000Z",
     pageKey: "overview",
     profileId: 200,
+    appliedVersion: 7,
+    desiredVersion: 7,
+    profileUpdateError: null,
     route: "/overview",
     siteScope: "kn",
     sourceStatus: "multi-source",
@@ -210,6 +227,7 @@ test("buildDisplayClientLivenessSnapshot exposes Device context without credenti
     runtimeSyncPageKey: null,
     runtimeSyncResolvedAt: null,
     runtimeSyncError: null,
+    updateState: "applied",
     viewport: {
       height: 1080,
       width: 1920

@@ -8,13 +8,13 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "allowImportingTsExtensions": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
       "@devtools/react-grab-bootstrap": [
-        "src/devtools/reactGrabBootstrap.ts"
+        "./src/devtools/reactGrabBootstrap.ts"
       ]
     },
     "jsx": "react-jsx",

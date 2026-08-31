@@ -45,10 +45,10 @@ test("image management editor surfaces playlist runtime controls and server-driv
 });
 
 test("image management repositions the page around governance and editor handoff instead of presenting a second asset-library home", () => {
-  assert.match(imageManagementContentSource, /輪播治理與素材交接/);
-  assert.match(imageManagementContentSource, /Governance &amp; Editor Handoff/);
+  assert.match(imageManagementContentSource, /圖片管理與輪播治理/);
+  assert.match(imageManagementContentSource, /Image Management &amp; Playlist Governance/);
   assert.match(imageManagementContentSource, /to="\/display-pages\/editor\?workspace=assets"/);
-  assert.match(imageManagementContentSource, /素材替換、版面配置與批次整理請前往展示頁編輯器資產工作區。/);
+  assert.match(imageManagementContentSource, /前往編輯器 <small>Asset Workspace →<\/small>/);
   assert.match(imageManagementContentSource, /intent=focal-point/);
   assert.match(imageManagementContentSource, /selectedAsset=/);
   assert.doesNotMatch(imageManagementContentSource, /className="im-crop-btn" disabled/);
@@ -107,7 +107,7 @@ test("image management loads the editable library model before deferred diagnost
 test("image management library and editor cards keep their own scroll containers", () => {
   assert.match(
     imageManagementCss,
-    /\.image-mgmt-page \.im-card-library\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/
+    /\.image-mgmt-page \.im-card-full\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/
   );
   assert.match(
     imageManagementCss,
@@ -115,6 +115,6 @@ test("image management library and editor cards keep their own scroll containers
   );
   assert.match(
     imageManagementCss,
-    /\.image-mgmt-page \.im-editor-body\s*\{[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/
+    /\.image-mgmt-page \.im-sidebar-scroll\s*\{[\s\S]*overflow-y:\s*auto;/
   );
 });

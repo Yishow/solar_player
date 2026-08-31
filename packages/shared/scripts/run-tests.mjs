@@ -11,7 +11,7 @@ export function buildTestRunnerArgs(testTargets, platform = process.platform) {
     "--test",
     ...(testTargets.length > 0
       ? testTargets
-      : ["src/**/*.test.ts", "src/**/*.test.tsx"])
+      : ["src/**/*.test.ts", "test/**/*.test.ts"])
   ];
 
   return platform === "win32" ? ["/d", "/s", "/c", "tsx", ...tsxArgs] : tsxArgs;

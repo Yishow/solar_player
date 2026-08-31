@@ -19,6 +19,12 @@ export const VERIFY_STAGES = [
     shell: false
   },
   {
+    label: "shared",
+    command: "pnpm",
+    args: ["--filter", "@solar-display/shared", "test"],
+    shell: false
+  },
+  {
     label: "server",
     command: "pnpm",
     args: ["--filter", "@solar-display/server", "test"],
@@ -42,6 +48,7 @@ export const VERIFY_STAGES = [
     args: [
       "--test",
       "apps/server/scripts/run-tests.test.mjs",
+      "apps/web/scripts/run-tests.test.mjs",
       "scripts/verify.test.mjs"
     ],
     shell: false

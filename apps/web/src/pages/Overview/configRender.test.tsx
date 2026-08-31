@@ -24,27 +24,113 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test("overview runtime reads resolved display config for hero copy and hero media", () => {
-  assert.match(overviewSource, /resolvedConfig\.heroCopy\.eyebrow/);
-  assert.match(overviewSource, /resolvedConfig\.heroCopy\.titleLines\[0\]/);
-  assert.match(overviewSource, /renderOverviewTitleLine\(resolvedConfig\.heroCopy\.titleLines\[0\]\)/);
-  assert.match(overviewSource, /resolvedConfig\.heroCopyLayout/);
-  assert.match(overviewSource, /heroTypography\.eyebrowFontSize/);
-  assert.match(overviewSource, /heroTypography\.titleFontSize/);
-  assert.match(overviewSource, /heroTypography\.subtitleMarginTop/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.thickness/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.goldLine\.opacity/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.opacity/);
-  assert.match(overviewSource, /resolvedConfig\.chrome\.ornaments\.leaf\.scale/);
-  assert.match(overviewSource, /resolveDisplayPageMediaSource\(resolvedConfig\.heroMedia, seedConfig\.heroMedia\.src\)/);
-  assert.match(overviewRuntimeSource, /resolvedConfig\.kpiCards\[cardItem\.key\]/);
-  assert.match(overviewRuntimeSource, /DisplayCardFrame/);
-  assert.match(overviewRuntimeSource, /DisplayCardValueRow/);
-  assert.match(overviewRuntimeSource, /resolvedConfig\.cardStyles\[cardItem\.key\]/);
-  assert.match(overviewRuntimeSource, /<OverviewKpiFooter/);
-  assert.match(overviewRuntimeSource, /footer=\{resolvedConfig\.kpiCards\[shell\.cardItem\.key\]\}/);
-  assert.match(overviewRuntimeSource, /metric=\{metric\}/);
-  assert.doesNotMatch(overviewSource, /import \{ trendSeries \} from \"\.\.\/\.\.\/mocks\/metrics\"/);
-  assert.doesNotMatch(overviewSource, /Shared Story Summary/);
+  assert.equal(
+    overviewSource.includes("resolvedConfig.heroCopy.eyebrow"),
+    true,
+    "Overview should read the resolved hero eyebrow"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.heroCopy.titleLines[0]"),
+    true,
+    "Overview should read the resolved hero title lines"
+  );
+  assert.equal(
+    overviewSource.includes("renderOverviewTitleLine(resolvedConfig.heroCopy.titleLines[0])"),
+    true,
+    "Overview should render the resolved hero title line"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.heroCopyLayout"),
+    true,
+    "Overview should derive hero copy layout from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("heroTypography.eyebrowFontSize"),
+    true,
+    "Overview should derive eyebrow typography from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("heroTypography.titleFontSize"),
+    true,
+    "Overview should derive title typography from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("heroTypography.subtitleMarginTop"),
+    true,
+    "Overview should derive subtitle spacing from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.chrome.ornaments.goldLine.thickness"),
+    true,
+    "Overview should derive the gold line thickness from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.chrome.ornaments.goldLine.opacity"),
+    true,
+    "Overview should derive the gold line opacity from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.chrome.ornaments.leaf.opacity"),
+    true,
+    "Overview should derive the leaf opacity from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes("resolvedConfig.chrome.ornaments.leaf.scale"),
+    true,
+    "Overview should derive the leaf scale from resolved config"
+  );
+  assert.equal(
+    overviewSource.includes(
+      "resolveDisplayPageMediaSource(resolvedConfig.heroMedia, seedConfig.heroMedia.src)"
+    ),
+    true,
+    "Overview should resolve hero media from the resolved config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("resolvedConfig.kpiCards[cardItem.key]"),
+    true,
+    "Overview runtime should resolve KPI cards from config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("DisplayCardFrame"),
+    true,
+    "Overview runtime should render KPI card frames"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("DisplayCardValueRow"),
+    true,
+    "Overview runtime should render KPI card values"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("resolvedConfig.cardStyles[cardItem.key]"),
+    true,
+    "Overview runtime should resolve KPI card styles from config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("<OverviewKpiFooter"),
+    true,
+    "Overview runtime should render KPI card footers"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("footer={resolvedConfig.kpiCards[shell.cardItem.key]}"),
+    true,
+    "Overview runtime should pass the resolved KPI footer config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("metric={metric}"),
+    true,
+    "Overview runtime should pass the live metric to the KPI footer"
+  );
+  assert.equal(
+    overviewSource.includes("import { trendSeries } from \"../../mocks/metrics\""),
+    false,
+    "Overview must not import mock trend series"
+  );
+  assert.equal(
+    overviewSource.includes("Shared Story Summary"),
+    false,
+    "Overview must not render the removed shared story summary"
+  );
 });
 
 test("overview value-only refresh keeps KPI card shell output on the config-only path", () => {
@@ -58,10 +144,15 @@ test("overview value-only refresh keeps KPI card shell output on the config-only
   assert.match(shellSource, /\[resolvedConfig\]/);
   assert.match(shellSource, /style: \{/);
   assert.match(shellSource, /createDisplayCardStyleConfig\(resolvedConfig\.cardStyles\[cardItem\.key\]\)/);
-  assert.match(overviewRuntimeSource, /\{kpiCardShells\.map\(\(shell\) => \{/);
-  assert.match(
-    overviewRuntimeSource,
-    /const metric = viewModel\.metrics\.find\([\s\S]*candidate\.itemId === shell\.cardItem\.key/
+  assert.equal(
+    overviewRuntimeSource.includes("{kpiCardShells.map((shell) => {"),
+    true,
+    "Overview runtime should render the resolved KPI card shells"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("candidate) => candidate.itemId === shell.cardItem.key"),
+    true,
+    "Overview runtime should resolve each metric by KPI card key"
   );
   assert.doesNotMatch(shellSource, /viewModel/);
 });
@@ -153,8 +244,16 @@ test("overview config preserves a configuring KPI status through resolution", ()
 });
 
 test("overview runtime replaces the value with the configuring placeholder", () => {
-  assert.match(overviewRuntimeSource, /resolveDisplayPageCardStatus\(resolvedConfig\.kpiCards\[cardItem\.key\]\)/);
-  assert.match(overviewRuntimeSource, /displayPageCardConfiguringLabel/);
+  assert.equal(
+    overviewRuntimeSource.includes("resolveDisplayPageCardStatus(resolvedConfig.kpiCards[cardItem.key])"),
+    true,
+    "Overview runtime should resolve each KPI card status"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("displayPageCardConfiguringLabel"),
+    true,
+    "Overview runtime should use the configuring placeholder label"
+  );
 });
 
 test("overview dashboard widget regions default visible and expose visibility toggles", () => {
@@ -183,35 +282,94 @@ test("overview dashboard widget regions default visible and expose visibility to
 });
 
 test("overview runtime gates dashboard widgets through visibility config", () => {
-  assert.match(overviewRuntimeSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.generationTrend\)/);
-  assert.match(overviewRuntimeSource, /shouldRenderOverviewDashboardWidget\(resolvedConfig\.dashboardWidgets\.alertNotifications\)/);
-  assert.match(overviewRuntimeSource, /<GenerationTrendWidget/);
-  assert.match(overviewRuntimeSource, /series=\{generationTrendSeries\}/);
-  assert.match(overviewRuntimeSource, /<AlertNotificationsWidget/);
-  assert.match(overviewRuntimeSource, /alerts=\{viewModel\.alerts\}/);
-  assert.match(
-    overviewRuntimeSource,
-    /alwaysShowThresholds=\{resolvedConfig\.dashboardWidgets\.alertNotifications\.alwaysShowThresholds\}/
+  assert.equal(
+    overviewRuntimeSource.includes(
+      "shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.generationTrend)"
+    ),
+    true,
+    "Overview runtime should gate the generation trend widget by config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes(
+      "shouldRenderOverviewDashboardWidget(resolvedConfig.dashboardWidgets.alertNotifications)"
+    ),
+    true,
+    "Overview runtime should gate the alert widget by config"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("<GenerationTrendWidget"),
+    true,
+    "Overview runtime should render the generation trend widget"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("series={generationTrendSeries}"),
+    true,
+    "Overview runtime should pass the generation trend series"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("<AlertNotificationsWidget"),
+    true,
+    "Overview runtime should render the alert widget"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("alerts={viewModel.alerts}"),
+    true,
+    "Overview runtime should pass view-model alerts"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes(
+      "alwaysShowThresholds={resolvedConfig.dashboardWidgets.alertNotifications.alwaysShowThresholds}"
+    ),
+    true,
+    "Overview runtime should pass the alert threshold visibility setting"
   );
 });
 
 test("overview runtime keeps story hydration staged behind visible config and live metrics", () => {
-  assert.match(overviewRuntimeSource, /useLiveMetricsSelector\(/);
-  assert.match(overviewSource, /useDisplayStoryRuntime\("overview",\s*\{\s*enabled: runtimeHydrationEnabled\s*\}\)/);
-  assert.match(overviewSource, /storyRuntime\.payload \?\? undefined/);
-  assert.match(overviewRuntimeSource, /storyOverview: storyOverviewPayload/);
-  assert.match(overviewRuntimeSource, /connectionState: overviewRuntimeSelection\.connectionState/);
-  assert.match(overviewRuntimeSource, /isSocketConnected: overviewRuntimeSelection\.isSocketConnected/);
-  assert.match(
-    overviewSource,
-    /allowUnscopedMetrics=\{!runtimeHydrationEnabled\}/
+  assert.equal(
+    overviewRuntimeSource.includes("useLiveMetricsSelector("),
+    true,
+    "Overview runtime should select live metrics"
   );
-  assert.match(
-    overviewRuntimeSource,
-    /<PhasePowerTableWidget[\s\S]*enabled=\{allowUnscopedMetrics\}/
+  assert.equal(
+    overviewSource.includes(
+      "useDisplayStoryRuntime(\"overview\", {\n    enabled: runtimeHydrationEnabled\n  });"
+    ),
+    true,
+    "Overview should enable story hydration only for runtime rendering"
   );
-  assert.match(overviewSource, /runtimeErrorMessage: runtimeHydrationEnabled \? storyRuntime\.errorMessage : ""/);
-  assert.match(overviewSource, /usesRuntimeFallback: storyRuntime\.usesFallback/);
+  assert.equal(
+    overviewSource.includes("storyRuntime.payload ?? undefined"),
+    true,
+    "Overview should expose the story payload to runtime content"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("storyOverview: storyOverviewPayload"),
+    true,
+    "Overview runtime should build its view model from the story payload"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("connectionState: overviewRuntimeSelection.connectionState"),
+    true,
+    "Overview runtime should pass the live connection state"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes("isSocketConnected: overviewRuntimeSelection.isSocketConnected"),
+    true,
+    "Overview runtime should pass socket connectivity"
+  );
+  assert.equal(
+    overviewSource.includes("allowUnscopedMetrics={!runtimeHydrationEnabled}"),
+    true,
+    "Overview should allow unscoped metrics only outside runtime hydration"
+  );
+  assert.equal(
+    overviewRuntimeSource.includes(
+      "<PhasePowerTableWidget\n          enabled={allowUnscopedMetrics}"
+    ),
+    true,
+    "Overview runtime should gate phase power metrics during hydration"
+  );
 });
 
 test("overview config treats KPI cards without visible as visible", () => {
