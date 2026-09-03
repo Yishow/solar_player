@@ -5,13 +5,14 @@ import type { WeatherCurrentSnapshot, WeatherDiagnostic, WeatherHeaderContract, 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MqttSettingsContent } from "./MqttSettingsContent";
+import type { TopicMapping } from "./viewModel";
 
 const mqttSettingsCss = readFileSync(
   new URL("./mqttSettings.css", import.meta.url),
   "utf8"
 );
-const mqttSettingsIndexSource = readFileSync(
-  new URL("./index.tsx", import.meta.url),
+const mqttSettingsWeatherSource = readFileSync(
+  new URL("./useMqttSettingsWeather.ts", import.meta.url),
   "utf8"
 );
 
@@ -114,6 +115,26 @@ function renderContent(overrides: Partial<React.ComponentProps<typeof MqttSettin
     refreshWeather: async () => undefined
   };
   return renderToStaticMarkup(React.createElement(MqttSettingsContent, { ...defaultProps, ...overrides }));
+}
+
+function createTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping {
+  return {
+    enabled: true,
+    id: 1,
+    lastReceivedAt: "2026-05-23T09:31:00.000Z",
+    lastValue: 42,
+    metricKey: "realTimePower",
+    metricScope: "cl",
+    nameEn: null,
+    nameZh: "即時發電功率",
+    quality: "good",
+    rawPayload: '{"value":42}',
+    topic: "kuozui/plant/solar/power",
+    unit: "kW",
+    updatedAt: "2026-05-23T09:31:00.000Z",
+    valuePath: "$.value",
+    ...overrides
+  };
 }
 
 function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): WeatherOptionsResponse {
@@ -405,6 +426,127 @@ test("MQTT operations surface guards against rendering the broker source tab", (
   assert.doesNotMatch(html, /data-mqtt-workspace-tab="source"/);
   assert.doesNotMatch(html, /data-mqtt-section="source-mode-card"/);
   assert.doesNotMatch(html, /Broker 主機/);
+});
+
+test("mqtt settings surface matrix preserves stable selectors and allowed controls", () => {
+  const topic = createTopicMapping();
+  const fullTopicHtml = renderContent({
+    activeTopicWorkspaceTab: "topic",
+    topics: [topic]
+  });
+
+  assert.match(fullTopicHtml, /data-mqtt-section="topic-workspace"/);
+  assert.match(fullTopicHtml, /data-mqtt-workspace-tab="source"/);
+  assert.match(fullTopicHtml, /data-mqtt-workspace-tab="topic"/);
+  assert.match(fullTopicHtml, /data-mqtt-workspace-tab="card-data"/);
+  assert.match(fullTopicHtml, /data-mqtt-row="editable-topic-row"/);
+  assert.match(fullTopicHtml, /data-mqtt-section="weather-card"/);
+
+  const fullSourceHtml = renderContent({ activeTopicWorkspaceTab: "source" });
+  assert.match(fullSourceHtml, /class="[^"]*mqtt-source-panel/);
+  assert.match(fullSourceHtml, /Broker 主機/);
+  assert.match(fullSourceHtml, /data-mqtt-section="weather-card"/);
+  assert.doesNotMatch(fullSourceHtml, /data-mqtt-row="editable-topic-row"/);
+
+  const fullCardDataHtml = renderContent({ activeTopicWorkspaceTab: "card-data" });
+  assert.match(fullCardDataHtml, /class="[^"]*mqtt-card-data-panel/);
+  assert.match(fullCardDataHtml, /尚未取得卡片資料診斷/);
+  assert.match(fullCardDataHtml, /data-mqtt-section="weather-card"/);
+
+  const connectionsHtml = renderContent({
+    draftSections: { broker: false, topic: true, weather: true },
+    surface: "connections",
+    topics: [topic]
+  });
+  assert.match(connectionsHtml, /data-data-hub-connections-view/);
+  assert.match(connectionsHtml, /data-data-hub-connection-status-card/);
+  assert.match(connectionsHtml, /data-data-hub-broker-form/);
+  assert.match(connectionsHtml, /data-connections-action="test"/);
+  assert.match(connectionsHtml, /data-connections-action="save"/);
+  assert.doesNotMatch(connectionsHtml, /data-mqtt-/);
+  assert.doesNotMatch(connectionsHtml, /data-weather-/);
+  assert.doesNotMatch(connectionsHtml, /data-mqtt-row="editable-topic-row"/);
+
+  const operationsTopicHtml = renderContent({
+    activeTopicWorkspaceTab: "topic",
+    surface: "operations",
+    topics: [topic]
+  });
+  assert.match(operationsTopicHtml, /data-mqtt-section="topic-workspace"/);
+  assert.match(operationsTopicHtml, /data-mqtt-workspace-tab="topic"/);
+  assert.match(operationsTopicHtml, /data-mqtt-workspace-tab="card-data"/);
+  assert.match(operationsTopicHtml, /data-mqtt-row="editable-topic-row"/);
+  assert.doesNotMatch(operationsTopicHtml, /data-mqtt-workspace-tab="source"/);
+  assert.doesNotMatch(operationsTopicHtml, /data-mqtt-section="weather-card"/);
+  assert.doesNotMatch(operationsTopicHtml, /data-data-hub-connections-view/);
+  assert.doesNotMatch(operationsTopicHtml, /Broker 主機/);
+
+  const operationsCardDataHtml = renderContent({
+    activeTopicWorkspaceTab: "card-data",
+    surface: "operations"
+  });
+  assert.match(operationsCardDataHtml, /data-mqtt-workspace-tab="card-data"/);
+  assert.match(operationsCardDataHtml, /尚未取得卡片資料診斷/);
+  assert.doesNotMatch(operationsCardDataHtml, /data-mqtt-workspace-tab="source"/);
+  assert.doesNotMatch(operationsCardDataHtml, /data-mqtt-section="weather-card"/);
+});
+
+test("mqtt settings surface actions preserve dirty and disabled-state contracts", () => {
+  const fullSourceHtml = renderContent({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: false,
+      isSavingSettings: true,
+      isSavingTopics: false,
+      isTestingConnection: true,
+      isRefreshingWeather: true
+    },
+    activeTopicWorkspaceTab: "source",
+    weatherSettings: createWeatherSettings({ enabled: true })
+  });
+  const testConnectionButton = fullSourceHtml.match(/<button[^>]*class="[^"]*mqtt-test-conn[^>]*>/)?.[0] ?? "";
+  const saveSettingsButton = fullSourceHtml.match(/<button[^>]*class="[^"]*mqtt-save[^>]*>/)?.[0] ?? "";
+  const weatherRefreshButton = fullSourceHtml.match(/<button[^>]*class="[^"]*mqtt-weather-card__refresh-btn[^>]*>/)?.[0] ?? "";
+  assert.match(testConnectionButton, /disabled/);
+  assert.match(saveSettingsButton, /disabled/);
+  assert.match(weatherRefreshButton, /disabled/);
+  assert.match(fullSourceHtml, /Testing.../);
+  assert.match(fullSourceHtml, /Saving.../);
+  assert.match(fullSourceHtml, /Refreshing.../);
+
+  const cleanConnectionsHtml = renderContent({
+    surface: "connections",
+    draftSections: { broker: false, topic: false, weather: false }
+  });
+  const cleanSaveButton = cleanConnectionsHtml.match(/<button[^>]*data-connections-action="save"[^>]*>/)?.[0] ?? "";
+  assert.match(cleanConnectionsHtml, /data-connections-dirty="false"/);
+  assert.match(cleanSaveButton, /disabled/);
+
+  const dirtyConnectionsHtml = renderContent({
+    draftSections: { broker: true, topic: false, weather: false },
+    surface: "connections"
+  });
+  const dirtySaveButton = dirtyConnectionsHtml.match(/<button[^>]*data-connections-action="save"[^>]*>/)?.[0] ?? "";
+  assert.match(dirtyConnectionsHtml, /data-connections-dirty="true"/);
+  assert.doesNotMatch(dirtySaveButton, /disabled/);
+
+  const operationsBusyHtml = renderContent({
+    actionState: {
+      isLoadingSettings: false,
+      isLoadingTopics: false,
+      isReloadingTopics: true,
+      isSavingSettings: false,
+      isSavingTopics: true,
+      isTestingConnection: false,
+      isRefreshingWeather: false
+    },
+    activeTopicWorkspaceTab: "topic",
+    surface: "operations",
+    topics: [createTopicMapping()]
+  });
+  assert.match(operationsBusyHtml, /<button[^>]*disabled[^>]*>Reloading\.\.\.<\/button>/);
+  assert.match(operationsBusyHtml, /<button[^>]*disabled[^>]*>Saving\.\.\.<\/button>/);
 });
 
 test("mqtt settings content filters Factory Circuit topic mappings by active factory site", () => {
@@ -1578,16 +1720,16 @@ test("Support manual weather refresh with source, stale state, and transport fai
 });
 
 test("mqtt settings refreshes weather diagnostics after options and manual current operations without page reload", () => {
-  assert.match(mqttSettingsIndexSource, /getWeatherDiagnostics/);
+  assert.match(mqttSettingsWeatherSource, /getWeatherDiagnostics/);
   assert.match(
-    mqttSettingsIndexSource,
+    mqttSettingsWeatherSource,
     /getWeatherOptions[\s\S]{0,1800}finally[\s\S]{0,300}loadWeatherDiagnostic/
   );
   assert.match(
-    mqttSettingsIndexSource,
+    mqttSettingsWeatherSource,
     /const refreshWeather[\s\S]{0,1800}finally[\s\S]{0,300}loadWeatherDiagnostic/
   );
-  assert.doesNotMatch(mqttSettingsIndexSource, /location\.reload/);
+  assert.doesNotMatch(mqttSettingsWeatherSource, /location\.reload/);
 });
 
 test("mqtt settings content exposes custom field controls and unavailable preview fallback", () => {

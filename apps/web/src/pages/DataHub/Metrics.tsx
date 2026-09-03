@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLoaderData } from "react-router-dom";
 import { DataHubSectionState } from "./sectionState";
 import { applyMetricsLiveSnapshot, useDataHubLiveMetrics } from "./liveActivity";
 import { buildDataHubDiagnosticsHref, buildDataHubUsageHref } from "./links";
+import {
+  createMetricDetailsStore,
+  metricDetailsKey,
+  type MetricDetailsIdentity,
+  type MetricDetailsSlice,
+  type MetricDetailsState,
+  type MetricDetailsStore
+} from "./MetricDetailsModel";
 import type {
   DataHubMetricsModel,
   DataHubMetricsRouteModel,
@@ -77,9 +85,134 @@ function ProvenanceSummary({ row }: { row: MetricInventoryRow }) {
   );
 }
 
-function MetricCard({ row }: { row: MetricInventoryRow }) {
+function detailStateLabel(status: MetricDetailsSlice<unknown>["status"]) {
+  if (status === "idle") return "尚未載入 (Not loaded)";
+  if (status === "loading") return "載入中 (Loading)";
+  if (status === "empty") return "沒有資料 (Empty)";
+  if (status === "error") return "無法取得 (Error)";
+  return "正常 (Ready)";
+}
+
+function MetricDetailState({
+  emptyMessage,
+  slice,
+  title
+}: {
+  emptyMessage: string;
+  slice: MetricDetailsSlice<unknown>;
+  title: string;
+}) {
+  return (
+    <div data-metric-detail-state={slice.status}>
+      <span className="text-[#637166]">{title}：</span>
+      {slice.status === "error" ? (
+        <span role="alert" className="ml-1 text-[#a33b32]">{slice.errorMessage ?? "資料同步失敗。"}</span>
+      ) : slice.status === "empty" ? (
+        <span className="ml-1">{emptyMessage}</span>
+      ) : (
+        <span className="ml-1">{detailStateLabel(slice.status)}</span>
+      )}
+    </div>
+  );
+}
+
+function usagePageLabel(row: { pageLabelEn: string | null; pageLabelZh: string | null; pageKey: string }) {
+  return row.pageLabelZh || row.pageLabelEn || row.pageKey;
+}
+
+function MetricUsageDetails({ state }: { state: MetricDetailsState }) {
+  if (state.usage.status !== "ready" || !state.usage.model) {
+    return (
+      <MetricDetailState
+        emptyMessage="此 metric 目前沒有 metric consumers。"
+        slice={state.usage}
+        title="狀態"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-1.5" data-metric-usage>
+      {state.usage.model.usage.map((consumer) => (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          data-metric-usage-consumer={consumer.consumerId}
+          key={`${consumer.consumerType}:${consumer.consumerId}:${consumer.pageInstanceId ?? "registered"}`}
+        >
+          <strong>{usagePageLabel(consumer)}</strong>
+          <code>{consumer.itemId ?? consumer.consumerId}</code>
+          <span className="text-[#637166]">{consumer.consumerType}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MetricDiagnosticsDetails({ row, state }: { row: MetricInventoryRow; state: MetricDetailsState }) {
+  const evaluation = row.evaluation;
+  const freshness = row.freshness;
+  const semanticNode = state.diagnostics.model?.nodes.find((node) =>
+    node.category === "semantic-metric"
+    && node.scope === row.metricScope
+    && node.metadata?.metricKey === row.metricKey
+  );
+  const contractStatus = state.diagnostics.status === "error"
+    ? "error"
+    : state.diagnostics.status === "loading"
+      ? "loading"
+      : state.diagnostics.status === "empty"
+        ? "empty"
+        : semanticNode?.status ?? evaluation?.status ?? row.evaluationState;
+
+  return (
+    <div className="space-y-2" data-metric-diagnostics>
+      <MetricDetailState
+        emptyMessage="此 metric 目前沒有 diagnostics。"
+        slice={state.diagnostics}
+        title="狀態"
+      />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <span className="text-[#637166]">Freshness age：</span>
+          <span className="font-mono ml-1">{freshness?.ageMs ?? "—"}</span>
+        </div>
+        <div>
+          <span className="text-[#637166]">Freshness category：</span>
+          <span className="ml-1">{freshness?.category ?? row.freshnessState}</span>
+        </div>
+        <div>
+          <span className="text-[#637166]">Evaluation：</span>
+          <span className="ml-1">{evaluation?.status ?? row.evaluationState}</span>
+        </div>
+        <div>
+          <span className="text-[#637166]">Failure：</span>
+          <span className="ml-1">{evaluation?.failureCode ?? "—"}</span>
+        </div>
+        <div>
+          <span className="text-[#637166]">Contract status：</span>
+          <span className="ml-1">{contractStatus}</span>
+        </div>
+        <div>
+          <span className="text-[#637166]">Diagnostic latency：</span>
+          <span className="font-mono ml-1">{state.diagnosticsLatencyMs === null ? "—" : `${state.diagnosticsLatencyMs} ms`}</span>
+        </div>
+      </div>
+      {state.diagnostics.status === "ready" && state.diagnostics.model ? (
+        <div className="space-y-1" data-metric-provenance-detail>
+          {state.diagnostics.model.nodes.map((node) => (
+            <div key={node.id}>{node.label} · {node.status ?? "unknown"}</div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MetricCard({ row, detailsStore }: { detailsStore: MetricDetailsStore; row: MetricInventoryRow }) {
   const value = row.value === null ? "--" : String(row.value);
   const [isExpanded, setIsExpanded] = useState(false);
+  const identity: MetricDetailsIdentity = { metricKey: row.metricKey, metricScope: row.metricScope };
+  const detailState = detailsStore.get(identity);
 
   return (
     <article
@@ -127,32 +260,29 @@ function MetricCard({ row }: { row: MetricInventoryRow }) {
           type="button"
           className="text-xs font-semibold text-[#375a2d] hover:text-[#25401d] flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-[#f0f6f1] hover:bg-[#e4eee5] border border-[#cbd8ce] transition-colors cursor-pointer"
           data-metric-action="toggle-details"
-          onClick={() => setIsExpanded((prev) => !prev)}
+          aria-expanded={isExpanded}
+          onClick={() => {
+            const next = !isExpanded;
+            setIsExpanded(next);
+            if (next) detailsStore.load(identity);
+          }}
         >
           <span>{isExpanded ? "收合使用情形與診斷 ▲" : "展開使用情形與診斷 ▼"}</span>
         </button>
       </div>
 
       {isExpanded ? (
-        <div className="rounded-lg border border-[#dbe3dd] bg-[#fbfcfb] p-3.5 space-y-3 text-xs text-[#37443a]">
+        <div
+          className="rounded-lg border border-[#dbe3dd] bg-[#fbfcfb] p-3.5 space-y-3 text-xs text-[#37443a]"
+          data-metric-details={metricDetailsKey(identity)}
+        >
           <div>
             <h4 className="font-bold text-[#1e2821] mb-1.5">📌 大螢幕輪播頁面引用 (Usage)</h4>
-            <p className="text-[#637166]">
-              此指標支援 Overview、Solar、FactoryCircuit 等播放頁面之資料綁定；若有自訂卡片引用，將自動同步最新即時數值。
-            </p>
+            <MetricUsageDetails state={detailState} />
           </div>
           <div className="border-t border-[#e8eee9] pt-2.5">
             <h4 className="font-bold text-[#1e2821] mb-1.5">🩺 即時品質與健康診斷 (Diagnostics)</h4>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <span className="text-[#637166]">延遲/觀測時間：</span>
-                <span className="font-mono ml-1">{row.provenance.sourceTimestamp ?? "即時更新中"}</span>
-              </div>
-              <div>
-                <span className="text-[#637166]">合約驗證狀態：</span>
-                <span className="ml-1 font-semibold text-[#275e34]">合約校驗通過 (Healthy)</span>
-              </div>
-            </div>
+            <MetricDiagnosticsDetails row={row} state={detailState} />
           </div>
         </div>
       ) : null}
@@ -160,7 +290,24 @@ function MetricCard({ row }: { row: MetricInventoryRow }) {
   );
 }
 
-export function DataHubMetricsContent({ model }: { model: DataHubMetricsModel }) {
+export function DataHubMetricsContent({
+  detailsStore: providedDetailsStore,
+  model
+}: {
+  detailsStore?: MetricDetailsStore;
+  model: DataHubMetricsModel;
+}) {
+  const ownedDetailsStoreRef = useRef<MetricDetailsStore | null>(null);
+  if (!providedDetailsStore && !ownedDetailsStoreRef.current) {
+    ownedDetailsStoreRef.current = createMetricDetailsStore();
+  }
+  const detailsStore = providedDetailsStore ?? ownedDetailsStoreRef.current!;
+  const [, setDetailsRevision] = useState(0);
+
+  useEffect(() => {
+    return detailsStore.subscribe(() => setDetailsRevision((revision) => revision + 1));
+  }, [detailsStore]);
+
   if (model.metrics.length === 0) {
     return <DataHubSectionState message="此範圍目前沒有 semantic metrics。" status="empty" />;
   }
@@ -177,7 +324,7 @@ export function DataHubMetricsContent({ model }: { model: DataHubMetricsModel })
         <span>{model.metrics.length} metrics · Generated {model.generatedAt}</span>
       </div>
       <section className="grid gap-4 xl:grid-cols-2">
-        {model.metrics.map((row) => <MetricCard key={row.id} row={row} />)}
+        {model.metrics.map((row) => <MetricCard detailsStore={detailsStore} key={row.id} row={row} />)}
       </section>
     </div>
   );

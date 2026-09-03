@@ -75,6 +75,7 @@ export function ManagedSourceCard({ row }: { row: ManagedSourceRow }) {
           <button
             type="button"
             className="text-xs font-semibold text-[#375a2d] hover:text-[#25401d] flex items-center gap-1 py-1 px-2.5 rounded-md hover:bg-[#edf4ee] transition-colors cursor-pointer"
+            aria-expanded={isExpanded}
             onClick={() => setIsExpanded((prev) => !prev)}
           >
             <span>{isExpanded ? "收合詳情 ▲" : "展開詳情 ▼"}</span>
@@ -82,32 +83,26 @@ export function ManagedSourceCard({ row }: { row: ManagedSourceRow }) {
         </div>
       </header>
 
-      <SourceRowMeta row={row} />
-
       {isExpanded ? (
-        <div className="space-y-4 border-t border-[#edf2ee] pt-3">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-[#e2e8e3] bg-[#fbfcfb] p-3.5 space-y-2">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#637166]">擁有的語意指標</h4>
-              <div className="flex flex-wrap gap-1.5" data-source-owned-metrics>
-                {row.ownedMetrics.map((metric) => <code className="rounded bg-white border border-[#cbd6ce] px-2 py-0.5 text-xs font-mono text-[#27342a]" key={metric}>{metric}</code>)}
+        <>
+          <SourceRowMeta row={row} />
+          <div className="space-y-4 border-t border-[#edf2ee] pt-3">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-[#e2e8e3] bg-[#fbfcfb] p-3.5 space-y-2">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#637166]">擁有的語意指標</h4>
+                <div className="flex flex-wrap gap-1.5" data-source-owned-metrics>
+                  {row.ownedMetrics.map((metric) => <code className="rounded bg-white border border-[#cbd6ce] px-2 py-0.5 text-xs font-mono text-[#27342a]" key={metric}>{metric}</code>)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#e2e8e3] bg-[#fbfcfb] p-3.5 space-y-2">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#637166]">自動探索資源</h4>
+                <SourceResourceList resources={row.resources} />
               </div>
             </div>
-            <div className="rounded-lg border border-[#e2e8e3] bg-[#fbfcfb] p-3.5 space-y-2">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#637166]">自動探索資源</h4>
-              <SourceResourceList resources={row.resources} />
-            </div>
+            <p className="text-xs text-[#738075]">由 Solar 轉接器託管的指標由系統自動同步，映射控制維持唯讀。</p>
           </div>
-          <p className="text-xs text-[#738075]">由 Solar 轉接器託管的指標由系統自動同步，映射控制維持唯讀。</p>
-        </div>
-      ) : (
-        <div className="hidden" aria-hidden="true">
-          <div data-source-owned-metrics>
-            {row.ownedMetrics.map((metric) => <code key={metric}>{metric}</code>)}
-          </div>
-          <SourceResourceList resources={row.resources} />
-        </div>
-      )}
+        </>
+      ) : null}
     </article>
   );
 }

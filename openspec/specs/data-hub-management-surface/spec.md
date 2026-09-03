@@ -3584,106 +3584,98 @@ tests:
 ---
 ### Requirement: Metric profile cards provide inline expandable usage and diagnostic inspection
 
-The `Metrics` workspace SHALL present each semantic metric as a self-contained profile card containing current live value, freshness state, source provenance, and inline expandable sections for consumer page usage and data health diagnostics. Operators SHALL be able to inspect which display pages reference the metric and review diagnostic health without navigating away to a separate full-page tab.
+The `Metrics` workspace SHALL present each semantic metric as a self-contained profile card containing current live value, freshness state, source provenance, and inline expandable sections for consumer page usage and data health diagnostics. The expanded content SHALL be derived from the current metric inventory, usage, and provenance responses for the card's `(metricScope, metricKey)` identity and SHALL NOT substitute hard-coded health or consumer claims. Operators SHALL be able to inspect which display pages reference the metric and review diagnostic health without navigating away to a separate full-page tab.
 
 #### Scenario: Operator inspects metric usage and diagnostics inline
-- **WHEN** an operator views a semantic metric card and toggles the usage and diagnostics section
-- **THEN** the card expands inline to display the list of referencing playback pages and cards
-- **AND** the card displays live freshness details, contract verification state, and diagnostic latency without leaving the Metrics view
+- **WHEN** an operator expands the usage and diagnostics section of a semantic metric card
+- **THEN** the card displays the actual referencing playback pages and cards returned for that metric identity
+- **AND** the card displays the actual freshness age and category, evaluation state, failure information when present, and diagnostic latency without leaving the Metrics view
+
+#### Scenario: Metric detail data is loading, empty, or unavailable
+- **WHEN** the usage or provenance request for an expanded metric is pending, returns no matching data, or fails
+- **THEN** the card displays a distinct loading, empty, or error state for that result
+- **AND** the card MUST NOT represent a failed or unavailable result as healthy
 
 
 <!-- @trace
-source: consolidate-data-hub-metrics-and-diagnostics
+source: fix-data-hub-consolidation-regressions
 updated: 2026-09-01
 code:
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/DataHub/Diagnostics.tsx
-  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsData.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsTopics.ts
+  - apps/web/src/pages/DataHub/MetricDetailsModel.ts
+  - apps/web/src/pages/MqttSettings/MqttConnectionsPanel.tsx
+  - apps/web/src/pages/MqttSettings/MqttWeatherPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRemoteSync.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsViewHelpers.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsCardData.ts
+  - apps/web/src/pages/MqttSettings/mqttSettingsRouteModel.ts
   - apps/web/src/pages/DataHub/Metrics.tsx
-  - apps/web/src/app/routeMeta.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/web/src/app/router.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/MqttSourcePanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRuntime.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsWeather.ts
   - apps/web/src/pages/DataHub/SourceCards.tsx
-  - apps/web/src/styles/management.css
-  - apps/web/src/pages/DataHub/Usage.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
-  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
-  - apps/web/src/pages/DataHub/index.tsx
-  - apps/web/src/pages/DataHub/WeatherModel.ts
-  - apps/web/src/pages/DataHub/WeatherCards.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
-  - apps/web/src/app/dataHub.ts
-  - apps/web/src/app/dataHubCompatibility.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
-  - apps/web/src/pages/DataHub/Weather.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/MqttSettings/MqttCardDataPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsController.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.types.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/MqttTopicPanel.tsx
 tests:
-  - apps/web/src/pages/DataHub/Metrics.test.tsx
-  - apps/web/src/app/router.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
   - apps/web/src/pages/DataHub/Sources.test.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/server/src/routes/metrics-history.test.ts
-  - apps/web/src/app/dataHub.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
-  - apps/web/src/sw.test.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
-  - apps/web/src/app/dataHubCompatibility.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
-  - apps/web/src/components/AppFooterNav.icons.test.tsx
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/web/src/pages/DataHub/Metrics.test.tsx
+  - apps/web/src/pages/DataHub/MetricDetailsModel.test.ts
+  - apps/web/src/pages/managementDisplaySync.test.ts
 -->
 
 ---
 ### Requirement: Managed Solar Adapters present a collapsible summary row
 
-The `Sources` workspace SHALL present read-only managed Solar Collector adapters as a collapsible summary row by default, displaying health status, topic, and discovered zone counts in a compact bar. Operators SHALL be able to expand the row to view detailed discovered zone resources and owned semantic metrics while keeping operator-managed generic MQTT mappings prominently visible.
+The `Sources` workspace SHALL present read-only managed Solar Collector adapters as a collapsible summary row by default. The collapsed DOM SHALL contain one summary row displaying health status, topic, and discovered zone count, while secondary metadata, discovered zone resources, and owned semantic metrics SHALL be rendered only in the expanded content. Operators SHALL be able to expand the row while keeping operator-managed generic MQTT mappings prominently visible.
 
-#### Scenario: Operator views Sources workspace
-- **WHEN** an operator opens the Sources workspace
-- **THEN** managed Solar adapters render as a compact, single-row summary
-- **AND** the operator can click to expand full zone details and owned metrics on demand
+#### Scenario: Operator views collapsed Sources workspace
+- **WHEN** an operator opens the Sources workspace and a managed Solar adapter is collapsed
+- **THEN** the adapter renders one compact summary row containing health, topic, and zone count
+- **AND** secondary metadata, zone resources, and owned metrics are absent from the collapsed content
+
+#### Scenario: Operator expands a Managed Solar adapter
+- **WHEN** an operator activates the managed adapter summary control
+- **THEN** the control exposes its expanded state
+- **AND** the adapter renders its secondary metadata, full zone details, and owned metrics
 
 <!-- @trace
-source: consolidate-data-hub-metrics-and-diagnostics
+source: fix-data-hub-consolidation-regressions
 updated: 2026-09-01
 code:
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/DataHub/Diagnostics.tsx
-  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsData.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsTopics.ts
+  - apps/web/src/pages/DataHub/MetricDetailsModel.ts
+  - apps/web/src/pages/MqttSettings/MqttConnectionsPanel.tsx
+  - apps/web/src/pages/MqttSettings/MqttWeatherPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRemoteSync.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsViewHelpers.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsCardData.ts
+  - apps/web/src/pages/MqttSettings/mqttSettingsRouteModel.ts
   - apps/web/src/pages/DataHub/Metrics.tsx
-  - apps/web/src/app/routeMeta.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/web/src/app/router.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/MqttSourcePanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRuntime.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsWeather.ts
   - apps/web/src/pages/DataHub/SourceCards.tsx
-  - apps/web/src/styles/management.css
-  - apps/web/src/pages/DataHub/Usage.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
-  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
-  - apps/web/src/pages/DataHub/index.tsx
-  - apps/web/src/pages/DataHub/WeatherModel.ts
-  - apps/web/src/pages/DataHub/WeatherCards.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
-  - apps/web/src/app/dataHub.ts
-  - apps/web/src/app/dataHubCompatibility.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
-  - apps/web/src/pages/DataHub/Weather.tsx
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/MqttSettings/MqttCardDataPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsController.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.types.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/MqttTopicPanel.tsx
 tests:
-  - apps/web/src/pages/DataHub/Metrics.test.tsx
-  - apps/web/src/app/router.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
   - apps/web/src/pages/DataHub/Sources.test.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/server/src/routes/metrics-history.test.ts
-  - apps/web/src/app/dataHub.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
-  - apps/web/src/sw.test.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
-  - apps/web/src/app/dataHubCompatibility.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
-  - apps/web/src/components/AppFooterNav.icons.test.tsx
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/web/src/pages/DataHub/Metrics.test.tsx
+  - apps/web/src/pages/DataHub/MetricDetailsModel.test.ts
+  - apps/web/src/pages/managementDisplaySync.test.ts
 -->

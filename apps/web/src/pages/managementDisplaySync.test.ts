@@ -20,9 +20,21 @@ const baseDisplaySyncEvent = {
   reason: "spec-regression"
 } as const;
 
+const mqttSettingsIndexSource = fs.readFileSync(
+  path.join(import.meta.dirname, "MqttSettings/index.tsx"),
+  "utf8"
+);
+const mqttSettingsControllerSource = fs.readFileSync(
+  path.join(import.meta.dirname, "MqttSettings/useMqttSettingsController.ts"),
+  "utf8"
+);
+const mqttSettingsRemoteSyncSource = fs.readFileSync(
+  path.join(import.meta.dirname, "MqttSettings/useMqttSettingsRemoteSync.ts"),
+  "utf8"
+);
+
 const pageSources = [
   "PlaybackSettings/index.tsx",
-  "MqttSettings/index.tsx",
   "CircuitSettings/index.tsx",
   "ImageManagement/index.tsx",
   "BrandAssets/index.tsx",
@@ -42,7 +54,11 @@ test("management surfaces wire the shared display-sync draft guard contract", ()
     assert.match(page.source, /isDirty:/, `${page.path} should provide an isDirty adapter field`);
     assert.match(page.source, /reloadNow:/, `${page.path} should provide a reloadNow adapter field`);
     assert.match(page.source, /RemoteSyncBanner/, `${page.path} should render the shared remote sync banner`);
-    assert.match(page.source, /onKeepEditing=\{syncDraftGuard\.keepEditing\}/, `${page.path} should keep the explicit keep-editing action`);
+    assert.match(
+      page.source,
+      /onKeepEditing=\{syncDraftGuard\.keepEditing\}/,
+      `${page.path} should keep the explicit keep-editing action`
+    );
     assert.match(
       page.source,
       /onReloadNow=\{\(\) => syncDraftGuard\.discardAndReload\(\)\.catch\(\(\) => \{\}\)\}/,
@@ -51,15 +67,29 @@ test("management surfaces wire the shared display-sync draft guard contract", ()
   }
 });
 
+test("mqtt settings wires its display-sync guard through the controller boundary", () => {
+  assert.match(mqttSettingsIndexSource, /const controller = useMqttSettingsController\(surface\)/);
+  assert.match(mqttSettingsIndexSource, /const \{ remoteSync, \.\.\.contentProps \} = controller/);
+  assert.match(mqttSettingsIndexSource, /onKeepEditing=\{remoteSync\.keepEditing\}/);
+  assert.match(
+    mqttSettingsIndexSource,
+    /onReloadNow=\{\(\) => remoteSync\.discardAndReload\(\)\.catch\(\(\) => \{\}\)\}/
+  );
+  assert.match(mqttSettingsControllerSource, /const remote = useMqttSettingsRemoteSync\(\{/);
+  assert.match(mqttSettingsControllerSource, /remoteSync:\s*remote\.syncDraftGuard/);
+  assert.match(mqttSettingsRemoteSyncSource, /useDisplaySyncDraftGuard\(\{/);
+  assert.match(mqttSettingsRemoteSyncSource, /isDirty:\s*isDirty/);
+  assert.match(mqttSettingsRemoteSyncSource, /reloadNow:\s*async \(\) => \{/);
+});
+
 test("management surfaces keep clean summary reloads inside their display-sync adapters", () => {
   const playbackSettingsSource = pageSources.find((page) => page.path === "PlaybackSettings/index.tsx")?.source ?? "";
-  const mqttSettingsSource = pageSources.find((page) => page.path === "MqttSettings/index.tsx")?.source ?? "";
   const circuitSettingsSource = pageSources.find((page) => page.path === "CircuitSettings/index.tsx")?.source ?? "";
   const imageManagementSource = pageSources.find((page) => page.path === "ImageManagement/index.tsx")?.source ?? "";
   const brandAssetsSource = pageSources.find((page) => page.path === "BrandAssets/index.tsx")?.source ?? "";
 
   assert.match(playbackSettingsSource, /reloadDisplayOpsSummary\(\)/);
-  assert.match(mqttSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
+  assert.match(mqttSettingsRemoteSyncSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
   assert.match(circuitSettingsSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
   assert.match(imageManagementSource, /reloadAssetHealth\(\)/);
   assert.match(imageManagementSource, /reloadAssetReferences\(\)/);
@@ -68,7 +98,6 @@ test("management surfaces keep clean summary reloads inside their display-sync a
 
 test("management surfaces declare surface-specific display-sync scope filters", () => {
   const playbackSettingsSource = pageSources.find((page) => page.path === "PlaybackSettings/index.tsx")?.source ?? "";
-  const mqttSettingsSource = pageSources.find((page) => page.path === "MqttSettings/index.tsx")?.source ?? "";
   const circuitSettingsSource = pageSources.find((page) => page.path === "CircuitSettings/index.tsx")?.source ?? "";
   const imageManagementSource = pageSources.find((page) => page.path === "ImageManagement/index.tsx")?.source ?? "";
   const brandAssetsSource = pageSources.find((page) => page.path === "BrandAssets/index.tsx")?.source ?? "";
@@ -78,9 +107,9 @@ test("management surfaces declare surface-specific display-sync scope filters", 
   assert.match(playbackSettingsSource, /relevantScopes:\s*PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES/);
   assert.match(playbackSettingsSource, /useDisplaySyncRefresh\(syncDraftGuard\.handleDisplaySync,\s*PLAYBACK_SETTINGS_DISPLAY_SYNC_SCOPES\)/);
 
-  assert.match(mqttSettingsSource, /MQTT_SETTINGS_DISPLAY_SYNC_SCOPES/);
-  assert.match(mqttSettingsSource, /relevantScopes:\s*MQTT_SETTINGS_DISPLAY_SYNC_SCOPES/);
-  assert.match(mqttSettingsSource, /useDisplaySyncRefresh\(syncDraftGuard\.handleDisplaySync,\s*MQTT_SETTINGS_DISPLAY_SYNC_SCOPES\)/);
+  assert.match(mqttSettingsRemoteSyncSource, /MQTT_SETTINGS_DISPLAY_SYNC_SCOPES/);
+  assert.match(mqttSettingsRemoteSyncSource, /relevantScopes:\s*MQTT_SETTINGS_DISPLAY_SYNC_SCOPES/);
+  assert.match(mqttSettingsRemoteSyncSource, /useDisplaySyncRefresh\(syncDraftGuard\.handleDisplaySync,\s*MQTT_SETTINGS_DISPLAY_SYNC_SCOPES\)/);
 
   assert.match(circuitSettingsSource, /CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES/);
   assert.match(circuitSettingsSource, /relevantScopes:\s*CIRCUIT_SETTINGS_DISPLAY_SYNC_SCOPES/);

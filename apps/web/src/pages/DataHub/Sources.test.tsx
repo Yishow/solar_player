@@ -14,6 +14,7 @@ import {
   DataHubSourcesContent,
   DataHubSources,
   isSolarAdapterManagedMetricIdentity,
+  ManagedSourceCard,
   resolveSourcesSaveErrorMessage,
   updateGenericMapping,
   type DataHubSourcesModel
@@ -203,7 +204,7 @@ test("stable ownership save conflicts become operator-visible feedback", () => {
   assert.match(html, /Solar adapter/);
 });
 
-test("Sources renders source type, scope, health, ownership, resources, and generic controls", () => {
+test("Sources renders source type, scope, health, ownership, and generic controls", () => {
   const html = renderSourcesContent({ model: baseModel, onRefresh: async () => undefined, onSave: async () => undefined });
 
   assert.match(html, /data-source-kind="managed"/);
@@ -211,7 +212,6 @@ test("Sources renders source type, scope, health, ownership, resources, and gene
   assert.match(html, /data-source-scope="cl"/);
   assert.match(html, /data-source-ownership="managed"/);
   assert.match(html, /factoryGeneration\.todayMwh/);
-  assert.match(html, /屋頂區/);
   assert.match(html, /data-source-kind="generic"/);
   assert.match(html, /data-source-scope="kn"/);
   assert.match(html, /factory\/kn\/stamping/);
@@ -221,6 +221,78 @@ test("Sources renders source type, scope, health, ownership, resources, and gene
   assert.match(html, /disabled=""[^>]*name="metricKey"/);
   assert.match(html, /disabled=""/);
   assert.doesNotMatch(html, /rawPayload|\{\"value\":4\.2\}/);
+});
+
+test("Managed Solar adapter keeps secondary details out of the collapsed summary row", async () => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id=\"root\"></div></body></html>",
+    { pretendToBeVisual: true, url: "http://127.0.0.1/settings/data-hub/sources" }
+  );
+  const previousGlobals = {
+    document: globalThis.document,
+    HTMLElement: globalThis.HTMLElement,
+    navigator: globalThis.navigator,
+    window: globalThis.window,
+    isReactActEnvironment: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
+  };
+  for (const [key, value] of Object.entries({
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    navigator: dom.window.navigator,
+    window: dom.window
+  })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value, writable: true });
+  }
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+  const managed = buildSourceRows(baseModel).find((row) => row.kind === "managed");
+  assert.ok(managed);
+  let root: Root | null = null;
+
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(<ManagedSourceCard row={managed} />);
+      await Promise.resolve();
+    });
+
+    const card = dom.window.document.querySelector<HTMLElement>('[data-source-kind="managed"]');
+    assert.ok(card);
+    const summary = card.querySelector("header");
+    assert.ok(summary);
+    assert.match(summary.textContent ?? "", /Healthy/);
+    assert.match(summary.textContent ?? "", /solar\/CL\/summary/);
+    assert.match(summary.textContent ?? "", /自動探索 1 個分區/);
+
+    assert.equal(card.querySelector("[data-source-meta]") === null, true);
+    assert.equal(card.querySelector("[data-source-resources]") === null, true);
+    assert.equal(card.querySelector("[data-source-owned-metrics]") === null, true);
+
+    const toggle = card.querySelector<HTMLButtonElement>("button");
+    assert.ok(toggle);
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    await act(async () => {
+      toggle.click();
+      await Promise.resolve();
+    });
+
+    assert.equal(toggle.getAttribute("aria-expanded"), "true");
+    assert.equal(Boolean(card.querySelector("[data-source-meta]")), true);
+    assert.equal(Boolean(card.querySelector("[data-source-resources]")), true);
+    assert.equal(Boolean(card.querySelector("[data-source-owned-metrics]")), true);
+    assert.match(card.textContent ?? "", /屋頂區/);
+    assert.match(card.textContent ?? "", /factoryGeneration\.todayMwh/);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    Object.defineProperty(globalThis, "document", { configurable: true, value: previousGlobals.document, writable: true });
+    Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: previousGlobals.HTMLElement, writable: true });
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: previousGlobals.navigator, writable: true });
+    Object.defineProperty(globalThis, "window", { configurable: true, value: previousGlobals.window, writable: true });
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = previousGlobals.isReactActEnvironment;
+    dom.window.close();
+  }
 });
 
 test("Sources exposes consolidated generic mapping controls including add topic and test publish", () => {

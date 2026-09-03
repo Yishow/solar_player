@@ -1311,42 +1311,47 @@ tests:
 
 ---
 ### Requirement: MQTT management components are structured into modular units under 400 lines
-The MQTT connection and operations management UI SHALL be decoupled into single-responsibility components (such as dedicated Broker form, connection status card, and topic operations view) where each source file is maintained under the 400-line constraint.
+The MQTT connection and operations management UI SHALL be decoupled into named, single-responsibility controller/hooks and view components for broker settings, source mode, topic operations, card data, weather, and surface composition. Every source file created or refactored for this MQTT management surface SHALL contain fewer than 400 physical lines, and the refactor SHALL preserve the existing routes, API calls, surface variants, dirty-state guards, polling behavior, callback semantics, and stable DOM selectors.
 
-#### Scenario: Codebase inspection of MQTT and Data Hub management components
-- **WHEN** the management UI code files are checked
-- **THEN** all newly created and refactored components for connections, broker forms, status cards, and topic operations strictly satisfy the file length and modularity constraints
+#### Scenario: Codebase inspection of refactored MQTT management modules
+- **WHEN** the source files created or refactored by this change are checked after the controller and content split
+- **THEN** every checked source file contains fewer than 400 physical lines
+- **AND** each module has one named interaction, state, or presentation responsibility rather than containing a relocated monolithic component
+
+#### Scenario: Existing MQTT surfaces remain compatible
+- **WHEN** the full, connections-only, and operations-only MQTT surfaces are rendered and exercised after the split
+- **THEN** their API requests, visible controls, dirty-state protection, polling lifecycle, disabled states, and `data-mqtt-*` selectors retain their pre-change behavior
 
 <!-- @trace
-source: refactor-data-hub-layout-and-connections
-updated: 2026-08-31
+source: fix-data-hub-consolidation-regressions
+updated: 2026-09-01
 code:
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
-  - apps/web/src/pages/DataHub/Usage.tsx
-  - apps/web/src/app/dataHub.ts
-  - apps/web/src/pages/DataHub/index.tsx
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
-  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/web/src/app/routeMeta.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsData.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsTopics.ts
+  - apps/web/src/pages/DataHub/MetricDetailsModel.ts
+  - apps/web/src/pages/MqttSettings/MqttConnectionsPanel.tsx
+  - apps/web/src/pages/MqttSettings/MqttWeatherPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRemoteSync.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsViewHelpers.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsCardData.ts
+  - apps/web/src/pages/MqttSettings/mqttSettingsRouteModel.ts
   - apps/web/src/pages/DataHub/Metrics.tsx
-  - apps/web/src/pages/DataHub/Diagnostics.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
+  - apps/web/src/pages/MqttSettings/MqttSourcePanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsRuntime.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsWeather.ts
   - apps/web/src/pages/DataHub/SourceCards.tsx
-  - apps/web/src/pages/DataHub/Sources.tsx
-  - apps/web/src/styles/management.css
-  - apps/web/src/pages/DataHub/Weather.tsx
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
+  - apps/web/src/pages/MqttSettings/index.tsx
+  - apps/web/src/pages/MqttSettings/MqttCardDataPanel.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsController.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.types.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
+  - apps/web/src/pages/MqttSettings/MqttTopicPanel.tsx
 tests:
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/web/src/components/AppFooterNav.icons.test.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
   - apps/web/src/pages/DataHub/Sources.test.tsx
-  - apps/web/src/sw.test.ts
+  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
+  - apps/web/src/pages/MqttSettings/index.test.ts
+  - apps/web/src/pages/DataHub/Metrics.test.tsx
+  - apps/web/src/pages/DataHub/MetricDetailsModel.test.ts
+  - apps/web/src/pages/managementDisplaySync.test.ts
 -->
