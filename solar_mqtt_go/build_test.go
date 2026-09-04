@@ -73,17 +73,21 @@ func TestStartPowerShellScriptMatchesContract(t *testing.T) {
 	}
 	source := string(script)
 	for _, want := range []string{
-		"solar_config.json",
+		`Test-Path "..\solar_mqtt\solar_config.json"`,
+		`Copy-Item "..\solar_mqtt\solar_config.json" "solar_config.json"`,
 		"18868",
-		"go run .",
+		".solar_mqtt_go_run.exe",
+		"go build",
+		"& $RunBinary",
+		"@args",
 	} {
 		if !strings.Contains(source, want) {
 			t.Errorf("start.ps1 missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", "IsNullOrWhiteSpace($env:SOLAR_MQTT_"} {
+	for _, forbidden := range []string{"go run", "缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", "IsNullOrWhiteSpace($env:SOLAR_MQTT_"} {
 		if strings.Contains(source, forbidden) {
-			t.Errorf("start.ps1 must not require optional MQTT credentials: %q", forbidden)
+			t.Errorf("start.ps1 contains forbidden content %q", forbidden)
 		}
 	}
 
@@ -93,17 +97,21 @@ func TestStartPowerShellScriptMatchesContract(t *testing.T) {
 	}
 	shellSource := string(shellScript)
 	for _, want := range []string{
-		"solar_config.json",
+		`if [ ! -f "solar_config.json" ] && [ -f "../solar_mqtt/solar_config.json" ]; then`,
+		`cp "../solar_mqtt/solar_config.json" "solar_config.json"`,
 		"18868",
-		"go run .",
+		".solar_mqtt_go_run",
+		"go build",
+		`exec "./$RUN_BINARY"`,
+		`"$@"`,
 	} {
 		if !strings.Contains(shellSource, want) {
 			t.Errorf("start.sh missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", `[ -z "${SOLAR_MQTT_`} {
+	for _, forbidden := range []string{"go run", "缺少 SOLAR_MQTT_USERNAME", "缺少 SOLAR_MQTT_PASSWORD", `[ -z "${SOLAR_MQTT_`} {
 		if strings.Contains(shellSource, forbidden) {
-			t.Errorf("start.sh must not require optional MQTT credentials: %q", forbidden)
+			t.Errorf("start.sh contains forbidden content %q", forbidden)
 		}
 	}
 }

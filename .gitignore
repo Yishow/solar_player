@@ -8,6 +8,8 @@ dist/
 .env.*
 !.env.example
 solar_mqtt_go/solar_config.json
+solar_mqtt_go/.solar_mqtt_go_run
+solar_mqtt_go/.solar_mqtt_go_run.exe
 __pycache__/
 
 .antigravitycli/

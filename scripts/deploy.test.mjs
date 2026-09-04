@@ -107,7 +107,7 @@ test("PC runbook does not assign a supervisor contract to the Go collector", () 
   assert.match(runbook, /## 5\. Install as a Windows service with nssm/u);
 });
 
-test("Go collector start wrappers do not require optional broker credentials", () => {
+test("Go collector start wrappers use local binaries without requiring broker credentials", () => {
   const script = readFileSync(collectorStartScriptPath, "utf8");
   const powershellScript = readFileSync(collectorStartPowerShellScriptPath, "utf8");
   assert.doesNotMatch(script, /SOLAR_MQTT_(?:USERNAME|PASSWORD)[^\n]*solar-collector/iu);
@@ -119,9 +119,15 @@ test("Go collector start wrappers do not require optional broker credentials", (
     assert.doesNotMatch(source, /required before starting|must be set before starting/iu);
   }
   assert.match(script, /solar_config\.json/u);
-  assert.match(script, /exec go run/u);
+  assert.match(script, /\.solar_mqtt_go_run/u);
+  assert.match(script, /go build/u);
+  assert.match(script, /exec "\.\/\$RUN_BINARY"/u);
+  assert.doesNotMatch(script, /go run/u);
   assert.match(powershellScript, /solar_config\.json/u);
-  assert.match(powershellScript, /go run/u);
+  assert.match(powershellScript, /\.solar_mqtt_go_run\.exe/u);
+  assert.match(powershellScript, /go build/u);
+  assert.match(powershellScript, /& \$RunBinary/u);
+  assert.doesNotMatch(powershellScript, /go run/u);
 });
 
 function fileMode(filePath) {

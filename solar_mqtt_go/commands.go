@@ -25,16 +25,8 @@ import (
 	"solar_mqtt_go/internal/webui"
 )
 
-// configPathFor 設定檔路徑（測試可替換；優先使用當前目錄，預設為 executable 目錄旁）。
-var configPathFor = func() string {
-	if _, err := os.Stat("solar_config.json"); err == nil {
-		if abs, err := filepath.Abs("solar_config.json"); err == nil {
-			return abs
-		}
-		return "solar_config.json"
-	}
-	return config.DefaultConfigPath()
-}
+// configPathFor 設定檔路徑（測試可替換；預設為 executable 目錄旁）。
+var configPathFor = config.DefaultConfigPath
 
 var webuiStartFn = func(port int) (*webui.Server, error) {
 	return webui.StartWithOptions(webui.Options{

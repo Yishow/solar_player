@@ -60,6 +60,9 @@ fi
 echo "==> 啟動 solar_mqtt_go (模式: $SUBCMD)..."
 echo "==> 儀表板網址: http://127.0.0.1:18868/"
 
+RUN_BINARY=".solar_mqtt_go_run"
+go build -o "./$RUN_BINARY" .
+
 # 背景延遲 1.2 秒自動開啟瀏覽器
 (
   sleep 1.2
@@ -71,7 +74,7 @@ echo "==> 儀表板網址: http://127.0.0.1:18868/"
 ) &
 
 if [ $# -eq 0 ]; then
-  exec go run . "$SUBCMD"
+  exec "./$RUN_BINARY" "$SUBCMD"
 else
-  exec go run . "$@"
+  exec "./$RUN_BINARY" "$@"
 fi

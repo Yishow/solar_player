@@ -142,11 +142,11 @@ tests:
 ---
 ### Requirement: Configuration file compatibility
 
-The Go implementation SHALL read and write solar_config.json beside the built executable, independent of the process working directory, as the deployed equivalent of Python CONFIG_PATH. It SHALL preserve the exact Python format, global keys, defaults, factory keys (factory_id, base_url, login_user, login_pass), per-factory defaults, legacy migration, unknown global and factory keys, and temp-file-plus-replace save behavior. Boolean coercion SHALL match Python exactly: after lower-casing, only string values "1", "true", "yes", and "on" become true; every other string becomes false without a warning; non-string values use Python-bool-equivalent truthiness. Numeric coercion SHALL accept numeric strings and SHALL keep the pre-load value with a warning when int/float conversion fails.
+The Go implementation SHALL read and write `solar_config.json` beside the built executable, independent of the process working directory, as the deployed equivalent of Python `CONFIG_PATH`. The executable-relative path SHALL be authoritative for command, tray, and WebUI defaults even when a different `solar_config.json` exists in the process working directory, and missing or inaccessible executable-relative config SHALL NOT trigger fallback to working-directory candidates. Repository `start.sh` and `start.ps1` launchers SHALL build and execute an ignored local platform binary beside the prepared `solar_config.json` and SHALL NOT use a temporary `go run` executable. An explicitly supplied non-empty config path used by an embedded caller or test SHALL remain authoritative. The implementation SHALL preserve the exact Python format, global keys, defaults, factory keys (`factory_id`, `base_url`, `login_user`, `login_pass`), per-factory defaults, legacy migration, unknown global and factory keys, and temp-file-plus-replace save behavior. Boolean coercion SHALL match Python exactly: after lower-casing, only string values `"1"`, `"true"`, `"yes"`, and `"on"` become true; every other string becomes false without a warning; non-string values use Python-bool-equivalent truthiness. Numeric coercion SHALL accept numeric strings and SHALL keep the pre-load value with a warning when int/float conversion fails.
 
 #### Scenario: Existing Python config loads unchanged
 
-- **WHEN** the Go service starts with a solar_config.json written by the Python version
+- **WHEN** the Go service starts with a `solar_config.json` written by the Python version
 - **THEN** all global and factory values match what the Python version would load
 - **AND** unknown keys present in the file are retained and written back on save
 - **AND** launching the built binary from a different working directory still loads the config beside the executable
@@ -162,122 +162,57 @@ The Go implementation SHALL read and write solar_config.json beside the built ex
 | `0` | `false` | no |
 | `2` | `true` | no |
 
+#### Scenario: Working directory contains a conflicting config
+
+- **WHEN** command, tray, or WebUI startup runs from a directory containing a different `solar_config.json`
+- **THEN** the application reads and writes only the executable-relative config
+- **AND** the working-directory config remains unchanged
+
+#### Scenario: Repository launch wrapper starts the executable beside its config
+
+- **WHEN** an operator starts the collector through `start.sh` or `start.ps1`
+- **THEN** the wrapper builds and launches the ignored `.solar_mqtt_go_run` platform binary from the `solar_mqtt_go` directory
+- **AND** the launched binary reads and writes the adjacent `solar_config.json` without using `go run`
+- **AND** relative `sqlite_path` values continue to resolve from the `solar_mqtt_go` process working directory
+
+#### Scenario: Caller supplies an explicit config path
+
+- **WHEN** an embedded caller or isolated test starts the WebUI with a non-empty config path
+- **THEN** all local-config read and write operations use that exact path
+- **AND** no working-directory candidate replaces it when the file is absent or later created
+
+##### Example: absent explicit target remains authoritative
+
+- **GIVEN** `/tmp/cwd/solar_config.json` contains `mqtt_host=cwd-decoy` and `/tmp/explicit/solar_config.json` does not exist
+- **WHEN** WebUI starts with `Options.ConfigPath=/tmp/explicit/solar_config.json`, reads local config, and writes `mqtt_host=explicit-update`
+- **THEN** `/tmp/explicit/solar_config.json` contains `mqtt_host=explicit-update`
+- **AND** `/tmp/cwd/solar_config.json` remains byte-for-byte unchanged
+
 #### Scenario: Legacy single-factory config migrates
 
-- **WHEN** the config file lacks a factories array but contains factory-level keys
-- **THEN** the loaded in-memory config moves the top-level factory keys into a single-element factories array and prints a migration notice
+- **WHEN** the config file lacks a `factories` array but contains factory-level keys
+- **THEN** the loaded in-memory config moves the top-level factory keys into a single-element `factories` array and prints a migration notice
 - **AND** load alone does not rewrite the source file; the migrated shape is written only by a later explicit save
 
 #### Scenario: set command updates and persists
 
-- **WHEN** a /set payload changes any global or factory field
+- **WHEN** a `/set` payload changes any global or factory field
 - **THEN** the in-memory config is updated, the file is saved atomically, and the effective config is republished to the config topic
 
 
 <!-- @trace
-source: refactor-solar-mqtt-to-go
-updated: 2026-08-29
+source: fix-solar-mqtt-config-path-contract
+updated: 2026-09-04
 code:
-  - solar_mqtt_go/internal/webui/web/styles/components.css
-  - solar_mqtt_go/internal/mosquitto/proc_windows.go
-  - solar_mqtt_go/internal/service/control.go
-  - solar_mqtt_go/commands.go
-  - solar_mqtt_go/internal/service/service.go
-  - solar_mqtt_go/internal/webui/web/vendor/mqtt.min.js
-  - apps/server/src/services/displayStoryService.ts
-  - solar_mqtt_go/start.sh
-  - solar_mqtt_go/internal/webui/web/js/local-config-view.js
-  - solar_mqtt_go/internal/discovery/discovery.go
-  - apps/server/src/mqtt/MqttClientService.ts
-  - .agents/skills/openspec-propose/SKILL.md
-  - .agents/skills/openspec-archive-change/SKILL.md
-  - solar_mqtt_go/assets/assets.go
-  - solar_mqtt_go/internal/tray/logfile.go
-  - solar_mqtt_go/internal/mqttbus/bus.go
-  - .agents/skills/openspec-explore/SKILL.md
-  - solar_mqtt_go/internal/scraper/scraper.go
-  - apps/server/src/services/displayValueOverrideService.ts
-  - packages/shared/src/displayCardData.ts
-  - packages/shared/src/index.ts
-  - solar_mqtt_go/internal/schedule/schedule.go
-  - solar_mqtt_go/start.ps1
-  - solar_mqtt_go/internal/tray/run.go
-  - solar_mqtt_go/internal/webui/web/js/factory-view.js
-  - solar_mqtt_go/internal/webui/web/js/mqtt-manager.js
-  - solar_mqtt_go/build.ps1
-  - solar_mqtt_go/assets/tray.ico
-  - solar_mqtt_go/internal/webui/web/index.html
-  - solar_mqtt_go/internal/display/display.go
-  - solar_mqtt_go/internal/webui/webui.go
-  - start.sh
-  - .agents/skills/openspec-apply-change/SKILL.md
-  - solar_mqtt_go/build.sh
-  - solar_mqtt_go/internal/tray/instance_unix.go
-  - .agents/skills/openspec-sync-specs/SKILL.md
-  - solar_mqtt_go/internal/webui/web/styles/layout.css
-  - docs/runbooks/pc-server-deploy.md
-  - apps/server/src/db/migrate.ts
-  - AGENTS.md
-  - solar_mqtt_go/internal/config/config.go
-  - apps/server/src/routes/settings-mqtt.ts
-  - apps/server/src/services/displayCardDataService.ts
-  - solar_mqtt_go/internal/anomaly/anomaly.go
-  - apps/server/src/services/factoryGenerationAggregateService.ts
-  - solar_mqtt_go/internal/webui/web/styles/theme.css
-  - solar_mqtt_go/internal/webui/web/js/config-view.js
-  - solar_mqtt_go/main.go
-  - apps/server/src/db/migrations/035_scoped_metric_identity.sql
-  - start.ps1
-  - solar_mqtt_go/internal/storage/storage.go
-  - solar_mqtt_go/internal/webui/web/js/app.js
-  - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - .agents/skills/.openspec-target
-  - apps/server/src/db/seed.ts
-  - apps/server/src/services/MetricResolver.ts
-  - solar_mqtt_go/internal/tray/instance_windows.go
-  - packages/shared/src/metricScope.ts
-  - solar_mqtt_go/internal/tray/run_nocgo.go
-  - solar_mqtt_go/internal/tray/app.go
-  - solar_mqtt_go/internal/mosquitto/proc_unix.go
-  - apps/server/src/db/scopedMetricMigration.ts
-  - apps/server/src/routes/display-card-data.ts
-  - solar_mqtt_go/internal/mosquitto/mosquitto.go
-  - solar_mqtt_go/internal/webui/web/styles.css
   - scripts/deploy.test.mjs
-  - solar_mqtt_go/internal/heartbeat/heartbeat.go
-  - solar_mqtt_go/go.sum
-  - solar_mqtt_go/go.mod
+  - solar_mqtt_go/internal/webui/webui.go
+  - solar_mqtt_go/commands.go
+  - solar_mqtt_go/start.sh
+  - solar_mqtt_go/start.ps1
 tests:
-  - solar_mqtt_go/internal/tray/app_test.go
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/routes/display-card-data.test.ts
-  - apps/server/src/db/migrations/scopeLiveMetricsMigration.test.ts
-  - solar_mqtt_go/internal/tray/instance_windows_test.go
-  - solar_mqtt_go/internal/heartbeat/heartbeat_test.go
-  - solar_mqtt_go/internal/schedule/schedule_test.go
-  - solar_mqtt_go/assets/assets_test.go
-  - solar_mqtt_go/internal/scraper/scraper_test.go
-  - solar_mqtt_go/internal/anomaly/anomaly_test.go
-  - solar_mqtt_go/internal/storage/storage_test.go
-  - solar_mqtt_go/internal/tray/logfile_test.go
-  - solar_mqtt_go/internal/mqttbus/control_contract_test.go
-  - packages/shared/src/metricScope.test.ts
-  - solar_mqtt_go/internal/config/config_test.go
-  - solar_mqtt_go/internal/service/control_contract_test.go
+  - solar_mqtt_go/internal/webui/config_path_contract_test.go
   - solar_mqtt_go/build_test.go
-  - solar_mqtt_go/internal/config/applyset_test.go
-  - solar_mqtt_go/internal/service/service_test.go
-  - solar_mqtt_go/internal/mosquitto/mosquitto_test.go
-  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
-  - apps/server/src/routes/settings-mqtt.test.ts
-  - solar_mqtt_go/internal/discovery/discovery_test.go
-  - apps/server/src/services/MetricResolver.test.ts
-  - solar_mqtt_go/internal/webui/webui_test.go
-  - apps/server/src/mqtt/metricKeyIngestion.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
-  - solar_mqtt_go/internal/display/display_test.go
-  - solar_mqtt_go/internal/mqttbus/bus_test.go
-  - solar_mqtt_go/main_test.go
+  - solar_mqtt_go/config_path_contract_test.go
 -->
 
 ---

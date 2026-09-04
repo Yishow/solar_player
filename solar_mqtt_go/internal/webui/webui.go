@@ -31,6 +31,8 @@ const (
 	maxPortTries = 10
 )
 
+var defaultConfigPathFor = config.DefaultConfigPath
+
 // Options 儀表板伺服器進階選項。
 type Options struct {
 	Port       int
@@ -59,11 +61,7 @@ func StartWithOptions(opts Options) (*Server, error) {
 	if opts.Port <= 0 {
 		opts.Port = defaultPort
 	}
-	if opts.ConfigPath == "" {
-		opts.ConfigPath = resolveConfigPath(config.DefaultConfigPath())
-	} else {
-		opts.ConfigPath = resolveConfigPath(opts.ConfigPath)
-	}
+	opts.ConfigPath = resolveConfigPath(opts.ConfigPath)
 
 	sub, err := fs.Sub(webFS, "web")
 	if err != nil {
@@ -91,22 +89,9 @@ func StartWithOptions(opts Options) (*Server, error) {
 
 func resolveConfigPath(path string) string {
 	if path != "" {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-	for _, candidate := range []string{"solar_config.json", "solar_mqtt_go/solar_config.json", "../solar_mqtt_go/solar_config.json", "../solar_mqtt/solar_config.json"} {
-		if _, err := os.Stat(candidate); err == nil {
-			if abs, err := filepath.Abs(candidate); err == nil {
-				return abs
-			}
-			return candidate
-		}
-	}
-	if path != "" {
 		return path
 	}
-	return config.DefaultConfigPath()
+	return defaultConfigPathFor()
 }
 
 func registerAPIRoutes(mux *http.ServeMux, opts Options) {

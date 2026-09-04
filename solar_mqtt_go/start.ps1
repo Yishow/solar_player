@@ -53,6 +53,12 @@ if (-not $portListening) {
 Write-Host "==> 啟動 solar_mqtt_go..."
 Write-Host "==> 儀表板網址: http://127.0.0.1:18868/"
 
+$RunBinary = Join-Path $ScriptDir ".solar_mqtt_go_run.exe"
+go build -o $RunBinary .
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
 # 背景延遲 1.2 秒自動開啟瀏覽器
 Start-Job -ScriptBlock {
     Start-Sleep -Milliseconds 1200
@@ -60,7 +66,8 @@ Start-Job -ScriptBlock {
 } | Out-Null
 
 if ($args.Count -eq 0) {
-    go run .
+    & $RunBinary
 } else {
-    go run . @args
+    & $RunBinary @args
 }
+exit $LASTEXITCODE
