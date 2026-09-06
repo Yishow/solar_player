@@ -27,6 +27,21 @@ beforeEach(() => {
   rmSync(`${databasePath}-wal`, { force: true });
   migrateDatabase();
   seedDatabase();
+  const database = getDatabase();
+  for (const scope of ["cl", "kn"] as const) {
+    database.prepare(`
+      INSERT INTO site_energy_profiles (
+        profile_id, metric_scope, revision, schema_version, site_time_zone, status, effective_from,
+        site_total_json, departments_json, share_basis_json, active, created_at
+      ) VALUES (?, ?, 1, 1, 'Asia/Taipei', 'ready', '2026-01-01T00:00:00+08:00', ?, '[]', ?, 1, ?)
+    `).run(
+      `${scope}-energy`,
+      scope,
+      JSON.stringify({ coverageReview: "reviewed", kind: "meter-set", label: scope, memberChannelIds: [`${scope}-main`] }),
+      JSON.stringify({ kind: "site-main" }),
+      new Date().toISOString()
+    );
+  }
 });
 
 after(() => {
@@ -477,6 +492,24 @@ test("GET /api/display-pages/rotation-preview keeps the images registry duration
       body.preview.playablePages.find((page) => page.pageKey === "images")?.durationSeconds,
       5
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("overview publish blocks when the energy profile is missing", async () => {
+  getDatabase().prepare("DELETE FROM site_energy_profiles").run();
+  const app = await buildApp();
+  try {
+    await saveDraftConfig(app, "overview", { heroCopyLayout: { left: 120 } });
+    const publishRes = await app.inject({
+      method: "POST",
+      url: "/api/display-pages/overview/publish",
+      payload: { publishedBy: "test-operator", unsavedBindings: false }
+    });
+    assert.equal(publishRes.statusCode, 422);
+    const body = publishRes.json() as { validation: { findings: Array<{ code: string }> } };
+    assert.equal(body.validation.findings.some((finding) => finding.code === "ENERGY_PROFILE_INCOMPLETE"), true);
   } finally {
     await app.close();
   }

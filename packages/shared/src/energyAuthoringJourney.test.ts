@@ -75,6 +75,7 @@ test("Q1 journey: mapping preview, ingest, period delta, department share, prefl
     period: { day: 1, kind: "day", month: 9, year: 2026 },
     profile,
     samples: [
+      { channelId: "kn-main", sourceTimestamp: "2026-01-01T00:00:00+08:00", valueKwh: "10000" },
       { channelId: "kn-main", sourceTimestamp: "2026-09-01T00:00:00+08:00", valueKwh: "10000" },
       { channelId: "kn-main", sourceTimestamp: "2026-09-01T23:59:00+08:00", valueKwh: "10300" }
     ]

@@ -21,7 +21,7 @@ test("display pages editor loads support panels only for the active panel tab", 
   assert.match(editorSource, /const shouldLoadAssetHealth = selectedWorkspace === "editor" && rightTab === "health"/);
   assert.match(editorSource, /const shouldLoadPublishingState = selectedWorkspace === "editor" && rightTab === "publish"/);
   assert.match(editorSource, /useDisplayPageAssetHealth\(\{ enabled: shouldLoadAssetHealth \}\)/);
-  assert.match(editorSource, /useDisplayPagePublishingState\([\s\S]*\{ enabled: shouldLoadPublishingState \}/);
+  assert.match(editorSource, /useDisplayPagePublishingState\([\s\S]*\{ enabled: shouldLoadPublishingState/);
 });
 
 test("display pages editor support panel refresh failures preserve warm state lanes", () => {

@@ -43,7 +43,12 @@ type DisplayPageConfigBody = {
   freeformObjects?: DisplayPageFreeformObject[];
   regions?: Record<string, unknown>;
 };
-type PublishRequestBody = { publishedBy?: string };
+type PublishRequestBody = {
+  expectedVersion?: number;
+  preflightToken?: string;
+  publishedBy?: string;
+  unsavedBindings?: boolean;
+};
 type RollbackRequestBody = { targetVersion: number; publishedBy?: string };
 
 type DisplayPageConfigRow = {
@@ -326,7 +331,12 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
     "/api/display-pages/:pageId/publish",
     async (request, reply) => {
       const pageId = assertDisplayPageId(request.params.pageId);
-      const { live, validation } = publishDraft(pageId, request.body?.publishedBy);
+      const { live, validation } = publishDraft(pageId, {
+        expectedVersion: request.body?.expectedVersion,
+        preflightToken: request.body?.preflightToken,
+        publishedBy: request.body?.publishedBy,
+        unsavedBindings: request.body?.unsavedBindings === true
+      });
 
       if (!validation.canPublish) {
         return reply.status(422).send({

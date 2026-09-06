@@ -682,12 +682,17 @@ export async function getDisplayPageConfig(pageId: DisplayPageId, stage: ConfigS
 export async function getDisplayDataPreview(
   pageId: DisplayPageId,
   context: DisplayPreviewContextSelection,
-  stage: ConfigStage = "live"
+  stage: ConfigStage = "live",
+  unsavedRegions?: Record<string, unknown>
 ) {
   const response = await requestJson<{ preview: DisplayDataPreview }>(
     `/api/display-pages/${pageId}/data-preview`,
     {
-      body: JSON.stringify({ context, stage }),
+      body: JSON.stringify({
+        context,
+        stage,
+        ...(unsavedRegions ? { unsavedRegions } : {})
+      }),
       method: "POST"
     }
   );
@@ -723,12 +728,21 @@ export async function validateDisplayPageDraft(pageId: DisplayPageId) {
   return response.validation;
 }
 
-export async function publishDisplayPageDraft(pageId: DisplayPageId, publishedBy?: string) {
+export async function publishDisplayPageDraft(
+  pageId: DisplayPageId,
+  publishedBy?: string,
+  options: { expectedVersion?: number; preflightToken?: string; unsavedBindings?: boolean } = {}
+) {
   const response = await requestJson<{
     config: DisplayPageConfigEnvelope;
     validation: ValidationResult;
   }>(`/api/display-pages/${pageId}/publish`, {
-    body: JSON.stringify({ publishedBy }),
+    body: JSON.stringify({
+      expectedVersion: options.expectedVersion,
+      preflightToken: options.preflightToken,
+      publishedBy,
+      unsavedBindings: options.unsavedBindings === true
+    }),
     method: "POST"
   });
   return response;

@@ -307,3 +307,30 @@ test("data preview recompiles the binding plan after the derived metric registry
     await app.close();
   }
 });
+
+test("U4 unsavedRegions preview does not write draft or live", async () => {
+  const app = await buildApp();
+  try {
+    const database = getDatabase();
+    const before = database.prepare(
+      "SELECT version, config_json FROM display_page_stage_configs WHERE page_key = 'overview' AND stage = 'draft'"
+    ).get();
+    const response = await app.inject({
+      method: "POST",
+      payload: {
+        context: { kind: "site", siteScope: "kn" },
+        stage: "draft",
+        unsavedRegions: { heroCopyLayout: { left: 88 } }
+      },
+      url: "/api/display-pages/overview/data-preview"
+    });
+    assert.equal(response.json().preview?.applied ?? false, false);
+    const after = database.prepare(
+      "SELECT version, config_json FROM display_page_stage_configs WHERE page_key = 'overview' AND stage = 'draft'"
+    ).get();
+    assert.deepEqual(after, before);
+    assert.notEqual(response.statusCode, 500);
+  } finally {
+    await app.close();
+  }
+});

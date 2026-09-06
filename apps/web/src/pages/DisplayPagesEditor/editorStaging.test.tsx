@@ -38,7 +38,7 @@ test("display editor diagnostics and publishing hooks are gated by active right 
   assert.match(editorSource, /const shouldLoadPublishingState = selectedWorkspace === "editor" && rightTab === "publish"/);
   assert.match(editorSource, /useDisplayPageAssetHealth\(\{\s*enabled:\s*shouldLoadAssetHealth\s*\}\)/);
   assert.match(editorSource, /enabled:\s*shouldLoadPublishingState/);
-  assert.match(publishingSource, /options:\s*\{\s*enabled\?: boolean\s*\} = \{\}/);
+  assert.match(publishingSource, /options:\s*\{\s*enabled\?: boolean/);
   assert.match(publishingSource, /if \(!enabled && !refreshOptions\.force\) \{/);
   assert.match(publishingSource, /refreshOptions:\s*\{\s*force\?: boolean; isActive\?: \(\) => boolean\s*\}/);
   assert.match(publishingSource, /refresh\(\{\s*isActive:\s*\(\) => active\s*\}\)/);

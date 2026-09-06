@@ -57,9 +57,11 @@ export function useDisplayPagePublishingState(
   draftUpdatedAt: string | null | undefined,
   initialPublishingStateByPage: DisplayPagePublishingStateMap | undefined,
   reloadDraft: () => Promise<void>,
-  options: { enabled?: boolean } = {}
+  options: { enabled?: boolean; energyProfileReady?: boolean; unsavedBindings?: boolean } = {}
 ) {
   const enabled = options.enabled ?? true;
+  const unsavedBindings = options.unsavedBindings ?? false;
+  const energyProfileReady = options.energyProfileReady ?? true;
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishingError, setPublishingError] = useState("");
   const [publishingStateByPage, setPublishingStateByPage] = useState<DisplayPagePublishingStateMap>(
@@ -81,8 +83,8 @@ export function useDisplayPagePublishingState(
       return;
     }
     const merged = mergeEnergyAuthoringPreflight(validation, {
-      energyProfileReady: true,
-      unsavedBindings: false
+      energyProfileReady,
+      unsavedBindings
     });
     setPublishingStateByPage((current) => ({ ...current, [pageId]: { fallback, validation: merged } }));
   };

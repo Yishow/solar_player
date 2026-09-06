@@ -313,15 +313,36 @@ export function buildFactoryCircuitRuntimes(circuits: CircuitConfig[]): FactoryC
     .sort((left, right) => resolveSlotOrder(left.displaySlot) - resolveSlotOrder(right.displaySlot));
 }
 
+export const DEPARTMENT_SLOT_ALIASES: Record<string, string> = {
+  a: "stamping",
+  assembly: "assembly",
+  b: "body",
+  body: "body",
+  c: "painting",
+  ed_coating: "ed_coating",
+  heavy_vehicle: "heavy_vehicle",
+  office: "office",
+  painting: "painting",
+  stamping: "stamping",
+  utility: "utility"
+};
+
+export function mapDepartmentShareToSlot(departmentId: string) {
+  return DEPARTMENT_SLOT_ALIASES[departmentId] ?? departmentId;
+}
+
 function resolveEnergySharePercent(
   slotKey: string,
   fallbackSharePercent: number,
   energyShares: Record<string, number | null> | undefined
-) {
+): number | null {
   if (!energyShares) {
     return fallbackSharePercent;
   }
-  return energyShares[slotKey] ?? 0;
+  if (!(slotKey in energyShares)) {
+    return null;
+  }
+  return energyShares[slotKey] ?? null;
 }
 
 export function buildFactoryCircuitViewModel({

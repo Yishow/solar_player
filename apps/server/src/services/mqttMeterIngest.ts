@@ -107,9 +107,23 @@ export function lookupEnabledMeterSource(
   }
 }
 
+function selectorFromMapping(mapping: { value_path: string | null; selector_json?: string | null }) {
+  if (mapping.selector_json) {
+    try {
+      const parsed = JSON.parse(mapping.selector_json) as { path?: string[]; tagEquals?: string };
+      if (Array.isArray(parsed.path)) {
+        return { path: parsed.path, tagEquals: parsed.tagEquals };
+      }
+    } catch {
+      // Fall back to value_path.
+    }
+  }
+  return compileSelector(mapping.value_path ?? "value");
+}
+
 export function ingestMappedMeterReading(
   database: Database.Database,
-  mapping: { metric_key: string; metric_scope: string; value_path: string | null },
+  mapping: { metric_key: string; metric_scope: string; value_path: string | null; selector_json?: string | null },
   rawPayload: string,
   packet: MqttPacketEvidence | undefined,
   receivedAt = new Date().toISOString()
@@ -119,7 +133,7 @@ export function ingestMappedMeterReading(
     return null;
   }
   const payload = parsePayload(rawPayload);
-  const selector = compileSelector(mapping.value_path ?? "value");
+  const selector = selectorFromMapping(mapping);
   let extracted: unknown;
   try {
     extracted = extractBySelector(payload, selector);

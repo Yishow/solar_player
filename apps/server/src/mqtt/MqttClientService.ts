@@ -49,6 +49,7 @@ type TopicMappingRecord = {
   topic: string;
   unit: string | null;
   value_path: string | null;
+  selector_json: string | null;
   multiplier: number | null;
   offset: number | null;
   decimal_places: number | null;
@@ -923,6 +924,7 @@ export class MqttClientService {
             topic,
             unit,
             value_path,
+            selector_json,
             multiplier,
             offset,
             decimal_places

@@ -597,7 +597,7 @@ export function DisplayPagesEditor({
     lastLoadedEnvelope?.updatedAt,
     initialPublishingStateByPage,
     reload,
-    { enabled: shouldLoadPublishingState }
+    { enabled: shouldLoadPublishingState, unsavedBindings: dirty }
   );
   const {
     errorMessage: assetHealthErrorMessage,

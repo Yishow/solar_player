@@ -1,5 +1,5 @@
-import { formatDecimalString, parseDecimalString, subtractDecimalString } from "./meterReading.js";
-import { monthBoundaryInProfileZone, rejectCalendarOverride, type SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
+import { formatDecimalString, parseDecimalString, parseSourceTimestamp, subtractDecimalString } from "./meterReading.js";
+import { rejectCalendarOverride, type SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
 
 export type PeriodKind = "day" | "month" | "year";
 
@@ -16,15 +16,77 @@ export type PeriodSample = {
   valueKwh: string;
 };
 
+export type PeriodConsumptionQuality = "exact" | "estimated-boundary" | "partial" | "unavailable" | "invalid";
+
 export type PeriodConsumptionResult = {
   profileRevision: number;
-  quality: "exact" | "partial" | "unavailable" | "invalid";
+  quality: PeriodConsumptionQuality;
   siteTimeZone: string;
   valueKwh: string | null;
 };
 
+const DEFAULT_BOUNDARY_MAX_AGE_SECONDS = 300;
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function civilUtcMs(local: string, timeZone: string) {
+  const parsed = parseSourceTimestamp(local, timeZone);
+  if (!parsed.instant) {
+    throw Object.assign(new Error("PERIOD_BOUNDARY_INVALID"), { code: "PERIOD_BOUNDARY_INVALID" });
+  }
+  return Date.parse(parsed.instant);
+}
+
+function nextCivilDate(year: number, month: number, day: number) {
+  const utc = new Date(Date.UTC(year, month - 1, day + 1));
+  return { day: utc.getUTCDate(), month: utc.getUTCMonth() + 1, year: utc.getUTCFullYear() };
+}
+
+export function periodWindow(period: PeriodSelection, siteTimeZone: string) {
+  if (period.kind === "day") {
+    const month = period.month ?? 1;
+    const day = period.day ?? 1;
+    const next = nextCivilDate(period.year, month, day);
+    return {
+      endMs: civilUtcMs(`${next.year}-${pad(next.month)}-${pad(next.day)}T00:00:00`, siteTimeZone),
+      startMs: civilUtcMs(`${period.year}-${pad(month)}-${pad(day)}T00:00:00`, siteTimeZone)
+    };
+  }
+  if (period.kind === "month") {
+    const month = period.month ?? 1;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? period.year + 1 : period.year;
+    return {
+      endMs: civilUtcMs(`${nextYear}-${pad(nextMonth)}-01T00:00:00`, siteTimeZone),
+      startMs: civilUtcMs(`${period.year}-${pad(month)}-01T00:00:00`, siteTimeZone)
+    };
+  }
+  return {
+    endMs: civilUtcMs(`${period.year + 1}-01-01T00:00:00`, siteTimeZone),
+    startMs: civilUtcMs(`${period.year}-01-01T00:00:00`, siteTimeZone)
+  };
+}
+
+function sampleMs(sample: PeriodSample) {
+  return Date.parse(sample.sourceTimestamp);
+}
+
+function lastAtOrBefore(series: PeriodSample[], instantMs: number) {
+  let found: PeriodSample | null = null;
+  for (const sample of series) {
+    const time = sampleMs(sample);
+    if (Number.isFinite(time) && time <= instantMs) {
+      found = sample;
+    }
+  }
+  return found;
+}
+
 export function resolvePeriodConsumption(input: {
   asOf: string;
+  boundaryMaxAgeSeconds?: number;
   meterIds: string[];
   period: PeriodSelection;
   profile: SiteEnergyProfileV1;
@@ -51,25 +113,41 @@ export function resolvePeriodConsumption(input: {
     throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
   }
 
+  const maxAgeMs = (input.boundaryMaxAgeSeconds ?? DEFAULT_BOUNDARY_MAX_AGE_SECONDS) * 1000;
+  const window = periodWindow(input.period, input.profile.siteTimeZone);
+  const asOfMs = Date.parse(input.asOf);
+  const closeCapMs = Number.isFinite(asOfMs) ? Math.min(window.endMs, asOfMs) : window.endMs;
+
   let total: string | null = null;
+  let quality: PeriodConsumptionQuality = "exact";
   for (const meterId of input.meterIds) {
     const series = input.samples
       .filter((sample) => sample.channelId === meterId)
       .sort((left, right) => left.sourceTimestamp.localeCompare(right.sourceTimestamp));
-    const inPeriod = series.filter((sample) =>
-      sampleBelongsToPeriod(sample.sourceTimestamp, input.period, input.profile.siteTimeZone)
-    );
-    if (inPeriod.length < 2) {
+    const opening = lastAtOrBefore(series, window.startMs);
+    const closing = lastAtOrBefore(series, closeCapMs);
+    if (!opening || window.startMs - sampleMs(opening) > maxAgeMs) {
       return {
         profileRevision: input.profile.revision,
-        quality: inPeriod.length === 0 ? "unavailable" : "partial",
+        quality: series.some((sample) => sampleMs(sample) > window.startMs && sampleMs(sample) <= closeCapMs)
+          ? "partial"
+          : "unavailable",
         siteTimeZone: input.profile.siteTimeZone,
         valueKwh: null
       };
     }
-    const start = inPeriod[0]!;
-    const end = inPeriod[inPeriod.length - 1]!;
-    const delta = subtractDecimalString(end.valueKwh, start.valueKwh);
+    if (!closing || sampleMs(closing) < sampleMs(opening)) {
+      return {
+        profileRevision: input.profile.revision,
+        quality: "partial",
+        siteTimeZone: input.profile.siteTimeZone,
+        valueKwh: null
+      };
+    }
+    if (sampleMs(opening) < window.startMs) {
+      quality = "estimated-boundary";
+    }
+    const delta = subtractDecimalString(closing.valueKwh, opening.valueKwh);
     if (delta.startsWith("-")) {
       return {
         profileRevision: input.profile.revision,
@@ -83,26 +161,10 @@ export function resolvePeriodConsumption(input: {
 
   return {
     profileRevision: input.profile.revision,
-    quality: "exact",
+    quality,
     siteTimeZone: input.profile.siteTimeZone,
     valueKwh: total
   };
-}
-
-function sampleBelongsToPeriod(instantUtc: string, period: PeriodSelection, siteTimeZone: string) {
-  const month = monthBoundaryInProfileZone(instantUtc, siteTimeZone);
-  const [year, monthPart] = month.split("-");
-  if (period.kind === "year") {
-    return year === String(period.year);
-  }
-  if (period.kind === "month") {
-    return year === String(period.year) && Number(monthPart) === period.month;
-  }
-  const day = new Intl.DateTimeFormat("en-US", {
-    timeZone: siteTimeZone,
-    day: "2-digit"
-  }).format(new Date(instantUtc));
-  return year === String(period.year) && Number(monthPart) === period.month && Number(day) === period.day;
 }
 
 function addDecimal(left: string, right: string) {

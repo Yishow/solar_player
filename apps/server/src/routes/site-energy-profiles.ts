@@ -6,6 +6,9 @@ import type { MappingPreviewDraft, SiteEnergyScope } from "@solar-display/shared
 
 const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/data-hub/sites/:scope/energy-profile", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
     const { scope } = request.params as { scope: string };
     if (scope !== "cl" && scope !== "kn") {
       return reply.code(422).send({ success: false, error: "INVALID_SCOPE", timestamp: new Date().toISOString() });
@@ -14,6 +17,9 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/api/data-hub/sites/:scope/energy-profile/preview", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
     const { scope } = request.params as { scope: SiteEnergyScope };
     try {
       return previewProfile(getDatabase(), scope, request.body as never);
@@ -37,7 +43,7 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/api/data-hub/mqtt-mappings/apply", async (request, reply) => {
-    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
       return app.managementAccess.deny(reply);
     }
     const body = request.body as {
@@ -60,6 +66,9 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/api/data-hub/sites/:scope/energy-profile/apply", async (request, reply) => {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
     const { scope } = request.params as { scope: SiteEnergyScope };
     try {
       return applyProfile(getDatabase(), scope, request.body as never);

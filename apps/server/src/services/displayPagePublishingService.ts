@@ -982,14 +982,28 @@ function checkImageReferences(regions: Record<string, unknown>): ValidationFindi
   return findings;
 }
 
-function collectEnergyAuthoringFindings(unsavedBindings = false): ValidationFinding[] {
+const ENERGY_PUBLISH_PAGES = new Set(["overview", "factory-circuit", "factory-circuit-guanyin"]);
+const preflightTokens = new Map<string, { expiresAt: number; pageId: string; version: number }>();
+
+function requiredEnergyScopes(pageId: DisplayPageId): Array<"cl" | "kn"> {
+  if (pageId === "factory-circuit-guanyin") {
+    return ["kn"];
+  }
+  if (pageId === "factory-circuit") {
+    return ["cl"];
+  }
+  return ["cl", "kn"];
+}
+
+function collectEnergyAuthoringFindings(pageId: DisplayPageId, unsavedBindings = false): ValidationFinding[] {
   let energyProfileReady = true;
-  try {
-    const database = getDatabase();
-    const profiles = [getActiveProfile(database, "cl"), getActiveProfile(database, "kn")];
-    energyProfileReady = !profiles.some((profile) => profile?.status === "incomplete" || profile?.status === "conflict");
-  } catch {
-    energyProfileReady = true;
+  if (ENERGY_PUBLISH_PAGES.has(pageId)) {
+    try {
+      const database = getDatabase();
+      energyProfileReady = requiredEnergyScopes(pageId).every((scope) => getActiveProfile(database, scope)?.status === "ready");
+    } catch {
+      energyProfileReady = false;
+    }
   }
   return unifyPublishPreflight({
     bindingErrors: [],
@@ -1002,13 +1016,58 @@ function collectEnergyAuthoringFindings(unsavedBindings = false): ValidationFind
   }));
 }
 
-function publishDraft(
-  pageId: DisplayPageId,
-  publishedBy?: string
-): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
+function issuePublishPreflight(pageId: DisplayPageId, unsavedBindings = false) {
   const draft = readStageConfig(pageId, "draft");
   const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
-  validation.findings.push(...collectEnergyAuthoringFindings(false));
+  validation.findings.push(...collectEnergyAuthoringFindings(pageId, unsavedBindings));
+  validation.canPublish = !validation.findings.some((finding) => finding.severity === "blocking");
+  const preflightToken = `u5-${pageId}-${draft.version}-${Date.now()}`;
+  preflightTokens.set(preflightToken, {
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    pageId,
+    version: draft.version
+  });
+  return { expectedVersion: draft.version, preflightToken, validation };
+}
+
+export type PublishDraftOptions = {
+  expectedVersion?: number;
+  preflightToken?: string;
+  publishedBy?: string;
+  unsavedBindings?: boolean;
+};
+
+function publishDraft(
+  pageId: DisplayPageId,
+  publishedByOrOptions?: string | PublishDraftOptions
+): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
+  const options: PublishDraftOptions = typeof publishedByOrOptions === "string" || publishedByOrOptions === undefined
+    ? { publishedBy: publishedByOrOptions }
+    : publishedByOrOptions;
+  const draft = readStageConfig(pageId, "draft");
+  const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
+  if (options.unsavedBindings) {
+    validation.findings.push(...collectEnergyAuthoringFindings(pageId, true));
+  } else {
+    validation.findings.push(...collectEnergyAuthoringFindings(pageId, false));
+  }
+  if (options.expectedVersion !== undefined && options.expectedVersion !== draft.version) {
+    validation.findings.push({
+      code: "EXPECTED_VERSION_MISMATCH",
+      message: "草稿版本已變更，請重新檢查後再發布。",
+      severity: "blocking"
+    });
+  }
+  if (options.preflightToken) {
+    const stored = preflightTokens.get(options.preflightToken);
+    if (!stored || stored.pageId !== pageId || stored.version !== draft.version || stored.expiresAt < Date.now()) {
+      validation.findings.push({
+        code: "PREFLIGHT_TOKEN_INVALID",
+        message: "發布檢查已過期，請重新檢查。",
+        severity: "blocking"
+      });
+    }
+  }
   validation.canPublish = !validation.findings.some((finding) => finding.severity === "blocking");
 
   if (!validation.canPublish) {
@@ -1048,12 +1107,12 @@ function publishDraft(
          updated_at = excluded.updated_at,
          published_at = excluded.published_at,
          published_by = excluded.published_by`
-    ).run(pageId, serializedRegions, newVersion, now, now, publishedBy ?? null);
+    ).run(pageId, serializedRegions, newVersion, now, now, options.publishedBy ?? null);
 
     db.prepare(
       `INSERT INTO display_page_publish_history (page_key, version, stage, action, config_json, published_by, source_version)
        VALUES (?, ?, 'live', 'publish', ?, ?, ?)`
-    ).run(pageId, newVersion, serializedRegions, publishedBy ?? null, draft.version);
+    ).run(pageId, newVersion, serializedRegions, options.publishedBy ?? null, draft.version);
   });
   tx();
 
@@ -1168,6 +1227,7 @@ export {
   validateConfigDraft,
   validateDisplayPageMetricBindings,
   checkImageReferences,
+  issuePublishPreflight,
   publishDraft,
   rollbackToVersion,
   getPublishHistory,

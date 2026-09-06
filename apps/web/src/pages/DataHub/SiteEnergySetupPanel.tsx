@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  currentProfileMonthSelection,
   nextSiteEnergySetupStep,
   previousSiteEnergySetupStep,
   type SiteEnergyProfileV1,
@@ -34,11 +35,43 @@ function emptyProfile(scope: "cl" | "kn"): SiteEnergyProfileV1 {
   };
 }
 
+function MeterPicker({
+  options,
+  selected,
+  onChange
+}: {
+  onChange: (ids: string[]) => void;
+  options: string[];
+  selected: string[];
+}) {
+  const ids = options.length > 0 ? options : selected;
+  return (
+    <ul className="space-y-1" data-meter-picker>
+      {ids.map((id) => (
+        <li key={id}>
+          <label className="flex min-h-[40px] items-center gap-2 text-sm">
+            <input
+              checked={selected.includes(id)}
+              onChange={(event) => {
+                onChange(event.target.checked ? [...selected, id] : selected.filter((item) => item !== id));
+              }}
+              type="checkbox"
+            />
+            {id}
+          </label>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
   const [step, setStep] = useState<SiteEnergySetupStep>("site");
   const [draft, setDraft] = useState<SiteEnergyProfileV1>(() => emptyProfile(scope));
   const [message, setMessage] = useState("");
   const [expectedRevision, setExpectedRevision] = useState(0);
+  const [meters, setMeters] = useState<string[]>([]);
+  const [previewSummary, setPreviewSummary] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +88,16 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
           setMessage("目前沒有已儲存的廠區用電設定，請從總進線開始。");
         }
       });
+    void requestJson<{ topics?: Array<{ metricKey: string; metricScope?: string }> }>("/api/settings/mqtt/topics")
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        setMeters((payload.topics ?? [])
+          .filter((topic) => !topic.metricScope || topic.metricScope === scope)
+          .map((topic) => topic.metricKey));
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -63,24 +106,26 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
   const apply = async () => {
     setMessage("");
     try {
-      const preview = await requestJson<{ previewToken: string }>(
+      const periodSelection = currentProfileMonthSelection(draft.siteTimeZone);
+      const preview = await requestJson<{ calculator?: { period?: { valueKwh: string | null } }; previewToken: string }>(
         `/api/data-hub/sites/${scope}/energy-profile/preview`,
         {
           body: JSON.stringify({
             draft,
             expectedRevision,
-            periodSelection: { kind: "month", month: 9, year: 2026 }
+            periodSelection
           }),
           method: "POST"
         }
       );
+      setPreviewSummary(`期間 ${periodSelection.year}-${periodSelection.month} 預覽 ${preview.calculator?.period?.valueKwh ?? "尚無差值"}`);
       const applied = await requestJson<SiteEnergyProfileV1>(
         `/api/data-hub/sites/${scope}/energy-profile/apply`,
         {
           body: JSON.stringify({
             draft,
             expectedRevision,
-            idempotencyKey: `u6-${scope}-${Date.now()}`,
+            idempotencyKey: `u6-${scope}-${periodSelection.year}-${periodSelection.month}`,
             previewToken: preview.previewToken
           }),
           method: "POST"
@@ -99,7 +144,7 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
       <h2 className="text-lg font-semibold text-[#1e2821]">{scope === "kn" ? "設定觀音用電" : "設定中壢用電"}</h2>
       <ol className="flex flex-wrap gap-2 text-sm">
         {(Object.keys(STEP_LABELS) as SiteEnergySetupStep[]).map((key) => (
-          <li key={key} data-site-energy-step-label={key} className={key === step ? "font-semibold" : ""}>
+          <li className={key === step ? "font-semibold" : ""} data-site-energy-step-label={key} key={key}>
             {STEP_LABELS[key]}
           </li>
         ))}
@@ -108,44 +153,41 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
         <p className="text-sm text-[#4d554f]">目前廠區是 {scope.toUpperCase()}。不會改成另一個廠區。</p>
       ) : null}
       {step === "total" ? (
-        <label className="block text-sm">
-          總進線 channel
-          <input
-            className="mgmt-input mt-1 min-h-[40px] w-full"
-            onChange={(event) => setDraft({
-              ...draft,
-              siteTotal: {
-                ...draft.siteTotal,
-                kind: "meter-set",
-                memberChannelIds: event.target.value.split(",").map((value) => value.trim()).filter(Boolean)
-              }
-            })}
-            value={draft.siteTotal.memberChannelIds.join(",")}
-          />
-        </label>
+        <MeterPicker
+          onChange={(memberChannelIds) => setDraft({
+            ...draft,
+            siteTotal: { ...draft.siteTotal, kind: "meter-set", memberChannelIds }
+          })}
+          options={meters}
+          selected={draft.siteTotal.memberChannelIds}
+        />
       ) : null}
       {step === "departments" ? (
-        <label className="block text-sm">
-          部門（名稱:channel）
-          <input
-            className="mgmt-input mt-1 min-h-[40px] w-full"
-            onChange={(event) => setDraft({
-              ...draft,
-              departments: event.target.value.split(";").filter(Boolean).map((row, index) => {
-                const [nameZh, channelId] = row.split(":").map((part) => part.trim());
-                return {
-                  accountingIncluded: true,
-                  coverageReview: "needs-review" as const,
-                  departmentId: channelId || `dept-${index}`,
-                  memberChannelIds: channelId ? [channelId] : [],
-                  nameZh: nameZh || `部門 ${index + 1}`
-                };
-              })
-            })}
-            placeholder="沖壓:a;塗裝:b"
-            value={draft.departments.map((department) => `${department.nameZh}:${department.memberChannelIds[0] ?? ""}`).join(";")}
-          />
-        </label>
+        <div className="space-y-3">
+          {["stamping", "body", "painting"].map((departmentId, index) => {
+            const department = draft.departments.find((entry) => entry.departmentId === departmentId) ?? {
+              accountingIncluded: true,
+              coverageReview: "needs-review" as const,
+              departmentId,
+              memberChannelIds: [] as string[],
+              nameZh: departmentId === "stamping" ? "沖壓" : departmentId === "body" ? "車身" : "塗裝"
+            };
+            return (
+              <fieldset className="space-y-1" key={departmentId}>
+                <legend className="text-sm font-medium">{department.nameZh}</legend>
+                <MeterPicker
+                  onChange={(memberChannelIds) => {
+                    const next = draft.departments.filter((entry) => entry.departmentId !== departmentId);
+                    next.splice(index, 0, { ...department, memberChannelIds });
+                    setDraft({ ...draft, departments: next });
+                  }}
+                  options={meters}
+                  selected={department.memberChannelIds}
+                />
+              </fieldset>
+            );
+          })}
+        </div>
       ) : null}
       {step === "basis" ? (
         <label className="block text-sm">
@@ -164,13 +206,10 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
           </select>
         </label>
       ) : null}
+      {previewSummary ? <p className="text-sm" data-site-energy-preview>{previewSummary}</p> : null}
       {message ? <p className="text-sm text-[#8a4f18]" role="status">{message}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button
-          className="mgmt-action min-h-[40px]"
-          onClick={() => setStep(previousSiteEnergySetupStep(step))}
-          type="button"
-        >
+        <button className="mgmt-action min-h-[40px]" onClick={() => setStep(previousSiteEnergySetupStep(step))} type="button">
           上一步
         </button>
         {step === "basis" ? (
@@ -178,11 +217,7 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
             檢查並套用
           </button>
         ) : (
-          <button
-            className="mgmt-action primary min-h-[40px]"
-            onClick={() => setStep(nextSiteEnergySetupStep(step))}
-            type="button"
-          >
+          <button className="mgmt-action primary min-h-[40px]" onClick={() => setStep(nextSiteEnergySetupStep(step))} type="button">
             下一步
           </button>
         )}

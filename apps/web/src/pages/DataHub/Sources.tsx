@@ -43,6 +43,7 @@ import {
   SourceSummaryRow
 } from "./SourceCards";
 import { useDataHubWorkspace, type DataHubListFilter } from "./workspaceContext";
+import { GuidedOnboardingPanel } from "./GuidedOnboardingPanel";
 
 export {
   buildSourceRows,
@@ -260,6 +261,9 @@ export function DataHubSourcesContent({
 
   return (
     <div className="space-y-5" data-data-hub-section="sources" data-workspace-safe-viewport="1366">
+      {workspace.task === "connect" ? (
+        <GuidedOnboardingPanel scope={workspace.managementScope} />
+      ) : null}
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="text-[13px] text-[#687169]">
           先從摘要列表找到來源，再打開單筆詳情。進階傳輸欄位只在抽屜中展開。

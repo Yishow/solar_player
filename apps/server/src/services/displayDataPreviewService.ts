@@ -148,10 +148,17 @@ function readPreviewRequest(value: unknown): {
     error.statusCode = 400;
     throw error;
   }
+  const unsavedRegions = isRecord(value.unsavedRegions) ? value.unsavedRegions : undefined;
+  if (unsavedRegions && Buffer.byteLength(JSON.stringify(unsavedRegions), "utf8") > 256 * 1024) {
+    const error = new Error("Unsaved preview exceeds 256KiB");
+    // @ts-expect-error fastify reads statusCode
+    error.statusCode = 413;
+    throw error;
+  }
   return {
     selection: value.context,
     stage: value.stage === "draft" || value.stage === "live" ? value.stage : "live",
-    unsavedRegions: isRecord(value.unsavedRegions) ? value.unsavedRegions : undefined
+    unsavedRegions
   };
 }
 

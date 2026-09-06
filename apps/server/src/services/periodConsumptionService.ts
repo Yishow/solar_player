@@ -7,6 +7,7 @@ import {
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
 import { getActiveProfile } from "./siteEnergyProfileService.js";
+import { readActiveProjection } from "./consumptionProjectionService.js";
 
 function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn") {
   return (database.prepare(`
@@ -89,6 +90,18 @@ export function tryResolvePersistedPeriodConsumption(
   const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
   if (!period) {
     return null;
+  }
+  const projectedRange = range === "total" ? "year" : range === "week" ? null : range;
+  if (projectedRange) {
+    const active = readActiveProjection(database, scope, projectedRange);
+    if (active) {
+      return {
+        profileRevision: active.profileRevision,
+        quality: active.quality,
+        siteTimeZone: active.siteTimeZone,
+        valueKwh: active.valueKwh
+      };
+    }
   }
   try {
     return resolvePersistedPeriodConsumption(database, scope, period, asOf);

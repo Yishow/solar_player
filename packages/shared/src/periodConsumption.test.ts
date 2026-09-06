@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolvePeriodConsumption } from "./periodConsumption.js";
+import { periodWindow, resolvePeriodConsumption } from "./periodConsumption.js";
 import type { SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
 
 const profile: SiteEnergyProfileV1 = {
@@ -21,8 +21,14 @@ const profile: SiteEnergyProfileV1 = {
   status: "ready"
 };
 
+test("E2-R2 Taipei September start is 2026-08-31T16:00:00Z", () => {
+  const window = periodWindow({ kind: "month", month: 9, year: 2026 }, "Asia/Taipei");
+  assert.equal(new Date(window.startMs).toISOString(), "2026-08-31T16:00:00.000Z");
+});
+
 test("E2-R1 day 300 / month 4300 / year 8300 from cumulative samples", () => {
   const samples = [
+    { channelId: "kn-main", sourceTimestamp: "2026-01-01T00:00:00+08:00", valueKwh: "10000" },
     { channelId: "kn-main", sourceTimestamp: "2026-09-01T00:00:00+08:00", valueKwh: "10000" },
     { channelId: "kn-main", sourceTimestamp: "2026-09-01T23:59:00+08:00", valueKwh: "10300" },
     { channelId: "kn-main", sourceTimestamp: "2026-09-30T23:59:00+08:00", valueKwh: "14300" },
@@ -52,6 +58,37 @@ test("E2-R1 day 300 / month 4300 / year 8300 from cumulative samples", () => {
     samples
   });
   assert.equal(year.valueKwh, "8300");
+});
+
+test("E2 uses at-or-before period-start baseline rather than first in-period sample", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-01T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: { day: 1, kind: "day", month: 9, year: 2026 },
+    profile,
+    samples: [
+      { channelId: "kn-main", sourceTimestamp: "2026-08-31T23:59:40+08:00", valueKwh: "10000" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-01T00:10:00+08:00", valueKwh: "10040" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-01T23:59:00+08:00", valueKwh: "10300" }
+    ]
+  });
+  assert.equal(result.valueKwh, "300");
+  assert.equal(result.quality, "estimated-boundary");
+});
+
+test("E2 does not fabricate a start baseline from a post-start reading", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: { kind: "month", month: 9, year: 2026 },
+    profile,
+    samples: [
+      { channelId: "kn-main", sourceTimestamp: "2026-09-10T12:00:00+08:00", valueKwh: "11000" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-30T12:00:00+08:00", valueKwh: "14000" }
+    ]
+  });
+  assert.equal(result.valueKwh, null);
+  assert.equal(result.quality, "partial");
 });
 
 test("E2 rejects caller timezone override and meters outside the profile", () => {

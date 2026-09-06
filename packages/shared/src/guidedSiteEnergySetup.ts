@@ -25,3 +25,14 @@ export function previousSiteEnergySetupStep(step: SiteEnergySetupStep): SiteEner
 export function siteEnergySetupStepIndex(step: SiteEnergySetupStep) {
   return ORDER.indexOf(step);
 }
+
+export function currentProfileMonthSelection(siteTimeZone: string, asOf = new Date().toISOString()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: siteTimeZone,
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(new Date(asOf));
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  return { kind: "month" as const, month, year };
+}

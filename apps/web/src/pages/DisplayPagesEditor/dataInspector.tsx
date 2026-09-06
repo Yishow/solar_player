@@ -341,7 +341,7 @@ export function DataInspectorPanel({
     if (!pageId || !shouldLoadManagedPreview) return;
     let active = true;
     setPreviewLoading(true);
-    void getDisplayDataPreview(pageId, previewContextSelection, "draft")
+    void getDisplayDataPreview(pageId, previewContextSelection, "draft", config)
       .then((preview) => {
         if (!active) return;
         setLoadedPreviewContext(preview.context);
@@ -362,7 +362,7 @@ export function DataInspectorPanel({
     return () => {
       active = false;
     };
-  }, [capability.itemId, pageId, previewContextSelection, shouldLoadManagedPreview]);
+  }, [capability.itemId, config, pageId, previewContextSelection, shouldLoadManagedPreview]);
 
   const currentItem = getValueAtPath(config, capability.bindingPath);
   const metricKey = isMetricBoundItem(currentItem, capability.itemId)

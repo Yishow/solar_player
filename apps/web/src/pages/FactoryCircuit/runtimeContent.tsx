@@ -21,6 +21,7 @@ import {
 import type { FactoryCircuitDisplayPageConfig } from "./displayPageConfig";
 import {
   buildFactoryCircuitViewModel,
+  mapDepartmentShareToSlot,
   type FactoryCircuitLoadState,
   type FactoryCircuitRuntime
 } from "./viewModel";
@@ -161,7 +162,7 @@ export function FactoryCircuitRuntimeContent({
       }
       const next: Record<string, number | null> = {};
       for (const share of payload.shares) {
-        next[share.departmentId] = share.ratio === null ? null : Math.round(share.ratio * 100);
+        next[mapDepartmentShareToSlot(share.departmentId)] = share.ratio === null ? null : Math.round(share.ratio * 100);
       }
       setEnergyShares(next);
     }).catch(() => {
@@ -223,9 +224,11 @@ export function FactoryCircuitRuntimeContent({
           );
           const sharePercent = row.isEmpty ? row.fallbackSharePercent : row.sharePercent;
           const formattedSharePercent =
-            storySlot?.format?.precision === undefined
-              ? String(sharePercent)
-              : sharePercent.toFixed(storySlot.format.precision);
+            sharePercent === null
+              ? "—"
+              : storySlot?.format?.precision === undefined
+                ? String(sharePercent)
+                : sharePercent.toFixed(storySlot.format.precision);
           const shareUnit = storySlot?.format?.unitDisplay === "hide" ? "" : "%";
           return (
             <article
