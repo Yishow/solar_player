@@ -53,6 +53,7 @@ import imagePlaylistRoute from "./routes/image-playlist.js";
 import freshnessPolicyRoute from "./routes/freshness-policy.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 import mqttCapturesRoute from "./routes/mqtt-captures.js";
+import siteEnergyProfilesRoute from "./routes/site-energy-profiles.js";
 import shellDecorationsRoute from "./routes/shell-decorations.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
 import weatherRoute from "./routes/weather.js";
@@ -254,6 +255,7 @@ export async function buildApp() {
   await app.register(freshnessPolicyRoute);
   await app.register(settingsMqttRoute);
   await app.register(mqttCapturesRoute);
+  await app.register(siteEnergyProfilesRoute);
   await app.register(shellDecorationsRoute);
   await app.register(sustainabilityStoryRoute);
   await app.register(weatherRoute);
