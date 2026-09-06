@@ -40,7 +40,10 @@ type TopicMappingResponse = {
 type SettingsBody = Partial<MqttSettingsResponse>;
 type TestConnectionBody = SettingsBody;
 type PublishTopicValueBody = {
+  confirmed?: unknown;
   metricScope?: unknown;
+  previewOnly?: unknown;
+  retain?: unknown;
   value?: unknown;
 };
 type ResetFactoryGenerationBaselineBody = {
@@ -487,6 +490,20 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const value = request.body?.value;
       const metricScope = request.body?.metricScope;
+      if (request.body?.previewOnly === true) {
+        return {
+          actualPublish: false,
+          metricKey: request.params.metricKey,
+          success: true
+        };
+      }
+      if (request.body?.confirmed === false) {
+        return reply.status(422).send({
+          error: "PUBLISH_CONFIRMATION_REQUIRED",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
       if (!isMetricScope(metricScope)) {
         return reply.status(400).send({
           error: "Publish metricScope must be cl, kn, or global",
@@ -521,7 +538,9 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       }
 
       const payload = buildTopicPublishPayload(value, mapping);
-      const publishResult = await app.mqttClientService.publish(topic, payload);
+      const publishResult = await app.mqttClientService.publish(topic, payload, {
+        retain: request.body?.retain === true
+      });
       if (!publishResult.success) {
         return reply.status(409).send({
           error: publishResult.message,
@@ -531,6 +550,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       }
 
       return {
+        actualPublish: true,
         metricKey: mapping.metric_key,
         payload,
         status: app.mqttClientService.getStatus(),

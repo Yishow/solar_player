@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { compileSelector, type MappingPreviewDraft } from "@solar-display/shared";
+import { compileSelector, type MappingPreviewDraft, type MappingSuggestion } from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 
 type Stage = "select" | "meaning" | "apply";
@@ -41,6 +41,8 @@ export function GuidedMqttMappingPanel({
   const [message, setMessage] = useState("");
   const [previewToken, setPreviewToken] = useState("");
   const [draft, setDraft] = useState<MappingPreviewDraft | null>(null);
+  const [suggestions, setSuggestions] = useState<MappingSuggestion[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const fields = useMemo(() => collectFields(payload), [payload]);
 
   const canonical = (): MappingPreviewDraft => ({
@@ -75,6 +77,51 @@ export function GuidedMqttMappingPanel({
             ))}
           </ul>
           <p className="text-sm">已選 {path}{tagEquals ? ` / ${tagEquals}` : ""}</p>
+          <button
+            className="mgmt-action min-h-[40px]"
+            data-mapping-suggest
+            onClick={() => {
+              void requestJson<{ suggestions: MappingSuggestion[] }>("/api/data-hub/mqtt-mappings/suggest", {
+                body: JSON.stringify({
+                  metricScope,
+                  observations: fields
+                    .filter((field) => field.tagEquals)
+                    .map((field) => ({
+                      namespace: metricScope,
+                      tag: field.tagEquals,
+                      topic: `${metricScope}/${field.tagEquals}`,
+                      value: field.preview
+                    }))
+                }),
+                method: "POST"
+              }).then((payload) => setSuggestions(payload.suggestions)).catch((error: unknown) => {
+                setMessage(error instanceof Error ? error.message : "建議失敗");
+              });
+            }}
+            type="button"
+          >
+            產生建議
+          </button>
+          {suggestions.length > 0 ? (
+            <ul className="space-y-1" data-mapping-suggestions>
+              {suggestions.map((suggestion) => (
+                <li key={`${suggestion.namespace}:${suggestion.tag}:${suggestion.topic}`}>
+                  <label className="flex min-h-[40px] items-center gap-2 text-sm">
+                    <input
+                      checked={selectedTags.includes(`${suggestion.topic}:${suggestion.tag}`)}
+                      onChange={(event) => {
+                        const key = `${suggestion.topic}:${suggestion.tag}`;
+                        setSelectedTags((current) => event.target.checked ? [...current, key] : current.filter((item) => item !== key));
+                      }}
+                      type="checkbox"
+                    />
+                    {suggestion.tag} @ {suggestion.topic} — {suggestion.reason}
+                    {suggestion.autoSelectAsSiteMain ? "（不應出現）" : ""}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <button className="mgmt-action primary min-h-[40px]" onClick={() => setStage("meaning")} type="button">下一步</button>
         </>
       ) : null}

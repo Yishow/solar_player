@@ -31,6 +31,31 @@ export function listMeterSources(database: Database.Database, scope: "cl" | "kn"
   }));
 }
 
+export function listReceivedTags(database: Database.Database, scope: "cl" | "kn") {
+  try {
+  return (database.prepare(`
+    SELECT metric_key, topic, selector_json
+    FROM topic_mappings
+    WHERE metric_scope = ? AND enabled = 1
+  `).all(scope) as Array<{ metric_key: string; selector_json: string | null; topic: string }>).map((row) => {
+    let tag: string | null = null;
+    try {
+      const selector = row.selector_json ? JSON.parse(row.selector_json) as { tagEquals?: string } : null;
+      tag = selector?.tagEquals ?? null;
+    } catch {
+      tag = null;
+    }
+    return {
+      metricKey: row.metric_key,
+      tag,
+      topic: row.topic
+    };
+  });
+  } catch {
+    return [];
+  }
+}
+
 export function inventoryTopicMappings(database: Database.Database) {
   const rows = database.prepare(`
     SELECT metric_key, unit FROM topic_mappings

@@ -22,4 +22,12 @@ test("M2 three-stage mapping panel starts at select", () => {
   assert.match(html, /從已接收資料選欄位/);
   assert.match(html, /data-mapping-field="value"/);
   assert.match(html, /tag=MAIN/);
+  assert.match(html, /data-mapping-suggest/);
+});
+
+test("U2 connection test is separate from real publish", () => {
+  const html = renderToStaticMarkup(<GuidedOnboardingPanel scope="kn" />);
+  assert.match(html, /data-onboarding-connection-test/);
+  assert.match(html, /測試連線/);
+  assert.doesNotMatch(html, /data-onboarding-real-publish/);
 });

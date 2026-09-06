@@ -1,7 +1,11 @@
 import {
   METRIC_DATA_BINDING_SCOPES,
+  PREVIEW_DEBOUNCE_MS,
+  buildMetricPickerOptions,
+  nextEditRevision,
   resolveEffectivePlaybackMetricCatalog,
   resolvePlaybackBindingItemConstraints,
+  shouldAcceptPreviewResponse,
   type DisplayDataPreviewItem,
   type DisplayEditorDataBindingCapability,
   type DisplayPreviewContextSelection,
@@ -13,7 +17,8 @@ import {
   type ResolvedDisplayPreviewContext,
   type WidgetDataBindingPageKey
 } from "@solar-display/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MetricPicker } from "./MetricPicker";
 import { getValueAtPath } from "../../hooks/displayPageConfigPaths";
 import { useLiveMetrics } from "../../hooks/useLiveMetrics";
 import { buildDataHubDiagnosticsHref } from "../DataHub/links";
@@ -182,6 +187,7 @@ export function resolveDataInspectorModel(args: {
   previewReading?: LiveMetricReading | null;
   derivedDefinitions?: readonly DerivedMetricDefinition[];
   excludedMetricKeys?: ReadonlySet<string>;
+  catalogPending?: boolean;
 }) {
   const item = getValueAtPath(args.config, args.capability.bindingPath);
   if (!isMetricBoundItem(item, args.capability.itemId)) return null;
@@ -221,6 +227,25 @@ export function resolveDataInspectorModel(args: {
       label: entry.unit ? `${entry.label}（${entry.unit}）` : entry.label,
       value: entry.metricKey
     })),
+    pickerOptions: buildMetricPickerOptions({
+      catalogPending: args.catalogPending === true,
+      options: catalog.map((entry) => {
+        const compatible = metricOptions.some((option) => option.metricKey === entry.metricKey);
+        return {
+          compatible,
+          incompatibleReason: compatible ? undefined : "與目前卡片語意不相容，或尚未進入可用目錄。",
+          labelZh: entry.label,
+          latestValue: args.previewReading && entry.metricKey === item.dataBinding.metricKey
+            ? String(args.previewReading.value)
+            : null,
+          measurementKind: entry.valueType,
+          metricKey: entry.metricKey,
+          missingBaseline: args.previewItem?.quality === "missing" || args.previewItem?.freshness?.state === "unavailable",
+          scope: item.dataBinding.scope,
+          unit: entry.unit
+        };
+      })
+    }),
     preview: {
       freshness: freshnessLabels[freshness],
       timestamp: args.previewReading?.timestamp ?? null,
@@ -271,6 +296,8 @@ export function DataInspectorPanel({
   const [loadedPreviewItem, setLoadedPreviewItem] = useState<DisplayDataPreviewItem | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const editRevisionRef = useRef(0);
+  const previewIdentityRef = useRef({ contextKey: "site:cl", editRevision: 0 });
   const [derivedDefinitions, setDerivedDefinitions] = useState<DerivedMetricDefinition[]>([]);
   const [excludedMetricKeys, setExcludedMetricKeys] = useState<ReadonlySet<string>>(new Set());
   const [derivedCatalogLoaded, setDerivedCatalogLoaded] = useState(false);
@@ -339,28 +366,43 @@ export function DataInspectorPanel({
 
   useEffect(() => {
     if (!pageId || !shouldLoadManagedPreview) return;
-    let active = true;
-    setPreviewLoading(true);
-    void getDisplayDataPreview(pageId, previewContextSelection, "draft", config)
-      .then((preview) => {
-        if (!active) return;
-        setLoadedPreviewContext(preview.context);
-        setLoadedPreviewItem(
-          preview.items.find((item) => item.itemId === capability.itemId) ?? null
-        );
-        setPreviewError(null);
-      })
-      .catch((error) => {
-        if (!active) return;
-        setLoadedPreviewContext(null);
-        setLoadedPreviewItem(null);
-        setPreviewError(error instanceof Error ? error.message : "資料預覽失敗。");
-      })
-      .finally(() => {
-        if (active) setPreviewLoading(false);
-      });
+    const contextKey = previewContextSelection.kind === "site"
+      ? `site:${previewContextSelection.siteScope}`
+      : previewContextSelection.kind === "group"
+        ? `group:${previewContextSelection.groupId}`
+        : `device:${previewContextSelection.deviceId}`;
+    const revision = nextEditRevision(editRevisionRef.current);
+    editRevisionRef.current = revision;
+    previewIdentityRef.current = { contextKey, editRevision: revision };
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewLoading(true);
+      void getDisplayDataPreview(pageId, previewContextSelection, "draft", config)
+        .then((preview) => {
+          if (controller.signal.aborted) return;
+          if (!shouldAcceptPreviewResponse(previewIdentityRef.current, { contextKey, editRevision: revision })) {
+            return;
+          }
+          setLoadedPreviewContext(preview.context);
+          setLoadedPreviewItem(
+            preview.items.find((item) => item.itemId === capability.itemId) ?? null
+          );
+          setPreviewError(null);
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          if (!shouldAcceptPreviewResponse(previewIdentityRef.current, { contextKey, editRevision: revision })) {
+            return;
+          }
+          setPreviewError(error instanceof Error ? error.message : "資料預覽失敗。");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setPreviewLoading(false);
+        });
+    }, PREVIEW_DEBOUNCE_MS);
     return () => {
-      active = false;
+      controller.abort();
+      window.clearTimeout(timer);
     };
   }, [capability.itemId, config, pageId, previewContextSelection, shouldLoadManagedPreview]);
 
@@ -387,12 +429,13 @@ export function DataInspectorPanel({
     : previewReading;
   const model = resolveDataInspectorModel({
     capability,
+    catalogPending: !derivedCatalogLoaded,
     config,
     derivedDefinitions,
     excludedMetricKeys,
     pageKey,
     previewContext: effectivePreviewContext,
-    previewItem: previewMatchesCurrentBinding ? effectivePreviewItem : null,
+    previewItem: previewMatchesCurrentBinding ? effectivePreviewItem : effectivePreviewItem,
     previewReading: resolvedPreviewReading
   });
   const selectedPreviewContextValue = useMemo(() => {
@@ -455,27 +498,23 @@ export function DataInspectorPanel({
           <p className="text-[11px] text-[var(--shell-subtitle-ink)]">
             Preview Context 只影響此處預覽，不會寫入頁面設定或模擬播放裝置。
           </p>
-          {previewLoading ? <p>正在解析預覽資料…</p> : null}
-          {previewError ? <p className="text-[#8f452d]">{previewError}</p> : null}
-          {!previewLoading && shouldLoadManagedPreview && !previewMatchesCurrentBinding ? (
-            <p className="text-[#8f452d]">資料綁定有未儲存變更；儲存草稿後更新預覽。</p>
+          {previewLoading ? <p data-unsaved-preview-pending>正在解析未儲存預覽…</p> : null}
+          {previewError ? <p className="text-[#8f452d]">{previewError} 未儲存變更仍保留，可重試。</p> : null}
+          {!previewLoading && shouldLoadManagedPreview ? (
+            <p data-unsaved-preview-stage>未儲存草稿預覽，尚未寫入草稿。</p>
           ) : null}
         </div>
       ) : null}
 
-      <label className="block space-y-1">
+      <div className="space-y-1">
         <span className="font-semibold text-[var(--shell-title-ink)]">語意指標</span>
-        <select
-          className="w-full rounded-[12px] border border-[var(--shell-divider)] bg-white px-3 py-2 disabled:opacity-55"
+        <MetricPicker
           disabled={!bindingEditable}
-          onChange={(event) => update({ metricKey: event.target.value })}
-          value={model.binding.metricKey}
-        >
-          {model.metricOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </label>
+          onChange={(metricKey) => update({ metricKey })}
+          options={model.pickerOptions}
+          selected={model.binding.metricKey}
+        />
+      </div>
 
       <label className="block space-y-1">
         <span className="font-semibold text-[var(--shell-title-ink)]">資料範圍</span>

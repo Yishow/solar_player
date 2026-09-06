@@ -467,9 +467,9 @@ export class MqttClientService {
     };
   }
 
-  async publish(topic: string, payload: string): Promise<MqttPublishResult> {
+  async publish(topic: string, payload: string, options: { retain?: boolean } = {}): Promise<MqttPublishResult> {
     if (this.mockMode) {
-      this.logger.debug?.({ topic, payload }, "MQTT mock publish");
+      this.logger.debug?.({ retain: options.retain === true, topic, payload }, "MQTT mock publish");
       return { mode: "mock", payload, success: true, topic };
     }
     if (!this.client || !this.status.connected) {
@@ -483,7 +483,7 @@ export class MqttClientService {
 
     const client = this.client;
     return new Promise<MqttPublishResult>((resolve) => {
-      client.publish(topic, payload, (error) => {
+      client.publish(topic, payload, { retain: options.retain === true }, (error) => {
         if (error) {
           const message = "MQTT publish failed";
           this.logger.error(

@@ -24,6 +24,13 @@ test("display pages editor loads support panels only for the active panel tab", 
   assert.match(editorSource, /useDisplayPagePublishingState\([\s\S]*\{ enabled: shouldLoadPublishingState/);
 });
 
+test("U5 toolbar publish check opens review without publishing", () => {
+  assert.match(editorSource, /setRightTab\("publish"\);\s*\n\s*void refresh\(\);/);
+  assert.doesNotMatch(editorSource, /onPublishCheck=\{\(\) => \{\s*\n\s*setRightTab\("publish"\);\s*\n\s*void publish\(\);/);
+  assert.match(editorSource, /PublishReviewDrawer/);
+  assert.match(editorSource, /onConfirmPublish=\{\(\) => void publish\(\)\}/);
+});
+
 test("display pages editor support panel refresh failures preserve warm state lanes", () => {
   assert.match(publishingSource, /initialPublishingStateByPage \?\? \{\}/);
   assert.match(publishingSource, /setPublishingStateByPage\(\(current\) => \(\{ \.\.\.current, \[pageId\]: \{ fallback, validation: merged \} \}\)\)/);

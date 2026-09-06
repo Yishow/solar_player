@@ -81,6 +81,7 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
     void requestJson<{
       meters?: Array<{ channelId: string; displayNameZh?: string | null; meterId: string }>;
       profile: SiteEnergyProfileV1 | null;
+      receivedTags?: Array<{ tag: string | null; topic: string }>;
     }>(`/api/data-hub/sites/${scope}/energy-profile`)
       .then((payload) => {
         if (cancelled) {
@@ -94,6 +95,9 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
           channelId: meter.channelId,
           label: meter.displayNameZh || meter.channelId
         })));
+        if ((payload.receivedTags ?? []).length > 0) {
+          setMessage(`已接收 ${payload.receivedTags?.length} 個穩定 tag 來源，可直接選 channel，不必手填 mapping。`);
+        }
       })
       .catch(() => {
         if (!cancelled) {

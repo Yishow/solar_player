@@ -17,7 +17,7 @@
 - [x] 1.9 **Compatibility** — 依舊設定與展示（D6）清冊只形成待確認候選；不改 broker/topic ownership，不複製 page-owned 分母，不把 E1 source role 當 siteTotal/department ownership。（Consumers share accounting configuration without duplicating it in page drafts；E6-R3 E6-R8）
 - [x] 1.10 **Verification** — 跑全部 profile API/shared/db 測試及 pnpm verify；記錄 UTC source／Asia/Taipei profile 月界線、timezone override／unknown revision、profile 外 channel、reassignment source-state preservation 與實際證據。（Profile site time zone is the calendar authority；E6-R1 E6-R2 E6-R3 E6-R4 E6-R5 E6-R6 E6-R7 E6-R8 E6-R9 E6-R11）
 
-- [ ] 1.11 **V3 MQTT integration** — 依 Guided MQTT sources integrate through the authoritative site profile 串接受控已接收資料清單/穩定tag來源與原任務，依新增契約驗證，不再要求外部client/手填mapping；此change只實作本層整合。（E6-R10）
+- [x] 1.11 **V3 MQTT integration** — 依 Guided MQTT sources integrate through the authoritative site profile 串接受控已接收資料清單/穩定tag來源與原任務，依新增契約驗證，不再要求外部client/手填mapping；此change只實作本層整合。（E6-R10）
 - [x] 1.12 **Calendar** — 驗證 Profile site time zone is the calendar authority：E1 `sourceTimestampTimeZone=UTC` 的 normalized instant 依 E6 `siteTimeZone=Asia/Taipei` 形成月界線；任何 timezone/start/end override、unknown profile revision 或 closed-history silent recalculation 均被拒絕或保留原 revision。（E6-R11）
 
 ## Closeout Notes

@@ -11,9 +11,9 @@
 - [x] 1.3 **Numbers** — numeric input保留字串直到validate，空白與0倍數不自動變1。（U2-R2）
 - [x] 1.4 **Preview API** — 新增唯讀mapping preview使用正式parser、管理授權及payload大小/遮罩限制。（U2-R3）
 - [x] 1.5 **Picker** — 新增支援numeric path的JSON欄位選取，unsupported expression有server error而非假成功。（U2-R3）
-- [ ] 1.6 **Safety** — 分離連線測試、解析preview、真publish；真publish顯示影響並確認，預設不retained。（U2-R4）
+- [x] 1.6 **Safety** — 分離連線測試、解析preview、真publish；真publish顯示影響並確認，預設不retained。（U2-R4）
 - [x] 1.7 **Persistence** — 單筆source save加入revision conflict；舊全量PUT相容但不可覆蓋他scope資料。（U2-R5）
-- [ ] 1.8 **Impact** — 刪除或身份變更列出draft/live/derived引用，impact unknown阻擋；managed identity由server拒絕。（U2-R5）
+- [x] 1.8 **Impact** — 刪除或身份變更列出draft/live/derived引用，impact unknown阻擋；managed identity由server拒絕。（U2-R5）
 - [x] 1.9 **Handoff** — 保存成功產出safe source identity handoff與waiting-data/baseline狀態，U4接後續目標選取。（U2-R6）
 - [x] 1.10 **Security tests** — 測試preview前後DB與MQTT publish count不變，未授權mutation拒絕，URL不含秘密。（U2-R3 U2-R4 U2-R5 U2-R6）
 - [x] 1.11 **Verification** — 執行sourceDraft、sourceMappingPreview、settings-mqtt與DataHub相關tests及pnpm verify；驗證熟手可不走wizard。（U2-R1 U2-R2 U2-R3 U2-R4 U2-R5 U2-R6）

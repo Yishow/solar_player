@@ -282,6 +282,10 @@ export function SourceConnectionPanel({
         <p className="mt-1 text-[12px] leading-5 text-[var(--shell-copy-ink)]">
           目前選取項目的素材與內容來源摘要。資料指標請使用「資料」頁籤。
         </p>
+        <p className="mt-2 text-[12px]" data-editor-energy-setup>
+          廠區總錶與部門歸屬請走共用用電設定，不會在這裡再填一套分母。
+          <a className="ml-1 underline" href="/settings/data-hub?task=energy">開啟廠區用電設定</a>
+        </p>
         {isLinkedFromDifferentSelection ? (
           <p className="mt-1 text-[12px] leading-5 text-[var(--shell-subtitle-ink)]">
             目前畫布選到的是版位容器，來源替換與霧化設定已連到對應的素材區域。

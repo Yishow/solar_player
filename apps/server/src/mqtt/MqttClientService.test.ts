@@ -25,9 +25,15 @@ class FakeMqttClient extends EventEmitter {
     return this;
   }
 
-  publish(topic: string, payload: string, callback?: (error?: Error | null) => void) {
+  publish(
+    topic: string,
+    payload: string,
+    optionsOrCallback?: { retain?: boolean } | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void
+  ) {
+    const done = typeof optionsOrCallback === "function" ? optionsOrCallback : callback;
     this.published.push({ topic, payload });
-    queueMicrotask(() => callback?.(this.publishError));
+    queueMicrotask(() => done?.(this.publishError));
     return this;
   }
 

@@ -58,6 +58,7 @@ test("Data inspector exposes only compatible semantic metrics and read-only runt
   );
 
   assert.match(html, /語意指標/);
+  assert.match(html, /data-metric-picker/);
   assert.match(html, /穩定項目：power/);
   assert.match(html, /資料範圍/);
   assert.match(html, /小數位數/);

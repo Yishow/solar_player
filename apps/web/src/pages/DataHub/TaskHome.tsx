@@ -25,6 +25,7 @@ import {
 } from "./workspaceContext";
 import { isSiteEnergySetupTask, siteEnergySetupHref } from "@solar-display/shared";
 import { SiteEnergySetupPanel } from "./SiteEnergySetupPanel";
+import { GuidedOnboardingPanel } from "./GuidedOnboardingPanel";
 
 const hiddenManagementRoutePaths = getConfiguredHiddenManagementRoutePaths();
 
@@ -44,6 +45,7 @@ export function DataHubTaskHomeContent({
       {isSiteEnergySetupTask(task) && (workspaceScope === "cl" || workspaceScope === "kn") ? (
         <SiteEnergySetupPanel scope={workspaceScope} />
       ) : null}
+      {task === "connect" ? <GuidedOnboardingPanel scope={workspaceScope} /> : null}
       <section className="space-y-3" aria-labelledby="data-hub-tasks-heading">
         <div>
           <h2 className="text-lg font-semibold text-[#1e2821]" id="data-hub-tasks-heading">要先做哪件事？</h2>

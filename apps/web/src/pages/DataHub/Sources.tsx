@@ -184,12 +184,29 @@ export function DataHubSourcesContent({
   }, [draftTopics, liveSolar, model, query.scope]);
 
   const handleDeleteGenericMapping = useCallback((id: number) => {
-    setDraftTopics((current) => current.filter((topic) => topic.id !== id));
-    setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
-    setOpenRowId(null);
-    setMessage("");
-    setErrorMessage("");
-  }, []);
+    const topic = draftTopics.find((row) => row.id === id);
+    if (!topic) {
+      return;
+    }
+    void requestJson<{ canMutate: boolean; unknown: boolean; consumers: Array<{ kind: string; pageId?: string; metricKey: string }> }>(
+      `/api/data-hub/source-impact?metricKey=${encodeURIComponent(topic.metricKey)}&metricScope=${encodeURIComponent(topic.metricScope)}`
+    ).then((impact) => {
+      if (!impact.canMutate) {
+        const detail = impact.unknown
+          ? "引用查詢失敗，未知影響不能當成沒有引用。"
+          : impact.consumers.map((row) => `${row.kind}:${row.pageId ?? row.metricKey}`).join("、");
+        setErrorMessage(`這個來源仍被引用，已阻擋刪除。${detail}`);
+        return;
+      }
+      setDraftTopics((current) => current.filter((item) => item.id !== id));
+      setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
+      setOpenRowId(null);
+      setMessage("");
+      setErrorMessage("");
+    }).catch(() => {
+      setErrorMessage("無法確認引用影響，未知影響不能當成沒有引用。");
+    });
+  }, [draftTopics]);
 
   const handlePublishTest = useCallback(async (metricScope: MetricScope, metricKey: string, value: number) => {
     setErrorMessage("");

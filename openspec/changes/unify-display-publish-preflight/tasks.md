@@ -13,7 +13,7 @@
 - [x] 1.5 **Findings** — 建立中文可行動訊息與item/field定位，保留code於details，修正後重查。（U5-R3）
 - [x] 1.6 **Policy** — 依卡片required data與fallback policy分類stale/partial warning或blocker，缺asset與incompatible binding阻擋。（U5-R3）
 - [x] 1.7 **Shared scope** — 接U2 impact，明確區分page/source/shared-shell保存，impact unknown不得視0。（U5-R4）
-- [ ] 1.8 **Review UI** — 統一PublishReviewDrawer顯示差異、影響、修正與確認，toolbar跳入同一路徑，移除誤導重複入口。（U5-R1 U5-R3 U5-R4）
+- [x] 1.8 **Review UI** — 統一PublishReviewDrawer顯示差異、影響、修正與確認，toolbar跳入同一路徑，移除誤導重複入口。（U5-R1 U5-R3 U5-R4）
 - [x] 1.9 **Evidence** — 顯示draft-saved/server-published/device-applied三層；只有matching ack可applied，無ack就unknown/pending。（U5-R5）
 - [x] 1.10 **Recovery** — 加入operation idempotency、失敗保持旧live與draft recovery測試。（U5-R6）
 - [x] 1.11 **Verification** — 跑displayPublishPreflightService、publishReviewState、display-pages authorization/publish regression及pnpm verify。（U5-R1 U5-R2 U5-R3 U5-R4 U5-R5 U5-R6）

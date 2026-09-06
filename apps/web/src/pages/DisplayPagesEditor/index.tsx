@@ -19,7 +19,7 @@ import { setValueAtPath, useDisplayPageConfig } from "../../hooks/useDisplayPage
 import { useDisplayEditorKeybinding } from "../../hooks/useDisplayEditor";
 import { buildApiUrl, getImages } from "../../services/api";
 import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } from "./publishing";
-import { DisplayPagePublishingPanels } from "./publishingStatus";
+import { PublishReviewDrawer } from "./PublishReviewDrawer";
 import { AssetLibrary } from "../AssetLibrary";
 import { ShellDecorationEditor } from "../ShellDecorationEditor";
 import { DisplayEditorCanvasPane } from "./canvasPane";
@@ -436,7 +436,6 @@ export function DisplayPagesEditor({
     config,
     dirty,
     errorMessage,
-    fallbackPolicy,
     isLoading,
     isSaving,
     lastLoadedEnvelope,
@@ -1389,7 +1388,7 @@ export function DisplayPagesEditor({
         onPreview={() => setEditMode(false)}
         onPublishCheck={() => {
           setRightTab("publish");
-          void publish();
+          void refresh();
         }}
         onRedo={redo}
         onSave={() => void handleSave()}
@@ -1596,9 +1595,10 @@ export function DisplayPagesEditor({
               />
             )}
             {rightTab === "publish" && (
-              <DisplayPagePublishingPanels
+              <PublishReviewDrawer
                 blockingCount={blockingCount}
-                fallbackPolicy={fallbackPolicy}
+                onClose={() => setRightTab("inspector")}
+                onConfirmPublish={() => void publish()}
                 publishingError={publishingError}
                 publishingState={publishingState}
               />
