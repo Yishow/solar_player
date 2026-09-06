@@ -31,5 +31,6 @@ export * from "./appTime.js";
 export * from "./playbackProfileVersion.js";
 export * from "./deviceProfileRollout.js";
 export * from "./metricScope.js";
+export * from "./meterReading.js";
 export * from "./widgetDataBinding.js";
 export type { DisplayEditorDataBindingCapability } from "./displayEditorSchema.js";

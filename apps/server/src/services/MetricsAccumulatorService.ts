@@ -1,6 +1,6 @@
 import { setInterval, clearInterval } from "node:timers";
 import type Database from "better-sqlite3";
-import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
+import { isRegisteredConsumptionPowerChannel, type DisplaySyncEvent, type MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { type LiveMetricsSnapshot, readScopedLiveMetricsSnapshot } from "../metrics/liveMetrics.js";
 import { readCalculationSettings } from "./calculationSettingsService.js";
@@ -124,7 +124,7 @@ function sumConsumptionPower(snapshot: LiveMetricsSnapshot): number | null {
   // null only when there is no source at all. Drop the bad reading instead.
   const contributing = Object.entries(snapshot.metrics).filter(
     ([metricKey, reading]) =>
-      metricKey.startsWith("factory")
+      isRegisteredConsumptionPowerChannel(metricKey)
       && normalizeUnit(reading.unit) === "kw"
       && isFiniteNumber(reading.value)
   );

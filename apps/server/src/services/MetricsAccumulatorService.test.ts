@@ -515,6 +515,39 @@ test("consumption power matches power units without case sensitivity", () => {
   database.close();
 });
 
+test("E1-R6-S02 cumulative energy is not presented as instantaneous kW", () => {
+  const observedAt = "2026-08-06T10:00:00.000Z";
+  const database = createDatabase();
+  const service = new MetricsAccumulatorService({
+    database,
+    metricScope: "cl",
+    readSnapshot: () => buildSnapshot([["consumptionEnergy", 10100, "kWh"]], observedAt)
+  });
+  service.processAt(new Date(observedAt));
+  assert.equal(service.getLatestSnapshot().consumptionPower, null);
+  database.close();
+});
+
+test("E1-R6-S01 factoryGeneration.powerKw is excluded from consumption power", () => {
+  const observedAt = "2026-08-06T10:00:00.000Z";
+  const database = createDatabase();
+  const service = new MetricsAccumulatorService({
+    database,
+    metricScope: "cl",
+    readSnapshot: () =>
+      buildSnapshot(
+        [
+          ["factoryProductionPower", 10, "kW"],
+          ["factoryGeneration.powerKw", 999, "kW"]
+        ],
+        observedAt
+      )
+  });
+  service.processAt(new Date(observedAt));
+  assert.equal(service.getLatestSnapshot().consumptionPower, 10);
+  database.close();
+});
+
 test("a non-finite reading does not turn a present aggregate into null", () => {
   const observedAt = "2026-08-06T10:00:00.000Z";
   const database = createDatabase();
