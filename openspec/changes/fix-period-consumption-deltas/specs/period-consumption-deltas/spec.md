@@ -3,7 +3,7 @@
 ### Requirement: Period consumption is a counter difference
 <!-- requirement-id: E2-R1 -->
 
-For a continuous cumulative-energy meter epoch, the resolver SHALL calculate period consumption as the normalized end reading minus the normalized start reading. It SHALL NOT sum register observations or use a lifetime register as a day, month or year total. Multi-meter totals SHALL sum eligible per-meter deltas without overlapping membership.
+For a continuous cumulative-energy meter epoch, the resolver SHALL calculate period consumption as the normalized end reading minus the normalized start reading. It SHALL NOT sum register observations or use a lifetime register as a day, month or year total. The resolver SHALL obtain accounting membership from a server-verified E6 profile revision; caller-supplied `meterIds` SHALL select only physical channels already validated within that revision and SHALL NOT assign site-total or department ownership. Multi-meter totals SHALL sum eligible per-meter deltas without overlapping profile membership.
 
 #### Scenario: Daily monthly yearly example
 <!-- scenario-id: E2-R1-S01 -->
@@ -22,13 +22,15 @@ For a continuous cumulative-energy meter epoch, the resolver SHALL calculate per
 ### Requirement: Calendar boundaries use explicit site time
 <!-- requirement-id: E2-R2 -->
 
-The resolver SHALL use the configured IANA site time zone for day, calendar month and calendar year boundaries, and SHALL accept an injected clock. Completed periods SHALL be non-overlapping half-open intervals while counter endpoint observations may be shared by adjacent periods.
+The resolver SHALL use `siteTimeZone` from a server-verified E6 accounting profile revision as the sole authority for day, calendar month and calendar year boundaries, and SHALL accept an injected clock. The request SHALL retain `metricScope`, `meterIds` and `definitionRevision`, and SHALL identify `profileRevision`, period selection and `asOf`; it SHALL reject caller-supplied `timeZone`, `start` or `end` overrides. E1 SHALL normalize source timestamps to UTC instants before ingestion into this resolver; E2 SHALL consume the normalized instant and SHALL preserve E1 `SOURCE_TIMESTAMP_INVALID` diagnostics without creating a second timestamp parser. A source time zone different from the profile time zone is valid after instant normalization. Completed periods SHALL be non-overlapping half-open intervals while counter endpoint observations SHALL be shared by adjacent periods when they are boundary endpoints.
+
+For E6 draft preview only, the internal calculator seam SHALL resolve the same calendar contract from an immutable server-validated E6 review snapshot bound to the expected persisted profile and source revisions. The result SHALL identify its review context and SHALL NOT be stored as production history or presented as a persisted profile revision. Public callers SHALL NOT provide an arbitrary draft timezone through this seam.
 
 #### Scenario: Taipei month boundary
 <!-- scenario-id: E2-R2-S01 -->
 
 - **GIVEN** the site time zone is Asia/Taipei
-- **WHEN** the September 2026 month start is resolved
+- **WHEN** the September 2026 month start is resolved using a server-verified profile revision
 - **THEN** the start instant is 2026-08-31T16:00:00Z regardless of the host time zone
 
 #### Scenario: Leap day and year rollover
@@ -38,10 +40,31 @@ The resolver SHALL use the configured IANA site time zone for day, calendar mont
 - **WHEN** period windows are enumerated
 - **THEN** February has 29 daily buckets and an endpoint is never counted as energy twice
 
+#### Scenario: Source and profile time zones differ
+<!-- scenario-id: E2-R2-S03 -->
+
+- **GIVEN** E1 accepts a source no-offset timestamp `2026-08-31 16:00:00` with `sourceTimestampTimeZone=UTC` and provides normalized instant `2026-08-31T16:00:00Z`, while the server-verified profile has `siteTimeZone=Asia/Taipei`
+- **WHEN** September 2026 consumption is resolved
+- **THEN** E2 assigns the normalized instant to the profile month boundary using Asia/Taipei, without reparsing the raw timestamp or using the host time zone
+
+#### Scenario: Calendar override or unknown profile is rejected
+<!-- scenario-id: E2-R2-S04 -->
+
+- **GIVEN** a caller supplies `timeZone`, `start` or `end`, names an unknown profile revision, or supplies a meterId outside the requested profile membership
+- **WHEN** period consumption is requested
+- **THEN** the server returns a stable override, profile-revision or membership error and produces no period result
+
+#### Scenario: Draft calendar preview uses the reviewed snapshot
+<!-- scenario-id: E2-R2-S05 -->
+
+- **GIVEN** the saved profile uses Asia/Taipei and an E6 server-validated draft proposes UTC in an immutable review snapshot bound to that saved revision
+- **WHEN** the E6 calculator seam previews September 2026
+- **THEN** preview uses 2026-09-01T00:00:00Z as its month start and identifies the review context, while the saved profile and its 2026-08-31T16:00:00Z boundary remain unchanged with no production history/cache writes
+
 ### Requirement: Boundary estimation is bounded and disclosed
 <!-- requirement-id: E2-R3 -->
 
-The resolver SHALL prefer exact boundary observations. An approved last observation before a boundary MAY be used only within the configured boundaryMaxAgeSeconds and SHALL produce estimated-boundary quality, actual sample timestamps and offsets. A post-start reading SHALL NOT fabricate the missing start baseline.
+The resolver SHALL prefer exact boundary observations. An approved last observation before a boundary SHALL be used only within the configured boundaryMaxAgeSeconds and SHALL produce estimated-boundary quality, actual sample timestamps and offsets. A post-start reading SHALL NOT fabricate the missing start baseline.
 
 #### Scenario: Bounded prior sample
 <!-- scenario-id: E2-R3-S01 -->
@@ -55,7 +78,14 @@ The resolver SHALL prefer exact boundary observations. An approved last observat
 
 - **GIVEN** the first available reading is at September 10 noon
 - **WHEN** September consumption is requested
-- **THEN** the full month-to-date value is null; only separately labeled observed partial consumption may be returned
+- **THEN** the full month-to-date value is null; any returned observed partial consumption SHALL be separately labeled
+
+#### Scenario: Receive-time estimate cannot be exact
+<!-- scenario-id: E2-R3-S03 -->
+
+- **GIVEN** E1 accepts an approved `retain=false`, `dup=false` packet with complete QoS evidence and no source timestamp as `timestampQuality=receive-time-estimated`, while a `retain=true` timestamp-free replay is not accepted
+- **WHEN** the resolver uses the accepted packet near a period boundary
+- **THEN** the accepted packet can contribute only as a bounded `estimated-boundary` sample based on `receivedAt`, even at the exact boundary; the retained replay cannot update accepted history, baseline or freshness
 
 ### Requirement: Zero and missing observations are not interchangeable
 <!-- requirement-id: E2-R4 -->
@@ -79,7 +109,7 @@ The resolver SHALL distinguish exact zero consumption from unavailable, partial 
 ### Requirement: Counter discontinuities require explicit evidence
 <!-- requirement-id: E2-R5 -->
 
-A decrease SHALL be invalid unless an explicit reset, replacement or configured rollover contract explains it. Unknown negative deltas SHALL NOT be clamped to zero or made positive. Verified continuous segments MAY be summed; unknown segments SHALL make the full period partial.
+A decrease SHALL be invalid unless an explicit reset, replacement or configured rollover contract explains it. Unknown negative deltas SHALL NOT be clamped to zero or made positive. The resolver SHALL sum only verified continuous segments; unknown segments SHALL make the full period partial.
 
 #### Scenario: Unknown decrease
 <!-- scenario-id: E2-R5-S01 -->
@@ -143,7 +173,7 @@ The resolver SHALL distinguish known whole-period energy from unknown allocation
 ### Requirement: Period quality and precision survive calculation
 <!-- requirement-id: E2-R8 -->
 
-The resolver SHALL preserve decimal precision until presentation and SHALL expose quality, freshness, actual coverage, contributing samples and calculation version. Stale values SHALL NOT become current merely because a poll or HTTP request occurred.
+The resolver SHALL preserve decimal precision until presentation and SHALL expose quality, freshness, actual coverage, contributing samples, calculation version and provenance for the server-verified profile revision and site time zone. Stale values SHALL NOT become current merely because a poll or HTTP request occurred.
 
 #### Scenario: Decimal preservation
 <!-- scenario-id: E2-R8-S01 -->
@@ -157,4 +187,4 @@ The resolver SHALL preserve decimal precision until presentation and SHALL expos
 
 - **GIVEN** no new observation arrives for a source beyond its freshness threshold
 - **WHEN** the service is polled repeatedly
-- **THEN** sample freshness remains stale and no new boundary observation is invented
+- **THEN** sample freshness remains stale, the profile revision and site time zone remain in provenance, and no new boundary observation is invented

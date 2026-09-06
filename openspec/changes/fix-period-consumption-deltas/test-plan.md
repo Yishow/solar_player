@@ -14,10 +14,14 @@
 |---|---|---|---|
 | E2-R1 | E2-R1-S01 — Daily monthly yearly example | service＋SQLite＋API | day=300, month=4300 and year=8300 kWh; none equals the register 9300 |
 | E2-R1 | E2-R1-S02 — Duplicate observations | service＋SQLite＋API | consumption is 250 kWh, not 40450 kWh and not 350 kWh |
-| E2-R2 | E2-R2-S01 — Taipei month boundary | service＋SQLite＋API | the start instant is 2026-08-31T16:00:00Z regardless of the host time zone |
+| E2-R2 | E2-R2-S01 — Taipei month boundary | service＋SQLite＋API | a server-verified E6 profile revision yields start instant 2026-08-31T16:00:00Z regardless of the host time zone |
 | E2-R2 | E2-R2-S02 — Leap day and year rollover | service＋SQLite＋API | February has 29 daily buckets and an endpoint is never counted as energy twice |
+| E2-R2 | E2-R2-S03 — Source and profile time zones differ | ingestion fixture＋service＋SQLite＋API | E1 supplies a normalized UTC instant from sourceTimestampTimeZone=UTC and E2 assigns it with the Asia/Taipei profile calendar at the September boundary |
+| E2-R2 | E2-R2-S04 — Calendar override or unknown profile is rejected | service＋SQLite＋API | caller timeZone/start/end override, unknown profile revision or profile-external meterId return stable errors with no period result |
+| E2-R2 | E2-R2-S05 — Draft calendar preview uses the reviewed snapshot | E6 calculator seam＋resolver＋SQLite/cache | draft UTC preview月初為2026-09-01T00:00:00Z、回review context；saved台北profile月初仍為2026-08-31T16:00:00Z，production history/cache零寫入 |
 | E2-R3 | E2-R3-S01 — Bounded prior sample | service＋SQLite＋API | the delta is returned with estimated-boundary quality and a -20 second start offset |
 | E2-R3 | E2-R3-S02 — Missing month start | service＋SQLite＋API | the full month-to-date value is null; only separately labeled observed partial consumption may be returned |
+| E2-R3 | E2-R3-S03 — Receive-time estimate cannot be exact | ingestion fixture＋service＋SQLite＋API | approved timestamp-free retain=false packet can be used only as estimated-boundary via receivedAt; retained timestamp-free replay changes no history, baseline or freshness |
 | E2-R4 | E2-R4-S01 — Idle meter | service＋SQLite＋API | valueKwh is 0 with valid quality |
 | E2-R4 | E2-R4-S02 — Only one observation | service＋SQLite＋API | valueKwh is null and the issue explains the missing endpoint or baseline |
 | E2-R5 | E2-R5-S01 — Unknown decrease | service＋SQLite＋API | the result is invalid, not 0, 10, 1190 or 1210 |
@@ -32,10 +36,11 @@
 | E2-M1 | E2-M1-S01 — Independent midnight rollover | service＋SQLite＋API | CL changes only its own period state and KN retains its independently persisted baseline |
 | E2-M1 | E2-M1-S02 — Restart with consumption evidence | service＋SQLite＋API | it resumes the same period calculation and preserves the original source timestamps without inserting mock readings |
 | E2-M1 | E2-M1-S03 — Unproven baseline | service＋SQLite＋API | the consumption result is unavailable or explicitly partial, never a valid zero or the current register |
+| E2-M1 | E2-M1-S04 — Accounting reassignment preserves source state | service＋SQLite＋API | changing siteTotal/department membership creates only an E6 profile revision; E1 source revision, accepted observations and baseline remain unchanged |
 
 ## Execution and Evidence
 
-1. 在隔離的測試資料庫與可注入 clock 下先使指定情境失敗，再完成實作；用生產路徑 ingest/resolver/API 驗證，不直接注入 UI state 冒充整合。
+1. 在隔離的測試資料庫與可注入 clock 下先使指定情境失敗，再完成實作；用生產路徑 ingest/profile lookup/resolver/API 驗證，不直接注入 UI state 冒充整合。profile revision、siteTimeZone 與 E1 normalized source timestamp 必須由服務端 fixture 提供；E2 不另建 raw timestamp parser。
 2. 依 repo 現行 package scripts 跑受影響 server/web 測試並保存實際输出，最後執行 pnpm verify。
 3. 有 UI 變更時另外驗證 keyboard、1366×768、1440×900、1920×1080；牽涉 playback/editor 時依 repo FHD 流程產生 fresh evidence。
 4. 實作完成後把實際結果放入本 change 的驗證紀錄；缺工具、樣本或人工驗收明確標示 not run / pending，不提前 archive。
