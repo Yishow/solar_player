@@ -79,7 +79,7 @@ The catalog SHALL state the broker reference, approved filters, capture interval
 ### Requirement: Message provenance and identity claims are evidence based
 <!-- requirement-id: M1-R5 -->
 
-Observed samples SHALL carry a connection reference, exact received topic, observedAt and receivedAt as separate fields, packet retain/dup/QoS metadata when available, capture origin, and schema revision. Publisher identity SHALL be unknown unless supplied by an approved authenticated source of metadata; a payload clientId or tag SHALL be labeled a claim, not authenticated publisher identity. The capture path SHALL preserve metadata currently lost by converting only topic and payload to the runtime handler.
+Observed samples SHALL carry a connection reference, exact received topic, observedAt and receivedAt as separate fields, `retained`, `dup`, `qos`, `sourceTimestamp`, `timestampQuality`, `origin`, and schema revision. The catalog `retained` flag SHALL map explicitly to the sample `retain` field. The receiver-to-E1 path SHALL preserve `retain`, `dup`, `qos`, `receivedAt`, and `origin` as immutable transport evidence. `sourceTimestamp` and `timestampQuality` SHALL be preserved when supplied by the packet, or derived only from a reviewed selector timestamp path while retaining the raw time evidence and parse result; `receivedAt` SHALL remain the receiver clock and SHALL never be used to fabricate a credible source event time. An absent source timestamp SHALL not be replaced with the receive time when the packet is retained. Publisher identity SHALL be unknown unless supplied by an approved authenticated source of metadata; a payload clientId or tag SHALL be labeled a claim, not authenticated publisher identity. The capture path SHALL preserve this complete evidence from the receiver through extraction to the E1 input and SHALL NOT convert `retained=true` to `retained=false` or drop any field. If required transport evidence is missing and no credible source timestamp exists, the E1 input SHALL reject the observation with `TRANSPORT_EVIDENCE_MISSING`.
 
 #### Scenario: Publisher client ID unavailable
 <!-- scenario-id: M1-R5-S01 -->
@@ -95,10 +95,24 @@ Observed samples SHALL carry a connection reference, exact received topic, obser
 - **WHEN** the candidate is displayed
 - **THEN** the UI labels them payload-declared identifiers and preserves the exact topic and receive time as independent evidence
 
+#### Scenario: Transport evidence reaches extraction
+<!-- scenario-id: M1-R5-S03 -->
+
+- **GIVEN** the receiver accepts a packet with `retained=true`, `dup=false`, `qos=1`, a current `receivedAt`, no `sourceTimestamp`, `timestampQuality=unknown`, and a capture `origin`
+- **WHEN** the packet crosses the extractor boundary toward E1
+- **THEN** all immutable transport fields retain their values and unknown state; any source timestamp is preserved or derived only through the reviewed timestamp path with its raw evidence and parse result, and no layer drops a flag, synthesizes a source timestamp from `receivedAt`, or changes `retained=true` to `false`
+
+#### Scenario: Missing transport evidence is rejected
+<!-- scenario-id: M1-R5-S04 -->
+
+- **GIVEN** an extractor forwards a reading without the required transport evidence and without a credible `sourceTimestamp`
+- **WHEN** the observation reaches the E1 input boundary
+- **THEN** it is rejected with `TRANSPORT_EVIDENCE_MISSING` before accepted write, live state, baseline, or freshness changes
+
 ### Requirement: Retained and replayed samples do not become fresh measurement evidence
 <!-- requirement-id: M1-R6 -->
 
-Retained replay SHALL remain explicitly labeled, with freshness derived from credible source time when present. A replay without source time SHALL have unknown observation age even if received now. A retained last value SHALL not prove present traffic, historical coverage, all tags on a multiplexed topic, or a day/month/year baseline. Discovery samples SHALL never be backfilled into accepted energy history merely by selecting them.
+Retained replay SHALL remain explicitly labeled, with freshness derived from credible source time when present. A packet with `retained=true` and no credible `sourceTimestamp` SHALL have `timestampQuality=unknown` and unknown observation age even if received now, and SHALL be configuration/diagnostic evidence only; E1 SHALL report `RETAINED_SOURCE_TIME_UNKNOWN`. Only a source with an explicitly audited E1 `timestampPolicy=allow-receive-time-estimate` and source revision SHALL allow `receive-time-estimated`, and only for an approved production packet with `retain=false`, `dup=false`, `qos` equal to 0, 1, or 2, and no source timestamp. The default `timestampPolicy=source-required` SHALL remain in force unless that source approval exists; packet or profile data SHALL not declare the policy. A present but unparseable source timestamp SHALL not use the fallback. For a retained packet without a credible `sourceTimestamp`, ingestion SHALL isolate the evidence from accepted history before E1 deduplication, negative-difference checks, epoch transitions, accepted writes, live state, baseline updates, or freshness updates. A production retained packet with a credible source timestamp SHALL remain eligible for E1-R2 deduplication and late-event handling. A retained last value SHALL not prove present traffic, historical coverage, all tags on a multiplexed topic, or a day/month/year baseline. Catalog/capture retained evidence and offline samples with `origin=catalog` or `origin=offline` SHALL never be backfilled into accepted energy history merely by selecting them.
 
 #### Scenario: Old retained sample
 <!-- scenario-id: M1-R6-S01 -->
@@ -113,6 +127,34 @@ Retained replay SHALL remain explicitly labeled, with freshness derived from cre
 - **GIVEN** one topic previously carried many tags but only the latest retained packet is available
 - **WHEN** discovery receives that packet
 - **THEN** the catalog shows only that observed tag and explicitly does not claim to know all historical tags
+
+#### Scenario: Restart replays an un-timestamped retained counter
+<!-- scenario-id: M1-R6-S03 -->
+
+- **GIVEN** the last accepted counter is `10100`, the process restarts, and the broker re-delivers a retained packet with value `10000`, `retained=true`, and no credible `sourceTimestamp`
+- **WHEN** the packet passes through extraction and reaches the E1 input boundary
+- **THEN** it is marked configuration/diagnostic-only with unknown age; the accepted value remains `10100`, no negative difference or epoch transition is produced, and accepted history, live state, baseline, and freshness are unchanged
+
+#### Scenario: Unparseable source time has no receive-time fallback
+<!-- scenario-id: M1-R6-S04 -->
+
+- **GIVEN** an approved production packet has `retain=false`, `dup=false`, and a present but unparseable `sourceTimestamp`
+- **WHEN** the extractor prepares the E1 input
+- **THEN** it is not labeled `receive-time-estimated` and does not update accepted history, live state, baseline, or freshness
+
+#### Scenario: Receive-time estimate requires source approval
+<!-- scenario-id: M1-R6-S05 -->
+
+- **GIVEN** a production packet has `retain=false`, `dup=false`, `qos=1`, and no source timestamp while its E1 source keeps the default `timestampPolicy=source-required`
+- **WHEN** the extractor prepares the E1 input
+- **THEN** it is not labeled `receive-time-estimated`; only an explicitly audited source revision changing the policy to `allow-receive-time-estimate` can permit that quality
+
+#### Scenario: Trusted retained time survives the production path
+<!-- scenario-id: M1-R6-S06 -->
+
+- **GIVEN** an activated production source receives a retained 10000 kWh packet with a trustworthy source timestamp through the MQTT receiver
+- **WHEN** the extractor forwards it to E1 and the same packet is redelivered ten times including after restart
+- **THEN** the first valid packet is accepted with its original source time, later identical deliveries are duplicates without freshness or baseline refresh, and no layer rejects it solely because retain=true; valid late packets with distinct source times follow E1 late-event rules without rolling back the live value
 
 ### Requirement: Candidate grouping respects tag identity and incomplete schemas
 <!-- requirement-id: M1-R7 -->
@@ -155,7 +197,7 @@ Every catalog, capture, sample-inspection and stream operation SHALL enforce man
 ### Requirement: Offline evidence is available without pretending to be live
 <!-- requirement-id: M1-R9 -->
 
-The same UI SHALL offer paste-sample and bounded structured-example import as recovery options, not mandatory prerequisites. Supported local examples SHALL be labeled imported or pasted and go through the same parser and permission checks. Configured source labels and approved recipes MAY persist, but raw sample bodies SHALL expire with the capture retention policy and shall not become permanent history. Opaque client exports and binary/proprietary formats SHALL not be claimed as supported without an implemented parser.
+The same UI SHALL offer paste-sample and bounded structured-example import as recovery options, not mandatory prerequisites. Supported local examples SHALL be labeled imported or pasted and go through the same parser and permission checks. Configured source labels and approved recipes MAY persist, but raw sample bodies SHALL expire with the capture retention policy and shall not become permanent history. Catalog and offline evidence SHALL never directly update E1 accepted history, live state, baseline, or freshness. Opaque client exports and binary/proprietary formats SHALL not be claimed as supported without an implemented parser.
 
 #### Scenario: A device is temporarily offline
 <!-- scenario-id: M1-R9-S01 -->
@@ -174,7 +216,7 @@ The same UI SHALL offer paste-sample and bounded structured-example import as re
 ### Requirement: Discovery and mapping APIs share stable references and recoverable states
 <!-- requirement-id: M1-R10 -->
 
-Discovery SHALL expose stable opaque capture and candidate references with bounded pagination and revision-aware sample access. Candidate references SHALL bind broker, scope, exact topic and schema evidence. Expired or changed evidence SHALL produce explicit retry states without clearing the mapping draft. Capture endpoints SHALL not accept arbitrary hosts or credentials from untrusted sample data; they SHALL reference an existing authorized connection. Catalog output SHALL never be used directly as accepted meter history.
+Discovery SHALL expose stable opaque capture and candidate references with bounded pagination and revision-aware sample access. Candidate references SHALL bind broker, scope, exact topic and schema evidence. Expired or changed evidence SHALL produce explicit retry states without clearing the mapping draft. Capture endpoints SHALL not accept arbitrary hosts or credentials from untrusted sample data; they SHALL reference an existing authorized connection. Catalog output, catalog/capture retained replay evidence, and offline evidence SHALL never be used directly as accepted meter history or as a freshness, baseline, live-state, or epoch signal; a production retained packet with credible source time remains governed by E1-R2.
 
 #### Scenario: Expired sample reference
 <!-- scenario-id: M1-R10-S01 -->

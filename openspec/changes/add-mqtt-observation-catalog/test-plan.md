@@ -84,6 +84,22 @@
 - THEN the UI labels them payload-declared identifiers and preserves the exact topic and receive time as independent evidence
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
 
+### M1-R5-S03 — Transport evidence reaches extraction
+
+需求：M1-R5。層：MQTT receiver＋shared extraction＋E1 boundary＋SQLite/API。
+- GIVEN the receiver accepts `retained=true`, `dup=false`, `qos=1`, a current `receivedAt`, no `sourceTimestamp`, `timestampQuality=unknown`, and a capture `origin`
+- WHEN the packet crosses the extractor boundary toward E1
+- THEN immutable retain/dup/qos/receivedAt/origin fields retain their values and unknown state; any source timestamp is preserved or derived only through the reviewed timestamp path with its raw evidence and parse result, and no layer synthesizes a source timestamp from `receivedAt`, drops a flag, or changes `retained=true` to `false`
+- 證據：receiver envelope、extractor input與E1 boundary的實際序列化snapshot逐欄比對；不以只檢查catalog row取代。
+
+### M1-R5-S04 — Missing transport evidence is rejected
+
+需求：M1-R5。層：shared extraction＋E1 boundary＋SQLite/API。
+- GIVEN an extractor forwards a reading without the required transport evidence and without a credible `sourceTimestamp`
+- WHEN the observation reaches the E1 input boundary
+- THEN it is rejected with `TRANSPORT_EVIDENCE_MISSING` before accepted write, live state, baseline, or freshness changes
+- 證據：實際error code、E1 input snapshot與accepted/history/baseline/live/freshness前後snapshot；確認沒有以receive-time補造證據。
+
 ### M1-R6-S01 — Old retained sample
 
 需求：M1-R6。層：shared extraction＋SQLite/API＋isolated MQTT broker＋UI journey。
@@ -99,6 +115,38 @@
 - WHEN discovery receives that packet
 - THEN the catalog shows only that observed tag and explicitly does not claim to know all historical tags
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
+
+### M1-R6-S03 — Restart replays an un-timestamped retained counter
+
+需求：M1-R6。層：MQTT receiver＋shared extraction＋E1 boundary＋SQLite/API。
+- GIVEN the last accepted counter is `10100`, the process restarts, and the broker re-delivers a retained packet with value `10000`, `retained=true`, and no credible `sourceTimestamp`
+- WHEN the packet passes through extraction and reaches the E1 input boundary
+- THEN it is marked configuration/diagnostic-only with unknown age; the accepted value remains `10100`, no negative difference or epoch transition is produced, and accepted history, live state, baseline, and freshness are unchanged
+- 證據：重啟前後accepted/history/baseline/live/freshness snapshot、E1 rejection/isolation reason與dedupe/epoch counters；確認未將receive-time當成source time。
+
+### M1-R6-S04 — Unparseable source time has no receive-time fallback
+
+需求：M1-R6。層：shared extraction＋E1 boundary＋SQLite/API。
+- GIVEN an approved production packet has `retain=false`, `dup=false`, and a present but unparseable `sourceTimestamp`
+- WHEN the extractor prepares the E1 input
+- THEN it is not labeled `receive-time-estimated` and does not update accepted history, live state, baseline, or freshness
+- 證據：timestamp parse error、timestampQuality、E1 decision與各domain snapshot；確認fallback只適用缺timestamp的正式retain=false/dup=false packet。
+
+### M1-R6-S05 — Receive-time estimate requires source approval
+
+需求：M1-R6。層：shared extraction＋E1 boundary＋SQLite/API。
+- GIVEN a production packet has `retain=false`, `dup=false`, `qos=1`, and no source timestamp while its E1 source keeps the default `timestampPolicy=source-required`
+- WHEN the extractor prepares the E1 input
+- THEN it is not labeled `receive-time-estimated`; only an explicitly audited source revision changing the policy to `allow-receive-time-estimate` can permit that quality
+- 證據：source policy、sourceRevision/audit、timestampQuality與E1 decision snapshot；確認packet或profile payload不能自行宣告放寬。
+
+### M1-R6-S06 — Trusted retained time survives the production path
+
+需求：M1-R6。層：isolated MQTT receiver＋shared extraction＋E1＋SQLite。
+- GIVEN an activated source receives retained 10000 kWh with a trustworthy source timestamp
+- WHEN the production receiver/extractor/E1 path accepts it and receives ten identical redeliveries including after restart
+- THEN one accepted observation retains the original source time, duplicates do not refresh freshness/baseline, and retain=true alone does not cause quarantine
+- 證據：receiver→extractor→E1 snapshot、accepted/duplicate結果與重啟前後SQLite/live/lastAcceptedAt對照；另送有不同可信較舊時間的late packet，驗證事件保存但live值不倒退，與無timestamp retained隔離案例作正反對照。
 
 ### M1-R7-S01 — Interleaved tag observations
 
@@ -182,7 +230,7 @@
 
 ## Required Test Boundaries
 
-先以隔離Broker測MQTT 3.1.1，若實作開啟5.0亦跑該版本；包含retained重送、SUBACK失敗、重連、相同Topic不同tag、錯序array、慢速/不發資料、capture退出與production不中断。shared extractor使用正反例，SQLite前後snapshot確認preview零寫入。API測越權、expired refs、schema/conflict、idempotency。UI測1366×768及1920×1080、鍵盤焦點、批次選取不因更新跳動、原任務返回與錯誤恢復。最終Q1以同一批真實測試流程對帳來源、期間用量、月圖與部門占比。
+先以隔離Broker測MQTT 3.1.1，若實作開啟5.0亦跑該版本；包含retained重送、重啟後無source timestamp的retained replay、無效source timestamp、未核准receive-time fallback、SUBACK失敗、重連、相同Topic不同tag、錯序array、慢速/不發資料、capture退出與production不中断。shared extractor與E1 boundary使用正反例，逐欄確認不可變retain/dup/qos/receivedAt/origin未遺失、catalog retained明確映射到sample.retain，sourceTimestamp/timestampQuality只由原始時間證據或reviewed timestamp path解析，並以`10000` retained舊值對`10100` accepted值檢查dedupe、負差、epoch、accepted write、live、baseline、freshness均未被觸發。另驗證`TRANSPORT_EVIDENCE_MISSING`、`RETAINED_SOURCE_TIME_UNKNOWN`、預設source-required、sourceRevision/audit核准的allow-receive-time-estimate，以及正式retain=false/dup=false/qos∈{0,1,2}缺timestamp的receive-time fallback邊界。SQLite前後snapshot確認origin=catalog/offline evidence不寫accepted history。API測越權、expired refs、schema/conflict、idempotency。UI測1366×768及1920×1080、鍵盤焦點、批次選取不因更新跳動、原任務返回與錯誤恢復。最終Q1以同一批真實測試流程對帳來源、期間用量、月圖與部門占比。
 
 ## Negative Completion Claims
 

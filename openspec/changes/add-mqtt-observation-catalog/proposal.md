@@ -9,7 +9,7 @@
 - runtime parse前的非阻塞catalog tap與有限候選queue，不改accepted history。
 - unique-ID只讀capture client、非shared訂閱、timeout/reconnect/stop清理。
 - 逐filter訂閱回覆與coverage/無流量/部分失敗狀態。
-- 保存retained/QoS/dup/source time與receive time，正確標示未知publisher。
+- 保存retained/dup/qos/receivedAt/sourceTimestamp/timestampQuality/origin證據，從接收封包經extractor完整傳到E1；retained且沒有可信source timestamp的資料只能作設定／診斷證據，不得刷新accepted history或freshness，並正確標示未知publisher。
 - 候選tag/欄位搜尋、sampleRefs與version/pagination，選取不隨stream跳動。
 - 實作payload/session/global budgets、rate/drop counters、auth/redaction。
 - 原地paste/import的有限JSON/scalar evidence與TTL過期提示。
@@ -34,12 +34,12 @@
 ## Dependencies and Delivery Boundary
 
 - 前置：無；可以先交付只讀探索。
-- 草案先行；相依契約及對應驗證完成後才進入相依實作。本地metadata非原生CLI已驗證產物。
+- 草案先行；相依契約及對應驗證完成後才進入相依實作。文件analyze/validate不代表相依實作、MQTT runtime或現場驗收。
 - 實作與驗證checkbox只在本change tasks維護。
 
 ## Success Criteria
 
-每個scenario須在test-plan對應層實測；不只demo正常路徑。未跑MQTT/SQLite/API/瀏覽器或人工任務不能宣稱已修好。來源已存、訂閱已生效、收到新資料與可計算期間是不同狀態。
+每個scenario須在test-plan對應層實測；不只demo正常路徑。未跑MQTT/SQLite/API/瀏覽器或人工任務不能宣稱已修好。來源已存、訂閱已生效、收到新資料與可計算期間是不同狀態；catalog與offline evidence永不直接寫入accepted history。重啟後重送沒有source timestamp的retained讀值，不能改變既有accepted讀值、製造counter discontinuity或刷新live/freshness/baseline。
 
 ## Impact
 
