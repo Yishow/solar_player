@@ -34,5 +34,6 @@ export * from "./metricScope.js";
 export * from "./meterReading.js";
 export * from "./mqttObservation.js";
 export * from "./siteEnergyProfile.js";
+export * from "./periodConsumption.js";
 export * from "./widgetDataBinding.js";
 export type { DisplayEditorDataBindingCapability } from "./displayEditorSchema.js";
