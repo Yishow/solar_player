@@ -9,12 +9,13 @@
 - [x] 1.1 **Fixtures** — 建立隔離CL/KN源資料與可注入clock，含年/月/日baseline、單位、gap、reset、duplicates及部門mapping。（Q1-R1 Q1-R3）
 - [x] 1.2 **Service/API** — 寫同一fixture穿過ingest→E2→E3的對帳測試，檢查values/quality/sample provenance。（Q1-R1）
 - [x] 1.3 **Consumers** — 對EnergyTrend/History、Overview及FactoryCircuit檢查同期間輸出，不僅比對DOM字串。（Q1-R1）
+
 - [ ] 1.4 **Journey J1** — 建立KN導引→選compatible metric→未儲存預覽→保存→檢查→發布瀏覽器測試與CL隔離斷言。（Q1-R2）
 - [ ] 1.5 **Journey J2** — 建立月圖zero/gap/unauthorized/refresh race與三尺寸可讀性測試。（Q1-R3 Q1-R4）
 - [x] 1.6 **Journey J3** — 建立部門50/30/20、缺分母、重複錶、隱藏卡片membership不變及period切換旅程。（Q1-R1 Q1-R3）
 - [ ] 1.7 **Journey J4** — 建立remote conflict、missing asset、離線/無ack的publish stage assertions。（Q1-R2 Q1-R3）
-- [x] 1.8 **Repair drill** — 在備份資料副本執行dry-run/activate/interrupted/rollback，前後raw sample checksum不變。（Q1-R5）
-- [x] 1.9 **Verification** — 執行repo targeted tests、browser journeys與pnpm verify，保存指令及實際輸出；fail交回owner change修。（Q1-R5）
+- [ ] 1.8 **Repair drill** — 在備份資料副本執行dry-run/activate/interrupted/rollback，前後raw sample checksum不變。（Q1-R5）
+- [ ] 1.9 **Verification** — 執行repo targeted tests、browser journeys與pnpm verify，保存指令及實際輸出；fail交回owner change修。（Q1-R5）
 - [ ] 1.10 **Witness** — 依repo FHD入口產生五頁fresh1920x1080 evidence bundles，另存management三尺寸/鍵盤gap notes。（Q1-R4）
 - [ ] 1.11 **Human acceptance** — 讓使用者驗收三項工作任務、用量口徑/分母與視覺差異，未驗收就保持pending。（Q1-R4）
 - [ ] 1.12 **Handoff** — 完成rollout/rollback runbook、source review與不可重建歷史清單；全部gate完成才archive，另取得commit確認。（Q1-R5）

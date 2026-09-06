@@ -5,7 +5,7 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import {
   compileSelector,
-  previewMapping,
+
   previewUnsavedBinding,
   type MeterSourceDefinition,
   type SiteEnergyProfileV1,
@@ -23,7 +23,7 @@ import {
   rollbackProjection,
   shadowProject
 } from "./consumptionProjectionService.js";
-import { applyGuidedMapping } from "./guidedMqttMappingService.js";
+import { applyGuidedMapping, previewGuidedMapping } from "./guidedMqttMappingService.js";
 
 function createDatabase() {
   const database = new Database(":memory:");
@@ -36,6 +36,7 @@ function createDatabase() {
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/040_meter_reading_contracts.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/041_site_energy_profiles.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/042_consumption_projections.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/043_energy_authoring_tokens.sql"), "utf8"));
   return database;
 }
 
@@ -105,7 +106,7 @@ test("Q1 CL+KN ingest→E2→E3→shares isolate 300/4300/8300 and 50/30/20", ()
     saveMeterSource(database, source);
   }
 
-  const preview = previewMapping({
+  const preview = previewGuidedMapping(database, {
     channelId: "kn-main",
     energyFlowRole: "consumption",
     measurementKind: "cumulative-energy",

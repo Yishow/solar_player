@@ -69,22 +69,27 @@ export function useDisplayPagePublishingState(
   );
   const publishingState = publishingStateByPage[pageId];
   const blockingCount = countBlockingFindings(publishingState?.validation);
+  const [preflight, setPreflight] = useState<{ expectedVersion: number; preflightToken: string } | null>(null);
 
   const refresh = async (refreshOptions: { force?: boolean; isActive?: () => boolean } = {}) => {
     if (!enabled && !refreshOptions.force) {
       return;
     }
 
-    const [validation, fallback] = await Promise.all([
-      validateDisplayPageDraft(pageId),
+    const [preflightResult, fallback] = await Promise.all([
+      validateDisplayPageDraft(pageId, { unsavedBindings }),
       getDisplayPageFallbackStatus(pageId)
     ]);
     if (refreshOptions.isActive && !refreshOptions.isActive()) {
       return;
     }
-    const merged = mergeEnergyAuthoringPreflight(validation, {
+    const merged = mergeEnergyAuthoringPreflight(preflightResult.validation, {
       energyProfileReady,
       unsavedBindings
+    });
+    setPreflight({
+      expectedVersion: preflightResult.expectedVersion,
+      preflightToken: preflightResult.preflightToken
     });
     setPublishingStateByPage((current) => ({ ...current, [pageId]: { fallback, validation: merged } }));
   };
@@ -105,13 +110,17 @@ export function useDisplayPagePublishingState(
     return () => {
       active = false;
     };
-  }, [draftUpdatedAt, enabled, pageId]);
+  }, [draftUpdatedAt, enabled, pageId, unsavedBindings]);
 
   const publish = async () => {
     setIsPublishing(true);
     setPublishingError("");
     try {
-      await publishDisplayPageDraft(pageId);
+      await publishDisplayPageDraft(pageId, undefined, {
+        expectedVersion: preflight?.expectedVersion,
+        preflightToken: preflight?.preflightToken,
+        unsavedBindings
+      });
       await reloadDraft();
       await refresh({ force: true });
     } catch (error) {

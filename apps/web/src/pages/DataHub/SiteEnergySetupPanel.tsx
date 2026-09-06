@@ -41,23 +41,26 @@ function MeterPicker({
   onChange
 }: {
   onChange: (ids: string[]) => void;
-  options: string[];
+  options: Array<{ channelId: string; label: string }>;
   selected: string[];
 }) {
-  const ids = options.length > 0 ? options : selected;
+  const ids = options.length > 0 ? options : selected.map((channelId) => ({ channelId, label: channelId }));
   return (
     <ul className="space-y-1" data-meter-picker>
-      {ids.map((id) => (
-        <li key={id}>
+      {ids.map((option) => (
+        <li key={option.channelId}>
           <label className="flex min-h-[40px] items-center gap-2 text-sm">
             <input
-              checked={selected.includes(id)}
+              checked={selected.includes(option.channelId)}
+              data-meter-channel={option.channelId}
               onChange={(event) => {
-                onChange(event.target.checked ? [...selected, id] : selected.filter((item) => item !== id));
+                onChange(event.target.checked
+                  ? [...selected, option.channelId]
+                  : selected.filter((item) => item !== option.channelId));
               }}
               type="checkbox"
             />
-            {id}
+            {option.label}
           </label>
         </li>
       ))}
@@ -70,34 +73,33 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
   const [draft, setDraft] = useState<SiteEnergyProfileV1>(() => emptyProfile(scope));
   const [message, setMessage] = useState("");
   const [expectedRevision, setExpectedRevision] = useState(0);
-  const [meters, setMeters] = useState<string[]>([]);
+  const [meters, setMeters] = useState<Array<{ channelId: string; label: string }>>([]);
   const [previewSummary, setPreviewSummary] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    void requestJson<{ profile: SiteEnergyProfileV1 | null }>(`/api/data-hub/sites/${scope}/energy-profile`)
+    void requestJson<{
+      meters?: Array<{ channelId: string; displayNameZh?: string | null; meterId: string }>;
+      profile: SiteEnergyProfileV1 | null;
+    }>(`/api/data-hub/sites/${scope}/energy-profile`)
       .then((payload) => {
-        if (cancelled || !payload.profile) {
+        if (cancelled) {
           return;
         }
-        setDraft(payload.profile);
-        setExpectedRevision(payload.profile.revision);
+        if (payload.profile) {
+          setDraft(payload.profile);
+          setExpectedRevision(payload.profile.revision);
+        }
+        setMeters((payload.meters ?? []).map((meter) => ({
+          channelId: meter.channelId,
+          label: meter.displayNameZh || meter.channelId
+        })));
       })
       .catch(() => {
         if (!cancelled) {
           setMessage("目前沒有已儲存的廠區用電設定，請從總進線開始。");
         }
       });
-    void requestJson<{ topics?: Array<{ metricKey: string; metricScope?: string }> }>("/api/settings/mqtt/topics")
-      .then((payload) => {
-        if (cancelled) {
-          return;
-        }
-        setMeters((payload.topics ?? [])
-          .filter((topic) => !topic.metricScope || topic.metricScope === scope)
-          .map((topic) => topic.metricKey));
-      })
-      .catch(() => undefined);
     return () => {
       cancelled = true;
     };

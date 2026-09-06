@@ -1,13 +1,25 @@
 import type Database from "better-sqlite3";
 import {
-  applyMapping,
   previewMapping,
   type MappingPreviewDraft
 } from "@solar-display/shared";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
 
-export function previewGuidedMapping(draft: MappingPreviewDraft) {
-  return previewMapping(draft);
+const TOKEN_TTL_MS = 10 * 60 * 1000;
+
+export function previewGuidedMapping(database: Database.Database, draft: MappingPreviewDraft) {
+  const preview = previewMapping(draft);
+  const now = new Date();
+  database.prepare(`
+    INSERT INTO mapping_preview_tokens (preview_token, canonical_draft_json, created_at, expires_at)
+    VALUES (?, ?, ?, ?)
+  `).run(
+    preview.previewToken,
+    JSON.stringify(preview.canonicalDraft),
+    now.toISOString(),
+    new Date(now.getTime() + TOKEN_TTL_MS).toISOString()
+  );
+  return preview;
 }
 
 export function persistAppliedSelector(
@@ -45,12 +57,16 @@ export function applyGuidedMapping(
     topic?: string;
   }
 ) {
-  const applied = applyMapping({
-    canonicalDraft: input.canonicalDraft,
-    idempotencyKey: input.idempotencyKey,
-    previewToken: input.previewToken
-  });
+  const stored = database.prepare(`
+    SELECT canonical_draft_json, expires_at FROM mapping_preview_tokens WHERE preview_token = ?
+  `).get(input.previewToken) as { canonical_draft_json: string; expires_at: string } | undefined;
+  if (!stored || stored.expires_at < new Date().toISOString()) {
+    throw Object.assign(new Error("PREVIEW_EXPIRED"), { code: "PREVIEW_EXPIRED" });
+  }
+  if (stored.canonical_draft_json !== JSON.stringify(input.canonicalDraft)) {
+    throw Object.assign(new Error("PREVIEW_DRAFT_MISMATCH"), { code: "PREVIEW_DRAFT_MISMATCH" });
+  }
   const saved = saveMeterSource(database, input.source);
   persistAppliedSelector(database, input.canonicalDraft, input.source.metricKey, input.topic);
-  return { applied: applied.applied, channelId: applied.channelId, source: saved };
+  return { applied: true, channelId: input.canonicalDraft.channelId, source: saved };
 }

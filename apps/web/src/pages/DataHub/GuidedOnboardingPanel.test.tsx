@@ -20,4 +20,6 @@ test("M2 three-stage mapping panel starts at select", () => {
   const html = renderToStaticMarkup(<GuidedMqttMappingPanel metricScope="kn" />);
   assert.match(html, /data-mapping-stage="select"/);
   assert.match(html, /從已接收資料選欄位/);
+  assert.match(html, /data-mapping-field="value"/);
+  assert.match(html, /tag=MAIN/);
 });

@@ -17,6 +17,7 @@ import {
   ManagementDraftSaveConflictError,
   readStageConfig,
   writeStageConfig,
+  issuePublishPreflight,
   publishDraft,
   rollbackToVersion,
   getPublishHistory,
@@ -358,27 +359,13 @@ const displayPagesRoute: FastifyPluginAsync = async (app) => {
 
   // --- Validate draft without publishing ---
 
-  app.post<{ Params: DisplayPageRouteParams }>("/api/display-pages/:pageId/validate", async (request, reply) => {
-    const pageId = assertDisplayPageId(request.params.pageId);
-    const draft = readStageConfig(pageId, "draft");
-    const { validateConfigDraft, checkImageReferences } = await import("../services/displayPagePublishingService.js");
-    const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
-    const imageWarnings = checkImageReferences(draft.regions);
-    if (imageWarnings.length > 0) validation.findings.push(...imageWarnings);
-    const assetFindings = collectDisplayPageAssetFindings(pageId, draft.regions);
-    if (assetFindings.length > 0) {
-      validation.findings.push(
-        ...assetFindings.map((finding) => ({
-          code: "ASSET_REFERENCE_MISSING",
-          message: finding.message,
-          regionId: finding.bindingId,
-          severity: "warning" as const
-        }))
-      );
+  app.post<{ Params: DisplayPageRouteParams; Body: { unsavedBindings?: boolean } }>(
+    "/api/display-pages/:pageId/validate",
+    async (request) => {
+      const pageId = assertDisplayPageId(request.params.pageId);
+      return issuePublishPreflight(pageId, request.body?.unsavedBindings === true);
     }
-
-    return { validation };
-  });
+  );
 
   // --- Rollback to previous version ---
 

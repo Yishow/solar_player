@@ -1,12 +1,36 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { compileSelector, type MappingPreviewDraft } from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 
 type Stage = "select" | "meaning" | "apply";
 
+type FieldCandidate = {
+  path: string;
+  preview: string;
+  tagEquals?: string;
+};
+
+function collectFields(value: unknown, prefix = ""): FieldCandidate[] {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const tag = typeof record.tag === "string" ? record.tag : undefined;
+    return Object.entries(record).flatMap(([key, nested]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (nested && typeof nested === "object") {
+        return collectFields(nested, path);
+      }
+      return [{ path, preview: String(nested), tagEquals: tag }];
+    });
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectFields(item, prefix));
+  }
+  return prefix ? [{ path: prefix, preview: String(value) }] : [];
+}
+
 export function GuidedMqttMappingPanel({
   metricScope,
-  payload
+  payload = { tag: "MAIN", value: "10000.125" }
 }: {
   metricScope: "cl" | "kn";
   payload?: unknown;
@@ -17,6 +41,7 @@ export function GuidedMqttMappingPanel({
   const [message, setMessage] = useState("");
   const [previewToken, setPreviewToken] = useState("");
   const [draft, setDraft] = useState<MappingPreviewDraft | null>(null);
+  const fields = useMemo(() => collectFields(payload), [payload]);
 
   const canonical = (): MappingPreviewDraft => ({
     channelId: `${metricScope}-main`,
@@ -32,15 +57,24 @@ export function GuidedMqttMappingPanel({
       <h3 className="text-base font-semibold">從已接收資料選欄位</h3>
       {stage === "select" ? (
         <>
-          <label className="block text-sm">
-            JSON 路徑
-            <input className="mgmt-input mt-1 min-h-[40px] w-full" onChange={(event) => setPath(event.target.value)} value={path} />
-          </label>
-          <label className="block text-sm">
-            tag 識別（可空）
-            <input className="mgmt-input mt-1 min-h-[40px] w-full" onChange={(event) => setTagEquals(event.target.value)} value={tagEquals} />
-          </label>
-          {payload ? <pre className="overflow-auto text-xs">{JSON.stringify(payload, null, 2)}</pre> : null}
+          <ul className="space-y-1">
+            {fields.map((field) => (
+              <li key={`${field.path}:${field.tagEquals ?? ""}`}>
+                <button
+                  className="mgmt-action min-h-[40px]"
+                  data-mapping-field={field.path}
+                  onClick={() => {
+                    setPath(field.path);
+                    setTagEquals(field.tagEquals ?? "");
+                  }}
+                  type="button"
+                >
+                  {field.path}{field.tagEquals ? ` tag=${field.tagEquals}` : ""} = {field.preview}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm">已選 {path}{tagEquals ? ` / ${tagEquals}` : ""}</p>
           <button className="mgmt-action primary min-h-[40px]" onClick={() => setStage("meaning")} type="button">下一步</button>
         </>
       ) : null}

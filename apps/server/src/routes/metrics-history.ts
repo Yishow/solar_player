@@ -119,7 +119,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
           const existing = summaries.find((summary) => summary.date === point.date);
           return {
             co2Total: existing?.co2Total ?? null,
-            consumptionTotal: point.valueKwh === null ? existing?.consumptionTotal ?? null : Number(point.valueKwh),
+            consumptionTotal: point.valueKwh === null ? null : Number(point.valueKwh),
             date: point.date,
             generationTotal: existing?.generationTotal ?? null,
             peakConsumption: existing?.peakConsumption ?? null,

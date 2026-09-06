@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { applyProfile, getActiveProfile, previewProfile } from "../services/siteEnergyProfileService.js";
 import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
+import { listMeterSources } from "../services/meterSourceCatalogService.js";
 import type { MappingPreviewDraft, SiteEnergyScope } from "@solar-display/shared";
 
 const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
@@ -13,7 +14,11 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
     if (scope !== "cl" && scope !== "kn") {
       return reply.code(422).send({ success: false, error: "INVALID_SCOPE", timestamp: new Date().toISOString() });
     }
-    return { profile: getActiveProfile(getDatabase(), scope as SiteEnergyScope) };
+    const database = getDatabase();
+    return {
+      meters: listMeterSources(database, scope as SiteEnergyScope),
+      profile: getActiveProfile(database, scope as SiteEnergyScope)
+    };
   });
 
   app.post("/api/data-hub/sites/:scope/energy-profile/preview", async (request, reply) => {
@@ -35,7 +40,7 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       return app.managementAccess.deny(reply);
     }
     try {
-      return previewGuidedMapping(request.body as MappingPreviewDraft);
+      return previewGuidedMapping(getDatabase(), request.body as MappingPreviewDraft);
     } catch (error) {
       const code = (error as { code?: string }).code ?? "MAPPING_PREVIEW_FAILED";
       return reply.code(422).send({ success: false, error: code, timestamp: new Date().toISOString() });

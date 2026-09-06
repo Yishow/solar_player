@@ -1016,17 +1016,49 @@ function collectEnergyAuthoringFindings(pageId: DisplayPageId, unsavedBindings =
   }));
 }
 
+function appendDraftAssetWarnings(
+  validation: ValidationResult,
+  pageId: DisplayPageId,
+  regions: Record<string, unknown>,
+  freeformObjects: DisplayPageFreeformObject[]
+) {
+  const imageWarnings = checkImageReferences(regions);
+  if (imageWarnings.length > 0) {
+    validation.findings.push(...imageWarnings);
+  }
+  const assetWarnings = collectDisplayPageAssetFindings(pageId, regions, freeformObjects).map((finding) => ({
+    code: "ASSET_REFERENCE_MISSING",
+    message: finding.message,
+    regionId: finding.bindingId,
+    severity: "warning" as const
+  }));
+  if (assetWarnings.length > 0) {
+    validation.findings.push(...assetWarnings);
+  }
+}
+
 function issuePublishPreflight(pageId: DisplayPageId, unsavedBindings = false) {
   const draft = readStageConfig(pageId, "draft");
   const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
   validation.findings.push(...collectEnergyAuthoringFindings(pageId, unsavedBindings));
+  appendDraftAssetWarnings(validation, pageId, draft.regions, draft.freeformObjects ?? []);
   validation.canPublish = !validation.findings.some((finding) => finding.severity === "blocking");
   const preflightToken = `u5-${pageId}-${draft.version}-${Date.now()}`;
+  const now = new Date();
+  const expiresAt = now.getTime() + 10 * 60 * 1000;
   preflightTokens.set(preflightToken, {
-    expiresAt: Date.now() + 10 * 60 * 1000,
+    expiresAt,
     pageId,
     version: draft.version
   });
+  try {
+    getDatabase().prepare(`
+      INSERT INTO publish_preflight_tokens (preflight_token, page_id, version, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(preflightToken, pageId, draft.version, now.toISOString(), new Date(expiresAt).toISOString());
+  } catch {
+    // Token table is required in migrated databases; in-memory map remains a process cache.
+  }
   return { expectedVersion: draft.version, preflightToken, validation };
 }
 
@@ -1058,8 +1090,25 @@ function publishDraft(
       severity: "blocking"
     });
   }
+  const requiresPreflightToken = ENERGY_PUBLISH_PAGES.has(pageId);
+  if (requiresPreflightToken && !options.preflightToken) {
+    validation.findings.push({
+      code: "PREFLIGHT_TOKEN_REQUIRED",
+      message: "請先檢查草稿再發布。",
+      severity: "blocking"
+    });
+  }
   if (options.preflightToken) {
-    const stored = preflightTokens.get(options.preflightToken);
+    const memory = preflightTokens.get(options.preflightToken);
+    let stored = memory;
+    if (!stored) {
+      const row = getDatabase().prepare(`
+        SELECT page_id, version, expires_at FROM publish_preflight_tokens WHERE preflight_token = ?
+      `).get(options.preflightToken) as { expires_at: string; page_id: string; version: number } | undefined;
+      if (row) {
+        stored = { expiresAt: Date.parse(row.expires_at), pageId: row.page_id, version: row.version };
+      }
+    }
     if (!stored || stored.pageId !== pageId || stored.version !== draft.version || stored.expiresAt < Date.now()) {
       validation.findings.push({
         code: "PREFLIGHT_TOKEN_INVALID",
@@ -1074,23 +1123,7 @@ function publishDraft(
     return { live: readStageConfig(pageId, "live"), validation };
   }
 
-  const imageWarnings = checkImageReferences(draft.regions);
-  if (imageWarnings.length > 0) {
-    validation.findings.push(...imageWarnings);
-  }
-  const assetWarnings = collectDisplayPageAssetFindings(
-    pageId,
-    draft.regions,
-    draft.freeformObjects ?? []
-  ).map((finding) => ({
-    code: "ASSET_REFERENCE_MISSING",
-    message: finding.message,
-    regionId: finding.bindingId,
-    severity: "warning" as const
-  }));
-  if (assetWarnings.length > 0) {
-    validation.findings.push(...assetWarnings);
-  }
+  appendDraftAssetWarnings(validation, pageId, draft.regions, draft.freeformObjects ?? []);
 
   const newVersion = readNextLiveVersion(pageId);
   const now = new Date().toISOString();

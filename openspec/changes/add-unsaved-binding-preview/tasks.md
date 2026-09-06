@@ -17,7 +17,7 @@
 - [x] 1.9 **Handoff** — 承接U2 source identity，列相容page/items；選取只寫draft，取消返回DataHub完整context。（U4-R6）
 - [x] 1.10 **Presentation** — 加入unsaved/saved/formal stage標記，missing/estimated/stale/sample-only不誤報ready。（U4-R7）
 - [x] 1.11 **Verification** — 跑ephemeralDisplayPreviewService、ephemeralPreviewState與dataInspector/route tests及pnpm verify。（U4-R1 U4-R2 U4-R3 U4-R4 U4-R5 U4-R6 U4-R7）
-- [x] 1.12 **Integration** — 實跑接KN累積資料→選period metric→選卡片→未儲存預覽→返回/保存；記錄DB無非預期寫入。（U4-R1 U4-R5 U4-R6 U4-R7）
+- [ ] 1.12 **Integration** — 實跑接KN累積資料→選period metric→選卡片→未儲存預覽→返回/保存；記錄DB無非預期寫入。（U4-R1 U4-R5 U4-R6 U4-R7）
 
 ## 2. V2 Site-Setup Integration
 

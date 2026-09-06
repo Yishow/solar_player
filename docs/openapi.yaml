@@ -496,6 +496,15 @@ paths:
       x-solar-access-class: trusted-management-mutation
       parameters:
         - $ref: "#/components/parameters/PageId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                unsavedBindings:
+                  type: boolean
       responses:
         "200":
           description: Validation result for the current draft
@@ -537,8 +546,14 @@ paths:
             schema:
               type: object
               properties:
+                expectedVersion:
+                  type: integer
+                preflightToken:
+                  type: string
                 publishedBy:
                   type: string
+                unsavedBindings:
+                  type: boolean
       responses:
         "200":
           description: Published live config with validation
@@ -1018,8 +1033,12 @@ components:
 
     DisplayPageValidateResponse:
       type: object
-      required: [validation]
+      required: [expectedVersion, preflightToken, validation]
       properties:
+        expectedVersion:
+          type: integer
+        preflightToken:
+          type: string
         validation:
           type: object
           additionalProperties: true

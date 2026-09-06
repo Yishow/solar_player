@@ -49,6 +49,28 @@ after(() => {
   rmSync(tempDir, { force: true, recursive: true });
 });
 
+async function publishPage(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  pageId: string,
+  payload: Record<string, unknown> = {}
+) {
+  const preflight = await app.inject({
+    method: "POST",
+    url: `/api/display-pages/${pageId}/validate`,
+    payload: { unsavedBindings: false }
+  });
+  const body = preflight.json() as { expectedVersion?: number; preflightToken?: string };
+  return app.inject({
+    method: "POST",
+    payload: {
+      ...payload,
+      expectedVersion: body.expectedVersion,
+      preflightToken: body.preflightToken
+    },
+    url: `/api/display-pages/${pageId}/publish`
+  });
+}
+
 async function saveDraftConfig(
   app: Awaited<ReturnType<typeof buildApp>>,
   pageId: string,
@@ -502,11 +524,7 @@ test("overview publish blocks when the energy profile is missing", async () => {
   const app = await buildApp();
   try {
     await saveDraftConfig(app, "overview", { heroCopyLayout: { left: 120 } });
-    const publishRes = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish",
-      payload: { publishedBy: "test-operator", unsavedBindings: false }
-    });
+    const publishRes = await publishPage(app, "overview", { publishedBy: "test-operator", unsavedBindings: false });
     assert.equal(publishRes.statusCode, 422);
     const body = publishRes.json() as { validation: { findings: Array<{ code: string }> } };
     assert.equal(body.validation.findings.some((finding) => finding.code === "ENERGY_PROFILE_INCOMPLETE"), true);
@@ -521,11 +539,7 @@ test("POST /api/display-pages/:pageId/publish promotes draft to live", async () 
   try {
     await saveDraftConfig(app, "overview", { heroCopyLayout: { left: 120 } });
 
-    const publishRes = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish",
-      payload: { publishedBy: "test-operator" }
-    });
+    const publishRes = await publishPage(app, "overview", { publishedBy: "test-operator" });
 
     assert.equal(publishRes.statusCode, 200);
     const publishBody = publishRes.json() as { config: { version: number; stage?: string; publishedBy?: string | null }; validation: { canPublish: boolean } };
@@ -586,11 +600,7 @@ test("metric binding edits participate in draft diff and publish lifecycle", asy
       true
     );
 
-    const publishResponse = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish",
-      payload: { publishedBy: "test-operator" }
-    });
+    const publishResponse = await publishPage(app, "overview", { publishedBy: "test-operator" });
     assert.equal(publishResponse.statusCode, 200);
 
     const liveAfterPublish = await app.inject({
@@ -737,11 +747,7 @@ test("display page freeform objects roundtrip from draft publish into the live c
     const draftBody = draftSave.json() as { config: { freeformObjects: typeof freeformObjects } };
     assert.deepEqual(draftBody.config.freeformObjects, freeformObjects);
 
-    const publishResponse = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish",
-      payload: {}
-    });
+    const publishResponse = await publishPage(app, "overview");
 
     assert.equal(publishResponse.statusCode, 200);
 
@@ -784,11 +790,7 @@ test("POST publish rejects malformed icon-asset freeform objects before they rea
 
     assert.equal(draftSave.statusCode, 200);
 
-    const publishResponse = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish",
-      payload: {}
-    });
+    const publishResponse = await publishPage(app, "overview");
 
     assert.equal(publishResponse.statusCode, 422);
     const publishBody = publishResponse.json() as { validation: { canPublish: boolean; findings: Array<{ code: string; regionId?: string }> } };
@@ -1016,10 +1018,7 @@ test("POST publish with out-of-bounds geometry is rejected", async () => {
       heroRegion: { left: 1800, top: 0, width: 200, height: 100 }
     });
 
-    const publishRes = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/overview/publish"
-    });
+    const publishRes = await publishPage(app, "overview");
 
     assert.equal(publishRes.statusCode, 422);
     const body = publishRes.json() as { success: false; validation: { canPublish: boolean; findings: Array<{ code: string; severity: string }> } };
@@ -1166,10 +1165,7 @@ test("POST publish with invalid FHD rhythm values is rejected", async () => {
       }
     });
 
-    const publishRes = await app.inject({
-      method: "POST",
-      url: "/api/display-pages/factory-circuit/publish"
-    });
+    const publishRes = await publishPage(app, "factory-circuit");
 
     assert.equal(publishRes.statusCode, 422);
     const body = publishRes.json() as {

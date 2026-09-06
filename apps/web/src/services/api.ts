@@ -719,13 +719,19 @@ export async function updateDisplayPageConfig(
   return response.config;
 }
 
-export async function validateDisplayPageDraft(pageId: DisplayPageId) {
+export async function validateDisplayPageDraft(
+  pageId: DisplayPageId,
+  options: { unsavedBindings?: boolean } = {}
+) {
   const response = await requestJson<{
+    expectedVersion: number;
+    preflightToken: string;
     validation: ValidationResult;
   }>(`/api/display-pages/${pageId}/validate`, {
+    body: JSON.stringify({ unsavedBindings: options.unsavedBindings === true }),
     method: "POST"
   });
-  return response.validation;
+  return response;
 }
 
 export async function publishDisplayPageDraft(

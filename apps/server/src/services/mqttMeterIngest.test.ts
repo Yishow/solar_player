@@ -3,16 +3,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
-import { compileSelector, previewMapping, type MeterSourceDefinition } from "@solar-display/shared";
+import { compileSelector, type MeterSourceDefinition } from "@solar-display/shared";
 import { countAcceptedReadings } from "./meterReadingService.js";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
 import { ingestMappedMeterReading } from "./mqttMeterIngest.js";
-import { applyGuidedMapping } from "./guidedMqttMappingService.js";
+import { applyGuidedMapping, previewGuidedMapping } from "./guidedMqttMappingService.js";
 
 function createDatabase() {
   const database = new Database(":memory:");
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/001_init.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/040_meter_reading_contracts.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/043_energy_authoring_tokens.sql"), "utf8"));
   return database;
 }
 
@@ -64,7 +65,9 @@ test("M2 apply persists selector then tagged MAIN ingest updates only that meter
     selector: compileSelector("value", "MAIN"),
     timestampPolicy: "source-required" as const
   };
-  const preview = previewMapping(draft);
+  const preview = previewGuidedMapping(database, draft);
+  const storedToken = database.prepare("SELECT canonical_draft_json FROM mapping_preview_tokens WHERE preview_token = ?").get(preview.previewToken) as { canonical_draft_json: string };
+  assert.equal(JSON.parse(storedToken.canonical_draft_json).channelId, "kn-main");
   applyGuidedMapping(database, {
     canonicalDraft: draft,
     idempotencyKey: "m2-tag",

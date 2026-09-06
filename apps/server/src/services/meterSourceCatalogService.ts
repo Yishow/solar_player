@@ -10,6 +10,27 @@ type TopicMappingRow = {
   unit: string | null;
 };
 
+export function listMeterSources(database: Database.Database, scope: "cl" | "kn") {
+  return (database.prepare(`
+    SELECT channel_id, meter_id, metric_key, display_name_zh, display_name_en
+    FROM meter_sources
+    WHERE metric_scope = ? AND enabled = 1
+    ORDER BY channel_id
+  `).all(scope) as Array<{
+    channel_id: string;
+    display_name_en: string | null;
+    display_name_zh: string | null;
+    meter_id: string;
+    metric_key: string;
+  }>).map((row) => ({
+    channelId: row.channel_id,
+    displayNameEn: row.display_name_en,
+    displayNameZh: row.display_name_zh,
+    meterId: row.meter_id,
+    metricKey: row.metric_key
+  }));
+}
+
 export function inventoryTopicMappings(database: Database.Database) {
   const rows = database.prepare(`
     SELECT metric_key, unit FROM topic_mappings
