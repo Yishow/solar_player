@@ -19,6 +19,7 @@ export type EnergyTrendSnapshot = {
 type BuildEnergyTrendViewModelArgs = {
   liveSnapshot: LiveMetricsSnapshot;
   now?: Date | string | null;
+  periodSummary?: { quality: string; valueKwh: string | null };
   range: EnergyTrendRange;
   snapshots: EnergyTrendSnapshot[];
 };
@@ -50,6 +51,7 @@ type EnergyTrendChartPoint = { label: string; value: number | null };
 export function buildEnergyTrendViewModel({
   liveSnapshot,
   now,
+  periodSummary,
   range,
   snapshots
 }: BuildEnergyTrendViewModelArgs) {
@@ -63,7 +65,6 @@ export function buildEnergyTrendViewModel({
   const co2Points: EnergyTrendChartPoint[] = [];
   let generationSum = 0;
   let generationCount = 0;
-  let consumptionSum = 0;
   let consumptionCount = 0;
   let ratioSum = 0;
   let ratioCount = 0;
@@ -79,8 +80,7 @@ export function buildEnergyTrendViewModel({
       generationSum += snapshot.generation;
       generationCount += 1;
     }
-    if (snapshot.consumption !== null) {
-      consumptionSum += snapshot.consumption;
+    if (snapshot.consumption !== null && periodSummary) {
       consumptionCount += 1;
     }
     if (snapshot.ratio !== null) {
@@ -104,12 +104,14 @@ export function buildEnergyTrendViewModel({
     }
   }
   const generationAggregate = generationCount === 0 ? null : generationSum;
-  const consumptionAggregate = consumptionCount === 0 ? null : consumptionSum;
+  const consumptionAggregate = periodSummary
+    ? (periodSummary.valueKwh === null ? null : Number(periodSummary.valueKwh))
+    : null;
   const ratioAggregate = ratioCount === 0 ? null : ratioSum / ratioCount;
   const co2Aggregate = co2Count === 0 ? null : co2Sum;
 
   const liveGenerationTotal = readLiveMetric(liveSnapshot, "todayGeneration");
-  const liveConsumptionTotal = readLiveMetric(liveSnapshot, "consumptionEnergy");
+  const liveConsumptionTotal = periodSummary?.valueKwh === null ? null : periodSummary ? Number(periodSummary.valueKwh) : null;
   const liveRatioValue = readLiveMetric(liveSnapshot, "selfConsumptionRatio");
   const liveCo2Value = readLiveMetric(liveSnapshot, "todayCo2Reduction");
   const livePowerValue = readLiveMetric(liveSnapshot, "realTimePower");

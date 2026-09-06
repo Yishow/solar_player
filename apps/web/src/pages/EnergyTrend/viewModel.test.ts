@@ -73,6 +73,7 @@ test("buildEnergyTrendViewModel maps five prototype chart cards from live and hi
   const model = buildEnergyTrendViewModel({
     liveSnapshot,
     now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "4300" },
     range: "day",
     snapshots: historySnapshots
   });
@@ -85,7 +86,7 @@ test("buildEnergyTrendViewModel maps five prototype chart cards from live and hi
   assert.equal(model.cards[0]?.valueLabel, "1,280");
   assert.equal(model.cards[0]?.unitLabel, "kW");
   assert.equal(model.cards[1]?.valueLabel, "8,450");
-  assert.equal(model.cards[2]?.valueLabel, "12,680");
+  assert.equal(model.cards[2]?.valueLabel, "4,300");
   assert.equal(model.cards[3]?.valueLabel, "32");
   assert.equal(model.cards[4]?.valueLabel, "4.21");
   assert.equal(model.cards[4]?.unitLabel, "t");
@@ -94,6 +95,29 @@ test("buildEnergyTrendViewModel maps five prototype chart cards from live and hi
   assert.equal(model.monitoringState.category, "fresh");
   assert.equal(model.monitoringState.freshnessLabel, "即時資料");
   assert.equal(model.monitoringState.sourceRoleLabel, "MQTT Live + History Snapshot");
+});
+
+test("E3-R1 consumption card uses period 4300 instead of live register 100000", () => {
+  const model = buildEnergyTrendViewModel({
+    liveSnapshot: {
+      ...liveSnapshot,
+      metrics: {
+        ...liveSnapshot.metrics,
+        consumptionEnergy: {
+          quality: "good",
+          timestamp: "2026-05-13T10:00:00.000Z",
+          unit: "kWh",
+          value: 100000
+        }
+      }
+    },
+    now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "4300" },
+    range: "month",
+    snapshots: historySnapshots
+  });
+  assert.equal(model.cards[2]?.valueLabel, "4,300");
+  assert.notEqual(model.cards[2]?.valueLabel, "100,000");
 });
 
 test("buildEnergyTrendViewModel keeps fallback copy when snapshots are empty", () => {
@@ -120,6 +144,7 @@ test("buildEnergyTrendViewModel labels stale cumulative fallback telemetry expli
   const model = buildEnergyTrendViewModel({
     liveSnapshot,
     now: "2026-05-13T10:20:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "4300" },
     range: "day",
     snapshots: historySnapshots
   });
