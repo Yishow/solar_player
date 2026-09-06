@@ -10,6 +10,7 @@
 |---|---|---|---|
 | E6-R1 | E6-R1-S01 — Independent choices | shared＋service/API＋UI journey | CL profile revision, membership and displayed totals are unchanged |
 | E6-R1 | E6-R1-S02 — Filter is not ownership | shared＋service/API＋UI journey | a concrete site is selected before any mapping can be applied |
+| E6-R1 | E6-R1-S03 — Accounting reassignment preserves source state | shared＋service/API＋SQLite | moving a channel between department and siteTotal creates only an E6 profile revision; E1 source revision, epoch, accepted observations and baseline remain unchanged |
 | E6-R2 | E6-R2-S01 — Two parallel main meters | shared＋service/API＋UI journey | site total is 1000 kWh and original register magnitudes are not added as period consumption |
 | E6-R2 | E6-R2-S02 — No main meter | shared＋service/API＋UI journey | department shares can be configured while overview whole-site consumption stays unavailable with a configure-source action |
 | E6-R3 | E6-R3-S01 — Department has two meters | shared＋service/API＋UI journey | stamping consumption is 300 kWh with traceable members |
@@ -29,12 +30,15 @@
 | E6-R8 | E6-R8-S02 — Custom page is not silently overwritten | shared＋service/API＋UI journey | impact preview identifies the exception and offers an explicit separate migration action rather than rewriting the page |
 | E6-R9 | E6-R9-S01 — Only one sample | shared＋service/API＋UI journey | the source can be configured but day/month/year readiness states honestly show missing baselines, not zero consumption |
 | E6-R9 | E6-R9-S02 — Denominator missing | shared＋service/API＋UI journey | the denominator control is identified as needing selection; applying the incomplete structure is blocked |
+| E6-R11 | E6-R11-S01 — UTC source reaches Asia/Taipei month boundary | ingestion fixture＋shared＋service/API＋SQLite | E1 normalized `2026-08-31T16:00:00Z` is resolved at the Asia/Taipei September boundary |
+| E6-R11 | E6-R11-S02 — Calendar override or unknown profile revision is rejected | service/API | timezone/start/end override and unknown profile revision return stable errors with no result or persistence |
+| E6-R11 | E6-R11-S03 — Time zone change creates a revision | service/API＋SQLite | changing siteTimeZone creates a new profile revision, keeps closed history on the old revision, labels open periods crossing the timezone change as partial/segmented or unavailable, and leaves source revision/epoch/baseline unchanged |
 
 ## Execution and Evidence
 
-使用同一份隔離 CL/KN 電錶fixture，由真實 ingestion、profile resolver、preview、apply、history/story、editor/runtime 路徑驗證；不可只將預算數字直接塞入元件。
+使用同一份隔離 CL/KN 電錶fixture，由真實 ingestion、profile resolver、preview、apply、history/story、editor/runtime 路徑驗證；不可只將預算數字直接塞入元件。fixture 必須同時帶 E1 source revision/epoch/baseline、E6 profile revision/siteTimeZone 與 normalized source instant，確認 accounting 重選不會重設來源狀態。
 
-用可注入時鐘測試來源更新、過期、邊界與設定版本；保存實際命令、exit code、fixture ID、被驗證commit、畫面證據與未解問題。文件內所有使用者測試與程式測試均 pending。
+用可注入時鐘測試來源更新、過期、UTC source／Asia/Taipei profile 邊界、timezone/start/end override、unknown profile revision 與設定版本；保存實際命令、exit code、fixture ID、被驗證commit、畫面證據與未解問題。文件內所有使用者測試與程式測試均 pending。
 
 UI驗收包含1366×768、1440×900、1920×1080、鍵盤、後退保留狀態、變更衝突、未知影響、禁止讀手冊後才測試。相關測試與pnpm verify完成後依repo workflow作人工驗收，不提前archive。
 

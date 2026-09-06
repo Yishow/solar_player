@@ -3,7 +3,7 @@
 ### Requirement: Each concrete site owns one authoritative accounting profile
 <!-- requirement-id: E6-R1 -->
 
-The system SHALL persist one independently versioned accounting profile per concrete site. CL and KN SHALL NOT share source selections by default. Profiles SHALL distinguish site total sources, department source sets and share comparison basis from page presentation. A global or all-sites filter SHALL NOT become an editable physical site.
+The system SHALL persist one independently versioned accounting profile per concrete site. CL and KN SHALL NOT share source selections by default. Profiles SHALL distinguish site total sources, department source sets, share comparison basis and calendar authority from page presentation. E1 source definitions SHALL contribute physical identity, measurement semantics and `energyFlowRole` only; they SHALL NOT persist `site-main|department` ownership or `departmentId`. A global or all-sites filter SHALL NOT become an editable physical site.
 
 #### Scenario: Independent choices
 <!-- scenario-id: E6-R1-S01 -->
@@ -19,10 +19,17 @@ The system SHALL persist one independently versioned accounting profile per conc
 - **WHEN** an operator starts site energy setup
 - **THEN** a concrete site is selected before any mapping can be applied
 
+#### Scenario: Accounting reassignment preserves source state
+<!-- scenario-id: E6-R1-S03 -->
+
+- **GIVEN** a physical channel has an E1 source revision, accepted observations and a persisted baseline while an E6 profile assigns it to a department
+- **WHEN** a new E6 profile revision assigns the same channel to site total
+- **THEN** only the E6 profile membership and revision change; the E1 source revision, epoch, accepted observations and baseline remain unchanged
+
 ### Requirement: Site total sources are selected separately from share denominators
 <!-- requirement-id: E6-R2 -->
 
-The profile SHALL store siteTotal as unconfigured or an explicit non-overlapping meter-channel set with a reviewed measurement boundary. Main meters can be one or multiple parallel incoming supplies. Overview day/month/year and monthly consumption SHALL resolve this siteTotal, never silently substitute the share denominator. Missing siteTotal MAY coexist with a configured managed-department share view, with site totals unavailable.
+The profile SHALL store siteTotal as unconfigured or an explicit non-overlapping meter-channel set with a reviewed measurement boundary. Main meters can be one or multiple parallel incoming supplies. Overview day/month/year and monthly consumption SHALL resolve this siteTotal, never silently substitute the share denominator. The profile SHALL permit a configured managed-department share view while siteTotal is missing, with site totals unavailable.
 
 #### Scenario: Two parallel main meters
 <!-- scenario-id: E6-R2-S01 -->
@@ -79,7 +86,7 @@ A profile SHALL select site-main (the siteTotal reference), department-sum (expl
 ### Requirement: Validation prevents incompatible units and overlap without forbidding legitimate hierarchy
 <!-- requirement-id: E6-R5 -->
 
-The server SHALL validate concrete site, reviewed energy measurement kind, normalized units and accounting boundaries. It SHALL reject duplicate physical channels or known parent-child overlap within the same additive set and across disjoint department sets. A main denominator covering a child numerator is legitimate and SHALL NOT be rejected simply because of ancestry. Unknown topology SHALL require an explicit operator review instead of pretending names prove disjointness. Grid-import, export, generation and plant-load boundaries SHALL not be equated by label alone.
+The server SHALL validate concrete site, reviewed energy measurement kind, normalized units, `energyFlowRole` and accounting boundaries. It SHALL reject duplicate physical channels or known parent-child overlap within the same additive set and across disjoint department sets. A main denominator covering a child numerator is legitimate and SHALL NOT be rejected simply because of ancestry. Unknown topology SHALL require an explicit operator review instead of pretending names prove disjointness. Grid-import, export, generation and plant-load boundaries SHALL not be equated by label alone or by the E1 source display name.
 
 #### Scenario: Parent denominator and child numerator
 <!-- scenario-id: E6-R5-S01 -->
@@ -138,7 +145,7 @@ Authorized management APIs SHALL accept an expected profile revision and a draft
 ### Requirement: Effective-dated profile changes preserve historical meaning
 <!-- requirement-id: E6-R7 -->
 
-Activation SHALL default to prospective effect and retain prior profile revisions and their effective intervals. Previously computed closed periods SHALL remain attributed to their original revisions. A period spanning materially changed membership SHALL be unavailable or explicitly partial/segmented until an authorized history policy resolves it; the UI SHALL NOT join unlike denominators into an unlabeled full-period percentage. Historical remapping/recomputation requires a separate bounded dry-run and confirmation. Rollback SHALL append a new activation, not erase audit history.
+Activation SHALL default to prospective effect and retain prior profile revisions and their effective intervals. Previously computed closed periods SHALL remain attributed to their original revisions. A period spanning materially changed membership or siteTimeZone SHALL be unavailable or explicitly partial/segmented until an authorized history policy resolves it; the UI SHALL NOT join unlike denominators into an unlabeled full-period percentage. Historical remapping/recomputation requires a separate bounded dry-run and confirmation. Rollback SHALL append a new activation, not erase audit history.
 
 #### Scenario: Change meter in midmonth
 <!-- scenario-id: E6-R7-S01 -->
@@ -157,7 +164,7 @@ Activation SHALL default to prospective effect and retain prior profile revision
 ### Requirement: Consumers share accounting configuration without duplicating it in page drafts
 <!-- requirement-id: E6-R8 -->
 
-Site-based consumption and share consumers SHALL reference the profile by concrete or device-inherited site and stable department identity. Presentation period and appearance MAY remain page settings; raw total/numerator/denominator selections SHALL NOT be copied into a second editor-owned definition. Profile apply SHALL show all known current consumers and distinguish existing profile-following consumers from legacy/custom bindings that need explicit migration. Unknown consumer resolution SHALL NOT be represented as zero impact.
+Site-based consumption and share consumers SHALL reference the profile by concrete or device-inherited site and stable department identity. The system SHALL allow presentation period and appearance to remain page settings; raw total/numerator/denominator selections SHALL NOT be copied into a second editor-owned definition. Profile apply SHALL show all known current consumers and distinguish existing profile-following consumers from legacy/custom bindings that need explicit migration. Unknown consumer resolution SHALL NOT be represented as zero impact.
 
 #### Scenario: One correction reaches all followers
 <!-- scenario-id: E6-R8-S01 -->
@@ -176,7 +183,7 @@ Site-based consumption and share consumers SHALL reference the profile by concre
 ### Requirement: Valid configuration and sufficient data are separate states
 <!-- requirement-id: E6-R9 -->
 
-A profile MAY be saved or explicitly activated with structurally valid sources but missing historical boundaries, exposing configured-waiting-for-data separately from fully ready. Invalid meter kind, conflicting membership or absent required structural choices SHALL block activation but allow a clearly marked resumable draft. The server SHALL provide actionable named diagnostics and finite nullable values, never manufacture period baselines or percentages.
+A structurally valid profile SHALL be saveable or explicitly activatable with missing historical boundaries, exposing configured-waiting-for-data separately from fully ready. Invalid meter kind, conflicting membership or absent required structural choices SHALL block activation but allow a clearly marked resumable draft. The server SHALL provide actionable named diagnostics and finite nullable values, never manufacture period baselines or percentages.
 
 #### Scenario: Only one sample
 <!-- scenario-id: E6-R9-S01 -->
@@ -210,3 +217,29 @@ The site profile SHALL accept reviewed stable source references from M2, never r
 - **GIVEN** a candidate is named MAIN by its publisher
 - **WHEN** it appears in M1
 - **THEN** the profile does not automatically adopt it as site total or share denominator
+
+### Requirement: Profile site time zone is the calendar authority
+<!-- requirement-id: E6-R11 -->
+
+The E6 profile revision selected and verified by the server SHALL persist one valid IANA `siteTimeZone` and SHALL be the sole authority for day, month and year calendar boundaries. E1 `sourceTimestampTimeZone` SHALL be used only by E1 to parse a source timestamp without an offset; E2 SHALL consume the resulting normalized UTC instant. A source time zone different from `siteTimeZone` SHALL remain valid after normalization. A server-validated profile draft SHALL be allowed to propose a new `siteTimeZone` within a review context bound to the expected persisted revision; unbound period callers SHALL NOT override the profile time zone or provide arbitrary start/end boundaries. Changing `siteTimeZone` SHALL create a new profile revision; closed history SHALL retain its original profile revision and SHALL NOT be silently recalculated.
+
+#### Scenario: UTC source reaches the Asia/Taipei month boundary
+<!-- scenario-id: E6-R11-S01 -->
+
+- **GIVEN** E1 parses `2026-08-31 16:00:00` with `sourceTimestampTimeZone=UTC` and stores normalized instant `2026-08-31T16:00:00Z`, while the selected and server-verified profile revision has `siteTimeZone=Asia/Taipei`
+- **WHEN** the September 2026 period is resolved
+- **THEN** the profile month starts at `2026-08-31T16:00:00Z`, and the resolver uses that profile boundary without reparsing the source timestamp with the host time zone
+
+#### Scenario: Calendar override or unknown profile revision is rejected
+<!-- scenario-id: E6-R11-S02 -->
+
+- **GIVEN** a resolver request contains an unbound `timeZone`, `start` or `end` override, or names a profile revision that does not exist for the concrete site
+- **WHEN** the request is validated
+- **THEN** the server returns a stable override or profile-revision error and does not calculate or persist a result
+
+#### Scenario: Time zone change creates a revision
+<!-- scenario-id: E6-R11-S03 -->
+
+- **GIVEN** a site has a closed period under profile revision 7 with `siteTimeZone=Asia/Taipei`
+- **WHEN** an operator changes the site time zone to another valid IANA zone and applies the profile
+- **THEN** profile revision 8 owns future calculations, closed history remains attributed to revision 7, open periods crossing the timezone change are partial/segmented or unavailable, and no source revision, epoch or baseline is reset
