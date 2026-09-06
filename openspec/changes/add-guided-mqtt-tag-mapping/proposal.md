@@ -8,11 +8,11 @@
 - 定義typed message/record equality、tokenized paths與stable source fingerprint。
 - 實作scalar/object/tag packet/tag array同production engine及lossless counter取值。
 - 可點選欄位與tag rows、自動編譯selector、中文名稱/目標選擇器。
-- 累積/區間/功率與單位倍率確認、baseline狀態，阻擋CT/PT重複套用。
+- 累積/區間/功率、energyFlowRole、單位倍率與timestampPolicy確認、baseline狀態；僅在offset-free source timestamp需要時選sourceTimestampTimeZone，阻擋CT/PT重複套用。
 - 帶證據的建議、批次套用已確認格式、既有對應重用及不相容列修正。
-- versioned唯讀preview共用engine，正反例與零publish/零live-history寫入。
-- 原子設定transaction、idempotency、version conflict、pending runtime subscription reconcile。
-- 嵌入U6與E6 draft/atomic final apply、返回原欄位，standalone不自動選分母。
+- versioned唯讀preview共用engine，回傳由server保存的opaque previewToken，將canonical draft、選定列、版本與review evidence snapshot綁在一起，正反例與零publish/零live-history寫入。
+- apply必須帶previewToken、相同canonical draft與idempotency key；server計算request hash，處理token/revision conflict、same-key changed payload及lost-response retry，並以atomic transaction與pending runtime subscription reconcile保存結果。
+- 嵌入U6與E6 draft/atomic final apply、返回原欄位；standalone只建立source並綁相關profile baseline或明確unconfigured，不自動選分母或複製E1 accounting欄位。
 - cross-site/reserved/physical duplicate檢查與逐列修正。
 - schema/type/tag/身份異動診斷、source revision/epoch安全更換。
 - 既有PUT保留selector-aware資料或明確拒絕，舊mapping不被覆寫/重複計量。
@@ -36,12 +36,12 @@
 ## Dependencies and Delivery Boundary
 
 - 前置：E1, E6, M1, U1。
-- 草案先行；相依契約及對應驗證完成後才進入相依實作。本地metadata非原生CLI已驗證產物。
+- 草案先行；相依契約及對應驗證完成後才進入相依實作。文件analyze/validate不代表相依實作、MQTT runtime或現場驗收。
 - 實作與驗證checkbox只在本change tasks維護。
 
 ## Success Criteria
 
-每個scenario須在test-plan對應層實測；不只demo正常路徑。未跑MQTT/SQLite/API/瀏覽器或人工任務不能宣稱已修好。來源已存、訂閱已生效、收到新資料與可計算期間是不同狀態。
+每個scenario須在test-plan對應層實測；不只demo正常路徑。未跑MQTT/SQLite/API/瀏覽器或人工任務不能宣稱已修好。來源已存、訂閱已生效、收到新資料與可計算期間是不同狀態。preview後變更selector（importEnergy→activePower）、target、measurement semantics、selected item set、source/profile/candidate/sample revision或optional E6 mutation均須重新preview；token過期或首次apply的revision不符時409且零寫入，同key同canonical request重試即使token後續過期也回原結果。
 
 ## Impact
 

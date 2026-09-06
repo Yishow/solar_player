@@ -137,7 +137,7 @@
 需求：M2-R8。層：shared extraction＋SQLite/API＋isolated MQTT broker＋UI journey。
 - GIVEN an operator previews an uncommitted source batch
 - WHEN multiple positive and negative samples are evaluated
-- THEN only preview output changes; MQTT publish count and live/history/config tables stay unchanged
+- THEN only preview output and its token/review evidence control record change; MQTT publish count and domain live/history/baseline/profile/page state stay unchanged
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
 
 ### M2-R8-S02 — First sample is not a month
@@ -151,9 +151,9 @@
 ### M2-R9-S01 — Request retry after timeout
 
 需求：M2-R9。層：shared extraction＋SQLite/API＋isolated MQTT broker＋UI journey。
-- GIVEN a batch transaction commits but the response is lost
-- WHEN the UI retries using the same idempotency key
-- THEN the existing result is returned without duplicate sources or resets
+- GIVEN a batch transaction commits but the response is lost, and the preview token later expires or a recorded revision advances
+- WHEN the UI retries with the same idempotency key, preview token, and server-returned canonical draft
+- THEN the exact stored result is returned without duplicate sources, resets, or a second mutation
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
 
 ### M2-R9-S02 — Broker rejects activation
@@ -172,6 +172,54 @@
 - THEN the batch is rejected with a version conflict and the draft remains available
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
 
+### M2-R9-S04 — Selector changes from import energy to active power
+
+需求：M2-R9。層：shared extraction＋SQLite/API＋UI journey。
+- GIVEN preview binds `measurements.importEnergy` as a cumulative source and the UI displays the returned canonicalDraft
+- WHEN apply changes the selector to `measurements.activePower` without obtaining a new preview token
+- THEN the server returns `409 PREVIEW_MISMATCH` and writes no source, mapping, profile, baseline, or history row
+- 證據：request canonical comparison、409 body與domain SQLite zero-write snapshot；確認apply使用preview回傳canonicalDraft而非client mutable state重組。
+
+### M2-R9-S05 — Target or measurement semantics change
+
+需求：M2-R9。層：shared extraction＋SQLite/API＋UI journey。
+- GIVEN preview binds one reviewed target with cumulative-energy semantics, an `energyFlowRole`, unit, scaling, `timestampPolicy`, and conditional `sourceTimestampTimeZone`
+- WHEN apply changes the target or any measurement semantic, including timestampPolicy or its explicit null/absent timezone state, while reusing the token
+- THEN the server returns `409 PREVIEW_MISMATCH` and requires a new preview before any write
+- 證據：逐一改target、energyFlowRole、unit、scaling、timestampPolicy、timezone state的request matrix、409與domain zero-write snapshot。
+
+### M2-R9-S06 — Selected items or optional E6 mutation change
+
+需求：M2-R9。層：shared extraction＋SQLite/API＋UI journey。
+- GIVEN the preview contains a selected item set and an optional reviewed E6 profile mutation
+- WHEN apply removes or adds a selected row, or changes that optional mutation, without a new preview
+- THEN the server returns `409 PREVIEW_MISMATCH` with zero domain writes and preserves the draft for review
+- 證據：selected-set/profile-mutation canonical hash差異、409 response與source/profile/baseline/history snapshot。
+
+### M2-R9-S07 — Candidate or profile evidence revision changes
+
+需求：M2-R9。層：shared extraction＋SQLite/API＋UI journey。
+- GIVEN preview records source, profile, candidate, and sample revisions
+- WHEN any recorded revision changes before the first apply commits
+- THEN the server returns `409 PREVIEW_STALE`, performs no mutation, and requires refreshed evidence and a new preview
+- 證據：逐一推進source/profile/candidate/sample revision並在commit前重查，檢查409與zero-write snapshot，包含TOCTOU race fixture。
+
+### M2-R9-S08 — Preview token expires
+
+需求：M2-R9。層：SQLite/API＋UI journey。
+- GIVEN a preview token is past its server-defined expiry and no matching idempotency record exists
+- WHEN apply is requested with that token and canonicalDraft
+- THEN the server returns `409 PREVIEW_STALE` with zero domain writes and requires a new preview
+- 證據：expiry clock fixture、409 error與domain metrics/baseline/profile/page zero-write snapshot；允許token/review evidence控制記錄存在。
+
+### M2-R9-S09 — Same idempotency key carries a changed payload
+
+需求：M2-R9。層：SQLite/API＋UI journey。
+- GIVEN an idempotency key was committed with one preview token and canonicalDraft, including expired-token and advanced-revision cases
+- WHEN the same key is submitted with a different token or any changed canonical draft field
+- THEN the server returns `409 IDEMPOTENCY_CONFLICT` and performs no additional domain write
+- 證據：改token、selector、target與selected set的request matrix、server canonical hash與409 response；確認token已過期／revision已推進仍優先回IDEMPOTENCY_CONFLICT，不覆蓋原idempotency result。
+
 ### M2-R10-S01 — Batch feeds department setup
 
 需求：M2-R10。層：shared extraction＋SQLite/API＋isolated MQTT broker＋UI journey。
@@ -185,7 +233,7 @@
 需求：M2-R10。層：shared extraction＋SQLite/API＋isolated MQTT broker＋UI journey。
 - GIVEN a source is added without an accounting task
 - **WHEN** source apply succeeds
-- **THEN** it is available to the site picker but is not silently made the whole-site total or a department denominator
+- **THEN** it is available to the site picker with a related profile baseline or explicit unconfigured state, and is not silently made the whole-site total or a department denominator
 - 證據：實際測試輸出、受影響表/訊息/版本對照；UI案例記錄操作與結果，不接正式Broker。
 
 ### M2-R11-S01 — Wrong site candidate
@@ -254,7 +302,7 @@
 
 ## Required Test Boundaries
 
-先以隔離Broker測MQTT 3.1.1，若實作開啟5.0亦跑該版本；包含retained重送、SUBACK失敗、重連、相同Topic不同tag、錯序array、慢速/不發資料、capture退出與production不中断。shared extractor使用正反例，SQLite前後snapshot確認preview零寫入。API測越權、expired refs、schema/conflict、idempotency。UI測1366×768及1920×1080、鍵盤焦點、批次選取不因更新跳動、原任務返回與錯誤恢復。最終Q1以同一批真實測試流程對帳來源、期間用量、月圖與部門占比。
+先以隔離Broker測MQTT 3.1.1，若實作開啟5.0亦跑該版本；包含retained重送、SUBACK失敗、重連、相同Topic不同tag、錯序array、慢速/不發資料、capture退出與production不中断。shared extractor使用正反例，SQLite/API前後snapshot確認preview只保存token/canonicalDraft/review evidence控制記錄，不寫domain metrics/live/history/baseline/profile/page。API測越權、expired refs、schema/conflict、selector/target/semantics/selected-set/profile-mutation mismatch、token expiry、server canonical hash、same-key changed payload、lost-response exact retry與commit前TOCTOU recheck。UI測1366×768及1920×1080、canonicalDraft review回帶、鍵盤焦點、批次選取不因更新跳動、原任務返回與錯誤恢復。最終Q1以同一批真實測試流程對帳來源、期間用量、月圖與部門占比。
 
 ## Negative Completion Claims
 

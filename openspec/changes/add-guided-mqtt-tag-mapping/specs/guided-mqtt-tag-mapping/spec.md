@@ -93,7 +93,7 @@ Initial support SHALL cover scalar numeric payloads, JSON nested numeric fields,
 ### Requirement: Measurement meaning is confirmed rather than guessed
 <!-- requirement-id: M2-R5 -->
 
-The operator SHALL confirm cumulative-energy, interval-energy or power-gauge semantics, unit and any conversion factor before activation. Compatible reviewed templates MAY fill these settings for a batch, but mixed or unknown units SHALL be individually flagged. Increasing samples and field names MAY suggest cumulative energy but SHALL NOT prove it. CT/PT scaling already applied upstream SHALL not be applied a second time. A cumulative source SHALL feed E1/E2 and show baseline availability, not a raw total mislabeled as daily consumption.
+The operator SHALL confirm cumulative-energy, interval-energy or power-gauge semantics, `energyFlowRole`, unit, scaling policy, and `timestampPolicy` before activation. The default `timestampPolicy` SHALL be `source-required`; `allow-receive-time-estimate` SHALL require an explicitly audited source revision and SHALL apply only under the approved E1 transport predicate. `sourceTimestampTimeZone` SHALL be provided only when needed to parse an offset-free source timestamp. Scalar values with no timestamp and timestamps that already contain an offset or `Z` SHALL retain explicit null/absent timezone state and SHALL not require an arbitrary timezone choice. Compatible reviewed templates MAY fill these settings for a batch, but mixed or unknown units SHALL be individually flagged. Increasing samples and field names MAY suggest cumulative energy but SHALL NOT prove it. CT/PT scaling already applied upstream SHALL not be applied a second time. A cumulative source SHALL feed E1/E2 and show baseline availability, not a raw total mislabeled as daily consumption. Total-meter ownership, department membership, and denominator selection SHALL remain an explicitly reviewed E6 profile decision and SHALL not be duplicated in the E1 source mapping.
 
 #### Scenario: Cumulative batch
 <!-- scenario-id: M2-R5-S01 -->
@@ -150,14 +150,14 @@ The UI SHALL support multi-select, per-row edits, apply-to-selected compatible s
 ### Requirement: Draft preview never publishes or changes readings
 <!-- requirement-id: M2-R8 -->
 
-Preview SHALL evaluate the exact reviewed selector, semantics and scaling against bounded evidence and negative/control samples using the production extraction engine. It SHALL show raw selected values, normalized values, match/no-match results, evidence origin and observation times. It SHALL NOT publish MQTT, persist live values, update meter baselines, activate profiles, save page drafts or replay captured packets into energy history. Simulated examples SHALL remain distinct from live evidence.
+Preview SHALL evaluate the exact reviewed selector, semantics, scaling, and `timestampPolicy` against bounded evidence and negative/control samples using the production extraction engine. It SHALL show raw selected values, normalized values, match/no-match results, evidence origin and observation times. The response SHALL contain an opaque server-issued `previewToken` and the server-normalized `canonicalDraft`; the UI SHALL review and display that canonicalDraft, and apply SHALL return the same content rather than rebuilding it from mutable client state. The token SHALL bind the canonical draft, selected item set, target/site/physical identities, measurement semantics including timestampPolicy and explicit null/absent timezone state, optional E6 mutation, source/profile/candidate/sample revisions, review evidence snapshot, and expiry. It SHALL NOT publish MQTT, persist live values, update domain live values or meter baselines, activate profiles, save page drafts or replay captured packets into energy history. Token/review-snapshot persistence is control evidence and SHALL not be treated as a domain mutation. Simulated examples SHALL remain distinct from live evidence.
 
 #### Scenario: Preview has no side effects
 <!-- scenario-id: M2-R8-S01 -->
 
 - **GIVEN** an operator previews an uncommitted source batch
 - **WHEN** multiple positive and negative samples are evaluated
-- **THEN** only preview output changes; MQTT publish count and live/history/config tables stay unchanged
+- **THEN** only preview output and its token/review evidence control record change; MQTT publish count and domain live/history/baseline/profile/page state stay unchanged
 
 #### Scenario: First sample is not a month
 <!-- scenario-id: M2-R8-S02 -->
@@ -169,7 +169,7 @@ Preview SHALL evaluate the exact reviewed selector, semantics and scaling agains
 ### Requirement: Apply is versioned idempotent and honest about runtime activation
 <!-- requirement-id: M2-R9 -->
 
-Apply SHALL validate authorization, candidate/schema versions, existing binding versions, measurement compatibility, ownership and an idempotency key. Selected source bindings and explicitly included E6 profile changes SHALL be committed atomically in the database; unrelated mappings SHALL not be replaced. Runtime exact-topic subscription reconciliation SHALL be staged and observable after commit, with retryable pending or failed status and no false live-success claim. Repeating an ambiguous network result with the same idempotency key SHALL return the original result. No observation captured before activation SHALL be replayed as newly measured usage.
+Apply SHALL validate authorization and SHALL require an opaque `previewToken`, the exact server-normalized `canonicalDraft` returned by preview and shown to the operator, and an idempotency key. The canonical draft SHALL include every selector field including selector version and expected schema, the selected item set, target/site/physical identities, `measurementKind`, `energyFlowRole`, unit, scaling, `timestampPolicy` including its default or audited source revision, an optional `sourceTimestampTimeZone` only when an offset-free source timestamp needs parsing, explicit null/absent timezone state otherwise, optional E6 mutation, source/profile/candidate/sample revisions, and the review evidence snapshot binding. The server SHALL canonicalize and hash the token plus draft; an arbitrary client-provided hash SHALL not substitute for the token. Any selector, target, semantic, selected-row, optional mutation, evidence, or revision change SHALL require a new preview and SHALL return `409` with zero writes. An expired token or stale revision SHALL return `409` with zero writes. After authorization, an existing committed idempotency key with the same canonical request hash SHALL return its original result even if the token later expires or revisions advance; the same key with a different hash SHALL return `409` conflict. For a first apply, token and revision checks SHALL be repeated immediately before transaction commit to prevent TOCTOU. Selected source bindings and explicitly included E6 profile changes SHALL be committed atomically in the database; unrelated mappings SHALL not be replaced. Runtime exact-topic subscription reconciliation SHALL be staged and observable after commit, with retryable pending or failed status and no false live-success claim. No observation captured before activation SHALL be replayed as newly measured usage.
 
 #### Scenario: Request retry after timeout
 <!-- scenario-id: M2-R9-S01 -->
@@ -192,10 +192,52 @@ Apply SHALL validate authorization, candidate/schema versions, existing binding 
 - **WHEN** apply is attempted
 - **THEN** the batch is rejected with a version conflict and the draft remains available
 
+#### Scenario: Selector changes from import energy to active power
+<!-- scenario-id: M2-R9-S04 -->
+
+- **GIVEN** preview binds `measurements.importEnergy` as a cumulative source
+- **WHEN** apply changes the selector to `measurements.activePower` without obtaining a new preview token
+- **THEN** the server returns `409 PREVIEW_MISMATCH` and writes no source, mapping, profile, baseline, or history row
+
+#### Scenario: Target or measurement semantics change
+<!-- scenario-id: M2-R9-S05 -->
+
+- **GIVEN** preview binds one reviewed target with cumulative-energy semantics, an `energyFlowRole`, unit, scaling, and `sourceTimestampTimeZone`
+- **WHEN** apply changes the target or any measurement semantic while reusing the token
+- **THEN** the server returns `409 PREVIEW_MISMATCH` and requires a new preview before any write
+
+#### Scenario: Selected items or optional E6 mutation change
+<!-- scenario-id: M2-R9-S06 -->
+
+- **GIVEN** the preview contains a selected item set and an optional reviewed E6 profile mutation
+- **WHEN** apply removes or adds a selected row, or changes that optional mutation, without a new preview
+- **THEN** the server returns `409 PREVIEW_MISMATCH` with zero writes and preserves the draft for review
+
+#### Scenario: Candidate or profile evidence revision changes
+<!-- scenario-id: M2-R9-S07 -->
+
+- **GIVEN** preview records source, profile, candidate, and sample revisions
+- **WHEN** any recorded revision changes before the first apply commits
+- **THEN** the server returns `409 PREVIEW_STALE`, performs no mutation, and requires refreshed evidence and a new preview
+
+#### Scenario: Preview token expires
+<!-- scenario-id: M2-R9-S08 -->
+
+- **GIVEN** a preview token is past its server-defined expiry
+- **WHEN** apply is requested for that token before any matching idempotency record exists
+- **THEN** the server returns `409 PREVIEW_STALE` with zero writes and requires a new preview
+
+#### Scenario: Same idempotency key carries a changed payload
+<!-- scenario-id: M2-R9-S09 -->
+
+- **GIVEN** an idempotency key was committed with one token and canonical draft, including cases where that token has since expired or its recorded revisions have advanced
+- **WHEN** the same key is submitted with a different token or any changed canonical draft field
+- **THEN** the server returns `409 IDEMPOTENCY_CONFLICT` and performs no additional write
+
 ### Requirement: Meters and accounting profiles have one authoritative binding path
 <!-- requirement-id: M2-R10 -->
 
-Committed mappings SHALL resolve to stable E1 source references consumable by the E6 site profile. The source workflow SHALL allow selecting an existing destination tag or generating a new named meter without hand-entering a metric key. When opened inside U6 it SHALL return draft references or explicitly saved-source references without independently activating an unreviewed denominator. The final review SHALL disclose any source writes separately from page publishing and SHALL never ask for the same MQTT mapping again in a display card.
+Committed mappings SHALL resolve to stable E1 source references consumable by the E6 site profile. The source workflow SHALL allow selecting an existing destination tag or generating a new named meter without hand-entering a metric key. When opened inside U6 it SHALL return draft references or explicitly saved-source references without independently activating an unreviewed denominator. The final review SHALL disclose any source writes separately from page publishing and SHALL never ask for the same MQTT mapping again in a display card. A standalone source apply SHALL bind a related profile baseline or explicitly show an unconfigured baseline; it SHALL not silently become the site total or a department denominator and SHALL not duplicate E6 accounting ownership in E1.
 
 #### Scenario: Batch feeds department setup
 <!-- scenario-id: M2-R10-S01 -->
