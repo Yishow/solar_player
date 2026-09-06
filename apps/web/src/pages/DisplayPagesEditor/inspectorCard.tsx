@@ -43,6 +43,10 @@ function InspectorContent({
             {selectedRegion.description}
           </p>
         ) : null}
+        <details className="mt-2 text-[11px] text-[var(--shell-subtitle-ink)]">
+          <summary>技術識別</summary>
+          <code data-inspector-region-id>{selectedRegion.id}</code>
+        </details>
       </div>
       {actions}
       {extraContent}

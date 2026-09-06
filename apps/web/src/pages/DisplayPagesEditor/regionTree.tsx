@@ -17,19 +17,19 @@ export function DisplayEditorLeftPanel({
   dirty,
   editMode,
   errorMessage,
-  isLoading,
-  isPublishing,
-  isPublishBlocked,
-  isSaving,
+  isLoading: _isLoading,
+  isPublishing: _isPublishing,
+  isPublishBlocked: _isPublishBlocked,
+  isSaving: _isSaving,
   message,
   onAddObject,
   onDeleteObject,
   onDuplicateObject,
   onMoveObjectBackward,
   onMoveObjectForward,
-  onPublish,
-  onReload,
-  onSave,
+  onPublish: _onPublish,
+  onReload: _onReload,
+  onSave: _onSave,
   onSelectObject,
   onSelectRegion,
   onToggleObjectLocked,
@@ -67,9 +67,7 @@ export function DisplayEditorLeftPanel({
   selectedRegionId: string | null;
   lockedRegionIds: string[];
 }) {
-  const [tab, setTab] = useState<"objects" | "regions" | "actions">(selectedObjectId ? "objects" : "regions");
-  const saveDisabled = isLoading || isSaving || !dirty;
-  const publishDisabled = isLoading || isSaving || isPublishing || isPublishBlocked;
+  const [tab, setTab] = useState<"objects" | "regions">(selectedObjectId ? "objects" : "regions");
   const groupedRegions = groupRegionsByParent(regions);
 
   useEffect(() => {
@@ -106,7 +104,10 @@ export function DisplayEditorLeftPanel({
                 <div className="break-words text-[14px] font-semibold text-[var(--shell-title-ink)]">
                   {localizeDisplayEditorRegionTreeLabel(region.label)}
                 </div>
-                <div className="mt-1 text-[11px] text-[var(--shell-subtitle-ink)]">{region.id}</div>
+                <details className="mt-1 text-[11px] text-[var(--shell-subtitle-ink)]">
+                  <summary>技術識別</summary>
+                  <code>{region.id}</code>
+                </details>
               </button>
               <button
                 type="button"
@@ -132,8 +133,8 @@ export function DisplayEditorLeftPanel({
   return (
     <section className="flex h-full flex-col border-r border-[var(--shell-divider)] bg-white/70 backdrop-blur-sm">
       <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
-        {(["regions", "objects", "actions"] as const).map((t) => {
-          const labels = { regions: "區域樹", objects: "自由物件", actions: "操作" };
+        {(["regions", "objects"] as const).map((t) => {
+          const labels = { regions: "區域樹", objects: "自由物件" };
           return (
             <button
               key={t}
@@ -205,67 +206,9 @@ export function DisplayEditorLeftPanel({
         </>
       )}
 
-      {tab === "actions" && (
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-3">
-          <div
-            className={[
-              "rounded-[18px] border px-3 py-2 text-[12px] leading-5",
-              errorMessage
-                ? "border-[rgba(180,82,52,0.25)] bg-[rgba(180,82,52,0.08)] text-[#8f452d]"
-                : dirty
-                  ? "border-[rgba(201,136,26,0.24)] bg-[rgba(201,136,26,0.08)] text-[#8e6410]"
-                  : "border-[var(--shell-divider)] bg-[rgba(82,91,66,0.05)] text-[var(--shell-copy-ink)]"
-            ].join(" ")}
-            role="status"
-          >
-            {errorMessage || message}
-          </div>
-          <button
-            type="button"
-            className="w-full rounded-full border border-[var(--shell-divider)] px-3 py-2.5 text-[13px] font-semibold text-[var(--shell-copy-ink)] disabled:opacity-55"
-            disabled={isLoading}
-            onClick={onReload}
-          >
-            重新同步
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-full px-3 py-2.5 text-[13px] font-semibold"
-            disabled={saveDisabled}
-            onClick={onSave}
-            style={saveDisabled
-              ? {
-                  backgroundColor: "rgba(95, 140, 80, 0.14)",
-                  border: "1px solid rgba(95, 140, 80, 0.22)",
-                  color: "var(--shell-muted-ink)"
-                }
-              : {
-                  backgroundColor: "#5f8c50",
-                  color: "#ffffff"
-                }}
-          >
-            {isSaving ? "儲存中..." : "儲存設定"}
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-full px-3 py-2.5 text-[13px] font-semibold"
-            disabled={publishDisabled}
-            onClick={onPublish}
-            style={publishDisabled
-              ? {
-                  backgroundColor: "rgba(52, 56, 58, 0.14)",
-                  border: "1px solid rgba(52, 56, 58, 0.18)",
-                  color: "var(--shell-muted-ink)"
-                }
-              : {
-                  backgroundColor: "#34383a",
-                  color: "#ffffff"
-                }}
-          >
-            {isPublishing ? "發布中..." : "發布草稿"}
-          </button>
-        </div>
-      )}
+      <div className="shrink-0 border-t border-[var(--shell-divider)] px-3 py-2 text-[11px] text-[var(--shell-copy-ink)]" role="status">
+        {errorMessage || message || (dirty ? "此頁有未儲存草稿；請用頂列儲存。" : "此頁草稿已同步。")}
+      </div>
     </section>
   );
 }

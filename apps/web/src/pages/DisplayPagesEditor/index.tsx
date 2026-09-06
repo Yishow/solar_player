@@ -49,6 +49,8 @@ import { localizeDisplayEditorLabel, localizeDisplayPageLabel } from "./localiza
 import { DisplayPageMediaEffectInspector } from "./mediaEffectInspector";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 import { DisplayEditorLeftPanel } from "./regionTree";
+import { EditorToolbar } from "./EditorToolbar";
+import { resolveEditorWorkspaceLayout } from "./workspaceLayout";
 import { SourceConnectionPanel } from "./sourceConnectionPanel";
 import { resolveSourceConnectionRegion } from "./sourceConnectionPanel";
 import {
@@ -401,6 +403,22 @@ export function DisplayPagesEditor({
   const [shellSelectedObjectId, setShellSelectedObjectId] = useState<string | null>(
     initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
   );
+  const [shellBaseline] = useState(() => JSON.stringify(initialShellDecorationDraft ?? null));
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [inlineAssetPickerOpen, setInlineAssetPickerOpen] = useState(false);
+  const workspaceLayout = useMemo(
+    () =>
+      resolveEditorWorkspaceLayout({
+        leftCollapsed,
+        rightCollapsed,
+        rightWidth: rightPanelWidth,
+        viewportWidth: typeof window === "undefined" ? 1920 : window.innerWidth
+      }),
+    [leftCollapsed, rightCollapsed, rightPanelWidth]
+  );
+  const shellDirty = JSON.stringify(shellDraftState ?? null) !== shellBaseline;
   const appliedEditorDeepLinkRef = useRef<string | null>(null);
   const editMode = controlledEditMode ?? internalEditMode;
   const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
@@ -958,6 +976,7 @@ export function DisplayPagesEditor({
       setSelectedRegionId(targetRegion.id);
       setSelectedRegionIds([targetRegion.id]);
     }
+    setInlineAssetPickerOpen(false);
     handleSelectWorkspace("editor");
   }, [
     applyConfigUpdate,
@@ -969,64 +988,68 @@ export function DisplayPagesEditor({
   ]);
 
   const pageTabs = (
-    <div className="flex flex-wrap items-end gap-2">
-      <button
-        type="button"
-        title="切換編輯模式 (E)"
-        aria-pressed={editMode}
-        className={[
-          "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-          editMode
-            ? "bg-[rgba(95,140,80,0.16)] text-[var(--shell-title-ink)] hover:bg-[rgba(95,140,80,0.26)]"
-            : "bg-[rgba(82,91,66,0.08)] text-[var(--shell-muted-ink)] hover:bg-[rgba(82,91,66,0.14)] hover:text-[var(--shell-title-ink)]"
-        ].join(" ")}
-        onClick={toggleEditMode}
-      >
-        {editMode ? "編輯模式開啟" : "編輯模式關閉"}
-      </button>
-      {([
-        { label: "頁面編輯", value: "editor" },
-        { label: "資產庫", value: "assets" },
-        { label: "殼層裝飾", value: "shell" }
-      ] as const).map((workspace) => (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-2" data-editor-page-picker>
+        {resolvedPageDefinitions.map((page) => {
+          const active = page.id === selectedPageId;
+          return (
+            <button
+              key={page.id}
+              type="button"
+              className={[
+                "rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors",
+                active
+                  ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
+                  : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-muted-ink)] hover:border-[var(--shell-divider-strong)] hover:text-[var(--shell-title-ink)]"
+              ].join(" ")}
+              onClick={() => handleSelectPage(page.id)}
+            >
+              {localizeDisplayEditorLabel(page.label)}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-end gap-2" data-editor-workspace-tools>
         <button
-          key={workspace.value}
           type="button"
+          title="切換編輯模式 (E)"
+          aria-pressed={editMode}
           className={[
-            "rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors",
-            selectedWorkspace === workspace.value
-              ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
-              : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-muted-ink)] hover:border-[var(--shell-divider-strong)] hover:text-[var(--shell-title-ink)]"
+            "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
+            editMode
+              ? "bg-[rgba(95,140,80,0.16)] text-[var(--shell-title-ink)] hover:bg-[rgba(95,140,80,0.26)]"
+              : "bg-[rgba(82,91,66,0.08)] text-[var(--shell-muted-ink)] hover:bg-[rgba(82,91,66,0.14)] hover:text-[var(--shell-title-ink)]"
           ].join(" ")}
-          onClick={() =>
-            handleSelectWorkspace(
-              workspace.value,
-              undefined,
-              selectedWorkspace === "shell" ? "shell" : "editor"
-            )
-          }
+          onClick={toggleEditMode}
         >
-          {workspace.label}
+          {editMode ? "編輯模式開啟" : "編輯模式關閉"}
         </button>
-      ))}
-      {resolvedPageDefinitions.map((page) => {
-        const active = page.id === selectedPageId;
-        return (
+        {([
+          { label: "頁面編輯", value: "editor" },
+          { label: "資產庫", value: "assets" },
+          { label: "殼層裝飾", value: "shell" }
+        ] as const).map((workspace) => (
           <button
-            key={page.id}
+            key={workspace.value}
             type="button"
             className={[
               "rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors",
-              active
+              selectedWorkspace === workspace.value
                 ? "border-[var(--shell-accent)] bg-[rgba(95,140,80,0.12)] text-[var(--shell-title-ink)]"
                 : "border-[var(--shell-divider)] bg-white/70 text-[var(--shell-muted-ink)] hover:border-[var(--shell-divider-strong)] hover:text-[var(--shell-title-ink)]"
             ].join(" ")}
-            onClick={() => handleSelectPage(page.id)}
+            onClick={() =>
+              handleSelectWorkspace(
+                workspace.value,
+                undefined,
+                selectedWorkspace === "shell" ? "shell" : "editor"
+              )
+            }
           >
-            {localizeDisplayEditorLabel(page.label)}
+            {workspace.label}
           </button>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 
@@ -1323,6 +1346,11 @@ export function DisplayPagesEditor({
               ? `草稿 version ${shellDraftState.version}，${shellDraftState.headerObjects.length + shellDraftState.footerObjects.length} 個殼層物件可直接在此調整幾何、層級與素材來源。`
               : "正在同步殼層草稿與可用素材。"}
           </WorkspaceBoard>
+          <aside className="mb-3 rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#5c4a1f]" data-shared-shell-scope role="note">
+            共用頁首／頁尾會影響所有使用此殼層的展示頁。殼層草稿與目前頁面草稿分開儲存。
+            {shellDirty ? <strong className="mt-1 block" data-shared-shell-dirty>殼層尚有未儲存變更</strong> : null}
+            {dirty ? <span className="mt-1 block" data-page-draft-dirty>目前頁面也有未儲存草稿，儲存頁面不會順便存殼層。</span> : null}
+          </aside>
           <ShellDecorationEditor
             embedded
             initialDraft={shellDraftState}
@@ -1350,7 +1378,36 @@ export function DisplayPagesEditor({
       spacing={editMode ? "compact" : "default"}
       aside={pageTabs}
     >
-      <div className="grid h-full min-h-0 grid-rows-1 grid-cols-[220px_1fr_260px] overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
+      <EditorToolbar
+        canRedo={canRedo}
+        canUndo={canUndo}
+        dirty={dirty}
+        errorMessage={errorMessage}
+        isPublishing={isPublishing}
+        isSaving={isSaving}
+        onPreview={() => setEditMode(false)}
+        onPublishCheck={() => {
+          setRightTab("publish");
+          void publish();
+        }}
+        onRedo={redo}
+        onSave={() => void handleSave()}
+        onUndo={undo}
+        pageLabel={localizeDisplayPageLabel(selectedPage.label)}
+        publishBlocked={isPublishBlocked}
+      />
+      {errorMessage.includes("儲存衝突") ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#ead7aa] bg-[#fff8e8] px-4 py-2 text-[13px]" data-editor-remote-revision role="status">
+          <span>遠端已有較新版本。比較或重載都不會自動覆蓋目前草稿。</span>
+          <button className="mgmt-action min-h-[40px]" onClick={() => void handleReload()} type="button">重載遠端</button>
+        </div>
+      ) : null}
+      <div
+        className="relative grid min-h-0 flex-1 grid-rows-1 overflow-hidden"
+        data-editor-workspace-layout
+        style={{ gridTemplateColumns: workspaceLayout.canvasGridTemplate }}
+      >
         <DisplayEditorLeftPanel
           freeformObjects={freeformObjects}
           dirty={dirty}
@@ -1426,6 +1483,18 @@ export function DisplayPagesEditor({
         />
 
         <div className="flex flex-col overflow-hidden border-l border-[var(--shell-divider)]">
+          <label className="flex items-center gap-2 border-b border-[var(--shell-divider)] px-3 py-1 text-[11px] text-[var(--shell-copy-ink)]">
+            面板寬度
+            <input
+              aria-label="調整屬性面板寬度"
+              className="min-h-[40px] flex-1"
+              max={480}
+              min={200}
+              onChange={(event) => setRightPanelWidth(Number(event.target.value))}
+              type="range"
+              value={rightPanelWidth}
+            />
+          </label>
           <div className="shrink-0 flex border-b border-[var(--shell-divider)]">
             {(dataBindingCapability && dataBindingPageKey
               ? (["inspector", "data", "source", "health", "publish"] as const)
@@ -1473,7 +1542,16 @@ export function DisplayPagesEditor({
                     : "這個頁面的專屬編輯區域尚未展開，先保留預覽與路由覆蓋。"
                 }
                 onChange={updatePath}
-                onOpenAssetLibrary={() => handleSelectWorkspace("assets", inspectorRegion?.id, "editor")}
+                onOpenAssetLibrary={() => {
+              const nextParams = new URLSearchParams(searchParams);
+              if (inspectorRegion?.id) {
+                nextParams.set("assetContext", inspectorRegion.id);
+                nextParams.set("assetReturn", "editor");
+              }
+              nextParams.delete("workspace");
+              setSearchParams(nextParams, { replace: true });
+              setInlineAssetPickerOpen(true);
+            }}
                 onResetField={handleResetField}
                 selectedRegion={inspectorRegion}
               />
@@ -1527,6 +1605,34 @@ export function DisplayPagesEditor({
             )}
           </div>
           </div>
+        {workspaceLayout.useDrawer ? (
+          <button
+            className="mgmt-action absolute left-2 top-2 z-10 min-h-[40px]"
+            data-editor-left-drawer-toggle
+            onClick={() => setLeftCollapsed((current) => !current)}
+            type="button"
+          >
+            {leftCollapsed ? "開啟結構面板" : "收合結構面板"}
+          </button>
+        ) : null}
+        {inlineAssetPickerOpen ? (
+          <div className="absolute inset-y-0 right-0 z-20 w-full max-w-xl overflow-y-auto border-l border-[var(--shell-divider)] bg-white shadow-lg" data-editor-inline-asset-picker>
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--shell-divider)] px-3 py-2">
+              <strong>選擇素材</strong>
+              <button className="mgmt-action min-h-[40px]" onClick={() => setInlineAssetPickerOpen(false)} type="button">取消</button>
+            </div>
+            <AssetLibrary
+              embedded
+              initialAssets={images}
+              contextLabel={assetWorkspaceContextLabel ?? undefined}
+              onApplySelection={handleApplyAssetSelectionAndReturn}
+              onAssetsChange={setImages}
+              onReturnToEditor={() => setInlineAssetPickerOpen(false)}
+              returnLabel="返回編輯"
+            />
+          </div>
+        ) : null}
+        </div>
         </div>
     </PageContainer>
   );

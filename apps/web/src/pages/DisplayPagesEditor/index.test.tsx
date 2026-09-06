@@ -169,7 +169,9 @@ test("display page editor shell exposes the full rollout page switcher and idle 
   assert.match(html, />展示圖像</);
   assert.match(html, />永續成果</);
   assert.match(html, /編輯模式關閉/);
-  assert.ok(html.indexOf("編輯模式關閉") < html.indexOf(">總覽<"));
+  assert.match(html, /data-editor-page-picker/);
+  assert.match(html, /data-editor-workspace-tools/);
+  assert.ok(html.indexOf("data-editor-page-picker") < html.indexOf("data-editor-workspace-tools"));
   assert.match(html, /按 E 啟用編輯模式/);
 });
 
@@ -238,6 +240,42 @@ test("display page editor shows blocking validation and fallback publishing stat
   assert.doesNotMatch(html, /目前 live 正在 fallback/);
   assert.doesNotMatch(html, /emptyContent/);
   assert.doesNotMatch(html, /發布草稿/);
+});
+
+test("U3-R1 toolbar keeps save visible while inspecting a bound card", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?page=overview"] },
+      React.createElement(DisplayPagesEditor, {
+        initialEditorState: {
+          editMode: true,
+          rightTab: "data",
+          selectedRegionId: "overview-kpi-power"
+        },
+        renderPreview: false
+      })
+    )
+  );
+  assert.match(html, /data-editor-toolbar-save/);
+  assert.match(html, /儲存草稿/);
+  assert.match(html, /檢查並發布/);
+  assert.doesNotMatch(html, />操作</);
+});
+
+test("U3-R5 shared shell workspace discloses separate dirty state and affected pages", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ["/display-pages/editor?page=overview&workspace=shell"] },
+      React.createElement(DisplayPagesEditor, {
+        renderPreview: false
+      })
+    )
+  );
+  assert.match(html, /data-shared-shell-scope/);
+  assert.match(html, /所有使用此殼層的展示頁/);
+  assert.match(html, /分開儲存/);
 });
 
 test("display page editor keeps the region tree selection and inspector in sync", () => {
