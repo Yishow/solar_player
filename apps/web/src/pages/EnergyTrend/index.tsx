@@ -142,10 +142,11 @@ export function EnergyTrend() {
           absoluteAppTimeEpoch === null
             ? null
             : new Date(absoluteAppTimeEpoch),
+        periodSummary: historyPayload?.periodSummary ?? undefined,
         range,
         snapshots
       }),
-    [absoluteAppTimeEpoch, range, snapshot, snapshots]
+    [absoluteAppTimeEpoch, historyPayload?.periodSummary, range, snapshot, snapshots]
   );
 
   const refreshState = errorMessage ? "is-error" : isLoading ? "is-loading" : "";

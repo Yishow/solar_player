@@ -140,11 +140,12 @@ export function EnergyHistory() {
           absoluteAppTimeEpoch === null
             ? null
             : new Date(absoluteAppTimeEpoch),
+        periodSummary: historyPayload?.periodSummary,
         range,
         snapshots,
         summaries
       }),
-    [absoluteAppTimeEpoch, counters, metricScope, range, snapshots, summaries]
+    [absoluteAppTimeEpoch, counters, historyPayload?.periodSummary, metricScope, range, snapshots, summaries]
   );
 
   const validChartPoints = viewModel.chartLines

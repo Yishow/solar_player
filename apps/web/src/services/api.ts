@@ -1114,6 +1114,7 @@ export type DataHubEnergyHistoryResponse = {
     totalValue: number | null;
   }>;
   metricScope: MetricScope;
+  periodSummary?: { quality: string; valueKwh: string | null } | null;
   range: DataHubEnergyHistoryRange;
   snapshots: Array<{
     capturedAt: string;

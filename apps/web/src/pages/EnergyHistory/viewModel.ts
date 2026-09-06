@@ -90,6 +90,7 @@ type BuildEnergyHistoryViewModelArgs = {
   counters: CumulativeCounter[];
   metricScope: MetricScope;
   now?: Date | string | null;
+  periodSummary?: { quality: string; valueKwh: string | null } | null;
   range: EnergyHistoryRange;
   snapshots: EnergyHistorySnapshot[];
   summaries: DailyEnergySummary[];
@@ -233,6 +234,7 @@ export function buildEnergyHistoryViewModel({
   counters,
   metricScope,
   now,
+  periodSummary,
   range,
   snapshots,
   summaries
@@ -267,9 +269,11 @@ export function buildEnergyHistoryViewModel({
       ? getCounterValue(counters, "selfConsumption")
       : getSummariesValue(range, summaries, (summary) => summary.selfConsumptionTotal);
   const consumptionValue =
-    range === "total"
-      ? getCounterValue(counters, "consumption")
-      : getSummariesValue(range, summaries, (summary) => summary.consumptionTotal);
+    periodSummary
+      ? (periodSummary.valueKwh === null ? null : Number(periodSummary.valueKwh))
+      : range === "total"
+        ? getCounterValue(counters, "consumption")
+        : getSummariesValue(range, summaries, (summary) => summary.consumptionTotal);
   const ratioValue =
     range === "total"
       ? getCounterValue(counters, "ratio")

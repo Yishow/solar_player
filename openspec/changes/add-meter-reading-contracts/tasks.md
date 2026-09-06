@@ -18,7 +18,7 @@
 - [x] 1.10 **Verification** — 執行 meterReadingService 測試及受影響 MQTT/accumulator regression，保存實際指令與輸出。（E1-R1 E1-R2 E1-R3 E1-R4 E1-R5 E1-R6）
 - [x] 1.11 **Verification** — 執行 shadow ingest／回退演練與 pnpm verify；缺現場遮罩樣本時記錄未驗證項，不勾完現場 acceptance。（E1-R1 E1-R6）
 
-- [ ] 1.12 **V3 MQTT integration** — 串接受控已接收資料清單/穩定tag來源，production callback→M2 extractor→E1 傳遞 origin/retain/dup/qos/receivedAt/sourceTimestamp/timestampQuality；以 E1-R7-S01/S02 及 E1-R2-S03 證明 catalog/offline/wrong-tag 不更新讀值、packet 證據不因 match 遺失。不再要求外部client/手填mapping；此change只實作本層整合。（E1-R7） 對照：Selector provenance accompanies accepted meter observations。
+- [x] 1.12 **V3 MQTT integration** — 串接受控已接收資料清單/穩定tag來源，production callback→M2 extractor→E1 傳遞 origin/retain/dup/qos/receivedAt/sourceTimestamp/timestampQuality；以 E1-R7-S01/S02 及 E1-R2-S03 證明 catalog/offline/wrong-tag 不更新讀值、packet 證據不因 match 遺失。不再要求外部client/手填mapping；此change只實作本層整合。（E1-R7） 對照：Selector provenance accompanies accepted meter observations。
 
 ## Closeout Notes
 

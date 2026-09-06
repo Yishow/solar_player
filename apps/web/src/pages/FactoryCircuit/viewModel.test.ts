@@ -545,3 +545,21 @@ test("buildFactoryCircuitViewModel keeps the last settled fallback rows visible 
   assert.equal(model.loadRows[1]?.labelZh, "車身工程");
   assert.equal(model.summary.statusLabel, "迴路資料未連線，顯示版型 fallback");
 });
+
+test("E5 energy shares override seed percentages for the same period", () => {
+  const runtimes = buildFactoryCircuitRuntimes(circuitConfigs).map((circuit) =>
+    circuit.id === 1 || circuit.id === 2 || circuit.id === 3
+      ? { ...circuit, livePowerKw: 100 }
+      : circuit
+  );
+  const model = buildFactoryCircuitViewModel({
+    circuits: runtimes,
+    connectionState: "connected",
+    energyShares: { stamping: 50, body: 30, painting: 20 },
+    loadState: "ready",
+    snapshot
+  });
+  assert.equal(model.loadRows[0]?.sharePercent, 50);
+  assert.equal(model.loadRows[1]?.sharePercent, 30);
+  assert.equal(model.loadRows[2]?.sharePercent, 20);
+});

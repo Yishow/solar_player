@@ -1,9 +1,10 @@
-import type {
-  DisplayPageId,
-  DisplayPageFallbackStatus,
-  FallbackPolicyKey,
-  FallbackPolicyMode,
-  ValidationResult
+import {
+  unifyPublishPreflight,
+  type DisplayPageId,
+  type DisplayPageFallbackStatus,
+  type FallbackPolicyKey,
+  type FallbackPolicyMode,
+  type ValidationResult
 } from "@solar-display/shared";
 import { useEffect, useState } from "react";
 import { getDisplayPageFallbackStatus, publishDisplayPageDraft, validateDisplayPageDraft } from "../../services/api";
@@ -17,6 +18,22 @@ export type DisplayPagePublishingStateMap = Record<string, DisplayPagePublishing
 
 export function countBlockingFindings(validation?: ValidationResult | null) {
   return validation?.findings.filter((finding) => finding.severity === "blocking").length ?? 0;
+}
+
+export function mergeEnergyAuthoringPreflight(
+  validation: ValidationResult | undefined,
+  input: { energyProfileReady: boolean; unsavedBindings: boolean }
+): ValidationResult {
+  const extra = unifyPublishPreflight({
+    bindingErrors: [],
+    energyProfileReady: input.energyProfileReady,
+    unsavedBindings: input.unsavedBindings
+  });
+  const findings = [...(validation?.findings ?? []), ...extra.findings];
+  return {
+    canPublish: extra.canPublish && (validation?.canPublish ?? true) && findings.every((finding) => finding.severity !== "blocking"),
+    findings
+  };
 }
 
 export function formatFallbackMode(mode: FallbackPolicyMode) {
@@ -63,7 +80,11 @@ export function useDisplayPagePublishingState(
     if (refreshOptions.isActive && !refreshOptions.isActive()) {
       return;
     }
-    setPublishingStateByPage((current) => ({ ...current, [pageId]: { fallback, validation } }));
+    const merged = mergeEnergyAuthoringPreflight(validation, {
+      energyProfileReady: true,
+      unsavedBindings: false
+    });
+    setPublishingStateByPage((current) => ({ ...current, [pageId]: { fallback, validation: merged } }));
   };
 
   useEffect(() => {

@@ -34,6 +34,7 @@ export const DATA_HUB_TASKS = [
 ] as const;
 
 export type DataHubTaskKey = (typeof DATA_HUB_TASKS)[number]["key"];
+export type DataHubWorkspaceTask = DataHubTaskKey | "energy";
 
 export type DataHubWorkspaceState = {
   filter: DataHubListFilter;
@@ -43,7 +44,7 @@ export type DataHubWorkspaceState = {
   scopeCorrectionMessage: string | null;
   search: string;
   selection: string | null;
-  task: DataHubTaskKey | null;
+  task: DataHubWorkspaceTask | null;
 };
 
 const listFilters = new Set<string>(DATA_HUB_LIST_FILTERS);
@@ -55,6 +56,10 @@ export function isDataHubListFilter(value: unknown): value is DataHubListFilter 
 
 export function isDataHubTaskKey(value: unknown): value is DataHubTaskKey {
   return typeof value === "string" && taskKeys.has(value);
+}
+
+export function isDataHubWorkspaceTask(value: unknown): value is DataHubWorkspaceTask {
+  return isDataHubTaskKey(value) || value === "energy";
 }
 
 export function parseDataHubWorkspaceSearch(
@@ -77,7 +82,7 @@ export function parseDataHubWorkspaceSearch(
       : null,
     search: params.get("q") ?? "",
     selection: params.get("selection"),
-    task: isDataHubTaskKey(requestedTask) ? requestedTask : null
+    task: isDataHubWorkspaceTask(requestedTask) ? requestedTask : null
   };
 }
 

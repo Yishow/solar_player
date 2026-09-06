@@ -22,8 +22,8 @@ test("buildMonthlyConsumptionTrend clears mock data when monthly summaries have 
     { consumptionTotal: null, date: "2026-07-02" }
   ]);
 
-  assert.deepEqual(trend.series, []);
-  assert.deepEqual(trend.dates, []);
+  assert.deepEqual(trend.series, [null, null]);
+  assert.deepEqual(trend.dates, ["7/1", "7/2"]);
 });
 
 test("buildMonthlyConsumptionTrend maps current-month summaries chronologically", () => {
@@ -33,8 +33,15 @@ test("buildMonthlyConsumptionTrend maps current-month summaries chronologically"
     { consumptionTotal: 1800, date: "2026-07-01" }
   ]);
 
-  assert.deepEqual(trend.series, [1800, 2200]);
-  assert.deepEqual(trend.dates, ["7/1", "7/2"]);
+  assert.deepEqual(trend.series, [1800, 2200, null]);
+  assert.deepEqual(trend.dates, ["7/1", "7/2", "7/3"]);
+});
+
+test("E4 zero remains a plotted observation", () => {
+  const trend = buildMonthlyConsumptionTrend([
+    { consumptionTotal: 0, date: "2026-07-01" }
+  ]);
+  assert.deepEqual(trend.series, [0]);
 });
 
 test("monthly consumption refreshes only for monitoring-history sync", () => {

@@ -23,6 +23,7 @@ import {
   normalizeDisplayPageFreeformObjects,
   resolvePlaybackBindingItemConstraints,
   resolveWidgetDataBindingPageKey,
+  unifyPublishPreflight,
   validateMetricDataBinding,
   resolveDisplayPageFallbackPolicyByPageId
 } from "@solar-display/shared";
@@ -38,6 +39,7 @@ import {
 } from "./displayPageAssetService.js";
 import { validateDisplayPageObjectDraft } from "./displayPageObjectValidation.js";
 import { readDisplayPageInstance } from "./displayPageRegistryService.js";
+import { getActiveProfile } from "./siteEnergyProfileService.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -980,12 +982,34 @@ function checkImageReferences(regions: Record<string, unknown>): ValidationFindi
   return findings;
 }
 
+function collectEnergyAuthoringFindings(unsavedBindings = false): ValidationFinding[] {
+  let energyProfileReady = true;
+  try {
+    const database = getDatabase();
+    const profiles = [getActiveProfile(database, "cl"), getActiveProfile(database, "kn")];
+    energyProfileReady = !profiles.some((profile) => profile?.status === "incomplete" || profile?.status === "conflict");
+  } catch {
+    energyProfileReady = true;
+  }
+  return unifyPublishPreflight({
+    bindingErrors: [],
+    energyProfileReady,
+    unsavedBindings
+  }).findings.map((finding) => ({
+    code: finding.code,
+    message: finding.message,
+    severity: finding.severity
+  }));
+}
+
 function publishDraft(
   pageId: DisplayPageId,
   publishedBy?: string
 ): { live: DisplayPageConfigEnvelope; validation: ValidationResult } {
   const draft = readStageConfig(pageId, "draft");
   const validation = validateConfigDraft(draft.regions, draft.freeformObjects ?? [], pageId);
+  validation.findings.push(...collectEnergyAuthoringFindings(false));
+  validation.canPublish = !validation.findings.some((finding) => finding.severity === "blocking");
 
   if (!validation.canPublish) {
     return { live: readStageConfig(pageId, "live"), validation };

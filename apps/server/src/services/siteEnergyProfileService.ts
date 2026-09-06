@@ -66,7 +66,14 @@ export function applyProfile(
   if (!preview) {
     throw Object.assign(new Error("PREVIEW_EXPIRED"), { code: "PREVIEW_EXPIRED", statusCode: 409 });
   }
-  const nextRevision = (getActiveProfile(database, scope)?.revision ?? 0) + 1;
+  if (JSON.stringify(preview.profile) !== JSON.stringify(input.draft)) {
+    throw Object.assign(new Error("PREVIEW_DRAFT_MISMATCH"), { code: "PREVIEW_DRAFT_MISMATCH", statusCode: 409 });
+  }
+  const active = getActiveProfile(database, scope);
+  if ((active?.revision ?? 0) !== input.expectedRevision) {
+    throw Object.assign(new Error("PROFILE_REVISION_CONFLICT"), { code: "PROFILE_REVISION_CONFLICT", statusCode: 409 });
+  }
+  const nextRevision = (active?.revision ?? 0) + 1;
   const next: SiteEnergyProfileV1 = { ...input.draft, metricScope: scope, revision: nextRevision };
   database.prepare("UPDATE site_energy_profiles SET active = 0 WHERE metric_scope = ?").run(scope);
   database.prepare(`

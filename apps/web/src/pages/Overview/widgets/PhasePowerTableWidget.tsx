@@ -1,4 +1,5 @@
 import type { DisplaySyncEvent } from "@solar-display/shared";
+import { buildMonthlyConsumptionSeries } from "@solar-display/shared";
 import type { CSSProperties } from "react";
 import { DisplayCardFrame, DisplayCardHeader } from "../../../components/displayPageCards";
 import { toSparklineSmoothPath } from "../../../components/Sparkline";
@@ -9,6 +10,7 @@ import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../../runtimeRefresh
 type MonthlyConsumptionSummary = {
   consumptionTotal: number | null;
   date: string;
+  valueKwh?: string | null;
 };
 
 const monthlyConsumptionRefresh = resolveMonitoringHistoryRuntimeRefreshSpec("month");
@@ -25,16 +27,19 @@ function formatDateLabel(dateStr: string) {
   return dateStr;
 }
 
-export function buildMonthlyConsumptionTrend(summaries: MonthlyConsumptionSummary[]) {
-  const validSummaries = summaries
-    .filter((summary): summary is MonthlyConsumptionSummary & { consumptionTotal: number } =>
-      typeof summary.consumptionTotal === "number"
-    )
-    .reverse();
-
+export function buildMonthlyConsumptionTrend(summaries: MonthlyConsumptionSummary[], month?: string) {
+  const inferredMonth = month ?? summaries.find((summary) => summary.date)?.date.slice(0, 7) ?? "";
+  const model = buildMonthlyConsumptionSeries(
+    summaries.map((summary) => ({
+      date: summary.date,
+      valueKwh: summary.valueKwh ?? (typeof summary.consumptionTotal === "number" ? String(summary.consumptionTotal) : null)
+    })),
+    inferredMonth
+  );
   return {
-    dates: validSummaries.map((summary) => formatDateLabel(summary.date)),
-    series: validSummaries.map((summary) => summary.consumptionTotal)
+    dates: model.points.map((point) => formatDateLabel(point.date)),
+    quality: model.quality,
+    series: model.points.map((point) => (point.valueKwh === null ? null : Number(point.valueKwh)))
   };
 }
 
@@ -61,14 +66,38 @@ function buildYTicks(series: number[], count = 3) {
   }));
 }
 
-function mapCoordinates(series: number[], niceMax: number) {
+function mapCoordinates(series: Array<number | null>, niceMax: number) {
   if (series.length === 0) return [];
   const scaleMax = niceMax > 0 ? niceMax : 1;
   const L = series.length;
-  return series.map((value, index) => ({
-    x: L > 1 ? (index / (L - 1)) * 100 : 0,
-    y: 100 - (value / scaleMax) * 90 - 5
-  }));
+  return series.map((value, index) => {
+    if (value === null || !Number.isFinite(value)) {
+      return null;
+    }
+    return {
+      x: L > 1 ? (index / (L - 1)) * 100 : 0,
+      y: 100 - (value / scaleMax) * 90 - 5
+    };
+  });
+}
+
+function splitCoordinateSegments(coords: Array<{ x: number; y: number } | null>) {
+  const segments: Array<Array<{ x: number; y: number }>> = [];
+  let current: Array<{ x: number; y: number }> = [];
+  for (const coord of coords) {
+    if (!coord) {
+      if (current.length > 0) {
+        segments.push(current);
+        current = [];
+      }
+      continue;
+    }
+    current.push(coord);
+  }
+  if (current.length > 0) {
+    segments.push(current);
+  }
+  return segments;
 }
 
 function formatTick(value: number) {
@@ -97,21 +126,28 @@ export function PhasePowerTableWidget({
   const { dates, series } = buildMonthlyConsumptionTrend(
     monthlyConsumptionRuntime.payload?.summaries ?? []
   );
+  const numericSeries = series.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
-  const yTicks = buildYTicks(series, 3);
+  const yTicks = buildYTicks(numericSeries, 3);
   const niceMax = yTicks[0]?.value ?? 0;
   const coords = mapCoordinates(series, niceMax);
-  const linePath = toSparklineSmoothPath(coords);
-  const areaPath = linePath ? `${linePath} L 100 100 L 0 100 Z` : "";
+  const segments = splitCoordinateSegments(coords);
+  const linePaths = segments.map((segment) => toSparklineSmoothPath(segment)).filter(Boolean);
+  const areaPath = linePaths[0] ? `${linePaths[0]} L 100 100 L 0 100 Z` : "";
 
-  let peakIndex = 0;
-  for (let i = 1; i < series.length; i++) {
-    if (series[i]! > series[peakIndex]!) {
+  let peakIndex = -1;
+  for (let i = 0; i < series.length; i++) {
+    const value = series[i];
+    if (typeof value !== "number") {
+      continue;
+    }
+    if (peakIndex < 0 || value > (series[peakIndex] ?? Number.NEGATIVE_INFINITY)) {
       peakIndex = i;
     }
   }
-  const peakCoord = coords[peakIndex];
-  const peakValue = series[peakIndex] ?? 0;
+  const peakCoord = peakIndex >= 0 ? coords[peakIndex] : null;
+  const rawPeak = peakIndex >= 0 ? series[peakIndex] : 0;
+  const peakValue = typeof rawPeak === "number" ? rawPeak : 0;
 
   const labelIndices = series.length > 0
     ? [0, Math.floor(series.length * 0.25), Math.floor(series.length * 0.5), Math.floor(series.length * 0.75), series.length - 1]
@@ -120,7 +156,7 @@ export function PhasePowerTableWidget({
   return (
     <DisplayCardFrame className="overview-dashboard-widget overview-phase-power-widget" style={style} surface="info">
       <DisplayCardHeader subtitle="Monthly Consumption" title="月用量曲線" />
-      {series.length > 0 ? (
+      {numericSeries.length > 0 ? (
         <div className="overview-widget-trend-sparkline">
           <div className="overview-trend-chart">
             <div className="overview-trend-chart-plot">
@@ -163,23 +199,24 @@ export function PhasePowerTableWidget({
                       fill="url(#overview-consumption-area-fill)"
                     />
                   )}
-                  {linePath && (
+                  {linePaths.map((linePath) => (
                     <path
                       className="overview-trend-line-path"
                       d={linePath}
                       fill="none"
+                      key={linePath}
                       vectorEffect="non-scaling-stroke"
                     />
-                  )}
+                  ))}
                 </svg>
                 <div className="overview-trend-points" aria-hidden="true">
-                  {coords.map((coord, idx) => (
+                  {coords.map((coord, idx) => coord ? (
                     <span
                       key={idx}
                       className="overview-trend-dot"
                       style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
                     />
-                  ))}
+                  ) : null)}
                   {peakCoord && (
                     <span
                       className="overview-trend-peak-marker"

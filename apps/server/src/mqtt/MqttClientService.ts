@@ -9,8 +9,11 @@ import type { MetricScope } from "@solar-display/shared";
 import {
   connect,
   type IClientOptions,
+  type IPublishPacket,
   type MqttClient
 } from "mqtt";
+import { ingestMappedMeterReading } from "../services/mqttMeterIngest.js";
+import { tapProductionObservation } from "../services/mqttObservationCatalogService.js";
 import { getDatabase } from "../db/index.js";
 import {
   type LiveMetricsSnapshot,
@@ -787,8 +790,8 @@ export class MqttClientService {
         error: error.message
       });
     });
-    client.on("message", (topic, payload) => {
-      void this.handleMessage(topic, payload.toString()).catch((error) => {
+    client.on("message", (topic, payload, packet) => {
+      void this.handleMessage(topic, payload.toString(), packet).catch((error) => {
         this.handleMessageError(topic, error);
       });
     });
@@ -883,7 +886,17 @@ export class MqttClientService {
     );
   }
 
-  private async handleMessage(topic: string, rawPayload: string) {
+  private async handleMessage(topic: string, rawPayload: string, packet?: IPublishPacket) {
+    tapProductionObservation({
+      connectionRef: this.status.clientId ?? "runtime",
+      dup: packet?.dup ?? null,
+      exactTopic: topic,
+      origin: "mqtt",
+      qos: packet?.qos ?? null,
+      receivedAt: new Date().toISOString(),
+      retain: packet?.retain ?? null,
+      sourceTimestampEvidence: null
+    }, rawPayload);
     await Promise.all(
       this.managedSourceAdapters
         .filter(({ subscriptionFilters }) =>
@@ -967,6 +980,19 @@ export class MqttClientService {
           parsedPayload.quality ?? null,
           parsedPayload.raw
         );
+        try {
+          ingestMappedMeterReading(this.database, mapping, rawPayload, packet);
+        } catch (error) {
+          this.logger.warn(
+            {
+              error,
+              metricKey: mapping.metric_key,
+              metricScope: mapping.metric_scope,
+              topic
+            },
+            "Meter-reading admission did not accept this MQTT payload"
+          );
+        }
         persistedMetricCount += 1;
         changedMetrics.push({
           metricKey: mapping.metric_key,

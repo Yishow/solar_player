@@ -22,7 +22,7 @@
 
 ## 2. V2 Site-Setup Integration
 
-- [ ] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（E3-R8）
+- [x] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（E3-R8）
 
 ## Closeout Notes
 

@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { requestJson } from "../../services/api";
 import { displayPageCardConfiguringLabel, resolveDisplayPageCardStatus } from "@solar-display/shared";
 import type { LiveMetricReading, LiveMetricsSnapshot, SocketConnectionState } from "../../services/socket";
 import { useLiveMetricsSelector } from "../../hooks/useLiveMetrics";
@@ -149,16 +150,40 @@ export function FactoryCircuitRuntimeContent({
     () => buildFactoryCircuitRuntimeSnapshot(runtimeSelection.readings),
     [runtimeSelection.readings]
   );
+  const [energyShares, setEnergyShares] = useState<Record<string, number | null> | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void requestJson<{ shares?: Array<{ departmentId: string; ratio: number | null }> }>(
+      "/api/metrics/department-shares?range=month"
+    ).then((payload) => {
+      if (cancelled || !payload.shares) {
+        return;
+      }
+      const next: Record<string, number | null> = {};
+      for (const share of payload.shares) {
+        next[share.departmentId] = share.ratio === null ? null : Math.round(share.ratio * 100);
+      }
+      setEnergyShares(next);
+    }).catch(() => {
+      if (!cancelled) {
+        setEnergyShares(undefined);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const viewModel = useMemo(
     () =>
       buildFactoryCircuitViewModel({
         circuits,
         connectionState: runtimeSelection.connectionState,
+        energyShares,
         loadState,
         snapshot,
         factoryCircuitStory
       }),
-    [circuits, factoryCircuitStory, loadState, runtimeSelection.connectionState, snapshot]
+    [circuits, energyShares, factoryCircuitStory, loadState, runtimeSelection.connectionState, snapshot]
   );
   const kpiSparklineValues = useMemo(
     () => viewModel.kpis.map((_, index) => trendSeries.map((value) => value - index * 1.5)),

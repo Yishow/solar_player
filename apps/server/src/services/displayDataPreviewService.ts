@@ -60,7 +60,8 @@ function readBindingPlan(
   pageId: string,
   contextKey: string,
   siteScope: "cl" | "kn",
-  stage: ConfigStage
+  stage: ConfigStage,
+  unsavedRegions?: Record<string, unknown>
 ) {
   const page = readDisplayPageInstance(pageId);
   if (!page) {
@@ -80,7 +81,9 @@ function readBindingPlan(
     throw error;
   }
 
-  const config = readStageConfig(pageId, stage);
+  const config = unsavedRegions
+    ? { regions: unsavedRegions, updatedAt: null, version: 0 }
+    : readStageConfig(pageId, stage);
   // The plan carries the source class and dependency identities the derived
   // metric registry resolved, so a registry change invalidates it even when the
   // page configuration and context are untouched. A missing revision means the
@@ -92,9 +95,10 @@ function readBindingPlan(
     config.version,
     config.updatedAt,
     contextKey,
-    registryRevision
+    registryRevision,
+    unsavedRegions ? "unsaved" : "saved"
   ]);
-  const cached = registryRevision === null ? undefined : bindingPlanCache.get(cacheKey);
+  const cached = unsavedRegions || registryRevision === null ? undefined : bindingPlanCache.get(cacheKey);
   if (cached) {
     return { ...cached, configRevision: config.version };
   }
@@ -117,10 +121,10 @@ function readBindingPlan(
   }
 
   const entry = { cacheKey, plan: compiled.plan };
-  if (registryRevision !== null) {
+  if (!unsavedRegions && registryRevision !== null) {
     bindingPlanCache.set(cacheKey, entry);
   }
-  return { ...entry, configRevision: config.version };
+  return { ...entry, configRevision: config.version, applied: false as const };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -130,20 +134,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readPreviewRequest(value: unknown): {
   selection: DisplayPreviewContextSelection | unknown;
   stage: ConfigStage;
+  unsavedRegions?: Record<string, unknown>;
 } {
   if (!isRecord(value) || !("context" in value)) {
     return { selection: value, stage: "live" };
   }
   const unsupportedField = Object.keys(value).find(
-    (field) => field !== "context" && field !== "stage"
+    (field) => field !== "context" && field !== "stage" && field !== "unsavedRegions"
   );
-  if (unsupportedField || (value.stage !== "draft" && value.stage !== "live")) {
+  if (unsupportedField || (value.stage !== "draft" && value.stage !== "live" && value.stage !== undefined)) {
     const error = new Error("Data preview request must contain only context and a valid stage");
     // @ts-expect-error fastify reads statusCode
     error.statusCode = 400;
     throw error;
   }
-  return { selection: value.context, stage: value.stage };
+  return {
+    selection: value.context,
+    stage: value.stage === "draft" || value.stage === "live" ? value.stage : "live",
+    unsavedRegions: isRecord(value.unsavedRegions) ? value.unsavedRegions : undefined
+  };
 }
 
 export function readDisplayDataPreview(
@@ -156,12 +165,14 @@ export function readDisplayDataPreview(
     pageId,
     context.contextKey,
     context.siteScope,
-    request.stage
+    request.stage,
+    request.unsavedRegions
   );
   const database = getDatabase();
   const nowMs = Date.now();
 
   return {
+    applied: false as const,
     cacheKey,
     configRevision,
     configStage: request.stage,

@@ -23,21 +23,27 @@ import {
   buildDataHubTaskHref,
   useDataHubWorkspace
 } from "./workspaceContext";
-import { siteEnergySetupHref } from "@solar-display/shared";
+import { isSiteEnergySetupTask, siteEnergySetupHref } from "@solar-display/shared";
+import { SiteEnergySetupPanel } from "./SiteEnergySetupPanel";
 
 const hiddenManagementRoutePaths = getConfiguredHiddenManagementRoutePaths();
 
 export function DataHubTaskHomeContent({
   specialistSections = DATA_HUB_SECTIONS,
   summary,
+  task,
   workspaceScope
 }: {
   specialistSections?: readonly DataHubSection[];
   summary: WorkspaceHealthSummary;
+  task?: ReturnType<typeof useDataHubWorkspace>["task"];
   workspaceScope: ReturnType<typeof useDataHubWorkspace>["managementScope"];
 }) {
   return (
     <div className="space-y-6" data-data-hub-task-home>
+      {isSiteEnergySetupTask(task) && (workspaceScope === "cl" || workspaceScope === "kn") ? (
+        <SiteEnergySetupPanel scope={workspaceScope} />
+      ) : null}
       <section className="space-y-3" aria-labelledby="data-hub-tasks-heading">
         <div>
           <h2 className="text-lg font-semibold text-[#1e2821]" id="data-hub-tasks-heading">要先做哪件事？</h2>
@@ -153,6 +159,7 @@ export function DataHubTaskHome() {
     <DataHubTaskHomeContent
       specialistSections={specialistSections}
       summary={summary}
+      task={workspace.task}
       workspaceScope={workspace.managementScope}
     />
   );

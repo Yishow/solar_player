@@ -37,6 +37,14 @@ test("U1-R2 invalid URL scope is corrected to all with an explicit message and n
   assert.equal(parsed.search, "沖床");
 });
 
+test("U6 energy task stays in workspace search without replacing the three operator tasks", () => {
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn&task=energy").task, "energy");
+  assert.deepEqual(
+    DATA_HUB_TASKS.map((task) => task.key),
+    ["connect", "edit", "diagnose"]
+  );
+});
+
 test("U1-R2 KN and all remain distinct legal management scopes", () => {
   assert.equal(parseDataHubWorkspaceSearch("scope=kn").managementScope, "kn");
   assert.equal(parseDataHubWorkspaceSearch("scope=all").managementScope, "all");

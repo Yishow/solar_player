@@ -49,6 +49,21 @@ test("U1-R1-S01 and U1-M1-S01 task landing shows three tasks, health summary and
   assert.doesNotMatch(html, /請先閱讀 MQTT mapping 文件/);
 });
 
+test("U6 energy task opens the four-step factory setup on KN", () => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <DataHubTaskHomeContent
+        specialistSections={DATA_HUB_SECTIONS}
+        summary={knSummary}
+        task="energy"
+        workspaceScope="kn"
+      />
+    </MemoryRouter>
+  );
+  assert.match(html, /data-site-energy-setup/);
+  assert.match(html, /設定觀音用電/);
+});
+
 test("U1-R1 empty health summary does not pretend zero is healthy", () => {
   const html = renderHome({
     emptyReason: "目前這個範圍還沒有可顯示的資料來源。",

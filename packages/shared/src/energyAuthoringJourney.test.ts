@@ -3,11 +3,12 @@ import test from "node:test";
 import { admitMeterReading, normalizeEnergyToKwhDecimal } from "./meterReading.js";
 import { resolvePeriodConsumption } from "./periodConsumption.js";
 import { resolveDepartmentShares } from "./departmentEnergyShares.js";
-import { previewMapping, applyMapping, compileSelector } from "./guidedMqttMapping.js";
+import { previewMapping, applyMapping, compileSelector, extractBySelector, extractDecimalLexeme } from "./guidedMqttMapping.js";
 import { unifyPublishPreflight } from "./displayPublishPreflight.js";
 import { previewUnsavedBinding } from "./unsavedBindingPreview.js";
 import { siteEnergySetupHref } from "./guidedSiteEnergySetup.js";
 import { nextOnboardingStep } from "./guidedOnboarding.js";
+import { buildMonthlyConsumptionSeries } from "./monthlyConsumptionSeries.js";
 import type { MeterSourceDefinition } from "./meterReading.js";
 import type { SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
 
@@ -47,12 +48,14 @@ const profile: SiteEnergyProfileV1 = {
 test("Q1 journey: mapping preview, ingest, period delta, department share, preflight", () => {
   assert.equal(nextOnboardingStep("connection"), "site");
   assert.equal(siteEnergySetupHref("kn"), "/settings/data-hub?scope=kn&task=energy");
+  const selector = compileSelector("value", "MAIN");
+  assert.equal(extractDecimalLexeme(extractBySelector({ tag: "MAIN", value: "10000" }, selector)), "10000");
   const preview = previewMapping({
     channelId: "kn-main",
     energyFlowRole: "consumption",
     measurementKind: "cumulative-energy",
     metricScope: "kn",
-    selector: compileSelector("value"),
+    selector,
     timestampPolicy: "source-required"
   });
   assert.equal(applyMapping({ canonicalDraft: preview.canonicalDraft, idempotencyKey: "q1", previewToken: preview.previewToken }).applied, true);
@@ -77,6 +80,10 @@ test("Q1 journey: mapping preview, ingest, period delta, department share, prefl
     ]
   });
   assert.equal(period.valueKwh, "300");
+  const monthSeries = buildMonthlyConsumptionSeries([
+    { date: "2026-09-01", valueKwh: period.valueKwh }
+  ], "2026-09");
+  assert.equal(monthSeries.points[0]?.valueKwh, "300");
   const shares = resolveDepartmentShares({ periodDeltas: { a: "150", "kn-main": "300" }, profile });
   assert.equal(shares.shares[0]?.ratio, 0.5);
   const bindingPreview = previewUnsavedBinding(

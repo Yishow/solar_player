@@ -8,6 +8,14 @@ import {
   resolveMetricSnapshotHistory,
   type MetricHistoryRange
 } from "../services/MetricResolver.js";
+import { getActiveProfile } from "../services/siteEnergyProfileService.js";
+import {
+  monthKeyFromProfile,
+  periodSelectionFromRange,
+  resolveDailyConsumptionSeries,
+  tryResolvePersistedPeriodConsumption
+} from "../services/periodConsumptionService.js";
+import { resolvePersistedDepartmentShares } from "../services/departmentSharesService.js";
 
 function isHistoryRange(value: unknown): value is MetricHistoryRange {
   return value === "day" || value === "week" || value === "month" || value === "year" || value === "total";
@@ -26,9 +34,11 @@ function readEnergyHistory(
   range: MetricHistoryRange
 ) {
   const database = getDatabase();
+  const asOf = new Date().toISOString();
   return {
     counters: resolveCumulativeCounterHistory(database, { metricScope }),
     metricScope,
+    periodSummary: tryResolvePersistedPeriodConsumption(database, metricScope, range, asOf),
     range,
     snapshots: resolveMetricSnapshotHistory(database, { metricScope, range }),
     summaries: resolveDailyEnergySummaryHistory(database, { metricScope, range })
@@ -76,7 +86,9 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     const metricScope = requireResolvedDisplayClientContext(request).siteScope;
 
     const database = getDatabase();
+    const asOf = new Date().toISOString();
     return {
+      periodSummary: tryResolvePersistedPeriodConsumption(database, metricScope, rangeParam, asOf),
       range: rangeParam,
       snapshots: resolveMetricSnapshotHistory(database, { metricScope, range: rangeParam })
     };
@@ -95,8 +107,32 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     const metricScope = requireResolvedDisplayClientContext(request).siteScope;
 
     const database = getDatabase();
+    const asOf = new Date().toISOString();
+    const summaries = resolveDailyEnergySummaryHistory(database, { metricScope, range: rangeParam });
+    const profile = metricScope === "cl" || metricScope === "kn" ? getActiveProfile(database, metricScope) : null;
+    const month = profile ? monthKeyFromProfile(asOf, profile) : asOf.slice(0, 7);
+    const series = metricScope === "cl" || metricScope === "kn"
+      ? resolveDailyConsumptionSeries(database, metricScope, month, asOf)
+      : null;
+    const overlaid = series
+      ? series.points.map((point) => {
+          const existing = summaries.find((summary) => summary.date === point.date);
+          return {
+            co2Total: existing?.co2Total ?? null,
+            consumptionTotal: point.valueKwh === null ? existing?.consumptionTotal ?? null : Number(point.valueKwh),
+            date: point.date,
+            generationTotal: existing?.generationTotal ?? null,
+            peakConsumption: existing?.peakConsumption ?? null,
+            peakConsumptionTime: existing?.peakConsumptionTime ?? null,
+            peakGeneration: existing?.peakGeneration ?? null,
+            peakGenerationTime: existing?.peakGenerationTime ?? null,
+            selfConsumptionTotal: existing?.selfConsumptionTotal ?? null,
+            valueKwh: point.valueKwh
+          };
+        })
+      : summaries;
     return {
-      summaries: resolveDailyEnergySummaryHistory(database, { metricScope, range: rangeParam })
+      summaries: overlaid
     };
   });
 
@@ -106,6 +142,30 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     return {
       counters: resolveCumulativeCounterHistory(database, { metricScope })
     };
+  });
+
+  app.get("/api/metrics/department-shares", { preHandler: app.requireDisplayClientContext }, async (request, reply) => {
+    const rangeParam = (request.query as { range?: string }).range ?? "month";
+    if (!isHistoryRange(rangeParam)) {
+      reply.status(400).send({
+        error: historyRangeError,
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    const metricScope = requireResolvedDisplayClientContext(request).siteScope;
+    if (metricScope !== "cl" && metricScope !== "kn") {
+      return { quality: "unavailable", shares: [] };
+    }
+    const database = getDatabase();
+    const asOf = new Date().toISOString();
+    const profile = getActiveProfile(database, metricScope);
+    const period = profile ? periodSelectionFromRange(rangeParam, asOf, profile.siteTimeZone) : null;
+    if (!period) {
+      return { quality: "unavailable", shares: [] };
+    }
+    return resolvePersistedDepartmentShares(database, metricScope, period, asOf) ?? { quality: "unavailable", shares: [] };
   });
 };
 

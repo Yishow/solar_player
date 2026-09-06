@@ -35,6 +35,13 @@ test("U3-R1-S01 save remains on the toolbar while inspecting data", () => {
   assert.doesNotMatch(html, /操作 tab|left actions/);
 });
 
+test("U5 unsaved bindings disable publish until the draft is saved", () => {
+  const html = renderToolbar({ dirty: true, publishBlocked: false });
+  assert.match(html, /data-editor-toolbar-publish[^>]*disabled/);
+  const saved = renderToolbar({ dirty: false, publishBlocked: false });
+  assert.doesNotMatch(saved, /data-editor-toolbar-publish[^>]*disabled/);
+});
+
 test("U3-R1-S02 save failure keeps the error and unsaved state", () => {
   const html = renderToolbar({
     dirty: true,

@@ -486,6 +486,7 @@ test("GET /api/data-hub/energy-history keeps an empty selected scope empty", asy
     assert.deepEqual(response.json(), {
       counters: [],
       metricScope: "cl",
+      periodSummary: null,
       range: "week",
       snapshots: [],
       summaries: []

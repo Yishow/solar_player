@@ -43,6 +43,7 @@ type CircuitSlotDefinition = {
 type BuildFactoryCircuitViewModelArgs = {
   circuits: FactoryCircuitRuntime[];
   connectionState: SocketConnectionState["status"];
+  energyShares?: Record<string, number | null>;
   factoryCircuitStory?: FactoryCircuitStoryPayload;
   loadState: FactoryCircuitLoadState;
   snapshot: LiveMetricsSnapshot;
@@ -312,9 +313,21 @@ export function buildFactoryCircuitRuntimes(circuits: CircuitConfig[]): FactoryC
     .sort((left, right) => resolveSlotOrder(left.displaySlot) - resolveSlotOrder(right.displaySlot));
 }
 
+function resolveEnergySharePercent(
+  slotKey: string,
+  fallbackSharePercent: number,
+  energyShares: Record<string, number | null> | undefined
+) {
+  if (!energyShares) {
+    return fallbackSharePercent;
+  }
+  return energyShares[slotKey] ?? 0;
+}
+
 export function buildFactoryCircuitViewModel({
   circuits,
   connectionState,
+  energyShares,
   loadState,
   snapshot,
   factoryCircuitStory
@@ -358,7 +371,7 @@ export function buildFactoryCircuitViewModel({
           labelZh: storySlot?.labelZh ?? storySlot?.label ?? slot.defaultZh,
           livePowerKw: null,
           progressClass: "bg-neutral-300",
-          sharePercent: 0,
+          sharePercent: resolveEnergySharePercent(slot.key, 0, energyShares),
           statusLabel: resolveStoryEmptyStatus({
             bindingState: storySlot?.bindingState ?? binding.bindingState,
             fallbackReason: storySlot?.fallbackReason ?? binding.fallbackReason,
@@ -384,7 +397,7 @@ export function buildFactoryCircuitViewModel({
         labelZh: storySlot.labelZh ?? storySlot.label,
         livePowerKw: livePower,
         progressClass: tone.progressClass,
-        sharePercent: slot.sharePercent,
+        sharePercent: resolveEnergySharePercent(slot.key, slot.sharePercent, energyShares),
         statusLabel: tone.statusLabel,
         statusTone: tone.tone as "success" | "warning" | "danger" | "neutral",
         textClass: tone.textClass,
@@ -463,7 +476,7 @@ export function buildFactoryCircuitViewModel({
         labelZh: slot.defaultZh,
         livePowerKw: null,
         progressClass: "bg-neutral-300",
-        sharePercent: 0,
+        sharePercent: resolveEnergySharePercent(slot.key, 0, energyShares),
         statusLabel: loadState === "loading" ? "載入中" : loadState === "error" ? "未接入" : "待接入",
         statusTone: "neutral" as const,
         textClass: "text-neutral-500",
@@ -485,7 +498,7 @@ export function buildFactoryCircuitViewModel({
         labelZh: circuit.nameZh ?? slot.defaultZh,
         livePowerKw: null,
         progressClass: status.progressClass,
-        sharePercent: 0,
+        sharePercent: resolveEnergySharePercent(slot.key, 0, energyShares),
         statusLabel: loadState === "loading" ? "載入中" : status.label,
         statusTone: status.tone,
         textClass: status.textClass,
@@ -505,7 +518,7 @@ export function buildFactoryCircuitViewModel({
       labelZh: circuit.nameZh ?? slot.defaultZh,
       livePowerKw: circuit.livePowerKw,
       progressClass: status.progressClass,
-      sharePercent: slot.sharePercent,
+      sharePercent: resolveEnergySharePercent(slot.key, slot.sharePercent, energyShares),
       statusLabel: status.label,
       statusTone: status.tone,
       textClass: status.textClass,

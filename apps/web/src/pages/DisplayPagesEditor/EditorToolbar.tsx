@@ -55,7 +55,7 @@ export function EditorToolbar({
         <button
           className="mgmt-action primary min-h-[40px]"
           data-editor-toolbar-publish
-          disabled={isPublishing || publishBlocked}
+          disabled={isPublishing || publishBlocked || dirty}
           onClick={onPublishCheck}
           type="button"
         >

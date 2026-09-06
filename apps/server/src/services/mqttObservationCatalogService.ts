@@ -62,6 +62,19 @@ export function stopCapture(captureId: string) {
   return { captureId, stopped: true };
 }
 
+export function tapProductionObservation(evidence: MqttTransportEvidence, payload: string) {
+  if (!featureEnabled() || captures.size === 0) {
+    return;
+  }
+  for (const captureId of captures.keys()) {
+    try {
+      tapCatalogObservation(captureId, evidence, payload);
+    } catch {
+      // Capture expiry must not block production ingest.
+    }
+  }
+}
+
 export function tapCatalogObservation(
   captureId: string,
   evidence: MqttTransportEvidence,

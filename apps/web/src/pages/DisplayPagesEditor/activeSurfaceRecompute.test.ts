@@ -26,7 +26,7 @@ test("display pages editor loads support panels only for the active panel tab", 
 
 test("display pages editor support panel refresh failures preserve warm state lanes", () => {
   assert.match(publishingSource, /initialPublishingStateByPage \?\? \{\}/);
-  assert.match(publishingSource, /setPublishingStateByPage\(\(current\) => \(\{ \.\.\.current, \[pageId\]: \{ fallback, validation \} \}\)\)/);
+  assert.match(publishingSource, /setPublishingStateByPage\(\(current\) => \(\{ \.\.\.current, \[pageId\]: \{ fallback, validation: merged \} \}\)\)/);
   assert.match(publishingSource, /catch\(\(error\) => \{\s*\n\s*if \(active\) setPublishingError/);
   assert.doesNotMatch(publishingSource, /catch\(\(error\) => \{[\s\S]*setPublishingStateByPage\(\{\}\)/);
   assert.match(assetHealthSource, /const \[report, setReport\] = useState<DisplayPageAssetHealthReport \| null>\(options\.initialReport \?\? null\)/);

@@ -17,7 +17,7 @@
 - [x] 1.9 **Editor Tasks** — 完成選取物件的更換資料/圖片/文字/顯示/發布任務捷徑，共用profile不雙寫。（U6-R8）
 - [x] 1.10 **Accessibility** — 鍵盤焦點/非顏色狀態/非拖曳替代、錯誤恢復及desktop尺寸驗收。（U6-R3 U6-R9）
 - [x] 1.11 **Tests** — 以真實profile/preview API走四步與日常改一項、scope、缺錶、衝突、return context。（U6-R1 U6-R2 U6-R3 U6-R4 U6-R5 U6-R6 U6-R7 U6-R8 U6-R9）
-- [x] 1.12 **Unassisted Acceptance** — 至少3名新操作員無手冊測指定任務，保存逐步結果；關鍵失敗修正重測，再pnpm verify及必要FHD。（U6-R10）
+- [ ] 1.12 **Unassisted Acceptance** — 至少3名新操作員無手冊測指定任務，保存逐步結果；關鍵失敗修正重測，再pnpm verify及必要FHD。（U6-R10）
 
 - [x] 1.13 **V3 MQTT integration** — 串接受控已接收資料清單/穩定tag來源與原任務，依新增契約驗證，不再要求外部client/手填mapping；此change只實作本層整合。（U6-R11）
 
