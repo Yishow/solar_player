@@ -211,15 +211,11 @@ test("Sources renders source type, scope, health, ownership, and generic control
   assert.match(html, /Solar Collector/);
   assert.match(html, /data-source-scope="cl"/);
   assert.match(html, /data-source-ownership="managed"/);
-  assert.match(html, /factoryGeneration\.todayMwh/);
   assert.match(html, /data-source-kind="generic"/);
   assert.match(html, /data-source-scope="kn"/);
-  assert.match(html, /factory\/kn\/stamping/);
-  assert.match(html, /name="metricKey"/);
-  assert.match(html, /name="metricScope"/);
-  assert.match(html, /name="topic"/);
-  assert.match(html, /disabled=""[^>]*name="metricKey"/);
-  assert.match(html, /disabled=""/);
+  assert.match(html, /KN 沖床/);
+  assert.match(html, /data-source-open/);
+  assert.doesNotMatch(html, /name="metricKey"/);
   assert.doesNotMatch(html, /rawPayload|\{\"value\":4\.2\}/);
 });
 
@@ -299,8 +295,8 @@ test("Sources exposes consolidated generic mapping controls including add topic 
   const html = renderSourcesContent({ model: baseModel, onRefresh: async () => undefined, onSave: async () => undefined });
 
   assert.match(html, /新增通用 MQTT 主題/);
-  assert.match(html, /測試發佈/);
-  assert.match(html, /刪除/);
+  assert.match(html, /搜尋名稱、代碼或主題/);
+  assert.match(html, /來源篩選/);
 });
 
 test("Sources refresh asks before discarding dirty mappings", () => {
@@ -348,6 +344,14 @@ test("Sources blocks dirty route navigation and full-document unload", async () 
       await Promise.resolve();
     });
 
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-source-id="mqtt:cl:factoryCircuit.stampingPower:10"] [data-source-open]'
+    );
+    assert.ok(openButton);
+    await act(async () => {
+      openButton.click();
+      await Promise.resolve();
+    });
     const enabledInput = dom.window.document.querySelector<HTMLInputElement>("input[name=enabled]");
     assert.ok(enabledInput);
     await act(async () => {
@@ -420,7 +424,15 @@ test("Sources refresh cancellation preserves every generic mapping draft field",
       await Promise.resolve();
     });
 
-    const row = dom.window.document.querySelector<HTMLElement>('[data-source-kind="generic"]');
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-source-id="mqtt:cl:factoryCircuit.stampingPower:10"] [data-source-open]'
+    );
+    assert.ok(openButton);
+    await act(async () => {
+      openButton.click();
+      await Promise.resolve();
+    });
+    const row = dom.window.document.querySelector<HTMLElement>("[data-source-drawer] [data-source-kind=generic]");
     assert.ok(row);
     const topic = row.querySelector<HTMLInputElement>('input[name="topic"]');
     const unit = row.querySelector<HTMLInputElement>('input[name="unit"]');
@@ -484,6 +496,263 @@ test("Sources refresh cancellation preserves every generic mapping draft field",
       await Promise.resolve();
     });
     assert.equal(refreshCalls, 1);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    getSocketClient().disconnect();
+    dom.window.close();
+  }
+});
+
+function installDom(url: string) {
+  const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+    pretendToBeVisual: true,
+    url
+  });
+  for (const [key, value] of Object.entries({
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    navigator: dom.window.navigator,
+    window: dom.window
+  })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value, writable: true });
+  }
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  return dom;
+}
+
+test("U1-R4-S01 filtering KN unhealthy sources by name hides other rows", () => {
+  const model: DataHubSourcesModel = {
+    ...baseModel,
+    topics: [
+      ...baseModel.topics,
+      {
+        ...baseModel.topics[1]!,
+        id: 21,
+        nameZh: "KN 空壓",
+        quality: "stale",
+        topic: "factory/kn/air"
+      }
+    ]
+  };
+  const html = renderToStaticMarkup(
+    <MemoryRouter initialEntries={["/settings/data-hub/sources?scope=kn&filter=issue&q=%E7%A9%BA%E5%A3%93"]}>
+      <DataHubSourcesContent model={model} onRefresh={async () => undefined} onSave={async () => undefined} />
+    </MemoryRouter>
+  );
+  assert.match(html, /KN 空壓/);
+  assert.doesNotMatch(html, /CL 沖床/);
+  assert.match(html, /品質異常/);
+});
+
+test("U1-R2-S01 adding a source under KN selects KN instead of CL", async () => {
+  const dom = installDom("http://127.0.0.1/settings/data-hub/sources?scope=kn");
+  let root: Root | null = null;
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/settings/data-hub/sources?scope=kn"]}>
+          <DataHubSourcesContent model={baseModel} onRefresh={async () => undefined} onSave={async () => undefined} />
+        </MemoryRouter>
+      );
+      await Promise.resolve();
+    });
+    const add = [...dom.window.document.querySelectorAll("button")].find((button) => button.textContent?.includes("新增通用 MQTT 主題"));
+    assert.ok(add);
+    await act(async () => {
+      add.click();
+      await Promise.resolve();
+    });
+    const scope = dom.window.document.querySelector<HTMLSelectElement>('select[name="metricScope"]');
+    assert.ok(scope);
+    assert.equal(scope.value, "kn");
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    getSocketClient().disconnect();
+    dom.window.close();
+  }
+});
+
+test("U1-R2-S02 creating a physical meter under all requires a site before save", async () => {
+  const dom = installDom("http://127.0.0.1/settings/data-hub/sources?scope=all");
+  let root: Root | null = null;
+  let saved = false;
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/settings/data-hub/sources?scope=all"]}>
+          <DataHubSourcesContent
+            model={baseModel}
+            onRefresh={async () => undefined}
+            onSave={async () => {
+              saved = true;
+            }}
+          />
+        </MemoryRouter>
+      );
+      await Promise.resolve();
+    });
+    const add = [...dom.window.document.querySelectorAll("button")].find((button) => button.textContent?.includes("新增通用 MQTT 主題"));
+    assert.ok(add);
+    await act(async () => {
+      add.click();
+      await Promise.resolve();
+    });
+    const scope = dom.window.document.querySelector<HTMLSelectElement>('select[name="metricScope"]');
+    assert.ok(scope);
+    assert.equal(scope.value, "");
+    const save = [...dom.window.document.querySelectorAll("button")].find((button) => button.textContent?.includes("儲存 mappings"));
+    assert.ok(save);
+    await act(async () => {
+      save.click();
+      await Promise.resolve();
+    });
+    assert.equal(saved, false);
+    assert.match(dom.window.document.body.textContent ?? "", /CL 或 KN/);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    getSocketClient().disconnect();
+    dom.window.close();
+  }
+});
+
+test("U1-R6-S01 closing the source drawer returns focus to the initiating row", async () => {
+  const dom = installDom("http://127.0.0.1/settings/data-hub/sources");
+  let root: Root | null = null;
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/settings/data-hub/sources"]}>
+          <DataHubSourcesContent model={baseModel} onRefresh={async () => undefined} onSave={async () => undefined} />
+        </MemoryRouter>
+      );
+      await Promise.resolve();
+    });
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-source-id="mqtt:cl:factoryCircuit.stampingPower:10"] [data-source-open]'
+    );
+    assert.ok(openButton);
+    await act(async () => {
+      openButton.click();
+      await Promise.resolve();
+    });
+    assert.ok(dom.window.document.querySelector("[data-source-drawer]"));
+    assert.match(dom.window.document.body.textContent ?? "", /測試發佈/);
+    assert.match(dom.window.document.body.textContent ?? "", /刪除/);
+    const close = [...dom.window.document.querySelectorAll("button")].find((button) => button.textContent === "關閉");
+    assert.ok(close);
+    await act(async () => {
+      close.click();
+      await Promise.resolve();
+    });
+    assert.equal(dom.window.document.querySelector("[data-source-drawer]"), null);
+    assert.equal(dom.window.document.activeElement, openButton);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    getSocketClient().disconnect();
+    dom.window.close();
+  }
+});
+
+test("U1-R6-S02 drawer actions stay wrapped and reachable at 1366-class layout", () => {
+  const html = renderSourcesContent({ model: baseModel, onRefresh: async () => undefined, onSave: async () => undefined });
+  assert.match(html, /data-workspace-safe-viewport="1366"/);
+  assert.match(html, /min-h-\[40px\]/);
+  assert.match(html, /flex-wrap/);
+});
+
+test("U1-R5-S01 saving a KN edit from a filtered view keeps the CL mapping byte-equivalent", async () => {
+  const dom = installDom("http://127.0.0.1/settings/data-hub/sources?scope=kn");
+  let root: Root | null = null;
+  const capturedPayloads: Array<ReturnType<typeof buildTopicMappingsSavePayload>> = [];
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/settings/data-hub/sources?scope=kn"]}>
+          <DataHubSourcesContent
+            model={baseModel}
+            onRefresh={async () => undefined}
+            onSave={async (topics) => {
+              capturedPayloads.push(topics);
+            }}
+          />
+        </MemoryRouter>
+      );
+      await Promise.resolve();
+    });
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-source-id="mqtt:kn:factoryCircuit.stampingPower:11"] [data-source-open]'
+    );
+    assert.ok(openButton);
+    await act(async () => {
+      openButton.click();
+      await Promise.resolve();
+    });
+    const enabled = dom.window.document.querySelector<HTMLInputElement>("input[name=enabled]");
+    assert.ok(enabled);
+    await act(async () => {
+      enabled.click();
+      await Promise.resolve();
+    });
+    const save = [...dom.window.document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("儲存 mappings") && !button.disabled);
+    assert.ok(save);
+    await act(async () => {
+      save.click();
+      await Promise.resolve();
+    });
+    const savedPayload = capturedPayloads[0];
+    if (!savedPayload) {
+      throw new Error("expected a save payload");
+    }
+    const originalCl = buildTopicMappingsSavePayload(baseModel.topics.filter((topic) => topic.metricScope === "cl"));
+    const savedCl = savedPayload.filter((topic) => topic.metricScope === "cl");
+    assert.equal(JSON.stringify(savedCl), JSON.stringify(originalCl));
+    assert.equal(savedPayload.find((topic) => topic.metricScope === "kn")?.enabled, false);
+    assert.equal(savedPayload.find((topic) => topic.metricScope === "kn")?.nameZh, "KN 沖床");
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    getSocketClient().disconnect();
+    dom.window.close();
+  }
+});
+
+test("U1-R4-S02 managed adapter drawer states why fields are read-only", async () => {
+  const dom = installDom("http://127.0.0.1/settings/data-hub/sources");
+  let root: Root | null = null;
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/settings/data-hub/sources"]}>
+          <DataHubSourcesContent model={baseModel} onRefresh={async () => undefined} onSave={async () => undefined} />
+        </MemoryRouter>
+      );
+      await Promise.resolve();
+    });
+    const openButton = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-source-kind="managed"] [data-source-open]'
+    );
+    assert.ok(openButton);
+    await act(async () => {
+      openButton.click();
+      await Promise.resolve();
+    });
+    assert.match(dom.window.document.body.textContent ?? "", /系統託管/);
+    assert.match(dom.window.document.body.textContent ?? "", /無法在這裡修改/);
   } finally {
     await act(async () => {
       root?.unmount();

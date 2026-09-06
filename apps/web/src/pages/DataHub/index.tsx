@@ -1,8 +1,8 @@
-import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import {
+  DATA_HUB_ROOT_PATH,
   DATA_HUB_SECTIONS,
   filterVisibleDataHubSections,
-  isDataHubManagementScope,
   resolveDataHubSection,
   type DataHubManagementScope
 } from "../../app/dataHub";
@@ -11,6 +11,8 @@ import {
   isManagementRouteHidden
 } from "../../app/managementRouteVisibility";
 import { PageScaffold } from "../shared/PageScaffold";
+import { DataHubDraftGuardProvider, useDataHubDraftGuard } from "./draftGuard";
+import { useDataHubWorkspace } from "./workspaceContext";
 
 const scopeLabels: Record<DataHubManagementScope, string> = {
   all: "全部",
@@ -21,48 +23,60 @@ const scopeLabels: Record<DataHubManagementScope, string> = {
 
 const hiddenManagementRoutePaths = getConfiguredHiddenManagementRoutePaths();
 
-export function DataHub() {
+function DataHubWorkspaceShell() {
   const { pathname } = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const section = resolveDataHubSection(pathname) ?? DATA_HUB_SECTIONS[0];
+  const workspace = useDataHubWorkspace();
+  const draftGuard = useDataHubDraftGuard();
+  const isTaskHome = pathname === DATA_HUB_ROOT_PATH || pathname === `${DATA_HUB_ROOT_PATH}/`;
+  const section = isTaskHome ? null : resolveDataHubSection(pathname) ?? DATA_HUB_SECTIONS[0];
   const visibleSections = filterVisibleDataHubSections(
     DATA_HUB_SECTIONS,
     (path) => isManagementRouteHidden(path, hiddenManagementRoutePaths)
   );
-  const requestedScope = searchParams.get("scope");
-  const scope: DataHubManagementScope = isDataHubManagementScope(requestedScope) ? requestedScope : "all";
+  const search = workspace.searchParams.toString();
+  const query = search ? `?${search}` : "";
 
   const updateScope = (nextScope: DataHubManagementScope) => {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set("scope", nextScope);
-      return next;
+    draftGuard.requestNavigation(() => {
+      workspace.updateWorkspace({ managementScope: nextScope });
     });
   };
 
   return (
-    <PageScaffold path={section.path} description="集中管理資料連線、來源、語意指標與外部資料。">
+    <PageScaffold path={section?.path ?? DATA_HUB_ROOT_PATH} description="從任務開始管理資料接入、修改與排查，專業頁仍可直接開啟。">
       <div className="space-y-6">
+        {workspace.scopeCorrectionMessage ? (
+          <div className="mgmt-status is-warning" data-workspace-scope-correction role="status">
+            {workspace.scopeCorrectionMessage}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#92a294]/20 pb-4">
           <nav aria-label="Data Hub sections" className="flex flex-wrap gap-2">
+            <Link
+              aria-current={isTaskHome ? "page" : undefined}
+              className={isTaskHome ? "mgmt-action primary min-h-[40px]" : "mgmt-action min-h-[40px]"}
+              to={`${DATA_HUB_ROOT_PATH}${query}`}
+            >
+              工作首頁
+            </Link>
             {visibleSections.map((entry) => (
               <Link
-                aria-current={entry.key === section.key ? "page" : undefined}
-                className={entry.key === section.key ? "mgmt-action primary" : "mgmt-action"}
+                aria-current={entry.key === section?.key ? "page" : undefined}
+                className={entry.key === section?.key ? "mgmt-action primary min-h-[40px]" : "mgmt-action min-h-[40px]"}
                 key={entry.key}
-                to={`${entry.path}?${searchParams.toString()}`}
+                to={`${entry.path}${query}`}
               >
                 {entry.label}
               </Link>
             ))}
           </nav>
-          <label className="flex items-center gap-2 text-sm text-[#4d554f]">
+          <label className="flex items-center gap-2 text-[13px] text-[#4d554f]">
             管理範圍
             <select
               aria-label="管理範圍"
-              className="mgmt-input"
+              className="mgmt-input min-h-[40px] text-[14px]"
               onChange={(event) => updateScope(event.target.value as DataHubManagementScope)}
-              value={scope}
+              value={workspace.managementScope}
             >
               {(["all", "cl", "kn", "global"] as const).map((value) => (
                 <option key={value} value={value}>{scopeLabels[value]}</option>
@@ -73,5 +87,13 @@ export function DataHub() {
         <Outlet />
       </div>
     </PageScaffold>
+  );
+}
+
+export function DataHub() {
+  return (
+    <DataHubDraftGuardProvider>
+      <DataHubWorkspaceShell />
+    </DataHubDraftGuardProvider>
   );
 }

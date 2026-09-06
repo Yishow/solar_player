@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLoaderData } from "react-router-dom";
 import { DataHubSectionState } from "./sectionState";
 import { applyMetricsLiveSnapshot, useDataHubLiveMetrics } from "./liveActivity";
 import { buildDataHubDiagnosticsHref, buildDataHubUsageHref } from "./links";
+import { filterMetricRows, type SourceListQuery } from "./sourceWorkspace";
+import { useDataHubWorkspace, type DataHubListFilter } from "./workspaceContext";
 import {
   createMetricDetailsStore,
   metricDetailsKey,
@@ -292,9 +294,11 @@ function MetricCard({ row, detailsStore }: { detailsStore: MetricDetailsStore; r
 
 export function DataHubMetricsContent({
   detailsStore: providedDetailsStore,
+  listQuery,
   model
 }: {
   detailsStore?: MetricDetailsStore;
+  listQuery?: SourceListQuery;
   model: DataHubMetricsModel;
 }) {
   const ownedDetailsStoreRef = useRef<MetricDetailsStore | null>(null);
@@ -308,6 +312,21 @@ export function DataHubMetricsContent({
     return detailsStore.subscribe(() => setDetailsRevision((revision) => revision + 1));
   }, [detailsStore]);
 
+  const [search, setSearch] = useState(listQuery?.search ?? "");
+  const [filter, setFilter] = useState<DataHubListFilter>(listQuery?.filter ?? "all");
+  useEffect(() => {
+    setSearch(listQuery?.search ?? "");
+    setFilter(listQuery?.filter ?? "all");
+  }, [listQuery?.filter, listQuery?.search]);
+  const visibleMetrics = useMemo(
+    () => filterMetricRows(model.metrics, {
+      filter,
+      scope: listQuery?.scope ?? "all",
+      search
+    }),
+    [filter, listQuery?.scope, model.metrics, search]
+  );
+
   if (model.metrics.length === 0) {
     return <DataHubSectionState message="此範圍目前沒有 semantic metrics。" status="empty" />;
   }
@@ -315,22 +334,50 @@ export function DataHubMetricsContent({
   return (
     <div className="space-y-5" data-data-hub-section="metrics">
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-xs text-[#687169]">
-          依 scope 查看 current value、freshness、evaluation、source ownership 與安全的 provenance 摘要。
+        <p className="text-[13px] text-[#687169]">
+          先用名稱與異常篩選找到指標，進階診斷只在展開後顯示。
         </p>
       </header>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="grid min-w-[16rem] flex-1 gap-1 text-[13px] text-[#4d554f]">
+          搜尋名稱或代碼
+          <input
+            aria-label="搜尋指標"
+            className="mgmt-input min-h-[40px] text-[14px]"
+            name="metricSearch"
+            onChange={(event) => setSearch(event.target.value)}
+            value={search}
+          />
+        </label>
+        <label className="grid gap-1 text-[13px] text-[#4d554f]">
+          篩選
+          <select
+            aria-label="指標篩選"
+            className="mgmt-input min-h-[40px] text-[14px]"
+            name="metricFilter"
+            onChange={(event) => setFilter(event.target.value as DataHubListFilter)}
+            value={filter}
+          >
+            <option value="all">全部</option>
+            <option value="issue">異常</option>
+            <option value="managed">託管</option>
+            <option value="custom">自訂</option>
+          </select>
+        </label>
+      </div>
       <div className="mgmt-card flex flex-wrap justify-between gap-3 p-4 text-sm text-[#4d554f]">
-        <span>Scope: <strong>{model.scope === "all" ? "All" : scopeLabels[model.scope]}</strong></span>
-        <span>{model.metrics.length} metrics · Generated {model.generatedAt}</span>
+        <span>範圍: <strong>{model.scope === "all" ? "全部" : scopeLabels[model.scope]}</strong></span>
+        <span data-metric-summary-counts>{visibleMetrics.length} 筆可用數據 · Generated {model.generatedAt}</span>
       </div>
       <section className="grid gap-4 xl:grid-cols-2">
-        {model.metrics.map((row) => <MetricCard detailsStore={detailsStore} key={row.id} row={row} />)}
+        {visibleMetrics.map((row) => <MetricCard detailsStore={detailsStore} key={row.id} row={row} />)}
       </section>
     </div>
   );
 }
 
 export function DataHubMetrics() {
+  const workspace = useDataHubWorkspace();
   const routeModel = useLoaderData() as DataHubMetricsRouteModel;
   const { errorMessage } = routeModel;
   const [model, setModel] = useState(routeModel.model);
@@ -347,5 +394,14 @@ export function DataHubMetrics() {
   if (!model) {
     return <DataHubSectionState message={errorMessage || "Metrics 資料同步失敗。"} status="error" />;
   }
-  return <DataHubMetricsContent model={model} />;
+  return (
+    <DataHubMetricsContent
+      listQuery={{
+        filter: workspace.filter,
+        scope: workspace.managementScope,
+        search: workspace.search
+      }}
+      model={model}
+    />
+  );
 }

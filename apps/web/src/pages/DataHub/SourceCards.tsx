@@ -111,12 +111,14 @@ export function GenericSourceCard({
   row,
   onChange,
   onDelete,
-  onPublishTest
+  onPublishTest,
+  siteChoicePending = false
 }: {
   row: GenericSourceRow;
   onChange: (id: number, patch: GenericMappingPatch) => void;
   onDelete?: (id: number) => void;
   onPublishTest?: (metricScope: MetricScope, metricKey: string, value: number) => Promise<void>;
+  siteChoicePending?: boolean;
 }) {
   const disabled = !row.editable;
   const [testValue, setTestValue] = useState("");
@@ -187,9 +189,10 @@ export function GenericSourceCard({
             className={inputClass}
             disabled={disabled}
             name="metricScope"
-            value={row.mapping.metricScope}
+            value={siteChoicePending ? "" : row.mapping.metricScope}
             onChange={(event) => onChange(row.mapping.id, { metricScope: event.target.value as GenericMqttMapping["metricScope"] })}
           >
+            {siteChoicePending ? <option value="">請選擇廠區</option> : null}
             <option value="cl">CL (中壢)</option>
             <option value="kn">KN (觀音)</option>
             <option value="global">全域 (Global)</option>
@@ -251,6 +254,56 @@ export function GenericSourceCard({
           </div>
         ) : null}
       </div>
+    </article>
+  );
+}
+
+export function SourceSummaryRow({
+  onOpen,
+  row,
+  rowRef
+}: {
+  onOpen: () => void;
+  row: ManagedSourceRow | GenericSourceRow;
+  rowRef?: (node: HTMLButtonElement | null) => void;
+}) {
+  const displayName = row.kind === "generic"
+    ? row.mapping.nameZh?.trim() || row.mapping.nameEn?.trim() || row.metricKey
+    : `Solar 轉接器 · ${getMetricScopeLabel(row.metricScope)}`;
+  const latestValue = row.kind === "generic" && row.mapping.lastValue !== null
+    ? `${row.mapping.lastValue} ${row.mapping.unit}`.trim()
+    : "尚無讀值";
+  const updatedAt = row.kind === "generic" ? row.mapping.lastReceivedAt : null;
+
+  return (
+    <article
+      className="mgmt-card flex flex-wrap items-center gap-3 p-3"
+      data-source-id={row.id}
+      data-source-kind={row.kind}
+      data-source-ownership={row.ownership}
+      data-source-row
+      data-source-scope={row.metricScope}
+    >
+      <button
+        className="flex min-h-[40px] min-w-[40px] flex-1 flex-wrap items-center justify-between gap-3 text-left"
+        data-source-open
+        onClick={onOpen}
+        ref={rowRef}
+        type="button"
+      >
+        <div className="min-w-0">
+          <strong className="block text-[14px] text-[#1e2821]" data-source-name>{displayName}</strong>
+          <span className="text-[13px] text-[#687169]">
+            {getMetricScopeLabel(row.metricScope)} · {row.sourceType}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-[#4d554f]">
+          <span data-source-value>{latestValue}</span>
+          <span data-source-updated>{updatedAt ?? "尚未更新"}</span>
+          <SourceHealthChip health={row.health} />
+          <span className="mgmt-chip" data-source-usage="unknown">使用頁面數尚未載入</span>
+        </div>
+      </button>
     </article>
   );
 }

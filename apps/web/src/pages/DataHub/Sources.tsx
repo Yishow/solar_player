@@ -1,9 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker } from "react-router-dom";
 import type { MetricScope } from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 import { DataHubSectionState } from "./sectionState";
 import { applySourcesLiveSnapshot, useDataHubLiveMetrics } from "./liveActivity";
+import { useDataHubDraftGuard } from "./draftGuard";
+import { SourceDetailsDrawer } from "./SourceDetailsDrawer";
+import {
+  countSourceSummary,
+  createGenericMappingDraft,
+  filterSourceRows,
+  mergeScopedTopicEdits,
+  mergeLiveObservationSnapshot,
+  overlayLiveObservations,
+  sourceDisplayName,
+  validateGenericMappingForSave,
+  type LiveObservationOverlay,
+  type SourceListQuery
+} from "./sourceWorkspace";
 import {
   buildSourceRows,
   buildTopicMappingsSavePayload,
@@ -20,17 +34,15 @@ import {
   type DataHubSourcesModel,
   type GenericMappingPatch,
   type GenericMqttMapping,
-  type GenericSourceRow,
-  type ManagedSourceRow,
   type MqttSourceStatus
 } from "./SourcesModel";
 import {
   GenericSourceCard,
   ManagedSourceCard,
   SourceHealthChip,
-  SourceResourceList,
-  SourceRowMeta
+  SourceSummaryRow
 } from "./SourceCards";
+import { useDataHubWorkspace, type DataHubListFilter } from "./workspaceContext";
 
 export {
   buildSourceRows,
@@ -46,7 +58,8 @@ export {
   ManagedSourceCard,
   SourceHealthChip,
   SourceResourceList,
-  SourceRowMeta
+  SourceRowMeta,
+  SourceSummaryRow
 } from "./SourceCards";
 export { applySourcesLiveSnapshot };
 export type {
@@ -68,26 +81,43 @@ type TopicMappingsResponse = {
 
 export function DataHubSourcesContent({
   initialErrorMessage = "",
+  listQuery,
   model,
   onRefresh,
   onSave,
   onDirtyChange
 }: {
   initialErrorMessage?: string;
+  listQuery?: SourceListQuery;
   model: DataHubSourcesModel;
   onDirtyChange?: (isDirty: boolean) => void;
   onRefresh?: () => Promise<void> | void;
   onSave?: (topics: ReturnType<typeof buildTopicMappingsSavePayload>) => Promise<void> | void;
 }) {
+  const workspace = useDataHubWorkspace();
+  const draftGuard = useDataHubDraftGuard();
+  const query: SourceListQuery = listQuery ?? {
+    filter: workspace.filter,
+    scope: workspace.managementScope,
+    search: workspace.search
+  };
   const [draftTopics, setDraftTopics] = useState(model.topics);
   const [liveSolar, setLiveSolar] = useState(model.solar);
+  const [liveOverlay, setLiveOverlay] = useState<LiveObservationOverlay>({});
+  const [pendingSiteChoiceIds, setPendingSiteChoiceIds] = useState<number[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState(initialErrorMessage);
+  const [openRowId, setOpenRowId] = useState<string | null>(workspace.selection);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   useEffect(() => {
-    setDraftTopics(model.topics);
     setLiveSolar(model.solar);
+    setDraftTopics((current) => {
+      const dirty = JSON.stringify(buildTopicMappingsSavePayload(current))
+        !== JSON.stringify(buildTopicMappingsSavePayload(model.topics));
+      return dirty ? current : model.topics;
+    });
   }, [model.solar, model.topics]);
 
   useEffect(() => {
@@ -95,17 +125,22 @@ export function DataHubSourcesContent({
   }, [initialErrorMessage]);
 
   const handleLiveSnapshot = useCallback((snapshot: Parameters<typeof applySourcesLiveSnapshot>[1]) => {
-    setDraftTopics((current) => applySourcesLiveSnapshot({ ...model, topics: current }, snapshot).topics);
-    setLiveSolar((current) => applySourcesLiveSnapshot({ ...model, solar: current }, snapshot).solar);
-  }, [model]);
+    setLiveOverlay((current) => mergeLiveObservationSnapshot(current, snapshot));
+    setLiveSolar((current) => applySourcesLiveSnapshot({ ...model, solar: current, topics: draftTopics }, snapshot).solar);
+  }, [draftTopics, model]);
   useDataHubLiveMetrics(handleLiveSnapshot);
 
-  const rows = useMemo(
-    () => buildSourceRows({ ...model, solar: liveSolar, topics: draftTopics }),
-    [draftTopics, liveSolar, model]
+  const displayTopics = useMemo(
+    () => overlayLiveObservations(draftTopics, liveOverlay),
+    [draftTopics, liveOverlay]
   );
-  const managedRows = rows.filter((row): row is ManagedSourceRow => row.kind === "managed");
-  const genericRows = rows.filter((row): row is GenericSourceRow => row.kind === "generic");
+  const rows = useMemo(
+    () => buildSourceRows({ ...model, solar: liveSolar, topics: displayTopics }),
+    [displayTopics, liveSolar, model]
+  );
+  const visibleRows = useMemo(() => filterSourceRows(rows, query), [query, rows]);
+  const summary = countSourceSummary(visibleRows);
+  const openRow = rows.find((row) => row.id === openRowId) ?? null;
   const isDirty = useMemo(
     () => JSON.stringify(buildTopicMappingsSavePayload(draftTopics)) !== JSON.stringify(buildTopicMappingsSavePayload(model.topics)),
     [draftTopics, model.topics]
@@ -113,41 +148,44 @@ export function DataHubSourcesContent({
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+    draftGuard.setDirty(isDirty);
+  }, [draftGuard, isDirty, onDirtyChange]);
 
   const handleGenericChange = useCallback((id: number, patch: GenericMappingPatch) => {
+    if (patch.metricScope) {
+      setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
+    }
     setDraftTopics((current) => updateGenericMapping(current, id, patch));
     setMessage("");
     setErrorMessage("");
   }, []);
 
   const handleAddGenericMapping = useCallback(() => {
-    const nextId = draftTopics.length > 0
-      ? Math.min(0, ...draftTopics.map((t) => t.id)) - 1
-      : -1;
-    const newMapping: GenericMqttMapping = {
-      enabled: true,
-      id: nextId,
-      lastReceivedAt: null,
-      lastValue: null,
-      metricKey: "custom.metric",
-      metricScope: "cl",
-      multiplier: 1,
-      nameEn: "",
-      nameZh: "自訂指標",
-      quality: null,
-      topic: "custom/cl/metric",
-      unit: "kW",
-      updatedAt: null,
-      valuePath: "$.value"
-    };
-    setDraftTopics((current) => [...current, newMapping]);
-    setMessage("已新增一筆自訂通用 MQTT 主題，請填寫參數後儲存。");
+    const created = createGenericMappingDraft({
+      existing: draftTopics,
+      managementScope: query.scope
+    });
+    setDraftTopics((current) => [...current, created.mapping]);
+    if (created.siteChoicePending) {
+      setPendingSiteChoiceIds((current) => [...current, created.mapping.id]);
+    }
+    const nextRows = buildSourceRows({
+      ...model,
+      solar: liveSolar,
+      topics: [...draftTopics, created.mapping]
+    });
+    const createdRow = nextRows.find((row) => row.kind === "generic" && row.mapping.id === created.mapping.id);
+    setOpenRowId(createdRow?.id ?? null);
+    setMessage(created.siteChoicePending
+      ? "已新增一筆資料。請先選擇 CL 或 KN 廠區後再儲存。"
+      : "已新增一筆資料，請填寫後儲存。");
     setErrorMessage("");
-  }, [draftTopics]);
+  }, [draftTopics, liveSolar, model, query.scope]);
 
   const handleDeleteGenericMapping = useCallback((id: number) => {
-    setDraftTopics((current) => current.filter((t) => t.id !== id));
+    setDraftTopics((current) => current.filter((topic) => topic.id !== id));
+    setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
+    setOpenRowId(null);
     setMessage("");
     setErrorMessage("");
   }, []);
@@ -172,83 +210,165 @@ export function DataHubSourcesContent({
     if (!onSave || !isDirty) {
       return;
     }
+    const pending = draftTopics.find((topic) => pendingSiteChoiceIds.includes(topic.id));
+    if (pending) {
+      const validation = validateGenericMappingForSave(pending, true);
+      setErrorMessage(validation.message ?? "請先選擇 CL 或 KN 廠區，才能儲存實體電錶。");
+      return;
+    }
     setIsSaving(true);
     setErrorMessage("");
     try {
-      await onSave(buildTopicMappingsSavePayload(draftTopics));
-      setMessage("Generic MQTT mappings 已儲存。");
+      const merged = mergeScopedTopicEdits({
+        draft: draftTopics,
+        original: model.topics,
+        visibleScope: query.scope
+      });
+      await onSave(buildTopicMappingsSavePayload(merged));
+      setMessage("資料來源設定已儲存。");
     } catch (error) {
       setErrorMessage(resolveSourcesSaveErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
-  }, [draftTopics, isDirty, onSave]);
+  }, [draftTopics, isDirty, model.topics, onSave, pendingSiteChoiceIds, query.scope]);
 
   const handleRefresh = useCallback(async () => {
-    if (!canRefreshSources(isDirty, () => window.confirm("尚有未儲存的 generic MQTT mappings，重新整理會捨棄目前修改，確定要繼續嗎？"))) {
+    if (!canRefreshSources(isDirty, () => window.confirm("尚有未儲存的修改，重新整理會捨棄目前輸入，確定要繼續嗎？"))) {
       return;
     }
     try {
       await onRefresh?.();
-      setMessage("Sources 已重新整理。");
+      setLiveOverlay({});
+      setPendingSiteChoiceIds([]);
+      setMessage("來源列表已重新整理。");
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(resolveSourcesSaveErrorMessage(error));
     }
   }, [isDirty, onRefresh]);
 
+  const updateQuery = (patch: Partial<SourceListQuery>) => {
+    workspace.updateWorkspace({
+      filter: (patch.filter ?? query.filter) as DataHubListFilter,
+      managementScope: patch.scope ?? query.scope,
+      search: patch.search ?? query.search
+    });
+  };
+
+  const closeDrawer = () => setOpenRowId(null);
+
   return (
-    <div className="space-y-5" data-data-hub-section="sources">
+    <div className="space-y-5" data-data-hub-section="sources" data-workspace-safe-viewport="1366">
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-xs text-[#687169]">
-          集中查看 Solar managed adapter 與 operator-managed generic MQTT mappings；可在本頁直接編輯、新增、刪除與測試發佈。
+        <div className="text-[13px] text-[#687169]">
+          先從摘要列表找到來源，再打開單筆詳情。進階傳輸欄位只在抽屜中展開。
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="mgmt-action" disabled={!onRefresh} onClick={() => void handleRefresh()} type="button">重新整理</button>
-          <button className="mgmt-action primary" disabled={!onSave || !isDirty || isSaving} onClick={() => void handleSave()} type="button">{isSaving ? "儲存中..." : "儲存 mappings"}</button>
+          <button className="mgmt-action min-h-[40px]" disabled={!onRefresh} onClick={() => void handleRefresh()} type="button">重新整理</button>
+          <button className="mgmt-action primary min-h-[40px]" disabled={!onSave || !isDirty || isSaving} onClick={() => void handleSave()} type="button">{isSaving ? "儲存中..." : "儲存 mappings"}</button>
         </div>
       </header>
 
       {errorMessage ? <div className="mgmt-status is-error" data-source-error role="alert">{errorMessage}</div> : null}
       {message ? <div className="mgmt-status is-success" role="status">{message}</div> : null}
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="grid min-w-[16rem] flex-1 gap-1 text-[13px] text-[#4d554f]">
+          搜尋名稱、代碼或主題
+          <input
+            aria-label="搜尋來源"
+            className="mgmt-input min-h-[40px] text-[14px]"
+            onChange={(event) => updateQuery({ search: event.target.value })}
+            value={query.search}
+          />
+        </label>
+        <label className="grid gap-1 text-[13px] text-[#4d554f]">
+          篩選
+          <select
+            aria-label="來源篩選"
+            className="mgmt-input min-h-[40px] text-[14px]"
+            onChange={(event) => updateQuery({ filter: event.target.value as DataHubListFilter })}
+            value={query.filter}
+          >
+            <option value="all">全部</option>
+            <option value="issue">異常</option>
+            <option value="managed">託管</option>
+            <option value="custom">自訂</option>
+          </select>
+        </label>
+        <button className="mgmt-action primary min-h-[40px]" onClick={handleAddGenericMapping} type="button">
+          + 新增通用 MQTT 主題
+        </button>
+      </div>
+
       <div className="mgmt-card grid gap-3 p-4 text-sm text-[#4d554f] sm:grid-cols-3" data-source-connection-summary>
         <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">中央 Broker</span><strong>{model.status.broker || "未設定"}</strong></div>
         <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">連線狀態</span><SourceHealthChip health={model.status.connected ? { label: "正常連線 (Connected)", tone: "success" } : { label: "未連線 (Offline)", tone: "danger" }} /></div>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">來源統計</span><strong>{managedRows.length} 託管來源 · {genericRows.length} 通用來源</strong></div>
+        <div>
+          <span className="block text-xs uppercase tracking-wide text-[#7b857d]">這個範圍的摘要</span>
+          <strong data-source-summary-counts>{summary.total} 筆 · {summary.issues} 筆異常 · {summary.managed} 託管 · {summary.custom} 自訂</strong>
+        </div>
       </div>
 
-      <section className="space-y-3" data-source-group="managed">
-        <div>
-          <h3 className="text-lg font-semibold text-[#27322b]">託管 Solar 轉接器 (Managed Solar Adapters)</h3>
-          <p className="text-sm text-[#687169]">由 Solar Collector 轉接器擁有的標準指標與自動探索資源。</p>
-        </div>
-        {managedRows.length > 0 ? managedRows.map((row) => <ManagedSourceCard key={row.id} row={row} />) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有託管的 Solar 來源診斷。</div>}
+      <section className="space-y-2" data-source-summary-list>
+        {visibleRows.length > 0 ? visibleRows.map((row) => (
+          <SourceSummaryRow
+            key={row.id}
+            onOpen={() => setOpenRowId(row.id)}
+            row={row}
+            rowRef={(node) => {
+              if (node) {
+                rowRefs.current.set(row.id, node);
+              } else {
+                rowRefs.current.delete(row.id);
+              }
+            }}
+          />
+        )) : (
+          <div className="mgmt-card p-5 text-sm text-[#687169]">這個範圍目前沒有符合條件的來源。</div>
+        )}
       </section>
 
-      <section className="space-y-3" data-source-group="generic">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-[#27322b]">通用 MQTT 來源 (Generic MQTT Mappings)</h3>
-            <p className="text-sm text-[#687169]">維運人員可直接新增、編輯、測試發佈與刪除主題映射；轉接器託管指標維持唯讀。</p>
-          </div>
-          <button
-            type="button"
-            className="mgmt-action primary"
-            onClick={handleAddGenericMapping}
-          >
-            + 新增通用 MQTT 主題
-          </button>
-        </div>
-        {genericRows.length > 0 ? genericRows.map((row) => (
-          <GenericSourceCard
-            key={row.id}
-            onChange={handleGenericChange}
-            onDelete={handleDeleteGenericMapping}
-            onPublishTest={handlePublishTest}
-            row={row}
-          />
-        )) : <div className="mgmt-card p-5 text-sm text-[#687169]">目前沒有自訂通用 MQTT 映射。</div>}
-      </section>
+      {openRow ? (
+        <SourceDetailsDrawer
+          onClose={closeDrawer}
+          returnFocusRef={{ current: rowRefs.current.get(openRow.id) ?? null }}
+          title={sourceDisplayName(openRow)}
+        >
+          {openRow.kind === "managed" ? (
+            <div className="space-y-3">
+              <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="note">
+                這是系統託管的 Solar 轉接器來源，對應欄位由轉接器同步，因此無法在這裡修改。
+              </p>
+              <ManagedSourceCard row={openRow} />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingSiteChoiceIds.includes(openRow.mapping.id) ? (
+                <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="alert">
+                  請先選擇 CL 或 KN 廠區，不能使用全域範圍儲存實體電錶。
+                </p>
+              ) : null}
+              {!openRow.editable ? (
+                <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="note">
+                  此來源由系統託管，Topic 與指標代碼維持唯讀。
+                </p>
+              ) : null}
+              <section data-source-basic>
+                <h3 className="mb-2 text-[13px] font-semibold text-[#637166]">基本資料</h3>
+                <GenericSourceCard
+                  onChange={handleGenericChange}
+                  onDelete={handleDeleteGenericMapping}
+                  onPublishTest={handlePublishTest}
+                  row={openRow}
+                  siteChoicePending={pendingSiteChoiceIds.includes(openRow.mapping.id)}
+                />
+              </section>
+            </div>
+          )}
+        </SourceDetailsDrawer>
+      ) : null}
     </div>
   );
 }

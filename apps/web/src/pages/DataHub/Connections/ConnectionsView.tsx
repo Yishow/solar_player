@@ -1,6 +1,8 @@
 import React from "react";
 import type { ReactNode } from "react";
+import type { DataHubManagementScope } from "../../../app/dataHub";
 import type { ConnectionTestFeedback, MqttSettingsForm, MqttStatus } from "../../MqttSettings/viewModel";
+import { SharedInfrastructureBanner } from "../SharedInfrastructureBanner";
 import { BrokerForm } from "./BrokerForm";
 import { ConnectionStatusCard } from "./ConnectionStatusCard";
 
@@ -11,6 +13,7 @@ export type ConnectionsViewProps = {
   isTesting?: boolean;
   isSaving?: boolean;
   isDirty?: boolean;
+  managementScope?: DataHubManagementScope;
   message?: string;
   errorMessage?: string;
   remoteSyncBanner?: ReactNode;
@@ -26,6 +29,7 @@ export function ConnectionsView({
   isTesting = false,
   isSaving = false,
   isDirty = false,
+  managementScope = "all",
   message = "",
   errorMessage = "",
   remoteSyncBanner = null,
@@ -40,6 +44,7 @@ export function ConnectionsView({
 
       {/* 遠端同步警告條 */}
       {remoteSyncBanner}
+      <SharedInfrastructureBanner kind="broker" managementScope={managementScope} />
 
       {/* 全域回饋提示 */}
       {errorMessage ? (

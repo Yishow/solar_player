@@ -19,6 +19,10 @@ test("legacy data settings URLs resolve to their Data Hub sections and preserve 
     resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/diagnostics?scope=cl&metricKey=realTimePower"),
     "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
   );
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/diagnostics?scope=kn&metricKey=factoryCircuit.stampingPower"),
+    "/settings/data-hub/metrics?scope=kn&metricKey=factoryCircuit.stampingPower"
+  );
 });
 
 test("unrelated management URLs are not treated as Data Hub compatibility entries", () => {

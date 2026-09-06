@@ -45,6 +45,24 @@ test("ConnectionsView renders two-column layout with toolbar actions", () => {
   assert.match(html, /data-connections-dirty="false"/);
 });
 
+test("U1-R3-S01 Connections under KN labels the broker as shared infrastructure", () => {
+  const html = renderToStaticMarkup(
+    <ConnectionsView
+      settings={mockSettings}
+      status={mockStatus}
+      lastConnectionTest={null}
+      managementScope="kn"
+      onChange={() => {}}
+      onTestConnection={() => {}}
+      onSaveSettings={() => {}}
+    />
+  );
+
+  assert.match(html, /data-shared-infrastructure="broker"/);
+  assert.match(html, /全系統共用/);
+  assert.match(html, /不只 KN/);
+});
+
 test("ConnectionsView displays dirty state and message alerts", () => {
   const html = renderToStaticMarkup(
     <ConnectionsView

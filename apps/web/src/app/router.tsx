@@ -138,7 +138,13 @@ export const router = createBrowserRouter([
           return { Component: DataHub };
         },
         children: [
-          { index: true, element: <Navigate to="connections" replace /> },
+          {
+            index: true,
+            lazy: async () => {
+              const { DataHubTaskHome } = await import("../pages/DataHub/TaskHome");
+              return { Component: DataHubTaskHome };
+            }
+          },
           {
             path: "connections",
             loader: createLazyManagementRouteLoader(

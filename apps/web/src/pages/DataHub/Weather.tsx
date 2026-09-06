@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useLoaderData } from "react-router-dom";
+import type { DataHubManagementScope } from "../../app/dataHub";
 import type {
   WeatherDiagnostic,
   WeatherFieldKey,
@@ -40,6 +41,8 @@ import {
   WeatherPreviewCard,
   type WeatherChangeHandler
 } from "./WeatherCards";
+import { SharedInfrastructureBanner } from "./SharedInfrastructureBanner";
+import { useDataHubWorkspace } from "./workspaceContext";
 
 const WEATHER_DISPLAY_SYNC_SCOPES = ["weather"] as const;
 
@@ -50,6 +53,7 @@ export type DataHubWeatherContentProps = {
   isLoading: boolean;
   isRefreshing?: boolean;
   isSaving: boolean;
+  managementScope?: DataHubManagementScope;
   message: string;
   onChange: WeatherChangeHandler;
   onCopyDiagnostic?: (text: string) => void | Promise<void>;
@@ -72,6 +76,7 @@ export function DataHubWeatherContent({
   isLoading,
   isRefreshing = false,
   isSaving,
+  managementScope = "all",
   message,
   onChange,
   onCopyDiagnostic = () => undefined,
@@ -114,6 +119,7 @@ export function DataHubWeatherContent({
   return (
     <div className="space-y-6" data-data-hub-section="external-weather">
       {remoteSyncBanner}
+      <SharedInfrastructureBanner kind="weather" managementScope={managementScope} />
       {errorMessage ? <div className="mgmt-status is-error" role="alert">{errorMessage}</div> : null}
       {message ? <div className="mgmt-status is-success" role="status">{message}</div> : null}
 
@@ -162,6 +168,7 @@ let cachedWeatherPreview: WeatherHeaderContract | null = null;
 let cachedWeatherDiagnostic: WeatherDiagnostic | null = null;
 
 export function DataHubWeather() {
+  const workspace = useDataHubWorkspace();
   const routeModel = useLoaderData() as DataHubWeatherRouteModel;
   const initialSettings = routeModel.settings;
   const [settings, setSettings] = useState<WeatherSettings | null>(initialSettings);
@@ -382,6 +389,7 @@ export function DataHubWeather() {
       isLoading={false}
       isRefreshing={isRefreshing}
       isSaving={isSaving}
+      managementScope={workspace.managementScope}
       message={message}
       onChange={handleChange}
       onCopyDiagnostic={copyWeatherDiagnostic}

@@ -268,6 +268,18 @@ test("a scoped live update changes only the matching metric identity", () => {
   assert.equal(updated.metrics[0]?.provenance.sourceTimestamp, "2026-08-31T03:01:00.000Z");
 });
 
+test("U1-R4 metrics issue filter keeps only unhealthy identities in the current list", () => {
+  const html = renderToStaticMarkup(
+    <DataHubMetricsContent
+      listQuery={{ filter: "issue", scope: "kn", search: "Shared" }}
+      model={normalizeMetricsInventory(inventory)}
+    />
+  );
+  assert.match(html, /data-metric-id="kn:inventory.same"/);
+  assert.doesNotMatch(html, /data-metric-id="cl:inventory.same"/);
+  assert.match(html, /1 筆可用數據/);
+});
+
 test("Metrics renders scope, current value, states, source, ownership, and provenance", () => {
   const html = renderToStaticMarkup(<DataHubMetricsContent model={normalizeMetricsInventory(inventory)} />);
 

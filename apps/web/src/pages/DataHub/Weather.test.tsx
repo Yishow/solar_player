@@ -75,6 +75,13 @@ function renderWeather(overrides: Partial<Parameters<typeof DataHubWeatherConten
   );
 }
 
+test("U1-R3-S02 weather with a site filter states shared non-applicability", () => {
+  const html = renderWeather({ managementScope: "kn" });
+  assert.match(html, /data-shared-infrastructure="weather"/);
+  assert.match(html, /不會依廠區複製/);
+  assert.match(html, /不只 KN/);
+});
+
 test("Weather content exposes enable, location, preset, custom-field, interval and preview controls", () => {
   const html = renderWeather({
     settings: { ...settings, fieldKeys: ["weather"], preset: "custom" }

@@ -25,6 +25,8 @@ test("Data Hub route family exposes the required sections", () => {
   for (const section of ["connections", "sources", "metrics", "external"]) {
     assert.match(routerSource, new RegExp(`path:\\s*"${section}"`));
   }
+  assert.match(routerSource, /DataHubTaskHome/);
+  assert.doesNotMatch(routerSource, /index:\s*true,\s*element:\s*<Navigate to="connections"/);
 });
 
 test("legacy data settings routes redirect through guarded compatibility loaders", () => {

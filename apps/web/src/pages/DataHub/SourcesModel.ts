@@ -145,10 +145,10 @@ export function getMetricScopeLabel(scope: MetricScope) {
 }
 
 const healthLabels: Record<SolarManagedSource["health"], string> = {
-  healthy: "Healthy",
-  stale: "Stale",
-  unhealthy: "Unhealthy",
-  unknown: "Unknown"
+  healthy: "正常 (Healthy)",
+  stale: "過期 (Stale)",
+  unhealthy: "異常 (Unhealthy)",
+  unknown: "未知 (Unknown)"
 };
 
 const healthTones: Record<SolarManagedSource["health"], SourceHealth["tone"]> = {
@@ -185,18 +185,18 @@ function isBadQuality(quality: string | null) {
 
 function resolveGenericHealth(topic: GenericMqttMapping, status: MqttSourceStatus): SourceHealth {
   if (!topic.enabled) {
-    return { label: "Disabled", tone: "warning" };
+    return { label: "已停用 (Disabled)", tone: "warning" };
   }
   if (!status.connected) {
-    return { label: "Broker offline", tone: "danger" };
+    return { label: "Broker 離線 (Broker offline)", tone: "danger" };
   }
   if (isBadQuality(topic.quality)) {
-    return { label: "Degraded", tone: "warning" };
+    return { label: "品質異常 (Degraded)", tone: "warning" };
   }
   if (topic.lastReceivedAt) {
-    return { label: "Active", tone: "success" };
+    return { label: "正常接收 (Active)", tone: "success" };
   }
-  return { label: "Waiting for data", tone: "warning" };
+  return { label: "等待資料 (Waiting for data)", tone: "warning" };
 }
 
 export function isSolarAdapterManagedMetricIdentity(metricScope: MetricScope, metricKey: string) {
