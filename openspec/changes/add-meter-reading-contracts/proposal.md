@@ -12,7 +12,10 @@ MetricsAccumulatorService 已讀 consumptionEnergy 並寫 cumulative counter；s
 
 ## What Changes
 
-在 shared、MQTT ingest 及 SQLite 持久層建立帶版本的來源定義與逐筆讀值；以明確的計量關係取代 metric key 前綴猜測。廠區主錶與部門子錶各自有身分；既有來源先做清冊与確認，不自動把所有 factory 欄位改成 kWh。
+- 在 shared、MQTT ingest 及 SQLite 持久層建立帶版本的物理來源、measurementKind 與 energyFlowRole(consumption/generation/grid-import/grid-export)，取代 metric key 前綴猜測；總錶、部門及比較分母只由 E6 profile 保存。
+- 將 retain/dup/qos、origin 與時間證據傳至 E1 入庫閘門；無可信來源時間的 retained packet 只能供設定／診斷，不新增 accepted history 或改變 baseline、freshness、epoch。
+- sourceTimestampTimeZone 僅解析無 offset 的裝置時間；E6 siteTimeZone 是唯一日曆邊界權威，解析錯誤不能用接收時間掩蓋。來源以版本化 timestampPolicy 明確批准 receive-time estimate，預設要求來源時間。
+- 既有來源先做清冊與確認，不自動把所有 factory 欄位改成 kWh；補上重啟 retained replay、accounting ownership 與來源時間解析的驗收情境。
 
 ## Non-Goals
 

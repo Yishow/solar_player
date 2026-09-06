@@ -6,7 +6,7 @@ MetricsAccumulatorService 已讀 consumptionEnergy 並寫 cumulative counter；s
 
 ## Goals / Non-Goals
 
-**In scope**：在 shared、MQTT ingest 及 SQLite 持久層建立帶版本的來源定義與逐筆讀值；以明確的計量關係取代 metric key 前綴猜測。廠區主錶與部門子錶各自有身分；既有來源先做清冊与確認，不自動把所有 factory 欄位改成 kWh。
+**In scope**：在 shared、MQTT ingest 及 SQLite 持久層建立帶版本的物理來源定義、量測語意與逐筆讀值；以明確的 energyFlowRole 取代 metric key 前綴猜測。總錶、部門歸屬及比較分母只由 E6 profile 保存；既有來源先做清冊與確認，不自動把所有 factory 欄位改成 kWh。
 
 **Out of scope**：不改 Solar Collector 已提供的今日／本月發電量語意；不推算電價、不操作現場電錶、不重設實體或既有累積 counter；不把 kWh 冒充 kW，也不在本 change 實作期間差值。
 
@@ -20,15 +20,23 @@ MetricsAccumulatorService 已讀 consumptionEnergy 並寫 cumulative counter；s
 
 ### D1. 來源模型
 
-MeterSourceDefinition 包含 meterId、channelId、metricScope(cl/kn)、metricKey、measurementKind(power-gauge/cumulative-energy/interval-energy)、inputUnit、scaleDecimal、sourceRevision、meterRole(site-main/department)、departmentId、enabled、timeZone、expectedCadenceSeconds、boundaryMaxAgeSeconds。全域僅能是明確的跨廠區衍生結果，不是實體廠區電錶。
+MeterSourceDefinition 包含 meterId、channelId、metricScope(cl/kn)、metricKey、measurementKind(power-gauge/cumulative-energy/interval-energy)、energyFlowRole(consumption/generation/grid-import/grid-export)、inputUnit、scaleDecimal、sourceRevision、enabled、sourceTimestampTimeZone?、timestampPolicy(source-required/allow-receive-time-estimate)、expectedCadenceSeconds、boundaryMaxAgeSeconds。全域僅能是明確的跨廠區衍生結果，不是實體廠區電錶。
+
+E1 不保存 meterRole(site-main/department) 或 departmentId；總錶、部門成員與比較分母只由 E6 的 siteTotal、departments.memberChannelIds、shareBasis 定義。energyFlowRole 描述量測的能源流向，不代表 accounting 歸屬；同一 consumption channel 改選為總錶或部門成員只建立 profile revision，不改 E1 sourceRevision/epoch/baseline。E1 CRUD 遇到 accounting 欄位須回欄位錯誤，不保存影子設定。
+
+sourceTimestampTimeZone 只用於解析裝置沒有 offset 的時間字串，不提供期間邊界。帶 offset/Z 的時間直接解析成 UTC instant；無 offset 時必須使用來源明確設定的有效 IANA timezone，缺設定、非法時間或 DST 歧義均隔離為 SOURCE_TIMESTAMP_INVALID，不借用 E6 或 OS 時區，也不把解析失敗降級成 receive-time-estimated。來源時區與 E6 siteTimeZone 不同是合法設定：先解析 instant，再由 E2 按 E6 profile 分期。E6 siteTimeZone 是唯一日曆邊界權威。timestampPolicy 預設 source-required；只有管理者明確審核後才可保存 allow-receive-time-estimate，批准與 sourceRevision／既有 audit 一起持久化，不接受 packet 或 E6 profile 臨時開啟 fallback。
 
 ### D2. 逐筆保存
 
-保留 rawValueDecimal、normalizedValueKwh（decimal string）、sourceTimestamp、receivedAt、timestampQuality、quality、epochId、sourceRevision、payloadHash。事件於 MQTT 接收時寫入，不以每五秒重讀同一份 live snapshot 當新樣本。只有具權限的診斷可看已遮罩原始樣本。
+保留 rawValueDecimal、normalizedValueKwh（decimal string）、sourceTimestamp（UTC instant 或 null）、receivedAt、timestampQuality、quality、epochId、sourceRevision、payloadHash 及 origin、retain、dup、qos。MQTT callback 的 packet 證據經 M1/M2 extractor 原樣傳到 E1；catalog 的 retained 欄位明確映射為 sample.retain，不因 selector 成功而遺失。sourceTimestamp/timestampQuality 可由 reviewed selector 與 E1 時間解析規則從所選 record 取得，保留原始時間證據；不要求 generic callback 先知道每個 tag 的觀測時間，也不得以接收時間充當可信來源時間。缺少 transport 證據不能預設 retain=false。事件於 MQTT 接收時經 admission gate 後寫入，不以每五秒重讀同一份 live snapshot 當新樣本。只有具權限的診斷可看已遮罩原始樣本。
 
 ### D3. 唯一性與順序
 
-同一 meter/channel/revision/epoch/sourceTimestamp 的相同值是重複訊息，不能重計。同 timestamp 不同值為衝突事件；保留診斷但不覆寫已接受樣本。延遲且較舊的有效樣本可加入事件紀錄，後續通知 E3 局部重算，不倒退目前 live 值。
+先做 admission gate，再處理唯一性、順序及 counter continuity。origin=catalog/offline 的樣本只供設定／診斷；正式 MQTT packet 若 retain=true 且無可信 sourceTimestamp，回 quarantined/RETAINED_SOURCE_TIME_UNKNOWN，實際年齡為 unknown。此分支不得新增 accepted history、更新 live 值／lastAcceptedAt／freshness／baseline、建立 epoch、判定 counter discontinuity 或送 meter-readings-changed。即使重啟遺失記憶體去重 cache，仍以 packet 證據擋下，不以 payloadHash 或 receive time 猜它是否為新樣本。
+
+可信 sourceTimestamp 是依已審核來源解析規則得到且通過驗證的原始觀測 instant，不包含 receivedAt、catalog lastSeen 或 receive-time-estimated。retain/dup/qos 不證明資料新鮮。時間解析只產生值或診斷，不更新 accepted state；若 retain=true 且解析失敗，主隔離原因仍為 RETAINED_SOURCE_TIME_UNKNOWN，另附 SOURCE_TIMESTAMP_INVALID 診斷。缺 transport 證據且無可信 sourceTimestamp 回 quarantined/TRANSPORT_EVIDENCE_MISSING；其他解析失敗的 source timestamp 依 D1 隔離，不走時間缺失 fallback。
+
+通過 gate 後，同一 meter/channel/revision/epoch/sourceTimestamp 的相同值是重複訊息，不能重計。同 timestamp 不同值為衝突事件；保留診斷但不覆寫已接受樣本。retained 帶可信 sourceTimestamp 依此去重，不能以重送 receivedAt 刷新 freshness。延遲且較舊的有效樣本可加入事件紀錄，後續通知 E3 局部重算，不倒退目前 live 值。
 
 ### D4. 單位與精度
 
@@ -36,7 +44,7 @@ Wh→kWh 除1000、MWh→kWh 乘1000，先用 decimal arithmetic 轉換及相減
 
 ### D5. 來源切換
 
-換 Topic、換錶、修正單位倍率須建立新 sourceRevision/epoch，記錄操作者與原因，不連接兩個不同口徑讀值。確定同一主錶可用多條 transport 時只允許一個 primary，其他明確 standby，不相加。
+換 Topic、換錶、修正量測種類／energyFlowRole／單位倍率／sourceTimestampTimeZone／timestampPolicy 須建立新 sourceRevision/epoch，記錄操作者與原因，不連接兩個不同口徑讀值。確定同一實體錶可用多條 transport 時只允許一個 primary，其他明確 standby，不相加。E6 accounting 歸屬或 siteTimeZone 變更不改寫 E1 原始樣本。
 
 ### D6. 既有來源遷移
 
@@ -44,11 +52,13 @@ Wh→kWh 除1000、MWh→kWh 乘1000，先用 decimal arithmetic 轉換及相減
 
 ### D7. 儲存與資料量界限
 
-新資料表使用定長來源識別與索引(scope,meter,channel,revision,epoch,sourceTimestamp)，不把完整payload永久存進計算表。accepted observations append-only；隔離訊息保留必要hash/原因，診斷樣本設大小與存留上限。唯一性用source identity與observed time/value hash，不以receive time去重。
+新資料表使用定長來源識別與索引(scope,meter,channel,revision,epoch,sourceTimestamp)，不把完整payload永久存進計算表。accepted observations append-only；隔離訊息保留必要 hash／原因與 transport/time 證據，診斷樣本設大小與存留上限。可信來源時間的唯一性用 source identity 與 sourceTimestamp/value hash，不以 receive time 去重。receive-time-estimated 不屬於可信 sourceTimestamp 索引；timestamp 缺失且 dup=true 的重送不能用新的 receivedAt 新增 accepted observation，回 quarantined/DUPLICATE_SOURCE_TIME_UNKNOWN。
 
-## API / Data / State Contracts
+## Implementation Contract
 
-新增 shared 純資料型別與服務契約 ingestMeterReading(definition, sample)。回傳 accepted/duplicate/conflict/quarantined 與 readingId；只有 accepted 的事件推送 meter-readings-changed（內部事件，不替代既有 display sync）。上游不必更改 MQTT Topic 才能導入；sourceTimestamp 缺失時可記 receive-time-estimated，不能冒充原始觀測時間。
+新增 shared 純資料型別與服務契約 ingestMeterReading(definition, sample)，sample 明確攜帶 D2 的 transport/time/origin 證據。回傳 accepted/duplicate/conflict/quarantined、可用時的 readingId 及隔離原因；只有 accepted 的事件推送 meter-readings-changed（內部事件，不替代既有 display sync）。上游不必更改 MQTT Topic 才能導入。只有來自正式接收路徑、retain=false、dup=false、qos 為 0/1/2，且該 sourceRevision 的 timestampPolicy=allow-receive-time-estimate 的缺 timestamp packet，才可記 receive-time-estimated；sourceTimestamp 保持 null，receivedAt 只作估計觀測時間，不冒充原始時間或 exact boundary。缺 timestamp 的 retained、duplicate 或 transport 證據未知情況不能進入 fallback；其餘 source-required 缺 timestamp 情況回 quarantined/SOURCE_TIMESTAMP_REQUIRED。
+
+以 E1-R2-S03 的「重啟後收到舊 retained 10000 kWh、無 timestamp，目前已接受 10100 kWh」確認 gate 在任何 state mutation 前執行，並以 E1-R5-S03/S04 驗證來源時間解析和拒絕案例；期間歸屬由 E2/E6 整合驗證，不在 E1 另建日曆 resolver。
 
 錯誤回應保留既有管理／播放權限邊界；新增錯誤提供穩定 code、可理解訊息與可定位的欄位或 item。缺資料用 null＋品質，不以空字串、NaN 或 0 掩蓋。未識別的 scope、meter、page 或 item 不自動改成 CL。
 

@@ -14,14 +14,21 @@
 |---|---|---|---|
 | E1-R1 | E1-R1-S01 — Separate power from energy | service＋SQLite＋API | only the main meter enters consumption-counter processing; the inverter is not summed into consumption |
 | E1-R1 | E1-R1-S02 — Unknown legacy mapping | service＋SQLite＋API | the original setting is preserved, its status is needs-review, and period calculation cannot use it |
+| E1-R1 | E1-R1-S03 — Accounting assignment does not redefine a source | source/profile service＋SQLite | E6 重選只改 profile revision；E1 source revision/epoch/baseline 不變，沒有第二份 accounting 設定 |
+| E1-R1 | E1-R1-S04 — Reject accounting fields on a source | source API＋SQLite | meterRole/departmentId 回欄位錯誤且零寫入 |
 | E1-R2 | E1-R2-S01 — Repeated retained payload | service＋SQLite＋API | one accepted observation remains and no energy increase is invented |
 | E1-R2 | E1-R2-S02 — Timestamp collision | service＋SQLite＋API | the second is retained as a conflict diagnostic and does not replace the accepted value |
+| E1-R2 | E1-R2-S03 — Timestamp-free retained replay after restart | isolated broker＋production callback/extractor＋SQLite＋clock | 重啟後 10000 kWh 無 timestamp retained 重送十次（包含 dup=false）皆隔離；原 10100 accepted rows/live/baseline/epoch/lastAcceptedAt 不變，freshness 不刷新，事件及 discontinuity 計數不增加 |
 | E1-R3 | E1-R3-S01 — Wh normalization | service＋SQLite＋API | the normalized values are 10000 and 10125 kWh, allowing a later 125 kWh delta |
 | E1-R3 | E1-R3-S02 — Large exact register | service＋SQLite＋API | the difference remains exactly 0.125 kWh without conversion through an unsafe JavaScript number |
 | E1-R4 | E1-R4-S01 — Replace physical meter | service＋SQLite＋API | a new epoch starts at 15; the service neither creates a negative delta nor credits 15 as observed interval consumption |
 | E1-R4 | E1-R4-S02 — Edit display name only | service＋SQLite＋API | physical identity and the counter baseline remain unchanged |
 | E1-R5 | E1-R5-S01 — Same key across sites | service＋SQLite＋API | their source revisions, samples and live values remain isolated |
-| E1-R5 | E1-R5-S02 — Timestamp missing | service＋SQLite＋API | the sample is marked receive-time-estimated and cannot be represented as an exact boundary observation |
+| E1-R5 | E1-R5-S02 — Timestamp missing | service＋SQLite＋API | 只允許 sourceRevision timestampPolicy=allow-receive-time-estimate、production retain=false/dup=false、qos=0/1/2 fallback；sourceTimestamp=null 且 estimated，不能當 exact boundary；dup=true 對照重送回 DUPLICATE_SOURCE_TIME_UNKNOWN、不新增 accepted |
+| E1-R5 | E1-R5-S03 — Source timezone differs from calendar timezone | timestamp parser＋E2/E6 integration | UTC 的無 offset 2026-08-31T16:00:00 與帶 +08:00 的 2026-09-01T00:00:00 都解析成 2026-08-31T16:00:00Z，由 Asia/Taipei profile 歸入九月邊界 |
+| E1-R5 | E1-R5-S04 — Unresolvable source timestamp is not receive-time fallback | parser＋SQLite | 非 retained packet 的無來源時區、DST 歧義與非法時間回 SOURCE_TIMESTAMP_INVALID；retained 對照組以 RETAINED_SOURCE_TIME_UNKNOWN 為主原因並附解析診斷；不以 profile/OS/receivedAt 代替，不改 accepted/baseline/freshness |
+| E1-R5 | E1-R5-S05 — Missing packet evidence cannot enable fallback | callback/extractor＋service＋SQLite | 缺 retain/dup/qos 且無 timestamp 回 TRANSPORT_EVIDENCE_MISSING；不默認 retain=false，不刷新 baseline/freshness |
+| E1-R5 | E1-R5-S06 — Unapproved receive-time fallback is rejected | source policy＋service＋SQLite | 預設 source-required 時無 timestamp 回 SOURCE_TIMESTAMP_REQUIRED；payload 不能開啟 fallback，domain state 不變 |
 | E1-R6 | E1-R6-S01 — Generation key shares prefix | service＋SQLite＋API | the generation metric is excluded despite its factory prefix |
 | E1-R6 | E1-R6-S02 — Only energy counter exists | service＋SQLite＋API | the instantaneous field is unavailable rather than showing the cumulative kWh number |
 
