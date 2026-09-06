@@ -23,6 +23,7 @@ import {
   buildDataHubTaskHref,
   useDataHubWorkspace
 } from "./workspaceContext";
+import { siteEnergySetupHref } from "@solar-display/shared";
 
 const hiddenManagementRoutePaths = getConfiguredHiddenManagementRoutePaths();
 
@@ -42,6 +43,17 @@ export function DataHubTaskHomeContent({
           <h2 className="text-lg font-semibold text-[#1e2821]" id="data-hub-tasks-heading">要先做哪件事？</h2>
           <p className="text-sm text-[#687169]">用任務開始，不必先記住連線、來源或指標這些內部名稱。</p>
         </div>
+        {workspaceScope === "kn" ? (
+          <Link className="mgmt-action primary min-h-[40px]" data-data-hub-energy-task="kn" to={siteEnergySetupHref("kn")}>
+            設定觀音用電
+          </Link>
+        ) : workspaceScope === "all" ? (
+          <p className="text-sm text-[#8a4f18]" data-data-hub-energy-task="choose-site">請先選擇 CL 或 KN 廠區，才能開始廠區用電設定。</p>
+        ) : workspaceScope === "cl" ? (
+          <Link className="mgmt-action primary min-h-[40px]" data-data-hub-energy-task="cl" to={siteEnergySetupHref("cl")}>
+            設定中壢用電
+          </Link>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-3">
           {DATA_HUB_TASKS.map((task) => (
             <Link
