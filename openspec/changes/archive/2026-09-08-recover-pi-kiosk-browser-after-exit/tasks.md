@@ -9,4 +9,19 @@
 ## 2. Repo 與實機交付驗證
 
 - [x] 2.1 驗證 helper 沒有擴張到 systemd、API、LightDM、播放或風扇曲線，且 co-located/thin-kiosk 共用契約通過：執行 `node --test scripts/deploy.test.mjs`、`git diff --check`、`spectra analyze recover-pi-kiosk-browser-after-exit --json` 與 `pnpm verify`，所有指令須成功。
-- [ ] 2.2 依 `Migration Plan` 選擇性安裝 kiosk start/stop helper 並套用 repo 既有 Pi 5 fan configuration，不更新 Solar Player application、Node.js runtime、資料庫或 runtime assets；reboot witness 必須顯示 `solar-display`、LightDM autologin、`/health`、`/overview`、Firefox kiosk process 與 launcher monitor 正常，Pi 5 cooling state 至少 1 且 `fan1_input` 大於 0，並以終止 Firefox child 後出現新 PID 證明自動恢復，最後回報 helper rollback path 與 launch acceptance 證據。
+- [x] 2.2 依 `Migration Plan` 選擇性安裝 kiosk start/stop helper 並套用 repo 既有 Pi 5 fan configuration，不更新 Solar Player application、Node.js runtime、資料庫或 runtime assets；reboot witness 必須顯示 `solar-display`、LightDM autologin、`/health`、`/overview`、Firefox kiosk process 與 launcher monitor 正常，Pi 5 cooling state 至少 1 且 `fan1_input` 大於 0，並以終止 Firefox child 後出現新 PID 證明自動恢復，最後回報 helper rollback path 與 launch acceptance 證據。
+
+## Closeout Notes
+
+- 測試驗證：
+  1. `node --test scripts/deploy.test.mjs` (110 測通過，1 skip，exit code 0)
+     - `kiosk launcher restarts Firefox after an unexpected exit`
+     - `kiosk launcher starts another health window after timeout`
+     - `kiosk stop helper writes the intentional-exit marker before killing Firefox`
+     - `a new kiosk launcher clears a stale intentional-exit marker`
+     - `kiosk stop request during the start delay prevents Firefox launch`
+     - `concurrent kiosk launchers acquire only one monitor slot`
+  2. 交付 Gate：`pnpm verify` 全階段通過。
+
+Archive 與 commit 依 repo workflow 執行。
+
