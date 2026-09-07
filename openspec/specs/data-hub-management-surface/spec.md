@@ -7,61 +7,30 @@ Defines a unified, scope-aware management workspace for data connections, source
 ## Requirements
 
 ### Requirement: Data Hub separates connection, source, metric, usage, diagnostics, and external-data concerns
+<!-- requirement-id: U1-M1 -->
 
-The management application SHALL provide a streamlined `Data Hub` workspace with primary navigable areas for `Connections`, `Sources`, `Metrics` (which consolidates semantic metrics, usage tracking, and diagnostics), and `External Data`. The workspace SHALL preserve backward-compatible redirects for legacy `/settings/data-hub/usage` and `/settings/data-hub/diagnostics` sub-paths to the consolidated `Metrics` workspace while preserving scope and metric filters.
+The management application SHALL provide a task-oriented Data Hub landing workspace for connecting a source, editing existing data and diagnosing unavailable data. It SHALL retain direct navigable areas for Connections, Sources, Metrics and External Data. Metrics SHALL continue to consolidate metric usage and diagnostics. Legacy usage and diagnostics URLs SHALL redirect to the consolidated Metrics workspace while preserving scope and metric filters. Chinese task labels SHALL clarify operator intent without changing metric identities, device credentials or the distinction between shared infrastructure and site-specific data.
 
 #### Scenario: Operator opens Data Hub
-- **WHEN** an authorized operator opens Data Hub
-- **THEN** the workspace exposes the consolidated primary areas with clear labels
-- **AND** broker configuration appears under Connections and MQTT source management rather than wrapping Weather/External Data
+<!-- scenario-id: U1-M1-S01 -->
 
-#### Scenario: Operator opens legacy usage or diagnostics path
-- **WHEN** an operator navigates to `/settings/data-hub/usage` or `/settings/data-hub/diagnostics`
-- **THEN** the application redirects to `/settings/data-hub/metrics` while preserving the requested scope or metric key in query parameters
+- **GIVEN** an authorized operator opens /settings/data-hub
+- **WHEN** the root workspace renders
+- **THEN** it presents three task entries and direct access to the four specialist areas
 
+#### Scenario: Legacy usage or diagnostic link
+<!-- scenario-id: U1-M1-S02 -->
 
-<!-- @trace
-source: consolidate-data-hub-metrics-and-diagnostics
-updated: 2026-09-01
-code:
-  - apps/web/src/pages/MqttSettings/mqttSettings.css
-  - apps/web/src/pages/DataHub/Diagnostics.tsx
-  - apps/web/src/pages/DataHub/Sources.tsx
-  - apps/web/src/pages/DataHub/Metrics.tsx
-  - apps/web/src/app/routeMeta.ts
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/web/src/app/router.tsx
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/web/src/pages/DataHub/SourceCards.tsx
-  - apps/web/src/styles/management.css
-  - apps/web/src/pages/DataHub/Usage.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
-  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
-  - apps/web/src/pages/DataHub/index.tsx
-  - apps/web/src/pages/DataHub/WeatherModel.ts
-  - apps/web/src/pages/DataHub/WeatherCards.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.ts
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
-  - apps/web/src/app/dataHub.ts
-  - apps/web/src/app/dataHubCompatibility.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.tsx
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
-  - apps/web/src/pages/DataHub/Weather.tsx
-tests:
-  - apps/web/src/pages/DataHub/Metrics.test.tsx
-  - apps/web/src/app/router.test.ts
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/web/src/pages/DataHub/Sources.test.tsx
-  - apps/web/src/hooks/useManagementPasswordGate.test.ts
-  - apps/server/src/routes/metrics-history.test.ts
-  - apps/web/src/app/dataHub.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.test.tsx
-  - apps/web/src/sw.test.ts
-  - apps/web/src/pages/DataHub/Connections/BrokerForm.test.tsx
-  - apps/web/src/app/dataHubCompatibility.test.ts
-  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
-  - apps/web/src/components/AppFooterNav.icons.test.tsx
--->
+- **GIVEN** a bookmark requests usage or diagnostics with KN and a metric filter
+- **WHEN** the application redirects
+- **THEN** Metrics opens with the original scope and metric filters preserved
+
+#### Scenario: One shared broker
+<!-- scenario-id: U1-M1-S03 -->
+
+- **GIVEN** CL and KN use the same central MQTT broker
+- **WHEN** the operator opens Connections while viewing KN data
+- **THEN** the interface identifies the broker as shared infrastructure rather than claiming the change affects KN alone
 
 ---
 ### Requirement: Connections presents the central broker as infrastructure

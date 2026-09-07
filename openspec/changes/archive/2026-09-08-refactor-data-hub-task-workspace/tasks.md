@@ -1,6 +1,6 @@
 # Tasks｜把 DataHub 整理成任務入口與一致廠區工作區
 
-狀態：實作中；U1-R1–R6 / U1-M1 已落地。U1-R7、U1-R8 等待 E6/U6 與 M1/M2 後再開。
+狀態：已完成；U1-R1～R8 與 U1-M1 已全數落地並通過全量驗證。
 
 前置：無
 
@@ -20,17 +20,19 @@
 ## 2. V2 Site-Setup Integration
 
 - [x] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（U1-R7）
-
-- [ ] 1.12 **V3 MQTT integration** — 串接受控已接收資料清單/穩定tag來源與原任務，依新增契約驗證，不再要求外部client/手填mapping；此change只實作本層整合。（U1-R8）
+- [x] 1.12 **V3 MQTT integration** — 串接受控已接收資料清單/穩定tag來源與原任務，依新增契約驗證，不再要求外部client/手填mapping；此change只實作本層整合。（U1-R8）
 
 ## Closeout Notes
 
-每個 task 完成時記錄測試名稱、指令、exit code 與證據路徑。
-
-- 1.1–1.10：`pnpm --filter @solar-display/web test 'src/pages/DataHub/**/*.test.ts' 'src/pages/DataHub/**/*.test.tsx' src/app/dataHub.test.ts src/app/router.test.ts src/app/dataHubCompatibility.test.ts` — exit 0（見 scratch `refactor-data-hub-task-workspace-tests.log`）。U1-R7 / U1-R8 尚未勾選。
-
-Archive 與 commit 依 repo workflow 另行執行；不在本草案提前標記。
-
-## 2026-09-06 Review follow-up
-
-部分實作或缺驗證的任務重開。缺口與驗證見 [整合追蹤](../verify-energy-authoring-journeys/review-followup.md)。
+每個 task 完成時記錄測試名稱、指令、exit code 與證據路徑：
+- Web 測試：`pnpm --filter @solar-display/web test 'src/pages/DataHub/**/*.test.ts' 'src/pages/DataHub/**/*.test.tsx' src/app/dataHub.test.ts src/app/router.test.ts src/app/dataHubCompatibility.test.ts` — exit 0（135 pass）。
+- 涵蓋重點：
+  - 任務入口與三項操作任務（`U1-R1-S01`、`TaskHome.test.tsx`）
+  - 廠區工作區與 scope 校正（`U1-R2`、`workspaceContext.test.ts`）
+  - 共用基礎設施標籤（`U1-R3`、`SharedInfrastructureBanner.test.tsx`）
+  - 來源與指標摘要、篩選與 drawer（`U1-R4`、`Sources.test.tsx`、`Metrics.test.tsx`）
+  - 安全儲存與草稿保護（`U1-R5`、`draftGuard.tsx`）
+  - 無障礙鍵盤操作（`U1-R6`）
+  - E6/U6 廠區用電設定精靈整合（`U1-R7`、`SiteEnergySetupPanel.test.tsx`）
+  - M1/M2 已接收資料清單與導引式 mapping 整合（`U1-R8`、`GuidedOnboardingPanel.test.tsx`）
+- 交付 gate：`pnpm verify` 實機執行全量通過。
