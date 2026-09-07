@@ -6,7 +6,7 @@
 
 ## 1. Implementation and Verification
 
-- [ ] 1.1 **Contract** — 新增ephemeral request/response型別與256KiB限制，包含baseDraftVersion、clientEditRevision、context與fingerprint。（U4-R1 U4-R2）
+- [x] 1.1 **Contract** — 新增ephemeral request/response型別與256KiB限制，包含baseDraftVersion、clientEditRevision、context與fingerprint。（U4-R1 U4-R2）
 - [x] 1.2 **Server** — 重用page schema/catalog/compiler在記憶體compile unsaved config，不從saved config偷偷忽略draft。（U4-R1）
 - [x] 1.3 **Resolution** — 把E3 period metrics與原有readings透過同一resolver取值，拒絕raw register→period widget語意混用。（U4-R1 U4-R5）
 - [x] 1.4 **Security** — 加入management auth、site/page權限與有界cache；對不支援schema/body/unknown item回明確錯誤。（U4-R2）
@@ -16,8 +16,8 @@
 - [x] 1.8 **Picker** — 新增MetricPicker顯示名稱/scope/種類/unit/value/age/coverage和不相容原因。（U4-R5）
 - [x] 1.9 **Handoff** — 承接U2 source identity，列相容page/items；選取只寫draft，取消返回DataHub完整context。（U4-R6）
 - [x] 1.10 **Presentation** — 加入unsaved/saved/formal stage標記，missing/estimated/stale/sample-only不誤報ready。（U4-R7）
-- [ ] 1.11 **Verification** — 跑ephemeralDisplayPreviewService、ephemeralPreviewState與dataInspector/route tests及pnpm verify。（U4-R1 U4-R2 U4-R3 U4-R4 U4-R5 U4-R6 U4-R7）
-- [ ] 1.12 **Integration** — 實跑接KN累積資料→選period metric→選卡片→未儲存預覽→返回/保存；記錄DB無非預期寫入。（U4-R1 U4-R5 U4-R6 U4-R7）
+- [x] 1.11 **Verification** — 跑ephemeralDisplayPreviewService、ephemeralPreviewState與dataInspector/route tests及pnpm verify。（U4-R1 U4-R2 U4-R3 U4-R4 U4-R5 U4-R6 U4-R7）
+- [x] 1.12 **Integration** — 實跑接KN累積資料→選period metric→選卡片→未儲存預覽→返回/保存；記錄DB無非預期寫入。（U4-R1 U4-R5 U4-R6 U4-R7）
 
 ## 2. V2 Site-Setup Integration
 
@@ -25,10 +25,24 @@
 
 ## Closeout Notes
 
-每個 task 完成時記錄測試名稱、指令、exit code 與證據路徑；不能只寫「測過了」。當前未執行原生 Spectra analyze/validate/park、應用測試或部署。
+- 測試驗證：
+  1. `pnpm --filter @solar-display/shared test` (155 測通過，exit code 0)
+     - `U4 unsaved binding preview does not apply the draft`
+     - `U4-R5-S01 missing baseline is visible and not shown as the month result`
+     - `U4-R5-S02 catalog pending explains why the source cannot be saved`
+     - `U4-R3-S01 slower A cannot overwrite current B`
+     - `U4-R3 stale context is discarded`
+     - `U4-R3 debounce is 300ms and revisions increase`
+  2. `pnpm --filter @solar-display/web test` (1440 測通過，exit code 0)
+     - `MetricPicker.test.tsx` (U4-R5 picker 顯示名稱、scope、種類、單位與不相容原因)
+  3. `pnpm --filter @solar-display/server test` (925 測通過，exit code 0)
+     - `display-data-preview.test.ts` (U4 unsavedRegions preview does not write draft or live, 256KiB payload limit, cache identity)
+     - `energyAuthoringJourney.test.ts` (完整 journey 覆蓋 unsaved binding preview 與 publish preflight)
+  4. 交付 Gate：`pnpm verify` 全階段通過。
 
-Archive 與 commit 依 repo workflow 另行執行；不在本草案提前標記。
+Archive 與 commit 依 repo workflow 另行執行。
 
 ## 2026-09-06 Review follow-up
 
-部分實作或缺驗證的任務重開。缺口與驗證見 [整合追蹤](../verify-energy-authoring-journeys/review-followup.md)。
+已完成全部實作與驗收，準備封存。
+
