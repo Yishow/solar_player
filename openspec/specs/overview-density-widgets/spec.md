@@ -7,52 +7,23 @@ TBD - created by archiving change 'add-overview-density-widgets'. Update Purpose
 ## Requirements
 
 ### Requirement: Render editor-maintainable Overview density widgets
+<!-- requirement-id: E4-M1 -->
 
-The `Overview` display page SHALL render a weather card, a three-phase power table, and a filled-area generation trend widget through the existing Overview dashboard widget mechanism, so that authoring, draft persistence, publishing, and runtime rendering all resolve the same widget configuration.
+The Overview display page SHALL render the weather card, monthly-consumption widget and generation-trend widget through the existing dashboard widget configuration. The monthly-consumption widget SHALL preserve its existing phasePower configuration identity for compatibility. Authoring, draft persistence, publication and runtime rendering SHALL resolve the same widget geometry, visibility and style. This requirement SHALL NOT introduce a page-local hardcoded configuration or a monetary quotation widget.
 
-#### Scenario: Default runtime shows density widgets
+#### Scenario: Default Overview widgets
+<!-- scenario-id: E4-M1-S01 -->
 
-- **WHEN** `/overview` renders with no explicit config and resolves the seed configuration
-- **THEN** the weather card, three-phase power table, and filled-area generation trend widget are visible alongside the hero and KPI cards
+- **GIVEN** Overview uses the seed configuration
+- **WHEN** the display page renders
+- **THEN** the weather card, monthly consumption curve and generation trend remain available alongside the hero and KPI cards
 
-#### Scenario: Editor region and visibility persist to runtime
+#### Scenario: Saved widget configuration
+<!-- scenario-id: E4-M1-S02 -->
 
-- **WHEN** an operator adjusts a density widget's region or visibility in `/display-pages/editor`, saves the draft, and publishes
-- **THEN** the published `/overview` runtime renders that widget with the same region and visibility
-
-
-<!-- @trace
-source: add-overview-density-widgets
-updated: 2026-06-07
-code:
-  - apps/web/src/pages/Overview/viewModel.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
-  - apps/web/src/pages/Overview/layout.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
-  - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
-  - data/server-runtime.lock.json
-  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
-  - docs/reference/Better/01.Overivew (大).png
-  - apps/web/src/hooks/useOverviewWeather.ts
-  - apps/web/src/pages/Overview/index.tsx
-  - apps/web/src/pages/Overview/overview.css
-  - apps/web/src/pages/shared/displayCardStyleConfig.ts
-  - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
-  - apps/web/src/pages/Overview/displayPageConfig.ts
-tests:
-  - apps/web/src/pages/Overview/densityWidgets.test.ts
-  - apps/web/src/pages/displayPageChromeConfig.test.ts
-  - apps/web/src/pages/Overview/widgets/GenerationTrendArea.test.tsx
-  - apps/web/src/pages/Overview/widgets/overviewWidgets.test.tsx
-  - apps/web/src/pages/displayPageCardStyleConfig.test.ts
-  - apps/web/src/pages/Overview/widgets/WeatherCardWidget.test.tsx
-  - apps/web/src/pages/Overview/style.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
-  - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
-  - apps/web/src/pages/Overview/densityViewModel.test.ts
-  - apps/web/src/pages/Overview/layout.test.ts
--->
+- **GIVEN** an operator changes the existing phasePower widget geometry or visibility in the editor
+- **WHEN** the draft is saved and published
+- **THEN** the runtime uses the same configuration without a renamed or orphaned widget identity
 
 ---
 ### Requirement: Bind weather card to the existing weather contract
@@ -105,39 +76,44 @@ tests:
 
 ---
 ### Requirement: Render three-phase power from existing metric channel with fallback
+<!-- requirement-id: E4-M2 -->
 
-The three-phase power table SHALL be replaced by a monthly consumption curve widget that renders daily power consumption over the current month. The widget SHALL display a title of "月用量曲線" and a subtitle of "Monthly Consumption". The chart SHALL render a smooth filled area curve with a layered gradient fill. It SHALL fetch daily summaries from `/api/metrics/daily-summary?range=month`, reverse the returned descending rows to draw chronologically, and refresh after a `monitoring-history` display sync event. When historical data is unavailable or empty, it SHALL render the existing empty state and SHALL NOT fabricate mock values, NaN, or empty chart points.
+The legacy-named phasePower widget SHALL render the current calendar month daily consumption with title 月用量曲線 and subtitle Monthly Consumption. Device playback SHALL read the authorized daily-summary endpoint /api/metrics/daily-summary?range=month, while management preview SHALL use its authorized explicit-scope history contract without impersonating a device. The widget SHALL validate finite values, sort dates chronologically, preserve zero observations, exclude future dates and display unavailable dates as gaps. Smooth filled-area segments and layered gradient styling SHALL only connect adjacent eligible daily points, not bridge missing dates. A single valid point SHALL remain visible. The widget SHALL refresh for applicable monitoring-history events and discard stale responses from previous scopes or revisions. API failure, unavailable baseline and empty history SHALL be distinguishable, with no fabricated mock values, NaN, fixed percentages or unsupported currency values.
 
-#### Scenario: Monthly consumption data available from API
+#### Scenario: Daily values in the current month
+<!-- scenario-id: E4-M2-S01 -->
 
-- **WHEN** the daily-summary API returns current-month consumption summaries
-- **THEN** the monthly consumption widget renders the daily values chronologically
+- **GIVEN** the API returns descending valid values [3400,3300,2900,3200,3100] for adjacent dates
+- **WHEN** the chart builds chronological data
+- **THEN** the series is [3100,3200,2900,3300,3400]
 
-##### Example: Rendering API consumption data
+#### Scenario: Valid zero and missing date
+<!-- scenario-id: E4-M2-S02 -->
 
-- **GIVEN** the API returns descending daily values `[3400, 3300, 2900, 3200, 3100]`
-- **WHEN** the monthly consumption widget resolves the response
-- **THEN** the curve contains `[3100, 3200, 2900, 3300, 3400]` from oldest to newest
+- **GIVEN** September 1 has 0 kWh, September 2 is unknown and September 3 has 80 kWh
+- **WHEN** the month chart renders
+- **THEN** September 1 remains a real zero and the line does not bridge the missing September 2 interval
 
-#### Scenario: Current-day summary refreshes an open widget
+#### Scenario: Current-day refresh
+<!-- scenario-id: E4-M2-S03 -->
 
-- **WHEN** the widget is mounted and receives a `monitoring-history` display sync event
-- **THEN** it SHALL fetch the month daily-summary API again and render the latest daily values
+- **GIVEN** the widget is mounted for KN
+- **WHEN** a matching monitoring-history event signals a newer revision
+- **THEN** the widget fetches KN history again and displays the new current-day value
 
-#### Scenario: Monthly consumption data unavailable or empty
+#### Scenario: Unauthorized management preview
+<!-- scenario-id: E4-M2-S04 -->
 
-- **WHEN** the daily-summary API fails or returns no valid consumption values
-- **THEN** the monthly consumption widget SHALL render the existing empty state without a chart or fabricated values
+- **GIVEN** a management editor lacks device credentials but has authorized KN management access
+- **WHEN** it previews monthly consumption
+- **THEN** it reads KN through the management history contract without removing playback authentication
 
+#### Scenario: No valid consumption data
+<!-- scenario-id: E4-M2-S05 -->
 
-<!-- @trace
-source: fix-overview-trend-accumulation
-updated: 2026-07-16
-code:
-  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
-tests:
-  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
--->
+- **GIVEN** the API fails or no eligible daily values exist
+- **WHEN** the widget resolves its state
+- **THEN** it displays the specific error or empty/baseline message without a fabricated chart
 
 ---
 ### Requirement: Preserve Overview architecture and scope boundaries
