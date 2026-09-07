@@ -12,6 +12,14 @@ test("legacy data settings URLs resolve to their Data Hub sections and preserve 
     "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
   );
   assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-source?scope=cl"),
+    "/settings/data-hub/sources?scope=cl"
+  );
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-source"),
+    "/settings/data-hub/sources"
+  );
+  assert.equal(
     resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/usage?scope=cl&metricKey=realTimePower"),
     "/settings/data-hub/metrics?scope=cl&metricKey=realTimePower"
   );

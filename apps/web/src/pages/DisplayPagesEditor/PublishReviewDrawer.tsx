@@ -3,12 +3,16 @@ import { formatFallbackKey, formatFallbackMode, type DisplayPagePublishingState 
 
 export function PublishReviewDrawer({
   blockingCount,
+  isPublishBlocked = false,
+  isPublishing = false,
   onClose,
   onConfirmPublish,
   publishingError,
   publishingState
 }: {
   blockingCount: number;
+  isPublishBlocked?: boolean;
+  isPublishing?: boolean;
   onClose: () => void;
   onConfirmPublish: () => void;
   publishingError: string;
@@ -39,7 +43,7 @@ export function PublishReviewDrawer({
       <button
         className="mgmt-action primary min-h-[40px]"
         data-publish-review-confirm
-        disabled={blockingCount > 0}
+        disabled={isPublishBlocked || isPublishing || blockingCount > 0 || publishingState?.validation.canPublish !== true}
         onClick={onConfirmPublish}
         type="button"
       >

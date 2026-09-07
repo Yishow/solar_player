@@ -34,6 +34,22 @@ test("M2-R4 high precision counter lexemes stay decimal strings", () => {
   assert.equal(extractDecimalLexeme(9007199254740993), null);
 });
 
+test("M2 selector metadata preserves version and selected record timestamp path", () => {
+  const selector = compileSelector("value", "MAIN", {
+    selectorVersion: 7,
+    timestampPath: ["observedAt"]
+  });
+  assert.equal(selector.selectorVersion, 7);
+  assert.deepEqual(selector.timestampPath, ["observedAt"]);
+  assert.equal(
+    extractBySelector({ tag: "MAIN", value: "10000.125", observedAt: "2026-09-01T00:00:00Z" }, {
+      ...selector,
+      path: selector.timestampPath ?? []
+    }),
+    "2026-09-01T00:00:00Z"
+  );
+});
+
 test("M2 preview is read-only and apply requires the same token and draft", () => {
   const draft = {
     channelId: "kn-main",

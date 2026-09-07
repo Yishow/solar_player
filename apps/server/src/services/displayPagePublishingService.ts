@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   ConfigStage,
   DisplayPageId,
@@ -40,6 +41,7 @@ import {
 import { validateDisplayPageObjectDraft } from "./displayPageObjectValidation.js";
 import { readDisplayPageInstance } from "./displayPageRegistryService.js";
 import { getActiveProfile } from "./siteEnergyProfileService.js";
+import { readAssignedEnergyScopes } from "./displayPublishEnergyScopes.js";
 
 type StageConfigRow = {
   config_json: string;
@@ -985,22 +987,17 @@ function checkImageReferences(regions: Record<string, unknown>): ValidationFindi
 const ENERGY_PUBLISH_PAGES = new Set(["overview", "factory-circuit", "factory-circuit-guanyin"]);
 const preflightTokens = new Map<string, { expiresAt: number; pageId: string; version: number }>();
 
-function requiredEnergyScopes(pageId: DisplayPageId): Array<"cl" | "kn"> {
-  if (pageId === "factory-circuit-guanyin") {
-    return ["kn"];
-  }
-  if (pageId === "factory-circuit") {
-    return ["cl"];
-  }
-  return ["cl", "kn"];
+function isEnergyPublishPage(pageId: DisplayPageId) {
+  const template = readDisplayPageInstance(pageId)?.templateKey ?? pageId;
+  return ENERGY_PUBLISH_PAGES.has(template);
 }
 
 function collectEnergyAuthoringFindings(pageId: DisplayPageId, unsavedBindings = false): ValidationFinding[] {
   let energyProfileReady = true;
-  if (ENERGY_PUBLISH_PAGES.has(pageId)) {
+  if (isEnergyPublishPage(pageId)) {
     try {
       const database = getDatabase();
-      energyProfileReady = requiredEnergyScopes(pageId).every((scope) => getActiveProfile(database, scope)?.status === "ready");
+      energyProfileReady = readAssignedEnergyScopes(database, pageId).every((scope) => getActiveProfile(database, scope)?.status === "ready");
     } catch {
       energyProfileReady = false;
     }
@@ -1043,7 +1040,7 @@ function issuePublishPreflight(pageId: DisplayPageId, unsavedBindings = false) {
   validation.findings.push(...collectEnergyAuthoringFindings(pageId, unsavedBindings));
   appendDraftAssetWarnings(validation, pageId, draft.regions, draft.freeformObjects ?? []);
   validation.canPublish = !validation.findings.some((finding) => finding.severity === "blocking");
-  const preflightToken = `u5-${pageId}-${draft.version}-${Date.now()}`;
+  const preflightToken = randomUUID();
   const now = new Date();
   const expiresAt = now.getTime() + 10 * 60 * 1000;
   preflightTokens.set(preflightToken, {
@@ -1090,7 +1087,7 @@ function publishDraft(
       severity: "blocking"
     });
   }
-  const requiresPreflightToken = ENERGY_PUBLISH_PAGES.has(pageId);
+  const requiresPreflightToken = isEnergyPublishPage(pageId);
   if (requiresPreflightToken && !options.preflightToken) {
     validation.findings.push({
       code: "PREFLIGHT_TOKEN_REQUIRED",

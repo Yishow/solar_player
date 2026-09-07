@@ -151,7 +151,7 @@ export function FactoryCircuitRuntimeContent({
     () => buildFactoryCircuitRuntimeSnapshot(runtimeSelection.readings),
     [runtimeSelection.readings]
   );
-  const [energyShares, setEnergyShares] = useState<Record<string, number | null> | undefined>(undefined);
+  const [energyShares, setEnergyShares] = useState<Record<string, number | null>>({});
   useEffect(() => {
     let cancelled = false;
     void requestJson<{ shares?: Array<{ departmentId: string; ratio: number | null }> }>(
@@ -167,7 +167,7 @@ export function FactoryCircuitRuntimeContent({
       setEnergyShares(next);
     }).catch(() => {
       if (!cancelled) {
-        setEnergyShares(undefined);
+        setEnergyShares({});
       }
     });
     return () => {
@@ -222,14 +222,14 @@ export function FactoryCircuitRuntimeContent({
           const storySlot = factoryCircuitStory?.slots.find(
             (candidate) => candidate.itemId === slotKey
           );
-          const sharePercent = row.isEmpty ? row.fallbackSharePercent : row.sharePercent;
+          const sharePercent = row.sharePercent;
           const formattedSharePercent =
             sharePercent === null
               ? "—"
               : storySlot?.format?.precision === undefined
                 ? String(sharePercent)
                 : sharePercent.toFixed(storySlot.format.precision);
-          const shareUnit = storySlot?.format?.unitDisplay === "hide" ? "" : "%";
+          const shareUnit = sharePercent === null || storySlot?.format?.unitDisplay === "hide" ? "" : "%";
           return (
             <article
               key={slotKey}

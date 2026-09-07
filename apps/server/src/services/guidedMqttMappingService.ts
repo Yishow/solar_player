@@ -1,32 +1,71 @@
+import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import {
-  previewMapping,
+  isEnergyFlowRole, isMeterMeasurementKind, parseDecimalString, validateMeterSourceWrite,
   type MappingPreviewDraft
 } from "@solar-display/shared";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
+import { canonicalJson } from "./authoringCanonicalJson.js";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
 
+function conflict(code: string): never {
+  throw Object.assign(new Error(code), { code, statusCode: 409 });
+}
+
+function reviewedDraft(draft: MappingPreviewDraft) {
+  const source = draft?.source;
+  if (!source || !draft.topic || /[+#\u0000]/u.test(draft.topic)) conflict("SOURCE_REVIEW_REQUIRED");
+  if (!validateMeterSourceWrite(source).ok
+    || (source.metricScope !== "cl" && source.metricScope !== "kn")
+    || !isMeterMeasurementKind(source.measurementKind) || !isEnergyFlowRole(source.energyFlowRole)
+    || source.reviewStatus !== "reviewed" || typeof source.enabled !== "boolean"
+    || !Number.isInteger(source.sourceRevision) || source.sourceRevision < 1
+    || !["meterId", "channelId", "metricKey", "epochId", "inputUnit"].every((key) => typeof source[key as keyof typeof source] === "string" && String(source[key as keyof typeof source]).trim())
+    || !["source-required", "allow-receive-time-estimate"].includes(source.timestampPolicy)
+    || source.channelId !== draft.channelId || source.metricScope !== draft.metricScope
+    || source.measurementKind !== draft.measurementKind || source.energyFlowRole !== draft.energyFlowRole
+    || source.timestampPolicy !== draft.timestampPolicy
+    || !Array.isArray(draft.selector?.path) || !draft.selector.path.every((part) => typeof part === "string")
+    || (draft.selector.tagEquals !== undefined && typeof draft.selector.tagEquals !== "string")) {
+    conflict("PREVIEW_DRAFT_MISMATCH");
+  }
+  if (parseDecimalString(source.scaleDecimal) <= 0n) conflict("PREVIEW_DRAFT_MISMATCH");
+  return JSON.parse(canonicalJson({ ...draft, source, topic: draft.topic })) as MappingPreviewDraft & {
+    source: NonNullable<MappingPreviewDraft["source"]>; topic: string;
+  };
+}
+
+function targetSnapshot(database: Database.Database, draft: ReturnType<typeof reviewedDraft>) {
+  const { metricScope, metricKey, channelId } = draft.source;
+  return canonicalJson({
+    mappings: database.prepare("SELECT * FROM topic_mappings WHERE metric_scope = ? AND metric_key = ? ORDER BY id").all(metricScope, metricKey),
+    sources: database.prepare("SELECT * FROM meter_sources WHERE metric_scope = ? AND (metric_key = ? OR channel_id = ?) ORDER BY meter_id, channel_id, source_revision, epoch_id").all(metricScope, metricKey, channelId)
+  });
+}
+
 export function previewGuidedMapping(database: Database.Database, draft: MappingPreviewDraft) {
-  const preview = previewMapping(draft);
+  const canonicalDraft = reviewedDraft(draft);
+  const previewToken = randomUUID();
   const now = new Date();
   database.prepare(`
-    INSERT INTO mapping_preview_tokens (preview_token, canonical_draft_json, created_at, expires_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO mapping_preview_tokens (preview_token, canonical_draft_json, created_at, expires_at, target_snapshot_json)
+    VALUES (?, ?, ?, ?, ?)
   `).run(
-    preview.previewToken,
-    JSON.stringify(preview.canonicalDraft),
+    previewToken,
+    canonicalJson(canonicalDraft),
     now.toISOString(),
-    new Date(now.getTime() + TOKEN_TTL_MS).toISOString()
+    new Date(now.getTime() + TOKEN_TTL_MS).toISOString(),
+    targetSnapshot(database, canonicalDraft)
   );
-  return preview;
+  return { canonicalDraft, previewToken };
 }
 
 export function persistAppliedSelector(
   database: Database.Database,
   draft: MappingPreviewDraft,
   metricKey: string,
-  topic = `${draft.metricScope}/${draft.channelId}`
+  topic: string
 ) {
   const selectorJson = JSON.stringify(draft.selector);
   const valuePath = draft.selector.path.join(".");
@@ -35,15 +74,15 @@ export function persistAppliedSelector(
   `).get(draft.metricScope, metricKey) as { id: number } | undefined;
   if (existing) {
     database.prepare(`
-      UPDATE topic_mappings SET value_path = ?, selector_json = ?, updated_at = CURRENT_TIMESTAMP
+      UPDATE topic_mappings SET topic = ?, unit = ?, value_path = ?, selector_json = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(valuePath, selectorJson, existing.id);
+    `).run(topic, draft.source!.inputUnit, valuePath, selectorJson, existing.id);
     return;
   }
   database.prepare(`
     INSERT INTO topic_mappings (metric_scope, metric_key, topic, unit, value_path, selector_json, multiplier, offset, decimal_places, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, 'kWh', ?, ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `).run(draft.metricScope, metricKey, topic, valuePath, selectorJson);
+    VALUES (?, ?, ?, ?, ?, ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run(draft.metricScope, metricKey, topic, draft.source!.inputUnit, valuePath, selectorJson);
 }
 
 export function applyGuidedMapping(
@@ -57,16 +96,37 @@ export function applyGuidedMapping(
     topic?: string;
   }
 ) {
-  const stored = database.prepare(`
-    SELECT canonical_draft_json, expires_at FROM mapping_preview_tokens WHERE preview_token = ?
-  `).get(input.previewToken) as { canonical_draft_json: string; expires_at: string } | undefined;
-  if (!stored || stored.expires_at < new Date().toISOString()) {
-    throw Object.assign(new Error("PREVIEW_EXPIRED"), { code: "PREVIEW_EXPIRED" });
-  }
-  if (stored.canonical_draft_json !== JSON.stringify(input.canonicalDraft)) {
-    throw Object.assign(new Error("PREVIEW_DRAFT_MISMATCH"), { code: "PREVIEW_DRAFT_MISMATCH" });
-  }
-  const saved = saveMeterSource(database, input.source);
-  persistAppliedSelector(database, input.canonicalDraft, input.source.metricKey, input.topic);
-  return { applied: true, channelId: input.canonicalDraft.channelId, source: saved };
+  if (!input.idempotencyKey?.trim()) conflict("IDEMPOTENCY_KEY_REQUIRED");
+  const requestJson = canonicalJson(input);
+  return database.transaction(() => {
+    const receipt = database.prepare("SELECT request_json, result_json FROM mapping_apply_receipts WHERE idempotency_key = ?")
+      .get(input.idempotencyKey) as { request_json: string; result_json: string } | undefined;
+    if (receipt) {
+      if (receipt.request_json !== requestJson) conflict("IDEMPOTENCY_CONFLICT");
+      return JSON.parse(receipt.result_json) as { applied: true; channelId: string; source: typeof input.source };
+    }
+    const stored = database.prepare(`
+      SELECT canonical_draft_json, expires_at, target_snapshot_json FROM mapping_preview_tokens WHERE preview_token = ?
+    `).get(input.previewToken) as { canonical_draft_json: string; expires_at: string; target_snapshot_json: string | null } | undefined;
+    if (!stored || Date.parse(stored.expires_at) <= Date.now()) conflict("PREVIEW_EXPIRED");
+    const draft = reviewedDraft(input.canonicalDraft);
+    if (stored.canonical_draft_json !== canonicalJson(draft)
+      || canonicalJson(input.source) !== canonicalJson(draft.source)
+      || input.meterId !== draft.source.meterId
+      || (input.topic !== undefined && input.topic !== draft.topic)) conflict("PREVIEW_DRAFT_MISMATCH");
+    if (stored.target_snapshot_json !== targetSnapshot(database, draft)) conflict("PREVIEW_STALE");
+    const mapping = database.prepare("SELECT topic, selector_json FROM topic_mappings WHERE metric_scope = ? AND metric_key = ? LIMIT 1")
+      .get(draft.metricScope, draft.source.metricKey) as { topic: string; selector_json: string | null } | undefined;
+    let previousSelector: unknown = null;
+    try { previousSelector = mapping?.selector_json ? JSON.parse(mapping.selector_json) : null; } catch { /* Invalid legacy selectors require a new revision. */ }
+    const transportChanged = Boolean(mapping && (mapping.topic !== draft.topic || canonicalJson(previousSelector) !== canonicalJson(draft.selector)));
+    const saved = saveMeterSource(database, draft.source, {
+      actor: "management", reason: "reviewed-mqtt-mapping-apply", transportChanged
+    });
+    persistAppliedSelector(database, draft, saved.metricKey, draft.topic);
+    const result = { applied: true as const, channelId: draft.channelId, source: saved };
+    database.prepare("INSERT INTO mapping_apply_receipts (idempotency_key, request_json, result_json, created_at) VALUES (?, ?, ?, ?)")
+      .run(input.idempotencyKey, requestJson, JSON.stringify(result), new Date().toISOString());
+    return result;
+  }).immediate();
 }

@@ -189,7 +189,7 @@ test("factory circuit runtime output stays stable when an unrelated metric chang
   assert.equal(after, before);
 });
 
-test("factory circuit runtime applies slot precision and hidden unit", () => {
+test("factory circuit runtime does not show seeded percentages before accounting data arrives", () => {
   const seedConfig = createFactoryCircuitDisplayPageSeedConfig();
   const emptyIcons = Object.fromEntries(
     Object.keys(seedConfig.loadRows).map((key) => [key, null])
@@ -206,6 +206,7 @@ test("factory circuit runtime applies slot precision and hidden unit", () => {
     />
   );
 
-  assert.match(markup, /<b>25\.00<\/b>/);
+  assert.match(markup, /<b>—<\/b>/);
+  assert.doesNotMatch(markup, /<b>25\.00<\/b>/);
   assert.doesNotMatch(markup, /25\.00%/);
 });

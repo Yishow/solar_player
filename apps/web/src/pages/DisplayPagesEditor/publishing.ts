@@ -6,7 +6,7 @@ import {
   type FallbackPolicyMode,
   type ValidationResult
 } from "@solar-display/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getDisplayPageFallbackStatus, publishDisplayPageDraft, validateDisplayPageDraft } from "../../services/api";
 
 export type DisplayPagePublishingState = {
@@ -63,15 +63,19 @@ export function useDisplayPagePublishingState(
   const unsavedBindings = options.unsavedBindings ?? false;
   const energyProfileReady = options.energyProfileReady ?? true;
   const [isPublishing, setIsPublishing] = useState(false);
+  const publishingRef = useRef(false);
   const [publishingError, setPublishingError] = useState("");
   const [publishingStateByPage, setPublishingStateByPage] = useState<DisplayPagePublishingStateMap>(
     initialPublishingStateByPage ?? {}
   );
   const publishingState = publishingStateByPage[pageId];
   const blockingCount = countBlockingFindings(publishingState?.validation);
-  const [preflight, setPreflight] = useState<{ expectedVersion: number; preflightToken: string } | null>(null);
+  const [preflight, setPreflight] = useState<{ pageId: string; draftUpdatedAt: string | null | undefined; expectedVersion: number; preflightToken: string } | null>(null);
+  const isPublishBlocked = unsavedBindings || !preflight || preflight.pageId !== pageId
+    || preflight.draftUpdatedAt !== draftUpdatedAt || publishingState?.validation.canPublish !== true;
 
   const refresh = async (refreshOptions: { force?: boolean; isActive?: () => boolean } = {}) => {
+    setPreflight(null);
     if (!enabled && !refreshOptions.force) {
       return;
     }
@@ -88,6 +92,8 @@ export function useDisplayPagePublishingState(
       unsavedBindings
     });
     setPreflight({
+      pageId,
+      draftUpdatedAt,
       expectedVersion: preflightResult.expectedVersion,
       preflightToken: preflightResult.preflightToken
     });
@@ -113,6 +119,8 @@ export function useDisplayPagePublishingState(
   }, [draftUpdatedAt, enabled, pageId, unsavedBindings]);
 
   const publish = async () => {
+    if (isPublishBlocked || publishingRef.current) return;
+    publishingRef.current = true;
     setIsPublishing(true);
     setPublishingError("");
     try {
@@ -126,13 +134,14 @@ export function useDisplayPagePublishingState(
     } catch (error) {
       setPublishingError(error instanceof Error ? error.message : "發布草稿失敗。");
     } finally {
+      publishingRef.current = false;
       setIsPublishing(false);
     }
   };
 
   return {
     blockingCount,
-    isPublishBlocked: blockingCount > 0,
+    isPublishBlocked,
     isPublishing,
     publish,
     publishingError,

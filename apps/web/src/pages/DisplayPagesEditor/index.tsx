@@ -1412,10 +1412,6 @@ export function DisplayPagesEditor({
           dirty={dirty}
           editMode={editMode}
           errorMessage={errorMessage}
-          isLoading={isLoading}
-          isPublishing={isPublishing}
-          isPublishBlocked={isPublishBlocked}
-          isSaving={isSaving}
           message={message}
           onAddObject={(type) => {
             applyFreeformObjectUpdate((objects) => addDisplayPageObject(objects, type));
@@ -1436,9 +1432,6 @@ export function DisplayPagesEditor({
           onMoveObjectForward={(objectId) => {
             applyFreeformObjectUpdate((objects) => moveDisplayPageObject(objects, objectId, "forward"));
           }}
-          onPublish={() => void publish()}
-          onReload={() => void handleReload()}
-          onSave={() => void handleSave()}
           onSelectObject={handleSelectRegion}
           onSelectRegion={handleSelectRegion}
           onToggleObjectLocked={(objectId) => {
@@ -1597,6 +1590,8 @@ export function DisplayPagesEditor({
             {rightTab === "publish" && (
               <PublishReviewDrawer
                 blockingCount={blockingCount}
+                isPublishBlocked={isPublishBlocked}
+                isPublishing={isPublishing}
                 onClose={() => setRightTab("inspector")}
                 onConfirmPublish={() => void publish()}
                 publishingError={publishingError}

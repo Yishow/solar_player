@@ -1,6 +1,10 @@
+import type { MeterSourceDefinition } from "./meterReading.js";
+
 export type MappingSelector = {
   path: string[];
   tagEquals?: string;
+  selectorVersion?: number;
+  timestampPath?: string[];
 };
 
 export type MappingPreviewDraft = {
@@ -10,6 +14,8 @@ export type MappingPreviewDraft = {
   metricScope: "cl" | "kn";
   selector: MappingSelector;
   timestampPolicy: "source-required" | "allow-receive-time-estimate";
+  source?: MeterSourceDefinition;
+  topic?: string;
 };
 
 type StoredPreview = {
@@ -26,9 +32,18 @@ type AppliedMapping = {
 const tokens = new Map<string, StoredPreview>();
 const appliedByKey = new Map<string, AppliedMapping>();
 
-export function compileSelector(path: string, tagEquals?: string): MappingSelector {
+export function compileSelector(
+  path: string,
+  tagEquals?: string,
+  metadata: Pick<MappingSelector, "selectorVersion" | "timestampPath"> = {}
+): MappingSelector {
   const normalized = path.replace(/^\$\./u, "");
-  return { path: normalized.split(".").filter(Boolean), tagEquals };
+  return {
+    path: normalized.split(".").filter(Boolean),
+    tagEquals,
+    selectorVersion: metadata.selectorVersion ?? 1,
+    ...(metadata.timestampPath ? { timestampPath: metadata.timestampPath } : {})
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -26,3 +26,13 @@ test("U5-R1 review drawer requires a separate confirm and does not auto-publish"
   assert.match(html, /這是檢查結果，還沒發布/);
   assert.match(html, /data-publish-review-confirm/);
 });
+
+test("U5 confirm stays disabled while review is unavailable or publication is in flight", () => {
+  for (const extra of [{}, { isPublishing: true }, { isPublishBlocked: true }]) {
+    const html = renderToStaticMarkup(<PublishReviewDrawer
+      blockingCount={0} onClose={() => undefined} onConfirmPublish={() => undefined}
+      publishingError="" {...extra}
+    />);
+    assert.match(html, /data-publish-review-confirm="true" disabled=""/);
+  }
+});

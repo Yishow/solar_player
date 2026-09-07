@@ -27,6 +27,7 @@ import { applyGuidedMapping, previewGuidedMapping } from "./guidedMqttMappingSer
 
 function createDatabase() {
   const database = new Database(":memory:");
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/033_freshness_policy.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/001_init.sql"), "utf8"));
   try {
     database.exec("ALTER TABLE topic_mappings ADD COLUMN metric_scope TEXT");
@@ -34,9 +35,16 @@ function createDatabase() {
     // Column may already exist on some init paths.
   }
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/040_meter_reading_contracts.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/049_meter_source_boundary_age.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/048_meter_source_lifecycle.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/046_meter_reading_evidence.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/041_site_energy_profiles.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/045_profile_apply_guards.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/050_profile_source_review.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/042_consumption_projections.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/047_projection_activation_context.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/043_energy_authoring_tokens.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/044_mapping_apply_receipts.sql"), "utf8"));
   return database;
 }
 
@@ -112,6 +120,8 @@ test("Q1 CL+KN ingest→E2→E3→shares isolate 300/4300/8300 and 50/30/20", ()
     measurementKind: "cumulative-energy",
     metricScope: "kn",
     selector: compileSelector("value"),
+    source: knMain,
+    topic: "factory/kn/main",
     timestampPolicy: "source-required"
   });
   applyGuidedMapping(database, {

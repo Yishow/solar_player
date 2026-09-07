@@ -100,6 +100,8 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
     measurementKind: "cumulative-energy",
     metricScope: "kn",
     selector: compileSelector("value"),
+    source: knMain,
+    topic: "factory/kn/main",
     timestampPolicy: "source-required"
   });
   applyGuidedMapping(database, {
@@ -152,14 +154,18 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
       url: "/api/metrics/history?range=month"
     });
     assert.equal(knHistory.statusCode, 200);
-    assert.equal(knHistory.json().periodSummary?.valueKwh, "4300");
+    assert.equal(knHistory.json().periodSummary?.valueKwh, "300");
 
     const knHub = await app.inject({
       method: "GET",
       url: "/api/data-hub/energy-history?metricScope=kn&range=month"
     });
     assert.equal(knHub.statusCode, 200);
-    assert.equal(knHub.json().periodSummary?.valueKwh, "4300");
+    assert.equal(knHub.json().periodSummary?.valueKwh, "300");
+    t.mock.timers.setTime(Date.parse("2026-09-30T15:59:00.000Z"));
+    const monthEnd = await app.inject({ method: "GET", url: "/api/data-hub/energy-history?metricScope=kn&range=month" });
+    assert.equal(monthEnd.json().periodSummary?.valueKwh, "4300");
+    t.mock.timers.setTime(Date.parse("2026-09-01T15:59:00.000Z"));
 
     const clHistory = await app.inject({
       cookies: { solar_device_credential: clPair.credential },

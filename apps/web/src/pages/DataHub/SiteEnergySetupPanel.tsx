@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   currentProfileMonthSelection,
   nextSiteEnergySetupStep,
@@ -6,7 +6,7 @@ import {
   type SiteEnergyProfileV1,
   type SiteEnergySetupStep
 } from "@solar-display/shared";
-import { requestJson } from "../../services/api";
+import { ApiRequestError, requestJson } from "../../services/api";
 
 const STEP_LABELS: Record<SiteEnergySetupStep, string> = {
   site: "確認廠區",
@@ -36,10 +36,12 @@ function emptyProfile(scope: "cl" | "kn"): SiteEnergyProfileV1 {
 }
 
 function MeterPicker({
+  disabled = false,
   options,
   selected,
   onChange
 }: {
+  disabled?: boolean;
   onChange: (ids: string[]) => void;
   options: Array<{ channelId: string; label: string }>;
   selected: string[];
@@ -53,6 +55,7 @@ function MeterPicker({
             <input
               checked={selected.includes(option.channelId)}
               data-meter-channel={option.channelId}
+              disabled={disabled}
               onChange={(event) => {
                 onChange(event.target.checked
                   ? [...selected, option.channelId]
@@ -73,11 +76,35 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
   const [draft, setDraft] = useState<SiteEnergyProfileV1>(() => emptyProfile(scope));
   const [message, setMessage] = useState("");
   const [expectedRevision, setExpectedRevision] = useState(0);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [meters, setMeters] = useState<Array<{ channelId: string; label: string }>>([]);
   const [previewSummary, setPreviewSummary] = useState("");
+  const [previewToken, setPreviewToken] = useState("");
+  const [previewExpectedRevision, setPreviewExpectedRevision] = useState<number | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+  const inputRevision = useRef(0);
+
+  const updateDraft = (next: SiteEnergyProfileV1) => {
+    inputRevision.current += 1;
+    setDraft(next);
+    setPreviewToken("");
+    setPreviewExpectedRevision(null);
+    setPreviewSummary("");
+  };
 
   useEffect(() => {
     let cancelled = false;
+    inputRevision.current += 1;
+    setStep("site");
+    setDraft(emptyProfile(scope));
+    setExpectedRevision(0);
+    setProfileLoaded(false);
+    setMeters([]);
+    setMessage("");
+    setPreviewToken("");
+    setPreviewExpectedRevision(null);
+    setPreviewSummary("");
+    setIsApplying(false);
     void requestJson<{
       meters?: Array<{ channelId: string; displayNameZh?: string | null; meterId: string }>;
       profile: SiteEnergyProfileV1 | null;
@@ -98,10 +125,11 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
         if ((payload.receivedTags ?? []).length > 0) {
           setMessage(`已接收 ${payload.receivedTags?.length} 個穩定 tag 來源，可直接選 channel，不必手填 mapping。`);
         }
+        setProfileLoaded(true);
       })
       .catch(() => {
         if (!cancelled) {
-          setMessage("目前沒有已儲存的廠區用電設定，請從總進線開始。");
+          setMessage("廠區用電設定讀取失敗，請稍後重試。");
         }
       });
     return () => {
@@ -109,39 +137,91 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
     };
   }, [scope]);
 
-  const apply = async () => {
+  const preview = async () => {
+    if (!profileLoaded) {
+      return;
+    }
     setMessage("");
+    const requestRevision = inputRevision.current;
+    const requestDraft = draft;
+    const requestExpectedRevision = expectedRevision;
     try {
-      const periodSelection = currentProfileMonthSelection(draft.siteTimeZone);
+      const periodSelection = currentProfileMonthSelection(requestDraft.siteTimeZone);
       const preview = await requestJson<{ calculator?: { period?: { valueKwh: string | null } }; previewToken: string }>(
         `/api/data-hub/sites/${scope}/energy-profile/preview`,
         {
           body: JSON.stringify({
-            draft,
-            expectedRevision,
+            draft: requestDraft,
+            expectedRevision: requestExpectedRevision,
             periodSelection
           }),
           method: "POST"
         }
       );
-      setPreviewSummary(`期間 ${periodSelection.year}-${periodSelection.month} 預覽 ${preview.calculator?.period?.valueKwh ?? "尚無差值"}`);
+      if (requestRevision !== inputRevision.current) {
+        return;
+      }
+      setPreviewToken(preview.previewToken);
+      setPreviewExpectedRevision(requestExpectedRevision);
+      setPreviewSummary(`期間 ${periodSelection.year}-${periodSelection.month} 預覽 ${preview.calculator?.period?.valueKwh ?? "尚無差值"}，待確認。`);
+    } catch (error) {
+      if (requestRevision !== inputRevision.current) {
+        return;
+      }
+      setMessage(error instanceof ApiRequestError && error.body?.error === "PROFILE_SOURCE_UNAVAILABLE"
+        ? "所選來源目前不可用，請返回來源選擇確認電錶。"
+        : error instanceof Error ? error.message : "預覽失敗。");
+    }
+  };
+
+  const apply = async () => {
+    if (!previewToken || previewExpectedRevision === null) {
+      return;
+    }
+    const requestRevision = inputRevision.current;
+    setIsApplying(true);
+    setMessage("");
+    try {
       const applied = await requestJson<SiteEnergyProfileV1>(
         `/api/data-hub/sites/${scope}/energy-profile/apply`,
         {
           body: JSON.stringify({
             draft,
-            expectedRevision,
-            idempotencyKey: `u6-${scope}-${periodSelection.year}-${periodSelection.month}`,
-            previewToken: preview.previewToken
+            expectedRevision: previewExpectedRevision,
+            idempotencyKey: `u6-${scope}-${previewToken}`,
+            previewToken
           }),
           method: "POST"
         }
       );
+      if (requestRevision !== inputRevision.current) {
+        return;
+      }
       setExpectedRevision(applied.revision);
       setDraft(applied);
+      setPreviewToken("");
+      setPreviewExpectedRevision(null);
+      setPreviewSummary("");
       setMessage("廠區用電設定已套用。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "套用失敗。");
+      if (requestRevision !== inputRevision.current) {
+        return;
+      }
+      if (error instanceof ApiRequestError && error.statusCode === 409
+        && (error.body?.error === "PROFILE_SOURCE_CONFLICT" || error.body?.error === "PROFILE_SOURCE_REVIEW_REQUIRED")) {
+        setPreviewToken("");
+        setPreviewExpectedRevision(null);
+        setPreviewSummary("");
+        setMessage(error.body.error === "PROFILE_SOURCE_CONFLICT"
+          ? "來源設定已變更，請重新預覽。"
+          : "來源設定需要重新確認，請重新預覽。");
+      } else {
+        setMessage(error instanceof Error ? error.message : "套用失敗。");
+      }
+    } finally {
+      if (requestRevision === inputRevision.current) {
+        setIsApplying(false);
+      }
     }
   };
 
@@ -160,7 +240,8 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
       ) : null}
       {step === "total" ? (
         <MeterPicker
-          onChange={(memberChannelIds) => setDraft({
+          disabled={isApplying}
+          onChange={(memberChannelIds) => updateDraft({
             ...draft,
             siteTotal: { ...draft.siteTotal, kind: "meter-set", memberChannelIds }
           })}
@@ -182,10 +263,11 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
               <fieldset className="space-y-1" key={departmentId}>
                 <legend className="text-sm font-medium">{department.nameZh}</legend>
                 <MeterPicker
+                  disabled={isApplying}
                   onChange={(memberChannelIds) => {
                     const next = draft.departments.filter((entry) => entry.departmentId !== departmentId);
                     next.splice(index, 0, { ...department, memberChannelIds });
-                    setDraft({ ...draft, departments: next });
+                    updateDraft({ ...draft, departments: next });
                   }}
                   options={meters}
                   selected={department.memberChannelIds}
@@ -200,7 +282,8 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
           占比分母
           <select
             className="mgmt-input mt-1 min-h-[40px]"
-            onChange={(event) => setDraft({
+            disabled={isApplying}
+            onChange={(event) => updateDraft({
               ...draft,
               shareBasis: { kind: event.target.value as SiteEnergyProfileV1["shareBasis"]["kind"] },
               status: draft.siteTotal.memberChannelIds.length > 0 ? "ready" : "incomplete"
@@ -215,18 +298,25 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
       {previewSummary ? <p className="text-sm" data-site-energy-preview>{previewSummary}</p> : null}
       {message ? <p className="text-sm text-[#8a4f18]" role="status">{message}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button className="mgmt-action min-h-[40px]" onClick={() => setStep(previousSiteEnergySetupStep(step))} type="button">
+        <button className="mgmt-action min-h-[40px]" disabled={isApplying} onClick={() => setStep(previousSiteEnergySetupStep(step))} type="button">
           上一步
         </button>
-        {step === "basis" ? (
-          <button className="mgmt-action primary min-h-[40px]" onClick={() => void apply()} type="button">
-            檢查並套用
-          </button>
-        ) : (
-          <button className="mgmt-action primary min-h-[40px]" onClick={() => setStep(nextSiteEnergySetupStep(step))} type="button">
+        {step !== "basis" ? (
+          <button className="mgmt-action primary min-h-[40px]" disabled={isApplying} onClick={() => setStep(nextSiteEnergySetupStep(step))} type="button">
             下一步
           </button>
-        )}
+        ) : null}
+        {step === "basis" ? (
+          previewToken ? (
+            <button className="mgmt-action primary min-h-[40px]" disabled={isApplying} onClick={() => void apply()} type="button">
+              確認套用
+            </button>
+          ) : (
+            <button className="mgmt-action primary min-h-[40px]" disabled={!profileLoaded} onClick={() => void preview()} type="button">
+              預覽變更
+            </button>
+          )
+        ) : null}
       </div>
     </section>
   );

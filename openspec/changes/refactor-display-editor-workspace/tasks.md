@@ -19,10 +19,14 @@
 
 ## 2. V2 Site-Setup Integration
 
-- [x] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（U3-R7）
+- [ ] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（U3-R7）
 
 ## Closeout Notes
 
 - 1.1–1.10：`pnpm --filter @solar-display/web test 'src/pages/DisplayPagesEditor/**/*.test.ts' 'src/pages/DisplayPagesEditor/**/*.test.tsx'` — 165 pass, exit 0。U3-R7 尚未勾選。
 
 Archive 與 commit 依 repo workflow 另行執行；不在本草案提前標記。
+
+## 2026-09-06 Review follow-up
+
+部分實作或缺驗證的任務重開。缺口與驗證見 [整合追蹤](../verify-energy-authoring-journeys/review-followup.md)。

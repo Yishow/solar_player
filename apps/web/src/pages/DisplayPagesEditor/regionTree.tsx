@@ -17,19 +17,12 @@ export function DisplayEditorLeftPanel({
   dirty,
   editMode,
   errorMessage,
-  isLoading: _isLoading,
-  isPublishing: _isPublishing,
-  isPublishBlocked: _isPublishBlocked,
-  isSaving: _isSaving,
   message,
   onAddObject,
   onDeleteObject,
   onDuplicateObject,
   onMoveObjectBackward,
   onMoveObjectForward,
-  onPublish: _onPublish,
-  onReload: _onReload,
-  onSave: _onSave,
   onSelectObject,
   onSelectRegion,
   onToggleObjectLocked,
@@ -44,19 +37,12 @@ export function DisplayEditorLeftPanel({
   dirty: boolean;
   editMode: boolean;
   errorMessage: string;
-  isLoading: boolean;
-  isPublishing: boolean;
-  isPublishBlocked: boolean;
-  isSaving: boolean;
   message: string;
   onAddObject: (type: DisplayPageFreeformObject["type"]) => void;
   onDeleteObject: (objectId: string) => void;
   onDuplicateObject: (objectId: string) => void;
   onMoveObjectBackward: (objectId: string) => void;
   onMoveObjectForward: (objectId: string) => void;
-  onPublish: () => void;
-  onReload: () => void;
-  onSave: () => void;
   onSelectObject: (objectId: string) => void;
   onSelectRegion: (regionId: string) => void;
   onToggleObjectLocked: (objectId: string) => void;

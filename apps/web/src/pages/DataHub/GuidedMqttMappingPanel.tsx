@@ -1,5 +1,10 @@
-import { useMemo, useState } from "react";
-import { compileSelector, type MappingPreviewDraft, type MappingSuggestion } from "@solar-display/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  compileSelector,
+  type MappingPreviewDraft,
+  type MappingSuggestion,
+  type MeterSourceDefinition
+} from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 
 type Stage = "select" | "meaning" | "apply";
@@ -30,57 +35,91 @@ function collectFields(value: unknown, prefix = ""): FieldCandidate[] {
 
 export function GuidedMqttMappingPanel({
   metricScope,
-  payload = { tag: "MAIN", value: "10000.125" }
+  payload,
+  source,
+  topic
 }: {
   metricScope: "cl" | "kn";
   payload?: unknown;
+  source?: MeterSourceDefinition;
+  topic?: string;
 }) {
   const [stage, setStage] = useState<Stage>("select");
-  const [path, setPath] = useState("value");
+  const [path, setPath] = useState("");
   const [tagEquals, setTagEquals] = useState("");
   const [message, setMessage] = useState("");
   const [previewToken, setPreviewToken] = useState("");
   const [draft, setDraft] = useState<MappingPreviewDraft | null>(null);
   const [suggestions, setSuggestions] = useState<MappingSuggestion[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const fields = useMemo(() => collectFields(payload), [payload]);
+  const inputRevision = useRef(0);
+  const fields = useMemo(() => payload === undefined ? [] : collectFields(payload), [payload]);
+  const hasSourceEvidence = Boolean(source && source.metricScope === metricScope && topic?.trim());
+  const canAdvance = fields.length > 0 && path.length > 0;
 
-  const canonical = (): MappingPreviewDraft => ({
-    channelId: `${metricScope}-main`,
-    energyFlowRole: "consumption",
-    measurementKind: "cumulative-energy",
-    metricScope,
-    selector: compileSelector(path, tagEquals || undefined),
-    timestampPolicy: "source-required"
-  });
+  useEffect(() => {
+    inputRevision.current += 1;
+    setStage("select");
+    setPath("");
+    setTagEquals("");
+    setMessage("");
+    setPreviewToken("");
+    setDraft(null);
+    setSuggestions([]);
+    setSelectedTags([]);
+  }, [metricScope, payload, source, topic]);
+
+  const canonical = (): MappingPreviewDraft => {
+    if (!source || source.metricScope !== metricScope || !topic?.trim()) {
+      throw new Error("SOURCE_REVIEW_REQUIRED");
+    }
+    return {
+      channelId: source.channelId,
+      energyFlowRole: source.energyFlowRole,
+      measurementKind: source.measurementKind,
+      metricScope,
+      selector: compileSelector(path, tagEquals || undefined),
+      timestampPolicy: source.timestampPolicy,
+      source,
+      topic: topic.trim()
+    };
+  };
 
   return (
     <section className="mgmt-card space-y-3 p-4" data-guided-mqtt-mapping data-mapping-stage={stage}>
       <h3 className="text-base font-semibold">從已接收資料選欄位</h3>
       {stage === "select" ? (
         <>
-          <ul className="space-y-1">
-            {fields.map((field) => (
-              <li key={`${field.path}:${field.tagEquals ?? ""}`}>
-                <button
-                  className="mgmt-action min-h-[40px]"
-                  data-mapping-field={field.path}
-                  onClick={() => {
-                    setPath(field.path);
-                    setTagEquals(field.tagEquals ?? "");
-                  }}
-                  type="button"
-                >
-                  {field.path}{field.tagEquals ? ` tag=${field.tagEquals}` : ""} = {field.preview}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm">已選 {path}{tagEquals ? ` / ${tagEquals}` : ""}</p>
+          {fields.length > 0 ? (
+            <ul className="space-y-1">
+              {fields.map((field) => (
+                <li key={`${field.path}:${field.tagEquals ?? ""}`}>
+                  <button
+                    className="mgmt-action min-h-[40px]"
+                    data-mapping-field={field.path}
+                    onClick={() => {
+                      setPath(field.path);
+                      setTagEquals(field.tagEquals ?? "");
+                    }}
+                    type="button"
+                  >
+                    {field.path}{field.tagEquals ? ` tag=${field.tagEquals}` : ""} = {field.preview}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm" data-mapping-no-observation>尚未收到可選的實際資料；收到資料後才能選取欄位。</p>
+          )}
+          <p className="text-sm">已選 {path || "尚未選取欄位"}{tagEquals ? ` / ${tagEquals}` : ""}</p>
           <button
             className="mgmt-action min-h-[40px]"
             data-mapping-suggest
+            disabled={!hasSourceEvidence || fields.length === 0}
             onClick={() => {
+              if (!topic?.trim()) {
+                return;
+              }
               void requestJson<{ suggestions: MappingSuggestion[] }>("/api/data-hub/mqtt-mappings/suggest", {
                 body: JSON.stringify({
                   metricScope,
@@ -89,7 +128,7 @@ export function GuidedMqttMappingPanel({
                     .map((field) => ({
                       namespace: metricScope,
                       tag: field.tagEquals,
-                      topic: `${metricScope}/${field.tagEquals}`,
+                      topic: topic.trim(),
                       value: field.preview
                     }))
                 }),
@@ -122,19 +161,27 @@ export function GuidedMqttMappingPanel({
               ))}
             </ul>
           ) : null}
-          <button className="mgmt-action primary min-h-[40px]" onClick={() => setStage("meaning")} type="button">下一步</button>
+          <button className="mgmt-action primary min-h-[40px]" disabled={!canAdvance} onClick={() => setStage("meaning")} type="button">下一步</button>
         </>
       ) : null}
       {stage === "meaning" ? (
         <>
-          <p className="text-sm">確認這是累積用電、consumption、source-required。</p>
+          <p className="text-sm">請確認所選欄位符合來源的計量定義。</p>
+          {!hasSourceEvidence ? (
+            <p className="text-sm" data-mapping-preview-blocked>尚未選定實際資料來源，請先完成來源確認。</p>
+          ) : null}
           <button
             className="mgmt-action primary min-h-[40px]"
+            disabled={!hasSourceEvidence}
             onClick={() => {
+              const requestRevision = inputRevision.current;
               void requestJson<{ canonicalDraft: MappingPreviewDraft; previewToken: string }>(
                 "/api/data-hub/mqtt-mappings/preview",
                 { body: JSON.stringify(canonical()), method: "POST" }
               ).then((result) => {
+                if (requestRevision !== inputRevision.current) {
+                  return;
+                }
                 setDraft(result.canonicalDraft);
                 setPreviewToken(result.previewToken);
                 setStage("apply");
@@ -150,36 +197,29 @@ export function GuidedMqttMappingPanel({
       ) : null}
       {stage === "apply" && draft ? (
         <>
-          <p className="text-sm" data-mapping-preview-token={previewToken}>previewToken 已核發，尚未寫入讀值。</p>
+          <p className="text-sm" data-mapping-preview-token={previewToken}>預覽已完成，尚未套用。</p>
+          {!draft.source || !draft.topic ? (
+            <p className="text-sm" data-mapping-apply-blocked>目前來源資料不完整，已停用套用。</p>
+          ) : null}
           <button
             className="mgmt-action primary min-h-[40px]"
+            disabled={!draft.source || !draft.topic}
             onClick={() => {
+              const requestRevision = inputRevision.current;
               void requestJson("/api/data-hub/mqtt-mappings/apply", {
                 body: JSON.stringify({
                   canonicalDraft: draft,
-                  idempotencyKey: `m2-${metricScope}-${Date.now()}`,
-                  meterId: draft.channelId,
+                  idempotencyKey: `m2-${previewToken}`,
+                  meterId: draft.source?.meterId ?? "",
                   previewToken,
-                  source: {
-                    channelId: draft.channelId,
-                    enabled: true,
-                    energyFlowRole: draft.energyFlowRole,
-                    epochId: "epoch-1",
-                    expectedCadenceSeconds: 60,
-                    inputUnit: "kWh",
-                    measurementKind: draft.measurementKind,
-                    meterId: draft.channelId,
-                    metricKey: "consumptionEnergy",
-                    metricScope,
-                    reviewStatus: "reviewed",
-                    scaleDecimal: "1",
-                    sourceRevision: 1,
-                    sourceTimestampTimeZone: "UTC",
-                    timestampPolicy: draft.timestampPolicy
-                  }
+                  source: draft.source,
+                  topic: draft.topic
                 }),
                 method: "POST"
-              }).then(() => setMessage("對應已套用。")).catch((error: unknown) => {
+              }).then(() => {
+                if (requestRevision === inputRevision.current) setMessage("對應已套用。");
+              }).catch((error: unknown) => {
+                if (requestRevision !== inputRevision.current) return;
                 setMessage(error instanceof Error ? error.message : "套用失敗");
               });
             }}
