@@ -5,21 +5,10 @@ import { createDefaultFreshnessPolicy } from "./freshnessPolicy.js";
 import type { SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
 
 const profile: SiteEnergyProfileV1 = {
-  departments: [],
-  effectiveFrom: "2026-01-01T00:00:00+08:00",
-  metricScope: "kn",
-  profileId: "kn-energy",
-  revision: 1,
-  schemaVersion: 1,
-  shareBasis: { kind: "site-main" },
-  siteTimeZone: "Asia/Taipei",
-  siteTotal: {
-    coverageReview: "reviewed",
-    kind: "meter-set",
-    label: "觀音總錶",
-    memberChannelIds: ["kn-main"]
-  },
-  status: "ready"
+  departments: [], effectiveFrom: "2026-01-01T00:00:00+08:00", metricScope: "kn",
+  profileId: "kn-energy", revision: 1, schemaVersion: 1, shareBasis: { kind: "site-main" },
+  siteTimeZone: "Asia/Taipei", status: "ready",
+  siteTotal: { coverageReview: "reviewed", kind: "meter-set", label: "觀音總錶", memberChannelIds: ["kn-main"] }
 };
 
 test("E2-R2 Taipei September start is 2026-08-31T16:00:00Z", () => {
@@ -281,7 +270,6 @@ test("E2 duplicate member selection cannot double count consumption", () => {
   assert.throws(() => resolvePeriodConsumption({ ...dayInput, meterIds: ["kn-main", "kn-main"], samples: [] }), /DUPLICATE_METER/);
 });
 
-
 test("E2 interval energy is counted once without inventing interval coverage", () => {
   const result = resolvePeriodConsumption({ ...dayInput, samples: [
     { channelId: "kn-main", sourceTimestamp: "2026-09-01T01:00:00Z", measurementKind: "interval-energy", valueKwh: "100" }
@@ -290,7 +278,6 @@ test("E2 interval energy is counted once without inventing interval coverage", (
   assert.equal(result.valueKwh, null);
   assert.ok(result.issues?.includes("INTERVAL_COVERAGE_UNPROVEN:kn-main"));
 });
-
 test("E2 gauges cannot masquerade as period energy", () => {
   const result = resolvePeriodConsumption({ ...dayInput, samples: [
     { channelId: "kn-main", sourceTimestamp: "2026-08-31T16:00:00Z", measurementKind: "power-gauge", valueKwh: "100" },
@@ -299,7 +286,6 @@ test("E2 gauges cannot masquerade as period energy", () => {
   assert.equal(result.quality, "invalid");
   assert.equal(result.valueKwh, null);
 });
-
 
 test("E2 observed partial does not include energy before a stale start baseline", () => {
   const result = resolvePeriodConsumption({ ...dayInput, samples: [
@@ -310,7 +296,6 @@ test("E2 observed partial does not include energy before a stale start baseline"
   assert.equal(result.valueKwh, null);
   assert.equal(result.observedDeltaKwh, "50");
 });
-
 
 test("E2 boundary tolerance and existing freshness thresholds are independent", () => {
   const samples = [
@@ -354,4 +339,61 @@ test("E2 exact source observations outrank receipt estimates at the same boundar
   assert.equal(result.quality, "exact");
   assert.equal(result.valueKwh, "100");
   assert.deepEqual(result.baselineSampleIds, ["source-start"]);
+});
+
+test("E2-R5-S02 verified rollover calculates 30 kWh with rollover provenance", () => {
+  const result = resolvePeriodConsumption({
+    ...dayInput,
+    rolloverModulus: 100000,
+    samples: [
+      { channelId: "kn-main", sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "99990" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-01T16:00:00Z", valueKwh: "20" }
+    ]
+  });
+  assert.equal(result.valueKwh, "30");
+  assert.equal(result.quality, "exact");
+  assert.ok(result.issues?.includes("ROLLOVER:kn-main"));
+  assert.equal(result.provenance?.rollover, true);
+});
+
+test("E2-R5-S03 replacement with missing closing read remains partial", () => {
+  const result = resolvePeriodConsumption({
+    ...dayInput,
+    samples: [
+      { channelId: "kn-main", epochId: "epoch-old", sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "500" },
+      { channelId: "kn-main", epochId: "epoch-new", sourceTimestamp: "2026-09-01T08:00:00Z", valueKwh: "10" },
+      { channelId: "kn-main", epochId: "epoch-new", sourceTimestamp: "2026-09-01T16:00:00Z", valueKwh: "60" }
+    ]
+  });
+  assert.equal(result.quality, "partial");
+  assert.equal(result.valueKwh, null);
+  assert.equal(result.observedDeltaKwh, "50");
+  assert.ok(result.issues?.includes("UNPROVEN_CONTINUITY:kn-main"));
+});
+
+test("E2-R7-S01 known month endpoints and daily gap resolves 6000 kWh and dailyCoverage", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: { kind: "month", month: 9, year: 2026 },
+    profile,
+    samples: [
+      { channelId: "kn-main", sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "10000" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-01T16:00:00Z", valueKwh: "10200" },
+      { channelId: "kn-main", sourceTimestamp: "2026-09-30T16:00:00Z", valueKwh: "16000" }
+    ]
+  });
+  assert.equal(result.valueKwh, "6000");
+  assert.equal(result.quality, "exact");
+  assert.equal(result.dailyCoverage?.totalDays, 30);
+  assert.equal(result.dailyCoverage?.coveredDays, 1);
+  assert.equal(result.dailyCoverage?.isComplete, false);
+});
+
+test("E2-R2-S04 rejects definition revision channel mismatch", () => {
+  assert.throws(() => resolvePeriodConsumption({
+    ...dayInput,
+    definitionRevision: [{ channelId: "kn-other", epochId: "e1", meterId: "kn-other", sourceRevision: 1 }],
+    samples: []
+  }), /DEFINITION_REVISION_MISMATCH/);
 });

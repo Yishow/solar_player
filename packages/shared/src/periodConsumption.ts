@@ -21,11 +21,25 @@ export type PeriodSample = {
   readingId?: string;
   measurementKind?: "cumulative-energy" | "interval-energy" | "power-gauge" | "unknown";
   boundaryMaxAgeSeconds?: number;
+  rolloverModulus?: string | number | null;
   sourceRevision?: number;
   valueKwh: string;
 };
 
 export type PeriodConsumptionQuality = "exact" | "estimated-boundary" | "partial" | "unavailable" | "invalid";
+
+export type DailyCoverage = {
+  coveredDays: number;
+  totalDays: number;
+  isComplete: boolean;
+};
+
+export type DefinitionRevisionItem = {
+  channelId: string;
+  epochId: string;
+  meterId: string;
+  sourceRevision: number;
+};
 
 export type PeriodConsumptionResult = {
   profileRevisionBoundaries?: Array<{ profileRevision: number; effectiveFrom: string; siteTimeZone: string }>;
@@ -33,6 +47,7 @@ export type PeriodConsumptionResult = {
   periodStart?: string;
   periodEnd?: string;
   calculatedThrough?: string;
+  dailyCoverage?: DailyCoverage;
   observedDeltaKwh?: string | null;
   freshness?: "fresh" | "stale" | "unavailable";
   freshnessState?: FreshnessState;
@@ -41,23 +56,19 @@ export type PeriodConsumptionResult = {
   boundaryOffsets?: Array<{ channelId: string; startSeconds: number | null; endSeconds: number | null; startTimestamp: string | null; endTimestamp: string | null }>;
   issues?: string[];
   calculationVersion?: string;
-  provenance?: { profileRevision: number; siteTimeZone: string; sourceRevisions: string[] };
+  provenance?: { profileRevision: number; siteTimeZone: string; sourceRevisions: string[]; rollover?: boolean; reviewContext?: string };
   profileRevision: number;
   quality: PeriodConsumptionQuality;
   siteTimeZone: string;
   valueKwh: string | null;
 };
-
-
 function pad(value: number) {
   return String(value).padStart(2, "0");
 }
 
 function civilUtcMs(local: string, timeZone: string) {
   const parsed = parseSourceTimestamp(local, timeZone);
-  if (!parsed.instant) {
-    throw Object.assign(new Error("PERIOD_BOUNDARY_INVALID"), { code: "PERIOD_BOUNDARY_INVALID" });
-  }
+  if (!parsed.instant) throw Object.assign(new Error("PERIOD_BOUNDARY_INVALID"), { code: "PERIOD_BOUNDARY_INVALID" });
   return Date.parse(parsed.instant);
 }
 
@@ -131,22 +142,46 @@ function resolveBoundaryMaxAgeMs(sample: PeriodSample | undefined, fallback?: nu
   return (sample?.boundaryMaxAgeSeconds ?? fallback ?? DEFAULT_BOUNDARY_MAX_AGE_SECONDS) * 1000;
 }
 
+function evaluateDailyCoverage(
+  period: PeriodSelection,
+  siteTimeZone: string,
+  meterIds: string[],
+  samples: PeriodSample[],
+  boundaryMaxAgeSeconds?: number
+): DailyCoverage | undefined {
+  if (period.kind !== "month") return undefined;
+  const month = period.month ?? 1;
+  const daysInMonth = new Date(Date.UTC(period.year, month, 0)).getUTCDate();
+  let coveredDays = 0;
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dayWin = periodWindow({ day, kind: "day", month, year: period.year }, siteTimeZone);
+    const dayCovered = meterIds.length > 0 && meterIds.every((meterId) => {
+      const meterSamples = samples.filter((s) => s.channelId === meterId);
+      const opening = lastAtOrBefore(meterSamples, dayWin.startMs);
+      const closing = lastAtOrBefore(meterSamples, dayWin.endMs);
+      if (!opening || !closing || opening === closing) return false;
+      const maxAgeMs = resolveBoundaryMaxAgeMs(opening, boundaryMaxAgeSeconds);
+      return dayWin.startMs - sampleMs(opening) <= maxAgeMs && dayWin.endMs - sampleMs(closing) <= maxAgeMs;
+    });
+    if (dayCovered) coveredDays += 1;
+  }
+  return { coveredDays, isComplete: coveredDays === daysInMonth, totalDays: daysInMonth };
+}
+
 function resultFor(profile: SiteEnergyProfileV1, quality: PeriodConsumptionQuality, valueKwh: string | null): PeriodConsumptionResult {
-  return {
-    profileRevision: profile.revision,
-    quality,
-    siteTimeZone: profile.siteTimeZone,
-    valueKwh
-  };
+  return { profileRevision: profile.revision, quality, siteTimeZone: profile.siteTimeZone, valueKwh };
 }
 
 export function resolvePeriodConsumption(input: {
   asOf: string;
   boundaryMaxAgeSeconds?: number;
+  definitionRevision?: DefinitionRevisionItem[];
   freshnessPolicy?: FreshnessPolicy;
   meterIds: string[];
   period: PeriodSelection;
   profile: SiteEnergyProfileV1;
+  reviewContext?: string;
+  rolloverModulus?: string | number | Record<string, string | number> | null;
   samples: PeriodSample[];
   timeZone?: string;
   start?: string;
@@ -169,6 +204,15 @@ export function resolvePeriodConsumption(input: {
   if (input.profile.revision < 1) {
     throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
   }
+  const definitionMap = new Map<string, DefinitionRevisionItem>();
+  if (input.definitionRevision) {
+    for (const item of input.definitionRevision) definitionMap.set(item.channelId, item);
+    for (const meterId of input.meterIds) {
+      if (!definitionMap.has(meterId)) {
+        throw Object.assign(new Error(`DEFINITION_REVISION_MISMATCH: meterId ${meterId} is not in definitionRevision`), { code: "DEFINITION_REVISION_MISMATCH" });
+      }
+    }
+  }
 
   if (new Set(input.meterIds).size !== input.meterIds.length) {
     throw Object.assign(new Error("DUPLICATE_METER"), { code: "DUPLICATE_METER" });
@@ -176,6 +220,15 @@ export function resolvePeriodConsumption(input: {
   const asOfMs = Date.parse(input.asOf);
   if (!Number.isFinite(asOfMs)) {
     throw Object.assign(new Error("INVALID_AS_OF"), { code: "INVALID_AS_OF" });
+  }
+  const normalizedModulus = new Map<string, bigint>();
+  if (typeof input.rolloverModulus === "object" && input.rolloverModulus !== null) {
+    for (const [k, v] of Object.entries(input.rolloverModulus)) {
+      if (v !== null && v !== undefined) normalizedModulus.set(k, parseDecimalString(String(v)));
+    }
+  } else if (input.rolloverModulus !== null && input.rolloverModulus !== undefined) {
+    const sharedMod = parseDecimalString(String(input.rolloverModulus));
+    for (const meterId of input.meterIds) normalizedModulus.set(meterId, sharedMod);
   }
   const window = periodWindow(input.period, input.profile.siteTimeZone);
   const closeCapMs = Math.min(window.endMs, asOfMs);
@@ -186,6 +239,7 @@ export function resolvePeriodConsumption(input: {
   const sourceRevisions = new Set<string>();
   let total: string | null = null;
   let observed: string | null = null;
+  let rolloverDetected = false;
   const state: { quality: PeriodConsumptionQuality } = { quality: "exact" };
   const freshnessPolicy = input.freshnessPolicy ?? createDefaultFreshnessPolicy();
   const freshnessResults: Array<{ metricKey: string; freshness: FreshnessResult }> = [];
@@ -229,16 +283,38 @@ export function resolvePeriodConsumption(input: {
     const identitySeries = series.filter((sample) => sampleIdentity(sample) === identity);
     const opening = lastAtOrBefore(identitySeries, window.startMs);
     const contributing = series.filter((sample) => sampleMs(sample) >= (opening ? sampleMs(opening) : window.startMs));
+    const canContribute = (s: PeriodSample) => sampleMs(s) >= window.startMs || (s === opening && window.startMs - sampleMs(s) <= resolveBoundaryMaxAgeMs(s, input.boundaryMaxAgeSeconds));
+    const def = definitionMap.get(meterId);
     let channelObserved: string | null = null;
+    let channelRollover = false;
     let previous: PeriodSample | undefined;
     for (const sample of contributing) {
       sourceRevisions.add(sampleIdentity(sample));
+      if (def) {
+        if (sample.meterId && sample.meterId !== def.meterId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+        if (sample.sourceRevision !== undefined && sample.sourceRevision !== def.sourceRevision) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+        if (sample.epochId && sample.epochId !== def.epochId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+      }
       if (previous && sampleIdentity(previous) === sampleIdentity(sample)) {
-        const delta = subtractDecimalString(sample.valueKwh, previous.valueKwh);
-        if (delta.startsWith("-")) degrade("invalid", `UNEXPLAINED_DECREASE:${meterId}`);
-        else if (sampleMs(previous) >= window.startMs || (previous === opening
-          && window.startMs - sampleMs(previous) <= resolveBoundaryMaxAgeMs(previous, input.boundaryMaxAgeSeconds))) {
-          channelObserved = addDecimal(channelObserved ?? "0", delta);
+        const prevNum = parseDecimalString(previous.valueKwh);
+        const currNum = parseDecimalString(sample.valueKwh);
+        if (currNum < prevNum) {
+          const modNum = sample.rolloverModulus !== undefined && sample.rolloverModulus !== null
+            ? parseDecimalString(String(sample.rolloverModulus))
+            : normalizedModulus.get(meterId) ?? 0n;
+          const rolloverDelta = (modNum - prevNum) + currNum;
+          if (modNum > 0n && prevNum < modNum && currNum >= 0n && rolloverDelta >= 0n && rolloverDelta <= (modNum / 2n)) {
+            const stepDelta = formatDecimalString(rolloverDelta);
+            if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", stepDelta);
+            channelRollover = true;
+            rolloverDetected = true;
+            issues.push(`ROLLOVER:${meterId}`);
+          } else {
+            degrade("invalid", `UNEXPLAINED_DECREASE:${meterId}`);
+          }
+        } else {
+          const delta = subtractDecimalString(sample.valueKwh, previous.valueKwh);
+          if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", delta);
         }
       }
       previous = sample;
@@ -254,7 +330,12 @@ export function resolvePeriodConsumption(input: {
       endTimestamp: new Date(sampleMs(closing)).toISOString()
     });
     if (!opening) {
-      degrade("partial", `MISSING_BASELINE:${meterId}`);
+      const globalOpening = lastAtOrBefore(series, window.startMs);
+      if (globalOpening && sampleIdentity(globalOpening) !== identity) {
+        degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
+      } else {
+        degrade("partial", `MISSING_BASELINE:${meterId}`);
+      }
       continue;
     }
     if (sampleMs(closing) <= sampleMs(opening)) {
@@ -272,7 +353,9 @@ export function resolvePeriodConsumption(input: {
     if (sampleMs(opening) < window.startMs || sampleMs(closing) < closeCapMs || contributing.some((sample) => sample.timestampQuality === "receive-time-estimated")) {
       degrade("estimated-boundary", `ESTIMATED_BOUNDARY:${meterId}`);
     }
-    const delta = subtractDecimalString(closing.valueKwh, opening.valueKwh);
+    const delta = channelRollover && channelObserved !== null
+      ? channelObserved
+      : subtractDecimalString(closing.valueKwh, opening.valueKwh);
     if (!delta.startsWith("-")) total = addDecimal(total ?? "0", delta);
   }
   let freshnessState = aggregateFreshnessResults(freshnessResults).state;
@@ -283,10 +366,14 @@ export function resolvePeriodConsumption(input: {
     total = null;
     observed = null;
   }
+  const dailyCoverage = input.period.kind === "month"
+    ? evaluateDailyCoverage(input.period, input.profile.siteTimeZone, input.meterIds, input.samples, input.boundaryMaxAgeSeconds)
+    : undefined;
   return {
     ...resultFor(input.profile, state.quality, state.quality === "exact" || state.quality === "estimated-boundary" ? total : null),
     meterIds: [...input.meterIds].sort(),
     observedDeltaKwh: state.quality === "invalid" ? null : observed,
+    dailyCoverage,
     freshness: freshnessState === "live" ? "fresh" : freshnessState === "unavailable" ? "unavailable" : "stale",
     freshnessState,
     periodStart: new Date(window.startMs).toISOString(),
@@ -297,7 +384,13 @@ export function resolvePeriodConsumption(input: {
     boundaryOffsets,
     issues,
     calculationVersion: "e2-v3",
-    provenance: { profileRevision: input.profile.revision, siteTimeZone: input.profile.siteTimeZone, sourceRevisions: [...sourceRevisions].sort() }
+    provenance: {
+      profileRevision: input.profile.revision,
+      siteTimeZone: input.profile.siteTimeZone,
+      sourceRevisions: [...sourceRevisions].sort(),
+      ...(rolloverDetected ? { rollover: true } : {}),
+      ...(input.reviewContext ? { reviewContext: input.reviewContext } : {})
+    }
   };
 }
 
