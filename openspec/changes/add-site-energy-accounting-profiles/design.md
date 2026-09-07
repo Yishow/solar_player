@@ -53,6 +53,10 @@ draft/preview/active型別分開；profile/schema/source revision錯誤422/409�
 
 ### D5. 版本與歷史
 
+2026-09-07 確認：來源版本由伺服器自動管理，UI 不新增版本輸入或選單。preview 以 concrete scope 讀取 siteTotal、各 department 與 shareBasis meter-set 所選 channel 的最新 E1 definition，要求來源存在、enabled、reviewed 且為 energy measurement。以 channel 排序、去重的 snapshot 綁定既有 `sourceRevision`、`meterId`、`epochId` 及計算／可用性欄位（包含 boundaryMaxAgeSeconds、expectedCadenceSeconds）；排除 displayName，名稱變更不使預覽失效。以 additive migration 將 snapshot 存於 token 的 `source_snapshot_json`，不建立新的來源版本計數器。
+
+apply 在現有 immediate transaction 中重新讀取並比對 snapshot，來源更換／停用／審核狀態／計算設定改變回 `PROFILE_SOURCE_CONFLICT`（409），不寫 profile 或 receipt；舊 token 缺 snapshot 回 `PROFILE_SOURCE_REVIEW_REQUIRED`（409）。成功的 idempotency receipt 仍優先回放，不因後來來源變更破壞成功重試。UI 保留草稿並清除過期預覽，顯示「來源設定已變更，請重新預覽。」與原有預覽按鈕。preview 的未知／不可用來源回 `PROFILE_SOURCE_UNAVAILABLE`（422）及對應欄位。此處不引入公式 registry 版本，也不改 E1 lifecycle；完整數值 calculator 與 period review context 依原 task 1.5 接續。
+
 預設往後生效；保留每段有效版本。siteTimeZone 任何變更都建立新的 profile revision，已關閉期間繼續使用原 revision，不無聲重算。進行中的月/年如跨過不同計量成員或日曆時區，標partial/segmented；不可拼成未註明的新口徑比率。另開歷史修復時先有界dry-run，再明確授權。CL修改不invalidate KN cache；cache key需包含site、profile revision、source revisions、period、algorithm version。
 
 ### D6. 舊設定與展示

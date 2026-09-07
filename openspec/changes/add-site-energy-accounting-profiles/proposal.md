@@ -8,6 +8,8 @@
 
 定義可實作的資料契約、唯一設定來源、具體UI入口與驗收情境。使用者不必編寫分子／分母公式、填metric key或閱讀系統操作手冊才能完成一般設定。siteTotal、departments、shareBasis 與 siteTimeZone 由 E6 profile 單一保存；E1 source 只保存物理來源、measurement semantics 與 energyFlowRole，不保存 site-main/department 或 departmentId。
 
+2026-09-07 補充：preview/apply 自動綁定及檢查既有 E1 source revisions 與計算設定；操作員不需填版本號。來源衝突時保留選擇並重新預覽，不新增設定步驟。
+
 ## Non-Goals
 
 不實作任意算式編輯器、不猜測未提供的現場電錶關係、不把資料完整性與設定完成混為一談、不偷偷改正式頁面或重算歷史。不在 E1 source definition 重複保存 accounting ownership 或 calendar authority；不讓 caller timezone override 改寫 profile 的 day/month/year 邊界。

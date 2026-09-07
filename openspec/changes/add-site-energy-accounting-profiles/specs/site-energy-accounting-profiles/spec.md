@@ -142,6 +142,16 @@ Authorized management APIs SHALL accept an expected profile revision and a draft
 - **WHEN** apply is requested
 - **THEN** neither part replaces the active profile
 
+#### Scenario: Source versions are managed without operator input
+<!-- scenario-id: E6-R6-S04 -->
+
+- **GIVEN** a draft selects source channels for site total, departments and a meter-set share basis
+- **WHEN** the operator previews and applies the draft
+- **THEN** the server SHALL capture the latest existing, enabled, reviewed energy source definitions for all selected channels in the concrete site and bind their identities, source revisions and calculation settings to the preview token without requiring version fields or a version selector in the UI
+- **AND** a selected source changing revision, meter identity, epoch, availability, cadence or boundary tolerance before apply SHALL cause a `PROFILE_SOURCE_CONFLICT` response with status 409 and no profile or receipt writes; display-name-only changes and unrelated channels or sites SHALL NOT invalidate the preview
+- **AND** the UI SHALL retain the draft, discard the stale preview and offer the existing preview action with a plain-language explanation; successful idempotent retries SHALL still return their original result
+- **AND** unknown or unusable selected sources SHALL fail preview with `PROFILE_SOURCE_UNAVAILABLE` and status 422; tokens created without a source snapshot SHALL require a new preview with `PROFILE_SOURCE_REVIEW_REQUIRED` and status 409
+
 ### Requirement: Effective-dated profile changes preserve historical meaning
 <!-- requirement-id: E6-R7 -->
 

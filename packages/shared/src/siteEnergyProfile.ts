@@ -103,3 +103,21 @@ export function reassignmentDoesNotTouchSource(previousSource: { sourceRevision:
     && previousSource.epochId === nextSource.epochId
     && previousSource.baseline === nextSource.baseline;
 }
+
+export function profileMemberChannelIds(profile: SiteEnergyProfileV1): string[] {
+  const ids = new Set<string>();
+  for (const channelId of profile.siteTotal.memberChannelIds) {
+    ids.add(channelId);
+  }
+  for (const department of profile.departments) {
+    for (const channelId of department.memberChannelIds) {
+      ids.add(channelId);
+    }
+  }
+  if (profile.shareBasis.kind === "meter-set" && Array.isArray(profile.shareBasis.memberChannelIds)) {
+    for (const channelId of profile.shareBasis.memberChannelIds) {
+      ids.add(channelId);
+    }
+  }
+  return Array.from(ids);
+}

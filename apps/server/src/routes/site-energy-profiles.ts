@@ -59,7 +59,9 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
     } catch (error) {
       const code = (error as { code?: string; statusCode?: number }).code ?? "PROFILE_INVALID";
       const statusCode = (error as { statusCode?: number }).statusCode ?? 422;
-      return reply.code(statusCode).send({ success: false, error: code, timestamp: new Date().toISOString() });
+      const fields = (error as { fields?: unknown }).fields;
+      return reply.code(statusCode).send({ success: false, error: code,
+        ...(Array.isArray(fields) ? { fields } : {}), timestamp: new Date().toISOString() });
     }
   });
 
@@ -90,7 +92,7 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       return applyGuidedMapping(getDatabase(), body);
     } catch (error) {
       const code = (error as { code?: string }).code ?? "MAPPING_APPLY_FAILED";
-      return reply.code(code === "PREVIEW_DRAFT_MISMATCH" || code === "PREVIEW_EXPIRED" ? 409 : 422).send({
+      return reply.code((error as { statusCode?: number }).statusCode ?? 422).send({
         success: false,
         error: code,
         timestamp: new Date().toISOString()
