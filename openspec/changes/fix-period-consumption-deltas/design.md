@@ -54,6 +54,8 @@ to-date 以請求 asOf 定義共同結束邊界；找不到正好 asOf 的樣本
 
 ### D9. Profile lookup precedes calculation
 
+2026-09-07 契約釐清：本 change 的 `definitionRevision` 指由伺服器解析的 E1 來源版本集合，形狀為 `Array<{channelId,meterId,sourceRevision,epochId}>`，scope 由外層 concrete `metricScope` 決定；不是 derived metric registry 的公式 revision，也不新增版本計數器或 UI 欄位。E6 preview 自動捕捉所選來源，apply 驗證該 review snapshot 仍有效。正式歷史 resolver 必須依選定 profile／期間的來源證據驗證版本，不可用最新來源取代歷史版本。本輪只落實 E6 review 綁定；E2 resolver 接入與 draft 數值預覽仍依 task 1.3 驗收。
+
 resolver 保留 `metricScope`、`meterIds`、`definitionRevision`，並要求 `profileRevision`、`periodSelection` 與 `asOf`。服務端依 metric scope/profile revision 讀取 siteTimeZone 與來源 membership，驗證 meterIds 屬於該 revision 的相關 membership 及 definition revision 存在且可用；caller 傳入 timeZone、start、end 或未知 profile revision 時拒絕，不以 caller 輸入或 OS timezone fallback。
 
 E6 草稿預覽在既有 calculator seam 內，透過相同 lookup 注入 E6 已驗證且不可變的 review snapshot（含 expected persisted revision、draft membership/siteTimeZone 與 source revisions）；這不是公共 caller 的 timezone override。預覽結果標示 review context reference，不能當 persisted profile revision 或寫入正式 history/cache；正式報表仍只解析 persisted revision。

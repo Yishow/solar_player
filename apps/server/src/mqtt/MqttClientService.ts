@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import {
   hasLiveMetricRequirementsData,
   resolveLiveMetricRequirementsForPage,
-  type DisplayPageTemplateKey
+  type DisplayPageTemplateKey,
+  type MeterReadingChangeEvent
 } from "@solar-display/shared";
 import type { MetricScope } from "@solar-display/shared";
 import {
@@ -12,8 +13,12 @@ import {
   type IPublishPacket,
   type MqttClient
 } from "mqtt";
-import { ingestMappedMeterReading } from "../services/mqttMeterIngest.js";
+import {
+  ingestMappedMeterReading,
+  type MappedMeterIngestResult
+} from "../services/mqttMeterIngest.js";
 import { tapProductionObservation } from "../services/mqttObservationCatalogService.js";
+import { matchesMqttTopicFilter } from "./topicFilter.js";
 import { getDatabase } from "../db/index.js";
 import {
   type LiveMetricsSnapshot,
@@ -69,7 +74,8 @@ type TestConnectionInput = {
   dataMode: string;
 };
 
-type MqttClientServiceOptions = {
+export type MqttClientServiceOptions = {
+  connectionRef?: string;
   logger: LoggerLike;
   database?: Database.Database;
   generatedClientIdFn?: () => string;
@@ -85,6 +91,7 @@ type MqttClientServiceOptions = {
     | "emitSystemError"
     | "emitSystemRecovered"
   >;
+  meterReadingEventSink?: (event: MeterReadingChangeEvent) => void;
 };
 
 export type MqttStatus = {
@@ -208,26 +215,6 @@ function disconnectClient(client: MqttClient) {
   });
 }
 
-function matchesMqttTopicFilter(filter: string, topic: string) {
-  const filterLevels = filter.split("/");
-  const topicLevels = topic.split("/");
-
-  for (let index = 0; index < filterLevels.length; index += 1) {
-    const filterLevel = filterLevels[index];
-    if (filterLevel === "#") {
-      return index === filterLevels.length - 1;
-    }
-    if (topicLevels[index] === undefined) {
-      return false;
-    }
-    if (filterLevel !== "+" && filterLevel !== topicLevels[index]) {
-      return false;
-    }
-  }
-
-  return filterLevels.length === topicLevels.length;
-}
-
 function hasPayloadTimestamp(rawPayload: string) {
   try {
     return typeof (JSON.parse(rawPayload) as { timestamp?: unknown }).timestamp === "string";
@@ -283,6 +270,8 @@ export class MqttClientService {
   private readonly solarSourceAdapter: SolarSourceAdapter | null;
   private readonly runtimeProcessAliveFn: ProcessAliveFunction;
   private readonly socketService: MqttClientServiceOptions["socketService"];
+  private readonly meterReadingEventSink: MqttClientServiceOptions["meterReadingEventSink"];
+  private readonly connectionRef: string;
   private readonly runtimeLeaseOwnerToken = `${process.pid}-${randomBytes(4).toString("hex")}`;
   private client: MqttClient | null = null;
   private desiredTopics = new Set<string>();
@@ -301,10 +290,12 @@ export class MqttClientService {
   private mockMode = false;
 
   constructor(options: MqttClientServiceOptions) {
+    this.connectionRef = options.connectionRef?.trim() || "central";
     this.database = options.database ?? getDatabase();
     this.logger = options.logger;
     this.connectFn = options.connectFn ?? connect;
     this.socketService = options.socketService;
+    this.meterReadingEventSink = options.meterReadingEventSink;
     this.generatedClientIdFn =
       options.generatedClientIdFn
       ?? (() => `${RUNTIME_CLIENT_ID_PREFIX}${randomBytes(4).toString("hex")}`);
@@ -888,13 +879,14 @@ export class MqttClientService {
   }
 
   private async handleMessage(topic: string, rawPayload: string, packet?: IPublishPacket) {
+    const receivedAt = new Date().toISOString();
     tapProductionObservation({
-      connectionRef: this.status.clientId ?? "runtime",
+      connectionRef: this.connectionRef,
       dup: packet?.dup ?? null,
       exactTopic: topic,
       origin: "mqtt",
       qos: packet?.qos ?? null,
-      receivedAt: new Date().toISOString(),
+      receivedAt,
       retain: packet?.retain ?? null,
       sourceTimestampEvidence: null
     }, rawPayload);
@@ -957,6 +949,23 @@ export class MqttClientService {
         timestamp,
         quality,
         raw_payload
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+        value = excluded.value,
+        unit = excluded.unit,
+        timestamp = excluded.timestamp,
+        quality = excluded.quality,
+        raw_payload = excluded.raw_payload
+    `);
+    const upsertLegacyLiveValue = this.database.prepare(`
+      INSERT INTO live_metric_values (
+        metric_scope,
+        metric_key,
+        value,
+        unit,
+        timestamp,
+        quality,
+        raw_payload
       ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
       ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
         value = excluded.value,
@@ -969,12 +978,83 @@ export class MqttClientService {
     const changedMetrics: DerivedMetricChange[] = [];
 
     for (const mapping of mappings) {
+      const pendingMeterEvents: MeterReadingChangeEvent[] = [];
       try {
+        let mapped: MappedMeterIngestResult | null = null;
+        let mappedLiveUpdated = false;
+        this.database.transaction(() => {
+          mapped = ingestMappedMeterReading(
+            this.database,
+            mapping,
+            rawPayload,
+            packet,
+            receivedAt,
+            { emitMeterReadingChange: (event) => pendingMeterEvents.push(event) }
+          );
+          if (
+            !mapped?.handled
+            || mapped.status !== "accepted"
+            || mapped.liveUpdated !== true
+            || mapped.liveValueKwh === null
+          ) {
+            return;
+          }
+          const normalizedValue = Number(mapped.liveValueKwh);
+          if (!Number.isFinite(normalizedValue)) {
+            this.logger.warn(
+              {
+                metricKey: mapping.metric_key,
+                metricScope: mapping.metric_scope,
+                value: mapped.liveValueKwh,
+                topic
+              },
+              "Accepted meter reading is not representable in generic live metrics"
+            );
+            return;
+          }
+          upsertLiveValue.run(
+            mapping.metric_scope,
+            mapping.metric_key,
+            normalizedValue,
+            "kWh",
+            mapped.sourceTimestamp ?? receivedAt,
+            mapped.timestampQuality,
+            rawPayload
+          );
+          mappedLiveUpdated = true;
+        })();
+        const mappedResult = mapped as MappedMeterIngestResult | null;
+        if (mappedResult?.handled) {
+          if (mappedLiveUpdated) {
+            persistedMetricCount += 1;
+            changedMetrics.push({
+              metricKey: mapping.metric_key,
+              metricScope: mapping.metric_scope
+            });
+          }
+          for (const event of pendingMeterEvents) {
+            this.socketService?.emitDisplaySync({
+              generatedAt: event.receivedAt,
+              metricScope: event.metricScope,
+              reason: "meter-readings-changed",
+              scope: "monitoring-history"
+            });
+            try {
+              this.meterReadingEventSink?.(event);
+            } catch (error) {
+              this.logger.warn(
+                { error, event },
+                "Meter-reading change event sink rejected an admitted sample"
+              );
+            }
+          }
+          continue;
+        }
         const parsedPayload = parse(rawPayload, mapping.value_path ?? undefined);
         const adjustedValue =
           parsedPayload.value * (mapping.multiplier ?? 1) + (mapping.offset ?? 0);
 
-        upsertLiveValue.run(
+        upsertLegacyLiveValue.run(
           mapping.metric_scope,
           mapping.metric_key,
           roundValue(adjustedValue, mapping.decimal_places),
@@ -982,25 +1062,13 @@ export class MqttClientService {
           parsedPayload.quality ?? null,
           parsedPayload.raw
         );
-        try {
-          ingestMappedMeterReading(this.database, mapping, rawPayload, packet);
-        } catch (error) {
-          this.logger.warn(
-            {
-              error,
-              metricKey: mapping.metric_key,
-              metricScope: mapping.metric_scope,
-              topic
-            },
-            "Meter-reading admission did not accept this MQTT payload"
-          );
-        }
         persistedMetricCount += 1;
         changedMetrics.push({
           metricKey: mapping.metric_key,
           metricScope: mapping.metric_scope
         });
       } catch (error) {
+        pendingMeterEvents.length = 0;
         this.logger.warn(
           {
             error,

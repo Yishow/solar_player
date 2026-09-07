@@ -3,21 +3,35 @@ import {
   buildMonthlyConsumptionSeries,
   monthBoundaryInProfileZone,
   resolvePeriodConsumption,
+  periodWindow,
+  type FreshnessPolicy,
   type PeriodSelection,
+  type PeriodSample,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
-import { getActiveProfile } from "./siteEnergyProfileService.js";
-import { readActiveProjection } from "./consumptionProjectionService.js";
+import { readFreshnessPolicy } from "./freshnessPolicyService.js";
+import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileService.js";
+import { readActiveProjection, acceptedSampleChecksum, projectionContextKey } from "./consumptionProjectionService.js";
 
-function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn") {
-  return (database.prepare(`
-    SELECT channel_id, source_timestamp, normalized_value_kwh
-    FROM meter_readings_accepted
-    WHERE metric_scope = ? AND source_timestamp IS NOT NULL
-    ORDER BY source_timestamp
-  `).all(scope) as Array<{ channel_id: string; source_timestamp: string; normalized_value_kwh: string }>).map((row) => ({
+import { loadAcceptedMeterReadings } from "./meterReadingService.js";
+
+export function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn"): PeriodSample[] {
+  const rows = loadAcceptedMeterReadings(database, scope);
+  return rows.slice().sort((a, b) => {
+    const timeA = Date.parse(a.source_timestamp ?? a.received_at);
+    const timeB = Date.parse(b.source_timestamp ?? b.received_at);
+    return timeA - timeB || a.reading_id.localeCompare(b.reading_id);
+  }).map((row) => ({
+    readingId: row.reading_id,
+    boundaryMaxAgeSeconds: row.boundary_max_age_seconds,
     channelId: row.channel_id,
+    epochId: row.epoch_id,
+    meterId: row.meter_id,
     sourceTimestamp: row.source_timestamp,
+    receivedAt: row.received_at,
+    timestampQuality: row.timestamp_quality,
+    measurementKind: row.measurement_kind ?? "unknown",
+    sourceRevision: row.source_revision,
     valueKwh: row.normalized_value_kwh
   }));
 }
@@ -59,19 +73,48 @@ export function resolvePersistedPeriodConsumption(
   database: Database.Database,
   scope: "cl" | "kn",
   period: PeriodSelection,
-  asOf: string
+  asOf: string,
+  options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
-  const profile = getActiveProfile(database, scope);
+  return resolveWithEvidence(listPersistedProfiles(database, scope), loadAcceptedSamples(database, scope), period, asOf, readFreshnessPolicy(database).policy, options);
+}
+
+function resolveWithEvidence(
+  storedProfiles: SiteEnergyProfileV1[], samples: PeriodSample[], period: PeriodSelection, asOf: string, freshnessPolicy: FreshnessPolicy,
+  options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
+) {
+  const profiles = [...storedProfiles].sort((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom) || a.revision - b.revision);
+  const profile = options.profileRevision === undefined
+    ? profiles.filter((candidate) => Date.parse(candidate.effectiveFrom) <= periodWindow(period, candidate.siteTimeZone).startMs).at(-1) ?? profiles[0]
+    : profiles.find((candidate) => candidate.revision === options.profileRevision);
   if (!profile) {
     throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
   }
-  return resolvePeriodConsumption({
+  const window = periodWindow(period, profile.siteTimeZone);
+  const through = Math.min(window.endMs, Date.parse(asOf));
+  const newerProfiles = profiles.filter((candidate) => candidate.revision !== profile.revision
+    && (Date.parse(candidate.effectiveFrom) > Date.parse(profile.effectiveFrom)
+      || (Date.parse(candidate.effectiveFrom) === Date.parse(profile.effectiveFrom) && candidate.revision > profile.revision))
+    && Date.parse(candidate.effectiveFrom) < through);
+  const boundary = newerProfiles[0];
+  const result = resolvePeriodConsumption({
     asOf,
-    meterIds: profile.siteTotal.memberChannelIds,
+    meterIds: options.meterIds ?? profile.siteTotal.memberChannelIds,
     period,
     profile,
-    samples: loadAcceptedSamples(database, scope)
+    samples,
+    freshnessPolicy,
+    timeZone: options.timeZone,
+    start: options.start,
+    end: options.end
   });
+  if (through >= window.startMs && (boundary || Date.parse(profile.effectiveFrom) > window.startMs)) {
+    return { ...result, valueKwh: null, observedDeltaKwh: null, quality: result.quality === "invalid" ? "invalid" as const : "partial" as const,
+      profileRevisionBoundaries: [profile, ...newerProfiles]
+        .map((candidate) => ({ profileRevision: candidate.revision, effectiveFrom: candidate.effectiveFrom, siteTimeZone: candidate.siteTimeZone })),
+      issues: [...result.issues ?? [], "PROFILE_REVISION_BOUNDARY"] };
+  }
+  return result;
 }
 
 export function tryResolvePersistedPeriodConsumption(
@@ -91,20 +134,16 @@ export function tryResolvePersistedPeriodConsumption(
   if (!period) {
     return null;
   }
-  const projectedRange = range === "total" ? "year" : range === "week" ? null : range;
-  if (projectedRange) {
-    const active = readActiveProjection(database, scope, projectedRange);
-    if (active) {
-      return {
-        profileRevision: active.profileRevision,
-        quality: active.quality,
-        siteTimeZone: active.siteTimeZone,
-        valueKwh: active.valueKwh
-      };
-    }
-  }
   try {
-    return resolvePersistedPeriodConsumption(database, scope, period, asOf);
+    const result = resolvePersistedPeriodConsumption(database, scope, period, asOf);
+    const projectedRange = period.kind;
+    const contextKey = projectionContextKey(result);
+    const active = readActiveProjection(database, scope, projectedRange, contextKey);
+    if (active && active.calculatedThrough === result.calculatedThrough && active.quality === result.quality
+      && active.sampleChecksum === acceptedSampleChecksum(database, scope, result)) {
+      return { ...active, freshness: result.freshness, freshnessState: result.freshnessState };
+    }
+    return result;
   } catch {
     return null;
   }
@@ -123,28 +162,28 @@ export function resolveDailyConsumptionSeries(
   const [yearPart, monthPart] = month.split("-");
   const year = Number(yearPart);
   const monthNumber = Number(monthPart);
-  if (!Number.isInteger(year) || !Number.isInteger(monthNumber)) {
+  if (!/^\d{4}-\d{2}$/.test(month) || !Number.isInteger(year) || !Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > 12) {
     return null;
   }
+  const profiles = listPersistedProfiles(database, scope);
   const samples = loadAcceptedSamples(database, scope);
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const monthResult = resolveWithEvidence(profiles, samples, { kind: "month", month: monthNumber, year }, asOf, freshnessPolicy);
   const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
   const points = [];
   for (let day = 1; day <= daysInMonth; day += 1) {
-    const result = resolvePeriodConsumption({
-      asOf,
-      meterIds: profile.siteTotal.memberChannelIds,
-      period: { day, kind: "day", month: monthNumber, year },
-      profile,
-      samples
-    });
+    const result = resolveWithEvidence(profiles, samples, { day, kind: "day", month: monthNumber, year }, asOf, freshnessPolicy);
     points.push({
       date: `${month}-${String(day).padStart(2, "0")}`,
-      valueKwh: result.quality === "exact" ? result.valueKwh : null
+      valueKwh: result.quality === "exact" || result.quality === "estimated-boundary" ? result.valueKwh : null,
+      quality: result.quality,
+      profileRevision: result.profileRevision,
+      siteTimeZone: result.siteTimeZone
     });
   }
   return {
-    profileRevision: profile.revision,
-    siteTimeZone: profile.siteTimeZone,
+    profileRevision: monthResult.profileRevision,
+    siteTimeZone: monthResult.siteTimeZone,
     ...buildMonthlyConsumptionSeries(points, month)
   };
 }

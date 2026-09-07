@@ -2094,3 +2094,33 @@ test("PUT /api/settings/mqtt/topics accepts the topic list read back from an upg
     await app.close();
   }
 });
+
+
+test("legacy mapping writes cannot bypass registered source revisions or erase selectors", async () => {
+  migrateDatabase(); seedDatabase();
+  const app = await buildApp();
+  const database = getDatabase();
+  try {
+    const { saveMeterSource } = await import("../services/meterSourceCatalogService.js");
+    saveMeterSource(database, {
+      channelId: "guard", meterId: "guard", metricKey: "guardEnergy", metricScope: "cl",
+      enabled: true, reviewStatus: "reviewed", measurementKind: "cumulative-energy", energyFlowRole: "consumption",
+      inputUnit: "kWh", scaleDecimal: "1", sourceRevision: 1, epochId: "one", expectedCadenceSeconds: 60,
+      sourceTimestampTimeZone: null, timestampPolicy: "source-required"
+    });
+    database.prepare("INSERT INTO topic_mappings (metric_scope,metric_key,topic,unit,value_path,selector_json,multiplier,enabled) VALUES ('cl','guardEnergy','guard/topic','kwh','value',?,1,1)")
+      .run(JSON.stringify({path:["value"],tagEquals:"MAIN"}));
+    const read = await app.inject({ method: "GET", url: "/api/settings/mqtt/topics" });
+    const topics: Array<Record<string, unknown>> = (read.json().topics as Array<Record<string, unknown>>).map(t => ({ ...t, nameZh: t.nameZh ?? "", nameEn: t.nameEn ?? "" }));
+    const before = database.prepare("SELECT * FROM topic_mappings ORDER BY id").all();
+    for (const proposed of [topics.filter(t => t.metricKey !== "guardEnergy"), topics.map(t => t.metricKey === "guardEnergy" ? {...t, topic:"other/topic"} : t)]) {
+      const denied = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload: { topics: proposed } });
+      assert.equal(denied.statusCode, 409, denied.body);
+      assert.equal(denied.json().code, "E1_SOURCE_REVISION_REQUIRED");
+      assert.deepEqual(database.prepare("SELECT * FROM topic_mappings ORDER BY id").all(), before);
+    }
+    const saved = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload: { topics } });
+    assert.equal(saved.statusCode, 200, saved.body);
+    assert.deepEqual(JSON.parse((database.prepare("SELECT selector_json FROM topic_mappings WHERE metric_key='guardEnergy'").get() as {selector_json:string}).selector_json), {path:["value"],tagEquals:"MAIN"});
+  } finally { await app.close(); }
+});

@@ -53,6 +53,7 @@ import imagePlaylistRoute from "./routes/image-playlist.js";
 import freshnessPolicyRoute from "./routes/freshness-policy.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 import mqttCapturesRoute from "./routes/mqtt-captures.js";
+import meterSourcesRoute from "./routes/meter-sources.js";
 import siteEnergyProfilesRoute from "./routes/site-energy-profiles.js";
 import shellDecorationsRoute from "./routes/shell-decorations.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
@@ -171,6 +172,7 @@ export async function buildApp() {
     server: app.server
   });
   mqttClientService = new MqttClientService({
+    connectionRef: process.env.MQTT_CONNECTION_REF || "central",
     logger: app.log,
     socketService
   });
@@ -256,6 +258,7 @@ export async function buildApp() {
   await app.register(settingsMqttRoute);
   await app.register(mqttCapturesRoute);
   await app.register(siteEnergyProfilesRoute);
+  await app.register(meterSourcesRoute);
   await app.register(shellDecorationsRoute);
   await app.register(sustainabilityStoryRoute);
   await app.register(weatherRoute);

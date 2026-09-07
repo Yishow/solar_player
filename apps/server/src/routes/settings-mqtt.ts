@@ -7,6 +7,7 @@ import { readDisplayReadinessReport } from "../services/displayReadinessService.
 import { listDerivedMetricDefinitions } from "../services/derivedMetricRegistryService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
 import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
+import { checkLegacyMappingMeterSourceConflict } from "../services/meterSourceCatalogService.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -63,6 +64,11 @@ type TopicMappingInput = {
 };
 
 type ExistingTopicMappingRow = {
+  topic: string;
+  unit: string | null;
+  value_path: string | null;
+  selector_json: string | null;
+  enabled: number;
   created_at: string | null;
   decimal_places: number | null;
   metric_key: string;
@@ -579,6 +585,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
               SELECT
                 metric_key,
                 metric_scope,
+                topic, unit, value_path, selector_json, enabled,
                 multiplier,
                 offset,
                 decimal_places,
@@ -636,6 +643,10 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
       resolvedTopics.push({ ...topic, metricScope });
     }
 
+    if (checkLegacyMappingMeterSourceConflict(database, existingMappings, resolvedTopics, canonicalizeMetricUnit, resolveMultiplier)) {
+      return reply.status(409).send({ success: false, code: "E1_SOURCE_REVISION_REQUIRED", error: "E1_SOURCE_REVISION_REQUIRED", timestamp: new Date().toISOString() });
+    }
+
     database.transaction(() => {
       database.prepare("DELETE FROM topic_mappings").run();
 
@@ -648,13 +659,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           name_en,
           unit,
           value_path,
+          selector_json,
           multiplier,
           offset,
           decimal_places,
           enabled,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `);
 
       for (const topic of resolvedTopics) {
@@ -668,6 +680,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           resolveCustomName(topic.nameEn, existingMapping?.name_en ?? null),
           unit,
           topic.valuePath?.trim() || null,
+          existingMapping?.selector_json ?? null,
           resolveMultiplier(topic.multiplier, existingMapping?.multiplier ?? 1),
           existingMapping?.offset ?? 0,
           existingMapping?.decimal_places ?? (unit === "%" ? 1 : 2),

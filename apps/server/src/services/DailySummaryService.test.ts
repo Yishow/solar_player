@@ -5,6 +5,9 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import { migrateScopedMetricIdentity } from "../db/scopedMetricMigration.js";
 import type { DisplaySyncEvent } from "@solar-display/shared";
+import { tryResolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
+import { readActiveProjection } from "./consumptionProjectionService.js";
+import { seedAcceptedReading } from "./meterReadingService.js";
 import { DailySummaryService } from "./DailySummaryService.js";
 
 function createDatabase() {
@@ -16,6 +19,9 @@ function createDatabase() {
   database.exec(migration003);
   database.exec(migration018);
   migrateScopedMetricIdentity(database, { legacySiteScope: "cl" });
+  for (const migration of ["033_freshness_policy.sql", "040_meter_reading_contracts.sql", "049_meter_source_boundary_age.sql", "041_site_energy_profiles.sql", "042_consumption_projections.sql", "046_meter_reading_evidence.sql", "047_projection_activation_context.sql"]) {
+    database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations", migration), "utf8"));
+  }
   return database;
 }
 
@@ -82,7 +88,7 @@ test("DailySummaryService emits monitoring-history invalidation when a daily sum
     };
 
   assert.deepEqual(row, {
-    consumption_total: 1,
+    consumption_total: null,
     generation_total: 3,
     self_consumption_total: 1
   });
@@ -135,7 +141,7 @@ test("DailySummaryService persists the current day and resumes its baseline afte
   firstService.processAt(new Date("2026-05-13T13:00:00.000Z"));
 
   assert.deepEqual(readSummary(), {
-    consumption_total: 1,
+    consumption_total: null,
     generation_total: 3,
     self_consumption_total: 1
   });
@@ -151,7 +157,7 @@ test("DailySummaryService persists the current day and resumes its baseline afte
   restartedService.processAt(new Date("2026-05-13T14:00:00.000Z"));
 
   assert.deepEqual(readSummary(), {
-    consumption_total: 3,
+    consumption_total: null,
     generation_total: 5,
     self_consumption_total: 3
   });
@@ -194,5 +200,40 @@ test("DailySummaryService rolls the local-day baseline for one metric scope with
     { date: "2026-08-29", generation_total: 0, metric_scope: "kn" }
   ]);
 
+  database.close();
+});
+
+
+test("E2 daily summary restores canonical consumption from samples without clamping or poll readings", () => {
+  const database = createDatabase();
+  database.prepare(`INSERT INTO site_energy_profiles
+    (profile_id, metric_scope, revision, schema_version, site_time_zone, status, effective_from, site_total_json, departments_json, share_basis_json, active, created_at)
+    VALUES ('kn-energy', 'kn', 1, 1, 'Asia/Taipei', 'ready', '2026-01-01T00:00:00Z', ?, '[]', '{"kind":"site-main"}', 1, '2026-01-01T00:00:00Z')`)
+    .run(JSON.stringify({ coverageReview: "reviewed", kind: "meter-set", label: "KN", memberChannelIds: ["main"] }));
+  const source = { channelId: "main", meterId: "main", metricKey: "consumptionEnergy", metricScope: "kn" as const,
+    sourceRevision: 1, epochId: "epoch", measurementKind: "cumulative-energy" as const, energyFlowRole: "consumption" as const,
+    expectedCadenceSeconds: 60, sourceTimestampTimeZone: "UTC",
+    inputUnit: "kWh", scaleDecimal: "1", enabled: true, reviewStatus: "reviewed" as const, timestampPolicy: "source-required" as const };
+  seedAcceptedReading(database, source, "10000", "2026-08-31T16:00:00Z", "2026-08-31T16:00:01Z");
+  seedAcceptedReading(database, source, "10300", "2026-09-01T04:00:00Z", "2026-09-01T04:00:01Z");
+  const metricsAccumulatorService = { getCounters: () => ({ co2: 0, consumption: 99999, generation: 0, selfConsumption: 0 }),
+    getLatestSnapshot: () => ({ capturedAt: null, consumptionPower: null, generationPower: null }) } as never;
+  const makeService = () => new DailySummaryService({ database, metricScope: "kn", metricsAccumulatorService });
+  makeService().processAt(new Date("2026-09-01T04:00:00Z"));
+  assert.equal(readActiveProjection(database, "kn", "day")?.valueKwh, "300");
+  assert.equal(readActiveProjection(database, "kn", "day")?.siteTimeZone, "Asia/Taipei");
+  makeService().processAt(new Date("2026-09-01T04:00:00Z"));
+  assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 2);
+  makeService().processAt(new Date("2026-09-01T04:01:00Z"));
+  const saved = readActiveProjection(database, "kn", "day");
+  makeService().processAt(new Date("2026-09-01T04:02:00Z"));
+  assert.equal(readActiveProjection(database, "kn", "day")?.projectionId, saved?.projectionId);
+  assert.equal(tryResolvePersistedPeriodConsumption(database, "kn", "day", "2026-09-01T04:02:00Z")?.calculatedThrough, "2026-09-01T04:02:00.000Z");
+  seedAcceptedReading(database, source, "10", "2026-09-01T05:00:00Z", "2026-09-01T05:00:01Z");
+  makeService().processAt(new Date("2026-09-01T05:00:00Z"));
+  assert.equal(readActiveProjection(database, "kn", "day")?.quality, "invalid");
+  assert.equal(readActiveProjection(database, "kn", "day")?.valueKwh, null);
+  const summaryRow = database.prepare("SELECT date FROM daily_energy_summaries WHERE metric_scope = 'kn'").get() as { date: string };
+  assert.equal(summaryRow.date, "2026-09-01");
   database.close();
 });

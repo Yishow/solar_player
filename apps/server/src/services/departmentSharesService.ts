@@ -1,27 +1,17 @@
 import type Database from "better-sqlite3";
 import {
+  profileMemberChannelIds,
   resolveDepartmentShares,
   resolvePeriodConsumption,
   type PeriodSelection,
+  type PeriodSample,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
+import { loadAcceptedSamples } from "./periodConsumptionService.js";
 import { getActiveProfile } from "./siteEnergyProfileService.js";
 
-function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn") {
-  return (database.prepare(`
-    SELECT channel_id, source_timestamp, normalized_value_kwh
-    FROM meter_readings_accepted
-    WHERE metric_scope = ? AND source_timestamp IS NOT NULL
-    ORDER BY source_timestamp
-  `).all(scope) as Array<{ channel_id: string; source_timestamp: string; normalized_value_kwh: string }>).map((row) => ({
-    channelId: row.channel_id,
-    sourceTimestamp: row.source_timestamp,
-    valueKwh: row.normalized_value_kwh
-  }));
-}
-
-function periodDelta(profile: SiteEnergyProfileV1, samples: ReturnType<typeof loadAcceptedSamples>, channelIds: string[], period: PeriodSelection, asOf: string) {
-  const allowed = new Set(profile.siteTotal.memberChannelIds);
+function periodDelta(profile: SiteEnergyProfileV1, samples: PeriodSample[], channelIds: string[], period: PeriodSelection, asOf: string) {
+  const allowed = new Set(profileMemberChannelIds(profile));
   const usable = channelIds.filter((id) => allowed.has(id));
   if (usable.length === 0) {
     return undefined;
@@ -58,14 +48,7 @@ export function resolvePersistedDepartmentShares(
   for (const department of profile.departments) {
     for (const channelId of department.memberChannelIds) {
       if (periodDeltas[channelId] === undefined) {
-        const isolatedProfile: SiteEnergyProfileV1 = {
-          ...profile,
-          siteTotal: {
-            ...profile.siteTotal,
-            memberChannelIds: Array.from(new Set([...profile.siteTotal.memberChannelIds, channelId]))
-          }
-        };
-        periodDeltas[channelId] = periodDelta(isolatedProfile, samples, [channelId], period, asOf);
+        periodDeltas[channelId] = periodDelta(profile, samples, [channelId], period, asOf);
       }
     }
   }

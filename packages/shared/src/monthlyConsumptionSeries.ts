@@ -1,6 +1,7 @@
 export type MonthlyPoint = {
   date: string;
   valueKwh: string | null;
+  quality?: "exact" | "estimated-boundary" | "partial" | "unavailable" | "invalid";
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -32,13 +33,28 @@ export function buildMonthlyConsumptionSeries(points: MonthlyPoint[], month: str
   }
   const orderedDates = [...byDate.keys()];
   if (orderedDates.length === 0) {
-    return { quality: "exact" as const, points: [] as MonthlyPoint[] };
+    return { quality: "unavailable" as const, points: [] as MonthlyPoint[] };
   }
 
   const calendar = enumerateDates(orderedDates[0]!, orderedDates[orderedDates.length - 1]!);
   const filled = calendar.map((date) => byDate.get(date) ?? { date, valueKwh: null });
+  const allUnavailableOrNull = filled.every((point) => point.valueKwh === null || point.quality === "unavailable");
+  if (allUnavailableOrNull) {
+    return { quality: "unavailable" as const, points: filled };
+  }
+  const hasNull = filled.some((point) => point.valueKwh === null || point.quality === "unavailable");
+  const hasInvalid = filled.some((point) => point.quality === "invalid");
+  const hasPartial = filled.some((point) => point.quality === "partial");
+  const hasEstimated = filled.some((point) => point.quality === "estimated-boundary");
+  const quality = hasInvalid
+    ? ("invalid" as const)
+    : (hasNull || hasPartial)
+      ? ("partial" as const)
+      : hasEstimated
+        ? ("estimated-boundary" as const)
+        : ("exact" as const);
   return {
-    quality: filled.some((point) => point.valueKwh === null) ? "partial" as const : "exact" as const,
+    quality,
     points: filled
   };
 }

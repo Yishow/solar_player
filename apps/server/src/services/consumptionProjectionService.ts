@@ -1,10 +1,13 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import type { PeriodConsumptionResult } from "@solar-display/shared";
+import { meterIdentityKey, type PeriodConsumptionResult } from "@solar-display/shared";
+import { canonicalJson } from "./authoringCanonicalJson.js";
+import { loadAcceptedMeterReadings, type AcceptedMeterReadingRow } from "./meterReadingService.js";
 
 export type ConsumptionProjection = PeriodConsumptionResult & {
   active: boolean;
-  algorithmVersion: "e2-v1";
+  algorithmVersion: string;
+  contextKey: string;
   createdAt: string;
   projectionId: string;
   range: "day" | "month" | "year";
@@ -15,8 +18,10 @@ export type ConsumptionProjection = PeriodConsumptionResult & {
 
 function rowToProjection(row: Record<string, unknown>): ConsumptionProjection {
   return {
+    ...(row.result_json ? JSON.parse(String(row.result_json)) as PeriodConsumptionResult : {}),
+    contextKey: String(row.context_key ?? ""),
     active: Number(row.active) === 1,
-    algorithmVersion: "e2-v1",
+    algorithmVersion: String(row.algorithm_version),
     createdAt: String(row.created_at),
     profileRevision: Number(row.profile_revision),
     projectionId: String(row.projection_id),
@@ -30,21 +35,44 @@ function rowToProjection(row: Record<string, unknown>): ConsumptionProjection {
   };
 }
 
-export function acceptedSampleChecksum(database: Database.Database, scope: "cl" | "kn") {
-  const rows = database.prepare(`
-    SELECT reading_id, normalized_value_kwh, source_timestamp
-    FROM meter_readings_accepted
-    WHERE metric_scope = ?
-    ORDER BY source_timestamp, reading_id
-  `).all(scope) as Array<{ normalized_value_kwh: string; reading_id: string; source_timestamp: string | null }>;
-  return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+function projectionSamples(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
+  const rows = loadAcceptedMeterReadings(database, scope);
+  if (!result?.periodStart || !result.calculatedThrough || !result.meterIds) return rows;
+  const members = new Set(result.meterIds);
+  const start = Date.parse(result.periodStart);
+  const through = Date.parse(result.calculatedThrough);
+  const baselines = new Map<string, AcceptedMeterReadingRow>();
+  const instant = (row: AcceptedMeterReadingRow) => Date.parse(row.source_timestamp ?? row.received_at);
+  const selected = rows.filter((row) => {
+    if (!members.has(row.channel_id) || instant(row) > through) return false;
+    if (instant(row) >= start) return true;
+    const identity = meterIdentityKey({
+      metricScope: scope,
+      meterId: row.meter_id,
+      channelId: row.channel_id,
+      sourceRevision: row.source_revision,
+      epochId: row.epoch_id
+    });
+    const prior = baselines.get(identity);
+    if (!prior || instant(row) > instant(prior)) baselines.set(identity, row);
+    return false;
+  });
+  return [...selected, ...baselines.values()].sort((a, b) => a.reading_id.localeCompare(b.reading_id));
 }
 
-export function acceptedWatermark(database: Database.Database, scope: "cl" | "kn") {
-  const row = database.prepare(`
-    SELECT MAX(source_timestamp) AS watermark FROM meter_readings_accepted WHERE metric_scope = ?
-  `).get(scope) as { watermark: string | null };
-  return row.watermark;
+export function acceptedSampleChecksum(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
+  return createHash("sha256").update(JSON.stringify(projectionSamples(database, scope, result))).digest("hex");
+}
+
+export function acceptedWatermark(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
+  const times = projectionSamples(database, scope, result).map((row) => Date.parse(row.source_timestamp ?? row.received_at)).filter(Number.isFinite);
+  return times.length ? new Date(times.reduce((latest, time) => Math.max(latest, time), -Infinity)).toISOString() : null;
+}
+
+export function projectionContextKey(result: PeriodConsumptionResult) {
+  return result.periodStart && result.periodEnd
+    ? JSON.stringify([result.periodStart, result.periodEnd, result.siteTimeZone, result.profileRevision, result.calculationVersion, result.meterIds, result.profileRevisionBoundaries])
+    : "";
 }
 
 export function shadowProject(
@@ -52,83 +80,92 @@ export function shadowProject(
   result: PeriodConsumptionResult,
   scope: "cl" | "kn",
   range: ConsumptionProjection["range"],
-  checksum = acceptedSampleChecksum(database, scope),
-  watermark = acceptedWatermark(database, scope)
+  checksum = acceptedSampleChecksum(database, scope, result),
+  watermark = acceptedWatermark(database, scope, result)
 ) {
-  const next: ConsumptionProjection = {
-    ...result,
-    active: false,
-    algorithmVersion: "e2-v1",
-    createdAt: new Date().toISOString(),
-    projectionId: randomUUID(),
-    range,
-    sampleChecksum: checksum,
-    scope,
-    watermark
-  };
+  const contextKey = projectionContextKey(result);
+  const inputChecksum = acceptedSampleChecksum(database, scope, result);
+  if (checksum !== inputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
+  const projectionId = createHash("sha256").update(canonicalJson({ result, scope, range, checksum, watermark, inputChecksum })).digest("hex");
+  const current = readActiveProjection(database, scope, range, contextKey);
+  const algorithmVersion = result.calculationVersion ?? "e2-v1";
+  const createdAt = new Date().toISOString();
   database.prepare(`
-    INSERT INTO consumption_projections (
+    INSERT OR IGNORE INTO consumption_projections (
       projection_id, metric_scope, range, profile_revision, algorithm_version, quality,
-      site_time_zone, value_kwh, watermark, sample_checksum, active, created_at
-    ) VALUES (?, ?, ?, ?, 'e2-v1', ?, ?, ?, ?, ?, 0, ?)
+      site_time_zone, value_kwh, watermark, sample_checksum, active, created_at,
+      context_key, result_json, expected_active_id, input_checksum
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
   `).run(
-    next.projectionId,
+    projectionId,
     scope,
     range,
     result.profileRevision,
+    algorithmVersion,
     result.quality,
     result.siteTimeZone,
     result.valueKwh,
     watermark,
     checksum,
-    next.createdAt
+    createdAt,
+    contextKey,
+    JSON.stringify(result),
+    current?.projectionId ?? null,
+    inputChecksum
   );
-  return next;
+  return rowToProjection(database.prepare("SELECT * FROM consumption_projections WHERE projection_id = ?").get(projectionId) as Record<string, unknown>);
+}
+
+function projectionError(code: string): never {
+  throw Object.assign(new Error(code), { code });
 }
 
 export function activateProjection(database: Database.Database, candidate: ConsumptionProjection) {
-  const current = readActiveProjection(database, candidate.scope, candidate.range);
-  if (current && current.watermark && candidate.watermark && candidate.watermark < current.watermark) {
-    throw Object.assign(new Error("PROJECTION_WATERMARK_STALE"), { code: "PROJECTION_WATERMARK_STALE" });
-  }
-  const tx = database.transaction(() => {
-    database.prepare(`
-      UPDATE consumption_projections SET active = 0 WHERE metric_scope = ? AND range = ?
-    `).run(candidate.scope, candidate.range);
-    database.prepare(`
-      UPDATE consumption_projections SET active = 1 WHERE projection_id = ?
-    `).run(candidate.projectionId);
-  });
-  tx();
-  return readActiveProjection(database, candidate.scope, candidate.range);
-}
-
-export function rollbackProjection(database: Database.Database, scope: "cl" | "kn", range: ConsumptionProjection["range"]) {
-  const current = readActiveProjection(database, scope, range);
-  if (!current) {
-    return null;
-  }
-  const previous = database.prepare(`
-    SELECT * FROM consumption_projections
-    WHERE metric_scope = ? AND range = ? AND projection_id != ?
-    ORDER BY created_at DESC
-    LIMIT 1
-  `).get(scope, range, current.projectionId) as Record<string, unknown> | undefined;
-  const tx = database.transaction(() => {
-    database.prepare(`UPDATE consumption_projections SET active = 0 WHERE projection_id = ?`).run(current.projectionId);
-    if (previous) {
-      database.prepare(`UPDATE consumption_projections SET active = 1 WHERE projection_id = ?`).run(previous.projection_id);
+  return database.transaction(() => {
+    const row = database.prepare("SELECT * FROM consumption_projections WHERE projection_id = ? AND metric_scope = ? AND range = ?")
+      .get(candidate.projectionId, candidate.scope, candidate.range) as Record<string, unknown> | undefined;
+    if (!row) projectionError("PROJECTION_NOT_FOUND");
+    const stored = rowToProjection(row);
+    const current = readActiveProjection(database, stored.scope, stored.range, stored.contextKey);
+    if (current?.projectionId === stored.projectionId) return current;
+    if ((current?.projectionId ?? null) !== row.expected_active_id) projectionError("PROJECTION_ACTIVATION_CONFLICT");
+    if (row.input_checksum !== acceptedSampleChecksum(database, stored.scope, stored)) projectionError("PROJECTION_INPUT_CHANGED");
+    if (current?.watermark && (!stored.watermark || Date.parse(stored.watermark) < Date.parse(current.watermark))) {
+      projectionError("PROJECTION_WATERMARK_STALE");
     }
-  });
-  tx();
-  return previous ? rowToProjection({ ...previous, active: 1 }) : null;
+    if (current) database.prepare("UPDATE consumption_projections SET active = 0 WHERE projection_id = ?").run(current.projectionId);
+    database.prepare("UPDATE consumption_projections SET active = 1, previous_active_id = ? WHERE projection_id = ?")
+      .run(current?.projectionId ?? null, stored.projectionId);
+    return readActiveProjection(database, stored.scope, stored.range, stored.contextKey);
+  }).immediate();
 }
 
-export function readActiveProjection(database: Database.Database, scope: "cl" | "kn", range: ConsumptionProjection["range"]) {
+export function rollbackProjection(database: Database.Database, scope: "cl" | "kn", range: ConsumptionProjection["range"], expectedActiveId?: string) {
+  return database.transaction(() => {
+    const candidates = database.prepare("SELECT * FROM consumption_projections WHERE metric_scope = ? AND range = ? AND active = 1")
+      .all(scope, range) as Array<Record<string, unknown>>;
+    if (!expectedActiveId && candidates.length > 1) projectionError("PROJECTION_CONTEXT_REQUIRED");
+    const currentRow = expectedActiveId ? candidates.find((row) => row.projection_id === expectedActiveId) : candidates[0];
+    const current = currentRow ? rowToProjection(currentRow) : null;
+    if (expectedActiveId && current?.projectionId !== expectedActiveId) projectionError("PROJECTION_ACTIVATION_CONFLICT");
+    if (!current) return null;
+    const lineage = database.prepare("SELECT previous_active_id FROM consumption_projections WHERE projection_id = ?")
+      .get(current.projectionId) as { previous_active_id: string | null };
+    const previous = lineage.previous_active_id ? database.prepare("SELECT * FROM consumption_projections WHERE projection_id = ? AND metric_scope = ? AND range = ? AND context_key = ?")
+      .get(lineage.previous_active_id, scope, range, current.contextKey) as Record<string, unknown> | undefined : undefined;
+    if (!previous) return current;
+    database.prepare("UPDATE consumption_projections SET active = 0 WHERE projection_id = ?").run(current.projectionId);
+    database.prepare("UPDATE consumption_projections SET active = 1 WHERE projection_id = ?").run(previous.projection_id);
+    return rowToProjection({ ...previous, active: 1 });
+  }).immediate();
+}
+
+export function readActiveProjection(database: Database.Database, scope: "cl" | "kn", range: ConsumptionProjection["range"], contextKey?: string) {
   const row = database.prepare(`
     SELECT * FROM consumption_projections WHERE metric_scope = ? AND range = ? AND active = 1
-    ORDER BY created_at DESC LIMIT 1
-  `).get(scope, range) as Record<string, unknown> | undefined;
+      ${contextKey === undefined ? "" : "AND context_key = ?"}
+    ORDER BY created_at DESC, rowid DESC LIMIT 1
+  `).get(scope, range, ...(contextKey === undefined ? [] : [contextKey])) as Record<string, unknown> | undefined;
   return row ? rowToProjection(row) : null;
 }
 

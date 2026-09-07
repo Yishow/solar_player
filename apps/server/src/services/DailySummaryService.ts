@@ -2,6 +2,9 @@ import { clearInterval, setInterval } from "node:timers";
 import type Database from "better-sqlite3";
 import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import { getActiveProfile } from "./siteEnergyProfileService.js";
+import { periodSelectionFromRange, resolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
+import { acceptedSampleChecksum, activateProjection, projectionContextKey, readActiveProjection, shadowProject } from "./consumptionProjectionService.js";
 import type { CumulativeCounters, MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
 type DailySummaryServiceOptions = {
@@ -21,15 +24,30 @@ type PeakSnapshot = {
 
 type DailySummaryRow = PeakSnapshot & {
   co2Total: number;
-  consumptionTotal: number;
+  consumptionTotal: number | null;
   generationTotal: number;
   selfConsumptionTotal: number;
 };
 
-function toDateKey(date: Date) {
+function toDateKey(date: Date, timeZone?: string) {
+  if (timeZone) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  }
   const pad = (value: number) => `${value}`.padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
 
 function clampDelta(total: number, baseline: number) {
   return Number(Math.max(total - baseline, 0).toFixed(3));
@@ -79,8 +97,9 @@ export class DailySummaryService {
 
   processAt(now: Date) {
     this.initialize(now);
+    this.persistConsumption(now);
 
-    const nextDateKey = toDateKey(now);
+    const nextDateKey = toDateKey(now, this.getEffectiveTimeZone());
     const snapshot = this.metricsAccumulatorService.getLatestSnapshot();
     const counters = this.metricsAccumulatorService.getCounters();
 
@@ -113,7 +132,7 @@ export class DailySummaryService {
     if (this.currentDateKey !== null && this.baselineCounters !== null) {
       this.persistSummary(this.currentDateKey, counters, this.baselineCounters);
       this.emitDisplaySync?.({
-        generatedAt: new Date().toISOString(),
+        generatedAt: now.toISOString(),
         metricScope: this.metricScope,
         reason: "daily-summary-updated",
         scope: "monitoring-history"
@@ -121,12 +140,20 @@ export class DailySummaryService {
     }
   }
 
+  private getEffectiveTimeZone(): string | undefined {
+    if (this.metricScope === "cl" || this.metricScope === "kn") {
+      const profile = getActiveProfile(this.database, this.metricScope);
+      if (profile?.siteTimeZone) return profile.siteTimeZone;
+    }
+    return undefined;
+  }
+
   private initialize(now: Date) {
     if (this.currentDateKey !== null && this.baselineCounters !== null) {
       return;
     }
 
-    this.currentDateKey = toDateKey(now);
+    this.currentDateKey = toDateKey(now, this.getEffectiveTimeZone());
     const counters = this.metricsAccumulatorService.getCounters();
     const existing = this.database
       .prepare(
@@ -149,7 +176,7 @@ export class DailySummaryService {
     this.baselineCounters = existing
       ? {
           co2: counters.co2 - existing.co2Total,
-          consumption: counters.consumption - existing.consumptionTotal,
+          consumption: counters.consumption - (existing.consumptionTotal ?? 0),
           generation: counters.generation - existing.generationTotal,
           selfConsumption: counters.selfConsumption - existing.selfConsumptionTotal
         }
@@ -163,6 +190,21 @@ export class DailySummaryService {
         peakGenerationTime: existing.peakGenerationTime
       };
     }
+  }
+
+  private persistConsumption(now: Date) {
+    const scope = this.metricScope;
+    if (scope !== "cl" && scope !== "kn") return;
+    const profile = getActiveProfile(this.database, scope);
+    if (!profile) return;
+    const period = periodSelectionFromRange("day", now.toISOString(), profile.siteTimeZone)!;
+    this.database.transaction(() => {
+      const result = resolvePersistedPeriodConsumption(this.database, scope, period, now.toISOString());
+      const checksum = acceptedSampleChecksum(this.database, scope, result);
+      const current = readActiveProjection(this.database, scope, "day", projectionContextKey(result));
+      if (current?.sampleChecksum === checksum && current.quality === result.quality && current.freshness === result.freshness && current.freshnessState === result.freshnessState) return;
+      activateProjection(this.database, shadowProject(this.database, result, scope, "day", checksum));
+    }).immediate();
   }
 
   private persistSummary(date: string, totals: CumulativeCounters, baseline: CumulativeCounters) {
@@ -196,7 +238,7 @@ export class DailySummaryService {
         this.metricScope,
         date,
         clampDelta(totals.generation, baseline.generation),
-        clampDelta(totals.consumption, baseline.consumption),
+        this.metricScope === "global" ? clampDelta(totals.consumption, baseline.consumption) : null,
         clampDelta(totals.selfConsumption, baseline.selfConsumption),
         clampDelta(totals.co2, baseline.co2),
         this.peaks.peakGeneration,
