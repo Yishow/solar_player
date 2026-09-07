@@ -12,6 +12,8 @@ export type MeterIngestStatus = (typeof METER_INGEST_STATUSES)[number];
 
 export type MeterPhysicalScope = "cl" | "kn";
 
+export const DEFAULT_BOUNDARY_MAX_AGE_SECONDS = 300;
+
 export type MeterSourceDefinition = {
   channelId: string;
   enabled: boolean;
@@ -28,6 +30,7 @@ export type MeterSourceDefinition = {
   sourceTimestampTimeZone: string | null;
   timestampPolicy: TimestampPolicy;
   epochId: string;
+  boundaryMaxAgeSeconds?: number;
   displayNameZh?: string | null;
   displayNameEn?: string | null;
 };
@@ -40,13 +43,34 @@ export type MeterReadingSample = {
   receivedAt: string;
   retain: boolean | null;
   sourceTimestamp: string | null;
+  selectorVersion?: number | null;
+  sourceTimestampPath?: string | null;
+};
+
+export type MeterReadingChangeEvent = {
+  identity: string;
+  metricScope: MeterPhysicalScope;
+  meterId: string;
+  channelId: string;
+  sourceRevision: number;
+  epochId: string;
+  readingId: string;
+  sourceTimestamp: string | null;
+  receivedAt: string;
+  late: boolean;
 };
 
 export type MeterIngestResult = {
   diagnostics: string[];
   liveValueKwh: string | null;
+  liveUpdated?: boolean;
+  normalizedValueKwh?: string | null;
   readingId: string | null;
   reason: string | null;
+  selectorVersion?: number | null;
+  sourceTimestamp?: string | null;
+  sourceTimestampPath?: string | null;
+  sourceTimestampRaw?: string | null;
   status: MeterIngestStatus;
   timestampQuality: "source" | "receive-time-estimated" | "unknown" | null;
 };
@@ -65,22 +89,48 @@ export function isEnergyFlowRole(value: unknown): value is EnergyFlowRole {
 }
 
 export function validateMeterSourceWrite(draft: Record<string, unknown>) {
-  const offending = ACCOUNTING_FIELDS.filter((field) => draft[field] !== undefined && draft[field] !== null);
-  if (offending.length > 0) {
-    return {
-      ok: false as const,
-      fields: offending,
-      message: `E1 不保存會計歸屬欄位：${offending.join(", ")}`
-    };
+  const reject = (fields: string[], message = "來源設定欄位無效。", code = "E1_SOURCE_INVALID") =>
+    ({ ok: false as const, fields, message, code });
+  if (!draft || typeof draft !== "object" || Array.isArray(draft)) return reject(["source"]);
+  const offending = ACCOUNTING_FIELDS.filter((field) => Object.hasOwn(draft, field));
+  if (offending.length) return reject(offending, `E1 不保存會計歸屬欄位：${offending.join(", ")}`, "E1_ACCOUNTING_FIELD_REJECTED");
+  const allowed = new Set([
+    "channelId", "meterId", "metricKey", "metricScope", "sourceRevision", "epochId", "enabled",
+    "reviewStatus", "measurementKind", "energyFlowRole", "inputUnit", "scaleDecimal",
+    "sourceTimestampTimeZone", "timestampPolicy", "expectedCadenceSeconds", "boundaryMaxAgeSeconds",
+    "displayNameZh", "displayNameEn"
+  ]);
+  const fields = Object.keys(draft).filter((key) => !allowed.has(key));
+  for (const key of ["channelId", "meterId", "metricKey", "epochId"]) {
+    const value = draft[key];
+    if (typeof value !== "string" || !value.trim() || value.length > 200 || /[\u0000-\u001f]/u.test(value)) fields.push(key);
   }
-  if (draft.metricScope === "all" || draft.metricScope === "global") {
-    return {
-      ok: false as const,
-      fields: ["metricScope"],
-      message: "實體電錶必須是 CL 或 KN，不能使用 all/global。"
-    };
+  if (draft.metricScope !== "cl" && draft.metricScope !== "kn") fields.push("metricScope");
+  if (!Number.isSafeInteger(draft.sourceRevision) || Number(draft.sourceRevision) < 1) fields.push("sourceRevision");
+  if (typeof draft.enabled !== "boolean") fields.push("enabled");
+  if (draft.reviewStatus !== "reviewed" && draft.reviewStatus !== "needs-review") fields.push("reviewStatus");
+  if (!isMeterMeasurementKind(draft.measurementKind)) fields.push("measurementKind");
+  if (!isEnergyFlowRole(draft.energyFlowRole)) fields.push("energyFlowRole");
+  const units = draft.measurementKind === "power-gauge" ? ["w", "kw", "mw"] : ["wh", "kwh", "mwh"];
+  if (typeof draft.inputUnit !== "string" || !units.includes(draft.inputUnit.trim().toLowerCase())) fields.push("inputUnit");
+  try {
+    if (typeof draft.scaleDecimal !== "string" || draft.scaleDecimal.length > 100 || parseDecimalString(draft.scaleDecimal) <= 0n) fields.push("scaleDecimal");
+  } catch { fields.push("scaleDecimal"); }
+  if (draft.sourceTimestampTimeZone !== null) {
+    try {
+      if (typeof draft.sourceTimestampTimeZone !== "string" || !draft.sourceTimestampTimeZone) throw new Error();
+      new Intl.DateTimeFormat("en", { timeZone: draft.sourceTimestampTimeZone });
+    } catch { fields.push("sourceTimestampTimeZone"); }
   }
-  return { ok: true as const };
+  if (!TIMESTAMP_POLICIES.includes(draft.timestampPolicy as TimestampPolicy)
+    || (draft.timestampPolicy === "allow-receive-time-estimate" && draft.reviewStatus !== "reviewed")) fields.push("timestampPolicy");
+  if (draft.expectedCadenceSeconds !== null && (!Number.isSafeInteger(draft.expectedCadenceSeconds) || Number(draft.expectedCadenceSeconds) <= 0)) fields.push("expectedCadenceSeconds");
+  if (draft.boundaryMaxAgeSeconds !== undefined
+    && (!Number.isSafeInteger(draft.boundaryMaxAgeSeconds) || Number(draft.boundaryMaxAgeSeconds) <= 0)) fields.push("boundaryMaxAgeSeconds");
+  for (const key of ["displayNameZh", "displayNameEn"]) {
+    if (draft[key] !== undefined && draft[key] !== null && (typeof draft[key] !== "string" || String(draft[key]).length > 200)) fields.push(key);
+  }
+  return fields.length ? reject([...new Set(fields)]) : { ok: true as const };
 }
 
 export function parseDecimalString(value: string): bigint {
@@ -169,6 +219,14 @@ export function parseSourceTimestamp(timestamp: string | null, sourceTimestampTi
     return { instant: null, reason: null };
   }
   if (hasExplicitOffset(timestamp)) {
+    const civil = timestamp.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/);
+    if (!civil) return { instant: null, reason: "SOURCE_TIMESTAMP_INVALID" };
+    const [, year, month, day, hour, minute, second] = civil;
+    const calendar = new Date(`${year}-${month}-${day}T00:00:00Z`);
+    if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== `${year}-${month}-${day}`
+      || Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) {
+      return { instant: null, reason: "SOURCE_TIMESTAMP_INVALID" };
+    }
     const parsed = Date.parse(timestamp);
     if (!Number.isFinite(parsed)) {
       return { instant: null, reason: "SOURCE_TIMESTAMP_INVALID" };

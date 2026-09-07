@@ -12,6 +12,7 @@ import {
 } from "@solar-display/shared";
 import type { MeterSourceDefinition } from "@solar-display/shared";
 import { countAcceptedReadings } from "./meterReadingService.js";
+import { matchesMqttTopicFilter } from "../mqtt/topicFilter.js";
 
 const featureEnabled = () => process.env.MQTT_OBSERVATION_CATALOG === "1";
 
@@ -20,7 +21,24 @@ const profiles: ReceptionProfile[] = [
   { allowedFilters: ["factory/kn/"], id: "kn-power", name: "觀音電力資料", siteScope: "kn" }
 ];
 
-const captures = new Map<string, CaptureSession & { candidates: ObservationCandidate[]; samples: Map<string, MqttTransportEvidence> }>();
+const captures = new Map<string, CaptureSession & { filter: string; candidates: ObservationCandidate[]; samples: Map<string, MqttTransportEvidence> }>();
+
+function pruneCaptures() {
+  for (const [id, session] of captures) {
+    if (!featureEnabled() || Date.parse(session.expiresAt) <= Date.now()) {
+      captures.delete(id);
+    }
+  }
+}
+
+function requireCapture(captureId: string) {
+  pruneCaptures();
+  const session = captures.get(captureId);
+  if (!session) {
+    throw Object.assign(new Error("CAPTURE_EXPIRED"), { code: "CAPTURE_EXPIRED" });
+  }
+  return session;
+}
 
 export function listReceptionProfiles() {
   return profiles.map(({ allowedFilters, id, name, siteScope }) => ({ allowedFilters, id, name, siteScope }));
@@ -32,6 +50,7 @@ export function startCapture(input: {
   receptionProfileId: string;
   siteScope: "cl" | "kn";
 }): CaptureSession {
+  pruneCaptures();
   if (!featureEnabled()) {
     throw Object.assign(new Error("SCOPE_NOT_CONFIGURED"), { code: "SCOPE_NOT_CONFIGURED" });
   }
@@ -53,7 +72,7 @@ export function startCapture(input: {
     receptionProfileId: profile.id,
     siteScope: profile.siteScope
   };
-  captures.set(captureId, { ...session, candidates: [], samples: new Map() });
+  captures.set(captureId, { ...session, filter: input.filter, candidates: [], samples: new Map() });
   return session;
 }
 
@@ -63,6 +82,7 @@ export function stopCapture(captureId: string) {
 }
 
 export function tapProductionObservation(evidence: MqttTransportEvidence, payload: string) {
+  pruneCaptures();
   if (!featureEnabled() || captures.size === 0) {
     return;
   }
@@ -80,9 +100,9 @@ export function tapCatalogObservation(
   evidence: MqttTransportEvidence,
   payload: string
 ) {
-  const session = captures.get(captureId);
-  if (!session) {
-    throw Object.assign(new Error("CAPTURE_EXPIRED"), { code: "CAPTURE_EXPIRED" });
+  const session = requireCapture(captureId);
+  if (evidence.connectionRef !== session.connectionRef || !matchesMqttTopicFilter(session.filter, evidence.exactTopic)) {
+    return { dropped: true };
   }
   if (Buffer.byteLength(payload) > MQTT_CATALOG_LIMITS.payloadBytes) {
     session.dropped += 1;
@@ -108,7 +128,8 @@ export function tapCatalogObservation(
   }
   const sampleId = randomUUID();
   if (candidate.sampleRefs.length >= MQTT_CATALOG_LIMITS.samplesPerCandidate) {
-    candidate.sampleRefs.shift();
+    const expired = candidate.sampleRefs.shift();
+    if (expired) session.samples.delete(expired);
   }
   candidate.sampleRefs.push(sampleId);
   candidate.lastSeenAt = evidence.receivedAt;
@@ -118,10 +139,7 @@ export function tapCatalogObservation(
 }
 
 export function listCandidates(captureId: string) {
-  const session = captures.get(captureId);
-  if (!session) {
-    throw Object.assign(new Error("CAPTURE_EXPIRED"), { code: "CAPTURE_EXPIRED" });
-  }
+  const session = requireCapture(captureId);
   return { captureId, candidates: session.candidates, coverage: session.coverage, dropped: session.dropped };
 }
 

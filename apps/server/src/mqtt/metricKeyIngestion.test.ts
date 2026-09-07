@@ -91,6 +91,216 @@ test("enabled topic mapping ingests under its metric_key without a metric_key wh
   }
 });
 
+test("E1 production callback gates retained replay, collision and late samples before generic live writes", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM meter_sources").run();
+  database.prepare("DELETE FROM meter_readings_accepted").run();
+  database.prepare("DELETE FROM meter_readings_quarantine").run();
+  database.prepare("DELETE FROM meter_live_state").run();
+  database.prepare(`
+    INSERT INTO meter_sources (
+      meter_id, channel_id, metric_scope, metric_key, measurement_kind, energy_flow_role,
+      input_unit, scale_decimal, source_revision, epoch_id, enabled, review_status,
+      source_timestamp_time_zone, timestamp_policy, expected_cadence_seconds, created_at
+    ) VALUES ('kn-main', 'main', 'kn', 'consumptionEnergy', 'cumulative-energy', 'consumption',
+      'kWh', '1', 1, 'epoch-1', 1, 'reviewed', 'UTC', 'source-required', 60, CURRENT_TIMESTAMP)
+  `).run();
+  database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, selector_json,
+      multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES ('kn', 'consumptionEnergy', 'e1/kn/main', 'Wh', '$.value', ?, 99, 7, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run(JSON.stringify({
+    path: ["value"],
+    tagEquals: "MAIN",
+    selectorVersion: 7,
+    timestampPath: ["timestamp"]
+  }));
+
+  const client = new FakeMqttClient();
+  const events: Array<{ late: boolean; sourceTimestamp: string | null }> = [];
+  const historyEvents: Array<{ metricScope?: string; scope: string }> = [];
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined },
+    managedSourceAdapters: [],
+    socketService: {
+      emitDisplaySync: (event) => { if (event.scope === "monitoring-history") historyEvents.push(event); },
+      emitLiveMetrics: () => undefined, emitCircuitMetrics: () => undefined, emitMqttStatus: () => undefined,
+      emitSystemError: () => undefined, emitSystemRecovered: () => undefined
+    },
+    meterReadingEventSink: (event) => events.push({ late: event.late, sourceTimestamp: event.sourceTimestamp })
+  });
+  const publish = async (value: string, timestamp: string | undefined, packet: { dup: boolean; qos: number; retain: boolean }) => {
+    client.emit("message", "e1/kn/main", Buffer.from(JSON.stringify({
+      tag: "MAIN",
+      value,
+      ...(timestamp ? { timestamp } : {})
+    })), packet);
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+
+  try {
+    await service.connect();
+    await publish("10100", "2026-09-01T01:00:00Z", { dup: false, qos: 1, retain: false });
+    const firstLive = database.prepare(`
+      SELECT value, unit, timestamp FROM live_metric_values
+      WHERE metric_scope = 'kn' AND metric_key = 'consumptionEnergy'
+    `).get() as { value: number; unit: string; timestamp: string };
+    assert.equal(firstLive.value, 10100);
+    assert.equal(firstLive.unit, "kWh");
+    assert.equal(firstLive.timestamp, "2026-09-01T01:00:00Z");
+    assert.deepEqual(events, [{ late: false, sourceTimestamp: "2026-09-01T01:00:00Z" }]);
+
+    for (let index = 0; index < 10; index += 1) {
+      await publish("10000", undefined, { dup: index % 2 === 0, qos: 1, retain: true });
+    }
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 1);
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_quarantine").get() as { count: number }).count, 10);
+    assert.deepEqual(
+      database.prepare(`SELECT value, timestamp FROM live_metric_values WHERE metric_scope = 'kn' AND metric_key = 'consumptionEnergy'`).get(),
+      { value: 10100, timestamp: "2026-09-01T01:00:00Z" }
+    );
+    assert.equal(events.length, 1);
+    assert.equal(historyEvents.length, 1);
+
+    await publish("9999", "2026-09-01T01:00:00Z", { dup: false, qos: 1, retain: false });
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 1);
+    assert.equal(events.length, 1);
+    assert.equal(historyEvents.length, 1);
+
+    await publish("10050", "2026-09-01T00:30:00Z", { dup: false, qos: 1, retain: false });
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 2);
+    assert.deepEqual(events, [
+      { late: false, sourceTimestamp: "2026-09-01T01:00:00Z" },
+      { late: true, sourceTimestamp: "2026-09-01T00:30:00Z" }
+    ]);
+    assert.deepEqual(
+      database.prepare(`SELECT value, timestamp FROM live_metric_values WHERE metric_scope = 'kn' AND metric_key = 'consumptionEnergy'`).get(),
+      { value: 10100, timestamp: "2026-09-01T01:00:00Z" }
+    );
+
+    database.prepare("UPDATE topic_mappings SET selector_json = ? WHERE metric_scope = 'kn'").run(JSON.stringify({
+      path: ["value"],
+      tagEquals: "WRONG-TAG",
+      selectorVersion: 8,
+      timestampPath: ["timestamp"]
+    }));
+    await publish("10300", "2026-09-01T01:03:00Z", { dup: false, qos: 1, retain: false });
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 2);
+    assert.equal(events.length, 2);
+    assert.deepEqual(
+      database.prepare(`SELECT value, timestamp FROM live_metric_values WHERE metric_scope = 'kn' AND metric_key = 'consumptionEnergy'`).get(),
+      { value: 10100, timestamp: "2026-09-01T01:00:00Z" }
+    );
+
+    assert.equal(historyEvents.length, 2);
+    assert.ok(historyEvents.every((event) => event.metricScope === "kn"));
+    database.prepare("UPDATE topic_mappings SET selector_json = ? WHERE metric_scope = 'kn'")
+      .run(JSON.stringify({ path: ["value"], tagEquals: "MAIN", selectorVersion: 7, timestampPath: ["timestamp"] }));
+    database.exec(`
+      CREATE TRIGGER reject_generic_energy_live
+      BEFORE INSERT ON live_metric_values
+      BEGIN
+        SELECT RAISE(ABORT, 'generic live write rejected');
+      END;
+    `);
+    await publish("10200", "2026-09-01T01:02:00Z", { dup: false, qos: 1, retain: false });
+    database.exec("DROP TRIGGER reject_generic_energy_live");
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 2);
+    assert.equal(events.length, 2);
+    assert.deepEqual(
+      database.prepare(`SELECT value, timestamp FROM live_metric_values WHERE metric_scope = 'kn' AND metric_key = 'consumptionEnergy'`).get(),
+      { value: 10100, timestamp: "2026-09-01T01:00:00Z" }
+    );
+    assert.equal(historyEvents.length, 2);
+    await publish("10200", "2026-09-01T01:02:00Z", { dup: false, qos: 1, retain: false });
+    assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 3);
+    assert.equal(historyEvents.length, 3);
+  } finally {
+    await service.disconnect();
+  }
+});
+
+test("E1 production selector keeps CL and KN decimal records isolated", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const database = getDatabase();
+  database.prepare("DELETE FROM live_metric_values").run();
+  database.prepare("DELETE FROM topic_mappings").run();
+  database.prepare("DELETE FROM meter_sources").run();
+  database.prepare("DELETE FROM meter_readings_accepted").run();
+  database.prepare("DELETE FROM meter_readings_quarantine").run();
+  database.prepare("DELETE FROM meter_live_state").run();
+  const insertSource = database.prepare(`
+    INSERT INTO meter_sources (
+      meter_id, channel_id, metric_scope, metric_key, measurement_kind, energy_flow_role,
+      input_unit, scale_decimal, source_revision, epoch_id, enabled, review_status,
+      source_timestamp_time_zone, timestamp_policy, expected_cadence_seconds, created_at
+    ) VALUES (?, 'main', ?, 'consumptionEnergy', 'interval-energy', 'consumption',
+      'kWh', '1', 1, 'epoch-1', 1, 'reviewed', 'UTC', 'source-required', 60, CURRENT_TIMESTAMP)
+  `);
+  insertSource.run("cl-main", "cl");
+  insertSource.run("kn-main", "kn");
+  const insertMapping = database.prepare(`
+    INSERT INTO topic_mappings (
+      metric_scope, metric_key, topic, unit, value_path, selector_json,
+      multiplier, offset, decimal_places, enabled, created_at, updated_at
+    ) VALUES (?, 'consumptionEnergy', 'e1/shared', 'Wh', '$.value', ?, 100, 9, 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `);
+  insertMapping.run("cl", JSON.stringify({ path: ["value"], tagEquals: "CL", selectorVersion: 3, timestampPath: ["timestamp"] }));
+  insertMapping.run("kn", JSON.stringify({ path: ["value"], tagEquals: "KN", selectorVersion: 4, timestampPath: ["timestamp"] }));
+
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: { debug: () => undefined, error: () => undefined, info: () => undefined, warn: () => undefined },
+    managedSourceAdapters: []
+  });
+  try {
+    await service.connect();
+    client.emit("message", "e1/shared", Buffer.from(JSON.stringify([
+      { tag: "KN", value: "2.125", timestamp: "2026-09-01T00:00:01Z" },
+      { tag: "CL", value: "1.25", timestamp: "2026-09-01T00:00:02Z" }
+    ])), { dup: false, qos: 1, retain: false });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(
+      database.prepare(`
+        SELECT metric_scope, raw_value_decimal, normalized_value_kwh, measurement_kind, selector_version
+        FROM meter_readings_accepted ORDER BY metric_scope
+      `).all(),
+      [
+        { metric_scope: "cl", raw_value_decimal: "1.25", normalized_value_kwh: "1.25", measurement_kind: "interval-energy", selector_version: 3 },
+        { metric_scope: "kn", raw_value_decimal: "2.125", normalized_value_kwh: "2.125", measurement_kind: "interval-energy", selector_version: 4 }
+      ]
+    );
+    assert.deepEqual(
+      database.prepare(`
+        SELECT metric_scope, value, unit FROM live_metric_values
+        WHERE metric_key = 'consumptionEnergy' ORDER BY metric_scope
+      `).all(),
+      [
+        { metric_scope: "cl", value: 1.25, unit: "kWh" },
+        { metric_scope: "kn", value: 2.125, unit: "kWh" }
+      ]
+    );
+  } finally {
+    await service.disconnect();
+  }
+});
+
 test("MQTT source updates evaluate only transitively affected derived metrics", async () => {
   migrateDatabase();
   seedDatabase();

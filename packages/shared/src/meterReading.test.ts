@@ -52,7 +52,7 @@ test("E1-R1-S04 source writes reject meterRole and departmentId", () => {
   if (!rejected.ok) {
     assert.deepEqual(rejected.fields, ["meterRole", "departmentId"]);
   }
-  assert.equal(validateMeterSourceWrite({ metricScope: "cl", meterId: "cl-main" }).ok, true);
+  assert.equal(validateMeterSourceWrite(clMain).ok, true);
   assert.equal(validateMeterSourceWrite({ metricScope: "global" }).ok, false);
 });
 
@@ -143,4 +143,33 @@ test("E1-R6 generation keys are never registered consumption power", () => {
   assert.equal(isRegisteredConsumptionPowerChannel("factoryProductionPower"), true);
   assert.equal(inventoryLegacyMapping("consumptionEnergy", "kWh").reviewStatus, "needs-review");
   assert.equal(inventoryLegacyMapping("factoryGeneration.powerKw", "kW").preserved, true);
+});
+
+
+test("source definitions reject malformed configuration before persistence", () => {
+  for (const change of [
+    { metricScope: "unknown" }, { sourceRevision: 0 }, { sourceRevision: 1.5 },
+    { scaleDecimal: "NaN" }, { scaleDecimal: "0" }, { inputUnit: "liters" },
+    { sourceTimestampTimeZone: "Bad/Zone" }, { expectedCadenceSeconds: -1 },
+    { enabled: "true" }, { meterId: "" }, { timestampPolicy: "fallback" },
+    { timestampPolicy: "allow-receive-time-estimate", reviewStatus: "needs-review" },
+    { password: "secret" }, { departmentId: null }
+  ]) assert.equal(validateMeterSourceWrite({ ...clMain, ...change }).ok, false, JSON.stringify(change));
+});
+
+test("boundary age defaults when omitted and rejects non-positive or non-integer values", () => {
+  assert.equal(validateMeterSourceWrite(clMain).ok, true);
+  assert.equal(validateMeterSourceWrite({ ...clMain, boundaryMaxAgeSeconds: 300 }).ok, true);
+  for (const value of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, "300", null]) {
+    const result = validateMeterSourceWrite({ ...clMain, boundaryMaxAgeSeconds: value });
+    assert.equal(result.ok, false, String(value));
+    if (!result.ok) assert.ok(result.fields.includes("boundaryMaxAgeSeconds"), String(value));
+  }
+});
+
+
+test("explicit-offset source timestamps reject impossible civil dates", () => {
+  for (const time of ["2026-02-30T00:00:00Z", "2026-04-31T00:00:00+08:00", "2026-01-01T24:00:00Z"]) {
+    assert.equal(parseSourceTimestamp(time, "UTC").reason, "SOURCE_TIMESTAMP_INVALID");
+  }
 });

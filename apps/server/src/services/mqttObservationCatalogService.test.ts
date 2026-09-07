@@ -7,10 +7,12 @@ import type { MeterSourceDefinition } from "@solar-display/shared";
 import { seedAcceptedReading, countAcceptedReadings } from "./meterReadingService.js";
 import {
   listReceptionProfiles,
+  listCandidates,
   proveCatalogDoesNotWriteAcceptedHistory,
   startCapture,
   stopCapture,
-  tapCatalogObservation
+  tapCatalogObservation,
+  tapProductionObservation
 } from "./mqttObservationCatalogService.js";
 
 const clMain: MeterSourceDefinition = {
@@ -37,6 +39,33 @@ test("M1 reception profiles never include broker passwords", () => {
   assert.match(listed, /觀音電力資料/);
 });
 
+test("M1 capture accepts only its broker and selected topic filter", () => {
+  process.env.MQTT_OBSERVATION_CATALOG = "1";
+  const session = startCapture({ connectionRef: "central", filter: "factory/kn/meter/+", receptionProfileId: "kn-power", siteScope: "kn" });
+  const evidence = { connectionRef: "central", dup: false, qos: 1, retain: true, origin: "mqtt" as const, receivedAt: new Date().toISOString(), sourceTimestampEvidence: null };
+  tapProductionObservation({ ...evidence, exactTopic: "factory/cl/meter/main" }, "100");
+  tapProductionObservation({ ...evidence, connectionRef: "other", exactTopic: "factory/kn/meter/main" }, "100");
+  tapProductionObservation({ ...evidence, exactTopic: "factory/kn/another/main" }, "100");
+  assert.equal(listCandidates(session.captureId).candidates.length, 0);
+  tapProductionObservation({ ...evidence, exactTopic: "factory/kn/meter/main" }, "100");
+  assert.equal(listCandidates(session.captureId).candidates.length, 1);
+  stopCapture(session.captureId);
+});
+
+test("M1 expiry and feature rollback make captures inaccessible", (t) => {
+  process.env.MQTT_OBSERVATION_CATALOG = "1";
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const start = () => startCapture({ connectionRef: "central", filter: "factory/kn/#", receptionProfileId: "kn-power", siteScope: "kn" });
+  const expired = start();
+  t.mock.timers.tick(181_000);
+  assert.throws(() => listCandidates(expired.captureId), /CAPTURE_EXPIRED/);
+  const disabled = start();
+  process.env.MQTT_OBSERVATION_CATALOG = "0";
+  assert.throws(() => listCandidates(disabled.captureId), /CAPTURE_EXPIRED/);
+  process.env.MQTT_OBSERVATION_CATALOG = "1";
+  assert.throws(() => listCandidates(disabled.captureId), /CAPTURE_EXPIRED/);
+});
+
 test("M1 capture refuses unapproved filters and default #", () => {
   process.env.MQTT_OBSERVATION_CATALOG = "1";
   assert.throws(
@@ -57,6 +86,7 @@ test("M1 catalog tap of retained 10000 does not change accepted 10100 rows", () 
   process.env.MQTT_OBSERVATION_CATALOG = "1";
   const database = new Database(":memory:");
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/040_meter_reading_contracts.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/046_meter_reading_evidence.sql"), "utf8"));
   seedAcceptedReading(database, clMain, "10100", "2026-08-31T17:00:00Z", "2026-08-31T17:00:01.000Z");
   const proof = proveCatalogDoesNotWriteAcceptedHistory(database, clMain, {
     connectionRef: "central",

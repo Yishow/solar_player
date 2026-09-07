@@ -7,6 +7,12 @@ import {
 } from "../services/mqttObservationCatalogService.js";
 
 const mqttCapturesRoute: FastifyPluginAsync = async (app) => {
+  app.addHook("onRequest", async (request, reply) => {
+    const trusted = request.method === "GET" || request.method === "HEAD"
+      ? app.managementAccess.isTrustedManagementReadRequest(request)
+      : app.managementAccess.isTrustedManagementMutationRequest(request);
+    if (!trusted) return app.managementAccess.deny(reply);
+  });
   app.get("/api/settings/mqtt/reception-profiles", async () => ({
     profiles: listReceptionProfiles()
   }));
@@ -18,12 +24,15 @@ const mqttCapturesRoute: FastifyPluginAsync = async (app) => {
       receptionProfileId?: string;
       siteScope?: "cl" | "kn";
     };
+    if (!body || (body.siteScope !== "cl" && body.siteScope !== "kn")) {
+      return reply.code(400).send({ success: false, error: "INVALID_SCOPE", timestamp: new Date().toISOString() });
+    }
     try {
       const session = startCapture({
         connectionRef: body.connectionRef ?? "central",
         filter: body.filter ?? "",
         receptionProfileId: body.receptionProfileId ?? "",
-        siteScope: body.siteScope === "kn" ? "kn" : "cl"
+        siteScope: body.siteScope
       });
       return session;
     } catch (error) {
