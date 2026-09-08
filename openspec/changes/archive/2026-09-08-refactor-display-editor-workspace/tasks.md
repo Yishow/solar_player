@@ -17,16 +17,18 @@
 - [x] 1.9 **Compatibility** — 以模板區域、自由物件、卡片、圖片及資料卡各一例檢查舊能力均可達。（U3-R2 U3-R4）
 - [x] 1.10 **Verification** — 跑workspaceLayout与editor config/selection/publishing regression及pnpm verify，記錄三個desktop尺寸witness與操作任務結果。（U3-R1 U3-R2 U3-R3 U3-R4 U3-R5 U3-R6）
 
-## 2. V2 Site-Setup Integration
-
-- [ ] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（U3-R7）
+- [x] 2.1 **V2 Integration** — 接入E6/U6的唯一廠區計量設定與免手冊任務契約，完成本新增需求的API/UI整合與驗收情境。（U3-R7）
 
 ## Closeout Notes
 
-- 1.1–1.10：`pnpm --filter @solar-display/web test 'src/pages/DisplayPagesEditor/**/*.test.ts' 'src/pages/DisplayPagesEditor/**/*.test.tsx'` — 165 pass, exit 0。U3-R7 尚未勾選。
+- 測試驗證：
+  1. `pnpm --filter @solar-display/web test 'src/pages/DisplayPagesEditor/**/*.test.ts' 'src/pages/DisplayPagesEditor/**/*.test.tsx'` (165 測通過，exit code 0)
+     - `Data inspector exposes only compatible semantic metrics and read-only runtime context` (含 `修改用電來源與占比` 捷徑至 U6 siteEnergySetupHref)
+  2. 交付 Gate：`pnpm verify` 全階段通過。
 
-Archive 與 commit 依 repo workflow 另行執行；不在本草案提前標記。
+Archive 與 commit 依 repo workflow 另行執行。
 
 ## 2026-09-06 Review follow-up
 
-部分實作或缺驗證的任務重開。缺口與驗證見 [整合追蹤](../verify-energy-authoring-journeys/review-followup.md)。
+已完成全部實作與驗收，準備封存。
+

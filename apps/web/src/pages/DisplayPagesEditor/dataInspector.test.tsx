@@ -65,6 +65,8 @@ test("Data inspector exposes only compatible semantic metrics and read-only runt
   assert.match(html, /單位顯示/);
   assert.match(html, /目前預覽值/);
   assert.match(html, /來源分類/);
+  assert.match(html, /data-data-inspector-action="energy-setup"/);
+  assert.match(html, /修改用電來源與占比/);
   assert.doesNotMatch(html, /MQTT Topic|Raw Topic|Formula|公式編輯/);
 });
 

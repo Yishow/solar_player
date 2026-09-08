@@ -6,6 +6,7 @@ import {
   resolveEffectivePlaybackMetricCatalog,
   resolvePlaybackBindingItemConstraints,
   shouldAcceptPreviewResponse,
+  siteEnergySetupHref,
   type DisplayDataPreviewItem,
   type DisplayEditorDataBindingCapability,
   type DisplayPreviewContextSelection,
@@ -573,13 +574,22 @@ export function DataInspectorPanel({
         {model.provenance.topic ? <p>來源 Topic：{model.provenance.topic}</p> : null}
       </div>
 
-      <a
-        className="inline-flex rounded-full border border-[var(--shell-divider)] px-3 py-1.5 font-semibold"
-        data-data-inspector-action="diagnostics"
-        href={diagnosticsHref}
-      >
-        Data Hub Diagnostics
-      </a>
+      <div className="flex flex-wrap gap-2">
+        <a
+          className="inline-flex rounded-full border border-[var(--shell-divider)] px-3 py-1.5 font-semibold"
+          data-data-inspector-action="diagnostics"
+          href={diagnosticsHref}
+        >
+          Data Hub Diagnostics
+        </a>
+        <a
+          className="inline-flex rounded-full border border-[var(--shell-divider)] px-3 py-1.5 font-semibold"
+          data-data-inspector-action="energy-setup"
+          href={siteEnergySetupHref(diagnosticsScope === "cl" ? "cl" : "kn")}
+        >
+          修改用電來源與占比
+        </a>
+      </div>
 
       <button
         type="button"
