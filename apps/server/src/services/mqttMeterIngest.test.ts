@@ -18,6 +18,14 @@ function createDatabase() {
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/046_meter_reading_evidence.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/043_energy_authoring_tokens.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/044_mapping_apply_receipts.sql"), "utf8"));
+  try {
+    database.exec("ALTER TABLE topic_mappings ADD COLUMN metric_scope TEXT");
+  } catch {
+    // already present
+  }
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/015_calculation_settings.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/037_derived_metric_registry.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/038_derived_metric_site_scopes.sql"), "utf8"));
   return database;
 }
 

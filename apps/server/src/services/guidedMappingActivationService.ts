@@ -12,12 +12,18 @@ type SubscriptionOwner = Pick<MqttClientService, "getActiveTopics" | "getStatus"
  * Hands the committed reception configuration to the runtime owner and reports
  * whether the broker acknowledged it. The saved configuration is never rolled
  * back by a broker failure, so every non-active outcome stays retryable.
+ *
+ * The desired subscription set is always recomputed from the committed enabled
+ * mappings, so reconciling one owner never unsubscribes another owner of the
+ * same topic. A disabled target still reconciles, but reports `inactive`: an
+ * acknowledgement earned by a different owner is not its own activation.
  */
 export async function activateGuidedMapping(
   runtime: SubscriptionOwner,
   database: Database.Database,
-  topic: string
+  target: { enabled: boolean; topic: string }
 ): Promise<GuidedMappingActivation> {
+  const { enabled, topic } = target;
   try {
     await runtime.subscribe(listEnabledGenericTopics(database));
   } catch (error) {
@@ -27,6 +33,9 @@ export async function activateGuidedMapping(
       state: "failed",
       topic
     };
+  }
+  if (!enabled) {
+    return { reason: "SOURCE_DISABLED", retryable: false, state: "inactive", topic };
   }
   if (runtime.getActiveTopics().includes(topic)) {
     return { reason: null, retryable: false, state: "active", topic };

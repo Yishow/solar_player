@@ -213,3 +213,220 @@ test("R1 an activated topic delivers a production packet to the selected source 
     await app.close();
   }
 });
+
+/** N1 at the HTTP boundary: an ownership conflict is a 409 with zero configuration and zero runtime effect. */
+const solarSource: MeterSourceDefinition = {
+  ...source, channelId: "cl-solar-total", meterId: "cl-solar-total", metricScope: "cl",
+  metricKey: "factoryGeneration.totalKw", measurementKind: "power-gauge",
+  energyFlowRole: "generation", inputUnit: "kW"
+};
+
+function registerEnabledDerivedMetric(metricKey: string) {
+  getDatabase().prepare(`
+    INSERT INTO derived_metric_definitions (
+      metric_key, name, description, output_scope_policy, expression, output_unit,
+      precision, fallback_policy, enabled, managed, revision
+    ) VALUES (?, ?, '', 'site', 'a', 'kWh', 3, 'unavailable', 1, 0, 1)
+  `).run(metricKey, metricKey);
+}
+
+test("M2-R11 preview of a Solar-managed destination returns 409 and issues no usable token", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const previewed = await app.inject({
+      method: "POST",
+      payload: {
+        ...draft, channelId: solarSource.channelId, metricScope: solarSource.metricScope,
+        measurementKind: solarSource.measurementKind, energyFlowRole: solarSource.energyFlowRole,
+        source: solarSource, topic: "review/isolated/managed"
+      },
+      url: previewUrl
+    });
+    assert.equal(previewed.statusCode, 409, previewed.body);
+    assert.equal(previewed.json().error, "MANAGED_SOURCE_METRIC_CONFLICT");
+    assert.equal(countRows("mapping_preview_tokens"), 0);
+    assert.equal(countRows("meter_sources"), 0);
+    assert.equal(broker.requests.length, 0, "a rejected preview must not touch the runtime owner");
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R11 apply of a destination claimed after the preview returns 409 with no write or activation", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const request = await reviewedApplyPayload(app, "claimed-after-preview");
+    registerEnabledDerivedMetric(source.metricKey);
+    const applied = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(applied.statusCode, 409, applied.body);
+    assert.equal(applied.json().error, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.equal(countRows("meter_sources"), 0);
+    assert.equal(countRows("meter_source_audit"), 0);
+    assert.equal(countRows("mapping_apply_receipts"), 0);
+    assert.equal(
+      (getDatabase().prepare("SELECT COUNT(*) AS count FROM topic_mappings WHERE metric_scope = ? AND metric_key = ?")
+        .get(source.metricScope, source.metricKey) as { count: number }).count,
+      0
+    );
+    assert.equal(broker.requests.length, 0, "a rejected apply must not reach the runtime owner");
+  } finally {
+    await app.close();
+  }
+});
+
+/** N2 at the HTTP boundary: a disabled result must not borrow another owner's live subscription. */
+const sharedSecondSource: MeterSourceDefinition = {
+  ...source, channelId: "kn-second", meterId: "kn-second", metricKey: "selfConsumptionEnergy"
+};
+
+function mappingEnabled(metricScope: string, metricKey: string) {
+  return (getDatabase().prepare("SELECT enabled FROM topic_mappings WHERE metric_scope = ? AND metric_key = ?")
+    .get(metricScope, metricKey) as { enabled: number } | undefined)?.enabled;
+}
+
+test("M2-R15 a disabled guided apply never reports itself active on a shared topic", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    assert.equal((await applyReviewedMapping(app, "shared-owner-one")).statusCode, 200);
+    const second = await applyReviewedMapping(app, "shared-owner-two", {
+      channelId: sharedSecondSource.channelId, source: sharedSecondSource
+    });
+    assert.equal(second.statusCode, 200, second.body);
+
+    const disabled = await applyReviewedMapping(app, "shared-owner-one-disable", {
+      source: { ...source, enabled: false }
+    });
+    assert.equal(disabled.statusCode, 200, disabled.body);
+    const body = disabled.json();
+    assert.equal(body.saved, true);
+    assert.notEqual(body.activation.state, "active", "a disabled source must not claim the shared topic's subscription");
+    assert.equal(body.reception.observed, false);
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0);
+    assert.equal(mappingEnabled(sharedSecondSource.metricScope, sharedSecondSource.metricKey), 1);
+    assert.ok(
+      broker.requests.at(-1)!.includes(draft.topic),
+      "the remaining owner's subscription must be preserved after the reconciliation"
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R15 a broker refusal on a re-enable keeps the enabled mapping and stays retryable", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    assert.equal((await applyReviewedMapping(app, "reenable-initial")).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "reenable-disable", { source: { ...source, enabled: false } })).statusCode, 200);
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0);
+
+    broker.refuse = new Error("Subscribe refused");
+    const request = await reviewedApplyPayload(app, "reenable-after-refusal");
+    const refused = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(refused.statusCode, 200, refused.body);
+    assert.equal(refused.json().activation.state, "failed");
+    assert.equal(refused.json().activation.retryable, true);
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 1, "a broker refusal must not undo the committed enabled state");
+
+    broker.refuse = null;
+    const retried = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(retried.statusCode, 200, retried.body);
+    assert.equal(retried.json().activation.state, "active");
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 1);
+    assert.equal(
+      (getDatabase().prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts WHERE idempotency_key = ?")
+        .get("reenable-after-refusal") as { count: number }).count,
+      1
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R15 a re-enabled source receives a production packet on its restored subscription", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger
+  });
+  try {
+    assert.equal((await applyReviewedMapping(app, "packet-initial")).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "packet-disable", { source: { ...source, enabled: false } })).statusCode, 200);
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0, "the disable step must actually remove the mapping from the enabled set");
+    const reEnabled = await applyReviewedMapping(app, "packet-re-enable");
+    assert.equal(reEnabled.statusCode, 200, reEnabled.body);
+    assert.equal(reEnabled.json().activation.state, "active");
+
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(draft.topic), "the re-enabled topic must be part of the runtime subscription");
+    client.emit(
+      "message",
+      draft.topic,
+      Buffer.from(JSON.stringify({ sourceTimestamp: "2026-09-08T02:00:00Z", value: 31.25 })),
+      { dup: false, qos: 0, retain: false }
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    const accepted = database.prepare(`
+      SELECT normalized_value_kwh FROM meter_readings_accepted
+      WHERE metric_scope = ? AND meter_id = ? AND channel_id = ?
+    `).all(source.metricScope, source.meterId, source.channelId) as Array<{ normalized_value_kwh: string }>;
+    assert.equal(accepted.length, 1, "a production packet must reach the re-enabled source");
+    assert.equal(accepted[0]!.normalized_value_kwh, "31.25");
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("M2-R11 a replayed receipt cannot keep activating a destination claimed after the commit", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const request = await reviewedApplyPayload(app, "replay-after-claim");
+    assert.equal((await app.inject({ method: "POST", payload: request, url: applyUrl })).statusCode, 200);
+    const requestsAfterCommit = broker.requests.length;
+
+    registerEnabledDerivedMetric(source.metricKey);
+    const replayed = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(replayed.statusCode, 409, replayed.body);
+    assert.equal(replayed.json().error, "DERIVED_METRIC_IDENTITY_CONFLICT");
+    assert.equal(broker.requests.length, requestsAfterCommit, "a rejected replay must not reach the runtime owner");
+    assert.equal(countRows("meter_sources"), 1, "the rejected replay must not redo or undo the committed write");
+    assert.equal(countRows("mapping_apply_receipts"), 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R15 a lost-response retry re-attempts activation without a second source mutation", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const request = await reviewedApplyPayload(app, "lost-response-retry");
+    const first = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(first.statusCode, 200, first.body);
+    assert.equal(first.json().activation.state, "active");
+
+    const retried = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(retried.statusCode, 200, retried.body);
+    assert.deepEqual(retried.json().source, first.json().source);
+    assert.equal(retried.json().activation.state, "active");
+    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 1);
+    assert.equal(countRows("meter_sources"), 1);
+    assert.equal(countRows("meter_source_audit"), 1);
+    assert.equal(countRows("mapping_apply_receipts"), 1);
+    assert.equal(broker.requests.length, 2, "each retry re-attempts the runtime subscription");
+  } finally {
+    await app.close();
+  }
+});

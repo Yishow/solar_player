@@ -18,13 +18,14 @@ export type MappingPreviewDraft = {
   topic?: string;
 };
 
-export const GUIDED_MAPPING_ACTIVATION_STATES = ["active", "pending", "failed"] as const;
+export const GUIDED_MAPPING_ACTIVATION_STATES = ["active", "inactive", "pending", "failed"] as const;
 export type GuidedMappingActivationState = (typeof GUIDED_MAPPING_ACTIVATION_STATES)[number];
 
 /**
  * Saving a reviewed mapping, having the broker acknowledge its subscription and
  * having actually received a measurement are three distinct facts. `active` only
- * means the subscription was acknowledged.
+ * means the subscription was acknowledged. A disabled source reports `inactive`
+ * rather than borrowing an acknowledgement another owner of the topic holds.
  */
 export type GuidedMappingActivation = {
   reason: string | null;

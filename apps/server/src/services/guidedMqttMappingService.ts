@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import {
   isEnergyFlowRole, isMeterMeasurementKind, parseDecimalString, validateMeterSourceWrite,
-  type MappingPreviewDraft
+  type MappingPreviewDraft, type MeterSourceDefinition
 } from "@solar-display/shared";
-import { saveMeterSource } from "./meterSourceCatalogService.js";
+import { saveMeterSource, syncSourceTopicMapping } from "./meterSourceCatalogService.js";
+import { assertUnownedMetricDestination } from "./metricDestinationOwnershipService.js";
 import { canonicalJson } from "./authoringCanonicalJson.js";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -46,6 +47,10 @@ function targetSnapshot(database: Database.Database, draft: ReturnType<typeof re
 
 export function previewGuidedMapping(database: Database.Database, draft: MappingPreviewDraft) {
   const canonicalDraft = reviewedDraft(draft);
+  assertUnownedMetricDestination(database, {
+    metricKey: canonicalDraft.source.metricKey,
+    metricScope: canonicalDraft.source.metricScope
+  });
   const previewToken = randomUUID();
   const now = new Date();
   database.prepare(`
@@ -61,28 +66,35 @@ export function previewGuidedMapping(database: Database.Database, draft: Mapping
   return { canonicalDraft, previewToken };
 }
 
+/**
+ * Upserts the transport half of a mapping (topic, value path, selector) and then
+ * hands the enabled/unit pair to the one synchronization responsibility shared
+ * with the existing source-management path. The saved source — not the request
+ * flag — decides that state, so an insert can never be enabled on its own.
+ */
 export function persistAppliedSelector(
   database: Database.Database,
   draft: MappingPreviewDraft,
-  metricKey: string,
+  saved: MeterSourceDefinition,
   topic: string
 ) {
   const selectorJson = JSON.stringify(draft.selector);
   const valuePath = draft.selector.path.join(".");
   const existing = database.prepare(`
     SELECT id FROM topic_mappings WHERE metric_scope = ? AND metric_key = ? LIMIT 1
-  `).get(draft.metricScope, metricKey) as { id: number } | undefined;
+  `).get(draft.metricScope, saved.metricKey) as { id: number } | undefined;
   if (existing) {
     database.prepare(`
-      UPDATE topic_mappings SET topic = ?, unit = ?, value_path = ?, selector_json = ?, updated_at = CURRENT_TIMESTAMP
+      UPDATE topic_mappings SET topic = ?, value_path = ?, selector_json = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(topic, draft.source!.inputUnit, valuePath, selectorJson, existing.id);
-    return;
+    `).run(topic, valuePath, selectorJson, existing.id);
+  } else {
+    database.prepare(`
+      INSERT INTO topic_mappings (metric_scope, metric_key, topic, unit, value_path, selector_json, multiplier, offset, decimal_places, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 0, 3, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).run(draft.metricScope, saved.metricKey, topic, saved.inputUnit, valuePath, selectorJson, saved.enabled ? 1 : 0);
   }
-  database.prepare(`
-    INSERT INTO topic_mappings (metric_scope, metric_key, topic, unit, value_path, selector_json, multiplier, offset, decimal_places, enabled, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 0, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `).run(draft.metricScope, metricKey, topic, draft.source!.inputUnit, valuePath, selectorJson);
+  syncSourceTopicMapping(database, draft.metricScope, saved);
 }
 
 export function applyGuidedMapping(
@@ -103,7 +115,14 @@ export function applyGuidedMapping(
       .get(input.idempotencyKey) as { request_json: string; result_json: string } | undefined;
     if (receipt) {
       if (receipt.request_json !== requestJson) conflict("IDEMPOTENCY_CONFLICT");
-      return JSON.parse(receipt.result_json) as { applied: true; channelId: string; source: typeof input.source };
+      const replayed = JSON.parse(receipt.result_json) as { applied: true; channelId: string; source: MeterSourceDefinition };
+      // A receipt replays a committed write; it is not a pass to keep activating a
+      // destination another authority has claimed since. This redoes no write.
+      assertUnownedMetricDestination(database, {
+        metricKey: replayed.source.metricKey,
+        metricScope: replayed.source.metricScope
+      });
+      return replayed;
     }
     const stored = database.prepare(`
       SELECT canonical_draft_json, expires_at, target_snapshot_json FROM mapping_preview_tokens WHERE preview_token = ?
@@ -115,6 +134,12 @@ export function applyGuidedMapping(
       || input.meterId !== draft.source.meterId
       || (input.topic !== undefined && input.topic !== draft.topic)) conflict("PREVIEW_DRAFT_MISMATCH");
     if (stored.target_snapshot_json !== targetSnapshot(database, draft)) conflict("PREVIEW_STALE");
+    // Ownership is re-evaluated here because a valid token only proves the draft
+    // was reviewed, not that the destination is still free to take.
+    assertUnownedMetricDestination(database, {
+      metricKey: draft.source.metricKey,
+      metricScope: draft.source.metricScope
+    });
     const mapping = database.prepare("SELECT topic, selector_json FROM topic_mappings WHERE metric_scope = ? AND metric_key = ? LIMIT 1")
       .get(draft.metricScope, draft.source.metricKey) as { topic: string; selector_json: string | null } | undefined;
     let previousSelector: unknown = null;
@@ -123,7 +148,7 @@ export function applyGuidedMapping(
     const saved = saveMeterSource(database, draft.source, {
       actor: "management", reason: "reviewed-mqtt-mapping-apply", transportChanged
     });
-    persistAppliedSelector(database, draft, saved.metricKey, draft.topic);
+    persistAppliedSelector(database, draft, saved, draft.topic);
     const result = { applied: true as const, channelId: draft.channelId, source: saved };
     database.prepare("INSERT INTO mapping_apply_receipts (idempotency_key, request_json, result_json, created_at) VALUES (?, ?, ?, ?)")
       .run(input.idempotencyKey, requestJson, JSON.stringify(result), new Date().toISOString());

@@ -26,6 +26,9 @@ function describeApplyResult(result: Partial<GuidedMappingApplyResult>) {
   if (result.activation.state === "active") {
     return `${saved}訂閱已生效（${result.activation.topic}）。${reception}`;
   }
+  if (result.activation.state === "inactive") {
+    return `${saved}來源目前為停用，未建立自身訂閱。`;
+  }
   const retry = result.activation.retryable ? "可重試套用，不需重新新增來源。" : "";
   return `${saved}訂閱尚未生效：${result.activation.reason ?? result.activation.state}。${retry}${reception}`;
 }

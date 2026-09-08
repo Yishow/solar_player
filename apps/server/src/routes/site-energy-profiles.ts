@@ -78,7 +78,8 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       return previewGuidedMapping(getDatabase(), request.body as MappingPreviewDraft);
     } catch (error) {
       const code = (error as { code?: string }).code ?? "MAPPING_PREVIEW_FAILED";
-      return reply.code(422).send({ success: false, error: code, timestamp: new Date().toISOString() });
+      return reply.code((error as { statusCode?: number }).statusCode ?? 422)
+        .send({ success: false, error: code, timestamp: new Date().toISOString() });
     }
   });
 
@@ -98,7 +99,10 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       const result = applyGuidedMapping(database, body);
       return {
         ...result,
-        activation: await activateGuidedMapping(app.mqttClientService, database, body.canonicalDraft.topic ?? ""),
+        activation: await activateGuidedMapping(app.mqttClientService, database, {
+          enabled: result.source.enabled,
+          topic: body.canonicalDraft.topic ?? ""
+        }),
         reception: readGuidedMappingReception(database, result.source),
         saved: true as const
       };

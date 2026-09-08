@@ -10,7 +10,7 @@ import {
 import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
-import { listDerivedMetricDefinitions } from "../services/derivedMetricRegistryService.js";
+import { listDerivedMetricDestinationIdentities } from "../services/metricDestinationOwnershipService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
 import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
 import { checkLegacyMappingMeterSourceConflict } from "../services/meterSourceCatalogService.js";
@@ -655,14 +655,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request, reply) => {
     const database = getDatabase();
     const topics = request.body?.topics ?? [];
-    const derivedMetricIdentities = new Set(
-      listDerivedMetricDefinitions(database).flatMap((definition) => {
-        const scopes = definition.outputScopePolicy === "site"
-          ? definition.siteScopes ?? ["cl", "kn"]
-          : ["global"];
-        return scopes.map((scope) => `${scope}:${definition.metricKey}`);
-      })
-    );
+    const derivedMetricIdentities = listDerivedMetricDestinationIdentities(database);
     const existingMappings = new Map<string, ExistingTopicMappingRow>(
       (
         database
