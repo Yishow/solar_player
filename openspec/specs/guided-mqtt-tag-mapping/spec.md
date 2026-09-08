@@ -276,6 +276,8 @@ The server SHALL validate concrete site, reserved managed identities, existing d
 
 Guided MQTT writes SHALL use the same authoritative ownership rules as other source-management writes. Solar-managed destinations, registered derived-metric destinations whose identities remain reserved even while disabled, and server-owned period-energy destinations SHALL NOT be acquired by a generic guided mapping. Ownership conflicts SHALL return a stable conflict code and HTTP 409 at both preview and apply. Apply SHALL evaluate current ownership again even when a previously issued preview token is otherwise valid. Rejection SHALL leave source definitions, mappings, source-change audit records, apply receipts and production subscriptions unchanged; a rejected preview SHALL NOT issue a usable token.
 
+The 409 status SHALL identify a contest with the destination's actual owner and SHALL NOT be extended to other rejections. A preview rejected for the shape or internal consistency of its own draft SHALL retain the unprocessable-entity status it reports outside an ownership contest, so an operator is told to correct the draft rather than to choose a different destination. The set of ownership conflict codes SHALL have one authoritative definition that routes read rather than restate.
+
 #### Scenario: Wrong site candidate
 <!-- scenario-id: M2-R11-S01 -->
 
@@ -290,51 +292,47 @@ Guided MQTT writes SHALL use the same authoritative ownership rules as other sou
 - **WHEN** apply is requested
 - **THEN** the conflict is blocked and offers the existing compatible source rather than overwriting ownership
 
-#### Scenario: N1 Solar destination is rejected before a preview token exists
+#### Scenario: A malformed draft is not reported as an ownership contest
 
-- **WHEN** an authorized operator previews an enabled generic MQTT source for `cl:factoryGeneration.totalKw`
-- **THEN** the response is an ownership conflict, no usable preview token is issued, and the Solar destination and existing mappings remain unchanged
+- **GIVEN** a preview draft whose topic contains a wildcard character, so it cannot be reviewed at all
+- **WHEN** an authorized operator previews it
+- **THEN** the response is unprocessable-entity with `SOURCE_REVIEW_REQUIRED`, not the ownership-conflict status
 
-#### Scenario: N1 destination ownership changes after preview
+#### Scenario: An internally inconsistent draft keeps its own status
 
-- **GIVEN** an unowned custom destination had a valid guided preview and is subsequently claimed by an enabled derived metric
-- **WHEN** the original mapping is applied
-- **THEN** the operation is rejected with an ownership conflict and does not create a source, mapping, source-change audit record, apply receipt or runtime subscription
+- **GIVEN** a preview draft whose declared scaling is not a positive decimal
+- **WHEN** an authorized operator previews it
+- **THEN** the response is unprocessable-entity with `PREVIEW_DRAFT_MISMATCH`, and no preview token is issued
 
-#### Scenario: N1 period metrics cannot be acquired by MQTT
+#### Scenario: An ownership contest still answers with the conflict status
 
-- **WHEN** an authorized operator previews or applies a generic mapping to a server-owned `consumption.period.dayKwh`, `consumption.period.monthKwh` or `consumption.period.yearKwh` destination
-- **THEN** the operation is blocked without changing the owned period metric or its calculation
-
-#### Scenario: N1 disabled derived destinations remain reserved
-
-- **GIVEN** a registered derived metric is disabled but retains its destination identity
-- **WHEN** an authorized operator previews or applies a generic mapping for that identity
-- **THEN** the ownership conflict is rejected, including when the incoming generic mapping is itself disabled, without releasing or overwriting the registered identity
-
-#### Scenario: N1 unowned custom destinations remain usable
-
-- **WHEN** a reviewed mapping targets an unowned custom metric in its authorized site and satisfies the existing physical-identity rules
-- **THEN** it can be previewed and applied without changing any other site's sources or introducing a site-total or department assignment
+- **WHEN** an authorized operator previews a generic source for a destination the Solar adapter or an enabled derived metric already owns
+- **THEN** the response is the ownership conflict status with its stable code, and no usable preview token exists
 
 
 <!-- @trace
-source: fix-guided-mqtt-write-integrity
+source: fix-guided-preview-rejection-status
 updated: 2026-09-08
 code:
-  - docs/reviews/2026-09-08-energy-authoring-followup-review.md
-  - apps/server/src/routes/settings-mqtt.ts
+  - apps/web/src/pages/shared/monitoringHistoryPayloadCache.ts
+  - apps/server/src/services/periodConsumptionService.ts
   - apps/server/src/services/metricDestinationOwnershipService.ts
-  - apps/server/src/services/guidedMappingActivationService.ts
-  - apps/web/src/pages/DataHub/GuidedMqttMappingPanel.tsx
-  - packages/shared/src/guidedMqttMapping.ts
-  - apps/server/src/services/guidedMqttMappingService.ts
+  - apps/web/src/pages/EnergyHistory/viewModel.ts
+  - apps/web/src/services/api.ts
+  - apps/server/src/services/profileReadinessService.ts
+  - apps/server/src/routes/metrics-history.ts
+  - packages/shared/src/periodConsumption.ts
+  - apps/server/src/services/departmentSharesService.ts
   - apps/server/src/routes/site-energy-profiles.ts
 tests:
-  - apps/server/src/services/mqttMeterIngest.test.ts
-  - apps/server/src/routes/mqtt-guided-activation.test.ts
+  - apps/server/src/services/departmentSharesService.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - packages/shared/src/periodConsumption.test.ts
   - apps/server/src/services/energyAuthoringJourney.test.ts
-  - apps/server/src/services/guidedMqttMappingService.test.ts
+  - apps/server/src/services/periodConsumptionService.test.ts
+  - apps/web/src/pages/EnergyHistory/viewModel.test.ts
+  - apps/server/src/routes/mqtt-guided-activation.test.ts
+  - apps/web/src/pages/EnergyTrend/viewModel.test.ts
 -->
 
 ---

@@ -5,6 +5,7 @@ import { readProfileReadiness } from "../services/profileReadinessService.js";
 import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
 import { activateGuidedMapping, readGuidedMappingReception } from "../services/guidedMappingActivationService.js";
 import { listMeterSources, listReceivedTags } from "../services/meterSourceCatalogService.js";
+import { isMetricDestinationOwnershipConflict } from "../services/metricDestinationOwnershipService.js";
 import { readSourceImpact } from "../services/sourceImpactService.js";
 import { suggestMappings, type MappingPreviewDraft, type ObservedTag, type SiteEnergyScope } from "@solar-display/shared";
 
@@ -78,7 +79,9 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       return previewGuidedMapping(getDatabase(), request.body as MappingPreviewDraft);
     } catch (error) {
       const code = (error as { code?: string }).code ?? "MAPPING_PREVIEW_FAILED";
-      return reply.code((error as { statusCode?: number }).statusCode ?? 422)
+      // Only a contest with the destination's real owner is a 409; draft-shape rejections stay
+      // 422 so a client is told to fix the draft rather than to try another destination.
+      return reply.code(isMetricDestinationOwnershipConflict(code) ? 409 : 422)
         .send({ success: false, error: code, timestamp: new Date().toISOString() });
     }
   });

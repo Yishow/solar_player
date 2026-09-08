@@ -430,3 +430,29 @@ test("M2-R15 a lost-response retry re-attempts activation without a second sourc
     await app.close();
   }
 });
+
+test("M2-R11 preview keeps ordinary draft rejections at 422 while only ownership conflicts reach 409", async () => {
+  const app = await buildApp();
+  try {
+    // An unreviewable draft is a malformed request, not a contest over a destination someone
+    // else owns; letting it borrow the ownership 409 would tell clients to retry a different
+    // destination instead of fixing the draft.
+    const malformed = await app.inject({
+      method: "POST",
+      payload: { ...draft, source, topic: "review/isolated/+bad" },
+      url: previewUrl
+    });
+    assert.equal(malformed.statusCode, 422, malformed.body);
+    assert.equal(malformed.json().error, "SOURCE_REVIEW_REQUIRED");
+
+    const mismatched = await app.inject({
+      method: "POST",
+      payload: { ...draft, source: { ...source, scaleDecimal: "0" } },
+      url: previewUrl
+    });
+    assert.equal(mismatched.statusCode, 422, mismatched.body);
+    assert.equal(mismatched.json().error, "PREVIEW_DRAFT_MISMATCH");
+  } finally {
+    await app.close();
+  }
+});

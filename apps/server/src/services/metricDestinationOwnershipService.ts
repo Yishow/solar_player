@@ -19,6 +19,15 @@ const OWNER_CONFLICT_CODES: Readonly<Record<MetricDestinationOwner, string>> = {
   "solar-adapter": "MANAGED_SOURCE_METRIC_CONFLICT"
 };
 
+/**
+ * The codes that mean "another owner already holds this destination". Routes use this to give
+ * ownership contests their 409 without promoting every other rejection that happens to travel
+ * with a status code.
+ */
+export function isMetricDestinationOwnershipConflict(code: string | undefined): boolean {
+  return code !== undefined && Object.values(OWNER_CONFLICT_CODES).includes(code);
+}
+
 function scopedIdentity(destination: MetricDestination) {
   return `${destination.metricScope}:${destination.metricKey}`;
 }
