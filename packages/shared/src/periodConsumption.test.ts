@@ -397,3 +397,113 @@ test("E2-R2-S04 rejects definition revision channel mismatch", () => {
     samples: []
   }), /DEFINITION_REVISION_MISMATCH/);
 });
+
+const SEPTEMBER_MONTH = { kind: "month" as const, month: 9, year: 2026 };
+const SEPTEMBER_START_MS = Date.parse("2026-08-31T16:00:00Z");
+const DAY_MS = 86_400_000;
+
+function dayBoundary(dayIndex: number) {
+  return new Date(SEPTEMBER_START_MS + dayIndex * DAY_MS).toISOString();
+}
+
+test("R8 a replacement epoch inside a day does not prove that day is covered", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: SEPTEMBER_MONTH,
+    profile,
+    samples: [
+      { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(0), valueKwh: "100" },
+      { channelId: "kn-main", epochId: "epoch-2", meterId: "m2", sourceRevision: 2, sourceTimestamp: "2026-09-01T15:59:00Z", valueKwh: "0" }
+    ]
+  });
+  assert.equal(result.dailyCoverage?.totalDays, 30);
+  assert.equal(result.dailyCoverage?.coveredDays, 0);
+  assert.equal(result.dailyCoverage?.isComplete, false);
+});
+
+test("R8 later stored samples cannot inflate coverage of an earlier asOf", () => {
+  const samples = Array.from({ length: 31 }, (_, index) => ({
+    channelId: "kn-main",
+    epochId: "epoch-1",
+    meterId: "m1",
+    sourceRevision: 1,
+    sourceTimestamp: dayBoundary(index),
+    valueKwh: String(index * 100)
+  }));
+  const asOfTenth = resolvePeriodConsumption({
+    asOf: dayBoundary(9),
+    meterIds: ["kn-main"],
+    period: SEPTEMBER_MONTH,
+    profile,
+    samples
+  });
+  assert.equal(asOfTenth.dailyCoverage?.totalDays, 30);
+  assert.equal(asOfTenth.dailyCoverage?.coveredDays, 9);
+  assert.equal(asOfTenth.dailyCoverage?.isComplete, false);
+
+  const asOfMonthEnd = resolvePeriodConsumption({
+    asOf: dayBoundary(30),
+    meterIds: ["kn-main"],
+    period: SEPTEMBER_MONTH,
+    profile,
+    samples
+  });
+  assert.equal(asOfMonthEnd.dailyCoverage?.coveredDays, 30);
+  assert.equal(asOfMonthEnd.dailyCoverage?.isComplete, true);
+});
+
+test("R8 input ordering does not change coverage and invalid resets stay uncovered", () => {
+  const samples = [
+    { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(0), valueKwh: "100" },
+    { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(1), valueKwh: "200" },
+    { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(2), valueKwh: "150" },
+    { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(3), valueKwh: "400" }
+  ];
+  const ascending = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z", meterIds: ["kn-main"], period: SEPTEMBER_MONTH, profile, samples
+  });
+  const descending = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z", meterIds: ["kn-main"], period: SEPTEMBER_MONTH, profile, samples: [...samples].reverse()
+  });
+  assert.equal(ascending.dailyCoverage?.coveredDays, 2);
+  assert.deepEqual(descending.dailyCoverage, ascending.dailyCoverage);
+});
+
+test("R8 non-energy measurement kinds cannot raise coverage", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: SEPTEMBER_MONTH,
+    profile,
+    samples: Array.from({ length: 31 }, (_, index) => ({
+      channelId: "kn-main",
+      epochId: "epoch-1",
+      measurementKind: "power-gauge" as const,
+      meterId: "m1",
+      sourceRevision: 1,
+      sourceTimestamp: dayBoundary(index),
+      valueKwh: String(index * 100)
+    }))
+  });
+  assert.equal(result.dailyCoverage?.coveredDays, 0);
+  assert.equal(result.dailyCoverage?.totalDays, 30);
+});
+
+test("R8 known month endpoints coexist with incomplete daily coverage", () => {
+  const result = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: SEPTEMBER_MONTH,
+    profile,
+    samples: [
+      { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(0), valueKwh: "0" },
+      { channelId: "kn-main", epochId: "epoch-1", meterId: "m1", sourceRevision: 1, sourceTimestamp: dayBoundary(30), valueKwh: "1000" }
+    ]
+  });
+  assert.equal(result.valueKwh, "1000");
+  assert.equal(result.quality, "exact");
+  assert.equal(result.dailyCoverage?.coveredDays, 0);
+  assert.equal(result.dailyCoverage?.totalDays, 30);
+  assert.equal(result.dailyCoverage?.isComplete, false);
+});

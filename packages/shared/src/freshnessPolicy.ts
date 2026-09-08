@@ -261,6 +261,10 @@ const freshnessStateRank: Record<FreshnessState, number> = {
   unavailable: 4
 };
 
+export function dominantFreshnessState(states: FreshnessState[]): FreshnessState {
+  return [...states].sort((left, right) => freshnessStateRank[right] - freshnessStateRank[left])[0] ?? "unavailable";
+}
+
 export function aggregateFreshnessResults(
   results: Array<{ metricKey: string; freshness: FreshnessResult }>
 ) {

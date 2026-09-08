@@ -77,7 +77,27 @@ function nextCivilDate(year: number, month: number, day: number) {
   return { day: utc.getUTCDate(), month: utc.getUTCMonth() + 1, year: utc.getUTCFullYear() };
 }
 
+// Civil-to-UTC resolution scans candidate offsets through Intl, so a long range would repeat the
+// same expensive boundary work for every profile and every daily window. The mapping is pure, so
+// memoise it per (period, zone) and drop the whole index once it grows past a bounded size.
+const periodWindowCache = new Map<string, { endMs: number; startMs: number }>();
+const PERIOD_WINDOW_CACHE_LIMIT = 4096;
+
 export function periodWindow(period: PeriodSelection, siteTimeZone: string) {
+  const cacheKey = `${period.kind}|${period.year}|${period.month ?? ""}|${period.day ?? ""}|${siteTimeZone}`;
+  const cached = periodWindowCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const window = Object.freeze(computePeriodWindow(period, siteTimeZone));
+  if (periodWindowCache.size >= PERIOD_WINDOW_CACHE_LIMIT) {
+    periodWindowCache.clear();
+  }
+  periodWindowCache.set(cacheKey, window);
+  return window;
+}
+
+function computePeriodWindow(period: PeriodSelection, siteTimeZone: string) {
   if (period.kind === "day") {
     const month = period.month ?? 1;
     const day = period.day ?? 1;
@@ -142,28 +162,215 @@ function resolveBoundaryMaxAgeMs(sample: PeriodSample | undefined, fallback?: nu
   return (sample?.boundaryMaxAgeSeconds ?? fallback ?? DEFAULT_BOUNDARY_MAX_AGE_SECONDS) * 1000;
 }
 
+type PeriodEvaluationContext = {
+  boundaryMaxAgeSeconds?: number;
+  definitionMap: Map<string, DefinitionRevisionItem>;
+  freshnessPolicy: FreshnessPolicy;
+  meterIds: string[];
+  normalizedModulus: Map<string, bigint>;
+  samplesByChannel: Map<string, PeriodSample[]>;
+};
+
+type PeriodEvaluation = {
+  baselineSampleIds: string[];
+  boundaryOffsets: NonNullable<PeriodConsumptionResult["boundaryOffsets"]>;
+  endSampleIds: string[];
+  freshnessResults: Array<{ metricKey: string; freshness: FreshnessResult }>;
+  issues: string[];
+  observed: string | null;
+  quality: PeriodConsumptionQuality;
+  rolloverDetected: boolean;
+  sourceRevisions: Set<string>;
+  total: string | null;
+};
+
+/**
+ * One channel-keyed, instant-sorted index, built once per request and reused by the period total
+ * and by every daily window. Sorting here also makes the result independent of input ordering.
+ */
+function indexSamplesByChannel(samples: PeriodSample[], meterIds: string[]) {
+  const index = new Map<string, PeriodSample[]>();
+  for (const meterId of meterIds) {
+    if (!index.has(meterId)) {
+      index.set(meterId, sortByInstant(samples.filter((sample) => sample.channelId === meterId)));
+    }
+  }
+  return index;
+}
+
+/**
+ * The single admissibility and delta calculation for one window. Daily coverage calls it with a
+ * day window so a counted day obeys exactly the boundary-age, identity, revision, epoch,
+ * measurement-kind, reset and as-of rules that its own daily consumption calculation obeys.
+ */
+function evaluatePeriod(
+  context: PeriodEvaluationContext,
+  window: { endMs: number; startMs: number },
+  asOfMs: number
+): PeriodEvaluation {
+  const closeCapMs = Math.min(window.endMs, asOfMs);
+  const issues: string[] = [];
+  const baselineSampleIds: string[] = [];
+  const endSampleIds: string[] = [];
+  const boundaryOffsets: NonNullable<PeriodConsumptionResult["boundaryOffsets"]> = [];
+  const sourceRevisions = new Set<string>();
+  const freshnessResults: Array<{ metricKey: string; freshness: FreshnessResult }> = [];
+  let total: string | null = null;
+  let observed: string | null = null;
+  let rolloverDetected = false;
+  const state: { quality: PeriodConsumptionQuality } = { quality: "exact" };
+  const degrade = (next: PeriodConsumptionQuality, issue: string) => {
+    const ranks = { exact: 0, "estimated-boundary": 1, unavailable: 2, partial: 3, invalid: 4 };
+    if (ranks[next] > ranks[state.quality]) state.quality = next;
+    issues.push(issue);
+  };
+  for (const meterId of context.meterIds) {
+    const series = (context.samplesByChannel.get(meterId) ?? []).filter((sample) => sampleMs(sample) <= closeCapMs);
+    const closing = lastAtOrBefore(series, closeCapMs);
+    freshnessResults.push({ metricKey: meterId, freshness: evaluateFreshness({
+      category: "cumulative", policy: context.freshnessPolicy, nowMs: asOfMs,
+      sourceTimestamp: closing?.sourceTimestamp ?? null
+    }) });
+    if (!closing) {
+      degrade("unavailable", `MISSING_OBSERVATIONS:${meterId}`);
+      continue;
+    }
+    const maxAgeMs = resolveBoundaryMaxAgeMs(closing, context.boundaryMaxAgeSeconds);
+    if (closing.measurementKind === "unknown") {
+      degrade("invalid", `SOURCE_SEMANTICS_UNKNOWN:${meterId}`);
+      continue;
+    }
+    if (closing.measurementKind === "power-gauge") {
+      degrade("invalid", `POWER_GAUGE_NOT_ENERGY:${meterId}`);
+      continue;
+    }
+    if (closing.measurementKind === "interval-energy") {
+      // A timestamp alone does not prove an interval's start or complete coverage.
+      const intervals = series.filter((sample) => sample.measurementKind === "interval-energy" && sampleMs(sample) >= window.startMs && sampleMs(sample) < window.endMs);
+      for (const sample of intervals) {
+        if (sample.valueKwh.startsWith("-")) degrade("invalid", `NEGATIVE_INTERVAL_ENERGY:${meterId}`);
+        else observed = addDecimal(observed ?? "0", sample.valueKwh);
+        sourceRevisions.add(sampleIdentity(sample));
+      }
+      degrade("partial", `INTERVAL_COVERAGE_UNPROVEN:${meterId}`);
+      continue;
+    }
+    const identity = sampleIdentity(closing);
+    const identitySeries = series.filter((sample) => sampleIdentity(sample) === identity);
+    const opening = lastAtOrBefore(identitySeries, window.startMs);
+    const contributing = series.filter((sample) => sampleMs(sample) >= (opening ? sampleMs(opening) : window.startMs));
+    const canContribute = (s: PeriodSample) => sampleMs(s) >= window.startMs || (s === opening && window.startMs - sampleMs(s) <= resolveBoundaryMaxAgeMs(s, context.boundaryMaxAgeSeconds));
+    const def = context.definitionMap.get(meterId);
+    let channelObserved: string | null = null;
+    let channelRollover = false;
+    let previous: PeriodSample | undefined;
+    for (const sample of contributing) {
+      sourceRevisions.add(sampleIdentity(sample));
+      if (def) {
+        if (sample.meterId && sample.meterId !== def.meterId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+        if (sample.sourceRevision !== undefined && sample.sourceRevision !== def.sourceRevision) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+        if (sample.epochId && sample.epochId !== def.epochId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
+      }
+      if (previous && sampleIdentity(previous) === sampleIdentity(sample)) {
+        const prevNum = parseDecimalString(previous.valueKwh);
+        const currNum = parseDecimalString(sample.valueKwh);
+        if (currNum < prevNum) {
+          const modNum = sample.rolloverModulus !== undefined && sample.rolloverModulus !== null
+            ? parseDecimalString(String(sample.rolloverModulus))
+            : context.normalizedModulus.get(meterId) ?? 0n;
+          const rolloverDelta = (modNum - prevNum) + currNum;
+          if (modNum > 0n && prevNum < modNum && currNum >= 0n && rolloverDelta >= 0n && rolloverDelta <= (modNum / 2n)) {
+            const stepDelta = formatDecimalString(rolloverDelta);
+            if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", stepDelta);
+            channelRollover = true;
+            rolloverDetected = true;
+            issues.push(`ROLLOVER:${meterId}`);
+          } else {
+            degrade("invalid", `UNEXPLAINED_DECREASE:${meterId}`);
+          }
+        } else {
+          const delta = subtractDecimalString(sample.valueKwh, previous.valueKwh);
+          if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", delta);
+        }
+      }
+      previous = sample;
+    }
+    if (channelObserved !== null) observed = addDecimal(observed ?? "0", channelObserved);
+    if (opening?.readingId) baselineSampleIds.push(opening.readingId);
+    if (closing.readingId) endSampleIds.push(closing.readingId);
+    boundaryOffsets.push({
+      channelId: meterId,
+      startSeconds: opening ? (sampleMs(opening) - window.startMs) / 1000 : null,
+      endSeconds: (sampleMs(closing) - closeCapMs) / 1000,
+      startTimestamp: opening ? new Date(sampleMs(opening)).toISOString() : null,
+      endTimestamp: new Date(sampleMs(closing)).toISOString()
+    });
+    if (!opening) {
+      const globalOpening = lastAtOrBefore(series, window.startMs);
+      if (globalOpening && sampleIdentity(globalOpening) !== identity) {
+        degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
+      } else {
+        degrade("partial", `MISSING_BASELINE:${meterId}`);
+      }
+      continue;
+    }
+    if (sampleMs(closing) <= sampleMs(opening)) {
+      degrade("partial", `MISSING_ENDPOINT:${meterId}`);
+      continue;
+    }
+    if (contributing.some((sample) => sampleIdentity(sample) !== identity)) {
+      degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
+      continue;
+    }
+    if (window.startMs - sampleMs(opening) > resolveBoundaryMaxAgeMs(opening, context.boundaryMaxAgeSeconds) || closeCapMs - sampleMs(closing) > maxAgeMs) {
+      degrade("partial", `STALE_BOUNDARY:${meterId}`);
+      continue;
+    }
+    if (sampleMs(opening) < window.startMs || sampleMs(closing) < closeCapMs || contributing.some((sample) => sample.timestampQuality === "receive-time-estimated")) {
+      degrade("estimated-boundary", `ESTIMATED_BOUNDARY:${meterId}`);
+    }
+    const delta = channelRollover && channelObserved !== null
+      ? channelObserved
+      : subtractDecimalString(closing.valueKwh, opening.valueKwh);
+    if (!delta.startsWith("-")) total = addDecimal(total ?? "0", delta);
+  }
+  return {
+    baselineSampleIds,
+    boundaryOffsets,
+    endSampleIds,
+    freshnessResults,
+    issues,
+    observed,
+    quality: state.quality,
+    rolloverDetected,
+    sourceRevisions,
+    total
+  };
+}
+
+/**
+ * A day counts toward coveredDays only when its own window has completed no later than asOf and
+ * the shared evaluation can return a usable daily delta for it. totalDays keeps describing the
+ * calendar month, so a known month total and an incomplete daily allocation stay independent.
+ */
 function evaluateDailyCoverage(
+  context: PeriodEvaluationContext,
   period: PeriodSelection,
   siteTimeZone: string,
-  meterIds: string[],
-  samples: PeriodSample[],
-  boundaryMaxAgeSeconds?: number
-): DailyCoverage | undefined {
-  if (period.kind !== "month") return undefined;
+  asOfMs: number
+): DailyCoverage {
   const month = period.month ?? 1;
   const daysInMonth = new Date(Date.UTC(period.year, month, 0)).getUTCDate();
   let coveredDays = 0;
   for (let day = 1; day <= daysInMonth; day += 1) {
-    const dayWin = periodWindow({ day, kind: "day", month, year: period.year }, siteTimeZone);
-    const dayCovered = meterIds.length > 0 && meterIds.every((meterId) => {
-      const meterSamples = samples.filter((s) => s.channelId === meterId);
-      const opening = lastAtOrBefore(meterSamples, dayWin.startMs);
-      const closing = lastAtOrBefore(meterSamples, dayWin.endMs);
-      if (!opening || !closing || opening === closing) return false;
-      const maxAgeMs = resolveBoundaryMaxAgeMs(opening, boundaryMaxAgeSeconds);
-      return dayWin.startMs - sampleMs(opening) <= maxAgeMs && dayWin.endMs - sampleMs(closing) <= maxAgeMs;
-    });
-    if (dayCovered) coveredDays += 1;
+    const dayWindow = periodWindow({ day, kind: "day", month, year: period.year }, siteTimeZone);
+    if (dayWindow.endMs > asOfMs) {
+      continue;
+    }
+    const evaluation = evaluatePeriod(context, dayWindow, asOfMs);
+    if (evaluation.total !== null && (evaluation.quality === "exact" || evaluation.quality === "estimated-boundary")) {
+      coveredDays += 1;
+    }
   }
   return { coveredDays, isComplete: coveredDays === daysInMonth, totalDays: daysInMonth };
 }
@@ -232,163 +439,49 @@ export function resolvePeriodConsumption(input: {
   }
   const window = periodWindow(input.period, input.profile.siteTimeZone);
   const closeCapMs = Math.min(window.endMs, asOfMs);
-  const issues: string[] = [];
-  const baselineSampleIds: string[] = [];
-  const endSampleIds: string[] = [];
-  const boundaryOffsets: NonNullable<PeriodConsumptionResult["boundaryOffsets"]> = [];
-  const sourceRevisions = new Set<string>();
-  let total: string | null = null;
-  let observed: string | null = null;
-  let rolloverDetected = false;
-  const state: { quality: PeriodConsumptionQuality } = { quality: "exact" };
-  const freshnessPolicy = input.freshnessPolicy ?? createDefaultFreshnessPolicy();
-  const freshnessResults: Array<{ metricKey: string; freshness: FreshnessResult }> = [];
-  const degrade = (next: PeriodConsumptionQuality, issue: string) => {
-    const ranks = { exact: 0, "estimated-boundary": 1, unavailable: 2, partial: 3, invalid: 4 };
-    if (ranks[next] > ranks[state.quality]) state.quality = next;
-    issues.push(issue);
+  const context: PeriodEvaluationContext = {
+    boundaryMaxAgeSeconds: input.boundaryMaxAgeSeconds,
+    definitionMap,
+    freshnessPolicy: input.freshnessPolicy ?? createDefaultFreshnessPolicy(),
+    meterIds: input.meterIds,
+    normalizedModulus,
+    samplesByChannel: indexSamplesByChannel(input.samples, input.meterIds)
   };
-  for (const meterId of input.meterIds) {
-    const series = sortByInstant(input.samples.filter((sample) => sample.channelId === meterId && sampleMs(sample) <= closeCapMs));
-    const closing = lastAtOrBefore(series, closeCapMs);
-    freshnessResults.push({ metricKey: meterId, freshness: evaluateFreshness({
-      category: "cumulative", policy: freshnessPolicy, nowMs: asOfMs,
-      sourceTimestamp: closing?.sourceTimestamp ?? null
-    }) });
-    if (!closing) {
-      degrade("unavailable", `MISSING_OBSERVATIONS:${meterId}`);
-      continue;
-    }
-    const maxAgeMs = resolveBoundaryMaxAgeMs(closing, input.boundaryMaxAgeSeconds);
-    if (closing.measurementKind === "unknown") {
-      degrade("invalid", `SOURCE_SEMANTICS_UNKNOWN:${meterId}`);
-      continue;
-    }
-    if (closing.measurementKind === "power-gauge") {
-      degrade("invalid", `POWER_GAUGE_NOT_ENERGY:${meterId}`);
-      continue;
-    }
-    if (closing.measurementKind === "interval-energy") {
-      // A timestamp alone does not prove an interval's start or complete coverage.
-      const intervals = series.filter((sample) => sample.measurementKind === "interval-energy" && sampleMs(sample) >= window.startMs && sampleMs(sample) < window.endMs);
-      for (const sample of intervals) {
-        if (sample.valueKwh.startsWith("-")) degrade("invalid", `NEGATIVE_INTERVAL_ENERGY:${meterId}`);
-        else observed = addDecimal(observed ?? "0", sample.valueKwh);
-        sourceRevisions.add(sampleIdentity(sample));
-      }
-      degrade("partial", `INTERVAL_COVERAGE_UNPROVEN:${meterId}`);
-      continue;
-    }
-    const identity = sampleIdentity(closing);
-    const identitySeries = series.filter((sample) => sampleIdentity(sample) === identity);
-    const opening = lastAtOrBefore(identitySeries, window.startMs);
-    const contributing = series.filter((sample) => sampleMs(sample) >= (opening ? sampleMs(opening) : window.startMs));
-    const canContribute = (s: PeriodSample) => sampleMs(s) >= window.startMs || (s === opening && window.startMs - sampleMs(s) <= resolveBoundaryMaxAgeMs(s, input.boundaryMaxAgeSeconds));
-    const def = definitionMap.get(meterId);
-    let channelObserved: string | null = null;
-    let channelRollover = false;
-    let previous: PeriodSample | undefined;
-    for (const sample of contributing) {
-      sourceRevisions.add(sampleIdentity(sample));
-      if (def) {
-        if (sample.meterId && sample.meterId !== def.meterId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
-        if (sample.sourceRevision !== undefined && sample.sourceRevision !== def.sourceRevision) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
-        if (sample.epochId && sample.epochId !== def.epochId) degrade("partial", `DEFINITION_REVISION_MISMATCH:${meterId}`);
-      }
-      if (previous && sampleIdentity(previous) === sampleIdentity(sample)) {
-        const prevNum = parseDecimalString(previous.valueKwh);
-        const currNum = parseDecimalString(sample.valueKwh);
-        if (currNum < prevNum) {
-          const modNum = sample.rolloverModulus !== undefined && sample.rolloverModulus !== null
-            ? parseDecimalString(String(sample.rolloverModulus))
-            : normalizedModulus.get(meterId) ?? 0n;
-          const rolloverDelta = (modNum - prevNum) + currNum;
-          if (modNum > 0n && prevNum < modNum && currNum >= 0n && rolloverDelta >= 0n && rolloverDelta <= (modNum / 2n)) {
-            const stepDelta = formatDecimalString(rolloverDelta);
-            if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", stepDelta);
-            channelRollover = true;
-            rolloverDetected = true;
-            issues.push(`ROLLOVER:${meterId}`);
-          } else {
-            degrade("invalid", `UNEXPLAINED_DECREASE:${meterId}`);
-          }
-        } else {
-          const delta = subtractDecimalString(sample.valueKwh, previous.valueKwh);
-          if (canContribute(previous)) channelObserved = addDecimal(channelObserved ?? "0", delta);
-        }
-      }
-      previous = sample;
-    }
-    if (channelObserved !== null) observed = addDecimal(observed ?? "0", channelObserved);
-    if (opening?.readingId) baselineSampleIds.push(opening.readingId);
-    if (closing.readingId) endSampleIds.push(closing.readingId);
-    boundaryOffsets.push({
-      channelId: meterId,
-      startSeconds: opening ? (sampleMs(opening) - window.startMs) / 1000 : null,
-      endSeconds: (sampleMs(closing) - closeCapMs) / 1000,
-      startTimestamp: opening ? new Date(sampleMs(opening)).toISOString() : null,
-      endTimestamp: new Date(sampleMs(closing)).toISOString()
-    });
-    if (!opening) {
-      const globalOpening = lastAtOrBefore(series, window.startMs);
-      if (globalOpening && sampleIdentity(globalOpening) !== identity) {
-        degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
-      } else {
-        degrade("partial", `MISSING_BASELINE:${meterId}`);
-      }
-      continue;
-    }
-    if (sampleMs(closing) <= sampleMs(opening)) {
-      degrade("partial", `MISSING_ENDPOINT:${meterId}`);
-      continue;
-    }
-    if (contributing.some((sample) => sampleIdentity(sample) !== identity)) {
-      degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
-      continue;
-    }
-    if (window.startMs - sampleMs(opening) > resolveBoundaryMaxAgeMs(opening, input.boundaryMaxAgeSeconds) || closeCapMs - sampleMs(closing) > maxAgeMs) {
-      degrade("partial", `STALE_BOUNDARY:${meterId}`);
-      continue;
-    }
-    if (sampleMs(opening) < window.startMs || sampleMs(closing) < closeCapMs || contributing.some((sample) => sample.timestampQuality === "receive-time-estimated")) {
-      degrade("estimated-boundary", `ESTIMATED_BOUNDARY:${meterId}`);
-    }
-    const delta = channelRollover && channelObserved !== null
-      ? channelObserved
-      : subtractDecimalString(closing.valueKwh, opening.valueKwh);
-    if (!delta.startsWith("-")) total = addDecimal(total ?? "0", delta);
-  }
-  let freshnessState = aggregateFreshnessResults(freshnessResults).state;
-  if (state.quality === "unavailable" && observed !== null) state.quality = "partial";
+  const evaluation = evaluatePeriod(context, window, asOfMs);
+  let quality = evaluation.quality;
+  let total = evaluation.total;
+  let observed = evaluation.observed;
+  let freshnessState = aggregateFreshnessResults(evaluation.freshnessResults).state;
+  if (quality === "unavailable" && observed !== null) quality = "partial";
   if (asOfMs < window.startMs || input.meterIds.length === 0) {
-    state.quality = "unavailable";
+    quality = "unavailable";
     freshnessState = "unavailable";
     total = null;
     observed = null;
   }
   const dailyCoverage = input.period.kind === "month"
-    ? evaluateDailyCoverage(input.period, input.profile.siteTimeZone, input.meterIds, input.samples, input.boundaryMaxAgeSeconds)
+    ? evaluateDailyCoverage(context, input.period, input.profile.siteTimeZone, asOfMs)
     : undefined;
   return {
-    ...resultFor(input.profile, state.quality, state.quality === "exact" || state.quality === "estimated-boundary" ? total : null),
+    ...resultFor(input.profile, quality, quality === "exact" || quality === "estimated-boundary" ? total : null),
     meterIds: [...input.meterIds].sort(),
-    observedDeltaKwh: state.quality === "invalid" ? null : observed,
+    observedDeltaKwh: quality === "invalid" ? null : observed,
     dailyCoverage,
     freshness: freshnessState === "live" ? "fresh" : freshnessState === "unavailable" ? "unavailable" : "stale",
     freshnessState,
     periodStart: new Date(window.startMs).toISOString(),
     periodEnd: new Date(window.endMs).toISOString(),
     calculatedThrough: new Date(closeCapMs).toISOString(),
-    baselineSampleIds,
-    endSampleIds,
-    boundaryOffsets,
-    issues,
-    calculationVersion: "e2-v3",
+    baselineSampleIds: evaluation.baselineSampleIds,
+    endSampleIds: evaluation.endSampleIds,
+    boundaryOffsets: evaluation.boundaryOffsets,
+    issues: evaluation.issues,
+    calculationVersion: "e2-v4",
     provenance: {
       profileRevision: input.profile.revision,
       siteTimeZone: input.profile.siteTimeZone,
-      sourceRevisions: [...sourceRevisions].sort(),
-      ...(rolloverDetected ? { rollover: true } : {}),
+      sourceRevisions: [...evaluation.sourceRevisions].sort(),
+      ...(evaluation.rolloverDetected ? { rollover: true } : {}),
       ...(input.reviewContext ? { reviewContext: input.reviewContext } : {})
     }
   };

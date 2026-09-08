@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 import {
-  buildMonthlyConsumptionSeries,
   monthBoundaryInProfileZone,
   resolvePeriodConsumption,
   periodWindow,
   type FreshnessPolicy,
+  type PeriodConsumptionQuality,
   type PeriodSelection,
   type PeriodSample,
   type SiteEnergyProfileV1
@@ -69,6 +69,79 @@ export function periodSelectionFromRange(
   return null;
 }
 
+export type EffectivePeriodSelection = {
+  crossesRevisionBoundary: boolean;
+  newerProfiles: SiteEnergyProfileV1[];
+  profile: SiteEnergyProfileV1;
+  profiles: SiteEnergyProfileV1[];
+  throughMs: number;
+  window: { endMs: number; startMs: number };
+};
+
+export type EffectivePeriodContext = EffectivePeriodSelection & {
+  asOf: string;
+  freshnessPolicy: FreshnessPolicy;
+  samples: PeriodSample[];
+};
+
+export function profileRevisionBoundariesOf(profiles: SiteEnergyProfileV1[]) {
+  return profiles.map((candidate) => ({
+    profileRevision: candidate.revision,
+    effectiveFrom: candidate.effectiveFrom,
+    siteTimeZone: candidate.siteTimeZone
+  }));
+}
+
+/**
+ * Single authority for "which profile revision, calendar window and as-of instant does this
+ * period resolve against". Every consumer of a period — site total, department shares and the
+ * daily curve — must share this selection so one screen cannot mix two accounting bases.
+ */
+export function selectEffectivePeriod(
+  storedProfiles: SiteEnergyProfileV1[],
+  period: PeriodSelection,
+  asOf: string,
+  options: { profileRevision?: number } = {}
+): EffectivePeriodSelection {
+  const profiles = [...storedProfiles].sort((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom) || a.revision - b.revision);
+  const profile = options.profileRevision === undefined
+    ? profiles.filter((candidate) => Date.parse(candidate.effectiveFrom) <= periodWindow(period, candidate.siteTimeZone).startMs).at(-1) ?? profiles[0]
+    : profiles.find((candidate) => candidate.revision === options.profileRevision);
+  if (!profile) {
+    throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
+  }
+  const window = periodWindow(period, profile.siteTimeZone);
+  const throughMs = Math.min(window.endMs, Date.parse(asOf));
+  const newerProfiles = profiles.filter((candidate) => candidate.revision !== profile.revision
+    && (Date.parse(candidate.effectiveFrom) > Date.parse(profile.effectiveFrom)
+      || (Date.parse(candidate.effectiveFrom) === Date.parse(profile.effectiveFrom) && candidate.revision > profile.revision))
+    && Date.parse(candidate.effectiveFrom) < throughMs);
+  return {
+    crossesRevisionBoundary: throughMs >= window.startMs
+      && (newerProfiles.length > 0 || Date.parse(profile.effectiveFrom) > window.startMs),
+    newerProfiles,
+    profile,
+    profiles,
+    throughMs,
+    window
+  };
+}
+
+export function loadEffectivePeriodContext(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  period: PeriodSelection,
+  asOf: string,
+  options: { profileRevision?: number } = {}
+): EffectivePeriodContext {
+  return {
+    ...selectEffectivePeriod(listPersistedProfiles(database, scope), period, asOf, options),
+    asOf,
+    freshnessPolicy: readFreshnessPolicy(database).policy,
+    samples: loadAcceptedSamples(database, scope)
+  };
+}
+
 export function resolvePersistedPeriodConsumption(
   database: Database.Database,
   scope: "cl" | "kn",
@@ -83,35 +156,21 @@ function resolveWithEvidence(
   storedProfiles: SiteEnergyProfileV1[], samples: PeriodSample[], period: PeriodSelection, asOf: string, freshnessPolicy: FreshnessPolicy,
   options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
-  const profiles = [...storedProfiles].sort((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom) || a.revision - b.revision);
-  const profile = options.profileRevision === undefined
-    ? profiles.filter((candidate) => Date.parse(candidate.effectiveFrom) <= periodWindow(period, candidate.siteTimeZone).startMs).at(-1) ?? profiles[0]
-    : profiles.find((candidate) => candidate.revision === options.profileRevision);
-  if (!profile) {
-    throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
-  }
-  const window = periodWindow(period, profile.siteTimeZone);
-  const through = Math.min(window.endMs, Date.parse(asOf));
-  const newerProfiles = profiles.filter((candidate) => candidate.revision !== profile.revision
-    && (Date.parse(candidate.effectiveFrom) > Date.parse(profile.effectiveFrom)
-      || (Date.parse(candidate.effectiveFrom) === Date.parse(profile.effectiveFrom) && candidate.revision > profile.revision))
-    && Date.parse(candidate.effectiveFrom) < through);
-  const boundary = newerProfiles[0];
+  const context = selectEffectivePeriod(storedProfiles, period, asOf, options);
   const result = resolvePeriodConsumption({
     asOf,
-    meterIds: options.meterIds ?? profile.siteTotal.memberChannelIds,
+    meterIds: options.meterIds ?? context.profile.siteTotal.memberChannelIds,
     period,
-    profile,
+    profile: context.profile,
     samples,
     freshnessPolicy,
     timeZone: options.timeZone,
     start: options.start,
     end: options.end
   });
-  if (through >= window.startMs && (boundary || Date.parse(profile.effectiveFrom) > window.startMs)) {
+  if (context.crossesRevisionBoundary) {
     return { ...result, valueKwh: null, observedDeltaKwh: null, quality: result.quality === "invalid" ? "invalid" as const : "partial" as const,
-      profileRevisionBoundaries: [profile, ...newerProfiles]
-        .map((candidate) => ({ profileRevision: candidate.revision, effectiveFrom: candidate.effectiveFrom, siteTimeZone: candidate.siteTimeZone })),
+      profileRevisionBoundaries: profileRevisionBoundariesOf([context.profile, ...context.newerProfiles]),
       issues: [...result.issues ?? [], "PROFILE_REVISION_BOUNDARY"] };
   }
   return result;
@@ -149,43 +208,81 @@ export function tryResolvePersistedPeriodConsumption(
   }
 }
 
-export function resolveDailyConsumptionSeries(
+export type DailyConsumptionPoint = {
+  date: string;
+  profileRevision: number;
+  quality: PeriodConsumptionQuality;
+  siteTimeZone: string;
+  valueKwh: string | null;
+};
+
+/** Every calendar date key of `YYYY-MM`, ascending. Returns [] for a malformed month key. */
+export function monthDateKeys(month: string): string[] {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) {
+    return [];
+  }
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+  if (monthNumber < 1 || monthNumber > 12) {
+    return [];
+  }
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  return Array.from({ length: daysInMonth }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
+}
+
+function dailyConsumptionPoint(
+  profiles: SiteEnergyProfileV1[],
+  samples: PeriodSample[],
+  freshnessPolicy: FreshnessPolicy,
+  date: string,
+  asOf: string
+): DailyConsumptionPoint | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return null;
+  }
+  const period: PeriodSelection = { day: Number(match[3]), kind: "day", month: Number(match[2]), year: Number(match[1]) };
+  if (period.month! < 1 || period.month! > 12 || period.day! < 1 || period.day! > 31) {
+    return null;
+  }
+  try {
+    const result = resolveWithEvidence(profiles, samples, period, asOf, freshnessPolicy);
+    return {
+      date,
+      profileRevision: result.profileRevision,
+      quality: result.quality,
+      siteTimeZone: result.siteTimeZone,
+      valueKwh: result.quality === "exact" || result.quality === "estimated-boundary" ? result.valueKwh : null
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Canonical consumption for an explicit set of dates. The caller owns the date set so a range
+ * contract (day/week/month/year/total) is never rewritten into the current month; profiles,
+ * samples and the freshness policy are loaded once for the whole set.
+ */
+export function resolveDailyConsumptionPoints(
   database: Database.Database,
   scope: "cl" | "kn",
-  month: string,
+  dates: string[],
   asOf: string
-) {
-  const profile = getActiveProfile(database, scope);
-  if (!profile) {
-    return null;
-  }
-  const [yearPart, monthPart] = month.split("-");
-  const year = Number(yearPart);
-  const monthNumber = Number(monthPart);
-  if (!/^\d{4}-\d{2}$/.test(month) || !Number.isInteger(year) || !Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > 12) {
-    return null;
-  }
+): DailyConsumptionPoint[] | null {
   const profiles = listPersistedProfiles(database, scope);
+  if (profiles.length === 0) {
+    return null;
+  }
+  if (dates.length === 0) {
+    return [];
+  }
   const samples = loadAcceptedSamples(database, scope);
   const freshnessPolicy = readFreshnessPolicy(database).policy;
-  const monthResult = resolveWithEvidence(profiles, samples, { kind: "month", month: monthNumber, year }, asOf, freshnessPolicy);
-  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  const points = [];
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const result = resolveWithEvidence(profiles, samples, { day, kind: "day", month: monthNumber, year }, asOf, freshnessPolicy);
-    points.push({
-      date: `${month}-${String(day).padStart(2, "0")}`,
-      valueKwh: result.quality === "exact" || result.quality === "estimated-boundary" ? result.valueKwh : null,
-      quality: result.quality,
-      profileRevision: result.profileRevision,
-      siteTimeZone: result.siteTimeZone
-    });
-  }
-  return {
-    profileRevision: monthResult.profileRevision,
-    siteTimeZone: monthResult.siteTimeZone,
-    ...buildMonthlyConsumptionSeries(points, month)
-  };
+  return dates
+    .map((date) => dailyConsumptionPoint(profiles, samples, freshnessPolicy, date, asOf))
+    .filter((point): point is DailyConsumptionPoint => point !== null);
 }
 
 export function monthKeyFromProfile(asOf: string, profile: Pick<SiteEnergyProfileV1, "siteTimeZone">) {

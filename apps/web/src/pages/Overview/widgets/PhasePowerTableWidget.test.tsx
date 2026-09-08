@@ -49,3 +49,19 @@ test("monthly consumption refreshes only for monitoring-history sync", () => {
   assert.equal(shouldRefreshMonthlyConsumption({ scope: "mqtt" }), false);
   assert.equal(shouldRefreshMonthlyConsumption({ scope: "display-pages" }), false);
 });
+
+test("E4 canonical point quality reaches the trend model instead of claiming exact", () => {
+  const estimated = buildMonthlyConsumptionTrend([
+    { consumptionTotal: 1800, date: "2026-07-01", quality: "estimated-boundary", valueKwh: "1800" },
+    { consumptionTotal: 2200, date: "2026-07-02", quality: "exact", valueKwh: "2200" }
+  ]);
+  assert.equal(estimated.quality, "estimated-boundary");
+  assert.deepEqual(estimated.series, [1800, 2200]);
+
+  const missing = buildMonthlyConsumptionTrend([
+    { consumptionTotal: 1800, date: "2026-07-01", quality: "exact", valueKwh: "1800" },
+    { consumptionTotal: null, date: "2026-07-02", quality: "unavailable", valueKwh: null }
+  ]);
+  assert.equal(missing.quality, "partial");
+  assert.deepEqual(missing.series, [1800, null]);
+});

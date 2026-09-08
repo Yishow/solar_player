@@ -164,3 +164,76 @@ The share service SHALL consume E6 profile numerator and denominator membership.
 - **GIVEN** a reviewed comparison set is 800 kWh and a department is 200 kWh
 - **WHEN** the server resolves that share group
 - **THEN** it yields 25% with that comparison label and leaves the siteTotal unchanged
+
+---
+### Requirement: Persisted share calculations use one effective period context
+<!-- requirement-id: E5-R9 -->
+
+All department numerators and their common denominator SHALL use the same server-resolved effective profile revision, calendar window and as-of instant as the corresponding site period calculation. Selecting the latest active profile SHALL NOT bypass effective-date boundaries or reinterpret closed historical membership. Unproven cross-revision periods SHALL expose partial or unavailable shares and a named boundary reason, not exact percentages. Upstream quality and freshness SHALL survive aggregation.
+
+#### Scenario: R5 membership changes during the requested month
+<!-- scenario-id: E5-R9-S01 -->
+
+- **WHEN** a site's accounting membership changes midway through a requested month and no reviewed continuity calculation covers both segments
+- **THEN** site consumption and department shares identify the profile boundary, do not claim an exact full-month ratio, and retain the relevant revisions and effective dates
+
+#### Scenario: R5 closed month retains historical membership
+<!-- scenario-id: E5-R9-S02 -->
+
+- **WHEN** a closed month is requested after a later profile assigns different department meters
+- **THEN** the share result uses the profile effective for that closed period rather than reclassifying its readings using today's active profile
+
+
+<!-- @trace
+source: fix-energy-period-consumer-consistency
+updated: 2026-09-08
+code:
+  - apps/server/src/routes/metrics-history.ts
+  - apps/server/src/services/periodConsumptionService.ts
+  - packages/shared/src/freshnessPolicy.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/server/src/services/departmentSharesService.ts
+  - packages/shared/src/periodConsumption.ts
+tests:
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
+  - apps/server/src/services/periodConsumptionService.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/server/src/services/departmentSharesService.test.ts
+  - packages/shared/src/periodConsumption.test.ts
+-->
+
+---
+### Requirement: Custom denominator-only channels participate in period resolution
+<!-- requirement-id: E5-R10 -->
+
+Share calculation SHALL resolve every required channel from the selected denominator, including channels belonging to neither the site-total set nor a department. Missing denominator evidence SHALL remain explicit and SHALL NOT trigger a fallback to another denominator. Shared channels SHALL be resolved once without changing numerator or denominator membership.
+
+#### Scenario: R6 independent meter-set denominator
+<!-- scenario-id: E5-R10-S01 -->
+
+- **WHEN** the selected period has site total A=1000 kWh, department B=100 kWh and the explicit custom denominator C=400 kWh, with C used nowhere else
+- **THEN** B's ratio is 25 percent using C, while the site total remains 1000 kWh
+
+#### Scenario: R6 custom denominator lacks its baseline
+<!-- scenario-id: E5-R10-S02 -->
+
+- **WHEN** C is selected as the denominator but its period delta cannot be established
+- **THEN** the ratio is null with the missing-evidence reason, not 10 percent from A and not a department-sum fallback
+
+<!-- @trace
+source: fix-energy-period-consumer-consistency
+updated: 2026-09-08
+code:
+  - apps/server/src/routes/metrics-history.ts
+  - apps/server/src/services/periodConsumptionService.ts
+  - packages/shared/src/freshnessPolicy.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/server/src/services/departmentSharesService.ts
+  - packages/shared/src/periodConsumption.ts
+tests:
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
+  - apps/server/src/services/periodConsumptionService.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/server/src/services/departmentSharesService.test.ts
+  - packages/shared/src/periodConsumption.test.ts
+-->

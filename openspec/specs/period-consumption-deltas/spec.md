@@ -282,3 +282,60 @@ code:
 tests:
   - packages/shared/src/periodConsumption.test.ts
 -->
+
+---
+### Requirement: Daily coverage uses admissible time-bounded period evidence
+<!-- requirement-id: E2-R9 -->
+
+Monthly dailyCoverage SHALL count only completed daily windows supported by eligible energy evidence no later than the request's asOf instant. Each counted day SHALL obey the same boundary-age, source identity, revision, epoch, measurement-kind and discontinuity rules as its daily consumption calculation. Input ordering SHALL NOT change coverage. Whole-month consumption and its daily allocation coverage SHALL remain independent facts.
+
+#### Scenario: R8 meter replacement does not prove a covered day
+<!-- scenario-id: E2-R9-S01 -->
+
+- **WHEN** a day opens with one meter epoch and closes with a replacement epoch without reviewed continuity evidence
+- **THEN** the daily result remains partial or unavailable and that day is excluded from coveredDays even when both timestamps are close to the calendar boundaries
+
+#### Scenario: R8 later stored samples cannot inflate historical coverage
+<!-- scenario-id: E2-R9-S02 -->
+
+- **WHEN** a September result is requested as of September 10 while the database already contains valid samples through September 30
+- **THEN** days ending after the asOf instant do not count as covered, while totalDays continues to describe the calendar month's length
+
+#### Scenario: R8 ordering and invalid resets are handled consistently
+<!-- scenario-id: E2-R9-S03 -->
+
+- **WHEN** the same samples arrive in a different input order or a daily interval contains an unexplained cumulative decrease
+- **THEN** reordering does not change coverage and the invalid-reset day is not counted as covered
+
+#### Scenario: R8 known month endpoints coexist with daily gaps
+<!-- scenario-id: E2-R9-S04 -->
+
+- **WHEN** valid continuous month endpoints establish 1000 kWh but intermediate daily boundaries are missing
+- **THEN** the month can report 1000 kWh with incomplete daily coverage without inventing daily allocations
+
+<!-- @trace
+source: fix-energy-period-consumer-consistency
+updated: 2026-09-08
+code:
+  - packages/shared/src/periodConsumption.ts
+tests:
+  - packages/shared/src/periodConsumption.test.ts
+-->
+
+<!-- @trace
+source: fix-energy-period-consumer-consistency
+updated: 2026-09-08
+code:
+  - apps/server/src/routes/metrics-history.ts
+  - apps/server/src/services/periodConsumptionService.ts
+  - packages/shared/src/freshnessPolicy.ts
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
+  - apps/server/src/services/departmentSharesService.ts
+  - packages/shared/src/periodConsumption.ts
+tests:
+  - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.test.tsx
+  - apps/server/src/services/periodConsumptionService.test.ts
+  - apps/server/src/routes/metrics-history.test.ts
+  - apps/server/src/services/departmentSharesService.test.ts
+  - packages/shared/src/periodConsumption.test.ts
+-->

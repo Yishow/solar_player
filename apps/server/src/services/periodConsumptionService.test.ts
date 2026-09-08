@@ -7,7 +7,7 @@ import type { MeterSourceDefinition } from "@solar-display/shared";
 import { shadowProject, activateProjection } from "./consumptionProjectionService.js";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
 import { seedAcceptedReading, ingestMeterReading } from "./meterReadingService.js";
-import { loadAcceptedSamples, resolvePersistedPeriodConsumption, tryResolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
+import { loadAcceptedSamples, resolveDailyConsumptionPoints, resolvePersistedPeriodConsumption, tryResolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
 
 function createDatabase() {
   const database = new Database(":memory:");
@@ -208,5 +208,72 @@ test("source boundary tolerance reaches the resolver and invalidates same-qualit
   assert.equal(current?.observedDeltaKwh, "50");
   assert.throws(() => activateProjection(database, pending), /PROJECTION_INPUT_CHANGED/);
   assert.deepEqual(database.prepare("SELECT * FROM meter_readings_accepted").all(), observations);
+  database.close();
+});
+
+
+test("E3 a projection stored under an earlier calculation version is not reused", () => {
+  const database = createDatabase();
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+  seedAcceptedReading(database, source(1, "epoch-1"), "150", "2026-09-01T04:00:00Z", "2026-09-01T04:00:01Z");
+  const asOf = "2026-09-01T04:00:01Z";
+  const current = resolvePersistedPeriodConsumption(database, "kn", { kind: "month", month: 9, year: 2026 }, asOf);
+  assert.equal(current.calculationVersion, "e2-v4");
+
+  const observations = database.prepare("SELECT * FROM meter_readings_accepted").all();
+  const stale = { ...current, calculationVersion: "e2-v3", valueKwh: "9999", dailyCoverage: { coveredDays: 30, isComplete: true, totalDays: 30 } };
+  activateProjection(database, shadowProject(database, stale, "kn", "month"));
+
+  const resolved = tryResolvePersistedPeriodConsumption(database, "kn", "month", asOf);
+  assert.equal(resolved?.valueKwh, "50");
+  assert.notEqual(resolved?.valueKwh, "9999");
+  assert.deepEqual(database.prepare("SELECT * FROM meter_readings_accepted").all(), observations);
+  database.close();
+});
+
+
+test("E3 a projection matching the current context is reused without rewriting accepted history", () => {
+  const database = createDatabase();
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+  seedAcceptedReading(database, source(1, "epoch-1"), "150", "2026-09-01T04:00:00Z", "2026-09-01T04:00:01Z");
+  const asOf = "2026-09-01T04:00:01Z";
+  const current = resolvePersistedPeriodConsumption(database, "kn", { kind: "month", month: 9, year: 2026 }, asOf);
+  activateProjection(database, shadowProject(database, current, "kn", "month"));
+  const observations = database.prepare("SELECT * FROM meter_readings_accepted").all();
+
+  const reused = tryResolvePersistedPeriodConsumption(database, "kn", "month", asOf);
+  assert.equal(reused?.valueKwh, current.valueKwh);
+  assert.deepEqual(reused?.dailyCoverage, current.dailyCoverage);
+  assert.deepEqual(database.prepare("SELECT * FROM meter_readings_accepted").all(), observations);
+  database.close();
+});
+
+
+test("a full-year date set loads accepted samples once instead of re-scanning per day", () => {
+  const database = createDatabase();
+  const definition = source(1, "epoch-1");
+  const dates: string[] = [];
+  for (let month = 1; month <= 12; month += 1) {
+    const daysInMonth = new Date(Date.UTC(2026, month, 0)).getUTCDate();
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      dates.push(`2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+    }
+  }
+  seedAcceptedReading(database, definition, "0", "2025-12-31T16:00:00Z", "2025-12-31T16:00:00Z");
+  seedAcceptedReading(database, definition, "5000", "2026-06-30T16:00:00Z", "2026-06-30T16:00:00Z");
+
+  let readingQueries = 0;
+  const prepare = database.prepare.bind(database);
+  (database as unknown as { prepare: typeof prepare }).prepare = ((sql: string) => {
+    if (sql.includes("meter_readings_accepted")) {
+      readingQueries += 1;
+    }
+    return prepare(sql);
+  }) as typeof prepare;
+
+  const points = resolveDailyConsumptionPoints(database, "kn", dates, "2026-12-31T16:00:00Z");
+  assert.equal(points?.length, 365);
+  assert.equal(readingQueries, 1);
+  assert.equal(points?.find((point) => point.date === "2026-01-01")?.valueKwh, null);
   database.close();
 });

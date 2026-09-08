@@ -1,4 +1,4 @@
-import type { DisplaySyncEvent } from "@solar-display/shared";
+import type { DisplaySyncEvent, MonthlyPoint } from "@solar-display/shared";
 import { buildMonthlyConsumptionSeries } from "@solar-display/shared";
 import type { CSSProperties } from "react";
 import { DisplayCardFrame, DisplayCardHeader } from "../../../components/displayPageCards";
@@ -10,6 +10,7 @@ import { resolveMonitoringHistoryRuntimeRefreshSpec } from "../../runtimeRefresh
 type MonthlyConsumptionSummary = {
   consumptionTotal: number | null;
   date: string;
+  quality?: MonthlyPoint["quality"] | null;
   valueKwh?: string | null;
 };
 
@@ -32,6 +33,7 @@ export function buildMonthlyConsumptionTrend(summaries: MonthlyConsumptionSummar
   const model = buildMonthlyConsumptionSeries(
     summaries.map((summary) => ({
       date: summary.date,
+      quality: summary.quality ?? undefined,
       valueKwh: summary.valueKwh ?? (typeof summary.consumptionTotal === "number" ? String(summary.consumptionTotal) : null)
     })),
     inferredMonth

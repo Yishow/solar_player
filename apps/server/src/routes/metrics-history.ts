@@ -10,9 +10,10 @@ import {
 } from "../services/MetricResolver.js";
 import { getActiveProfile } from "../services/siteEnergyProfileService.js";
 import {
+  monthDateKeys,
   monthKeyFromProfile,
   periodSelectionFromRange,
-  resolveDailyConsumptionSeries,
+  resolveDailyConsumptionPoints,
   tryResolvePersistedPeriodConsumption
 } from "../services/periodConsumptionService.js";
 import { resolvePersistedDepartmentShares } from "../services/departmentSharesService.js";
@@ -22,6 +23,31 @@ function isHistoryRange(value: unknown): value is MetricHistoryRange {
 }
 
 const historyRangeError = "Invalid range. Expected day, week, month, year, or total.";
+
+/**
+ * The requested range owns the response's date set. Only a month request may additionally expose
+ * the profile month's full calendar curve; every other range keeps exactly the dates the daily
+ * summary range contract selected, so consumption is overlaid rather than substituted.
+ */
+function requestedConsumptionDates(
+  summaries: Array<{ date: string }>,
+  range: MetricHistoryRange,
+  profileMonth: string
+) {
+  const summaryDates = summaries.map((summary) => summary.date);
+  if (range !== "month") {
+    return summaryDates;
+  }
+  const dates = monthDateKeys(profileMonth);
+  const known = new Set(dates);
+  for (const date of summaryDates) {
+    if (!known.has(date)) {
+      known.add(date);
+      dates.push(date);
+    }
+  }
+  return dates;
+}
 const energyHistoryScopeError = "Energy history metricScope must be cl, kn, or global.";
 
 type EnergyHistoryQuery = {
@@ -109,30 +135,37 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     const database = getDatabase();
     const asOf = new Date().toISOString();
     const summaries = resolveDailyEnergySummaryHistory(database, { metricScope, range: rangeParam });
-    const profile = metricScope === "cl" || metricScope === "kn" ? getActiveProfile(database, metricScope) : null;
-    const month = profile ? monthKeyFromProfile(asOf, profile) : asOf.slice(0, 7);
-    const series = metricScope === "cl" || metricScope === "kn"
-      ? resolveDailyConsumptionSeries(database, metricScope, month, asOf)
-      : null;
-    const overlaid = series
-      ? series.points.map((point) => {
-          const existing = summaries.find((summary) => summary.date === point.date);
-          return {
-            co2Total: existing?.co2Total ?? null,
-            consumptionTotal: point.valueKwh === null ? null : Number(point.valueKwh),
-            date: point.date,
-            generationTotal: existing?.generationTotal ?? null,
-            peakConsumption: existing?.peakConsumption ?? null,
-            peakConsumptionTime: existing?.peakConsumptionTime ?? null,
-            peakGeneration: existing?.peakGeneration ?? null,
-            peakGenerationTime: existing?.peakGenerationTime ?? null,
-            selfConsumptionTotal: existing?.selfConsumptionTotal ?? null,
-            valueKwh: point.valueKwh
-          };
-        })
-      : summaries;
+    if (metricScope !== "cl" && metricScope !== "kn") {
+      return { summaries };
+    }
+    const profile = getActiveProfile(database, metricScope);
+    if (!profile) {
+      return { summaries };
+    }
+    const dates = requestedConsumptionDates(summaries, rangeParam, monthKeyFromProfile(asOf, profile));
+    const points = new Map(
+      (resolveDailyConsumptionPoints(database, metricScope, dates, asOf) ?? []).map((point) => [point.date, point])
+    );
+    const existing = new Map(summaries.map((summary) => [summary.date, summary]));
     return {
-      summaries: overlaid
+      summaries: dates.map((date) => {
+        const summary = existing.get(date);
+        const point = points.get(date);
+        const valueKwh = point?.valueKwh ?? null;
+        return {
+          co2Total: summary?.co2Total ?? null,
+          consumptionTotal: valueKwh === null ? null : Number(valueKwh),
+          date,
+          generationTotal: summary?.generationTotal ?? null,
+          peakConsumption: summary?.peakConsumption ?? null,
+          peakConsumptionTime: summary?.peakConsumptionTime ?? null,
+          peakGeneration: summary?.peakGeneration ?? null,
+          peakGenerationTime: summary?.peakGenerationTime ?? null,
+          quality: point?.quality ?? "unavailable",
+          selfConsumptionTotal: summary?.selfConsumptionTotal ?? null,
+          valueKwh
+        };
+      })
     };
   });
 
