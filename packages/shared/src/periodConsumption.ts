@@ -160,15 +160,34 @@ function sortByInstant(series: PeriodSample[]) {
     .sort((left, right) => sampleMs(left) - sampleMs(right));
 }
 
-function lastAtOrBefore(series: PeriodSample[], instantMs: number) {
-  let found: PeriodSample | null = null;
-  for (const sample of series) {
-    const time = sampleMs(sample);
-    if (Number.isFinite(time) && time <= instantMs) {
-      found = sample;
-    }
+/**
+ * A channel series is instant-sorted with every non-finite instant already dropped, so the samples
+ * one window needs are a contiguous slice of it. These two searches locate that slice's edges in
+ * O(log n), which is what keeps a long range from re-reading the whole history once per date.
+ *
+ * `firstAtOrAfter` is the first index whose instant is >= the given one; `endOfAtOrBefore` is one
+ * past the last index whose instant is <= it. Together they express the half-open window contract.
+ */
+function firstAtOrAfter(series: PeriodSample[], instantMs: number) {
+  let low = 0;
+  let high = series.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (sampleMs(series[mid]!) < instantMs) low = mid + 1;
+    else high = mid;
   }
-  return found;
+  return low;
+}
+
+function endOfAtOrBefore(series: PeriodSample[], instantMs: number) {
+  let low = 0;
+  let high = series.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (sampleMs(series[mid]!) <= instantMs) low = mid + 1;
+    else high = mid;
+  }
+  return low;
 }
 
 function resolveBoundaryMaxAgeMs(sample: PeriodSample | undefined, fallback?: number) {
@@ -279,8 +298,14 @@ function evaluatePeriod(
     issues.push(issue);
   };
   for (const meterId of context.meterIds) {
-    const series = (context.samplesByChannel.get(meterId) ?? []).filter((sample) => sampleMs(sample) <= closeCapMs);
-    const closing = lastAtOrBefore(series, closeCapMs);
+    // The channel index is shared across every window, so this reads a slice of it rather than
+    // rebuilding a per-window array: `closeIndex` is one past the last admissible sample, and
+    // `startIndex` one past the last sample at or before the window opens. `startIndex` is clamped
+    // to `closeIndex` because an as-of instant before the window leaves nothing admissible at all.
+    const channelSeries = context.samplesByChannel.get(meterId) ?? [];
+    const closeIndex = endOfAtOrBefore(channelSeries, closeCapMs);
+    const startIndex = Math.min(endOfAtOrBefore(channelSeries, window.startMs), closeIndex);
+    const closing = closeIndex > 0 ? channelSeries[closeIndex - 1]! : null;
     freshnessResults.push({ metricKey: meterId, freshness: evaluateFreshness({
       category: "cumulative", policy: context.freshnessPolicy, nowMs: asOfMs,
       sourceTimestamp: closing?.sourceTimestamp ?? null
@@ -300,8 +325,11 @@ function evaluatePeriod(
     }
     if (closing.measurementKind === "interval-energy") {
       // A timestamp alone does not prove an interval's start or complete coverage.
-      const intervals = series.filter((sample) => sample.measurementKind === "interval-energy" && sampleMs(sample) >= window.startMs && sampleMs(sample) < window.endMs);
-      for (const sample of intervals) {
+      const intervalFrom = firstAtOrAfter(channelSeries, window.startMs);
+      const intervalTo = Math.min(closeIndex, firstAtOrAfter(channelSeries, window.endMs));
+      for (let index = intervalFrom; index < intervalTo; index += 1) {
+        const sample = channelSeries[index]!;
+        if (sample.measurementKind !== "interval-energy") continue;
         if (sample.valueKwh.startsWith("-")) degrade("invalid", `NEGATIVE_INTERVAL_ENERGY:${meterId}`);
         else observed = addDecimal(observed ?? "0", sample.valueKwh);
         sourceRevisions.add(sampleIdentity(sample));
@@ -310,9 +338,21 @@ function evaluatePeriod(
       continue;
     }
     const identity = sampleIdentity(closing);
-    const identitySeries = series.filter((sample) => sampleIdentity(sample) === identity);
-    const opening = lastAtOrBefore(identitySeries, window.startMs);
-    const contributing = series.filter((sample) => sampleMs(sample) >= (opening ? sampleMs(opening) : window.startMs));
+    // The opening is the newest same-identity sample at or before the window opens; walking back
+    // from the window's edge finds it immediately in the ordinary case, and only walks further when
+    // other identities sit in front of it — exactly the case that degrades to unproven continuity.
+    let openingIndex = -1;
+    for (let index = startIndex - 1; index >= 0; index -= 1) {
+      if (sampleIdentity(channelSeries[index]!) === identity) {
+        openingIndex = index;
+        break;
+      }
+    }
+    const opening = openingIndex >= 0 ? channelSeries[openingIndex]! : null;
+    const contributingFrom = opening
+      ? firstAtOrAfter(channelSeries, sampleMs(opening))
+      : firstAtOrAfter(channelSeries, window.startMs);
+    const contributing = channelSeries.slice(contributingFrom, closeIndex);
     const canContribute = (s: PeriodSample) => sampleMs(s) >= window.startMs || (s === opening && window.startMs - sampleMs(s) <= resolveBoundaryMaxAgeMs(s, context.boundaryMaxAgeSeconds));
     const def = context.definitionMap.get(meterId);
     let channelObserved: string | null = null;
@@ -360,7 +400,7 @@ function evaluatePeriod(
       endTimestamp: new Date(sampleMs(closing)).toISOString()
     });
     if (!opening) {
-      const globalOpening = lastAtOrBefore(series, window.startMs);
+      const globalOpening = startIndex > 0 ? channelSeries[startIndex - 1]! : null;
       if (globalOpening && sampleIdentity(globalOpening) !== identity) {
         degrade("partial", `UNPROVEN_CONTINUITY:${meterId}`);
       } else {

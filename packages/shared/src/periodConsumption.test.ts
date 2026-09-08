@@ -572,3 +572,179 @@ test("a reused sample array gives the same result as a fresh one for every windo
     resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period: periods[2]!, profile, samples: rows.map((row) => ({ ...row })) }).valueKwh
   );
 });
+
+/**
+ * Counts how often the evaluator asks a sample for its instant. Reading through a getter is the
+ * only way to observe scan volume without a wall-clock threshold, which would swing with the
+ * machine rather than with the algorithm.
+ */
+function instantCountingSamples(rows: PeriodSample[], counter: { reads: number }): PeriodSample[] {
+  return rows.map((row) => ({
+    ...row,
+    get sourceTimestamp() {
+      counter.reads += 1;
+      return row.sourceTimestamp;
+    }
+  }));
+}
+
+test("resolving more dates over one sample set does not re-scan the whole history for each date", () => {
+  const sampleCount = 400;
+  const start = Date.parse("2026-08-31T16:00:00Z");
+  const rows: PeriodSample[] = Array.from({ length: sampleCount }, (_, index) => ({
+    channelId: "kn-main",
+    sourceTimestamp: new Date(start + index * 3_600_000).toISOString(),
+    valueKwh: `${10_000 + index * 7}`
+  }));
+  const counter = { reads: 0 };
+  const samples = instantCountingSamples(rows, counter);
+  const asOf = "2026-09-30T16:00:00Z";
+  const dayOf = (day: number) => ({ day, kind: "day" as const, month: 9, year: 2026 });
+
+  // The first call also builds and memoises the channel index, so only the calls after it show
+  // what one additional date actually costs.
+  resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period: dayOf(1), profile, samples });
+  const afterIndexBuilt = counter.reads;
+  const measuredDates = 20;
+  for (let day = 2; day <= measuredDates + 1; day += 1) {
+    resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period: dayOf(day), profile, samples });
+  }
+  const perDate = (counter.reads - afterIndexBuilt) / measuredDates;
+
+  assert.ok(
+    perDate < sampleCount / 4,
+    `each further date must cost the evidence in its own window, not the whole history: ${perDate.toFixed(0)} instant reads for ${sampleCount} samples`
+  );
+});
+
+test("window boundaries keep their half-open meaning at the exact start and end instants", () => {
+  const startMs = Date.parse("2026-09-01T00:00:00+08:00");
+  const endMs = Date.parse("2026-09-02T00:00:00+08:00");
+  const at = (ms: number, valueKwh: string): PeriodSample => ({
+    channelId: "kn-main",
+    sourceTimestamp: new Date(ms).toISOString(),
+    valueKwh
+  });
+  const samples = [
+    at(startMs - 1, "900"),
+    at(startMs, "1000"),
+    at(startMs + 1, "1001"),
+    at(endMs - 1, "1299"),
+    at(endMs, "1300"),
+    at(endMs + 1, "1301")
+  ];
+
+  const day = resolvePeriodConsumption({
+    asOf: "2026-09-30T16:00:00Z",
+    meterIds: ["kn-main"],
+    period: { day: 1, kind: "day", month: 9, year: 2026 },
+    profile,
+    samples
+  });
+
+  // The window is [start, end): the sample on the end instant closes the day, and the opening is
+  // the one exactly on the start instant rather than the one a millisecond before it.
+  assert.equal(day.periodStart, new Date(startMs).toISOString());
+  assert.equal(day.periodEnd, new Date(endMs).toISOString());
+  assert.equal(day.valueKwh, "300");
+  assert.equal(day.quality, "exact");
+  assert.deepEqual(day.boundaryOffsets, [{
+    channelId: "kn-main",
+    endSeconds: 0,
+    endTimestamp: new Date(endMs).toISOString(),
+    startSeconds: 0,
+    startTimestamp: new Date(startMs).toISOString()
+  }]);
+});
+
+/**
+ * Characterisation of the evidence shapes whose handling is easiest to break when the evaluator's
+ * scanning changes: rollover, interval energy, a source replacement mid-window, receipt-time
+ * estimates, an unexplained decrease and a stale boundary. The expectations below were captured
+ * from the evaluator before its scanning was reworked; any of them changing means the rework
+ * changed what the system reports, not just how it got there.
+ */
+const EVIDENCE_SHAPES: Record<string, PeriodSample[]> = {
+  intervalEnergy: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "interval-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T02:00:00Z", valueKwh: "12" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "interval-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T08:00:00Z", valueKwh: "18" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "interval-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T14:00:00Z", valueKwh: "25" }
+  ],
+  receiveTimeEstimated: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", receivedAt: "2026-08-31T16:00:00Z", sourceRevision: 1, sourceTimestamp: null, timestampQuality: "receive-time-estimated", valueKwh: "700" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", receivedAt: "2026-09-01T15:00:00Z", sourceRevision: 1, sourceTimestamp: null, timestampQuality: "receive-time-estimated", valueKwh: "790" }
+  ],
+  rollover: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", rolloverModulus: "1000", sourceRevision: 1, sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "980" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", rolloverModulus: "1000", sourceRevision: 1, sourceTimestamp: "2026-09-01T04:00:00Z", valueKwh: "995" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", rolloverModulus: "1000", sourceRevision: 1, sourceTimestamp: "2026-09-01T10:00:00Z", valueKwh: "20" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", rolloverModulus: "1000", sourceRevision: 1, sourceTimestamp: "2026-09-01T15:59:00Z", valueKwh: "60" }
+  ],
+  sourceReplacement: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "500" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T06:00:00Z", valueKwh: "560" },
+    { channelId: "kn-main", epochId: "epoch-2", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 2, sourceTimestamp: "2026-09-01T07:00:00Z", valueKwh: "5" },
+    { channelId: "kn-main", epochId: "epoch-2", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 2, sourceTimestamp: "2026-09-01T15:59:00Z", valueKwh: "95" }
+  ],
+  staleBoundary: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-08-20T00:00:00Z", valueKwh: "100" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T15:59:00Z", valueKwh: "400" }
+  ],
+  unexplainedDecrease: [
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-08-31T16:00:00Z", valueKwh: "800" },
+    { channelId: "kn-main", epochId: "epoch-1", measurementKind: "cumulative-energy", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T08:00:00Z", valueKwh: "300" }
+  ]
+};
+
+const EVIDENCE_EXPECTATIONS: Record<string, { issues: string[]; observedDeltaKwh: string | null; quality: string; valueKwh: string | null }> = {
+  "intervalEnergy.day": { issues: ["INTERVAL_COVERAGE_UNPROVEN:kn-main"], observedDeltaKwh: "55", quality: "partial", valueKwh: null },
+  "intervalEnergy.month": { issues: ["INTERVAL_COVERAGE_UNPROVEN:kn-main"], observedDeltaKwh: "55", quality: "partial", valueKwh: null },
+  "intervalEnergy.year": { issues: ["INTERVAL_COVERAGE_UNPROVEN:kn-main"], observedDeltaKwh: "55", quality: "partial", valueKwh: null },
+  "receiveTimeEstimated.day": { issues: ["STALE_BOUNDARY:kn-main"], observedDeltaKwh: "90", quality: "partial", valueKwh: null },
+  "receiveTimeEstimated.month": { issues: ["STALE_BOUNDARY:kn-main"], observedDeltaKwh: "90", quality: "partial", valueKwh: null },
+  "receiveTimeEstimated.year": { issues: ["MISSING_BASELINE:kn-main"], observedDeltaKwh: "90", quality: "partial", valueKwh: null },
+  "rollover.day": { issues: ["ROLLOVER:kn-main", "ESTIMATED_BOUNDARY:kn-main"], observedDeltaKwh: "80", quality: "estimated-boundary", valueKwh: "80" },
+  "rollover.month": { issues: ["ROLLOVER:kn-main", "ESTIMATED_BOUNDARY:kn-main"], observedDeltaKwh: "80", quality: "estimated-boundary", valueKwh: "80" },
+  "rollover.year": { issues: ["ROLLOVER:kn-main", "MISSING_BASELINE:kn-main"], observedDeltaKwh: "80", quality: "partial", valueKwh: null },
+  "sourceReplacement.day": { issues: ["UNPROVEN_CONTINUITY:kn-main"], observedDeltaKwh: "150", quality: "partial", valueKwh: null },
+  "sourceReplacement.month": { issues: ["UNPROVEN_CONTINUITY:kn-main"], observedDeltaKwh: "150", quality: "partial", valueKwh: null },
+  "sourceReplacement.year": { issues: ["MISSING_BASELINE:kn-main"], observedDeltaKwh: "150", quality: "partial", valueKwh: null },
+  "staleBoundary.day": { issues: ["STALE_BOUNDARY:kn-main"], observedDeltaKwh: null, quality: "partial", valueKwh: null },
+  "staleBoundary.month": { issues: ["STALE_BOUNDARY:kn-main"], observedDeltaKwh: null, quality: "partial", valueKwh: null },
+  "staleBoundary.year": { issues: ["MISSING_BASELINE:kn-main"], observedDeltaKwh: "300", quality: "partial", valueKwh: null },
+  "unexplainedDecrease.day": { issues: ["UNEXPLAINED_DECREASE:kn-main", "STALE_BOUNDARY:kn-main"], observedDeltaKwh: null, quality: "invalid", valueKwh: null },
+  "unexplainedDecrease.month": { issues: ["UNEXPLAINED_DECREASE:kn-main", "STALE_BOUNDARY:kn-main"], observedDeltaKwh: null, quality: "invalid", valueKwh: null },
+  "unexplainedDecrease.year": { issues: ["UNEXPLAINED_DECREASE:kn-main", "MISSING_BASELINE:kn-main"], observedDeltaKwh: null, quality: "invalid", valueKwh: null }
+};
+
+test("difficult evidence shapes report exactly what they reported before", () => {
+  const periods = {
+    day: { day: 1, kind: "day" as const, month: 9, year: 2026 },
+    month: { kind: "month" as const, month: 9, year: 2026 },
+    year: { kind: "year" as const, year: 2026 }
+  };
+
+  for (const [shape, samples] of Object.entries(EVIDENCE_SHAPES)) {
+    for (const [periodName, period] of Object.entries(periods)) {
+      const result = resolvePeriodConsumption({
+        asOf: "2026-09-01T16:00:00Z",
+        meterIds: ["kn-main"],
+        period,
+        profile,
+        samples,
+        ...(shape === "rollover" ? { rolloverModulus: "1000" } : {})
+      });
+      const key = `${shape}.${periodName}`;
+      assert.deepEqual(
+        {
+          issues: result.issues,
+          observedDeltaKwh: result.observedDeltaKwh ?? null,
+          quality: result.quality,
+          valueKwh: result.valueKwh
+        },
+        EVIDENCE_EXPECTATIONS[key],
+        key
+      );
+    }
+  }
+});
