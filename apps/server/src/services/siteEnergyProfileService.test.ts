@@ -11,6 +11,7 @@ import type { MeterSourceDefinition } from "@solar-display/shared";
 
 function createDatabase() {
   const database = new Database(":memory:");
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/033_freshness_policy.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/040_meter_reading_contracts.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/046_meter_reading_evidence.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/041_site_energy_profiles.sql"), "utf8"));
@@ -18,6 +19,7 @@ function createDatabase() {
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/048_meter_source_lifecycle.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/049_meter_source_boundary_age.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/050_profile_source_review.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/051_profile_preview_evidence.sql"), "utf8"));
   return database;
 }
 
@@ -110,6 +112,7 @@ test("E6 rejects cross-site tokens and rolls back failed activation", () => {
   const input = { draft, expectedRevision: 0, idempotencyKey: "scope-guard", previewToken: preview.previewToken };
   assert.throws(() => applyProfile(database, "cl", input), /PROFILE_SCOPE_MISMATCH/);
   const first = applyProfile(database, "kn", input);
+  const { readiness: _readiness, activationAsOf: _activationAsOf, reviewAsOf: _reviewAsOf, ...persisted } = first;
   assert.deepEqual(applyProfile(database, "kn", input), first);
   const reordered = JSON.parse(JSON.stringify(input, (_key, value: unknown) => value && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value).reverse()) : value));
@@ -118,7 +121,7 @@ test("E6 rejects cross-site tokens and rolls back failed activation", () => {
   const next = previewProfile(database, "kn", { ...request, expectedRevision: 1 });
   database.exec("CREATE TRIGGER fail_profile BEFORE INSERT ON site_energy_profiles BEGIN SELECT RAISE(ABORT, 'injected failure'); END");
   assert.throws(() => applyProfile(database, "kn", { ...input, expectedRevision: 1, idempotencyKey: "failure", previewToken: next.previewToken }), /injected failure/);
-  assert.deepEqual(getActiveProfile(database, "kn"), first);
+  assert.deepEqual(getActiveProfile(database, "kn"), persisted);
   database.close();
 });
 
@@ -137,7 +140,8 @@ test("E6 preview calculator receives recursively frozen snapshots", () => {
       assert.equal(Object.isFrozen(profile.siteTotal.memberChannelIds), true);
       assert.equal(Object.isFrozen(period), true);
       profile.siteTotal.memberChannelIds.push("mutated");
-      return { previewToken: "calculator-token", siteTimeZone: profile.siteTimeZone };
+      const result = { profileRevision: profile.revision, quality: "unavailable" as const, siteTimeZone: profile.siteTimeZone, valueKwh: null };
+      return { period: result, basis: { memberChannelIds: profile.siteTotal.memberChannelIds, result }, departments: [] };
     }),
     TypeError
   );
@@ -177,7 +181,8 @@ test("E6 preview snapshots draft and period before calculator closure mutation",
     request.expectedRevision = 99;
     assert.equal(profile.siteTimeZone, draft.siteTimeZone);
     assert.deepEqual(period, { kind: "month", year: 2026, month: 9 });
-    return { previewToken: "calculator-token", siteTimeZone: profile.siteTimeZone };
+    const result = { profileRevision: profile.revision, quality: "unavailable" as const, siteTimeZone: profile.siteTimeZone, valueKwh: null };
+    return { period: result, basis: { memberChannelIds: profile.siteTotal.memberChannelIds, result }, departments: [] };
   });
   const stored = database.prepare("SELECT draft_json FROM profile_preview_tokens WHERE preview_token = ?")
     .get(preview.previewToken) as { draft_json: string };

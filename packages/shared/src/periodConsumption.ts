@@ -188,11 +188,22 @@ type PeriodEvaluation = {
  * One channel-keyed, instant-sorted index, built once per request and reused by the period total
  * and by every daily window. Sorting here also makes the result independent of input ordering.
  */
-function indexSamplesByChannel(samples: PeriodSample[], meterIds: string[]) {
+function indexSamplesByChannel(
+  samples: PeriodSample[],
+  meterIds: string[],
+  asOfMs: number,
+  excludeReceivedAfterAsOf: boolean
+) {
   const index = new Map<string, PeriodSample[]>();
   for (const meterId of meterIds) {
     if (!index.has(meterId)) {
-      index.set(meterId, sortByInstant(samples.filter((sample) => sample.channelId === meterId)));
+      index.set(meterId, sortByInstant(samples.filter((sample) => {
+        if (sample.channelId !== meterId || !excludeReceivedAfterAsOf || sample.receivedAt === undefined) {
+          return sample.channelId === meterId;
+        }
+        const receivedAtMs = Date.parse(sample.receivedAt);
+        return Number.isFinite(receivedAtMs) && receivedAtMs <= asOfMs;
+      })));
     }
   }
   return index;
@@ -379,7 +390,7 @@ function resultFor(profile: SiteEnergyProfileV1, quality: PeriodConsumptionQuali
   return { profileRevision: profile.revision, quality, siteTimeZone: profile.siteTimeZone, valueKwh };
 }
 
-export function resolvePeriodConsumption(input: {
+type PeriodConsumptionInput = {
   asOf: string;
   boundaryMaxAgeSeconds?: number;
   definitionRevision?: DefinitionRevisionItem[];
@@ -393,7 +404,9 @@ export function resolvePeriodConsumption(input: {
   timeZone?: string;
   start?: string;
   end?: string;
-}): PeriodConsumptionResult {
+};
+
+function resolvePeriodConsumptionCore(input: PeriodConsumptionInput, allowDraftRevision: boolean): PeriodConsumptionResult {
   const override = rejectCalendarOverride({
     end: input.end,
     start: input.start,
@@ -408,8 +421,11 @@ export function resolvePeriodConsumption(input: {
       throw Object.assign(new Error(`meterId ${meterId} is outside the profile membership`), { code: "METER_NOT_IN_PROFILE" });
     }
   }
-  if (input.profile.revision < 1) {
+  if (!allowDraftRevision && input.profile.revision < 1) {
     throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
+  }
+  if (allowDraftRevision && input.reviewContext !== "profile-draft") {
+    throw Object.assign(new Error("INVALID_REVIEW_CONTEXT"), { code: "INVALID_REVIEW_CONTEXT" });
   }
   const definitionMap = new Map<string, DefinitionRevisionItem>();
   if (input.definitionRevision) {
@@ -445,7 +461,7 @@ export function resolvePeriodConsumption(input: {
     freshnessPolicy: input.freshnessPolicy ?? createDefaultFreshnessPolicy(),
     meterIds: input.meterIds,
     normalizedModulus,
-    samplesByChannel: indexSamplesByChannel(input.samples, input.meterIds)
+    samplesByChannel: indexSamplesByChannel(input.samples, input.meterIds, asOfMs, allowDraftRevision)
   };
   const evaluation = evaluatePeriod(context, window, asOfMs);
   let quality = evaluation.quality;
@@ -485,6 +501,16 @@ export function resolvePeriodConsumption(input: {
       ...(input.reviewContext ? { reviewContext: input.reviewContext } : {})
     }
   };
+}
+
+export function resolvePeriodConsumption(input: PeriodConsumptionInput): PeriodConsumptionResult {
+  return resolvePeriodConsumptionCore(input, false);
+}
+
+export function resolveReviewPeriodConsumption(
+  input: PeriodConsumptionInput & { reviewContext: "profile-draft" }
+): PeriodConsumptionResult {
+  return resolvePeriodConsumptionCore(input, true);
 }
 
 function addDecimal(left: string, right: string) {

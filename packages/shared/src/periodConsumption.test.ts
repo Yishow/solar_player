@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { periodWindow, resolvePeriodConsumption } from "./periodConsumption.js";
+import { periodWindow, resolvePeriodConsumption, resolveReviewPeriodConsumption } from "./periodConsumption.js";
 import { createDefaultFreshnessPolicy } from "./freshnessPolicy.js";
 import type { SiteEnergyProfileV1 } from "./siteEnergyProfile.js";
 
@@ -48,6 +48,36 @@ test("E2-R1 day 300 / month 4300 / year 8300 from cumulative samples", () => {
     samples
   });
   assert.equal(year.valueKwh, "8300");
+});
+
+test("E6 review resolver calculates an unpersisted draft without inventing a persisted revision", () => {
+  const draft = { ...profile, revision: 0, siteTimeZone: "UTC" };
+  const result = resolveReviewPeriodConsumption({
+    asOf: "2026-09-30T12:00:00Z",
+    definitionRevision: [{ channelId: "kn-main", epochId: "epoch-1", meterId: "kn-main", sourceRevision: 1 }],
+    meterIds: ["kn-main"],
+    period: { kind: "month", month: 9, year: 2026 },
+    profile: draft,
+    reviewContext: "profile-draft",
+    samples: [
+      { channelId: "kn-main", epochId: "epoch-1", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-01T00:00:00Z", valueKwh: "100" },
+      { channelId: "kn-main", epochId: "epoch-1", meterId: "kn-main", sourceRevision: 1, sourceTimestamp: "2026-09-30T11:59:00Z", valueKwh: "500" }
+    ]
+  });
+  assert.equal(result.valueKwh, "400");
+  assert.equal(result.profileRevision, 0);
+  assert.equal(result.provenance?.reviewContext, "profile-draft");
+  assert.equal(result.siteTimeZone, "UTC");
+  assert.throws(
+    () => resolvePeriodConsumption({
+      asOf: "2026-09-30T12:00:00Z",
+      meterIds: ["kn-main"],
+      period: { kind: "month", month: 9, year: 2026 },
+      profile: draft,
+      samples: []
+    }),
+    (error: Error & { code?: string }) => error.code === "UNKNOWN_PROFILE_REVISION"
+  );
 });
 
 test("E2 uses at-or-before period-start baseline rather than first in-period sample", () => {

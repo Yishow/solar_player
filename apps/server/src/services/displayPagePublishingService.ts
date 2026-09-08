@@ -40,7 +40,7 @@ import {
 } from "./displayPageAssetService.js";
 import { validateDisplayPageObjectDraft } from "./displayPageObjectValidation.js";
 import { readDisplayPageInstance } from "./displayPageRegistryService.js";
-import { getActiveProfile } from "./siteEnergyProfileService.js";
+import { readProfileReadiness } from "./profileReadinessService.js";
 import { readAssignedEnergyScopes } from "./displayPublishEnergyScopes.js";
 
 type StageConfigRow = {
@@ -997,7 +997,8 @@ function collectEnergyAuthoringFindings(pageId: DisplayPageId, unsavedBindings =
   if (isEnergyPublishPage(pageId)) {
     try {
       const database = getDatabase();
-      energyProfileReady = readAssignedEnergyScopes(database, pageId).every((scope) => getActiveProfile(database, scope)?.status === "ready");
+      const asOf = new Date().toISOString();
+      energyProfileReady = readAssignedEnergyScopes(database, pageId).every((scope) => readProfileReadiness(database, scope, asOf).status === "ready");
     } catch {
       energyProfileReady = false;
     }

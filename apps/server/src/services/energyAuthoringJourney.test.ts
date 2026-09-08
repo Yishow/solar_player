@@ -41,6 +41,7 @@ function createDatabase() {
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/041_site_energy_profiles.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/045_profile_apply_guards.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/050_profile_source_review.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/051_profile_preview_evidence.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/042_consumption_projections.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/047_projection_activation_context.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/043_energy_authoring_tokens.sql"), "utf8"));

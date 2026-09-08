@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { applyProfile, getActiveProfile, previewProfile } from "../services/siteEnergyProfileService.js";
+import { readProfileReadiness } from "../services/profileReadinessService.js";
 import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
 import { activateGuidedMapping, readGuidedMappingReception } from "../services/guidedMappingActivationService.js";
 import { listMeterSources, listReceivedTags } from "../services/meterSourceCatalogService.js";
@@ -17,9 +18,12 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       return reply.code(422).send({ success: false, error: "INVALID_SCOPE", timestamp: new Date().toISOString() });
     }
     const database = getDatabase();
+    const profile = getActiveProfile(database, scope);
+    const readiness = readProfileReadiness(database, scope);
     return {
       meters: listMeterSources(database, scope as SiteEnergyScope),
-      profile: getActiveProfile(database, scope as SiteEnergyScope),
+      profile: profile ? { ...profile, status: readiness.status } : null,
+      readiness,
       receivedTags: listReceivedTags(database, scope as SiteEnergyScope)
     };
   });

@@ -519,8 +519,21 @@ test("GET /api/display-pages/rotation-preview keeps the images registry duration
   }
 });
 
-test("overview publish checks only assigned sites and blocks when their energy profile is missing", async () => {
+test("overview publish checks only assigned sites and blocks when their energy profile is missing", async (t) => {
+  const asOf = "2026-09-08T04:00:00.000Z";
+  t.mock.timers.enable({ apis: ["Date"], now: Date.parse(asOf) });
   const database = getDatabase();
+  const { saveMeterSource } = await import("../services/meterSourceCatalogService.js");
+  const { seedAcceptedReading } = await import("../services/meterReadingService.js");
+  const source = {
+    channelId: "kn-main", meterId: "kn-main", metricKey: "consumptionEnergy", metricScope: "kn",
+    enabled: true, reviewStatus: "reviewed", measurementKind: "cumulative-energy", energyFlowRole: "consumption",
+    inputUnit: "kWh", scaleDecimal: "1", sourceRevision: 1, epochId: "one", expectedCadenceSeconds: 60,
+    sourceTimestampTimeZone: "UTC", timestampPolicy: "source-required"
+  } as const;
+  saveMeterSource(database, source);
+  seedAcceptedReading(database, source, "1000", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+  seedAcceptedReading(database, source, "1400", asOf, asOf);
   database.prepare(`
     INSERT INTO device_groups (name, enabled, site_scope, playback_profile_id)
     SELECT 'KN publish target', 1, 'kn', id FROM playback_profiles WHERE is_default = 1

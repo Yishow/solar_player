@@ -2,17 +2,35 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import {
   rejectCalendarOverride,
+  resolveReviewPeriodConsumption,
   validateSiteEnergyProfile,
+  type PeriodConsumptionResult,
+  type ProfileApplyResponse,
+  type ProfilePreviewResponse,
   type ProfilePreviewRequest,
   type SiteEnergyProfileV1,
   type SiteEnergyScope
 } from "@solar-display/shared";
 import { canonicalJson } from "./authoringCanonicalJson.js";
-import { captureProfileSourceSnapshot } from "./profileSourceSnapshot.js";
+import { captureProfileSourceSnapshot, type ProfileSourceSnapshot } from "./profileSourceSnapshot.js";
+import { loadAcceptedSamples } from "./periodConsumptionService.js";
+import { readFreshnessPolicy } from "./freshnessPolicyService.js";
+import { buildReviewReadiness, readProfileReadiness } from "./profileReadinessService.js";
+import { getActiveProfile } from "./siteEnergyProfileRepository.js";
+import { resolveProfileEvidence } from "./profileEvidence.js";
+import type { DefinitionRevisionItem, PeriodSelection } from "@solar-display/shared";
 
-export type ProfileCalculator = (profile: SiteEnergyProfileV1, period: ProfilePreviewRequest["periodSelection"]) => {
-  previewToken: string;
-  siteTimeZone: string;
+export { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
+
+export type ProfileCalculator = (
+  profile: SiteEnergyProfileV1,
+  period: ProfilePreviewRequest["periodSelection"],
+  context: { asOf: string; sourceSnapshot: ProfileSourceSnapshot[] }
+) => ProfilePreviewResponse["calculator"];
+
+type ReviewCalculation = {
+  calculator: ProfilePreviewResponse["calculator"];
+  readiness: ProfilePreviewResponse["readiness"];
 };
 
 function conflict(code: string): never {
@@ -27,16 +45,56 @@ function freezeDeep<T>(value: T): T {
   return Object.freeze(value);
 }
 
-export function getActiveProfile(database: Database.Database, scope: SiteEnergyScope) {
-  const row = database.prepare(`
-    SELECT * FROM site_energy_profiles WHERE metric_scope = ? AND active = 1 ORDER BY revision DESC LIMIT 1
-  `).get(scope) as Record<string, unknown> | undefined;
-  return row ? deserialize(row) : null;
+function reviewDefinitionRevisions(sourceSnapshot: ProfileSourceSnapshot[]): DefinitionRevisionItem[] {
+  return sourceSnapshot.map(({ channelId, epochId, meterId, sourceRevision }) => ({
+    channelId,
+    epochId,
+    meterId,
+    sourceRevision
+  }));
 }
 
-export function listPersistedProfiles(database: Database.Database, scope: SiteEnergyScope) {
-  return (database.prepare("SELECT * FROM site_energy_profiles WHERE metric_scope = ? ORDER BY revision")
-    .all(scope) as Array<Record<string, unknown>>).map(deserialize);
+function calculateReview(
+  database: Database.Database,
+  profile: SiteEnergyProfileV1,
+  period: PeriodSelection,
+  asOf: string,
+  sourceSnapshot: ProfileSourceSnapshot[]
+): ReviewCalculation {
+  const samples = loadAcceptedSamples(database, profile.metricScope);
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const definitionRevision = reviewDefinitionRevisions(sourceSnapshot);
+  const resolve = (meterIds: string[]): PeriodConsumptionResult => resolveReviewPeriodConsumption({
+    asOf,
+    definitionRevision,
+    freshnessPolicy,
+    meterIds,
+    period,
+    profile,
+    reviewContext: "profile-draft",
+    samples
+  });
+
+  const evidence = resolveProfileEvidence(profile, (meterIds) => resolve(meterIds));
+  const basisCalculatorResult = evidence.basis ?? resolve([]);
+  const periodResult = evidence.period ?? resolve([]);
+
+  return {
+    calculator: {
+      basis: { memberChannelIds: evidence.basisIds, result: basisCalculatorResult },
+      departments: evidence.departments,
+      period: periodResult
+    },
+    readiness: buildReviewReadiness({
+      asOf,
+      basis: evidence.basis,
+      departments: evidence.departments,
+      period: profile.siteTotal.kind === "meter-set" ? periodResult : null,
+      periodSelection: period,
+      profile,
+      sourceSnapshots: sourceSnapshot
+    })
+  };
 }
 
 export function previewProfile(
@@ -70,33 +128,70 @@ export function previewProfile(
   const sourceSnapshot = captureProfileSourceSnapshot(database, draftSnapshot);
   freezeDeep(draftSnapshot);
   freezeDeep(periodSnapshot);
-  const calc = calculator?.(draftSnapshot, periodSnapshot);
+  freezeDeep(sourceSnapshot);
+  const asOf = new Date().toISOString();
+  let review: ReviewCalculation;
+  try {
+    if (calculator) {
+      const calculatorResult = calculator(draftSnapshot, periodSnapshot, freezeDeep({ asOf, sourceSnapshot }));
+      review = { calculator: calculatorResult, readiness: buildReviewReadiness({
+        asOf,
+        basis: calculatorResult.basis.result,
+        departments: calculatorResult.departments,
+        period: calculatorResult.period,
+        periodSelection: periodSnapshot,
+        profile: draftSnapshot,
+        sourceSnapshots: sourceSnapshot
+      }) };
+    } else {
+      review = calculateReview(database, draftSnapshot, periodSnapshot, asOf, sourceSnapshot);
+    }
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error("PROFILE_CALCULATOR_FAILED"), {
+      code: "PROFILE_CALCULATOR_FAILED", statusCode: 500
+    });
+  }
   const previewToken = randomUUID();
   database.prepare(`
     INSERT INTO profile_preview_tokens (
-      preview_token, metric_scope, expected_revision, draft_json, expires_at, source_snapshot_json
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      preview_token, metric_scope, expected_revision, draft_json, expires_at, source_snapshot_json,
+      period_selection_json, review_as_of
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     previewToken,
     scope,
     expectedRevisionSnapshot,
     canonicalJson(draftSnapshot),
     new Date(Date.now() + 600_000).toISOString(),
-    canonicalJson(sourceSnapshot)
+    canonicalJson(sourceSnapshot),
+    canonicalJson(periodSnapshot),
+    asOf
   );
-  return {
+  const response: ProfilePreviewResponse = {
+    asOf,
+    calculator: review.calculator,
+    expectedRevision: expectedRevisionSnapshot,
+    periodSelection: periodSnapshot,
     previewToken,
     profile: draftSnapshot,
+    readiness: review.readiness,
+    reviewContext: "profile-draft",
     siteTimeZone: draftSnapshot.siteTimeZone,
-    calculator: calc ?? null
+    sources: sourceSnapshot.map(({ channelId, epochId, meterId, sourceRevision }) => ({
+      channelId,
+      epochId,
+      meterId,
+      sourceRevision
+    }))
   };
+  return response;
 }
 
 export function applyProfile(
   database: Database.Database,
   scope: SiteEnergyScope,
   input: { draft: SiteEnergyProfileV1; expectedRevision: number; previewToken: string; idempotencyKey: string }
-) {
+): ProfileApplyResponse {
   if (!input.idempotencyKey?.trim()) conflict("IDEMPOTENCY_KEY_REQUIRED");
   const requestJson = canonicalJson({ input, scope });
   return database.transaction(() => {
@@ -104,7 +199,7 @@ export function applyProfile(
       .get(input.idempotencyKey) as { request_json: string; result_json: string } | undefined;
     if (receipt) {
       if (receipt.request_json !== requestJson) conflict("IDEMPOTENCY_CONFLICT");
-      return JSON.parse(receipt.result_json) as SiteEnergyProfileV1;
+      return JSON.parse(receipt.result_json) as ProfileApplyResponse;
     }
     if (input.draft.metricScope !== scope) conflict("PROFILE_SCOPE_MISMATCH");
     const preview = database.prepare("SELECT * FROM profile_preview_tokens WHERE preview_token = ?")
@@ -114,19 +209,25 @@ export function applyProfile(
         draft_json: string;
         expires_at: string;
         source_snapshot_json: string | null;
+        period_selection_json: string | null;
+        review_as_of: string | null;
       } | undefined;
     if (!preview || Date.parse(preview.expires_at) <= Date.now()) conflict("PREVIEW_EXPIRED");
     if (preview.metric_scope !== scope) conflict("PROFILE_SCOPE_MISMATCH");
     if (preview.draft_json !== canonicalJson(input.draft) || preview.expected_revision !== input.expectedRevision) {
       conflict("PREVIEW_DRAFT_MISMATCH");
     }
+    if (!preview.period_selection_json || !preview.review_as_of) {
+      conflict("PROFILE_SOURCE_REVIEW_REQUIRED");
+    }
     const active = getActiveProfile(database, scope);
     if ((active?.revision ?? 0) !== input.expectedRevision) {
       throw Object.assign(new Error("PROFILE_REVISION_CONFLICT"), { code: "PROFILE_REVISION_CONFLICT", statusCode: 409 });
     }
     if (!preview.source_snapshot_json) conflict("PROFILE_SOURCE_REVIEW_REQUIRED");
+    let currentSourceSnapshot: ProfileSourceSnapshot[];
     try {
-      const currentSourceSnapshot = captureProfileSourceSnapshot(database, input.draft);
+      currentSourceSnapshot = captureProfileSourceSnapshot(database, input.draft);
       if (canonicalJson(currentSourceSnapshot) !== preview.source_snapshot_json) {
         conflict("PROFILE_SOURCE_CONFLICT");
       }
@@ -136,8 +237,19 @@ export function applyProfile(
       }
       throw error;
     }
+    const activationAsOf = new Date().toISOString();
+    const review = calculateReview(database, input.draft, JSON.parse(preview.period_selection_json) as PeriodSelection,
+      activationAsOf, currentSourceSnapshot);
+    if (review.readiness.status === "incomplete" || review.readiness.status === "conflict") {
+      conflict("PROFILE_NOT_READY");
+    }
     const nextRevision = (active?.revision ?? 0) + 1;
-    const next: SiteEnergyProfileV1 = { ...input.draft, metricScope: scope, revision: nextRevision };
+    const next: SiteEnergyProfileV1 = {
+      ...input.draft,
+      metricScope: scope,
+      revision: nextRevision,
+      status: "configured-awaiting-data"
+    };
     database.prepare("UPDATE site_energy_profiles SET active = 0 WHERE metric_scope = ?").run(scope);
     database.prepare(`
       INSERT INTO site_energy_profiles (
@@ -154,25 +266,20 @@ export function applyProfile(
       JSON.stringify(next.siteTotal),
       JSON.stringify(next.departments),
       JSON.stringify(next.shareBasis),
-      new Date().toISOString()
+      activationAsOf
     );
+    const readiness = readProfileReadiness(database, scope, activationAsOf);
+    database.prepare("UPDATE site_energy_profiles SET status = ? WHERE metric_scope = ? AND revision = ?")
+      .run(readiness.status, scope, nextRevision);
+    const result: ProfileApplyResponse = {
+      ...next,
+      readiness,
+      reviewAsOf: preview.review_as_of,
+      activationAsOf,
+      status: readiness.status
+    };
     database.prepare("INSERT INTO profile_apply_receipts (idempotency_key, request_json, result_json) VALUES (?, ?, ?)")
-      .run(input.idempotencyKey, requestJson, JSON.stringify(next));
-    return next;
+      .run(input.idempotencyKey, requestJson, JSON.stringify(result));
+    return result;
   }).immediate();
-}
-
-function deserialize(row: Record<string, unknown>): SiteEnergyProfileV1 {
-  return {
-    departments: JSON.parse(String(row.departments_json)),
-    effectiveFrom: String(row.effective_from),
-    metricScope: row.metric_scope as SiteEnergyScope,
-    profileId: String(row.profile_id),
-    revision: Number(row.revision),
-    schemaVersion: 1,
-    shareBasis: JSON.parse(String(row.share_basis_json)),
-    siteTimeZone: String(row.site_time_zone),
-    siteTotal: JSON.parse(String(row.site_total_json)),
-    status: row.status as SiteEnergyProfileV1["status"]
-  };
 }

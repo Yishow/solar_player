@@ -5,10 +5,38 @@ import React, { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
-import type { SiteEnergyProfileV1 } from "@solar-display/shared";
+import type { ProfilePreviewResponse, SiteEnergyProfileV1 } from "@solar-display/shared";
 import { SiteEnergySetupPanel } from "./SiteEnergySetupPanel";
 
 const panelSource = readFileSync(new URL("./SiteEnergySetupPanel.tsx", import.meta.url), "utf8");
+
+function previewResponse(profile: SiteEnergyProfileV1, previewToken: string): ProfilePreviewResponse {
+  const result = {
+    profileRevision: profile.revision,
+    quality: "exact" as const,
+    siteTimeZone: profile.siteTimeZone,
+    valueKwh: "12.5"
+  };
+  const periodSelection = { kind: "month" as const, month: 9, year: 2026 };
+  return {
+    asOf: "2026-09-08T01:02:03.000Z",
+    calculator: {
+      basis: { memberChannelIds: profile.siteTotal.memberChannelIds, result },
+      departments: [],
+      period: result
+    },
+    expectedRevision: profile.revision,
+    periodSelection,
+    previewToken,
+    profile,
+    readiness: { asOf: "2026-09-08T01:02:03.000Z", periodSelection, reasons: [], status: "ready" },
+    reviewContext: "profile-draft",
+    siteTimeZone: profile.siteTimeZone,
+    sources: profile.siteTotal.memberChannelIds.map((channelId) => ({
+      channelId, epochId: "epoch-1", meterId: channelId, sourceRevision: 1
+    }))
+  };
+}
 
 for (const code of ["PROFILE_SOURCE_CONFLICT", "PROFILE_SOURCE_REVIEW_REQUIRED"]) {
   test(`U6 ${code} preserves selections and requires a fresh preview`, async () => {
@@ -42,12 +70,23 @@ for (const code of ["PROFILE_SOURCE_CONFLICT", "PROFILE_SOURCE_REVIEW_REQUIRED"]
       if (url.endsWith("/preview")) {
         previews.push(JSON.parse(String(init?.body)));
         if (previews.length === 2) return json({ error: "PROFILE_SOURCE_UNAVAILABLE" }, 422);
-        return json({ previewToken: `token-${previews.length}` });
+        return json(previewResponse(profile, `token-${previews.length}`));
       }
       if (url.endsWith("/apply")) {
         const submitted = JSON.parse(String(init?.body)) as typeof applies[number];
         applies.push(submitted);
-        return applies.length === 1 ? json({ error: code }, 409) : json({ ...submitted.draft, revision: 8 });
+        return applies.length === 1 ? json({ error: code }, 409) : json({
+          ...submitted.draft,
+          activationAsOf: "2026-09-08T01:03:00.000Z",
+          readiness: {
+            asOf: "2026-09-08T01:03:00.000Z",
+            periodSelection: { kind: "month", month: 9, year: 2026 },
+            reasons: [],
+            status: "ready"
+          },
+          reviewAsOf: "2026-09-08T01:02:03.000Z",
+          revision: 8
+        });
       }
       throw new Error(`Unexpected URL ${url}`);
     };
@@ -61,8 +100,10 @@ for (const code of ["PROFILE_SOURCE_CONFLICT", "PROFILE_SOURCE_REVIEW_REQUIRED"]
       await act(async () => root.render(<SiteEnergySetupPanel scope="kn" />));
       await click("下一步");
       await act(async () => (dom.window.document.querySelector('[data-meter-channel="second"]') as HTMLInputElement).click());
+      await act(async () => (dom.window.document.querySelector('[data-site-energy-coverage="site-total"]') as HTMLInputElement).click());
       await click("下一步");
       await click("下一步");
+      await act(async () => (dom.window.document.querySelector('[data-site-energy-basis-confirm]') as HTMLInputElement).click());
       await click("預覽變更");
       await click("確認套用");
       assert.match(dom.window.document.body.textContent ?? "", /來源設定.*重新預覽/);
@@ -152,10 +193,9 @@ test("U6 previews before confirm and retries with the same token key", async () 
       }), { headers: { "content-type": "application/json" }, status: 200 });
     }
     if (url.endsWith("/energy-profile/preview")) {
-      return new Response(JSON.stringify({
-        calculator: { period: { valueKwh: "12.5" } },
-        previewToken: "preview-token-1"
-      }), { headers: { "content-type": "application/json" }, status: 200 });
+      return new Response(JSON.stringify(previewResponse(profile, "preview-token-1")), {
+        headers: { "content-type": "application/json" }, status: 200
+      });
     }
     if (url.endsWith("/energy-profile/apply")) {
       applyAttempts += 1;
@@ -165,7 +205,18 @@ test("U6 previews before confirm and retries with the same token key", async () 
           status: 503
         });
       }
-      return new Response(JSON.stringify({ ...profile, revision: 8 }), {
+      return new Response(JSON.stringify({
+        ...profile,
+        activationAsOf: "2026-09-08T01:03:00.000Z",
+        readiness: {
+          asOf: "2026-09-08T01:03:00.000Z",
+          periodSelection: { kind: "month", month: 9, year: 2026 },
+          reasons: [],
+          status: "ready"
+        },
+        reviewAsOf: "2026-09-08T01:02:03.000Z",
+        revision: 8
+      }), {
         headers: { "content-type": "application/json" },
         status: 200
       });
@@ -189,6 +240,7 @@ test("U6 previews before confirm and retries with the same token key", async () 
     await act(async () => { button("下一步").click(); });
     await act(async () => { button("下一步").click(); });
     await act(async () => { button("下一步").click(); });
+    await act(async () => { (dom.window.document.querySelector('[data-site-energy-basis-confirm]') as HTMLInputElement).click(); });
     await act(async () => { button("預覽變更").click(); await Promise.resolve(); });
 
     assert.equal(calls.filter(({ url }) => url.endsWith("/energy-profile/preview")).length, 1);

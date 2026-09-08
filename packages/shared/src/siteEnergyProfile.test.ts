@@ -60,6 +60,15 @@ test("E6-R4 invalid timezone and duplicate channels fail with field paths", () =
   assert.ok(invalid.errors.some((error) => error.field === "siteTotal.memberChannelIds"));
 });
 
+test("E6-R4 unknown share basis kind fails validation", () => {
+  const invalid = validateSiteEnergyProfile({
+    ...knProfile,
+    shareBasis: { kind: "unexpected-basis" }
+  } as unknown as SiteEnergyProfileV1);
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.field === "shareBasis.kind"));
+});
+
 test("E6-R1-S03 reassignment does not change E1 source revision/epoch/baseline", () => {
   const source = { baseline: "10100", epochId: "epoch-1", sourceRevision: 3 };
   assert.equal(reassignmentDoesNotTouchSource(source, source), true);

@@ -10,7 +10,7 @@ import {
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
 import { readFreshnessPolicy } from "./freshnessPolicyService.js";
-import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileService.js";
+import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
 import { readActiveProjection, acceptedSampleChecksum, projectionContextKey } from "./consumptionProjectionService.js";
 
 import { loadAcceptedMeterReadings } from "./meterReadingService.js";

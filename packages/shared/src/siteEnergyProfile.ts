@@ -1,3 +1,5 @@
+import type { PeriodConsumptionResult, PeriodSelection } from "./periodConsumption.js";
+
 export type SiteEnergyScope = "cl" | "kn";
 
 export type SiteTotalConfig = {
@@ -41,6 +43,50 @@ export type ProfilePreviewRequest = {
   periodSelection: { kind: "month"; year: number; month: number };
 };
 
+export type ProfileReadiness = {
+  asOf: string;
+  periodSelection: PeriodSelection;
+  reasons: string[];
+  status: SiteEnergyProfileV1["status"];
+};
+
+export type ProfilePreviewSource = {
+  channelId: string;
+  epochId: string;
+  meterId: string;
+  sourceRevision: number;
+};
+
+export type ProfilePreviewDepartment = {
+  departmentId: string;
+  nameZh: string;
+  ratio: number | null;
+  result: PeriodConsumptionResult;
+};
+
+export type ProfilePreviewResponse = {
+  asOf: string;
+  calculator: {
+    basis: { memberChannelIds: string[]; result: PeriodConsumptionResult };
+    departments: ProfilePreviewDepartment[];
+    period: PeriodConsumptionResult;
+  };
+  expectedRevision: number;
+  periodSelection: PeriodSelection;
+  previewToken: string;
+  profile: SiteEnergyProfileV1;
+  readiness: ProfileReadiness;
+  reviewContext: "profile-draft";
+  siteTimeZone: string;
+  sources: ProfilePreviewSource[];
+};
+
+export type ProfileApplyResponse = SiteEnergyProfileV1 & {
+  activationAsOf: string;
+  readiness: ProfileReadiness;
+  reviewAsOf: string;
+};
+
 export function isValidIanaTimeZone(value: string) {
   try {
     Intl.DateTimeFormat("en-US", { timeZone: value });
@@ -57,6 +103,10 @@ export function validateSiteEnergyProfile(profile: SiteEnergyProfileV1) {
   }
   if (!isValidIanaTimeZone(profile.siteTimeZone)) {
     errors.push({ field: "siteTimeZone", message: "siteTimeZone 必須是有效 IANA 時區。" });
+  }
+  const shareBasisKind = (profile.shareBasis as { kind?: unknown } | undefined)?.kind;
+  if (shareBasisKind !== "site-main" && shareBasisKind !== "department-sum" && shareBasisKind !== "meter-set") {
+    errors.push({ field: "shareBasis.kind", message: "分母來源類型不受支援。" });
   }
   if (profile.siteTotal.kind === "meter-set" && profile.siteTotal.memberChannelIds.length === 0) {
     errors.push({ field: "siteTotal.memberChannelIds", message: "總錶來源尚未設定。" });
