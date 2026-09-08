@@ -169,3 +169,40 @@ test("buildEnergyTrendViewModel marks history-only fallback data as degraded", (
   assert.equal(model.monitoringState.freshnessLabel, "降級資料");
   assert.equal(model.monitoringState.sourceRoleLabel, "History Snapshot Fallback");
 });
+
+test("N4 a canonical unavailable week keeps the consumption card empty instead of using the live register", () => {
+  const model = buildEnergyTrendViewModel({
+    liveSnapshot: {
+      ...liveSnapshot,
+      metrics: {
+        ...liveSnapshot.metrics,
+        consumptionEnergy: {
+          quality: "good",
+          timestamp: "2026-05-13T10:00:00.000Z",
+          unit: "kWh",
+          value: 100000
+        }
+      }
+    },
+    now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { quality: "partial", valueKwh: null },
+    range: "week",
+    snapshots: historySnapshots
+  });
+
+  assert.equal(model.cards[2]?.valueLabel, "--");
+  assert.notEqual(model.cards[2]?.valueLabel, "0");
+  assert.notEqual(model.cards[2]?.valueLabel, "100,000");
+});
+
+test("N4 a measured zero week is reported as zero rather than missing", () => {
+  const model = buildEnergyTrendViewModel({
+    liveSnapshot,
+    now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "0" },
+    range: "week",
+    snapshots: historySnapshots
+  });
+
+  assert.equal(model.cards[2]?.valueLabel, "0");
+});

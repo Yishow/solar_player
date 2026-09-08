@@ -1,9 +1,12 @@
 import type Database from "better-sqlite3";
 import {
   monthBoundaryInProfileZone,
+  resolveAccountingSpanConsumption,
   resolvePeriodConsumption,
   periodWindow,
+  type AccountingSpan,
   type FreshnessPolicy,
+  type PeriodConsumptionResult,
   type PeriodConsumptionQuality,
   type PeriodSelection,
   type PeriodSample,
@@ -63,10 +66,99 @@ export function periodSelectionFromRange(
   if (range === "month") {
     return { kind: "month", month: parts.month, year: parts.year };
   }
-  if (range === "year" || range === "total") {
+  if (range === "year") {
     return { kind: "year", year: parts.year };
   }
+  // week and total are not one calendar period; they resolve through `rangeSpanFromRange` so that
+  // `total` can never be answered with the current year's window.
   return null;
+}
+
+function civilDayWindow(year: number, month: number, day: number, siteTimeZone: string) {
+  const civil = new Date(Date.UTC(year, month - 1, day));
+  return periodWindow(
+    { day: civil.getUTCDate(), kind: "day", month: civil.getUTCMonth() + 1, year: civil.getUTCFullYear() },
+    siteTimeZone
+  );
+}
+
+/**
+ * The server's authorized window for the two ranges that are not a calendar period.
+ *
+ * `week` keeps the established "today and the previous six dates" selection — it is deliberately
+ * not a Monday-start calendar week.
+ *
+ * `total` starts at the site's currently effective accounting profile, never at the current year's
+ * start and never at an inferred installation date. Anchoring on the active revision is what makes
+ * the span provable: an earlier anchor would cross every later profile revision, so a site that has
+ * ever edited its accounting setup could never report a total again. The result therefore means
+ * "cumulative on the accounting basis in force", and its `periodStart` is the honest span the
+ * consumers must display alongside the number.
+ *
+ * Both end at the end of today in the site calendar, so the shared resolver caps them at the same
+ * as-of instant the calendar ranges use. Returns null when no start can be identified.
+ */
+export function rangeSpanFromRange(
+  range: "week" | "total",
+  asOf: string,
+  activeProfile: SiteEnergyProfileV1,
+  siteTimeZone: string
+): AccountingSpan | null {
+  const parts = calendarPartsInProfileZone(asOf, siteTimeZone);
+  const today = civilDayWindow(parts.year, parts.month, parts.day, siteTimeZone);
+  if (range === "week") {
+    const weekStart = civilDayWindow(parts.year, parts.month, parts.day - 6, siteTimeZone);
+    return { endMs: today.endMs, kind: "span", spanOf: "week", startMs: weekStart.startMs };
+  }
+  const startMs = Date.parse(activeProfile.effectiveFrom);
+  if (!Number.isFinite(startMs) || startMs >= today.endMs) {
+    return null;
+  }
+  return { endMs: today.endMs, kind: "span", spanOf: "total", startMs };
+}
+
+/**
+ * How one requested range resolves: a calendar period for day/month/year, or a server-authorized
+ * span for week/total. Site total, department shares and the daily curve all resolve through this
+ * one authority, so no two consumers of the same range can report different boundaries.
+ */
+export type RangeWindow =
+  | { kind: "period"; period: PeriodSelection }
+  | { kind: "span"; span: AccountingSpan };
+
+export function rangeWindowFor(
+  range: "day" | "week" | "month" | "year" | "total",
+  asOf: string,
+  activeProfile: SiteEnergyProfileV1
+): RangeWindow | null {
+  const period = periodSelectionFromRange(range, asOf, activeProfile.siteTimeZone);
+  if (period) {
+    return { kind: "period", period };
+  }
+  const span = rangeSpanFromRange(range as "week" | "total", asOf, activeProfile, activeProfile.siteTimeZone);
+  return span ? { kind: "span", span } : null;
+}
+
+function windowResolverFor(rangeWindow: RangeWindow) {
+  return rangeWindow.kind === "period"
+    ? (candidate: SiteEnergyProfileV1) => periodWindow(rangeWindow.period, candidate.siteTimeZone)
+    : () => ({ endMs: rangeWindow.span.endMs, startMs: rangeWindow.span.startMs });
+}
+
+/** The shared consumption calculation for either kind of window; the rules are identical. */
+export function resolveConsumptionForRangeWindow(
+  rangeWindow: RangeWindow,
+  input: {
+    asOf: string;
+    freshnessPolicy: FreshnessPolicy;
+    meterIds: string[];
+    profile: SiteEnergyProfileV1;
+    samples: PeriodSample[];
+  }
+) {
+  return rangeWindow.kind === "period"
+    ? resolvePeriodConsumption({ ...input, period: rangeWindow.period })
+    : resolveAccountingSpanConsumption({ ...input, accountingContext: "server-authorized-range", span: rangeWindow.span });
 }
 
 export type EffectivePeriodSelection = {
@@ -103,14 +195,36 @@ export function selectEffectivePeriod(
   asOf: string,
   options: { profileRevision?: number } = {}
 ): EffectivePeriodSelection {
+  return selectEffectiveForWindow(storedProfiles, (candidate) => periodWindow(period, candidate.siteTimeZone), asOf, options);
+}
+
+export function selectEffectiveRangeWindow(
+  storedProfiles: SiteEnergyProfileV1[],
+  rangeWindow: RangeWindow,
+  asOf: string,
+  options: { profileRevision?: number } = {}
+): EffectivePeriodSelection {
+  return selectEffectiveForWindow(storedProfiles, windowResolverFor(rangeWindow), asOf, options);
+}
+
+/**
+ * One profile-selection and revision-boundary authority for both calendar periods and server
+ * authorized spans; only the way the window is derived from a candidate profile differs.
+ */
+function selectEffectiveForWindow(
+  storedProfiles: SiteEnergyProfileV1[],
+  windowFor: (profile: SiteEnergyProfileV1) => { endMs: number; startMs: number },
+  asOf: string,
+  options: { profileRevision?: number } = {}
+): EffectivePeriodSelection {
   const profiles = [...storedProfiles].sort((a, b) => Date.parse(a.effectiveFrom) - Date.parse(b.effectiveFrom) || a.revision - b.revision);
   const profile = options.profileRevision === undefined
-    ? profiles.filter((candidate) => Date.parse(candidate.effectiveFrom) <= periodWindow(period, candidate.siteTimeZone).startMs).at(-1) ?? profiles[0]
+    ? profiles.filter((candidate) => Date.parse(candidate.effectiveFrom) <= windowFor(candidate).startMs).at(-1) ?? profiles[0]
     : profiles.find((candidate) => candidate.revision === options.profileRevision);
   if (!profile) {
     throw Object.assign(new Error("UNKNOWN_PROFILE_REVISION"), { code: "UNKNOWN_PROFILE_REVISION" });
   }
-  const window = periodWindow(period, profile.siteTimeZone);
+  const window = windowFor(profile);
   const throughMs = Math.min(window.endMs, Date.parse(asOf));
   const newerProfiles = profiles.filter((candidate) => candidate.revision !== profile.revision
     && (Date.parse(candidate.effectiveFrom) > Date.parse(profile.effectiveFrom)
@@ -130,12 +244,12 @@ export function selectEffectivePeriod(
 export function loadEffectivePeriodContext(
   database: Database.Database,
   scope: "cl" | "kn",
-  period: PeriodSelection,
+  rangeWindow: RangeWindow,
   asOf: string,
   options: { profileRevision?: number } = {}
 ): EffectivePeriodContext {
   return {
-    ...selectEffectivePeriod(listPersistedProfiles(database, scope), period, asOf, options),
+    ...selectEffectiveRangeWindow(listPersistedProfiles(database, scope), rangeWindow, asOf, options),
     asOf,
     freshnessPolicy: readFreshnessPolicy(database).policy,
     samples: loadAcceptedSamples(database, scope)
@@ -157,7 +271,7 @@ function resolveWithEvidence(
   options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
   const context = selectEffectivePeriod(storedProfiles, period, asOf, options);
-  const result = resolvePeriodConsumption({
+  return withRevisionBoundary(context, resolvePeriodConsumption({
     asOf,
     meterIds: options.meterIds ?? context.profile.siteTotal.memberChannelIds,
     period,
@@ -167,7 +281,25 @@ function resolveWithEvidence(
     timeZone: options.timeZone,
     start: options.start,
     end: options.end
-  });
+  }));
+}
+
+/** A span reaches the same accumulated-delta, identity and quality core as a calendar period. */
+function resolveSpanWithEvidence(
+  storedProfiles: SiteEnergyProfileV1[], samples: PeriodSample[], span: AccountingSpan, asOf: string, freshnessPolicy: FreshnessPolicy
+) {
+  const rangeWindow: RangeWindow = { kind: "span", span };
+  const context = selectEffectiveRangeWindow(storedProfiles, rangeWindow, asOf);
+  return withRevisionBoundary(context, resolveConsumptionForRangeWindow(rangeWindow, {
+    asOf,
+    freshnessPolicy,
+    meterIds: context.profile.siteTotal.memberChannelIds,
+    profile: context.profile,
+    samples
+  }));
+}
+
+function withRevisionBoundary(context: EffectivePeriodSelection, result: ReturnType<typeof resolvePeriodConsumption>) {
   if (context.crossesRevisionBoundary) {
     return { ...result, valueKwh: null, observedDeltaKwh: null, quality: result.quality === "invalid" ? "invalid" as const : "partial" as const,
       profileRevisionBoundaries: profileRevisionBoundariesOf([context.profile, ...context.newerProfiles]),
@@ -191,7 +323,10 @@ export function tryResolvePersistedPeriodConsumption(
   }
   const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
   if (!period) {
-    return null;
+    // A configured profile always answers with a canonical result, so the consumers can tell
+    // "no supported measurement" apart from "no accounting profile" and never fall back to a
+    // legacy counter. Spans are not cached as projections: that store only knows calendar ranges.
+    return tryResolveSpanConsumption(database, scope, range as "week" | "total", asOf, profile);
   }
   try {
     const result = resolvePersistedPeriodConsumption(database, scope, period, asOf);
@@ -206,6 +341,54 @@ export function tryResolvePersistedPeriodConsumption(
   } catch {
     return null;
   }
+}
+
+/**
+ * The span boundaries come from the active profile's calendar, but the profile a span actually
+ * resolves against is still chosen by `selectEffectiveForWindow`. When those differ the span also
+ * crosses a revision boundary, so it degrades to partial rather than reporting an exact number
+ * measured on one calendar and labelled with another.
+ */
+function tryResolveSpanConsumption(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  range: "week" | "total",
+  asOf: string,
+  activeProfile: SiteEnergyProfileV1
+) {
+  const profiles = listPersistedProfiles(database, scope);
+  if (profiles.length === 0) {
+    return null;
+  }
+  const span = rangeSpanFromRange(range, asOf, activeProfile, activeProfile.siteTimeZone);
+  if (!span) {
+    // The requested cumulative beginning cannot be identified, so the span stays explicitly
+    // unavailable instead of borrowing a calendar year that was never requested.
+    return unavailableSpanResult(activeProfile, range, asOf);
+  }
+  try {
+    return resolveSpanWithEvidence(profiles, loadAcceptedSamples(database, scope), span, asOf, readFreshnessPolicy(database).policy);
+  } catch (error) {
+    // A broken profile must stay distinguishable from "no evidence yet", so the raised code is
+    // carried into the diagnostics instead of collapsing into one opaque reason.
+    return unavailableSpanResult(activeProfile, range, asOf, (error as { code?: string })?.code);
+  }
+}
+
+function unavailableSpanResult(
+  profile: SiteEnergyProfileV1,
+  range: "week" | "total",
+  asOf: string,
+  cause?: string
+): PeriodConsumptionResult {
+  return {
+    calculatedThrough: asOf,
+    issues: [`UNRESOLVED_ACCOUNTING_SPAN:${range}`, ...(cause ? [cause] : [])],
+    profileRevision: profile.revision,
+    quality: "unavailable" as const,
+    siteTimeZone: profile.siteTimeZone,
+    valueKwh: null
+  };
 }
 
 export type DailyConsumptionPoint = {

@@ -537,3 +537,38 @@ test("R8 known month endpoints coexist with incomplete daily coverage", () => {
   assert.equal(result.dailyCoverage?.totalDays, 30);
   assert.equal(result.dailyCoverage?.isComplete, false);
 });
+
+test("a reused sample array gives the same result as a fresh one for every window it is asked about", () => {
+  const rows = Array.from({ length: 120 }, (_, index) => ({
+    channelId: "kn-main",
+    sourceTimestamp: new Date(Date.parse("2026-08-31T16:00:00Z") + index * 6 * 3_600_000).toISOString(),
+    valueKwh: `${10_000 + index * 25}`
+  }));
+  const asOf = "2026-09-30T16:00:00Z";
+  const periods = [
+    { day: 1, kind: "day" as const, month: 9, year: 2026 },
+    { day: 15, kind: "day" as const, month: 9, year: 2026 },
+    { kind: "month" as const, month: 9, year: 2026 },
+    { kind: "year" as const, year: 2026 }
+  ];
+
+  // The channel index is memoised against the sample array, so a shared array must never leak one
+  // window's view into another, and a second meter set on the same array must be indexed on its own.
+  const shared = rows.map((row) => ({ ...row }));
+  for (const period of periods) {
+    const reused = resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period, profile, samples: shared });
+    const isolated = resolvePeriodConsumption({
+      asOf, meterIds: ["kn-main"], period, profile, samples: rows.map((row) => ({ ...row }))
+    });
+    assert.deepEqual(reused, isolated, `${period.kind}${period.day ?? ""}`);
+  }
+
+  const otherMeters = resolvePeriodConsumption({
+    asOf, meterIds: [], period: periods[2]!, profile, samples: shared
+  });
+  assert.equal(otherMeters.quality, "unavailable");
+  assert.equal(
+    resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period: periods[2]!, profile, samples: shared }).valueKwh,
+    resolvePeriodConsumption({ asOf, meterIds: ["kn-main"], period: periods[2]!, profile, samples: rows.map((row) => ({ ...row })) }).valueKwh
+  );
+});

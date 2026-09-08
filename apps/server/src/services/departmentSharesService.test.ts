@@ -81,6 +81,7 @@ function source(channelId: string): MeterSourceDefinition {
 const MONTH_START = "2026-08-31T16:00:00Z";
 const MONTH_END = "2026-09-30T16:00:00Z";
 const SEPTEMBER = { kind: "month" as const, month: 9, year: 2026 };
+const SEPTEMBER_WINDOW = { kind: "period" as const, period: SEPTEMBER };
 
 function seedMonthDelta(database: Database.Database, channelId: string, opening: string, closing: string) {
   seedAcceptedReading(database, source(channelId), opening, MONTH_START, MONTH_START);
@@ -98,7 +99,7 @@ test("R6 explicit meter-set denominator is resolved even when it belongs to no o
   seedMonthDelta(database, "kn-b", "0", "100");
   seedMonthDelta(database, "kn-c", "0", "400");
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.quality, "exact");
   assert.equal(shares?.shares[0]?.valueKwh, "100");
   assert.equal(shares?.shares[0]?.ratio, 0.25);
@@ -124,7 +125,7 @@ test("R6 missing custom denominator evidence stays unavailable without a denomin
   seedMonthDelta(database, "kn-b", "0", "100");
   seedAcceptedReading(database, source("kn-c"), "400", MONTH_END, MONTH_END);
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.quality, "unavailable");
   assert.equal(shares?.shares[0]?.ratio, null);
   assert.ok(shares?.issues?.some((issue) => issue.startsWith("MISSING_BASELINE:kn-c")));
@@ -142,7 +143,7 @@ test("R6 a channel shared by the denominator and a department is resolved once w
   seedMonthDelta(database, "kn-b", "0", "100");
   seedMonthDelta(database, "kn-c", "0", "300");
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.quality, "exact");
   assert.deepEqual(shares?.shares.map((share) => share.ratio), [0.25, 0.75]);
   assert.equal(shares?.unallocatedKwh, "0");
@@ -161,7 +162,7 @@ test("R5 a mid-month membership change cannot claim an exact full-month ratio", 
   seedMonthDelta(database, "kn-main", "0", "1000");
   seedMonthDelta(database, "kn-b", "0", "100");
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   const siteTotal = resolvePersistedPeriodConsumption(database, "kn", SEPTEMBER, MONTH_END);
   assert.equal(siteTotal.quality, "partial");
   assert.equal(shares?.quality, "partial");
@@ -187,7 +188,7 @@ test("R5 a closed month keeps the membership effective for that period", () => {
   seedMonthDelta(database, "kn-main", "0", "1000");
   seedMonthDelta(database, "kn-b", "0", "250");
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.profileRevision, 1);
   assert.equal(shares?.quality, "exact");
   assert.equal(shares?.shares[0]?.valueKwh, "250");
@@ -206,7 +207,7 @@ test("R5 upstream estimated boundaries survive share aggregation", () => {
   seedAcceptedReading(database, source("kn-b"), "0", "2026-08-31T15:59:00Z", "2026-08-31T15:59:00Z");
   seedAcceptedReading(database, source("kn-b"), "250", MONTH_END, MONTH_END);
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.quality, "estimated-boundary");
   assert.equal(shares?.shares[0]?.ratio, 0.25);
   assert.equal(shares?.freshnessState, resolvePersistedPeriodConsumption(database, "kn", SEPTEMBER, MONTH_END).freshnessState);
@@ -223,7 +224,7 @@ test("R6 a site-total channel outside the denominator cannot degrade a proven ra
   seedMonthDelta(database, "kn-b", "0", "100");
   seedMonthDelta(database, "kn-c", "0", "400");
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER, MONTH_END);
+  const shares = resolvePersistedDepartmentShares(database, "kn", SEPTEMBER_WINDOW, MONTH_END);
   assert.equal(shares?.quality, "exact");
   assert.equal(shares?.shares[0]?.ratio, 0.25);
   assert.ok(!shares?.issues?.some((issue) => issue.endsWith(":kn-main")));

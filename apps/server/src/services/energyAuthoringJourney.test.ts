@@ -196,7 +196,7 @@ test("Q1 CL+KN ingest→E2→E3→shares isolate 300/4300/8300 and 50/30/20", ()
   rollbackProjection(database, "kn", "month");
   assert.equal(acceptedSampleChecksum(database, "kn"), checksumBefore);
 
-  const shares = resolvePersistedDepartmentShares(database, "kn", { day: 1, kind: "day", month: 9, year: 2026 }, "2026-09-01T16:00:00Z");
+  const shares = resolvePersistedDepartmentShares(database, "kn", { kind: "period", period: { day: 1, kind: "day", month: 9, year: 2026 } }, "2026-09-01T16:00:00Z");
   assert.deepEqual(shares?.shares.map((share) => Math.round((share.ratio ?? 0) * 100)), [50, 30, 20]);
 
   const bindingPreview = previewUnsavedBinding(

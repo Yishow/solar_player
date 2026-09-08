@@ -823,3 +823,353 @@ test("R5 a mid-month revision boundary reaches every consumer of the same period
     await app.close();
   }
 });
+
+/**
+ * N3 fixture: one KN day whose accepted readings prove a 300 kWh delta while its stored daily
+ * summary still carries the superseded 9999 sentinel next to a generation value of 10. Management
+ * and the paired display read the same rows, so the same evidence must produce the same answer.
+ */
+function seedLegacySentinelFixture() {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+
+  const today = localMidnight(new Date());
+  const evidenceDay = addLocalDays(today, -3);
+
+  const insertSummary = database.prepare(`
+    INSERT INTO daily_energy_summaries (
+      metric_scope, date, generation_total, consumption_total, self_consumption_total, co2_total,
+      peak_generation, peak_generation_time, peak_consumption, peak_consumption_time
+    ) VALUES ('kn', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertSummary.run(localDateKey(evidenceDay), 10, 9999, 7, 5, 612, "11:00", 488, "15:00");
+  insertSummary.run(localDateKey(today), 20, 5555, 14, 9, 700, "12:00", 500, "16:00");
+
+  database.prepare(`
+    INSERT INTO site_energy_profiles (
+      profile_id, metric_scope, revision, schema_version, site_time_zone, status,
+      effective_from, site_total_json, departments_json, share_basis_json, active, created_at
+    ) VALUES ('kn-energy', 'kn', 1, 1, ?, 'ready', ?, ?, '[]', ?, 1, ?)
+  `).run(
+    localTimeZone,
+    new Date(today.getFullYear() - 1, 0, 1).toISOString(),
+    JSON.stringify({ coverageReview: "reviewed", kind: "meter-set", label: "觀音總錶", memberChannelIds: ["kn-main"] }),
+    JSON.stringify({ kind: "site-main" }),
+    new Date(today.getFullYear() - 1, 0, 1).toISOString()
+  );
+
+  const meter = historyMeter("kn-main");
+  for (const [date, value] of [[evidenceDay, "1000"], [addLocalDays(evidenceDay, 1), "1300"]] as const) {
+    const instant = date.toISOString();
+    seedAcceptedReading(database, meter, value, instant, instant);
+  }
+
+  return { evidenceDayKey: localDateKey(evidenceDay), todayKey: localDateKey(today) };
+}
+
+async function readManagementHistory(app: Awaited<ReturnType<typeof buildApp>>, metricScope: string, range: string) {
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/data-hub/energy-history?metricScope=${metricScope}&range=${range}`
+  });
+  assert.equal(response.statusCode, 200);
+  return response.json() as {
+    counters: Array<{ metricKey: string; totalValue: number | null }>;
+    periodSummary: { periodStart?: string; quality: string; valueKwh: string | null } | null;
+    summaries: SummaryRow[];
+  };
+}
+
+test("N3 management history and the paired display agree despite a legacy sentinel", async () => {
+  const fixture = seedLegacySentinelFixture();
+  const paired = createPairedDeviceTestContext("kn");
+  const app = await buildApp();
+
+  try {
+    const [management, display] = await Promise.all([
+      readManagementHistory(app, "kn", "total"),
+      readDailySummaries(app, paired.credential, "total")
+    ]);
+
+    const managementRow = management.summaries.find((row) => row.date === fixture.evidenceDayKey);
+    const displayRow = display.find((row) => row.date === fixture.evidenceDayKey);
+
+    assert.equal(displayRow?.consumptionTotal, 300);
+    assert.equal(managementRow?.consumptionTotal, 300, "management chart and table must render 300, not the 9999 sentinel");
+    assert.equal(managementRow?.quality, displayRow?.quality);
+    assert.equal(managementRow?.quality, "exact");
+    assert.equal(managementRow?.generationTotal, 10);
+    assert.equal(managementRow?.co2Total, 5);
+    assert.equal(managementRow?.peakGeneration, 612);
+
+    const storedRow = getDatabase()
+      .prepare("SELECT consumption_total, generation_total FROM daily_energy_summaries WHERE metric_scope = 'kn' AND date = ?")
+      .get(fixture.evidenceDayKey) as { consumption_total: number; generation_total: number };
+    assert.equal(storedRow.consumption_total, 9999, "the stored legacy row must stay untouched");
+    assert.equal(storedRow.generation_total, 10);
+  } finally {
+    await app.close();
+  }
+});
+
+test("N3 management history keeps the requested range date set while overlaying consumption", async () => {
+  const fixture = seedLegacySentinelFixture();
+  const app = await buildApp();
+
+  try {
+    const [day, week, year, total] = await Promise.all([
+      readManagementHistory(app, "kn", "day"),
+      readManagementHistory(app, "kn", "week"),
+      readManagementHistory(app, "kn", "year"),
+      readManagementHistory(app, "kn", "total")
+    ]);
+
+    assert.deepEqual(day.summaries.map((row) => row.date), [fixture.todayKey]);
+    assert.deepEqual(new Set(week.summaries.map((row) => row.date)), new Set([fixture.todayKey, fixture.evidenceDayKey]));
+    assert.deepEqual(new Set(year.summaries.map((row) => row.date)), new Set([fixture.todayKey, fixture.evidenceDayKey]));
+    assert.deepEqual(new Set(total.summaries.map((row) => row.date)), new Set([fixture.todayKey, fixture.evidenceDayKey]));
+
+    for (const body of [day, week, year, total]) {
+      const todayRow = body.summaries.find((row) => row.date === fixture.todayKey);
+      assert.equal(todayRow?.generationTotal, 20, "non-consumption fields keep their stored meaning");
+      assert.equal(todayRow?.consumptionTotal, null, "an unproven day must stay null instead of the 5555 sentinel");
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("N3 management history reads supported consumption through a null legacy column", async () => {
+  const fixture = seedLegacySentinelFixture();
+  getDatabase()
+    .prepare("UPDATE daily_energy_summaries SET consumption_total = NULL WHERE metric_scope = 'kn'")
+    .run();
+  const app = await buildApp();
+
+  try {
+    const total = await readManagementHistory(app, "kn", "total");
+    const row = total.summaries.find((entry) => entry.date === fixture.evidenceDayKey);
+    assert.equal(row?.consumptionTotal, 300);
+    assert.equal(row?.quality, "exact");
+    assert.equal(row?.generationTotal, 10);
+  } finally {
+    await app.close();
+  }
+});
+
+test("N3 management history keeps authorization and the no-profile path unchanged", async () => {
+  seedLegacySentinelFixture();
+  const app = await buildApp();
+
+  try {
+    const denied = await app.inject({
+      method: "GET",
+      remoteAddress: "198.51.100.24",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=total"
+    });
+    assert.equal(denied.statusCode, 403);
+
+    getDatabase()
+      .prepare("INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total) VALUES ('global', ?, 44, 88)")
+      .run(fixtureGlobalDateKey());
+    const global = await readManagementHistory(app, "global", "total");
+    assert.equal(global.periodSummary, null, "a scope without a site profile keeps its legacy compatibility shape");
+    assert.deepEqual(global.summaries.map((row) => row.consumptionTotal), [88]);
+    assert.equal(global.summaries[0]?.quality, undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+function fixtureGlobalDateKey() {
+  return localDateKey(localMidnight(new Date()));
+}
+
+/**
+ * N4 fixture: a KN register that is continuous from the profile's own effective start, through the
+ * current year's start and the recent-seven-date start, to a closing observation just before now.
+ * Instants are derived from the real clock because the route stamps its own as-of.
+ */
+function seedRangeSpanFixture() {
+  const database = getDatabase();
+  database.prepare("DELETE FROM metric_snapshots").run();
+  database.prepare("DELETE FROM daily_energy_summaries").run();
+
+  const today = localMidnight(new Date());
+  const spanStart = new Date(today.getFullYear() - 1, 0, 1);
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const weekStart = addLocalDays(today, -6);
+  const closingAt = new Date(Date.now() - 60_000);
+
+  database.prepare(`
+    INSERT INTO site_energy_profiles (
+      profile_id, metric_scope, revision, schema_version, site_time_zone, status,
+      effective_from, site_total_json, departments_json, share_basis_json, active, created_at
+    ) VALUES ('kn-energy', 'kn', 1, 1, ?, 'ready', ?, ?, '[]', ?, 1, ?)
+  `).run(
+    localTimeZone,
+    spanStart.toISOString(),
+    JSON.stringify({ coverageReview: "reviewed", kind: "meter-set", label: "觀音總錶", memberChannelIds: ["kn-main"] }),
+    JSON.stringify({ kind: "site-main" }),
+    spanStart.toISOString()
+  );
+
+  // Values increase with time whatever the calendar position of today is, so no seeded step can
+  // look like an unexplained decrease in the first week of January.
+  const meter = historyMeter("kn-main");
+  const seeded = [spanStart, yearStart, weekStart, closingAt]
+    .map((at) => at.getTime())
+    .filter((at, index, all) => all.indexOf(at) === index)
+    .sort((left, right) => left - right);
+  const valueAt = new Map<number, number>();
+  for (const [index, at] of seeded.entries()) {
+    const value = 1000 + index * 300;
+    valueAt.set(at, value);
+    const instant = new Date(at).toISOString();
+    seedAcceptedReading(database, meter, `${value}`, instant, instant);
+  }
+
+  const closingValue = valueAt.get(seeded[seeded.length - 1]!)!;
+  const deltaFrom = (from: Date) => `${closingValue - valueAt.get(from.getTime())!}`;
+  return { deltaFrom, spanStart, weekStart, yearStart };
+}
+
+test("N4 management history reports a canonical result for every range of a configured profile", async () => {
+  seedRangeSpanFixture();
+  const app = await buildApp();
+
+  try {
+    const bodies = await Promise.all(
+      (["day", "week", "month", "year", "total"] as const).map(async (range) =>
+        [range, await readManagementHistory(app, "kn", range)] as const
+      )
+    );
+
+    for (const [range, body] of bodies) {
+      assert.ok(body.periodSummary !== null, `${range} must not collapse into the no-profile shape`);
+      assert.ok(typeof body.periodSummary?.quality === "string", `${range} must report a quality`);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("N4 management history keeps the week and total spans distinct from the calendar year", async () => {
+  const fixture = seedRangeSpanFixture();
+  const app = await buildApp();
+
+  try {
+    const [week, year, total] = await Promise.all([
+      readManagementHistory(app, "kn", "week"),
+      readManagementHistory(app, "kn", "year"),
+      readManagementHistory(app, "kn", "total")
+    ]);
+
+    const startOf = (body: { periodSummary: { periodStart?: string } | null }) => body.periodSummary?.periodStart;
+    assert.equal(startOf(year), fixture.yearStart.toISOString());
+    assert.equal(startOf(week), fixture.weekStart.toISOString(), "the week starts six dates back, not at the month or year start");
+    assert.equal(startOf(total), fixture.spanStart.toISOString(), "total describes the supported accounting span");
+    assert.notEqual(startOf(total), startOf(year), "total must not silently reuse the current year's start");
+    assert.equal(total.periodSummary?.valueKwh, fixture.deltaFrom(fixture.spanStart));
+    assert.equal(year.periodSummary?.valueKwh, fixture.deltaFrom(fixture.yearStart));
+    assert.equal(week.periodSummary?.valueKwh, fixture.deltaFrom(fixture.weekStart));
+  } finally {
+    await app.close();
+  }
+});
+
+test("N4 a configured week without evidence stays unavailable instead of zero", async () => {
+  seedRangeSpanFixture();
+  getDatabase().prepare("DELETE FROM meter_readings_accepted").run();
+  const app = await buildApp();
+
+  try {
+    const week = await readManagementHistory(app, "kn", "week");
+    assert.ok(week.periodSummary !== null, "a configured profile must still return a canonical result");
+    assert.equal(week.periodSummary?.valueKwh, null);
+    assert.notEqual(week.periodSummary?.quality, "exact");
+  } finally {
+    await app.close();
+  }
+});
+
+test("N3 the management response carries every field the history consumers read", async () => {
+  const fixture = seedLegacySentinelFixture();
+  const app = await buildApp();
+
+  try {
+    const body = await readManagementHistory(app, "kn", "total");
+    const row = body.summaries.find((entry) => entry.date === fixture.evidenceDayKey) as Record<string, unknown>;
+
+    // EnergyHistory's cards, month curve and table read exactly these keys; the paired viewModel
+    // fixtures mirror this shape, so a rename here has to break this test before it reaches a screen.
+    for (const key of [
+      "co2Total", "consumptionTotal", "date", "generationTotal", "peakConsumption",
+      "peakConsumptionTime", "peakGeneration", "peakGenerationTime", "quality", "selfConsumptionTotal"
+    ]) {
+      assert.ok(key in row, `daily summary rows must expose ${key}`);
+    }
+    for (const key of ["quality", "valueKwh", "periodStart", "periodEnd", "calculatedThrough"]) {
+      assert.ok(key in (body.periodSummary as Record<string, unknown>), `periodSummary must expose ${key}`);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("N3 management month keeps its stored rows and order while the display keeps its calendar padding", async () => {
+  const fixture = seedLegacySentinelFixture();
+  const paired = createPairedDeviceTestContext("kn");
+  const app = await buildApp();
+
+  try {
+    const [management, display] = await Promise.all([
+      readManagementHistory(app, "kn", "month"),
+      readDailySummaries(app, paired.credential, "month")
+    ]);
+
+    const storedMonthDates = (getDatabase()
+      .prepare("SELECT date FROM daily_energy_summaries WHERE metric_scope = 'kn' AND date >= ? ORDER BY date DESC")
+      .all(`${fixture.todayKey.slice(0, 7)}-01`) as Array<{ date: string }>).map((row) => row.date);
+
+    // Sharing the overlay must not hand management the display's month padding rule.
+    assert.deepEqual(management.summaries.map((row) => row.date), storedMonthDates);
+    assert.ok(display.length > management.summaries.length, "the display month still expands to the full calendar");
+    assert.equal(display[0]?.date, `${fixture.todayKey.slice(0, 7)}-01`);
+
+    const overlaid = management.summaries.find((row) => row.date === fixture.evidenceDayKey);
+    assert.equal(overlaid?.consumptionTotal, 300);
+    assert.equal(overlaid?.quality, "exact");
+  } finally {
+    await app.close();
+  }
+});
+
+test("R5 department shares report the same span the consumption card reports", async () => {
+  const fixture = seedRangeSpanFixture();
+  getDatabase().prepare("UPDATE site_energy_profiles SET departments_json = ? WHERE metric_scope = 'kn'")
+    .run(JSON.stringify([
+      { accountingIncluded: true, coverageReview: "reviewed", departmentId: "kn-main", memberChannelIds: ["kn-main"], nameZh: "全廠" }
+    ]));
+  const paired = createPairedDeviceTestContext("kn");
+  const app = await buildApp();
+
+  try {
+    for (const range of ["week", "total"] as const) {
+      const [history, shares] = await Promise.all([
+        readManagementHistory(app, "kn", range),
+        readJson(app, paired.credential, `/api/metrics/department-shares?range=${range}`)
+      ]);
+      assert.equal(shares.periodStart, history.periodSummary?.periodStart, `${range} must not resolve two different spans`);
+      assert.equal(shares.quality, history.periodSummary?.quality, range);
+      assert.ok(shares.shares.length > 0, `${range} must not silently return an empty share set`);
+    }
+
+    const totalShares = await readJson(app, paired.credential, "/api/metrics/department-shares?range=total");
+    assert.equal(totalShares.periodStart, fixture.spanStart.toISOString());
+    assert.notEqual(totalShares.periodStart, fixture.yearStart.toISOString(), "total shares must not fall back to the calendar year");
+  } finally {
+    await app.close();
+  }
+});

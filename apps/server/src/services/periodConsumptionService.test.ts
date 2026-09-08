@@ -9,7 +9,7 @@ import { saveMeterSource } from "./meterSourceCatalogService.js";
 import { seedAcceptedReading, ingestMeterReading } from "./meterReadingService.js";
 import { loadAcceptedSamples, resolveDailyConsumptionPoints, resolvePersistedPeriodConsumption, tryResolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
 
-function createDatabase() {
+function createDatabase(effectiveFrom = "2026-01-01T00:00:00+08:00") {
   const database = new Database(":memory:");
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/033_freshness_policy.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/001_init.sql"), "utf8"));
@@ -23,7 +23,7 @@ function createDatabase() {
       effective_from, site_total_json, departments_json, share_basis_json, active, created_at
     ) VALUES ('kn-energy', 'kn', 1, 1, 'Asia/Taipei', 'ready', ?, ?, '[]', ?, 1, ?)
   `).run(
-    "2026-01-01T00:00:00+08:00",
+    effectiveFrom,
     JSON.stringify({
       coverageReview: "reviewed",
       kind: "meter-set",
@@ -31,7 +31,7 @@ function createDatabase() {
       memberChannelIds: ["kn-main"]
     }),
     JSON.stringify({ kind: "site-main" }),
-    "2026-01-01T00:00:00.000Z"
+    new Date(effectiveFrom).toISOString()
   );
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/042_consumption_projections.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/047_projection_activation_context.sql"), "utf8"));
@@ -275,5 +275,168 @@ test("a full-year date set loads accepted samples once instead of re-scanning pe
   assert.equal(points?.length, 365);
   assert.equal(readingQueries, 1);
   assert.equal(points?.find((point) => point.date === "2026-01-01")?.valueKwh, null);
+  database.close();
+});
+
+/**
+ * N4 evidence: one continuous KN register across a year boundary. The accounting span starts on
+ * 2025-01-01 Asia/Taipei with a supported opening baseline, so `total` must describe that span
+ * instead of borrowing the current calendar year's start.
+ */
+function seedCrossYearRegister(database: ReturnType<typeof createDatabase>, options: { openingBaseline?: boolean } = {}) {
+  const definition = source(1, "epoch-1");
+  if (options.openingBaseline !== false) {
+    seedAcceptedReading(database, definition, "1000", "2024-12-31T16:00:00Z", "2024-12-31T16:00:00Z");
+  }
+  seedAcceptedReading(database, definition, "1600", "2025-12-31T16:00:00Z", "2025-12-31T16:00:00Z");
+  seedAcceptedReading(database, definition, "1900", "2026-09-01T16:00:00Z", "2026-09-01T16:00:00Z");
+}
+
+const N4_AS_OF = "2026-09-01T16:00:00Z";
+
+test("N4 total spans the supported accounting range instead of the current year", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedCrossYearRegister(database);
+
+  const year = tryResolvePersistedPeriodConsumption(database, "kn", "year", N4_AS_OF);
+  const total = tryResolvePersistedPeriodConsumption(database, "kn", "total", N4_AS_OF);
+
+  assert.equal(year?.valueKwh, "300");
+  assert.equal(total?.valueKwh, "900");
+  assert.equal(year?.periodStart, "2025-12-31T16:00:00.000Z");
+  assert.equal(total?.periodStart, "2024-12-31T16:00:00.000Z");
+  assert.equal(total?.calculatedThrough, year?.calculatedThrough);
+  assert.equal(total?.quality, "exact");
+  database.close();
+});
+
+test("N4 an unknown cumulative beginning stays explicit instead of a year-to-date substitute", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedCrossYearRegister(database, { openingBaseline: false });
+
+  const year = tryResolvePersistedPeriodConsumption(database, "kn", "year", N4_AS_OF);
+  const total = tryResolvePersistedPeriodConsumption(database, "kn", "total", N4_AS_OF);
+
+  assert.equal(year?.valueKwh, "300");
+  assert.equal(total?.valueKwh, null);
+  assert.ok(total?.quality === "partial" || total?.quality === "unavailable", `expected partial/unavailable, got ${total?.quality}`);
+  assert.ok(total?.issues?.some((issue) => issue.startsWith("MISSING_BASELINE")), JSON.stringify(total?.issues));
+  assert.equal(total?.periodStart, "2024-12-31T16:00:00.000Z");
+  database.close();
+});
+
+test("N4 a week keeps the recent seven dates across a month boundary", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  const definition = source(1, "epoch-1");
+  seedAcceptedReading(database, definition, "100", "2026-08-26T16:00:00Z", "2026-08-26T16:00:00Z");
+  seedAcceptedReading(database, definition, "175", N4_AS_OF, N4_AS_OF);
+
+  const week = tryResolvePersistedPeriodConsumption(database, "kn", "week", N4_AS_OF);
+  const month = tryResolvePersistedPeriodConsumption(database, "kn", "month", N4_AS_OF);
+
+  assert.equal(week?.valueKwh, "75");
+  assert.equal(week?.quality, "exact");
+  assert.equal(week?.periodStart, "2026-08-26T16:00:00.000Z", "the week starts six dates before today, not at the month start");
+  assert.equal(month?.periodStart, "2026-08-31T16:00:00.000Z");
+  assert.equal(week?.calculatedThrough, N4_AS_OF.replace("Z", ".000Z"));
+  database.close();
+});
+
+test("N4 a week crossing an unproven source replacement cannot be declared exact", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-08-26T16:00:00Z", "2026-08-26T16:00:00Z");
+  seedAcceptedReading(database, source(2, "epoch-2"), "10", "2026-08-30T00:00:00Z", "2026-08-30T00:00:00Z");
+  seedAcceptedReading(database, source(2, "epoch-2"), "175", N4_AS_OF, N4_AS_OF);
+
+  const week = tryResolvePersistedPeriodConsumption(database, "kn", "week", N4_AS_OF);
+
+  assert.equal(week?.valueKwh, null);
+  assert.equal(week?.quality, "partial");
+  assert.ok(week?.issues?.some((issue) => issue.startsWith("UNPROVEN_CONTINUITY") || issue.startsWith("MISSING_BASELINE")), JSON.stringify(week?.issues));
+  database.close();
+});
+
+function activateSecondProfileRevision(database: ReturnType<typeof createDatabase>, effectiveFrom: string) {
+  database.prepare("UPDATE site_energy_profiles SET active = 0").run();
+  database.prepare(`INSERT INTO site_energy_profiles SELECT profile_id, metric_scope, 2, schema_version, site_time_zone, status, ?, site_total_json, departments_json, share_basis_json, 1, created_at FROM site_energy_profiles WHERE revision = 1`)
+    .run(effectiveFrom);
+}
+
+test("N4 total re-anchors on the accounting basis in force after a profile revision", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedCrossYearRegister(database);
+  seedAcceptedReading(database, source(1, "epoch-1"), "1800", "2026-05-31T16:00:00Z", "2026-05-31T16:00:00Z");
+  activateSecondProfileRevision(database, "2026-06-01T00:00:00+08:00");
+
+  const total = tryResolvePersistedPeriodConsumption(database, "kn", "total", N4_AS_OF);
+  const year = tryResolvePersistedPeriodConsumption(database, "kn", "year", N4_AS_OF);
+
+  // The span the site can actually prove is "since the current accounting basis took effect", and
+  // it reports that start rather than going permanently unavailable or borrowing the year.
+  assert.equal(total?.valueKwh, "100");
+  assert.equal(total?.periodStart, "2026-05-31T16:00:00.000Z");
+  assert.equal(total?.profileRevision, 2);
+  assert.notEqual(total?.periodStart, year?.periodStart);
+  database.close();
+});
+
+test("N4 a span crossing an accounting-profile boundary reports the boundary instead of a value", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-08-26T16:00:00Z", "2026-08-26T16:00:00Z");
+  seedAcceptedReading(database, source(1, "epoch-1"), "175", N4_AS_OF, N4_AS_OF);
+  activateSecondProfileRevision(database, "2026-08-30T08:00:00+08:00");
+
+  const week = tryResolvePersistedPeriodConsumption(database, "kn", "week", N4_AS_OF);
+
+  assert.equal(week?.valueKwh, null);
+  assert.equal(week?.quality, "partial");
+  assert.ok(week?.issues?.includes("PROFILE_REVISION_BOUNDARY"), JSON.stringify(week?.issues));
+  database.close();
+});
+
+test("N4 a measured zero week stays a supported result", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  const definition = source(1, "epoch-1");
+  seedAcceptedReading(database, definition, "500", "2026-08-26T16:00:00Z", "2026-08-26T16:00:00Z");
+  seedAcceptedReading(database, definition, "500", N4_AS_OF, N4_AS_OF);
+
+  const week = tryResolvePersistedPeriodConsumption(database, "kn", "week", N4_AS_OF);
+
+  assert.equal(week?.valueKwh, "0");
+  assert.equal(week?.quality, "exact");
+  database.close();
+});
+
+test("N4 day and month keep their calendar resolution while week and total gain spans", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  seedCrossYearRegister(database);
+  seedAcceptedReading(database, source(1, "epoch-1"), "1750", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+
+  const results = (["day", "week", "month", "year", "total"] as const).map((range) =>
+    [range, tryResolvePersistedPeriodConsumption(database, "kn", range, N4_AS_OF)] as const
+  );
+  const starts = new Map(results.map(([range, result]) => [range, result?.periodStart]));
+
+  assert.equal(starts.get("day"), "2026-09-01T16:00:00.000Z");
+  assert.equal(starts.get("month"), "2026-08-31T16:00:00.000Z");
+  assert.equal(starts.get("year"), "2025-12-31T16:00:00.000Z");
+  assert.equal(starts.get("week"), "2026-08-26T16:00:00.000Z");
+  assert.equal(starts.get("total"), "2024-12-31T16:00:00.000Z");
+  for (const [range, result] of results) {
+    assert.ok(result !== null, `${range} must stay a canonical result for a configured profile`);
+  }
+  database.close();
+});
+
+test("N4 a configured profile without usable evidence still returns a canonical unavailable result", () => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+
+  for (const range of ["week", "total"] as const) {
+    const result = tryResolvePersistedPeriodConsumption(database, "kn", range, N4_AS_OF);
+    assert.ok(result !== null, `${range} must not collapse into the no-profile shape`);
+    assert.equal(result?.valueKwh, null);
+    assert.ok(result?.quality === "partial" || result?.quality === "unavailable");
+  }
+  assert.equal(tryResolvePersistedPeriodConsumption(database, "global" as unknown as "kn", "total", N4_AS_OF), null);
   database.close();
 });

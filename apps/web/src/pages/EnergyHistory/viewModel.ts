@@ -76,6 +76,8 @@ export type DailyEnergySummary = {
   peakConsumptionTime: string | null;
   peakGeneration: number | null;
   peakGenerationTime: string | null;
+  /** Canonical consumption quality when the site has an accounting profile; absent on legacy rows. */
+  quality?: string;
   selfConsumptionTotal: number | null;
 };
 
@@ -90,7 +92,13 @@ type BuildEnergyHistoryViewModelArgs = {
   counters: CumulativeCounter[];
   metricScope: MetricScope;
   now?: Date | string | null;
-  periodSummary?: { quality: string; valueKwh: string | null } | null;
+  periodSummary?: {
+    issues?: string[];
+    periodStart?: string;
+    quality: string;
+    siteTimeZone?: string;
+    valueKwh: string | null;
+  } | null;
   range: EnergyHistoryRange;
   snapshots: EnergyHistorySnapshot[];
   summaries: DailyEnergySummary[];
@@ -131,6 +139,40 @@ const rangeHeadings: Record<EnergyHistoryRange, { sourceLabel: string; title: st
     title: "今年趨勢"
   }
 };
+
+/** The calendar date of an instant in the site's own accounting zone, as YYYY-MM-DD. */
+function formatSiteDate(instant: string, siteTimeZone?: string) {
+  const parsed = new Date(instant);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: siteTimeZone,
+    year: "numeric"
+  }).formatToParts(parsed);
+  const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${read("year")}-${read("month")}-${read("day")}`;
+}
+
+/**
+ * 今日/本月/今年 already name the period they cover, but 本週 and 累積 do not: 累積 in particular is
+ * "since the accounting basis in force", not the whole history of the site. Whenever the server
+ * reports a span for those two, the screen says where the consumption number actually starts.
+ */
+function consumptionSpanLabel(
+  range: EnergyHistoryRange,
+  periodSummary: BuildEnergyHistoryViewModelArgs["periodSummary"]
+) {
+  if (range !== "total" && range !== "week") {
+    return "";
+  }
+  const start = periodSummary?.periodStart
+    ? formatSiteDate(periodSummary.periodStart, periodSummary.siteTimeZone)
+    : null;
+  return start === null ? "" : `用電統計期間 ${start} 起`;
+}
 
 function formatInteger(value: number | null) {
   if (value === null) {
@@ -291,7 +333,7 @@ export function buildEnergyHistoryViewModel({
     now,
     staleAfterMs: 24 * 60 * 60 * 1000
   });
-  const monitoringState = range === "total"
+  const baseMonitoringState = range === "total"
     ? !hasUsableCounters
       ? buildMonitoringSurfaceState({
           category: "empty",
@@ -356,6 +398,22 @@ export function buildEnergyHistoryViewModel({
               sourceRoleLabel: "History Summary + Trend Snapshot"
             });
 
+  // A configured site that cannot support a consumption result still has usable generation and
+  // carbon rows, so the surface stays readable — but it must not keep claiming everything is in
+  // sync while the consumption card reads "--". More specific empty and stale states already say
+  // something truer, so only the "fresh" claim is replaced.
+  const consumptionUnavailable = periodSummary?.valueKwh === null;
+  const monitoringState = consumptionUnavailable && baseMonitoringState.category === "fresh"
+    ? buildMonitoringSurfaceState({
+        category: "degraded",
+        detailLabel: `用電量沒有可支持的期間結果（品質 ${periodSummary?.quality}${periodSummary?.issues?.length ? ` · ${periodSummary.issues[0]}` : ""}），其餘來源仍可判讀`,
+        emptyStateLabel,
+        freshnessLabel: "降級資料",
+        lastUpdatedAt: lastUpdated,
+        sourceRoleLabel: baseMonitoringState.sourceRoleLabel
+      })
+    : baseMonitoringState;
+
   const generationLinePoints: EnergyHistoryLinePoint[] = [];
   const selfConsumptionLinePoints: EnergyHistoryLinePoint[] = [];
   const consumptionLinePoints: EnergyHistoryLinePoint[] = [];
@@ -390,7 +448,7 @@ export function buildEnergyHistoryViewModel({
           : "--"
       },
       {
-        detailLabel: "",
+        detailLabel: consumptionSpanLabel(range, periodSummary),
         label: "資料來源",
         valueLabel: sourceLabel
       },

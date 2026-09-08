@@ -12,7 +12,12 @@ import {
   type PeriodSelection,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
-import { loadEffectivePeriodContext, profileRevisionBoundariesOf } from "./periodConsumptionService.js";
+import {
+  loadEffectivePeriodContext,
+  profileRevisionBoundariesOf,
+  resolveConsumptionForRangeWindow,
+  type RangeWindow
+} from "./periodConsumptionService.js";
 
 export type PersistedDepartmentShares = {
   calculatedThrough: string;
@@ -82,12 +87,12 @@ function unavailableShares(profile: SiteEnergyProfileV1) {
 export function resolvePersistedDepartmentShares(
   database: Database.Database,
   scope: "cl" | "kn",
-  period: PeriodSelection,
+  rangeWindow: RangeWindow,
   asOf: string
 ): PersistedDepartmentShares | null {
   let context;
   try {
-    context = loadEffectivePeriodContext(database, scope, period, asOf);
+    context = loadEffectivePeriodContext(database, scope, rangeWindow, asOf);
   } catch {
     return null;
   }
@@ -101,11 +106,10 @@ export function resolvePersistedDepartmentShares(
   for (const channelId of requiredChannelIds(profile)) {
     let result: PeriodConsumptionResult;
     try {
-      result = resolvePeriodConsumption({
+      result = resolveConsumptionForRangeWindow(rangeWindow, {
         asOf,
         freshnessPolicy: context.freshnessPolicy,
         meterIds: [channelId],
-        period,
         profile,
         samples: context.samples
       });

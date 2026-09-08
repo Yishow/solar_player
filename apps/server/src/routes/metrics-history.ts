@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { isMetricScope, type MetricScope } from "@solar-display/shared";
+import { isMetricScope, type MetricScope, type SiteEnergyProfileV1 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
 import {
@@ -12,7 +12,7 @@ import { getActiveProfile } from "../services/siteEnergyProfileService.js";
 import {
   monthDateKeys,
   monthKeyFromProfile,
-  periodSelectionFromRange,
+  rangeWindowFor,
   resolveDailyConsumptionPoints,
   tryResolvePersistedPeriodConsumption
 } from "../services/periodConsumptionService.js";
@@ -48,6 +48,55 @@ function requestedConsumptionDates(
   }
   return dates;
 }
+
+type DailySummaryRow = ReturnType<typeof resolveDailyEnergySummaryHistory>[number];
+
+/**
+ * The one read-time consumption composition shared by management history and display daily
+ * summaries. The caller keeps ownership of scope, authorization and the range's own date set —
+ * `selectDates` is how it keeps it, so sharing this function cannot hand one surface the other's
+ * date rule. Only consumption and its quality are replaced, so the same evidence and as-of instant
+ * can never produce two different daily answers on two screens. Raw summaries are never written back.
+ */
+function overlayCanonicalDailyConsumption(
+  database: ReturnType<typeof getDatabase>,
+  metricScope: MetricScope,
+  summaries: DailySummaryRow[],
+  asOf: string,
+  selectDates: (summaries: DailySummaryRow[], profile: SiteEnergyProfileV1) => string[]
+) {
+  if (metricScope !== "cl" && metricScope !== "kn") {
+    return summaries;
+  }
+  const profile = getActiveProfile(database, metricScope);
+  if (!profile) {
+    return summaries;
+  }
+  const dates = selectDates(summaries, profile);
+  const points = new Map(
+    (resolveDailyConsumptionPoints(database, metricScope, dates, asOf) ?? []).map((point) => [point.date, point])
+  );
+  const existing = new Map(summaries.map((summary) => [summary.date, summary]));
+  return dates.map((date) => {
+    const summary = existing.get(date);
+    const point = points.get(date);
+    const valueKwh = point?.valueKwh ?? null;
+    return {
+      co2Total: summary?.co2Total ?? null,
+      consumptionTotal: valueKwh === null ? null : Number(valueKwh),
+      date,
+      generationTotal: summary?.generationTotal ?? null,
+      peakConsumption: summary?.peakConsumption ?? null,
+      peakConsumptionTime: summary?.peakConsumptionTime ?? null,
+      peakGeneration: summary?.peakGeneration ?? null,
+      peakGenerationTime: summary?.peakGenerationTime ?? null,
+      quality: point?.quality ?? "unavailable",
+      selfConsumptionTotal: summary?.selfConsumptionTotal ?? null,
+      valueKwh
+    };
+  });
+}
+
 const energyHistoryScopeError = "Energy history metricScope must be cl, kn, or global.";
 
 type EnergyHistoryQuery = {
@@ -67,7 +116,15 @@ function readEnergyHistory(
     periodSummary: tryResolvePersistedPeriodConsumption(database, metricScope, range, asOf),
     range,
     snapshots: resolveMetricSnapshotHistory(database, { metricScope, range }),
-    summaries: resolveDailyEnergySummaryHistory(database, { metricScope, range })
+    // Management history keeps exactly the stored rows its range selected, in their existing
+    // order; only their consumption becomes canonical.
+    summaries: overlayCanonicalDailyConsumption(
+      database,
+      metricScope,
+      resolveDailyEnergySummaryHistory(database, { metricScope, range }),
+      asOf,
+      (rows) => rows.map((row) => row.date)
+    )
   };
 }
 
@@ -134,38 +191,15 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
 
     const database = getDatabase();
     const asOf = new Date().toISOString();
-    const summaries = resolveDailyEnergySummaryHistory(database, { metricScope, range: rangeParam });
-    if (metricScope !== "cl" && metricScope !== "kn") {
-      return { summaries };
-    }
-    const profile = getActiveProfile(database, metricScope);
-    if (!profile) {
-      return { summaries };
-    }
-    const dates = requestedConsumptionDates(summaries, rangeParam, monthKeyFromProfile(asOf, profile));
-    const points = new Map(
-      (resolveDailyConsumptionPoints(database, metricScope, dates, asOf) ?? []).map((point) => [point.date, point])
-    );
-    const existing = new Map(summaries.map((summary) => [summary.date, summary]));
     return {
-      summaries: dates.map((date) => {
-        const summary = existing.get(date);
-        const point = points.get(date);
-        const valueKwh = point?.valueKwh ?? null;
-        return {
-          co2Total: summary?.co2Total ?? null,
-          consumptionTotal: valueKwh === null ? null : Number(valueKwh),
-          date,
-          generationTotal: summary?.generationTotal ?? null,
-          peakConsumption: summary?.peakConsumption ?? null,
-          peakConsumptionTime: summary?.peakConsumptionTime ?? null,
-          peakGeneration: summary?.peakGeneration ?? null,
-          peakGenerationTime: summary?.peakGenerationTime ?? null,
-          quality: point?.quality ?? "unavailable",
-          selfConsumptionTotal: summary?.selfConsumptionTotal ?? null,
-          valueKwh
-        };
-      })
+      // The display daily summary keeps its own month full-calendar padding.
+      summaries: overlayCanonicalDailyConsumption(
+        database,
+        metricScope,
+        resolveDailyEnergySummaryHistory(database, { metricScope, range: rangeParam }),
+        asOf,
+        (rows, profile) => requestedConsumptionDates(rows, rangeParam, monthKeyFromProfile(asOf, profile))
+      )
     };
   });
 
@@ -194,11 +228,13 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     const database = getDatabase();
     const asOf = new Date().toISOString();
     const profile = getActiveProfile(database, metricScope);
-    const period = profile ? periodSelectionFromRange(rangeParam, asOf, profile.siteTimeZone) : null;
-    if (!period) {
+    // Shares resolve the requested range through the same authority the consumption card uses, so
+    // week and total describe the same span rather than silently emptying or borrowing the year.
+    const rangeWindow = profile ? rangeWindowFor(rangeParam, asOf, profile) : null;
+    if (!rangeWindow) {
       return { quality: "unavailable", shares: [] };
     }
-    return resolvePersistedDepartmentShares(database, metricScope, period, asOf) ?? { quality: "unavailable", shares: [] };
+    return resolvePersistedDepartmentShares(database, metricScope, rangeWindow, asOf) ?? { quality: "unavailable", shares: [] };
   });
 };
 

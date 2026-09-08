@@ -113,7 +113,7 @@ export function readProfileReadiness(
   }
 
   try {
-    const context = loadEffectivePeriodContext(database, scope, period, asOf);
+    const context = loadEffectivePeriodContext(database, scope, { kind: "period", period }, asOf);
     const sourceReasons: string[] = [];
     let sources: ProfileSourceSnapshot[] = [];
     try {

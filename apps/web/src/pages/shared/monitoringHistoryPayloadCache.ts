@@ -11,7 +11,13 @@ export type MonitoringHistorySnapshot = {
 };
 
 export type MonitoringHistoryPayload<TSnapshot extends MonitoringHistorySnapshot = MonitoringHistorySnapshot> = {
-  periodSummary?: { quality: string; valueKwh: string | null } | null;
+  periodSummary?: {
+    issues?: string[];
+    periodStart?: string;
+    quality: string;
+    siteTimeZone?: string;
+    valueKwh: string | null;
+  } | null;
   range: MonitoringHistoryRange;
   snapshots: TSnapshot[];
 };

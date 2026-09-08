@@ -1134,7 +1134,13 @@ export type DataHubEnergyHistoryResponse = {
     totalValue: number | null;
   }>;
   metricScope: MetricScope;
-  periodSummary?: { quality: string; valueKwh: string | null } | null;
+  periodSummary?: {
+    issues?: string[];
+    periodStart?: string;
+    quality: string;
+    siteTimeZone?: string;
+    valueKwh: string | null;
+  } | null;
   range: DataHubEnergyHistoryRange;
   snapshots: Array<{
     capturedAt: string;
@@ -1154,6 +1160,8 @@ export type DataHubEnergyHistoryResponse = {
     peakConsumptionTime: string | null;
     peakGeneration: number | null;
     peakGenerationTime: string | null;
+    /** Canonical consumption quality; absent on legacy rows of a scope without a site profile. */
+    quality?: string;
     selfConsumptionTotal: number | null;
   }>;
 };

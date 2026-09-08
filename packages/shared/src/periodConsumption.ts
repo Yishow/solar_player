@@ -11,6 +11,19 @@ export type PeriodSelection = {
   day?: number;
 };
 
+/**
+ * A window the server has already resolved against the site's own calendar for a range that is not
+ * one calendar period — the recent-seven-date week and the supported accounting total. It is not a
+ * caller-supplied start/end override: `resolveAccountingSpanConsumption` is the only entry point
+ * that accepts it, and it still refuses the public timeZone/start/end fields that E6 forbids.
+ */
+export type AccountingSpan = {
+  endMs: number;
+  kind: "span";
+  spanOf: "week" | "total";
+  startMs: number;
+};
+
 export type PeriodSample = {
   channelId: string;
   epochId?: string;
@@ -185,10 +198,40 @@ type PeriodEvaluation = {
 };
 
 /**
+ * A long range asks for the same channel index once per date, and building it is O(n log n) in the
+ * whole accepted-sample set — so a year of hourly readings paid that cost 365 times. The mapping is
+ * a pure function of the sample array, the meter set and the as-of cap, so memoise it against the
+ * array itself; a WeakMap keeps the index alive no longer than the samples it describes. Callers
+ * must not mutate a sample array after handing it over, which is already true of every caller.
+ */
+const sampleIndexCache = new WeakMap<PeriodSample[], Map<string, Map<string, PeriodSample[]>>>();
+
+function indexSamplesByChannel(
+  samples: PeriodSample[],
+  meterIds: string[],
+  asOfMs: number,
+  excludeReceivedAfterAsOf: boolean
+) {
+  const cacheKey = `${asOfMs}|${excludeReceivedAfterAsOf}|${meterIds.join("\u0000")}`;
+  let byInputs = sampleIndexCache.get(samples);
+  if (!byInputs) {
+    byInputs = new Map();
+    sampleIndexCache.set(samples, byInputs);
+  }
+  const cached = byInputs.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const index = buildSampleIndex(samples, meterIds, asOfMs, excludeReceivedAfterAsOf);
+  byInputs.set(cacheKey, index);
+  return index;
+}
+
+/**
  * One channel-keyed, instant-sorted index, built once per request and reused by the period total
  * and by every daily window. Sorting here also makes the result independent of input ordering.
  */
-function indexSamplesByChannel(
+function buildSampleIndex(
   samples: PeriodSample[],
   meterIds: string[],
   asOfMs: number,
@@ -406,7 +449,17 @@ type PeriodConsumptionInput = {
   end?: string;
 };
 
-function resolvePeriodConsumptionCore(input: PeriodConsumptionInput, allowDraftRevision: boolean): PeriodConsumptionResult {
+type SpanConsumptionInput = Omit<PeriodConsumptionInput, "period"> & {
+  accountingContext: "server-authorized-range";
+  span: AccountingSpan;
+};
+
+function resolvePeriodConsumptionCore(
+  input: Omit<PeriodConsumptionInput, "period">,
+  window: { endMs: number; startMs: number },
+  dailyCoveragePeriod: PeriodSelection | null,
+  allowDraftRevision: boolean
+): PeriodConsumptionResult {
   const override = rejectCalendarOverride({
     end: input.end,
     start: input.start,
@@ -453,7 +506,6 @@ function resolvePeriodConsumptionCore(input: PeriodConsumptionInput, allowDraftR
     const sharedMod = parseDecimalString(String(input.rolloverModulus));
     for (const meterId of input.meterIds) normalizedModulus.set(meterId, sharedMod);
   }
-  const window = periodWindow(input.period, input.profile.siteTimeZone);
   const closeCapMs = Math.min(window.endMs, asOfMs);
   const context: PeriodEvaluationContext = {
     boundaryMaxAgeSeconds: input.boundaryMaxAgeSeconds,
@@ -475,8 +527,8 @@ function resolvePeriodConsumptionCore(input: PeriodConsumptionInput, allowDraftR
     total = null;
     observed = null;
   }
-  const dailyCoverage = input.period.kind === "month"
-    ? evaluateDailyCoverage(context, input.period, input.profile.siteTimeZone, asOfMs)
+  const dailyCoverage = dailyCoveragePeriod
+    ? evaluateDailyCoverage(context, dailyCoveragePeriod, input.profile.siteTimeZone, asOfMs)
     : undefined;
   return {
     ...resultFor(input.profile, quality, quality === "exact" || quality === "estimated-boundary" ? total : null),
@@ -503,14 +555,34 @@ function resolvePeriodConsumptionCore(input: PeriodConsumptionInput, allowDraftR
   };
 }
 
+function calendarWindowOf(input: PeriodConsumptionInput) {
+  return periodWindow(input.period, input.profile.siteTimeZone);
+}
+
 export function resolvePeriodConsumption(input: PeriodConsumptionInput): PeriodConsumptionResult {
-  return resolvePeriodConsumptionCore(input, false);
+  return resolvePeriodConsumptionCore(input, calendarWindowOf(input), input.period.kind === "month" ? input.period : null, false);
 }
 
 export function resolveReviewPeriodConsumption(
   input: PeriodConsumptionInput & { reviewContext: "profile-draft" }
 ): PeriodConsumptionResult {
-  return resolvePeriodConsumptionCore(input, true);
+  return resolvePeriodConsumptionCore(input, calendarWindowOf(input), input.period.kind === "month" ? input.period : null, true);
+}
+
+/**
+ * The internal seam for server-authorized week and total windows. Every admissibility rule — meter
+ * membership, boundary age, source identity, revision, epoch, rollover, as-of capping and quality
+ * degradation — is the shared one; only the window's origin differs, and only a verified internal
+ * accounting context may supply it.
+ */
+export function resolveAccountingSpanConsumption(input: SpanConsumptionInput): PeriodConsumptionResult {
+  if (input.accountingContext !== "server-authorized-range") {
+    throw Object.assign(new Error("INVALID_ACCOUNTING_CONTEXT"), { code: "INVALID_ACCOUNTING_CONTEXT" });
+  }
+  if (!Number.isFinite(input.span.startMs) || !Number.isFinite(input.span.endMs) || input.span.endMs <= input.span.startMs) {
+    throw Object.assign(new Error("PERIOD_BOUNDARY_INVALID"), { code: "PERIOD_BOUNDARY_INVALID" });
+  }
+  return resolvePeriodConsumptionCore(input, { endMs: input.span.endMs, startMs: input.span.startMs }, null, false);
 }
 
 function addDecimal(left: string, right: string) {

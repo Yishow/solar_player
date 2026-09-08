@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DailyEnergySummary } from "./viewModel";
 import {
   buildEnergyHistoryViewModel,
   isEnergyHistoryPayloadForSelection,
@@ -302,4 +303,225 @@ test("buildEnergyHistoryViewModel keeps an empty selected scope visibly scoped",
   assert.equal(model.scopeLabel, "KN 廠區 / KN Site");
   assert.equal(model.monitoringState.category, "empty");
   assert.match(model.monitoringState.emptyStateLabel, /KN 廠區/);
+});
+
+/**
+ * The management history API shape a configured site returns: canonical daily consumption with its
+ * own quality, and a period result that owns the card. Rows keep their legacy non-consumption
+ * fields, so the fixtures below mirror the route response rather than a trimmed convenience shape.
+ */
+function canonicalSummary(overrides: Partial<DailyEnergySummary> & { date: string }): DailyEnergySummary {
+  return {
+    co2Total: 5,
+    consumptionTotal: null,
+    generationTotal: 10,
+    peakConsumption: 488,
+    peakConsumptionTime: "15:00",
+    peakGeneration: 612,
+    peakGenerationTime: "11:00",
+    quality: "partial",
+    selfConsumptionTotal: 7,
+    ...overrides
+  };
+}
+
+test("N3 the monthly curve and table keep canonical daily gaps beside a known month total", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-30T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "900" },
+    range: "month",
+    snapshots,
+    summaries: [
+      canonicalSummary({ consumptionTotal: 300, date: "2026-09-01", quality: "exact" }),
+      canonicalSummary({ consumptionTotal: null, date: "2026-09-02", quality: "partial" })
+    ]
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "900", "the card keeps the supported month total");
+  assert.deepEqual(model.chartLines[2]?.points, [
+    { label: "2026-09-01", value: 300 },
+    { label: "2026-09-02", value: null }
+  ]);
+  assert.deepEqual(model.tableRows.map((row) => row.consumptionLabel), ["300", "--"]);
+  assert.deepEqual(model.tableRows.map((row) => row.generationLabel), ["10", "10"]);
+});
+
+test("N3 a legacy sentinel row cannot outrank the canonical period result", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: { quality: "partial", valueKwh: null },
+    range: "week",
+    snapshots,
+    summaries: [
+      canonicalSummary({ consumptionTotal: null, date: "2026-09-01" }),
+      canonicalSummary({ consumptionTotal: null, date: "2026-09-02" })
+    ]
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "--", "missing week evidence is unavailable, not zero");
+  assert.notEqual(model.metricCards[2]?.valueLabel, "0");
+  assert.equal(model.metricCards[0]?.valueLabel, "20", "non-consumption cards keep summing their own rows");
+});
+
+test("N4 a canonical unavailable total does not fall back to the lifetime counter", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: { quality: "partial", valueKwh: null },
+    range: "total",
+    snapshots: [],
+    summaries: []
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "--", "an unproven accounting span must not borrow the raw counter");
+});
+
+test("N4 a measured zero stays a measured zero", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "0" },
+    range: "week",
+    snapshots,
+    summaries: [canonicalSummary({ consumptionTotal: 0, date: "2026-09-02", quality: "exact" })]
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "0");
+});
+
+test("N3 a scope without an accounting profile keeps the legacy summary fallback", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "global",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: null,
+    range: "week",
+    snapshots,
+    summaries: [
+      { co2Total: 1, consumptionTotal: 120, date: "2026-09-01", generationTotal: 10, peakConsumption: null, peakConsumptionTime: null, peakGeneration: null, peakGenerationTime: null, selfConsumptionTotal: 3 },
+      { co2Total: 1, consumptionTotal: 80, date: "2026-09-02", generationTotal: 10, peakConsumption: null, peakConsumptionTime: null, peakGeneration: null, peakGenerationTime: null, selfConsumptionTotal: 3 }
+    ]
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "200", "the no-profile compatibility path is unchanged");
+});
+
+test("N4 an unavailable canonical consumption is reported with its quality instead of a fresh claim", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { issues: ["MISSING_BASELINE:kn-main"], quality: "partial", valueKwh: null },
+    range: "week",
+    snapshots,
+    summaries: [canonicalSummary({ consumptionTotal: null, date: "2026-05-13" })]
+  });
+
+  assert.equal(model.metricCards[2]?.valueLabel, "--");
+  assert.equal(model.monitoringState.category, "degraded");
+  assert.match(model.monitoringState.detailLabel, /用電/);
+  assert.match(model.monitoringState.detailLabel, /partial/);
+  assert.match(model.monitoringState.detailLabel, /MISSING_BASELINE:kn-main/);
+});
+
+test("N4 an unavailable canonical total does not overwrite a more specific empty or stale state", () => {
+  const empty = buildEnergyHistoryViewModel({
+    counters: [],
+    metricScope: "kn",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: { quality: "unavailable", valueKwh: null },
+    range: "total",
+    snapshots: [],
+    summaries: []
+  });
+  assert.equal(empty.monitoringState.category, "empty");
+
+  const stale = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-02T10:02:00.000Z",
+    periodSummary: { quality: "partial", valueKwh: null },
+    range: "week",
+    snapshots: [{ ...snapshots[0]!, capturedAt: "2026-08-01T00:00:00.000Z" }],
+    summaries: [canonicalSummary({ consumptionTotal: null, date: "2026-08-01" })]
+  });
+  assert.equal(stale.monitoringState.category, "stale");
+});
+
+test("N4 a supported consumption value keeps the existing monitoring category", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-05-13T10:02:00.000Z",
+    periodSummary: { quality: "exact", valueKwh: "300" },
+    range: "week",
+    snapshots,
+    summaries: [canonicalSummary({ consumptionTotal: 300, date: "2026-05-13", quality: "exact" })]
+  });
+
+  assert.equal(model.monitoringState.category, "fresh");
+  assert.equal(model.metricCards[2]?.valueLabel, "300");
+});
+
+test("N4 the cumulative range states the accounting span its consumption actually covers", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "kn",
+    now: "2026-09-08T10:02:00.000Z",
+    periodSummary: {
+      periodStart: "2026-05-31T16:00:00.000Z",
+      quality: "exact",
+      siteTimeZone: "Asia/Taipei",
+      valueKwh: "100"
+    },
+    range: "total",
+    snapshots: [],
+    summaries: []
+  });
+
+  const source = model.bottomSummary.find((item) => item.label === "資料來源");
+  assert.equal(model.metricCards[2]?.valueLabel, "100");
+  assert.equal(source?.detailLabel, "用電統計期間 2026-06-01 起");
+});
+
+test("N4 the week range states its own span and the calendar ranges stay unlabelled", () => {
+  const build = (range: "week" | "month") =>
+    buildEnergyHistoryViewModel({
+      counters: cumulativeCounters,
+      metricScope: "kn",
+      now: "2026-09-08T10:02:00.000Z",
+      periodSummary: {
+        periodStart: "2026-09-01T16:00:00.000Z",
+        quality: "partial",
+        siteTimeZone: "Asia/Taipei",
+        valueKwh: null
+      },
+      range,
+      snapshots: [],
+      summaries: []
+    });
+
+  assert.equal(build("week").bottomSummary.find((item) => item.label === "資料來源")?.detailLabel, "用電統計期間 2026-09-02 起");
+  // 今日/本月/今年 already name their own period, so the row stays as it was.
+  assert.equal(build("month").bottomSummary.find((item) => item.label === "資料來源")?.detailLabel, "");
+});
+
+test("N4 a cumulative range without a canonical span keeps the source row unchanged", () => {
+  const model = buildEnergyHistoryViewModel({
+    counters: cumulativeCounters,
+    metricScope: "global",
+    now: "2026-09-08T10:02:00.000Z",
+    periodSummary: null,
+    range: "total",
+    snapshots: [],
+    summaries: []
+  });
+
+  assert.equal(model.bottomSummary.find((item) => item.label === "資料來源")?.detailLabel, "");
 });
