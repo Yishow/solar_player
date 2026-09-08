@@ -261,6 +261,21 @@ function isProcessAlive(pid: number) {
   }
 }
 
+/** Generic (non managed-adapter) topics production reception is configured for. */
+export function listEnabledGenericTopics(database: Database.Database) {
+  return (
+    database
+      .prepare(
+        `
+          SELECT DISTINCT topic
+          FROM topic_mappings
+          WHERE enabled = 1 AND TRIM(topic) != ''
+        `
+      )
+      .all() as Array<{ topic: string }>
+  ).map((row) => row.topic);
+}
+
 export class MqttClientService {
   private readonly database: Database.Database;
   private readonly logger: LoggerLike;
@@ -406,6 +421,14 @@ export class MqttClientService {
     } finally {
       await disconnectClient(client);
     }
+  }
+
+  /**
+   * Topics the broker has acknowledged for this connection. Read-only: the
+   * runtime stays the single owner of the production subscription list.
+   */
+  getActiveTopics() {
+    return [...this.activeTopics];
   }
 
   async subscribe(topics: string[]) {
@@ -854,17 +877,7 @@ export class MqttClientService {
   }
 
   private async loadEnabledTopics() {
-    const rows = this.database
-      .prepare(
-        `
-          SELECT DISTINCT topic
-          FROM topic_mappings
-          WHERE enabled = 1 AND TRIM(topic) != ''
-        `
-      )
-      .all() as Array<{ topic: string }>;
-
-    return rows.map((row) => row.topic);
+    return listEnabledGenericTopics(this.database);
   }
 
   private buildDesiredTopics(genericTopics: readonly string[]) {
@@ -995,17 +1008,17 @@ export class MqttClientService {
             !mapped?.handled
             || mapped.status !== "accepted"
             || mapped.liveUpdated !== true
-            || mapped.liveValueKwh === null
+            || mapped.liveValueDecimal === null
           ) {
             return;
           }
-          const normalizedValue = Number(mapped.liveValueKwh);
+          const normalizedValue = Number(mapped.liveValueDecimal);
           if (!Number.isFinite(normalizedValue)) {
             this.logger.warn(
               {
                 metricKey: mapping.metric_key,
                 metricScope: mapping.metric_scope,
-                value: mapped.liveValueKwh,
+                value: mapped.liveValueDecimal,
                 topic
               },
               "Accepted meter reading is not representable in generic live metrics"
@@ -1016,7 +1029,7 @@ export class MqttClientService {
             mapping.metric_scope,
             mapping.metric_key,
             normalizedValue,
-            "kWh",
+            mapped.liveUnit,
             mapped.sourceTimestamp ?? receivedAt,
             mapped.timestampQuality,
             rawPayload

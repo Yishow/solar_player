@@ -1,6 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { isMetricScope, type MetricScope, type RuntimeMqttStatus } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import {
+  consumePublishConfirmation,
+  issuePublishConfirmation,
+  normalizePublishValue,
+  resolvePublishTarget
+} from "../services/mqttTestPublishConfirmationService.js";
 import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
@@ -41,9 +47,15 @@ type TopicMappingResponse = {
 type SettingsBody = Partial<MqttSettingsResponse>;
 type TestConnectionBody = SettingsBody;
 type PublishTopicValueBody = {
+  confirmationToken?: unknown;
   confirmed?: unknown;
   metricScope?: unknown;
   previewOnly?: unknown;
+  retain?: unknown;
+  value?: unknown;
+};
+type PublishConfirmationBody = {
+  metricScope?: unknown;
   retain?: unknown;
   value?: unknown;
 };
@@ -345,6 +357,12 @@ function getTopicMapping(metricScope: MetricScope, metricKey: string) {
     | undefined;
 }
 
+/** The configured broker a publish actually goes to, independent of live connection state. */
+function resolveBrokerReference() {
+  const settings = resolveMqttSettings(process.env, getSettingsRow());
+  return `${settings.broker_host?.trim() || "localhost"}:${settings.broker_port ?? 1883}`;
+}
+
 const settingsMqttRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/runtime/mqtt-status", async () => ({
     status: app.mqttClientService.getStatus() satisfies RuntimeMqttStatus
@@ -491,10 +509,60 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
+  app.post<{ Body: PublishConfirmationBody; Params: { metricKey: string } }>(
+    "/api/settings/mqtt/topics/:metricKey/publish-confirmation",
+    async (request, reply) => {
+      const metricScope = request.body?.metricScope;
+      const value = normalizePublishValue(request.body?.value);
+      if (!isMetricScope(metricScope)) {
+        return reply.status(400).send({
+          error: "Publish metricScope must be cl, kn, or global",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      if (!value) {
+        return reply.status(400).send({
+          error: "Publish value must be a reviewed decimal",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      const mapping = getTopicMapping(metricScope, request.params.metricKey);
+      if (!mapping) {
+        return reply.status(404).send({
+          error: "MQTT topic mapping not found",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      if (mapping.enabled !== 1 || (mapping.topic?.trim() ?? "") === "") {
+        return reply.status(409).send({
+          error: "MQTT topic mapping is not publishable",
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return issuePublishConfirmation(resolvePublishTarget(getDatabase(), {
+        broker: resolveBrokerReference(),
+        buildPayload: (numeric) => buildTopicPublishPayload(numeric, mapping),
+        mapping,
+        metricScope,
+        retain: request.body?.retain === true,
+        value
+      }));
+    }
+  );
+
   app.post<{ Body: PublishTopicValueBody; Params: { metricKey: string } }>(
     "/api/settings/mqtt/topics/:metricKey/publish",
     async (request, reply) => {
-      const value = request.body?.value;
+      const confirmationToken = typeof request.body?.confirmationToken === "string"
+        ? request.body.confirmationToken
+        : null;
+      const value = confirmationToken === null
+        ? request.body?.value
+        : normalizePublishValue(request.body?.value);
       const metricScope = request.body?.metricScope;
       if (request.body?.previewOnly === true) {
         return {
@@ -517,7 +585,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
           timestamp: new Date().toISOString()
         });
       }
-      if (typeof value !== "number" || !Number.isFinite(value)) {
+      if (confirmationToken === null ? typeof value !== "number" || !Number.isFinite(value) : typeof value !== "string") {
         return reply.status(400).send({
           error: "Publish value must be a finite number",
           success: false,
@@ -543,10 +611,28 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const payload = buildTopicPublishPayload(value, mapping);
-      const publishResult = await app.mqttClientService.publish(topic, payload, {
-        retain: request.body?.retain === true
-      });
+      const retain = request.body?.retain === true;
+      let payload = buildTopicPublishPayload(Number(value), mapping);
+      if (confirmationToken !== null) {
+        const check = consumePublishConfirmation(confirmationToken, resolvePublishTarget(getDatabase(), {
+          broker: resolveBrokerReference(),
+          buildPayload: (numeric) => buildTopicPublishPayload(numeric, mapping),
+          mapping,
+          metricScope,
+          retain,
+          value: String(value)
+        }));
+        if (!check.ok) {
+          return reply.status(409).send({
+            error: check.reason,
+            success: false,
+            timestamp: new Date().toISOString(),
+            ...(check.value === null ? {} : { value: check.value })
+          });
+        }
+        payload = check.target.payload;
+      }
+      const publishResult = await app.mqttClientService.publish(topic, payload, { retain });
       if (!publishResult.success) {
         return reply.status(409).send({
           error: publishResult.message,

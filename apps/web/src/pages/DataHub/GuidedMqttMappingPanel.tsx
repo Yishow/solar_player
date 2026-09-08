@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   compileSelector,
+  type GuidedMappingApplyResult,
   type MappingPreviewDraft,
   type MappingSuggestion,
   type MeterSourceDefinition
@@ -14,6 +15,20 @@ type FieldCandidate = {
   preview: string;
   tagEquals?: string;
 };
+
+/** Saved, broker-acknowledged and actually received are reported separately. */
+function describeApplyResult(result: Partial<GuidedMappingApplyResult>) {
+  const saved = "對應已保存。";
+  if (!result.activation) {
+    return saved;
+  }
+  const reception = result.reception?.observed ? "已收到資料。" : "尚未收到資料。";
+  if (result.activation.state === "active") {
+    return `${saved}訂閱已生效（${result.activation.topic}）。${reception}`;
+  }
+  const retry = result.activation.retryable ? "可重試套用，不需重新新增來源。" : "";
+  return `${saved}訂閱尚未生效：${result.activation.reason ?? result.activation.state}。${retry}${reception}`;
+}
 
 function collectFields(value: unknown, prefix = ""): FieldCandidate[] {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -206,7 +221,7 @@ export function GuidedMqttMappingPanel({
             disabled={!draft.source || !draft.topic}
             onClick={() => {
               const requestRevision = inputRevision.current;
-              void requestJson("/api/data-hub/mqtt-mappings/apply", {
+              void requestJson<Partial<GuidedMappingApplyResult>>("/api/data-hub/mqtt-mappings/apply", {
                 body: JSON.stringify({
                   canonicalDraft: draft,
                   idempotencyKey: `m2-${previewToken}`,
@@ -216,8 +231,8 @@ export function GuidedMqttMappingPanel({
                   topic: draft.topic
                 }),
                 method: "POST"
-              }).then(() => {
-                if (requestRevision === inputRevision.current) setMessage("對應已套用。");
+              }).then((result) => {
+                if (requestRevision === inputRevision.current) setMessage(describeApplyResult(result));
               }).catch((error: unknown) => {
                 if (requestRevision !== inputRevision.current) return;
                 setMessage(error instanceof Error ? error.message : "套用失敗");

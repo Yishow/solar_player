@@ -1,0 +1,960 @@
+[
+  {
+    "request": {
+      "method": "GET",
+      "url": "/api/settings/mqtt/reception-profiles"
+    },
+    "response": {
+      "body": {
+        "profiles": [
+          {
+            "allowedFilters": [
+              "factory/cl/"
+            ],
+            "id": "cl-power",
+            "name": "中壢電力資料",
+            "siteScope": "cl"
+          },
+          {
+            "allowedFilters": [
+              "factory/kn/"
+            ],
+            "id": "kn-power",
+            "name": "觀音電力資料",
+            "siteScope": "kn"
+          }
+        ]
+      },
+      "statusCode": 200
+    },
+    "step": "R3 列出已批准接收範圍"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "connectionRef": "central",
+        "filter": "factory/kn/#",
+        "mode": "active",
+        "receptionProfileId": "kn-power",
+        "siteScope": "kn"
+      },
+      "url": "/api/settings/mqtt/captures"
+    },
+    "response": {
+      "body": {
+        "captureId": "4d2a7d9d-fe65-41c4-b151-88c3255ea90d",
+        "connectionRef": "central",
+        "coverage": "no-traffic",
+        "dropped": 0,
+        "expiresAt": "2026-09-08T07:45:52.136Z",
+        "featureEnabled": true,
+        "mode": "active",
+        "receptionProfileId": "kn-power",
+        "siteScope": "kn",
+        "discovery": {
+          "reason": null,
+          "state": "granted"
+        }
+      },
+      "statusCode": 200
+    },
+    "step": "R3 由正式入口開始隔離 active discovery"
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "/api/settings/mqtt/captures/4d2a7d9d-fe65-41c4-b151-88c3255ea90d/candidates"
+    },
+    "response": {
+      "body": {
+        "captureId": "4d2a7d9d-fe65-41c4-b151-88c3255ea90d",
+        "candidates": [
+          {
+            "candidateId": "factory/kn/main",
+            "declaredTag": null,
+            "exactTopic": "factory/kn/main",
+            "lastSeenAt": "2026-09-08T07:42:52.136Z",
+            "sampleRefs": [
+              "4a66a4b2-4eac-4b12-912b-9fa817676dca"
+            ],
+            "schemaVersion": 1
+          }
+        ],
+        "coverage": "partial",
+        "discovery": {
+          "reason": null,
+          "state": "granted"
+        },
+        "dropped": 0
+      },
+      "statusCode": 200
+    },
+    "step": "R3 取得候選 Topic"
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "/api/settings/mqtt/captures/4d2a7d9d-fe65-41c4-b151-88c3255ea90d/samples/4a66a4b2-4eac-4b12-912b-9fa817676dca"
+    },
+    "response": {
+      "body": {
+        "captureId": "4d2a7d9d-fe65-41c4-b151-88c3255ea90d",
+        "connectionRef": "central",
+        "exactTopic": "factory/kn/main",
+        "receptionProfileId": "kn-power",
+        "redactedPayload": "{\"tag\":\"MAIN\",\"value\":\"1234.5\",\"sourceTimestamp\":\"2026-09-08T01:00:00Z\"}",
+        "sampleId": "4a66a4b2-4eac-4b12-912b-9fa817676dca",
+        "schemaVersion": 1,
+        "siteScope": "kn",
+        "transportEvidence": {
+          "dup": false,
+          "origin": "mqtt",
+          "qos": 0,
+          "receivedAt": "2026-09-08T07:42:52.136Z",
+          "retain": false
+        },
+        "truncated": false
+      },
+      "statusCode": 200
+    },
+    "step": "R3 取回可選欄位的實際樣本"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "channelId": "kn-main",
+        "energyFlowRole": "consumption",
+        "measurementKind": "cumulative-energy",
+        "metricScope": "kn",
+        "selector": {
+          "path": [
+            "value"
+          ]
+        },
+        "source": {
+          "channelId": "kn-main",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "cumulative-energy",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kWh",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required"
+        },
+        "timestampPolicy": "source-required",
+        "topic": "factory/kn/main"
+      },
+      "url": "/api/data-hub/mqtt-mappings/preview"
+    },
+    "response": {
+      "body": {
+        "canonicalDraft": {
+          "channelId": "kn-main",
+          "energyFlowRole": "consumption",
+          "measurementKind": "cumulative-energy",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ]
+          },
+          "source": {
+            "channelId": "kn-main",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "one",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kWh",
+            "measurementKind": "cumulative-energy",
+            "meterId": "kn-main",
+            "metricKey": "consumptionEnergy",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 1,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "source-required"
+          },
+          "timestampPolicy": "source-required",
+          "topic": "factory/kn/main"
+        },
+        "previewToken": "5a6b4116-f712-4966-bafb-a19e8e5d1909"
+      },
+      "statusCode": 200
+    },
+    "step": "R1 失敗情境：產生預覽"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "canonicalDraft": {
+          "channelId": "kn-main",
+          "energyFlowRole": "consumption",
+          "measurementKind": "cumulative-energy",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ]
+          },
+          "source": {
+            "channelId": "kn-main",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "one",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kWh",
+            "measurementKind": "cumulative-energy",
+            "meterId": "kn-main",
+            "metricKey": "consumptionEnergy",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 1,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "source-required"
+          },
+          "timestampPolicy": "source-required",
+          "topic": "factory/kn/main"
+        },
+        "idempotencyKey": "evidence-activation",
+        "meterId": "kn-main",
+        "previewToken": "5a6b4116-f712-4966-bafb-a19e8e5d1909",
+        "source": {
+          "channelId": "kn-main",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "cumulative-energy",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kWh",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required"
+        }
+      },
+      "url": "/api/data-hub/mqtt-mappings/apply"
+    },
+    "response": {
+      "body": {
+        "applied": true,
+        "channelId": "kn-main",
+        "source": {
+          "channelId": "kn-main",
+          "displayNameEn": null,
+          "displayNameZh": null,
+          "enabled": true,
+          "energyFlowRole": "consumption",
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "inputUnit": "kWh",
+          "measurementKind": "cumulative-energy",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "reviewStatus": "reviewed",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required",
+          "boundaryMaxAgeSeconds": 300
+        },
+        "activation": {
+          "reason": "BROKER_SUBSCRIBE_REFUSED",
+          "retryable": true,
+          "state": "failed",
+          "topic": "factory/kn/main"
+        },
+        "reception": {
+          "lastAcceptedAt": null,
+          "observed": false
+        },
+        "saved": true
+      },
+      "statusCode": 200
+    },
+    "step": "R1 失敗情境：套用（broker 拒絕訂閱）"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "canonicalDraft": {
+          "channelId": "kn-main",
+          "energyFlowRole": "consumption",
+          "measurementKind": "cumulative-energy",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ]
+          },
+          "source": {
+            "channelId": "kn-main",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "one",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kWh",
+            "measurementKind": "cumulative-energy",
+            "meterId": "kn-main",
+            "metricKey": "consumptionEnergy",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 1,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "source-required"
+          },
+          "timestampPolicy": "source-required",
+          "topic": "factory/kn/main"
+        },
+        "idempotencyKey": "evidence-activation",
+        "meterId": "kn-main",
+        "previewToken": "5a6b4116-f712-4966-bafb-a19e8e5d1909",
+        "source": {
+          "channelId": "kn-main",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "cumulative-energy",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kWh",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required"
+        }
+      },
+      "url": "/api/data-hub/mqtt-mappings/apply"
+    },
+    "response": {
+      "body": {
+        "applied": true,
+        "channelId": "kn-main",
+        "source": {
+          "channelId": "kn-main",
+          "displayNameEn": null,
+          "displayNameZh": null,
+          "enabled": true,
+          "energyFlowRole": "consumption",
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "inputUnit": "kWh",
+          "measurementKind": "cumulative-energy",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "reviewStatus": "reviewed",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required",
+          "boundaryMaxAgeSeconds": 300
+        },
+        "activation": {
+          "reason": null,
+          "retryable": false,
+          "state": "active",
+          "topic": "factory/kn/main"
+        },
+        "reception": {
+          "lastAcceptedAt": null,
+          "observed": false
+        },
+        "saved": true
+      },
+      "statusCode": 200
+    },
+    "step": "R1 重試情境：同一 idempotency key 再次套用"
+  },
+  {
+    "request": "runtime packet on the activated topic",
+    "response": {
+      "accepted": [
+        {
+          "normalized_value_kwh": "1234.5",
+          "source_timestamp": "2026-09-08T01:00:00Z"
+        }
+      ]
+    },
+    "step": "R1 正常情境：啟用後收到正式封包"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "channelId": "kn-main-power",
+        "energyFlowRole": "consumption",
+        "measurementKind": "power-gauge",
+        "metricScope": "kn",
+        "selector": {
+          "path": [
+            "value"
+          ],
+          "tagEquals": "P1"
+        },
+        "source": {
+          "channelId": "kn-main-power",
+          "meterId": "kn-main-power",
+          "metricKey": "consumptionPower",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "power-gauge",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kW",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "allow-receive-time-estimate"
+        },
+        "timestampPolicy": "allow-receive-time-estimate",
+        "topic": "factory/kn/power"
+      },
+      "url": "/api/data-hub/mqtt-mappings/preview"
+    },
+    "response": {
+      "body": {
+        "canonicalDraft": {
+          "channelId": "kn-main-power",
+          "energyFlowRole": "consumption",
+          "measurementKind": "power-gauge",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ],
+            "tagEquals": "P1"
+          },
+          "source": {
+            "channelId": "kn-main-power",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "one",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kW",
+            "measurementKind": "power-gauge",
+            "meterId": "kn-main-power",
+            "metricKey": "consumptionPower",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 1,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "allow-receive-time-estimate"
+          },
+          "timestampPolicy": "allow-receive-time-estimate",
+          "topic": "factory/kn/power"
+        },
+        "previewToken": "c06789f2-774c-4e09-9b30-8ef835400165"
+      },
+      "statusCode": 200
+    },
+    "step": "R2 功率來源：產生預覽（tag=P1）"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "canonicalDraft": {
+          "channelId": "kn-main-power",
+          "energyFlowRole": "consumption",
+          "measurementKind": "power-gauge",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ],
+            "tagEquals": "P1"
+          },
+          "source": {
+            "channelId": "kn-main-power",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "one",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kW",
+            "measurementKind": "power-gauge",
+            "meterId": "kn-main-power",
+            "metricKey": "consumptionPower",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 1,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "allow-receive-time-estimate"
+          },
+          "timestampPolicy": "allow-receive-time-estimate",
+          "topic": "factory/kn/power"
+        },
+        "idempotencyKey": "evidence-power",
+        "meterId": "kn-main-power",
+        "previewToken": "c06789f2-774c-4e09-9b30-8ef835400165",
+        "source": {
+          "channelId": "kn-main-power",
+          "meterId": "kn-main-power",
+          "metricKey": "consumptionPower",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "power-gauge",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kW",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "allow-receive-time-estimate"
+        }
+      },
+      "url": "/api/data-hub/mqtt-mappings/apply"
+    },
+    "response": {
+      "body": {
+        "applied": true,
+        "channelId": "kn-main-power",
+        "source": {
+          "channelId": "kn-main-power",
+          "displayNameEn": null,
+          "displayNameZh": null,
+          "enabled": true,
+          "energyFlowRole": "consumption",
+          "epochId": "one",
+          "expectedCadenceSeconds": 60,
+          "inputUnit": "kW",
+          "measurementKind": "power-gauge",
+          "meterId": "kn-main-power",
+          "metricKey": "consumptionPower",
+          "metricScope": "kn",
+          "reviewStatus": "reviewed",
+          "scaleDecimal": "1",
+          "sourceRevision": 1,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "allow-receive-time-estimate",
+          "boundaryMaxAgeSeconds": 300
+        },
+        "activation": {
+          "reason": null,
+          "retryable": false,
+          "state": "active",
+          "topic": "factory/kn/power"
+        },
+        "reception": {
+          "lastAcceptedAt": null,
+          "observed": false
+        },
+        "saved": true
+      },
+      "statusCode": 200
+    },
+    "step": "R2 功率來源：套用"
+  },
+  {
+    "request": "runtime packet [{tag:P1,value:12.5},{tag:P2,value:99}]",
+    "response": {
+      "acceptedEnergyRows": {
+        "count": 0
+      },
+      "live": {
+        "value": 12.5,
+        "unit": "kW",
+        "quality": "receive-time-estimated"
+      }
+    },
+    "step": "R2 正常情境：功率 selector 解析結果"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "metricScope": "kn",
+        "value": "77.25"
+      },
+      "url": "/api/settings/mqtt/topics/consumptionEnergy/publish-confirmation"
+    },
+    "response": {
+      "body": {
+        "broker": "localhost:1883",
+        "exactTopic": "factory/kn/main",
+        "metricKey": "consumptionEnergy",
+        "metricScope": "kn",
+        "payload": "{\"value\":77.25}",
+        "retain": false,
+        "source": {
+          "channelId": "kn-main",
+          "inputUnit": "kWh",
+          "measurementKind": "cumulative-energy",
+          "meterId": "kn-main",
+          "sourceRevision": 1
+        },
+        "targetFingerprint": "18b1505925491b5312d07241807850afc8cc7844d07305c2552915d46b381df5",
+        "value": "77.25",
+        "expiresAt": "2026-09-08T07:47:52.146Z",
+        "confirmationToken": "a4172edc-86a9-4122-9ce9-3b07f75c632e"
+      },
+      "statusCode": 200
+    },
+    "step": "R4 由 server 解析實際發送目標"
+  },
+  {
+    "request": "publish attempts after showing the confirmation",
+    "response": {
+      "published": []
+    },
+    "step": "R4 顯示確認本身零 publish"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "channelId": "kn-main",
+        "energyFlowRole": "consumption",
+        "measurementKind": "cumulative-energy",
+        "metricScope": "kn",
+        "selector": {
+          "path": [
+            "value"
+          ]
+        },
+        "source": {
+          "channelId": "kn-main",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "cumulative-energy",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kWh",
+          "scaleDecimal": "1",
+          "sourceRevision": 2,
+          "epochId": "two",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required"
+        },
+        "timestampPolicy": "source-required",
+        "topic": "factory/kn/replacement"
+      },
+      "url": "/api/data-hub/mqtt-mappings/preview"
+    },
+    "response": {
+      "body": {
+        "canonicalDraft": {
+          "channelId": "kn-main",
+          "energyFlowRole": "consumption",
+          "measurementKind": "cumulative-energy",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ]
+          },
+          "source": {
+            "channelId": "kn-main",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "two",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kWh",
+            "measurementKind": "cumulative-energy",
+            "meterId": "kn-main",
+            "metricKey": "consumptionEnergy",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 2,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "source-required"
+          },
+          "timestampPolicy": "source-required",
+          "topic": "factory/kn/replacement"
+        },
+        "previewToken": "f25c2b27-b36b-4a9b-ab82-a41bdbb2e5a7"
+      },
+      "statusCode": 200
+    },
+    "step": "R4 失敗情境：確認開啟期間目標被改到新 Topic"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "canonicalDraft": {
+          "channelId": "kn-main",
+          "energyFlowRole": "consumption",
+          "measurementKind": "cumulative-energy",
+          "metricScope": "kn",
+          "selector": {
+            "path": [
+              "value"
+            ]
+          },
+          "source": {
+            "channelId": "kn-main",
+            "enabled": true,
+            "energyFlowRole": "consumption",
+            "epochId": "two",
+            "expectedCadenceSeconds": 60,
+            "inputUnit": "kWh",
+            "measurementKind": "cumulative-energy",
+            "meterId": "kn-main",
+            "metricKey": "consumptionEnergy",
+            "metricScope": "kn",
+            "reviewStatus": "reviewed",
+            "scaleDecimal": "1",
+            "sourceRevision": 2,
+            "sourceTimestampTimeZone": null,
+            "timestampPolicy": "source-required"
+          },
+          "timestampPolicy": "source-required",
+          "topic": "factory/kn/replacement"
+        },
+        "idempotencyKey": "evidence-moved",
+        "meterId": "kn-main",
+        "previewToken": "f25c2b27-b36b-4a9b-ab82-a41bdbb2e5a7",
+        "source": {
+          "channelId": "kn-main",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "enabled": true,
+          "reviewStatus": "reviewed",
+          "measurementKind": "cumulative-energy",
+          "energyFlowRole": "consumption",
+          "inputUnit": "kWh",
+          "scaleDecimal": "1",
+          "sourceRevision": 2,
+          "epochId": "two",
+          "expectedCadenceSeconds": 60,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required"
+        }
+      },
+      "url": "/api/data-hub/mqtt-mappings/apply"
+    },
+    "response": {
+      "body": {
+        "applied": true,
+        "channelId": "kn-main",
+        "source": {
+          "channelId": "kn-main",
+          "displayNameEn": null,
+          "displayNameZh": null,
+          "enabled": true,
+          "energyFlowRole": "consumption",
+          "epochId": "two",
+          "expectedCadenceSeconds": 60,
+          "inputUnit": "kWh",
+          "measurementKind": "cumulative-energy",
+          "meterId": "kn-main",
+          "metricKey": "consumptionEnergy",
+          "metricScope": "kn",
+          "reviewStatus": "reviewed",
+          "scaleDecimal": "1",
+          "sourceRevision": 2,
+          "sourceTimestampTimeZone": null,
+          "timestampPolicy": "source-required",
+          "boundaryMaxAgeSeconds": 300
+        },
+        "activation": {
+          "reason": null,
+          "retryable": false,
+          "state": "active",
+          "topic": "factory/kn/replacement"
+        },
+        "reception": {
+          "lastAcceptedAt": null,
+          "observed": false
+        },
+        "saved": true
+      },
+      "statusCode": 200
+    },
+    "step": "R4 失敗情境：套用新目標"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "confirmationToken": "a4172edc-86a9-4122-9ce9-3b07f75c632e",
+        "confirmed": true,
+        "metricScope": "kn",
+        "value": "77.25"
+      },
+      "url": "/api/settings/mqtt/topics/consumptionEnergy/publish"
+    },
+    "response": {
+      "body": {
+        "error": "PUBLISH_TARGET_CHANGED",
+        "success": false,
+        "timestamp": "2026-09-08T07:42:52.147Z",
+        "value": "77.25"
+      },
+      "statusCode": 409
+    },
+    "step": "R4 失敗情境：提交已失效的舊確認"
+  },
+  {
+    "request": "publish attempts so far",
+    "response": {
+      "published": []
+    },
+    "step": "R4 失敗情境：舊確認被拒後仍零 publish"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "metricScope": "kn",
+        "value": "77.25"
+      },
+      "url": "/api/settings/mqtt/topics/consumptionEnergy/publish-confirmation"
+    },
+    "response": {
+      "body": {
+        "broker": "localhost:1883",
+        "exactTopic": "factory/kn/replacement",
+        "metricKey": "consumptionEnergy",
+        "metricScope": "kn",
+        "payload": "{\"value\":77.25}",
+        "retain": false,
+        "source": {
+          "channelId": "kn-main",
+          "inputUnit": "kWh",
+          "measurementKind": "cumulative-energy",
+          "meterId": "kn-main",
+          "sourceRevision": 2
+        },
+        "targetFingerprint": "df8819ea60c0a9de33c0e277cc89191d2c56b48660e138225c36a5d3d5a74f10",
+        "value": "77.25",
+        "expiresAt": "2026-09-08T07:47:52.147Z",
+        "confirmationToken": "ac06e67c-a6f0-4e11-83f6-53653e32966d"
+      },
+      "statusCode": 200
+    },
+    "step": "R4 重試情境：重新取得確認"
+  },
+  {
+    "request": {
+      "method": "POST",
+      "payload": {
+        "confirmationToken": "ac06e67c-a6f0-4e11-83f6-53653e32966d",
+        "confirmed": true,
+        "metricScope": "kn",
+        "value": "77.25"
+      },
+      "url": "/api/settings/mqtt/topics/consumptionEnergy/publish"
+    },
+    "response": {
+      "body": {
+        "actualPublish": true,
+        "metricKey": "consumptionEnergy",
+        "payload": "{\"value\":77.25}",
+        "status": {
+          "broker": "localhost:1883",
+          "clientId": "solar-display-5df41db2",
+          "connected": true,
+          "reason": "connected",
+          "updatedAt": "2026-09-08T07:42:52.128Z"
+        },
+        "success": true,
+        "topic": "factory/kn/replacement"
+      },
+      "statusCode": 200
+    },
+    "step": "R4 正常情境：確認後發送"
+  },
+  {
+    "request": "publish attempts after confirmed send",
+    "response": {
+      "published": [
+        {
+          "payload": "{\"value\":77.25}",
+          "retain": false,
+          "topic": "factory/kn/replacement"
+        }
+      ]
+    },
+    "step": "R4 正常情境：實際送出的 topic/payload/retain"
+  },
+  {
+    "request": {
+      "method": "DELETE",
+      "url": "/api/settings/mqtt/captures/4d2a7d9d-fe65-41c4-b151-88c3255ea90d"
+    },
+    "response": {
+      "body": {
+        "captureId": "4d2a7d9d-fe65-41c4-b151-88c3255ea90d",
+        "stopped": true
+      },
+      "statusCode": 200
+    },
+    "step": "R3 停止 capture"
+  },
+  {
+    "request": "discovery subscriptions",
+    "response": {
+      "discoveryOpened": [
+        {
+          "closed": true,
+          "filter": "factory/kn/#"
+        }
+      ],
+      "productionActiveTopics": [
+        "factory/guanyin/power/assembly",
+        "factory/guanyin/power/body",
+        "factory/guanyin/power/ed_coating",
+        "factory/guanyin/power/heavy_vehicle",
+        "factory/guanyin/power/office",
+        "factory/guanyin/power/painting",
+        "factory/guanyin/power/stamping",
+        "factory/guanyin/power/utility",
+        "factory/peak_multiplier",
+        "factory/power/assembly",
+        "factory/power/body",
+        "factory/power/ed_coating",
+        "factory/power/heavy_vehicle",
+        "factory/power/office",
+        "factory/power/painting",
+        "factory/power/stamping",
+        "factory/power/utility",
+        "kuozui/plant/factory/consumption",
+        "kuozui/plant/solar/efficiency",
+        "kuozui/plant/solar/power",
+        "kuozui/plant/solar/self_consumption",
+        "solar/+/summary",
+        "solar/+/zone/+",
+        "solar/+/status",
+        "solar/+/heartbeat",
+        "solar/+/alert",
+        "factory/kn/power",
+        "factory/kn/replacement"
+      ]
+    },
+    "step": "R3 停止後釋放 discovery，production 訂閱不變"
+  }
+]

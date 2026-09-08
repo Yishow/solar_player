@@ -12,6 +12,8 @@ import { closeDatabaseConnection } from "./db/index.js";
 import { createLoggerOptions } from "./logger.js";
 import { readAuthoritativeScopedLiveMetricsSnapshot } from "./metrics/liveMetrics.js";
 import { MqttClientService } from "./mqtt/MqttClientService.js";
+import { createMqttDiscoveryTransport } from "./mqtt/discoveryTransport.js";
+import { setDiscoveryTransport } from "./services/mqttObservationCatalogService.js";
 import { getWeatherService } from "./services/weatherService.js";
 import managementAuthPlugin, {
   createManagementAccessControl,
@@ -182,6 +184,8 @@ export async function buildApp() {
   weatherService.setMqttPublisher((topic, payload) => {
     mqttClientService?.publish(topic, payload);
   });
+
+  setDiscoveryTransport(createMqttDiscoveryTransport());
 
   app.decorate("managementAccess", managementAccess);
   app.decorate("mqttClientService", mqttClientService);

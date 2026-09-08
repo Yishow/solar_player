@@ -18,6 +18,35 @@ export type MappingPreviewDraft = {
   topic?: string;
 };
 
+export const GUIDED_MAPPING_ACTIVATION_STATES = ["active", "pending", "failed"] as const;
+export type GuidedMappingActivationState = (typeof GUIDED_MAPPING_ACTIVATION_STATES)[number];
+
+/**
+ * Saving a reviewed mapping, having the broker acknowledge its subscription and
+ * having actually received a measurement are three distinct facts. `active` only
+ * means the subscription was acknowledged.
+ */
+export type GuidedMappingActivation = {
+  reason: string | null;
+  retryable: boolean;
+  state: GuidedMappingActivationState;
+  topic: string;
+};
+
+export type GuidedMappingReception = {
+  lastAcceptedAt: string | null;
+  observed: boolean;
+};
+
+export type GuidedMappingApplyResult = {
+  activation: GuidedMappingActivation;
+  applied: true;
+  channelId: string;
+  reception: GuidedMappingReception;
+  saved: true;
+  source: MeterSourceDefinition;
+};
+
 type StoredPreview = {
   draft: MappingPreviewDraft;
   hash: string;

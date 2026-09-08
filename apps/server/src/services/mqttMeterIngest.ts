@@ -1,10 +1,14 @@
 import type Database from "better-sqlite3";
 import {
+  admitMeterReading,
+  applyMeterScaleDecimal,
   compileSelector,
   extractBySelector,
   extractDecimalLexeme,
+  parseSourceTimestamp,
   type MappingSelector,
   type MeterIngestResult,
+  type MeterReadingSample,
   type MeterSourceDefinition
 } from "@solar-display/shared";
 import {
@@ -145,17 +149,23 @@ function selectorFromMapping(mapping: { value_path: string | null; selector_json
 
 export type MappedMeterIngestResult = MeterIngestResult & {
   handled: true;
+  /** Unit of `liveValueDecimal`; energy normalizes to kWh, power keeps its reviewed unit. */
+  liveUnit: string;
+  liveValueDecimal: string | null;
   selectorVersion: number | null;
   sourceTimestampPath: string | null;
 };
 
 function rejectedMapping(
   selector: MappingSelector,
-  reason: string
+  reason: string,
+  liveUnit = "kWh"
 ): MappedMeterIngestResult {
   return {
     handled: true,
     diagnostics: [reason],
+    liveUnit,
+    liveValueDecimal: null,
     liveValueKwh: null,
     liveUpdated: false,
     normalizedValueKwh: null,
@@ -167,6 +177,67 @@ function rejectedMapping(
     sourceTimestampRaw: null,
     status: "quarantined",
     timestampQuality: "unknown"
+  };
+}
+
+/**
+ * A power gauge is an instantaneous reading: it updates the live metric in its
+ * reviewed unit and never becomes an accepted cumulative-energy reading or a
+ * period baseline. Anything it cannot admit leaves the last valid value in place.
+ */
+function ingestLivePowerReading(
+  definition: MeterSourceDefinition,
+  sample: MeterReadingSample,
+  selector: MappingSelector
+): MappedMeterIngestResult {
+  const selectorVersion = selector.selectorVersion ?? null;
+  const sourceTimestampPath = sample.sourceTimestampPath ?? null;
+  const admission = admitMeterReading(definition, sample);
+  const base = {
+    handled: true as const,
+    liveUnit: definition.inputUnit,
+    liveValueDecimal: null,
+    liveValueKwh: null,
+    liveUpdated: false,
+    normalizedValueKwh: null,
+    readingId: null,
+    selectorVersion,
+    sourceTimestampPath,
+    sourceTimestampRaw: sample.sourceTimestamp
+  };
+  if (admission.status !== "accepted") {
+    return {
+      ...base,
+      diagnostics: admission.diagnostics,
+      reason: admission.reason,
+      sourceTimestamp: null,
+      status: admission.status,
+      timestampQuality: admission.timestampQuality
+    };
+  }
+  let scaled: string;
+  try {
+    scaled = applyMeterScaleDecimal(sample.rawValueDecimal, definition.scaleDecimal);
+  } catch {
+    return {
+      ...base,
+      diagnostics: ["UNSUPPORTED_SCALE"],
+      reason: "UNSUPPORTED_SCALE",
+      sourceTimestamp: null,
+      status: "quarantined",
+      timestampQuality: admission.timestampQuality
+    };
+  }
+  const parsed = parseSourceTimestamp(sample.sourceTimestamp, definition.sourceTimestampTimeZone);
+  return {
+    ...base,
+    diagnostics: [],
+    liveUpdated: true,
+    liveValueDecimal: scaled,
+    reason: null,
+    sourceTimestamp: admission.timestampQuality === "source" ? parsed.instant : null,
+    status: "accepted",
+    timestampQuality: admission.timestampQuality
   };
 }
 
@@ -184,24 +255,26 @@ export function ingestMappedMeterReading(
       .get(mapping.metric_scope, mapping.metric_key);
     return registered ? rejectedMapping({ path: [] }, "SOURCE_NOT_ACTIVE") : null;
   }
-  if (definition.measurementKind === "power-gauge") return null;
+  // The reviewed selector is resolved for every measurement kind; only the
+  // destination of the resolved value depends on the kind.
+  const liveUnit = definition.measurementKind === "power-gauge" ? definition.inputUnit : "kWh";
   const payload = parsePayload(rawPayload);
   const selector = selectorFromMapping(mapping);
   if (!selector) {
-    return rejectedMapping({ path: [] }, "SELECTOR_INVALID");
+    return rejectedMapping({ path: [] }, "SELECTOR_INVALID", liveUnit);
   }
   let extracted: unknown;
   try {
     extracted = extractBySelector(payload, selector);
   } catch {
-    return rejectedMapping(selector, "SELECTOR_AMBIGUOUS");
+    return rejectedMapping(selector, "SELECTOR_AMBIGUOUS", liveUnit);
   }
   const rawValueDecimal = extractDecimalLexeme(extracted);
   if (!rawValueDecimal) {
-    return rejectedMapping(selector, "SELECTOR_NO_MATCH");
+    return rejectedMapping(selector, "SELECTOR_NO_MATCH", liveUnit);
   }
   const timestampEvidence = extractSourceTimestampEvidence(payload, selector);
-  const result = ingestMeterReading(database, definition, {
+  const sample: MeterReadingSample = {
     dup: packet?.dup ?? null,
     origin: "mqtt",
     qos: packet?.qos ?? null,
@@ -211,10 +284,16 @@ export function ingestMappedMeterReading(
     selectorVersion: selector.selectorVersion ?? null,
     sourceTimestamp: timestampEvidence.value,
     sourceTimestampPath: timestampEvidence.path
-  }, store);
+  };
+  if (definition.measurementKind === "power-gauge") {
+    return ingestLivePowerReading(definition, sample, selector);
+  }
+  const result = ingestMeterReading(database, definition, sample, store);
   return {
     ...result,
     handled: true,
+    liveUnit,
+    liveValueDecimal: result.liveValueKwh,
     selectorVersion: result.selectorVersion ?? selector.selectorVersion ?? null,
     sourceTimestampPath: result.sourceTimestampPath ?? timestampEvidence.path
   };

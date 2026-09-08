@@ -266,3 +266,52 @@ Catalog discovery SHALL be additive and feature-gated. Disabling it SHALL close 
 - **GIVEN** a discovered topic belongs to a registered managed adapter
 - **WHEN** the operator selects it
 - **THEN** the UI offers the managed source or diagnostics and does not create a conflicting generic energy mapping
+
+---
+### Requirement: Production capture exposes selectable bounded samples
+
+A capture candidate's sample references SHALL resolve to bounded, redacted payload evidence usable by the normal mapping task, with connection, scope, exact topic, schema revision and immutable transport evidence. Candidate listing alone SHALL NOT be presented as a complete field-selection facility. A passive tap SHALL NOT claim coverage of topics to which production is not subscribed. Approved active discovery SHALL use an isolated short-lived subscription and expose its actual grant, refusal and expiry states.
+
+#### Scenario: R3 unmapped approved topic is discoverable
+- **WHEN** a publisher sends on an approved exact topic outside existing production subscriptions during an authorized active capture
+- **THEN** the candidate and its selectable sample become available through the capture flow without creating a production mapping or changing production subscription ownership
+
+#### Scenario: R3 sample evidence is retrievable and expires honestly
+- **WHEN** a candidate supplies a sample reference and the mapping task requests it before and after expiry
+- **THEN** the valid request returns bounded redacted evidence and the expired request returns an explicit refresh-required state, never fabricated payload data
+
+#### Scenario: R3 capture shutdown preserves production
+- **WHEN** a capture is stopped, expires, loses authorization or is disabled by the feature gate
+- **THEN** its temporary resources are released while existing production subscriptions and accepted readings remain unchanged
+
+#### Scenario: R3 access and payload limits remain enforced
+- **WHEN** a sample request lacks authorized management/site access or exceeds configured payload and session budgets
+- **THEN** the operation is denied or visibly limited without exposing unauthorized topics or blocking production ingestion
+
+<!-- @trace
+source: fix-mqtt-guided-source-activation
+updated: 2026-09-08
+code:
+  - apps/server/src/services/guidedMappingActivationService.ts
+  - apps/server/src/mqtt/MqttClientService.ts
+  - apps/server/src/app.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - docs/reviews/2026-09-08-energy-authoring-review.md
+  - apps/server/src/mqtt/discoveryTransport.ts
+  - apps/server/src/routes/site-energy-profiles.ts
+  - packages/shared/src/meterReading.ts
+  - apps/server/src/services/mqttObservationCatalogService.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/server/src/routes/mqtt-captures.ts
+  - apps/web/src/pages/DataHub/GuidedMqttMappingPanel.tsx
+  - packages/shared/src/guidedMqttMapping.ts
+  - packages/shared/src/mqttObservation.ts
+  - apps/server/src/services/mqttMeterIngest.ts
+  - apps/server/src/services/mqttTestPublishConfirmationService.ts
+tests:
+  - apps/web/src/pages/DataHub/GuidedOnboardingJourney.test.tsx
+  - apps/server/src/routes/mqtt-test-publish-confirmation.test.ts
+  - apps/server/src/mqtt/mqttPowerSelectorIngest.test.ts
+  - apps/server/src/routes/mqtt-guided-activation.test.ts
+  - apps/server/src/routes/mqtt-capture-samples.test.ts
+-->

@@ -5,6 +5,8 @@ import {
   catalogMustNotMutateAcceptedHistory,
   isAllowedDiscoveryFilter,
   redactObservationPayload,
+  type CaptureMode,
+  type CaptureSampleEvidence,
   type CaptureSession,
   type MqttTransportEvidence,
   type ObservationCandidate,
@@ -21,12 +23,59 @@ const profiles: ReceptionProfile[] = [
   { allowedFilters: ["factory/kn/"], id: "kn-power", name: "觀音電力資料", siteScope: "kn" }
 ];
 
-const captures = new Map<string, CaptureSession & { filter: string; candidates: ObservationCandidate[]; samples: Map<string, MqttTransportEvidence> }>();
+type StoredSample = {
+  evidence: MqttTransportEvidence;
+  redactedPayload: string;
+  truncated: boolean;
+};
+
+type DiscoverySubscription = { close: () => void | Promise<void> };
+
+/**
+ * Opens an isolated, short-lived subscription for an approved discovery filter.
+ * It is never the production subscription owner, so releasing it can never
+ * unsubscribe production topics.
+ */
+export type DiscoveryTransport = {
+  open(input: {
+    connectionRef: string;
+    filter: string;
+    onMessage: (evidence: MqttTransportEvidence, payload: string) => void;
+  }): Promise<DiscoverySubscription>;
+};
+
+type StoredCapture = CaptureSession & {
+  candidates: ObservationCandidate[];
+  discoverySubscription: DiscoverySubscription | null;
+  filter: string;
+  samples: Map<string, StoredSample>;
+};
+
+const captures = new Map<string, StoredCapture>();
+let discoveryTransport: DiscoveryTransport | null = null;
+
+export function setDiscoveryTransport(transport: DiscoveryTransport | null) {
+  discoveryTransport = transport;
+}
+
+function releaseCapture(captureId: string) {
+  const session = captures.get(captureId);
+  captures.delete(captureId);
+  const subscription = session?.discoverySubscription;
+  if (!subscription) {
+    return;
+  }
+  session.discoverySubscription = null;
+  // Releasing discovery must never block or fail a capture lifecycle transition.
+  void Promise.resolve()
+    .then(() => subscription.close())
+    .catch(() => undefined);
+}
 
 function pruneCaptures() {
   for (const [id, session] of captures) {
     if (!featureEnabled() || Date.parse(session.expiresAt) <= Date.now()) {
-      captures.delete(id);
+      releaseCapture(id);
     }
   }
 }
@@ -40,6 +89,11 @@ function requireCapture(captureId: string) {
   return session;
 }
 
+function toSession(session: StoredCapture): CaptureSession {
+  const { candidates: _candidates, discoverySubscription: _subscription, filter: _filter, samples: _samples, ...rest } = session;
+  return rest;
+}
+
 export function listReceptionProfiles() {
   return profiles.map(({ allowedFilters, id, name, siteScope }) => ({ allowedFilters, id, name, siteScope }));
 }
@@ -47,6 +101,7 @@ export function listReceptionProfiles() {
 export function startCapture(input: {
   connectionRef: string;
   filter: string;
+  mode?: CaptureMode;
   receptionProfileId: string;
   siteScope: "cl" | "kn";
 }): CaptureSession {
@@ -62,23 +117,89 @@ export function startCapture(input: {
     throw Object.assign(new Error("SUBSCRIPTION_REFUSED"), { code: "SUBSCRIPTION_REFUSED" });
   }
   const captureId = randomUUID();
-  const session: CaptureSession = {
+  const mode: CaptureMode = input.mode === "active" ? "active" : "passive";
+  const stored: StoredCapture = {
+    candidates: [],
     captureId,
     connectionRef: input.connectionRef,
     coverage: "no-traffic",
+    discoverySubscription: null,
     dropped: 0,
     expiresAt: new Date(Date.now() + MQTT_CATALOG_LIMITS.sessionSeconds * 1000).toISOString(),
     featureEnabled: true,
+    filter: input.filter,
+    mode,
     receptionProfileId: profile.id,
-    siteScope: profile.siteScope
+    samples: new Map(),
+    siteScope: profile.siteScope,
+    ...(mode === "active" ? { discovery: { reason: null, state: "unavailable" as const } } : {})
   };
-  captures.set(captureId, { ...session, filter: input.filter, candidates: [], samples: new Map() });
-  return session;
+  captures.set(captureId, stored);
+  return toSession(stored);
+}
+
+/**
+ * A passive tap only sees topics production already subscribes to, so an active
+ * capture opens its own subscription and reports the broker's actual answer.
+ */
+export async function openCaptureDiscovery(captureId: string): Promise<CaptureSession> {
+  const session = requireCapture(captureId);
+  if (!discoveryTransport) {
+    session.discovery = { reason: "DISCOVERY_TRANSPORT_UNAVAILABLE", state: "unavailable" };
+    return toSession(session);
+  }
+  try {
+    session.discoverySubscription = await discoveryTransport.open({
+      connectionRef: session.connectionRef,
+      filter: session.filter,
+      onMessage: (evidence, payload) => {
+        try {
+          tapCatalogObservation(captureId, evidence, payload);
+        } catch {
+          // An expired capture must not surface through its own transport.
+        }
+      }
+    });
+    session.discovery = { reason: null, state: "granted" };
+  } catch (error) {
+    const reason = (error as { code?: string }).code ?? "SUBSCRIPTION_REFUSED";
+    session.discovery = { reason, state: "refused" };
+    session.coverage = "subscription-refused";
+  }
+  return toSession(session);
 }
 
 export function stopCapture(captureId: string) {
-  captures.delete(captureId);
+  releaseCapture(captureId);
   return { captureId, stopped: true };
+}
+
+/** Resolves a candidate sample reference to bounded, redacted payload evidence. */
+export function readCaptureSample(captureId: string, sampleId: string): CaptureSampleEvidence {
+  pruneCaptures();
+  const session = captures.get(captureId);
+  const sample = session?.samples.get(sampleId);
+  if (!session || !sample) {
+    throw Object.assign(new Error("CAPTURE_REFRESH_REQUIRED"), { code: "CAPTURE_REFRESH_REQUIRED" });
+  }
+  return {
+    captureId,
+    connectionRef: session.connectionRef,
+    exactTopic: sample.evidence.exactTopic,
+    receptionProfileId: session.receptionProfileId,
+    redactedPayload: sample.redactedPayload,
+    sampleId,
+    schemaVersion: session.candidates.find((candidate) => candidate.candidateId === sample.evidence.exactTopic)?.schemaVersion ?? 1,
+    siteScope: session.siteScope,
+    transportEvidence: {
+      dup: sample.evidence.dup,
+      origin: sample.evidence.origin,
+      qos: sample.evidence.qos,
+      receivedAt: sample.evidence.receivedAt,
+      retain: sample.evidence.retain
+    },
+    truncated: sample.truncated
+  };
 }
 
 export function tapProductionObservation(evidence: MqttTransportEvidence, payload: string) {
@@ -133,14 +254,21 @@ export function tapCatalogObservation(
   }
   candidate.sampleRefs.push(sampleId);
   candidate.lastSeenAt = evidence.receivedAt;
-  session.samples.set(sampleId, evidence);
+  const redacted = redactObservationPayload(payload);
+  session.samples.set(sampleId, { evidence, redactedPayload: redacted, truncated: false });
   session.coverage = "partial";
-  return { dropped: false, redacted: redactObservationPayload(payload), sampleId };
+  return { dropped: false, redacted, sampleId };
 }
 
 export function listCandidates(captureId: string) {
   const session = requireCapture(captureId);
-  return { captureId, candidates: session.candidates, coverage: session.coverage, dropped: session.dropped };
+  return {
+    captureId,
+    candidates: session.candidates,
+    coverage: session.coverage,
+    ...(session.discovery ? { discovery: session.discovery } : {}),
+    dropped: session.dropped
+  };
 }
 
 export function proveCatalogDoesNotWriteAcceptedHistory(

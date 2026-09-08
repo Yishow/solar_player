@@ -1,7 +1,10 @@
 import type { FastifyPluginAsync } from "fastify";
+import type { CaptureMode } from "@solar-display/shared";
 import {
   listCandidates,
   listReceptionProfiles,
+  openCaptureDiscovery,
+  readCaptureSample,
   startCapture,
   stopCapture
 } from "../services/mqttObservationCatalogService.js";
@@ -21,6 +24,7 @@ const mqttCapturesRoute: FastifyPluginAsync = async (app) => {
     const body = request.body as {
       connectionRef?: string;
       filter?: string;
+      mode?: CaptureMode;
       receptionProfileId?: string;
       siteScope?: "cl" | "kn";
     };
@@ -31,10 +35,11 @@ const mqttCapturesRoute: FastifyPluginAsync = async (app) => {
       const session = startCapture({
         connectionRef: body.connectionRef ?? "central",
         filter: body.filter ?? "",
+        mode: body.mode,
         receptionProfileId: body.receptionProfileId ?? "",
         siteScope: body.siteScope
       });
-      return session;
+      return session.mode === "active" ? openCaptureDiscovery(session.captureId) : session;
     } catch (error) {
       const code = (error as { code?: string }).code ?? "CAPTURE_FAILED";
       return reply.code(code === "UNAUTHORIZED_SCOPE" ? 403 : 400).send({
@@ -51,6 +56,16 @@ const mqttCapturesRoute: FastifyPluginAsync = async (app) => {
       return listCandidates(id);
     } catch (error) {
       const code = (error as { code?: string }).code ?? "CAPTURE_EXPIRED";
+      return reply.code(404).send({ success: false, error: code, timestamp: new Date().toISOString() });
+    }
+  });
+
+  app.get("/api/settings/mqtt/captures/:id/samples/:sampleId", async (request, reply) => {
+    const { id, sampleId } = request.params as { id: string; sampleId: string };
+    try {
+      return readCaptureSample(id, sampleId);
+    } catch (error) {
+      const code = (error as { code?: string }).code ?? "CAPTURE_REFRESH_REQUIRED";
       return reply.code(404).send({ success: false, error: code, timestamp: new Date().toISOString() });
     }
   });

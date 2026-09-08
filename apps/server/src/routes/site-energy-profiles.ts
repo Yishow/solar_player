@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { applyProfile, getActiveProfile, previewProfile } from "../services/siteEnergyProfileService.js";
 import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
+import { activateGuidedMapping, readGuidedMappingReception } from "../services/guidedMappingActivationService.js";
 import { listMeterSources, listReceivedTags } from "../services/meterSourceCatalogService.js";
 import { readSourceImpact } from "../services/sourceImpactService.js";
 import { suggestMappings, type MappingPreviewDraft, type ObservedTag, type SiteEnergyScope } from "@solar-display/shared";
@@ -89,7 +90,14 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
       source: Parameters<typeof applyGuidedMapping>[1]["source"];
     };
     try {
-      return applyGuidedMapping(getDatabase(), body);
+      const database = getDatabase();
+      const result = applyGuidedMapping(database, body);
+      return {
+        ...result,
+        activation: await activateGuidedMapping(app.mqttClientService, database, body.canonicalDraft.topic ?? ""),
+        reception: readGuidedMappingReception(database, result.source),
+        saved: true as const
+      };
     } catch (error) {
       const code = (error as { code?: string }).code ?? "MAPPING_APPLY_FAILED";
       return reply.code((error as { statusCode?: number }).statusCode ?? 422).send({

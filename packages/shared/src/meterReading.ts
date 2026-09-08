@@ -159,6 +159,11 @@ export function subtractDecimalString(left: string, right: string): string {
   return formatDecimalString(parseDecimalString(left) - parseDecimalString(right));
 }
 
+/** Applies a reviewed source scale without changing its unit. */
+export function applyMeterScaleDecimal(rawValueDecimal: string, scaleDecimal = "1"): string {
+  return formatDecimalString(parseDecimalString(rawValueDecimal) * parseDecimalString(scaleDecimal) / DECIMAL_FACTOR);
+}
+
 export function normalizeEnergyToKwhDecimal(rawValueDecimal: string, inputUnit: string, scaleDecimal = "1"): string {
   const unit = inputUnit.trim().toLowerCase();
   if (!ENERGY_UNITS.has(unit)) {

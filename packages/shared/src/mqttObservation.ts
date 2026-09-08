@@ -27,15 +27,48 @@ export type ReceptionProfile = {
   siteScope: "cl" | "kn";
 };
 
+export const CAPTURE_MODES = ["passive", "active"] as const;
+export type CaptureMode = (typeof CAPTURE_MODES)[number];
+
+export type CaptureDiscoveryState = "granted" | "refused" | "unavailable";
+
+/** State of the isolated short-lived subscription an active capture opens. */
+export type CaptureDiscovery = {
+  reason: string | null;
+  state: CaptureDiscoveryState;
+};
+
 export type CaptureSession = {
   captureId: string;
   connectionRef: string;
   coverage: "complete" | "partial" | "no-traffic" | "subscription-refused";
+  discovery?: CaptureDiscovery;
   dropped: number;
   expiresAt: string;
   featureEnabled: boolean;
+  mode?: CaptureMode;
   receptionProfileId: string;
   siteScope: "cl" | "kn";
+};
+
+/** Bounded, redacted payload evidence a candidate sample reference resolves to. */
+export type CaptureSampleEvidence = {
+  captureId: string;
+  connectionRef: string;
+  exactTopic: string;
+  receptionProfileId: string;
+  redactedPayload: string;
+  sampleId: string;
+  schemaVersion: number;
+  siteScope: "cl" | "kn";
+  transportEvidence: {
+    dup: boolean | null;
+    origin: MqttTransportEvidence["origin"];
+    qos: number | null;
+    receivedAt: string;
+    retain: boolean | null;
+  };
+  truncated: boolean;
 };
 
 export const MQTT_CATALOG_LIMITS = {
