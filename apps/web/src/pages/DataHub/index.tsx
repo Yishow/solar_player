@@ -43,8 +43,12 @@ function DataHubWorkspaceShell() {
   };
 
   return (
-    <PageScaffold path={section?.path ?? DATA_HUB_ROOT_PATH} description="從任務開始管理資料接入、修改與排查，專業頁仍可直接開啟。">
-      <div className="space-y-6">
+    <PageScaffold
+      path={section?.path ?? DATA_HUB_ROOT_PATH}
+      description="從任務開始管理資料接入、修改與排查，專業頁仍可直接開啟。"
+      spacing={isTaskHome ? "compact" : "default"}
+    >
+      <div className={isTaskHome ? "space-y-4" : "space-y-6"}>
         {workspace.scopeCorrectionMessage ? (
           <div className="mgmt-status is-warning" data-workspace-scope-correction role="status">
             {workspace.scopeCorrectionMessage}

@@ -6,9 +6,10 @@ import { PageContainer } from "../../components/PageContainer";
 type PageScaffoldProps = PropsWithChildren<{
   path: string;
   description: string;
+  spacing?: "compact" | "default";
 }>;
 
-export function PageScaffold({ path, description, children }: PageScaffoldProps) {
+export function PageScaffold({ path, description, spacing, children }: PageScaffoldProps) {
   const routeMeta = routeMetaMap.get(path);
 
   if (!routeMeta) {
@@ -22,6 +23,7 @@ export function PageScaffold({ path, description, children }: PageScaffoldProps)
       title={routeMeta.title}
       subtitle={routeMeta.subtitle}
       description={description}
+      spacing={spacing}
     >
       {children}
     </PageContainer>

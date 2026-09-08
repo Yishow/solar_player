@@ -17,6 +17,7 @@ Data Hub SHALL provide connect-new-data, edit-existing-data and diagnose-data ta
 - **GIVEN** an authorized operator opens the Data Hub root
 - **WHEN** the page loads
 - **THEN** the three tasks and scoped health summary are visible without requiring terminology knowledge
+- **AND** the task home overview fits within the management viewport without requiring vertical scrolling
 
 #### Scenario: Legacy diagnostics bookmark
 <!-- scenario-id: U1-R1-S02 -->
@@ -164,3 +165,39 @@ The DataHub source workspace SHALL expose the M1 observed-data catalog and M2 ad
 - **GIVEN** approved discovery observations exist but zero generic mappings exist
 - **WHEN** the user opens sources
 - **THEN** unmapped candidates are visible and selectable instead of an empty form demanding a metric key
+
+---
+### Requirement: Data Hub provides direct access to calculation settings and operational maintenance
+<!-- requirement-id: U1-R9 -->
+
+Data Hub SHALL provide an accessible operational entry point for global calculation settings (carbon emission factor, tree equivalent factor, household usage baselines, and estimated electricity tariff) and runtime trend reset maintenance. Navigating to operations SHALL NOT be blocked by circular redirects, and calculation settings SHALL be clearly marked as global shared parameters.
+
+#### Scenario: Operator opens calculation settings and operations from Metrics
+<!-- scenario-id: U1-R9-S01 -->
+
+- **GIVEN** an authorized operator is viewing the Data Hub Metrics section
+- **WHEN** the operator opens the operations maintenance view
+- **THEN** the calculation settings form is displayed with currently persisted values and global scope indication
+- **AND** today and month trend reset controls are available
+
+#### Scenario: Legacy operations URL loads operational maintenance
+<!-- scenario-id: U1-R9-S02 -->
+
+- **GIVEN** an operator accesses /settings/data-hub/diagnostics/operations
+- **WHEN** the route resolves
+- **THEN** the operational maintenance component is rendered directly without redirecting back to sources
+
+<!-- @trace
+source: integrate-data-source-operations-into-data-hub
+updated: 2026-09-08
+code:
+  - apps/web/src/pages/DataHub/Metrics.tsx
+  - apps/web/src/pages/DataHub/TaskHome.tsx
+  - apps/web/src/app/dataHubCompatibility.ts
+  - apps/web/src/app/router.tsx
+tests:
+  - apps/web/src/pages/DataHub/Metrics.test.tsx
+  - apps/web/src/app/router.test.ts
+  - apps/web/src/pages/DataHub/TaskHome.test.tsx
+  - apps/web/src/app/dataHubCompatibility.test.ts
+-->

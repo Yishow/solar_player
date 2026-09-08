@@ -6,7 +6,8 @@ export const DATA_HUB_SECTIONS = [
   { key: "connections", label: "連線設定", path: `${DATA_HUB_ROOT_PATH}/connections`, title: "連線設定" },
   { key: "sources", label: "接收與轉換", path: `${DATA_HUB_ROOT_PATH}/sources`, title: "接收與轉換" },
   { key: "metrics", label: "可用數據", path: `${DATA_HUB_ROOT_PATH}/metrics`, title: "可用數據" },
-  { key: "external", label: "天氣／外部資料", path: `${DATA_HUB_ROOT_PATH}/external`, title: "天氣／外部資料" }
+  { key: "external", label: "天氣／外部資料", path: `${DATA_HUB_ROOT_PATH}/external`, title: "天氣／外部資料" },
+  { key: "operations", label: "維運與換算係數", path: `${DATA_HUB_ROOT_PATH}/operations`, title: "維運與換算係數" }
 ] as const;
 
 export type DataHubSection = typeof DATA_HUB_SECTIONS[number];
@@ -27,6 +28,9 @@ export function isDataHubManagementScope(value: unknown): value is DataHubManage
 }
 
 export function resolveDataHubSection(pathname: string): DataHubSection | null {
+  if (pathname === `${DATA_HUB_ROOT_PATH}/diagnostics/operations`) {
+    return DATA_HUB_SECTIONS.find((s) => s.key === "operations") ?? null;
+  }
   return DATA_HUB_SECTIONS.find((section) => {
     return pathname === section.path || pathname.startsWith(`${section.path}/`);
   }) ?? null;

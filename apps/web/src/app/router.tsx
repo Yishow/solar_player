@@ -219,7 +219,33 @@ export const router = createBrowserRouter([
           },
           {
             path: "diagnostics/operations",
-            loader: createDataHubCompatibilityRedirectLoader("settings/data-hub/diagnostics/operations")
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/diagnostics/operations",
+              async () => {
+                const { loadDataSourceOperationsRoute } = await import("../pages/DataSourceSettings");
+                return loadDataSourceOperationsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataSourceOperations } = await import("../pages/DataSourceSettings");
+              return { Component: () => <DataSourceOperations showTodayReset /> };
+            }
+          },
+          {
+            path: "operations",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/operations",
+              async () => {
+                const { loadDataSourceOperationsRoute } = await import("../pages/DataSourceSettings");
+                return loadDataSourceOperationsRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { DataSourceOperations } = await import("../pages/DataSourceSettings");
+              return { Component: () => <DataSourceOperations showTodayReset /> };
+            }
           },
           {
             path: "external",

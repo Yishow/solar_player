@@ -1,14 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  DATA_HUB_SECTIONS,
-  filterVisibleDataHubSections,
-  type DataHubSection
-} from "../../app/dataHub";
-import {
-  getConfiguredHiddenManagementRoutePaths,
-  isManagementRouteHidden
-} from "../../app/managementRouteVisibility";
 import {
   buildWorkspaceHealthSummary,
   type WorkspaceHealthSummary
@@ -27,26 +18,27 @@ import { isSiteEnergySetupTask, siteEnergySetupHref } from "@solar-display/share
 import { SiteEnergySetupPanel } from "./SiteEnergySetupPanel";
 import { GuidedOnboardingPanel } from "./GuidedOnboardingPanel";
 
-const hiddenManagementRoutePaths = getConfiguredHiddenManagementRoutePaths();
+const MAX_VISIBLE_ISSUES = 3;
 
 export function DataHubTaskHomeContent({
-  specialistSections = DATA_HUB_SECTIONS,
   summary,
   task,
   workspaceScope
 }: {
-  specialistSections?: readonly DataHubSection[];
   summary: WorkspaceHealthSummary;
   task?: ReturnType<typeof useDataHubWorkspace>["task"];
   workspaceScope: ReturnType<typeof useDataHubWorkspace>["managementScope"];
 }) {
+  const visibleIssues = summary.issueExplanations.slice(0, MAX_VISIBLE_ISSUES);
+  const remainingIssueCount = summary.issueExplanations.length - visibleIssues.length;
+
   return (
-    <div className="space-y-6" data-data-hub-task-home>
+    <div className="space-y-4" data-data-hub-task-home>
       {isSiteEnergySetupTask(task) && (workspaceScope === "cl" || workspaceScope === "kn") ? (
         <SiteEnergySetupPanel scope={workspaceScope} />
       ) : null}
       {task === "connect" ? <GuidedOnboardingPanel scope={workspaceScope} /> : null}
-      <section className="space-y-3" aria-labelledby="data-hub-tasks-heading">
+      <section className="space-y-2.5" aria-labelledby="data-hub-tasks-heading">
         <div>
           <h2 className="text-lg font-semibold text-[#1e2821]" id="data-hub-tasks-heading">要先做哪件事？</h2>
           <p className="text-sm text-[#687169]">用任務開始，不必先記住連線、來源或指標這些內部名稱。</p>
@@ -91,12 +83,26 @@ export function DataHubTaskHomeContent({
             <p className="text-sm text-[#4d554f]">
               共 {summary.sourceCount} 筆資料，其中 {summary.issueCount} 筆需要處理。
             </p>
-            {summary.issueExplanations.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5 text-sm text-[#8a4f18]">
-                {summary.issueExplanations.map((explanation) => (
-                  <li key={explanation}>{explanation}</li>
-                ))}
-              </ul>
+            {visibleIssues.length > 0 ? (
+              <div className="space-y-1.5">
+                <ul className="list-disc space-y-1 pl-5 text-sm text-[#8a4f18]">
+                  {visibleIssues.map((explanation) => (
+                    <li key={explanation}>{explanation}</li>
+                  ))}
+                </ul>
+                {remainingIssueCount > 0 ? (
+                  <p className="text-xs text-[#687169]">
+                    還有 {remainingIssueCount} 筆異常項目，請前往{" "}
+                    <Link
+                      className="font-medium text-[#2d5f35] underline hover:text-[#1e4024]"
+                      to={buildDataHubTaskHref(DATA_HUB_TASKS[2], workspaceScope)}
+                    >
+                      排除資料異常
+                    </Link>{" "}
+                    查看全部。
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <p className="text-sm text-[#375a2d]">這個範圍目前沒有需要處理的異常。</p>
             )}
@@ -105,22 +111,6 @@ export function DataHubTaskHomeContent({
           <p className="text-sm text-[#687169]">{summary.emptyReason}</p>
         )}
       </section>
-
-      <nav aria-label="專業頁面" className="space-y-2">
-        <h2 className="text-base font-semibold text-[#1e2821]">直接開啟專業頁</h2>
-        <div className="flex flex-wrap gap-2">
-          {specialistSections.map((section) => (
-            <Link
-              className="mgmt-action min-h-[40px]"
-              data-data-hub-specialist={section.key}
-              key={section.key}
-              to={`${section.path}?scope=${workspaceScope}`}
-            >
-              {section.label}
-            </Link>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }
@@ -149,17 +139,8 @@ export function DataHubTaskHome() {
     };
   }, [workspace.managementScope]);
 
-  const specialistSections = useMemo(
-    () => filterVisibleDataHubSections(
-      DATA_HUB_SECTIONS,
-      (path) => isManagementRouteHidden(path, hiddenManagementRoutePaths)
-    ),
-    []
-  );
-
   return (
     <DataHubTaskHomeContent
-      specialistSections={specialistSections}
       summary={summary}
       task={workspace.task}
       workspaceScope={workspace.managementScope}

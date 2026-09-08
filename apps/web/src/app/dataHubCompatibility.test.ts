@@ -35,4 +35,12 @@ test("legacy data settings URLs resolve to their Data Hub sections and preserve 
 
 test("unrelated management URLs are not treated as Data Hub compatibility entries", () => {
   assert.equal(resolveDataHubCompatibilityRedirect("https://display.local/settings/playback"), null);
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/diagnostics/operations?scope=kn"),
+    null
+  );
+  assert.equal(
+    resolveDataHubCompatibilityRedirect("https://display.local/settings/data-hub/operations"),
+    null
+  );
 });

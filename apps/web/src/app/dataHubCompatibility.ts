@@ -4,7 +4,6 @@ const compatibilityTargets = new Map([
   ["/settings/mqtt", `${DATA_HUB_ROOT_PATH}/connections`],
   [`${DATA_HUB_ROOT_PATH}/usage`, `${DATA_HUB_ROOT_PATH}/metrics`],
   [`${DATA_HUB_ROOT_PATH}/diagnostics`, `${DATA_HUB_ROOT_PATH}/metrics`],
-  [`${DATA_HUB_ROOT_PATH}/diagnostics/operations`, `${DATA_HUB_ROOT_PATH}/sources`],
   [`${DATA_HUB_ROOT_PATH}/derived`, `${DATA_HUB_ROOT_PATH}/metrics`]
 ]);
 

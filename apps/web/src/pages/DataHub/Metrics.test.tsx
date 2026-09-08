@@ -294,6 +294,8 @@ test("Metrics renders scope, current value, states, source, ownership, and prove
   assert.match(html, /Derived metric/);
   assert.match(html, /factory\/cl\/power/);
   assert.match(html, /global:inventory\.input/);
+  assert.match(html, /data-data-hub-action="operations"/);
+  assert.match(html, /進階維運／換算係數/);
   assert.doesNotMatch(html, /rawPayload|password|credential/);
 });
 

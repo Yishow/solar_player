@@ -70,14 +70,18 @@ test("Data Hub Sources loads only the managed and generic source surface", () =>
   );
 });
 
-test("Data Hub keeps MQTT operations as guarded lazy child route", () => {
+test("Data Hub keeps MQTT and data source operations as guarded lazy child routes", () => {
   assert.match(
     routerSource,
     /path:\s*"sources\/operations",[\s\S]*createLazyManagementRouteLoader\([\s\S]*settings\/data-hub\/sources\/operations[\s\S]*loadMqttOperationsRoute[\s\S]*import\("\.\.\/pages\/MqttSettings"\)[\s\S]*MqttOperations/s
   );
   assert.match(
     routerSource,
-    /path:\s*"diagnostics\/operations",\s*loader:\s*createDataHubCompatibilityRedirectLoader\("settings\/data-hub\/diagnostics\/operations"\)/s
+    /path:\s*"diagnostics\/operations",[\s\S]*createLazyManagementRouteLoader\([\s\S]*settings\/data-hub\/diagnostics\/operations[\s\S]*loadDataSourceOperationsRoute[\s\S]*import\("\.\.\/pages\/DataSourceSettings"\)[\s\S]*DataSourceOperations/s
+  );
+  assert.match(
+    routerSource,
+    /path:\s*"operations",[\s\S]*createLazyManagementRouteLoader\([\s\S]*settings\/data-hub\/operations[\s\S]*loadDataSourceOperationsRoute[\s\S]*import\("\.\.\/pages\/DataSourceSettings"\)[\s\S]*DataSourceOperations/s
   );
 });
 

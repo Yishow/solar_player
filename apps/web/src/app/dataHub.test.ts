@@ -13,7 +13,7 @@ import { routeMetaMap } from "./routeMeta";
 test("Data Hub exposes every required section through management route metadata", () => {
   assert.deepEqual(
     DATA_HUB_SECTIONS.map(({ key }) => key),
-    ["connections", "sources", "metrics", "external"]
+    ["connections", "sources", "metrics", "external", "operations"]
   );
 
   for (const section of DATA_HUB_SECTIONS) {
@@ -24,6 +24,8 @@ test("Data Hub exposes every required section through management route metadata"
 
   assert.equal(resolveDataHubSection("/settings/data-hub/metrics")?.key, "metrics");
   assert.equal(resolveDataHubSection("/settings/data-hub/sources/operations")?.key, "sources");
+  assert.equal(resolveDataHubSection("/settings/data-hub/operations")?.key, "operations");
+  assert.equal(resolveDataHubSection("/settings/data-hub/diagnostics/operations")?.key, "operations");
   assert.equal(resolveDataHubSection("/settings/data-hub/unknown"), null);
 });
 
@@ -42,7 +44,7 @@ test("Data Hub section navigation filters sections hidden by management visibili
 
   assert.deepEqual(
     filterVisibleDataHubSections(DATA_HUB_SECTIONS, (path) => hiddenPaths.has(path)).map(({ key }) => key),
-    ["connections", "metrics", "external"]
+    ["connections", "metrics", "external", "operations"]
   );
 });
 

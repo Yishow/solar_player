@@ -337,6 +337,13 @@ export function DataHubMetricsContent({
         <p className="text-[13px] text-[#687169]">
           先用名稱與異常篩選找到指標，進階診斷只在展開後顯示。
         </p>
+        <a
+          className="mgmt-action min-h-[36px] text-xs font-semibold"
+          data-data-hub-action="operations"
+          href={`/settings/data-hub/operations?scope=${listQuery?.scope ?? "all"}`}
+        >
+          進階維運／換算係數 →
+        </a>
       </header>
       <div className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-[16rem] flex-1 gap-1 text-[13px] text-[#4d554f]">
