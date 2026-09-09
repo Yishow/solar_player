@@ -106,7 +106,11 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
           enabled: result.source.enabled,
           topic: body.canonicalDraft.topic ?? ""
         }),
-        reception: readGuidedMappingReception(database, result.source),
+        reception: readGuidedMappingReception(
+          database,
+          result.source,
+          (source) => app.mqttClientService.readPowerReceptionEvidence(source)
+        ),
         saved: true as const
       };
     } catch (error) {

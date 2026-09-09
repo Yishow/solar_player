@@ -4,6 +4,7 @@ import {
   hasLiveMetricRequirementsData,
   resolveLiveMetricRequirementsForPage,
   type DisplayPageTemplateKey,
+  type GuidedMappingReception,
   type MeterReadingChangeEvent
 } from "@solar-display/shared";
 import type { MetricScope } from "@solar-display/shared";
@@ -17,6 +18,10 @@ import {
   ingestMappedMeterReading,
   type MappedMeterIngestResult
 } from "../services/mqttMeterIngest.js";
+import {
+  PowerReceptionEvidenceStore,
+  type PowerReceptionSourceIdentity
+} from "./powerReceptionEvidence.js";
 import { tapProductionObservation } from "../services/mqttObservationCatalogService.js";
 import {
   decideReviewedPowerObservation,
@@ -291,6 +296,7 @@ export class MqttClientService {
   private readonly socketService: MqttClientServiceOptions["socketService"];
   private readonly meterReadingEventSink: MqttClientServiceOptions["meterReadingEventSink"];
   private readonly connectionRef: string;
+  private readonly powerReceptionEvidence: PowerReceptionEvidenceStore;
   private readonly runtimeLeaseOwnerToken = `${process.pid}-${randomBytes(4).toString("hex")}`;
   private client: MqttClient | null = null;
   private desiredTopics = new Set<string>();
@@ -311,6 +317,7 @@ export class MqttClientService {
   constructor(options: MqttClientServiceOptions) {
     this.connectionRef = options.connectionRef?.trim() || "central";
     this.database = options.database ?? getDatabase();
+    this.powerReceptionEvidence = new PowerReceptionEvidenceStore(this.database);
     this.logger = options.logger;
     this.connectFn = options.connectFn ?? connect;
     this.socketService = options.socketService;
@@ -475,6 +482,10 @@ export class MqttClientService {
     return {
       ...this.status
     };
+  }
+
+  readPowerReceptionEvidence(source: PowerReceptionSourceIdentity): GuidedMappingReception {
+    return this.powerReceptionEvidence.read(source);
   }
 
   readSolarSourceManagementSnapshot() {
@@ -1082,6 +1093,13 @@ export class MqttClientService {
         })();
         const mappedResult = mapped as MappedMeterIngestResult | null;
         if (mappedResult?.handled) {
+          if (
+            mappedLiveUpdated
+            && mappedResult.measurementKind === "power-gauge"
+            && mappedResult.sourceIdentity
+          ) {
+            this.powerReceptionEvidence.record(mappedResult.sourceIdentity, receivedAt);
+          }
           if (mappedLiveUpdated) {
             persistedMetricCount += 1;
             changedMetrics.push({

@@ -15,6 +15,10 @@ import {
   ingestMeterReading,
   type MeterReadingStore
 } from "./meterReadingService.js";
+import {
+  powerReceptionSourceIdentity,
+  type PowerReceptionSourceIdentity
+} from "../mqtt/powerReceptionEvidence.js";
 
 export type MqttPacketEvidence = {
   dup?: boolean;
@@ -153,6 +157,7 @@ export type MappedMeterIngestResult = MeterIngestResult & {
   liveUnit: string;
   liveValueDecimal: string | null;
   measurementKind: MeterSourceDefinition["measurementKind"] | null;
+  sourceIdentity: PowerReceptionSourceIdentity | null;
   selectorVersion: number | null;
   sourceTimestampPath: string | null;
 };
@@ -173,6 +178,7 @@ function rejectedMapping(
     normalizedValueKwh: null,
     readingId: null,
     reason,
+    sourceIdentity: null,
     selectorVersion: selector.selectorVersion ?? null,
     sourceTimestamp: null,
     sourceTimestampPath: selector.timestampPath?.join(".") ?? null,
@@ -205,6 +211,7 @@ function ingestLivePowerReading(
     normalizedValueKwh: null,
     readingId: null,
     selectorVersion,
+    sourceIdentity: powerReceptionSourceIdentity(definition),
     sourceTimestampPath,
     sourceTimestampRaw: sample.sourceTimestamp
   };
@@ -298,6 +305,7 @@ export function ingestMappedMeterReading(
     liveUnit,
     liveValueDecimal: result.liveValueKwh,
     measurementKind: definition.measurementKind,
+    sourceIdentity: null,
     selectorVersion: result.selectorVersion ?? selector.selectorVersion ?? null,
     sourceTimestampPath: result.sourceTimestampPath ?? timestampEvidence.path
   };

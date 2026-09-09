@@ -66,6 +66,7 @@ test("E1-R7 production MQTT callback uses M2 extractor then E1 admission", () =>
   );
   assert.equal(accepted?.status, "accepted");
   assert.equal(accepted?.measurementKind, "cumulative-energy");
+  assert.equal(accepted?.sourceIdentity, null);
   assert.equal(countAcceptedReadings(database, knMain), 1);
 });
 

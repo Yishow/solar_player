@@ -5,8 +5,10 @@ import type {
   MeterSourceDefinition
 } from "@solar-display/shared";
 import { listEnabledGenericTopics, type MqttClientService } from "../mqtt/MqttClientService.js";
+import type { PowerReceptionSourceIdentity } from "../mqtt/powerReceptionEvidence.js";
 
 type SubscriptionOwner = Pick<MqttClientService, "getActiveTopics" | "getStatus" | "subscribe">;
+type PowerReceptionReader = (source: PowerReceptionSourceIdentity) => GuidedMappingReception;
 
 /**
  * Hands the committed reception configuration to the runtime owner and reports
@@ -51,8 +53,12 @@ export async function activateGuidedMapping(
 /** Activation is not reception: only an admitted reading proves data arrived. */
 export function readGuidedMappingReception(
   database: Database.Database,
-  source: Pick<MeterSourceDefinition, "channelId" | "epochId" | "meterId" | "metricScope" | "sourceRevision">
+  source: PowerReceptionSourceIdentity & Pick<MeterSourceDefinition, "measurementKind">,
+  readPowerReceptionEvidence?: PowerReceptionReader
 ): GuidedMappingReception {
+  if (source.measurementKind === "power-gauge") {
+    return readPowerReceptionEvidence?.(source) ?? { lastAcceptedAt: null, observed: false };
+  }
   const row = database.prepare(`
     SELECT MAX(received_at) AS last_accepted_at FROM meter_readings_accepted
     WHERE metric_scope = ? AND meter_id = ? AND channel_id = ? AND source_revision = ? AND epoch_id = ?
